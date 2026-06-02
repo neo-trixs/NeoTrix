@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 
 use chrono::Utc;
 
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use crate::core::nt_core_bank::iteration::{Bm25Document, Bm25Index, rrf_fuse};
 use crate::core::nt_core_bank::{ReasoningMemory, T3ViewType};
 

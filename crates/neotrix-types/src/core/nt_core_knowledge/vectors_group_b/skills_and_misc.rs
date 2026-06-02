@@ -1,5 +1,5 @@
 use crate::core::CapabilityVector;
-use crate::core::knowledge::KnowledgeSource;
+use crate::core::nt_core_knowledge::KnowledgeSource;
 
 pub(super) fn handle_skills_and_misc(s: &KnowledgeSource) -> CapabilityVector {
     match s {

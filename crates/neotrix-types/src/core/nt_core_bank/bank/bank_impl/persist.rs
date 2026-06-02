@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ReasoningBank;
 use crate::core::fs_util::{atomic_write_signed, verify_sig};
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use crate::core::nt_core_bank::iteration::Bm25Index;
 use crate::core::nt_core_bank::ReasoningMemory;
 

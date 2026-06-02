@@ -4,7 +4,7 @@ use crate::core::nt_core_hcube::axis::DimensionAxis;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::core::nt_core_bank::ReasoningMemory;
-use crate::core::edit::MicroEdit;
+use crate::core::nt_core_edit::MicroEdit;
 use crate::neotrix::nt_world_model::{WorldModelV2, TaskType};
 use crate::neotrix::nt_world_infer::FreeEnergyReport;
 use crate::neotrix::iit_phi::PhiReport;

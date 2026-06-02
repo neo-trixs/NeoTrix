@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 /// Reverse bridge: types re-exported from `crate::core::edit`.
-pub use crate::core::edit::{SelfEdit, MicroEdit, ToolCall};
+pub use crate::core::nt_core_edit::{SelfEdit, MicroEdit, ToolCall};
 
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 
 pub fn infer_task_type(task: &str) -> TaskType {
     let t = task.to_lowercase();

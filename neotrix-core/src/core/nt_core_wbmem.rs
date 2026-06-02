@@ -683,7 +683,7 @@ mod tests {
     #[test]
     fn test_sync_from_brain_adds_entries() {
         let mut bank = ReasoningBank::new(100);
-        let mem = crate::core::nt_core_bank::ReasoningMemory::new("test memory", crate::core::knowledge::TaskType::General, &[], 0.8);
+        let mem = crate::core::nt_core_bank::ReasoningMemory::new("test memory", crate::core::nt_core_knowledge::TaskType::General, &[], 0.8);
         bank.store(mem);
 
         let mut wbm = WhiteBoxMemory::new();
@@ -695,7 +695,7 @@ mod tests {
     #[test]
     fn test_sync_from_brain_idempotent() {
         let mut bank = ReasoningBank::new(100);
-        let mem = crate::core::nt_core_bank::ReasoningMemory::new("test", crate::core::knowledge::TaskType::General, &[], 0.8);
+        let mem = crate::core::nt_core_bank::ReasoningMemory::new("test", crate::core::nt_core_knowledge::TaskType::General, &[], 0.8);
         bank.store(mem);
         let mut wbm = WhiteBoxMemory::new();
         wbm.sync_from_brain(&bank);

@@ -1,5 +1,5 @@
 use crate::core::CapabilityVector;
-use crate::core::knowledge::KnowledgeSource;
+use crate::core::nt_core_knowledge::KnowledgeSource;
 
 pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<CapabilityVector> {
     match s {
@@ -309,15 +309,5 @@ pub(super) fn capability_vector_group_a(s: &KnowledgeSource) -> Option<Capabilit
             Some(cv)
         }
         _ => None,
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn test_basic() {
-        assert!(true);
     }
 }

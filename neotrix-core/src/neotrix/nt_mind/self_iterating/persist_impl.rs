@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use super::brain_impl::{ReasoningBrain, BrainMetadata, DefaultSealStrategy};
-use crate::core::knowledge::SourceAccessTracker;
+use crate::core::nt_core_knowledge::SourceAccessTracker;
 use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
 
 impl ReasoningBrain {

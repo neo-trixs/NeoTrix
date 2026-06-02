@@ -5,7 +5,7 @@ mod tool_ecosystem;
 mod skills_and_misc;
 
 use crate::core::CapabilityVector;
-use crate::core::knowledge::KnowledgeSource;
+use crate::core::nt_core_knowledge::KnowledgeSource;
 
 pub(super) fn capability_vector_group_b(s: &KnowledgeSource) -> CapabilityVector {
     if let Some(cv) = cli_agent_tools::handle_cli_agent_tools(s) {

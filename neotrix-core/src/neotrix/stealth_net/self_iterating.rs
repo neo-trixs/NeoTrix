@@ -324,7 +324,7 @@ pub struct StealthLearning {
 
 impl StealthLearning {
     pub fn to_reasoning_memory(&self, task: &str) -> crate::core::nt_core_bank::ReasoningMemory {
-        use crate::core::knowledge::TaskType;
+        use crate::core::nt_core_knowledge::TaskType;
         crate::core::nt_core_bank::ReasoningMemory::new(
             task,
             TaskType::CodeAnalysis,

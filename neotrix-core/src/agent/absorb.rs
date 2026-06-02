@@ -1,5 +1,5 @@
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::core::knowledge::{KnowledgeSource, KnowledgeProvider};
+use crate::core::nt_core_knowledge::{KnowledgeSource, KnowledgeProvider};
 use crate::core::nt_core_absorb::AbsorbValidator;
 
 #[derive(Debug, Clone)]
@@ -34,7 +34,7 @@ mod tests {
     use super::*;
     use crate::core::nt_core_absorb::AbsorbValidator;
     use crate::core::nt_core_cap::CapabilityVector;
-    use crate::core::knowledge::{KnowledgeSource, KnowledgeProvider};
+    use crate::core::nt_core_knowledge::{KnowledgeSource, KnowledgeProvider};
 
     struct AlwaysValid;
     impl AbsorbValidator for AlwaysValid {

@@ -1,4 +1,4 @@
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use std::collections::HashMap;
 use std::time::Instant;
 

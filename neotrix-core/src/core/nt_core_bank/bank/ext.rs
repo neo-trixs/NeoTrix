@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::core::knowledge::TaskType;
+    use crate::core::nt_core_knowledge::TaskType;
     use crate::core::nt_core_bank::{
         MemoryTier, OffloadManager, PipelineConfig, PipelineState,
         ReasoningBank, ReasoningMemory, T3ViewType,

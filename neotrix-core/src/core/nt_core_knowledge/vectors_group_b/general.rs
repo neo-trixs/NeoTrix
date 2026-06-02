@@ -1,4 +1,4 @@
-use crate::core::{CapabilityVector, knowledge::KnowledgeSource};
+use crate::core::{CapabilityVector, nt_core_knowledge::KnowledgeSource};
 pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
     match s {
         KnowledgeSource::DeepSeekTui => {

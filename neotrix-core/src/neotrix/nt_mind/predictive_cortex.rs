@@ -1,4 +1,4 @@
-use crate::core::edit::MicroEdit;
+use crate::core::nt_core_edit::MicroEdit;
 
 pub use crate::neotrix::nt_mind::cortex_types::*;
 

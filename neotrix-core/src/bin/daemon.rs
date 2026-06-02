@@ -12,7 +12,7 @@ use tokio::time::{interval, Duration};
 
 use neotrix::neotrix::background_loop::BackgroundLoop;
 use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
-use neotrix::core::knowledge::{KSActivationEngine, TaskType};
+use neotrix::core::nt_core_knowledge::{KSActivationEngine, TaskType};
 use neotrix::neotrix::nt_mind::self_iterating::validation::{cargo_check_validation, ValidationResult};
 
 fn health_path() -> String {

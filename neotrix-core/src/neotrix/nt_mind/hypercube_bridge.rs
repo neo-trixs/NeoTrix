@@ -5,7 +5,7 @@ use crate::core::nt_core_hcube::axis::DimensionAxis;
 use crate::core::nt_core_hcube::coord::HyperCoord;
 use crate::core::nt_core_hcube::cube::{KnowledgeHyperCube, CubeEntry};
 use crate::core::nt_core_hcube::gap::GapReport;
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 
 pub struct HyperCubeBridge {
     pub cortex: CortexMemory,
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_bridge_query_by_task_type() {
-        use crate::core::knowledge::TaskType;
+        use crate::core::nt_core_knowledge::TaskType;
         let mut bridge = HyperCubeBridge::new();
         bridge.hypercube.insert_with_task_type(
             &HyperCoord::with(DimensionAxis::Abstraction, 0.9),

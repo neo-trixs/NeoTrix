@@ -5,7 +5,7 @@ use crate::core::CapabilityVector;
 use crate::neotrix::nt_world_model::TaskType;
 use crate::neotrix::nt_mind::memory::ReasoningBank;
 use crate::neotrix::nt_mind::ReasoningBrain;
-use crate::core::knowledge::KnowledgeSource;
+use crate::core::nt_core_knowledge::KnowledgeSource;
 use crate::core::nt_core_bank::ReasoningMemory;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

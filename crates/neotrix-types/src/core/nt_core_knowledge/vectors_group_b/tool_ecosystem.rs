@@ -1,5 +1,5 @@
 use crate::core::CapabilityVector;
-use crate::core::knowledge::KnowledgeSource;
+use crate::core::nt_core_knowledge::KnowledgeSource;
 
 pub(super) fn handle_tool_ecosystem(s: &KnowledgeSource) -> Option<CapabilityVector> {
     match s {

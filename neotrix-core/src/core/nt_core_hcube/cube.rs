@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use super::coord::HyperCoord;
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 
 #[derive(Debug, Clone)]
 pub struct CubeEntry {

@@ -1,7 +1,7 @@
 //! Reverse bridge: V1 → core/
 //! All types re-exported from `crate::core::knowledge`.
 
-pub use crate::core::knowledge::{
+pub use crate::core::nt_core_knowledge::{
     KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, AbsorptionRecord,
     MaturityLevel,
 };

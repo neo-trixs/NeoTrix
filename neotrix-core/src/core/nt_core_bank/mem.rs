@@ -1,6 +1,6 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use crate::core::edit::{MicroEdit, SelfEdit};
+use crate::core::nt_core_edit::{MicroEdit, SelfEdit};
 use crate::core::{RewardSource, TaskType};
 use crate::core::nt_core_bank::{MemoryTier, MemoryLifecycle};
 

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use crate::core::CapabilityVector;
-use crate::core::edit::MicroEdit;
+use crate::core::nt_core_edit::MicroEdit;
 use crate::core::nt_core_hcube::axis::DimensionAxis;
 use crate::core::nt_core_hcube::coord::HyperCoord;
-use crate::core::knowledge::{TaskType, RewardSource};
+use crate::core::nt_core_knowledge::{TaskType, RewardSource};
 use crate::core::nt_core_bank::{ReasoningMemory, T3Views, MemoryTier, MemoryLifecycle};
 use crate::ReasoningBank;
 

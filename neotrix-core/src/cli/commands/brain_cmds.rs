@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::core::knowledge::KnowledgeSource;
+use crate::core::nt_core_knowledge::KnowledgeSource;
 use crate::core::nt_core_wbmem::{MemoryEntry, WhiteBoxMemory};
 
 static WHITEBOX_MEMORY: LazyLock<Mutex<WhiteBoxMemory>> = LazyLock::new(|| {

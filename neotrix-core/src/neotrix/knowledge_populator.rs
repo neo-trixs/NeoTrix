@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use crate::core::{CapabilityVector, KnowledgeSource, TaskType};
 use crate::core::nt_core_bank::{ReasoningBank, ReasoningMemory};
-use crate::core::edit::MicroEdit;
+use crate::core::nt_core_edit::MicroEdit;
 
 const LEARNING_RATE: f64 = 0.15;
 

@@ -9,8 +9,8 @@ pub mod core;
 
 // Re-export sub-modules so external code can use neotrix_types::nt_core_bank::X etc.
 pub use core::nt_core_bank as memory;
-pub use core::knowledge;
-pub use core::edit;
+pub use core::nt_core_knowledge;
+pub use core::nt_core_edit;
 pub use core::nt_core_event as event;
 pub use core::nt_core_ssm as signal;
 pub use core::context;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 use serde::{Deserialize, Serialize};
-use crate::core::knowledge::KnowledgeSource;
+use crate::core::nt_core_knowledge::KnowledgeSource;
 
 /// Records a single absorption event: which source, when, and the applied weight.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +72,7 @@ impl SourceAccessTracker {
 
 #[cfg(test)]
 mod lifecycle_tests {
-    use crate::core::knowledge::*;
+    use crate::core::nt_core_knowledge::*;
 
     #[test]
     fn test_record_access_increments_count() {

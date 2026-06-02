@@ -7,7 +7,7 @@ pub type Matrix = Vec<Vec<f64>>;
 
 pub const LATENT_DIM: usize = 32;
 
-pub use crate::core::knowledge::TaskType;
+pub use crate::core::nt_core_knowledge::TaskType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LatentState {

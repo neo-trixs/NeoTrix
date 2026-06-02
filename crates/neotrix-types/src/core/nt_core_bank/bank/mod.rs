@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::AtomicBool;
 use std::sync::RwLock;
 
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use crate::core::layered_memory::LayeredMemory;
 use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_bank::iteration::Bm25Index;
@@ -27,7 +27,7 @@ mod bank_impl;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::knowledge::TaskType;
+    use crate::core::nt_core_knowledge::TaskType;
     use crate::core::nt_core_bank::{MemoryTier, OffloadManager, PipelineConfig, PipelineState, ReasoningMemory, T3ViewType};
 
     fn make_mem(desc: &str, tt: TaskType, reward: f64) -> ReasoningMemory {

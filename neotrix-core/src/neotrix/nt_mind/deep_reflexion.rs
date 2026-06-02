@@ -170,7 +170,7 @@ impl OuterReflector {
 
     pub fn store_as_memory(heuristic: &StrategyHeuristic, bank: &mut neotrix_types::memory::ReasoningBank) {
 //        let desc = format!("Heuristic: {} — {}", heuristic.name, heuristic.description);
-        let mem = ReasoningMemory::new(&desc, neotrix_types::knowledge::TaskType::Reflection, &[], heuristic.confidence);
+        let mem = ReasoningMemory::new(&desc, neotrix_types::nt_core_knowledge::TaskType::Reflection, &[], heuristic.confidence);
         bank.store(mem);
     }
 
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_dual_path_align_explicit_positive() {
-        let mut mem = ReasoningMemory::new("test", neotrix_types::knowledge::TaskType::General, &[], 0.5);
+        let mut mem = ReasoningMemory::new("test", neotrix_types::nt_core_knowledge::TaskType::General, &[], 0.5);
         DualPathAligner::align_explicit(&mut mem, "good work");
         assert!(mem.reward > 0.5);
         assert!(mem.success);
@@ -350,14 +350,14 @@ mod tests {
 
     #[test]
     fn test_dual_path_align_explicit_negative() {
-        let mut mem = ReasoningMemory::new("test", neotrix_types::knowledge::TaskType::General, &[], 0.8);
+        let mut mem = ReasoningMemory::new("test", neotrix_types::nt_core_knowledge::TaskType::General, &[], 0.8);
         DualPathAligner::align_explicit(&mut mem, "wrong approach");
         assert!(mem.reward < 0.8);
     }
 
     #[test]
     fn test_dual_path_align_combined() {
-        let mut mem = ReasoningMemory::new("test", neotrix_types::knowledge::TaskType::General, &[], 0.5);
+        let mut mem = ReasoningMemory::new("test", neotrix_types::nt_core_knowledge::TaskType::General, &[], 0.5);
         let ctx = vec![make_step("step1", "ok", true), make_step("step2", "ok", true)];
         DualPathAligner::align(&mut mem, Some("good"), &ctx);
         assert!(mem.reward > 0.5);

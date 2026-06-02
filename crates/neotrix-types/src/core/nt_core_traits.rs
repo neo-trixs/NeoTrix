@@ -4,7 +4,7 @@
 //! 所有实现都在各自层中，traits 本身在 core 层。
 
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::core::knowledge::{KnowledgeSource, AbsorptionRecord, TaskType};
+use crate::core::nt_core_knowledge::{KnowledgeSource, AbsorptionRecord, TaskType};
 use crate::core::nt_core_bank::{ReasoningMemory, ReasoningBankStats, ReasoningBank};
 
 /// MemoryProvider — 记忆存储/检索抽象
@@ -58,7 +58,7 @@ pub trait SessionProvider {
 }
 
 /// KnowledgeProvider re-export (defined in knowledge.rs)
-pub use super::knowledge::KnowledgeProvider;
+pub use super::nt_core_knowledge::KnowledgeProvider;
 
 /// SealResult — SEAL 自迭代循环的结果
 #[derive(Debug, Clone)]

@@ -3,8 +3,8 @@
 //! 零外部依赖层，仅包含核心数据结构和 trait 定义。
 
 pub mod nt_core_cap;
-pub mod knowledge;
-pub mod edit;
+pub mod nt_core_knowledge;
+pub mod nt_core_edit;
 pub mod nt_core_bank;
 pub mod nt_core_event;
 pub mod nt_core_ssm;
@@ -44,9 +44,9 @@ pub mod nt_core_rkyv;
 
 // Re-export 主要类型到 core 层顶层
 pub use nt_core_cap::CapabilityVector;
-pub use knowledge::{KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, SourceAccessTracker, SourceAccessRecord};
+pub use nt_core_knowledge::{KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, SourceAccessTracker, SourceAccessRecord};
 pub use nt_core_accessor::{Accessor, AccessionReport, SourceType, UrlAccessor};
-pub use edit::{SelfEdit, MicroEdit, ToolCall};
+pub use nt_core_edit::{SelfEdit, MicroEdit, ToolCall};
 pub use nt_core_bank::{ReasoningBank, ReasoningMemory, TemporalContext, MemoryTier, MemoryLifecycle, ReasoningBankStats};
 pub use nt_core_ssm::{SelectiveState, SelectableOperator, SparseMatrix, ConsciousnessTier, SemanticType, SemanticBlock};
 pub use nt_core_absorb::AbsorbValidator;

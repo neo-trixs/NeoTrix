@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 use chrono::Utc;
 
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use crate::core::nt_core_bank::{MemoryTier, ReasoningMemory, ReasoningBankStats, MemoryDetailedStats};
 use crate::core::nt_core_walsh::WalshMemoryIndex;
 use crate::core::nt_core_kron::KroneckerCleanup;

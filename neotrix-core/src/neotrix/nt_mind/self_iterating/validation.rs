@@ -1,4 +1,4 @@
-use crate::core::knowledge::RewardSource;
+use crate::core::nt_core_knowledge::RewardSource;
 
 /// Result of an external validation check.
 #[derive(Debug, Clone)]

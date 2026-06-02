@@ -1,6 +1,6 @@
 use neotrix_types::CapabilityVector;
-use neotrix_types::edit::MicroEdit;
-use neotrix_types::knowledge::{TaskType, RewardSource};
+use neotrix_types::nt_core_edit::MicroEdit;
+use neotrix_types::nt_core_knowledge::{TaskType, RewardSource};
 use neotrix_types::memory::{ReasoningMemory, T3Views, MemoryTier, MemoryLifecycle};
 use crate::ReasoningBank;
 

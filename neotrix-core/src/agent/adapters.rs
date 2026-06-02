@@ -14,7 +14,7 @@ use crate::neotrix::nt_mind::ReasoningBrain;
 impl MemoryProvider for ReasoningBank {
     fn store(&mut self, key: &str, value: &str) -> Result<String, String> {
         use crate::core::nt_core_bank::ReasoningMemory;
-        use crate::core::knowledge::TaskType;
+        use crate::core::nt_core_knowledge::TaskType;
         let mem = ReasoningMemory::new(
             &format!("{}: {}", key, value),
             TaskType::General,
@@ -78,9 +78,9 @@ impl BrainProvider for ReasoningBrain {
         self.capability.clone()
     }
 
-    fn absorb_knowledge(&mut self, source: KnowledgeSource) -> crate::core::knowledge::AbsorptionRecord {
+    fn absorb_knowledge(&mut self, source: KnowledgeSource) -> crate::core::nt_core_knowledge::AbsorptionRecord {
         self.absorb(source);
-        self.absorption_history.last().cloned().unwrap_or(crate::core::knowledge::AbsorptionRecord {
+        self.absorption_history.last().cloned().unwrap_or(crate::core::nt_core_knowledge::AbsorptionRecord {
             source,
             timestamp: 0,
             weight: self.learning_rate,
@@ -114,7 +114,7 @@ impl EngineProvider for ReasoningEngine {
 mod tests {
     use super::*;
     use crate::core::nt_core_bank::ReasoningMemory;
-    use crate::core::knowledge::TaskType;
+    use crate::core::nt_core_knowledge::TaskType;
 
     #[test]
     fn test_memory_provider_store_and_search() {
@@ -214,7 +214,7 @@ impl AgentExecutor for SelfIteratingBrain {
     type Output = String;
 
     fn execute(&mut self, task: &str) -> Result<String, String> {
-        use crate::core::knowledge::TaskType;
+        use crate::core::nt_core_knowledge::TaskType;
         if let Some(ref mut engine) = self.reasoning_engine {
             crate::neotrix::nt_mind::reasoning_engine::ReasoningEngine::reason(
                 engine, task,

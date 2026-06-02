@@ -1,5 +1,5 @@
 use super::ReasoningBank;
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use crate::core::nt_core_bank::ReasoningMemory;
 
 impl ReasoningBank {

@@ -97,7 +97,7 @@ mod tests {
     }
 
     use crate::core::nt_core_bank::ReasoningMemory;
-    use crate::core::knowledge::{KnowledgeSource, AbsorptionRecord};
+    use crate::core::nt_core_knowledge::{KnowledgeSource, AbsorptionRecord};
     use crate::core::SealResult;
 
     struct MockMemoryProvider;

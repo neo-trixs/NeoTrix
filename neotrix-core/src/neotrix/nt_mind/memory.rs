@@ -6,7 +6,7 @@ pub use crate::core::nt_core_bank::{
     ReasoningBankStats, MemoryDetailedStats, MemoryIterationResult,
 };
 
-use crate::core::knowledge::TaskType;
+use crate::core::nt_core_knowledge::TaskType;
 use super::kronecker_cleanup::KroneckerCleanup;
 
 impl ReasoningBank {
