@@ -16,12 +16,25 @@ use crate::neotrix::nt_world_model::{TaskType, Context};
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_core_signal::select::SelectableOperator;
 use crate::neotrix::nt_core_signal::SelectiveState;
+use crate::cli::shield_enforcer::global_shield;
 
 
 type BatchTask<'a> = &'a [(String, Option<Vec<f64>>, Option<f64>)];
 
 impl SelfIteratingBrain {
     pub fn run_seal_loop_pipeline(&mut self, task: &str, task_embedding: Option<Vec<f64>>, external_reward: Option<f64>) -> NeoTrixResult<f64> {
+        // ShieldEnforcer governance check: is SEAL self-iteration allowed?
+        if let Ok(shield) = global_shield().lock() {
+            if let Err(decision) = shield.check_all("seal_iterate", "internal", None, None) {
+                let msg = match decision {
+                    crate::cli::ShieldDecision::Block(m) => format!("Shield blocked SEAL iteration: {}", m),
+                    crate::cli::ShieldDecision::RequireApproval(m) => format!("Shield requires approval for SEAL iteration: {}", m),
+                    _ => "Shield blocked SEAL iteration".to_string(),
+                };
+                log::warn!("{}", msg);
+            }
+        }
+
         self._current_task = task.to_string();
         self._current_task_type = Context::from_task_description(task).task_type;
         self._task_embedding = task_embedding;

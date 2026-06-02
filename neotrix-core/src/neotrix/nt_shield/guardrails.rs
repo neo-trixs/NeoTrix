@@ -44,7 +44,7 @@ pub struct GuardrailViolation {
     pub severity: ViolationSeverity,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ViolationSeverity {
     Warning,
     Blocked,

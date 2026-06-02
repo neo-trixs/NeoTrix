@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 pub(crate) use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::agent::hooks::{HookRegistry, HookEvent, HookContext};
 use crate::cli::sandbox::check_sandbox;
+use crate::cli::shield_enforcer::global_shield;
 
 /// 退出码约定（参考 witr: 0=clean / 1=warning / 2=notfound / 3=permission / 4=invalid）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,6 +126,10 @@ impl CommandRegistry {
             if let Some(blocked) = check_sandbox_for_command(cmd.name(), &args) {
                 return blocked;
             }
+            // ShieldEnforcer check: unified policy + guardrails + laws
+            if let Some(blocked) = check_shield_for_command(cmd.name(), &args) {
+                return blocked;
+            }
             // PreToolUse hook
             if let Some(ref hooks) = self.hooks {
                 let pre_ctx = HookContext {
@@ -196,6 +201,23 @@ fn check_sandbox_for_command(name: &str, args: &[String]) -> Option<CommandOutpu
         return check_sandbox();
     }
     None
+}
+
+fn check_shield_for_command(name: &str, _args: &[String]) -> Option<CommandOutput> {
+    let shield = global_shield();
+    let s = shield.lock().expect("global_shield lock");
+    let action = name.trim_start_matches('/');
+    let result = s.check_cli_command(action, action);
+    match result {
+        Ok(()) => None,
+        Err(decision) => {
+            match decision {
+                crate::cli::ShieldDecision::Block(msg) =>
+                    Some(CommandOutput::err(&format!("{} (blocked by nt_shield)", msg))),
+                _ => None,
+            }
+        }
+    }
 }
 
 #[cfg(test)]

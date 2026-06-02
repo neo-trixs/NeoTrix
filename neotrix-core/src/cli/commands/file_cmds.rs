@@ -8,7 +8,26 @@ use tokio::sync::RwLock;
 
 use crate::cli::approval::{ActionType, global_approval};
 use crate::cli::commands::types::{CliCommand, CommandOutput};
+use crate::cli::shield_enforcer::global_shield;
 use crate::neotrix::nt_mind::SelfIteratingBrain;
+
+/// Check ShieldEnforcer for a file action. Returns Some(block) if hard-denied.
+fn check_shield_for_file(action: &str, path: &str) -> Option<CommandOutput> {
+    let shield = global_shield();
+    let s = shield.lock().expect("global_shield lock");
+    let result = s.check_all(action, path, None, None);
+    match result {
+        Ok(()) => None,
+        Err(decision) => {
+            match decision {
+                crate::cli::ShieldDecision::Block(m) =>
+                    Some(CommandOutput::err(&format!("{} (blocked by nt_shield)", m))),
+                crate::cli::ShieldDecision::RequireApproval(_) => None,
+                _ => None,
+            }
+        }
+    }
+}
 
 /// Check if action requires approval. If yes, submit and return blocking message.
 fn check_file_approval(args: &[String], action: ActionType) -> Option<CommandOutput> {
@@ -41,6 +60,9 @@ impl CliCommand for FileReadCmd {
             return CommandOutput::err("用法: /read <path>");
         }
         let path_str = args.join(" ");
+        if let Some(blocked) = check_shield_for_file("read_file", &path_str) {
+            return blocked;
+        }
         let path = Path::new(&path_str);
         if !path.exists() {
             return CommandOutput::not_found(&format!("文件不存在: {}", path_str));
@@ -74,7 +96,14 @@ impl CliCommand for FileWriteCmd {
         if clean_args.is_empty() {
             return CommandOutput::err("用法: /write <path> <content> [--yes]");
         }
+        let clean_args: Vec<String> = args.iter().filter(|a| *a != "--yes" && *a != "-y").cloned().collect();
+        if clean_args.is_empty() {
+            return CommandOutput::err("用法: /write <path> <content> [--yes]");
+        }
         let path_str = clean_args[0].clone();
+        if let Some(blocked) = check_shield_for_file("write_file", &path_str) {
+            return blocked;
+        }
         let path = Path::new(&path_str);
         if path.exists() {
             return CommandOutput::warn(&format!("⚠️ 文件已存在: {}. 如需覆盖请先执行 /read 查看, 或 /create 创建新文件", path_str));
@@ -110,6 +139,9 @@ impl CliCommand for FileCreateCmd {
             return CommandOutput::err("用法: /create <path> [content] [--yes]");
         }
         let path_str = clean_args[0].clone();
+        if let Some(blocked) = check_shield_for_file("write_file", &path_str) {
+            return blocked;
+        }
         let path = Path::new(&path_str);
         if path.exists() {
             return CommandOutput::err(&format!("文件已存在: {}", path_str));
@@ -144,6 +176,9 @@ impl CliCommand for FileEditCmd {
             return CommandOutput::err("用法: /edit <path> [<行号>:<新内容>] [--yes]");
         }
         let path_str = clean_args[0].clone();
+        if let Some(blocked) = check_shield_for_file("write_file", &path_str) {
+            return blocked;
+        }
         let path = Path::new(&path_str);
         let orig = match fs::read_to_string(path) {
             Ok(c) => c,
@@ -199,6 +234,9 @@ impl CliCommand for FilePatchCmd {
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /patch <path> (从 stdin 读取 patch, 在 TUI 中不可用)");
+        }
+        if let Some(blocked) = check_shield_for_file("write_file", &args[0]) {
+            return blocked;
         }
         CommandOutput::ok(&format!("📋 /patch 需要从 stdin 读取 patch 数据。请使用 /edit 进行行编辑。"))
     }

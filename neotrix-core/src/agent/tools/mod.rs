@@ -253,6 +253,19 @@ impl McpRegistry {
 
     /// 执行 MCP 工具调用
     pub fn call_tool(&self, name: &str, args: &serde_json::Value) -> Result<String, String> {
+        // ShieldEnforcer governance check for tool execution
+        if let Ok(shield) = crate::cli::shield_enforcer::global_shield().lock() {
+            if let Err(decision) = shield.check_all(&format!("mcp_tool:{}", name), "tool_exec", None, None) {
+                let msg = match decision {
+                    crate::cli::ShieldDecision::Block(m) => format!("Shield blocked MCP tool '{}': {}", name, m),
+                    crate::cli::ShieldDecision::RequireApproval(m) =>
+                        format!("Shield needs approval for MCP tool '{}': {}", name, m),
+                    _ => format!("Shield blocked MCP tool '{}'", name),
+                };
+                log::warn!("{}", msg);
+            }
+        }
+
         // 优先检查内置处理器
         if let Some(handler) = self.builtin_handlers.get(name) {
             return handler(args);

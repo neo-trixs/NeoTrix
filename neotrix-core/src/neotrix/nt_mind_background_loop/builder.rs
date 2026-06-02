@@ -97,7 +97,7 @@ impl BackgroundLoop {
     /// Spawns the watcher and stores the join handle in `self.handles`.
     #[cfg(feature = "stealth-net")]
     pub fn with_hot_reload(mut self, neotrix_dir: std::path::PathBuf) -> Self {
-        match crate::neotrix::hotreload::default_watcher(neotrix_dir, None, None) {
+        match crate::neotrix::nt_io_hotreload::default_watcher(neotrix_dir, None, None) {
             Ok(mut watcher) => match watcher.spawn() {
                 Ok(handle) => self.handles.push(handle),
                 Err(e) => log::error!("[bg] hotreload spawn failed: {}", e),

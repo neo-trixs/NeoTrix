@@ -25,4 +25,8 @@ pub use permission_profiles::{
 };
 pub use cost_tracker::CostTracker;
 pub use sandbox::{SandboxMode, SandboxEnforcer, global_sandbox, check_sandbox, init_sandbox};
+pub mod shield_enforcer;
+pub mod laws;
+pub use shield_enforcer::{ShieldEnforcer, ShieldDecision, global_shield, init_shield};
+pub use laws::{ProjectLaws, LawViolation, LawSeverity};
 pub mod cli_interface;

@@ -40,4 +40,31 @@ if [ -n "$SECRETS" ]; then
     echo "[pre-commit] ⚠️  请检查后提交 (使用 --no-verify 跳过)"
 fi
 
+# ShieldEnforcer: ProjectLaws check on staged .rs files
+echo "[pre-commit] ⏳ ShieldEnforcer 法律检查..."
+STAGED_RS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
+if [ -n "$STAGED_RS" ]; then
+    for FILE in $STAGED_RS; do
+        if [ -f "$FILE" ]; then
+            CONTENT=$(cat "$FILE")
+            if echo "$CONTENT" | grep -q "sk-[A-Za-z0-9]\{20,\}" 2>/dev/null; then
+                echo "[pre-commit] ⚠️  L001 (硬编码密钥) 违规: $FILE"
+            fi
+            if echo "$CONTENT" | grep -q "^\s*unsafe\s*{" 2>/dev/null; then
+                echo "[pre-commit] ⚠️  L002 (unsafe代码) 违规: $FILE"
+            fi
+            if echo "$CONTENT" | grep -q '\.unwrap()' 2>/dev/null; then
+                # 排除测试文件
+                case "$FILE" in
+                    *test*|*tests*) ;;
+                    *) echo "[pre-commit] ⚠️  L003 (unwrap) 违规: $FILE" ;;
+                esac
+            fi
+            if echo "$CONTENT" | grep -q "TODO\|FIXME\|HACK" 2>/dev/null; then
+                echo "[pre-commit] ⚠️  L009 (TODO/FIXME) 违规: $FILE"
+            fi
+        fi
+    done
+fi
+
 echo "[pre-commit] ✅ 全部检查通过"

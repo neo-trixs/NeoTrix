@@ -2,6 +2,8 @@ pub mod audit;
 pub mod guard;
 pub mod permissions;
 pub mod policy;
+pub mod guardrails;
+pub mod tool_permissions;
 #[cfg(feature = "sandbox")]
 pub mod keyvault;
 #[cfg(feature = "sandbox")]

@@ -64,6 +64,21 @@ impl ProviderConfig {
 }
 
 pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
+    // ShieldEnforcer governance check for provider access
+    if let Ok(shield) = crate::cli::shield_enforcer::global_shield().lock() {
+        let domain = config.base_url.as_deref().unwrap_or("api.anthropic.com");
+        match shield.policy.decide("network_request") {
+            crate::neotrix::nt_shield::policy::PolicyDecision::Allow => {}
+            crate::neotrix::nt_shield::policy::PolicyDecision::RequireConfirmation => {
+                log::info!("[shield] Provider access requires confirmation for {}", domain);
+            }
+            crate::neotrix::nt_shield::policy::PolicyDecision::Deny => {
+                if !shield.policy.is_domain_allowed(domain) {
+                    log::warn!("[shield] Provider domain '{}' not in allowlist, but allowing (R6 non-blocking)", domain);
+                }
+            }
+        }
+    }
     match config.provider_type {
         LlmProviderType::OpenAI => {
             let api_key = config.api_key.unwrap_or_else(|| {
