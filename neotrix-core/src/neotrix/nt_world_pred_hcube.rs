@@ -11,7 +11,7 @@
 use crate::core::nt_core_hcube::coord::HyperCoord;
 use crate::core::nt_core_hcube::cube::KnowledgeHyperCube;
 use crate::core::nt_core_hcube::axis::DimensionAxis;
-use crate::neotrix::signal::core::Vector;
+use crate::neotrix::nt_core_signal::core::Vector;
 
 // ============================================================
 // 常量

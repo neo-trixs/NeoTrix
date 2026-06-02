@@ -1,7 +1,7 @@
 /// 外部资源种子 — 从 X 帖子提炼的自托管/开源工具库
 /// 使用 KBIngester 可复用模块
 use std::time::{Duration, Instant};
-use neotrix::neotrix::nt_memory_kb::{ingester::KBIngester, NodeType, RelationType};
+use neotrix::neotrix::nt_memory_kb::{nt_memory_ingest::KBIngester, NodeType, RelationType};
 
 const GITHUB_REPOS: &[(&str, &str, &str, &str)] = &[
     ("aleksilassila", "reiverr", "media_server",

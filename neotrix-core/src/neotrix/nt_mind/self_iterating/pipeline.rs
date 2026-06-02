@@ -5,7 +5,7 @@ use super::super::memory::ReasoningMemory;
 use super::super::distillation::{ExperienceDistiller, apply_principles, avoid_anti_patterns};
 use super::super::cortex_memory::CmsConfig;
 use crate::neotrix::nt_world_model::TaskType;
-use crate::neotrix::error::NeoTrixError;
+use crate::neotrix::nt_core_error::NeoTrixError;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,7 +243,7 @@ impl BrainStage for SSMUpdateStage {
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let Some(ref op) = brain.select_operator {
             let input = brain.brain.capability.to_full_vector();
-            let mut ssm_state = crate::neotrix::signal::core::SelectiveState::new(input.len(), op.hidden_dim);
+            let mut ssm_state = crate::neotrix::nt_core_signal::core::SelectiveState::new(input.len(), op.hidden_dim);
             let output = op.step(&mut ssm_state, &input);
             let dim = output.len().min(brain.brain.capability.arr().len());
             for (i, item) in brain.brain.capability.arr_mut().iter_mut().enumerate().take(dim) {

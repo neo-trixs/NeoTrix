@@ -45,8 +45,8 @@ pub use knowledge_arbitrage::{
     KnowledgeGraph, KnowledgeEntity, EntityRelation,
 };
 
-use crate::neotrix::provider::factory::{ProviderConfig, create_provider};
-use crate::neotrix::provider::types::LlmProvider;
+use crate::neotrix::nt_io_provider::factory::{ProviderConfig, create_provider};
+use crate::neotrix::nt_io_provider::types::LlmProvider;
 
 /// 轻量 LLM 引擎
 pub struct LlmEngine {

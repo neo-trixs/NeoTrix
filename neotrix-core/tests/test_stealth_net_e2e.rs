@@ -9,7 +9,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use neotrix::neotrix::stealth_net::{
+use neotrix::neotrix::nt_shield_stealth_net::{
     StealthHttpClient, ProxyConfig,
     RotationCoordinator, RotationDomain,
     RuleEngine, OutboundRule, OutboundAction, RuleCondition,
@@ -132,15 +132,15 @@ mod integration_tests {
     /// Bandit 收敛测试 (无需网络)
     #[tokio::test]
     async fn test_real_bandit_convergence() {
-        use neotrix::neotrix::stealth_net::bandit::FingerprintBandit;
-        use neotrix::neotrix::http_factory::TlsVariant;
-        use neotrix::neotrix::stealth_net::system_fingerprint::Platform;
+        use neotrix::neotrix::nt_shield_stealth_net::bandit::FingerprintBandit;
+        use neotrix::neotrix::nt_io_http_factory::TlsVariant;
+        use neotrix::neotrix::nt_shield_stealth_net::system_fingerprint::Platform;
 
         let bandit = FingerprintBandit::load();
 
         // LegacyHttp11 + MacOS 模拟最优
-        let best = neotrix::neotrix::stealth_net::bandit::ComboArm { tls: TlsVariant::LegacyHttp11, platform: Platform::MacOS, h2_profile: neotrix::neotrix::http_factory::H2SettingsProfile::ChromeDefault, geo_tag: String::new() };
-        let worst = neotrix::neotrix::stealth_net::bandit::ComboArm { tls: TlsVariant::StrictVerify, platform: Platform::Windows, h2_profile: neotrix::neotrix::http_factory::H2SettingsProfile::ChromeDefault, geo_tag: String::new() };
+        let best = neotrix::neotrix::nt_shield_stealth_net::bandit::ComboArm { tls: TlsVariant::LegacyHttp11, platform: Platform::MacOS, h2_profile: neotrix::neotrix::nt_io_http_factory::H2SettingsProfile::ChromeDefault, geo_tag: String::new() };
+        let worst = neotrix::neotrix::nt_shield_stealth_net::bandit::ComboArm { tls: TlsVariant::StrictVerify, platform: Platform::Windows, h2_profile: neotrix::neotrix::nt_io_http_factory::H2SettingsProfile::ChromeDefault, geo_tag: String::new() };
 
         for _ in 0..50 {
             bandit.update(best.clone(), 0.9);

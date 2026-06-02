@@ -3,7 +3,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
 
-use crate::neotrix::error::{NeoTrixResult, NeoTrixError};
+use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 use crate::neotrix::nt_io_remote::{auth::ClientAuth, RemoteCommand, RemoteResponse};
 
 /// Client for connecting to a NeoTrix RemoteControl server

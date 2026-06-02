@@ -1,7 +1,7 @@
 /// 终局: 手工创建被 Wikipedia API 限流的节点 + 剩余边
 /// 使用 KBIngester 可复用模块
 use std::time::Instant;
-use neotrix::neotrix::nt_memory_kb::{ingester::KBIngester, NodeType, RelationType};
+use neotrix::neotrix::nt_memory_kb::{nt_memory_ingest::KBIngester, NodeType, RelationType};
 
 const MANUAL: &[(&str, NodeType, &str, &str)] = &[
     ("Object detection", NodeType::Concept, "computer_vision",

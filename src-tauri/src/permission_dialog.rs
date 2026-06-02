@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tauri::State;
-use neotrix::neotrix::security::permissions::{PermissionManager, PermissionRequest, AuditEntry};
+use neotrix::neotrix::nt_shield::permissions::{PermissionManager, PermissionRequest, AuditEntry};
 
 #[tauri::command]
 pub fn request_permission(

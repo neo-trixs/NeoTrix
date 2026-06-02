@@ -259,7 +259,7 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, sk
                     let mode_str = parts.get(2).copied();
                     #[cfg(feature = "stealth-net")]
                     {
-                        use neotrix::neotrix::stealth_net::proxy_control::{ProxyClient, DaemonMode};
+                        use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyClient, DaemonMode};
                         let client = ProxyClient::new();
                         if let Some(m) = mode_str {
                             if let Some(mode) = DaemonMode::from_str(m) {
@@ -287,8 +287,8 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, sk
                 Some("status") | None => {
                     #[cfg(feature = "stealth-net")]
                     {
-                        use neotrix::neotrix::stealth_net::proxy_control::ProxyClient;
-                        use neotrix::neotrix::stealth_net::local_proxy::TorManager;
+                        use neotrix::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient;
+                        use neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager;
                         println!("\n╭─ NeoTrix 代理状态 ───────────────────────────────╮");
                         let tor = TorManager::socks5_reachable().await;
                         println!("│ Tor SOCKS5 :9050 :  {}                     │",

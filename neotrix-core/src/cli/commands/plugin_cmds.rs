@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::plugin::PluginRegistry;
+use crate::neotrix::nt_io_plugin::PluginRegistry;
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 pub struct PluginCmd;

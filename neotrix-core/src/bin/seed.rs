@@ -65,7 +65,7 @@ fn main() {
 
     // 7. Consciousness interface test
     println!("\n━━━ 7. 意识层接口测试 ━━━");
-    use neotrix::core::e8_reasoning::ReasoningHexagram;
+    use neotrix::core::ReasoningHexagram;
     let state = ReasoningHexagram::new(42);
     println!("  E8 状态 {}: {}", state.0, state.mode_name());
     match kb.query_by_e8_state(state, 3) {

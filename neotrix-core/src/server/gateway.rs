@@ -8,7 +8,7 @@ use axum::{
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
-use crate::neotrix::provider::{
+use crate::neotrix::nt_io_provider::{
     LlmProvider, LlmProviderType, ProviderConfig, create_provider,
     LlmRequest, Message, Role, FinishReason, sanitize_history,
 };
@@ -302,7 +302,7 @@ pub fn start_gateway(gateway: OpenAICompatibleGateway, addr: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::provider::LlmProviderType;
+    use crate::neotrix::nt_io_provider::LlmProviderType;
 
     #[test]
     fn test_model_routing() {

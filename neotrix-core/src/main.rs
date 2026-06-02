@@ -214,7 +214,7 @@ enum WalletCommands {
 }
 
 fn main() {
-    let _sentry_guard = neotrix::neotrix::sentry::init_sentry();
+    let _sentry_guard = neotrix::neotrix::nt_shield_sentry::init_sentry();
     let cli = Cli::parse();
 
     // First-run provider config wizard

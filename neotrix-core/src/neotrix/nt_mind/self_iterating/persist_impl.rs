@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::brain_impl::{ReasoningBrain, BrainMetadata, DefaultSealStrategy};
 use crate::core::nt_core_knowledge::SourceAccessTracker;
-use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 impl ReasoningBrain {
     /// 保存ReasoningBrain状态到 ~/.neotrix/brain.json

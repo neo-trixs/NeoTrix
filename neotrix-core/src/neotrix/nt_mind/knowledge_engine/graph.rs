@@ -5,7 +5,7 @@ use super::search::LiteratureSearcher;
 use super::types::{
     KnowledgeEngineStats, KnowledgeEntry, KnowledgeRelation, RelationType,
 };
-use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_mind::embedding::TextEmbedder;
 
 pub struct KnowledgeEngine {

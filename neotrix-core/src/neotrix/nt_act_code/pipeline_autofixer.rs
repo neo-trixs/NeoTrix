@@ -5,11 +5,11 @@
 //!
 //! 零 LLM 依赖: 所有决策基于规则 + 历史模式 + 确定性模板
 
-use crate::neotrix::evolution_loop::EvolutionLoop;
+use crate::neotrix::nt_mind_evolution_loop::EvolutionLoop;
 use crate::neotrix::nt_act_code::code_writer::{CodeGenRequest, SelfCodeWriter};
 use crate::neotrix::nt_act_code::edit_history::EditHistoryTracker;
 use crate::neotrix::nt_act_code::safe_applier::SafeCodeApplier;
-use crate::neotrix::self_diagnose::ActionPlan;
+use crate::neotrix::nt_mind_self_diagnose::ActionPlan;
 
 /// 单次管道执行结果
 #[derive(Debug)]

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::neotrix::signal::core::Vector;
+use crate::neotrix::nt_core_signal::core::Vector;
 
 pub const JEPA_LATENT_DIM: usize = 32;
 

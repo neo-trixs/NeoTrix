@@ -6,7 +6,7 @@ use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
 use super::self_edit::MicroEdit;
 use super::knowledge_miner::{KnowledgeMiner, MinedKnowledge};
-use crate::neotrix::error::NeoTrixResult;
+use crate::neotrix::nt_core_error::NeoTrixResult;
 
 /// 知识链阶段
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

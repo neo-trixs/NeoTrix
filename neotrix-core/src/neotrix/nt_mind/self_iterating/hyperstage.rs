@@ -1,4 +1,4 @@
-use crate::neotrix::error::NeoTrixError;
+use crate::neotrix::nt_core_error::NeoTrixError;
 use super::{BrainStage, StageDecision, SelfIteratingBrain};
 use super::HyperMetaAgent;
 use super::HyperAgentArchive;

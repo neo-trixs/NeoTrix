@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::config::{CrawlFormat, CrawlTopic};
-use crate::neotrix::provider::{LlmProvider, LlmRequest};
+use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest};
 
 #[derive(Debug, Clone)]
 pub struct ClassifiedContent {
@@ -479,16 +479,16 @@ mod tests {
 
     #[async_trait::async_trait]
     impl LlmProvider for MockLlmProvider {
-        async fn complete(&self, _request: &LlmRequest) -> Result<crate::neotrix::provider::LlmResponse, crate::neotrix::provider::LlmError> {
-            Ok(crate::neotrix::provider::LlmResponse {
+        async fn complete(&self, _request: &LlmRequest) -> Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError> {
+            Ok(crate::neotrix::nt_io_provider::LlmResponse {
                 content: r#"{"topic":"science_and_technology","format":"academic_paper","confidence":0.92}"#.into(),
                 model: "mock".into(),
-                usage: crate::neotrix::provider::Usage::default(),
-                finish_reason: crate::neotrix::provider::FinishReason::Stop,
+                usage: crate::neotrix::nt_io_provider::Usage::default(),
+                finish_reason: crate::neotrix::nt_io_provider::FinishReason::Stop,
             })
         }
 
-        async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::neotrix::provider::LlmResponse, crate::neotrix::provider::LlmError>>, crate::neotrix::provider::LlmError> {
+        async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<crate::neotrix::nt_io_provider::LlmResponse, crate::neotrix::nt_io_provider::LlmError>>, crate::neotrix::nt_io_provider::LlmError> {
             let (_, rx) = tokio::sync::mpsc::channel(1);
             Ok(rx)
         }

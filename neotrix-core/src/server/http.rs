@@ -9,8 +9,8 @@ use futures::{SinkExt, StreamExt};
 use serde::{Serialize, Deserialize};
 use crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 use crate::neotrix::nt_world_model::TaskType;
-use crate::neotrix::standalone::format_kernel_output;
-use crate::neotrix::kernel_core::{ReasoningKernel, EVOLUTION};
+use crate::neotrix::nt_io_standalone::format_kernel_output;
+use crate::neotrix::nt_core_kernel::{ReasoningKernel, EVOLUTION};
 use crate::server::ws::WsBridge;
 use crate::server::h5::h5_routes;
 use crate::server::session::SessionShareManager;
@@ -120,7 +120,7 @@ async fn reason_kernel_handler(Json(req): Json<ReasonKernelRequest>) -> Json<Rea
     let stage = req.stage.unwrap_or(18).min(EVOLUTION.len() - 1);
     let kernel = ReasoningKernel::new(stage);
     let dim = kernel.state.len();
-    let query = crate::neotrix::standalone::text_to_vector(&req.prompt, dim);
+    let query = crate::neotrix::nt_io_standalone::text_to_vector(&req.prompt, dim);
     let output = kernel.reason(&query, None);
     let energy: f64 = output.state_delta.iter().map(|x| x.abs()).sum::<f64>() / dim.max(1) as f64;
     let response = format_kernel_output(&output.state_delta, &req.prompt, &kernel);
@@ -239,7 +239,7 @@ struct EvolveResponse {
 }
 
 async fn evolve_handler() -> Json<EvolveResponse> {
-    let mut kernel = crate::neotrix::kernel_core::ReasoningKernel::new(18);
+    let mut kernel = crate::neotrix::nt_core_kernel::ReasoningKernel::new(18);
     kernel.evolve_stage();
     let s = kernel.stats();
     Json(EvolveResponse {

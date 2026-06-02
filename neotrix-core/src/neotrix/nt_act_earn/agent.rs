@@ -340,7 +340,7 @@ impl EarnAgent {
             multi = if plan.platforms.iter().any(|p| p == "wechat" || p == "bilibili") { "200" } else { "20" },
         );
 
-        let request = crate::neotrix::provider::types::LlmRequest::new(&engine.model, &prompt);
+        let request = crate::neotrix::nt_io_provider::types::LlmRequest::new(&engine.model, &prompt);
         let response = engine.runtime.block_on(engine.llm.complete(&request))
             .map_err(|e| format!("LLM generation failed: {}", e))?;
         Ok(response.content)

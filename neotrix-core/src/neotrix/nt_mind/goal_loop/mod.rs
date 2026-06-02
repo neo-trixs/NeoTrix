@@ -183,7 +183,7 @@ mod tests {
     fn test_with_orchestrator_does_not_panic() {
         let mut gl = GoalLoop::new();
         let mut brain = SelfIteratingBrain::new();
-        let orch = crate::neotrix::orchestrator::Orchestrator::new();
+        let orch = crate::neotrix::nt_act_orchestrator::Orchestrator::new();
         gl = gl.with_orchestrator(orch);
         gl.start_goal(&mut brain, "design a login page", None);
         let _ = gl.pursue_iteration(&mut brain);

@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use tauri::{command, Emitter};
-use neotrix::neotrix::provider::{ProviderConfig, LlmProviderType, create_provider, LlmRequest};
+use neotrix::neotrix::nt_io_provider::{ProviderConfig, LlmProviderType, create_provider, LlmRequest};
 use super::{AgentStatus, ProviderConfigPayload, ReasonRequest, ReasonResponse};
 
 // ===== Agent state statics =====

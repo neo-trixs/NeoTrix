@@ -74,7 +74,7 @@ pub struct SandboxAgent {
     /// Code to execute inside the sandbox.
     pub code: String,
     /// The sandbox instance (local/docker/wasm/remote).
-    pub sandbox: crate::neotrix::sandbox::Sandbox,
+    pub sandbox: crate::neotrix::nt_shield_sandbox_entry::Sandbox,
     /// Maximum wall-clock duration before the agent is killed.
     pub max_duration: Duration,
     /// Optional channel for periodic progress reports.
@@ -102,7 +102,7 @@ impl SandboxAgent {
 
         send_progress("sandbox: execution started");
 
-        let result: Result<Result<crate::neotrix::sandbox::SandboxResult, tokio::task::JoinError>, tokio::time::error::Elapsed> =
+        let result: Result<Result<crate::neotrix::nt_shield_sandbox_entry::SandboxResult, tokio::task::JoinError>, tokio::time::error::Elapsed> =
             tokio::time::timeout(deadline, tokio::task::spawn_blocking(move || {
                 let script_path =
                     std::path::PathBuf::from(&work_dir).join(format!("sandbox_{}.sh", id));
@@ -116,7 +116,7 @@ impl SandboxAgent {
                 }
 
                 let cmd = script_path.to_string_lossy().to_string();
-                let sandbox = crate::neotrix::sandbox::Sandbox::new(sandbox_mode);
+                let sandbox = crate::neotrix::nt_shield_sandbox_entry::Sandbox::new(sandbox_mode);
                 sandbox.execute(&cmd)
             }))
             .await;

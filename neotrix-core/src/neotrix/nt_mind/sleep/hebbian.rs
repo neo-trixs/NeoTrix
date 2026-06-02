@@ -1,7 +1,7 @@
 use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningMemory;
-use crate::neotrix::signal::core::SelectiveState;
-use crate::neotrix::signal::select::SelectableOperator;
+use crate::neotrix::nt_core_signal::core::SelectiveState;
+use crate::neotrix::nt_core_signal::select::SelectableOperator;
 
 pub struct HebbianUpdater {
     pub forget_gate_bias: f64,

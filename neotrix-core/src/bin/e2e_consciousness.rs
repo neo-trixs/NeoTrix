@@ -1,7 +1,7 @@
 /// 验证意识进化回路: KB ↔ GWT ↔ E8 完整闭环
 use neotrix::core::nt_core_gwt::module_def::SpecialistModule;
 use neotrix::core::nt_core_gwt::workspace::GlobalWorkspace;
-use neotrix::core::e8_reasoning::ReasoningHexagram;
+use neotrix::core::ReasoningHexagram;
 use neotrix::neotrix::nt_memory_kb::KnowledgeBase;
 use neotrix::neotrix::nt_mind::consciousness_bridge::ConsciousnessBridge;
 use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;

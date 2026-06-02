@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use neotrix::CapabilityVector;
 use neotrix::core::hypercube::{VSAEngine, VsaBackend};
 use neotrix::neotrix::jepa_world_model::{JepaEncoder, JepaPredictor, JepaWorldModel};
-use neotrix::neotrix::evolution_loop::EvolutionLoop;
+use neotrix::neotrix::nt_mind_evolution_loop::EvolutionLoop;
 
 // ============================================================
 // Helpers

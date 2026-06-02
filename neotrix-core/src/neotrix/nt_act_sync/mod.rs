@@ -6,7 +6,7 @@ pub use index::*;
 pub use transfer::*;
 pub use types::*;
 
-use crate::neotrix::agent_protocol::discovery::{AgentDiscovery, AgentInfo};
+use crate::neotrix::nt_agent_protocol::discovery::{AgentDiscovery, AgentInfo};
 use std::collections::HashMap;
 use std::path::Path;
 

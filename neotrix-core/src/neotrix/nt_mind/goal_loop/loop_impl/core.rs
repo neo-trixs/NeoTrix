@@ -5,12 +5,12 @@ use super::super::tracker::GoalTracker;
 use super::super::super::self_iterating::SelfIteratingBrain;
 use crate::core::{CrtTimeScale, ReasoningHexagram, optimal_starting_mode};
 use crate::neotrix::nt_world_model::TaskType;
-use crate::neotrix::orchestrator::Orchestrator;
+use crate::neotrix::nt_act_orchestrator::Orchestrator;
 use crate::agent::AgentTeam;
 use crate::core::nt_core_self::MotivationState;
 use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
-use crate::neotrix::distiller::SessionDistiller;
-use crate::neotrix::error::{NeoTrixResult, NeoTrixError};
+use crate::neotrix::nt_mind_distiller::SessionDistiller;
+use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 
 fn state_icon(state: &GoalState) -> &str {
     match state {

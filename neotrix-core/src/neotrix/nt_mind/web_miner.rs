@@ -7,7 +7,7 @@ use super::core::CapabilityVector;
 use super::self_edit::MicroEdit;
 use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
-use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_world_model::TaskType;
 

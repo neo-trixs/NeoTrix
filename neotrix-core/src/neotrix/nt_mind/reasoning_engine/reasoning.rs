@@ -1,9 +1,9 @@
 //! 4 种推理类型实现 + Deep Research
 
-use crate::neotrix::error::NeoTrixResult;
+use crate::neotrix::nt_core_error::NeoTrixResult;
 use crate::neotrix::nt_mind::reasoning_engine::ReasoningEngine;
 use crate::neotrix::nt_mind::reasoning_types::ReasoningType;
-use crate::neotrix::provider::search_router::SearchRouter;
+use crate::neotrix::nt_io_provider::search_router::SearchRouter;
 
 impl ReasoningEngine {
     pub fn reason_conversation(&mut self, query: &str) -> NeoTrixResult<String> {

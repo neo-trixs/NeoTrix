@@ -4,12 +4,12 @@ use std::io::{self, Write};
 
 use colored::Colorize;
 
-use neotrix::neotrix::background_loop::BackgroundLoop;
+use neotrix::neotrix::nt_mind_background_loop::BackgroundLoop;
 use neotrix::neotrix::nt_world_model::WorldModelV2;
 use neotrix::neotrix::nt_mind::panorama_pipeline::PanoramaPipeline;
 use neotrix::neotrix::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
 use neotrix::neotrix::nt_mind::memory::ReasoningBank;
-use neotrix::neotrix::mention::resolve_mentions;
+use neotrix::neotrix::nt_io_mention::resolve_mentions;
 
 use crate::config::NeoTrixConfig;
 
@@ -191,7 +191,7 @@ pub(crate) fn run_server_mode(_addr: &str, profile: &str) {
         let bg_agent = Arc::new(tokio::sync::RwLock::new(agent));
         let mut bg = BackgroundLoop::new(bg_agent.clone());
         bg.goal_loop = neotrix::neotrix::nt_mind::goal_loop::GoalLoop::new();
-        bg.world_model = Some(WorldModelV2::new(8, 64));
+        bg.nt_world_model = Some(WorldModelV2::new(8, 64));
         bg.panorama = Some(PanoramaPipeline::new());
         #[cfg(feature = "stealth-net")]
         {
@@ -407,7 +407,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str) {
 }
 
 pub fn show_status() {
-    let status = neotrix::neotrix::server_proxy::ServerProxy::status();
+    let status = neotrix::neotrix::nt_io_proxy_server::ServerProxy::status();
     println!("{}", info("╭─ NeoTrix Status ───────────────────────╮"));
     println!("│ {}  {:<2} / {:<2} {}   │",
         info("Brain dimensions:"),
@@ -450,7 +450,7 @@ pub fn run_mcp_server() {
 }
 
 pub fn run_benchmark(category: Option<&str>) {
-    use neotrix::neotrix::benchmark::{BenchmarkSuite, BenchmarkReport};
+    use neotrix::neotrix::nt_mind_benchmark::{BenchmarkSuite, BenchmarkReport};
     use neotrix::CapabilityVector;
 
     let path = dirs::home_dir().unwrap_or_default().join(".neotrix/brain.json");
@@ -500,7 +500,7 @@ pub fn run_benchmark(category: Option<&str>) {
 }
 
 pub fn run_browse(url: &str) {
-    use neotrix::neotrix::browser::BrowserCircuit;
+    use neotrix::neotrix::nt_world_browse::BrowserCircuit;
     println!("{}", info("╭─ NeoTrix Browser ──────────────────────────╮"));
     println!("│ {} {}", info("Fetching:"), url);
     println!("{}", info("╰────────────────────────────────────────────────╯"));
@@ -551,7 +551,7 @@ pub fn run_search(query: &str, count: usize) {
 }
 
 pub fn run_login(url: &str) {
-    use neotrix::neotrix::browser::BrowserCircuit;
+    use neotrix::neotrix::nt_world_browse::BrowserCircuit;
     println!("{}", info("╭─ NeoTrix Login ────────────────────────────╮"));
     println!("│ {}: {}", info("URL"), url);
     println!("│ {}", info("A Chrome window will open. Log in, then"));
@@ -631,7 +631,7 @@ pub fn run_daemon(profile: &str) {
         let bg_agent = Arc::new(tokio::sync::RwLock::new(agent));
         let mut bg = BackgroundLoop::new(bg_agent.clone());
         bg.goal_loop = neotrix::neotrix::nt_mind::goal_loop::GoalLoop::new();
-        bg.world_model = Some(WorldModelV2::new(8, 64));
+        bg.nt_world_model = Some(WorldModelV2::new(8, 64));
         #[cfg(feature = "stealth-net")]
         {
             bg = bg.with_world_consciousness();
@@ -656,7 +656,7 @@ pub fn run_daemon_evolution(profile: &str) {
         let bg_agent = Arc::new(tokio::sync::RwLock::new(agent));
         let mut bg = BackgroundLoop::new(bg_agent.clone());
         bg.goal_loop = neotrix::neotrix::nt_mind::goal_loop::GoalLoop::new();
-        bg.world_model = Some(WorldModelV2::new(8, 64));
+        bg.nt_world_model = Some(WorldModelV2::new(8, 64));
         #[cfg(feature = "stealth-net")]
         {
             bg = bg.with_world_consciousness();
@@ -664,7 +664,7 @@ pub fn run_daemon_evolution(profile: &str) {
         println!("{} {}", info("[daemon]"), info("NeoTrix evolution daemon started"));
         let daemon_handle = bg.start();
         let daemon = std::sync::Arc::new(std::sync::Mutex::new(
-            neotrix::neotrix::evolution_daemon::EvolutionDaemon::default()
+            neotrix::neotrix::nt_mind_evolution_daemon::EvolutionDaemon::default()
         ));
         let daemon_clone = daemon.clone();
         tokio::spawn(async move {
@@ -694,7 +694,7 @@ pub fn run_standalone_mode(stage: usize) {
 }
 
 pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
-    use neotrix::neotrix::background_loop::BackgroundLoop;
+    use neotrix::neotrix::nt_mind_background_loop::BackgroundLoop;
     use neotrix::neotrix::nt_world_model::WorldModelV2;
     use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
     
@@ -745,9 +745,9 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
                 input_schema: serde_json::json!({"type": "object"}),
             },
         ];
-        builtin_tools.extend(neotrix::neotrix::mcp_tools::neotrix_mcp_tools());
+        builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        neotrix::neotrix::mcp_tools::register_neotrix_tools(&mut mcp_registry);
+        neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
@@ -776,7 +776,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         let _ = tokio::spawn(async move {
             let mut bg = BackgroundLoop::new(bg_agent)
                 .with_goal_loop(bg_goal_loop)
-                .with_world_model(WorldModelV2::new(8, 64));
+                .with_nt_world_model(WorldModelV2::new(8, 64));
             #[cfg(feature = "stealth-net")]
             {
                 bg = bg.with_world_consciousness();
@@ -801,7 +801,7 @@ pub fn run_interactive(cfg: &NeoTrixConfig, profile: &str) {
 }
 
 pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, ephemeral: bool) {
-    use neotrix::neotrix::background_loop::BackgroundLoop;
+    use neotrix::neotrix::nt_mind_background_loop::BackgroundLoop;
     use neotrix::neotrix::nt_world_model::WorldModelV2;
     use neotrix::neotrix::nt_mind::panorama_pipeline::PanoramaPipeline;
     use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
@@ -857,9 +857,9 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
                 input_schema: serde_json::json!({"type": "object"}),
             },
         ];
-        builtin_tools.extend(neotrix::neotrix::mcp_tools::neotrix_mcp_tools());
+        builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        neotrix::neotrix::mcp_tools::register_neotrix_tools(&mut mcp_registry);
+        neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let _mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
@@ -903,7 +903,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         let _ = tokio::spawn(async move {
             let mut bg = BackgroundLoop::new(bg_agent)
                 .with_goal_loop(bg_goal_loop)
-                .with_world_model(WorldModelV2::new(8, 64))
+                .with_nt_world_model(WorldModelV2::new(8, 64))
                 .with_panorama(PanoramaPipeline::new())
                 .with_nt_world_crawl(std::path::PathBuf::from("."))
                 .with_exploration_pipeline(std::path::PathBuf::from("."))
@@ -943,22 +943,22 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
 
 
 pub fn run_sandbox_run(code: Option<&str>, runtime: &str, timeout: u64) {
-    use neotrix::neotrix::sandbox_v2::cli;
+    use neotrix::neotrix::nt_shield_sandbox::cli;
     let runtime = if runtime.is_empty() { None } else { Some(runtime) };
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     rt.block_on(cli::handle_run(code, runtime, Some(timeout)));
 }
 
 pub fn run_sandbox_list() {
-    neotrix::neotrix::sandbox_v2::cli::handle_list();
+    neotrix::neotrix::nt_shield_sandbox::cli::handle_list();
 }
 
 pub fn run_sandbox_cancel(session_id: &str) {
-    neotrix::neotrix::sandbox_v2::cli::handle_cancel(session_id);
+    neotrix::neotrix::nt_shield_sandbox::cli::handle_cancel(session_id);
 }
 
 pub fn run_discover(port: u16, duration_ms: u64, json: bool) {
-    use neotrix::neotrix::agent_protocol::discovery::AgentDiscovery;
+    use neotrix::neotrix::nt_agent_protocol::discovery::AgentDiscovery;
 
     let mut discovery = match AgentDiscovery::new(port) {
         Ok(d) => d,
@@ -1024,7 +1024,7 @@ pub fn run_discover(port: u16, duration_ms: u64, json: bool) {
 }
 
 pub fn run_sandbox_upload(path: &str, session_id: &str) {
-    use neotrix::neotrix::sandbox_v2::cli;
+    use neotrix::neotrix::nt_shield_sandbox::cli;
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     rt.block_on(cli::handle_upload(path, session_id));
 }

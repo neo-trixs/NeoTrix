@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use crate::neotrix::signal::core::Vector;
-use crate::neotrix::signal::ops::cosine_similarity;
+use crate::neotrix::nt_core_signal::core::Vector;
+use crate::neotrix::nt_core_signal::ops::cosine_similarity;
 use super::types::{
     JEPA_VAR_WEIGHT, JEPA_INV_WEIGHT, JEPA_COV_WEIGHT,
     JEPA_VARIANCE_TARGET,

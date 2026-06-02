@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
 
-use neotrix::neotrix::background_loop::BackgroundLoop;
+use neotrix::neotrix::nt_mind_background_loop::BackgroundLoop;
 use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 use neotrix::core::nt_core_knowledge::{KSActivationEngine, TaskType};
 use neotrix::neotrix::nt_mind::self_iterating::validation::{cargo_check_validation, ValidationResult};
@@ -105,7 +105,7 @@ async fn main() {
         None
     };
 
-    let mut heal_engine = neotrix::neotrix::knowledge_gap_detector::NeotrixGapDetector::new(kb);
+    let mut heal_engine = neotrix::neotrix::nt_core_knowledge_gap::NeotrixGapDetector::new(kb);
     println!("[daemon] Self-healing engine ready");
 
     // 5. Initial KS activation

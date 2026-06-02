@@ -1,4 +1,4 @@
-use crate::neotrix::error::NeoTrixResult;
+use crate::neotrix::nt_core_error::NeoTrixResult;
 use crate::neotrix::nt_mind::ReasoningType;
 use crate::neotrix::nt_mind::reasoning_engine::ReasoningEngine;
 

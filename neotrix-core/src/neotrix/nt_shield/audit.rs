@@ -16,7 +16,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use crate::neotrix::error::{NeoTrixResult, NeoTrixError};
+use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 
 /// 安全审计发现
 #[derive(Debug, Clone)]

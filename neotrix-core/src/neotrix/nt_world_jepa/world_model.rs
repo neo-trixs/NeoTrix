@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::neotrix::signal::core::Vector;
+use crate::neotrix::nt_core_signal::core::Vector;
 use crate::core::nt_core_td::{TemporalDifferenceFlows, TDFlowsConfig};
 use super::types::{
     JEPA_LATENT_DIM, JEPA_HIDDEN_DIM, JEPA_LEARNING_RATE, JEPA_EMA_MOMENTUM,

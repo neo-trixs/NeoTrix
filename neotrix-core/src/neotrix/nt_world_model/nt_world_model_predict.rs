@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use crate::neotrix::signal::ops::cosine_similarity;
+use crate::neotrix::nt_core_signal::ops::cosine_similarity;
 use super::LATENT_DIM;
 use super::Vector;
 

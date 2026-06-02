@@ -4,7 +4,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
-use crate::neotrix::error::{NeoTrixResult, NeoTrixError};
+use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 use crate::neotrix::nt_io_remote::{
     auth::{self, Authenticator},
     connection::{ConnectionManager, ConnectionState},

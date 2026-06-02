@@ -20,7 +20,7 @@ pub struct VideoScene {
 
 /// 视频脚本规划器
 pub struct VideoScriptPlanner {
-    llm: Option<(tokio::runtime::Runtime, Box<dyn crate::neotrix::provider::types::LlmProvider>)>,
+    llm: Option<(tokio::runtime::Runtime, Box<dyn crate::neotrix::nt_io_provider::types::LlmProvider>)>,
 }
 
 impl VideoScriptPlanner {
@@ -28,7 +28,7 @@ impl VideoScriptPlanner {
         Self { llm: None }
     }
 
-    pub fn with_llm(provider: Box<dyn crate::neotrix::provider::types::LlmProvider>) -> Self {
+    pub fn with_llm(provider: Box<dyn crate::neotrix::nt_io_provider::types::LlmProvider>) -> Self {
         let runtime = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         Self { llm: Some((runtime, provider)) }
     }
@@ -43,7 +43,7 @@ impl VideoScriptPlanner {
 
     fn generate_llm(
         &self, runtime: &tokio::runtime::Runtime,
-        provider: &dyn crate::neotrix::provider::types::LlmProvider,
+        provider: &dyn crate::neotrix::nt_io_provider::types::LlmProvider,
         topic: &str, platform: &str, duration_secs: f64,
     ) -> VideoScript {
         let scene_count = (duration_secs / 8.0).ceil() as usize;
@@ -57,7 +57,7 @@ impl VideoScriptPlanner {
              JSON only, no markdown.",
             dur_str, platform, topic, scene_str,
         );
-        let request = crate::neotrix::provider::types::LlmRequest::new("gpt-4o", &prompt);
+        let request = crate::neotrix::nt_io_provider::types::LlmRequest::new("gpt-4o", &prompt);
         match runtime.block_on(provider.complete(&request)) {
             Ok(resp) => self.parse_json_script(&resp.content, topic, duration_secs),
             Err(_) => self.generate_template(topic, duration_secs),

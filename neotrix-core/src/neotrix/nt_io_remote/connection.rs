@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc;
 use tokio::time::interval;
 
-use crate::neotrix::error::{NeoTrixResult, NeoTrixError};
+use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
 
 /// State of a remote connection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
-pub type SyncState = Arc<Mutex<Option<neotrix::neotrix::file_sync::FileSync>>>;
+pub type SyncState = Arc<Mutex<Option<neotrix::neotrix::nt_act_sync::FileSync>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PeerInfo {
@@ -32,7 +32,7 @@ pub struct SyncDiffInfo {
 /// Initialize the file sync subsystem with discovery + sync server.
 #[tauri::command]
 pub fn sync_init(state: State<'_, SyncState>, discovery_port: u16, sync_port: u16, local_root: String) -> Result<(), String> {
-    let sync = neotrix::neotrix::file_sync::FileSync::new(discovery_port, sync_port, local_root)?;
+    let sync = neotrix::neotrix::nt_act_sync::FileSync::new(discovery_port, sync_port, local_root)?;
     let mut guard = state.lock().map_err(|e| e.to_string())?;
     *guard = Some(sync);
     Ok(())
@@ -60,7 +60,7 @@ pub fn sync_add_pair(state: State<'_, SyncState>, peer_id: String, local_path: S
     let sync = guard.as_mut().ok_or("sync not initialized")?;
     sync.add_pair(&peer_id)?;
     if let Some(pair) = sync.pairs_mut().iter_mut().find(|p| p.peer_id == peer_id) {
-        pair.directories.push(neotrix::neotrix::file_sync::SyncDir {
+        pair.directories.push(neotrix::neotrix::nt_act_sync::SyncDir {
             local_path,
             include_patterns: Vec::new(),
             exclude_patterns: vec![".git".into(), "target".into(), "node_modules".into()],

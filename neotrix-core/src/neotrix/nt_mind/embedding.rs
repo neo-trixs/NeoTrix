@@ -1,4 +1,4 @@
-use crate::neotrix::signal::ops::cosine_similarity;
+use crate::neotrix::nt_core_signal::ops::cosine_similarity;
 
 pub use crate::core::nt_core_embed::TextEmbedder;
 

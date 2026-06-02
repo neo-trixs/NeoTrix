@@ -1,8 +1,8 @@
 use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_bank::ReasoningBank;
 use crate::core::nt_core_cap::CapabilityVector;
-use crate::neotrix::signal::core::SelectiveState;
-use crate::neotrix::signal::select::SelectableOperator;
+use crate::neotrix::nt_core_signal::core::SelectiveState;
+use crate::neotrix::nt_core_signal::select::SelectableOperator;
 use chrono::Utc;
 use super::hebbian::HebbianUpdater;
 

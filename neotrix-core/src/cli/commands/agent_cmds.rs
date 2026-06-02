@@ -107,7 +107,7 @@ impl CliCommand for DiscoverCmd {
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(3000);
 
-        let mut discovery = match crate::neotrix::agent_protocol::discovery::AgentDiscovery::new(port) {
+        let mut discovery = match crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery::new(port) {
             Ok(d) => d,
             Err(e) => return CommandOutput::err(&format!("绑定 UDP :{} 失败: {}", port, e)),
         };
@@ -221,7 +221,7 @@ impl CliCommand for McpCmd {
                 }
             }
             "discover" | "scan" => {
-                use crate::neotrix::mcp_discovery::McpDiscovery;
+                use crate::neotrix::nt_agent_mcp_discovery::McpDiscovery;
                 let entries = McpDiscovery::scan_path();
                 let mut s = format!("🔍 MCP Discovery: {} candidates in PATH\n", entries.len());
                 for (i, e) in entries.iter().enumerate() {

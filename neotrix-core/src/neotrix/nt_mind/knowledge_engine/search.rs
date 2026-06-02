@@ -5,7 +5,7 @@ use super::types::{
     extract_authors, extract_categories, extract_xml, strip_html, urlencoding,
 };
 use crate::neotrix::nt_mind::embedding::TextEmbedder;
-use crate::neotrix::signal::ops::cosine_similarity;
+use crate::neotrix::nt_core_signal::ops::cosine_similarity;
 
 pub struct LiteratureSearcher {
     client: reqwest::blocking::Client,

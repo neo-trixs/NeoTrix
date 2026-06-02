@@ -9,9 +9,9 @@ use crate::neotrix::nt_mind::context_artifacts::inject_relevant_artifacts;
 use crate::neotrix::nt_mind::distillation::AntiPattern;
 use crate::neotrix::nt_mind::memory::ReasoningMemory;
 use crate::neotrix::nt_mind::model_router::ModelTier;
-use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_shield_prompt::{PromptGuard, RiskLevel};
-use crate::neotrix::provider::LlmRequest;
+use crate::neotrix::nt_io_provider::LlmRequest;
 use crate::neotrix::nt_world_model::TaskType;
 
 impl ReasoningEngine {

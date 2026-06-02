@@ -1,6 +1,6 @@
 use tauri::{command, Emitter};
 use tauri_plugin_notification::NotificationExt;
-use neotrix::neotrix::provider::{create_provider, LlmRequest};
+use neotrix::neotrix::nt_io_provider::{create_provider, LlmRequest};
 use super::ProviderConfigPayload;
 use super::agent_cmds::{read_provider_config, payload_to_provider_config};
 

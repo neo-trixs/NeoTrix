@@ -3,8 +3,8 @@ use colored::Colorize;
 
 #[cfg(feature = "stealth-net")]
 pub async fn run_proxy_cmd(cmd_str: &str) {
-    use neotrix::neotrix::stealth_net::local_proxy::TorManager;
-    use neotrix::neotrix::stealth_net::proxy_control::{DaemonMode, ProxyClient};
+    use neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager;
+    use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{DaemonMode, ProxyClient};
     use neotrix::neotrix::proxy_daemon_wrapper;
 
     let client = ProxyClient::new();

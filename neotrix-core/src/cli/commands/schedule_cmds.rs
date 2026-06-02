@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::background_loop::always_on::{
+use crate::neotrix::nt_mind_background_loop::always_on::{
     ScheduleExpr, ALWAYS_ON_ENGINE,
 };
 

@@ -2,7 +2,7 @@ use tauri::command;
 use super::ProxyStatus;
 
 #[cfg(feature = "stealth-net")]
-use neotrix::neotrix::stealth_net::proxy_control::{ProxyClient, DaemonMode};
+use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyClient, DaemonMode};
 #[cfg(feature = "stealth-net")]
 use neotrix::neotrix::proxy_daemon_wrapper;
 

@@ -22,15 +22,15 @@ use crate::core::nt_core_self::{
     SiliconSelfModel,
 };
 use crate::neotrix::nt_mind::thinking_bridge::ThinkingBridge;
-use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_world_jepa::{JepaWorldModel, WorldModelState};
-use crate::neotrix::provider::{
+use crate::neotrix::nt_io_provider::{
     factory::{ProviderConfig, create_provider},
     types::{LlmProvider, LlmRequest},
 };
 use crate::neotrix::nt_shield_prompt::{PromptGuard, RiskLevel};
-use crate::neotrix::mention::resolve_mentions;
+use crate::neotrix::nt_io_mention::resolve_mentions;
 use crate::neotrix::nt_world_search::WebSearchTool;
 use tokio::sync::mpsc;
 
@@ -1262,8 +1262,8 @@ mod tests {
         let brain = ReasoningBrain::new();
         let bank = ReasoningBank::new(100);
         let mut engine = ReasoningEngine::new(
-            crate::neotrix::provider::factory::create_provider(
-                crate::neotrix::provider::factory::ProviderConfig::from_env(),
+            crate::neotrix::nt_io_provider::factory::create_provider(
+                crate::neotrix::nt_io_provider::factory::ProviderConfig::from_env(),
             ),
             brain, bank, "test-model",
         );

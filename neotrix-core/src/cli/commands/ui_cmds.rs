@@ -7,7 +7,7 @@ use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::core::nt_core_router::{SMART_ROUTER, TaskComplexity, TaskContext};
 use crate::core::WORKSPACE_MANAGER;
-use crate::neotrix::background_loop::always_on::ALWAYS_ON_ENGINE;
+use crate::neotrix::nt_mind_background_loop::always_on::ALWAYS_ON_ENGINE;
 
 // ====== /side ======
 

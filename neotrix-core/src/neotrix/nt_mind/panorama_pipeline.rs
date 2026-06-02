@@ -7,7 +7,7 @@ use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_edit::MicroEdit;
 use crate::neotrix::nt_world_model::{WorldModelV2, TaskType};
 use crate::neotrix::nt_world_infer::FreeEnergyReport;
-use crate::neotrix::iit_phi::PhiReport;
+use crate::neotrix::nt_core_iit_phi::PhiReport;
 use super::cortex_memory::{CortexMemory, MemoryTrace, DimensionTag, Modality};
 use super::consciousness_bridge::ConsciousnessBridge;
 use super::self_iterating::SelfIteratingBrain;

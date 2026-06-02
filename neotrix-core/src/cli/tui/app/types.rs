@@ -135,8 +135,8 @@ pub fn extract_tool_calls(content: &str) -> Vec<ToolCall> {
 }
 
 pub async fn ask_side_llm(question: &str) -> Result<String, String> {
-    use crate::neotrix::provider::factory::{ProviderConfig, create_provider};
-    use crate::neotrix::provider::LlmRequest;
+    use crate::neotrix::nt_io_provider::factory::{ProviderConfig, create_provider};
+    use crate::neotrix::nt_io_provider::LlmRequest;
     let config = ProviderConfig::from_env();
     let model = std::env::var("NEOTRIX_MODEL")
         .unwrap_or_else(|_| "claude-sonnet-4-20250514".to_string());

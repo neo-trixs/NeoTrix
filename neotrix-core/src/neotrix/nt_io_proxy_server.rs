@@ -1,5 +1,5 @@
 use crate::core::CapabilityVector;
-use crate::neotrix::benchmark::{BenchmarkSuite, BenchmarkReport};
+use crate::neotrix::nt_mind_benchmark::{BenchmarkSuite, BenchmarkReport};
 use crate::core::nt_core_bank::ReasoningBank;
 use std::path::PathBuf;
 

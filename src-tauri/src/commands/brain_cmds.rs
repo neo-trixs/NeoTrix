@@ -1,9 +1,9 @@
 use std::sync::Mutex;
 use tauri::{command, State, Emitter};
-use neotrix::neotrix::reasoning_brain::{ReasoningBrain, ReasoningBank};
-use neotrix::neotrix::reasoning_brain::KnowledgeSource;
-use neotrix::neotrix::avatar_channel::{AvatarIdentity, MessageDirection};
-use neotrix::neotrix::user_avatar::{DistillationEngine, DistillationFlowEvent, UserAvatar, AuthRequest};
+use neotrix::neotrix::nt_mind::{ReasoningBrain, ReasoningBank};
+use neotrix::neotrix::nt_mind::KnowledgeSource;
+use neotrix::neotrix::nt_io_avatar_channel::{AvatarIdentity, MessageDirection};
+use neotrix::neotrix::nt_io_user_avatar::{DistillationEngine, DistillationFlowEvent, UserAvatar, AuthRequest};
 use super::{BrainStats, ChainStats};
 
 #[command]

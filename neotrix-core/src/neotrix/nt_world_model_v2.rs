@@ -11,7 +11,7 @@ use crate::neotrix::nt_world_model::{WorldModel, Context};
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
 use crate::neotrix::nt_world_e8::E8WorldModel;
 use crate::neotrix::nt_world_infer::{ActiveInferenceEngine, FreeEnergyReport};
-use crate::neotrix::iit_phi::{IITPhiCalculator, PhiReport};
+use crate::neotrix::nt_core_iit_phi::{IITPhiCalculator, PhiReport};
 
 /// V2 世界模型: 传统 WorldModel + JEPA + E8 + Active Inference + IIT
 pub struct WorldModelV2 {

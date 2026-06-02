@@ -50,4 +50,4 @@ pub use core::{
     ReasoningStrategy, ReasoningStrategyRegistry, StrategyKind,
     ThinkingTrace, ThinkingStep, ReflectionGrade,
 };
-pub use neotrix::orchestrator::Orchestrator;
+pub use neotrix::nt_act_orchestrator::Orchestrator;

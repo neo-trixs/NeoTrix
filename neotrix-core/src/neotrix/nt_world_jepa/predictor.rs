@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::neotrix::signal::core::Vector;
+use crate::neotrix::nt_core_signal::core::Vector;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JepaPredictor {

@@ -7,7 +7,7 @@ use neotrix::neotrix::reasoning_brain::exploration_pipeline::{
 };
 use neotrix::neotrix::reasoning_brain::self_iterating::SelfIteratingBrain;
 use neotrix::neotrix::reasoning_brain::memory::ReasoningBank;
-use neotrix::neotrix::knowledge_populator::KnowledgePopulator;
+use neotrix::neotrix::nt_memory_knowledge_populator::KnowledgePopulator;
 
 fn print_header(s: &str) {
     println!("\n╔══════════════════════════════════════════════════╗");

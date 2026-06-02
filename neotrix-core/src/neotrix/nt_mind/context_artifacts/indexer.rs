@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 use super::store::{ArtifactBuilder, ArtifactStore};
 use super::types::{ArtifactType, ArtifactsConfig};

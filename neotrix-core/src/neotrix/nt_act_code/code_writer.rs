@@ -9,7 +9,7 @@ use super::semantic_entropy::SemanticEntropyGate;
 use super::semantic_entropy::SemanticEntropy;
 use super::template_registry::{CodeTemplateRegistry, TemplateCategory};
 
-use crate::neotrix::self_diagnose::ActionPlan;
+use crate::neotrix::nt_mind_self_diagnose::ActionPlan;
 
 /// N‑gram based content entropy detector — measures code generation uncertainty
 /// via Shannon entropy of token n‑gram distribution.
@@ -466,7 +466,7 @@ mod tests {
         let w = SelfCodeWriter::new();
         let req = CodeGenRequest {
             plan: ActionPlan::HumanDecision {
-                issue_type: crate::neotrix::evolution_loop::IssueType::TodoLeftovers,
+                issue_type: crate::neotrix::nt_mind_evolution_loop::IssueType::TodoLeftovers,
                 file: None,
                 reason: "test".into(),
             },

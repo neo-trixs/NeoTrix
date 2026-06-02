@@ -8,9 +8,9 @@ use clap::Parser;
 use tauri::{Manager, State, Emitter};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use neotrix::neotrix::reasoning_brain::{ReasoningBank, ReasoningBrain};
-use neotrix::neotrix::security::permissions::PermissionManager;
-use neotrix::neotrix::user_avatar::DistillationEngine;
+use neotrix::neotrix::nt_mind::{ReasoningBank, ReasoningBrain};
+use neotrix::neotrix::nt_shield::permissions::PermissionManager;
+use neotrix::neotrix::nt_io_user_avatar::DistillationEngine;
 
 mod commands;
 mod permission_dialog;
@@ -149,7 +149,7 @@ fn auto_sync_cycle(sync_state: &commands::SyncState, handle: &tauri::AppHandle) 
 }
 
 fn main() {
-    let _sentry_guard = neotrix::neotrix::sentry::init_sentry();
+    let _sentry_guard = neotrix::neotrix::nt_shield_sentry::init_sentry();
     let cli = Cli::parse();
 
     match cli.command {

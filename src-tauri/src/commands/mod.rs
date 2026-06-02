@@ -37,7 +37,7 @@ pub use sync_cmds::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use neotrix::neotrix::provider::LlmProviderType;
+    use neotrix::neotrix::nt_io_provider::LlmProviderType;
 
     // ===== parse_git_diff =====
 

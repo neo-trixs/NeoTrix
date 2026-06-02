@@ -39,15 +39,15 @@ fn read_provider_config() -> Result<serde_json::Value, String> {
     serde_json::from_str(&content).map_err(|e| format!("Parse error: {}", e))
 }
 
-fn payload_to_provider_config(payload: &ProviderConfigPayload) -> crate::neotrix::provider::ProviderConfig {
+fn payload_to_provider_config(payload: &ProviderConfigPayload) -> crate::neotrix::nt_io_provider::ProviderConfig {
     let provider_type = match payload.id.to_lowercase().as_str() {
-        "openai" => crate::neotrix::provider::LlmProviderType::OpenAI,
-        "anthropic" => crate::neotrix::provider::LlmProviderType::Anthropic,
-        "gemini" => crate::neotrix::provider::LlmProviderType::Gemini,
-        "ollama" => crate::neotrix::provider::LlmProviderType::Ollama,
-        _ => crate::neotrix::provider::LlmProviderType::OpenAI,
+        "openai" => crate::neotrix::nt_io_provider::LlmProviderType::OpenAI,
+        "anthropic" => crate::neotrix::nt_io_provider::LlmProviderType::Anthropic,
+        "gemini" => crate::neotrix::nt_io_provider::LlmProviderType::Gemini,
+        "ollama" => crate::neotrix::nt_io_provider::LlmProviderType::Ollama,
+        _ => crate::neotrix::nt_io_provider::LlmProviderType::OpenAI,
     };
-    crate::neotrix::provider::ProviderConfig {
+    crate::neotrix::nt_io_provider::ProviderConfig {
         provider_type,
         api_key: Some(payload.api_key.clone()),
         base_url: payload.base_url.clone(),
@@ -208,8 +208,8 @@ pub async fn reason_handler(
         })),
     };
     let provider_config = payload_to_provider_config(&payload);
-    let provider = crate::neotrix::provider::create_provider(provider_config);
-    let request = crate::neotrix::provider::LlmRequest::new(&payload.model, &body.prompt);
+    let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
+    let request = crate::neotrix::nt_io_provider::LlmRequest::new(&payload.model, &body.prompt);
     match provider.complete(&request).await {
         Ok(response) => json_ok(serde_json::json!({
             "output": response.content, "success": true
@@ -454,8 +454,8 @@ pub async fn agent_reason_stream_handler(
         };
 
         let provider_config = payload_to_provider_config(&payload);
-        let provider = crate::neotrix::provider::create_provider(provider_config);
-        let request = crate::neotrix::provider::LlmRequest::new(&payload.model, &body.prompt);
+        let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
+        let request = crate::neotrix::nt_io_provider::LlmRequest::new(&payload.model, &body.prompt);
 
         match provider.complete(&request).await {
             Ok(response) => {
@@ -706,8 +706,8 @@ pub async fn test_provider_handler(
         }));
     }
     let provider_config = payload_to_provider_config(&body);
-    let provider = crate::neotrix::provider::create_provider(provider_config);
-    let request = crate::neotrix::provider::LlmRequest::new(&body.model, "Hello");
+    let provider = crate::neotrix::nt_io_provider::create_provider(provider_config);
+    let request = crate::neotrix::nt_io_provider::LlmRequest::new(&body.model, "Hello");
     match provider.complete(&request).await {
         Ok(_) => json_ok(serde_json::json!({"success": true, "message": "ok"})),
         Err(e) => json_ok(serde_json::json!({

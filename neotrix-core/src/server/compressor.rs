@@ -1,4 +1,4 @@
-use crate::neotrix::provider::types::Message;
+use crate::neotrix::nt_io_provider::types::Message;
 
 pub struct ConversationCompressor {
     max_messages_before_compress: usize,
@@ -31,23 +31,23 @@ impl ConversationCompressor {
         let summary_text = compressible
             .iter()
             .map(|m| match m.role {
-                crate::neotrix::provider::types::Role::User => {
+                crate::neotrix::nt_io_provider::types::Role::User => {
                     format!("User: {}", m.content)
                 }
-                crate::neotrix::provider::types::Role::Assistant => {
+                crate::neotrix::nt_io_provider::types::Role::Assistant => {
                     format!("Assistant: {}", m.content)
                 }
-                crate::neotrix::provider::types::Role::System => {
+                crate::neotrix::nt_io_provider::types::Role::System => {
                     format!("System: {}", m.content)
                 }
-                crate::neotrix::provider::types::Role::Tool => {
+                crate::neotrix::nt_io_provider::types::Role::Tool => {
                     format!("Tool: {}", m.content)
                 }
             })
             .collect::<Vec<_>>()
             .join("\n");
         let summary_message = Message {
-            role: crate::neotrix::provider::types::Role::System,
+            role: crate::neotrix::nt_io_provider::types::Role::System,
             content: format!("Summary of earlier conversation:\n{}", summary_text),
         };
         let mut result = vec![summary_message];
@@ -59,7 +59,7 @@ impl ConversationCompressor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::neotrix::provider::types::Role;
+    use crate::neotrix::nt_io_provider::types::Role;
 
     #[test]
     fn test_no_compress_below_threshold() {

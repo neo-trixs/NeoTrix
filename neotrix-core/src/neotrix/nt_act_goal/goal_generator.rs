@@ -8,7 +8,7 @@
 //!   - DGM-Hyperagents (arXiv, Mar 2026): 可编辑元层的自我改进
 //!   - 核心差异: NeoTrix 的进化目标由诊断驱动而非 LLM 提议
 
-use crate::neotrix::evolution_loop::ProjectSnapshot;
+use crate::neotrix::nt_mind_evolution_loop::ProjectSnapshot;
 
 /// 进化目标优先级
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

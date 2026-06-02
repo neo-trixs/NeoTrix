@@ -1,8 +1,8 @@
 use crate::core::nt_core_cap::CapabilityVector;
 use crate::core::nt_core_bank::ReasoningBank;
-use crate::neotrix::signal::core::SelectiveState;
-use crate::neotrix::signal::select::SelectableOperator;
-use crate::neotrix::error::NeoTrixResult;
+use crate::neotrix::nt_core_signal::core::SelectiveState;
+use crate::neotrix::nt_core_signal::select::SelectableOperator;
+use crate::neotrix::nt_core_error::NeoTrixResult;
 
 use super::hebbian::HebbianUpdater;
 use super::consolidation::{MemoryConsolidation, ConsolidationConfig};

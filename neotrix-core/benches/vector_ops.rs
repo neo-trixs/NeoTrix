@@ -4,7 +4,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ndarray::Array1;
 use neotrix::neotrix::reasoning_brain::core::CapabilityVector;
-use neotrix::neotrix::signal::ops;
+use neotrix::neotrix::nt_core_signal::ops;
 
 /// 生成随机向量（指定维度）
 fn random_vector(dim: usize) -> Vec<f64> {

@@ -10,7 +10,7 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 
 use base64::Engine;
-use crate::neotrix::error::{NeoTrixError, NeoTrixResult};
+use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 
 const STORAGE_PATH: &str = "~/.neotrix/secrets.json";
 const NONCE_LEN: usize = 12;
