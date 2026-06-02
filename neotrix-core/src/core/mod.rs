@@ -68,6 +68,7 @@ pub mod nt_core_rkyv;
 
 pub mod nt_core_abstr;
 pub mod nt_core_cdwm;
+pub mod nt_core_prm;
 pub mod nt_core_iface;
 pub mod nt_core_pred;
 
@@ -87,6 +88,8 @@ pub use nt_core_graph::{HyperGraph, HyperNode, HyperEdge, HyperNodeType, EdgeRel
 pub use nt_core_gwt::resonance::{
     ResonanceMatrix, ResonanceReport, MODULE_COUNT,
     resonate_and_select, resonate_cycle, default_specialist_states,
+    resonate_cycle_with_diversity, diversity_inject, compute_semantic_entropy,
+    DIVERSITY_MIN_ENTROPY, DIVERSITY_NOISE_AMPLITUDE,
     RESONANCE_THRESHOLD,
 };
 
@@ -98,8 +101,16 @@ pub use nt_core_hex::{
     evolve_strategy_entry,
     MODE_NAMES, MODE_DESCRIPTIONS, MODE_TASKS,
 };
-pub use nt_core_policy::{E8Outcome, E8TransitionLearner, E8Policy, NUM_E8_FACTORS};
+pub use nt_core_policy::{E8Outcome, E8TransitionLearner, E8Policy, NUM_E8_FACTORS, ProcessRewardLearner};
 pub use nt_core_observer::{OneObserver, ObserverReport};
+pub use nt_core_prm::{
+    AgentTrajectory, TrajectoryStep, ProcessScore, ScoredCriterion,
+    CoachContext, Coach, TrajectoryCollector, HeuristicCoach,
+};
+pub use nt_core_gwt::pipeline::{
+    PipelineRole, PipelineStage, PipelineSpec, PipelineStepResult, PipelineResult,
+    PipelineExecutor, PipelineHandler, CreditArbiter,
+};
 pub use nt_core_crt::{CrtTimeScale, CrtPlan};
 pub use nt_core_ws::WORKSPACE_MANAGER;
 

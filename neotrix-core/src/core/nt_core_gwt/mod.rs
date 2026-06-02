@@ -5,6 +5,7 @@ pub mod monitor;
 pub mod physics_attention;
 pub mod cls_buffer;
 pub mod geometry_sync;
+pub mod pipeline;
 
 pub use geometry_sync::{
     CycleReport, CrossDimensionalResonator, DimensionLayer, GeometrySync, IntegratedPhi,

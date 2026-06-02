@@ -466,6 +466,119 @@ impl OneObserver {
     }
 }
 
+use super::nt_core_prm::{AgentTrajectory, Coach, CoachContext, ProcessScore, ScoredCriterion};
+
+/// Map ObserverReport → Vec<ProcessScore> for Coach trait compatibility.
+fn observer_report_to_process_scores(
+    report: &ObserverReport,
+    trajectory: &AgentTrajectory,
+) -> Vec<ProcessScore> {
+    trajectory
+        .steps
+        .iter()
+        .enumerate()
+        .map(|(i, step)| {
+            let step_quality = report.step_qualities.get(i).copied();
+            let quality_score = match step_quality {
+                Some(StepQuality::Productive) => 0.8,
+                Some(StepQuality::Neutral) => 0.5,
+                Some(StepQuality::Regressive) => 0.3,
+                Some(StepQuality::Oscillating) => 0.2,
+                Some(StepQuality::Stuck) => 0.1,
+                Some(StepQuality::DeadEnd) => 0.0,
+                None => 0.5,
+            };
+
+            let mut tags = Vec::new();
+            if let Some(q) = step_quality {
+                tags.push(format!("step_{:?}", q).to_lowercase());
+            }
+            if !step.success {
+                tags.push("step_fail".to_string());
+            }
+
+            let mut criteria = Vec::new();
+            criteria.push(ScoredCriterion {
+                name: "observer_quality".to_string(),
+                score: quality_score,
+                rationale: Some(format!("{:?}", step_quality.unwrap_or(StepQuality::Neutral))),
+            });
+
+            // Map trajectory patterns to global criteria
+            for pattern in &report.patterns {
+                match pattern {
+                    TrajectoryPattern::Efficient { .. } => {
+                        criteria.push(ScoredCriterion {
+                            name: "efficiency".to_string(),
+                            score: 0.9,
+                            rationale: Some("efficient trajectory".to_string()),
+                        });
+                        tags.push("efficient".to_string());
+                    }
+                    TrajectoryPattern::Inefficient { .. } => {
+                        criteria.push(ScoredCriterion {
+                            name: "efficiency".to_string(),
+                            score: 0.2,
+                            rationale: Some("inefficient trajectory".to_string()),
+                        });
+                        tags.push("inefficient".to_string());
+                    }
+                    TrajectoryPattern::Stuck { .. } => {
+                        tags.push("stuck".to_string());
+                    }
+                    TrajectoryPattern::ProductiveWalk { .. } => {
+                        tags.push("productive_walk".to_string());
+                    }
+                    _ => {}
+                }
+            }
+
+            let adjusted = if report.quality_score < 0.3 {
+                quality_score * 0.8
+            } else if report.quality_score > 0.8 {
+                (quality_score + 0.1).min(1.0)
+            } else {
+                quality_score
+            };
+
+            ProcessScore {
+                step_idx: i,
+                score: adjusted.max(0.0).min(1.0),
+                confidence: report.quality_score,
+                criteria,
+                attribution_tags: tags,
+            }
+        })
+        .collect()
+}
+
+impl Coach for OneObserver {
+    fn name(&self) -> &str {
+        "observer-v1"
+    }
+
+    fn score_step(&self, _step: &super::nt_core_prm::TrajectoryStep, _context: &CoachContext) -> ProcessScore {
+        ProcessScore::new(0)
+    }
+
+    fn score_episode(&self, trajectory: &AgentTrajectory) -> Vec<ProcessScore> {
+        let modes: Vec<ReasoningHexagram> = trajectory.steps.iter().map(|s| s.e8_mode).collect();
+        if modes.is_empty() {
+            return Vec::new();
+        }
+        let full_states: Vec<FullReasoningState> = modes
+            .iter()
+            .map(|m| FullReasoningState::new(*m, MetaState(0)))
+            .collect();
+
+        let mut observer = OneObserver::new();
+        let keywords: Vec<&str> = trajectory.task.split_whitespace().collect();
+        let report = observer.analyze(&full_states, &keywords);
+
+        observer_report_to_process_scores(&report, trajectory)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

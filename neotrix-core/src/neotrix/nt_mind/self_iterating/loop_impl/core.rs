@@ -77,6 +77,8 @@ pub struct SelfIteratingBrain {
     pub(crate) _knowledge_distiller: KnowledgeDistiller,
     pub(crate) _nt_memory_kb: Option<KnowledgeBase>,
     pub(crate) _strategy_matrix: [[ReasoningHexagram; 8]; 8],
+    pub(crate) _trajectory_collector: crate::core::nt_core_prm::TrajectoryCollector,
+    pub(crate) _coach: Option<Box<dyn crate::core::nt_core_prm::Coach>>,
     pub nt_act_crypto: Option<Arc<Mutex<CryptoAgent>>>,
     pub nt_world_jepa: Option<JepaWorldModel>,
 }
@@ -142,6 +144,8 @@ impl SelfIteratingBrain {
             _harness_adapter: init_adapter,
             _stage_results: Vec::new(),
             _strategy_matrix: strategy_matrix(),
+            _trajectory_collector: crate::core::nt_core_prm::TrajectoryCollector::new(),
+            _coach: Some(Box::new(crate::core::nt_core_prm::HeuristicCoach::default())),
             nt_act_crypto: None,
             nt_world_jepa: None,
         }

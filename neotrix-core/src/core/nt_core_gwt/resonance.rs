@@ -8,6 +8,8 @@
 
 use std::collections::VecDeque;
 
+use rand::Rng;
+
 use crate::core::nt_core_hex::ReasoningHexagram;
 use super::physics_attention::AdaptiveSlicer;
 
@@ -233,6 +235,99 @@ pub fn resonate_cycle_with_physics(
     let resonator_clusters: Vec<Vec<usize>> = slicer.slices.iter()
         .filter(|sl| sl.members.len() > 1)
         .map(|sl| sl.members.clone())
+        .collect();
+
+    let complement_activated = matrix.complement_of(winner, states).is_some();
+
+    ResonanceReport {
+        winner,
+        effective_saliences: eff,
+        raw_saliences: *raw_salience,
+        entropy,
+        resonator_clusters,
+        complement_activated,
+    }
+}
+
+/// Minimum entropy before diversity injection is triggered.
+pub const DIVERSITY_MIN_ENTROPY: f64 = 1.5;
+
+/// Maximum noise amplitude for diversity injection.
+pub const DIVERSITY_NOISE_AMPLITUDE: f64 = 0.15;
+
+/// Inject diversity noise when attention entropy drops below threshold.
+///
+/// This implements GWA-style entropy-driven exploration:
+/// when the system converges too strongly on a single specialist,
+/// we add controlled noise to break the deadlock.
+///
+/// Returns (modified_salience, diversity_injected).
+pub fn diversity_inject(
+    raw_salience: &mut [f64; MODULE_COUNT],
+    entropy: f64,
+    min_entropy: f64,
+    noise_amplitude: f64,
+) -> bool {
+    if entropy >= min_entropy {
+        return false;
+    }
+    let deficit = (min_entropy - entropy) / min_entropy;
+    let noise_strength = (deficit * noise_amplitude).min(noise_amplitude);
+    let mut rng = rand::thread_rng();
+    for v in raw_salience.iter_mut() {
+        let noise: f64 = rng.gen_range(-noise_strength..noise_strength);
+        *v = (*v + noise).max(0.0).min(1.0);
+    }
+    true
+}
+
+/// Compute semantic entropy from effective salience distribution.
+/// Higher values mean more distributed attention across specialists.
+pub fn compute_semantic_entropy(effective_saliences: &[f64; MODULE_COUNT]) -> f64 {
+    let total: f64 = effective_saliences.iter().sum();
+    if total <= 0.0 {
+        return 0.0;
+    }
+    -effective_saliences
+        .iter()
+        .filter(|&&v| v > 0.0)
+        .map(|&v| {
+            let p = v / total;
+            p * p.log2()
+        })
+        .sum::<f64>()
+}
+
+/// Run a full resonance cycle with diversity injection.
+///
+/// Same as `resonate_cycle` but injects diversity noise when entropy
+/// drops below `DIVERSITY_MIN_ENTROPY`.
+pub fn resonate_cycle_with_diversity(
+    raw_salience: &mut [f64; MODULE_COUNT],
+    states: &[ReasoningHexagram; MODULE_COUNT],
+) -> ResonanceReport {
+    let matrix = ResonanceMatrix::from_states(states);
+    let (mut winner, mut eff, mut entropy) = resonate_and_select(raw_salience, &matrix);
+
+    let injected = diversity_inject(raw_salience, entropy, DIVERSITY_MIN_ENTROPY, DIVERSITY_NOISE_AMPLITUDE);
+
+    if injected {
+        let (new_winner, new_eff, new_entropy) = resonate_and_select(raw_salience, &matrix);
+        winner = new_winner;
+        eff = new_eff;
+        entropy = new_entropy;
+    }
+
+    let resonator_clusters: Vec<Vec<usize>> = (0..MODULE_COUNT)
+        .filter(|&i| {
+            let res = matrix.resonators(i);
+            !res.is_empty()
+        })
+        .map(|i| {
+            let mut c = vec![i];
+            c.extend(matrix.resonators(i));
+            c
+        })
         .collect();
 
     let complement_activated = matrix.complement_of(winner, states).is_some();

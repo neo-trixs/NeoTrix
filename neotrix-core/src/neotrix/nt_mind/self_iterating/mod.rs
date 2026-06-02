@@ -26,7 +26,7 @@ pub mod hyperdgm;
 pub mod hyperstage;
 pub mod hyperagents;
 
-pub use pipeline::{BrainPipeline, BrainStage, StageDecision, BrainSnapshot, AutonomyLevel, seal_pipeline, kernel_iterate_pipeline};
+pub use pipeline::{BrainPipeline, BrainStage, StageDecision, BrainSnapshot, AutonomyLevel, seal_pipeline, kernel_iterate_pipeline, run_conversation_distill, DistillationResult};
 pub use validation::{ValidationResult, cargo_check_validation, taste_skill_gate, aggregate_reward, user_accept_reject};
 pub use sia_loop::{SIAController, MetaAgent, TargetAgent, FeedbackAgent, SIAImprovement, ExecutionTrajectory, TrajectoryStep, ToolCallRecord, ExecutionMetrics};
 

@@ -445,252 +445,290 @@ impl BrainStage for DistillationStage {
     }
 }
 
+/// Result of a conversation distillation run.
+pub struct DistillationResult {
+    pub total: usize,
+    pub successes: usize,
+    pub failures: usize,
+    pub avg_eff: f64,
+    pub error_rate: f64,
+    pub patterns_created: bool,
+    pub total_gain: f64,
+}
+
+/// Standalone conversation distillation — analyzes recent ConversationRecords,
+/// detects patterns, and stores EvolutionRecords. Can be called from both
+/// the SEAL pipeline stage and directly from core_review() after every reason().
+pub fn run_conversation_distill(kb: &crate::neotrix::nt_memory_kb::KnowledgeBase) -> Result<DistillationResult, NeoTrixError> {
+    let records = match kb.get_evolution_history(10) {
+        Ok(r) => r,
+        Err(e) => {
+            log::warn!("[conv-distill] query failed: {}", e);
+            return Ok(DistillationResult {
+                total: 0, successes: 0, failures: 0, avg_eff: 0.0,
+                error_rate: 0.0, patterns_created: false, total_gain: 0.0,
+            });
+        }
+    };
+    if records.is_empty() {
+        return Ok(DistillationResult {
+            total: 0, successes: 0, failures: 0, avg_eff: 0.0,
+            error_rate: 0.0, patterns_created: false, total_gain: 0.0,
+        });
+    }
+
+    let total = records.len();
+    let successes = records.iter().filter(|r| r.outcome == "success").count();
+    let failures = total - successes;
+    let avg_eff: f64 = records.iter().map(|r| r.effectiveness).sum::<f64>() / total as f64;
+
+    let mut by_strategy: std::collections::HashMap<&str, Vec<f64>> = std::collections::HashMap::new();
+    for r in &records {
+        by_strategy.entry(r.strategy_used.as_str()).or_default().push(r.effectiveness);
+    }
+    let mut strategy_ratings: Vec<(&str, f64)> = by_strategy.iter()
+        .map(|(k, v)| (*k, v.iter().sum::<f64>() / v.len() as f64))
+        .collect();
+    strategy_ratings.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    let error_patterns: Vec<&str> = records.iter()
+        .filter(|r| !r.obstacles_encountered.is_empty())
+        .map(|r| r.obstacles_encountered[0].as_str())
+        .collect();
+
+    let error_rate = records.iter().map(|r| r.error_count).sum::<u32>() as f64 / total as f64;
+
+    let mut modes_used: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    for r in &records {
+        modes_used.insert(r.e8_mode.as_str());
+    }
+
+    let fix_patterns_present = records.iter().any(|r| !r.fix_patterns.is_empty());
+
+    log::info!(
+        "[conv-distill] {} records: {}/{} success, avg_eff={:.3}, error_rate={:.3}, modes={}, top_strategy={:?}",
+        total, successes, failures, avg_eff, error_rate, modes_used.len(),
+        strategy_ratings.first().map(|(s, _)| *s),
+    );
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+
+    let mut created_any = false;
+
+    // 1. RecurringError
+    if error_rate > 0.0 {
+        let most_common_error = error_patterns.first().unwrap_or(&"unknown");
+        let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+            id: format!("conv_pat_err_{}", timestamp),
+            source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+            pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::RecurringError,
+            description: format!("Error rate {:.2}, {} failures: {}", error_rate, failures, most_common_error),
+            before_behavior: "".into(),
+            after_behavior: "".into(),
+            effectiveness_gain: avg_eff * error_rate,
+            applied_to: vec![],
+            verified: false,
+            timestamp,
+        };
+        if kb.store_evolution_record(&evolution).is_ok() {
+            created_any = true;
+            log::info!("[conv-distill] recorded RecurringError pattern: {}", evolution.description);
+        }
+    }
+
+    // 2. CommunicationOptimization
+    if let Some((best_strat, best_eff)) = strategy_ratings.first() {
+        if let Some((_, default_eff)) = strategy_ratings.iter().find(|(s, _)| *s == "auto") {
+            if best_eff - default_eff > 0.1 {
+                let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                    id: format!("conv_pat_comm_{}", timestamp),
+                    source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                    pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::CommunicationOptimization,
+                    description: format!("Strategy '{}' improves over 'auto' by {:.2}", best_strat, best_eff - default_eff),
+                    before_behavior: "auto".into(),
+                    after_behavior: best_strat.to_string(),
+                    effectiveness_gain: best_eff - default_eff,
+                    applied_to: vec![],
+                    verified: false,
+                    timestamp,
+                };
+                if kb.store_evolution_record(&evolution).is_ok() {
+                    created_any = true;
+                    log::info!("[conv-distill] recorded CommunicationOptimization pattern: {}", evolution.description);
+                }
+            }
+        }
+    }
+
+    // 3. ProblemDecomposition
+    let high_eff_low_err = records.iter()
+        .filter(|r| r.effectiveness > 0.7 && r.error_count == 0)
+        .count();
+    if high_eff_low_err as f64 > total as f64 * 0.3 {
+        let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+            id: format!("conv_pat_dec_{}", timestamp),
+            source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+            pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::ProblemDecomposition,
+            description: format!("{}/{} records high-effectiveness zero-error", high_eff_low_err, total),
+            before_behavior: "".into(),
+            after_behavior: "".into(),
+            effectiveness_gain: avg_eff,
+            applied_to: vec![],
+            verified: false,
+            timestamp,
+        };
+        if kb.store_evolution_record(&evolution).is_ok() {
+            created_any = true;
+            log::info!("[conv-distill] recorded ProblemDecomposition pattern: {}", evolution.description);
+        }
+    }
+
+    // 4. VerificationImprovement
+    if fix_patterns_present {
+        let fix_count: usize = records.iter().map(|r| r.fix_patterns.len()).sum();
+        let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+            id: format!("conv_pat_ver_{}", timestamp),
+            source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+            pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::VerificationImprovement,
+            description: format!("{} fix patterns across {} records", fix_count, total),
+            before_behavior: "".into(),
+            after_behavior: "".into(),
+            effectiveness_gain: avg_eff,
+            applied_to: vec![],
+            verified: false,
+            timestamp,
+        };
+        if kb.store_evolution_record(&evolution).is_ok() {
+            created_any = true;
+            log::info!("[conv-distill] recorded VerificationImprovement pattern: {}", evolution.description);
+        }
+    }
+
+    // 5. ToolUsagePattern
+    let successful_strategies: Vec<&str> = records.iter()
+        .filter(|r| r.outcome == "success" && !r.actions_taken.is_empty())
+        .map(|r| r.strategy_used.as_str())
+        .collect();
+    if !successful_strategies.is_empty() && successful_strategies.len() > total / 2 {
+        let mut tool_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for t in &successful_strategies {
+            *tool_counts.entry(t).or_insert(0) += 1;
+        }
+        if let Some((best_tool, _)) = tool_counts.iter().max_by_key(|(_, c)| **c) {
+            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                id: format!("conv_pat_tool_{}", timestamp),
+                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::ToolUsagePattern,
+                description: format!("Strategy '{}' used in {}/{} successes", best_tool, tool_counts[best_tool], successes),
+                before_behavior: "".into(),
+                after_behavior: best_tool.to_string(),
+                effectiveness_gain: avg_eff,
+                applied_to: vec![],
+                verified: false,
+                timestamp,
+            };
+            if kb.store_evolution_record(&evolution).is_ok() {
+                created_any = true;
+                log::info!("[conv-distill] recorded ToolUsagePattern pattern: {}", evolution.description);
+            }
+        }
+    }
+
+    // 6. StrategyDiscovery
+    if let Some((best_strat, best_eff)) = strategy_ratings.first() {
+        if *best_strat != "auto" && *best_eff > avg_eff * 1.1 {
+            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                id: format!("conv_pat_strat_{}", timestamp),
+                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::StrategyDiscovery,
+                description: format!("New strategy '{}' outperforms average ({:.2} vs {:.2})", best_strat, best_eff, avg_eff),
+                before_behavior: "auto".into(),
+                after_behavior: best_strat.to_string(),
+                effectiveness_gain: best_eff - avg_eff,
+                applied_to: vec![],
+                verified: false,
+                timestamp,
+            };
+            if kb.store_evolution_record(&evolution).is_ok() {
+                created_any = true;
+                log::info!("[conv-distill] recorded StrategyDiscovery pattern: {}", evolution.description);
+            }
+        }
+    }
+
+    // 7. PrincipleUpdate
+    if avg_eff > 0.8 {
+        let all_above_threshold = by_strategy.iter().all(|(_, v)| v.iter().sum::<f64>() / v.len() as f64 > 0.7);
+        if all_above_threshold && strategy_ratings.len() > 1 {
+            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                id: format!("conv_pat_princ_{}", timestamp),
+                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::PrincipleUpdate,
+                description: format!("Consistent high effectiveness ({:.2}) across {} strategies", avg_eff, strategy_ratings.len()),
+                before_behavior: "".into(),
+                after_behavior: "".into(),
+                effectiveness_gain: avg_eff,
+                applied_to: vec![],
+                verified: false,
+                timestamp,
+            };
+            if kb.store_evolution_record(&evolution).is_ok() {
+                created_any = true;
+                log::info!("[conv-distill] recorded PrincipleUpdate pattern: {}", evolution.description);
+            }
+        }
+    }
+
+    // Read back recent evolution patterns and compute total gain
+    let total_gain = if let Ok(patterns) = kb.get_evolution_patterns(5) {
+        if !patterns.is_empty() {
+            patterns.iter().map(|p| p.effectiveness_gain).sum()
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+
+    Ok(DistillationResult {
+        total,
+        successes,
+        failures,
+        avg_eff,
+        error_rate,
+        patterns_created: created_any,
+        total_gain,
+    })
+}
+
 make_stage!(ConversationDistillStage);
 impl BrainStage for ConversationDistillStage {
     fn name(&self) -> &str { "conversation_distill" }
-    fn frequency(&self) -> usize { 3 }
+    fn frequency(&self) -> usize { 1 }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let Some(ref kb) = brain._nt_memory_kb else {
             return Ok(StageDecision::Skip("no KB".into()));
         };
-        let records = match kb.get_evolution_history(10) {
-            Ok(r) => r,
-            Err(e) => {
-                log::warn!("[conv-distill] query failed: {}", e);
-                return Ok(StageDecision::Continue);
-            }
-        };
-        if records.is_empty() {
+        let result = run_conversation_distill(kb)?;
+
+        if result.total == 0 {
             return Ok(StageDecision::Continue);
         }
 
-        // Analyze patterns
-        let total = records.len();
-        let successes = records.iter().filter(|r| r.outcome == "success").count();
-        let failures = total - successes;
-        let avg_eff: f64 = records.iter().map(|r| r.effectiveness).sum::<f64>() / total as f64;
-
-        // Find most/least effective strategy
-        let mut by_strategy: std::collections::HashMap<&str, Vec<f64>> = std::collections::HashMap::new();
-        for r in &records {
-            by_strategy.entry(r.strategy_used.as_str()).or_default().push(r.effectiveness);
-        }
-        let mut strategy_ratings: Vec<(&str, f64)> = by_strategy.iter()
-            .map(|(k, v)| (*k, v.iter().sum::<f64>() / v.len() as f64))
-            .collect();
-        strategy_ratings.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Find recurring errors
-        let error_patterns: Vec<&str> = records.iter()
-            .filter(|r| !r.obstacles_encountered.is_empty())
-            .map(|r| r.obstacles_encountered[0].as_str())
-            .collect();
-
-        // Error rate
-        let error_rate = records.iter().map(|r| r.error_count).sum::<u32>() as f64 / total as f64;
-
-        // Mode-switching frequency
-        let mut modes_used: std::collections::HashSet<&str> = std::collections::HashSet::new();
-        for r in &records {
-            modes_used.insert(r.e8_mode.as_str());
-        }
-
-        // Fix patterns present
-        let fix_patterns_present = records.iter().any(|r| !r.fix_patterns.is_empty());
-
-        log::info!(
-            "[conv-distill] {} records: {}/{} success, avg_eff={:.3}, error_rate={:.3}, modes={}, top_strategy={:?}",
-            total, successes, failures, avg_eff, error_rate, modes_used.len(),
-            strategy_ratings.first().map(|(s, _)| *s),
-        );
-
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-
-        let mut created_any = false;
-
-        // 1. RecurringError — when error_count > 0
-        if error_rate > 0.0 {
-            let most_common_error = error_patterns.first().unwrap_or(&"unknown");
-            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
-                id: format!("conv_pat_err_{}", brain.iteration),
-                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
-                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::RecurringError,
-                description: format!("Error rate {:.2}, {} failures: {}", error_rate, failures, most_common_error),
-                before_behavior: "".into(),
-                after_behavior: "".into(),
-                effectiveness_gain: avg_eff * error_rate,
-                applied_to: vec![],
-                verified: false,
-                timestamp,
-            };
-            if kb.store_evolution_record(&evolution).is_ok() {
-                created_any = true;
-                log::info!("[conv-distill] recorded RecurringError pattern: {}", evolution.description);
-            }
-        }
-
-        // 2. CommunicationOptimization — when best strategy improves over "auto" by > 0.1
-        if let Some((best_strat, best_eff)) = strategy_ratings.first() {
-            if let Some((_, default_eff)) = strategy_ratings.iter().find(|(s, _)| *s == "auto") {
-                if best_eff - default_eff > 0.1 {
-                    let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
-                        id: format!("conv_pat_comm_{}", brain.iteration),
-                        source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
-                        pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::CommunicationOptimization,
-                        description: format!("Strategy '{}' improves over 'auto' by {:.2}", best_strat, best_eff - default_eff),
-                        before_behavior: "auto".into(),
-                        after_behavior: best_strat.to_string(),
-                        effectiveness_gain: best_eff - default_eff,
-                        applied_to: vec![],
-                        verified: false,
-                        timestamp,
-                    };
-                    if kb.store_evolution_record(&evolution).is_ok() {
-                        created_any = true;
-                        log::info!("[conv-distill] recorded CommunicationOptimization pattern: {}", evolution.description);
-                    }
-                }
-            }
-        }
-
-        // 3. ProblemDecomposition — when high effectiveness with low error_count
-        let high_eff_low_err = records.iter()
-            .filter(|r| r.effectiveness > 0.7 && r.error_count == 0)
-            .count();
-        if high_eff_low_err as f64 > total as f64 * 0.3 {
-            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
-                id: format!("conv_pat_dec_{}", brain.iteration),
-                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
-                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::ProblemDecomposition,
-                description: format!("{}/{} records high-effectiveness zero-error", high_eff_low_err, total),
-                before_behavior: "".into(),
-                after_behavior: "".into(),
-                effectiveness_gain: avg_eff,
-                applied_to: vec![],
-                verified: false,
-                timestamp,
-            };
-            if kb.store_evolution_record(&evolution).is_ok() {
-                created_any = true;
-                log::info!("[conv-distill] recorded ProblemDecomposition pattern: {}", evolution.description);
-            }
-        }
-
-        // 4. VerificationImprovement — when fix patterns are found
-        if fix_patterns_present {
-            let fix_count: usize = records.iter().map(|r| r.fix_patterns.len()).sum();
-            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
-                id: format!("conv_pat_ver_{}", brain.iteration),
-                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
-                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::VerificationImprovement,
-                description: format!("{} fix patterns across {} records", fix_count, total),
-                before_behavior: "".into(),
-                after_behavior: "".into(),
-                effectiveness_gain: avg_eff,
-                applied_to: vec![],
-                verified: false,
-                timestamp,
-            };
-            if kb.store_evolution_record(&evolution).is_ok() {
-                created_any = true;
-                log::info!("[conv-distill] recorded VerificationImprovement pattern: {}", evolution.description);
-            }
-        }
-
-        // 5. ToolUsagePattern — when specific tools/strategies correlate with success
-        let successful_strategies: Vec<&str> = records.iter()
-            .filter(|r| r.outcome == "success" && !r.actions_taken.is_empty())
-            .map(|r| r.strategy_used.as_str())
-            .collect();
-        if !successful_strategies.is_empty() && successful_strategies.len() > total / 2 {
-            let mut tool_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-            for t in &successful_strategies {
-                *tool_counts.entry(t).or_insert(0) += 1;
-            }
-            if let Some((best_tool, _)) = tool_counts.iter().max_by_key(|(_, c)| **c) {
-                let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
-                    id: format!("conv_pat_tool_{}", brain.iteration),
-                    source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
-                    pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::ToolUsagePattern,
-                    description: format!("Strategy '{}' used in {}/{} successes", best_tool, tool_counts[best_tool], successes),
-                    before_behavior: "".into(),
-                    after_behavior: best_tool.to_string(),
-                    effectiveness_gain: avg_eff,
-                    applied_to: vec![],
-                    verified: false,
-                    timestamp,
-                };
-                if kb.store_evolution_record(&evolution).is_ok() {
-                    created_any = true;
-                    log::info!("[conv-distill] recorded ToolUsagePattern pattern: {}", evolution.description);
-                }
-            }
-        }
-
-        // 6. StrategyDiscovery — when a new strategy outperforms the default
-        if let Some((best_strat, best_eff)) = strategy_ratings.first() {
-            if *best_strat != "auto" && *best_eff > avg_eff * 1.1 {
-                let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
-                    id: format!("conv_pat_strat_{}", brain.iteration),
-                    source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
-                    pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::StrategyDiscovery,
-                    description: format!("New strategy '{}' outperforms average ({:.2} vs {:.2})", best_strat, best_eff, avg_eff),
-                    before_behavior: "auto".into(),
-                    after_behavior: best_strat.to_string(),
-                    effectiveness_gain: best_eff - avg_eff,
-                    applied_to: vec![],
-                    verified: false,
-                    timestamp,
-                };
-                if kb.store_evolution_record(&evolution).is_ok() {
-                    created_any = true;
-                    log::info!("[conv-distill] recorded StrategyDiscovery pattern: {}", evolution.description);
-                }
-            }
-        }
-
-        // 7. PrincipleUpdate — when effectiveness > 0.8 and consistent across strategies
-        if avg_eff > 0.8 {
-            let all_above_threshold = by_strategy.iter().all(|(_, v)| v.iter().sum::<f64>() / v.len() as f64 > 0.7);
-            if all_above_threshold && strategy_ratings.len() > 1 {
-                let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
-                    id: format!("conv_pat_princ_{}", brain.iteration),
-                    source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
-                    pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::PrincipleUpdate,
-                    description: format!("Consistent high effectiveness ({:.2}) across {} strategies", avg_eff, strategy_ratings.len()),
-                    before_behavior: "".into(),
-                    after_behavior: "".into(),
-                    effectiveness_gain: avg_eff,
-                    applied_to: vec![],
-                    verified: false,
-                    timestamp,
-                };
-                if kb.store_evolution_record(&evolution).is_ok() {
-                    created_any = true;
-                    log::info!("[conv-distill] recorded PrincipleUpdate pattern: {}", evolution.description);
-                }
-            }
-        }
-
-        // Read back recent evolution patterns and adjust reward
-        if let Ok(patterns) = kb.get_evolution_patterns(5) {
-            if !patterns.is_empty() {
-                let total_gain: f64 = patterns.iter().map(|p| p.effectiveness_gain).sum();
-                if total_gain > 0.0 {
-                    let bonus = (total_gain * 0.1).min(0.5);
-                    brain._set_reward(brain._reward() + bonus);
-                    log::info!("[conv-distill] evolution reward bonus: {:.4}", bonus);
-                }
-            }
+        // Adjust reward based on evolution pattern gains
+        if result.total_gain > 0.0 {
+            let bonus = (result.total_gain * 0.1).min(0.5);
+            brain._set_reward(brain._reward() + bonus);
+            log::info!("[conv-distill] evolution reward bonus: {:.4}", bonus);
         }
 
         // Broadcast to GWT
         if let Some(ref mut router) = brain.attention_router {
             let report = format!(
                 "[conversation-evolution] {} records: {}/{} OK, avg_eff={:.2}, error_rate={:.3}, patterns_created={}",
-                total, successes, failures, avg_eff, error_rate,
-                if created_any { "yes" } else { "no" },
+                result.total, result.successes, result.failures, result.avg_eff, result.error_rate,
+                if result.patterns_created { "yes" } else { "no" },
             );
             router.wm().broadcast(&report);
         }
@@ -1111,6 +1149,81 @@ impl BrainStage for EmbeddingRefreshStage {
     }
 }
 
+make_stage!(TrajectoryCollectStage);
+impl BrainStage for TrajectoryCollectStage {
+    fn name(&self) -> &str { "trajectory_collect" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        brain._trajectory_collector.begin(brain._current_task.clone());
+        for step in &brain._stage_results {
+            brain._trajectory_collector.record_step(
+                crate::core::nt_core_gwt::module_def::SpecialistType::Planner,
+                brain._e8_policy.best_mode(),
+                step.stage_name.clone(),
+                brain._current_task.clone(),
+                format!("efc={:.3}", step.efc),
+                None,
+                true,
+                None,
+            );
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(CoachLabelStage);
+impl BrainStage for CoachLabelStage {
+    fn name(&self) -> &str { "coach_label" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let trajectories: Vec<crate::core::nt_core_prm::AgentTrajectory> =
+            brain._trajectory_collector.collected.drain(..).collect();
+        if trajectories.is_empty() {
+            return Ok(StageDecision::Continue);
+        }
+        if let Some(ref coach) = brain._coach {
+            for traj in &trajectories {
+                let scores = coach.score_episode(traj);
+                for score in &scores {
+                    if let Some(step) = traj.steps.get(score.step_idx) {
+                        brain._e8_policy.set_previous(step.e8_mode);
+                        brain._e8_policy.update(score.score);
+                    }
+                }
+            }
+            brain._e8_policy.decay_epsilon();
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(PolicyUpdateStage);
+impl BrainStage for PolicyUpdateStage {
+    fn name(&self) -> &str { "policy_update" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let trajectories: Vec<crate::core::nt_core_prm::AgentTrajectory> =
+            brain._trajectory_collector.collected.drain(..).collect();
+        if trajectories.is_empty() {
+            return Ok(StageDecision::Continue);
+        }
+        if let Some(ref coach) = brain._coach {
+            for traj in &trajectories {
+                let scores = coach.score_episode(traj);
+                let outcome_reward = traj.outcome_reward.unwrap_or(0.5);
+                brain._transition_learner.record(
+                    &traj.task,
+                    traj.steps.first().map(|s| s.e8_mode).unwrap_or(brain._e8_policy.best_mode()),
+                    outcome_reward,
+                    brain.iteration,
+                );
+                let avg_score = scores.iter().map(|s| s.score).sum::<f64>() / scores.len().max(1) as f64;
+                brain._reward = brain._reward * 0.9 + avg_score * 0.1;
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
 pub fn seal_pipeline() -> BrainPipeline {
     BrainPipeline::with_stages(vec![
         Box::new(SnapshotStage::new()),
@@ -1141,6 +1254,9 @@ pub fn seal_pipeline() -> BrainPipeline {
         Box::new(ConversationDistillStage::new()),
         Box::new(crate::neotrix::nt_mind::self_iterating::aging_monitor::AgingDiagnosisStage::new()),
         Box::new(EmbeddingRefreshStage::new()),
+        Box::new(TrajectoryCollectStage::new()),
+        Box::new(CoachLabelStage::new()),
+        Box::new(PolicyUpdateStage::new()),
     ])
 }
 
@@ -1263,7 +1379,8 @@ mod tests {
             "hypercube_optimize",
             "e8_experiment",
             "epoch_slow_update", "nt_shield_scan", "session_distill", "conversation_distill", "aging_diagnosis", "embedding_refresh",
-        ], "SEAL pipeline 应有 28 个 stage");
+            "trajectory_collect", "coach_label", "policy_update",
+        ], "SEAL pipeline 应有 31 个 stage");
     }
 
     #[test]

@@ -7,6 +7,7 @@
 use super::nt_core_hex::{
     ReasoningHexagram, evolve_strategy_entry,
 };
+use super::nt_core_prm::{AgentTrajectory, Coach, ProcessScore, TrajectoryCollector};
 use rand::Rng;
 #[cfg(test)]
 use super::nt_core_hex::strategy_matrix;
@@ -261,6 +262,32 @@ impl E8Policy {
     pub fn previous_mode(&self) -> Option<ReasoningHexagram> {
         self.previous_mode
     }
+
+    /// Learn from a sequence of process scores produced by a Coach over an episode.
+    ///
+    /// Each ProcessScore is used as a TD update signal for the corresponding step's mode.
+    /// Attribution tags are mapped to factor deltas for factorized learning.
+    pub fn learn_from_scores(&mut self, trajectory: &AgentTrajectory, scores: &[ProcessScore]) {
+        for score in scores {
+            if let Some(step) = trajectory.steps.get(score.step_idx) {
+                self.set_previous(step.e8_mode);
+
+                let mut factor_deltas = [0.0; NUM_E8_FACTORS];
+                for (i, tag) in score.attribution_tags.iter().enumerate() {
+                    if i < NUM_E8_FACTORS {
+                        factor_deltas[i] = match tag {
+                            t if t.contains("good") || t.contains("ok") || t.contains("productive") => 0.1,
+                            t if t.contains("fail") || t.contains("stuck") || t.contains("inefficient") => -0.1,
+                            t if t.contains("efficient") => 0.15,
+                            _ => 0.05,
+                        };
+                    }
+                }
+                self.update_factorized(score.score, &factor_deltas);
+            }
+        }
+        self.decay_epsilon();
+    }
 }
 
 /// A single E8 experiment outcome.
@@ -427,6 +454,78 @@ impl E8TransitionLearner {
 impl Default for E8TransitionLearner {
     fn default() -> Self {
         Self::new(500, 3, 0.05)
+    }
+}
+
+/// Lightweight online learner that wraps Coach + Policy + TrajectoryCollector.
+///
+/// This is the CPU-trainable PRM integration point:
+/// 1. Collect trajectories via `TrajectoryCollector`
+/// 2. Score them with a `Coach`
+/// 3. Learn from scores via `E8Policy::learn_from_scores`
+pub struct ProcessRewardLearner {
+    pub policy: E8Policy,
+    pub coach: Box<dyn Coach>,
+    pub collector: TrajectoryCollector,
+    pub learning_count: u64,
+    pub score_history: Vec<f64>,
+}
+
+impl ProcessRewardLearner {
+    pub fn new(policy: E8Policy, coach: Box<dyn Coach>) -> Self {
+        Self {
+            policy,
+            coach,
+            collector: TrajectoryCollector::new(),
+            learning_count: 0,
+            score_history: Vec::new(),
+        }
+    }
+
+    /// Run one learning step: collect, score, learn.
+    ///
+    /// `collect_fn` should populate `collector` with trajectory steps.
+    pub fn learn_step<F>(&mut self, collect_fn: F)
+    where
+        F: FnOnce(&mut TrajectoryCollector),
+    {
+        // Phase 1: collect trajectory
+        collect_fn(&mut self.collector);
+
+        // Phase 2: score collected trajectories
+        let trajectories: Vec<AgentTrajectory> = self.collector.collected.drain(..).collect();
+
+        for traj in &trajectories {
+            let scores = self.coach.score_episode(traj);
+            let avg_score = scores.iter().map(|s| s.score).sum::<f64>() / scores.len().max(1) as f64;
+            self.score_history.push(avg_score);
+
+            // Phase 3: learn from scores
+            self.policy.learn_from_scores(traj, &scores);
+
+            // Phase 4: record in transition learner
+            for step in &traj.steps {
+                if let Some(ext_r) = step.external_reward {
+                    let _outcome = E8Outcome {
+                        task: traj.task.clone(),
+                        mode: step.e8_mode,
+                        reward: ext_r,
+                        iteration: self.learning_count,
+                    };
+                }
+            }
+        }
+
+        self.learning_count += 1;
+    }
+
+    /// Average score from recent learning steps.
+    pub fn avg_recent_score(&self, window: usize) -> f64 {
+        let window = window.min(self.score_history.len());
+        if window == 0 {
+            return 0.0;
+        }
+        self.score_history.iter().rev().take(window).sum::<f64>() / window as f64
     }
 }
 
