@@ -1,5 +1,6 @@
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_gwt::module_def::SpecialistType;
+use crate::core::nt_core_policy::E8Policy;
 
 /// One step in a multi-agent reasoning trajectory.
 #[derive(Debug, Clone)]
@@ -341,6 +342,74 @@ impl Coach for HeuristicCoach {
     }
 }
 
+/// Lightweight online learner that wraps Coach + Policy + TrajectoryCollector.
+///
+/// This is the CPU-trainable PRM integration point:
+/// 1. Collect trajectories via `TrajectoryCollector`
+/// 2. Score them with a `Coach`
+/// 3. Learn from scores via `E8Policy::learn_from_scores`
+pub struct ProcessRewardLearner {
+    pub policy: E8Policy,
+    pub coach: Box<dyn Coach>,
+    pub collector: TrajectoryCollector,
+    pub learning_count: u64,
+    pub score_history: Vec<f64>,
+}
+
+impl ProcessRewardLearner {
+    pub fn new(policy: E8Policy, coach: Box<dyn Coach>) -> Self {
+        Self {
+            policy,
+            coach,
+            collector: TrajectoryCollector::new(),
+            learning_count: 0,
+            score_history: Vec::new(),
+        }
+    }
+
+    /// Run one learning step: collect, score, learn.
+    ///
+    /// `collect_fn` should populate `collector` with trajectory steps.
+    pub fn learn_step<F>(&mut self, collect_fn: F)
+    where
+        F: FnOnce(&mut TrajectoryCollector),
+    {
+        collect_fn(&mut self.collector);
+
+        let trajectories: Vec<AgentTrajectory> = self.collector.collected.drain(..).collect();
+
+        for traj in &trajectories {
+            let scores = self.coach.score_episode(traj);
+            let avg_score = scores.iter().map(|s| s.score).sum::<f64>() / scores.len().max(1) as f64;
+            self.score_history.push(avg_score);
+
+            self.policy.learn_from_scores(traj, &scores);
+
+            for step in &traj.steps {
+                if let Some(ext_r) = step.external_reward {
+                    let _outcome = crate::core::nt_core_policy::E8Outcome {
+                        task: traj.task.clone(),
+                        mode: step.e8_mode,
+                        reward: ext_r,
+                        iteration: self.learning_count,
+                    };
+                }
+            }
+        }
+
+        self.learning_count += 1;
+    }
+
+    /// Average score from recent learning steps.
+    pub fn avg_recent_score(&self, window: usize) -> f64 {
+        let window = window.min(self.score_history.len());
+        if window == 0 {
+            return 0.0;
+        }
+        self.score_history.iter().rev().take(window).sum::<f64>() / window as f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -449,7 +518,6 @@ mod tests {
 
     #[test]
     fn test_process_reward_learner_end_to_end() {
-        use crate::core::nt_core_policy::ProcessRewardLearner;
         let policy = crate::core::nt_core_policy::E8Policy::new(0.0, 1.0, 0.0, 0.5, 0.0);
         let coach: Box<dyn Coach> = Box::new(HeuristicCoach::default());
         let mut learner = ProcessRewardLearner::new(policy, coach);

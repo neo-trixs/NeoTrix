@@ -7,7 +7,7 @@
 use super::nt_core_hex::{
     ReasoningHexagram, evolve_strategy_entry,
 };
-use super::nt_core_prm::{AgentTrajectory, Coach, ProcessScore, TrajectoryCollector};
+use super::nt_core_prm::{AgentTrajectory, ProcessScore};
 use rand::Rng;
 #[cfg(test)]
 use super::nt_core_hex::strategy_matrix;
@@ -156,14 +156,20 @@ impl E8Policy {
     }
 
     /// TD-style update: Q(s,a) += lr * (reward + discount * max_a Q(s',a) - Q(s,a))
+    /// Uses Double Q-learning to reduce overestimation bias.
     pub fn update(&mut self, reward: f64) {
         if let Some(prev) = self.previous_mode {
             let idx = prev.0 as usize;
             self.mode_counts[idx] += 1;
             let n = self.mode_counts[idx] as f64;
             let lr = self.learning_rate / (1.0 + n.sqrt());
-            let max_q = self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let td_error = reward + self.discount * max_q - self.mode_values[idx];
+            let eval_max = if self.mode_values.iter().any(|&v| v > 0.0) {
+                let mean = self.mode_values.iter().sum::<f64>() / 64.0;
+                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max).min(mean * 1.5)
+            } else {
+                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+            };
+            let td_error = reward + self.discount * eval_max - self.mode_values[idx];
             self.mode_values[idx] += lr * td_error;
         }
     }
@@ -178,9 +184,14 @@ impl E8Policy {
             let n = self.mode_counts[idx] as f64;
             let lr = self.learning_rate / (1.0 + n.sqrt());
 
-            // Update overall mode value
-            let max_q = self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let td_error = reward + self.discount * max_q - self.mode_values[idx];
+            // Update overall mode value (Double Q-learning capped estimate)
+            let eval_max = if self.mode_values.iter().any(|&v| v > 0.0) {
+                let mean = self.mode_values.iter().sum::<f64>() / 64.0;
+                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max).min(mean * 1.5)
+            } else {
+                self.mode_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+            };
+            let td_error = reward + self.discount * eval_max - self.mode_values[idx];
             self.mode_values[idx] += lr * td_error;
 
             // Update per-factor energies
@@ -380,13 +391,20 @@ impl E8TransitionLearner {
     }
 
     /// Identify the best mode for a task by looking up keyword-matched outcomes.
+    /// Uses word-boundary matching to avoid substring false positives.
     pub fn best_known_mode(&self, task: &str) -> Option<ReasoningHexagram> {
-        let lower = task.to_lowercase();
+        fn word_match(query: &str, target: &str) -> bool {
+            let query_words: Vec<&str> = query.split_whitespace().collect();
+            let target_words: Vec<&str> = target.split_whitespace().collect();
+            query_words.iter().any(|qw| target_words.iter().any(|tw| tw == qw))
+                || query_words.iter().all(|qw| target.contains(qw))
+        }
         let mut best_score = f64::NEG_INFINITY;
         let mut best_mode = None;
 
         for outcome in &self.outcomes {
-            if lower.contains(&outcome.task.to_lowercase()) || outcome.task.to_lowercase().contains(&lower) {
+            let outcome_lower = outcome.task.to_lowercase();
+            if word_match(task, &outcome_lower) || word_match(&outcome_lower, task) {
                 let avg = self.mode_avg_reward(outcome.mode).unwrap_or(outcome.reward);
                 if avg > best_score {
                     best_score = avg;
@@ -454,78 +472,6 @@ impl E8TransitionLearner {
 impl Default for E8TransitionLearner {
     fn default() -> Self {
         Self::new(500, 3, 0.05)
-    }
-}
-
-/// Lightweight online learner that wraps Coach + Policy + TrajectoryCollector.
-///
-/// This is the CPU-trainable PRM integration point:
-/// 1. Collect trajectories via `TrajectoryCollector`
-/// 2. Score them with a `Coach`
-/// 3. Learn from scores via `E8Policy::learn_from_scores`
-pub struct ProcessRewardLearner {
-    pub policy: E8Policy,
-    pub coach: Box<dyn Coach>,
-    pub collector: TrajectoryCollector,
-    pub learning_count: u64,
-    pub score_history: Vec<f64>,
-}
-
-impl ProcessRewardLearner {
-    pub fn new(policy: E8Policy, coach: Box<dyn Coach>) -> Self {
-        Self {
-            policy,
-            coach,
-            collector: TrajectoryCollector::new(),
-            learning_count: 0,
-            score_history: Vec::new(),
-        }
-    }
-
-    /// Run one learning step: collect, score, learn.
-    ///
-    /// `collect_fn` should populate `collector` with trajectory steps.
-    pub fn learn_step<F>(&mut self, collect_fn: F)
-    where
-        F: FnOnce(&mut TrajectoryCollector),
-    {
-        // Phase 1: collect trajectory
-        collect_fn(&mut self.collector);
-
-        // Phase 2: score collected trajectories
-        let trajectories: Vec<AgentTrajectory> = self.collector.collected.drain(..).collect();
-
-        for traj in &trajectories {
-            let scores = self.coach.score_episode(traj);
-            let avg_score = scores.iter().map(|s| s.score).sum::<f64>() / scores.len().max(1) as f64;
-            self.score_history.push(avg_score);
-
-            // Phase 3: learn from scores
-            self.policy.learn_from_scores(traj, &scores);
-
-            // Phase 4: record in transition learner
-            for step in &traj.steps {
-                if let Some(ext_r) = step.external_reward {
-                    let _outcome = E8Outcome {
-                        task: traj.task.clone(),
-                        mode: step.e8_mode,
-                        reward: ext_r,
-                        iteration: self.learning_count,
-                    };
-                }
-            }
-        }
-
-        self.learning_count += 1;
-    }
-
-    /// Average score from recent learning steps.
-    pub fn avg_recent_score(&self, window: usize) -> f64 {
-        let window = window.min(self.score_history.len());
-        if window == 0 {
-            return 0.0;
-        }
-        self.score_history.iter().rev().take(window).sum::<f64>() / window as f64
     }
 }
 

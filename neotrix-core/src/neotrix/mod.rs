@@ -38,7 +38,7 @@ pub mod nt_memory_knowledge_populator;
 pub mod nt_io_logging;
 pub mod nt_io_http_factory;
 pub mod nt_io_mention;
-pub mod nt_io_neotrix_interface;
+// pub mod nt_io_neotrix_interface; // 孤儿声明,文件不存在
 pub mod nt_io_push_channel;
 pub mod nt_io_standalone;
 #[cfg(feature = "telemetry")]

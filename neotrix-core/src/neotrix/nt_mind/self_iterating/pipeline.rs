@@ -1170,9 +1170,9 @@ impl BrainStage for TrajectoryCollectStage {
     }
 }
 
-make_stage!(CoachLabelStage);
-impl BrainStage for CoachLabelStage {
-    fn name(&self) -> &str { "coach_label" }
+make_stage!(CoachAndUpdateStage);
+impl BrainStage for CoachAndUpdateStage {
+    fn name(&self) -> &str { "coach_and_update" }
     fn frequency(&self) -> usize { 3 }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let trajectories: Vec<crate::core::nt_core_prm::AgentTrajectory> =
@@ -1180,7 +1180,7 @@ impl BrainStage for CoachLabelStage {
         if trajectories.is_empty() {
             return Ok(StageDecision::Continue);
         }
-        if let Some(ref coach) = brain._coach {
+        if let Some(ref mut coach) = brain._coach {
             for traj in &trajectories {
                 let scores = coach.score_episode(traj);
                 for score in &scores {
@@ -1189,26 +1189,6 @@ impl BrainStage for CoachLabelStage {
                         brain._e8_policy.update(score.score);
                     }
                 }
-            }
-            brain._e8_policy.decay_epsilon();
-        }
-        Ok(StageDecision::Continue)
-    }
-}
-
-make_stage!(PolicyUpdateStage);
-impl BrainStage for PolicyUpdateStage {
-    fn name(&self) -> &str { "policy_update" }
-    fn frequency(&self) -> usize { 3 }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let trajectories: Vec<crate::core::nt_core_prm::AgentTrajectory> =
-            brain._trajectory_collector.collected.drain(..).collect();
-        if trajectories.is_empty() {
-            return Ok(StageDecision::Continue);
-        }
-        if let Some(ref coach) = brain._coach {
-            for traj in &trajectories {
-                let scores = coach.score_episode(traj);
                 let outcome_reward = traj.outcome_reward.unwrap_or(0.5);
                 brain._transition_learner.record(
                     &traj.task,
@@ -1219,6 +1199,7 @@ impl BrainStage for PolicyUpdateStage {
                 let avg_score = scores.iter().map(|s| s.score).sum::<f64>() / scores.len().max(1) as f64;
                 brain._reward = brain._reward * 0.9 + avg_score * 0.1;
             }
+            brain._e8_policy.decay_epsilon();
         }
         Ok(StageDecision::Continue)
     }
@@ -1255,8 +1236,7 @@ pub fn seal_pipeline() -> BrainPipeline {
         Box::new(crate::neotrix::nt_mind::self_iterating::aging_monitor::AgingDiagnosisStage::new()),
         Box::new(EmbeddingRefreshStage::new()),
         Box::new(TrajectoryCollectStage::new()),
-        Box::new(CoachLabelStage::new()),
-        Box::new(PolicyUpdateStage::new()),
+        Box::new(CoachAndUpdateStage::new()),
     ])
 }
 
@@ -1379,8 +1359,8 @@ mod tests {
             "hypercube_optimize",
             "e8_experiment",
             "epoch_slow_update", "nt_shield_scan", "session_distill", "conversation_distill", "aging_diagnosis", "embedding_refresh",
-            "trajectory_collect", "coach_label", "policy_update",
-        ], "SEAL pipeline 应有 31 个 stage");
+            "trajectory_collect", "coach_and_update",
+        ], "SEAL pipeline 应有 30 个 stage");
     }
 
     #[test]

@@ -101,7 +101,8 @@ pub use nt_core_hex::{
     evolve_strategy_entry,
     MODE_NAMES, MODE_DESCRIPTIONS, MODE_TASKS,
 };
-pub use nt_core_policy::{E8Outcome, E8TransitionLearner, E8Policy, NUM_E8_FACTORS, ProcessRewardLearner};
+pub use nt_core_policy::{E8Outcome, E8TransitionLearner, E8Policy, NUM_E8_FACTORS};
+pub use nt_core_prm::ProcessRewardLearner;
 pub use nt_core_observer::{OneObserver, ObserverReport};
 pub use nt_core_prm::{
     AgentTrajectory, TrajectoryStep, ProcessScore, ScoredCriterion,
