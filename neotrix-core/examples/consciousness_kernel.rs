@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::knowledge_engine::*;
-use neotrix::neotrix::reasoning_brain::CapabilityVector;
+use neotrix::neotrix::nt_mind::knowledge_engine::*;
+use neotrix::neotrix::nt_mind::CapabilityVector;
 
 /// 意识推理内核 — 从古籍知识中提炼思想力量，迭代核心认知
 fn main() {
@@ -15,7 +15,7 @@ fn main() {
     eng.set_persist_path(kb_path.clone());
 
     // Load existing brain
-    let mut cap = if let Ok(b) = neotrix::neotrix::reasoning_brain::ReasoningBrain::load() {
+    let mut cap = if let Ok(b) = neotrix::neotrix::nt_mind::ReasoningBrain::load() {
         println!("✅ 加载 brain.json, 当前能力向量和: {:.3}",
             b.capability.to_full_vector().iter().sum::<f64>());
         b.capability
@@ -71,7 +71,7 @@ fn main() {
     println!("\n  归一化后能力向量和: {:.3}", cap.to_full_vector().iter().sum::<f64>());
 
     // Save capability vector
-    let brain = neotrix::neotrix::reasoning_brain::ReasoningBrain { capability: cap.clone(), ..Default::default() };
+    let brain = neotrix::neotrix::nt_mind::ReasoningBrain { capability: cap.clone(), ..Default::default() };
     if let Err(e) = brain.save() { eprintln!("❌ brain保存失败: {}", e); }
     else { println!("💾 brain.json已更新"); }
 

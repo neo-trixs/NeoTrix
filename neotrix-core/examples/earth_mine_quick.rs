@@ -1,12 +1,12 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::self_iterating::SelfIteratingBrain;
-use neotrix::neotrix::reasoning_brain::web_miner::WebKnowledgeMiner;
+use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::neotrix::nt_mind::web_miner::WebKnowledgeMiner;
 
 fn main() {
     println!("=== 🌍 地球演进知识库 — 快速挖掘（跳过git clone） ===");
 
-    let mut brain = if neotrix::neotrix::reasoning_brain::ReasoningBrain::has_saved_state() {
-        match neotrix::neotrix::reasoning_brain::ReasoningBrain::load() {
+    let mut brain = if neotrix::neotrix::nt_mind::ReasoningBrain::has_saved_state() {
+        match neotrix::neotrix::nt_mind::ReasoningBrain::load() {
             Ok(b) => {
                 println!("✅ 加载已有 brain.json");
                 let mut agent = SelfIteratingBrain::new();
@@ -92,7 +92,7 @@ fn main() {
                     "analysis", "creativity", "experimental", "verification",
                     "compound_composition", "quality_gates"];
     for name in &tracked {
-        if let Some(idx) = neotrix::neotrix::reasoning_brain::CapabilityVector::index_from_name(name) {
+        if let Some(idx) = neotrix::neotrix::nt_mind::CapabilityVector::index_from_name(name) {
             let val = cap.arr()[idx];
             let bar = "█".repeat((val * 30.0) as usize);
             let empty = "░".repeat(30 - (val * 30.0) as usize);

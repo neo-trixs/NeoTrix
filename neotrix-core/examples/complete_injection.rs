@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::knowledge_engine::*;
-use neotrix::neotrix::reasoning_brain::CapabilityVector;
+use neotrix::neotrix::nt_mind::knowledge_engine::*;
+use neotrix::neotrix::nt_mind::CapabilityVector;
 
 fn add(eng: &mut KnowledgeEngine, t: &str, b: String, tags: Vec<&str>, imp: f64) {
     if !eng.entries.values().any(|x| x.title.contains(t) && t.len() > 4) {
@@ -113,7 +113,7 @@ fn main() {
     println!("  ✅ 交叉关系");
 
     // ── 意识迭代 ──
-    let mut cap = if let Ok(b) = neotrix::neotrix::reasoning_brain::ReasoningBrain::load() { b.capability }
+    let mut cap = if let Ok(b) = neotrix::neotrix::nt_mind::ReasoningBrain::load() { b.capability }
         else { CapabilityVector::default() };
     for (d,v) in &[("domain_specificity",0.06),("synthesis",0.04)] {
         if let Some(idx) = CapabilityVector::index_from_name(d) {
@@ -121,7 +121,7 @@ fn main() {
         }
     }
     cap.normalize();
-    let _ = neotrix::neotrix::reasoning_brain::ReasoningBrain { capability: cap, ..Default::default() }.save();
+    let _ = neotrix::neotrix::nt_mind::ReasoningBrain { capability: cap, ..Default::default() }.save();
     if let Err(e) = eng.save() { eprintln!("❌{}", e); }
     println!("\n💾 完成: {}条目(+{}), 关系{}", eng.stats().total_entries,
         eng.stats().total_entries - before, eng.stats().total_relations);

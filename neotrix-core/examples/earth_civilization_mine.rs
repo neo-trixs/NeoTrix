@@ -1,11 +1,11 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::self_iterating::SelfIteratingBrain;
+use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 
 fn main() {
     println!("=== 地球文明多维度时间链路 - 知识挖掘 ===");
 
-    let mut brain = if neotrix::neotrix::reasoning_brain::ReasoningBrain::has_saved_state() {
-        match neotrix::neotrix::reasoning_brain::ReasoningBrain::load() {
+    let mut brain = if neotrix::neotrix::nt_mind::ReasoningBrain::has_saved_state() {
+        match neotrix::neotrix::nt_mind::ReasoningBrain::load() {
             Ok(b) => {
                 println!("✅ 加载已有 brain.json");
                 let mut agent = SelfIteratingBrain::new();
@@ -132,9 +132,9 @@ fn main() {
             if !edits.is_empty() {
                 // 注册为知识来源
                 let source_name = format!("wiki_{}", file_name);
-                let mut cv = neotrix::neotrix::reasoning_brain::CapabilityVector::default();
+                let mut cv = neotrix::neotrix::nt_mind::CapabilityVector::default();
                 for (dim, delta) in &edits {
-                    if let Some(idx) = neotrix::neotrix::reasoning_brain::CapabilityVector::index_from_name(dim) {
+                    if let Some(idx) = neotrix::neotrix::nt_mind::CapabilityVector::index_from_name(dim) {
                         cv.arr_mut()[idx] = *delta;
                     }
                 }
@@ -145,7 +145,7 @@ fn main() {
 
                 // 应用 MicroEdits
                 for (dim, delta) in &edits {
-                    if let Some(idx) = neotrix::neotrix::reasoning_brain::CapabilityVector::index_from_name(dim) {
+                    if let Some(idx) = neotrix::neotrix::nt_mind::CapabilityVector::index_from_name(dim) {
                         let val = &mut brain.brain.capability.arr_mut()[idx];
                         *val = (*val + delta).clamp(0.0, 1.0);
                     }
@@ -168,9 +168,9 @@ fn main() {
     brain.brain.capability.normalize();
 
     // 存储到 ReasoningBank
-    let memory = neotrix::neotrix::reasoning_brain::ReasoningMemory::new(
+    let memory = neotrix::neotrix::nt_mind::ReasoningMemory::new(
         &format!("地球文明多维度时间链路: {} 个来源吸收", success_count),
-        neotrix::neotrix::world_model::TaskType::CodeAnalysis,
+        neotrix::neotrix::nt_world_model::TaskType::CodeAnalysis,
         &[],
         total_reward / urls.len() as f64,
     );
@@ -202,7 +202,7 @@ fn main() {
     let names = ["inference_depth", "domain_specificity", "synthesis", "analysis",
                   "creativity", "experimental"];
     for name in &names {
-        if let Some(idx) = neotrix::neotrix::reasoning_brain::CapabilityVector::index_from_name(name) {
+        if let Some(idx) = neotrix::neotrix::nt_mind::CapabilityVector::index_from_name(name) {
             if cap.arr()[idx] > 0.01 {
                 println!("  {}: {:.3}", name, cap.arr()[idx]);
             }

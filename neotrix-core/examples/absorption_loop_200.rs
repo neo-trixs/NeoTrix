@@ -1,9 +1,9 @@
 fn main() {
-    use neotrix::neotrix::reasoning_brain::core::{
+    use neotrix::neotrix::nt_mind::core::{
         KnowledgeSource, FIELD_NAMES,
     };
-    use neotrix::neotrix::reasoning_brain::self_iterating::ReasoningBrain;
-    use neotrix::neotrix::reasoning_brain::attention_router::AttentionRouter;
+    use neotrix::neotrix::nt_mind::self_iterating::ReasoningBrain;
+    use neotrix::neotrix::nt_mind::attention_router::AttentionRouter;
     use neotrix::core::memory::ReasoningBank;
 
     const N: usize = 200;

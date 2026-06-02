@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::cortex_memory::*;
-use neotrix::neotrix::reasoning_brain::web_miner::WebKnowledgeMiner;
+use neotrix::neotrix::nt_mind::cortex_memory::*;
+use neotrix::neotrix::nt_mind::web_miner::WebKnowledgeMiner;
 
 fn mine_to_cortex(miner: &mut WebKnowledgeMiner, urls: &[&str], cortex: &mut CortexMemory, label: &str) -> usize {
     println!("\n📌 {} ({} 个来源)", label, urls.len());

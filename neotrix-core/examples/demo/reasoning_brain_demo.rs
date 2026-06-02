@@ -3,10 +3,10 @@
 //! 展示吸收不同知识源（HeroUI, BaseUI 等）后能力向量的变化
 //! 使用 ReasoningBrain::absorb() 和 evaluate_capability()
 
-use neotrix::reasoning_brain::{
+use neotrix::neotrix::nt_mind::{
     ReasoningBrain, KnowledgeSource, CapabilityVector,
 };
-use neotrix::world_model::TaskType;
+use neotrix::neotrix::nt_world_model::TaskType;
 use colored::Colorize;
 
 /// 打印能力向量（只显示关键维度）

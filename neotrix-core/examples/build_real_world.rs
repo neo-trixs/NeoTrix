@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::knowledge_engine::*;
+use neotrix::neotrix::nt_mind::knowledge_engine::*;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");

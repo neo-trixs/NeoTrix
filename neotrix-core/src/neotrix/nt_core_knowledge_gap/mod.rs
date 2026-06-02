@@ -318,7 +318,7 @@ mod tests {
     fn test_to_camel_case() {
         assert_eq!(to_camel_case("knowledge_gap_detector"), "KnowledgeGapDetector");
         assert_eq!(to_camel_case("intra_reflection"), "IntraReflection");
-        assert_eq!(to_camel_case("nt_world_model"), "WorldModel");
+        assert_eq!(to_camel_case("nt_world_model"), "NtWorldModel");
     }
 
     #[test]

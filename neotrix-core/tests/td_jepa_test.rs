@@ -1,4 +1,4 @@
-use neotrix::world_model::world_model_td_jepa::TemporalDifferenceJEPA;
+use neotrix::neotrix::nt_world_model::world_model_td_jepa::TemporalDifferenceJEPA;
 
 fn make_state() -> Vec<f64> {
     vec![0.1, -0.2, 0.3, -0.1, 0.05, -0.05, 0.15, -0.25]

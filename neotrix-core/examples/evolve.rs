@@ -7,10 +7,10 @@
 //! 使用: cargo run --bin evolve --release
 use std::time::Instant;
 
-use neotrix::neotrix::crawler::{
+use neotrix::neotrix::nt_world_crawl::{
     CrawlerConfig, CrawlStrategy, CrawlTopic, SeedEntry, UnifiedCrawler,
 };
-use neotrix::neotrix::reasoning_brain::attention_router::AttentionRouter;
+use neotrix::neotrix::nt_mind::attention_router::AttentionRouter;
 use neotrix::{ReasoningBrain, ReasoningBank};
 
 fn main() {

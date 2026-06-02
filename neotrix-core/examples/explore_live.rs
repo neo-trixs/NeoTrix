@@ -2,11 +2,11 @@
 /// cargo run --example explore_live
 
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::exploration_pipeline::{
+use neotrix::neotrix::nt_mind::exploration_pipeline::{
     ExplorationPipeline, ExploreDomain, seed_urls_by_domain,
 };
-use neotrix::neotrix::reasoning_brain::self_iterating::SelfIteratingBrain;
-use neotrix::neotrix::reasoning_brain::memory::ReasoningBank;
+use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 use neotrix::neotrix::nt_memory_knowledge_populator::KnowledgePopulator;
 
 fn print_header(s: &str) {

@@ -42,7 +42,7 @@ fn main() {
 
     // 5. 代码审查
     println!("\n=== 代码审查 ===");
-    let reviewer = neotrix::reasoning_brain::code_review::CodeReviewEngine::new(cv);
+    let reviewer = neotrix::neotrix::nt_mind::code_review::CodeReviewEngine::new(cv);
     let code = "fn main() { let x = foo.unwrap(); unsafe { *p = 1; } }";
     let report = reviewer.review("example.rs", code);
     println!("审查评分: {:.3}, 问题数: {}", report.score, report.total());

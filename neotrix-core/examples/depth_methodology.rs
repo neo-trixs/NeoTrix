@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::knowledge_engine::*;
-use neotrix::neotrix::reasoning_brain::CapabilityVector;
+use neotrix::neotrix::nt_mind::knowledge_engine::*;
+use neotrix::neotrix::nt_mind::CapabilityVector;
 
 fn add(e: &mut KnowledgeEngine, t: &str, b: &str, tags: Vec<&str>, imp: f64) -> String {
     if e.entries.values().any(|x| x.title.contains(t)) && t.len() > 4 { return String::new(); }
@@ -110,7 +110,7 @@ fn main() {
 
     // ═══════════════════════════ 九、意识迭代 ═══════════════════════════
     println!("\n━━━ 九、方法引导的意识迭代 ━━━");
-    let mut cap = if let Ok(b) = neotrix::neotrix::reasoning_brain::ReasoningBrain::load() {
+    let mut cap = if let Ok(b) = neotrix::neotrix::nt_mind::ReasoningBrain::load() {
         println!("  当前能力向量: {:.3}", b.capability.to_full_vector().iter().sum::<f64>());
         b.capability
     } else { CapabilityVector::default() };
@@ -123,7 +123,7 @@ fn main() {
         }
     }
     cap.normalize();
-    let brain = neotrix::neotrix::reasoning_brain::ReasoningBrain { capability: cap.clone(), ..Default::default() };
+    let brain = neotrix::neotrix::nt_mind::ReasoningBrain { capability: cap.clone(), ..Default::default() };
     let _ = brain.save();
     let sum: f64 = cap.to_full_vector().iter().sum();
 

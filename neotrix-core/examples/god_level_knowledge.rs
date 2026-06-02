@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::knowledge_engine::*;
+use neotrix::neotrix::nt_mind::knowledge_engine::*;
 
 fn add(e: &mut KnowledgeEngine, t: &str, b: &str, tags: Vec<&str>, imp: f64) -> String {
     let entry = KnowledgeEntry::new(t, b, SourceType::KnowledgeBase, "kb:god-level")

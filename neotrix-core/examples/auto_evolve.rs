@@ -1,8 +1,8 @@
 //! 自动进化示例 - 自动检测并执行 URL 分析
 //! 从 stdin 读取输入，自动检测 URL 并执行进化
-use neotrix::reasoning_brain::self_evolver::SelfEvolver;
-use neotrix::reasoning_brain::self_iterating::ReasoningBrain;
-use neotrix::reasoning_brain::memory::ReasoningBank;
+use neotrix::neotrix::nt_mind::self_evolver::SelfEvolver;
+use neotrix::neotrix::nt_mind::self_iterating::ReasoningBrain;
+use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 

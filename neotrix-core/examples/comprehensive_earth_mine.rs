@@ -1,7 +1,7 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::self_iterating::SelfIteratingBrain;
-use neotrix::neotrix::reasoning_brain::web_miner::WebKnowledgeMiner;
-use neotrix::neotrix::reasoning_brain::knowledge_miner::KnowledgeMiner;
+use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
+use neotrix::neotrix::nt_mind::web_miner::WebKnowledgeMiner;
+use neotrix::neotrix::nt_mind::knowledge_miner::KnowledgeMiner;
 
 // ============================================================
 // 地球演进完整知识库 — 4 源类型统一挖掘
@@ -14,8 +14,8 @@ fn main() {
     println!("╚════════════════════════════════════════════════════╝");
 
     // 加载/创建 brain
-    let mut brain = if neotrix::neotrix::reasoning_brain::ReasoningBrain::has_saved_state() {
-        match neotrix::neotrix::reasoning_brain::ReasoningBrain::load() {
+    let mut brain = if neotrix::neotrix::nt_mind::ReasoningBrain::has_saved_state() {
+        match neotrix::neotrix::nt_mind::ReasoningBrain::load() {
             Ok(b) => {
                 let mut agent = SelfIteratingBrain::new();
                 agent.brain = b;
@@ -137,7 +137,7 @@ fn main() {
     let tracked = ["synthesis", "inference_depth", "domain_specificity",
                     "analysis", "creativity", "experimental", "verification"];
     for name in &tracked {
-        if let Some(idx) = neotrix::neotrix::reasoning_brain::CapabilityVector::index_from_name(name) {
+        if let Some(idx) = neotrix::neotrix::nt_mind::CapabilityVector::index_from_name(name) {
             let val = cap.arr()[idx];
             let bar = "█".repeat((val * 30.0) as usize);
             let empty = "░".repeat(30 - (val * 30.0) as usize);
@@ -152,8 +152,8 @@ fn main() {
     }
 }
 
-fn kb_web_miner(work_dir: &PathBuf, brain: &mut neotrix::neotrix::reasoning_brain::self_iterating::ReasoningBrain,
-                bank: &mut neotrix::neotrix::reasoning_brain::memory::ReasoningBank) {
+fn kb_web_miner(work_dir: &PathBuf, brain: &mut neotrix::neotrix::nt_mind::self_iterating::ReasoningBrain,
+                bank: &mut neotrix::neotrix::nt_mind::memory::ReasoningBank) {
     let mut miner = WebKnowledgeMiner::new(work_dir.clone());
     let kb_urls = vec![
         "https://www.nature.com/scitable/knowledge/library/earth-science-14572495/",

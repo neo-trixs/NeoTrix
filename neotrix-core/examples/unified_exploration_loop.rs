@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use neotrix::neotrix::reasoning_brain::{
+use neotrix::neotrix::nt_mind::{
     ReasoningBrain, ReasoningBank,
     exploration_pipeline::ExplorationPipeline,
 };

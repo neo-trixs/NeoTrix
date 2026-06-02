@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::self_iterating::SelfIteratingBrain;
+use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 
 fn main() {
     println!("=== NeoTrix 知识挖掘启动 ===");

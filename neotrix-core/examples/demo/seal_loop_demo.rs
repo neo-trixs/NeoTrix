@@ -3,11 +3,11 @@
 //! 展示 run_seal_loop() 如何根据任务调整能力向量
 //! 展示 ReasoningBank 如何存储和检索记忆
 
-use neotrix::reasoning_brain::{
+use neotrix::neotrix::nt_mind::{
     SelfIteratingBrain, ReasoningBank, ReasoningMemory,
     KnowledgeSource, SelfEdit,
 };
-use neotrix::world_model::TaskType;
+use neotrix::neotrix::nt_world_model::TaskType;
 use colored::Colorize;
 
 /// 打印 SelfIteratingBrain 状态

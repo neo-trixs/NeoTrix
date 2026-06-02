@@ -1,18 +1,18 @@
 //! SEAL 循环和 ReasoningBank 基准测试
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use neotrix::neotrix::reasoning_brain::{
+use neotrix::neotrix::nt_mind::{
     self_iterating::SelfIteratingBrain,
     core::{CapabilityVector, KnowledgeSource},
     memory::{ReasoningBank, ReasoningMemory},
 };
-use neotrix::neotrix::reasoning_brain::self_edit::SelfEdit;
+use neotrix::neotrix::nt_mind::self_edit::SelfEdit;
 use std::time::Duration;
 
 /// 生成测试用的 SelfEdit
 fn make_test_edit(_task: &str) -> SelfEdit {
     SelfEdit {
-        task_type: neotrix::neotrix::world_model::TaskType::Design,
+        task_type: neotrix::neotrix::nt_world_model::TaskType::Design,
         target_dimensions: vec!["typography".to_string(), "color".to_string()],
         adjustment_magnitude: 0.1,
         tool_calls: vec![],

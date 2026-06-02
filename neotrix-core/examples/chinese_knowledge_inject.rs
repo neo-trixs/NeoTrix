@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::knowledge_engine::*;
+use neotrix::neotrix::nt_mind::knowledge_engine::*;
 use std::collections::HashMap;
 
 fn add(e: &mut KnowledgeEngine, t: &str, b: &str, tags: Vec<&str>, imp: f64) -> String {

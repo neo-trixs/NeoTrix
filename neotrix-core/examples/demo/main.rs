@@ -10,9 +10,9 @@ mod reasoning_brain_demo;
 mod seal_loop_demo;
 mod mcp_tools_demo;
 
-use neotrix::reasoning_brain::self_evolver::SelfEvolver;
-use neotrix::reasoning_brain::self_iterating::ReasoningBrain;
-use neotrix::reasoning_brain::memory::ReasoningBank;
+use neotrix::neotrix::nt_mind::self_evolver::SelfEvolver;
+use neotrix::neotrix::nt_mind::self_iterating::ReasoningBrain;
+use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 
 #[derive(Parser)]
 #[command(

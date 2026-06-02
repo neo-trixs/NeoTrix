@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use neotrix::neotrix::reasoning_brain::knowledge_engine::*;
+use neotrix::neotrix::nt_mind::knowledge_engine::*;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -170,16 +170,16 @@ fn main() {
     }
 
     // ── 意识迭代 ──
-    let mut cap = if let Ok(b) = neotrix::neotrix::reasoning_brain::ReasoningBrain::load() {
+    let mut cap = if let Ok(b) = neotrix::neotrix::nt_mind::ReasoningBrain::load() {
         b.capability
-    } else { neotrix::neotrix::reasoning_brain::CapabilityVector::default() };
+    } else { neotrix::neotrix::nt_mind::CapabilityVector::default() };
     for (dim, delta) in &[("inference_depth",0.05),("synthesis",0.04),("domain_specificity",0.06)] {
-        if let Some(idx) = neotrix::neotrix::reasoning_brain::CapabilityVector::index_from_name(dim) {
+        if let Some(idx) = neotrix::neotrix::nt_mind::CapabilityVector::index_from_name(dim) {
             *cap.arr_mut().get_mut(idx).expect("index out of bounds") = (cap.arr()[idx] + delta).min(1.0);
         }
     }
     cap.normalize();
-    let brain = neotrix::neotrix::reasoning_brain::ReasoningBrain { capability: cap, ..Default::default() };
+    let brain = neotrix::neotrix::nt_mind::ReasoningBrain { capability: cap, ..Default::default() };
     let _ = brain.save();
 
     if let Err(e) = eng.save() { eprintln!("❌保存:{}", e); }
