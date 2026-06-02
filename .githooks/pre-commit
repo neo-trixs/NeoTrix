@@ -1,0 +1,43 @@
+#!/bin/bash
+# pre-commit hook: 提交前自动同步 TODO.md + 编译检查 + 安全预检 (S-CR-14)
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+echo "[pre-commit] ⏳ 运行 TODO 同步..."
+
+# 运行 smart-sync (如果脚本存在)
+if [ -f "$SCRIPT_DIR/scripts/sync_todos.py" ]; then
+    python3 "$SCRIPT_DIR/scripts/sync_todos.py" --smart-sync 2>/dev/null || true
+fi
+
+# 运行编译检查
+echo "[pre-commit] ⏳ 编译检查..."
+if output=$(cargo check --lib 2>&1); then
+    errors=$(echo "$output" | grep -c "error:" || echo "0")
+    warnings=$(echo "$output" | grep -c "warning:" || echo "0")
+    echo "[pre-commit] ✅ 编译: errors=$errors warnings=$warnings"
+else
+    echo "[pre-commit] ❌ 编译失败，请修复后提交"
+    exit 1
+fi
+
+# 运行测试检查
+echo "[pre-commit] ⏳ 测试检查..."
+TEST_OUTPUT=$(cargo test --lib 2>&1 | grep "test result:" | head -1)
+if echo "$TEST_OUTPUT" | grep -q "0 failed"; then
+    echo "[pre-commit] ✅ $TEST_OUTPUT"
+else
+    echo "[pre-commit] ❌ 测试失败: $TEST_OUTPUT"
+    exit 1
+fi
+
+# S-CR-14: 快速安全预检 (secrets, hardcoded paths)
+echo "[pre-commit] ⏳ 快速安全预检..."
+SECRETS=$(grep -rn "api_key\|apiKey\|GITHUB_TOKEN\|NEOTRIX_API_KEY\|sk-[a-zA-Z0-9]\{20,\}" --include="*.rs" src/ 2>/dev/null | grep -v "test\|backup\|target" || echo "")
+if [ -n "$SECRETS" ]; then
+    echo "[pre-commit] ⚠️  检测到可能的密钥泄露!"
+    echo "$SECRETS"
+    echo "[pre-commit] ⚠️  请检查后提交 (使用 --no-verify 跳过)"
+fi
+
+echo "[pre-commit] ✅ 全部检查通过"

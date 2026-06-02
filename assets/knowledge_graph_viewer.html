@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>🌐 地球知识图谱 — 天地人叁界</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background:#0f0f1a; color:#e0e0e0; overflow:hidden; height:100vh; }
+#container { display:flex; height:100vh; }
+#graph { flex:1; position:relative; }
+#graph canvas { display:block; width:100%; height:100%; }
+#sidebar { width:380px; background:#1a1a2e; border-left:1px solid #2a2a4a; padding:20px; overflow-y:auto; }
+#sidebar h2 { color:#fff; font-size:18px; margin-bottom:12px; }
+#sidebar .stat { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #2a2a4a; font-size:13px; }
+#sidebar .tag { display:inline-block; background:#2a2a4a; padding:2px 8px; border-radius:10px; font-size:11px; margin:2px; }
+#detail { display:none; }
+#detail h3 { color:#7c7cff; margin:8px 0 4px; }
+#detail p { font-size:13px; line-height:1.5; color:#aaa; }
+#detail .body { max-height:200px; overflow-y:auto; font-size:12px; color:#888; }
+#controls { position:absolute; top:12px; left:12px; z-index:10; display:flex; gap:8px; }
+#controls input { padding:8px 12px; border-radius:6px; border:1px solid #333; background:#1a1a2e; color:#fff; font-size:13px; width:200px; }
+#controls button { padding:8px 14px; border-radius:6px; border:none; background:#4a4aff; color:#fff; cursor:pointer; font-size:13px; }
+#controls button:hover { background:#6666ff; }
+#legend { position:absolute; bottom:20px; left:20px; background:#1a1a2ee0; padding:12px 16px; border-radius:8px; font-size:12px; border:1px solid #2a2a4a; }
+.legend-item { display:flex; align-items:center; gap:8px; margin:4px 0; }
+.legend-dot { width:10px; height:10px; border-radius:50%; }
+</style>
+</head>
+<body>
+<div id="container">
+  <div id="graph"><canvas id="canvas"></canvas><div id="controls"><input id="search" placeholder="搜索节点..." oninput="searchNodes()"><button onclick="resetView()">重置</button></div><div id="legend"></div></div>
+  <div id="sidebar">
+    <h2>🌐 知识图谱</h2>
+    <div class="stat"><span>节点数</span><span id="nodeCount">0</span></div>
+    <div class="stat"><span>边数</span><span id="edgeCount">0</span></div>
+    <div class="stat"><span>关系/节点</span><span id="density">0</span></div>
+    <div id="detail"></div>
+    <h2 style="margin-top:20px">🏷️ 标签</h2>
+    <div id="tags"></div>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let nodes = [], edges = [], zoom = 1, offsetX = 0, offsetY = 0;
+let dragged = null, hovered = null;
+
+function resize() { const r = canvas.parentElement.getBoundingClientRect(); canvas.width = r.width; canvas.height = r.height; }
+resize(); window.onresize = resize;
+
+const COLORS = { '天界': '#ff6b6b','地界': '#51cf66','人界': '#5c7cfa','数学':'#ff922b','物理':'#f06595',
+  '化学':'#20c997','天文':'#845ef7','历史':'#ffd43b','哲学':'#e64980','生物':'#38d9a9','地理':'#94d82d',
+  '科学':'#4dabf7','文学':'#da77f2','艺术':'#f783ac','音乐':'#63e6be','建筑':'#a9e34b','default':'#868e96' };
+
+fetch('/Users/neo/Downloads/code/neotrix/assets/knowledge_graph.json').then(r=>r.json()).then(data=>{
+  nodes = (data.nodes||data.Node||[]).map((n,i)=>({
+    id: n.id||i, label: n.title||n.id, tags: n.tags||[n.source||'通用'],
+    importance: n.importance||0.5, x: Math.random()*800, y: Math.random()*600, vx:0, vy:0, r:8+Math.sqrt((n.importance||0.5)*200)
+  }));
+  edges = (data.edges||data.Edge||[]).map(e=>({
+    source: e.from||e.source, target: e.to||e.target, weight: e.weight||1, label: e.type||''
+  })).filter(e=>nodes.some(n=>n.id===e.source)&&nodes.some(n=>n.id===e.target));
+
+  document.getElementById('nodeCount').textContent=nodes.length;
+  document.getElementById('edgeCount').textContent=edges.length;
+  document.getElementById('density').textContent=(edges.length/(nodes.length||1)).toFixed(2);
+
+  const tags={}; nodes.forEach(n=>n.tags.forEach(t=>tags[t]=(tags[t]||0)+1));
+  const tg=document.getElementById('tags');
+  Object.entries(tags).sort((a,b)=>b[1]-a[1]).slice(0,20).forEach(([t,c])=>{
+    const el=document.createElement('span');el.className='tag';el.textContent=`${t} ${c}`;
+    el.style.background=(COLORS[t]||COLORS.default)+'33';el.style.color=COLORS[t]||COLORS.default;
+    el.onclick=()=>filterByTag(t);tg.appendChild(el);
+  });
+  const lg=document.getElementById('legend');
+  Object.entries(tags).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([t,c])=>{
+    const el=document.createElement('div');el.className='legend-item';
+    el.innerHTML='<div class="legend-dot" style="background:'+(COLORS[t]||COLORS.default)+'"></div><span>'+t+' ('+c+')</span>';
+    lg.appendChild(el);
+  });
+  document.getElementById('search').placeholder=`搜索 ${nodes.length} 个节点...`;
+  startSimulation();
+});
+
+function startSimulation() {
+  const ALPHA=0.1,REP=5000,ATT=0.1;
+  let frame=0;
+  function tick() {
+    if(frame++>300) return;
+    for(let n of nodes){ n.vx=0; n.vy=0; }
+    // repulsion
+    for(let i=0;i<nodes.length;i++) for(let j=i+1;j<nodes.length;j++){
+      let dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+      let d=Math.sqrt(dx*dx+dy*dy)||1; let f=REP/(d*d);
+      nodes[i].vx-=f*dx/d; nodes[i].vy-=f*dy/d;
+      nodes[j].vx+=f*dx/d; nodes[j].vy+=f*dy/d;
+    }
+    // attraction
+    for(let e of edges){
+      let s=nodes.find(n=>n.id===e.source), t=nodes.find(n=>n.id===e.target);
+      if(!s||!t) continue;
+      let dx=t.x-s.x, dy=t.y-s.y, d=Math.sqrt(dx*dx+dy*dy)||1;
+      let f=ATT*d;
+      s.vx+=f*dx/d; s.vy+=f*dy/d;
+      t.vx-=f*dx/d; t.vy-=f*dy/d;
+    }
+    for(let n of nodes){ n.x+=n.vx*ALPHA; n.y+=n.vy*ALPHA; }
+    draw();
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save(); ctx.translate(offsetX,offsetY); ctx.scale(zoom,zoom);
+
+  for(let e of edges){
+    let s=nodes.find(n=>n.id===e.source), t=nodes.find(n=>n.id===e.target);
+    if(!s||!t) continue;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(t.x,t.y);
+    ctx.strokeStyle='rgba(100,100,140,'+(0.1+e.weight*0.15)+')'; ctx.lineWidth=e.weight;
+    ctx.stroke();
+  }
+  for(let n of nodes){
+    let col=COLORS[n.tags[0]]||COLORS.default;
+    ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    ctx.fillStyle=col+'88'; ctx.fill();
+    ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.stroke();
+    if(n===hovered||n===dragged){
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r+4,0,Math.PI*2);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    }
+    if(zoom>0.5){
+      ctx.fillStyle='#fff'; ctx.font='10px system-ui'; ctx.textAlign='center';
+      ctx.fillText(n.label,n.x,n.y+n.r+12);
+    }
+  }
+  ctx.restore();
+}
+
+canvas.onmousedown=e=>{
+  let p=screenToCanvas(e); dragged=nodes.find(n=>Math.hypot(n.x-p.x,n.y-p.y)<n.r+5);
+  if(dragged){ dragged.fixed=true; }
+};
+canvas.onmousemove=e=>{
+  let p=screenToCanvas(e); hovered=nodes.find(n=>Math.hypot(n.x-p.x,n.y-p.y)<n.r+5);
+  if(dragged){ dragged.x=p.x; dragged.y=p.y; draw(); }
+  showHover(hovered);
+};
+canvas.onmouseup=e=>{ if(dragged){dragged.fixed=false;dragged=null;} };
+canvas.onwheel=e=>{ e.preventDefault(); zoom*=1-e.deltaY*0.001; zoom=Math.max(0.2,Math.min(5,zoom)); draw(); };
+
+function screenToCanvas(e){
+  let r=canvas.getBoundingClientRect();
+  return {x:(e.clientX-r.x-offsetX)/zoom, y:(e.clientY-r.y-offsetY)/zoom};
+}
+
+function showHover(n){
+  if(!n){ document.getElementById('detail').style.display='none'; return; }
+  const d=document.getElementById('detail'); d.style.display='block';
+  let col=COLORS[n.tags[0]]||COLORS.default;
+  d.innerHTML='<h3 style="color:'+col+'">'+n.label+'</h3><div class="stat">重要度: '+n.importance.toFixed(2)+'</div>'+
+    '<div>标签:'+n.tags.map(t=>'<span class="tag" style="background:'+(COLORS[t]||COLORS.default)+'33">'+t+'</span>').join('')+'</div>';
+  let conn=edges.filter(e=>e.source===n.id||e.target===n.id);
+  d.innerHTML+='<h3 style="margin-top:10px">连接 ('+conn.length+')</h3>';
+  for(let e of conn.slice(0,15)){
+    let other=nodes.find(nn=>nn.id===(e.source===n.id?e.target:e.source));
+    if(other) d.innerHTML+='<div style="font-size:12px;padding:2px 0;border-bottom:1px solid #222"><span style="color:'+col+'">↔</span> '+other.label+'</div>';
+  }
+}
+
+function searchNodes(){
+  let q=document.getElementById('search').value.toLowerCase();
+  if(!q){ draw(); return; }
+  nodes.forEach(n=>{ n.hidden=!n.label.toLowerCase().includes(q); });
+  draw();
+}
+
+function filterByTag(tag){
+  nodes.forEach(n=>{ n.hidden=!n.tags.some(t=>t===tag); });
+  draw();
+}
+
+function resetView(){ zoom=1;offsetX=0;offsetY=0;nodes.forEach(n=>n.hidden=false);draw(); }
+</script>
+</body>
+</html>

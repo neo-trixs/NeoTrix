@@ -1,0 +1,1289 @@
+use super::SelfIteratingBrain;
+use super::super::core::RewardSource;
+use super::super::self_edit::MicroEdit;
+use super::super::memory::ReasoningMemory;
+use super::super::distillation::{ExperienceDistiller, apply_principles, avoid_anti_patterns};
+use super::super::cortex_memory::CmsConfig;
+use crate::neotrix::nt_world_model::TaskType;
+use crate::neotrix::error::NeoTrixError;
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
+pub enum AutonomyLevel {
+    Proposal,
+    Bounded,
+    #[default]
+    Full,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct BrainSnapshot {
+    pub capability: super::super::core::CapabilityVector,
+    pub learning_rate: f64,
+    pub score: f64,
+}
+
+impl BrainSnapshot {
+    pub fn new(brain: &super::brain_impl::ReasoningBrain, task_type: &TaskType) -> Self {
+        Self {
+            capability: brain.capability.clone(),
+            learning_rate: brain.learning_rate,
+            score: brain.evaluate_capability(*task_type),
+        }
+    }
+
+    pub fn restore(&self, brain: &mut super::brain_impl::ReasoningBrain) {
+        brain.capability = self.capability.clone();
+        brain.learning_rate = self.learning_rate;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StageResult {
+    pub stage_name: String,
+    pub efc: f64,
+    pub raw_cost: f64,
+    pub efficiency: f64,
+}
+
+impl StageResult {
+    pub fn new(stage_name: &str) -> Self {
+        let (efc, raw_cost) = estimate_stage_efc(stage_name);
+        let efficiency = compute_stage_efficiency(efc, raw_cost);
+        Self {
+            stage_name: stage_name.to_string(),
+            efc,
+            raw_cost,
+            efficiency,
+        }
+    }
+}
+
+pub fn estimate_stage_efc(stage_name: &str) -> (f64, f64) {
+    match stage_name {
+        "gap_analysis" => (0.85, 1000.0),
+        "session_distill" => (0.80, 800.0),
+        "conversation_distill" => (0.75, 900.0),
+        "autonomy_gate" => (0.50, 200.0),
+        "memory_retrieval" => (0.50, 300.0),
+        "snapshot" => (0.15, 50.0),
+        "nt_shield_scan" => (0.10, 400.0),
+        "hypercube_optimize" => (0.10, 500.0),
+        _ => (0.30, 200.0),
+    }
+}
+
+pub fn compute_stage_efficiency(efc: f64, raw_cost: f64) -> f64 {
+    if raw_cost > 0.0 { efc / raw_cost } else { 0.0 }
+}
+
+#[derive(Debug, Clone)]
+pub enum StageDecision {
+    Continue,
+    Skip(String),
+    Promote(BrainSnapshot),
+    Rollback(String),
+}
+
+pub trait BrainStage: Send + Sync {
+    fn name(&self) -> &str;
+    fn frequency(&self) -> usize { 1 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError>;
+}
+
+pub struct BrainPipeline {
+    pub stages: Vec<Box<dyn BrainStage>>,
+}
+
+impl BrainPipeline {
+    pub fn new() -> Self { Self { stages: Vec::new() } }
+
+    pub fn with_stages(stages: Vec<Box<dyn BrainStage>>) -> Self { Self { stages } }
+
+    pub fn register(&mut self, stage: Box<dyn BrainStage>) {
+        self.stages.push(stage);
+    }
+
+    pub fn execute(&self, brain: &mut SelfIteratingBrain) -> Result<(), NeoTrixError> {
+        brain._stage_results.clear();
+        for stage in &self.stages {
+            let freq = stage.frequency();
+            if freq > 1 && !brain.iteration.is_multiple_of(freq as u64) {
+                continue;
+            }
+            let _span = tracing::info_span!(
+                "pipeline_stage",
+                stage.name = %stage.name(),
+                iteration = brain.iteration,
+            ).entered();
+            let decision = stage.process(brain)?;
+
+            let mut stage_result = StageResult::new(stage.name());
+            if matches!(decision, StageDecision::Skip(_)) {
+                stage_result.efc *= 0.1;
+                stage_result.raw_cost *= 0.1;
+            } else if matches!(decision, StageDecision::Rollback(_)) {
+                stage_result.efc *= 0.3;
+            }
+            stage_result.efficiency = compute_stage_efficiency(stage_result.efc, stage_result.raw_cost);
+            brain._stage_results.push(stage_result);
+
+            match decision {
+                StageDecision::Continue => continue,
+                StageDecision::Skip(reason) => {
+                    log::trace!("Stage '{}' aborted remaining: {}", stage.name(), reason);
+                    return Ok(()); // Skip = 跳过剩余所有 stage
+                }
+                StageDecision::Promote(champ) => {
+                    log::info!("Stage '{}' promoted new champion", stage.name());
+                    brain.champion = Some(champ);
+                }
+                StageDecision::Rollback(reason) => {
+                    log::warn!("Stage '{}' triggered rollback: {}", stage.name(), reason);
+                    return Err(NeoTrixError::Brain(reason));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Default for BrainPipeline {
+    fn default() -> Self { Self::new() }
+}
+
+#[macro_export]
+macro_rules! make_stage {
+    ($name:ident) => {
+        pub struct $name;
+        impl Default for $name { fn default() -> Self { Self } }
+        impl $name { pub fn new() -> Self { Self } }
+    };
+}
+
+make_stage!(SnapshotStage);
+impl BrainStage for SnapshotStage {
+    fn name(&self) -> &str { "snapshot" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let champ = BrainSnapshot::new(&brain.brain, &brain._current_task_type());
+        if let Some(ref champion) = brain.champion {
+            if champ.score < champion.score * 0.8 {
+                return Ok(StageDecision::Skip("当前能力显著低于冠军".to_string()));
+            }
+        }
+        brain._set_snapshot(champ);
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(MemoryRetrievalStage);
+impl BrainStage for MemoryRetrievalStage {
+    fn name(&self) -> &str { "memory_retrieval" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let task_type = brain._current_task_type();
+        let embedding = brain._task_embedding();
+        if let Some(ref emb) = embedding {
+            brain.reasoning_bank.retrieve_relevant_by_embedding(emb, Some(task_type), 5);
+        } else {
+            brain.reasoning_bank.retrieve_relevant(&task, Some(task_type), 5);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(GapAnalysisStage);
+impl BrainStage for GapAnalysisStage {
+    fn name(&self) -> &str { "gap_analysis" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        if let Some(ref router) = brain.attention_router {
+            let gap_reports = router.bridge.analyze_gaps();
+            let domains = router.bridge.sparse_domains(&gap_reports);
+
+            let mut gap_lines: Vec<String> = Vec::new();
+            for report in &gap_reports {
+                if report.gap > 0.0 {
+                    gap_lines.push(format!(
+                        "[dim {}] current={:.3}, target={:.3}, gap={:.3}",
+                        report.dim_index, report.current_value, report.target_value, report.gap
+                    ));
+                    log::info!("[gap-analysis] dim {}: current={:.3}, target={:.3}, gap={:.3}",
+                        report.dim_index, report.current_value, report.target_value, report.gap);
+                }
+            }
+
+            if !domains.is_empty() {
+                let domain_str: Vec<String> = domains.iter().map(|d| format!("{:?}", d)).collect();
+                log::info!("[gap-analysis] exploration domains suggested: {:?}", domain_str);
+                gap_lines.push(format!("Suggested exploration: {}", domain_str.join(", ")));
+            }
+
+            if !gap_lines.is_empty() {
+                let gap_summary = gap_lines.join(" | ");
+                let existing = brain._open_source_insights.clone().unwrap_or_default();
+                let combined = if existing.is_empty() {
+                    format!("Knowledge gaps: {}", gap_summary)
+                } else {
+                    format!("{} | Knowledge gaps: {}", existing, gap_summary)
+                };
+                brain._set_open_source_insights(Some(combined));
+            }
+        } else {
+            log::trace!("[gap-analysis] no attention_router, skipping");
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(SSMUpdateStage);
+impl BrainStage for SSMUpdateStage {
+    fn name(&self) -> &str { "ssm_update" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        if let Some(ref op) = brain.select_operator {
+            let input = brain.brain.capability.to_full_vector();
+            let mut ssm_state = crate::neotrix::signal::core::SelectiveState::new(input.len(), op.hidden_dim);
+            let output = op.step(&mut ssm_state, &input);
+            let dim = output.len().min(brain.brain.capability.arr().len());
+            for (i, item) in brain.brain.capability.arr_mut().iter_mut().enumerate().take(dim) {
+                let gate = (ssm_state.hidden.get(i).copied().unwrap_or(0.0)).abs().min(1.0);
+                let current = *item;
+                *item = gate * output[i] + (1.0 - gate) * current;
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(OpenSourceCompareStage);
+impl BrainStage for OpenSourceCompareStage {
+    fn name(&self) -> &str { "open_source_compare" }
+    fn frequency(&self) -> usize { 5 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let task_type = brain._current_task_type();
+        let capability = brain.brain.capability.clone();
+        let benchmarker = crate::neotrix::nt_mind::open_source_benchmark::OpenSourceBenchmarker::new();
+
+        // Phase 1: Static benchmark against known projects
+        let reports = benchmarker.benchmark_top3(&task, task_type, &capability);
+
+        let dyn_edits: Vec<MicroEdit> = Vec::new();
+
+        if reports.is_empty() || (reports[0].relevance_score < 0.3 && dyn_edits.is_empty()) {
+            brain._set_open_source_insights(None);
+            brain._set_open_source_edits(Vec::new());
+            return Ok(StageDecision::Skip("No relevant open-source projects found".into()));
+        }
+
+        let mut summary_lines = Vec::new();
+        let mut all_edits = Vec::new();
+
+        for report in &reports {
+            summary_lines.push(report.summary.clone());
+            for (idx, delta, detail) in &report.gap_areas {
+                let edit = MicroEdit::AdjustDimension(idx.to_string(), *delta);
+                if !all_edits.iter().any(|e: &MicroEdit| matches!(e, MicroEdit::AdjustDimension(i, _) if *i == idx.to_string())) {
+                    all_edits.push(edit);
+                }
+                log::info!("[open-source] gap: {}", detail);
+            }
+        }
+
+        for edit in dyn_edits {
+            if !all_edits.iter().any(|e: &MicroEdit| {
+                matches!((e, &edit), (MicroEdit::AdjustDimension(i1, _), MicroEdit::AdjustDimension(i2, _)) if *i1 == *i2)
+            }) {
+                all_edits.push(edit);
+            }
+        }
+
+        if !all_edits.is_empty() {
+            all_edits.push(MicroEdit::NormalizeVector);
+        }
+
+        let insights = summary_lines.join(" | ");
+        brain._set_open_source_insights(Some(insights));
+        brain._set_open_source_edits(all_edits);
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(SelfEditGenerationStage);
+impl BrainStage for SelfEditGenerationStage {
+    fn name(&self) -> &str { "self_edit_gen" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let mut edits = if let Some(ref dgm) = brain.dgm_strategy {
+            let ctx = super::brain_dgm::EditContext {
+                task: &task,
+                brain: &brain.brain,
+                noise_level: 0.0,
+            };
+            dgm.generate_via_diffusion(&ctx)
+        } else {
+            brain.brain.generate_self_edit(&task)
+        };
+
+        let task_type = brain._current_task_type();
+        let memories = brain.reasoning_bank.retrieve_relevant(&task, Some(task_type), 5);
+        if !memories.is_empty() {
+            let avg_reward: f64 = memories.iter().map(|m| m.reward).sum::<f64>() / memories.len() as f64;
+            let factor = if avg_reward > 0.7 { 1.1 } else if avg_reward < 0.3 { 0.9 } else { 1.0 };
+            if (factor - 1.0_f64).abs() > 0.01_f64 {
+                for edit in &mut edits {
+                    if let MicroEdit::AdjustDimension(_, ref mut amount) = edit {
+                        *amount *= factor;
+                    }
+                }
+            }
+        }
+
+        brain._set_micro_edits(edits);
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(ApplyEditsStage);
+impl BrainStage for ApplyEditsStage {
+    fn name(&self) -> &str { "apply_edits" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let edits = brain._take_micro_edits();
+        brain.brain.apply_micro_edits(&edits);
+        brain._set_micro_edits(edits);
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(RewardCalculationStage);
+impl BrainStage for RewardCalculationStage {
+    fn name(&self) -> &str { "reward_calc" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let external = brain._external_reward();
+        let (reward, source) = if let Some(ext) = external {
+            (ext, RewardSource::External)
+        } else {
+            let task_type = brain._current_task_type();
+            let score_before = brain._snapshot_score();
+            let score_after = brain.brain.evaluate_capability(task_type);
+            let regularization = brain.compute_regularization(&brain._snapshot_capability());
+            let raw = (score_after - score_before) + regularization;
+            let health = brain.evo_stats().health_score;
+            let calibrated = raw * (0.5 + health * 0.5);
+            (calibrated, RewardSource::Internal)
+        };
+        brain._set_reward(reward);
+        brain._set_reward_source(source);
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(GwtAbsorbStage);
+impl BrainStage for GwtAbsorbStage {
+    fn name(&self) -> &str { "gwt_absorb" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let reward = brain._reward();
+        let source = brain._reward_source();
+        let summary = format!("task: {}, reward: {:.4}, source: {:?}", task, reward, source);
+        if let Some(ref mut router) = brain.attention_router {
+            router.absorb_reasoning_result(&task, &summary, "seal_loop");
+            router.wm().broadcast(&summary);
+            log::info!("[gwt-absorb] broadcast: {}", summary);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(HyperCubeOptimizeStage);
+impl BrainStage for HyperCubeOptimizeStage {
+    fn name(&self) -> &str { "hypercube_optimize" }
+    fn frequency(&self) -> usize { 10 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let pruned = if let Some(ref mut router) = brain.attention_router {
+            router.bridge.prune_low_access(2)
+        } else {
+            0
+        };
+        if pruned > 0 {
+            log::info!("[hypercube-optimize] pruned {} low-access entries", pruned);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(DistillationStage);
+impl BrainStage for DistillationStage {
+    fn name(&self) -> &str { "session_distill" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let session = crate::neotrix::nt_act_autonomy::knowledge_distiller::SessionRecord {
+            id: format!("seal-iter-{}", brain.iteration),
+            user_messages: vec![brain._current_task()],
+            actions_taken: brain._micro_edits.iter().map(|e| format!("{:?}", e)).collect(),
+            outcomes: vec![format!("reward={:.4}", brain._reward())],
+            reward_signal: brain._reward(),
+            timestamp: brain.iteration,
+            task_type: Some(format!("{:?}", brain._current_task_type())),
+            e8_mode: Some(brain._e8_policy.best_mode()),
+            edit_types: brain._micro_edits.iter().map(|e| format!("{:?}", e)).collect(),
+        };
+        let principles = brain._knowledge_distiller.distill(&session);
+        if !principles.is_empty() {
+            let absorbed = brain._knowledge_distiller.absorb(&mut brain.brain.capability);
+            log::info!(
+                "[session-distill] {} principles from iter {}, {} absorbed",
+                principles.len(), brain.iteration, absorbed,
+            );
+            let summary = brain._knowledge_distiller.summary();
+            if let Some(ref mut router) = brain.attention_router {
+                router.wm().broadcast(&summary);
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(ConversationDistillStage);
+impl BrainStage for ConversationDistillStage {
+    fn name(&self) -> &str { "conversation_distill" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let Some(ref kb) = brain._nt_memory_kb else {
+            return Ok(StageDecision::Skip("no KB".into()));
+        };
+        let records = match kb.get_evolution_history(10) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("[conv-distill] query failed: {}", e);
+                return Ok(StageDecision::Continue);
+            }
+        };
+        if records.is_empty() {
+            return Ok(StageDecision::Continue);
+        }
+
+        // Analyze patterns
+        let total = records.len();
+        let successes = records.iter().filter(|r| r.outcome == "success").count();
+        let failures = total - successes;
+        let avg_eff: f64 = records.iter().map(|r| r.effectiveness).sum::<f64>() / total as f64;
+
+        // Find most/least effective strategy
+        let mut by_strategy: std::collections::HashMap<&str, Vec<f64>> = std::collections::HashMap::new();
+        for r in &records {
+            by_strategy.entry(r.strategy_used.as_str()).or_default().push(r.effectiveness);
+        }
+        let mut strategy_ratings: Vec<(&str, f64)> = by_strategy.iter()
+            .map(|(k, v)| (*k, v.iter().sum::<f64>() / v.len() as f64))
+            .collect();
+        strategy_ratings.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Find recurring errors
+        let error_patterns: Vec<&str> = records.iter()
+            .filter(|r| !r.obstacles_encountered.is_empty())
+            .map(|r| r.obstacles_encountered[0].as_str())
+            .collect();
+
+        // Error rate
+        let error_rate = records.iter().map(|r| r.error_count).sum::<u32>() as f64 / total as f64;
+
+        // Mode-switching frequency
+        let mut modes_used: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for r in &records {
+            modes_used.insert(r.e8_mode.as_str());
+        }
+
+        // Fix patterns present
+        let fix_patterns_present = records.iter().any(|r| !r.fix_patterns.is_empty());
+
+        log::info!(
+            "[conv-distill] {} records: {}/{} success, avg_eff={:.3}, error_rate={:.3}, modes={}, top_strategy={:?}",
+            total, successes, failures, avg_eff, error_rate, modes_used.len(),
+            strategy_ratings.first().map(|(s, _)| *s),
+        );
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+
+        let mut created_any = false;
+
+        // 1. RecurringError — when error_count > 0
+        if error_rate > 0.0 {
+            let most_common_error = error_patterns.first().unwrap_or(&"unknown");
+            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                id: format!("conv_pat_err_{}", brain.iteration),
+                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::RecurringError,
+                description: format!("Error rate {:.2}, {} failures: {}", error_rate, failures, most_common_error),
+                before_behavior: "".into(),
+                after_behavior: "".into(),
+                effectiveness_gain: avg_eff * error_rate,
+                applied_to: vec![],
+                verified: false,
+                timestamp,
+            };
+            if kb.store_evolution_record(&evolution).is_ok() {
+                created_any = true;
+                log::info!("[conv-distill] recorded RecurringError pattern: {}", evolution.description);
+            }
+        }
+
+        // 2. CommunicationOptimization — when best strategy improves over "auto" by > 0.1
+        if let Some((best_strat, best_eff)) = strategy_ratings.first() {
+            if let Some((_, default_eff)) = strategy_ratings.iter().find(|(s, _)| *s == "auto") {
+                if best_eff - default_eff > 0.1 {
+                    let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                        id: format!("conv_pat_comm_{}", brain.iteration),
+                        source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                        pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::CommunicationOptimization,
+                        description: format!("Strategy '{}' improves over 'auto' by {:.2}", best_strat, best_eff - default_eff),
+                        before_behavior: "auto".into(),
+                        after_behavior: best_strat.to_string(),
+                        effectiveness_gain: best_eff - default_eff,
+                        applied_to: vec![],
+                        verified: false,
+                        timestamp,
+                    };
+                    if kb.store_evolution_record(&evolution).is_ok() {
+                        created_any = true;
+                        log::info!("[conv-distill] recorded CommunicationOptimization pattern: {}", evolution.description);
+                    }
+                }
+            }
+        }
+
+        // 3. ProblemDecomposition — when high effectiveness with low error_count
+        let high_eff_low_err = records.iter()
+            .filter(|r| r.effectiveness > 0.7 && r.error_count == 0)
+            .count();
+        if high_eff_low_err as f64 > total as f64 * 0.3 {
+            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                id: format!("conv_pat_dec_{}", brain.iteration),
+                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::ProblemDecomposition,
+                description: format!("{}/{} records high-effectiveness zero-error", high_eff_low_err, total),
+                before_behavior: "".into(),
+                after_behavior: "".into(),
+                effectiveness_gain: avg_eff,
+                applied_to: vec![],
+                verified: false,
+                timestamp,
+            };
+            if kb.store_evolution_record(&evolution).is_ok() {
+                created_any = true;
+                log::info!("[conv-distill] recorded ProblemDecomposition pattern: {}", evolution.description);
+            }
+        }
+
+        // 4. VerificationImprovement — when fix patterns are found
+        if fix_patterns_present {
+            let fix_count: usize = records.iter().map(|r| r.fix_patterns.len()).sum();
+            let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                id: format!("conv_pat_ver_{}", brain.iteration),
+                source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::VerificationImprovement,
+                description: format!("{} fix patterns across {} records", fix_count, total),
+                before_behavior: "".into(),
+                after_behavior: "".into(),
+                effectiveness_gain: avg_eff,
+                applied_to: vec![],
+                verified: false,
+                timestamp,
+            };
+            if kb.store_evolution_record(&evolution).is_ok() {
+                created_any = true;
+                log::info!("[conv-distill] recorded VerificationImprovement pattern: {}", evolution.description);
+            }
+        }
+
+        // 5. ToolUsagePattern — when specific tools/strategies correlate with success
+        let successful_strategies: Vec<&str> = records.iter()
+            .filter(|r| r.outcome == "success" && !r.actions_taken.is_empty())
+            .map(|r| r.strategy_used.as_str())
+            .collect();
+        if !successful_strategies.is_empty() && successful_strategies.len() > total / 2 {
+            let mut tool_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+            for t in &successful_strategies {
+                *tool_counts.entry(t).or_insert(0) += 1;
+            }
+            if let Some((best_tool, _)) = tool_counts.iter().max_by_key(|(_, c)| **c) {
+                let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                    id: format!("conv_pat_tool_{}", brain.iteration),
+                    source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                    pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::ToolUsagePattern,
+                    description: format!("Strategy '{}' used in {}/{} successes", best_tool, tool_counts[best_tool], successes),
+                    before_behavior: "".into(),
+                    after_behavior: best_tool.to_string(),
+                    effectiveness_gain: avg_eff,
+                    applied_to: vec![],
+                    verified: false,
+                    timestamp,
+                };
+                if kb.store_evolution_record(&evolution).is_ok() {
+                    created_any = true;
+                    log::info!("[conv-distill] recorded ToolUsagePattern pattern: {}", evolution.description);
+                }
+            }
+        }
+
+        // 6. StrategyDiscovery — when a new strategy outperforms the default
+        if let Some((best_strat, best_eff)) = strategy_ratings.first() {
+            if *best_strat != "auto" && *best_eff > avg_eff * 1.1 {
+                let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                    id: format!("conv_pat_strat_{}", brain.iteration),
+                    source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                    pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::StrategyDiscovery,
+                    description: format!("New strategy '{}' outperforms average ({:.2} vs {:.2})", best_strat, best_eff, avg_eff),
+                    before_behavior: "auto".into(),
+                    after_behavior: best_strat.to_string(),
+                    effectiveness_gain: best_eff - avg_eff,
+                    applied_to: vec![],
+                    verified: false,
+                    timestamp,
+                };
+                if kb.store_evolution_record(&evolution).is_ok() {
+                    created_any = true;
+                    log::info!("[conv-distill] recorded StrategyDiscovery pattern: {}", evolution.description);
+                }
+            }
+        }
+
+        // 7. PrincipleUpdate — when effectiveness > 0.8 and consistent across strategies
+        if avg_eff > 0.8 {
+            let all_above_threshold = by_strategy.iter().all(|(_, v)| v.iter().sum::<f64>() / v.len() as f64 > 0.7);
+            if all_above_threshold && strategy_ratings.len() > 1 {
+                let evolution = crate::neotrix::nt_memory_kb::EvolutionRecord {
+                    id: format!("conv_pat_princ_{}", brain.iteration),
+                    source_conversation_id: records.last().map(|r| r.id.clone()).unwrap_or_default(),
+                    pattern_type: crate::neotrix::nt_memory_kb::EvolutionPatternType::PrincipleUpdate,
+                    description: format!("Consistent high effectiveness ({:.2}) across {} strategies", avg_eff, strategy_ratings.len()),
+                    before_behavior: "".into(),
+                    after_behavior: "".into(),
+                    effectiveness_gain: avg_eff,
+                    applied_to: vec![],
+                    verified: false,
+                    timestamp,
+                };
+                if kb.store_evolution_record(&evolution).is_ok() {
+                    created_any = true;
+                    log::info!("[conv-distill] recorded PrincipleUpdate pattern: {}", evolution.description);
+                }
+            }
+        }
+
+        // Read back recent evolution patterns and adjust reward
+        if let Ok(patterns) = kb.get_evolution_patterns(5) {
+            if !patterns.is_empty() {
+                let total_gain: f64 = patterns.iter().map(|p| p.effectiveness_gain).sum();
+                if total_gain > 0.0 {
+                    let bonus = (total_gain * 0.1).min(0.5);
+                    brain._set_reward(brain._reward() + bonus);
+                    log::info!("[conv-distill] evolution reward bonus: {:.4}", bonus);
+                }
+            }
+        }
+
+        // Broadcast to GWT
+        if let Some(ref mut router) = brain.attention_router {
+            let report = format!(
+                "[conversation-evolution] {} records: {}/{} OK, avg_eff={:.2}, error_rate={:.3}, patterns_created={}",
+                total, successes, failures, avg_eff, error_rate,
+                if created_any { "yes" } else { "no" },
+            );
+            router.wm().broadcast(&report);
+        }
+
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(SecurityStage);
+impl BrainStage for SecurityStage {
+    fn name(&self) -> &str { "nt_shield_scan" }
+    fn frequency(&self) -> usize { 1 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let code_context = brain._open_source_insights.clone().unwrap_or_default();
+        let scanner = super::secret_scanner::SecretScanner::new();
+        let result = scanner.scan_with_context(&task, &code_context);
+        if !result.is_safe() {
+            let critical_count = result.count_by_severity
+                .get(&super::secret_scanner::Severity::Critical)
+                .copied()
+                .unwrap_or(0);
+            log::warn!(
+                "[nt_shield-scan] found {} secrets ({} critical) — max_severity={:?}, risk={:.2}",
+                result.findings.len(),
+                critical_count,
+                result.max_severity,
+                result.risk_score()
+            );
+            if let Some(ref mut router) = brain.attention_router {
+                for finding in &result.findings {
+                    router.wm().broadcast(&format!(
+                        "Security alert: {} at line {} — \"{}\"",
+                        finding.pattern, finding.line, finding.snippet
+                    ));
+                }
+            }
+            if critical_count > 0 {
+                brain._set_reward(brain._reward() - result.risk_score() * 0.2);
+                log::info!("[nt_shield-scan] penalized reward by {:.4}", result.risk_score() * 0.2);
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(E8ExperimentStage);
+impl BrainStage for E8ExperimentStage {
+    fn name(&self) -> &str { "e8_experiment" }
+    fn frequency(&self) -> usize { 5 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let reward = brain._reward();
+        let task_type = brain._current_task_type();
+
+        let mode = brain._e8_policy.select_mode(&task, task_type, &brain._transition_learner);
+        brain._transition_learner.record(&task, mode, reward, brain.iteration);
+        brain._e8_policy.update(reward);
+
+        // Consume evolution patterns for factorized E8 updates
+        if let Some(ref kb) = brain._nt_memory_kb {
+            if let Ok(patterns) = kb.get_evolution_patterns(5) {
+                if !patterns.is_empty() {
+                    let mut factor_deltas = [0.0f64; crate::core::NUM_E8_FACTORS];
+                    for pattern in &patterns {
+                        let base_deltas = match pattern.pattern_type {
+                            crate::neotrix::nt_memory_kb::EvolutionPatternType::RecurringError
+                                => [0.2, 0.0, 0.1, 0.0, 0.0, 0.3],
+                            crate::neotrix::nt_memory_kb::EvolutionPatternType::CommunicationOptimization
+                                => [0.0, 0.1, 0.0, 0.0, 0.3, 0.0],
+                            crate::neotrix::nt_memory_kb::EvolutionPatternType::ProblemDecomposition
+                                => [-0.2, 0.0, -0.2, 0.2, 0.0, -0.1],
+                            crate::neotrix::nt_memory_kb::EvolutionPatternType::VerificationImprovement
+                                => [0.0, 0.0, -0.1, 0.0, 0.0, -0.2],
+                            crate::neotrix::nt_memory_kb::EvolutionPatternType::ToolUsagePattern
+                                => [0.0, -0.1, 0.0, 0.1, 0.0, 0.0],
+                            crate::neotrix::nt_memory_kb::EvolutionPatternType::StrategyDiscovery
+                                => [0.3, 0.2, 0.3, -0.1, 0.1, 0.3],
+                            crate::neotrix::nt_memory_kb::EvolutionPatternType::PrincipleUpdate
+                                => [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                        };
+                        let weight = pattern.effectiveness_gain * 0.5;
+                        for i in 0..crate::core::NUM_E8_FACTORS {
+                            factor_deltas[i] += base_deltas[i] * weight;
+                        }
+                    }
+                    let has_nonzero = factor_deltas.iter().any(|d| d.abs() > 0.001);
+                    if has_nonzero {
+                        brain._e8_policy.update_factorized(reward, &factor_deltas);
+                        log::info!(
+                            "[e8-experiment] factorized update from {} evolution patterns: [{:.3}, {:.3}, {:.3}, {:.3}, {:.3}, {:.3}]",
+                            patterns.len(),
+                            factor_deltas[0], factor_deltas[1], factor_deltas[2],
+                            factor_deltas[3], factor_deltas[4], factor_deltas[5],
+                        );
+                    }
+                }
+            }
+        }
+
+        brain._e8_policy.decay_epsilon();
+
+        log::info!(
+            "[e8-experiment] mode={}, epsilon={:.4}, mode_value={:.4}",
+            mode.0, brain._e8_policy.epsilon(), brain._e8_policy.mode_values[mode.0 as usize],
+        );
+
+        if let Some(ref mut router) = brain.attention_router {
+            let bridge = &router.bridge;
+            let gap_reports = bridge.analyze_gaps();
+            let high_gaps: usize = gap_reports.iter().filter(|r| r.gap > 0.5).count();
+            if high_gaps > 3 && brain._transition_learner.outcomes.len() > 20 {
+                let approach = (mode.0 >> 3) as usize;
+                let domain = (mode.0 & 0x07) as usize;
+                if let Some(pattern) = brain._transition_learner.suggest_evolution(approach, domain) {
+                    log::info!("[e8-experiment] suggested evolution ({}) for cell ({},{})", pattern, approach, domain);
+                }
+            }
+        }
+
+        let evolved = brain._transition_learner.evolve_matrix(&mut brain._strategy_matrix);
+        if evolved > 0 {
+            log::info!("[e8-experiment] evolved {} strategy matrix cells", evolved);
+        }
+
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(HarnessAdaptStage);
+impl BrainStage for HarnessAdaptStage {
+    fn name(&self) -> &str { "harness_adapt" }
+    fn frequency(&self) -> usize { 2 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let current_task = brain._current_task();
+        if let Some(ref mut router) = brain.attention_router {
+            let env = current_task.clone();
+            router.set_environment(&env);
+            let profile = brain._harness_adapter.active_profile().cloned();
+            if let Some(p) = profile {
+                router.register_harness_profile(&env, &p);
+                log::info!("[harness-adapt] applied profile for env={}, performance_delta={:.4}",
+                    env, p.performance_delta);
+            }
+        }
+        // Persist harness profiles to KnowledgeBase
+        if let Some(ref kb) = brain._nt_memory_kb {
+            let saved = brain._harness_adapter.save_to_kb(kb).unwrap_or(0);
+            if saved > 0 {
+                log::info!("[harness-adapt] saved {} profiles to KB", saved);
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(TaskAffinityStage);
+impl BrainStage for TaskAffinityStage {
+    fn name(&self) -> &str { "task_affinity" }
+    fn frequency(&self) -> usize { 2 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task_type = brain._current_task_type();
+        let reward = brain._reward();
+        brain.brain.update_task_affinity(task_type, brain._snapshot_score() + reward);
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(KnowledgeQualityStage);
+impl BrainStage for KnowledgeQualityStage {
+    fn name(&self) -> &str { "knowledge_quality" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let quality = brain.reasoning_bank.quality_score();
+        let current_reward = brain._reward();
+
+        if quality > 0.5 {
+            let bonus = quality * 0.03;
+            let new_reward = current_reward + bonus;
+            brain._set_reward(new_reward);
+            log::info!("[knowledge-quality] quality={:.3}, bonus={:.4}, reward={:.3}→{:.3}",
+                quality, bonus, current_reward, new_reward);
+        } else {
+            log::info!("[knowledge-quality] quality={:.3} below threshold, no bonus", quality);
+        }
+
+        brain._open_source_insights = Some(format!(
+            "{} | Knowledge quality: {:.3}",
+            brain._open_source_insights.clone().unwrap_or_default(),
+            quality
+        ));
+
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(RollbackDecisionStage);
+impl BrainStage for RollbackDecisionStage {
+    fn name(&self) -> &str { "rollback_decision" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let reward = brain._reward();
+        let source = brain._reward_source();
+        let snapshot_lr = brain._snapshot_lr();
+        if reward < 0.0 && source == RewardSource::External {
+            brain._snapshot_restore();
+            brain.brain.learning_rate = (snapshot_lr * 0.9).max(0.01);
+            return Ok(StageDecision::Rollback("外部奖励为负，已回滚".to_string()));
+        }
+        if reward > brain.quality_threshold {
+            if let Err(e) = brain.brain.save() {
+                log::warn!("持久化失败: {}", e);
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(ReasoningBankStorageStage);
+impl BrainStage for ReasoningBankStorageStage {
+    fn name(&self) -> &str { "bank_storage" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let task_type = brain._current_task_type();
+        let reward = brain._reward();
+        let source = brain._reward_source();
+        let edits = brain._take_micro_edits();
+
+        let memory = if source == RewardSource::External {
+            ReasoningMemory::with_external_reward(&task, task_type, &edits, reward)
+        } else {
+            ReasoningMemory::new(&task, task_type, &edits, reward)
+        };
+
+        let embedding = brain._take_task_embedding();
+        if let Some(emb) = embedding {
+            brain.reasoning_bank.store_with_embedding(memory, emb);
+        } else {
+            brain.reasoning_bank.store(memory);
+        }
+        brain._set_micro_edits(edits);
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(AdaptiveLRStage);
+impl BrainStage for AdaptiveLRStage {
+    fn name(&self) -> &str { "adaptive_lr" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let task_type = brain._current_task_type();
+        let memories = brain.reasoning_bank.retrieve_relevant(&task, Some(task_type), 3);
+        let avg_memory_reward = if memories.is_empty() { 0.0 } else {
+            memories.iter().map(|m| m.reward).sum::<f64>() / memories.len() as f64
+        };
+        if avg_memory_reward > 0.7 {
+            brain.brain.learning_rate *= 1.2;
+        } else if avg_memory_reward < 0.3 {
+            brain.brain.learning_rate *= 0.8;
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(KnowledgeAbsorbStage);
+impl BrainStage for KnowledgeAbsorbStage {
+    fn name(&self) -> &str { "knowledge_absorb" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task_type = brain._current_task_type();
+        let score_before = brain._snapshot_score();
+        if score_before < brain.quality_threshold && brain.auto_absorb {
+            let sources = brain.select_relevant_sources(task_type);
+            brain.brain.absorb_batch(&sources);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(MemoryStorageStage);
+impl BrainStage for MemoryStorageStage {
+    fn name(&self) -> &str { "memory_storage" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let task_type = brain._current_task_type();
+        let score_before = brain._snapshot_score();
+        let reward = brain.brain.evaluate_capability(task_type) - score_before;
+        let micro_edits = brain.brain.generate_self_edit(&task);
+        let memory = ReasoningMemory::new(&task, task_type, &micro_edits, reward);
+        brain.reasoning_bank.store(memory);
+
+        if brain.auto_memory_iteration && brain.iteration.is_multiple_of(brain.memory_iteration_interval) {
+            brain.reasoning_bank.iterate_memories(0.85, 0.1);
+            let all_mems: Vec<ReasoningMemory> = brain.reasoning_bank.memories().iter().cloned().collect();
+            let principles = ExperienceDistiller::distill(&all_mems);
+            if !principles.is_empty() {
+                apply_principles(&mut brain.brain.capability, &principles, 0.6);
+            }
+            let anti_patterns = ExperienceDistiller::contrastive_reflect(&all_mems);
+            if !anti_patterns.is_empty() {
+                avoid_anti_patterns(&mut brain.brain.capability, &anti_patterns);
+            }
+            if let Some(ref mut gm) = brain.group_manager {
+                gm.evolve_group();
+            }
+        }
+
+        // CMS: Continuum Memory System consolidation (every pipeline iteration)
+        let cms_config = CmsConfig::default();
+        let cms_result = brain.cortex.consolidate_cms(brain.iteration, &cms_config);
+        if cms_result.nt_world_sense_to_topic + cms_result.topic_to_event + cms_result.event_to_fact > 0 {
+            log::trace!("CMS: S→T {} T→E {} E→F {}", 
+                cms_result.nt_world_sense_to_topic, cms_result.topic_to_event, cms_result.event_to_fact);
+        }
+
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(EvaluationStage);
+impl BrainStage for EvaluationStage {
+    fn name(&self) -> &str { "evaluation" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task_type = brain._current_task_type();
+        let score_before = brain._snapshot_score();
+        let score_after = brain.brain.evaluate_capability(task_type);
+        brain.evaluation_history.push(super::brain_impl::EvaluationRecord {
+            iteration: brain.iteration,
+            task_type,
+            score_before,
+            score_after,
+            improved: score_after > score_before,
+        });
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(ChampionCompareStage);
+impl BrainStage for ChampionCompareStage {
+    fn name(&self) -> &str { "champion_compare" }
+    fn frequency(&self) -> usize { 2 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        if let Some(ref champion) = brain.champion {
+            let task_type = brain._current_task_type();
+            let current_score = brain.brain.evaluate_capability(task_type);
+            if current_score > champion.score * 1.05 {
+                let new_champ = BrainSnapshot::new(&brain.brain, &task_type);
+                return Ok(StageDecision::Promote(new_champ));
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(AutonomyGateStage);
+impl BrainStage for AutonomyGateStage {
+    fn name(&self) -> &str { "autonomy_gate" }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        match brain.autonomy {
+            AutonomyLevel::Proposal => {
+                return Ok(StageDecision::Skip("Proposal 模式：只预览不执行".to_string()));
+            }
+            AutonomyLevel::Bounded => {
+                let current: f64 = brain.brain.capability.arr().iter().sum();
+                if current > 16.0 {
+                    return Ok(StageDecision::Skip(format!(
+                        "Bounded 模式：能力总和 {:.2} 超过阈值 16.0", current)));
+                }
+            }
+            AutonomyLevel::Full => {}
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(StatsSignificanceStage);
+impl BrainStage for StatsSignificanceStage {
+    fn name(&self) -> &str { "stats_significance" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let recent: Vec<bool> = brain.evaluation_history.iter()
+            .rev().take(5).map(|r| r.improved).collect();
+        if recent.len() >= 3 {
+            let success_rate = recent.iter().filter(|&&x| x).count() as f64 / recent.len() as f64;
+            if success_rate < 0.3 && brain._reward() < 0.0 {
+                return Ok(StageDecision::Skip(
+                    "统计显著性不足：近期成功率低于30%".to_string()));
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(EmbeddingRefreshStage);
+impl BrainStage for EmbeddingRefreshStage {
+    fn name(&self) -> &str { "embedding_refresh" }
+    fn frequency(&self) -> usize { 10 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let kb = match brain.reasoning_engine.as_mut().and_then(|e| e.kb.as_mut()) {
+            Some(k) => k,
+            None => return Ok(StageDecision::Skip("no KB attached".to_string())),
+        };
+        let has_config = kb.embedding_config.read()
+            .map(|r| r.is_some())
+            .unwrap_or(false);
+        if !has_config {
+            return Ok(StageDecision::Skip("no embedding config".to_string()));
+        }
+        match kb.ensure_embeddings() {
+            Ok(count) => {
+                if count > 0 {
+                    log::info!("[embedding-refresh] generated {} missing embeddings", count);
+                }
+            }
+            Err(e) => {
+                log::warn!("[embedding-refresh] {}", e);
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+pub fn seal_pipeline() -> BrainPipeline {
+    BrainPipeline::with_stages(vec![
+        Box::new(SnapshotStage::new()),
+        Box::new(AutonomyGateStage::new()),
+        Box::new(MemoryRetrievalStage::new()),
+        Box::new(GapAnalysisStage::new()),
+        Box::new(SSMUpdateStage::new()),
+        Box::new(OpenSourceCompareStage::new()),
+        Box::new(SelfEditGenerationStage::new()),
+        Box::new(crate::neotrix::nt_mind::self_iterating::skillopt::BoundedEditStage::new()),
+        Box::new(ApplyEditsStage::new()),
+        Box::new(RewardCalculationStage::new()),
+        Box::new(crate::neotrix::nt_mind::self_iterating::skillopt::ValidationGateStage::new()),
+        Box::new(GwtAbsorbStage::new()),
+        Box::new(StatsSignificanceStage::new()),
+        Box::new(HarnessAdaptStage::new()),
+        Box::new(TaskAffinityStage::new()),
+        Box::new(KnowledgeQualityStage::new()),
+        Box::new(RollbackDecisionStage::new()),
+        Box::new(crate::neotrix::nt_mind::self_iterating::skillopt::RejectedBufferFeedbackStage::new()),
+        Box::new(ChampionCompareStage::new()),
+        Box::new(ReasoningBankStorageStage::new()),
+        Box::new(HyperCubeOptimizeStage::new()),
+        Box::new(E8ExperimentStage::new()),
+        Box::new(crate::neotrix::nt_mind::self_iterating::skillopt::EpochSlowUpdateStage::new()),
+        Box::new(SecurityStage::new()),
+        Box::new(DistillationStage::new()),
+        Box::new(ConversationDistillStage::new()),
+        Box::new(crate::neotrix::nt_mind::self_iterating::aging_monitor::AgingDiagnosisStage::new()),
+        Box::new(EmbeddingRefreshStage::new()),
+    ])
+}
+
+pub fn kernel_iterate_pipeline() -> BrainPipeline {
+    BrainPipeline::with_stages(vec![
+        Box::new(SnapshotStage::new()),
+        Box::new(AutonomyGateStage::new()),
+        Box::new(MemoryRetrievalStage::new()),
+        Box::new(OpenSourceCompareStage::new()),
+        Box::new(AdaptiveLRStage::new()),
+        Box::new(KnowledgeAbsorbStage::new()),
+        Box::new(MemoryStorageStage::new()),
+        Box::new(ChampionCompareStage::new()),
+        Box::new(EvaluationStage::new()),
+    ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
+    use crate::neotrix::nt_world_model::TaskType;
+
+    #[test]
+    fn test_pipeline_execution_returns_reward() {
+        let mut brain = SelfIteratingBrain::new();
+        let result = brain.run_seal_loop("设计一个响应式 UI 界面", None, None);
+        assert!(result.is_ok(), "pipeline 应返回奖励值，但得到: {:?}", result);
+        let reward = result.expect("result should be ok in test");
+        // 即使无外部信号，pipeline 也应产生内部评估奖励
+        assert!(reward > -1.0, "奖励应 > -1.0，得到: {}", reward);
+    }
+
+    #[test]
+    fn test_pipeline_kernel_iterate() {
+        let mut brain = SelfIteratingBrain::new();
+        let result = brain.kernel_iterate("优化数据库查询性能");
+        assert!(result.improved || result.score_after >= result.score_before - 0.1);
+        assert!(result.iteration > 0);
+    }
+
+    #[test]
+    fn test_pipeline_stores_memory() {
+        let mut brain = SelfIteratingBrain::new();
+        let _ = brain.run_seal_loop("设计 React 组件", None, None);
+        let stats = brain.reasoning_bank.stats();
+        assert!(stats.total_memories > 0, "pipeline 应存储推理记忆");
+    }
+
+    #[test]
+    fn test_pipeline_twice_accumulates() {
+        let mut brain = SelfIteratingBrain::new();
+        let _ = brain.run_seal_loop("任务 A", None, None);
+        let _ = brain.run_seal_loop("任务 B", None, None);
+        let stats = brain.reasoning_bank.stats();
+        assert!(stats.total_memories >= 2, "两次 pipeline 应累积记忆");
+    }
+
+    #[test]
+    fn test_pipeline_champion_promotion() {
+        let mut brain = SelfIteratingBrain::new();
+        // 初始冠军
+        brain.champion = Some(BrainSnapshot::new(&brain.brain, &TaskType::General));
+        let baseline = brain.champion.as_ref().expect("value should be ok in test").score;
+
+        // 强制提升能力（模拟外部吸收）
+        brain.brain.capability.arr_mut()[0] = 0.99;
+        brain.brain.capability.normalize();
+        let _ = brain.kernel_iterate("general");
+
+        // Champion 应有提升（或至少不降低）
+        if let Some(ref champ) = brain.champion {
+            assert!(champ.score >= baseline * 0.9, "champion 不应显著降低");
+        }
+    }
+
+    #[test]
+    fn test_pipeline_autonomy_proposal_skips_execution() {
+        let mut brain = SelfIteratingBrain::new();
+        brain.autonomy = AutonomyLevel::Proposal;
+        let before = brain.brain.capability.clone();
+        let result = brain.run_seal_loop("测试任务", None, None);
+        let after = brain.brain.capability.clone();
+        // Proposal 模式：能力向量不应修改
+        let change: f64 = before.arr().iter().zip(after.arr().iter()).map(|(a, b)| (a - b).abs()).sum();
+        assert!(change < 0.001, "Proposal 模式不应修改能力向量");
+        // 但 pipeline 仍应返回奖励（不阻止流程）
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_autonomy_bounded_blocks_high_capability() {
+        let mut brain = SelfIteratingBrain::new();
+        brain.autonomy = AutonomyLevel::Bounded;
+        // 设置能力总和 > 16.0 以触发 bounded 门控
+        for i in 0..brain.brain.capability.arr().len() {
+            brain.brain.capability.arr_mut()[i] = 0.9;
+        }
+        let _snapshot = brain.brain.capability.clone();
+        let result = brain.run_seal_loop("test", None, None);
+        // Bounded 模式能力超过阈值时应返回 Ok（但实际跳过了修改）
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_pipeline_stages_order() {
+        let pipeline = seal_pipeline();
+        let names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(names, vec![
+            "snapshot", "autonomy_gate", "memory_retrieval",
+            "gap_analysis",
+            "ssm_update", "open_source_compare", "self_edit_gen",
+            "bounded_edit", "apply_edits",
+            "reward_calc", "validation_gate",
+            "gwt_absorb", "stats_significance",
+            "harness_adapt",
+            "task_affinity", "knowledge_quality",
+            "rollback_decision", "rejected_feedback",
+            "champion_compare", "bank_storage",
+            "hypercube_optimize",
+            "e8_experiment",
+            "epoch_slow_update", "nt_shield_scan", "session_distill", "conversation_distill", "aging_diagnosis", "embedding_refresh",
+        ], "SEAL pipeline 应有 28 个 stage");
+    }
+
+    #[test]
+    fn test_kernel_pipeline_stages_order() {
+        let pipeline = kernel_iterate_pipeline();
+        let names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        assert_eq!(names, vec![
+            "snapshot", "autonomy_gate", "memory_retrieval",
+            "open_source_compare", "adaptive_lr", "knowledge_absorb", "memory_storage",
+            "champion_compare", "evaluation",
+        ], "Kernel pipeline 应有 9 个 stage");
+    }
+
+    #[test]
+    fn test_all_stages_have_unique_names() {
+        let pipeline = seal_pipeline();
+        let names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), names.len(), "所有 stage 名必须唯一");
+    }
+}

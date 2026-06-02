@@ -1,0 +1,1234 @@
+conflicts: []
+meta:
+  conflicts: 0
+    generated_at: '2026-06-01'
+     total_items: 60
+    v1_completed: 107
+   v2_phase: all_done
+   v2_r1_completed: 5
+   v2_r1_total: 5
+   session_distilled: false
+         total_tests: 3200
+     compile_default: 'pending'
+     compile_full: 'pending'
+     last_session: '2026-06-01'
+       total_tests_session32: 1673
+       unwrap_removed: 880
+       production_unwrap: 0
+       clippy_before: 404
+       clippy_after: 0
+       v_next: earn_agent_verify
+
+items:
+  # ===========================================================================
+  # SESSION-0529-COGNITIVE-EYE — 元认知观察器集成
+  # ===========================================================================
+  - id: SESSION-0529-COGNITIVE-EYE
+    title: CognitiveEye 集成 + 测试全绿 (1641 passed, 0 failed)
+    status: done
+    priority: high
+    created: '2026-05-29'
+    updated: '2026-05-29'
+    session: '2026-05-29'
+    files:
+      - neotrix-core/src/neotrix/reasoning_brain/reasoning_engine/cognitive_observer.rs
+      - neotrix-core/src/neotrix/reasoning_brain/reasoning_engine/engine_core.rs
+      - neotrix-core/src/neotrix/mod.rs
+      - neotrix-core/src/core/knowledge/activation.rs
+    depends_on: []
+    blocked_by: []
+    notes: CognitiveEye observe() API 修正, ReasoningType 穷举匹配, 遗留模块声明删除, activation 断言调整, error_recurrence test 3-call fixed; 1641 passed 0 failed
+  # ===========================================================================
+  # R1 — 真 P0 (阻塞级, 本轮最高优先级)
+  # ===========================================================================
+  - id: R1-01
+    title: sandbox.rs WASM 沙箱实现（替换 sh -c shell 注入）
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: R1
+    files: [neotrix-core/src/neotrix/sandbox.rs]
+    depends_on: []
+    blocked_by: []
+    notes: exec_local/exec_docker 均改用 split+args 零 shell; +Wasm 模式(feature-gated)
+
+  - id: R1-02
+    title: agent_workflow.rs:162 shell 注入消除
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: R1
+    files: [neotrix-core/src/agent/agent_workflow.rs]
+    depends_on: []
+    blocked_by: []
+    notes: sh -c → split_whitespace + Command::new + args, 零 shell 调用
+
+  - id: R1-03
+    title: Orchestrator agent_feedback_callback 实现
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: R1
+    files: [neotrix-core/src/neotrix/orchestrator/mod.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 新增 +with_feedback_callback(), DAG 执行后回调通知 GoalLoop
+
+  - id: R1-04
+    title: background_loop shutdown() + JoinHandle 全量存储
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: R1
+    files: [neotrix-core/src/neotrix/background_loop.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 3 处 tokio::spawn→self.spawn(), JoinHandle 存储, shutdown() abort 清理
+
+  - id: R1-05
+    title: pipeline.rs 所有权重构
+    status: pending
+    priority: low
+    created: '2026-05-23'
+    session: R1
+    files: [neotrix-core/src/neotrix/reasoning_brain/self_iterating/pipeline.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 评估为 P2 非阻塞, 降级
+
+  # ===========================================================================
+  # R2 — 真架构债 (本周)
+  # ===========================================================================
+  - id: R2-01
+    title: 3 个零实现 trait 补全
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R2
+    files: [neotrix-core/src/core/traits.rs]
+    depends_on: []
+    blocked_by: []
+    notes: ToolProvider, SessionProvider, KnowledgeProvider — 定义但无人 impl
+
+  - id: R2-02
+    title: .ok() 真实治理 (91 处)
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R2
+    files: []
+    depends_on: []
+    blocked_by: []
+    notes: batch1(20) + batch3(64) = 84/96; 8 exempt
+
+  - id: R2-03
+    title: memory.rs 拆分 (1805→模块)
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R2
+    files: [neotrix-core/src/core/memory.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 1→9 文件; 拆成 types/storage/search 模块
+
+  - id: R2-04
+    title: goal_loop.rs 拆分 (1098→模块)
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R2
+    files: [neotrix-core/src/neotrix/reasoning_brain/goal_loop.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 1→4 文件拆分完成
+
+  - id: R2-05
+    title: context_artifacts.rs 拆分 (1077→模块)
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R2
+    files: [neotrix-core/src/neotrix/reasoning_brain/context_artifacts.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 1→4 文件拆分完成
+
+  - id: R2-06
+    title: http_client.rs 拆分 (995→模块)
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R2
+    files: [neotrix-core/src/neotrix/stealth_net/http_client.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 1→4 文件拆分完成
+
+  - id: R2-07
+    title: production panic! 审计 (11 处)
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R2
+    files: []
+    depends_on: []
+    blocked_by: []
+    notes: 0 production panics (均在测试); 无需修复
+
+  # ===========================================================================
+  # R3 — 代码健康 (月内)
+  # ===========================================================================
+  - id: R3-01
+    title: 慢测试优化 (~10 个 >60s)
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R3
+    files: []
+    depends_on: []
+    blocked_by: []
+    notes: 10 个 >60s 测试已 #[ignore]; 测试时间 72.85s→52.64s
+
+  - id: R3-02
+    title: stealth_net/ 单元测试覆盖
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R3
+    files: [neotrix-core/src/neotrix/stealth_net/]
+    depends_on: []
+    blocked_by: []
+    notes: 39 新 tests (4 文件); 26/28 文件 (93%) 覆盖
+
+  - id: R3-03
+    title: 重复模块合并: permission.rs vs permissions.rs
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R3
+    files: [neotrix-core/src/neotrix/security/permissions.rs]
+    depends_on: []
+    blocked_by: []
+    notes: permission.rs 已删除; 仅保留 permissions.rs
+
+  - id: R3-04
+    title: 死模块清理: reasoning_kernel/ 删除
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R3
+    files: []
+    depends_on: []
+    blocked_by: []
+    notes: 25 文件 → 3 forwarding shim (mod/circuits/decoder); 4.4K LOC 已清理
+
+  - id: R3-05
+    title: 死模块清理: harness/ infopool/ plugin_system/
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R3
+    files: []
+    depends_on: []
+    blocked_by: []
+    notes: 已不存在; 确认清理完毕
+
+  - id: R3-06
+    title: 空 feature placeholder 清理
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R3
+    files: [neotrix-core/Cargo.toml]
+    depends_on: []
+    blocked_by: []
+    notes: 已删除 rayon, operator_tests, playwright, telegram — 4 个空 feature
+
+  # ===========================================================================
+  # R4 — 进化目标 (季度)
+  # ===========================================================================
+  - id: R4-01
+    title: core → 5 独立 crate 演进
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R4
+    files: [repo-analysis/crate-split-design.md]
+    depends_on: [R3-04, R3-05]
+    blocked_by: []
+    notes: 设计文档完成; 边界定义/迁移阶段/依赖图/风险评估
+
+  - id: R4-02
+    title: rkyv 零拷贝接入知识图谱
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R4
+    files: [neotrix-core/src/core/rkyv_store.rs]
+    depends_on: [R2-03]
+    blocked_by: []
+    notes: rkyv_store (155行, 4 tests) + bank.rs store_to_rkyv()/load_from_rkyv() (feature-gated)
+
+  - id: R4-03
+    title: OTel agent 级分布式追踪
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R4
+    files: [neotrix-core/src/neotrix/telemetry.rs]
+    depends_on: []
+    blocked_by: []
+    notes: telemetry (56行, OTLP exporter) + pipeline.rs 各 stage spans 插桩完成
+
+  - id: R4-04
+    title: CLI 入口统一
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R4
+    files: [neotrix-core/src/main.rs]
+    depends_on: []
+    blocked_by: []
+    notes: clap derive 重构: neotrix desktop / headless / reason subcommands
+
+  - id: R4-05
+    title: 外部来源吸收协议
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R4
+    files: [neotrix-core/src/core/accessor.rs]
+    depends_on: [R2-01, R2-02, R2-03, R2-04]
+    blocked_by: []
+    notes: Accessor trait + UrlAccessor + AccessionReport + 4 tests; 已注册 core/mod.rs
+
+  - id: R4-06
+    title: Guardrails 输出/动作筛选器补全
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: R4
+    files: [neotrix-core/src/neotrix/prompt_guard.rs]
+    depends_on: []
+    blocked_by: []
+    notes: OutputScreener + ActionScreener 补全; 24 tests
+
+  # ===========================================================================
+  # 本轮已完成 (履历保留)
+  # ===========================================================================
+  # ===========================================================================
+  # TODO-after-R2 — 本 session 完成(暂放R3前面)
+  # ===========================================================================
+  - id: HC-07
+    title: AttentionRouter — SEAL loop ↔ GWT 连接
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: R2-3
+    files: [neotrix-core/src/neotrix/reasoning_brain/attention_router.rs, neotrix-core/src/core/consciousness/module_def.rs]
+    depends_on: [HC-05, HC-06]
+    blocked_by: []
+    notes: 11 tests; SEAL eval → GWT competition → broadcast → collect back
+
+  - id: F-05
+    title: patch_file 精确手术编辑
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: R2-3
+    files: [neotrix-core/src/agent/tools/patch.rs, neotrix-core/src/agent/tools/mod.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 11 tests; surgical text replacement + MCP handler + backup safety
+
+  - id: F-06
+    title: 密钥双层存储 (localStorage + Rust keyring)
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: R2-3
+    files: [neotrix-core/src/neotrix/security/keyvault.rs, neotrix-core/src/neotrix/security/mod.rs, neotrix-core/Cargo.toml]
+    depends_on: []
+    blocked_by: []
+    notes: 6 tests; AES-GCM localStorage + OS keyring(feature-gated)
+
+  # ===========================================================================
+  # HC — 知识超立方体 + GWT 注意力路由 (本 session)
+  # ===========================================================================
+  - id: HC-01
+    title: core/hypercube/vsa.rs — VSA 引擎 (4096-dim, bundle/bind/permute)
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files: [neotrix-core/src/core/hypercube/vsa.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 17 tests; MAP-style VSA with bundle/bind/permute/bind_sequence/cleanup
+
+  - id: HC-02
+    title: core/hypercube/axis+coord — 8轴坐标系
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files: [neotrix-core/src/core/hypercube/axis.rs, neotrix-core/src/core/hypercube/coord.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 20 tests; Time/Abstraction/Domain/Modality/Culture/Scale/Certainty/Agency
+
+  - id: HC-03
+    title: core/hypercube/cube — KnowledgeHyperCube
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files: [neotrix-core/src/core/hypercube/cube.rs]
+    depends_on: [HC-01, HC-02]
+    blocked_by: []
+    notes: 10 tests; insert/query/density_region/cell_count/total_density
+
+  - id: HC-04
+    title: core/hypercube/gap+projection+contradiction
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files: [neotrix-core/src/core/hypercube/gap.rs, neotrix-core/src/core/hypercube/projection.rs, neotrix-core/src/core/hypercube/contradiction.rs]
+    depends_on: [HC-03]
+    blocked_by: []
+    notes: 18 tests; GapReport, Slice/Rollup, Contradiction with resolve
+
+  - id: HC-05
+    title: core/consciousness/ — GWT 注意力路由
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files: [neotrix-core/src/core/consciousness/workspace.rs, module_def.rs, competition.rs, broadcast.rs, ignition.rs]
+    depends_on: []
+    blocked_by: []
+    notes: 30 tests; GlobalWorkspace + CompetitionArena + BroadcastBus + IgnitionDetector
+
+  - id: HC-06
+    title: hypercube_bridge — cortex/knowledge → cube 集成
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files: [neotrix-core/src/neotrix/reasoning_brain/hypercube_bridge.rs]
+    depends_on: [HC-03, HC-04]
+    blocked_by: []
+    notes: 7 tests; DimensionTag→8轴, KnowledgeEntry→HD编码, Gap→ExploreDomain
+
+  - id: HC-07
+    title: AttentionRouter — SEAL loop ↔ GWT 连接
+    status: done
+    priority: medium
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files: [neotrix-core/src/neotrix/reasoning_brain/attention_router.rs]
+    depends_on: [HC-05, HC-06]
+    blocked_by: []
+    notes: SEAL loop 状态 → GlobalWorkspace 竞争 → Broadcast → ReasoningEngine
+
+  - id: HC-08
+    title: ARCHITECTURE_V2.md 更新
+    status: done
+    priority: low
+    created: '2026-05-23'
+    updated: '2026-05-24'
+    session: HC
+    files: [ARCHITECTURE_V2.md]
+    depends_on: [HC-06]
+    blocked_by: []
+    notes: 反映新的 4 层架构; 已更新
+
+  - id: SESSION-0523-HC
+    title: 知识超立方体 + GWT 注意力路由 (本 session)
+    status: done
+    priority: high
+    created: '2026-05-23'
+    updated: '2026-05-23'
+    session: HC
+    files:
+      - neotrix-core/src/core/hypercube/ (7 files)
+      - neotrix-core/src/core/consciousness/ (5 files)
+      - neotrix-core/src/neotrix/reasoning_brain/hypercube_bridge.rs
+      - neotrix-core/src/core/mod.rs
+    depends_on: []
+    blocked_by: []
+    notes: 103 tests; ~1,000 LOC; 0 errors; 3 sub-agents 并行完成
+
+  - id: SESSION-0529-CACHE-FIX
+    title: 增量编译缓存修复 + 模块声明恢复
+    status: done
+    priority: high
+    created: '2026-05-29'
+    updated: '2026-05-29'
+    session: '2026-05-29'
+    files:
+      - neotrix-core/src/neotrix/crawler/mod.rs
+      - neotrix-core/src/neotrix/reasoning_brain/self_iterating/loop_impl/core.rs
+      - neotrix-core/src/neotrix/reasoning_brain/experiment.rs
+    depends_on: []
+    blocked_by: []
+    notes: 发现 pub mod 编辑未持久化 → git diff 验证协议; core.rs brace 修复; experiment.rs 借位修复; 全模块 1503tests 0 failed
+
+  - id: SESSION-0529-SLEEP
+    title: Sleep 引擎完全吸收 (arXiv:2605.26099v2)
+    status: done
+    priority: high
+    created: '2026-05-29'
+    updated: '2026-05-29'
+    session: '2026-05-29'
+    files:
+      - repo-analysis/sleep-fusion-design.md
+      - neotrix-core/src/neotrix/reasoning_brain/sleep/
+      - neotrix-core/src/neotrix/reasoning_brain/self_iterating/loop_impl/core.rs
+      - neotrix-core/src/neotrix/reasoning_brain/self_iterating/loop_impl/seal_loop.rs
+      - neotrix-core/src/neotrix/reasoning_brain/mod.rs
+    depends_on: []
+    blocked_by: []
+    notes: HebbianUpdater + MemoryConsolidation + SleepEngine + SelfIteratingBrain 集成; 23 tests; 0 errors 0 warnings; 1572 total tests passed
+
+  # ===========================================================================
+  # SESSION-0529-JEPA — JEPA World Model 进化 (LeCun 2022-2026)
+  # ===========================================================================
+  - id: SESSION-0529-JEPA
+    title: JEPA World Model + E8 隐藏世界模型 + HyperCube 预测桥
+    status: done
+    priority: high
+    created: '2026-05-29'
+    updated: '2026-05-29'
+    session: '2026-05-29'
+    files:
+      - neotrix-core/src/neotrix/jepa_world_model.rs
+      - neotrix-core/src/neotrix/e8_world_model.rs
+      - neotrix-core/src/neotrix/hypercube_prediction.rs
+      - neotrix-core/src/neotrix/world_model.rs
+      - neotrix-core/src/neotrix/mod.rs
+    depends_on: [HC-01, HC-02, HC-03, HC-05]
+    blocked_by: []
+    notes: |
+      JEPA 三层预测架构:
+        JEPA (32-dim latent) → E8 (64-dim hexagram) → HyperCube (16-dim VSA)
+        短期预测+不确定性     中长期演化+共振选择     知识增强+经验回放
+      文献:
+        - LeCun (2022) "A Path Towards Autonomous Machine Intelligence"
+        - I-JEPA (2023), V-JEPA (2024), LeWorldModel (2026) arXiv:2603.19312
+        - VICReg (2022)
+       结果: 3 files, ~1037 LOC, 34 tests, 0 errors, 0 warnings
+  # ===========================================================================
+  # SESSION-0530-AI-PHI-EVOLUTION — Active Inference + IIT Φ + EvolutionLoop
+  # ===========================================================================
+  - id: SESSION-0530-AI-PHI-EVOLUTION
+    title: Active Inference + IIT Φ 度量 + 自进化循环引擎
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '2026-05-30'
+    files:
+      - neotrix-core/src/neotrix/active_inference.rs
+      - neotrix-core/src/neotrix/iit_phi.rs
+      - neotrix-core/src/neotrix/evolution_loop.rs
+      - neotrix-core/src/neotrix/world_model.rs
+      - neotrix-core/src/neotrix/background_loop.rs
+      - neotrix-core/src/neotrix/mod.rs
+    depends_on: [SESSION-0529-JEPA]
+    blocked_by: []
+    notes: |
+      Friston Active Inference (F=β·E_JEPA - H(E8)/T + γ·|∇E8|)
+      + Tononi/Chalmers IIT Phi (Φ=共振加权协方差/总能量-1/N)
+      + EvolutionLoop (自进化引擎: 扫描→检测→建议→蒸馏)
+      结果: 3 new files, ~980 LOC, 34 tests, 0 errors, 0 warnings
+        测试总计: 1675→1713 (Session 35: 1821)
+
+  # ===========================================================================
+  # SESSION-0530-CODE-HEALTH — 全量代码卫生治理 (Session 32)
+  # ===========================================================================
+  - id: SESSION-0530-CODE-HEALTH
+    title: 全量代码卫生治理 — unwrap/panic/dead_code/clippy/megafile 清零
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '2026-05-30'
+    files:
+      - neotrix-core/src/
+      - neotrix-types/src/
+      - src-tauri/src/
+      - TODO.md
+    depends_on: [SESSION-0530-AI-PHI-EVOLUTION]
+    blocked_by: []
+    notes: |
+      全量卫生治理: unwrap 880→0, production panic 6→0, dead_code crate-allow→deny,
+      clippy 404→0, megafiles 5→21 sub-files, test re-enable 25, neotrix-types 96→0,
+      src-tauri 56→0, session log distilled.
+      编译: neotrix-core 0e/0w + neotrix-types 0e/495t + src-tauri 0e/0w
+
+  # ===========================================================================
+  # SESSION-33-PROXY-DAEMON — Proxy Daemon 重构
+  # ===========================================================================
+  - id: SESSION-33-PROXY-DAEMON
+    title: Proxy Daemon 重写 + Tor/ProxyPool 路由
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '2026-05-30'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/local_proxy.rs
+      - neotrix-core/src/bin/proxy_daemon.rs
+      - neotrix-core/src/neotrix/evolution_loop.rs
+    depends_on: []
+    blocked_by: []
+    notes: |
+      local_proxy.rs 重写: HTTP CONNECT + SOCKS5 Tor + ProxyPool 优先路由 + bypass loopback fix.
+      Tor via SOCKS5 on 9050, ProxyPool fallback.
+      x.com HTTP 200 in ~12s.
+      --lan system proxy loopback bypass fix.
+
+  - id: PROXY-POOL-SPEED
+    title: ProxyPool 速度优化 — 选最快非中国出口代理优先于 Tor
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '2026-05-30'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/proxy_pool.rs
+      - neotrix-core/src/neotrix/stealth_net/config.rs
+      - neotrix-core/src/neotrix/stealth_net/local_proxy.rs
+    depends_on: []
+    blocked_by: []
+    notes: |
+      NodeSelectionStrategy enum with 6 strategies: Fastest/LeastLatency/LeastFailure/
+      WeightedRandom/GeoPreferred/RoundRobin. select_node() method dispatches by strategy.
+      Config field pool.selection_strategy in TOML. select_node() wired into local_proxy.
+      12 new tests all passing.
+
+- id: PROXY-DAEMON-STABILITY
+    title: ProxyDaemon 稳定性 — Unix socket 控制平面 + DaemonMode + idle shutdown
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-31'
+    session: '2026-05-31'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/proxy_control.rs
+      - neotrix-core/src/bin/proxy_daemon.rs
+      - neotrix-core/src/neotrix/stealth_net/local_proxy.rs
+      - neotrix-core/src/neotrix/stealth_net/mod.rs
+    depends_on: [SESSION-33-PROXY-DAEMON]
+    blocked_by: []
+    notes: |
+        Daemon restructured with mode controller (off/geo/stealth/tor),
+        Unix socket control plane (GET status / POST mode/shutdown/activity),
+        ActivityTracker for idle detection.
+        5 redundant modules deleted (tun/pf/transparent/identity/dns).
+        .zshrc updated: port 11080 unified, proxy-run wrapper added.
+        cargo check --features full --lib: 0 errors.
+
+  # ===========================================================================
+  # SESSION-39-NETWORK-DIAG — 网络诊断预测推理引擎
+  # ===========================================================================
+  - id: ND-01
+    title: 4层诊断脚本 (Network/DNS/API/Routing)
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - scripts/network-diag.sh
+    notes: bash script, curl -w timing breakdown + host DNS check + 4 layers
+
+  - id: ND-02
+    title: NEL-style 错误分类层级
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/network_diagnostics.rs
+    notes: ErrorPhase(Dns/Tcp/Tls/Http) -> ErrorClass -> subtypes
+
+  - id: ND-03
+    title: EWMA + CUSUM 流式异常检测
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/network_diagnostics.rs
+    notes: 4 tests, Welford online variance, CUSUM K=0.5 H=5.0
+
+  - id: ND-04
+    title: 双层根因分类器 (确定性+概率)
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/network_diagnostics.rs
+    notes: Layer1 deterministic (0.90-0.98), Layer2 Bayesian fusion
+
+  - id: ND-05
+    title: Holt-Winters 三重指数平滑
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/network_diagnostics.rs
+    notes: alpha=0.4 beta=0.2 gamma=0.2, period 12/24, 2 tests
+
+  - id: ND-06
+    title: 复合健康评分 (Google SRE)
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/network_diagnostics.rs
+    notes: Latency 45% + Error 35% + DNS 20%, Green/Yellow/Red
+
+  - id: ND-07
+    title: Auto-Remediation Playbook (D3框架)
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/network_diagnostics.rs
+    notes: flush_dns/toggle_wifi/reset_network + verify, 2 tests
+
+  - id: ND-08
+    title: PredictiveNetworkMonitor 全链路
+    status: done
+    priority: high
+    created: '2026-05-30'
+    updated: '2026-05-30'
+    session: '39'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/network_diagnostics.rs
+    notes: scan -> predict -> classify -> remediate pipeline
+       3. Error recovery in initialization
+
+  # ===========================================================================
+  # SESSION-52-EARN-V3 — EarnAgent v3 三大引擎重构 (2026-06-01)
+  # ===========================================================================
+  - id: EA-V3-WEALTH
+    title: 'wealth_model.rs — 金字塔财富积累机制 (杠杆×不对称性×复利)'
+    status: done
+    priority: high
+    created: '2026-06-01'
+    updated: '2026-06-01'
+    session: '2026-06-01'
+    files:
+      - neotrix-core/src/neotrix/earn_agent/wealth_model.rs
+    depends_on: []
+    blocked_by: ['EA-V3-VERIFY']
+    notes: |
+      WealthMechanism(7种), CapitalStack(多层杠杆), CompoundingTracker(资本/劳动收入比)
+      11 tests: 创建/杠杆/复利/策略评估/资本成本/翻倍追踪
+
+  - id: EA-V3-FINANCE
+    title: 'financial_abstraction.rs — 实体→虚拟金融抽象堆叠'
+    status: done
+    priority: high
+    created: '2026-06-01'
+    updated: '2026-06-01'
+    session: '2026-06-01'
+    files:
+      - neotrix-core/src/neotrix/earn_agent/financial_abstraction.rs
+    depends_on: []
+    blocked_by: ['EA-V3-VERIFY']
+    notes: |
+      AbstractionLayer(7层: L0实物→L6加密), SecuritizationPool(3级), DerivativeBook
+      9 tests: 默认/抽象倍率/证券化/衍生品/风险调整收益/做市PNL
+
+  - id: EA-V3-KNOWLEDGE
+    title: 'knowledge_arbitrage.rs — 互联网知识套利引擎'
+    status: done
+    priority: high
+    created: '2026-06-01'
+    updated: '2026-06-01'
+    session: '2026-06-01'
+    files:
+      - neotrix-core/src/neotrix/earn_agent/knowledge_arbitrage.rs
+    depends_on: []
+    blocked_by: ['EA-V3-VERIFY']
+    notes: |
+      InformationSource(9种), SignalProcessor, KnowledgeGraph, ArbitrageOpportunity
+      9 tests: 扫描/评估/实体关系/注意力价值/知识资本提取
+
+  - id: EA-V3-AGENT
+    title: 'agent.rs + mod.rs — EarnAgent v3 集成三大引擎 + strategic_report()'
+    status: done
+    priority: high
+    created: '2026-06-01'
+    updated: '2026-06-01'
+    session: '2026-06-01'
+    files:
+      - neotrix-core/src/neotrix/earn_agent/agent.rs
+      - neotrix-core/src/neotrix/earn_agent/mod.rs
+    depends_on: [EA-V3-WEALTH, EA-V3-FINANCE, EA-V3-KNOWLEDGE]
+    blocked_by: ['EA-V3-VERIFY']
+    notes: |
+      EarnAgent 新增字段 wealth_model/financial_stack/knowledge_engine
+      deploy_leverage()/securitize_assets()/open_arbitrage_position()/scan_knowledge_opportunities()
+      strategic_report() — 综合赚钱战略洞察
+      16 tests: 创建/杠杆/证券化/头寸/扫描/报告/循环
+
+  - id: EA-V3-VERIFY
+    title: '编译验证 + 全量测试 — TODO 队列统一处理'
+    status: pending
+    priority: high
+    created: '2026-06-01'
+    updated: '2026-06-01'
+    session: '2026-06-01'
+    files: []
+    depends_on: [EA-V3-AGENT]
+    blocked_by: []
+    notes: |
+      earn_agent 模块编译 0 error (已验证)
+      待: --features full 验证, cargo test earn_agent 全量测试
+      预存编译错误（非 earn_agent）待批次修复
+
+  # ===========================================================================
+  # SESSION-50-P2-DELTA — Hooks Wiring / Session Share / mDNS Discover (2026-05-31)
+  # ===========================================================================
+  - id: SESSION-50-P2-DELTA
+    title: 'Hooks/Share/mDNS — P2 增量 + 31 pre-existing error fixes'
+    status: done
+    priority: medium
+    created: '2026-05-31'
+    updated: '2026-05-31'
+    session: '2026-05-31'
+    files:
+      - neotrix-core/src/agent/agent_workflow.rs
+      - neotrix-core/src/cli/commands/types.rs
+      - neotrix-core/src/entry/headless.rs
+      - neotrix-core/src/entry/mod.rs
+      - neotrix-core/src/server/session.rs
+      - neotrix-core/src/server/http.rs
+      - neotrix-core/src/cli/commands/session_cmds.rs
+      - neotrix-core/src/neotrix/agent_protocol/discovery.rs
+      - neotrix-core/src/neotrix/agent_protocol/mod.rs
+      - neotrix-core/src/neotrix/background_loop/run.rs
+      - neotrix-core/src/cli/commands/agent_cmds.rs
+      - neotrix-core/src/cli/commands/registry.rs
+      - neotrix-core/src/main.rs
+      - neotrix-core/src/entry/mod.rs
+      - neotrix-core/src/neotrix/earn_agent/content.rs
+      - neotrix-core/src/neotrix/earn_agent/agent.rs
+      - neotrix-core/src/neotrix/earn_agent/video.rs
+      - neotrix-core/src/neotrix/voice/mod.rs
+    depends_on: []
+    blocked_by: []
+    notes: |
+      P2 增量:
+      1. Hooks 系统: PreToolUse/PostToolUse 接入执行管道 (agent_workflow, types.rs, entry/*)
+      2. Session 分享: /session share CLI + GET/POST HTTP API + SessionShareManager
+      3. mDNS 发现: neotrix discover CLI + 主动扫描探针 + background_loop 接入
+      预存修复: earn_agent format/CapabilityVector, voice MicCapture move, 共 ~30 errors → 0
+      编译: --lib ✅ 0e/0w, --features full ✅ 0e, tauri ✅ 0e, tsc ✅ 0e
+  # ===========================================================================
+  # SESSION-44-PROXY-EVOLUTION — 代理架构演化 (2026-05-31)
+  # ===========================================================================
+  - id: SESSION-44-PROXY-EVOLUTION
+    title: 代理架构演化 — 删除5冗余模块 + Unix socket 控制平面 + DaemonMode
+    status: done
+    priority: high
+    created: '2026-05-31'
+    updated: '2026-05-31'
+    session: '2026-05-31'
+    files:
+      - neotrix-core/src/neotrix/stealth_net/proxy_control.rs (NEW)
+      - neotrix-core/src/bin/proxy_daemon.rs (REWRITE)
+      - neotrix-core/src/neotrix/stealth_net/local_proxy.rs (MODIFIED)
+      - neotrix-core/src/neotrix/stealth_net/mod.rs (MODIFIED)
+      - neotrix-core/src/neotrix/stealth_net/proxy_pool.rs (MODIFIED)
+      - neotrix-core/src/neotrix/stealth_net/tor_crawler.rs (MODIFIED)
+      - neotrix-core/src/neotrix/stealth_net/pool_types.rs (MODIFIED)
+      - neotrix-core/src/neotrix/stealth_net/pool_strategies.rs (MODIFIED)
+      - neotrix-core/src/neotrix/stealth_net/pool_health.rs (MODIFIED)
+      - deploy/com.neotrix.proxy-daemon.plist (MODIFIED)
+    depends_on: [SESSION-33-PROXY-DAEMON]
+    blocked_by: []
+    notes: |
+      代理架构彻底演化:
+      - 删除5冗余模块: tun_proxy, pf_nat, transparent_proxy, identity_rotator, dns_hijack
+      - 新建 proxy_control.rs (226行): Unix socket 控制平面 + DaemonMode + ActivityTracker
+      - DaemonMode 4态: off/geo/stealth/tor (默认geo)
+      - LocalProxy 增加 mode-aware routing_decision()
+      - 修复12个 pre-existing stealth-net warning-as-error
+      - 编译: --lib ✅, --features stealth-net ✅, --features full ✅
+      - .zshrc 端口统一11080 + proxy-run wrapper
+      - Daemon E2E验证: status/mode切换(geo→stealth)/activity/uptime 全部正确
+
+   # ===========================================================================
+   # SESSION-52-RELEASE-GAPS — 发布就绪差距补齐 (2026-06-01)
+   # ===========================================================================
+   - id: S52-CI-WINDOWS
+     title: 'CI: Windows runner 加入 (check + test)'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files: [.github/workflows/ci.yml]
+     notes: windows-latest 加入 check 和 test 矩阵
+
+   - id: S52-CI-FRONTEND
+     title: 'CI: Frontend vitest + full features check'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files: [.github/workflows/ci.yml]
+     notes: 新增 frontend 和 full-features job
+
+   - id: S52-CONTRIBUTING
+     title: 'CONTRIBUTING.md 创建'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files: [CONTRIBUTING.md]
+     notes: 开发指南 + 提交规范 + PR 流程
+
+   - id: S52-SECURITY
+     title: 'SECURITY.md 创建'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files: [SECURITY.md]
+     notes: 漏洞报告 + 安全实践 + 支持版本
+
+   - id: S52-COMPONENT-TESTS
+     title: 'Desktop 组件测试 (6 文件, 76 tests)'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files:
+       - src-tauri/frontend/src/__tests__/components/ErrorBoundary.test.tsx
+       - src-tauri/frontend/src/__tests__/components/StatusBar.test.tsx
+       - src-tauri/frontend/src/__tests__/components/ChatPanel.test.tsx
+       - src-tauri/frontend/src/__tests__/components/InputPanel.test.tsx
+       - src-tauri/frontend/src/__tests__/components/SessionList.test.tsx
+       - src-tauri/frontend/src/__tests__/components/DiffViewer.test.tsx
+     notes: 6 组件测试文件, 76 tests, 覆盖正常/边界/错误路径
+
+   - id: S52-VERSION-UNIFY
+     title: '统一版本号 v0.18.0 (CLI + Desktop + Types)'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files:
+       - src-tauri/tauri.conf.json
+       - src-tauri/src/main.rs
+       - neotrix-core/src/main.rs
+       - crates/neotrix-types/Cargo.toml
+     notes: tauri v0.2.0→0.18.0, main.rs version 取消注释, types workspace.workspace
+
+   - id: S52-WEB-SEARCH
+     title: 'Web 搜索 /search 命令 + TUI 斜杠命令'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files:
+       - neotrix-core/src/neotrix/web_search.rs
+       - neotrix-core/src/main.rs
+     notes: WebSearchEngine + /search CLI + /search TUI command
+
+   - id: S52-IMAGE-INPUT
+     title: '图像输入 /image 命令 + multimodal content'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files:
+       - neotrix-core/src/cli/tui/app/types.rs
+       - neotrix-core/src/cli/tui/app/app.rs
+     notes: /image <path> 加载 + base64 编码 + multimodal 消息传递
+
+   - id: S52-SHORTCUTS-PANEL
+     title: 'Desktop: ShortcutsPanel (Cmd+/ 快捷键面板)'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files:
+       - src-tauri/frontend/src/components/ShortcutsPanel.tsx
+       - src-tauri/frontend/src/store.ts
+       - src-tauri/frontend/src/App.tsx
+       - src-tauri/frontend/src/styles/global.css
+     notes: Cmd+/ 触发, 4 分类快捷键展示, glassmorphism 风格
+
+   - id: S52-SEARCH-OVERLAY
+     title: 'Desktop: SearchOverlay (Ctrl+R 会话历史搜索)'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files:
+       - src-tauri/frontend/src/components/SearchOverlay.tsx
+       - src-tauri/frontend/src/store.ts
+       - src-tauri/frontend/src/App.tsx
+       - src-tauri/frontend/src/styles/global.css
+     notes: Ctrl+R 触发, 跨会话实时搜索, ↑↓导航, Enter 跳转
+
+   - id: S52-CODE-EDITOR
+     title: 'Desktop: CodeEditor 升级 (语法高亮/编辑/保存/查找)'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files:
+       - src-tauri/frontend/src/components/CodeEditor.tsx
+       - src-tauri/frontend/src/styles/global.css
+     notes: 语法高亮/可编辑/Cmd+S保存/Cmd+F查找/行号/自动保存/缩进参考线
+
+   - id: S52-ERROR-BOUNDARY
+     title: 'Desktop: ErrorBoundary 系统化包裹 (7 区域)'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files: [src-tauri/frontend/src/App.tsx]
+     notes: Settings/PermissionDialog/SessionList/主面板/FileTree/CodeEditor/Terminal
+
+   - id: S52-HOMEBREW
+     title: 'Homebrew Formula 更新到 v0.18.0 + livecheck'
+     status: done
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52'
+     files: [scripts/neotrix.rb]
+      notes: v0.0.1→v0.18.0, livecheck, on_macos/on_linux arch detection
+
+   # ===========================================================================
+   # SESSION-52-PENDING — 已规划待后续统一处理
+   # ===========================================================================
+   - id: S52-P0-SENTRY
+     title: 'P0: Sentry crash reporting 集成 (Rust + frontend, env-gated)'
+     status: pending
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     depends_on: []
+     blocked_by: ['need Sentry DSN for activation']
+     notes: |
+       neotrix-core + src-tauri 集成 sentry crate
+       init_sentry() 检查 NEOTRIX_SENTRY_DSN 环境变量
+       无 DSN 时 no-op
+
+   - id: S52-P0-E2E
+     title: 'P0: E2E 测试脚手架 (CLI shell + Desktop Cypress)'
+     status: pending
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       tests/e2e/cli_basic.sh + cli_session.sh + run_all.sh
+       src-tauri/frontend/cypress/ 配置 + 4 spec 文件
+       CI 新增 e2e-cli + e2e-desktop jobs
+
+   - id: S52-P0-DOCS
+     title: 'P0: 文档网站脚手架 (VitePress)'
+     status: pending
+     priority: high
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       docs/ 目录, vitepress 配置
+       页面: 指南/快速开始/CLI参考/桌面指南/配置/开发/API
+       品牌色 dark purple/blue 主题
+
+   - id: S52-P1-PROFILES
+     title: 'P1: Config Profiles (neotrix --profile work/personal)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       ProfileStore at ~/.config/neotrix/profiles/
+       命令: config profile list/create/delete/rename/show
+       默认 profile "default", active_profile 文件
+
+   - id: S52-P1-FEATURES
+     title: 'P1: Feature Flags CLI (neotrix features enable/disable/list)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       FeatureFlag enum (CloudAsync/VoiceInput/WebSearch/ImageInput/LspIntegration/VimMode/BudgetTracking)
+       features list/enable/disable 子命令
+       TOML 持久化
+
+   - id: S52-P1-EXEC
+     title: 'P1: Exec Mode (neotrix exec ''prompt'' --path src/)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       ExecSession: 临时 session → AI 请求 → 文件写入 → 清理
+       --path, --model, --max-tokens, --no-cleanup, --format json|text
+
+   - id: S52-P1-SUBAGENTS
+     title: 'P1: Subagents (neotrix subagents create/list/delete/show)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       SubAgent: id/name/role/model/system_prompt
+       JSON files at ~/.config/neotrix/subagents/
+       subagents list/create/delete/show 命令
+
+   - id: S52-P1-AGENTSMD
+     title: 'P1: AGENTS.md 兼容性文件 (root + crate + subsystem)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       3 级 AGENTS.md: root/neotrix-core/neotrix-core/src/neotrix/
+       AI agent onboarding: build/test/conventions/architecture/module guide
+
+   - id: S52-P1-DOCKER
+     title: 'P1: Homebrew Docker 发布 (Dockerfile + CI publish)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       Dockerfile (multi-stage, debian slim)
+       Dockerfile.desktop (Tauri deps, ubuntu)
+       scripts/docker-publish.sh
+       .github/workflows/docker-publish.yml
+
+   - id: S52-P1-SBOM
+     title: 'P1: SBOM 生成 (cargo-cyclonedx + CI job)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       scripts/sbom.sh
+       .github/workflows/sbom.yml (release/manual trigger)
+       cargo cyclonedx → JSON + XML artifacts
+
+   - id: S52-P1-SECRET-SCAN
+     title: 'P1: Secret Scanning (gitleaks/trufflehog CI)'
+     status: pending
+     priority: medium
+     created: '2026-06-01'
+     updated: '2026-06-01'
+     session: '52-pending'
+     files: []
+     depends_on: []
+     blocked_by: []
+     notes: |
+       .github/workflows/secret-scan.yml
+       .gitleaks.toml with allowlist for test fixtures
+       Push + PR trigger

@@ -1,0 +1,135 @@
+[package]
+name = "neotrix"
+version.workspace = true
+edition = "2021"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[lib]
+name = "neotrix"
+
+[[bin]]
+name = "neotrix"
+path = "src/main.rs"
+
+[[bin]]
+name = "neotrix-proxy-daemon"
+path = "src/bin/proxy_daemon.rs"
+required-features = ["stealth-net"]
+
+[[bin]]
+name = "neotrix-web"
+path = "src/bin/neotrix_web.rs"
+
+[[bin]]
+name = "neotrix-kb-crawl"
+path = "src/bin/kb_crawl_daemon.rs"
+
+[dependencies]
+neotrix-types = { path = "../crates/neotrix-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dirs = { workspace = true }
+log = "0.4"
+hmac = "0.12"
+sha2 = "0.10"
+sha1 = "0.10"
+aes = "0.8"
+num-bigint = "0.4"
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "multipart", "socks", "rustls-tls"] }
+url = "2"
+rand = "0.8"
+async-trait = "0.1"
+rmcp = { version = "0.5", features = ["server", "macros"] }
+lru = "0.12"
+base64 = "0.22"
+hex = "0.4"
+filetime = "0.2"
+k256 = { version = "0.13", features = ["ecdsa"] }
+sha3 = "0.10"
+glob = "0.3"
+regex = "1"
+syn = { version = "2", features = ["full", "visit"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+walkdir = "2"
+toml = "0.8.19"
+futures = "0.3"
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+chromiumoxide = { version = "0.7", default-features = false, features = ["tokio-runtime"], optional = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+ratatui = "0.30.0"
+crossterm = "0.29.0"
+axum = { version = "0.8", features = ["ws"] }
+shellexpand = { version = "3", features = ["tilde"] }
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+indicatif = "0.17"
+clap_complete = "4"
+libc = "0.2"
+wasmtime = { version = "24", optional = true }
+aes-gcm = "0.10"
+keyring = { version = "3", optional = true }
+rkyv = { version = "0.8", features = ["std", "bytecheck"], optional = true }
+memmap2 = { version = "0.9", optional = true }
+opentelemetry = { version = "0.27", optional = true }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.27", optional = true }
+tracing-opentelemetry = { version = "0.28", optional = true }
+anyhow = { version = "1", optional = true }
+rcgen = { version = "0.13", features = ["x509-parser"] }
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+self_update = { version = "0.42", default-features = false, features = ["rustls"], optional = true }
+agent-sandbox = { version = "0.4", optional = true }
+holon = { git = "https://github.com/watmin/holon-rs", optional = true }
+notify = "7"
+sentry = { version = "0.34", default-features = false, features = ["anyhow", "backtrace", "contexts", "panic"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "core_bench"
+harness = false
+
+[[bench]]
+name = "vector_ops"
+harness = false
+
+[[bench]]
+name = "seal_loop"
+harness = false
+
+[[bench]]
+name = "real_tasks"
+harness = false
+
+[features]
+default = []
+stealth-net = ["dep:chromiumoxide"]
+sandbox = ["dep:wasmtime", "dep:agent-sandbox"]
+telemetry = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
+rkyv-storage = ["dep:rkyv", "dep:memmap2"]
+keyring = ["dep:keyring"]
+anyhow = ["dep:anyhow"]
+simd-vsa = ["dep:holon"]
+self-update = ["dep:self_update"]
+integration_tests = []
+network_tests = []
+full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "integration_tests", "network_tests"]
+
+[[example]]
+name = "evolve"
+path = "examples/evolve.rs"
+
+[[example]]
+name = "absorption_loop_200"
+path = "examples/absorption_loop_200.rs"

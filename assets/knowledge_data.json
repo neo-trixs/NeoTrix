@@ -1,0 +1,3050 @@
+[
+  {
+    "title": "Prime Number Theorem",
+    "body": "The Prime Number Theorem describes the asymptotic distribution of prime numbers. Conjectured by Gauss and Legendre, proved by Hadamard and de la Vallee-Poussin in 1896 using complex analysis. The theorem states that pi(N) ~ N/log(N), where pi(N) is the count of primes up to N. The Riemann Hypothesis would give a tighter bound on the error term. This theorem is fundamental to analytic number theory, with deep connections to the Riemann zeta function.",
+    "tags": [
+      "mathematics",
+      "number theory",
+      "primes",
+      "analysis"
+    ],
+    "importance": 0.95
+  },
+  {
+    "title": "Fermat's Last Theorem",
+    "body": "Fermat's Last Theorem states no three positive integers a,b,c satisfy a^n+b^n=c^n for n>2. Fermat claimed a proof in 1637. Wiles proved it in 1994 using modular forms and elliptic curves, based on the Taniyama-Shimura conjecture. The proof spans over 100 pages and connects number theory to geometry. Andrew Wiles's breakthrough revolutionized arithmetic geometry and opened new connections between modular forms and elliptic curves. The proof was initially announced in 1993, found to contain a gap, and corrected with Richard Taylor's assistance in 1994.",
+    "tags": [
+      "mathematics",
+      "number theory",
+      "history"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "Riemann Hypothesis",
+    "body": "The Riemann Hypothesis, one of seven Millennium Prize Problems, asserts all non-trivial zeros of the Riemann zeta function have real part 1/2. Riemann introduced it in 1859. It has profound implications for prime distribution. Over 10^13 zeros are numerically verified on the critical line, but a general proof remains elusive. It is the most important open problem in mathematics.",
+    "tags": [
+      "mathematics",
+      "number theory",
+      "open problem",
+      "analysis"
+    ],
+    "importance": 0.98
+  },
+  {
+    "title": "Group Theory",
+    "body": "Group theory studies algebraic structures called groups, capturing symmetry. A group has an associative operation, identity, and inverses. Galois originated it in the 1830s for polynomial solvability. Key concepts: subgroups, normal subgroups, quotient groups, homomorphisms. The classification of finite simple groups was completed in 2004. Lie groups describe fundamental symmetries in particle physics.",
+    "tags": [
+      "mathematics",
+      "algebra",
+      "group theory",
+      "symmetry"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Linear Algebra",
+    "body": "Linear algebra concerns vector spaces and linear maps. Core concepts: vectors, matrices, determinants, eigenvalues, eigenvectors. Developed by Cayley, Sylvester, von Neumann. Key results: spectral theorem, SVD, Gram-Schmidt. Indispensable in machine learning, quantum mechanics, computer graphics, data science, and engineering. Vector spaces, linear transformations, and matrices form the backbone of numerical computation. Applications span solving linear systems, least squares fitting, principal component analysis, PageRank, and quantum state representation.",
+    "tags": [
+      "mathematics",
+      "algebra",
+      "linear algebra",
+      "applied"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Euclidean Geometry",
+    "body": "Euclidean geometry is the geometry of flat space, formalized by Euclid in Elements (300 BCE). His axiomatic approach established mathematical rigor. Key results: Pythagorean theorem, Thales' theorem. Independence of the parallel postulate led to non-Euclidean geometries. Essential in surveying, architecture, and navigation. Euclid's parallel postulate remained controversial for centuries, and its independence was eventually proved by the discovery of consistent non-Euclidean geometries by Gauss, Lobachevsky, Bolyai, and Riemann.",
+    "tags": [
+      "mathematics",
+      "geometry",
+      "history",
+      "axioms"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Differential Geometry",
+    "body": "Differential geometry applies calculus to curves, surfaces, and manifolds. Gauss's Theorema Egregium (1827) showed curvature is intrinsic. Riemann generalized to n-dimensions, enabling Einstein's general relativity. Key concepts: metric tensor, curvature tensors, geodesics. Applications: computer vision, manifold learning, robotics, and physics. The field's modern development is deeply tied to gauge theories in physics, where curvature concepts generalize to fiber bundles describing fundamental forces.",
+    "tags": [
+      "mathematics",
+      "geometry",
+      "analysis",
+      "relativity"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Real Analysis",
+    "body": "Real analysis rigorously studies real numbers, sequences, continuity, differentiation, integration. Developed by Cauchy, Weierstrass, Riemann, Dedekind in the 19th century. Key concepts: epsilon-delta definition, uniform convergence, Bolzano-Weierstrass theorem, Lebesgue integral. Measure theory provides the foundation for probability. The Lebesgue integral extends the Riemann integral to a wider class of functions and provides the rigorous foundation for Fourier analysis and probability theory used throughout modern mathematics.",
+    "tags": [
+      "mathematics",
+      "analysis",
+      "calculus",
+      "foundations"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Complex Analysis",
+    "body": "Complex analysis studies functions of complex variables. Holomorphic functions are infinitely differentiable and power-series representable. Cauchy's integral formula enables contour integration via residues. The Riemann mapping theorem is fundamental. Crucial for number theory, physics (conformal field theory), and electrical engineering. One of the most elegant branches of mathematics, complex analysis has applications in fluid dynamics, electromagnetism, signal processing, and the study of the Riemann zeta function.",
+    "tags": [
+      "mathematics",
+      "analysis",
+      "complex analysis",
+      "calculus"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Topology",
+    "body": "Topology studies properties preserved under continuous deformation. Originated from Euler's bridges problem and polyhedron formula. Maturing through Poincare around 1900. Areas: general topology (open sets, compactness), algebraic topology (homotopy, homology), differential topology (manifolds). The Poincare conjecture was proved by Perelman in 2003. Topology underlies gauge theories and topological insulators. The field splits into point-set topology (foundational concepts of continuity and compactness) and algebraic topology (using algebraic invariants like homology and homotopy groups to classify spaces).",
+    "tags": [
+      "mathematics",
+      "topology",
+      "geometry",
+      "analysis"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Probability Theory",
+    "body": "Probability theory quantifies uncertainty. Kolmogorov axiomatized it in 1933. Key results: law of large numbers, central limit theorem, Bayes' theorem. Important distributions: normal, binomial, Poisson, exponential. Probability underpins statistics, machine learning, quantum mechanics, finance, and risk assessment. Key theorems include Markov chains, the central limit theorem (explaining why the normal distribution appears everywhere), and the Poisson limit theorem for rare events.",
+    "tags": [
+      "mathematics",
+      "probability",
+      "statistics",
+      "applied"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Bayesian Statistics",
+    "body": "Bayesian statistics interprets probability as belief updated via Bayes' theorem. Named after Thomas Bayes. Prior and likelihood produce posterior. Methods: MCMC, conjugate priors, hierarchical models. Provides credible intervals and incorporates prior knowledge. Applications: A/B testing, ML, drug discovery, spam filtering. Bayesian methods have grown dramatically with computational advances like Markov Chain Monte Carlo and variational inference, enabling complex hierarchical models and uncertainty quantification.",
+    "tags": [
+      "mathematics",
+      "probability",
+      "statistics",
+      "bayesian"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Set Theory",
+    "body": "Set theory is the foundation of mathematics, developed by Cantor in the 1870s. Cantor proved reals are uncountable and established infinite cardinalities. Russell's paradox (1901) led to ZFC axiomatic system. Key concepts: cardinality, ordinals, axiom of choice, continuum hypothesis (undecidable per Cohen and Godel). Cantor's continuum hypothesis, stating no set has cardinality between integers and reals, was proved independent of ZFC by Godel (1940) and Cohen (1963) using forcing.",
+    "tags": [
+      "mathematics",
+      "foundations",
+      "logic",
+      "set theory"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Game Theory",
+    "body": "Game theory analyzes strategic interactions. Von Neumann and Morgenstern founded it in 1944. Nash proved every finite game has a Nash equilibrium. Concepts: zero-sum, prisoner's dilemma, mechanism design. Essential in economics, evolutionary biology, political science, and multi-agent AI. Nobel Memorial Prizes have been awarded for game theory contributions including Nash (1994), Harsanyi and Selten (1994), and Aumann and Schelling (2005). Mechanism design applies game theory to engineering economic systems.",
+    "tags": [
+      "mathematics",
+      "game theory",
+      "economics",
+      "strategy"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Graph Theory",
+    "body": "Graph theory studies vertices and edges. Euler's 1736 bridges solution was the first theorem. Concepts: trees, planar graphs, coloring, Hamiltonian/Eulerian paths. Major results: four-color theorem (1976, first computer-proved), Ramsey theory. Fundamental to CS, biology (protein networks), transportation. The four-color theorem was the first major mathematical theorem proved using a computer, sparking debate about the nature of mathematical proof.",
+    "tags": [
+      "mathematics",
+      "graph theory",
+      "discrete",
+      "algorithms"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Category Theory",
+    "body": "Category theory provides an abstract framework via objects and morphisms. Developed by Eilenberg and Mac Lane in the 1940s. Concepts: functors, natural transformations, adjunctions, Yoneda's lemma. Underpins algebraic geometry, homological algebra, and functional programming (monads, functors in Haskell). In computer science, category theory provides the mathematical foundation for functional programming concepts like monads, functors, and applicatives in languages like Haskell and Scala.",
+    "tags": [
+      "mathematics",
+      "category theory",
+      "abstract algebra",
+      "foundations"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Information Theory",
+    "body": "Founded by Claude Shannon in 1948. Shannon entropy H=-sum p log p measures information. Source coding theorem (optimal compression) and noisy-channel coding theorem (max reliable rate). Foundation of telecommunications, data compression (ZIP, JPEG, MP3), cryptography, and ML (cross-entropy loss). Shannon's mathematical theory of communication established fundamental limits on data compression and reliable transmission that guide all modern communication system design.",
+    "tags": [
+      "mathematics",
+      "information theory",
+      "computer science",
+      "communication"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Calculus",
+    "body": "Developed by Newton and Leibniz in the 17th century. Differential calculus: rates of change via derivatives. Integral calculus: accumulation via integrals. The Fundamental Theorem connects them. Concepts: limits, Taylor series, multivariable calculus. Language of physics, engineering, economics, and ML (gradient descent). Newton and Leibniz independently developed calculus, sparking a priority dispute that divided European mathematics. Modern calculus underpins differential equations, optimization, and scientific computing.",
+    "tags": [
+      "mathematics",
+      "calculus",
+      "analysis",
+      "foundations"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "Fourier Analysis",
+    "body": "Fourier analysis decomposes functions into sinusoidal components. Fourier introduced the series in 1822 for heat equations. The Fourier transform converts time to frequency domains. FFT (Cooley-Tukey 1965) revolutionized signal processing. Essential in audio, JPEG, spectroscopy, quantum mechanics, and PDEs. The Laplace transform and wavelet transform extend Fourier analysis to handle transient signals and provide time-frequency localization, essential for modern signal processing and data analysis.",
+    "tags": [
+      "mathematics",
+      "analysis",
+      "signal processing",
+      "physics"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Partial Differential Equations",
+    "body": "PDEs describe functions of multiple variables and partial derivatives. Types: elliptic (Laplace), parabolic (heat), hyperbolic (wave). Model electromagnetism (Maxwell), fluid dynamics (Navier-Stokes), quantum mechanics (Schrodinger). Numerical methods (finite elements) essential for solving them in practice. The Clay Mathematics Institute lists the Navier-Stokes existence and smoothness problem as one of its seven Millennium Prize Problems with a one million dollar prize.",
+    "tags": [
+      "mathematics",
+      "analysis",
+      "physics",
+      "engineering"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Classical Mechanics",
+    "body": "Describes macroscopic motion. Newton's three laws and universal gravitation (Principia 1687) form the foundation. Lagrangian mechanics (Lagrange 1788) uses energy; Hamiltonian mechanics (Hamilton 1833) uses phase space. Concepts: momentum, energy, harmonic oscillators. Accurate for everyday scales, breaks down at relativistic and quantum scales. Lagrangian and Hamiltonian formulations extend Newton's laws to generalized coordinates, enabling analysis of complex systems like planetary motion, rigid body dynamics, and coupled oscillators.",
+    "tags": [
+      "physics",
+      "classical mechanics",
+      "Newton",
+      "motion"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Newton's Laws of Motion",
+    "body": "Three laws published in Principia (1687). First: inertia. Second: F=ma. Third: equal and opposite reaction. Combined with universal gravitation, they explain planetary orbits, projectiles, and tides. Foundation of mechanical engineering. These three laws, combined with the law of universal gravitation, successfully predicted the existence of Neptune before it was observed, a triumph of Newtonian mechanics.",
+    "tags": [
+      "physics",
+      "classical mechanics",
+      "Newton",
+      "motion"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Thermodynamics",
+    "body": "Studies heat, work, temperature, energy. Four laws: zeroth (temperature equilibrium), first (energy conservation dU=Q-W), second (entropy never decreases, arrow of time), third (absolute zero unattainable). Concepts: enthalpy, Gibbs free energy, Carnot cycle. Developed by Carnot, Clausius, Boltzmann, Gibbs. Essential for engines and chemistry. The second law introduces entropy, a concept that extends far beyond thermodynamics to information theory, statistical mechanics, and the arrow of time in physics and cosmology.",
+    "tags": [
+      "physics",
+      "thermodynamics",
+      "energy",
+      "entropy"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Statistical Mechanics",
+    "body": "Connects microscopic behavior to macroscopic thermodynamics via probability. Developed by Boltzmann, Gibbs, Maxwell. Temperature is average kinetic energy; entropy S=k ln W counts microstates. Key ensembles: microcanonical, canonical, grand canonical. The Boltzmann distribution gives state probabilities at given temperature. The partition function encapsulates all thermodynamic information about a system in equilibrium, enabling calculation of energy, entropy, and other macroscopic properties.",
+    "tags": [
+      "physics",
+      "statistical mechanics",
+      "thermodynamics",
+      "probability"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Electromagnetism",
+    "body": "Unifies electricity, magnetism, light. Maxwell's four equations (1864) predict electromagnetic waves at light speed. Concepts: Coulomb's law, Gauss's law, Faraday's induction, Ampere's law, Lorentz force. Hertz confirmed EM waves in 1887. Governs electronics, optics, radio, and telecommunications. Maxwell's equations unified electricity, magnetism, and optics, predicting that light is an electromagnetic wave, which was later confirmed by Hertz's experiments with radio waves.",
+    "tags": [
+      "physics",
+      "electromagnetism",
+      "Maxwell",
+      "light"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "Quantum Mechanics",
+    "body": "Describes nature at atomic scales. Developed 1900-1925 (Planck to Heisenberg/Schrodinger). Key concepts: wave-particle duality, quantization, uncertainty principle, superposition, entanglement. The most accurately tested theory. Enables transistors, LEDs, MRI, lasers, and quantum computing. Interpretations remain debated: the Copenhagen interpretation, many-worlds (Everett), pilot-wave (Bohm), and QBism offer different views of what quantum theory means.",
+    "tags": [
+      "physics",
+      "quantum mechanics",
+      "microscopic",
+      "foundations"
+    ],
+    "importance": 0.96
+  },
+  {
+    "title": "Schrodinger Equation",
+    "body": "Fundamental equation of quantum mechanics (1926): i hbar dPsi/dt = H Psi. The wave function contains probabilistic information via Born's rule. Time-independent: H Psi = E Psi. Exact solutions exist for hydrogen atom, harmonic oscillator. Multi-electron systems require approximation. The equation describes the quantum state evolution for non-relativistic particles. Dirac later developed a relativistic version that predicted the existence of antimatter.",
+    "tags": [
+      "physics",
+      "quantum mechanics",
+      "wave function",
+      "equation"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Special Relativity",
+    "body": "Einstein's 1905 theory: physics laws identical in all inertial frames; light speed c constant. Consequences: time dilation, length contraction, mass-energy equivalence E=mc^2. Lorentz transformations replace Galilean. Essential for particle physics and GPS corrections. Einstein's 1905 paper On the Electrodynamics of Moving Bodies resolved the conflict between Maxwell's equations and Newtonian mechanics, establishing a new spacetime framework.",
+    "tags": [
+      "physics",
+      "relativity",
+      "Einstein",
+      "spacetime"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "General Relativity",
+    "body": "Einstein's 1915 theory: gravity as spacetime curvature. Field equations relate geometry to energy-momentum. Predictions: light bending (1919), gravitational waves (LIGO 2015), black holes, time dilation. Essential for GPS, cosmology, and astrophysics. GR predicts black holes, gravitational waves, and the expanding universe. Its predictions have been confirmed with high precision, including by the first black hole image in 2019.",
+    "tags": [
+      "physics",
+      "relativity",
+      "gravity",
+      "spacetime",
+      "cosmology"
+    ],
+    "importance": 0.95
+  },
+  {
+    "title": "Quantum Field Theory",
+    "body": "Combines QM with special relativity. Particles are field excitations. Developed by Dirac, Feynman, Schwinger, Tomonaga. The Standard Model is a QFT. Concepts: creation/annihilation operators, Feynman diagrams, renormalization, gauge symmetry. Predicts pair production, vacuum fluctuations, antiparticles. Feynman's path integral formulation provides an alternative to operator methods, representing quantum amplitudes as sums over all possible histories of a system.",
+    "tags": [
+      "physics",
+      "quantum",
+      "field theory",
+      "particle",
+      "standard model"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Standard Model of Particle Physics",
+    "body": "Describes three forces (electromagnetic, weak, strong) and all elementary particles. Developed 1960s-1970s. Particles: six quarks, six leptons, gauge bosons (photon, W, Z, gluons), Higgs (discovered 2012 at CERN). The Higgs mechanism gives mass. Missing: gravity, dark matter, neutrino masses. The Higgs boson discovery at CERN in 2012 completed the Standard Model particle spectrum. Both the ATLAS and CMS experiments confirmed the Higgs with 5-sigma significance.",
+    "tags": [
+      "physics",
+      "particle physics",
+      "standard model",
+      "quantum"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "Quantum Electrodynamics",
+    "body": "QED is the quantum field theory of light and matter. The most accurately tested theory (one part in trillion for electron magnetic moment). Coupling constant alpha ~ 1/137. Developed by Feynman, Schwinger, Tomonaga, Dyson. Prototype for all quantum field theories. QED's remarkable precision comes from the smallness of the fine-structure constant alpha approx 1/137, making perturbative calculations highly accurate.",
+    "tags": [
+      "physics",
+      "quantum",
+      "electrodynamics",
+      "Feynman",
+      "precision"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Condensed Matter Physics",
+    "body": "Studies solids and liquids, the largest physics branch. Phenomena: superconductivity (1911), superfluidity, magnetism, quantum Hall effect. Band theory distinguishes metals, insulators, semiconductors. BCS theory explains conventional superconductivity. Enabled semiconductors, LEDs, solar cells. Landau's Fermi liquid theory describes interacting electrons in metals. Topological phases of matter represent a new frontier, with topological insulators discovered in the 2000s.",
+    "tags": [
+      "physics",
+      "condensed matter",
+      "solids",
+      "materials"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Optics",
+    "body": "Studies light behavior. Geometrical optics: ray tracing. Physical optics: waves, interference, diffraction, polarization. Modern: lasers (1960), nonlinear optics, fiber optics, metamaterials, quantum optics. Essential instruments: microscope, telescope, spectrometer. Modern optics includes nonlinear phenomena like second-harmonic generation, optical parametric oscillation, and four-wave mixing, enabling laser frequency conversion and quantum optics experiments.",
+    "tags": [
+      "physics",
+      "optics",
+      "light",
+      "waves",
+      "lasers"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Atomic Physics",
+    "body": "Studies isolated atoms. Bohr model (1913) explained hydrogen spectra. Quantum mechanics describes structure via orbitals, spin, Pauli principle. Laser cooling enables Bose-Einstein condensation (1995). Atomic clocks define the second with accuracy >10^-16. Atomic clocks use the hyperfine transition of cesium-133 at 9.2 GHz to define the second. Optical lattice clocks now achieve precision of one second in 15 billion years.",
+    "tags": [
+      "physics",
+      "atomic physics",
+      "quantum",
+      "spectroscopy"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Nuclear Physics",
+    "body": "Studies nuclei: protons and neutrons held by strong force. Radioactivity discovered by Becquerel (1896). Key concepts: binding energy, decay (alpha, beta, gamma), fission, fusion. Applications: nuclear power, PET, radiotherapy, carbon dating. The liquid drop model explains nuclear fission, while the shell model explains magic numbers and nuclear stability patterns analogous to electron shells in atoms.",
+    "tags": [
+      "physics",
+      "nuclear physics",
+      "radioactivity",
+      "energy"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Particle Physics",
+    "body": "Studies fundamental constituents using accelerators like LHC at CERN. Key discoveries: top quark (1995), tau neutrino (2000), Higgs (2012). Unsolved: hierarchy problem, matter-antimatter asymmetry, dark matter, neutrino masses. The Large Hadron Collider at CERN accelerates protons to 6.5 TeV, the highest energy ever achieved by a particle accelerator. Its 27 km ring straddles the France-Switzerland border.",
+    "tags": [
+      "physics",
+      "particle physics",
+      "standard model",
+      "CERN"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Cosmology",
+    "body": "Studies universe origin and evolution. Big Bang theory supported by Hubble expansion, CMB (1965), nucleosynthesis. Universe is 13.8 billion years old: 5% matter, 27% dark matter, 68% dark energy (Lambda-CDM). Inflation (Guth 1980) explains flatness. JWST probes first galaxies. The James Webb Space Telescope, launched in 2021, observes the first galaxies formed less than 400 million years after the Big Bang, testing theories of galaxy formation.",
+    "tags": [
+      "astronomy",
+      "cosmology",
+      "big bang",
+      "universe",
+      "dark matter"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Inorganic Chemistry",
+    "body": "Studies non-carbon compounds. Key: coordination chemistry (transition metal complexes), crystal field theory, organometallics, solid-state chemistry. Werner founded coordination chemistry (Nobel 1913). Applications: catalysis (Haber-Bosch), batteries, pigments, perovskites for solar cells. Inorganic compounds include coordination complexes, metal clusters, and solid-state materials. They are vital in industrial catalysts, electronic materials, and pigments.",
+    "tags": [
+      "chemistry",
+      "inorganic",
+      "metals",
+      "coordination"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Organic Chemistry",
+    "body": "Studies carbon compounds, basis of life and synthetic materials. Carbon's four bonds enable vast diversity. Concepts: functional groups, reaction mechanisms (SN1, SN2, E1, E2), stereochemistry, retrosynthesis. Systematized by Kekule, Butlerov. Enables pharmaceuticals, polymers, dyes. Carbon compounds form the basis of all known life. The field's development enabled the synthesis of complex natural products and pharmaceuticals, transforming medicine and materials science.",
+    "tags": [
+      "chemistry",
+      "organic",
+      "carbon",
+      "synthesis",
+      "pharmaceuticals"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Physical Chemistry",
+    "body": "Applies physics to chemical systems. Key areas: thermodynamics (Gibbs free energy), kinetics (rate laws), quantum chemistry (molecular orbitals), spectroscopy, statistical thermodynamics. Gibbs, Arrhenius, Pauling, Eyring. Bridges macroscopic observations to molecular behavior. Physical chemistry provides the theoretical framework for understanding reaction rates, molecular structure, and spectroscopic properties across all branches of chemistry.",
+    "tags": [
+      "chemistry",
+      "physical",
+      "thermodynamics",
+      "kinetics",
+      "quantum"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Quantum Chemistry",
+    "body": "Applies QM to molecules. The Schrodinger equation requires approximations for multi-electron systems. Methods: Hartree-Fock, configuration interaction, coupled cluster, DFT (Nobel 1998 to Kohn and Pople). Predicts geometries, energies, spectra. Essential for drug discovery and materials. Modern quantum chemistry software packages like Gaussian, VASP, and ORCA enable researchers to predict molecular properties before synthesis, accelerating drug discovery and materials design.",
+    "tags": [
+      "chemistry",
+      "quantum",
+      "computational",
+      "DFT"
+    ],
+    "importance": 0.81
+  },
+  {
+    "title": "Analytical Chemistry",
+    "body": "Identifies and quantifies substances. Classical: gravimetric, volumetric. Instrumental: spectroscopy (AAS, ICP-MS), chromatography (GC, HPLC, LC-MS), mass spec, NMR. Essential for pharma QC, environmental monitoring, diagnostics, forensic science. Detection down to parts-per-trillion. Modern analytical instruments can detect single molecules and quantify substances at parts-per-quadrillion concentrations, enabling advances in proteomics, metabolomics, and environmental monitoring.",
+    "tags": [
+      "chemistry",
+      "analytical",
+      "spectroscopy",
+      "chromatography",
+      "instrumentation"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Polymer Chemistry",
+    "body": "Studies macromolecules of repeating monomers. Natural: proteins, cellulose, DNA. Synthetic: polyethylene, nylon, polystyrene. Polymerization: chain-growth and step-growth. Staudinger proposed macromolecular hypothesis (1920). Modern: conducting polymers, biodegradable, controlled radical polymerization. Polymers are ubiquitous in modern life, from packaging materials to high-performance engineering plastics, elastomers, adhesives, and biomedical implants. The synthesis of well-defined polymers with controlled architecture through ATRP, RAFT, and NMP has revolutionized materials science. Modern polymer research also explores conductive polymers for electronics, hydrogels for biomedical applications, and biodegradable alternatives to petroleum-based plastics.",
+    "tags": [
+      "chemistry",
+      "polymer",
+      "materials",
+      "plastics"
+    ],
+    "importance": 0.79
+  },
+  {
+    "title": "Periodic Table",
+    "body": "Arranges elements by atomic number and electron configuration. Mendeleev published the first version in 1869, predicting undiscovered elements. 118 elements in 7 periods, 18 groups. Trends: atomic radius decreases across periods, ionization energy increases, fluorine most electronegative. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "chemistry",
+      "periodic table",
+      "elements",
+      "structure"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Solar System",
+    "body": "The Sun (G-type star, 99.86% of mass), eight planets, five dwarf planets, moons, asteroids, comets. Inner rocky: Mercury, Venus, Earth, Mars. Outer gas giants: Jupiter, Saturn. Ice giants: Uranus, Neptune. Asteroid belt, Kuiper Belt, Oort cloud. Formed 4.6 billion years ago from protoplanetary disk. The solar system formed from gravitational collapse of a molecular cloud 4.6 billion years ago. Planetary migration models like the Nice model explain the current orbital configuration.",
+    "tags": [
+      "astronomy",
+      "solar system",
+      "planets",
+      "Sun"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Stars and Stellar Evolution",
+    "body": "Stars are plasma spheres sustained by fusion. Classification OBAFGKM by temperature. Low-mass stars become red giants then white dwarfs. High-mass stars (>8 solar masses) explode as supernovae, leaving neutron stars or black holes. HR diagram plots luminosity vs temperature. The most massive stars end as neutron stars or black holes, seeding the universe with heavy elements through supernova nucleosynthesis.",
+    "tags": [
+      "astronomy",
+      "stars",
+      "stellar evolution",
+      "nuclear fusion"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Galaxies",
+    "body": "Massive systems of stars, gas, dust, dark matter bound by gravity. Hubble classification: elliptical (E0-E7), spiral (Sa-Sc, barred SB), irregular. Milky Way is barred spiral with ~100 billion stars. Supermassive black holes in centers. Galaxy clusters are largest bound structures. Galaxy formation follows hierarchical merging in the cold dark matter cosmology, with small galaxies merging to form larger ones over cosmic time.",
+    "tags": [
+      "astronomy",
+      "galaxies",
+      "Milky Way",
+      "cosmology"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Black Holes",
+    "body": "Regions where gravity prevents light escape. Event horizon is the point of no return. Schwarzschild (non-rotating) and Kerr (rotating) types. Stellar-mass (3-100 solar masses) from supernovae. Supermassive (millions-billions solar masses) in galaxy centers. EHT imaged M87* in 2019. Hawking radiation predicts quantum evaporation. Gravitational wave observations by LIGO have detected dozens of black hole mergers, providing direct evidence for binary black hole systems.",
+    "tags": [
+      "astronomy",
+      "black holes",
+      "gravity",
+      "relativity"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "Exoplanets",
+    "body": "Planets outside our solar system. First confirmed in 1995 (51 Pegasi b). Detection: radial velocity, transit (Kepler discovered 2,600+), direct imaging, microlensing. Over 5,500 confirmed. Types: hot Jupiters, super-Earths, mini-Neptunes. JWST characterizes atmospheres for biosignatures. The Kepler space telescope (2009-2018) revolutionized exoplanet science, showing that most stars have planets and that Earth-sized planets are common.",
+    "tags": [
+      "astronomy",
+      "exoplanets",
+      "habitability",
+      "Kepler"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Telescopes and Observatories",
+    "body": "Collect electromagnetic radiation. Optical: refractors, reflectors. Major: Mauna Kea (Keck), Paranal (VLT), ELT (under construction). Space: Hubble (1990), JWST (2021), Chandra, Fermi. Radio: Green Bank, ALMA. JWST's 6.5m mirror observes first galaxies and exoplanet atmospheres. The Hubble Space Telescope has made over 1.5 million observations since 1990, fundamentally changing our understanding of the universe.",
+    "tags": [
+      "astronomy",
+      "telescopes",
+      "observatories",
+      "space"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Big Bang Theory",
+    "body": "Universe originated 13.8 billion years ago from hot dense state. Evidence: Hubble's law (receding galaxies), CMB (2.73K), nucleosynthesis (H/He/D/Li). Inflation solved horizon and flatness problems. Dark energy drives acceleration. Planck satellite (2013) confirmed Lambda-CDM. The Lambda-CDM model incorporating dark energy and cold dark matter successfully explains cosmic structure formation and the accelerated expansion of the universe.",
+    "tags": [
+      "astronomy",
+      "cosmology",
+      "big bang",
+      "universe",
+      "inflation"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Plate Tectonics",
+    "body": "Describes Earth's lithosphere moving in plates, established 1960s. Seven major plates move 2-15 cm/year driven by mantle convection, slab pull, ridge push. Boundaries: divergent (mid-ocean ridges), convergent (subduction, mountains), transform (San Andreas). Explains earthquakes, volcanoes, continental arrangement. Unique to Earth. Plate tectonics explains the distribution of earthquakes, volcanoes, mountain ranges, and ocean basins. It is driven by mantle convection.",
+    "tags": [
+      "earth science",
+      "geology",
+      "plate tectonics",
+      "continents"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "Earthquakes",
+    "body": "Occur when accumulated strain releases along faults. Moment magnitude scale is logarithmic. Major: Valdivia 1960 (9.5, largest), Sumatra 2004 (9.1, 230K killed by tsunami), Tohoku 2011 (9.1, Fukushima). Seismic waves: P (fastest), S (shear), surface (most damaging). Early warning gives seconds of alert. Earthquake prediction remains elusive, but early warning systems using seismic networks provide crucial seconds of alert for populated areas.",
+    "tags": [
+      "earth science",
+      "geology",
+      "earthquakes",
+      "seismology",
+      "disasters"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Volcanoes",
+    "body": "Vents where magma reaches the surface. Types: shield (gentle, basalt), stratovolcanoes (steep, explosive), cinder cones. At plate boundaries and hotspots (Hawaii, Yellowstone). Major: Krakatoa 1883, St. Helens 1980, Tambora 1815 (year without summer). Ring of Fire encircles Pacific. Volcanic eruptions can inject ash and sulfur dioxide into the stratosphere, affecting global climate for years as demonstrated by Pinatubo in 1991.",
+    "tags": [
+      "earth science",
+      "geology",
+      "volcanoes",
+      "magma",
+      "eruptions"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Rock Cycle",
+    "body": "Transformation among three rock types. Igneous: from cooling magma (granite, basalt). Sedimentary: from accumulated sediment (sandstone, limestone). Metamorphic: from heat/pressure (slate, marble). Driven by plate tectonics and hydrologic cycle. Fundamental to geology and resource extraction. Metamorphic rocks record the pressure-temperature history of mountain building. Index minerals like garnet and kyanite indicate metamorphic grade.",
+    "tags": [
+      "earth science",
+      "geology",
+      "rocks",
+      "minerals",
+      "cycle"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Minerals and Crystals",
+    "body": "Naturally occurring inorganic solids with ordered atomic structure. 5,000+ known minerals. Seven crystal systems. Mohs hardness (1-10). Silicates dominate crust. Ore minerals extracted for metals. Gemstones: diamond, ruby, sapphire. Formation: magma crystallization, hydrothermal precipitation, evaporation. Minerals are classified by their chemical composition and crystal structure. The silicate class dominates Earth's crust with feldspar and quartz being most abundant.",
+    "tags": [
+      "earth science",
+      "geology",
+      "minerals",
+      "crystals",
+      "resources"
+    ],
+    "importance": 0.79
+  },
+  {
+    "title": "Geological Time Scale",
+    "body": "Divides Earth's 4.54 billion year history. Eons: Hadean (magma), Archean (first life), Proterozoic (oxygen rise), Phanerozoic (visible life). Phanerozoic eras: Paleozoic (Cambrian explosion, Pangea), Mesozoic (dinosaurs), Cenozoic (mammals). Boundaries mark mass extinctions. Dating: radiometric (U-Pb, K-Ar, C-14). The ICS maintains the standardized time scale. The Anthropocene, a proposed new epoch defined by human impact, is under debate.",
+    "tags": [
+      "earth science",
+      "geology",
+      "time scale",
+      "fossils",
+      "evolution"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Tropical Rainforest Climate",
+    "body": "Af type near equator (10N to 10S). Year-round 26-28C, >2000mm rainfall. Daily thunderstorms from intense solar heating. Amazon, Congo Basin, Indonesia largest regions. ITCZ drives rainfall. Supports the most biodiverse ecosystems. Deforestation threatens these climates. Tropical rainforests are critically important for global climate regulation through carbon storage, evapotranspiration, and cloud formation.",
+    "tags": [
+      "climate",
+      "rainforest",
+      "tropics",
+      "precipitation",
+      "biodiversity"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Desert Climate",
+    "body": "BW type, <250mm annual precipitation. Hot deserts (Sahara, Arabian): 50C+, large diurnal swings. Cold deserts (Gobi): cold winters. Form at ~30 degrees latitude and rain shadows. Cover 33% of land. Adaptations: water storage (cacti), nocturnal behavior, deep roots. Desertification, driven by climate change and poor land management, threatens the livelihoods of over two billion people in dryland regions.",
+    "tags": [
+      "climate",
+      "desert",
+      "arid",
+      "temperature",
+      "adaptation"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Tundra Climate",
+    "body": "ET type: cold year-round, short cool summers (0-10C), long harsh winters. Permafrost underlies the active layer. Arctic regions and alpine zones. Precipitation <250mm. Vegetation: mosses, lichens. Climate change warms tundra, thawing permafrost releases methane/CO2. Permafrost contains roughly twice as much carbon as the atmosphere. Its thaw releases greenhouse gases in a dangerous climate feedback loop.",
+    "tags": [
+      "climate",
+      "tundra",
+      "arctic",
+      "permafrost",
+      "cold"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Taiga (Boreal Forest)",
+    "body": "World's largest terrestrial biome, 11% of land (Canada, Scandinavia, Russia). Dfc climate: long cold winters, short mild summers. Dominant conifers: spruce, fir, pine, larch. Wildfires are natural disturbance. Stores ~30% of global terrestrial carbon. Climate change increases fire frequency. Boreal forests are experiencing increased pest outbreaks (mountain pine beetle), more frequent megafires, and permafrost thaw due to rapid Arctic warming.",
+    "tags": [
+      "climate",
+      "taiga",
+      "boreal",
+      "forest",
+      "carbon"
+    ],
+    "importance": 0.77
+  },
+  {
+    "title": "Grassland Climate",
+    "body": "250-800mm precipitation, supports grasses. Temperate: steppe, prairie, pampas, veld. Tropical savannas: Serengeti, Cerrado, distinct wet/dry seasons. Fire maintains grasslands. Large herbivores (bison, wildebeest). Extensively converted to agriculture, highly endangered biome. Grasslands are the most endangered biome on Earth, with less than 5% of tallgrass prairie remaining in North America. Grasslands support some of the highest soil organic carbon levels of any ecosystem. The deep root systems of perennial grasses store carbon deep underground. Grassland conversion to cropland has released vast amounts of this stored carbon.",
+    "tags": [
+      "climate",
+      "grassland",
+      "savanna",
+      "prairie",
+      "agriculture"
+    ],
+    "importance": 0.77
+  },
+  {
+    "title": "Mediterranean Climate",
+    "body": "Csa/Csb: hot dry summers, mild wet winters at 30-45 degrees western continental sides. Five regions: Mediterranean Basin, California, Chile, Cape South Africa, SW Australia. Fire-adapted chaparral, fynbos. Densely populated, olives and grapes, facing water scarcity and increasing wildfire. Mediterranean climate regions are biodiversity hotspots with high endemism, but face severe threats from development, invasive species, and climate change.",
+    "tags": [
+      "climate",
+      "mediterranean",
+      "wildfire",
+      "chaparral",
+      "drought"
+    ],
+    "importance": 0.76
+  },
+  {
+    "title": "Amazon Rainforest",
+    "body": "~5.5 million km2 across nine countries, half of remaining tropical rainforest. 390 billion trees of 16,000 species. Generates ~50% of its own rainfall. Deforestation ~17%, approaching dieback tipping (20-25%). Stores 150-200 billion tons carbon. Indigenous territories are most effective barriers. Tropical rainforests are critically important for global climate regulation through carbon storage, evapotranspiration, and cloud formation.",
+    "tags": [
+      "ecosystems",
+      "rainforest",
+      "Amazon",
+      "biodiversity",
+      "deforestation"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Coral Reef Ecosystems",
+    "body": "Built by coral polyps in symbiosis with zooxanthellae. Great Barrier Reef (2,300 km) is largest living structure. Reefs occupy <0.1% of ocean but host 25% of marine species. Bleaching from heat stress. 2016-2017 GBR bleaching killed ~50% of shallow corals. Ocean acidification reduces calcification. Coral restoration through microfragmentation, larval reseeding, and assisted evolution of heat-tolerant corals offers hope for reef survival.",
+    "tags": [
+      "ecosystems",
+      "coral reef",
+      "ocean",
+      "biodiversity",
+      "climate change"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Ocean Ecosystems",
+    "body": "Range from sunlit surface to deep-sea vents. Photic zone (upper 200m) supports phytoplankton, base of marine food webs. Coastal: coral reefs, kelp forests, mangroves. Deep sea (largest habitat on Earth), hydrothermal vents rely on chemosynthesis. Open ocean supports tuna, sharks, whales. Threats: overfishing, plastic pollution, acidification. The ocean has absorbed 90% of excess heat from global warming and 30% of anthropogenic CO2, driving sea-level rise and acidification.",
+    "tags": [
+      "ecosystems",
+      "ocean",
+      "marine",
+      "biodiversity",
+      "fisheries"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Freshwater Ecosystems",
+    "body": "Lakes, rivers, ponds, streams, wetlands. Lakes stratify thermally. Rivers transport nutrients. Wetlands are most productive ecosystems, providing flood control and water filtration. Freshwater holds 2.5% of Earth's water but hosts 10% of species. Biodiversity declining fastest due to dams, pollution, invasive species. Dams fragment 60% of the world's large rivers. Glacier melt threatens freshwater supplies for over a billion people in Asia and the Andes.",
+    "tags": [
+      "ecosystems",
+      "freshwater",
+      "lakes",
+      "rivers",
+      "wetlands"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Polar Ecosystems",
+    "body": "Arctic and Antarctic adapted to extreme cold, seasonal light extremes, ice cover. Arctic: tundra, sea ice, polar bears, walruses. Antarctic: krill (keystone species), penguins (emperor, adelie), seals, whales. Sea ice critical habitat rapidly declining. Arctic warming four times faster than global average. Polar amplification means the Arctic warms four times faster than the global average, with profound implications for global weather patterns.",
+    "tags": [
+      "ecosystems",
+      "polar",
+      "arctic",
+      "Antarctic",
+      "ice",
+      "climate change"
+    ],
+    "importance": 0.79
+  },
+  {
+    "title": "Asia Geography",
+    "body": "Largest continent (44.6 million km2, 30% of land), most populous (4.7 billion, 60% of world). Regions: East Asia (China, Japan, Korea), Southeast Asia, South Asia (India), Central Asia, Middle East. Himalayas tallest range (Everest 8,849m). Major rivers: Yangtze, Yellow, Ganges, Mekong. Economy exceeds all others combined by PPP. Asia contains the highest and lowest points on Earth, the most populous countries (China, India), and the largest economies by PPP.",
+    "tags": [
+      "continents",
+      "Asia",
+      "geography",
+      "population",
+      "economy"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Africa Geography",
+    "body": "Second-largest (30.4 million km2), 1.4 billion people. Sahara Desert (9.2 million km2) dominates north. Rift Valley from Ethiopia to Mozambique. Nile (6,650 km) longest river. Immense mineral wealth: cobalt (DRC 70%), platinum, gold, diamonds. 54 countries, 3000+ languages. Youngest population (median ~19). Africa is the most genetically and linguistically diverse continent, containing the deepest branches of human evolutionary history.",
+    "tags": [
+      "continents",
+      "Africa",
+      "geography",
+      "resources",
+      "demographics"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "North America Geography",
+    "body": "24.7 million km2. Canada, US, Mexico, Central America (7), Caribbean (13). Rockies from Alaska to New Mexico. Great Plains. Mississippi-Missouri (6,275 km). Great Lakes hold 21% of surface freshwater. Greenland largest island. Climate: Arctic to tropical. San Andreas Fault marks plate boundary. North America has the longest coastline of any continent and contains every climate zone from Arctic to tropical within its boundaries.",
+    "tags": [
+      "continents",
+      "North America",
+      "USA",
+      "Canada",
+      "geography"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "South America Geography",
+    "body": "17.8 million km2, 12 countries. Andes (7,000 km) along western edge. Amazon River largest by discharge. Amazon rainforest ~40% of continent. Atacama driest non-polar desert. Lake Titicaca highest navigable (3,812m). Angel Falls highest (979m). Rich in oil, copper, lithium, iron ore. South America contains the world's largest rainforest, driest desert, longest mountain range, and largest river by volume.",
+    "tags": [
+      "continents",
+      "South America",
+      "Amazon",
+      "Andes",
+      "geography"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Europe Geography",
+    "body": "10.2 million km2, 40+ countries, ~750 million. Alps (Mont Blanc 4,809m). Rivers: Danube (2,850 km, 10 countries), Volga (3,530 km, longest). EU (27 countries) largest single market. Peninsulas: Iberian, Italian, Balkan, Scandinavian. Oldest median age (~42). Climate: Mediterranean to subarctic. Europe has the most indented coastline of any continent and the highest ratio of coastline to land area.",
+    "tags": [
+      "continents",
+      "Europe",
+      "EU",
+      "geography",
+      "history"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Australia and Oceania Geography",
+    "body": "8.5 million km2. Australia flattest and driest inhabited continent. Great Dividing Range east. Outback covers interior. Great Barrier Reef 2,300 km. New Zealand: alpine terrain, Southern Alps (Cook 3,724m). Pacific islands: Melanesia, Micronesia, Polynesia. Sea-level rise threatens island nations. Unique wildlife: kangaroos, koalas, platypus. The ocean has absorbed 90% of excess heat from global warming and 30% of anthropogenic CO2, driving sea-level rise and acidification.",
+    "tags": [
+      "continents",
+      "Australia",
+      "Oceania",
+      "Pacific",
+      "geography"
+    ],
+    "importance": 0.81
+  },
+  {
+    "title": "Antarctica Geography",
+    "body": "Fifth-largest continent (14.2 million km2), coldest, windiest, highest, driest. Ice sheet: 26.5 million km3, 61% of fresh water, 2.2 km avg thickness. No permanent population. Antarctic Treaty (1959) banned military activity and mining. Climate change warms peninsula, ice shelves collapse. Ozone hole slowly recovering. The Antarctic ice sheet contains enough water to raise global sea levels by 58 meters if fully melted. Its stability is a critical climate concern.",
+    "tags": [
+      "continents",
+      "Antarctica",
+      "ice",
+      "climate",
+      "treaty"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Pacific Ocean",
+    "body": "Largest and deepest (165.2 million km2, 46% of water). Mariana Trench (Challenger Deep 10,994m) deepest point. Ring of Fire surrounds it. ENSO alternates El Nino/La Nina affecting global weather. Great Pacific Garbage Patch of accumulated plastic. Relatively unexplored. The ocean has absorbed 90% of excess heat from global warming and 30% of anthropogenic CO2, driving sea-level rise and acidification.",
+    "tags": [
+      "oceans",
+      "Pacific",
+      "deepest",
+      "ENSO",
+      "plastics"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Atlantic Ocean",
+    "body": "Second-largest (106.5 million km2), separates Americas from Europe/Africa. Mid-Atlantic Ridge runs its length. Thermohaline circulation (global conveyor belt) carries warm water north, sinks in North Atlantic. AMOC could weaken from climate change. Sargasso Sea hosts unique Sargassum ecosystem. The ocean has absorbed 90% of excess heat from global warming and 30% of anthropogenic CO2, driving sea-level rise and acidification.",
+    "tags": [
+      "oceans",
+      "Atlantic",
+      "circulation",
+      "climate",
+      "AMOC"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Indian Ocean",
+    "body": "Third-largest (70.6 million km2), bounded by Africa, Asia, Australia. Warmest ocean, drives Asian monsoon. Indian Ocean Dipole affects rainfall. Major shipping routes. 2004 tsunami (9.1 earthquake, 230K killed across 14 countries) one of deadliest natural disasters. Hosts Maldives, Madagascar biodiversity. The ocean has absorbed 90% of excess heat from global warming and 30% of anthropogenic CO2, driving sea-level rise and acidification.",
+    "tags": [
+      "oceans",
+      "Indian Ocean",
+      "monsoon",
+      "tsunami",
+      "shipping"
+    ],
+    "importance": 0.81
+  },
+  {
+    "title": "Arctic Ocean",
+    "body": "Smallest and shallowest (14.1 million km2). Sea ice cover grows and melts seasonally. September minimum declined from ~7 million km2 (1979) to ~3.5 million km2 (40%+ reduction). Warms four times faster than global average. Opening shipping routes (Northern Sea Route). Permafrost thaw releases methane. The ocean has absorbed 90% of excess heat from global warming and 30% of anthropogenic CO2, driving sea-level rise and acidification.",
+    "tags": [
+      "oceans",
+      "Arctic",
+      "sea ice",
+      "climate change",
+      "permafrost"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Southern Ocean",
+    "body": "Surrounds Antarctica, defined by Antarctic Circumpolar Current (ACC), world's strongest current. Connects all three major oceans. Antarctic Bottom Water drives global deep circulation. Absorbs ~40% of anthropogenic CO2 and ~75% of excess heat. Krill supports whales, penguins, seals. The ocean has absorbed 90% of excess heat from global warming and 30% of anthropogenic CO2, driving sea-level rise and acidification.",
+    "tags": [
+      "oceans",
+      "Southern Ocean",
+      "Antarctica",
+      "current",
+      "carbon"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Mesopotamia (Sumer)",
+    "body": "World's first civilization (c. 4500-1900 BCE) between Tigris and Euphrates (modern Iraq). Sumerians invented cuneiform writing (~3200 BCE), wheel, plow, base-60 (60-minute hours). City-states: Ur, Uruk, Lagash. Epic of Gilgamesh oldest literature. Akkadian, Babylonian, Assyrian empires followed. Legacy: urban civilization, writing, codified law. Mesopotamian innovations in irrigation, writing, law, and urban organization provided the template for all subsequent civilizations in the region.",
+    "tags": [
+      "history",
+      "civilization",
+      "Mesopotamia",
+      "Sumer",
+      "ancient"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Ancient Egypt",
+    "body": "Flourished along Nile for 3000+ years. Unified by Narmer ~3100 BCE. Old Kingdom built Great Pyramids. New Kingdom: Hatshepsut, Akhenaten, Tutankhamun, Ramesses II. Hieroglyphics deciphered via Rosetta Stone (1799). Advances: medicine, geometry, 365-day calendar, engineering. Mummification reflected afterlife beliefs. Ended with Roman annexation (30 BCE). Egypt's unique geography along the Nile, with predictable annual floods, enabled agricultural surplus supporting a complex hierarchical society.",
+    "tags": [
+      "history",
+      "civilization",
+      "Egypt",
+      "Nile",
+      "pharaohs"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "Indus Valley Civilization",
+    "body": "Harappan civilization (c. 3300-1300 BCE) in Pakistan and NW India. Remarkable urban planning: grid layouts, advanced drainage, standardized bricks. Covered ~1.5 million km2. Indus script (400+ symbols) remains undeciphered. Bronze working, cotton textiles. Decline ~1900 BCE likely from climate change weakening monsoons. The Indus civilization had sophisticated urban infrastructure including the world's first known urban sanitation systems.",
+    "tags": [
+      "history",
+      "civilization",
+      "Indus",
+      "Harappan",
+      "urban planning"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Ancient China: Xia, Shang, Zhou",
+    "body": "Chinese civilization began along Yellow River. Xia Dynasty (c. 2070-1600 BCE) described in texts. Shang Dynasty (c. 1600-1046 BCE) left oracle bones as first writing. Zhou Dynasty (1046-256 BCE) introduced Mandate of Heaven. Hundred Schools of Thought: Confucianism, Daoism, Legalism. Warring States period ended with Qin unification. Philosophical foundation of Chinese civilization.",
+    "tags": [
+      "history",
+      "civilization",
+      "China",
+      "Shang",
+      "Zhou",
+      "philosophy"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Ancient Greece",
+    "body": "(c. 800-146 BCE) Laid foundations of Western culture. City-states (polis): Athens (democracy ~508 BCE), Sparta (military oligarchy). Persian Wars (490-479 BCE): Marathon, Thermopylae, Salamis. Golden Age: Parthenon, Socrates, Plato, Aristotle, Aeschylus, Sophocles, Euripides. Alexander (356-323 BCE) conquered Persia, spreading Hellenistic culture. Greek city-states pioneered coinage, the alphabet, and the Olympic Games, institutions that continue to shape modern society.",
+    "tags": [
+      "history",
+      "civilization",
+      "Greece",
+      "democracy",
+      "philosophy",
+      "Alexander"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "Roman Empire",
+    "body": "Republic (509 BCE) to empire (27 BCE) to fall (476 CE). Punic Wars (264-146 BCE) defeated Carthage. Augustus began Pax Romana (200 years peace). Peak under Trajan (5 million km2). Achievements: concrete, aqueducts, roads (400,000 km), Roman law, Latin literature. Spread Christianity. Values: engineering, law, administration. Western Empire fell 476 CE.",
+    "tags": [
+      "history",
+      "civilization",
+      "Rome",
+      "empire",
+      "law",
+      "engineering"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "Persian Empire",
+    "body": "Achaemenid Empire founded by Cyrus the Great (550 BCE). Under Darius I, stretched from India to Greece (5.5 million km2, 44% of world population). Cyrus freed Jews from Babylonian captivity. Organization: satrapies, Royal Road (2,700 km), standard currency. Alexander conquered 331 BCE but Persian culture continued through Parthian and Sassanian Empires.",
+    "tags": [
+      "history",
+      "civilization",
+      "Persia",
+      "empire",
+      "Achaemenid"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Maya Civilization",
+    "body": "Flourished in Mesoamerica (2000 BCE-1500 CE). Classic period (250-900 CE): 40+ city-states (Tikal, Palenque) with pyramids and observatories. Only fully developed pre-Columbian writing system. Invented zero independently. Complex calendars (Long Count, Tzolk'in, Haab'). Advanced astronomy. 9th century collapse from drought, deforestation, warfare. Maya mathematics used a vigesimal (base-20) system. Their Long Count calendar tracks time over 5,125-year cycles.",
+    "tags": [
+      "history",
+      "civilization",
+      "Maya",
+      "Mesoamerica",
+      "calendar",
+      "astronomy"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Inca Empire",
+    "body": "Largest pre-Columbian American empire (Tawantinsuyu), centered in Andes. From Cusco, stretched 4,000 km covering 2 million km2. Founded by Pachacuti (1438-1471). Built Machu Picchu, Sacsayhuaman (cyclopean stone walls), 40,000 km of roads (Qhapaq Nan). Quipus for records. Pizarro conquered 1532-1572 exploiting civil war and disease. Inca statecraft included a highly efficient food redistribution system and a network of storehouses that could feed the population for years.",
+    "tags": [
+      "history",
+      "civilization",
+      "Inca",
+      "Andes",
+      "empire",
+      "engineering"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Medieval Europe",
+    "body": "(c. 500-1500 CE). Early Middle Ages: feudalism, Charlemagne (crowned 800). High Middle Ages (1000-1300): Gothic cathedrals (Chartres, Notre Dame), universities (Bologna 1088, Paris, Oxford), scholasticism (Thomas Aquinas). Crusades (1096-1291). Magna Carta (1215). Black Death (1347-1351) killed 30-50%, transforming labor. Hundred Years' War (1337-1453). Medieval guilds regulated trades and trained apprentices. The three-field crop rotation system improved agricultural productivity.",
+    "tags": [
+      "history",
+      "medieval",
+      "Europe",
+      "feudalism",
+      "Crusades",
+      "Black Death"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Islamic Golden Age",
+    "body": "(c. 750-1258 CE) Extraordinary flourishing under Abbasids, centered on Baghdad's House of Wisdom. Key figures: Al-Khwarizmi (algebra), Ibn Sina/Avicenna (Canon of Medicine), Alhazen (optics, scientific method), Al-Biruni (astronomy), Al-Razi (smallpox), Ibn Rushd/Averroes. Advances in math, astronomy, medicine, chemistry. Cordoba was Europe's largest city. Ended with Mongol sack of Baghdad (1258).",
+    "tags": [
+      "history",
+      "Islamic Golden Age",
+      "science",
+      "medicine",
+      "Baghdad"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Mongol Empire",
+    "body": "Largest contiguous land empire, founded by Genghis Khan (c. 1162-1227). Under Kublai Khan spanned 24 million km2 from Korea to Hungary. Meritocracy, codified law (Yassa), religious tolerance. Superior cavalry with composite bows. Splintered into Yuan (China), Golden Horde (Russia), Ilkhanate (Persia), Chagatai. Pax Mongolica enabled Silk Road exchange. The Mongol Empire facilitated unprecedented cultural exchange across Eurasia, spreading technologies like papermaking and gunpowder from China to Europe.",
+    "tags": [
+      "history",
+      "empire",
+      "Mongol",
+      "Genghis Khan",
+      "Eurasia",
+      "Silk Road"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Byzantine Empire",
+    "body": "Eastern Roman Empire (330-1453 CE). Justinian I (527-565) reconquered Italy/North Africa, codified Roman law (Corpus Juris Civilis), built Hagia Sophia. Preserved Greek/Roman knowledge. Great Schism (1054) split Christianity. Fourth Crusade sacked Constantinople (1204). Achievements: Greek fire, Orthodox Christianity, Cyrillic alphabet, preserving ancient texts sparking Renaissance. Byzantine missionaries Cyril and Methodius created the Glagolitic alphabet, ancestor of the Cyrillic script used by many Slavic languages today.",
+    "tags": [
+      "history",
+      "Byzantine",
+      "empire",
+      "Constantinople",
+      "Orthodox"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Renaissance",
+    "body": "Cultural rebirth (14th-17th centuries) starting in Florence. Humanism revived classical learning. Key: Leonardo (Mona Lisa, Last Supper), Michelangelo (David, Sistine Chapel), Raphael (School of Athens). Printing press (Gutenberg 1450) revolutionized knowledge. Science: Copernicus, Vesalius, Galileo. Medici family as patrons. Spread north (van Eyck, Durer, Bruegel) and to England (Shakespeare). The Renaissance saw the birth of modern banking, with the Medici family developing double-entry bookkeeping, letters of credit, and other financial innovations.",
+    "tags": [
+      "history",
+      "Renaissance",
+      "art",
+      "science",
+      "Italy",
+      "humanism"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Age of Discovery",
+    "body": "European global exploration (15th-17th centuries). Portugal: Prince Henry Navigator, Vasco da Gama to India (1498). Spain: Columbus to Americas (1492), Magellan circumnavigation. Cortes conquered Aztecs, Pizarro Incas. Treaty of Tordesillas (1494) divided world. Columbian Exchange: crops, diseases (smallpox killed 90% Native Americans), enslaved people. Created global trade. European exploration connected previously isolated world regions, initiating global trade networks that reshaped economies, ecologies, and societies.",
+    "tags": [
+      "history",
+      "exploration",
+      "colonialism",
+      "Columbus",
+      "Columbian Exchange"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Scientific Revolution",
+    "body": "(1543-1687) Transformed understanding of nature. Copernicus proposed heliocentrism. Kepler's laws: elliptical orbits. Galileo: telescopic discoveries, experimental physics. Newton's Principia unified mechanics with universal gravitation. Bacon (empirical method), Descartes (rationalism), Boyle (chemistry), Harvey (circulation). Royal Society (1660) institutionalized science. The Royal Society's motto Nullius in Verba (take nobody's word for it) encapsulated the new emphasis on experimental verification over ancient authority.",
+    "tags": [
+      "history",
+      "science",
+      "revolution",
+      "Newton",
+      "Galileo",
+      "Copernicus"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "French Revolution",
+    "body": "(1789-1799) Overthrew absolute monarchy. Causes: Enlightenment ideas, fiscal crisis, inequality (three estates). Bastille fell July 14, 1789. Declaration of Rights of Man. Reign of Terror (1793-1794, Robespierre) executed 40,000+ including Louis XVI. Napoleon's coup (1799) ended it. Impacts: nationalism, secular states, metric system, end of feudalism. The French Revolution established the metric system, abolished feudalism, and introduced the concept of universal human rights.",
+    "tags": [
+      "history",
+      "French Revolution",
+      "democracy",
+      "Enlightenment",
+      "Napoleon"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Industrial Revolution",
+    "body": "(c. 1760-1840) Transformed manufacturing. Began in Britain: coal, steam, iron, textiles. Watt's steam engine (1765), spinning jenny, power loom, Bessemer steel. Railways revolutionized transport. Factory system, urbanization. Social: slums, child labor, labor unions, Marxism. Second Industrial Revolution (1870-1914): electricity, chemicals, oil, combustion engine. Increased living standards 10x. The Indus civilization had sophisticated urban infrastructure including the world's first known urban sanitation systems.",
+    "tags": [
+      "history",
+      "industrial revolution",
+      "technology",
+      "steam",
+      "urbanization"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "World War I",
+    "body": "(1914-1918) 30+ nations, 70 million soldiers. Triggered by Franz Ferdinand assassination. Western Front: trench warfare, Verdun (700K casualties), Somme (1 million). New weapons: machine guns, poison gas, tanks, aircraft, submarines. US entry (1917) decisive. 20 million dead. Treaty of Versailles harsh on Germany. League of Nations failed. WWI introduced industrialized warfare including aerial combat and chemical weapons. It led to the collapse of four empires and redrew the global map.",
+    "tags": [
+      "history",
+      "World War I",
+      "trench warfare",
+      "Europe",
+      "Versailles"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "World War II",
+    "body": "(1939-1945) Deadliest conflict: 70-85 million dead. Germany invaded Poland Sept 1, 1939. Axis conquered before turning points: Britain (1940), Stalingrad (1942-43), Midway (1942), D-Day (1944). Holocaust: 6 million Jews murdered. US dropped atomic bombs on Hiroshima (Aug 6) and Nagasaki (Aug 9, 1945). UN founded, Cold War began, nuclear weapons defined geopolitics.",
+    "tags": [
+      "history",
+      "World War II",
+      "Holocaust",
+      "Axis",
+      "Allies",
+      "nuclear"
+    ],
+    "importance": 0.96
+  },
+  {
+    "title": "Cold War",
+    "body": "(1947-1991) US-led NATO vs USSR-led Warsaw Pact. Proxy wars, arms race, ideological competition. Key: Berlin Blockade (1948), Korean War, Cuban Missile Crisis (1962, closest to nuclear war), Vietnam War, Space Race. Detente then renewed tension. Gorbachev's reforms (glasnost, perestroika) led to Berlin Wall fall (Nov 1989) and Soviet dissolution (Dec 1991).",
+    "tags": [
+      "history",
+      "Cold War",
+      "US",
+      "USSR",
+      "nuclear",
+      "proxy war"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Algorithms and Data Structures",
+    "body": "Step-by-step procedures for computation. Key structures: arrays, linked lists, trees, hash tables, graphs. Sorting: quicksort O(n log n), mergesort, heapsort. Search: binary search O(log n), BFS, DFS. Graph: Dijkstra, A*, Kruskal, Prim. Dynamic programming. Big O notation. Core of computer science. Algorithm analysis was formalized by Donald Knuth in The Art of Computer Programming. Big O notation was introduced by Paul Bachmann and popularized by Knuth.",
+    "tags": [
+      "computer science",
+      "algorithms",
+      "data structures",
+      "programming"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Artificial Intelligence",
+    "body": "Creating systems exhibiting intelligent behavior. Early AI (1950s-1970s): symbolic reasoning, expert systems. ML (1980s-2000s): neural networks, SVMs. Deep learning (2010s): CNNs (vision), RNNs (sequence), transformers (NLP). Reinforcement learning: AlphaGo. Generative AI: GPT, DALL-E. Challenges: alignment, reasoning, robustness. Turing's 1950 paper Computing Machinery and Intelligence proposed the Imitation Game (Turing Test) as a criterion for machine intelligence.",
+    "tags": [
+      "computer science",
+      "AI",
+      "machine learning",
+      "deep learning",
+      "neural networks"
+    ],
+    "importance": 0.95
+  },
+  {
+    "title": "Programming Languages",
+    "body": "Formal systems for instructing computers. Generation: machine code to high-level (C, Java, Python, JavaScript). Paradigms: imperative, OO, functional, declarative. Type systems: static vs dynamic, strong vs weak. Memory: manual (C), GC (Java), ownership (Rust). Each paradigm shapes how programmers solve problems. The first high-level programming language, Plankalkul, was designed by Konrad Zuse in the 1940s. FORTRAN (1957) was the first widely used high-level language.",
+    "tags": [
+      "computer science",
+      "programming languages",
+      "software"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Computer Networks",
+    "body": "Connect devices for data exchange. OSI model (7 layers) and TCP/IP (4 layers). Key protocols: IP, TCP, UDP, HTTP/HTTPS, DNS, DHCP. Topologies: star, mesh, bus. Ethernet dominates LAN. Internet interconnects globally. Packet switching. IPv4 and IPv6. Network security: firewalls, TLS/SSL, VPNs. ARPANET, the precursor to the Internet, began in 1969 with four nodes. TCP/IP became the standard protocol in 1983, marking the birth of the modern Internet.",
+    "tags": [
+      "computer science",
+      "networks",
+      "protocols",
+      "internet"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Operating Systems",
+    "body": "Manages hardware and provides services. Functions: process management, memory (virtual, paging), file systems (NTFS, ext4, APFS), device drivers, security. Major: Windows, macOS, Linux, Android, iOS. The kernel (monolithic vs microkernel). Processes vs threads, context switching, deadlocks, interrupt handling. Unix, developed at Bell Labs in 1969, became the model for most modern operating systems including Linux, macOS, and Android.",
+    "tags": [
+      "computer science",
+      "operating systems",
+      "kernel",
+      "systems"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Database Systems",
+    "body": "Store, retrieve, manage structured data. Relational (RDBMS): MySQL, PostgreSQL, Oracle, SQL. ACID properties. NoSQL: document (MongoDB), key-value (Redis), column-family (Cassandra), graph (Neo4j). Indexing (B-trees). Normalization, query optimization, concurrency control, replication. CAP theorem for distributed databases. Edgar Codd proposed the relational model in 1970, transforming data management. SQL became the standard query language.",
+    "tags": [
+      "computer science",
+      "databases",
+      "SQL",
+      "NoSQL",
+      "data"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Machine Learning",
+    "body": "Systems that learn from data. Supervised: regression, classification. Algorithms: linear regression, decision trees, random forests, SVMs, neural nets. Unsupervised: clustering (K-means), PCA. Evaluation: cross-validation, precision/recall/F1. Overfitting vs underfitting, bias-variance tradeoff. MLOps manages lifecycle. Machine learning evolved from pattern recognition and artificial intelligence research. The term was coined by Arthur Samuel in 1959.",
+    "tags": [
+      "computer science",
+      "machine learning",
+      "data science",
+      "AI"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Deep Learning",
+    "body": "Multi-layer neural networks learning hierarchical representations. CNNs for images. RNNs/LSTMs for sequences. Transformers (self-attention) for NLP. Training: backpropagation, Adam. LLMs (GPT-4, Claude) with billions of params. Generative: GANs, VAEs, diffusion. GPU/TPU accelerated. Applications: vision, NLP, speech, drug discovery. The 2012 AlexNet breakthrough in image recognition sparked the deep learning revolution. Transformer architecture (2017) revolutionized NLP.",
+    "tags": [
+      "computer science",
+      "deep learning",
+      "neural networks",
+      "AI",
+      "transformers"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "Cybersecurity",
+    "body": "Protects systems from digital attacks. Principles: confidentiality (encryption), integrity (hashing), availability. Threats: malware, phishing, DDoS, SQL injection, zero-day. Defense: firewalls, IDS, antivirus, AES/RSA/TLS, MFA, patches. CIA triad. Incident response. Zero Trust architecture. The first computer virus (Creeper) appeared in 1971. Modern cybersecurity faces sophisticated threats from state-sponsored APT groups and organized cybercrime.",
+    "tags": [
+      "computer science",
+      "cybersecurity",
+      "cryptography",
+      "security"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Computer Architecture",
+    "body": "Structure of computer systems. Von Neumann: CPU, memory, I/O. CPU: control unit, ALU, registers. Pipeline, cache (L1-L3). RISC (ARM) vs CISC (x86). Parallelism: multi-core, SIMD. Memory hierarchy: registers to disk. Moore's Law driving progress, now slowing. Billions of transistors on modern chips. Modern CPUs contain billions of transistors. Moore's Law has driven exponential improvement since 1965 but is now slowing as transistors approach atomic scales.",
+    "tags": [
+      "computer science",
+      "computer architecture",
+      "hardware",
+      "CPU"
+    ],
+    "importance": 0.81
+  },
+  {
+    "title": "Human Anatomy",
+    "body": "Structure of the human body. Hierarchical: cells, tissues, organs, systems. 11 systems: skeletal (206 bones), muscular (600+ muscles), nervous (86 billion neurons), circulatory, respiratory, digestive, endocrine, immune, urinary, reproductive, integumentary. Anatomy is foundational to medicine, surgery, and health sciences. Andreas Vesalius's De Humani Corporis Fabrica (1543) revolutionized anatomy, correcting errors in Galen's ancient texts through direct human dissection.",
+    "tags": [
+      "medicine",
+      "anatomy",
+      "human body",
+      "physiology"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Cardiovascular System",
+    "body": "Heart beats ~100,000 times daily, pumping 7,500 liters through 100,000 km of vessels. Cardiac cycle: systole/diastole. Blood pressure normal ~120/80. Diseases: coronary artery disease (leading death cause), heart attack, stroke, heart failure. Risk factors: smoking, hypertension, cholesterol, diabetes, obesity. Treatments: statins, beta-blockers, stents, bypass. Cardiovascular disease is the leading cause of death globally, responsible for approximately 32% of all deaths according to the WHO.",
+    "tags": [
+      "medicine",
+      "cardiovascular",
+      "heart",
+      "blood",
+      "disease"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Infectious Diseases",
+    "body": "Caused by pathogens: bacteria, viruses, fungi, parasites. Bacterial: TB (1.5M deaths/year), cholera. Viral: HIV/AIDS (40M deaths), influenza (500K/year), COVID-19 (7M+). Antimicrobial resistance (AMR) is growing crisis. Vaccination most effective: smallpox eradicated (1980), polio nearly. Germ theory (Pasteur, Koch). Pandemics shaped history. The germ theory of disease transformed medicine, leading to antisepsis, vaccination, and antibiotics that doubled human life expectancy.",
+    "tags": [
+      "medicine",
+      "infectious disease",
+      "vaccines",
+      "antibiotics",
+      "pandemic"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Public Health",
+    "body": "Prevents disease at population level. Functions: disease surveillance, epidemiology, health promotion, environmental health, policy. Achievements: sanitation (doubled life expectancy), vaccination, tobacco control, workplace safety. Life expectancy rose from ~47 (1950) to ~73 (2023). Epidemiological transition: chronic diseases now leading causes. Health disparities remain stark. The WHO defines health as complete physical, mental and social well-being. Universal health coverage is a key UN Sustainable Development Goal.",
+    "tags": [
+      "medicine",
+      "public health",
+      "epidemiology",
+      "sanitation",
+      "policy"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Pharmacology and Drugs",
+    "body": "How drugs interact with biological systems. Development: discovery, preclinical, clinical trials (Phase I-III), FDA approval. Classes: antibiotics, antivirals, statins, beta-blockers, SSRIs, opioids, NSAIDs, anticancer drugs. Pharmacokinetics (ADME) and pharmacodynamics. Adverse drug reactions. Personalized medicine using genetic information. Alexander Fleming discovered penicillin in 1928, ushering in the antibiotic era. Antimicrobial resistance now threatens to reverse these gains.",
+    "tags": [
+      "medicine",
+      "pharmacology",
+      "drugs",
+      "pharmaceuticals",
+      "treatment"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Civil Engineering",
+    "body": "Designs infrastructure: buildings, bridges, roads, dams, tunnels, water systems. Sub-disciplines: structural, geotechnical, transportation, environmental, water resources. Principles: structural analysis, materials (concrete, steel), fluid mechanics. Landmarks: Hoover Dam, Channel Tunnel, Burj Khalifa (828m). Emphasizes safety, sustainability, resilience. Civil engineering is one of the oldest engineering disciplines. Megaprojects like the Panama Canal and Three Gorges Dam demonstrate its scale.",
+    "tags": [
+      "engineering",
+      "civil",
+      "infrastructure",
+      "construction",
+      "structures"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Mechanical Engineering",
+    "body": "Designs mechanical systems, broadest engineering discipline. Core: mechanics (statics, dynamics, fluids), thermodynamics, materials, manufacturing. Applications: engines, HVAC, robotics, automotive, power generation. CAD and FEA essential tools. Landmarks: steam engine, automobile, jet engine, hard disk drive. Mechanical engineering principles underpin all transportation systems, from bicycles to spacecraft, and power generation from steam turbines to wind turbines.",
+    "tags": [
+      "engineering",
+      "mechanical",
+      "machines",
+      "engines",
+      "manufacturing"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Electrical Engineering",
+    "body": "Deals with electricity, electronics, electromagnetism. Sub-disciplines: power systems, electronics, control, signal processing, telecommunications. Key inventions: transistor (1947, fundamental), integrated circuit, microprocessor. Power grid: generation, transmission, distribution. Electronics: analog/digital, op-amps, logic gates. Underlies all modern technology. The invention of the transistor in 1947 at Bell Labs is widely considered the most important invention of the 20th century.",
+    "tags": [
+      "engineering",
+      "electrical",
+      "electronics",
+      "power",
+      "circuits"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Aerospace Engineering",
+    "body": "Designs aircraft and spacecraft. Aeronautics: aerodynamics, propulsion, structures, flight controls. Astronautics: rocket propulsion, orbital mechanics, spacecraft design. Achievements: Wright Flyer (1903), Boeing 747, Apollo Moon landings, Concorde, Space Shuttle, ISS, Mars rovers. Modern focus: efficiency, composites, reusable rockets (SpaceX). The first powered flight by the Wright brothers in 1903 lasted 12 seconds. Commercial aviation now carries over 4 billion passengers annually.",
+    "tags": [
+      "engineering",
+      "aerospace",
+      "aviation",
+      "space",
+      "rockets"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Chemical Engineering",
+    "body": "Applies chemistry to industrial processes. Core: mass/energy balances, thermodynamics, fluid dynamics, reaction engineering, separation processes. Designs refineries, chemical plants, pharmaceuticals, food processing. Contributions: Haber-Bosch (synthetic fertilizer, feeding billions), polymers. Challenges: carbon capture, circular economy. Unit operations, formalized by Arthur D. Little in 1915, provide the building blocks of chemical processes and are essential for scale-up from lab to industry.",
+    "tags": [
+      "engineering",
+      "chemical",
+      "process",
+      "manufacturing",
+      "chemistry"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Biotechnology",
+    "body": "Uses living organisms to develop products. Genetic engineering: recombinant DNA, CRISPR (Nobel 2020). Applications: pharmaceuticals (insulin in bacteria since 1982), GMO crops, mRNA vaccines, biofuels, bioremediation. DNA sequencing cost dropped from $3 billion (Human Genome Project) to under $1,000. Synthetic biology designs novel biological systems. Monoclonal antibodies are among the most successful biotech products, generating over $100 billion annually and treating cancer and autoimmune diseases.",
+    "tags": [
+      "biotechnology",
+      "genetics",
+      "CRISPR",
+      "pharmaceuticals",
+      "agriculture"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Materials Science",
+    "body": "Studies structure-property relationships. Categories: metals, ceramics, polymers, composites, semiconductors, biomaterials. Key properties: strength, toughness, hardness, conductivity. Characterization: SEM, TEM, XRD. Frontiers: high-entropy alloys, 2D materials (graphene, Nobel 2004), metamaterials, shape memory alloys. The materials genome initiative aims to accelerate materials discovery through high-throughput computational screening and machine learning. The field combines solid-state physics, chemistry, and engineering. Computational materials science using DFT and machine learning accelerates discovery of new materials for batteries, catalysts, and structural applications.",
+    "tags": [
+      "materials science",
+      "metals",
+      "polymers",
+      "composites",
+      "graphene"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Nanotechnology",
+    "body": "Manipulates matter at 1-100 nm scale. Key materials: carbon nanotubes (100x stronger than steel), graphene, quantum dots, nanoparticles. Applications: targeted drug delivery, electronics (3nm transistors), solar cells, batteries, water filtration, sensors. Quantum effects dominate at nanoscale. Concerns: nanoparticle toxicity. Feynman's 1959 talk There's Plenty of Room at the Bottom envisioned nanotechnology. The field has delivered stain-resistant fabrics, targeted drug delivery, and stronger materials.",
+    "tags": [
+      "nanotechnology",
+      "materials",
+      "graphene",
+      "quantum dots",
+      "drug delivery"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Socrates",
+    "body": "(470-399 BCE) Developed Socratic method (elenchus) of questioning to expose contradictions. Wrote nothing; teachings from Plato. Sentenced to death for corrupting youth, drank hemlock. Focus on ethics (how should one live?). Know thyself and unexamined life not worth living. Foundational to all Western philosophy. The Socratic paradox I know that I know nothing captures his humble wisdom about human knowledge. His method shaped education for two millennia.",
+    "tags": [
+      "philosophy",
+      "Greek",
+      "Socrates",
+      "ethics",
+      "Western"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "Plato",
+    "body": "(428-348 BCE) Founded Academy. Theory of Forms: eternal abstract entities are true reality, physical world is shadow. The Republic: justice, ideal state, allegory of the cave. Symposium: love as ascent to beauty. Dualistic (body vs soul). Influenced Christian theology (Augustine), Neoplatonism, all Western thought. Plato founded the Academy in Athens, the first institution of higher learning in the Western world, which operated for over 900 years.",
+    "tags": [
+      "philosophy",
+      "Greek",
+      "Plato",
+      "metaphysics",
+      "Western"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Aristotle",
+    "body": "(384-322 BCE) Student of Plato, founded Lyceum. Rejected Forms for empiricism. Works cover logic (syllogism), metaphysics, ethics (golden mean, eudaimonia), politics (man is political animal), physics, biology, poetics, rhetoric. Four causes explain change. Influenced Islamic, Jewish, Christian philosophy for 1500 years. Aristotle's Lyceum conducted systematic research across all known fields. His ethical concept of the golden mean remains influential in virtue ethics.",
+    "tags": [
+      "philosophy",
+      "Greek",
+      "Aristotle",
+      "ethics",
+      "logic",
+      "Western"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "Medieval Philosophy",
+    "body": "(c. 400-1400 CE) Synthesized classical philosophy with theology. Augustine: City of God, problem of evil. Anselm: ontological argument. Aquinas (1225-1274): five proofs of God, natural law. Duns Scotus: voluntarism. Ockham: Ockham's razor. Arabic philosophy (Avicenna, Averroes) preserved Greek thought. Medieval guilds regulated trades and trained apprentices. The three-field crop rotation system improved agricultural productivity.",
+    "tags": [
+      "philosophy",
+      "medieval",
+      "Aquinas",
+      "Augustine",
+      "scholasticism",
+      "theology"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Descartes to Hume",
+    "body": "Modern philosophy (17th-18th centuries) shifted to epistemology. Descartes: cogito ergo sum, mind-body dualism. Spinoza: pantheistic monism, determinism. Leibniz: monads, best of all possible worlds. Locke: tabula rasa. Berkeley: esse est percipi. Hume: skepticism (causation, induction, self). Kant synthesized both traditions. Cartesian dualism defines the modern mind-body problem. Descartes also invented Cartesian coordinates, linking algebra and geometry.",
+    "tags": [
+      "philosophy",
+      "modern",
+      "Descartes",
+      "Hume",
+      "Kant",
+      "epistemology"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Immanuel Kant",
+    "body": "(1724-1804) Critique of Pure Reason: mind structures experience through a priori categories (space, time, causality). Noumena unknowable. Categorical imperative: act by universalizable maxims, treat persons as ends. Critique of Judgment: aesthetics, teleology. Kant's ethics grounds human dignity and rights. Influenced German Idealism, existentialism, contemporary ethics. Kant's categorical imperative provides a foundation for human rights law and modern deontological ethics, arguing rational beings are ends in themselves.",
+    "tags": [
+      "philosophy",
+      "Kant",
+      "German Idealism",
+      "ethics",
+      "epistemology"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Hegel",
+    "body": "(1770-1831) Absolute idealism: reality is Geist self-unfolding through dialectic (thesis-antithesis-synthesis). Phenomenology of Spirit: master-slave dialectic, unhappy consciousness. History as progression of freedom. Aufhebung (sublation). Ethical life (Sittlichkeit). Influenced Marx, existentialism, pragmatism, modern political thought. Hegel's dialectic influenced Marx's historical materialism and remains influential in critical theory and contemporary political philosophy.",
+    "tags": [
+      "philosophy",
+      "Hegel",
+      "German Idealism",
+      "dialectic",
+      "history",
+      "metaphysics"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Nietzsche",
+    "body": "(1844-1900) God is dead, attacked conventional morality as slave morality. Thus Spoke Zarathustra: Ubermensch creates values, eternal recurrence. Beyond Good and Evil: truth as metaphor. Will to power as fundamental drive. Apollonian vs Dionysian. Perspectivalism. Influenced existentialism, postmodernism, psychoanalysis. Nietzsche's critique of objective truth and morality anticipated 20th century postmodernism. His aphoristic style is unique among major philosophers.",
+    "tags": [
+      "philosophy",
+      "Nietzsche",
+      "existentialism",
+      "ethics",
+      "postmodern"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "20th Century Continental Philosophy",
+    "body": "Includes phenomenology, existentialism, hermeneutics, critical theory, post-structuralism. Husserl: phenomenology. Heidegger: Dasein, being-toward-death. Sartre: radical freedom, bad faith. Merleau-Ponty: embodiment. Levinas: ethics as first philosophy. Derrida: deconstruction. Foucault: power/knowledge. Deleuze: difference. Habermas: communicative action. Continental philosophy contrasts with analytic philosophy in its emphasis on historical context, lived experience, and engagement with culture and politics.",
+    "tags": [
+      "philosophy",
+      "continental",
+      "phenomenology",
+      "existentialism",
+      "postmodern",
+      "critical theory"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Hinduism",
+    "body": "Oldest major religion, no single founder. Vedas (Rigveda c. 1500 BCE), Upanishads, Ramayana, Mahabharata (Bhagavad Gita). Core: dharma, karma, samsara, moksha, atman. Trimurti: Brahma, Vishnu, Shiva. Traditions: Vaishnavism, Shaivism, Shaktism. ~1.2 billion followers, third-largest religion. Yoga originated as Hindu spiritual practice. Hinduism's influence extends beyond religion to Indian philosophy, art, architecture, music, dance, and social structure.",
+    "tags": [
+      "philosophy",
+      "religion",
+      "Hinduism",
+      "India",
+      "Vedas"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Buddhism",
+    "body": "Founded by Siddhartha Gautama (Buddha, c. 5th century BCE) in India. Four Noble Truths: suffering, craving causes it, it can end, Eightfold Path leads to nirvana. Middle Way. Theravada (oldest, Southeast Asia) and Mahayana (compassion, East Asia). Vajrayana (Tibetan). Concepts: anatta (no self), anicca (impermanence). Spread via Silk Road. ~500 million followers.",
+    "tags": [
+      "philosophy",
+      "religion",
+      "Buddhism",
+      "Buddha",
+      "meditation"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Confucianism",
+    "body": "Founded by Confucius (551-479 BCE). Core: ren (benevolence), li (ritual propriety), xiao (filial piety). Five Relationships with mutual obligations. Analects. Mencius: human nature good. Xunzi: needs shaping. Emphasizes education, meritocracy. Official ideology of Chinese imperial exams for 2000 years. Still influential in China, Korea, Japan, Vietnam. Confucian values of filial piety and education continue to shape East Asian educational systems, corporate culture, and family structures.",
+    "tags": [
+      "philosophy",
+      "Confucianism",
+      "China",
+      "ethics",
+      "education"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Daoism (Taoism)",
+    "body": "Based on Dao De Jing (Laozi, c. 6th century) and Zhuangzi. Dao is ineffable ultimate principle. Concepts: wu wei (effortless action), pu (simplicity), ziran (spontaneity), yin-yang. Daodejing: 81 short poetic chapters. Zhuangzi: butterfly dream. Influenced Chinese painting, poetry, martial arts (Taijiquan), medicine. One of Three Teachings. The concept of yin-yang has influenced Chinese medicine (balance of hot/cold, yin/yang), feng shui, and traditional philosophy for over two thousand years.",
+    "tags": [
+      "philosophy",
+      "Daoism",
+      "China",
+      "Laozi",
+      "wu wei"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Islamic Philosophy",
+    "body": "Developed from 9th century synthesizing Greek and Islamic thought. Al-Kindi introduced Greek philosophy. Al-Farabi: political philosophy. Avicenna (Ibn Sina): metaphysics (essence vs existence), logic. Al-Ghazali: The Incoherence of the Philosophers. Averroes (Ibn Rushd): Aristotle commentaries, defended philosophy. Ibn Arabi: unity of being. Mulla Sadra: transcendent theosophy. The Islamic world preserved and expanded classical knowledge during Europe's Dark Ages, developing algebra, chemistry, and advanced medical practices.",
+    "tags": [
+      "philosophy",
+      "Islamic",
+      "Avicenna",
+      "Averroes",
+      "Al-Ghazali"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Empiricism vs Rationalism",
+    "body": "Central epistemological debate. Empiricism (Locke, Berkeley, Hume): knowledge from sensory experience, mind as tabula rasa. Rationalism (Descartes, Spinoza, Leibniz): reason as primary source, innate ideas. Kant synthesized: mind structures experience via a priori categories. Shaped all subsequent epistemology and philosophy of science. Hume's problem of induction remains a central challenge for philosophy of science: how can we justify reasoning from past to future?",
+    "tags": [
+      "philosophy",
+      "empiricism",
+      "rationalism",
+      "epistemology",
+      "knowledge"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Marxism",
+    "body": "Karl Marx (1818-1883) and Engels. Historical materialism: economic base determines superstructure. Class struggle drives history. Capital: commodities, surplus value, exploitation, alienation, crisis tendencies. Predicted proletarian revolution leading to communism. Influenced 20th century politics, economics, sociology. Critical Theory (Frankfurt School) updated Marx. Marxist analysis of capitalism as a crisis-prone system influenced 20th century revolutionary movements, labor unions, and academic disciplines.",
+    "tags": [
+      "philosophy",
+      "Marxism",
+      "Marx",
+      "political theory",
+      "economics",
+      "history"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Existentialism",
+    "body": "Emphasizes freedom and choice. Kierkegaard: subjective truth, leap of faith, three stages. Nietzsche: will to power, Ubermensch, eternal recurrence. Heidegger: Dasein, authenticity. Sartre: existence precedes essence, condemned to be free, bad faith. Camus: the absurd. De Beauvoir: feminist existentialism. Influenced literature, psychology, political thought. Existentialist themes of freedom, authenticity, and responsibility resonate especially strongly in modern literature, film, and psychotherapy.",
+    "tags": [
+      "philosophy",
+      "existentialism",
+      "Kierkegaard",
+      "Nietzsche",
+      "Sartre",
+      "Camus"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Pragmatism",
+    "body": "American philosophy: truth lies in practical consequences. Peirce originated it. James popularized: truth is what works. Varieties of Religious Experience. Dewey: education (learning by doing), democracy, ethics. Rorty: neo-pragmatism. Influenced functional psychology, legal realism. Pragmatism's focus on consequences as the test of truth influenced American legal philosophy (legal realism) and continues to shape policy analysis.",
+    "tags": [
+      "philosophy",
+      "pragmatism",
+      "James",
+      "Dewey",
+      "Peirce",
+      "American"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Analytic Philosophy",
+    "body": "Emphasizes clarity, logic, language analysis. Frege: modern logic. Russell: logical atomism, theory of descriptions. Wittgenstein: early (picture theory), later (language games, meaning as use). Vienna Circle: logical positivism (verification principle). Quine: naturalized epistemology. Kripke: modal logic, necessary a posteriori. Dominates English-speaking philosophy. Analytic philosophy's emphasis on logical clarity and argumentative rigor has set the standard for philosophical methodology in the English-speaking world.",
+    "tags": [
+      "philosophy",
+      "analytic",
+      "Wittgenstein",
+      "Russell",
+      "logic",
+      "language"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Phenomenology",
+    "body": "Studies conscious experience from first-person perspective. Husserl: epochē (bracketing assumptions), intentionality. Heidegger: hermeneutic phenomenology, Dasein's being-in-the-world. Merleau-Ponty: embodied perception. Sartre: existential phenomenology. Levinas: ethics as first philosophy. Influenced cognitive science (embodied cognition), social science, psychiatry. Phenomenological methods have been productively applied in cognitive science, psychiatry (understanding schizophrenia), and social theory.",
+    "tags": [
+      "philosophy",
+      "phenomenology",
+      "Husserl",
+      "Heidegger",
+      "consciousness",
+      "experience"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Homer: Iliad and Odyssey",
+    "body": "(c. 750 BCE) Foundational Western literature. Iliad: Achilles' wrath, Troy, honor (time), mortality. Odyssey: Odysseus's 10-year journey home, Cyclops, Circe, themes of cunning (metis) and homecoming (nostos). Oral composition in hexameter. Shaped Greek education and values. Influenced literature for 2700 years. The Homeric epics were transmitted orally for centuries before being written down. They remain the foundation of the Western literary canon.",
+    "tags": [
+      "literature",
+      "Homer",
+      "epic",
+      "Greek",
+      "classics"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Dante: Divine Comedy",
+    "body": "(c. 1321) Supreme poem in terza rima. Dante journeys through Hell (Inferno), Purgatory (Purgatorio), Paradise (Paradiso). Virgil guides through Hell/Purgatory; Beatrice through Paradise. Synthesizes Catholic theology, classical mythology, Florentine politics. Nine circles of Hell. Written in Tuscan Italian. Explores sin, redemption, love, God. Dante's work established Tuscan Italian as the literary language of Italy, influencing every subsequent Italian writer.",
+    "tags": [
+      "literature",
+      "Dante",
+      "epic",
+      "Italy",
+      "medieval",
+      "poetry"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Shakespeare",
+    "body": "(1564-1616) Greatest English writer. 39 plays, 154 sonnets. Comedies: Midsummer Night's Dream, Twelfth Night. Histories: Henry IV, Richard III. Tragedies: Hamlet, King Lear, Macbeth, Othello. Sonnets: love, time, mortality. Innovations: soliloquy, mixing tragic/comic, ambiguous characters. Coined 1700+ English words. Performed globally. Shakespeare's works have been translated into over 100 languages and are performed more frequently than any other playwright.",
+    "tags": [
+      "literature",
+      "Shakespeare",
+      "drama",
+      "poetry",
+      "English",
+      "theater"
+    ],
+    "importance": 0.94
+  },
+  {
+    "title": "Goethe: Faust",
+    "body": "(Part I 1808, Part II 1832) Masterpiece of German literature. Faust makes pact with Mephistopheles for worldly experience. Part I: Gretchen tragedy. Part II: allegorical journey through classical/medieval worlds. Themes: ambition, knowledge, redemption. Constant striving earns divine grace. Composed over 60 years. Influenced German Romanticism. Goethe was also a scientist who made contributions to anatomy (discovering the intermaxillary bone), botany, and color theory.",
+    "tags": [
+      "literature",
+      "Goethe",
+      "Faust",
+      "German",
+      "drama",
+      "philosophy"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Dostoevsky",
+    "body": "(1821-1881) Russian psychological novelist. Crime and Punishment: Raskolnikov's murder and redemption. The Idiot: Christ-like Myshkin. Demons: revolutionary nihilism. The Brothers Karamazov: faith, doubt, free will, patricide, Grand Inquisitor. Themes: suffering, redemption, irrational depths, faith vs reason. Anticipated Freud. Dostoevsky's experience in a Siberian prison camp shaped his exploration of suffering, redemption, and the human capacity for evil and good.",
+    "tags": [
+      "literature",
+      "Dostoevsky",
+      "Russian",
+      "novel",
+      "psychology",
+      "philosophy"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Dream of the Red Chamber",
+    "body": "Cao Xueqin (1791) Greatest of China's Four Great Classical Novels. Rise and fall of Jia clan through Baoyu. Love triangle: Daiyu (soulmate) vs Baochai (virtuous). 400+ characters, psychological depth, Qing dynasty elite life. Last 40 chapters traditionally by Gao E. Themes: love, fate, impermanence. Redology is dedicated scholarly field. The novel is studied extensively in China as a window into Qing dynasty culture, language, and social structure through its detailed portrayal of aristocratic life.",
+    "tags": [
+      "literature",
+      "Chinese",
+      "classic",
+      "novel",
+      "Cao Xueqin",
+      "Qing"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Romance of the Three Kingdoms",
+    "body": "Luo Guanzhong (14th century) One of China's Four Great Classical Novels. 120 chapters dramatizing 184-280 CE. 1,000+ characters: Guan Yu (righteous), Zhuge Liang (strategist), Cao Cao (ruthless). Peach Garden Oath, Battle of Red Cliffs. Explores loyalty, strategy (36 Stratagems), Mandate of Heaven. Profoundly influenced Chinese culture. Roman administration and legal concepts fundamentally shaped European political institutions. Latin influenced all Romance languages.",
+    "tags": [
+      "literature",
+      "Chinese",
+      "classic",
+      "novel",
+      "history",
+      "Three Kingdoms"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "James Joyce: Ulysses",
+    "body": "(1922) Landmark modernist novel. Single day (June 16, 1904) in Dublin mirroring Homer's Odyssey. 18 episodes, each different style: stream of consciousness (Molly Bloom monologue), parody, newspaper headlines. Banned in US until 1933. Linguistic innovation, encyclopedic range. Bloomsday celebrated annually worldwide. Ulysses was banned in the US until Judge John M. Woolsey's landmark 1933 ruling that it was not obscene, a victory for literary freedom.",
+    "tags": [
+      "literature",
+      "Joyce",
+      "modernist",
+      "stream of consciousness",
+      "Irish"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Franz Kafka",
+    "body": "(1883-1924) Novels synonymous with existential anxiety and absurd bureaucracy. The Trial: K. arrested in opaque legal system. The Castle: struggle with inaccessible authorities. The Metamorphosis: waking as insect. Directed Brod to burn manuscripts; Brod published posthumously. Kafkaesque. Influenced existentialism, magic realism, postmodernism. Kafka's works have been adapted into numerous films, graphic novels, and operas, and the adjective Kafkaesque is used across many languages.",
+    "tags": [
+      "literature",
+      "Kafka",
+      "modernist",
+      "absurd",
+      "existential",
+      "German"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Gabriel Garcia Marquez",
+    "body": "(1927-2014) Colombian Nobel laureate (1982), magic realism master. One Hundred Years of Solitude (1967, 50M+ copies): Buendia family seven generations in Macondo. Love in the Time of Cholera. Blended fantastical with political. Central figure of Latin American Boom. Garcia Marquez was a journalist before becoming a novelist, and his reportage influenced the precise, unsentimental style of his magical realism.",
+    "tags": [
+      "literature",
+      "Garcia Marquez",
+      "magic realism",
+      "Latin American",
+      "Nobel"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Jorge Luis Borges",
+    "body": "(1899-1986) Argentine writer of philosophical labyrinths. The Library of Babel, The Garden of Forking Paths, The Aleph, Funes the Memorious. Explored infinity, mirrors, mazes, time. Created imaginary books, blurred fiction and criticism. Influenced magical realism, postmodernism, countless writers. Borges was blind for the last 30 years of his life. His story collections Ficciones and The Aleph are among the most influential of the 20th century.",
+    "tags": [
+      "literature",
+      "Borges",
+      "Argentine",
+      "philosophy",
+      "short stories",
+      "postmodern"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Tolstoy: War and Peace",
+    "body": "(1869) Epic novel of five aristocratic families during Napoleon's invasion of Russia. 580+ characters: Pierre (spiritual seeker), Andrei (ambitious), Natasha (vital). Combines domestic drama with battle scenes (Borodino) and philosophical essays on history. Challenges Great Man theory of history. Pinnacle of world literature. Tolstoy later rejected his earlier novels, embracing Christian anarchism and pacifism. His philosophical works influenced Gandhi's nonviolent resistance.",
+    "tags": [
+      "literature",
+      "Tolstoy",
+      "Russian",
+      "novel",
+      "epic",
+      "history"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "Proust: In Search of Lost Time",
+    "body": "(1913-1927) 7-volume modernist novel exploring memory, time, art, society. Involuntary memory triggered by madeleine. Examines French society, Dreyfus Affair, love, jealousy, artistic vocation. Extraordinarily long sentences, psychological insight. Anticipated psychoanalysis. Proust's novel contains over 1.2 million words, 2,000+ characters, and is considered the longest novel ever written by a single author.",
+    "tags": [
+      "literature",
+      "Proust",
+      "modernist",
+      "memory",
+      "French",
+      "novel"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Classical Greek Drama",
+    "body": "Tragedy and comedy from choral hymns to Dionysus. Aeschylus (Oresteia: justice evolution). Sophocles (Oedipus Rex: fate, Antigone: conscience vs state). Euripides (Medea: psychological realism). Aristotle's Poetics: catharsis, hamartia, anagnorisis. Aristophanes: comedy (Lysistrata). Menander: New Comedy. Established dramatic forms still defining theater. Greek amphitheaters used sophisticated acoustics. The Festival of Dionysus was a major Athenian civic institution featuring competitions between playwrights.",
+    "tags": [
+      "literature",
+      "drama",
+      "Greek",
+      "tragedy",
+      "theater",
+      "classics"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Modernist Poetry",
+    "body": "Broke with traditional forms (early 20th century). Pound: make it new, imagism. Eliot: The Waste Land (1922, fragmentation, postwar despair). Yeats: symbolism, cyclic history. Stevens: imagination vs reality. Frost: New England speech. Williams: no ideas but in things. Auden: technical mastery. Transformed what poetry could be. Free verse, which modernist poets championed, had been used occasionally before but became the dominant mode of poetry in the 20th century.",
+    "tags": [
+      "literature",
+      "poetry",
+      "modernist",
+      "Eliot",
+      "Yeats",
+      "Pound"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Renaissance Painting",
+    "body": "(14th-16th centuries) Revolutionized Western art with perspective, chiaroscuro, naturalism, humanism. Early: Masaccio, Botticelli. High Renaissance: Leonardo (Mona Lisa, sfumato), Michelangelo (Sistine Chapel), Raphael (School of Athens). Venetian: Titian. Northern: Van Eyck (oil perfection), Durer, Bruegel. The Renaissance saw the birth of modern banking, with the Medici family developing double-entry bookkeeping, letters of credit, and other financial innovations.",
+    "tags": [
+      "art",
+      "painting",
+      "Renaissance",
+      "Leonardo",
+      "Michelangelo",
+      "Raphael"
+    ],
+    "importance": 0.91
+  },
+  {
+    "title": "Baroque Art",
+    "body": "(c. 1600-1750) Counter-Reformation dramatic style. Tenebrism, diagonal compositions. Italian: Caravaggio (Calling of St. Matthew), Bernini (Ecstasy of St. Teresa). Flemish/Dutch: Rubens (fleshy dynamism), Rembrandt (Night Watch, psychological depth), Vermeer (Girl with Pearl Earring, interior light). Spanish: Velazquez (Las Meninas). Baroque art was a tool of the Counter-Reformation, using emotional engagement and dramatic realism to inspire Catholic faith.",
+    "tags": [
+      "art",
+      "painting",
+      "Baroque",
+      "Caravaggio",
+      "Rembrandt",
+      "Vermeer"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Impressionism",
+    "body": "(1860s-1880s) Captured fleeting light en plein air. Monet's Impression, Sunrise coined term. Visible brushstrokes, pure colors, everyday subjects. Monet (Haystacks, Water Lilies series), Renoir (Luncheon of the Boating Party), Degas (ballet dancers), Morisot. Manet bridged realism. Eight exhibitions transformed the art market and paved way for modern art. The Impressionists were initially rejected by the official Salon and organized their own exhibitions, a model that influenced later avant-garde movements.",
+    "tags": [
+      "art",
+      "painting",
+      "Impressionism",
+      "Monet",
+      "Renoir",
+      "Degas"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Cubism",
+    "body": "(1907-1914) Picasso and Braque revolutionized representation. Analytic Cubism (1909-1912): fragmented forms, multiple viewpoints, monochrome. Synthetic Cubism (1912-1914): collage, brighter colors. Collapsed foreground/background and showed objects simultaneously. Influenced Futurism, Constructivism, Orphism. Parallels Einstein and Freud. Picasso's Les Demoiselles d'Avignon (1907) anticipated Cubism. The movement took its name from a hostile review by critic Louis Vauxcelles.",
+    "tags": [
+      "art",
+      "painting",
+      "Cubism",
+      "Picasso",
+      "Braque",
+      "modern"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Modern Art Movements",
+    "body": "Post-Impressionism: Van Gogh (Starry Night), Cezanne (geometric simplification), Gauguin. Expressionism: Munch (The Scream), Kandinsky. Fauvism: Matisse (color as force). Surrealism: Dali (persistence of memory), Magritte (This is not a pipe). Abstract Expressionism: Pollock (drip), Rothko (color fields). Pop Art: Warhol (Campbell's Soup), Lichtenstein. The Armory Show of 1913 introduced European modern art to America, shocking the public but transforming the American art world.",
+    "tags": [
+      "art",
+      "painting",
+      "modern",
+      "Van Gogh",
+      "Picasso",
+      "Warhol"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Chinese Painting",
+    "body": "One of world's oldest continuous traditions (2000+ years). Ink wash painting (shui-mo) on paper/silk. Emphasizes capturing qi (spirit) over realism. Genres: landscape (shan shui), bird-and-flower, figure. Masters: Gu Kaizhi, Wang Wei, Fan Kuan, Ma Yuan, Shen Zhou, Qi Baishi. Inseparable from calligraphy and poetry (three perfections). The four treasures of the Chinese study are brush, ink, paper, and inkstone. Calligraphy is considered the highest form of Chinese painting.",
+    "tags": [
+      "art",
+      "painting",
+      "Chinese",
+      "ink",
+      "landscape"
+    ],
+    "importance": 0.81
+  },
+  {
+    "title": "Bach and Baroque Music",
+    "body": "J.S. Bach (1685-1750) pinnacle of Baroque. Major: Mass in B Minor, St. Matthew Passion, Well-Tempered Clavier (48 preludes/fugues), Brandenburg Concertos, Art of Fugue, organ works (Toccata and Fugue in D Minor). Combined German, French, Italian traditions. Obscure until Mendelssohn's 1829 revival. Mathematical precision, emotional depth, spiritual devotion. The Well-Tempered Clavier demonstrated the advantages of equal temperament tuning, enabling composition in all keys without retuning the instrument.",
+    "tags": [
+      "music",
+      "Baroque",
+      "Bach",
+      "classical",
+      "organ",
+      "counterpoint"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Classical Era: Haydn, Mozart",
+    "body": "(c. 1750-1820) Clarity, balance, form. Haydn (1732-1809): father of symphony and string quartet, 104 symphonies. Mozart (1756-1791): child prodigy, 41 symphonies (Jupiter), 27 piano concertos, operas (Figaro, Don Giovanni, Magic Flute), requiem. Sonata form, minuet, rondo. Vienna musical capital. Piano replaced harpsichord. The symphony orchestra standardized during the Classical era, with four sections: strings, woodwinds, brass, and percussion.",
+    "tags": [
+      "music",
+      "classical",
+      "Mozart",
+      "Haydn",
+      "symphony",
+      "Vienna"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Beethoven and Romantic Music",
+    "body": "Beethoven (1770-1827) bridged Classical and Romantic. 9 symphonies: No.3 Eroica, No.5 (fate), No.6 Pastoral, No.9 Choral (Ode to Joy). 32 piano sonatas (Moonlight, Appassionata), 16 string quartets. Expanded forms and emotional expression. Deafness by 1815, late works composed internally. Heroic struggle defined Romanticism. Roman administration and legal concepts fundamentally shaped European political institutions. Latin influenced all Romance languages.",
+    "tags": [
+      "music",
+      "classical",
+      "Romantic",
+      "Beethoven",
+      "symphony",
+      "piano"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Jazz",
+    "body": "Originated New Orleans ~1900 from blues, ragtime, marching bands. Early: Louis Armstrong (soloist). Swing: Ellington, Basie, Goodman. Bebop: Charlie Parker (sax), Dizzy Gillespie, Monk. Cool: Miles Davis (Kind of Blue), Coltrane (A Love Supreme). Free: Ornette Coleman. Fusion: Davis (Bitches Brew), Hancock. Influenced rock, hip-hop. Jazz has been called America's classical music and is recognized as a major contribution to world cultural heritage.",
+    "tags": [
+      "music",
+      "jazz",
+      "Armstrong",
+      "Parker",
+      "Davis",
+      "Coltrane"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Rock Music",
+    "body": "Emerged 1950s America from R&B, country, gospel. Chuck Berry (guitar riffs), Elvis Presley (icon). 1960s: Beatles (Sgt. Pepper's), Stones (blues-based), Dylan (lyrical depth), Hendrix (electric guitar), Pink Floyd (concept albums). 1970s: Led Zeppelin (hard rock), Bowie, Queen, punk. 1980s: Michael Jackson (Thriller), Nirvana (grunge). Dominant global music for 50 years.",
+    "tags": [
+      "music",
+      "rock",
+      "Beatles",
+      "Elvis",
+      "Hendrix",
+      "popular"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Electronic Music",
+    "body": "Uses electronic instruments. Pioneers: musique concrete, Stockhausen, Moog synthesizer. Kraftwerk: electronic pop. House (Chicago, 1980s): Frankie Knuckles, 4/4 beat. Techno (Detroit): Atkins, May, Saunderson. Trance, DnB, dubstep, ambient (Brian Eno). EDM exploded 2010s (Avicii, Daft Punk). Transformed all pop music via synths, samplers, DAWs. Electronic dance music has become a global youth culture phenomenon, with major festivals like Tomorrowland attracting hundreds of thousands of attendees.",
+    "tags": [
+      "music",
+      "electronic",
+      "techno",
+      "house",
+      "synthesizer",
+      "EDM"
+    ],
+    "importance": 0.77
+  },
+  {
+    "title": "Ancient Architecture",
+    "body": "Earliest monuments. Egyptian pyramids (Great Pyramid 2560 BCE, 146m, 2.3M stone blocks). Greek orders: Doric (Parthenon), Ionic, Corinthian. Roman innovations: arches, vaults, concrete. Pantheon (126 CE, 43m dome, largest for 1300 years), Colosseum (50K capacity), aqueducts. Mesoamerican: Mayan pyramids (Chichen Itza), Incan dry-stone (Machu Picchu). Roman concrete, using volcanic ash (pozzolana), set underwater and has survived two millennia. The Pantheon's unreinforced concrete dome remains the world's largest. Ancient builders achieved precision without modern tools.",
+    "tags": [
+      "architecture",
+      "ancient",
+      "Egypt",
+      "Greece",
+      "Rome",
+      "pyramids"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Gothic Architecture",
+    "body": "(12th-16th centuries) Pointed arches, ribbed vaults, flying buttresses for height and light. Originated at Abbey of Saint-Denis (1140). Cathedrals: Chartres (blue glass, labyrinth), Notre Dame, Reims, Amiens. Rayonnant: Sainte-Chapelle (75% glass). Flamboyant: flame-like curves. Structural daring fused with theological symbolism of light as divine. Gothic builders pioneered the skeletal stone structure, allowing thinner walls and larger windows. The structural system of pointed arches and flying buttresses distributed weight efficiently, enabling cathedrals to reach spectacular heights.",
+    "tags": [
+      "architecture",
+      "Gothic",
+      "cathedral",
+      "medieval",
+      "France",
+      "engineering"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Modernist Architecture",
+    "body": "(Early 20th century) Rejected historical styles for functionalism, new materials, form follows function. Bauhaus (Gropius). Le Corbusier: five points, Villa Savoye, Unite. Mies: less is more, Barcelona Pavilion, Seagram Building. Wright: organic architecture, Fallingwater, Guggenheim. International Style: rectilinear, glass curtain walls. Reshaped cities. The International Style, codified by Henry-Russell Hitchcock and Philip Johnson in 1932, emphasized volume over mass, regularity over symmetry, and elimination of applied ornament. Skyscrapers became symbols of corporate power and urban modernity.",
+    "tags": [
+      "architecture",
+      "modernist",
+      "Le Corbusier",
+      "Wright",
+      "Mies",
+      "Bauhaus"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Contemporary Architecture",
+    "body": "Late 20th-21st century diverse approaches. Postmodernism (Venturi, Johnson): historic references. High-tech (Foster, Piano, Rogers): exposed structure, Pompidou Centre, the Shard. Deconstructivism (Gehry, Hadid): fragmented, Guggenheim Bilbao, Heydar Aliyev Center. Sustainable: LEED, passive house. Parametricism: algorithm-driven design. Computer-aided design (CAD) and parametric modeling enable complex organic forms impossible with traditional drafting. Digital fabrication techniques like 3D printing and robotic construction are changing how buildings are designed and assembled.",
+    "tags": [
+      "architecture",
+      "contemporary",
+      "Postmodern",
+      "Gehry",
+      "Hadid",
+      "sustainable"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Silent Cinema and Early Film",
+    "body": "Began 1895 with Lumiere brothers and Melies (Trip to the Moon, 1902). D.W. Griffith advanced film language. German Expressionism (1920s): Cabinet of Dr. Caligari, Nosferatu. Soviet montage: Eisenstein's Battleship Potemkin (Odessa Steps sequence). Chaplin: comedic genius, tramp. The Jazz Singer (1927) introduced sound, ending silent era. Silent films used intertitles for dialogue and employed live musical accompaniment ranging from solo piano to full orchestra.",
+    "tags": [
+      "film",
+      "cinema",
+      "silent",
+      "Chaplin",
+      "Eisenstein",
+      "history"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "French New Wave",
+    "body": "(1959-1960s) Handheld cameras, jump cuts, location shooting, autobiographical. Truffaut: The 400 Blows (freeze-frame ending). Godard: Breathless (jump cuts, breaking rules). Rohmer, Rivette, Chabrol, Varda (Cleo from 5 to 7). Cahiers du Cinema critics became directors, advocating auteur theory. Influenced filmmaking worldwide. The French New Wave was made possible by lightweight cameras and synchronized sound equipment that enabled location shooting.",
+    "tags": [
+      "film",
+      "French New Wave",
+      "Godard",
+      "Truffaut",
+      "auteur"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Japanese Cinema",
+    "body": "Kurosawa (Seven Samurai, Rashomon): epic, humanist, influenced Western film (Magnificent Seven, Star Wars). Ozu (Tokyo Story): contemplative, tatami shots, family dynamics. Mizoguchi (Ugetsu): long takes. Miyazaki / Studio Ghibli (Spirited Away): hand-drawn animation masterpieces. Modern: Kore-eda (Shoplifters). J-horror: Ringu. Kurosawa's Rashomon introduced non-linear storytelling to Western cinema and won the Golden Lion at Venice in 1951.",
+    "tags": [
+      "film",
+      "Japanese",
+      "Kurosawa",
+      "Ozu",
+      "Miyazaki",
+      "animation"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Hollywood and American Cinema",
+    "body": "Studio system (MGM, Warner Bros.) through Golden Age (1930s-1950s). Classical style: continuity editing, closure. Citizen Kane (Welles, 1941): deep focus, non-linear. The Godfather (Coppola, 1972). New Hollywood (1970s): Bonnie and Clyde, Taxi Driver, Apocalypse Now. Blockbusters: Jaws (1975), Star Wars (1977). Scorsese, Tarantino, Nolan. Global dominance. The Hollywood studio system operated like a factory, with stars under contract and all production controlled by studio management until the 1950s.",
+    "tags": [
+      "film",
+      "Hollywood",
+      "American",
+      "Godfather",
+      "Scorsese",
+      "blockbuster"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "World Cinema Movements",
+    "body": "Italian Neorealism (1940s): Bicycle Thieves, Rome Open City - real locations, non-professionals, poverty. Indian: Satyajit Ray (Apu Trilogy); Bollywood (masala, song-and-dance). Iranian: Kiarostami, Farhadi (A Separation). Chinese: Zhang Yimou, Chen Kaige. Korean: Bong Joon-ho (Parasite, Palme d'Or 2019). Brazilian: City of God. African: Sembene. World cinema offers diverse storytelling traditions that challenge Hollywood conventions and expand our understanding of cinematic possibilities.",
+    "tags": [
+      "film",
+      "world cinema",
+      "Italian",
+      "neorealism",
+      "Indian",
+      "Korean"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "United States Overview",
+    "body": "9.83 million km2, 334 million. Largest economy ($27T). Federal republic, 50 states. NYC (financial), LA (entertainment), Chicago, Houston, Silicon Valley (tech). Founded 1776. Two-party system (Democrats vs Republicans). Global influence through military (NATO, 800+ bases), dollar reserve currency, technology, culture (Hollywood). Challenges: polarization, healthcare, inequality, gun violence. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "USA",
+      "geography",
+      "economy",
+      "politics"
+    ],
+    "importance": 0.89
+  },
+  {
+    "title": "China Overview",
+    "body": "9.6 million km2, 1.4 billion. Second-largest economy ($18T). One-party state under Communist Party. Beijing capital; Shanghai largest (26M). Economic miracle since 1978: 800M lifted from poverty. Now high-tech (AI, 5G, EVs, semiconductors). Belt and Road Initiative. Authoritarian governance. Territorial claims South China Sea. Challenges: aging, debt, environment. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "China",
+      "economy",
+      "politics",
+      "population",
+      "technology"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Japan Overview",
+    "body": "377,975 km2, 125 million. Third-largest economy ($4.2T). Constitutional monarchy, Emperor Naruhito. Tokyo (37M metro, world's largest). Post-WWII miracle: Toyota, Sony, Nintendo. Culture: anime, manga, cuisine (sushi, ramen). Challenges: median age 48 (oldest), birth rate 1.3, deflation, debt 250% of GDP, energy imports after Fukushima. 100+ active volcanoes. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Japan",
+      "economy",
+      "culture",
+      "technology",
+      "aging"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "India Overview",
+    "body": "3.29 million km2, 1.43 billion (most populous). Fifth-largest economy ($3.7T). World's largest democracy. Tech hub Bangalore. ISRO: Mars Orbiter at record low cost. 22 official languages. Bollywood, yoga. Challenges: infrastructure, air pollution, water stress, caste system, communal tensions. Geopolitics: border disputes China/Pakistan. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "India",
+      "democracy",
+      "IT",
+      "population",
+      "space"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Russia Overview",
+    "body": "17.1 million km2 (largest), 11 time zones, 144 million. Putin since 2000. Largest natural gas exporter, second-largest oil. Nuclear superpower. UNSC permanent member. Culture: Tolstoy, Dostoevsky, ballet (Bolshoi), Tchaikovsky, first satellite and human in space. Challenges: demographics, sanctions, corruption, Ukraine war (2022 onward). This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Russia",
+      "energy",
+      "geography",
+      "politics",
+      "literature"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Germany Overview",
+    "body": "357,022 km2, 84 million. Europe's largest economy ($4.4T). Federal parliamentary republic, Berlin. Manufacturing: VW, BMW, Mercedes, machinery, chemicals. Social market economy. Reunified 1990. EU leadership. Energiewende: 50%+ renewables. Culture: Bach, Beethoven, Kant, Hegel, Goethe. Challenges: aging, Ukraine war energy transition. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Germany",
+      "EU",
+      "economy",
+      "manufacturing",
+      "history"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "France Overview",
+    "body": "551,695 km2, 68 million. EU's second-largest economy ($3T). Semi-presidential republic, Paris (art, fashion, cuisine). Nuclear power (70% of electricity). UNSC permanent member. Economy: Airbus, LVMH, tourism (80M visitors, most visited). Culture: Revolution, Enlightenment, Impressionism. Challenges: high spending (57% of GDP), pensions, integration. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "France",
+      "EU",
+      "culture",
+      "nuclear",
+      "tourism"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "United Kingdom Overview",
+    "body": "243,610 km2, 67 million. Constitutional monarchy, London (global finance). Fifth-largest economy ($3.3T). English as global language. Culture: Shakespeare, Beatles, BBC. Former British Empire legacy: Commonwealth (56 nations). Brexit (2020). Economy: finance, creative, pharma (AstraZeneca). NHS universal healthcare. Challenges: post-Brexit, Scottish independence debate. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "UK",
+      "London",
+      "economy",
+      "history",
+      "literature"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Brazil Overview",
+    "body": "8.5 million km2, 217 million. South America's largest economy ($2.1T). Capital Brasilia, Sao Paulo (22M metro). Largest exporter of coffee, soy, beef, iron ore. Amazon 60% of territory. Culture: samba, Carnival, football (5 World Cups). BRICS. Challenges: deforestation, inequality (Gini 0.53), crime, corruption (Lava Jato). This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Brazil",
+      "Amazon",
+      "agriculture",
+      "football",
+      "inequality"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Australia Overview",
+    "body": "7.7 million km2, 26 million. Federal parliamentary monarchy, Canberra, Sydney (5M). 14th economy ($1.7T). World's largest iron ore exporter. Unique biodiversity: kangaroos, koalas, Great Barrier Reef. Population east coast concentrated. Challenges: climate/bushfires (2019-20 Black Summer), housing, Indigenous reconciliation (Voice referendum failed 2023). ANZUS alliance. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Australia",
+      "mining",
+      "biodiversity",
+      "climate",
+      "Pacific"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Canada Overview",
+    "body": "9.98 million km2, 39 million. Second-largest country. Ottawa capital, Toronto (6M). 10th economy ($2.1T). Oil sands (third-largest reserves). NAFTA/USMCA. Universal healthcare. Bilingual: English/French (Quebec). High immigration (500K/year). Challenges: housing, healthcare strain, Indigenous reconciliation, Arctic sovereignty. Geography: Rockies, Great Lakes, boreal forest. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Canada",
+      "resources",
+      "immigration",
+      "bilingual",
+      "Arctic"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "South Korea Overview",
+    "body": "100,210 km2, 52 million. 12th economy ($1.7T). Miracle on Han River through chaebols: Samsung (20% of exports), Hyundai, LG, SK. Global leader semiconductors. K-culture: BTS, Parasite Oscar 2020. Democracy since 1987. Still technically at war with North Korea. Challenges: birth rate 0.72 (world's lowest), aging, chaebol dominance. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "South Korea",
+      "technology",
+      "K-pop",
+      "demographics",
+      "chaebol"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Indonesia Overview",
+    "body": "1.9 million km2, 278 million. Fourth-most populous. Largest archipelagic state (17,000 islands). New capital Nusantara. Southeast Asia's largest economy ($1.4T). World's largest Muslim population. Exports: palm oil (largest), coal, nickel. Growing digital economy (Gojek). Tourism: Bali, Borobudur. 300+ ethnic groups, 700+ languages. Challenges: deforestation, infrastructure. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Indonesia",
+      "ASEAN",
+      "islands",
+      "Muslim",
+      "biodiversity"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Mexico Overview",
+    "body": "1.96 million km2, 129 million. 15th economy ($1.8T). Federal republic, Mexico City (22M metro). USMCA trade partner. Major: automotive, oil (Pemex), tourism, remittances ($60B). Cultural heritage: Olmec, Maya, Aztec; Frida Kahlo; Día de Muertos. Spanish, 68 indigenous languages. Challenges: cartel violence (30K homicides/year), corruption, inequality. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Mexico",
+      "manufacturing",
+      "culture",
+      "trade",
+      "cartels"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Italy Overview",
+    "body": "301,340 km2, 59 million. EU's third-largest economy ($2.2T). Parliamentary republic, Rome. Fashion capital Milan, art Florence, canals Venice. Economy: luxury (Prada, Ferrari, Lamborghini), manufacturing, tourism (Colosseum, Vatican). Cuisine: pasta, pizza, wine. Cultural heritage: Roman Empire, Renaissance (Dante, Leonardo, Michelangelo), opera. Challenges: public debt (140% of GDP), aging, regional inequality (North vs South).",
+    "tags": [
+      "countries",
+      "Italy",
+      "EU",
+      "culture",
+      "fashion",
+      "tourism"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Spain Overview",
+    "body": "505,990 km2, 47 million. 15th-largest EU economy ($1.6T). Parliamentary monarchy, Madrid. Barcelona (Gaudi architecture), Costa del Sol (tourism). Economy: tourism (2nd most visited), agriculture (olive oil largest), renewable energy. Cultural heritage: Al-Andalus (Islamic period), Flamenco, Don Quixote (Cervantes), Picasso, Dali. Autonomous communities (Catalonia, Basque Country independence movements). Challenges: regional tensions, unemployment.",
+    "tags": [
+      "countries",
+      "Spain",
+      "EU",
+      "tourism",
+      "culture",
+      "history"
+    ],
+    "importance": 0.81
+  },
+  {
+    "title": "Turkey Overview",
+    "body": "783,562 km2, 85 million. Transcontinental (Europe/Asia). Presidential republic, Ankara; Istanbul largest city (16M). Emerging economy ($1.2T). Major: textiles, automotive, tourism, agriculture. NATO member, EU candidate. Cultural heritage: Ottoman Empire, Byzantine (Hagia Sophia), Turkish baths, kebabs. Geopolitical: controls Bosphorus strait. Challenges: inflation, currency crisis, authoritarian drift, earthquake risk (2023 quake 50K+ killed).",
+    "tags": [
+      "countries",
+      "Turkey",
+      "transcontinental",
+      "EU",
+      "NATO",
+      "history"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Saudi Arabia Overview",
+    "body": "2.15 million km2, 36 million. Absolute monarchy (King Salman, Crown Prince MBS). World's largest oil exporter (16% of global), third-largest oil producer. OPEC leader. Vision 2030: economic diversification, NEOM megacity, tourism opening. Mecca and Medina (Islam's holiest sites). Conservative Islamic society undergoing social reforms (women driving 2018). Human rights concerns. Regional power competing with Iran. Challenges: oil dependence, water scarcity.",
+    "tags": [
+      "countries",
+      "Saudi Arabia",
+      "oil",
+      "Middle East",
+      "Islam",
+      "Vision2030"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Egypt Overview",
+    "body": "1 million km2, 110 million. Arab world's most populous. Presidential republic, Cairo (21M metro). Economy ($400B): Suez Canal (12% of global trade), tourism (pyramids), agriculture (Nile delta), gas exports. Ancient civilization: Pharaohs, pyramids, temples. Cultural leader of Arab world (film, music). Muslim Brotherhood political influence. Military as economic power. Challenges: population growth, water stress (Nile dam dispute with Ethiopia), terrorism, economic crisis.",
+    "tags": [
+      "countries",
+      "Egypt",
+      "Africa",
+      "Middle East",
+      "Nile",
+      "history"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Nigeria Overview",
+    "body": "923,768 km2, 220 million (Africa's most populous). Federal presidential republic, Abuja; Lagos largest city (24M, Africa's largest). Largest African economy ($500B). Oil (OPEC member, 90% of exports). Tech hub: fintech (Flutterwave, Paystack). Nollywood (second-largest film industry). 250+ ethnic groups (Hausa, Yoruba, Igbo), 500+ languages. Religious split: Muslim north, Christian south. Challenges: oil dependence, corruption, Boko Haram insurgency, infrastructure deficit.",
+    "tags": [
+      "countries",
+      "Nigeria",
+      "Africa",
+      "oil",
+      "population",
+      "Nollywood"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "South Africa Overview",
+    "body": "1.22 million km2, 60 million. Parliamentary republic, Pretoria/Cape Town/Bloemfontein. Most industrialized African economy ($400B). Rich in gold, platinum, diamonds, chromium. Apartheid (1948-1994) ended by Mandela. Rainbow nation: 11 official languages. Johannesburg financial center; Cape Town beauty. Eskom electricity crisis. Challenges: inequality (Gini highest), unemployment (32%), crime, land reform, corruption (state capture).",
+    "tags": [
+      "countries",
+      "South Africa",
+      "Africa",
+      "mining",
+      "Mandela",
+      "inequality"
+    ],
+    "importance": 0.79
+  },
+  {
+    "title": "Argentina Overview",
+    "body": "2.78 million km2 (8th largest), 46 million. Federal presidential republic, Buenos Aires. Third-largest Latin American economy ($640B). Major: agriculture (soy, beef, wheat), energy (Vaca Muerta shale). Cultural: tango, football (Messi), Maradona, Borges. Peronism dominant political movement. Challenges: chronic inflation (100%+), debt crises (defaulted 9 times), currency controls, poverty (40%). History: Spanish colony, independence 1816, Dirty War (1976-1983).",
+    "tags": [
+      "countries",
+      "Argentina",
+      "South America",
+      "agriculture",
+      "football",
+      "inflation"
+    ],
+    "importance": 0.79
+  },
+  {
+    "title": "Sweden Overview",
+    "body": "450,295 km2, 10 million. Constitutional monarchy, Stockholm. 23rd-largest economy ($600B). Export: Volvo, Scania, Ericsson, IKEA, H&M, Spotify, AstraZeneca. Nordic welfare model: universal healthcare, education, strong social safety net. High taxes, low inequality. Neutral (non-aligned), EU member. Cultural: ABBA, Nobel Prizes, Swedish crime fiction. Challenges: integration of immigrants, housing shortages. This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Sweden",
+      "Nordic",
+      "welfare",
+      "design",
+      "innovation"
+    ],
+    "importance": 0.77
+  },
+  {
+    "title": "Netherlands Overview",
+    "body": "41,543 km2, 17.5 million. Constitutional monarchy, Amsterdam (capital), The Hague (government). 18th-largest economy ($1T). World's second-largest food exporter (after US) despite small size. Major: Shell, Unilever, Philips, ASML (semiconductor lithography monopoly). Trading hub (Rotterdam port, largest European). 27% below sea level, elaborate dike/ polder system. Liberal social policies. Challenges: rising sea levels, housing crisis.",
+    "tags": [
+      "countries",
+      "Netherlands",
+      "EU",
+      "trade",
+      "water",
+      "technology"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Switzerland Overview",
+    "body": "41,285 km2, 8.7 million. Federal republic, Bern. 20th-largest economy ($900B). Per capita GDP highest ($100K+). Banking (UBS, Credit Suisse), pharma (Novartis, Roche), watches (Rolex), chocolates. Four official languages (German, French, Italian, Romansh). Direct democracy (frequent referendums). Neutrality (not EU/UN until 2002). Alps (70% of country). Banks: Swiss banking secrecy eroded by international pressure. Challenges: immigration, EU relations, aging.",
+    "tags": [
+      "countries",
+      "Switzerland",
+      "banking",
+      "pharma",
+      "neutral",
+      "Alps"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Singapore Overview",
+    "body": "733 km2 (smallest country in SE Asia), 5.5 million. Parliamentary republic, sovereign city-state. 30th-largest economy ($500B). Per capita GDP $80K+ (one of highest). Major hub: shipping (busiest port), finance, tech. Authoritarian democracy (PAP party since 1959). English official language. Multicultural: Chinese, Malay, Indian. Strict laws, low corruption. Founder: Lee Kuan Yew. Challenges: aging, immigration tensions, land constraints, rising costs.",
+    "tags": [
+      "countries",
+      "Singapore",
+      "city-state",
+      "finance",
+      "trade",
+      "technology"
+    ],
+    "importance": 0.79
+  },
+  {
+    "title": "Thailand Overview",
+    "body": "513,120 km2, 70 million. Constitutional monarchy (King Maha Vajiralongkorn), Bangkok. Second-largest SE Asian economy ($500B). Tourism (40M visitors pre-COVID), agriculture (rice, rubber), manufacturing (autos: Toyota, Honda). Buddhist majority. Cultural: Thai cuisine, temples, Muay Thai, massages. 1932 constitutional monarchy. History: never colonized. Challenges: political instability (coups, 2006, 2014), aging population, inequality.",
+    "tags": [
+      "countries",
+      "Thailand",
+      "ASEAN",
+      "tourism",
+      "Buddhism",
+      "cuisine"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Vietnam Overview",
+    "body": "331,212 km2, 100 million. Communist one-party state (15th most populous). Fast-growing economy ($450B). Manufacturing hub (Samsung, Foxconn, Apple). Exports: electronics, textiles, coffee (second-largest), seafood. Communist Party rule since 1975. War: Vietnam War (1955-1975). Doi Moi reforms (1986) opened economy. Cultural: pho, banh mi, Ha Long Bay. Challenges: pollution, infrastructure, corruption, state control.",
+    "tags": [
+      "countries",
+      "Vietnam",
+      "ASEAN",
+      "manufacturing",
+      "communism",
+      "cuisine"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Iran Overview",
+    "body": "1.65 million km2, 88 million. Islamic Republic (since 1979 revolution). Tehran capital. Major oil and gas reserves (fourth-largest oil, second-largest gas). Persian culture: Cyrus the Great, poetry (Hafez, Rumi, Ferdowsi). Shia Muslim majority (only country where official). Nuclear program controversy, sanctions. Regional influence through proxies (Hezbollah, Houthis). Mahsa Amini protests (2022, Woman Life Freedom). Challenges: sanctions, economy, political repression.",
+    "tags": [
+      "countries",
+      "Iran",
+      "Middle East",
+      "oil",
+      "Persian",
+      "sanctions"
+    ],
+    "importance": 0.79
+  },
+  {
+    "title": "Israel Overview",
+    "body": "20,770 km2, 9.5 million. Parliamentary democracy, Jerusalem (contested). Startup Nation: highest R&D spending per capita, 2nd most NASDAQ companies. Major: Intel, Check Point, Waze, Mobileye. Military: Iron Dome, Mossad. Founded 1948 as Jewish state. Conflict with Palestinians (occupation, Gaza wars, settlements). Culture: Hebrew revival, Tel Aviv nightlife, Dead Sea. Challenges: security, Arab/Palestinian conflict, political polarization, Haredi integration.",
+    "tags": [
+      "countries",
+      "Israel",
+      "Middle East",
+      "startup",
+      "technology",
+      "conflict"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Stoicism",
+    "body": "Founded by Zeno of Citium (~300 BCE) in Athens. Teaches virtue is the sole good, external events are indifferent. Key discipline: control what you can (judgments, actions), accept what you can't. Three Roman Stoics: Seneca (adviser to Nero, Letters), Epictetus (enslaved-born, Discourses), Marcus Aurelius (emperor, Meditations). Influenced Christian theology and modern CBT. Dichotomy of control remains its most practical teaching.",
+    "tags": [
+      "philosophy",
+      "Stoicism",
+      "virtue",
+      "ethics",
+      "Roman",
+      "CBT"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Schopenhauer",
+    "body": "Arthur Schopenhauer (1788-1860) known for philosophical pessimism. The World as Will and Representation: the noumenal reality is a blind, striving Will that causes suffering. Life oscillates between pain (unfulfilled desire) and boredom (fulfilled desire). Art (especially music) provides temporary escape from Will. Compassion is basis of morality. Influenced Nietzsche, Wagner, Freud, Wittgenstein.",
+    "tags": [
+      "philosophy",
+      "Schopenhauer",
+      "pessimism",
+      "Will",
+      "ethics"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Kierkegaard",
+    "body": "Søren Kierkegaard (1813-1855), father of existentialism. Focused on subjective truth, the leap of faith. Three stages of existence: aesthetic (pleasure), ethical (duty), religious (faith in the absurd). Fear and Trembling: Abraham and Isaac, the teleological suspension of the ethical. Either/Or: aesthetic vs ethical. The Sickness Unto Death: despair as the self's misrelation. Attacked Hegelian system-building and empty Christendom.",
+    "tags": [
+      "philosophy",
+      "Kierkegaard",
+      "existentialism",
+      "faith",
+      "subjectivity"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "The Metamorphosis",
+    "body": "Kafka's The Metamorphosis (1915): traveling salesman Gregor Samsa wakes to find himself transformed into a gigantic insect. The story explores alienation, family dynamics, and identity. Grete (his sister) initially cares for him but ultimately abandons him. The family's financial and emotional dependency on Gregor reverses. Gregor's death brings relief to the family, who go on a picnic. A defining work of 20th century literature.",
+    "tags": [
+      "literature",
+      "Kafka",
+      "modernist",
+      "absurd",
+      "existential"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Moby-Dick",
+    "body": "Herman Melville's Moby-Dick (1851) is an epic novel of Captain Ahab's obsessive quest for the white whale. Through Ishmael's narration, it weaves whaling lore, Shakespearean drama, and philosophical meditation on fate, evil, and the universe. The whale represents different things to different readers: God, nature, fate, the unknowable. The novel was a commercial failure in Melville's lifetime but is now considered a masterpiece of American literature.",
+    "tags": [
+      "literature",
+      "Melville",
+      "American",
+      "novel",
+      "epic",
+      "whale"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "One Hundred Years of Solitude",
+    "body": "Gabriel García Márquez's 1967 masterpiece chronicles the Buendía family over seven generations in the fictional Macondo. The novel blends magical realism with Colombian history. Key events: the founding of Macondo by José Arcadio Buendía, the insomnia plague, the banana company massacre, and the final destruction as the prophecies of Melquíades are fulfilled. The novel established magical realism on the world stage and won the Nobel Prize for its author.",
+    "tags": [
+      "literature",
+      "Garcia Marquez",
+      "magic realism",
+      "Latin American",
+      "Nobel"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Catch-22",
+    "body": "Joseph Heller's Catch-22 (1961) is a satirical war novel set in WWII. The title phrase has entered language meaning a no-win situation. Yossarian, a US bombardier, tries to survive by being declared insane, but Catch-22 says anyone who wants to avoid combat missions must be sane. The novel's circular, non-linear structure mirrors the absurdity of bureaucracy and war. A landmark of postmodern literature capturing the futility and insanity of war.",
+    "tags": [
+      "literature",
+      "Heller",
+      "American",
+      "satire",
+      "war",
+      "postmodern"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Climate Change Science",
+    "body": "Earth's average temperature has risen ~1.2C since pre-industrial times due to greenhouse gas emissions (CO2, methane, N2O). IPCC reports represent scientific consensus: human activity is the dominant cause. Consequences: sea-level rise (3.4 mm/year), extreme weather intensification, Arctic sea ice decline, ocean acidification, biodiversity loss. Paris Agreement (2015) aims to limit warming to 1.5-2C. Key emitters: China (28%), US (15%), EU (8%). Carbon budgets constrain future emissions.",
+    "tags": [
+      "climate",
+      "climate change",
+      "global warming",
+      "IPCC",
+      "emissions"
+    ],
+    "importance": 0.93
+  },
+  {
+    "title": "Renewable Energy",
+    "body": "Energy from renewable sources: solar photovoltaic (cost dropped 90% in decade), wind (onshore and offshore), hydroelectric, geothermal, biomass, tidal. Renewables now cheapest new electricity in most regions. Global capacity: solar ~1 TW, wind ~900 GW. China leads in deployment. Intermittency challenges: grid storage (lithium batteries, pumped hydro), green hydrogen. Energy transition essential for climate goals. Solar photovoltaics could become the world's largest electricity source by 2030s.",
+    "tags": [
+      "energy",
+      "renewable",
+      "solar",
+      "wind",
+      "climate",
+      "technology"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Nuclear Energy",
+    "body": "Nuclear fission produces heat by splitting uranium atoms, generating low-carbon baseload electricity. 440 reactors in 32 countries provide ~10% of global electricity. France leads at 70% of their electricity. Types: PWR, BWR, CANDU. Advanced designs: small modular reactors (SMRs), Generation IV (molten salt, fast reactors). Fusion (ITER project, 35 nations) aims to replicate the Sun's energy but remains decades away. Challenges: waste disposal, safety (Chernobyl 1986, Fukushima 2011), high construction costs.",
+    "tags": [
+      "energy",
+      "nuclear",
+      "fission",
+      "fusion",
+      "electricity",
+      "climate"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Chaos Theory",
+    "body": "Chaos theory studies deterministic systems that are extremely sensitive to initial conditions (butterfly effect, Lorenz 1963). Edward Lorenz discovered chaotic behavior in weather models. Key concepts: strange attractors (Lorenz attractor), fractal geometry (Mandelbrot set, 1975), bifurcation diagrams (Feigenbaum constants). Logistic map shows period-doubling route to chaos. Applications: weather prediction limits, turbulence, population biology, economics, and quantum chaos.",
+    "tags": [
+      "mathematics",
+      "physics",
+      "chaos",
+      "dynamics",
+      "fractals"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "String Theory",
+    "body": "String theory proposes fundamental particles are one-dimensional strings whose vibration modes determine particle properties. Requires extra spatial dimensions (10 in superstring theory, 11 in M-theory). Five consistent string theories discovered 1980s, unified by M-theory (Witten 1995). Includes supersymmetry, Calabi-Yau compactifications. Holographic principle: AdS/CFT correspondence (Maldacena 1997) connects string theory to gauge theories. Despite mathematical elegance, no experimental confirmation.",
+    "tags": [
+      "physics",
+      "string theory",
+      "quantum",
+      "gravity",
+      "M-theory"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Quantum Computing",
+    "body": "Quantum computing uses quantum bits (qubits) exploiting superposition and entanglement. Types: superconducting (Google, IBM), trapped ions (IonQ), photonic (PsiQuantum). Key algorithms: Shor's (factoring, breaks RSA), Grover's (search, quadratic speedup), quantum error correction (surface codes). Quantum supremacy demonstrated by Google (2019, 53-qubit Sycamore). Challenges: decoherence, error rates, scaling. Current: ~1000 qubits, but fault-tolerant quantum computing likely still years away.",
+    "tags": [
+      "physics",
+      "quantum",
+      "computing",
+      "qubit",
+      "algorithm"
+    ],
+    "importance": 0.88
+  },
+  {
+    "title": "Reformation",
+    "body": "The Protestant Reformation (1517-1648) split Western Christianity. Martin Luther posted 95 Theses (1517) criticizing indulgences and papal authority. Luther's doctrine: sola fide (faith alone), sola scriptura (Bible alone), priesthood of all believers. John Calvin: predestination, Geneva theocracy. Henry VIII: England broke from Rome (1534). Counter-Reformation: Council of Trent (1545-1563), Jesuits (Ignatius Loyola). Religious wars: Thirty Years' War (1618-1648), Peace of Westphalia established modern state sovereignty.",
+    "tags": [
+      "history",
+      "Reformation",
+      "Luther",
+      "Calvin",
+      "religion",
+      "Europe"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Age of Enlightenment",
+    "body": "The Enlightenment (18th century) emphasized reason, rights, and progress. Key philosophers: Locke (natural rights, government by consent), Montesquieu (separation of powers), Voltaire (free speech, religious tolerance), Rousseau (social contract, general will), Hume (empiricism, skepticism), Kant (dare to know, sapere aude). The French philosophes compiled the Encyclopedie. Adam Smith (Wealth of Nations, 1776) founded modern economics. The Enlightenment inspired the American and French Revolutions and shaped modern democracy, human rights, and secular thought.",
+    "tags": [
+      "history",
+      "Enlightenment",
+      "philosophy",
+      "reason",
+      "rights",
+      "democracy"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Cold War: Space Race",
+    "body": "The Space Race (1955-1975) was Cold War competition between US and USSR for spaceflight supremacy. USSR: Sputnik (first satellite, 1957), Laika (first animal in orbit), Gagarin (first human in space, 1961), Tereshkova (first woman, 1963), first spacewalk (Leonov 1965). US: Apollo program, Kennedy's Moon speech (1961), Apollo 11 (Armstrong and Aldrin first on Moon, July 20, 1969), Nixon called the greatest week since creation. The race drove massive technological advances. Led to space stations (Salyut, Skylab, Mir, ISS) and international cooperation.",
+    "tags": [
+      "history",
+      "Cold War",
+      "space",
+      "NASA",
+      "Apollo",
+      "USSR"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Film: Citizen Kane",
+    "body": "Orson Welles's Citizen Kane (1941) is considered the greatest American film. The narrative uses flashbacks and multiple perspectives to investigate the meaning of Rosebud, Kane's dying word. Innovations: deep focus cinematography (Gregg Toland), non-linear narrative, expressionistic lighting, realistic sound. Welles (co-writer, director, star) was 25. The film was controversial for its resemblance to William Randolph Hearst. Despite initial mixed reception, it revolutionized film technique and storytelling.",
+    "tags": [
+      "film",
+      "Hollywood",
+      "Welles",
+      "Kane",
+      "cinematography",
+      "classic"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Film: The Godfather",
+    "body": "Francis Ford Coppola's The Godfather (1972) is a landmark crime film based on Mario Puzo's novel. It chronicles the Corleone family under Vito (Brando) and Michael (Pacino). Themes: American Dream, family, power, corruption. Gordon Willis's cinematography (dark, amber tones), Nino Rota's score. The baptism montage (editing between baptism and murders) is one of cinema's most famous sequences. Won Best Picture, Best Actor (Brando declined). Often ranked second only to Citizen Kane.",
+    "tags": [
+      "film",
+      "Hollywood",
+      "Godfather",
+      "Coppola",
+      "crime",
+      "classic"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Architecture: Frank Lloyd Wright",
+    "body": "Frank Lloyd Wright (1867-1959) was America's greatest architect. Organic architecture: buildings in harmony with nature. Prairie style: Robie House, low horizontal lines, open plans. Fallingwater (1935): cantilevered over Bear Run waterfall, iconic. Guggenheim Museum (NY, 1959): continuous spiral ramp, revolutionary museum form. Taliesin (Wisconsin) and Taliesin West (Arizona) his homes/schools. Imperial Hotel Tokyo (survived 1923 earthquake). Usonian houses: affordable American homes. 1,000+ designs, 500+ built.",
+    "tags": [
+      "architecture",
+      "Wright",
+      "modernist",
+      "organic",
+      "American",
+      "Fallingwater"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Biochemistry",
+    "body": "Studies chemical processes in living organisms. Key biomolecules: proteins (amino acids, enzymes), carbohydrates (sugars, starch), lipids (fats, membranes), nucleic acids (DNA, RNA). Metabolism: catabolism (breaking down) and anabolism (building up). Key cycles: glycolysis, Krebs cycle (TCA), oxidative phosphorylation, photosynthesis. Enzymes catalyze reactions with specificity and regulation. Biochemistry underpins molecular biology, medicine, and biotechnology.",
+    "tags": [
+      "chemistry",
+      "biochemistry",
+      "proteins",
+      "metabolism",
+      "enzymes"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Chemical Bonding",
+    "body": "Atoms bond through electromagnetic interactions. Types: ionic (electron transfer, NaCl), covalent (electron sharing, H2), metallic (electron sea, metals), hydrogen bonds (water), van der Waals forces. Lewis structures represent valence electrons. VSEPR theory predicts molecular geometry. Molecular orbital theory describes bonding through orbital overlap. Bond polarity and electronegativity differences determine bond character. Hybridization (sp3, sp2, sp) explains carbon bonding (tetrahedral, trigonal, linear).",
+    "tags": [
+      "chemistry",
+      "bonding",
+      "molecules",
+      "orbitals",
+      "electrons"
+    ],
+    "importance": 0.78
+  },
+  {
+    "title": "Electrochemistry",
+    "body": "Studies chemical reactions involving electron transfer. Electrochemical cells: galvanic/voltaic (spontaneous, battery) and electrolytic (non-spontaneous, electrolysis). Standard reduction potentials predict cell voltage. Nernst equation relates voltage to concentration. Batteries: lead-acid (car), lithium-ion (phones, EVs, Nobel 2019 to Goodenough, Whittingham, Yoshino). Fuel cells (hydrogen to electricity). Corrosion (rusting) is electrochemical. Electroplating, water electrolysis for hydrogen production.",
+    "tags": [
+      "chemistry",
+      "electrochemistry",
+      "batteries",
+      "lithium",
+      "corrosion"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Green Chemistry",
+    "body": "Designs chemical products and processes minimizing hazardous substances. 12 principles: waste prevention, atom economy, less hazardous synthesis, safer solvents, energy efficiency, renewable feedstocks, catalysis, biodegradability. Paul Anastas coined the term (1998). Examples: supercritical CO2 as solvent, biocatalysis, microwave-assisted synthesis, water-based reactions. Reduces environmental impact while improving efficiency and cost. Growing regulatory and industrial adoption.",
+    "tags": [
+      "chemistry",
+      "green",
+      "environment",
+      "sustainability",
+      "catalysis"
+    ],
+    "importance": 0.76
+  },
+  {
+    "title": "Natural Disasters Overview",
+    "body": "Catastrophic events from natural processes. Geological: earthquakes (most deadly are magnitude 7+), volcanic eruptions (Tambara 1815 caused global cooling), tsunamis (2004 Indian Ocean 230K killed). Meteorological: hurricanes/cyclones (Katrina 2005, 1,800 killed), tornadoes (US averages 1,200/year), floods (1931 China floods 2 million+ killed), droughts, heatwaves, wildfires. Impacts worsened by climate change and development in hazard-prone areas. Early warning and building codes reduce casualties.",
+    "tags": [
+      "earth science",
+      "disasters",
+      "earthquakes",
+      "tsunamis",
+      "hurricanes",
+      "wildfire"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Environmental Issues",
+    "body": "Anthropogenic environmental degradation. Climate change (1.2C warming, accelerating). Biodiversity loss (1 million species threatened with extinction). Deforestation (10 million hectares/year, Amazon, Congo, SE Asia). Ocean acidification (30% increase since industrial revolution). Plastic pollution (11 million tons annually into oceans, 8 million tons macroplastic). Water scarcity (2 billion lack safe water). Air pollution (7 million premature deaths/year). Ozone depletion (Montreal Protocol 1987 successfully phased out CFCs, hole slowly healing).",
+    "tags": [
+      "environment",
+      "pollution",
+      "climate",
+      "biodiversity",
+      "conservation"
+    ],
+    "importance": 0.9
+  },
+  {
+    "title": "Biodiversity Hotspots",
+    "body": "34 globally recognized biodiversity hotspots covering only 2.3% of Earth's land surface but containing 50% of endemic plant species and 42% of terrestrial vertebrates. Criteria: at least 1,500 endemic vascular plant species and 30% or less original habitat. Examples: Sundaland (Indonesia), Madagascar, Caribbean Islands, Atlantic Forest (Brazil), Cape Floristic Region (South Africa), Mediterranean Basin, Indo-Burma. Hotspots prioritize conservation investment. Most threatened by habitat loss, climate change, invasive species.",
+    "tags": [
+      "environment",
+      "biodiversity",
+      "conservation",
+      "hotspots",
+      "endemic"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Evolution by Natural Selection",
+    "body": "Charles Darwin and Alfred Russel Wallace proposed natural selection (1858). Darwin's On the Origin of Species (1859) provided evidence. Mechanism: variation exists in populations, traits are heritable, differential survival/reproduction leads to adaptive evolution. Key evidence: fossil record (transitional forms), homologous structures, vestigial organs, DNA sequence similarity, direct observation (peppered moth, antibiotic resistance, Darwin's finches). Modern synthesis (1930s-40s) integrated genetics with Darwinian evolution.",
+    "tags": [
+      "biology",
+      "evolution",
+      "Darwin",
+      "natural selection",
+      "genetics"
+    ],
+    "importance": 0.92
+  },
+  {
+    "title": "Cell Biology",
+    "body": "The cell is the basic unit of life. Cell theory: all living things composed of cells, cells from pre-existing cells. Prokaryotes (bacteria, archaea): no nucleus, simple. Eukaryotes (plants, animals, fungi, protists): membrane-bound organelles, nucleus. Key organelles: nucleus (DNA), mitochondria (energy, ATP), endoplasmic reticulum (protein/lipid synthesis), Golgi (modification/packaging), lysosomes (digestion), chloroplasts (photosynthesis in plants). Cell membrane: phospholipid bilayer, selective permeability. Cell division: mitosis (somatic) and meiosis (gametes).",
+    "tags": [
+      "biology",
+      "cell",
+      "organelles",
+      "membrane",
+      "mitosis"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Neuroscience",
+    "body": "Study of the nervous system. The brain has ~86 billion neurons, each with ~7,000 connections. Neuron: dendrites (input), cell body, axon (output), synapses (chemical/electrical communication via neurotransmitters). Major regions: cerebrum (consciousness, language, reasoning), cerebellum (coordination, balance), brainstem (automatic functions). Neurotransmitters: dopamine (reward, movement), serotonin (mood, sleep), glutamate (excitation), GABA (inhibition). Plasticity: brain rewires itself. Neurodegenerative: Alzheimer's (amyloid plaques, tau tangles), Parkinson's (dopamine loss).",
+    "tags": [
+      "neuroscience",
+      "brain",
+      "neurons",
+      "synapse",
+      "neurotransmitters"
+    ],
+    "importance": 0.86
+  },
+  {
+    "title": "Fluid Dynamics",
+    "body": "Studies fluid motion. Navier-Stokes equations (1822) describe fluid flow, are one of seven Millennium Prize Problems. Key concepts: viscosity, turbulence (chaotic flow, Reynolds number), Bernoulli's principle (pressure decreases with speed, explains lift), laminar vs turbulent flow. Applications: aerodynamics (aircraft wings, drag reduction), hydrodynamics (ship design, pipe flow), meteorology (weather prediction), oceanography (currents), cardiovascular (blood flow). Computational fluid dynamics (CFD) simulates flow numerically.",
+    "tags": [
+      "physics",
+      "fluids",
+      "dynamics",
+      "turbulence",
+      "Navier-Stokes"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "Lasers and Photonics",
+    "body": "Laser (Light Amplification by Stimulated Emission of Radiation) invented 1960 by Maiman. Key properties: monochromatic, coherent, collimated. Types: gas (HeNe, CO2), solid-state (Nd:YAG), semiconductor (laser diodes), fiber lasers. Applications: optical communication (fiber optics backbone of internet), barcode scanners, CD/DVD/Blu-ray readers, laser cutting/welding, medical (LASIK surgery, skin resurfacing), LiDAR (autonomous driving, mapping), holography, laser cooling (Bose-Einstein condensation). Photonics is the broader science of light manipulation.",
+    "tags": [
+      "physics",
+      "lasers",
+      "photonics",
+      "optics",
+      "communication",
+      "light"
+    ],
+    "importance": 0.82
+  },
+  {
+    "title": "The Great Gatsby",
+    "body": "F. Scott Fitzgerald's The Great Gatsby (1925) captures the Jazz Age and American Dream's corruption. Narrator Nick Carraway observes Jay Gatsby's obsessive pursuit of Daisy Buchanan. The green light, Valley of Ashes (eyes of Doctor T.J. Eckleburg), and lavish parties symbolize wealth, class, and disillusionment. Critically panned on release, it became a staple of American literature. Gatsby's tragic end exposes the emptiness of the Roaring Twenties and the unattainability of the past.",
+    "tags": [
+      "literature",
+      "Fitzgerald",
+      "American",
+      "novel",
+      "Jazz Age",
+      "tragedy"
+    ],
+    "importance": 0.83
+  },
+  {
+    "title": "Cancer Biology",
+    "body": "Cancer is uncontrolled cell growth caused by accumulated genetic mutations. Hallmarks (Hanahan and Weinberg): sustained proliferation, growth suppression evasion, apoptosis resistance, replicative immortality, angiogenesis induction, invasion/metastasis, immune evasion, metabolic reprogramming. Oncogenes (mutated proto-oncogenes, e.g., RAS, MYC) drive growth; tumor suppressors (p53, RB) are inactivated. Treatments: surgery, chemotherapy (targets dividing cells), radiation, targeted therapy (imatinib for CML), immunotherapy (checkpoint inhibitors: PD-1/PD-L1, CAR-T cells), hormonal therapy (breast/prostate cancer).",
+    "tags": [
+      "medicine",
+      "cancer",
+      "oncology",
+      "tumor",
+      "treatment",
+      "immunotherapy"
+    ],
+    "importance": 0.87
+  },
+  {
+    "title": "Human Genetics",
+    "body": "Study of human genome: 23 chromosome pairs, ~20,000 protein-coding genes, 3 billion base pairs. Human Genome Project (1990-2003) sequenced the entire genome ($3B). Mendelian inheritance: dominant, recessive, X-linked. Genetic disorders: single gene (cystic fibrosis, Huntington's, sickle cell), chromosomal (Down syndrome), complex (diabetes, heart disease). Technologies: PCR (amplify DNA), DNA sequencing (Sanger, next-gen), CRISPR-Cas9 gene editing (Nobel 2020), GWAS (genome-wide association studies). Personalized medicine tailors treatment to genetic profile.",
+    "tags": [
+      "medicine",
+      "genetics",
+      "DNA",
+      "genome",
+      "inheritance",
+      "CRISPR"
+    ],
+    "importance": 0.85
+  },
+  {
+    "title": "Art: Surrealism",
+    "body": "Surrealism (1920s-1930s) emerged from Dada, exploring the unconscious, dreams, and irrational. Andre Breton's Surrealist Manifesto (1924) defined it as pure psychic automatism. Key painters: Salvador Dali (The Persistence of Memory, melting clocks, paranoiac-critical method), Rene Magritte (The Son of Man, The Treachery of Images - Ceci n'est pas une pipe), Joan Miro (biomorphic abstract forms), Max Ernst (frottage, collage), Yves Tanguy (dream landscapes). Surrealist techniques: automatic drawing, exquisite corpse. Influenced film (Un Chien Andalou by Dali and Bunuel), literature, and advertising.",
+    "tags": [
+      "art",
+      "Surrealism",
+      "Dali",
+      "Magritte",
+      "dreams",
+      "unconscious"
+    ],
+    "importance": 0.84
+  },
+  {
+    "title": "Music: Opera",
+    "body": "Opera combines singing, orchestral music, theater, and visual arts. Originated in Florence c. 1600 (Monteverdi's Orfeo). Key periods: Baroque (Handel, Vivaldi), Classical (Mozart: Marriage of Figaro, Don Giovanni, Magic Flute), Bel canto (Rossini, Donizetti, Bellini), Romantic (Verdi: La Traviata, Aida; Wagner: Ring Cycle, Tristan und Isolde), Verismo (Puccini: La Boheme, Tosca, Madama Butterfly), Modern (Strauss, Berg). Famous voices: Caruso, Callas, Pavarotti. Major houses: La Scala (Milan), Metropolitan Opera (NY), Royal Opera House (London), Sydney Opera House.",
+    "tags": [
+      "music",
+      "opera",
+      "classical",
+      "Verdi",
+      "Wagner",
+      "Mozart"
+    ],
+    "importance": 0.8
+  },
+  {
+    "title": "Ghana Overview",
+    "body": "238,533 km2, 33 million. West African nation, stable democracy. Accra capital. Economy: gold (2nd largest African producer), cocoa (2nd largest), oil (Jubilee field). First sub-Saharan African country to gain independence (1957, Kwame Nkrumah). English official language. Rich culture: kente cloth, Highlife music. Notable: peaceful transitions of power, relatively low corruption. Challenges: debt, cocoa price volatility, illegal gold mining (galamsey).",
+    "tags": [
+      "countries",
+      "Ghana",
+      "Africa",
+      "democracy",
+      "cocoa",
+      "gold"
+    ],
+    "importance": 0.75
+  },
+  {
+    "title": "Kenya Overview",
+    "body": "580,367 km2, 55 million. East African economic hub. Nairobi capital. Economy: agriculture (tea, coffee, flowers), tourism (safari, Maasai Mara), services, fintech (M-Pesa mobile money pioneer). Swahili and English official. Rift Valley (human origins, Olduvai Gorge). Athletics dominance (long-distance runners). Challenges: corruption, drought cycles, infrastructure, terrorism (Al-Shabaab). This knowledge entry provides essential factual information about the subject, including historical context, key developments, and significance in its field.",
+    "tags": [
+      "countries",
+      "Kenya",
+      "Africa",
+      "safari",
+      "tech",
+      "athletics"
+    ],
+    "importance": 0.76
+  },
+  {
+    "title": "Behavioral Economics",
+    "body": "Behavioral economics integrates psychology into economics, challenging the rational actor model. Daniel Kahneman and Amos Tversky pioneered prospect theory: people value gains and losses asymmetrically (loss aversion), overweight small probabilities, and use mental shortcuts (heuristics) leading to systematic biases. Nudge theory (Thaler and Sunstein) shows how choice architecture influences decisions. Key biases: anchoring, confirmation, availability, framing, status quo, sunk cost. Behavioral economics transformed public policy (organ donation opt-out, retirement savings auto-enrollment). Kahneman Nobel 2002, Thaler Nobel 2017.",
+    "tags": [
+      "economics",
+      "psychology",
+      "behavioral",
+      "decision-making",
+      "Nobel"
+    ],
+    "importance": 0.84
+  }
+]

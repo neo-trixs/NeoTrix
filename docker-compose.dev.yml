@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  neotrix:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    image: neotrix/neotrix:dev
+    container_name: neotrix-dev
+    ports:
+      - "3000:3000"
+      - "2345:2345"
+    volumes:
+      - neotrix_dev_data:/home/neotrix/.neotrix
+      - ./:/workspace
+      - cargo_registry:/usr/local/cargo/registry
+    environment:
+      - NEOTRIX_PROVIDER=${NEOTRIX_PROVIDER:-openai}
+      - NEOTRIX_API_KEY=${NEOTRIX_API_KEY:-}
+      - NEOTRIX_BASE_URL=${NEOTRIX_BASE_URL:-}
+      - NEOTRIX_MODEL=${NEOTRIX_MODEL:-}
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=1
+    command: ["serve", "--addr", "0.0.0.0:3000"]
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  kb-crawl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    image: neotrix/neotrix:dev
+    container_name: neotrix-kb-crawl-dev
+    volumes:
+      - neotrix_dev_data:/home/neotrix/.neotrix
+      - ./:/workspace
+      - cargo_registry:/usr/local/cargo/registry
+    environment:
+      - NEOTRIX_PROVIDER=${NEOTRIX_PROVIDER:-openai}
+      - NEOTRIX_API_KEY=${NEOTRIX_API_KEY:-}
+      - NEOTRIX_EMBEDDING_API_KEY=${NEOTRIX_EMBEDDING_API_KEY:-}
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=1
+    command: ["daemon", "--evolve"]
+    restart: unless-stopped
+
+volumes:
+  neotrix_dev_data:
+  cargo_registry:

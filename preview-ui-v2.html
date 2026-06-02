@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NeoTrix · 山海经</title>
+<style>
+  :root {
+    /* geometry */
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+
+    /* 山海经 color system — mineral & mythical */
+    --pri: #4ecdc4;     /* 青玉 jade */
+    --pri2: #2a9d8f;    /* 碧玺 tourmaline */
+    --des: #e76f51;     /* 朱砂 cinnabar */
+    --suc: #4ecdc4;     /* 青玉 */
+    --war: #e9c46a;     /* 琥珀 amber */
+
+    /* surfaces — 玄青 deep mountain */
+    --bg-base: #080c18;
+    --bg-surface: #0e1428;
+    --bg-elevated: #161e36;
+    --bg-raised: #1e2844;
+    --bg-glass: rgba(14,20,40,0.78);
+
+    --bd: rgba(255,255,255,0.05);
+    --bd2: rgba(255,255,255,0.09);
+
+    --ghost: rgba(255,255,255,0.04);
+    --ghost-hover: rgba(255,255,255,0.08);
+    --accent-bg: rgba(78,205,196,0.10);
+    --accent-glow: rgba(78,205,196,0.12);
+
+    --blur: blur(28px) saturate(150%);
+    --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+    --shadow-lg: 0 12px 48px rgba(0,0,0,0.4);
+    --shadow-xl: 0 24px 80px rgba(0,0,0,0.5);
+
+    /* typography */
+    --fs-caption: 10px;
+    --fs-small: 11px;
+    --fs-body: 13px;
+    --fs-body-lg: 14px;
+    --fs-heading: 15px;
+    --fs-display: 20px;
+
+    --fw-regular: 400;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+    --fw-bold: 700;
+
+    --lh-tight: 1.3;
+    --lh-normal: 1.5;
+    --lh-loose: 1.55;
+    --lh-code: 1.4;
+
+    /* 山海经 text — 素白 + 烟云 */
+    --tx: #e8e6e0;
+    --tx2: #b0b8ca;
+    --tx3: #7a86a2;
+    --tx-meta: #5a6680;
+
+    --ff: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Noto Sans SC", sans-serif;
+    --fm: "SF Mono", "JetBrains Mono", "Source Code Pro", Menlo, monospace;
+
+    --sw: 220px; --rw: 240px; --th: 34px; --sh: 24px;
+    --tr: 0.2s cubic-bezier(0.22,1,0.36,1);
+  }
+
+  [data-theme="light"] {
+    --pri: #2a9d8f;
+    --pri2: #45c4a0;
+    --des: #c75a3e;
+    --suc: #2a9d8f;
+    --war: #d4a84b;
+
+    --bg-base: #eae4da;
+    --bg-surface: #faf6f0;
+    --bg-elevated: #f2ece2;
+    --bg-raised: #e8e0d4;
+    --bg-glass: rgba(250,246,240,0.82);
+
+    --bd: rgba(0,0,0,0.06);
+    --bd2: rgba(0,0,0,0.10);
+
+    --ghost: rgba(0,0,0,0.04);
+    --ghost-hover: rgba(0,0,0,0.07);
+    --accent-bg: rgba(42,157,143,0.08);
+    --accent-glow: rgba(42,157,143,0.08);
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.08);
+    --shadow-xl: 0 24px 60px rgba(0,0,0,0.10);
+
+    --tx: #1a1822;
+    --tx2: #5a5470;
+    --tx3: #8a849e;
+    --tx-meta: #a8a2ba;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    font-family: var(--ff); font-size: var(--fs-body); font-weight: var(--fw-regular);
+    line-height: var(--lh-loose); color: var(--tx); background: var(--bg-base);
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    display:flex; align-items:center; justify-content:center; padding:14px;
+  }
+  ::selection { background:var(--pri); color:#fff; }
+
+  .bg-depth {
+    position:fixed; inset:0; pointer-events:none; z-index:-1;
+    background:
+      radial-gradient(ellipse 70% 50% at 25% 20%, rgba(78,205,196,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 75% 80%, rgba(42,157,143,0.03) 0%, transparent 50%);
+  }
+  .bg-depth::after {
+    content:''; position:absolute; inset:0; opacity:0.25; z-index:1;
+    background:
+      repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,0.01) 2px,rgba(255,255,255,0.01) 4px);
+  }
+  [data-theme="light"] .bg-depth {
+    background:
+      radial-gradient(ellipse 70% 50% at 25% 20%, rgba(42,157,143,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 75% 80%, rgba(78,205,196,0.03) 0%, transparent 50%);
+  }
+
+  .app {
+    width:1180px; max-width:calc(100vw - 28px);
+    height:760px; max-height:calc(100vh - 28px);
+    display:flex; flex-direction:column;
+    border-radius:var(--r-xl);
+    background: var(--bg-surface);
+    border:1px solid var(--bd);
+    overflow:hidden; position:relative;
+    box-shadow:var(--shadow-lg);
+  }
+
+  /* ===== TITLE BAR ===== */
+  .tb {
+    position:relative; z-index:10; height:var(--th); flex-shrink:0;
+    display:flex; align-items:center; padding:0 12px;
+    background:var(--bg-elevated); border-bottom:1px solid var(--bd);
+  }
+  .tb-l { display:flex; align-items:center; gap:8px; }
+  .tl { display:flex; gap:6px; }
+  .tl-d { width:10px; height:10px; border-radius:50%; }
+  .tl-c { background:#ff5f57; } .tl-m { background:#febc2e; } .tl-x { background:#28c840; }
+  .tb-b {
+    font-size:11px; font-weight:var(--fw-semibold);
+    letter-spacing:-0.2px; color:var(--tx2); margin-left:10px;
+    display:flex; align-items:center; gap:5px;
+  }
+  .tb-b svg { width:14px; height:14px; }
+  .tb-c { flex:1; }
+  .tb-r { display:flex; align-items:center; gap:6px; }
+
+  /* ===== BODY ===== */
+  .ab { flex:1; display:flex; min-height:0; }
+
+  /* ===== SIDEBAR ===== */
+  .sb { width:var(--sw); flex-shrink:0; display:flex; flex-direction:column; background:var(--bg-elevated); border-right:1px solid var(--bd); }
+
+  .sb-h { display:flex; align-items:center; justify-content:space-between; padding:12px 12px 8px; }
+  .sb-h h2 { font-size:var(--fs-small); font-weight:var(--fw-semibold); letter-spacing:0.6px; text-transform:uppercase; color:var(--tx3); }
+  .sb-actions { display:flex; gap:2px; }
+  .sbn {
+    width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+    border-radius:var(--r-sm); border:none; cursor:pointer;
+    background:transparent; color:var(--tx3); transition:var(--tr);
+  }
+  .sbn:hover { background:var(--ghost); color:var(--tx); }
+
+  .sb-config {
+    margin:0 8px 8px; padding:10px 12px;
+    border-radius:var(--r-md);
+    background:var(--accent-bg); border:1px solid transparent;
+    cursor:pointer; transition:var(--tr);
+  }
+  .sb-config:hover { border-color:var(--pri); background:var(--accent-glow); transform:translateY(-1px); }
+  .sb-config-top { display:flex; align-items:center; justify-content:space-between; }
+  .sb-config-label { font-size:var(--fs-small); font-weight:var(--fw-semibold); text-transform:uppercase; letter-spacing:0.5px; color:var(--pri); }
+  .sb-config-status { width:6px; height:6px; border-radius:50%; background:var(--pri); box-shadow:0 0 6px var(--pri); }
+  .sb-config-name { font-size:var(--fs-body); font-weight:var(--fw-medium); color:var(--tx); margin-top:3px; }
+  .sb-config-sub { font-size:var(--fs-small); color:var(--tx3); margin-top:2px; display:flex; align-items:center; gap:6px; }
+
+  .ss { flex:1; overflow-y:auto; padding:4px 8px; }
+  .sg { font-size:var(--fs-caption); font-weight:var(--fw-semibold); text-transform:uppercase; letter-spacing:0.8px; color:var(--tx-meta); padding:10px 8px 4px; }
+  .si {
+    display:flex; align-items:center; gap:8px;
+    padding:7px 8px; border-radius:var(--r-sm);
+    cursor:pointer; transition:var(--tr); margin-bottom:1px;
+  }
+  .si:hover { background:var(--ghost); }
+  .si.on { background:linear-gradient(135deg,var(--pri),var(--pri2)); }
+  .si-ic { width:24px; height:24px; border-radius:var(--r-sm); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .si.on .si-ic { background:rgba(255,255,255,0.2); }
+  .si:not(.on) .si-ic { background:var(--ghost); }
+  .si-n { flex:1; min-width:0; }
+  .si-t { font-size:var(--fs-body); font-weight:var(--fw-medium); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .si.on .si-t,
+  .si.on .si-ic svg,
+  .si.on .si-m { color:#fff; }
+  .si:not(.on) .si-t { color:var(--tx); }
+  .si:not(.on) .si-ic svg { color:var(--tx3); }
+  .si-m { font-size:var(--fs-caption); display:flex; gap:4px; margin-top:2px; font-weight:var(--fw-regular); color:var(--tx-meta); }
+
+  .sf { padding:8px; display:flex; align-items:center; gap:8px; border-top:1px solid var(--bd); background:var(--bg-raised); }
+  .sa {
+    width:22px; height:22px; border-radius:6px;
+    background:linear-gradient(135deg,var(--pri),var(--pri2));
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:var(--fw-bold); flex-shrink:0;
+  }
+  .sa svg { color:#fff; }
+  .su { font-size:var(--fs-body); font-weight:var(--fw-medium); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--tx); }
+  .gear-btn {
+    width:26px; height:26px; display:flex; align-items:center; justify-content:center;
+    border-radius:var(--r-sm); border:none; cursor:pointer;
+    background:transparent; color:var(--tx3); transition:var(--tr);
+  }
+  .gear-btn:hover { background:var(--ghost); color:var(--tx); }
+
+  /* ===== MAIN ===== */
+  .ma { flex:1; display:flex; flex-direction:column; min-width:0; background:var(--bg-surface); position:relative; }
+
+  /* ===== RIGHT PANEL REVEAL BUTTON ===== */
+  .rp-reveal {
+    position:absolute; right:0; top:50%; transform:translateY(-50%);
+    width:20px; height:36px; z-index:5;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:6px 0 0 6px;
+    background:var(--bg-elevated); border:1px solid var(--bd); border-right:none;
+    cursor:pointer; color:var(--tx3); transition:var(--tr);
+  }
+  .rp-reveal:hover { background:var(--ghost-hover); color:var(--pri); width:24px; }
+  .rp-reveal svg { width:12px; height:12px; }
+
+  .ca { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .cs { flex:1; overflow-y:auto; padding:24px 24px 8px; display:flex; flex-direction:column; gap:16px; }
+
+  .msg { display:flex; gap:10px; max-width:78%; animation:fi 0.25s ease-out; }
+  .msg.r { align-self:flex-end; flex-direction:row-reverse; }
+  .msg.l { align-self:flex-start; }
+  .msg.c { align-self:center; }
+
+  .ma2 { width:28px; height:28px; border-radius:8px; flex-shrink:0; display:flex; align-items:center; justify-content:center; margin-top:4px; }
+  .ma2 svg { width:14px; height:14px; }
+  .msg.r .ma2 { background:linear-gradient(135deg,var(--pri),var(--pri2)); }
+  .msg.r .ma2 svg { color:#fff; }
+  .msg.l .ma2 { background:var(--ghost); }
+  .msg.l .ma2 svg { color:var(--pri); }
+
+  .mb { padding:10px 16px; border-radius:var(--r-lg); font-size:var(--fs-body); font-weight:var(--fw-regular); line-height:var(--lh-loose); position:relative; }
+  .msg.r .mb { background:linear-gradient(135deg,var(--pri),#238b7e); color:#fff; }
+  .msg.l .mb { background:var(--bg-elevated); border:1px solid var(--bd); }
+  .mb code { background:rgba(0,0,0,0.15); padding:1px 6px; border-radius:4px; font-family:var(--fm); font-size:var(--fs-small); line-height:var(--lh-code); }
+  .msg.r .mb code { background:rgba(0,0,0,0.15); color:#fff; }
+  .msg.l .mb code { background:var(--bg-raised); color:var(--tx); }
+  .mb p { margin:4px 0; }
+  .mb-t { font-size:var(--fs-caption); font-weight:var(--fw-regular); color:inherit; opacity:0.35; margin-top:4px; }
+  .sc { display:inline-block; width:2px; height:13px; background:var(--pri); animation:bl 0.8s step-end infinite; vertical-align:middle; margin-left:2px; }
+
+  /* ===== INPUT ===== */
+  .ic { padding:10px 16px 14px; border-top:1px solid var(--bd); }
+  .mb2 { display:flex; align-items:center; gap:8px; padding:0 0 8px 2px; }
+
+  .mp {
+    display:flex; align-items:center; gap:5px;
+    padding:4px 12px 4px 8px; border-radius:20px;
+    font-size:var(--fs-small); font-weight:var(--fw-medium);
+    background:var(--accent-bg); border:1px solid transparent;
+    cursor:pointer; transition:var(--tr); color:var(--pri);
+  }
+  .mp:hover { border-color:var(--pri); background:var(--accent-glow); }
+  .mp .d { width:6px; height:6px; border-radius:50%; background:var(--pri); }
+  .mp .ch { margin-left:1px; display:flex; align-items:center; }
+  .mp .ch svg { width:8px; height:8px; }
+
+  .mpr { display:flex; gap:4px; }
+  .mps {
+    padding:3px 12px; border-radius:12px;
+    font-size:var(--fs-caption); font-weight:var(--fw-medium);
+    background:transparent; border:1px solid var(--bd); color:var(--tx3);
+    cursor:pointer; transition:var(--tr);
+  }
+  .mps:hover { background:var(--ghost); border-color:var(--tx3); color:var(--tx); }
+  .mps.on { background:var(--accent-bg); border-color:var(--pri); color:var(--pri); }
+
+  .ib2 {
+    display:flex; align-items:flex-end; gap:8px;
+    padding:4px 4px 4px 16px; border-radius:var(--r-lg);
+    transition:var(--tr); background:var(--bg-elevated); border:1px solid var(--bd);
+    box-shadow:var(--shadow-sm);
+  }
+  .ib2:focus-within { border-color:var(--pri); box-shadow:0 0 0 1px var(--accent-glow), var(--shadow-sm); }
+  .ib2 textarea {
+    flex:1; background:transparent; border:none; outline:none;
+    font-family:var(--ff); font-size:var(--fs-body); line-height:var(--lh-normal);
+    color:var(--tx); resize:none; min-height:20px; max-height:100px; padding:2px 0;
+  }
+  .ib2 textarea::placeholder { color:var(--tx3); }
+
+  .ia { display:flex; align-items:center; gap:1px; flex-shrink:0; }
+  .ib3 {
+    width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    border-radius:7px; border:none; cursor:pointer;
+    background:transparent; color:var(--tx3); transition:var(--tr);
+  }
+  .ib3:hover { background:var(--ghost); color:var(--tx); }
+  .ib3.sd {
+    width:30px; height:30px; border-radius:8px;
+    background:linear-gradient(135deg,var(--pri),var(--pri2));
+    box-shadow:0 2px 6px var(--accent-glow);
+  }
+  .ib3.sd svg { color:#fff; }
+  .ib3.sd:hover { opacity:0.9; transform:scale(1.05); }
+  .ib3.sd:disabled { filter:saturate(0.3); opacity:0.35; cursor:default; transform:none; }
+
+  .st {
+    height:var(--sh); flex-shrink:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px; font-size:var(--fs-small); color:var(--tx3);
+    background:var(--bg-elevated); border-top:1px solid var(--bd);
+  }
+  .st-l, .st-r { display:flex; align-items:center; gap:12px; }
+  .st-s { display:flex; align-items:center; gap:5px; }
+  .st-d { width:5px; height:5px; border-radius:50%; background:var(--pri); box-shadow:0 0 5px var(--pri); }
+  .st-v { width:1px; height:12px; background:var(--bd); }
+  .st-btn {
+    width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+    border-radius:4px; border:none; cursor:pointer;
+    background:transparent; color:var(--tx3); transition:var(--tr);
+  }
+  .st-btn:hover { background:var(--ghost); color:var(--tx); }
+  .st-btn svg { width:12px; height:12px; }
+  .st-btn.on { color:var(--pri); }
+
+  /* ===== RIGHT PANEL ===== */
+  .rp {
+    width:var(--rw); flex-shrink:0; display:flex; flex-direction:column;
+    background:var(--bg-elevated); border-left:1px solid var(--bd);
+    position:relative; overflow:hidden;
+  }
+  .rp.hidden { display:none; }
+  .rh { display:flex; align-items:center; justify-content:space-between; padding:10px 12px 8px; }
+  .rh span { font-size:var(--fs-small); font-weight:var(--fw-semibold); text-transform:uppercase; letter-spacing:0.5px; color:var(--tx3); }
+  .rh-close {
+    width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    border-radius:var(--r-sm); border:none; cursor:pointer;
+    background:transparent; color:var(--tx3); transition:var(--tr);
+  }
+  .rh-close:hover { background:var(--ghost); color:var(--tx); }
+
+  .rt { display:flex; padding:0 8px; gap:2px; }
+  .rtb {
+    flex:1; text-align:center; padding:6px 0;
+    font-size:var(--fs-caption); font-weight:var(--fw-medium);
+    color:var(--tx3); border-radius:6px 6px 0 0;
+    cursor:pointer; transition:var(--tr);
+    border:none; background:transparent;
+  }
+  .rtb:hover { color:var(--tx); background:var(--ghost); }
+  .rtb.on { color:var(--tx); background:var(--bg-surface); border:1px solid var(--bd); border-bottom:1px solid var(--bg-surface); margin-bottom:-1px; }
+  .rbd { flex:1; overflow-y:auto; padding:6px 8px; background:var(--bg-surface); }
+
+  .fi2 { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:4px; font-size:var(--fs-small); cursor:pointer; transition:var(--tr); }
+  .fi2:hover { background:var(--ghost); }
+  .fi2 .fi2c { width:14px; height:14px; flex-shrink:0; }
+  .fi2 .fi2c svg { color:var(--tx3); }
+  .fi2 .fn { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--tx); }
+  .fi2 .fs { font-size:var(--fs-caption); color:var(--tx-meta); }
+
+  /* ===== SETTINGS MODAL ===== */
+  .modal-overlay {
+    position:fixed; inset:0; z-index:200;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.5); backdrop-filter:blur(8px);
+    animation:fo 0.15s ease-out;
+  }
+  .modal-overlay.open { display:flex; }
+
+  .modal {
+    width:740px; max-width:calc(100vw - 60px);
+    max-height:calc(100vh - 60px);
+    display:flex; flex-direction:column;
+    border-radius:var(--r-xl);
+    background:var(--bg-glass);
+    backdrop-filter:var(--blur);
+    border:1px solid var(--bd2);
+    box-shadow:var(--shadow-xl);
+    animation:mo 0.25s ease-out;
+    overflow:hidden;
+  }
+
+  .mh { display:flex; align-items:center; justify-content:space-between; padding:18px 24px; flex-shrink:0; border-bottom:1px solid var(--bd); }
+  .mh h2 { font-size:var(--fs-heading); font-weight:var(--fw-semibold); color:var(--tx); }
+  .mh .close {
+    width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+    border-radius:50%; border:none; cursor:pointer;
+    background:transparent; color:var(--tx3); transition:var(--tr);
+  }
+  .mh .close:hover { background:var(--ghost); color:var(--tx); }
+
+  .mt { display:flex; gap:0; padding:0 24px; flex-shrink:0; }
+  .mtb {
+    padding:9px 18px; font-size:var(--fs-small); font-weight:var(--fw-medium);
+    color:var(--tx3); background:transparent; border:none; cursor:pointer;
+    transition:var(--tr); border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .mtb:hover { color:var(--tx); }
+  .mtb.on { color:var(--pri); border-bottom-color:var(--pri); }
+
+  .mbd { flex:1; overflow-y:auto; padding:20px 24px; }
+
+  .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  .scard { padding:14px; border-radius:var(--r-md); background:var(--ghost); border:1px solid var(--bd); transition:var(--tr); }
+  .scard:hover { background:var(--ghost-hover); }
+  .scard .lbl { font-size:var(--fs-small); font-weight:var(--fw-semibold); color:var(--tx2); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
+  .scard .val { font-size:var(--fs-body-lg); font-weight:var(--fw-medium); color:var(--tx); }
+  .scard .sub { font-size:var(--fs-caption); color:var(--tx-meta); margin-top:2px; }
+
+  .settings-status-row { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .settings-dot { width:8px; height:8px; border-radius:50%; background:var(--pri); box-shadow:0 0 6px var(--pri); }
+  .settings-status-row .lbl { font-size:var(--fs-body); font-weight:var(--fw-medium); color:var(--tx); }
+
+  .settings-section-title { font-size:var(--fs-small); font-weight:var(--fw-semibold); color:var(--tx2); text-transform:uppercase; letter-spacing:0.5px; margin:20px 0 12px; }
+
+  .provider-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px; }
+  .po { text-align:left; padding:10px 12px; border-radius:var(--r-md); border:1px solid var(--bd); font-size:var(--fs-body); cursor:pointer; transition:var(--tr); background:transparent; color:var(--tx3); }
+  .po:hover { border-color:var(--pri); color:var(--tx); background:var(--ghost); }
+  .po.on { border-color:var(--pri); background:var(--accent-bg); color:var(--tx); }
+  .po .nm { font-weight:var(--fw-medium); margin-bottom:2px; }
+  .po .ds { font-size:var(--fs-small); opacity:0.6; }
+
+  .fg { margin-bottom:14px; }
+  .fg label { display:block; font-size:var(--fs-small); font-weight:var(--fw-medium); color:var(--tx2); margin-bottom:5px; }
+  .fi3 { width:100%; padding:7px 10px; font-size:var(--fs-body); border-radius:var(--r-sm); border:1px solid var(--bd); background:var(--bg-elevated); color:var(--tx); outline:none; font-family:var(--ff); transition:var(--tr); }
+  .fi3:focus { border-color:var(--pri); box-shadow:0 0 0 1px var(--accent-glow); }
+
+  .about-section { text-align:center; padding:32px 0; }
+  .about-logo { width:56px; height:56px; border-radius:14px; background:linear-gradient(135deg,var(--pri),var(--pri2)); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; box-shadow:0 8px 24px var(--accent-glow); }
+  .about-version { font-size:var(--fs-display); font-weight:var(--fw-bold); color:var(--tx); }
+  .about-sub { font-size:var(--fs-body); color:var(--tx2); margin-top:4px; font-weight:var(--fw-medium); }
+  .about-details { font-size:var(--fs-small); color:var(--tx3); line-height:2; margin-top:12px; }
+
+  .mfoot { display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:12px 24px; border-top:1px solid var(--bd); flex-shrink:0; }
+  .btn { padding:7px 20px; font-size:var(--fs-small); font-weight:var(--fw-medium); border-radius:var(--r-sm); border:none; cursor:pointer; transition:var(--tr); }
+  .btn-sec { background:var(--ghost); color:var(--tx); }
+  .btn-sec:hover { opacity:0.8; }
+  .btn-pri { background:linear-gradient(135deg,var(--pri),var(--pri2)); color:#fff; }
+  .btn-pri:hover { opacity:0.9; box-shadow:0 4px 16px var(--accent-glow); }
+
+  @keyframes fi { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes bl { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes fo { from{opacity:0} to{opacity:1} }
+  @keyframes mo { from{opacity:0;transform:scale(0.96) translateY(6px)} to{opacity:1;transform:scale(1) translateY(0)} }
+
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--tx-meta); border-radius:4px; transition:var(--tr); }
+  ::-webkit-scrollbar-thumb:hover { background:var(--tx3); }
+
+  .theme-btn {
+    position:fixed; bottom:14px; right:14px; z-index:999;
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--bd); cursor:pointer;
+    transition:var(--tr);
+    background:var(--bg-surface); color:var(--tx);
+    box-shadow:var(--shadow-md);
+  }
+  .theme-btn:hover { transform:scale(1.08); }
+
+  /* ===== UNIFIED SVG ICON ===== */
+  .icon { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .icon-sm { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .icon-xs { width:8px; height:8px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .icon-fill { width:14px; height:14px; fill:currentColor; stroke:none; }
+</style>
+</head>
+<body>
+
+<div class="bg-depth"></div>
+<button class="theme-btn" onclick="toggleTheme()">🌓</button>
+
+<div class="app">
+
+  <!-- TITLE BAR -->
+  <div class="tb">
+    <div class="tb-l">
+      <div class="tl">
+        <div class="tl-d tl-c"></div>
+        <div class="tl-d tl-m"></div>
+        <div class="tl-d tl-x"></div>
+      </div>
+      <div class="tb-b">
+        <!-- NeoTrix logo: mount + river = 山海 -->
+        <svg viewBox="0 0 20 20" width="14" height="14" fill="none">
+          <path d="M3 15l4-8 3 4 4-6 3 10" stroke="var(--pri)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 15h14" stroke="var(--tx3)" stroke-width="0.8" stroke-linecap="round"/>
+          <circle cx="14" cy="7" r="1" fill="var(--pri)" stroke="none"/>
+        </svg>
+        NeoTrix
+      </div>
+    </div>
+    <div class="tb-c"></div>
+    <div class="tb-r"></div>
+  </div>
+
+  <!-- BODY -->
+  <div class="ab">
+
+    <!-- SIDEBAR -->
+    <div class="sb">
+      <div class="sb-h">
+        <h2>会话</h2>
+        <div class="sb-actions">
+          <button class="sbn" onclick="addSession()">
+            <svg class="icon-sm" viewBox="0 0 12 12"><path d="M6 2v8M2 6h8"/></svg>
+          </button>
+          <button class="sbn">
+            <svg class="icon-sm" viewBox="0 0 12 12"><circle cx="6" cy="3" r="0.8" fill="currentColor" stroke="none"/><circle cx="6" cy="6" r="0.8" fill="currentColor" stroke="none"/><circle cx="6" cy="9" r="0.8" fill="currentColor" stroke="none"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="sb-config" onclick="openSettings()" title="点击配置 Provider / 模型">
+        <div class="sb-config-top">
+          <span class="sb-config-label">推理引擎</span>
+          <span class="sb-config-status"></span>
+        </div>
+        <div class="sb-config-name">Local · MiniCPM5-1B</div>
+        <div class="sb-config-sub">
+          <span>26.4 tk/s</span> · <span>上下文 2048</span> · <span>656 MB</span>
+        </div>
+      </div>
+
+      <div class="ss">
+        <div class="sg">今天</div>
+        <div class="si on" onclick="selectSession(this,0)">
+          <div class="si-ic"><svg class="icon" viewBox="0 0 14 14"><path d="M2 4h4l1.5-1.5H11a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg></div>
+          <div class="si-n"><div class="si-t">前端 UI 重构</div><div class="si-m">12 条</div></div>
+        </div>
+        <div class="si" onclick="selectSession(this,1)">
+          <div class="si-ic"><svg class="icon" viewBox="0 0 14 14"><circle cx="7" cy="7" r="3"/><path d="M7 2v1M7 11v1M2 7h1M11 7h1"/></svg></div>
+          <div class="si-n"><div class="si-t">Capability 迭代</div><div class="si-m">8 条</div></div>
+        </div>
+        <div class="sg">上周</div>
+        <div class="si" onclick="selectSession(this,2)">
+          <div class="si-ic"><svg class="icon" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1.5"/><path d="M4.5 5h5M4.5 7.5h5M4.5 10h3"/></svg></div>
+          <div class="si-n"><div class="si-t">MCP 工具集成</div><div class="si-m">23 条</div></div>
+        </div>
+        <div class="si" onclick="selectSession(this,3)">
+          <div class="si-ic"><svg class="icon" viewBox="0 0 14 14"><rect x="3" y="6" width="8" height="6" rx="1.2"/><path d="M5 6V4.5a2 2 0 014 0V6"/></svg></div>
+          <div class="si-n"><div class="si-t">知识超立方体</div><div class="si-m">15 条</div></div>
+        </div>
+        <div class="sg">归档</div>
+        <div class="si" onclick="selectSession(this,4)">
+          <div class="si-ic"><svg class="icon" viewBox="0 0 14 14"><path d="M1.5 4.5h11l-1.5 8H3L1.5 4.5z"/><path d="M3.5 4.5V3a1.5 1.5 0 013 0v1.5"/></svg></div>
+          <div class="si-n"><div class="si-t">SEAL 循环优化</div><div class="si-m">6 条</div></div>
+        </div>
+        <div class="si" onclick="selectSession(this,5)">
+          <div class="si-ic"><svg class="icon" viewBox="0 0 14 14"><circle cx="7" cy="5" r="2.8"/><path d="M2.5 12a4.5 4.5 0 019 0"/></svg></div>
+          <div class="si-n"><div class="si-t">Agent 系统设计</div><div class="si-m">10 条</div></div>
+        </div>
+      </div>
+
+      <div class="sf">
+        <div class="sa"><svg class="icon-fill" viewBox="0 0 14 14"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 13a5 5 0 0110 0"/></svg></div>
+        <span class="su">Neo</span>
+        <button class="gear-btn" onclick="openSettings()" title="设置">
+          <svg class="icon" viewBox="0 0 14 14">
+            <circle cx="7" cy="7" r="2"/>
+            <path d="M7 1.5v1M7 11.5v1M1.5 7h1M11.5 7h1M3 3l.7.7M10.3 10.3l.7.7M3 10.5l.7-.7M10.3 3.5l.7.7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="ma">
+
+      <!-- RIGHT PANEL REVEAL -->
+      <button class="rp-reveal" id="rpReveal" onclick="toggleRight()" title="打开文件面板" style="display:none">
+        <svg class="icon-sm" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg>
+      </button>
+
+      <!-- CHAT -->
+      <div class="ca">
+        <div class="cs" id="chatScroll">
+          <div class="msg c" style="max-width:none">
+            <div class="mb" style="background:var(--accent-bg);font-size:var(--fs-small);padding:4px 14px;border-radius:20px;border:none;color:var(--pri);font-weight:var(--fw-medium)">✨ NeoTrix v0.6 — 新 UI 上线</div>
+          </div>
+          <div class="msg l">
+            <div class="ma2"><svg class="icon" viewBox="0 0 14 14"><rect x="2" y="3.5" width="10" height="7.5" rx="1.5"/><circle cx="7" cy="7" r="1.4"/><path d="M4.5 11v1h5v-1"/></svg></div>
+            <div class="mb">
+              <p>你好，我是 NeoTrix — 具备自主进化能力的 AI 编程助手。</p>
+              <p>当前模式：<strong>Local GGUF</strong> (MiniCPM5-1B @ 26.4 tk/s)</p>
+              <p>我可以：</p>
+              <p>• 代码审查与分析<br>• 知识吸收与模式学习<br>• SEAL 自我进化循环<br>• 工具调用 (终端/MCP)</p>
+              <div class="mb-t">15:23</div>
+            </div>
+          </div>
+          <div class="msg r">
+            <div class="ma2"><svg class="icon" viewBox="0 0 14 14"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 13a5 5 0 0110 0"/></svg></div>
+            <div class="mb">审查项目文件结构<div class="mb-t">15:24</div></div>
+          </div>
+          <div class="msg l">
+            <div class="ma2"><svg class="icon" viewBox="0 0 14 14"><rect x="2" y="3.5" width="10" height="7.5" rx="1.5"/><circle cx="7" cy="7" r="1.4"/><path d="M4.5 11v1h5v-1"/></svg></div>
+            <div class="mb">已扫描项目结构。CapabilityVector 当前 22 维，检测到 <code>social/</code> 和 <code>telegram/</code> 模块有未使用字段 warning。<div class="mb-t">15:24</div></div>
+          </div>
+          <div class="msg r">
+            <div class="ma2"><svg class="icon" viewBox="0 0 14 14"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 13a5 5 0 0110 0"/></svg></div>
+            <div class="mb">运行 SEAL 循环优化知识图谱<div class="mb-t">15:25</div></div>
+          </div>
+          <div class="msg l">
+            <div class="ma2"><svg class="icon" viewBox="0 0 14 14"><rect x="2" y="3.5" width="10" height="7.5" rx="1.5"/><circle cx="7" cy="7" r="1.4"/><path d="M4.5 11v1h5v-1"/></svg></div>
+            <div class="mb">SEAL 循环完成。1 次外部奖励 +0.12，策略: oscillation→direct→heuristic，Capability 总和 11.842→11.954<span class="sc"></span><div class="mb-t">15:26</div></div>
+          </div>
+        </div>
+
+        <!-- INPUT -->
+        <div class="ic">
+          <div class="mb2">
+            <div class="mp" onclick="openSettings()" title="点击切换 Provider / 模型">
+              <span class="d"></span>
+              Local · MiniCPM5-1B
+              <span class="ch"><svg class="icon-xs" viewBox="0 0 8 8"><path d="M2 3l2 2 2-2"/></svg></span>
+            </div>
+            <div class="mpr">
+              <span class="mps on">对话</span>
+              <span class="mps">代码</span>
+              <span class="mps">审查</span>
+            </div>
+          </div>
+          <div class="ib2">
+            <textarea id="chatInput" rows="1" placeholder="输入消息…" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+            <div class="ia">
+              <button class="ib3">
+                <svg class="icon" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="2"/><path d="M5.5 7l1.5 1.5L9 6"/></svg>
+              </button>
+              <button class="ib3 sd" id="sendBtn" onclick="sendMsg()" disabled>
+                <svg class="icon" viewBox="0 0 14 14"><path d="M2 7h10M8 3.5L11.5 7 8 10.5"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATUSBAR -->
+      <div class="st">
+        <div class="st-l">
+          <div class="st-s"><span class="st-d"></span> 就绪</div>
+          <div class="st-v"></div>
+          <span>26.4 tk/s</span>
+          <div class="st-v"></div>
+          <span>会话 2/4</span>
+        </div>
+        <div class="st-r">
+          <button class="st-btn" title="终端">
+            <svg class="icon-sm" viewBox="0 0 12 12"><path d="M2.5 3.5l4 4-4 4"/><path d="M7.5 9.5h3"/></svg>
+          </button>
+          <button class="st-btn on" id="rpToggle" onclick="toggleRight()" title="文件面板">
+            <svg class="icon-sm" viewBox="0 0 12 12"><path d="M2 3.5h3.5l1-1H9.5a1 1 0 011 1v4a1 1 0 01-1 1H2.5a1 1 0 01-1-1V4.5a1 1 0 011-1z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="rp" id="rightPanel">
+      <div class="rh">
+        <span>文件</span>
+        <button class="rh-close" onclick="toggleRight()" title="关闭面板">
+          <svg class="icon-sm" viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+        </button>
+      </div>
+      <div class="rt">
+        <button class="rtb on" onclick="switchTab(this,'files')">项目</button>
+        <button class="rtb" onclick="switchTab(this,'knowledge')">知识</button>
+        <button class="rtb" onclick="switchTab(this,'processes')">进程</button>
+      </div>
+      <div class="rbd">
+        <div class="fi2"><span class="fi2c"><svg class="icon-sm" viewBox="0 0 12 12"><path d="M7 1.5H3.5a1 1 0 00-1 1v7a1 1 0 001 1h5a1 1 0 001-1V4L7 1.5z"/></svg></span><span class="fn">App.tsx</span><span class="fs">12 KB</span></div>
+        <div class="fi2"><span class="fi2c"><svg class="icon-sm" viewBox="0 0 12 12"><path d="M7 1.5H3.5a1 1 0 00-1 1v7a1 1 0 001 1h5a1 1 0 001-1V4L7 1.5z"/></svg></span><span class="fn">ChatPanel.tsx</span><span class="fs">3.2 KB</span></div>
+        <div class="fi2"><span class="fi2c"><svg class="icon-sm" viewBox="0 0 12 12"><path d="M7 1.5H3.5a1 1 0 00-1 1v7a1 1 0 001 1h5a1 1 0 001-1V4L7 1.5z"/></svg></span><span class="fn">store.ts</span><span class="fs">4.7 KB</span></div>
+        <div style="margin:10px 0 2px;border-top:1px solid var(--bd);padding-top:5px">
+          <div class="fi2"><span class="fi2c"><svg class="icon-sm" viewBox="0 0 12 12"><path d="M1.5 4h3.5l1-1h3.5a1 1 0 011 1v4a1 1 0 01-1 1H2.5a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg></span><span class="fn" style="font-weight:var(--fw-medium)">components/</span></div>
+          <div class="fi2" style="padding-left:14px"><span class="fn">ui/button.tsx</span></div>
+          <div class="fi2" style="padding-left:14px"><span class="fn">ui/dialog.tsx</span></div>
+          <div class="fi2" style="padding-left:14px"><span class="fn">SessionList.tsx</span></div>
+          <div class="fi2" style="padding-left:14px"><span class="fn">InputPanel.tsx</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /ab -->
+</div><!-- /app -->
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="mh">
+      <h2>设置</h2>
+      <button class="close" onclick="closeSettings()">
+        <svg class="icon" viewBox="0 0 14 14"><path d="M3 3l8 8M11 3l-8 8"/></svg>
+      </button>
+    </div>
+
+    <div class="mt">
+      <button class="mtb on" onclick="switchSettingsTab(this,'tab1')">引擎状态</button>
+      <button class="mtb" onclick="switchSettingsTab(this,'tab2')">模型管理</button>
+      <button class="mtb" onclick="switchSettingsTab(this,'tab3')">Provider</button>
+      <button class="mtb" onclick="switchSettingsTab(this,'tab4')">系统设置</button>
+      <button class="mtb" onclick="switchSettingsTab(this,'tab5')">关于</button>
+    </div>
+
+    <div class="mbd">
+      <div id="tab1" class="stab">
+        <div class="settings-status-row"><span class="settings-dot"></span><span class="lbl">引擎运行中</span></div>
+        <div class="settings-grid">
+          <div class="scard"><div class="lbl">Provider</div><div class="val">Local GGUF</div></div>
+          <div class="scard"><div class="lbl">模型</div><div class="val">MiniCPM5-1B-Q4_K_M</div></div>
+          <div class="scard"><div class="lbl">运行时间</div><div class="val">12m</div></div>
+          <div class="scard"><div class="lbl">推理速度</div><div class="val">26.4 tk/s</div></div>
+          <div class="scard"><div class="lbl">内存占用</div><div class="val">1.2 GB</div></div>
+          <div class="scard"><div class="lbl">上下文</div><div class="val">2048 / 4096</div></div>
+        </div>
+        <div class="scard" style="padding:12px">
+          <div style="display:flex;justify-content:space-between;font-size:var(--fs-small);color:var(--tx3);margin-bottom:6px"><span>缓存利用率</span><span>67%</span></div>
+          <div style="height:6px;background:var(--ghost);border-radius:3px;overflow:hidden"><div style="height:100%;width:67%;background:linear-gradient(90deg,var(--pri),var(--pri2));border-radius:3px;transition:width 0.3s"></div></div>
+        </div>
+      </div>
+
+      <div id="tab2" class="stab" style="display:none">
+        <div class="settings-section-title">已下载模型</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:var(--r-sm);background:var(--ghost);border:1px solid var(--bd);margin-bottom:8px">
+          <div>
+            <div style="font-size:var(--fs-body);font-weight:var(--fw-medium);color:var(--tx)">minicpm5-1b-Q4_K_M.gguf</div>
+            <div style="font-size:var(--fs-small);color:var(--tx3)">656 MB · Q4_K_M</div>
+          </div>
+          <span style="padding:3px 8px;border-radius:4px;font-size:var(--fs-caption);font-weight:var(--fw-medium);background:rgba(78,205,196,0.12);color:var(--pri)">使用中</span>
+        </div>
+        <button style="padding:7px 14px;border-radius:var(--r-sm);border:1px dashed var(--bd);background:transparent;color:var(--pri);font-size:var(--fs-small);cursor:pointer;width:100%;transition:var(--tr);font-weight:var(--fw-medium)">+ 从 HuggingFace 下载</button>
+      </div>
+
+      <div id="tab3" class="stab" style="display:none">
+        <div class="settings-section-title">选择 Provider</div>
+        <div class="provider-grid">
+          <button class="po on"><div class="nm">Local GGUF</div><div class="ds">本地模型 (llama-server)</div></button>
+          <button class="po"><div class="nm">Ollama</div><div class="ds">本地 Ollama 服务</div></button>
+          <button class="po"><div class="nm">Omlx</div><div class="ds">Apple Silicon 加速</div></button>
+          <button class="po"><div class="nm">OpenAI</div><div class="ds">GPT-4o / GPT-4</div></button>
+          <button class="po"><div class="nm">Anthropic</div><div class="ds">Claude Sonnet / Haiku</div></button>
+          <button class="po"><div class="nm">Gemini</div><div class="ds">Google Gemini</div></button>
+        </div>
+        <div class="fg"><label>模型名称</label><input class="fi3" value="Abiray/MiniCPM5-1B-GGUF" /></div>
+        <div class="fg" style="opacity:0.4;pointer-events:none"><label>API Key</label><input class="fi3" type="password" placeholder="sk-...（本地模型不需要）" disabled /></div>
+        <div class="fg"><label>Base URL</label><input class="fi3" placeholder="http://localhost:8088" /></div>
+      </div>
+
+      <div id="tab4" class="stab" style="display:none">
+        <div class="settings-grid">
+          <div class="scard"><div class="lbl">主题</div><div class="val">暗色</div><div class="sub">点击右下角 🌓 切换</div></div>
+          <div class="scard"><div class="lbl">字号</div><div class="val">13px</div><div class="sub">对话区域</div></div>
+          <div class="scard"><div class="lbl">语言</div><div class="val">中文</div></div>
+          <div class="scard"><div class="lbl">自动保存</div><div class="val">已开启</div></div>
+          <div class="scard"><div class="lbl">最多会话</div><div class="val">20</div></div>
+          <div class="scard"><div class="lbl">终端路径</div><div class="val" style="font-family:var(--fm);font-size:var(--fs-small)">/bin/zsh</div></div>
+        </div>
+      </div>
+
+      <div id="tab5" class="stab" style="display:none">
+        <div class="about-section">
+          <div class="about-logo">
+            <svg viewBox="0 0 20 20" width="28" height="28" fill="none">
+              <path d="M4 15l4-8 3 4 4-6 3 10" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 15h14" stroke="#fff" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/>
+              <circle cx="14" cy="7" r="1" fill="#fff" stroke="none"/>
+            </svg>
+          </div>
+          <div class="about-version">NeoTrix v0.6.0</div>
+          <div class="about-sub">自主进化 AI 编程助手</div>
+          <div class="about-details">Rust + React + Tauri · SEAL 自迭代引擎<br>ReasoningBrain · CapabilityVector · 本地 GGUF 推理<br>Knowledge Hypercube · Consciousness Workspace</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mfoot">
+      <button class="btn btn-sec" onclick="closeSettings()">取消</button>
+      <button class="btn btn-pri">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let sessionIdx=0;
+  function selectSession(el,idx){
+    document.querySelectorAll('.si').forEach(s=>s.classList.remove('on'));
+    el.classList.add('on');sessionIdx=idx;
+  }
+  function addSession(){
+    const n=document.createElement('div');
+    n.className='si';n.setAttribute('onclick','selectSession(this,'+(document.querySelectorAll('.si').length)+')');
+    n.innerHTML='<div class="si-ic"><svg class="icon" viewBox="0 0 14 14"><path d="M2 4h4l1.5-1.5H11a1 1 0 011 1v6a1 1 0 01-1 1H3a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg></div><div class="si-n"><div class="si-t">新会话</div><div class="si-m">0 条</div></div>';
+    document.querySelector('.ss').appendChild(n);
+    n.click();
+  }
+  function autoResize(el){
+    el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';
+    document.getElementById('sendBtn').disabled=!el.value.trim();
+  }
+  function handleKey(e){
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}
+  }
+  function sendMsg(){
+    const inp=document.getElementById('chatInput');
+    const txt=inp.value.trim();if(!txt)return;
+    const s=document.getElementById('chatScroll');
+    const d=new Date();const t=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const u=document.createElement('div');u.className='msg r';
+    u.innerHTML=`<div class="ma2"><svg class="icon" viewBox="0 0 14 14"><circle cx="7" cy="4.5" r="2.5"/><path d="M2 13a5 5 0 0110 0"/></svg></div><div class="mb">${txt.replace(/\n/g,'<br>')}<div class="mb-t">${t}</div></div>`;
+    s.appendChild(u);inp.value='';inp.style.height='auto';
+    document.getElementById('sendBtn').disabled=true;s.scrollTop=s.scrollHeight;
+    setTimeout(()=>{
+      const a=document.createElement('div');a.className='msg l';
+      a.innerHTML=`<div class="ma2"><svg class="icon" viewBox="0 0 14 14"><rect x="2" y="3.5" width="10" height="7.5" rx="1.5"/><circle cx="7" cy="7" r="1.4"/><path d="M4.5 11v1h5v-1"/></svg></div><div class="mb">收到，正在处理…<span class="sc"></span><div class="mb-t">${t}</div></div>`;
+      s.appendChild(a);s.scrollTop=s.scrollHeight;
+    },600);
+  }
+  function toggleTheme(){
+    const h=document.documentElement;
+    h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');
+  }
+  function toggleRight(){
+    const rp=document.getElementById('rightPanel');
+    const rev=document.getElementById('rpReveal');
+    const btn=document.getElementById('rpToggle');
+    const h=rp.classList.contains('hidden');
+    rp.classList.toggle('hidden');
+    rev.style.display=h?'none':'';
+    btn.classList.toggle('on',h);
+  }
+  function switchTab(btn,tabId){
+    document.querySelectorAll('.rtb').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  function openSettings(){
+    document.getElementById('settingsModal').classList.add('open');
+  }
+  function closeSettings(){
+    document.getElementById('settingsModal').classList.remove('open');
+  }
+  function switchSettingsTab(btn,tabId){
+    document.querySelectorAll('.mtb').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.querySelectorAll('.stab').forEach(t=>t.style.display='none');
+    document.getElementById(tabId).style.display='';
+  }
+  document.addEventListener('click',function(e){
+    const m=document.getElementById('settingsModal');
+    if(m.classList.contains('open')&&e.target===m)closeSettings();
+  });
+</script>
+</body>
+</html>

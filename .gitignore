@@ -1,0 +1,12 @@
+target/
+Cargo.lock
+.DS_Store
+*.lock
+node_modules/
+dist/
+notes/
+sessions/
+.opencode/
+.claude-plugin/
+*.rs.bak.DS_Store
+models/
