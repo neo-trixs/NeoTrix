@@ -141,6 +141,46 @@ pub fn reset_stuck_items(conn: &Connection) -> Result<usize, String> {
     ).map_err(|e| format!("Reset stuck error: {}", e))
 }
 
+pub fn purge_all_skip_patterns(conn: &Connection) -> Result<usize, String> {
+    let mut total = 0usize;
+    let urls: Vec<(String, String)> = conn
+        .prepare("SELECT id, url FROM crawl_queue WHERE status='pending'")
+        .map_err(|e| format!("Prepare error: {}", e))?
+        .query_map([], |row| {
+            let id: String = row.get(0)?;
+            let url: String = row.get(1)?;
+            Ok((id, url))
+        })
+        .map_err(|e| format!("Query error: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut batch: Vec<String> = Vec::new();
+    for (id, url) in &urls {
+        if skip_url(url) {
+            batch.push(id.clone());
+            if batch.len() >= 500 {
+                let placeholders: Vec<String> = batch.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+                let sql = format!("DELETE FROM crawl_queue WHERE id IN ({})", placeholders.join(","));
+                let mut stmt = conn.prepare(&sql).map_err(|e| format!("Prepare batch: {}", e))?;
+                let params: Vec<&dyn rusqlite::types::ToSql> = batch.iter().map(|s| s as &dyn rusqlite::types::ToSql).collect();
+                let n = stmt.execute(params.as_slice()).map_err(|e| format!("Delete batch: {}", e))?;
+                total += n;
+                batch.clear();
+            }
+        }
+    }
+    if !batch.is_empty() {
+        let placeholders: Vec<String> = batch.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let sql = format!("DELETE FROM crawl_queue WHERE id IN ({})", placeholders.join(","));
+        let mut stmt = conn.prepare(&sql).map_err(|e| format!("Prepare batch: {}", e))?;
+        let params: Vec<&dyn rusqlite::types::ToSql> = batch.iter().map(|s| s as &dyn rusqlite::types::ToSql).collect();
+        let n = stmt.execute(params.as_slice()).map_err(|e| format!("Delete batch: {}", e))?;
+        total += n;
+    }
+    Ok(total)
+}
+
 pub fn purge_skip_domains(conn: &Connection) -> Result<usize, String> {
     let mut total = 0;
     for d in &["doi.org", "dx.doi.org", "worldcat.org", "d-nb.info", "openlibrary.org",
@@ -167,8 +207,7 @@ pub fn validate_urls_parallel(
         .query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0))
         .unwrap_or(0);
     if count == 0 { return Ok((0, 0)); }
-    let max_batch = (count as usize).min(5000);
-    let items = store::claim_crawl_urls_batch(main_conn, max_batch)
+    let items = store::claim_crawl_urls_batch(main_conn, count as usize)
         .map_err(|e| format!("Claim error: {}", e))?;
     if items.is_empty() { return Ok((0, 0)); }
     let alive = Arc::new(AtomicUsize::new(0));

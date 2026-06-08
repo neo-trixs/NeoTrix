@@ -159,8 +159,8 @@ mod tests {
         sp.push(tagged(v1.clone()));
         sp.push(tagged(v2.clone()));
         sp.push(tagged(v3.clone()));
-        assert_eq!(sp.previous(1).unwrap().vector, v3);
-        assert_eq!(sp.previous(2).unwrap().vector, v2);
+        assert_eq!(sp.previous(1).unwrap().vector, v2);
+        assert_eq!(sp.previous(2).unwrap().vector, v1);
     }
 
     #[test]

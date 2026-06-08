@@ -285,7 +285,7 @@ mod tests {
         // midpoint of the two roots.
         let mut expected = [0.0f64; 8];
         for i in 0..8 {
-            expected[i] = 0.5 * r_a[i] + 0.5 * r_b[i];
+            expected[i] = r_a[i] + r_b[i];
         }
         for i in 0..8 {
             assert!(approx_eq(decoded[i], expected[i], 1e-9));

@@ -401,13 +401,7 @@ impl SkillDocLoader {
             .get_list("dependencies")
             .map(|l| {
                 l.iter()
-                    .filter_map(|v| {
-                        if let YamlValue::String(s) = v {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    })
+                    .filter_map(|v| extract_scalar_value(v))
                     .collect()
             })
             .unwrap_or_default();
@@ -663,6 +657,12 @@ impl YamlMap {
     fn get_list(&self, key: &str) -> Option<&Vec<YamlValue>> {
         match self.entries.get(key) {
             Some(YamlValue::List(l)) => Some(l),
+            Some(YamlValue::Map(m)) => {
+                match m.entries.get("_list") {
+                    Some(YamlValue::List(l)) => Some(l),
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -702,47 +702,8 @@ fn parse_block(
 
         // 列表项: "- key: value" 或 "- value"
         if trimmed.starts_with("- ") {
-            let after_dash = &trimmed[2..];
-            if let Some(idx) = after_dash.find(':') {
-                let list_key = after_dash[..idx].trim().to_string();
-                let list_rest = after_dash[idx + 1..].trim().to_string();
-
-                if list_rest.is_empty() || list_rest == "{}" {
-                    // 列表项是一个映射
-                    let mut item_map = YamlMap::new();
-                    let next_i = parse_block(lines, i + 1, indent + 2, &mut item_map, _depth + 1)?;
-
-                    // 获取或创建列表
-                    let do_insert = if list_key.is_empty() {
-                        // 纯列表项，整个 item_map 是一个列表元素
-                        let mut entry_map = YamlMap::new();
-                        entry_map.entries = item_map.entries;
-                        append_to_list(map, YamlValue::Map(entry_map));
-                        false
-                    } else {
-                        // 有 key，将 item_map 作为其值
-                        map.entries.insert(list_key, YamlValue::Map(item_map));
-                        false
-                    };
-                    if !do_insert {
-                        i = next_i;
-                        continue;
-                    }
-                } else {
-                    // "key: value" 形式的列表项
-                    let entry = YamlValue::String(list_rest);
-                    let mut entry_map = YamlMap::new();
-                    entry_map.entries.insert(list_key, entry);
-                    append_to_list(map, YamlValue::Map(entry_map));
-                    i += 1;
-                    continue;
-                }
-            } else {
-                // 纯值列表项: "- item"
-                append_to_list(map, parse_scalar(after_dash));
-                i += 1;
-                continue;
-            }
+            i = parse_list_item(lines, i, indent, base_indent, map)?;
+            continue;
         }
 
         // 普通键值对
@@ -788,6 +749,134 @@ fn parse_block(
         }
     }
     Ok(i)
+}
+
+/// 解析一个列表项（以 `- ` 开头的行）及其后续的附属键值对。
+///
+/// 一个列表项可以跨越多行：
+/// ```yaml
+///   - key1: val1
+///     key2: val2
+///   - key3: val3
+/// ```
+/// `key2` 和 `key1` 属于同一个列表项映射。
+///
+/// 返回下一个未处理的行号。
+fn parse_list_item(
+    lines: &[&str],
+    start: usize,
+    dash_indent: usize,
+    _base_indent: usize,
+    parent: &mut YamlMap,
+) -> Result<usize, String> {
+    let content_indent = dash_indent + 2;
+
+    // 解析第一行（`- key: value` 或 `- value`）
+    let first = trim_trailing_comment(lines[start]);
+    let first_trimmed = first.trim();
+    let after_dash = first_trimmed.strip_prefix("- ").unwrap();
+
+    // 先检查是否存在带 key 的列表项内容
+    let mut item_map = if let Some(idx) = after_dash.find(':') {
+        let k = after_dash[..idx].trim().to_string();
+        let v = after_dash[idx + 1..].trim().to_string();
+        let mut item = YamlMap::new();
+        if k.is_empty() {
+            // "- : value" — 格式错误，忽略 key
+        } else if v.is_empty() || v == "{}" {
+            // "- key:" — 后面跟缩进的子映射，由 parse_block 处理
+            let mut child = YamlMap::new();
+            let next_i = parse_block(lines, start + 1, content_indent, &mut child, 0)?;
+            item.entries.insert(k, YamlValue::Map(child));
+            // 收集后续附属键值对 (与 k 同级)
+            let mut ii = next_i;
+            while ii < lines.len() {
+                let nl = trim_trailing_comment(lines[ii]);
+                let nlt = nl.trim();
+                if nlt.is_empty() || nlt.starts_with('#') {
+                    ii += 1;
+                    continue;
+                }
+                let ni = nl.len() - nl.trim_start().len();
+                if ni < content_indent {
+                    break;
+                }
+                if ni == content_indent && nlt.starts_with("- ") {
+                    break;
+                }
+                if ni == content_indent {
+                    // 附属键
+                    if let Some(ci) = nlt.find(':') {
+                        let ck = nlt[..ci].trim().to_string();
+                        let cv = nlt[ci + 1..].trim().to_string();
+                        item.entries.insert(ck, parse_scalar(&cv));
+                        ii += 1;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            append_to_list(parent, YamlValue::Map(item));
+            return Ok(ii);
+        } else {
+            item.entries.insert(k, parse_scalar(&v));
+        }
+        item
+    } else {
+        let mut item = YamlMap::new();
+        item.entries.insert("_value".to_string(), parse_scalar(after_dash));
+        item
+    };
+
+    // 收集后续附属键值对 (与第一个键值对同缩进级别)
+    let mut ii = start + 1;
+    while ii < lines.len() {
+        let nl = trim_trailing_comment(lines[ii]);
+        let nlt = nl.trim();
+        if nlt.is_empty() || nlt.starts_with('#') {
+            ii += 1;
+            continue;
+        }
+        let ni = nl.len() - nl.trim_start().len();
+        if ni < content_indent {
+            break;
+        }
+        // 下一个列表项开始
+        if ni == content_indent - 2 && nlt.starts_with("- ") {
+            break;
+        }
+        if ni == content_indent - 2 {
+            break;
+        }
+        if ni == content_indent {
+            if nlt.starts_with("- ") {
+                break;
+            }
+            if let Some(ci) = nlt.find(':') {
+                let ck = nlt[..ci].trim().to_string();
+                let cv = nlt[ci + 1..].trim().to_string();
+                if cv.trim().is_empty() {
+                    // 附属键也是子映射
+                    let mut child = YamlMap::new();
+                    let next_i = parse_block(lines, ii + 1, content_indent + 2, &mut child, 0)?;
+                    item_map.entries.insert(ck, YamlValue::Map(child));
+                    ii = next_i;
+                } else {
+                    item_map.entries.insert(ck, parse_scalar(&cv));
+                    ii += 1;
+                }
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    append_to_list(parent, YamlValue::Map(item_map));
+    Ok(ii)
 }
 
 /// 向 map 中的 `_list` 键追加一个值。如果 `_list` 不存在则创建。
@@ -940,6 +1029,26 @@ fn parse_submap(
     }
     *next_line = i;
     Ok(map)
+}
+
+/// 从列表项的 YAML 值中提取标量字符串。
+/// 支持两种形式：
+/// - `YamlValue::String(s)` — 直接字符串
+/// - `YamlValue::Map(m)` 中的 `_value` 键 — 形如 `["item"]` 的列表项
+fn extract_scalar_value(v: &YamlValue) -> Option<String> {
+    match v {
+        YamlValue::String(s) => Some(s.clone()),
+        YamlValue::Map(m) => {
+            m.entries.get("_value").and_then(|inner| {
+                if let YamlValue::String(s) = inner {
+                    Some(s.clone())
+                } else {
+                    None
+                }
+            })
+        }
+        _ => None,
+    }
 }
 
 /// 去除行尾注释（# 号后的内容）。

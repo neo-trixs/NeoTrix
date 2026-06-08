@@ -7,6 +7,7 @@ pub mod ios;
 pub use http::start_server;
 pub use ios::{IosAppState, ios_routes};
 pub use ws::{WsBridge, WsBridgeConfig, ImAdapter, TelegramAdapter, WhatsAppAdapter};
+pub mod server_interface;
 
 #[cfg(test)]
 mod tests {
@@ -25,4 +26,3 @@ mod tests {
         assert_eq!(cloned.max_reconnect_attempts, cfg.max_reconnect_attempts);
     }
 }
-pub mod server_interface;

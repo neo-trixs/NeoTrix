@@ -1376,8 +1376,9 @@ mod tests {
             "hypercube_optimize",
             "e8_experiment",
             "epoch_slow_update", "nt_shield_scan", "session_distill", "conversation_distill", "aging_diagnosis", "embedding_refresh",
+            "spectral_monitor",
             "trajectory_collect", "coach_and_update",
-        ], "SEAL pipeline 应有 30 个 stage");
+        ], "SEAL pipeline 应有 31 个 stage");
     }
 
     #[test]

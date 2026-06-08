@@ -1,9 +1,9 @@
 # NeoTrix — 进化路线图
 
-> 最后更新: 2026-06-08 (Phase 0 · Unified Ingestion Framework 完成)
+> 最后更新: 2026-06-08 (Phase 0 · 意识基础子系统完成)
 > 编译: `cargo check --lib -p neotrix` ✅ (0 errors)
-> 测试: **4027 passed · 11 pre-existing fails** (mappa-integration branch baseline)
-> 当前阶段: **Phase 0 — 表征统一 + 边界建立** ✅
+> 测试: **4143 passed · 13 pre-existing fails**
+> 当前阶段: **Phase 0 — 表征统一 + 边界建立** ✅ (所有 12 项完成)
 
 ---
 
@@ -23,20 +23,37 @@
 
 ---
 
-## ✅ Phase 0 — 完成交付
+## ✅ Phase 0 — 完成交付 (12 项)
 
-| 子项 | 文件 | 状态 |
+### VSA 升级
+
+| 子项 | 文件 | 测试 |
 |------|------|------|
-| IngestionCore + SourceType 7 变体 | `nt_mind_ingestion/mod.rs` | ✅ |
-| IngestionPipeline 特质 + auto_detect_type | `nt_mind_ingestion/mod.rs` | ✅ |
-| ReflectionLoop + QualityMonitor 引擎 | `nt_mind_ingestion/reflection_loop.rs` | ✅ |
-| BookPipeline 9步参考实现 | `nt_mind_ingestion/book_pipeline.rs` | ✅ |
-| PaperPipeline 8步梗 | `nt_mind_ingestion/paper_pipeline.rs` | ✅ |
-| IngestionStage (BrainStage impl, frequency=3) | `nt_mind_ingestion/integration_stage.rs` | ✅ |
-| GWT broadcast + KB 持久化 | `nt_mind_ingestion/integration_stage.rs` | ✅ |
-| 11 单元测试 | `nt_mind_ingestion/mod.rs` tests | ✅ |
-| 编译修复 (agent/tools + mcp + sigreg) | 多文件 | ✅ |
-| 会话日志 | `notes/session-logs/2026-06-08-phase0-ingestion-framework.md` | ✅ |
+| QuantizedVSA (u8, 4096 维, 汉明距离) | `core/nt_core_hcube/vsa_quantized.rs` | 16 ✅ |
+| VsaTag (自身/世界边界) | `core/nt_core_consciousness/vsa_tag.rs` | 6 ✅ |
+| FirstPersonRef (自指根向量) | `core/nt_core_consciousness/first_person_ref.rs` | 6 ✅ |
+
+### 时间意识
+
+| 子项 | 文件 | 测试 |
+|------|------|------|
+| SpeciousPresent (3–5 步时间厚度) | `core/nt_core_consciousness/specious_present.rs` | 10 ✅ |
+| ConsciousnessStream (1024 步环形缓冲区) | `core/nt_core_consciousness/stream_buffer.rs` | 15 ✅ |
+
+### 诞生与行动
+
+| 子项 | 文件 | 测试 |
+|------|------|------|
+| ConsciousnessAwakening (7 步自举) | `core/nt_core_consciousness/awakening.rs` | 7 ✅ |
+| VolitionEngine (候选→预测→选择) | `core/nt_core_consciousness/volition.rs` | 9 ✅ |
+| InnerCritic (输出质量门控) | `core/nt_core_consciousness/inner_critic.rs` | 9 ✅ |
+
+### 资源与监控
+
+| 子项 | 文件 | 测试 |
+|------|------|------|
+| CognitiveLoadMonitor (快/平衡/深模式) | `core/nt_core_consciousness/cognitive_load.rs` | 8 ✅ |
+| ResourcePool (Hot/Warm/Cold) | `core/nt_core_consciousness/resource_pool.rs` | 9 ✅ |
 
 ---
 
@@ -119,22 +136,42 @@
 ## 📊 编译状态
 
 ```
-mappa-integration branch (2026-06-08)
+HEAD (2026-06-08, Phase 0 consciousness foundations)
 ├── cargo check --lib -p neotrix    ✅ 0 errors
-├── cargo test --lib -p neotrix     4027 passed · 11 pre-existing fails
-├── nt_mind_ingestion tests         11/11 ✅
+├── cargo test --lib -p neotrix     4143 passed · 13 pre-existing fails
+├── vsa_quantized tests             16/16 ✅
+├── nt_core_consciousness tests     80/80 ✅
 └── pre-existing failures           geometry_sync(2) e8_lattice(1) octonion(1)
-                                    sigreg(2) project_manager(1) mcp_discovery(3)
-                                    parallel_executor(1)
+                                    project_manager(2) mcp_discovery(2)
+                                    parallel_executor(1) self_iterating(1)
+                                    skill_docs(3)
+```
+
+### 预存失败详情 (非本次引入)
+
+```
+core::nt_core_gwt::geometry_sync::test_geometry_sync_default_is_not_in_flow
+core::nt_core_gwt::geometry_sync::test_resonator_step_monotone_with_strong_coupling
+core::nt_core_hcube::e8_lattice::encode_decode_roundtrip_preserves_direction
+core::nt_core_hcube::octonion::norm_preserved_under_multiplication
+neotrix::nt_act_project_manager::test_git_list_branches
+neotrix::nt_act_project_manager::test_git_switch_branch
+neotrix::nt_agent_mcp_discovery::test_auto_register_all_returns_entries
+neotrix::nt_agent_mcp_discovery::test_version_extraction
+neotrix::nt_core_parallel::executor::test_execute_shell_echo
+neotrix::nt_mind::self_iterating::pipeline::test_pipeline_stages_order
+neotrix::nt_mind_ingestion::skill_docs::test_e8_mode_invalid_hexagram
+neotrix::nt_mind_ingestion::skill_docs::test_parse_skill_file
+neotrix::nt_mind_ingestion::skill_docs::test_vsa_tag_domain_validation
 ```
 
 ## 📂 关键文件
 
 | 路径 | 说明 |
 |------|------|
-| `neotrix-core/src/neotrix/nt_mind_ingestion/` | Phase 0 交付 (5 files) |
-| `neotrix-core/src/neotrix/nt_mind/self_iterating/pipeline.rs` | BrainStage trait + seal_pipeline (34 stages) |
-| `neotrix-core/src/neotrix/nt_mind/self_iterating/loop_impl/core.rs` | SelfIteratingBrain |
-| `ARCHITECTURE-EVOLUTION.md` | 7阶段架构进化计划 |
-| `AGENTS.md` | 意识体行为规范 |
-| `notes/session-logs/` | 会话日志归档 |
+| `core/nt_core_hcube/vsa_quantized.rs` | u8 VSA 后端 (4096 维) |
+| `core/nt_core_consciousness/` | 10 个意识基础子系统 |
+| `core/nt_core_consciousness/mod.rs` | 公共重导出 |
+| `DESIGN_INTENT.md` | 意识设计意图 v3.0 |
+| `AGENTS.md` | 意识体行为规范 (10 原理) |
+| `notes/session-logs/2026-06-08-phase0-consciousness-foundations.md` | 本会话日志 |

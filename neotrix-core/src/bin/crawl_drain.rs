@@ -84,6 +84,17 @@ fn main() {
     };
     println!("  验证后待处理: {} URLs", after_validate);
 
+    // Phase 2d: Bulk-delete all skip-pattern URLs (skip_url logic as SQL)
+    println!("\n━━━ Phase 2d: 批量清除 skip_url 匹配项 ━━━");
+    let s_start = std::time::Instant::now();
+    let skipped = kb.purge_all_skip_patterns().unwrap_or(0);
+    let after_skip = {
+        let conn = kb.conn.lock().expect("Lock");
+        conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
+    };
+    println!("  清除 {} URLs | [{:.1}s]", skipped, s_start.elapsed().as_secs_f64());
+    println!("  清除后待处理: {} URLs", after_skip);
+
     // Phase 3: Drain cycles (parallel, no link fetching to prevent queue growth)
     println!(
         "\n━━━ Phase 3: 并行批量排空 ({} URLs/cycle, {} workers, {} cycles, drain mode) ━━━",

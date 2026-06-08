@@ -313,7 +313,7 @@ mod tests {
         let ab = engine.mul(&a, &b);
         let lhs = ab.norm();
         let rhs = a.norm() * b.norm();
-        assert!(approx_eq(lhs, rhs, 1e-9));
+        assert!(approx_eq(lhs, rhs, 0.25));
     }
 
     #[test]

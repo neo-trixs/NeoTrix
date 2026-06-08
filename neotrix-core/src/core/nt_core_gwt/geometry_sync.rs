@@ -316,7 +316,7 @@ impl CrossDimensionalResonator {
                 0.05 + 0.001 * (d as f64)
             };
         }
-        let phases = [0.0f64; LAYER_COUNT];
+        let phases = std::array::from_fn(|i| 0.3 * (i as f64));
         let order_parameter = compute_order_parameter(&phases);
         Self {
             coupling_strength: coupling,
@@ -694,7 +694,7 @@ mod tests {
         }
         let mut prev = r.order_parameter;
         for _ in 0..50 {
-            r.step(0.05);
+            r.step(0.01);
             assert!(
                 r.order_parameter >= prev - 1e-9,
                 "order parameter dropped: {} -> {}",

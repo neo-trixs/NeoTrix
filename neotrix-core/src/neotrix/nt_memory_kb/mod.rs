@@ -188,6 +188,11 @@ impl KnowledgeBase {
         nt_memory_crawl::purge_skip_domains(&conn)
     }
 
+    pub fn purge_all_skip_patterns(&self) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        nt_memory_crawl::purge_all_skip_patterns(&conn)
+    }
+
     pub fn validate_urls(&self, num_workers: usize) -> Result<(usize, usize), String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         let db_path = self.db_path.to_string_lossy().to_string();
