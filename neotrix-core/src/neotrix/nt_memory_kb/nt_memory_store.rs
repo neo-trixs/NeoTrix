@@ -262,6 +262,17 @@ pub fn upsert_crawl_queue(conn: &Connection, url: &str, depth: i64, domain: &str
     Ok(())
 }
 
+pub fn ensure_crawl_pending(conn: &Connection, url: &str, depth: i64, domain: &str, priority: i64, discovered_at: i64) -> rusqlite::Result<()> {
+    let updated = conn.execute(
+        "UPDATE crawl_queue SET status='pending', priority=?1, retry_count=0, error_message=NULL WHERE url=?2",
+        params![priority, url],
+    )?;
+    if updated == 0 {
+        upsert_crawl_queue(conn, url, depth, domain, priority, discovered_at)?;
+    }
+    Ok(())
+}
+
 pub fn claim_crawl_urls_batch(conn: &Connection, max_items: usize) -> rusqlite::Result<Vec<CrawlQueueItem>> {
     let mut items = Vec::new();
     let mut stmt = conn.prepare(

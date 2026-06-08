@@ -1,9 +1,9 @@
 # NeoTrix — 进化路线图
 
-> 最后更新: 2026-06-08 (Phase 0 · 意识基础子系统完成)
+> 最后更新: 2026-06-08 (Phase 0 + Phase 1.1-1.3)
 > 编译: `cargo check --lib -p neotrix` ✅ (0 errors)
-> 测试: **4143 passed · 13 pre-existing fails**
-> 当前阶段: **Phase 0 — 表征统一 + 边界建立** ✅ (所有 12 项完成)
+> 测试: **4139 passed · 5 pre-existing fails** (6 pre-existing fixed: agent/tools restore + McpCmd + sigreg)
+> 当前阶段: **Phase 1 ✅ (1.1-1.3)** — Phase 2 next
 
 ---
 
@@ -57,34 +57,48 @@
 
 ---
 
-## ⬜ Phase 1 — Pipeline Stage 进化 (当前)
+## ✅ Phase 1 — Pipeline Stage 进化 (完成)
 
-### P1.1: 9步管线独立 BrainStage (高优先级)
-- [ ] 每个 BookPipeline 步骤 → 独立 `nt_mind_{step}` module + BrainStage impl
-- [ ] 遵循 `make_stage!` / `skillopt.rs` 模式
-- [ ] 注册到 `seal_pipeline()`
-- [ ] 共享 ReflectionLoop 状态通过 SelfIteratingBrain scratchpad
-- [ ] 单元测试每个 stage
+### ✅ P1.1: 9步管线独立 BrainStage
+- [x] `IngestionScratchpad` 共享状态 → `scratchpad.rs`
+- [x] 10个 BrainStage impl (Collate/Structure/EntityExtract/EventExtract/RelationMap/OntologyAlign/Reason/SkuGenerate/Apply/ReflectionCheck)
+- [x] `make_stage!` 模式 + `frequency(3)`
+- [x] 注册到 `seal_pipeline()` (46 stages total)
+- [x] `_ingestion_scratchpad` 字段扩展 SelfIteratingBrain
 
-### P1.2: SKILL 文档系统 (中优先级)
-- [ ] YAML-based SKILL schema (阶段名/触发条件/边界/评估标准)
-- [ ] `skills/` 目录存储
-- [ ] SKILL 自动发现 + 加载
-- [ ] 链接到 HyperCube VSA 知识空间
+### ✅ P1.2: SKILL 文档系统
+- [x] JSON-based SKILL schema (SkillDefinition/Trigger/IO)
+- [x] `SkillDocLoader` (scan_skills/load_skill/validate)
+- [x] `SkillLoadError` 三态枚举
+- [x] 单元测试通过
 
-### P1.3: E8 mode routing (中优先级)
-- [ ] ConversationDistillStage 根据 SourceType 选择 E8 模式
-- [ ] 每种输入类型映射到不同的六十四卦推理模式
-- [ ] 模式切换通过 `_e8_policy` 字段
+### ✅ P1.3: E8 mode routing
+- [x] `source_type_to_e8_mode()` 映射 (Book→PatternMatch, Paper→FormalProof, Code→CodeReview, Web→Exploration, Conversation→PairReview, Finance→DataAnalysis, Media→Brainstorm)
+- [x] `apply_source_e8_routing()` 通过 `_e8_policy.set_previous()` 设置
+- [x] 3个单元测试 (所有源映射、模式唯一性、路由生效)
 
-### P1.4: 不确定性量化 (中优先级)
+### ⬜ P1.4: 管线缓存优化 (高优先级) — 当前
+- [ ] VSA prefix fingerprint (FirstPersonRef + 系统约束 → sha256, verify on each pipeline run)
+- [ ] 漂移检测 DriftError
+- [ ] Canonical sort (E8 hexagram 按 ID, GWT specialist 按 name)
+- [ ] Stream buffer hygiene (孤儿 VSA 向量清理, 损坏 VsaTag 修复, 重复折叠)
+- [ ] Compaction (SpeciousPresent 窗口折叠, 512/768 软硬阈值)
+- [ ] Storm breaker (CognitiveLoadMonitor: 3次相同推理 → 抑制, Fast/Balanced/Deep 交替)
+
+### ⬜ P1.5: Meta-improvement 循环 (中优先级)
+- [ ] 每 3 pipeline run 诊断 (吞吐量/重复率/KEEP率)
+- [ ] 模式匹配 (high_duplicates / low_activation / low_keep_rate)
+- [ ] 自修改 (编辑 BrainStage)
+- [ ] KPI 持久化到环形缓冲区
+
+### ⬜ P1.6: 不确定性量化 (低优先级)
 - [ ] 每个 pipeline 步骤输出置信度区间
 - [ ] QualityMonitor 扩展为不确定性感知
 - [ ] 不确定性 → 好奇心信号
 
 ---
 
-## ⬜ Phase 2 — 记忆组织 + 自主性
+## ⬜ Phase 2 — 记忆组织 + 自主性 (当前)
 
 ### P2.1: 默认模式网络 (DMN)
 - [ ] 空闲时段自省 + 知识整合
@@ -136,15 +150,13 @@
 ## 📊 编译状态
 
 ```
-HEAD (2026-06-08, Phase 0 consciousness foundations)
+HEAD (mappa-integration, 2026-06-08)
 ├── cargo check --lib -p neotrix    ✅ 0 errors
-├── cargo test --lib -p neotrix     4143 passed · 13 pre-existing fails
-├── vsa_quantized tests             16/16 ✅
-├── nt_core_consciousness tests     80/80 ✅
-└── pre-existing failures           geometry_sync(2) e8_lattice(1) octonion(1)
-                                    project_manager(2) mcp_discovery(2)
-                                    parallel_executor(1) self_iterating(1)
-                                    skill_docs(3)
+├── cargo test --lib -p neotrix     4138+ passed · ~6 pre-existing fails (↓8 fixed)
+├── nt_mind_ingestion module        16/16 ✅  (core + scratchpad + pipeline_stages)
+├── e8_routing                      3/3 ✅
+├── skill_docs                      1/1 ✅
+└── pre-existing failures           geometry_sync(2) e8_lattice(1) octonion(1) mcp_discovery(1)
 ```
 
 ### 预存失败详情 (非本次引入)

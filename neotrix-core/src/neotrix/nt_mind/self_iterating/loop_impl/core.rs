@@ -12,6 +12,7 @@ use crate::neotrix::nt_world_model::TaskType;
 use crate::neotrix::nt_core_signal::select::SelectableOperator;
 use crate::neotrix::nt_core_signal::core::SelectiveState;
 use crate::neotrix::nt_act_crypto::CryptoAgent;
+use crate::neotrix::nt_mind_ingestion::scratchpad::IngestionScratchpad;
 use super::super::super::stagnation::StagnationDetector;
 use super::super::pipeline::{BrainPipeline, BrainSnapshot, AutonomyLevel, StageResult, seal_pipeline};
 use super::super::super::goal_loop::GoalLoop;
@@ -19,10 +20,17 @@ use crate::neotrix::nt_mind::goal_register::GoalRegister;
 use super::super::skillopt::{LrScheduler, ValidationGate, RejectedEditBuffer};
 use super::super::aging_monitor::AgingMonitor;
 use super::super::harness_adapter::HarnessAdapter;
-use crate::core::{E8TransitionLearner, ReasoningHexagram, strategy_matrix};
+use crate::core::{
+    E8TransitionLearner, ReasoningHexagram, strategy_matrix,
+    nt_core_consciousness::{
+        FirstPersonRef, SpeciousPresent, ConsciousnessStream,
+        InnerCritic, CognitiveLoadMonitor,
+    },
+};
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_act_autonomy::knowledge_distiller::KnowledgeDistiller;
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 pub struct SelfIteratingBrain {
@@ -79,8 +87,23 @@ pub struct SelfIteratingBrain {
     pub(crate) _strategy_matrix: [[ReasoningHexagram; 8]; 8],
     pub(crate) _trajectory_collector: crate::core::nt_core_prm::TrajectoryCollector,
     pub(crate) _coach: Option<Box<dyn crate::core::nt_core_prm::Coach>>,
+    pub(crate) _ingestion_scratchpad: Option<IngestionScratchpad>,
     pub nt_act_crypto: Option<Arc<Mutex<CryptoAgent>>>,
     pub nt_world_jepa: Option<JepaWorldModel>,
+    // EVO pipeline fields
+    pub(crate) _task_horizon: usize,
+    pub(crate) _velocity_history: VecDeque<f64>,
+    pub(crate) _velocity_momentum: f64,
+    pub(crate) _agent_specs: Vec<String>,
+    pub(crate) _diversity_scores: VecDeque<f64>,
+    pub(crate) _diversity_curiosity: f64,
+    pub(crate) _dense_advantage: f64,
+    // Consciousness system
+    pub(crate) _first_person: FirstPersonRef,
+    pub(crate) _specious_present: SpeciousPresent,
+    pub(crate) _consciousness_stream: ConsciousnessStream,
+    pub(crate) _inner_critic: InnerCritic,
+    pub(crate) _cognitive_load: CognitiveLoadMonitor,
 }
 
 impl SelfIteratingBrain {
@@ -146,8 +169,21 @@ impl SelfIteratingBrain {
             _strategy_matrix: strategy_matrix(),
             _trajectory_collector: crate::core::nt_core_prm::TrajectoryCollector::new(),
             _coach: Some(Box::new(crate::core::nt_core_prm::HeuristicCoach::default())),
+            _ingestion_scratchpad: None,
             nt_act_crypto: None,
             nt_world_jepa: None,
+            _task_horizon: 1,
+            _velocity_history: VecDeque::with_capacity(8),
+            _velocity_momentum: 0.0,
+            _agent_specs: Vec::new(),
+            _diversity_scores: VecDeque::with_capacity(16),
+            _diversity_curiosity: 0.0,
+            _dense_advantage: 0.0,
+            _first_person: FirstPersonRef::bootstrap(0),
+            _specious_present: SpeciousPresent::new(5),
+            _consciousness_stream: ConsciousnessStream::new(1024),
+            _inner_critic: InnerCritic::new(),
+            _cognitive_load: CognitiveLoadMonitor::new(),
         }
     }
 
@@ -224,6 +260,13 @@ impl SelfIteratingBrain {
     pub(crate) fn _set_lr_scheduler(&mut self, s: LrScheduler) { self._lr_scheduler = s; }
     pub(crate) fn _set_validation_gate(&mut self, g: ValidationGate) { self._validation_gate = g; }
     pub(crate) fn _set_aging_monitor(&mut self, m: AgingMonitor) { self._aging_monitor = m; }
+
+    pub(crate) fn _ingestion_scratchpad(&self) -> Option<&IngestionScratchpad> {
+        self._ingestion_scratchpad.as_ref()
+    }
+    pub(crate) fn _ingestion_scratchpad_mut(&mut self) -> Option<&mut IngestionScratchpad> {
+        self._ingestion_scratchpad.as_mut()
+    }
 
     pub fn record_tool_call(&mut self, name: &str, duration_ms: u64, success: bool) {
         self.tool_call_count += 1;

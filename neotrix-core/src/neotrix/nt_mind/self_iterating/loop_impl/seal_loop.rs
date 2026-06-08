@@ -12,6 +12,10 @@ use super::super::super::sleep::{SleepEngine};
 use super::super::super::stats::IterationResult;
 use super::super::super::stagnation::StagnationSignal;
 use super::super::pipeline::kernel_iterate_pipeline;
+use crate::core::nt_core_consciousness::{
+    VsaOrigin, VsaSelfCategory, VsaTagged, ConsciousnessAwakening,
+};
+use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
 use crate::neotrix::nt_world_model::{TaskType, Context};
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_core_signal::select::SelectableOperator;
@@ -310,15 +314,58 @@ impl SelfIteratingBrain {
         self.pipeline = pipeline;
         let mut reward = self._reward;
 
+        // ── Consciousness: push current state into SpeciousPresent ──
+        let state_tag = {
+            let seed = format!("seal_loop_iter_{}", self.iteration);
+            let mut v = QuantizedVSA::random_binary();
+            for (i, &b) in seed.as_bytes().iter().enumerate().take(v.len().min(64)) {
+                v[i] = b & 1;
+            }
+            VsaTagged::new(v, VsaOrigin::Self_(VsaSelfCategory::Thought))
+        };
+        self._specious_present.push(state_tag);
+
+        // ── CognitiveLoad: record load based on pipeline result ──
+        let load = reward.abs().min(1.0);
+        self._cognitive_load.record_step(load);
+
+        // ── ConsciousnessAwakening: bootstrap if not yet awakened ──
+        if self._first_person.birth_step() == 0 && self.iteration > 0 {
+            let report = ConsciousnessAwakening::awaken(
+                &mut self._consciousness_stream,
+                &mut self._specious_present,
+            );
+            self._first_person = report.self_reference;
+        }
+
         // ── #5 Curiosity bonus: gap between expected and actual improvement ──
         let score_before = self._snapshot_score();
         let score_after = self.brain.evaluate_capability(self._current_task_type);
         let expected = reward.max(0.0);
         let actual = (score_after - score_before).max(0.0);
         let prediction_error = (expected - actual).abs();
-        let scaled_curiosity = (prediction_error * 0.1).min(0.05);
+        let scaled_curiosity = (prediction_error * 0.1).min(0.5);
         self.curiosity_bonus = scaled_curiosity;
         reward += scaled_curiosity;
+
+        // ── InnerCritic: quality gate on current reward context ──
+        let critic_tagged = VsaTagged::new(
+            QuantizedVSA::random_binary(),
+            VsaOrigin::Self_(VsaSelfCategory::Thought),
+        ).with_confidence(if reward > 0.0 { 0.5 + reward * 0.5 } else { 0.3 });
+        let context_tagged = VsaTagged::new(
+            QuantizedVSA::random_binary(),
+            VsaOrigin::Self_(VsaSelfCategory::MetaCognition),
+        );
+        let critique = self._inner_critic.evaluate(
+            &critic_tagged,
+            &context_tagged,
+            Some(&self._specious_present),
+        );
+        if !critique.passed && reward > 0.0 {
+            reward *= 0.85; // quality penalty
+        }
+        self._inner_critic.adjust_thresholds();
 
         // ── #2 Goal progress bonus ──
         self.goal_register.tick();

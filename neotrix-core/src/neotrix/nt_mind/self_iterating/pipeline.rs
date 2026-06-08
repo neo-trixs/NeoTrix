@@ -6,6 +6,10 @@ use super::super::distillation::{ExperienceDistiller, apply_principles, avoid_an
 use super::super::cortex_memory::CmsConfig;
 use crate::neotrix::nt_world_model::TaskType;
 use crate::neotrix::nt_core_error::NeoTrixError;
+use crate::core::nt_core_consciousness::{
+    VsaOrigin, VsaSelfCategory, VsaTagged,
+};
+use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -370,7 +374,24 @@ impl BrainStage for RewardCalculationStage {
             let regularization = brain.compute_regularization(&brain._snapshot_capability());
             let raw = (score_after - score_before) + regularization;
             let health = brain.evo_stats().health_score;
-            let calibrated = raw * (0.5 + health * 0.5);
+            let mut calibrated = raw * (0.5 + health * 0.5);
+
+            // InnerCritic quality gate
+            let critic_out = VsaTagged::new(
+                QuantizedVSA::random_binary(),
+                VsaOrigin::Self_(VsaSelfCategory::Thought),
+            ).with_confidence(if calibrated > 0.0 { 0.6 } else { 0.3 });
+            let critic_ctx = VsaTagged::new(
+                QuantizedVSA::random_binary(),
+                VsaOrigin::Self_(VsaSelfCategory::MetaCognition),
+            );
+            let critique = brain._inner_critic.evaluate(
+                &critic_out, &critic_ctx, Some(&brain._specious_present),
+            );
+            if !critique.passed && calibrated > 0.0 {
+                calibrated *= 0.8;
+            }
+
             (calibrated, RewardSource::Internal)
         };
         brain._set_reward(reward);
@@ -1098,6 +1119,12 @@ impl BrainStage for AutonomyGateStage {
             }
             AutonomyLevel::Full => {}
         }
+
+        // CognitiveLoad gate: switch to Fast mode under high load
+        if !brain._cognitive_load.can_do_deep_reasoning() {
+            return Ok(StageDecision::Skip(
+                "CognitiveLoad 过高：切换到快速模式".to_string()));
+        }
         Ok(StageDecision::Continue)
     }
 }
@@ -1223,6 +1250,9 @@ impl BrainStage for SpectralMonitorStage {
 
 pub fn seal_pipeline() -> BrainPipeline {
     BrainPipeline::with_stages(vec![
+        Box::new(crate::neotrix::nt_mind_ingestion::pipeline_stages::VsaFingerprintStage::new()),
+        Box::new(crate::neotrix::nt_mind_ingestion::pipeline_stages::CanonicalSortStage::new()),
+        Box::new(crate::neotrix::nt_mind_ingestion::pipeline_stages::StreamHygieneStage::new()),
         Box::new(SnapshotStage::new()),
         Box::new(AutonomyGateStage::new()),
         Box::new(MemoryRetrievalStage::new()),
@@ -1363,7 +1393,7 @@ mod tests {
         let pipeline = seal_pipeline();
         let names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
         assert_eq!(names, vec![
-            "snapshot", "autonomy_gate", "memory_retrieval",
+            "vsa_fingerprint", "canonical_sort", "stream_hygiene", "snapshot", "autonomy_gate", "memory_retrieval",
             "gap_analysis",
             "ssm_update", "open_source_compare", "self_edit_gen",
             "bounded_edit", "apply_edits",
@@ -1378,7 +1408,7 @@ mod tests {
             "epoch_slow_update", "nt_shield_scan", "session_distill", "conversation_distill", "aging_diagnosis", "embedding_refresh",
             "spectral_monitor",
             "trajectory_collect", "coach_and_update",
-        ], "SEAL pipeline 应有 31 个 stage");
+        ], "SEAL pipeline 应有 34 个 stage");
     }
 
     #[test]

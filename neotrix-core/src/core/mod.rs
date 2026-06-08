@@ -73,6 +73,14 @@ pub mod nt_core_iface;
 pub mod nt_core_pred;
 pub mod nt_core_consciousness;
 
+// Re-export consciousness types to core layer
+pub use nt_core_consciousness::{
+    FirstPersonRef, SpeciousPresent, ConsciousnessStream,
+    InnerCritic, CritiqueResult, CognitiveLoadMonitor, ThinkingMode,
+    ConsciousnessAwakening, AwakeningReport,
+    VsaOrigin, VsaSelfCategory, VsaWorldCategory, VsaTagged,
+};
+
 // Re-export 主要类型到 core 层顶层
 pub use nt_core_cap::CapabilityVector;
 pub use nt_core_knowledge::{KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, SourceAccessTracker, SourceAccessRecord};

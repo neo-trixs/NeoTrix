@@ -249,6 +249,20 @@ impl KnowledgeBase {
         r
     }
 
+    pub fn ingest_openlibrary_search(&self, query: &str) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let r = nt_memory_crawl::ingest_from_openlibrary_search(&conn, query)?;
+        self.mark_bm25_dirty();
+        Ok(r)
+    }
+
+    pub fn ingest_github_search(&self, query: &str) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let r = nt_memory_crawl::ingest_github_search(&conn, query)?;
+        self.mark_bm25_dirty();
+        Ok(r)
+    }
+
     pub fn dedup_nodes(&self) -> Result<usize, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         let r = nt_memory_store::dedup_nodes(&conn).map_err(|e| format!("Dedup error: {}", e))?;

@@ -13,7 +13,19 @@ fn http_client() -> &'static reqwest::blocking::Client {
         reqwest::blocking::Client::builder()
             .user_agent("NeoTrix/0.18 (KnowledgeBase nt_world_crawl)")
             .no_proxy()
-            .timeout(Duration::from_secs(2))
+            .timeout(Duration::from_secs(10))
+            .build()
+            .expect("HTTP client")
+    })
+}
+
+fn http_client_seed() -> &'static reqwest::blocking::Client {
+    static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::blocking::Client::builder()
+            .user_agent("NeoTrix/0.18 (KnowledgeSeed)")
+            .no_proxy()
+            .timeout(Duration::from_secs(15))
             .build()
             .expect("HTTP client")
     })
@@ -52,7 +64,6 @@ fn skip_url(url: &str) -> bool {
         || d == "id.loc.gov" || d == "export.arxiv.org"
         || d == "doi.org" || d == "dx.doi.org"
         || d == "worldcat.org" || d == "d-nb.info"
-        || d == "openlibrary.org"
         || d == "books.google.com" || d.starts_with("books.google.")
         || d.starts_with("google.") || d == "www.google.com"
         || d.starts_with("scholar.google.")
@@ -183,7 +194,7 @@ pub fn purge_all_skip_patterns(conn: &Connection) -> Result<usize, String> {
 
 pub fn purge_skip_domains(conn: &Connection) -> Result<usize, String> {
     let mut total = 0;
-    for d in &["doi.org", "dx.doi.org", "worldcat.org", "d-nb.info", "openlibrary.org",
+    for d in &["doi.org", "dx.doi.org", "worldcat.org", "d-nb.info",
                "id.loc.gov", "link.springer.com", "academic.oup.com", "jstor.org",
                "sciencedirect.com", "cambridge.org", "tandfonline.com",
                "onlinelibrary.wiley.com", "emerald.com", "degruyter.com",
@@ -260,7 +271,7 @@ pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) ->
     let ts = now();
     let mut count = 0;
     for (url, priority, domain) in topic_urls {
-        store::upsert_crawl_queue(conn, url, 0, domain, *priority, ts)?;
+        store::ensure_crawl_pending(conn, url, 0, domain, *priority, ts)?;
         count += 1;
     }
     Ok(count)
@@ -268,7 +279,7 @@ pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) ->
 
 pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, String> {
     let url = format!("https://en.wikipedia.org/api/rest_v1/page/summary/{}", topic);
-    let resp = http_client().get(&url).send().map_err(|e| format!("Wikipedia fetch error: {}", e))?;
+    let resp = http_client_seed().get(&url).send().map_err(|e| format!("Wikipedia fetch error: {}", e))?;
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
     let title = data["title"].as_str().unwrap_or(topic);
     let summary = data["extract"].as_str().unwrap_or("");
@@ -289,7 +300,7 @@ pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, St
 
 pub fn ingest_from_arxiv(conn: &Connection, arxiv_id: &str) -> Result<usize, String> {
     let url = format!("https://export.arxiv.org/api/query?id_list={}", arxiv_id);
-    let resp = http_client().get(&url).send().map_err(|e| format!("arXiv fetch error: {}", e))?;
+    let resp = http_client_seed().get(&url).send().map_err(|e| format!("arXiv fetch error: {}", e))?;
     let text = resp.text().map_err(|e| format!("Text error: {}", e))?;
     let title = extract_xml_tag(&text, "title").unwrap_or_else(|| "Unknown".into());
     let summary = extract_xml_tag(&text, "summary").unwrap_or_default();
@@ -308,9 +319,36 @@ pub fn ingest_from_arxiv(conn: &Connection, arxiv_id: &str) -> Result<usize, Str
     Ok(1)
 }
 
+pub fn ingest_from_openlibrary_search(conn: &Connection, query: &str) -> Result<usize, String> {
+    let url = format!("https://openlibrary.org/search.json?q={}&limit=50", urlencode(query));
+    let resp = http_client_seed().get(&url).send().map_err(|e| format!("OL fetch error: {}", e))?;
+    let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
+    let docs = data["docs"].as_array().ok_or_else(|| "No docs in response".to_string())?;
+    let mut count = 0;
+    for doc in docs {
+        let title = doc["title"].as_str().unwrap_or("Untitled");
+        let author = doc["author_name"][0].as_str().unwrap_or("Unknown");
+        let ol_id = doc["key"].as_str().unwrap_or("");
+        let first_year = doc["first_publish_year"].as_i64().unwrap_or(0);
+        let summary = Some(&format!("Author: {} | First published: {} | OL ID: {}", author, first_year, ol_id)[..]);
+        let ol_url = format!("https://openlibrary.org{}", ol_id);
+        let node_id = match store::insert_or_get_node(conn, title, NodeType::Article, summary, Some(&ol_url), Some("openlibrary.org")) {
+            Ok(id) => id,
+            Err(_) => continue,
+        };
+        if !author.is_empty() && author != "Unknown" {
+            if let Ok(author_id) = store::insert_or_get_node(conn, author, NodeType::Person, None, None, Some("openlibrary.org")) {
+                let _ = store::upsert_edge(conn, &node_id, &author_id, RelationType::DevelopedBy, 1.0, Some("Author"));
+            }
+        }
+        count += 1;
+    }
+    Ok(count)
+}
+
 pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<usize, String> {
     let api_url = format!("https://api.github.com/repos/{}/{}", owner, repo);
-    let resp = http_client().get(&api_url).send().map_err(|e| format!("GitHub fetch error: {}", e))?;
+    let resp = http_client_seed().get(&api_url).send().map_err(|e| format!("GitHub fetch error: {}", e))?;
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
     let default_title = format!("{}/{}", owner, repo);
     let title = data["full_name"].as_str().unwrap_or(&default_title);
@@ -332,6 +370,51 @@ pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<
         }
     }
     Ok(1)
+}
+
+pub fn ingest_github_search(conn: &Connection, query: &str) -> Result<usize, String> {
+    let url = format!("https://api.github.com/search/repositories?q={}&sort=stars&per_page=30", urlencode(query));
+    let resp = http_client_seed().get(&url).header("Accept", "application/vnd.github.v3+json").send()
+        .map_err(|e| format!("GitHub search fetch error: {}", e))?;
+    let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
+    let items = data["items"].as_array().ok_or_else(|| "No items in response".to_string())?;
+    let mut count = 0;
+    for item in items {
+        let owner = item["owner"]["login"].as_str().unwrap_or("");
+        let repo = item["name"].as_str().unwrap_or("");
+        if owner.is_empty() || repo.is_empty() { continue; }
+        let default_title = format!("{}/{}", owner, repo);
+        let title = item["full_name"].as_str().unwrap_or(&default_title);
+        let description = item["description"].as_str().unwrap_or("");
+        let repo_url = item["html_url"].as_str().unwrap_or("");
+        let topics: Vec<String> = item["topics"].as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default();
+        let node_id = match store::insert_or_get_node(conn, title, NodeType::Repository, Some(description), Some(repo_url), Some("github.com")) {
+            Ok(id) => id,
+            Err(_) => continue,
+        };
+        if let Some(owner_login) = item["owner"]["login"].as_str() {
+            if let Ok(owner_id) = store::insert_or_get_node(conn, owner_login, NodeType::Organization, None,
+                Some(&format!("https://github.com/{}", owner_login)), Some("github.com")) {
+                let _ = store::upsert_edge(conn, &node_id, &owner_id, RelationType::DevelopedBy, 1.0, None);
+            }
+        }
+        for topic in &topics {
+            if let Ok(topic_id) = store::insert_or_get_node(conn, topic, NodeType::Concept, None, None, Some("github.com")) {
+                let _ = store::upsert_edge(conn, &node_id, &topic_id, RelationType::Related, 1.0, Some("GitHub topic"));
+            }
+        }
+        count += 1;
+    }
+    Ok(count)
+}
+
+pub fn urlencode(s: &str) -> String {
+    s.chars().map(|c| match c {
+        'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+        ' ' => "%20".to_string(),
+        c => format!("%{:02X}", c as u8),
+    }).collect()
 }
 
 pub fn run_crawl_cycle(conn: &Connection, max_items: usize) -> Result<CrawlCycleReport, String> {

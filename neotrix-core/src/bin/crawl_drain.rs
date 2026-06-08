@@ -18,6 +18,8 @@ fn main() {
         .nth(3)
         .and_then(|a| a.parse().ok())
         .unwrap_or(DEFAULT_WORKERS);
+    let mode = std::env::args().nth(4).unwrap_or_else(|| "drain".into());
+    let fetch_links = mode == "full";
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  NeoTrix 爬取队列排空 v2 — 多进程并行加速                  ║");
@@ -33,6 +35,10 @@ fn main() {
     println!(
         "║  并行数:   {} workers                                      ║",
         workers
+    );
+    println!(
+        "║  模式:     {}                                             ║",
+        if fetch_links { "full (发现新链接)" } else { "drain (只排空)" }
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 
@@ -57,47 +63,53 @@ fn main() {
     println!("\n━━━ Phase 2: 当前待处理队列 ━━━");
     println!("  待处理: {} URLs", before_pending);
 
-    // Phase 2b: Purge skip domains
-    println!("\n━━━ Phase 2b: 清除已知无用域名 ━━━");
-    let purged = kb.purge_skip_domains().unwrap_or(0);
-    println!("  已清除 {} URLs", purged);
-
-    let after_purge = {
-        let conn = kb.conn.lock().expect("Lock");
-        conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
-    };
-    println!("  清除后待处理: {} URLs", after_purge);
-
-    // Phase 2c: Quick connectivity validation (HEAD, 1s timeout, delete failures)
-    println!("\n━━━ Phase 2c: 连通性验证 (HEAD, 1s timeout) ━━━");
-    let v_start = std::time::Instant::now();
-    match kb.validate_urls(workers) {
-        Ok((alive, dead)) => {
-            println!("  ✅ 存活: {}, ❌ 失效: {} | [{:.1}s]",
-                alive, dead, v_start.elapsed().as_secs_f64());
-        }
-        Err(e) => println!("  ⚠ 验证错误: {}", e),
+    // Phase 2b: Purge skip domains — skip in full mode
+    if !fetch_links {
+        println!("\n━━━ Phase 2b: 清除已知无用域名 ━━━");
+        let purged = kb.purge_skip_domains().unwrap_or(0);
+        println!("  已清除 {} URLs", purged);
+        let after_purge = {
+            let conn = kb.conn.lock().expect("Lock");
+            conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
+        };
+        println!("  清除后待处理: {} URLs", after_purge);
     }
-    let after_validate = {
-        let conn = kb.conn.lock().expect("Lock");
-        conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
-    };
-    println!("  验证后待处理: {} URLs", after_validate);
 
-    // Phase 2d: Bulk-delete all skip-pattern URLs (skip_url logic as SQL)
-    println!("\n━━━ Phase 2d: 批量清除 skip_url 匹配项 ━━━");
-    let s_start = std::time::Instant::now();
-    let skipped = kb.purge_all_skip_patterns().unwrap_or(0);
-    let after_skip = {
-        let conn = kb.conn.lock().expect("Lock");
-        conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
-    };
-    println!("  清除 {} URLs | [{:.1}s]", skipped, s_start.elapsed().as_secs_f64());
-    println!("  清除后待处理: {} URLs", after_skip);
+    // Phase 2c: Quick connectivity validation — skip in full mode (seed URLs need HTTP)
+    if !fetch_links {
+        println!("\n━━━ Phase 2c: 连通性验证 (HEAD, 1s timeout) ━━━");
+        let v_start = std::time::Instant::now();
+        match kb.validate_urls(workers) {
+            Ok((alive, dead)) => {
+                println!("  ✅ 存活: {}, ❌ 失效: {} | [{:.1}s]",
+                    alive, dead, v_start.elapsed().as_secs_f64());
+            }
+            Err(e) => println!("  ⚠ 验证错误: {}", e),
+        }
+        let after_validate = {
+            let conn = kb.conn.lock().expect("Lock");
+            conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
+        };
+        println!("  验证后待处理: {} URLs", after_validate);
+    }
 
-    // Phase 3: Drain cycles (parallel, no link fetching to prevent queue growth)
+    // Phase 2d: Bulk-delete all skip-pattern URLs — skip in full mode
+    if !fetch_links {
+        println!("\n━━━ Phase 2d: 批量清除 skip_url 匹配项 ━━━");
+        let s_start = std::time::Instant::now();
+        let skipped = kb.purge_all_skip_patterns().unwrap_or(0);
+        let after_skip = {
+            let conn = kb.conn.lock().expect("Lock");
+            conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
+        };
+        println!("  清除 {} URLs | [{:.1}s]", skipped, s_start.elapsed().as_secs_f64());
+        println!("  清除后待处理: {} URLs", after_skip);
+    }
+
+    // Phase 3: Crawl cycles (parallel)
     println!(
-        "\n━━━ Phase 3: 并行批量排空 ({} URLs/cycle, {} workers, {} cycles, drain mode) ━━━",
+        "\n━━━ Phase 3: 并行{} ({} URLs/cycle, {} workers, {} cycles) ━━━",
+        if fetch_links { "爬取+发现新链接" } else { "排空" },
         batch, workers, cycles
     );
     let mut total_processed = 0u64;
@@ -122,7 +134,7 @@ fn main() {
             break;
         }
 
-            match kb.run_crawl_cycle_parallel(batch, workers, false) {
+            match kb.run_crawl_cycle_parallel(batch, workers, fetch_links) {
             Ok(report) => {
                 let elapsed = c_start.elapsed();
                 total_processed += report.completed as u64;

@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+pub mod scratchpad;
+pub use scratchpad::*;
+
 mod reflection_loop;
 pub use reflection_loop::*;
 
@@ -14,6 +17,20 @@ pub use paper_pipeline::*;
 
 pub mod integration_stage;
 pub use integration_stage::*;
+
+pub mod pipeline_stages;
+
+pub mod fingerprint;
+pub use fingerprint::*;
+
+pub mod canonical;
+pub use canonical::*;
+
+pub mod e8_routing;
+pub use e8_routing::*;
+
+pub mod stream_hygiene;
+pub use stream_hygiene::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceType {

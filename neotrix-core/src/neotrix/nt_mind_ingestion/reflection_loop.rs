@@ -67,6 +67,7 @@ impl ReflectionLoop {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct QualityMonitor {
     pub threshold: f64,
     pub scores: Vec<f64>,
