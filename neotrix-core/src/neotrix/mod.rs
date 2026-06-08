@@ -29,6 +29,7 @@ pub mod nt_mind_scheduler;
 pub mod nt_mind_topic_aggregator;
 pub mod nt_mind_consciousness_gold_standard;
 pub mod nt_mind_consciousness_monitor;
+pub mod nt_mind_ingestion;
 
 // NT-MEMORY domain
 pub mod nt_memory_kb;
@@ -88,7 +89,6 @@ pub mod nt_agent_protocol;
 pub mod nt_agent_subagent;
 pub mod nt_agent_mcp_discovery;
 pub mod nt_agent_mcp_tools;
-
 // NT-WORLD domain
 pub mod nt_world_model;
 pub mod nt_world_model_v2;

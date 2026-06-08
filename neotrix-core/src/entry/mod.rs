@@ -440,15 +440,6 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
     clap_complete::generate(shell, cmd, "neotrix", &mut stdout);
 }
 
-pub fn run_mcp_server() {
-    let mut server = neotrix::core::McpServer::new();
-    server.register_all_tools();
-    println!("neotrix-mcp {} starting (stdio JSON-RPC 2.0)", env!("CARGO_PKG_VERSION"));
-    if let Err(e) = server.run() {
-        eprintln!("MCP server error: {}", e);
-    }
-}
-
 pub fn run_benchmark(category: Option<&str>) {
     use neotrix::neotrix::nt_mind_benchmark::{BenchmarkSuite, BenchmarkReport};
     use neotrix::CapabilityVector;
@@ -700,7 +691,6 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
     
     use neotrix::agent::skills::SkillsEngine;
     use neotrix::agent::hooks::{HookRegistry, HookEvent, HookContext};
-    use neotrix::agent::tools::{McpRegistry, McpTransport, McpToolDef};
     use neotrix::agent::{AgentTeam, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
@@ -731,25 +721,6 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         let skill_count = skills_engine.init().len();
         println!("{}: {} {}", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)), "");
         println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
-
-        let mut mcp_registry = McpRegistry::new();
-        let mut builtin_tools = vec![
-            McpToolDef {
-                name: "neotrix_info".to_string(),
-                description: "NeoTrix MCP system info".to_string(),
-                server_name: "built-in".to_string(),
-                transport: McpTransport::Stdio {
-                    command: "echo".to_string(),
-                    args: vec![],
-                },
-                input_schema: serde_json::json!({"type": "object"}),
-            },
-        ];
-        builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
-        mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
-        println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
-        let mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
         let mut hook_registry = HookRegistry::default();
         hook_registry.set_profile(neotrix::agent::hooks::HookProfile::Standard);
@@ -791,7 +762,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
                 .expect("invalid spinner template"),
         );
         sp.set_message("starting headless mode...");
-        headless::run_headless(agent, skills_engine, hook_registry, mcp_registry).await;
+        headless::run_headless(agent, skills_engine, hook_registry).await;
         sp.finish_and_clear();
     });
 }
@@ -808,7 +779,6 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
     
     use neotrix::agent::skills::SkillsEngine;
     use neotrix::agent::hooks::{HookRegistry, HookEvent, HookContext};
-    use neotrix::agent::tools::{McpRegistry, McpTransport, McpToolDef};
     use neotrix::agent::{AgentTeam, AgentRole, ProcessType};
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
@@ -843,25 +813,6 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         let skill_count = skills_engine.init().len();
         println!("{}: {} {}", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)), "");
         println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
-
-        let mut mcp_registry = McpRegistry::new();
-        let mut builtin_tools = vec![
-            McpToolDef {
-                name: "neotrix_info".to_string(),
-                description: "NeoTrix MCP system info".to_string(),
-                server_name: "built-in".to_string(),
-                transport: McpTransport::Stdio {
-                    command: "echo".to_string(),
-                    args: vec![],
-                },
-                input_schema: serde_json::json!({"type": "object"}),
-            },
-        ];
-        builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
-        mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
-        neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
-        println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
-        let _mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
         let mut hook_registry = HookRegistry::default();
         hook_registry.set_profile(neotrix::agent::hooks::HookProfile::Standard);

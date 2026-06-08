@@ -5,7 +5,6 @@
 //! - session: 会话管理
 //! - agent: Agent 控制
 //! - project: 项目文件
-//! - mcp: MCP 工具
 //! - pty: PTY 终端管理
 
 pub mod pty;
@@ -17,7 +16,6 @@ pub mod agent_cmds;
 pub mod project_cmds;
 pub mod diff_cmds;
 pub mod perms_cmds;
-pub mod mcp_cmds;
 pub mod sync_cmds;
 
 // Re-exports for convenience (frontend/tauri registration)
@@ -29,7 +27,6 @@ pub use agent_cmds::*;
 pub use project_cmds::*;
 pub use diff_cmds::*;
 pub use perms_cmds::*;
-pub use mcp_cmds::*;
 pub use sync_cmds::*;
 
 // ========== Tests ==========

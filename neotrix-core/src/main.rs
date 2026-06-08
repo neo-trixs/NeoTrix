@@ -105,8 +105,6 @@ enum Commands {
     Login { url: String },
     #[command(about = "Proxy daemon control (status|mode|start|stop|install)")]
     Proxy { args: Vec<String> },
-    #[command(name = "mcp-server", about = "Run as MCP server (stdio JSON-RPC 2.0)")]
-    McpServer,
     #[command(about = "Cloud/Docker sandbox commands")]
     Sandbox {
         #[command(subcommand)]
@@ -316,7 +314,6 @@ fn main() {
         Some(Commands::Discover { port, duration, json }) => {
             run_discover(*port, *duration, *json);
         }
-        Some(Commands::McpServer) => entry::run_mcp_server(),
         Some(Commands::Features { command }) => {
             match command {
                 FeaturesCommands::Enable { name } => {

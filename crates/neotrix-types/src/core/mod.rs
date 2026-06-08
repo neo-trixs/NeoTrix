@@ -51,7 +51,7 @@ pub use nt_core_bank::{ReasoningBank, ReasoningMemory, TemporalContext, MemoryTi
 pub use nt_core_ssm::{SelectiveState, SelectableOperator, SparseMatrix, ConsciousnessTier, SemanticType, SemanticBlock};
 pub use nt_core_absorb::AbsorbValidator;
 pub use nt_core_iter::SelfIteration;
-pub use nt_core_traits::{MemoryProvider, RichMemoryProvider, AgentExecutor, ToolProvider, ToolDef, ToolOutput, SessionProvider, BrainProvider, EngineProvider, SealResult};
+pub use nt_core_traits::{MemoryProvider, RichMemoryProvider, AgentExecutor, SessionProvider, BrainProvider, EngineProvider, SealResult};
 pub use nt_core_graph::{HyperGraph, HyperNode, HyperEdge, HyperNodeType, EdgeRelation};
 
 // Re-export consciousness loop types

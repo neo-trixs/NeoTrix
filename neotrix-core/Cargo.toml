@@ -45,7 +45,6 @@ reqwest = { version = "0.11", default-features = false, features = ["blocking", 
 url = "2"
 rand = "0.8"
 async-trait = "0.1"
-rmcp = { version = "0.5", features = ["server", "macros"] }
 lru = "0.12"
 base64 = "0.22"
 hex = "0.4"

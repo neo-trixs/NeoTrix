@@ -44,7 +44,7 @@ pub use core::{
     ReasoningBank, ReasoningMemory, TemporalContext, MemoryTier, MemoryLifecycle, ReasoningBankStats,
     SelectiveState, SelectableOperator, SparseMatrix, ConsciousnessTier, SemanticType, SemanticBlock,
     SelfIteration,
-    MemoryProvider, RichMemoryProvider, AgentExecutor, ToolProvider, ToolDef, ToolOutput, SessionProvider, BrainProvider, EngineProvider, SealResult,
+    MemoryProvider, RichMemoryProvider, AgentExecutor, SessionProvider, BrainProvider, EngineProvider, SealResult,
     HyperGraph, HyperNode, HyperEdge, HyperNodeType, EdgeRelation,
     ToolSandbox, SandboxError, SessionStore, SessionRecord, SessionMessage, TruncationStrategy, HookRegistry, LifecycleEvent,
     ConsciousnessState, ConsciousnessLoop, RecurrentCell, CellDecision, LoopExit, TickMetrics, PanoramaCell,

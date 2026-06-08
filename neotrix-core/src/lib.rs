@@ -37,7 +37,7 @@ pub use core::{
     ReasoningBank, ReasoningMemory,
     SelectiveState, SelectableOperator,
     AbsorbValidator, SelfIteration,
-    KnowledgeProvider, MemoryProvider, AgentExecutor, ToolProvider, ToolDef, ToolOutput, SessionProvider,
+    KnowledgeProvider, MemoryProvider, AgentExecutor, SessionProvider,
     SelfModel, ModuleInfo, FileInfo, DepGraph, TechDebtInventory, TechDebtItem, TechDebtKind, DebtSeverity,
     EvolutionEvent, EventKind, ComponentMap, ComponentNode,
     CodeScanner, MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend,

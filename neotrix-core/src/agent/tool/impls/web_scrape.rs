@@ -45,8 +45,11 @@ impl AgentTool for WebScrapeTool {
     fn execute(&self, ctx: ToolContext) -> Result<ToolOutput, ToolError> {
         let args: serde_json::Value = serde_json::from_str(&ctx.input)
             .map_err(|e| ToolError::Runtime { id: self.id().into(), message: e.to_string() })?;
-        let result = crate::neotrix::nt_agent_mcp_tools::exec_web_scrape(&args)
-            .map_err(|e| ToolError::Runtime { id: self.id().into(), message: e })?;
+        let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+        let result = match reqwest::blocking::get(url) {
+            Ok(resp) => resp.text().unwrap_or_else(|e| format!("read error: {}", e)),
+            Err(e) => format!("request error: {}", e),
+        };
         Ok(ToolOutput { result, metadata: HashMap::new() })
     }
 

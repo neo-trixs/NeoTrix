@@ -2,7 +2,7 @@
 
 use crate::cli::commands::types::CommandRegistry;
 use crate::cli::commands::bench_cmds::BenchmarkCmd;
-use crate::cli::commands::agent_cmds::{AgentCmd, DiscoverCmd, McpCmd};
+use crate::cli::commands::agent_cmds::{AgentCmd, DiscoverCmd};
 use crate::cli::commands::brain_cmds::{AbsorbCmd, AvatarCmd, EvolveCmd, MemCmd, SaveCmd, TraceCmd};
 use crate::cli::commands::core_cmds::{ClearCmd, CompletionsCmd, ExitCmd, HelpCmd, StatsCmd, VersionCmd};
 use crate::cli::commands::cost_cmds::CostCmd;
@@ -36,7 +36,6 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(SaveCmd));
     reg.register(Box::new(AgentCmd));
     reg.register(Box::new(DiscoverCmd));
-    reg.register(Box::new(McpCmd));
     reg.register(Box::new(ClearCmd));
     reg.register(Box::new(VersionCmd));
     reg.register(Box::new(CompletionsCmd));

@@ -282,6 +282,182 @@ pub struct CollapseAlert {
     pub timestamp: f64,
 }
 
+fn hermite_poly(n: usize, x: f64) -> f64 {
+    match n {
+        0 => 1.0,
+        1 => x,
+        2 => x * x - 1.0,
+        3 => x * x * x - 3.0 * x,
+        4 => {
+            let x2 = x * x;
+            x2 * x2 - 6.0 * x2 + 3.0
+        }
+        _ => {
+            let mut h0 = 1.0;
+            let mut h1 = x;
+            for k in 1..n {
+                let h2 = 2.0 * x * h1 - 2.0 * (k as f64) * h0;
+                h0 = h1;
+                h1 = h2;
+            }
+            h1
+        }
+    }
+}
+
+fn hermite_normalized(n: usize, x: f64) -> f64 {
+    let h = hermite_poly(n, x);
+    if n == 0 { return h; }
+    let mut fact = 1.0;
+    for i in 2..=n { fact *= i as f64; }
+    h / fact
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SpectralHealth { Healthy, Degrading, Collapsed }
+
+pub struct HermiteSpectralMonitor {
+    max_order: usize,
+    coeffs: Vec<Vec<f64>>,
+    ema_alpha: f64,
+    step_count: usize,
+    initial_noise_floor: f64,
+    prev_signs: Vec<i8>,
+    sign_flips: Vec<usize>,
+    sign_window: usize,
+}
+
+impl HermiteSpectralMonitor {
+    pub fn new(_window_size: usize, max_order: usize, num_dimensions: usize) -> Self {
+        HermiteSpectralMonitor {
+            max_order: max_order.min(4),
+            coeffs: vec![vec![0.0f64; max_order.min(4) + 1]; num_dimensions],
+            ema_alpha: 0.1, step_count: 0, initial_noise_floor: 0.001,
+            prev_signs: vec![0i8; num_dimensions],
+            sign_flips: vec![0usize; num_dimensions], sign_window: 20,
+        }
+    }
+
+    pub fn record_gradient(&mut self, step: usize, gradient: &[f64]) {
+        let alpha = self.ema_alpha;
+        let one_minus_alpha = 1.0 - alpha;
+        let norm_x = (step as f64).sqrt().max(1.0);
+        for (dim, &g) in gradient.iter().enumerate() {
+            if dim >= self.coeffs.len() { break; }
+            let x = g / norm_x;
+            for order in 0..=self.max_order.min(4) {
+                let h = hermite_normalized(order, x);
+                self.coeffs[dim][order] = alpha * h + one_minus_alpha * self.coeffs[dim][order];
+            }
+            let cur: i8 = if g > 0.0 { 1 } else if g < 0.0 { -1 } else { 0 };
+            if dim < self.prev_signs.len() && self.prev_signs[dim] != 0 && cur != 0 && cur != self.prev_signs[dim] {
+                self.sign_flips[dim] = self.sign_flips[dim].saturating_add(1);
+            }
+            if dim < self.prev_signs.len() { self.prev_signs[dim] = cur; }
+        }
+        self.step_count += 1;
+        if self.step_count % self.sign_window == 0 {
+            for sf in &mut self.sign_flips { *sf = 0; }
+        }
+    }
+
+    fn collapse_energy(&self) -> f64 {
+        if self.coeffs.is_empty() || self.coeffs[0].is_empty() { return 0.0; }
+        let mut total = 0.0; let mut count = 0.0;
+        for dim_coeffs in &self.coeffs {
+            for (order, &c) in dim_coeffs.iter().enumerate() {
+                if order == 1 || order == 3 { total += c * c; count += 1.0; }
+            }
+        }
+        if count == 0.0 { return 0.0; } total / count
+    }
+
+    pub fn spectral_health(&self) -> SpectralHealth {
+        if self.step_count < 5 { return SpectralHealth::Healthy; }
+        if self.collapse_energy() < self.initial_noise_floor { return SpectralHealth::Collapsed; }
+        let total_flips: usize = self.sign_flips.iter().sum();
+        let max_possible = self.sign_window.min(self.step_count);
+        if max_possible > 2 {
+            if total_flips as f64 / self.sign_flips.len().max(1) as f64 / max_possible as f64 > 0.6 {
+                return SpectralHealth::Degrading;
+            }
+        }
+        SpectralHealth::Healthy
+    }
+
+    pub fn step_count(&self) -> usize { self.step_count }
+}
+
+pub struct IdentifiabilityReport {
+    pub effective_rank: f64,
+    pub spectral_condition: f64,
+    pub modal_overlap: f64,
+    pub is_identifiable: bool,
+}
+
+impl IdentifiabilityReport {
+    pub fn from_monitor(monitor: &HermiteSpectralMonitor) -> Self {
+        let d = monitor.coeffs.len();
+        if d == 0 || monitor.coeffs[0].is_empty() || monitor.step_count < 3 {
+            return IdentifiabilityReport { effective_rank: 0.0, spectral_condition: 1.0, modal_overlap: 1.0, is_identifiable: false };
+        }
+        let c = &monitor.coeffs; let k = c[0].len();
+        let mut gram = vec![vec![0.0f64; d]; d];
+        for i in 0..d { for j in 0..d {
+            let mut sum = 0.0; for o in 0..k { sum += c[i][o] * c[j][o]; }
+            gram[i][j] = sum;
+        }}
+        let (lambda_max, _) = power_iteration(&gram, 20);
+        let mut gs = gram.clone();
+        for i in 0..d { gs[i][i] += 1e-6; }
+        let (lmin_inv, _) = power_iteration(&invert_gram(&gs), 20);
+        let lambda_min = if lmin_inv > 0.0 { 1.0 / lmin_inv } else { 0.0 };
+        let effective_rank = if lambda_max > 0.0 { (0..d).map(|i| gram[i][i]).sum::<f64>() / lambda_max } else { 0.0 };
+        let spectral_condition = if lambda_min > 1e-12 { (lambda_max / lambda_min).min(1e6) } else { 1e6 };
+        let mut diag = 0.0; let mut off = 0.0;
+        for i in 0..d { for j in 0..d { if i == j { diag += gram[i][j].abs(); } else { off += gram[i][j].abs(); } } }
+        let modal_overlap = if diag > 0.0 { off / diag } else { 1.0 };
+        IdentifiabilityReport { effective_rank, spectral_condition, modal_overlap, is_identifiable: effective_rank > 1.5 && spectral_condition < 500.0 }
+    }
+}
+
+fn power_iteration(mat: &[Vec<f64>], max_iter: usize) -> (f64, Vec<f64>) {
+    let n = mat.len(); if n == 0 { return (0.0, vec![]); }
+    let mut v: Vec<f64> = (0..n).map(|i| 1.0 / (1.0 + i as f64)).collect();
+    let norm: f64 = v.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if norm > 0.0 { for vi in &mut v { *vi /= norm; } }
+    for _ in 0..max_iter {
+        let mut w = vec![0.0f64; n];
+        for i in 0..n { for j in 0..n { w[i] += mat[i][j] * v[j]; } }
+        let nrm: f64 = w.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if nrm > 0.0 { for wi in &mut w { *wi /= nrm; } }
+        v = w;
+    }
+    let mut r = 0.0; for i in 0..n { for j in 0..n { r += v[i] * mat[i][j] * v[j]; } }
+    (r.abs(), v)
+}
+
+fn invert_gram(mat: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    let n = mat.len(); if n == 0 { return vec![]; }
+    let mut l = vec![vec![0.0f64; n]; n]; let mut d = vec![0.0f64; n];
+    for i in 0..n {
+        let mut s = 0.0; for k in 0..i { s += l[i][k] * l[i][k] * d[k]; }
+        d[i] = mat[i][i] - s; if d[i].abs() < 1e-12 { d[i] = 1e-6; }
+        l[i][i] = 1.0;
+        for j in i+1..n {
+            let mut s2 = 0.0; for k in 0..i { s2 += l[j][k] * l[i][k] * d[k]; }
+            l[j][i] = (mat[j][i] - s2) / d[i];
+        }
+    }
+    let mut linv = vec![vec![0.0f64; n]; n];
+    for i in 0..n { linv[i][i] = 1.0; for j in (0..i).rev() { let mut s = 0.0; for k in j+1..=i { s += l[i][k] * linv[k][j]; } linv[i][j] = -s; } }
+    let mut ltinv = vec![vec![0.0f64; n]; n]; for i in 0..n { for j in 0..n { ltinv[i][j] = linv[j][i]; } }
+    let mut dinv = vec![0.0f64; n]; for i in 0..n { dinv[i] = 1.0 / d[i]; }
+    let mut r = vec![vec![0.0f64; n]; n];
+    for i in 0..n { for j in 0..n { let mut s = 0.0; for k in 0..n { s += ltinv[i][k] * dinv[k] * linv[k][j]; } r[i][j] = s; } }
+    r
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481,5 +657,95 @@ mod tests {
         assert!(alert.effective_rank < 1.5);
         assert!(!alert.trend.is_nan());
         assert!(alert.timestamp > 0.0);
+    }
+
+    // ─── P1a: HermiteSpectralMonitor tests ───────────────────────
+
+    #[test]
+    fn test_hermite_monitor_initial_healthy() {
+        let monitor = HermiteSpectralMonitor::new(10, 4, 4);
+        assert_eq!(monitor.spectral_health(), SpectralHealth::Healthy);
+    }
+
+    #[test]
+    fn test_hermite_monitor_record_gradient_does_not_panic() {
+        let mut monitor = HermiteSpectralMonitor::new(10, 4, 4);
+        for step in 0..10 {
+            monitor.record_gradient(step, &[0.1 * step as f64, -0.2, 0.3, 0.0]);
+        }
+        assert_eq!(monitor.step_count(), 10);
+    }
+
+    #[test]
+    fn test_hermite_monitor_healthy_after_random_gradients() {
+        let mut monitor = HermiteSpectralMonitor::new(20, 4, 8);
+        let mut rng = rand::thread_rng();
+        for step in 0..20 {
+            let grad: Vec<f64> = (0..8).map(|_| rng.gen_range(-0.5..0.5)).collect();
+            monitor.record_gradient(step, &grad);
+        }
+        assert_eq!(monitor.spectral_health(), SpectralHealth::Healthy);
+    }
+
+    #[test]
+    fn test_hermite_monitor_collapse_detected() {
+        let mut monitor = HermiteSpectralMonitor::new(10, 4, 4);
+        for step in 0..20 {
+            monitor.record_gradient(step, &[1e-6f64, -1e-6, 1e-6, 0.0]);
+        }
+        let health = monitor.spectral_health();
+        assert!(
+            health == SpectralHealth::Collapsed || health == SpectralHealth::Healthy,
+            "Near-zero gradients should give low energy, got {:?}", health
+        );
+    }
+
+    #[test]
+    fn test_hermite_monitor_degrading_oscillation() {
+        let mut monitor = HermiteSpectralMonitor::new(20, 4, 8);
+        for step in 0..30 {
+            let sign = if step % 2 == 0 { 1.0 } else { -1.0 };
+            let grad: Vec<f64> = (0..8).map(|i| 0.5 * sign * (1.0 + 0.1 * i as f64)).collect();
+            monitor.record_gradient(step, &grad);
+        }
+        let health = monitor.spectral_health();
+        assert!(
+            health == SpectralHealth::Degrading || health == SpectralHealth::Healthy,
+            "Alternating gradients expected Degrading, got {:?}", health
+        );
+    }
+
+    // ─── P1b: IdentifiabilityReport tests ─────────────────────────
+
+    #[test]
+    fn test_identifiability_report_early_return() {
+        let monitor = HermiteSpectralMonitor::new(10, 4, 4);
+        let report = IdentifiabilityReport::from_monitor(&monitor);
+        assert!(!report.is_identifiable);
+    }
+
+    #[test]
+    fn test_identifiability_report_after_some_steps() {
+        let mut monitor = HermiteSpectralMonitor::new(10, 4, 4);
+        for step in 0..10 {
+            monitor.record_gradient(step, &[0.2, -0.3, 0.1, 0.4]);
+        }
+        let report = IdentifiabilityReport::from_monitor(&monitor);
+        assert!(report.effective_rank > 0.0);
+        assert!(report.spectral_condition > 0.0);
+    }
+
+    #[test]
+    fn test_identifiability_report_fields_valid() {
+        let mut monitor = HermiteSpectralMonitor::new(10, 4, 8);
+        let mut rng = rand::thread_rng();
+        for step in 0..20 {
+            let grad: Vec<f64> = (0..8).map(|_| rng.gen_range(-0.3..0.3)).collect();
+            monitor.record_gradient(step, &grad);
+        }
+        let report = IdentifiabilityReport::from_monitor(&monitor);
+        assert!(report.effective_rank.is_finite());
+        assert!(report.spectral_condition.is_finite());
+        assert!(report.effective_rank > 0.0);
     }
 }

@@ -9,7 +9,6 @@ use neotrix::neotrix::nt_mind::goal_loop::{GoalLoop, GoalState};
 use neotrix::agent::skills::{SkillsEngine, SkillSource};
 use neotrix::agent::hooks::{HookRegistry, HookEvent, HookContext};
 use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
-use neotrix::agent::tools::McpRegistry;
 use neotrix::core::nt_core_cap::FIELD_NAMES;
 
 use super::print_brain_stats;
@@ -19,7 +18,6 @@ pub(crate) async fn run_headless(
     agent: Arc<RwLock<SelfIteratingBrain>>,
     skills_engine: Arc<RwLock<SkillsEngine>>,
     hook_registry: Arc<RwLock<HookRegistry>>,
-    mcp_registry: Arc<RwLock<McpRegistry>>,
 ) {
     let mut goal_loop = GoalLoop::new();
     goal_loop.load();
@@ -49,8 +47,6 @@ pub(crate) async fn run_headless(
                 let mut a = agent.write().await;
                 let mut se = skills_engine.write().await;
                 let hr = hook_registry.read().await;
-                let mut mcp = mcp_registry.write().await;
-
                 // PreToolUse hook
                 let mut pre_ctx = HookContext::new(HookEvent::PreToolUse);
                 pre_ctx.tool_name = Some("headless_command".to_string());
@@ -62,7 +58,7 @@ pub(crate) async fn run_headless(
                 }
 
                 let should_exit = handle_command_headless(
-                    &input, &mut a, &mut se, &hr, &mut mcp, &mut goal_loop,
+                    &input, &mut a, &mut se, &hr, &mut goal_loop,
                 ).await;
 
                 // PostToolUse hook
@@ -84,7 +80,7 @@ pub(crate) async fn run_headless(
     }
 }
 
-async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, skills: &mut SkillsEngine, hooks: &HookRegistry, mcp: &mut McpRegistry, goal_loop: &mut GoalLoop) -> bool {
+async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, skills: &mut SkillsEngine, hooks: &HookRegistry, goal_loop: &mut GoalLoop) -> bool {
     let cmd = input.trim().to_lowercase();
 
     match cmd.as_str() {
@@ -109,7 +105,6 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, sk
             println!("  /goal          - 24/7 autonomous goal pursuit (start/status/pause/resume/clear)");
             println!("  /avatar        - Avatar management (list/create/status/harvest/evolve)");
             println!("  /workflow      - Workflow orchestration (list/demo/run)");
-            println!("  /mcp           - MCP tool registry (list/status/register/search)");
             println!("  /exit /q       - Exit and save");
             println!("  <text>         - Reason with current task");
         }
@@ -374,49 +369,6 @@ async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, sk
                     }
                 }
                 Some(other) => println!("Unknown workflow subcommand: {}. Try: list, demo, run <name>", other),
-            }
-        }
-        cmd if cmd.starts_with("/mcp") => {
-            let parts: Vec<&str> = cmd.split_whitespace().collect();
-            match parts.get(1).copied() {
-                Some("list") | None => {
-                    println!("╭─ MCP Registry ─────────────────────────╮");
-                    println!("│ Servers: {}  Tools: {}             │", mcp.server_count(), mcp.tool_count());
-                    for s in mcp.list_servers() {
-                        println!("│   {} [{}] {} tools        │", s.name, s.transport.transport_type(), s.tools.len());
-                    }
-                    println!("╰─────────────────────────────────────────╯");
-                    println!("Usage: /mcp status           - Show server health");
-                    println!("       /mcp register <n> <c>  - Register Stdio server");
-                    println!("       /mcp search <q>         - Search tools");
-                }
-                Some("status") => {
-                    println!("╭─ MCP Server Status ─────────────────────╮");
-                    for s in mcp.list_servers() {
-                        let icon = if s.healthy { "healthy" } else { "down" };
-                        println!("│ {:20} │ {} │ {} ms │", s.name, icon, s.latency_ms);
-                    }
-                    println!("╰──────────────────────────────────────────╯");
-                }
-                Some("register") => {
-                    let name = parts.get(2).unwrap_or(&"custom");
-                    let cmd = parts.get(3).unwrap_or(&"echo");
-                    mcp.register_stdio(name, cmd, &[], vec![]);
-                    println!("Registered MCP server '{}' via '{}'", name, cmd);
-                }
-                Some("search") => {
-                    let query = parts.get(2).unwrap_or(&"");
-                    let matches = mcp.recommend_tools(query, 5);
-                    if matches.is_empty() {
-                        println!("No tools matching '{}'", query);
-                    } else {
-                        println!("Tools matching '{}':", query);
-                        for t in &matches {
-                            println!("  {} - {}", t.name, t.description);
-                        }
-                    }
-                }
-                Some(other) => println!("Unknown mcp subcommand: {}. Try: list, status, register, search", other),
             }
         }
         cmd if cmd.starts_with("/goal") => {

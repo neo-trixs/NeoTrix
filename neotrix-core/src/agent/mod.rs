@@ -36,7 +36,7 @@ pub use absorb::AbsorbResult;
 pub use team::{AgentTeam, AgentRole, AgentResult, ProcessType, Coordinator};
 pub use workflow::{Workflow, WorkflowStep, WorkflowEngine, WorkflowResult};
 pub use skills::{SkillsEngine, Skill, SkillMeta, SkillSource, SkillOutput, SkillDiscovery, SkillActivator, SkillExecutor, SkillInjector};
-pub use tools::{McpRegistry, McpTransport, McpToolDef, McpToolGenerator, McpServer};
+
 pub use hooks::{HookRegistry, Hook, HookEvent, HookContext, HookAction, HookProfile, SessionPersistenceHook, QualityGateHook};
 pub use persona::{AgentPersona, AgentPersonaRegistry, PersonaRole, ExperienceLevel};
 pub use sub_agent::{SubAgentPool, SubAgentConfig, SubAgentStatus, SubAgentResult, SubAgentHandle, SubAgentEvent, SubAgentVariant};

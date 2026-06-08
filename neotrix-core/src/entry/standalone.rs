@@ -43,30 +43,12 @@ pub(crate) async fn run_standalone(stage: usize) {
                         println!("  /stats     - Kernel statistics");
                         println!("  /stage <N> - Switch evolution stage (0-18)");
                         println!("  /workflow  - Workflow engine (use --headless for full)");
-                        println!("  /mcp       - MCP tool registry");
                         println!("  /help      - This help");
                         println!("  /exit      - Exit");
                         println!("  <text>     - Reason with internal kernel");
                     }
                     cmd if cmd.starts_with("/workflow") => {
                         println!("WorkflowEngine available in headless/TUI mode (use --headless)");
-                    }
-                    cmd if cmd.starts_with("/mcp") => {
-                        let parts: Vec<&str> = cmd.split_whitespace().collect();
-                        match parts.get(1).copied() {
-                            Some("list") | None => {
-                                println!("╭─ MCP Registry (standalone) ───────────────╮");
-                                println!("│  Limited MCP support in standalone mode.  │");
-                                println!("│  Use --headless for full MCP features.     │");
-                                println!("╰────────────────────────────────────────────╯");
-                            }
-                            Some("status") => {
-                                println!("╭─ MCP Server Status ─────────────────────╮");
-                                println!("│  Mode: standalone (limited)              │");
-                                println!("╰──────────────────────────────────────────╯");
-                            }
-                            Some(other) => println!("Unknown mcp subcommand: {}. Try: list, status", other),
-                        }
                     }
                     _ if !trimmed.is_empty() => {
                         let response = engine.reason(trimmed);

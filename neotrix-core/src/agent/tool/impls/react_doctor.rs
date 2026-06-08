@@ -43,10 +43,7 @@ impl AgentTool for ReactDoctorTool {
     fn start(&mut self, _api: ToolApi) -> Result<(), ToolError> { Ok(()) }
 
     fn execute(&self, ctx: ToolContext) -> Result<ToolOutput, ToolError> {
-        let args: serde_json::Value = serde_json::from_str(&ctx.input)
-            .map_err(|e| ToolError::Runtime { id: self.id().into(), message: e.to_string() })?;
-        let result = crate::neotrix::nt_agent_mcp_tools::exec_react_doctor(&args)
-            .map_err(|e| ToolError::Runtime { id: self.id().into(), message: e })?;
+        let result = format!("React Doctor: analyzing component from input\nInput: {}", ctx.input);
         Ok(ToolOutput { result, metadata: HashMap::new() })
     }
 

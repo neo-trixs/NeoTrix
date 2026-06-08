@@ -54,8 +54,8 @@ fn skip_url(url: &str) -> bool {
         || d == "worldcat.org" || d == "d-nb.info"
         || d == "openlibrary.org"
         || d == "books.google.com" || d.starts_with("books.google.")
-        || d == "google.com" || d == "www.google.com"
-        || d == "scholar.google.com"
+        || d.starts_with("google.") || d == "www.google.com"
+        || d.starts_with("scholar.google.")
         || d == "facebook.com" || d == "twitter.com" || d == "x.com"
         || d == "reddit.com" || d == "linkedin.com"
         || d == "pinterest.com" || d == "youtube.com"
@@ -69,12 +69,19 @@ fn skip_url(url: &str) -> bool {
 
 fn try_parse_metadata_url(conn: &Connection, url: &str) -> Option<Result<(usize, usize), String>> {
     let lower = url.to_lowercase();
-    if lower.contains("google.com/search") || lower.contains("www.google.com/search") {
-        let query = url.split('?').nth(1).unwrap_or("");
-        let params: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(query.as_bytes())
-                .map(|(k, v)| (k.to_lowercase(), v.into_owned()))
-                .collect();
+    let is_google = lower.contains(".google.") && lower.contains("/search");
+    let is_scholar = lower.contains("scholar.google.");
+
+    if !is_google && !is_scholar { return None; }
+
+    let raw_query = url.split('?').nth(1).unwrap_or("");
+    let cleaned_query = raw_query.replace("&amp;", "&").replace("&#x3D;", "=").replace("&#38;", "&");
+    let params: std::collections::HashMap<String, String> =
+        url::form_urlencoded::parse(cleaned_query.as_bytes())
+            .map(|(k, v)| (k.to_lowercase(), v.into_owned()))
+            .collect();
+
+    if is_google {
         if let Some(q) = params.get("q") {
             let qt = q.trim();
             if !qt.is_empty() {
@@ -86,13 +93,8 @@ fn try_parse_metadata_url(conn: &Connection, url: &str) -> Option<Result<(usize,
         }
         return None;
     }
-    if !lower.contains("scholar.google.com") { return None; }
+
     if !lower.contains("/scholar_lookup") {
-        let query = url.split('?').nth(1).unwrap_or("");
-        let params: std::collections::HashMap<String, String> =
-            url::form_urlencoded::parse(query.as_bytes())
-                .map(|(k, v)| (k.to_lowercase(), v.into_owned()))
-                .collect();
         if let Some(q) = params.get("q") {
             let qt = q.trim();
             if !qt.is_empty() {
@@ -104,11 +106,6 @@ fn try_parse_metadata_url(conn: &Connection, url: &str) -> Option<Result<(usize,
         }
         return None;
     }
-    let query = url.split('?').nth(1).unwrap_or("");
-    let params: std::collections::HashMap<String, String> =
-        url::form_urlencoded::parse(query.as_bytes())
-            .map(|(k, v)| (k.to_lowercase(), v.into_owned()))
-            .collect();
     let title = params.get("title").map(|s| s.trim()).unwrap_or("").to_string();
     if title.is_empty() && params.get("doi").is_none() { return None; }
     let doi = params.get("doi").map(|s| s.trim()).unwrap_or("").to_string();
