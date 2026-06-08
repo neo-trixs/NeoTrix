@@ -158,6 +158,65 @@ pub fn purge_skip_domains(conn: &Connection) -> Result<usize, String> {
     Ok(total)
 }
 
+pub fn validate_urls_parallel(
+    main_conn: &Connection,
+    db_path: &str,
+    num_workers: usize,
+) -> Result<(usize, usize), String> {
+    let count: i64 = main_conn
+        .query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0))
+        .unwrap_or(0);
+    if count == 0 { return Ok((0, 0)); }
+    let max_batch = (count as usize).min(5000);
+    let items = store::claim_crawl_urls_batch(main_conn, max_batch)
+        .map_err(|e| format!("Claim error: {}", e))?;
+    if items.is_empty() { return Ok((0, 0)); }
+    let alive = Arc::new(AtomicUsize::new(0));
+    let dead = Arc::new(AtomicUsize::new(0));
+    let dead_ids = Arc::new(Mutex::new(Vec::<String>::new()));
+    let db_path = db_path.to_string();
+    let client = Arc::new(
+        reqwest::blocking::Client::builder()
+            .user_agent("NeoTrix/0.18 (Validator)")
+            .no_proxy()
+            .timeout(Duration::from_secs(1))
+            .build()
+            .expect("HTTP client"),
+    );
+    std::thread::scope(|s| {
+        let n = num_workers.max(1);
+        for chunk in items.chunks(n) {
+            let chunk: Vec<_> = chunk.iter().map(|i| (i.id.clone(), i.url.clone())).collect();
+            let db = db_path.clone();
+            let c = Arc::clone(&client);
+            let a = Arc::clone(&alive);
+            let d = Arc::clone(&dead);
+            let di = Arc::clone(&dead_ids);
+            s.spawn(move || {
+                let conn = Connection::open(&db).expect("Worker DB connection");
+                for (id, url) in &chunk {
+                    let ok = if try_parse_metadata_url(&conn, url).is_some() {
+                        true
+                    } else if skip_url(url) {
+                        false
+                    } else {
+                        c.head(url).send().map(|r| r.status().is_success()).unwrap_or(false)
+                    };
+                    if ok {
+                        let _ = conn.execute("UPDATE crawl_queue SET status='pending' WHERE id=?1", rusqlite::params![id]);
+                        a.fetch_add(1, Ordering::SeqCst);
+                    } else {
+                        let _ = conn.execute("DELETE FROM crawl_queue WHERE id=?1", rusqlite::params![id]);
+                        d.fetch_add(1, Ordering::SeqCst);
+                        di.lock().unwrap().push(id.clone());
+                    }
+                }
+            });
+        }
+    });
+    Ok((alive.load(Ordering::SeqCst), dead.load(Ordering::SeqCst)))
+}
+
 pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) -> rusqlite::Result<usize> {
     let ts = now();
     let mut count = 0;

@@ -3,6 +3,9 @@ use std::collections::HashMap;
 mod reflection_loop;
 pub use reflection_loop::*;
 
+pub mod skill_docs;
+pub use skill_docs::*;
+
 mod book_pipeline;
 pub use book_pipeline::*;
 

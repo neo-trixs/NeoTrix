@@ -1205,6 +1205,22 @@ impl BrainStage for CoachAndUpdateStage {
     }
 }
 
+make_stage!(SpectralMonitorStage);
+impl BrainStage for SpectralMonitorStage {
+    fn name(&self) -> &str { "spectral_monitor" }
+    fn frequency(&self) -> usize { 5 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        if let Some(ref mut jepa) = brain.nt_world_jepa {
+            jepa.record_rollout_reward(brain.iteration as usize, brain._reward);
+            if !jepa.check_rollout_stability() {
+                log::warn!("[spectral] model degrading — reducing reward momentum");
+                brain._reward *= 0.9;
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
 pub fn seal_pipeline() -> BrainPipeline {
     BrainPipeline::with_stages(vec![
         Box::new(SnapshotStage::new()),
@@ -1235,6 +1251,7 @@ pub fn seal_pipeline() -> BrainPipeline {
         Box::new(ConversationDistillStage::new()),
         Box::new(crate::neotrix::nt_mind::self_iterating::aging_monitor::AgingDiagnosisStage::new()),
         Box::new(EmbeddingRefreshStage::new()),
+        Box::new(SpectralMonitorStage::new()),
         Box::new(TrajectoryCollectStage::new()),
         Box::new(CoachAndUpdateStage::new()),
     ])

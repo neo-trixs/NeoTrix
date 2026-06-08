@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use crate::neotrix::nt_core_signal::core::Vector;
 use crate::core::nt_core_td::{TemporalDifferenceFlows, TDFlowsConfig};
+use crate::core::nt_core_sigreg::{
+    HermiteSpectralMonitor, SpectralHealth, IdentifiabilityReport,
+};
 use super::types::{
     JEPA_LATENT_DIM, JEPA_HIDDEN_DIM, JEPA_LEARNING_RATE, JEPA_EMA_MOMENTUM,
     JEPA_GAUSS_WEIGHT, JEPA_GAUSS_STD_TARGET,
@@ -33,6 +36,8 @@ pub struct JepaWorldModel {
     pub sigreg: Option<SIGReg>,
     pub sigreg_lambda: f64,
     pub td_flows: Option<TemporalDifferenceFlows>,
+    #[serde(skip)]
+    pub spectral_monitor: Option<HermiteSpectralMonitor>,
 }
 
 impl JepaWorldModel {
@@ -62,6 +67,7 @@ impl JepaWorldModel {
             sigreg: None,
             sigreg_lambda: 0.01,
             td_flows: None,
+            spectral_monitor: None,
         }
     }
 
@@ -84,6 +90,49 @@ impl JepaWorldModel {
     pub fn with_td_flows(mut self, config: TDFlowsConfig) -> Self {
         self.td_flows = Some(TemporalDifferenceFlows::new(config, self.latent_dim));
         self
+    }
+
+    /// Enable spectral monitoring with a HermiteSpectralMonitor of the
+    /// given window size.
+    pub fn with_spectral_monitor(mut self, window_size: usize) -> Self {
+        self.spectral_monitor = Some(HermiteSpectralMonitor::new(
+            window_size, 4, self.latent_dim,
+        ));
+        self
+    }
+
+    /// Record a reward or prediction-error value as a "gradient" proxy
+    /// for spectral monitoring.
+    pub fn record_rollout_reward(&mut self, step: usize, reward: f64) {
+        if let Some(ref mut monitor) = self.spectral_monitor {
+            let pseudo_grad: Vec<f64> = (0..self.latent_dim)
+                .map(|i| reward * (1.0 + 0.01 * (i as f64)))
+                .collect();
+            monitor.record_gradient(step, &pseudo_grad);
+        }
+    }
+
+    /// Return the current spectral health of the world model's gradient
+    /// dynamics.
+    pub fn spectral_health(&self) -> Option<SpectralHealth> {
+        self.spectral_monitor.as_ref().map(|m| m.spectral_health())
+    }
+
+    /// Check rollout stability by comparing spectral health against an
+    /// acceptable threshold.  Returns `true` if the model is stable
+    /// (Healthy) or has insufficient data.
+    pub fn check_rollout_stability(&self) -> bool {
+        match self.spectral_health() {
+            None => true,
+            Some(SpectralHealth::Healthy) => true,
+            Some(SpectralHealth::Degrading) => false,
+            Some(SpectralHealth::Collapsed) => false,
+        }
+    }
+
+    /// Generate an identifiability report from the spectral monitor.
+    pub fn identifiability_report(&self) -> Option<IdentifiabilityReport> {
+        self.spectral_monitor.as_ref().map(IdentifiabilityReport::from_monitor)
     }
 
     pub fn predict(&self, context_features: &[f64]) -> (Vector, f64) {
@@ -385,9 +434,47 @@ impl JepaWorldModel {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_spectral_monitor_can_be_enabled() {
+        let model = JepaWorldModel::new(32).with_spectral_monitor(10);
+        assert!(model.spectral_monitor.is_some());
+    }
+
+    #[test]
+    fn test_spectral_health_none_without_monitor() {
+        let model = JepaWorldModel::new(32);
+        assert!(model.spectral_health().is_none());
+    }
+
+    #[test]
+    fn test_check_rollout_stability_default() {
+        let model = JepaWorldModel::new(32);
+        assert!(model.check_rollout_stability());
+    }
+
+    #[test]
+    fn test_record_rollout_reward_does_not_panic() {
+        let mut model = JepaWorldModel::new(32).with_spectral_monitor(10);
+        for step in 0..5 {
+            model.record_rollout_reward(step, 0.5 + 0.1 * step as f64);
+        }
+        let health = model.spectral_health();
+        assert!(health.is_some());
+    }
+
+    #[test]
+    fn test_identifiability_report_available() {
+        let mut model = JepaWorldModel::new(32).with_spectral_monitor(10);
+        for step in 0..10 {
+            model.record_rollout_reward(step, 0.3);
+        }
+        assert!(model.identifiability_report().is_some());
     }
 }

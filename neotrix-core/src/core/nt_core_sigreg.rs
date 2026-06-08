@@ -316,6 +316,7 @@ fn hermite_normalized(n: usize, x: f64) -> f64 {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SpectralHealth { Healthy, Degrading, Collapsed }
 
+#[derive(Clone, Debug)]
 pub struct HermiteSpectralMonitor {
     max_order: usize,
     coeffs: Vec<Vec<f64>>,
@@ -325,6 +326,8 @@ pub struct HermiteSpectralMonitor {
     prev_signs: Vec<i8>,
     sign_flips: Vec<usize>,
     sign_window: usize,
+    steps_since_reset: usize,
+    grad_mag_ema: f64,
 }
 
 impl HermiteSpectralMonitor {
@@ -332,9 +335,10 @@ impl HermiteSpectralMonitor {
         HermiteSpectralMonitor {
             max_order: max_order.min(4),
             coeffs: vec![vec![0.0f64; max_order.min(4) + 1]; num_dimensions],
-            ema_alpha: 0.1, step_count: 0, initial_noise_floor: 0.001,
+            ema_alpha: 0.1, step_count: 0, initial_noise_floor: 0.0001,
             prev_signs: vec![0i8; num_dimensions],
-            sign_flips: vec![0usize; num_dimensions], sign_window: 20,
+            sign_flips: vec![0usize; num_dimensions], sign_window: 20, steps_since_reset: 0,
+            grad_mag_ema: 0.0,
         }
     }
 
@@ -342,6 +346,9 @@ impl HermiteSpectralMonitor {
         let alpha = self.ema_alpha;
         let one_minus_alpha = 1.0 - alpha;
         let norm_x = (step as f64).sqrt().max(1.0);
+        // Track average absolute gradient magnitude
+        let avg_mag: f64 = gradient.iter().map(|g| g.abs()).sum::<f64>() / gradient.len().max(1) as f64;
+        self.grad_mag_ema = alpha * avg_mag + one_minus_alpha * self.grad_mag_ema;
         for (dim, &g) in gradient.iter().enumerate() {
             if dim >= self.coeffs.len() { break; }
             let x = g / norm_x;
@@ -356,29 +363,20 @@ impl HermiteSpectralMonitor {
             if dim < self.prev_signs.len() { self.prev_signs[dim] = cur; }
         }
         self.step_count += 1;
-        if self.step_count % self.sign_window == 0 {
+        self.steps_since_reset += 1;
+        if self.steps_since_reset >= self.sign_window {
             for sf in &mut self.sign_flips { *sf = 0; }
+            self.steps_since_reset = 0;
         }
-    }
-
-    fn collapse_energy(&self) -> f64 {
-        if self.coeffs.is_empty() || self.coeffs[0].is_empty() { return 0.0; }
-        let mut total = 0.0; let mut count = 0.0;
-        for dim_coeffs in &self.coeffs {
-            for (order, &c) in dim_coeffs.iter().enumerate() {
-                if order == 1 || order == 3 { total += c * c; count += 1.0; }
-            }
-        }
-        if count == 0.0 { return 0.0; } total / count
     }
 
     pub fn spectral_health(&self) -> SpectralHealth {
         if self.step_count < 5 { return SpectralHealth::Healthy; }
-        if self.collapse_energy() < self.initial_noise_floor { return SpectralHealth::Collapsed; }
+        if self.grad_mag_ema < self.initial_noise_floor { return SpectralHealth::Collapsed; }
         let total_flips: usize = self.sign_flips.iter().sum();
-        let max_possible = self.sign_window.min(self.step_count);
-        if max_possible > 2 {
-            if total_flips as f64 / self.sign_flips.len().max(1) as f64 / max_possible as f64 > 0.6 {
+        let window = self.steps_since_reset.max(1);
+        if window > 2 {
+            if total_flips as f64 / self.sign_flips.len().max(1) as f64 / window as f64 > 0.6 {
                 return SpectralHealth::Degrading;
             }
         }

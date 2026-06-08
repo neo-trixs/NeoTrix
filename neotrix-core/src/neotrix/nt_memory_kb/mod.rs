@@ -188,6 +188,12 @@ impl KnowledgeBase {
         nt_memory_crawl::purge_skip_domains(&conn)
     }
 
+    pub fn validate_urls(&self, num_workers: usize) -> Result<(usize, usize), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let db_path = self.db_path.to_string_lossy().to_string();
+        nt_memory_crawl::validate_urls_parallel(&conn, &db_path, num_workers)
+    }
+
     pub fn run_crawl_cycle_parallel(&self, max_items: usize, num_workers: usize, fetch_links: bool) -> Result<nt_memory_crawl::CrawlCycleReport, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         let db_path = self.db_path.to_string_lossy().to_string();

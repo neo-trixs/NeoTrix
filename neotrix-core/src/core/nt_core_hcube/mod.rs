@@ -3,6 +3,7 @@ pub mod coord;
 pub mod cube;
 pub mod gap;
 pub mod vsa;
+pub mod vsa_quantized;
 
 pub mod octonion;
 pub mod e8_lattice;
@@ -12,6 +13,7 @@ pub mod topology;
 pub mod vsa_holon;
 
 pub use vsa::{VsaBackend, VSAEngine};
+pub use vsa_quantized::QuantizedVSA;
 
 #[cfg(feature = "simd-vsa")]
 pub use vsa_holon::HolonBackend;

@@ -68,6 +68,22 @@ fn main() {
     };
     println!("  清除后待处理: {} URLs", after_purge);
 
+    // Phase 2c: Quick connectivity validation (HEAD, 1s timeout, delete failures)
+    println!("\n━━━ Phase 2c: 连通性验证 (HEAD, 1s timeout) ━━━");
+    let v_start = std::time::Instant::now();
+    match kb.validate_urls(workers) {
+        Ok((alive, dead)) => {
+            println!("  ✅ 存活: {}, ❌ 失效: {} | [{:.1}s]",
+                alive, dead, v_start.elapsed().as_secs_f64());
+        }
+        Err(e) => println!("  ⚠ 验证错误: {}", e),
+    }
+    let after_validate = {
+        let conn = kb.conn.lock().expect("Lock");
+        conn.query_row("SELECT COUNT(*) FROM crawl_queue WHERE status='pending'", [], |r| r.get(0)).unwrap_or(0i64)
+    };
+    println!("  验证后待处理: {} URLs", after_validate);
+
     // Phase 3: Drain cycles (parallel, no link fetching to prevent queue growth)
     println!(
         "\n━━━ Phase 3: 并行批量排空 ({} URLs/cycle, {} workers, {} cycles, drain mode) ━━━",

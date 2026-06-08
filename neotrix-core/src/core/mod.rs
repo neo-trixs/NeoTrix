@@ -71,6 +71,7 @@ pub mod nt_core_cdwm;
 pub mod nt_core_prm;
 pub mod nt_core_iface;
 pub mod nt_core_pred;
+pub mod nt_core_consciousness;
 
 // Re-export 主要类型到 core 层顶层
 pub use nt_core_cap::CapabilityVector;
