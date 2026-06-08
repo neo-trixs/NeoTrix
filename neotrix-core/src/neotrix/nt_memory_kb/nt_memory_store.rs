@@ -262,6 +262,31 @@ pub fn upsert_crawl_queue(conn: &Connection, url: &str, depth: i64, domain: &str
     Ok(())
 }
 
+pub fn claim_crawl_urls_batch(conn: &Connection, max_items: usize) -> rusqlite::Result<Vec<CrawlQueueItem>> {
+    let mut items = Vec::new();
+    let mut stmt = conn.prepare(
+        "SELECT id, url, depth, domain, priority, status, discovered_at, last_attempt, retry_count, error_message
+         FROM crawl_queue WHERE status='pending' ORDER BY priority DESC, discovered_at ASC LIMIT ?1",
+    )?;
+    let mut rows = stmt.query(params![max_items as i64])?;
+    while let Some(row) = rows.next()? {
+        items.push(CrawlQueueItem {
+            id: row.get(0)?, url: row.get(1)?, depth: row.get(2)?, domain: row.get(3)?,
+            priority: row.get(4)?, status: row.get(5)?, discovered_at: row.get(6)?,
+            last_attempt: row.get(7)?, retry_count: row.get(8)?, error_message: row.get(9)?,
+        });
+    }
+    let ids: Vec<String> = items.iter().map(|i| i.id.clone()).collect();
+    if !ids.is_empty() {
+        let placeholders: Vec<String> = ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        conn.execute(
+            &format!("UPDATE crawl_queue SET status='processing', last_attempt={} WHERE id IN ({})", now(), placeholders.join(",")),
+            rusqlite::params_from_iter(ids.iter()),
+        )?;
+    }
+    Ok(items)
+}
+
 pub fn claim_next_crawl_url(conn: &Connection) -> rusqlite::Result<Option<CrawlQueueItem>> {
     let mut stmt = conn.prepare(
         "SELECT id, url, depth, domain, priority, status, discovered_at, last_attempt, retry_count, error_message

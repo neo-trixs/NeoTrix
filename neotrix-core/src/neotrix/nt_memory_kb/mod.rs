@@ -178,6 +178,24 @@ impl KnowledgeBase {
         r
     }
 
+    pub fn reset_stuck_items(&self) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        nt_memory_crawl::reset_stuck_items(&conn)
+    }
+
+    pub fn purge_skip_domains(&self) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        nt_memory_crawl::purge_skip_domains(&conn)
+    }
+
+    pub fn run_crawl_cycle_parallel(&self, max_items: usize, num_workers: usize, fetch_links: bool) -> Result<nt_memory_crawl::CrawlCycleReport, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let db_path = self.db_path.to_string_lossy().to_string();
+        let r = nt_memory_crawl::run_crawl_cycle_parallel(&conn, &db_path, max_items, num_workers, fetch_links);
+        self.mark_bm25_dirty();
+        r
+    }
+
     pub fn seed_foundational(&self) -> Result<usize, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         let r = nt_memory_seed::seed_foundational_knowledge(&conn).map_err(|e| format!("Seed error: {}", e))?;
