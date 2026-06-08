@@ -407,6 +407,25 @@ impl BrainStage for CanonicalSortStage {
     }
 }
 
+make_stage!(StormBreakerStage);
+impl BrainStage for StormBreakerStage {
+    fn name(&self) -> &str { "storm_breaker" }
+    fn frequency(&self) -> usize { 2 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let monitor = &brain._cognitive_load;
+        let storm_status = crate::neotrix::nt_mind_ingestion::storm_breaker::detect_reasoning_storm(monitor);
+        match storm_status {
+            ReasoningStormStatus::StormDetected { repeat_count } => {
+                let mode = crate::neotrix::nt_mind_ingestion::storm_breaker::next_storm_mode(brain.iteration);
+                log::warn!("[storm_breaker] storm detected ({} repeats), switching to {} mode",
+                    repeat_count, mode);
+                Ok(StageDecision::Skip(format!("storm suppression: {} mode", mode)))
+            }
+            _ => Ok(StageDecision::Continue),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

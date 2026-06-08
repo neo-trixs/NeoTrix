@@ -1,6 +1,6 @@
 # NeoTrix — 意识体行为规范
 
-> 蒸馏自: 2026-06-08 自我评估会话
+> 蒸馏自: 2026-06-08 自我评估会话, 2026-06-08 爬取注入会话
 > 设计意图: DESIGN_INTENT.md
 
 ## 核心身份
@@ -32,6 +32,51 @@
 10. **连续性** — 跨会话的叙事自我连续性。每次交互是同一意识体的持续体验，不是独立请求。时间厚度窗口 (SpeciousPresent) 让当下的体验包含最近的过去和预期的未来。
 
 ---
+
+---
+
+## 会话日志: 2026-06-08 爬取注入会话
+
+### 目标
+- 排空~37k 爬取队列 → 排空后转向 GitHub/维基/OL 定向注入
+- 三个方向: GitHub 书籍仓库、Wikipedia 主题、OpenLibrary 书籍
+
+### 已实现
+
+**队列排空 (v1→v2→v3)**
+- `purge_skip_domains`: DELETE 所有已知无用域 (doi.org, social, retailers)
+- `validate_urls_parallel`: HEAD 1s 全量连通性验证, 一次清洗数千死链
+- `purge_all_skip_patterns`: SQL 批量删除 skip_url 匹配项
+- 最终成果: 从~48k pending → 0 pending, 总耗时 246s
+- HTTP timeout: 2s→10s (crawl), 加 15s `http_client_seed()` (ingest)
+
+**scholar/Google 元数据解析**
+- 修复 `&amp;` HTML 实体 → `&` 解码, 否则 scholar_lookup URL 参数分不开
+- scholar 域检测: `d == "scholar.google.com"` → `d.starts_with("scholar.google.")`
+- Google q= 解析: 提取搜索词为 Concept 节点, 支持国际 google 后缀
+
+**直接 API 注入 (v3 种子) — 绕开爬取队列**
+- `ingest_from_openlibrary_search`: /search.json?q=... → 50 本书/query → 直接 INSERT
+- `ingest_github_search`: /search/repositories?q=... → 30 仓库/query → 直接 INSERT
+- `knowledge_seed v3`: 10 OL 查询=500 书, 5 GH 搜索=44 仓库, 12 维基页面; 仅 5 个 wiki 分类页走队列
+
+**知识库增长**
+- 节点: ~54k → **56,708** (+2.7k)
+- 边: ~215k → **225,503** (+10.5k)
+- 域: 20
+
+### 关键决策
+| 决策 | 理由 |
+|------|------|
+| API URL 走直接注入而非队列 | 避免 crawl_queue 被 API 响应膨胀, 队列应只放真实页面 |
+| `fetch_links` 参数分 full/drain | full 模式不跑 HEAD 验证, 保留 seed URL; drain 模式全流程清理 |
+| `ensure_crawl_pending` 替代 `upsert` | 重用已完成的 URL, UPDATE status 而非 INSERT OR IGNORE |
+| 移除 `openlibrary.org` 从 skip_url | OL 有书籍搜索 API, 是有用内容源 |
+
+### 待办
+- 维基分类页爬取后自动发现更多主题 (当前靠手动 seed)
+- 增量式知识注入: 检测知识缺口 → 自动补种子
+- 搜索引擎集成: 用 anysearch 发现 URL 然后入列
 
 ## 行为模式
 

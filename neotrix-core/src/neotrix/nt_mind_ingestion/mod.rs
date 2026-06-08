@@ -32,6 +32,9 @@ pub use e8_routing::*;
 pub mod stream_hygiene;
 pub use stream_hygiene::*;
 
+pub mod storm_breaker;
+pub use storm_breaker::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceType {
     Book,
