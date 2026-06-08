@@ -63,7 +63,7 @@ pub fn fold_duplicate_vectors(stream: &mut ConsciousnessStream, window: usize) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+    use crate::core::nt_core_consciousness::vsa_tag::{VsaSelfCategory, VsaWorldCategory};
 
     fn self_tagged(v: Vec<u8>) -> VsaTagged {
         VsaTagged::new(v, VsaOrigin::Self_(VsaSelfCategory::Thought))
