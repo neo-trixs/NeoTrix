@@ -1,4 +1,4 @@
-//! 费用 & 审批命令 — Cost / Approval
+//! Cost & approval commands — Cost / Approval
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -15,7 +15,7 @@ impl CliCommand for CostCmd {
     fn name(&self) -> &str { "/cost" }
     fn aliases(&self) -> Vec<&str> { vec!["/spend"] }
     fn description(&self) -> &str {
-        "费用追踪: /cost | /cost detail | /cost budget <amount> [daily|weekly|monthly] | /cost reset"
+        "Cost tracking: /cost | /cost detail | /cost budget <amount> [daily|weekly|monthly] | /cost reset"
     }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
@@ -129,7 +129,7 @@ pub struct ApprovalCmd;
 impl CliCommand for ApprovalCmd {
     fn name(&self) -> &str { "/approval" }
     fn aliases(&self) -> Vec<&str> { vec!["/app"] }
-    fn description(&self) -> &str { "审批管理: /approval mode <suggest|auto-edit|full-auto> | status | list | approve <id> | deny <id> | approve-all" }
+    fn description(&self) -> &str { "Approval management: /approval mode <suggest|auto-edit|full-auto> | status | list | approve <id> | deny <id> | approve-all" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
 

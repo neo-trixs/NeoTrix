@@ -18,9 +18,8 @@ impl CliCommand for PluginCmd {
         let sub = args.first().map(|s| s.as_str()).unwrap_or("");
         match sub {
             "list" | "ls" => {
-                let rt = tokio::runtime::Runtime::new().unwrap();
                 let registry = PluginRegistry::new();
-                let plugins = rt.block_on(registry.list());
+                let plugins = registry.list();
                 if plugins.is_empty() {
                     return CommandOutput::ok("No plugins registered. Use /plugin load <path> to load from a directory.");
                 }
@@ -36,11 +35,10 @@ impl CliCommand for PluginCmd {
                     return CommandOutput::err("Usage: /plugin load <path>");
                 }
                 let dir = PathBuf::from(path);
-                let rt = tokio::runtime::Runtime::new().unwrap();
                 let registry = PluginRegistry::new();
-                match rt.block_on(registry.load_from_dir(&dir)) {
+                match registry.load_from_dir(&dir) {
                     Ok(loaded) => {
-                        let count: usize = loaded.len();
+                        let count = loaded.len();
                         CommandOutput::ok(&format!("Scanned {}. Found {} plugin files (loading pending WASM/DynamicLib support).", path, count))
                     }
                     Err(e) => CommandOutput::err(&format!("Failed to load from directory: {}", e)),
@@ -51,9 +49,8 @@ impl CliCommand for PluginCmd {
                 if name.is_empty() {
                     return CommandOutput::err("Usage: /plugin unload <name>");
                 }
-                let rt = tokio::runtime::Runtime::new().unwrap();
                 let registry = PluginRegistry::new();
-                match rt.block_on(registry.unregister(name)) {
+                match registry.unregister(name) {
                     Ok(()) => CommandOutput::ok(&format!("Plugin '{}' unregistered.", name)),
                     Err(e) => CommandOutput::err(&format!("Failed to unregister '{}': {}", name, e)),
                 }
@@ -63,9 +60,8 @@ impl CliCommand for PluginCmd {
                 if name.is_empty() {
                     return CommandOutput::err("Usage: /plugin info <name>");
                 }
-                let rt = tokio::runtime::Runtime::new().unwrap();
                 let registry = PluginRegistry::new();
-                let plugins = rt.block_on(registry.list());
+                let plugins = registry.list();
                 match plugins.iter().find(|p| p.name == name) {
                     Some(p) => {
                         let mut msg = format!("Plugin: {} v{}\n", p.name, p.version);

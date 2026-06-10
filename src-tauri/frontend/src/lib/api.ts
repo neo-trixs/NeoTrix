@@ -268,3 +268,148 @@ export async function proxyStartDaemon(): Promise<string> {
 export async function proxyStopDaemon(): Promise<string> {
   return invoke<string>("proxy_stop_daemon");
 }
+
+// ========== Browser API ==========
+
+export interface BrowserState {
+  url: string;
+  title: string;
+  is_open: boolean;
+}
+
+export interface SearchResultItem {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+export interface CredentialInfo {
+  id: string;
+  domain: string;
+  username: string;
+  notes: string;
+  created_at: number;
+}
+
+export interface WebAppAgentInfo {
+  id: string;
+  name: string;
+  url_pattern: string;
+  actions: { id: string; label: string }[];
+  is_active: boolean;
+}
+
+export async function browserOpen(url: string): Promise<BrowserState> {
+  return invoke<BrowserState>("browser_open", { url });
+}
+
+export async function browserClose(): Promise<void> {
+  await invoke("browser_close");
+}
+
+export async function browserBack(): Promise<void> {
+  await invoke("browser_back");
+}
+
+export async function browserForward(): Promise<void> {
+  await invoke("browser_forward");
+}
+
+export async function browserReload(): Promise<void> {
+  await invoke("browser_reload");
+}
+
+export async function browserExtractContent(url: string): Promise<{ title: string; summary: string }> {
+  return invoke("browser_extract_content", { args: { url } });
+}
+
+export async function browserAgentDetect(url: string, title: string): Promise<WebAppAgentInfo | null> {
+  try {
+    return await invoke<WebAppAgentInfo | null>("browser_agent_detect", { url, title });
+  } catch {
+    return null;
+  }
+}
+
+export async function browserAgentList(): Promise<WebAppAgentInfo[]> {
+  return invoke<WebAppAgentInfo[]>("browser_agent_list");
+}
+
+export async function browserAgentExecute(agentId: string, actionId: string): Promise<string> {
+  return invoke<string>("browser_agent_execute", { agentId, actionId });
+}
+
+export async function browserCredentialList(): Promise<CredentialInfo[]> {
+  return invoke<CredentialInfo[]>("browser_credential_list");
+}
+
+export async function browserCredentialStore(domain: string, username: string, password: string, notes?: string): Promise<CredentialInfo> {
+  return invoke<CredentialInfo>("browser_credential_store", { domain, username, password, notes });
+}
+
+export async function browserCredentialRemove(id: string): Promise<void> {
+  await invoke("browser_credential_remove", { id });
+}
+
+export async function browserCredentialAutofill(domain: string): Promise<string> {
+  return invoke<string>("browser_credential_autofill", { domain });
+}
+
+export async function toolSearch(query: string, count?: number): Promise<SearchResultItem[]> {
+  return invoke<SearchResultItem[]>("tool_search", { query, count: count ?? 8 });
+}
+
+export async function toolExecute(tool: string, args: Record<string, unknown>): Promise<{ success: boolean; output: string; duration_ms: number }> {
+  return invoke("tool_execute", { tool, args });
+}
+
+// ========== X Auto-Scroll API ==========
+
+export interface XAutoScrollStatus {
+  running: boolean;
+  tweet_count: number;
+  current_url: string;
+  session_active: boolean;
+  absorbed: number;
+  negentropy_avg: number;
+}
+
+export interface XAbsorptionEvent {
+  count: number;
+  total_negentropy: number;
+  avg_negentropy: number;
+  tweets_seen: number;
+}
+
+export interface XHumanProfile {
+  scroll_speed: number;
+  pause_range: [number, number];
+  scroll_variance: number;
+  mouse_trail: boolean;
+  interaction_rate: number;
+  user_agent: string;
+}
+
+export async function browserXStartSession(): Promise<string> {
+  return invoke<string>("browser_x_start_session");
+}
+
+export async function browserXLogin(username: string, password: string): Promise<string> {
+  return invoke<string>("browser_x_login", { username, password });
+}
+
+export async function browserXHumanScroll(): Promise<string> {
+  return invoke<string>("browser_x_human_scroll");
+}
+
+export async function browserXStopSession(): Promise<string> {
+  return invoke<string>("browser_x_stop_session");
+}
+
+export async function browserXStatus(): Promise<XAutoScrollStatus> {
+  return invoke<XAutoScrollStatus>("browser_x_status");
+}
+
+export async function browserXHumanProfile(): Promise<XHumanProfile> {
+  return invoke<XHumanProfile>("browser_x_human_profile");
+}

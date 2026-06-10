@@ -71,7 +71,10 @@ pub mod nt_core_cdwm;
 pub mod nt_core_prm;
 pub mod nt_core_iface;
 pub mod nt_core_pred;
+pub mod nt_core_aura;
 pub mod nt_core_consciousness;
+pub mod nt_core_negentropy;
+pub mod nt_core_vector_store;
 
 // Re-export consciousness types to core layer
 pub use nt_core_consciousness::{

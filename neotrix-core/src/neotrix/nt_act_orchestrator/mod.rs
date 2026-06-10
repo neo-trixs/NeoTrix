@@ -8,6 +8,14 @@ pub mod pm_workflow;
 pub mod group_integration_test;
 #[cfg(test)]
 pub mod pm_integration_test;
+pub mod adversarial;
+pub mod agent_spec;
+pub mod flow;
+pub mod flow_state;
+pub mod guardrail;
+pub mod process;
+pub mod task_spec;
+pub mod verification;
 
 use std::sync::{Arc, Mutex};
 use crate::neotrix::nt_mind::reasoning_engine::ReasoningEngine;

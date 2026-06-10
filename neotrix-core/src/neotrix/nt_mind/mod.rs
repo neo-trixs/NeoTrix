@@ -31,6 +31,7 @@ pub mod reasoning_engine;        // ReasoningEngine: LLM + Knowledge + Capabilit
 pub mod reasoning_types;         // ReasoningMethod, PerspectiveLens, ReasoningType, ReasoningTrace
 pub mod self_edit;               // SelfEdit, MicroEdit, ToolCall, generate_self_edit()
 pub mod self_iterating;          // ReasoningBrain, SelfIteratingBrain, EvaluationRecord
+pub mod perception_evolution;    // Perception Evolution — adaptive sensing and attention
 pub mod stats;                   // BrainStats, BrainReport, IterationResult
 pub mod model_router;            // 智能模型分级路由 (T0-T4)
 pub mod tier_prompts;            // Tier-aware system prompts based on ContextTier
@@ -63,6 +64,7 @@ pub mod export_import;           // v2.0: ReasoningBank 导出/导入（借鉴 M
 // ============================================================================
 pub mod self_evolver;            // SelfEvolver: 从外部链接自我进化 (S-06)
 pub mod auto_crystallizer;       // AutoCrystallizer: 吸收知识自动结晶为 SkillCrystal
+pub mod skill_evolution;         // SkillEvolver: ActionSequenceMiner + SkillDiagnoser + SkillRepairer
 pub mod curiosity_drive;         // CuriosityDrive: 知识缺口→好奇心信号→主动探索
 pub mod knowledge_aging;         // KnowledgeAging: 知识老化评分 + 自动重新扫描
 pub mod stagnation;              // StagnationDetector: 防止无效循环
@@ -113,12 +115,40 @@ pub mod kronecker_cleanup;       // L-02: Kronecker-structured O(N log N) cleanu
 pub mod open_source_benchmark;
 #[cfg(test)]
 pub mod context_integration_test;
+pub mod side_git;                // Side-git world memory — independent git snapshot system
+pub mod theory_of_mind;          // Theory of Mind — user mental model inference
 pub mod tests;                   // 所有测试
 
 // ============================================================================
 // Domain 6: 开发者工具（Developer Tools）
 // ============================================================================
 pub mod lsp_client;
+pub mod rule_engine;                     // 声明式路由规则引擎
+
+// ============================================================================
+// Orphaned modules — reintegrated from flat files
+// ============================================================================
+pub mod brain_event_bus;
+pub mod clawbench;
+pub mod clawbench_bench;
+pub mod consciousness_reasoner;
+pub mod content_extractor;
+pub mod credential_manager;
+pub mod deep_reflexion;
+pub mod discovery_agent;
+pub mod eval_monitor;
+pub mod full_dimension_evolver;
+pub mod gap_analyzer;
+pub mod knowledge_absorber;
+pub mod panoramic;
+pub mod prediction_trainer;
+pub mod reasoning_bench;
+pub mod self_distillation;
+pub mod session_context;
+pub mod webapp_agent;
+pub mod self_questioning;
+pub mod meta_agent;
+pub mod task_driver;
 
 // Domain grouping sub-modules (reorganize flat 62 modules into 6 domains)
 pub(crate) mod seal_core;
@@ -154,12 +184,14 @@ pub use change_archive::{ChangeArchive, DeltaChange, DeltaKind, ArchiveEntry, Co
 // --- Self-Improvement ---
 pub use self_evolver::SelfEvolver;
 pub use auto_crystallizer::AutoCrystallizer;
+pub use skill_evolution::SkillEvolver;
 pub use curiosity_drive::CuriosityDrive;
 pub use knowledge_aging::{KnowledgeAging, KnowledgeFreshness, AgingReport};
 
 // --- Connectivity ---
 pub use consciousness_bridge::ConsciousnessBridge;
 pub use attention_router::AttentionRouter;
+pub use rule_engine::{RuleEngine, RuleAction, RulePattern, RoutingRule};
 pub use stagnation::{StagnationDetector, StagnationSignal, StagnationStats};
 pub use thinking_bridge::SkillBridge;
 pub use bbrain_monitor::{BMonitor, BMonitorReport, AlertLevel};
@@ -170,3 +202,4 @@ pub use panorama_pipeline::{PanoramaPipeline, PanoramaReport};
 pub use open_source_benchmark::{OpenSourceBenchmarker, BenchmarkReport};
 pub use react_doctor::{ReactDoctorEngine, ReactHealthReport, ReactDiagnostic, ReactRuleCategory, RuleSeverity, SuppressionAnalysis};
 pub use goal_loop::{GoalLoop, GoalState, GoalConfig, GoalTracker, GoalIterationRecord};
+pub use theory_of_mind::{TheoryOfMind, MentalModel, InferredIntent};

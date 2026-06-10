@@ -18,6 +18,9 @@ pub mod adaptive;
 pub mod spider;
 pub mod stealth;
 pub mod unified;
+pub mod data_connector;
+pub mod enrichment;
+pub mod research_scanner;
 
 pub use config::{CrawlerConfig, CrawlStrategy, CrawlTopic, CrawlFormat, SeedEntry, default_seed_urls};
 pub use frontier::{DualQueueFrontier, UrlEntry, FrontierStats, extract_domain, extract_links};

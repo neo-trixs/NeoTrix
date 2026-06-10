@@ -46,7 +46,7 @@ impl CliCommand for SwapCmd {
     }
 
     fn aliases(&self) -> Vec<&str> {
-        vec!["/s"]
+        vec!["/sw"]
     }
 
     fn description(&self) -> &str {

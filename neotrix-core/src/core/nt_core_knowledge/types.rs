@@ -153,6 +153,8 @@ pub enum KnowledgeSource {
     SiaFeedbackLoop,        // 三体反馈循环架构
     // 🆕 2026-05-30: DGM-HyperAgents (arXiv 2603.19461, Meta FAIR)
     HyperAgents,            // 自指涉自我改进
+    // 🆕 2026-06-10: Social media feed (X, Reddit, etc.) — negentropy scored
+    SocialFeed,
 }
 
 #[cfg(test)]

@@ -27,6 +27,22 @@ path = "src/bin/neotrix_web.rs"
 name = "neotrix-kb-crawl"
 path = "src/bin/kb_crawl_daemon.rs"
 
+[[bin]]
+name = "data-ingest-loop"
+path = "src/bin/data_ingest_loop.rs"
+
+[[bin]]
+name = "neotrix-explore"
+path = "src/bin/explore.rs"
+
+[[bin]]
+name = "neotrix-knowledge-seed"
+path = "src/bin/knowledge_seed.rs"
+
+[[bin]]
+name = "neotrix-evolve"
+path = "src/bin/evolve.rs"
+
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
 serde = { workspace = true }

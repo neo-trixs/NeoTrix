@@ -2,7 +2,6 @@
 ///
 /// 从 SelfMeasure trajectory 学习子系统间线性耦合矩阵，
 /// 支持干预模拟 (equilibrium_effect) 与假设生成 (generate_hypotheses)。
-
 use super::self_measure::{SystemSnapshot, SubsystemId, RingBuffer, AwakeningReport, NUM_SUBSYSTEMS};
 
 /// 子系统均值状态向量: 将每个多维子系统压缩为标量均值
@@ -30,6 +29,7 @@ impl SelfRepresentation {
     /// 从 trajectory 学习耦合矩阵（最小二乘）
     /// 对每个输出去 j，解 β = (X^T X)^{-1} X^T y
     /// X 为 N×8 设计矩阵 (列1为1截距, 列2~8为7维输入)
+    #[allow(clippy::needless_range_loop, clippy::manual_memcpy)]
     pub fn learn(trajectory: &RingBuffer<SystemSnapshot>) -> Self {
         let snaps: Vec<&SystemSnapshot> = trajectory.iter().collect();
         let n = snaps.len();
@@ -135,6 +135,7 @@ impl SelfRepresentation {
     }
 
     /// 单步预测: 给定当前状态, 预测下步状态
+    #[allow(clippy::needless_range_loop)]
     pub fn predict(&self, current: &[f64; NUM_SUBSYSTEMS]) -> [f64; NUM_SUBSYSTEMS] {
         let mut next = [0.0_f64; NUM_SUBSYSTEMS];
         for j in 0..NUM_SUBSYSTEMS {
@@ -160,6 +161,7 @@ impl SelfRepresentation {
     /// 干预均衡效应: 对子系统 target 施加永久偏移 delta,
     /// 预测均衡后所有子系统的变化量
     /// 解 (I - C) · Δx = C[:, target] · delta
+    #[allow(clippy::needless_range_loop)]
     pub fn equilibrium_effect(&self, target: usize, delta: f64) -> [f64; NUM_SUBSYSTEMS] {
         // 构造 A = I - C
         let mut a = [[0.0_f64; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS];
@@ -190,6 +192,7 @@ impl Default for SelfRepresentation {
 }
 
 /// 求解 7×7 线性系统 A·x = b (高斯消元 + 部分主元)
+#[allow(clippy::needless_range_loop)]
 fn solve_linear_system_7(a: &[[f64; 7]; 7], b: &[f64; 7]) -> [f64; 7] {
     let mut aug = [[0.0_f64; 8]; 7];
     for i in 0..7 {

@@ -9,6 +9,7 @@ use neotrix::neotrix::nt_shield_stealth_net::geo_proxy::RuleUpdater;
 use neotrix::neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler;
 use neotrix::neotrix::nt_shield_stealth_net::self_iterating::FingerprintManager;
 use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyControl, DaemonMode};
+use neotrix::neotrix::nt_shield_stealth_net::proxy_discovery::ProxyDiscoveryEngine;
 
 #[tokio::main]
 async fn main() {
@@ -62,6 +63,18 @@ async fn main() {
     let uc = updater.clone();
     tokio::spawn(async move {
         uc.start_auto_update(6).await;
+    });
+
+    // --- 代理自发现引擎 ---
+    let discovery = Arc::new(ProxyDiscoveryEngine::new());
+    let dc = discovery.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        dc.run_discovery_cycle().await;
+    });
+    let dl = discovery.clone();
+    tokio::spawn(async move {
+        dl.start_discovery_loop().await;
     });
 
     // --- Tor 深网爬虫 ---

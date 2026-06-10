@@ -20,6 +20,8 @@ pub use integration_stage::*;
 
 pub mod pipeline_stages;
 
+pub mod agent_orchestrator;
+pub mod meta_improvement;
 pub mod fingerprint;
 pub use fingerprint::*;
 
@@ -32,8 +34,14 @@ pub use e8_routing::*;
 pub mod stream_hygiene;
 pub use stream_hygiene::*;
 
+pub mod intrinsic_value;
+pub mod self_preservation;
+pub mod graceful_degradation;
+
 pub mod storm_breaker;
 pub use storm_breaker::*;
+
+pub mod document_parser;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceType {
@@ -44,6 +52,7 @@ pub enum SourceType {
     Conversation,
     Finance,
     Media,
+    Social,
 }
 
 impl SourceType {
@@ -56,13 +65,14 @@ impl SourceType {
             Self::Conversation => "conversation",
             Self::Finance => "finance",
             Self::Media => "media",
+            Self::Social => "social",
         }
     }
 
     pub fn all() -> Vec<SourceType> {
         vec![
             Self::Book, Self::Paper, Self::Code, Self::Web,
-            Self::Conversation, Self::Finance, Self::Media,
+            Self::Conversation, Self::Finance, Self::Media, Self::Social,
         ]
     }
 }

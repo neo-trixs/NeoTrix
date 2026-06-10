@@ -12,6 +12,7 @@ use super::super::super::sleep::{SleepEngine};
 use super::super::super::stats::IterationResult;
 use super::super::super::stagnation::StagnationSignal;
 use super::super::pipeline::kernel_iterate_pipeline;
+use super::super::recipe::RecipeRegistry;
 use crate::core::nt_core_consciousness::{
     VsaOrigin, VsaSelfCategory, VsaTagged, ConsciousnessAwakening,
 };
@@ -21,6 +22,7 @@ use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_core_signal::select::SelectableOperator;
 use crate::neotrix::nt_core_signal::SelectiveState;
 use crate::cli::shield_enforcer::global_shield;
+use crate::neotrix::nt_mind::self_iterating::goal_contract::should_stop_seal_loop;
 
 
 type BatchTask<'a> = &'a [(String, Option<Vec<f64>>, Option<f64>)];
@@ -310,7 +312,22 @@ impl SelfIteratingBrain {
         }
 
         let pipeline = std::mem::take(&mut self.pipeline);
-        let result = pipeline.execute(self);
+
+        let result: Result<(), NeoTrixError> = {
+            let registry = std::mem::replace(&mut self.recipe_registry, RecipeRegistry::new());
+            let idx = registry.select_index(self._current_task_type);
+            if let Some(idx) = idx {
+                let name = registry.all()[idx].config.name.clone();
+                log::info!("[recipe] selected '{}' for task_type={:?}", name, self._current_task_type);
+                let r = registry.all()[idx].execute(self);
+                self.recipe_registry = registry;
+                r
+            } else {
+                self.recipe_registry = registry;
+                pipeline.execute(self).map(|_| ())
+            }
+        };
+
         self.pipeline = pipeline;
         let mut reward = self._reward;
 
@@ -383,6 +400,9 @@ impl SelfIteratingBrain {
         // Sync self._reward so downstream tool_call_count modifications accumulate
         self._reward = reward;
 
+        // ── Curvature-aware LR scheduler: feed reward signal ──
+        self._lr_scheduler.observe_reward(reward);
+
         // ── CryptoAgent periodic scan & absorb ──
         if self.iteration % 3 == 0 {
             if let Some(ref crypto_arc) = self.nt_act_crypto {
@@ -418,6 +438,21 @@ impl SelfIteratingBrain {
                 let current = self.brain.capability.quality_gates();
                 self.brain.capability.set_quality_gates((current + bonus).min(1.0));
             }
+            // Skill evolution: mine traces → diagnose → repair
+            let edits_from_evolution = self.skill_evolver.evolve(
+                &[],
+                &self.tool_traces,
+                self.iteration,
+                None,
+            );
+            if !edits_from_evolution.is_empty() {
+                log::info!(
+                    "[skill_evolution] evolved {} edits (total_repaired={}, proposals={})",
+                    edits_from_evolution.len(),
+                    self.skill_evolver.total_repaired,
+                    self.skill_evolver.total_proposed,
+                );
+            }
             self.tool_call_count = 0;
             self.tool_traces.clear();
         }
@@ -427,6 +462,8 @@ impl SelfIteratingBrain {
             self.archive.record(&self._current_task, "run_seal_loop", &edits);
         }
         self._set_micro_edits(edits);
+
+        self._narrative_self.save();
 
         match result {
             Ok(_) => {
@@ -447,6 +484,52 @@ impl SelfIteratingBrain {
                 Err(e)
             }
         }
+    }
+
+    /// Run SEAL loop repeatedly until the goal contract is satisfied or max iterations reached.
+    /// This implements the /goal pattern: keep iterating until verifiable conditions are met.
+    pub fn run_until_goal_achieved(
+        &mut self,
+        task: &str,
+        task_embedding: Option<Vec<f64>>,
+        external_reward: Option<f64>,
+        max_iterations: usize,
+    ) -> NeoTrixResult<f64> {
+        self._goal_complete = false;
+        self._goal_contract = None;
+        self._phase_evidence.clear();
+
+        let mut cumulative_reward = 0.0;
+        let mut iterations = 0;
+
+        for i in 0..max_iterations {
+            match self.run_seal_loop(task, task_embedding.clone(), external_reward) {
+                Ok(reward) => {
+                    cumulative_reward += reward;
+                    iterations += 1;
+                    if should_stop_seal_loop(self) {
+                        log::info!("[goal] /goal achieved after {} iterations (reward={:.3})", i + 1, cumulative_reward);
+                        break;
+                    }
+                }
+                Err(e) => {
+                    log::warn!("[goal] iteration {} failed: {}", i + 1, e);
+                    if should_stop_seal_loop(self) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let avg_reward = if iterations > 0 { cumulative_reward / iterations as f64 } else { 0.0 };
+        log::info!("[goal] /goal complete: {} iterations, avg_reward={:.3}, achieved={}",
+            iterations, avg_reward, self._goal_complete);
+
+        if let Err(e) = crate::neotrix::nt_mind::self_iterating::goal_contract::write_journal(self) {
+            log::warn!("[goal] journal write failed: {}", e);
+        }
+
+        Ok(avg_reward)
     }
 
     pub fn run_seal_loop_batch(&mut self, tasks: BatchTask) -> NeoTrixResult<f64> {

@@ -169,7 +169,7 @@ impl OuterReflector {
     }
 
     pub fn store_as_memory(heuristic: &StrategyHeuristic, bank: &mut neotrix_types::memory::ReasoningBank) {
-//        let desc = format!("Heuristic: {} — {}", heuristic.name, heuristic.description);
+        let desc = format!("Heuristic: {} — {}", heuristic.name, heuristic.description);
         let mem = ReasoningMemory::new(&desc, neotrix_types::nt_core_knowledge::TaskType::Reflection, &[], heuristic.confidence);
         bank.store(mem);
     }

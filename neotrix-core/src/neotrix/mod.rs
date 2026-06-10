@@ -13,6 +13,7 @@ pub mod nt_core_intra_reflection;
 pub mod nt_core_parallel;
 pub mod nt_core_signal;
 pub mod nt_core_knowledge_gap;
+pub mod nt_core_negentropy;
 
 // NT-MIND domain
 pub mod nt_mind;
@@ -39,16 +40,13 @@ pub mod nt_memory_knowledge_populator;
 pub mod nt_io_logging;
 pub mod nt_io_http_factory;
 pub mod nt_io_mention;
-// pub mod nt_io_neotrix_interface; // 孤儿声明,文件不存在
-pub mod nt_io_push_channel;
+pub mod nt_io_neotrix_interface;
 pub mod nt_io_standalone;
 #[cfg(feature = "telemetry")]
 pub mod nt_io_telemetry;
-pub mod nt_io_user_avatar;
-pub mod nt_io_avatar_channel;
+pub mod nt_io_avatar;
 pub mod nt_io_lsp;
 pub mod nt_io_hotreload;
-pub mod nt_io_notify;
 pub mod nt_io_server;
 pub mod nt_io_remote;
 pub mod nt_io_web;
@@ -80,15 +78,17 @@ pub mod nt_act_crypto;
 pub mod nt_act_earn;
 pub mod nt_act_social;
 pub mod nt_act_sync;
-pub mod nt_act_sub_agent_middleware;
 pub mod nt_act_orchestrator;
 pub mod nt_act_project_manager;
+pub mod nt_act_remote_control;
 
-// NT-AGENT domain
+// NT-AGENT domain — consolidated: nt_act_mcp replaces nt_agent_mcp_tools + nt_agent_mcp_discovery
 pub mod nt_agent_protocol;
-pub mod nt_agent_subagent;
-pub mod nt_agent_mcp_discovery;
-pub mod nt_agent_mcp_tools;
+pub mod nt_act_mcp;
+pub mod nt_tools;
+pub mod nt_agent_orchestrator;
+pub mod nt_agent_mod;
+pub mod nt_mind_awakening;
 // NT-WORLD domain
 pub mod nt_world_model;
 pub mod nt_world_model_v2;
@@ -103,9 +103,12 @@ pub mod nt_world_pred;
 pub mod nt_world_sense;
 pub mod nt_world_crawl;
 pub mod nt_world_search;
+pub mod nt_world_code_search;
+pub mod nt_world_journal_index;
+pub mod nt_world_vision;
+pub mod nt_world_pet;
 
 // Re-exports
-pub use nt_io_notify::{notify, notify_with_level, notify_task_complete, notify_approval_needed, Level};
 pub use nt_io_mention::{resolve_mentions, MentionResult};
 pub use nt_mind_consciousness_gold_standard::{ConsciousnessGoldStandard, GoldStandardReport, ConsciousnessLevel, DetectionTrend, E8HexagramState};
 pub use nt_mind::export_import::ReasoningBankExporter;

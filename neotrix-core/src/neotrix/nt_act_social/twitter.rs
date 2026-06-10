@@ -336,6 +336,89 @@ impl SocialMediaPlatform for TwitterConnector {
         })
     }
 
+    async fn get_home_timeline(&self, max_results: u32) -> Result<Vec<crate::neotrix::nt_act_social::connector::TimelineTweet>, PlatformError> {
+        let clamped = max_results.min(100);
+        let url = Url::parse_with_params(
+            "https://api.twitter.com/2/tweets/search/recent",
+            &[
+                ("query", "from:me OR from:following"), // requires following context; fallback
+                ("max_results", &clamped.to_string()),
+                ("tweet.fields", "created_at,public_metrics,author_id"),
+                ("expansions", "author_id"),
+                ("user.fields", "username"),
+            ],
+        ).map_err(|e| PlatformError::Network(e.to_string()))?;
+
+        #[derive(Deserialize)]
+        struct TimelineResponse {
+            data: Option<Vec<TweetData>>,
+            includes: Option<TwitterIncludes>,
+            #[allow(dead_code)]
+            errors: Option<Vec<TwitterError>>,
+        }
+
+        let resp: TimelineResponse = self.call_api(url).await?;
+        let users = resp.includes.as_ref().and_then(|i| i.users.as_ref());
+
+        let tweets = resp.data.unwrap_or_default().iter().map(|t| {
+            let username = users.and_then(|u| {
+                t.author_id.as_ref().and_then(|aid| {
+                    u.iter().find(|u2| u2.id == *aid).map(|u2| u2.username.clone())
+                })
+            });
+            crate::neotrix::nt_act_social::connector::TimelineTweet {
+                id: t.id.clone(),
+                text: t.text.clone(),
+                created_at: t.created_at.clone(),
+                author_id: t.author_id.clone(),
+                author_username: username,
+                like_count: t.public_metrics.as_ref().and_then(|m| m.like_count),
+                retweet_count: t.public_metrics.as_ref().and_then(|m| m.retweet_count),
+                reply_count: t.public_metrics.as_ref().and_then(|m| m.reply_count),
+                is_quote: false,
+            }
+        }).collect();
+
+        Ok(tweets)
+    }
+
+    async fn get_user_tweets(&self, user_id: &str, max_results: u32) -> Result<Vec<crate::neotrix::nt_act_social::connector::TimelineTweet>, PlatformError> {
+        let clamped = max_results.min(100);
+        let fields = "created_at,public_metrics,author_id".to_string();
+        let url = Url::parse_with_params(
+            &format!("https://api.twitter.com/2/users/{}/tweets", user_id),
+            &[
+                ("max_results", &clamped.to_string()),
+                ("tweet.fields", &fields),
+            ],
+        ).map_err(|e| PlatformError::Network(e.to_string()))?;
+
+        #[derive(Deserialize)]
+        struct UserTweetsResponse {
+            data: Option<Vec<TweetData>>,
+            #[allow(dead_code)]
+            errors: Option<Vec<TwitterError>>,
+        }
+
+        let resp: UserTweetsResponse = self.call_api(url).await?;
+
+        let tweets = resp.data.unwrap_or_default().iter().map(|t| {
+            crate::neotrix::nt_act_social::connector::TimelineTweet {
+                id: t.id.clone(),
+                text: t.text.clone(),
+                created_at: t.created_at.clone(),
+                author_id: t.author_id.clone(),
+                author_username: None,
+                like_count: t.public_metrics.as_ref().and_then(|m| m.like_count),
+                retweet_count: t.public_metrics.as_ref().and_then(|m| m.retweet_count),
+                reply_count: t.public_metrics.as_ref().and_then(|m| m.reply_count),
+                is_quote: false,
+            }
+        }).collect();
+
+        Ok(tweets)
+    }
+
     async fn upload_video(
         &self,
         _title: &str,

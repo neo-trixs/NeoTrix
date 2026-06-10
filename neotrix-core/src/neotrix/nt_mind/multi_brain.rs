@@ -11,6 +11,7 @@ use super::self_iterating::ReasoningBrain;
 use super::memory::{ReasoningBank, ReasoningMemory};
 use super::core::KnowledgeSource;
 use super::self_edit::MicroEdit;
+use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
 
 /// 多 Brain 管理器
 /// 借鉴 MemOS：管理多个记忆体（这里对应多个 ReasoningBrain）
@@ -151,6 +152,31 @@ impl MultiBrainManager {
         self.brains.get_mut(index)
     }
 
+    /// Compute effective total negentropy with mutual information deduction.
+    /// effective_N = ΣN_i - ΣMI(brain_i, brain_j) for i < j
+    /// Mutual information is approximated by VSA vector similarity between brain capability vectors.
+    pub fn effective_negentropy(&self, brain_negentropies: &[f64]) -> f64 {
+        let n = self.brains.len().min(brain_negentropies.len());
+        if n < 2 {
+            return brain_negentropies.iter().sum::<f64>() / n.max(1) as f64;
+        }
+        let sum_n: f64 = brain_negentropies.iter().take(n).sum();
+        let mut mi_total: f64 = 0.0;
+        let mut mi_count: usize = 0;
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let sim = QuantizedVSA::similarity(
+                    &self.brains[i].capability.arr().iter().map(|&x| (x * 255.0) as u8).collect::<Vec<_>>(),
+                    &self.brains[j].capability.arr().iter().map(|&x| (x * 255.0) as u8).collect::<Vec<_>>(),
+                );
+                mi_total += sim * 0.3;
+                mi_count += 1;
+            }
+        }
+        let mi_avg = if mi_count > 0 { mi_total / mi_count as f64 } else { 0.0 };
+        (sum_n / n as f64 - mi_avg).max(0.0)
+    }
+
     /// GEA 风格群体进化：找出最优 brain，将其知识广播到其他 brain
     /// 最优 = total_absorb_count 最高的 brain
     /// 这是群体级知识共享的简化实现
@@ -245,5 +271,24 @@ mod tests {
         
         // 应该有 2 个记忆（每个 brain 一个）
         assert_eq!(manager.shared_bank().stats().total_memories, 2);
+    }
+
+    #[test]
+    fn test_effective_negentropy_single_brain() {
+        let manager = MultiBrainManager::new(100);
+        let result = manager.effective_negentropy(&[0.8]);
+        assert!((result - 0.8).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_effective_negentropy_deducts_mi() {
+        let mut manager = MultiBrainManager::new(100);
+        let brain1 = ReasoningBrain::new();
+        let brain2 = ReasoningBrain::new();
+        manager.add_brain(brain1, "A");
+        manager.add_brain(brain2, "B");
+        let effective = manager.effective_negentropy(&[0.9, 0.9]);
+        assert!(effective <= 0.9, "MI deduction should lower effective N");
+        assert!(effective >= 0.0, "effective N should not be negative");
     }
 }

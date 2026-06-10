@@ -1,4 +1,4 @@
-//! 会话管理命令 — Compact / Context / Session / Resume / History
+//! Session management commands — Compact / Context / Session / Resume / History
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -14,7 +14,7 @@ pub struct CompactCmd;
 impl CliCommand for CompactCmd {
     fn name(&self) -> &str { "/compact" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "上下文压缩: /compact [now]" }
+    fn description(&self) -> &str { "Compress context window: /compact [now]" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let immediate = args.first().map(|s| s.as_str()) == Some("now");
         if let Some(b) = brain {
@@ -46,7 +46,7 @@ pub struct ContextCmd;
 impl CliCommand for ContextCmd {
     fn name(&self) -> &str { "/context" }
     fn aliases(&self) -> Vec<&str> { vec!["/ctx"] }
-    fn description(&self) -> &str { "上下文管理: /context | /context clear | /context model <name>" }
+    fn description(&self) -> &str { "Context management: /context | /context clear | /context model <name>" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             if let Some(b) = brain {
@@ -83,7 +83,7 @@ pub struct SessionCmd;
 impl CliCommand for SessionCmd {
     fn name(&self) -> &str { "/session" }
     fn aliases(&self) -> Vec<&str> { vec!["/sessions"] }
-    fn description(&self) -> &str { "会话管理: /session list | save <name> | load <name> | delete <name> | fork <name> | export <name> [--output <path>] | import <path> | share <name> [--ttl <hours>]" }
+    fn description(&self) -> &str { "Session management: /session list | save | load | delete | fork | export | import | share" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let store = SessionStore::new();
         if args.is_empty() {
@@ -232,7 +232,7 @@ pub struct ResumeCmd;
 impl CliCommand for ResumeCmd {
     fn name(&self) -> &str { "/resume" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "恢复上次会话" }
+    fn description(&self) -> &str { "Resume the last session" }
     fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let store = SessionStore::new();
         match store.get_last_session() {
@@ -253,7 +253,7 @@ pub struct ForkCmd;
 impl CliCommand for ForkCmd {
     fn name(&self) -> &str { "/fork" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "创建当前会话的分支副本: /fork [name]" }
+    fn description(&self) -> &str { "Fork the current session: /fork [name]" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             CommandOutput::ok("在 TUI 中直接输入 /fork 可创建当前会话的分支副本。")
@@ -269,7 +269,7 @@ pub struct HistoryCmd;
 impl CliCommand for HistoryCmd {
     fn name(&self) -> &str { "/history" }
     fn aliases(&self) -> Vec<&str> { vec!["/hist"] }
-    fn description(&self) -> &str { "命令历史: /history | /history clear" }
+    fn description(&self) -> &str { "Command history: /history | /history clear" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let cmd = args.iter().find(|a| *a != "--json").map(|s| s.as_str());

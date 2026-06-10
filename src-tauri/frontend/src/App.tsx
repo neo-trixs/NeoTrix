@@ -7,7 +7,8 @@ import TabBar from "./components/TabBar";
 import ChatPanel from "./components/ChatPanel";
 import InputPanel from "./components/InputPanel";
 import StatusBar from "./components/StatusBar";
-import ErrorBoundary from "./components/ErrorBoundary";
+import Loading from "./components/Loading";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import NotificationToast from "./components/NotificationToast";
 import type { DiffBlock, PermissionRequest, KnowledgeEntry, ProviderConfig, AppSettings, Message, Session, ContextMenuItem } from "./types";
 import * as api from "./lib/api";
@@ -32,8 +33,8 @@ const SplitView = React.lazy(() => import("./components/SplitView"));
 const CodeEditor = React.lazy(() => import("./components/CodeEditor"));
 const ContextMenu = React.lazy(() => import("./components/ContextMenu"));
 
-function Lazy({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<div className="panel-loading" />}>{children}</Suspense>;
+function Lazy({ children, message }: { children: React.ReactNode; message?: string }) {
+  return <Suspense fallback={<Loading message={message} />}>{children}</Suspense>;
 }
 
 const App: React.FC = () => {

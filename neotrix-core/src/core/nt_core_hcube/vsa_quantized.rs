@@ -24,6 +24,12 @@ impl QuantizedVSA {
         (0..VSA_DIM).map(|_| rng.gen()).collect()
     }
 
+    pub fn seeded_random(seed: u64, dim: usize) -> Vec<u8> {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        (0..dim).map(|_| rng.gen()).collect()
+    }
+
     pub fn random_binary() -> Vec<u8> {
         let mut rng = rand::thread_rng();
         (0..VSA_DIM).map(|_| if rng.gen_bool(0.5) { 1 } else { 0 }).collect()
@@ -119,6 +125,35 @@ impl QuantizedVSA {
     pub fn dim(&self) -> usize {
         self.dim
     }
+}
+
+/// Pack 8 binary values (each 0 or 1) into each byte for fast hamming distance.
+/// Input length must be multiple of 8. Output is input.len() / 8.
+pub fn pack_binary(v: &[u8]) -> Vec<u8> {
+    v.chunks(8).map(|chunk| {
+        let mut byte = 0u8;
+        for (i, &bit) in chunk.iter().enumerate() {
+            if bit != 0 {
+                byte |= 1 << i;
+            }
+        }
+        byte
+    }).collect()
+}
+
+/// Hamming distance on packed binary vectors using POPCNT via u8::count_ones().
+/// Both inputs must be same length.
+pub fn hamming_distance_packed(a: &[u8], b: &[u8]) -> u32 {
+    a.iter().zip(b.iter()).map(|(&x, &y)| (x ^ y).count_ones()).sum()
+}
+
+/// Normalized similarity [0,1] from packed hamming distance.
+/// 1.0 = identical, 0.0 = all bits differ.
+pub fn similarity_packed(a: &[u8], b: &[u8]) -> f64 {
+    let total_bits = (a.len().min(b.len()) * 8) as f64;
+    if total_bits == 0.0 { return 0.0; }
+    let dist = hamming_distance_packed(a, b) as f64;
+    1.0 - dist / total_bits
 }
 
 #[cfg(test)]
@@ -251,5 +286,43 @@ mod tests {
         let b = QuantizedVSA::random_binary();
         let dist = QuantizedVSA::hamming_distance(&a, &b);
         assert!(dist <= VSA_DIM as u32, "Hamming cannot exceed dimension");
+    }
+
+    #[test]
+    fn test_pack_binary_roundtrip() {
+        let original = QuantizedVSA::random_binary();
+        assert_eq!(original.len(), VSA_DIM);
+        let packed = pack_binary(&original);
+        assert_eq!(packed.len(), VSA_DIM / 8);
+    }
+
+    #[test]
+    fn test_pack_identical_vectors_zero_distance() {
+        let v = vec![1u8; VSA_DIM];
+        let packed = pack_binary(&v);
+        assert_eq!(hamming_distance_packed(&packed, &packed), 0);
+        assert!((similarity_packed(&packed, &packed) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_pack_all_zeros_vs_all_ones() {
+        let zeros = vec![0u8; VSA_DIM];
+        let ones = vec![1u8; VSA_DIM];
+        let pz = pack_binary(&zeros);
+        let po = pack_binary(&ones);
+        assert_eq!(hamming_distance_packed(&pz, &po), VSA_DIM as u32);
+        assert!((similarity_packed(&pz, &po) - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_pack_preserves_information() {
+        let mut v = vec![0u8; VSA_DIM];
+        for i in (0..VSA_DIM).step_by(2) { v[i] = 1; }
+        let packed = pack_binary(&v);
+        assert_eq!(packed.len(), VSA_DIM / 8);
+        // Every other bit is 1 → each byte = 0b01010101 = 85
+        for &byte in &packed {
+            assert_eq!(byte, 0b01010101, "alternating bits should pack to 0x55");
+        }
     }
 }

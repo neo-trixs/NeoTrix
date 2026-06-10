@@ -1,8 +1,6 @@
 use std::path::PathBuf;
 use super::self_iterating::ReasoningBrain;
 use super::core::FIELD_NAMES;
-#[cfg(feature = "e8-theory")]
-use super::attention_router::AttentionRouter;
 
 /// 一个缺口驱动的种子建议
 #[derive(Debug, Clone)]
@@ -21,12 +19,12 @@ pub enum GapSource {
 
 /// 缺口分析器 — 统一汇聚能力向量缺口 + 超立方体稀疏信号，生成探索/爬取种子
 pub struct GapAnalyzer {
-    work_dir: PathBuf,
+    _work_dir: PathBuf,
 }
 
 impl GapAnalyzer {
     pub fn new(work_dir: PathBuf) -> Self {
-        Self { work_dir }
+        Self { _work_dir: work_dir }
     }
 
     /// capability gaps only (no hypercube gaps)
@@ -35,11 +33,10 @@ impl GapAnalyzer {
     }
 
     /// 汇聚两种缺口信号，返回按优先级降序排列的种子
-    #[cfg(feature = "e8-theory")]
+    #[cfg(any())]
     pub fn analyze(
         &self,
         brain: &ReasoningBrain,
-        router: Option<&AttentionRouter>,
     ) -> Vec<GapSeed> {
         let mut seeds = Vec::new();
         seeds.extend(self.capability_gaps(brain));
@@ -95,8 +92,8 @@ impl GapAnalyzer {
     }
 
     /// 从超立方体稀疏维度生成种子 (sparsity_score > 0.7)
-    #[cfg(feature = "e8-theory")]
-    fn hypercube_gaps(&self, router: &AttentionRouter) -> Vec<GapSeed> {
+    #[cfg(any())]
+    fn hypercube_gaps(&self) -> Vec<GapSeed> {
         let topics = router.sparse_topics();
         topics.into_iter().map(|t| {
             let url = format!("https://en.wikipedia.org/wiki/{}", t.name());
@@ -146,7 +143,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "e8-theory")]
     #[test]
     fn test_analyze_capability_only_no_router() {
         let mut brain = ReasoningBrain::new();
@@ -156,7 +152,7 @@ mod tests {
             brain.capability.arr[idx] = 0.1;
         }
         let analyzer = GapAnalyzer::new(PathBuf::from("."));
-        let seeds = analyzer.analyze(&brain, None);
+        let seeds = analyzer.capability_gaps(&brain);
         assert!(!seeds.is_empty(), "inference_depth弱应该有种子");
         assert!(seeds.iter().all(|s| s.source == GapSource::CapabilityWeakness));
     }

@@ -9,6 +9,10 @@ pub mod reddit;
 pub mod bilibili;
 pub mod filter;
 pub mod douyin;
+pub mod web_navigator;
+pub mod x_scraper;
+pub mod tweet_stream;
+pub mod social_ingestion_stage;
 
 
 pub use auth::{PlatformTokens, SocialAuth, TokenStore};
@@ -24,6 +28,10 @@ pub use twitter::TwitterConnector;
 pub use reddit::RedditConnector;
 pub use bilibili::BilibiliConnector;
 pub use douyin::DouyinConnector;
+pub use web_navigator::{WebNavigator, HumanBehavior, PageExtract, LoginCredentials};
+pub use x_scraper::{XScraper, RawTweet, XTimeline, XScrapeSource};
+pub use tweet_stream::{TweetStream, TweetFingerprint, NegentropyScore};
+pub use social_ingestion_stage::SocialIngestionStage;
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,4 @@
-//! Agent & MCP 命令 — Agent / Mcp
+//! Agent & MCP commands — Agent / Mcp
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -15,7 +15,7 @@ pub struct AgentCmd;
 impl CliCommand for AgentCmd {
     fn name(&self) -> &str { "/agent" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "Agent管理: /agent team <roles...> | /agent list | /agent status" }
+    fn description(&self) -> &str { "Agent management: /agent team <roles...> | /agent list | /agent status" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         if args.is_empty() || (args.len() == 1 && args[0] == "--json") {
@@ -93,7 +93,7 @@ pub struct DiscoverCmd;
 impl CliCommand for DiscoverCmd {
     fn name(&self) -> &str { "/discover" }
     fn aliases(&self) -> Vec<&str> { vec!["/scan", "/dsc"] }
-    fn description(&self) -> &str { "扫描网络中的 NeoTrix 代理: /discover [--json] [--port <port>] [--duration <ms>]" }
+    fn description(&self) -> &str { "Discover NeoTrix agents on the network: /discover [--json] [--port <port>] [--duration <ms>]" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let port = args.iter()
@@ -178,7 +178,7 @@ pub struct McpCmd;
 impl CliCommand for McpCmd {
     fn name(&self) -> &str { "/mcp" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "MCP: /mcp list|status|discover|search <q>|publish <name> <cmd>" }
+    fn description(&self) -> &str { "MCP server management. Sub: list, add, auth, debug" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         if args.is_empty() || (args.len() == 1 && args[0] == "--json") {
@@ -221,7 +221,7 @@ impl CliCommand for McpCmd {
                 }
             }
             "discover" | "scan" => {
-                use crate::neotrix::nt_agent_mcp_discovery::McpDiscovery;
+                use crate::neotrix::nt_act_mcp::McpDiscovery;
                 let entries = McpDiscovery::scan_path();
                 let mut s = format!("🔍 MCP Discovery: {} candidates in PATH\n", entries.len());
                 for (i, e) in entries.iter().enumerate() {

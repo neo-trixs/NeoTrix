@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use tokio::sync::RwLock;
-
 use super::{Plugin, PluginEvent, PluginInfo, PluginSource, PluginStatus};
+use super::discovery::discover_skills_on_disk;
 
 /// Thread-safe singleton registry for all plugins.
 #[derive(Default)]
@@ -67,7 +67,8 @@ impl InnerRegistry {
 /// Public handle to the shared plugin registry.
 #[derive(Clone, Default)]
 pub struct PluginRegistry {
-    inner: Arc<RwLock<InnerRegistry>>,
+    inner: Arc<Mutex<InnerRegistry>>,
+    discovered_count: Arc<AtomicUsize>,
 }
 
 impl PluginRegistry {
@@ -75,26 +76,44 @@ impl PluginRegistry {
         Self::default()
     }
 
-    pub async fn register(&self, plugin: Box<dyn Plugin>) -> Result<(), String> {
-        self.inner.write().await.register(plugin)
+    /// Synchronous disk scan for skills/plugins
+    pub fn discover(&self) {
+        let skills = discover_skills_on_disk();
+        self.discovered_count.store(skills.len(), Ordering::Relaxed);
+        if !skills.is_empty() {
+            log::info!("[plugin] discovered {} skill(s): {:?}",
+                skills.len(),
+                skills.iter().map(|s| s.name.as_str()).collect::<Vec<_>>());
+        }
     }
 
-    pub async fn unregister(&self, name: &str) -> Result<(), String> {
-        self.inner.write().await.unregister(name)
+    /// Number of discovered skills/plugins
+    pub fn count(&self) -> usize {
+        self.discovered_count.load(Ordering::Relaxed)
     }
 
-    pub async fn list(&self) -> Vec<PluginInfo> {
-        self.inner.read().await.list()
+    pub fn register(&self, plugin: Box<dyn Plugin>) -> Result<(), String> {
+        self.inner.lock().map_err(|e| e.to_string())?.register(plugin)
     }
 
-    pub async fn dispatch(&self, event: &PluginEvent) {
-        self.inner.read().await.dispatch(event)
+    pub fn unregister(&self, name: &str) -> Result<(), String> {
+        self.inner.lock().map_err(|e| e.to_string())?.unregister(name)
+    }
+
+    pub fn list(&self) -> Vec<PluginInfo> {
+        self.inner.lock().map(|g| g.list()).unwrap_or_default()
+    }
+
+    pub fn dispatch(&self, event: &PluginEvent) {
+        if let Ok(guard) = self.inner.lock() {
+            guard.dispatch(event)
+        }
     }
 
     /// Load all `.wasm` / `.so` / `.dll` files from the given directory.
     /// WASM files are loaded via wasmtime when the `sandbox` feature is enabled.
     #[cfg(feature = "sandbox")]
-    pub async fn load_from_dir(&self, path: &Path) -> Result<Vec<&'static str>, String> {
+    pub fn load_from_dir(&self, path: &Path) -> Result<Vec<&'static str>, String> {
         if !path.is_dir() {
             return Err(format!("not a directory: {}", path.display()));
         }
@@ -110,7 +129,7 @@ impl PluginRegistry {
                 match crate::neotrix::nt_io_plugin::wasm::WasmPluginWrapper::new(&full_path) {
                     Ok(wrapper) => {
                         let name = wrapper.name().to_string();
-                        if let Err(e) = self.register(Box::new(wrapper)).await {
+                        if let Err(e) = self.register(Box::new(wrapper)) {
                             log::warn!("[plugin] failed to register wasm plugin '{}': {}", name, e);
                         } else {
                             log::info!("[plugin] loaded wasm plugin: {}", name);
@@ -128,23 +147,11 @@ impl PluginRegistry {
 
     /// Non-sandbox fallback: log discovery only.
     #[cfg(not(feature = "sandbox"))]
-    pub async fn load_from_dir(&self, path: &Path) -> Result<Vec<&'static str>, String> {
+    pub fn load_from_dir(&self, path: &Path) -> Result<Vec<&'static str>, String> {
         if !path.is_dir() {
             return Err(format!("not a directory: {}", path.display()));
         }
-        let loaded = Vec::new();
-        let mut entries = match std::fs::read_dir(path) {
-            Ok(e) => e,
-            Err(e) => return Err(format!("read_dir failed: {}", e)),
-        };
-        while let Some(entry) = entries.next().transpose().map_err(|e| e.to_string())? {
-            let fname = entry.file_name().to_string_lossy().to_string();
-            if fname.ends_with(".wasm") {
-                log::info!("[plugin] discovered wasm plugin: {} (enable 'sandbox' feature to load)", fname);
-            } else if fname.ends_with(".so") || fname.ends_with(".dll") || fname.ends_with(".dylib") {
-                log::info!("[plugin] discovered dynamic plugin: {} (loading not yet implemented)", fname);
-            }
-        }
-        Ok(loaded)
+        let _ = std::fs::read_dir(path).map_err(|e| e.to_string())?;
+        Ok(Vec::new())
     }
 }

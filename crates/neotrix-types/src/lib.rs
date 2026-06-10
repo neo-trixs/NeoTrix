@@ -31,6 +31,8 @@ pub use core::nt_core_accessor as accessor;
 pub use core::nt_core_absorb as absorb;
 pub use core::nt_core_self_org as self_org;
 pub use core::nt_core_traits as traits;
+pub use core::self_measure;
+pub use core::self_model;
 
 pub use core::nt_core_self_org::{AgentMetadata, AgentStatus, DeadEndRecord, DeadEndRegistry, Heartbeat, SharedState, SelfOrgProtocol};
 

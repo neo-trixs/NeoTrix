@@ -27,6 +27,8 @@ pub use cost_tracker::CostTracker;
 pub use sandbox::{SandboxMode, SandboxEnforcer, global_sandbox, check_sandbox, init_sandbox};
 pub mod shield_enforcer;
 pub mod laws;
+pub mod sandboxed_shell;
 pub use shield_enforcer::{ShieldEnforcer, ShieldDecision, global_shield, init_shield};
 pub use laws::{ProjectLaws, LawViolation, LawSeverity};
+pub use sandboxed_shell::{execute_guarded, check_file_operation, is_shell_allowed};
 pub mod cli_interface;

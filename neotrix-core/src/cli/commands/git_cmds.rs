@@ -1,4 +1,4 @@
-//! Git 集成命令 — Git / Commit / Pr / Worktree
+//! Git integration commands — Git / Commit / Pr / Worktree
 
 use std::process::Command;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ impl CliCommand for GitCmd {
     fn name(&self) -> &str { "/git" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str {
-        "Git 命令: /git status | /git diff | /git log [--oneline -10] | /git worktree create|list|remove|pr|lock|unlock"
+        "Git commands: /git status | /git diff | /git log [--oneline -10] | /git worktree create|list|remove|pr|lock|unlock"
     }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
@@ -196,7 +196,7 @@ pub struct CommitCmd;
 impl CliCommand for CommitCmd {
     fn name(&self) -> &str { "/commit" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "暂存全部并提交: /commit <message>" }
+    fn description(&self) -> &str { "Stage all and commit: /commit <message>" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /commit <message>");
@@ -247,7 +247,7 @@ pub struct PrCmd;
 impl CliCommand for PrCmd {
     fn name(&self) -> &str { "/pr" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "创建 GitHub PR (使用 gh CLI)" }
+    fn description(&self) -> &str { "Create a GitHub PR (uses gh CLI)" }
     fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let gh_check = Command::new("gh").args(["--version"]).output();
         match gh_check {

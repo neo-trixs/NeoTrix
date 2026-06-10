@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use crate::neotrix::nt_agent::plugin::manifest::PluginManifest;
+use crate::neotrix::nt_agent_mod::plugin::manifest::PluginManifest;
 
 /// Represents a loaded plugin.
 #[derive(Debug, Clone)]

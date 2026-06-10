@@ -61,7 +61,7 @@ pub struct AwakeningEngine {
     pub modifier: SelfModify,
     pub config: AwakeningConfig,
     tick: u32,
-    last_refit_tick: u32,
+    _last_refit_tick: u32,
     last_modify_tick: u32,
     last_report: Option<AwakeningReport>,
 }
@@ -81,7 +81,7 @@ impl AwakeningEngine {
             modifier: SelfModify::new(),
             config,
             tick: 0,
-            last_refit_tick: 0,
+            _last_refit_tick: 0,
             last_modify_tick: 0,
             last_report: None,
         }

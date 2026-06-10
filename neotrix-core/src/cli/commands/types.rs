@@ -1,4 +1,4 @@
-//! 基类型 — ExitCode / CommandOutput / CliCommand trait / CommandRegistry
+//! Base types — ExitCode / CommandOutput / CliCommand trait / CommandRegistry
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -8,7 +8,7 @@ use crate::agent::hooks::{HookRegistry, HookEvent, HookContext};
 use crate::cli::sandbox::check_sandbox;
 use crate::cli::shield_enforcer::global_shield;
 
-/// 退出码约定（参考 witr: 0=clean / 1=warning / 2=notfound / 3=permission / 4=invalid）
+/// Exit code convention (0=clean / 1=warning / 2=notfound / 3=permission / 4=invalid)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitCode {
     Success = 0,
@@ -62,6 +62,7 @@ pub trait CliCommand {
         vec![]
     }
     fn description(&self) -> &str;
+    fn help_detail(&self) -> Option<String> { None }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput;
 }
 

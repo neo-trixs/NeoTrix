@@ -132,6 +132,13 @@ impl ConsciousnessStream {
         self.buffer
     }
 
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&VsaTagged) -> bool,
+    {
+        self.buffer.retain(f);
+    }
+
     pub fn retention_rate(&self) -> f64 {
         if self.total_pushed == 0 {
             return 1.0;

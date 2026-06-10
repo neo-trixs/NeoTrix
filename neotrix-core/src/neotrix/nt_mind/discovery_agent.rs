@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::neotrix::nt_mind::exploration_pipeline::ExplorationPipeline;
 
+#[allow(dead_code)]
 const CAPABILITY_DIMENSIONS: [&str; 7] = [
     "agent_orchestration", "code_understanding", "self_evolution",
     "knowledge_integration", "multi_modal", "reasoning_depth", "tool_use",
@@ -38,7 +39,7 @@ pub struct DiscoveryAgent {
     pub pipeline: Option<ExplorationPipeline>,
     pub discovered: Vec<DiscoveryResult>,
     processed_urls: HashMap<String, bool>,
-    work_dir: PathBuf,
+    _work_dir: PathBuf,
     pub auto_discovery_enabled: bool,
 }
 
@@ -48,7 +49,7 @@ impl DiscoveryAgent {
             pipeline: None,
             discovered: Vec::new(),
             processed_urls: HashMap::new(),
-            work_dir,
+            _work_dir: work_dir,
             auto_discovery_enabled: true,
         }
     }

@@ -1,4 +1,4 @@
-//! 主题命令 — /theme
+//! Theme command — /theme
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -11,7 +11,7 @@ pub struct ThemeCmd;
 impl CliCommand for ThemeCmd {
     fn name(&self) -> &str { "/theme" }
     fn aliases(&self) -> Vec<&str> { vec!["/t"] }
-    fn description(&self) -> &str { "切换 TUI 主题 (/theme list, /theme <name>, /theme save)" }
+    fn description(&self) -> &str { "Switch TUI theme: /theme list, /theme <name>, /theme save" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let themes = theme_list();
         let want_json = args.iter().any(|a| a == "--json");

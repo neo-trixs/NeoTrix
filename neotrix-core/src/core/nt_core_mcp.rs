@@ -445,27 +445,7 @@ fn call_execute_command(args: &serde_json::Value) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing required field: command".to_string())?;
 
-    let output = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .map_err(|e| format!("Failed to execute command: {}", e))?;
-
-    let mut result = String::new();
-    if !output.stdout.is_empty() {
-        result.push_str(&String::from_utf8_lossy(&output.stdout));
-    }
-    if !output.stderr.is_empty() {
-        if !result.is_empty() {
-            result.push('\n');
-        }
-        result.push_str(&String::from_utf8_lossy(&output.stderr));
-    }
-    if !output.status.success() {
-        result.push_str(&format!("\n(exit code: {})", output.status.code().unwrap_or(-1)));
-    }
-
-    Ok(result)
+    crate::cli::execute_guarded(command)
 }
 
 #[cfg(test)]

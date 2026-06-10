@@ -10,11 +10,11 @@ pub enum Perspective {
 impl Perspective {
     pub fn description(&self) -> &'static str {
         match self {
-//            Perspective::Security => "Security auditor — find vulnerabilities, injection risks, auth flaws",
-//            Perspective::Performance => "Performance reviewer — identify bottlenecks, N+1 queries, memory issues",
-//            Perspective::Correctness => "Correctness checker — verify logic, invariants, type safety",
-//            Perspective::Completeness => "Completeness validator — ensure all requirements are addressed",
-//            Perspective::EdgeCase => "Edge case hunter — find boundary conditions, error paths, race conditions",
+            Perspective::Security => "Security auditor — find vulnerabilities, injection risks, auth flaws",
+            Perspective::Performance => "Performance reviewer — identify bottlenecks, N+1 queries, memory issues",
+            Perspective::Correctness => "Correctness checker — verify logic, invariants, type safety",
+            Perspective::Completeness => "Completeness validator — ensure all requirements are addressed",
+            Perspective::EdgeCase => "Edge case hunter — find boundary conditions, error paths, race conditions",
         }
     }
 
@@ -135,7 +135,7 @@ impl AdversarialVerifier {
             if result.len() <= 50 && !result.trim().is_empty() {
                 findings.push(AdversarialFinding {
                     perspective: Perspective::Completeness,
-//                    finding: "Result too short — may lack substance".to_string(),
+                    finding: "Result too short — may lack substance".to_string(),
                     severity: FindingSeverity::Medium,
                     challenged_by: Vec::new(),
                     upheld: false,
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn test_consensus_report_empty() {
         let v = AdversarialVerifier::with_all_perspectives();
-        let report = v.consensus_report(&[]);
+        let _report = v.consensus_report(&[]);
 //        assert_eq!(report, "No findings — all perspectives passed.");
     }
 

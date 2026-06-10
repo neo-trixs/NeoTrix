@@ -49,24 +49,24 @@ fn main() {
     let before = kb.stats().expect("Stats");
     println!("\n  开始: {} 节点, {} 边\n", before.total_nodes, before.total_edges);
 
-    let mut total_new = 0usize;
+    let mut _total_new = 0usize;
     let mut success = 0usize;
-    let mut fail = 0usize;
+    let mut _fail = 0usize;
 
     for (i, topic) in EXPLORE_TOPICS.iter().enumerate() {
         let t_start = Instant::now();
         match kb.ingest_wikipedia(topic) {
             Ok(n) => {
-                total_new += n;
+                _total_new += n;
                 success += 1;
-                let domain = topic.split('_').next().unwrap_or(topic);
+                let _domain = topic.split('_').next().unwrap_or(topic);
                 println!("  [{:>2}/{}] {:>50} | +{:<3} nodes | {:>6.2}s",
                     i+1, EXPLORE_TOPICS.len(),
                     topic.replace('_', " "),
                     n, t_start.elapsed().as_secs_f64());
             }
             Err(e) => {
-                fail += 1;
+                _fail += 1;
                 println!("  [{:>2}/{}] {:>50} | ⚠ {}",
                     i+1, EXPLORE_TOPICS.len(),
                     topic.replace('_', " "),

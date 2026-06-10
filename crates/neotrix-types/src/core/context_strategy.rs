@@ -61,17 +61,16 @@ impl ContextStrategy {
 
         for line in lines {
             let trimmed = line.trim();
-            if trimmed.len() > 2 && line_count < Self::SECTION_LINE_LIMIT {
-                if trimmed.ends_with(':')
+            if trimmed.len() > 2 && line_count < Self::SECTION_LINE_LIMIT
+                && (trimmed.ends_with(':')
                     || trimmed.starts_with("# ")
                     || trimmed.starts_with("## ")
                     || trimmed.starts_with("### ")
-                    || trimmed.chars().all(|c| c.is_uppercase() || c.is_whitespace() || c.is_ascii_punctuation())
-                {
-                    if !current.is_empty() {
-                        sections.push(current);
-                        current = String::new();
-                    }
+                    || trimmed.chars().all(|c| c.is_uppercase() || c.is_whitespace() || c.is_ascii_punctuation()))
+            {
+                if !current.is_empty() {
+                    sections.push(current);
+                    current = String::new();
                 }
                 if current.len() < 200 {
                     if !current.is_empty() {

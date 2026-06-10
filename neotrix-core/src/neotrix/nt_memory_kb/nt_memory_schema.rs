@@ -24,7 +24,9 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             access_count INTEGER DEFAULT 0,
-            metadata TEXT
+            metadata TEXT,
+            version INTEGER NOT NULL DEFAULT 1,
+            superseded_by TEXT
         );
 
         CREATE TABLE IF NOT EXISTS edges (
@@ -35,7 +37,9 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
             weight REAL DEFAULT 1.0,
             description TEXT,
             created_at INTEGER NOT NULL,
-            metadata TEXT
+            metadata TEXT,
+            version INTEGER NOT NULL DEFAULT 1,
+            superseded_by TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_id);

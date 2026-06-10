@@ -1,4 +1,4 @@
-//! 基础命令 — Config / Help / Stats / Exit / Clear / Version / Completions
+//! Core commands — Config / Help / Stats / Exit / Clear / Version / Completions
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -20,6 +20,10 @@ impl CliCommand for ConfigCmd {
 
     fn description(&self) -> &str {
         "Config management: /config show | /config set <key> <value>"
+    }
+
+    fn help_detail(&self) -> Option<String> {
+        Some("Manage NeoTrix configuration. Use 'show' to view current config, 'set <key> <value>' to modify settings. Configuration is persisted to ~/.config/neotrix/config.toml.".into())
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -105,6 +109,10 @@ impl CliCommand for HelpCmd {
 
     fn description(&self) -> &str {
         "Show help: /help [command]"
+    }
+
+    fn help_detail(&self) -> Option<String> {
+        Some("Display help information for all available commands. Use '/help <command>' to get detailed help for a specific command.".into())
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -201,6 +209,10 @@ impl CliCommand for StatsCmd {
 
     fn description(&self) -> &str {
         "Show reasoning stats: capabilities, iterations, memory"
+    }
+
+    fn help_detail(&self) -> Option<String> {
+        Some("Display current reasoning statistics including capability sum, iteration count, absorbed sources, and memory entries. Use --json for machine-readable output.".into())
     }
 
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

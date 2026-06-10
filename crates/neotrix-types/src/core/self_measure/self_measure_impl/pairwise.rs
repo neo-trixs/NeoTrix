@@ -8,14 +8,10 @@ pub(crate) fn compute_pairwise_pid(
 ) -> PIDScores {
     let xi = &series[i];
     let yj = &series[j];
-    let mut target = Vec::with_capacity(n);
-    for t in 0..n {
-        let mut sum = 0.0;
-        for k in 0..NUM_SUBSYSTEMS {
-            sum += series[k][t];
-        }
-        target.push(sum / NUM_SUBSYSTEMS as f64);
-    }
+    let target: Vec<f64> = (0..n).map(|t| {
+        let sum: f64 = series.iter().map(|s| s[t]).sum();
+        sum / NUM_SUBSYSTEMS as f64
+    }).collect();
     let r_xt = pearson(xi, &target);
     let r_yt = pearson(yj, &target);
     let i_xt = if r_xt.abs() < 1.0 { -0.5 * (1.0 - r_xt * r_xt).ln() } else { 10.0 };

@@ -1,12 +1,13 @@
 //! Provider 工厂和配置
 
+use serde::{Serialize, Deserialize};
 use super::types::LlmProvider;
 use super::openai::OpenAiProvider;
 use super::anthropic::AnthropicProvider;
 use super::ollama::OllamaProvider;
 use super::gemini::GeminiProvider;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LlmProviderType {
     OpenAI,
     Anthropic,

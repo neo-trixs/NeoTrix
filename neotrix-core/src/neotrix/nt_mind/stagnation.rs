@@ -177,6 +177,14 @@ pub struct StagnationDetector {
     total_cycles: u64,
     last_reward: f64,
     pause_until: Option<Instant>,
+
+    /// Negentropy tracking
+    pub negentropy_plateau_threshold: u64,
+    consecutive_n_plateau: u64,
+    last_n_total: f64,
+    last_n_trend: f64,
+    n_history: Vec<f64>,
+    pub negentropy_mode: bool,
 }
 
 impl Default for StagnationDetector {
@@ -195,6 +203,12 @@ impl Default for StagnationDetector {
             total_cycles: 0,
             last_reward: 0.0,
             pause_until: None,
+            negentropy_plateau_threshold: 10,
+            consecutive_n_plateau: 0,
+            last_n_total: 0.0,
+            last_n_trend: 0.0,
+            n_history: Vec::with_capacity(30),
+            negentropy_mode: false,
         }
     }
 }
@@ -296,12 +310,58 @@ impl StagnationDetector {
         StagnationSignal::Continue
     }
 
+    pub fn record_negentropy(&mut self, n_total: f64) {
+        self.last_n_total = n_total;
+        self.n_history.push(n_total);
+        if self.n_history.len() > 30 {
+            self.n_history.remove(0);
+        }
+
+        if self.n_history.len() >= 5 {
+            let recent: Vec<f64> = self.n_history.iter().rev().take(5).copied().collect();
+            let _mean = recent.iter().sum::<f64>() / recent.len() as f64;
+            let first_deriv: Vec<f64> = (1..recent.len())
+                .map(|i| recent[i] - recent[i - 1])
+                .collect();
+            let trend = first_deriv.iter().sum::<f64>() / first_deriv.len() as f64;
+            self.last_n_trend = trend;
+
+            if trend.abs() < 0.001 {
+                self.consecutive_n_plateau += 1;
+            } else {
+                self.consecutive_n_plateau = 0;
+            }
+        }
+    }
+
+    pub fn negentropy_stagnation(&self) -> Option<StagnationSignal> {
+        if !self.negentropy_mode {
+            return None;
+        }
+        if self.consecutive_n_plateau >= self.negentropy_plateau_threshold {
+            Some(StagnationSignal::Pause(
+                self.pause_duration_secs,
+                format!(
+                    "N_total plateau for {} rounds (trend={:.4}), triggering exploration",
+                    self.consecutive_n_plateau, self.last_n_trend
+                ),
+            ))
+        } else {
+            None
+        }
+    }
+
+    pub fn enable_negentropy_mode(&mut self) {
+        self.negentropy_mode = true;
+    }
+
     pub fn reset(&mut self) {
         self.consecutive_no_absorb = 0;
         self.consecutive_pure_error = 0;
         self.consecutive_zero_reward = 0;
         self.consecutive_no_new_sources = 0;
         self.consecutive_minor_errors = 0;
+        self.consecutive_n_plateau = 0;
         self.pause_until = None;
     }
 
@@ -314,6 +374,10 @@ impl StagnationDetector {
             consecutive_no_new_sources: self.consecutive_no_new_sources,
             consecutive_minor_errors: self.consecutive_minor_errors,
             paused: self.is_paused(),
+            negentropy_mode: self.negentropy_mode,
+            consecutive_n_plateau: self.consecutive_n_plateau,
+            last_n_total: self.last_n_total,
+            last_n_trend: self.last_n_trend,
         }
     }
 }
@@ -327,4 +391,8 @@ pub struct StagnationStats {
     pub consecutive_no_new_sources: u64,
     pub consecutive_minor_errors: u64,
     pub paused: bool,
+    pub negentropy_mode: bool,
+    pub consecutive_n_plateau: u64,
+    pub last_n_total: f64,
+    pub last_n_trend: f64,
 }

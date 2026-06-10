@@ -36,6 +36,7 @@ impl DiscoveredModel {
 }
 
 /// 已知免费 API 端点
+#[allow(dead_code)]
 const BUILTIN_FREE_PROVIDERS: &[(&str, &str, &str, LlmProviderType, &str)] = &[
     ("openai", "gpt-4o-mini", "https://api.openai.com/v1", LlmProviderType::OpenAI, "t1-standard"),
     ("openai", "gpt-4o", "https://api.openai.com/v1", LlmProviderType::OpenAI, "t3-powerful"),

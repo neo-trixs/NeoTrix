@@ -1,6 +1,7 @@
 use std::fmt;
 use std::time::Instant;
 
+pub mod discovery;
 pub mod registry;
 pub mod builtin;
 #[cfg(feature = "sandbox")]
@@ -9,6 +10,7 @@ pub mod wasm;
 pub use registry::PluginRegistry;
 #[cfg(feature = "sandbox")]
 pub use wasm::WasmPluginWrapper;
+pub use discovery::DiscoveredSkill;
 
 /// Events dispatched to all registered plugins.
 #[derive(Debug, Clone)]
@@ -42,6 +44,8 @@ pub enum PluginSource {
     BuiltIn,
     Wasm,
     DynamicLib,
+    SkillMd,
+    SkillJson,
 }
 
 impl fmt::Display for PluginSource {
@@ -50,6 +54,8 @@ impl fmt::Display for PluginSource {
             PluginSource::BuiltIn => write!(f, "built-in"),
             PluginSource::Wasm => write!(f, "wasm"),
             PluginSource::DynamicLib => write!(f, "dynamic-lib"),
+            PluginSource::SkillMd => write!(f, "skill-md"),
+            PluginSource::SkillJson => write!(f, "skill-json"),
         }
     }
 }

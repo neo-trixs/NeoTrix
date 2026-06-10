@@ -3734,12 +3734,50 @@ mark.search-match {
   background: rgba(255, 200, 0, 0.25);
 }
 
-/* ======== Notification Toast ======== */
-.panel-loading {
-  padding: 40px;
-  text-align: center;
-  color: var(--mac-text-muted);
+/* ======== Loading ======== */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.loading-panel {
+  padding: 48px 24px;
+  min-height: 120px;
+}
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.15);
+  backdrop-filter: blur(4px);
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid var(--mac-border);
+  border-top-color: var(--mac-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.loading-overlay .loading-spinner {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.loading-message {
   font-size: 13px;
+  color: var(--mac-text-muted);
 }
 
 .update-progress-bar {

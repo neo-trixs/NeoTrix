@@ -109,6 +109,11 @@ impl ShieldEnforcer {
             ));
         }
 
+        // 4.5 ProxyAllowlist (network access)
+        if let Some(block) = self.sandbox.check_network_access(target) {
+            return Err(ShieldDecision::Block(block.message));
+        }
+
         // 5. ApprovalEngine
         if let Some(act) = approval_action {
             if self.approval.require_approval(act) {

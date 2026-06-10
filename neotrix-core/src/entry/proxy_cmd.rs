@@ -5,7 +5,7 @@ use colored::Colorize;
 pub async fn run_proxy_cmd(cmd_str: &str) {
     use neotrix::neotrix::nt_shield_stealth_net::local_proxy::TorManager;
     use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{DaemonMode, ProxyClient};
-    use neotrix::neotrix::proxy_daemon_wrapper;
+    use neotrix::neotrix::nt_io_proxy;
 
     let client = ProxyClient::new();
     let parts: Vec<&str> = cmd_str.split_whitespace().collect();
@@ -75,7 +75,7 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
                 println!("{} Proxy daemon already running.", "✓".green());
                 return;
             }
-            let daemon_path = match proxy_daemon_wrapper::resolve_daemon_path() {
+            let daemon_path = match nt_io_proxy::resolve_daemon_path() {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("{} {}", "✗".red(), e);
@@ -115,7 +115,7 @@ pub async fn run_proxy_cmd(cmd_str: &str) {
             }
         },
         "install" => {
-            let plist = match proxy_daemon_wrapper::resolve_daemon_path() {
+            let plist = match nt_io_proxy::resolve_daemon_path() {
                 Ok(p) => {
                     let parent = p.parent().unwrap_or(std::path::Path::new("/usr/local/bin"));
                     parent.join("com.neotrix.proxy-daemon.plist")

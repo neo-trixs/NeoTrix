@@ -1,4 +1,4 @@
-//! 命令注册表 — default_registry() 注册所有命令
+//! Command registry — default_registry() registers all commands
 
 use crate::cli::commands::types::CommandRegistry;
 use crate::cli::commands::bench_cmds::BenchmarkCmd;

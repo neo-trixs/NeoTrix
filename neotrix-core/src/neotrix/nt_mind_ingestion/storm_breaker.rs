@@ -7,7 +7,7 @@ pub enum ReasoningStormStatus {
     Suppressed { mode: &'static str },
 }
 
-pub fn detect_reasoning_storm(monitor: &CognitiveLoadMonitor) -> ReasoningStormStatus {
+pub fn detect_reasoning_storm(_monitor: &CognitiveLoadMonitor) -> ReasoningStormStatus {
     ReasoningStormStatus::Normal
 }
 

@@ -1,4 +1,4 @@
-//! 文件操作命令 — Read / Write / Create / Edit / Patch / Diff
+//! File operation commands — Read / Write / Create / Edit / Patch / Diff
 
 use std::fs;
 use std::path::Path;
@@ -54,7 +54,7 @@ pub struct FileReadCmd;
 impl CliCommand for FileReadCmd {
     fn name(&self) -> &str { "/read" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "读取并显示文件内容: /read <path>" }
+    fn description(&self) -> &str { "Read and display file contents: /read <path>" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /read <path>");
@@ -87,7 +87,7 @@ pub struct FileWriteCmd;
 impl CliCommand for FileWriteCmd {
     fn name(&self) -> &str { "/write" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "写入文件: /write <path> <content> [--yes]" }
+    fn description(&self) -> &str { "Write to a file: /write <path> <content> [--yes]" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法:\n  /write <path> <content>  覆盖写入内容\n  /write --yes <path> <content>  跳过审批\n  /write <path>             在 TUI 外通过 stdin 写入");
@@ -129,7 +129,7 @@ pub struct FileCreateCmd;
 impl CliCommand for FileCreateCmd {
     fn name(&self) -> &str { "/create" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "创建新文件: /create <path> [content] [--yes]" }
+    fn description(&self) -> &str { "Create a new file: /create <path> [content] [--yes]" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /create <path> [content] [--yes]");
@@ -166,7 +166,7 @@ pub struct FileEditCmd;
 impl CliCommand for FileEditCmd {
     fn name(&self) -> &str { "/edit" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "编辑文件: /edit <path> [<行号>:<新内容>] [--yes]" }
+    fn description(&self) -> &str { "Edit a file: /edit <path> [<line>:<content>] [--yes]" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /edit <path> [<行号>:<新内容>] [--yes]");
@@ -230,7 +230,7 @@ pub struct FilePatchCmd;
 impl CliCommand for FilePatchCmd {
     fn name(&self) -> &str { "/patch" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "应用 unified diff 补丁: /patch <path> (需要从 stdin 传入)" }
+    fn description(&self) -> &str { "Apply a unified diff patch: /patch <path> (reads from stdin)" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /patch <path> (从 stdin 读取 patch, 在 TUI 中不可用)");
@@ -248,7 +248,7 @@ pub struct FileDiffCmd;
 impl CliCommand for FileDiffCmd {
     fn name(&self) -> &str { "/diff" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "显示文件 git diff: /diff <path>" }
+    fn description(&self) -> &str { "Show git diff for a file: /diff <path>" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /diff <path>");

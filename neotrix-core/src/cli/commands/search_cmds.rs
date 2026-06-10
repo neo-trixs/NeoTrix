@@ -13,11 +13,15 @@ impl CliCommand for SearchCmd {
     }
 
     fn aliases(&self) -> Vec<&str> {
-        vec!["/se"]
+        vec!["/s"]
     }
 
     fn description(&self) -> &str {
         "Search the web: /search <query> [-n <count>]"
+    }
+
+    fn help_detail(&self) -> Option<String> {
+        Some("Search the web for information. Use -n <N> to limit results. Results include title, URL, and snippet for each match.".into())
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

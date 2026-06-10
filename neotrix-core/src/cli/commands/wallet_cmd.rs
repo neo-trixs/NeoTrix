@@ -1,13 +1,13 @@
-//! 钱包命令 — /wallet
+//! Wallet command — /wallet
 //!
-//! 子命令:
-//!   /wallet create <label>         创建新钱包
-//!   /wallet import <label> <pk>    导入私钥
-//!   /wallet list                   列出所有钱包
-//!   /wallet use <label>            切换活跃钱包
-//!   /wallet balance [chain]        查询余额
-//!   /wallet export <label>         导出私钥
-//!   /wallet delete <label>         删除钱包
+//! Subcommands:
+//!   /wallet create <label>         Create a new wallet
+//!   /wallet import <label> <pk>    Import private key
+//!   /wallet list                   List all wallets
+//!   /wallet use <label>            Switch active wallet
+//!   /wallet balance [chain]        Query balance
+//!   /wallet export <label>         Export private key
+//!   /wallet delete <label>         Delete wallet
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -37,7 +37,7 @@ impl CliCommand for WalletCmd {
     }
 
     fn description(&self) -> &str {
-        "钱包管理: create | import | list | use | balance | export | delete"
+        "Wallet management: create | import | list | use | balance | export | delete"
     }
 
     fn execute(

@@ -10,3 +10,6 @@ sessions/
 .claude-plugin/
 *.rs.bak.DS_Store
 models/
+
+# Generated nt-test files
+neotrix-core/tests/*.rs

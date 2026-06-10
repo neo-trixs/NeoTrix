@@ -210,6 +210,8 @@ impl HarnessAdapter {
                 updated_at: 0,
                 access_count: 0,
                 metadata: Some(json),
+                version: 1,
+                superseded_by: None,
             };
             kb.insert_node(&node)?;
             count += 1;

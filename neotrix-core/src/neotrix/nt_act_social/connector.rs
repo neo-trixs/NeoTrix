@@ -59,6 +59,20 @@ pub struct SearchResult {
     pub total_estimated: Option<u64>,
 }
 
+/// 结构化推文 (API 返回)
+#[derive(Debug, Clone)]
+pub struct TimelineTweet {
+    pub id: String,
+    pub text: String,
+    pub created_at: Option<String>,
+    pub author_id: Option<String>,
+    pub author_username: Option<String>,
+    pub like_count: Option<u64>,
+    pub retweet_count: Option<u64>,
+    pub reply_count: Option<u64>,
+    pub is_quote: bool,
+}
+
 #[derive(Debug)]
 pub enum PlatformError {
     NotAuthenticated,
@@ -103,6 +117,18 @@ pub trait SocialMediaPlatform: Send + Sync {
     async fn get_video(&self, video_id: &str) -> Result<VideoInfo, PlatformError>;
     async fn trending(&self, max_results: u32) -> Result<Vec<VideoInfo>, PlatformError>;
     async fn get_me(&self) -> Result<UserInfo, PlatformError>;
+
+    /// 获取主页时间线 (首页推文流)
+    async fn get_home_timeline(&self, max_results: u32) -> Result<Vec<TimelineTweet>, PlatformError> {
+        let _ = max_results;
+        Err(PlatformError::ApiError { status: 501, message: "home timeline not implemented".into() })
+    }
+
+    /// 获取用户推文
+    async fn get_user_tweets(&self, user_id: &str, max_results: u32) -> Result<Vec<TimelineTweet>, PlatformError> {
+        let _ = user_id; let _ = max_results;
+        Err(PlatformError::ApiError { status: 501, message: "user tweets not implemented".into() })
+    }
 
     async fn upload_video(
         &self,

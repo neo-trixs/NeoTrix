@@ -88,7 +88,8 @@ pub fn shortest_path(
     let mut edges = Vec::new();
     for eid in &path_edge_ids {
         let mut stmt = conn.prepare(
-            "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata
+            "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata,
+                    version, superseded_by
              FROM edges WHERE id=?1",
         )?;
         let mut rows = stmt.query(params![eid])?;
@@ -102,6 +103,8 @@ pub fn shortest_path(
                 description: row.get(5)?,
                 created_at: row.get(6)?,
                 metadata: row.get::<_, Option<String>>(7)?.and_then(|m| serde_json::from_str(&m).ok()),
+                version: row.get::<_, i64>(8)? as u64,
+                superseded_by: row.get(9)?,
             });
         }
     }
@@ -155,7 +158,8 @@ pub fn subgraph(
     let mut edges = Vec::new();
     for eid in &edge_ids {
         let mut stmt = conn.prepare(
-            "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata
+            "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata,
+                    version, superseded_by
              FROM edges WHERE id=?1",
         )?;
         let mut rows = stmt.query(params![eid])?;
@@ -169,6 +173,8 @@ pub fn subgraph(
                 description: row.get(5)?,
                 created_at: row.get(6)?,
                 metadata: row.get::<_, Option<String>>(7)?.and_then(|m| serde_json::from_str(&m).ok()),
+                version: row.get::<_, i64>(8)? as u64,
+                superseded_by: row.get(9)?,
             });
         }
     }

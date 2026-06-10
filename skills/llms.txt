@@ -1,0 +1,19 @@
+# NeoTrix Skills Index
+# Agent: scan this file → load matching SKILL.md from skills/{category}/{name}/
+
+code-expert, Code analysis/generation/review, triggers: code, programming, analysis
+diagnose, Disciplined debugging 6-step loop, triggers: debug, diagnose, bug, error, fix
+grill-me, Structured pre-task questioning, triggers: grill, plan, design, architect
+improve-architecture, Ball-of-mud codebase rescue, triggers: refactor, architecture, cleanup, tech-debt
+tdd, Red-Green-Refactor TDD loop, triggers: tdd, test
+zoom-out, System-context code understanding, triggers: zoom, context, architecture, overview
+caveman, Ultra-compressed communication, triggers: caveman, concise, compressed, terse
+self-iteration-agent, Full-stack iteration protocol, triggers: iterate, evolve, absorb, improve, 迭代, 进化
+external-absorption, External repo analysis + absorption, triggers: "analyze this repo", "absorb features"
+law-expert, Legal document analysis/review, triggers: legal, contract, compliance
+mcp-gateway, Unified MCP server gateway, triggers: mcp, gateway, 1mcp
+agentic-design-system, 3-pass UI evaluation loop, triggers: design-review, ux-baseline, ui-polish
+decantr-design, 3-layer design context system, triggers: decantr, design-system
+ui-reasoning, 10-dimension UI reasoning, triggers: ui-design, layout, visual
+ui-skill, 5-mode UI construction, triggers: architect, build, theme, motion, audit
+visual-taste-lab, Brand-to-design language workflow, triggers: brand, visual-identity, design-language

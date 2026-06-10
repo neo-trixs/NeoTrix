@@ -9,6 +9,18 @@ pub mod keyvault;
 #[cfg(feature = "sandbox")]
 pub mod vault;
 pub mod cvss;
+pub mod inner_critic;
+pub mod tool_inspection_stack;
+pub use tool_inspection_stack::*;
+pub mod check_registry;
+pub use check_registry::*;
+pub mod user_values;
+pub mod browser_security;
+pub mod http_proxy;
+pub mod poc_engine;
+pub mod provider_routing;
+pub mod recon;
+pub mod scanning;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -3,6 +3,38 @@ use std::collections::HashSet;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum NetworkPolicy {
+    AllowAll,
+    DenyAll,
+    AllowList(Vec<String>),
+    DefaultDeny,
+}
+
+impl Default for NetworkPolicy {
+    fn default() -> Self {
+        NetworkPolicy::DefaultDeny
+    }
+}
+
+impl NetworkPolicy {
+    pub fn check_access(&self, url: &str) -> bool {
+        match self {
+            NetworkPolicy::AllowAll => true,
+            NetworkPolicy::DenyAll => false,
+            NetworkPolicy::AllowList(allowed) => allowed.iter().any(|a| url.contains(a)),
+            NetworkPolicy::DefaultDeny => {
+                let allowed_domains = [
+                    "openai.com", "anthropic.com", "api.groq.com",
+                    "api.together.xyz", "deepseek.com", "gemini.googleapis.com",
+                    "api.anthropic.com", "api.openai.com",
+                ];
+                allowed_domains.iter().any(|d| url.contains(d))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ToolPermission {
     Network,
     FileSystem,
@@ -15,13 +47,23 @@ pub enum ToolPermission {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolPermissionSet {
     permissions: HashSet<ToolPermission>,
+    pub network_policy: NetworkPolicy,
 }
 
 impl ToolPermissionSet {
     pub fn new(permissions: Vec<ToolPermission>) -> Self {
         Self {
             permissions: permissions.into_iter().collect(),
+            network_policy: NetworkPolicy::default(),
         }
+    }
+
+    pub fn check_network_access(&self, url: &str) -> bool {
+        self.network_policy.check_access(url)
+    }
+
+    pub fn set_network_policy(&mut self, policy: NetworkPolicy) {
+        self.network_policy = policy;
     }
 
     pub fn verify(&self, required: &[ToolPermission]) -> Result<(), PermissionDenied> {
@@ -46,6 +88,7 @@ impl ToolPermissionSet {
             permissions: vec![Network, FileSystem, Shell, SystemConfig, UserData, McpServer]
                 .into_iter()
                 .collect(),
+            network_policy: NetworkPolicy::default(),
         }
     }
 }

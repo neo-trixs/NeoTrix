@@ -4,6 +4,8 @@ use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_hcube::gap::GapReport;
 use crate::neotrix::nt_mind::exploration_pipeline::ExploreDomain;
 
+const N_TOTAL_HISTORY_SIZE: usize = 20;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CuriosityLevel {
     Calm,
@@ -38,6 +40,8 @@ pub struct CuriosityDrive {
     pub total_gaps_detected: u64,
     pub last_curiosity_ignition: Option<i64>,
     pub exploration_queries_generated: u64,
+    pub n_total_history: VecDeque<f64>,
+    pub last_calibrated_level: CuriosityLevel,
 }
 
 impl CuriosityDrive {
@@ -49,6 +53,8 @@ impl CuriosityDrive {
             total_gaps_detected: 0,
             last_curiosity_ignition: None,
             exploration_queries_generated: 0,
+            n_total_history: VecDeque::with_capacity(N_TOTAL_HISTORY_SIZE),
+            last_calibrated_level: CuriosityLevel::Calm,
         }
     }
 
@@ -84,6 +90,49 @@ impl CuriosityDrive {
 
         while self.signals.len() > self.max_signals {
             self.signals.pop_front();
+        }
+    }
+
+    pub fn calibrate_to_negentropy(&mut self, n_total: f64, n_trend: f64) {
+        self.n_total_history.push_back(n_total);
+        if self.n_total_history.len() > N_TOTAL_HISTORY_SIZE {
+            self.n_total_history.pop_front();
+        }
+
+        let n_avg: f64 = self.n_total_history.iter().sum::<f64>() / self.n_total_history.len().max(1) as f64;
+
+        let base = if n_avg < 0.5 {
+            CuriosityLevel::IntenselyCurious
+        } else if n_avg < 0.7 {
+            CuriosityLevel::Curious
+        } else if n_avg < 0.85 {
+            CuriosityLevel::Interested
+        } else {
+            CuriosityLevel::Calm
+        };
+
+        let boosted = if n_trend < -0.01 {
+            let steps = ((-n_trend) * 20.0).min(2.0) as usize;
+            let mut lvl = base;
+            for _ in 0..steps {
+                lvl = match lvl {
+                    CuriosityLevel::Calm => CuriosityLevel::Interested,
+                    CuriosityLevel::Interested => CuriosityLevel::Curious,
+                    CuriosityLevel::Curious => CuriosityLevel::IntenselyCurious,
+                    CuriosityLevel::IntenselyCurious => CuriosityLevel::IntenselyCurious,
+                };
+            }
+            lvl
+        } else {
+            base
+        };
+
+        self.last_calibrated_level = boosted;
+
+        let current_salience = self.curiosity_level.salience_multiplier();
+        let boosted_salience = boosted.salience_multiplier();
+        if boosted_salience > current_salience {
+            self.curiosity_level = boosted;
         }
     }
 
@@ -146,9 +195,16 @@ impl CuriosityDrive {
     }
 
     pub fn summary(&self) -> String {
+        let n_avg = if self.n_total_history.is_empty() {
+            0.0
+        } else {
+            self.n_total_history.iter().sum::<f64>() / self.n_total_history.len() as f64
+        };
         format!(
-            "Curiosity: {:?} | {} signals pending | {} gaps total | {} queries generated",
+            "Curiosity: {:?} | N-calibrated: {:?} | N_avg={:.3} | {} signals pending | {} gaps total | {} queries generated",
             self.curiosity_level,
+            self.last_calibrated_level,
+            n_avg,
             self.signals.len(),
             self.total_gaps_detected,
             self.exploration_queries_generated,

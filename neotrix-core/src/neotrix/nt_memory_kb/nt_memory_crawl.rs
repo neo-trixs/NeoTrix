@@ -6,6 +6,7 @@ use rusqlite::Connection;
 
 use super::nt_memory_store as store;
 use super::nt_memory_types::*;
+use crate::neotrix::nt_world_search::WebSearchEngine;
 
 fn http_client() -> &'static reqwest::blocking::Client {
     static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
@@ -67,7 +68,7 @@ fn skip_url(url: &str) -> bool {
         || d == "books.google.com" || d.starts_with("books.google.")
         || d.starts_with("google.") || d == "www.google.com"
         || d.starts_with("scholar.google.")
-        || d == "facebook.com" || d == "twitter.com" || d == "x.com"
+         || d == "facebook.com"
         || d == "reddit.com" || d == "linkedin.com"
         || d == "pinterest.com" || d == "youtube.com"
         || d == "tumblr.com" || d == "instagram.com"
@@ -75,6 +76,8 @@ fn skip_url(url: &str) -> bool {
         || d == "booksamillion.com"
     { return true; }
     if d == "api.semanticscholar.org" && url.contains("/CorpusID:") { return true; }
+    if d == "api.twitter.com" || d == "api.x.com" { return true; }
+    if (d == "twitter.com" || d == "x.com") && url.contains("/i/api/") { return true; }
     false
 }
 
@@ -199,7 +202,7 @@ pub fn purge_skip_domains(conn: &Connection) -> Result<usize, String> {
                "sciencedirect.com", "cambridge.org", "tandfonline.com",
                "onlinelibrary.wiley.com", "emerald.com", "degruyter.com",
                "mdpi.com", "frontiersin.org", "export.arxiv.org",
-               "facebook.com", "twitter.com", "x.com", "reddit.com", "linkedin.com",
+               "facebook.com", "reddit.com", "linkedin.com",
                "pinterest.com", "youtube.com", "tumblr.com", "instagram.com",
                "amazon.com", "indiebound.org", "booksamillion.com",
                "api.semanticscholar.org"] {
@@ -273,6 +276,43 @@ pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) ->
     for (url, priority, domain) in topic_urls {
         store::ensure_crawl_pending(conn, url, 0, domain, *priority, ts)?;
         count += 1;
+    }
+    Ok(count)
+}
+
+/// Search the web and enqueue discovered URLs into the crawl queue.
+/// Uses WebSearchEngine (DuckDuckGo) to find URLs matching the query,
+/// then calls ensure_crawl_pending for each result URL.
+pub fn enqueue_search_results_from_engine(
+    conn: &Connection,
+    query: &str,
+    max_results: usize,
+    priority: i64,
+) -> Result<usize, String> {
+    let engine = WebSearchEngine::default();
+    let results = engine.search(query, max_results)?;
+    if results.is_empty() {
+        return Ok(0);
+    }
+    let ts = now();
+    let mut count = 0usize;
+    for result in &results {
+        let d = domain(&result.url);
+        if d.is_empty() || skip_url(&result.url) {
+            continue;
+        }
+        if store::ensure_crawl_pending(conn, &result.url, 0, &d, priority, ts).is_ok() {
+            count += 1;
+        }
+        // Also create a Concept node for the search result
+        let _ = store::insert_or_get_node(
+            conn,
+            &result.title,
+            NodeType::Concept,
+            Some(&result.snippet),
+            Some(&result.url),
+            Some(&d),
+        );
     }
     Ok(count)
 }
@@ -641,6 +681,123 @@ pub struct CrawlCycleReport {
     pub urls_processed: Vec<String>,
     pub errors: Vec<(String, String)>,
     pub by_domain: std::collections::HashMap<String, usize>,
+}
+
+/// Discover all pages and subcategories in a Wikipedia category.
+/// Uses the `categorymembers` API to find pages belonging to Category:{name}.
+/// Creates Concept nodes for each page + BelongsToCategory edges.
+/// Optionally enqueues discovered URLs to the crawl queue and recurses into subcategories.
+pub fn discover_wiki_category_members(
+    conn: &Connection,
+    category: &str,
+    max_pages: usize,
+    max_depth: u32,
+    enqueue_urls: bool,
+) -> Result<(usize, usize, usize), String> {
+    _discover_wiki_category_recursive(conn, category, max_pages, max_depth, enqueue_urls, 0)
+}
+
+fn _discover_wiki_category_recursive(
+    conn: &Connection,
+    category: &str,
+    max_pages: usize,
+    max_depth: u32,
+    enqueue_urls: bool,
+    depth: u32,
+) -> Result<(usize, usize, usize), String> {
+    if depth > max_depth {
+        return Ok((0, 0, 0));
+    }
+
+    let encoded = urlencode(category);
+    let api_url = format!(
+        "https://en.wikipedia.org/w/api.php?action=query&list=categorymembers\
+         &cmtitle=Category%3A{}&cmtype=page%7Csubcat&cmlimit=50&format=json",
+        encoded
+    );
+
+    let resp = http_client_seed()
+        .get(&api_url)
+        .send()
+        .map_err(|e| format!("Wikipedia category fetch error: {}", e))?;
+    let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
+
+    let members = data["query"]["categorymembers"]
+        .as_array()
+        .ok_or_else(|| "No categorymembers in response".to_string())?;
+
+    let mut nodes = 0usize;
+    let mut edges = 0usize;
+    let mut enqueued = 0usize;
+    let ts = now();
+    let cat_node_id = store::insert_or_get_node(
+        conn,
+        &format!("Category:{}", category),
+        NodeType::Concept,
+        Some(&format!("Wikipedia category: {}", category)),
+        Some(&format!("https://en.wikipedia.org/wiki/Category:{}", category)),
+        Some("wikipedia.org"),
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
+
+    for member in members.iter().take(max_pages) {
+        let title = member["title"].as_str().unwrap_or("");
+        let member_type = member["type"].as_str().unwrap_or("page");
+        if title.is_empty() {
+            continue;
+        }
+
+        if member_type == "subcat" {
+            // Strip "Category:" prefix and recurse
+            let subcat = title.strip_prefix("Category:").unwrap_or(title);
+            let (n, e, eq) = _discover_wiki_category_recursive(
+                conn, subcat, max_pages, max_depth, enqueue_urls, depth + 1,
+            )?;
+            nodes += n;
+            edges += e;
+            enqueued += eq;
+            continue;
+        }
+
+        // Create page node
+        let page_url = format!("https://en.wikipedia.org/wiki/{}", title.replace(' ', "_"));
+        let page_id = match store::insert_or_get_node(
+            conn,
+            title,
+            NodeType::Concept,
+            None,
+            Some(&page_url),
+            Some("wikipedia.org"),
+        ) {
+            Ok(id) => id,
+            Err(_) => continue,
+        };
+        nodes += 1;
+
+        // Create BelongsToCategory edge
+        if store::upsert_edge(
+            conn,
+            &page_id,
+            &cat_node_id,
+            RelationType::BelongsToCategory,
+            1.0,
+            Some(&format!("Wikipedia category member: {}", category)),
+        )
+        .is_ok()
+        {
+            edges += 1;
+        }
+
+        // Optionally enqueue for crawling
+        if enqueue_urls {
+            let d = domain(&page_url);
+            if store::ensure_crawl_pending(conn, &page_url, 1, &d, 3, ts).is_ok() {
+                enqueued += 1;
+            }
+        }
+    }
+
+    Ok((nodes, edges, enqueued))
 }
 
 pub fn discover_from_seed(conn: &Connection, seed_topic: &str) -> Result<usize, String> {

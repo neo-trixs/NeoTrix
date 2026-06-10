@@ -67,6 +67,7 @@ impl SelfMeasure {
         }
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn recompute_all(&mut self) {
         let n = self.trajectory.len();
         if n < 10 {
@@ -85,18 +86,18 @@ impl SelfMeasure {
                 series[i].push(mean);
             }
         }
-        let mut data = Vec::with_capacity(NUM_SUBSYSTEMS);
-        for i in 0..NUM_SUBSYSTEMS {
-            let mean = series[i].iter().sum::<f64>() / n as f64;
-            let centered: Vec<f64> = series[i].iter().map(|v| v - mean).collect();
-            data.push(centered);
-        }
+        let data: Vec<Vec<f64>> = series.iter()
+            .map(|s| {
+                let mean = s.iter().sum::<f64>() / n as f64;
+                s.iter().map(|v| v - mean).collect()
+            })
+            .collect();
         let mut cov = [[0.0; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS];
         for i in 0..NUM_SUBSYSTEMS {
             for j in 0..NUM_SUBSYSTEMS {
                 let mut s = 0.0;
-                for k in 0..n {
-                    s += data[i][k] * data[j][k];
+                for val in data[i].iter().zip(data[j].iter()).take(n) {
+                    s += val.0 * val.1;
                 }
                 cov[i][j] = s / (n as f64 - 1.0);
             }
@@ -137,8 +138,8 @@ impl SelfMeasure {
         let mut total_syn = 0.0;
         let mut count_syn = 0;
         for i in 0..NUM_SUBSYSTEMS {
-            for j in (i + 1)..NUM_SUBSYSTEMS {
-                total_syn += syn_matrix[i][j];
+            for syn_val in syn_matrix[i].iter().skip(i + 1).take(NUM_SUBSYSTEMS - i - 1) {
+                total_syn += syn_val;
                 count_syn += 1;
             }
         }

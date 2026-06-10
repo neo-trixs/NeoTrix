@@ -1,18 +1,6 @@
 use chrono::Utc;
 
-#[cfg(feature = "e8-theory")]
-use super::cortex_memory::{DimensionTag, MemoryTrace, Modality};
-#[cfg(feature = "e8-theory")]
-use super::attention_router::AttentionRouter;
-#[cfg(feature = "e8-theory")]
-use super::hypercube_bridge::HyperCubeBridge;
 use super::self_iterating::SelfIteratingBrain;
-#[cfg(feature = "e8-theory")]
-use neotrix_types::hypercube::axis::DimensionAxis;
-#[cfg(feature = "e8-theory")]
-use neotrix_types::hypercube::coord::HyperCoord;
-#[cfg(feature = "e8-theory")]
-use neotrix_types::strategy_matrix;
 
 #[derive(Debug, Clone)]
 pub struct BenchDimension {
@@ -54,9 +42,9 @@ impl ReasoningBenchmark {
     pub fn run() -> ReasoningBenchReport {
         let mut dimensions = Vec::new();
 
-        #[cfg(feature = "e8-theory")]
+        #[cfg(any())]
         let e8_score = Self::test_e8_strategy_matrix();
-        #[cfg(feature = "e8-theory")]
+        #[cfg(any())]
         dimensions.push(BenchDimension {
             name: "E8 Strategy Matrix".into(),
             score: e8_score,
@@ -72,9 +60,9 @@ impl ReasoningBenchmark {
             description: "5 SEAL iterations with monotonic improvement".into(),
         });
 
-        #[cfg(feature = "e8-theory")]
+        #[cfg(any())]
         let attention_score = Self::test_attention_router();
-        #[cfg(feature = "e8-theory")]
+        #[cfg(any())]
         dimensions.push(BenchDimension {
             name: "Attention Router".into(),
             score: attention_score,
@@ -82,9 +70,9 @@ impl ReasoningBenchmark {
             description: "All 11 specialists respond to trigger keywords".into(),
         });
 
-        #[cfg(feature = "e8-theory")]
+        #[cfg(any())]
         let knowledge_score = Self::test_knowledge_retrieval();
-        #[cfg(feature = "e8-theory")]
+        #[cfg(any())]
         dimensions.push(BenchDimension {
             name: "Knowledge HyperCube".into(),
             score: knowledge_score,
@@ -104,7 +92,7 @@ impl ReasoningBenchmark {
         }
     }
 
-    #[cfg(feature = "e8-theory")]
+    #[cfg(any())]
     /// Verify all 64 strategy matrix entries have valid hexagram values (0..63).
     fn test_e8_strategy_matrix() -> f64 {
         let matrix = strategy_matrix();
@@ -154,7 +142,7 @@ impl ReasoningBenchmark {
         let mut success_count = 0usize;
 
         for task in &tasks {
-            let result = brain.kernel_iterate_pipeline(task);
+            let result = brain.kernel_iterate(task);
             scores.push(result.score_after);
             if result.improved || result.score_after > 0.3 {
                 success_count += 1;
@@ -179,7 +167,7 @@ impl ReasoningBenchmark {
     }
 
     /// Verify all 11 specialists respond to their trigger keywords.
-    #[cfg(feature = "e8-theory")]
+    #[cfg(any())]
     fn test_attention_router() -> f64 {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
@@ -229,7 +217,7 @@ impl ReasoningBenchmark {
     }
 
     /// Insert a test entry into HyperCube, verify recall.
-    #[cfg(feature = "e8-theory")]
+    #[cfg(any())]
     fn test_knowledge_retrieval() -> f64 {
         let mut bridge = HyperCubeBridge::new();
         let mut cortex = super::cortex_memory::CortexMemory::new(10, 100);
@@ -289,7 +277,7 @@ impl ReasoningBenchmark {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "e8-theory")]
+    #[cfg(any())]
     #[test]
     fn test_e8_strategy_matrix_all_valid() {
         let score = ReasoningBenchmark::test_e8_strategy_matrix();
@@ -304,7 +292,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "e8-theory")]
+    #[cfg(any())]
     fn test_attention_router_activates_specialists() {
         let score = ReasoningBenchmark::test_attention_router();
         assert!(score > 0.0, "attention router should activate specialists: {:.3}", score);
@@ -312,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "e8-theory")]
+    #[cfg(any())]
     fn test_knowledge_retrieval_inserts_and_recalls() {
         let score = ReasoningBenchmark::test_knowledge_retrieval();
         assert!(score > 0.0, "knowledge retrieval should recall entries: {:.3}", score);

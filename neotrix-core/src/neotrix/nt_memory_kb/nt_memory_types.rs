@@ -16,6 +16,8 @@ pub struct KnowledgeNode {
     pub updated_at: i64,
     pub access_count: i64,
     pub metadata: Option<serde_json::Value>,
+    pub version: u64,
+    pub superseded_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -114,6 +116,8 @@ pub struct KnowledgeEdge {
     pub description: Option<String>,
     pub created_at: i64,
     pub metadata: Option<serde_json::Value>,
+    pub version: u64,
+    pub superseded_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -137,6 +141,7 @@ pub enum RelationType {
     DependsOn,
     Improves,
     Outperforms,
+    BelongsToCategory,
 }
 
 impl RelationType {
@@ -161,6 +166,7 @@ impl RelationType {
             RelationType::DependsOn => "depends_on",
             RelationType::Improves => "improves",
             RelationType::Outperforms => "outperforms",
+            RelationType::BelongsToCategory => "belongs_to_category",
         }
     }
 
@@ -185,6 +191,7 @@ impl RelationType {
             "depends_on" => RelationType::DependsOn,
             "improves" => RelationType::Improves,
             "outperforms" => RelationType::Outperforms,
+            "belongs_to_category" => RelationType::BelongsToCategory,
             _ => RelationType::Related,
         }
     }
@@ -225,7 +232,7 @@ pub struct GraphPath {
     pub total_distance: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct KnowledgeStats {
     pub total_nodes: i64,
     pub total_edges: i64,

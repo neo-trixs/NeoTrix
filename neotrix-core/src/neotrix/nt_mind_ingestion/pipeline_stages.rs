@@ -2,6 +2,8 @@ use crate::make_stage;
 use crate::neotrix::nt_core_error::NeoTrixError;
 use crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 use crate::neotrix::nt_mind::self_iterating::pipeline::{BrainStage, StageDecision};
+#[allow(unused_imports)]
+use crate::neotrix::nt_shield::inner_critic::InnerCritic;
 use super::scratchpad::should_continue_reflection;
 use super::ReflectionRound;
 
@@ -415,7 +417,7 @@ impl BrainStage for StormBreakerStage {
         let monitor = &brain._cognitive_load;
         let storm_status = crate::neotrix::nt_mind_ingestion::storm_breaker::detect_reasoning_storm(monitor);
         match storm_status {
-            ReasoningStormStatus::StormDetected { repeat_count } => {
+            crate::neotrix::nt_mind_ingestion::storm_breaker::ReasoningStormStatus::StormDetected { repeat_count } => {
                 let mode = crate::neotrix::nt_mind_ingestion::storm_breaker::next_storm_mode(brain.iteration);
                 log::warn!("[storm_breaker] storm detected ({} repeats), switching to {} mode",
                     repeat_count, mode);
@@ -423,6 +425,95 @@ impl BrainStage for StormBreakerStage {
             }
             _ => Ok(StageDecision::Continue),
         }
+    }
+}
+
+make_stage!(InnerCriticStage);
+impl BrainStage for InnerCriticStage {
+    fn name(&self) -> &str { "inner_critic" }
+    fn frequency(&self) -> usize { 5 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let mut total_violations = 0;
+        let critic = InnerCritic::new();
+
+        let task = brain._current_task();
+        if !task.is_empty() {
+            let violations = critic.audit(&task);
+            total_violations += violations.len();
+            for v in &violations {
+                log::info!(
+                    "[inner_critic] {} | severity={} | {}",
+                    v.name, v.severity, v.description
+                );
+            }
+        }
+
+        if let Some(ref pad) = brain._ingestion_scratchpad {
+            let violations = critic.audit(&pad.input);
+            total_violations += violations.len();
+            for v in &violations {
+                log::info!(
+                    "[inner_critic:ingestion] {} | severity={} | {}",
+                    v.name, v.severity, v.description
+                );
+            }
+        }
+
+        if total_violations > 0 {
+            let penalty = (total_violations as f64).min(10.0) * -0.02;
+            brain._set_reward(brain._reward() + penalty);
+        }
+
+        Ok(StageDecision::Continue)
+    }
+}
+
+use super::document_parser::DocumentParsingEngine;
+use std::path::Path;
+
+make_stage!(DocumentParseStage);
+impl BrainStage for DocumentParseStage {
+    fn name(&self) -> &str { "document_parse" }
+    fn frequency(&self) -> usize { 1 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let pad = match brain._ingestion_scratchpad_mut() {
+            Some(p) => p,
+            None => return Ok(StageDecision::Skip("no ingestion active".into())),
+        };
+        let input = pad.input.trim();
+        if !input.contains('\n') {
+            let path = Path::new(input);
+            if path.exists() && path.is_file() {
+                let engine = DocumentParsingEngine::default();
+                match engine.parse_file(path) {
+                    Ok(parsed) => {
+                        let sections: Vec<String> = parsed.document.sections.iter()
+                            .flat_map(|s| s.flatten())
+                            .map(|s| {
+                                let heading = s.heading.as_deref().unwrap_or("(untitled)");
+                                format!("[{}] {}", s.level, heading)
+                            })
+                            .collect();
+                        pad.sections = sections;
+                        let word_count: usize = parsed.document.raw_text.split_whitespace().count();
+                        pad.collated = format!(
+                            "parsed {} sections, {} words, format={:?}",
+                            parsed.section_count, word_count, parsed.document.format
+                        );
+                        log::info!(
+                            "[document_parse] parsed {}: {} sections, {} words",
+                            input, parsed.section_count, word_count
+                        );
+                        return Ok(StageDecision::Continue);
+                    }
+                    Err(e) => {
+                        log::warn!("[document_parse] failed to parse {}: {}", input, e);
+                        return Ok(StageDecision::Skip(format!("parse failed: {}", e)));
+                    }
+                }
+            }
+        }
+        Ok(StageDecision::Continue)
     }
 }
 

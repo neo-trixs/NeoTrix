@@ -56,6 +56,7 @@ fn dynamics_to_idx(d: TrajectoryDynamics) -> usize {
     }
 }
 
+#[allow(dead_code)]
 fn make_actions(variants: &[&str]) -> Vec<String> {
     variants.iter().map(|s| s.to_string()).collect()
 }

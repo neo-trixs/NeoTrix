@@ -1,4 +1,4 @@
-#![recursion_limit = "256"]
+#![recursion_limit = "2048"]
 //! # NeoTrix — 选择性矩阵运算架构 (Selective State-Space Agent)
 //!
 //! 核心公式: `Ψ(t+1) = Select(Ô, x) · Select(M, x) · Ψ(t)`

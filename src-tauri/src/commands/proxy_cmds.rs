@@ -4,7 +4,7 @@ use super::ProxyStatus;
 #[cfg(feature = "stealth-net")]
 use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyClient, DaemonMode};
 #[cfg(feature = "stealth-net")]
-use neotrix::neotrix::proxy_daemon_wrapper;
+use neotrix::neotrix::nt_io_proxy;
 
 #[cfg(feature = "stealth-net")]
 #[command]
@@ -63,7 +63,7 @@ pub async fn proxy_start_daemon() -> Result<String, String> {
     if ProxyClient::new().is_reachable().await {
         return Ok("already running".into());
     }
-    let daemon_path = proxy_daemon_wrapper::resolve_daemon_path()?;
+    let daemon_path = nt_io_proxy::resolve_daemon_path()?;
     let mut child = std::process::Command::new(&daemon_path)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -80,10 +80,13 @@ pub async fn proxy_start_daemon() -> Result<String, String> {
 }
 
 #[cfg(not(feature = "stealth-net"))]
+use neotrix::neotrix::nt_io_proxy;
+
+#[cfg(not(feature = "stealth-net"))]
 #[command]
 #[allow(dead_code)]
 pub async fn proxy_start_daemon() -> Result<String, String> {
-    let daemon_path = match proxy_daemon_wrapper::resolve_daemon_path() {
+    let daemon_path = match nt_io_proxy::resolve_daemon_path() {
         Ok(p) => p,
         Err(e) => return Err(e),
     };

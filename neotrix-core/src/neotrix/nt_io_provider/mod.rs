@@ -28,3 +28,7 @@ pub use factory::{LlmProviderType, ProviderConfig, create_provider, create_provi
 
 // Re-export 路由和配置管理
 pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
+
+pub mod compaction;
+pub mod discovery;
+pub mod free_catalog;

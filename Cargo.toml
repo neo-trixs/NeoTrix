@@ -3,6 +3,7 @@ members = [
     "neotrix-core",
     "src-tauri",
     "crates/neotrix-types",
+    "crates/nt-lang",
 ]
 
 resolver = "2"

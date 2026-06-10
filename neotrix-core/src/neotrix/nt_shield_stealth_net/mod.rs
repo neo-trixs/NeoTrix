@@ -36,6 +36,8 @@ pub mod network_diagnostics;
 pub mod nt_shield_manager;
 pub mod proxy_control;
 pub mod proxy_heartbeat;
+pub mod proxy_sourcing;
+pub mod proxy_discovery;
 
 pub use ip_geo::{IpGeoLocator, GeoResult};
 
@@ -71,5 +73,7 @@ pub use proxy_control::{ProxyControl, ProxyClient, DaemonMode};
 pub use proxy_pool::NodeSelectionStrategy;
 pub use firewall::{FirewallManager, FirewallStats, FirewallType, FirewallAction, FirewallRule};
 pub use rule_api::{RulesApiServer, RulesApiStatus, RuleRequest};
+pub use proxy_sourcing::{ProxySourceDef, RawProxy, SourceHealth, PROXIFLY_ALL, GEONODE, ALL_FREE_SOURCES};
+pub use proxy_discovery::ProxyDiscoveryEngine;
 pub use ip_rotator::{OsIpRotator, OsIpRotatorConfig, OsIpRotatorStats};
 // pub use dns_hijack::{DnsHijacker, DnsHijackerStats};  // removed

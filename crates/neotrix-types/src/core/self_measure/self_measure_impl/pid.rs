@@ -35,7 +35,7 @@ pub fn spectral_phi(corr: &[[f64; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS], n: usize) ->
     }
     let mut sorted = evals.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    sorted[1].max(0.0).min(2.0)
+    sorted[1].clamp(0.0, 2.0)
 }
 
 fn symmetric_qr(matrix: &[[f64; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS], n: usize, max_iter: usize) -> Vec<f64> {
@@ -50,6 +50,7 @@ fn symmetric_qr(matrix: &[[f64; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS], n: usize, max_
     qr_tridiagonal(&mut a, n, max_iter)
 }
 
+#[allow(clippy::needless_range_loop)]
 fn tridiagonalize(a: &mut [[f64; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS], n: usize) {
     for k in 0..(n.saturating_sub(2)) {
         let mut norm = 0.0;
@@ -76,8 +77,8 @@ fn tridiagonalize(a: &mut [[f64; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS], n: usize) {
             }
         }
         a[k + 1][k] = scale;
-        for i in (k + 2)..n {
-            a[i][k] = 0.0;
+        for a_ik in a.iter_mut().take(n).skip(k + 2) {
+            a_ik[k] = 0.0;
         }
     }
 }

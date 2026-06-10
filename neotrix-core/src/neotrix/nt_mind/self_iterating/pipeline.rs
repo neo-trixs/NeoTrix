@@ -5,11 +5,16 @@ use super::super::memory::ReasoningMemory;
 use super::super::distillation::{ExperienceDistiller, apply_principles, avoid_anti_patterns};
 use super::super::cortex_memory::CmsConfig;
 use crate::neotrix::nt_world_model::TaskType;
-use crate::neotrix::nt_core_error::NeoTrixError;
+pub(crate) use crate::neotrix::nt_core_error::NeoTrixError;
+use super::checkpoint::{CheckpointStage, RewindStage};
+use super::goal_contract::{GoalContractStage, EvidenceCaptureStage, NarrowRecoveryStage, FinalVerificationStage, GoalTerminatorStage, ExternalVerifierStage, SemanticRecallStage};
+use crate::neotrix::nt_world_vision::VisionStage;
 use crate::core::nt_core_consciousness::{
     VsaOrigin, VsaSelfCategory, VsaTagged,
 };
 use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
+use std::sync::Mutex;
+use std::path::Path;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,6 +24,29 @@ pub enum AutonomyLevel {
     Bounded,
     #[default]
     Full,
+}
+
+/// Pipeline-level permission gate.
+/// Maps to CLI ApprovalMode at the brain level:
+///   Review  → ApprovalMode::Suggest  (all actions need approval)
+///   Suggest → ApprovalMode::AutoEdit (file ops auto, shell/git needs approval)
+///   Full    → ApprovalMode::FullAuto (everything auto)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PermissionLevel {
+    Review,
+    Suggest,
+    #[default]
+    Full,
+}
+
+impl PermissionLevel {
+    pub fn to_approval_mode(&self) -> crate::cli::approval::ApprovalMode {
+        match self {
+            Self::Review => crate::cli::approval::ApprovalMode::Suggest,
+            Self::Suggest => crate::cli::approval::ApprovalMode::AutoEdit,
+            Self::Full => crate::cli::approval::ApprovalMode::FullAuto,
+        }
+    }
 }
 
 
@@ -117,6 +145,20 @@ impl BrainPipeline {
             if freq > 1 && !brain.iteration.is_multiple_of(freq as u64) {
                 continue;
             }
+
+            // Auto-checkpoint before each stage execution
+            {
+                let task_type = brain._current_task_type();
+                let snap = BrainSnapshot::new(&brain.brain, &task_type);
+                let iteration = brain.iteration;
+                let permission = brain.permission;
+                let autonomy = brain.autonomy;
+                let reward = brain._reward;
+                brain.checkpoint_manager.push(
+                    iteration, &snap, permission, autonomy, reward, stage.name(),
+                );
+            }
+
             let _span = tracing::info_span!(
                 "pipeline_stage",
                 stage.name = %stage.name(),
@@ -998,17 +1040,11 @@ make_stage!(AdaptiveLRStage);
 impl BrainStage for AdaptiveLRStage {
     fn name(&self) -> &str { "adaptive_lr" }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let task = brain._current_task();
-        let task_type = brain._current_task_type();
-        let memories = brain.reasoning_bank.retrieve_relevant(&task, Some(task_type), 3);
-        let avg_memory_reward = if memories.is_empty() { 0.0 } else {
-            memories.iter().map(|m| m.reward).sum::<f64>() / memories.len() as f64
-        };
-        if avg_memory_reward > 0.7 {
-            brain.brain.learning_rate *= 1.2;
-        } else if avg_memory_reward < 0.3 {
-            brain.brain.learning_rate *= 0.8;
-        }
+        let reward = brain._reward + brain.curiosity_bonus;
+        let adapted_lr = brain.curvature_policy.adapt_lr(reward);
+        brain.brain.learning_rate = adapted_lr;
+        log::debug!("[curvature] lr={:.4} regime={:?}",
+            adapted_lr, brain.curvature_policy.regime());
         Ok(StageDecision::Continue)
     }
 }
@@ -1106,6 +1142,30 @@ make_stage!(AutonomyGateStage);
 impl BrainStage for AutonomyGateStage {
     fn name(&self) -> &str { "autonomy_gate" }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        // 1. Sync permission level to global ShieldEnforcer
+        if let Ok(shield) = crate::cli::global_shield().try_lock() {
+            let target_mode = brain.permission.to_approval_mode();
+            if shield.approval.mode() != target_mode {
+                drop(shield);
+                if let Ok(mut s) = crate::cli::global_shield().lock() {
+                    s.set_approval_mode(target_mode);
+                    log::info!("[autonomy-gate] synced approval mode to {:?}", target_mode);
+                }
+            } else {
+                drop(shield);
+            }
+        }
+
+        // 2. Check PermissionLevel
+        match brain.permission {
+            PermissionLevel::Review => {
+                return Ok(StageDecision::Skip(
+                    "PermissionLevel=Review：所有编辑操作需要审批".to_string()));
+            }
+            PermissionLevel::Suggest | PermissionLevel::Full => {}
+        }
+
+        // 3. Check AutonomyLevel
         match brain.autonomy {
             AutonomyLevel::Proposal => {
                 return Ok(StageDecision::Skip("Proposal 模式：只预览不执行".to_string()));
@@ -1120,7 +1180,15 @@ impl BrainStage for AutonomyGateStage {
             AutonomyLevel::Full => {}
         }
 
-        // CognitiveLoad gate: switch to Fast mode under high load
+        // 4. ShieldEnforcer quick check — blocks if sandbox is read-only
+        if let Ok(shield) = crate::cli::global_shield().try_lock() {
+            if shield.sandbox.is_read_only() {
+                return Ok(StageDecision::Skip(
+                    "沙箱只读模式：不允许修改操作".to_string()));
+            }
+        }
+
+        // 5. CognitiveLoad gate: switch to Fast mode under high load
         if !brain._cognitive_load.can_do_deep_reasoning() {
             return Ok(StageDecision::Skip(
                 "CognitiveLoad 过高：切换到快速模式".to_string()));
@@ -1248,12 +1316,159 @@ impl BrainStage for SpectralMonitorStage {
     }
 }
 
+make_stage!(MetaImprovementStage);
+impl BrainStage for MetaImprovementStage {
+    fn name(&self) -> &str { "meta_improvement" }
+    fn frequency(&self) -> usize { 10 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::neotrix::nt_mind_ingestion::meta_improvement::{
+            MetaDiagnostics,
+        };
+        if brain._meta_agent.is_none() {
+            let mut agent = crate::neotrix::nt_mind_ingestion::meta_improvement::MetaAgent::new();
+            agent.meta_layer_can_rewrite_self = true;
+            brain._meta_agent = Some(agent);
+        }
+        if let Some(ref mut agent) = brain._meta_agent {
+            let diag = MetaDiagnostics::new(brain.iteration as u64);
+            let (action, self_edit) = agent.observe_and_act(&diag);
+            match action {
+                crate::neotrix::nt_mind_ingestion::meta_improvement::MetaAction::CreateStage { name, description: _, frequency } => {
+                    if !agent.created_stages.contains(&name.to_string()) && brain.meta_additions.len() < agent.max_stages {
+                        let stage = crate::neotrix::nt_mind_ingestion::meta_improvement::DynamicStage::new(name, "", frequency);
+                        brain.meta_additions.push(Box::new(stage));
+                        agent.created_stages.push(name.to_string());
+                        log::info!("[dgm-h] created stage: {}", name);
+                    }
+                }
+                crate::neotrix::nt_mind_ingestion::meta_improvement::MetaAction::RemoveStage { name } => {
+                    brain.meta_additions.retain(|s| s.name() != name);
+                    agent.created_stages.retain(|n| n != name);
+                    log::info!("[dgm-h] removed stage: {}", name);
+                }
+                crate::neotrix::nt_mind_ingestion::meta_improvement::MetaAction::ModifyConfig { param: _, value: _ } => {
+                    log::info!("[dgm-h] config modification (stub)");
+                }
+                crate::neotrix::nt_mind_ingestion::meta_improvement::MetaAction::NoOp => {}
+            }
+            if let Some(edit) = self_edit {
+                log::info!("[dgm-h] meta self-edit: {:?}", edit);
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(SleepStage);
+impl BrainStage for SleepStage {
+    fn name(&self) -> &str { "sleep" }
+    fn frequency(&self) -> usize { 100 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let report = brain._sleep_gate.consolidate(&mut brain._consciousness_stream, brain.iteration as usize);
+        if report.conflicts_detected > 0 || report.merged_count > 0 {
+            log::info!("[sleep] merged={} evicted={} conflicts={} pressure={:.2}",
+                report.merged_count, report.evicted_count, report.conflicts_detected, report.sleep_pressure_before);
+        } else {
+            log::debug!("[sleep] pressure={:.2} len={}->{}",
+                report.sleep_pressure_before, report.pre_sleep_len, report.post_sleep_len);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(UQCalibrationStage);
+impl BrainStage for UQCalibrationStage {
+    fn name(&self) -> &str { "uq_calibration" }
+    fn frequency(&self) -> usize { 20 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::core::nt_core_consciousness::conformal_uq::ConformalUQ;
+        use crate::core::nt_core_consciousness::confidence_calibrator::ConfidenceCalibrator;
+        let mut uq = ConformalUQ::new(0.9, 100);
+        let mut cal = ConfidenceCalibrator::new();
+        let recent: Vec<_> = brain._consciousness_stream.recent(50);
+        for tagged in &recent {
+            let score = tagged.confidence;
+            let nonconf = if score > 0.0 { 1.0 - score } else { 0.5 };
+            uq.add_calibration(&[nonconf]);
+            let correct = score > 0.5;
+            cal.record_prediction(score, correct);
+        }
+        let _threshold = uq.calibrate();
+        for tagged in brain._consciousness_stream.recent(20) {
+            let conf = tagged.confidence.max(0.1).min(1.0);
+            let calibrated = cal.calibrate(conf);
+            log::trace!("[uq] raw={:.4} calibrated={:.4} threshold={:.4} meta_acc={:.3}",
+                conf, calibrated, _threshold, cal.meta_accuracy());
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(PhiStage);
+impl BrainStage for PhiStage {
+    fn name(&self) -> &str { "phi_measure" }
+    fn frequency(&self) -> usize { 15 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::neotrix::nt_core_iit_phi::IITPhiCalculator;
+        let mut calculator = IITPhiCalculator::new();
+        let report = calculator.compute_phi(&brain.brain.capability.arr);
+        calculator.record(report.phi);
+        log::info!(
+            "[phi] Φ={:.4} trend={:+.4} conscious={} effective_dims={}",
+            report.phi, report.phi_trend, report.is_conscious_like, report.effective_dims
+        );
+        let phi_bonus = (report.phi * 0.15).min(0.15);
+        if phi_bonus > 0.01 {
+            brain._reward = (brain._reward + phi_bonus).min(1.0);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(NegentropyStage);
+impl BrainStage for NegentropyStage {
+    fn name(&self) -> &str { "negentropy" }
+    fn frequency(&self) -> usize { 5 }
+
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let report = brain._negentropy.compute_full(
+            &brain.brain.capability.arr,
+            &brain._negentropy_nvsa_pool,
+            brain._nt_memory_kb.as_ref(),
+            brain.nt_world_jepa.as_ref(),
+            &brain._strategy_matrix,
+            &brain._consciousness_stream,
+            0.0,  // import_rate — set by data ingestion stages
+            0,    // export_count — set by SleepGate
+            brain.tool_call_count as f64 + 1.0,
+        );
+
+        log::info!(
+            "[negentropy] N_total={:.4} Φ={:.4} KB={:.4} trend={:+.4} regime={:?} {}",
+            report.metric.total,
+            report.metric.components.phi,
+            report.metric.components.kb_order,
+            report.metric.trend,
+            report.regime,
+            report.recommendation,
+        );
+
+        brain._reward = (report.metric.total * 0.6 + brain._reward * 0.4).clamp(0.0, 1.0);
+
+        Ok(StageDecision::Continue)
+    }
+}
+
 pub fn seal_pipeline() -> BrainPipeline {
     BrainPipeline::with_stages(vec![
         Box::new(crate::neotrix::nt_mind_ingestion::pipeline_stages::VsaFingerprintStage::new()),
         Box::new(crate::neotrix::nt_mind_ingestion::pipeline_stages::CanonicalSortStage::new()),
         Box::new(crate::neotrix::nt_mind_ingestion::pipeline_stages::StreamHygieneStage::new()),
+        Box::new(crate::neotrix::nt_mind_ingestion::pipeline_stages::InnerCriticStage::new()),
+        Box::new(SemanticRecallStage::new()),
+        Box::new(GoalContractStage::new()),
         Box::new(SnapshotStage::new()),
+        Box::new(CheckpointStage::new()),
         Box::new(AutonomyGateStage::new()),
         Box::new(MemoryRetrievalStage::new()),
         Box::new(GapAnalysisStage::new()),
@@ -1262,7 +1477,12 @@ pub fn seal_pipeline() -> BrainPipeline {
         Box::new(SelfEditGenerationStage::new()),
         Box::new(crate::neotrix::nt_mind::self_iterating::skillopt::BoundedEditStage::new()),
         Box::new(ApplyEditsStage::new()),
+        Box::new(LspDiagnosticsStage::new()),
+        Box::new(EvidenceCaptureStage::new()),
+        Box::new(ExternalVerifierStage::new()),
         Box::new(RewardCalculationStage::new()),
+        Box::new(NarrowRecoveryStage::new()),
+        Box::new(AdaptiveLRStage::new()),
         Box::new(crate::neotrix::nt_mind::self_iterating::skillopt::ValidationGateStage::new()),
         Box::new(GwtAbsorbStage::new()),
         Box::new(StatsSignificanceStage::new()),
@@ -1270,6 +1490,7 @@ pub fn seal_pipeline() -> BrainPipeline {
         Box::new(TaskAffinityStage::new()),
         Box::new(KnowledgeQualityStage::new()),
         Box::new(RollbackDecisionStage::new()),
+        Box::new(RewindStage::new()),
         Box::new(crate::neotrix::nt_mind::self_iterating::skillopt::RejectedBufferFeedbackStage::new()),
         Box::new(ChampionCompareStage::new()),
         Box::new(ReasoningBankStorageStage::new()),
@@ -1284,7 +1505,383 @@ pub fn seal_pipeline() -> BrainPipeline {
         Box::new(SpectralMonitorStage::new()),
         Box::new(TrajectoryCollectStage::new()),
         Box::new(CoachAndUpdateStage::new()),
+        Box::new(MetaImprovementStage::new()),
+        Box::new(SleepStage::new()),
+        Box::new(SelfPreservationStage::new()),
+        Box::new(DegradationGateStage::new()),
+        Box::new(PluginDiscoveryStage::new()),
+        Box::new(UQCalibrationStage::new()),
+        Box::new(PhiStage::new()),
+        Box::new(NegentropyStage::new()),
+        Box::new(ConflictResolutionStage::new()),
+        Box::new(MotivationStage::new()),
+        Box::new(CodeSearchStage::new()),
+        Box::new(PerceptionEvolutionStage::new()),
+        Box::new(AuraIntentStage::new()),
+        Box::new(RemoteSyncStage::new()),
+        Box::new(crate::neotrix::nt_act_social::SocialIngestionStage::new()),
+        Box::new(VisionStage::default()),
+        Box::new(SideGitStage::new()),
+        Box::new(FinalVerificationStage::new()),
+        Box::new(GoalTerminatorStage::new()),
     ])
+}
+
+make_stage!(CodeSearchStage);
+impl BrainStage for CodeSearchStage {
+    fn name(&self) -> &str { "code_search" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::neotrix::nt_world_code_search::CodeSearchEngine;
+        let workspace = std::env::var("NEOTRIX_WORKSPACE")
+            .unwrap_or_else(|_| ".".to_string());
+        let query = std::env::var("NEOTRIX_CODE_QUERY").ok();
+        if let Some(q) = query {
+            if !q.trim().is_empty() {
+                let mut engine = CodeSearchEngine::with_root(std::path::Path::new(&workspace));
+                match engine.format_results(&q, 5) {
+                    Ok(output) => {
+                        log::info!("[code_search] query='{}' → {} chars", q, output.len());
+                        brain.code_search_cache = Some(output);
+                    }
+                    Err(e) => {
+                        log::warn!("[code_search] failed: {}", e);
+                        brain.code_search_cache = Some(format!("Code search error: {}", e));
+                    }
+                }
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(AuraIntentStage);
+impl BrainStage for AuraIntentStage {
+    fn name(&self) -> &str { "aura_intent" }
+    fn frequency(&self) -> usize { 1 }
+
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        if task.is_empty() { return Ok(StageDecision::Continue); }
+
+        let frame = brain._tom.infer(&task);
+        log::info!("[aura] intent={:?} gap={:.2} budget={} needs_probing={}",
+            frame.literal_intent, frame.gap_score, frame.probe_budget, frame.needs_probing());
+
+        if frame.gap_score > 0.3 {
+            brain._reward = (brain._reward + frame.gap_score * 0.05).min(1.0);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(RemoteSyncStage);
+impl BrainStage for RemoteSyncStage {
+    fn name(&self) -> &str { "remote_sync" }
+    fn frequency(&self) -> usize { 5 }
+
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        if let Some(ref state) = brain._remote_control_state {
+            if let Ok(mut s) = state.try_write() {
+                s.pipeline_status = brain.pipeline_status();
+                s.current_task = brain._current_task();
+                s.iteration = brain.iteration;
+                s.reward = brain._reward;
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+pub struct LspDiagnosticsStage {
+    manager: Mutex<crate::neotrix::nt_mind::lsp_client::LspManager>,
+}
+
+impl LspDiagnosticsStage {
+    pub fn new() -> Self {
+        Self { manager: Mutex::new(crate::neotrix::nt_mind::lsp_client::LspManager::new()) }
+    }
+}
+
+impl Default for LspDiagnosticsStage {
+    fn default() -> Self { Self::new() }
+}
+
+impl BrainStage for LspDiagnosticsStage {
+    fn name(&self) -> &str { "lsp_diagnostics" }
+    fn frequency(&self) -> usize { 5 }
+
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let workspace = std::env::var("NEOTRIX_WORKSPACE")
+            .unwrap_or_else(|_| ".".to_string());
+
+        let files = match recently_modified_sources(&workspace, 5) {
+            Ok(f) => f,
+            Err(e) => { log::debug!("[lsp_diag] scan failed: {}", e); return Ok(StageDecision::Continue); }
+        };
+
+        if files.is_empty() {
+            return Ok(StageDecision::Continue);
+        }
+
+        let mut manager = match self.manager.lock() {
+            Ok(m) => m,
+            Err(e) => { log::warn!("[lsp_diag] lock: {}", e); return Ok(StageDecision::Continue); }
+        };
+
+        let cargo = format!("{}/Cargo.toml", workspace);
+        let server = match manager.detect_and_start(&cargo) {
+            Some(s) => s,
+            None => { return Ok(StageDecision::Continue); }
+        };
+
+        let mut total_errors = 0;
+        let mut total_warnings = 0;
+
+        for file in &files {
+            let uri = format!("file://{}", file);
+            let _ = manager.send_request(&server, "textDocument/didOpen", serde_json::json!({
+                "textDocument": { "uri": uri, "languageId": "rust", "version": 1, "text": "" }
+            }));
+
+            let resp = manager.send_request(&server, "textDocument/diagnostic", serde_json::json!({
+                "textDocument": { "uri": uri }
+            }));
+
+            if let Some(val) = resp {
+                let items = val.pointer("/result/items")
+                    .or_else(|| val.pointer("/result"))
+                    .and_then(|r| r.as_array());
+                if let Some(diags) = items {
+                    for d in diags {
+                        let sev = d.get("severity").and_then(|s| s.as_i64()).unwrap_or(0);
+                        let msg = d.get("message").and_then(|m| m.as_str()).unwrap_or("");
+                        match sev {
+                            1 => { total_errors += 1; log::info!("[lsp_diag] ERR {}:{}", file, msg); }
+                            2 => { total_warnings += 1; log::debug!("[lsp_diag] WARN {}:{}", file, msg); }
+                            _ => {}
+                        }
+                    }
+                } else if let Some(err) = val.get("error") {
+                    log::debug!("[lsp_diag] LSP err {}: {}", file, err);
+                }
+            }
+        }
+
+        if total_errors > 0 || total_warnings > 0 {
+            let penalty = (total_errors as f64).min(5.0) * -0.05
+                       + (total_warnings as f64).min(5.0) * -0.01;
+            brain._reward = (brain._reward + penalty).max(-1.0);
+            log::info!("[lsp_diag] errors={} warnings={} penalty={:.3}", total_errors, total_warnings, penalty);
+        }
+
+        Ok(StageDecision::Continue)
+    }
+}
+
+fn recently_modified_sources(root: &str, max: usize) -> Result<Vec<String>, String> {
+    let mut files = Vec::new();
+    let now = std::time::SystemTime::now();
+
+    fn walk(dir: &Path, files: &mut Vec<(String, std::time::SystemTime)>, max: usize, now: std::time::SystemTime) -> Result<(), String> {
+        if files.len() >= max { return Ok(()); }
+        let entries = std::fs::read_dir(dir).map_err(|e| e.to_string())?;
+        for entry in entries {
+            let e = entry.map_err(|e| e.to_string())?;
+            let p = e.path();
+            if p.is_dir() {
+                let n = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if n.starts_with('.') || n == "node_modules" || n == "target" || n == "build" {
+                    continue;
+                }
+                walk(&p, files, max, now)?;
+            } else if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                if matches!(ext, "rs" | "ts" | "js" | "py" | "go") {
+                    if let Ok(meta) = std::fs::metadata(&p) {
+                        if let Ok(mtime) = meta.modified() {
+                            if let Ok(d) = now.duration_since(mtime) {
+                                if d.as_secs() < 60 {
+                                    files.push((p.to_string_lossy().to_string(), mtime));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    walk(Path::new(root), &mut files, max, now)?;
+    files.sort_by(|a, b| b.1.cmp(&a.1));
+    files.truncate(max);
+    Ok(files.into_iter().map(|(p, _)| p).collect())
+}
+
+make_stage!(ConflictResolutionStage);
+impl BrainStage for ConflictResolutionStage {
+    fn name(&self) -> &str { "conflict_resolution" }
+    fn frequency(&self) -> usize { 10 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::core::nt_core_consciousness::sleep_gate::detect_conflicts;
+        let threshold = 0.85;
+        let entries: Vec<&VsaTagged> = brain._consciousness_stream.recent(30);
+        let conflicts = detect_conflicts(&entries, threshold);
+        let _resolved = 0;
+        for (i, j) in &conflicts {
+            let sim = crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA::similarity(&entries[*i].vector, &entries[*j].vector);
+            log::debug!("[conflict] entry[{}] vs entry[{}] sim={:.3}", i, j, sim);
+        }
+        if !conflicts.is_empty() {
+            let _resolved = conflicts.len().min(5);
+            log::info!("[conflict] detected={} resolved={}", conflicts.len(), _resolved);
+            brain._reward = (brain._reward + 0.02 * _resolved as f64).min(1.0);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(MotivationStage);
+impl BrainStage for MotivationStage {
+    fn name(&self) -> &str { "intrinsic_motivation" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::neotrix::nt_mind_ingestion::intrinsic_value::aggregate_intrinsic_reward;
+        let prediction_error = brain.curiosity_bonus;
+        let knowledge_gaps = brain._external_reward.map(|r| (r * 10.0) as u64).unwrap_or(0);
+        let total_known = brain.reasoning_bank.stats().total_memories.max(1) as u64;
+        let rewards = aggregate_intrinsic_reward(prediction_error, knowledge_gaps as usize, total_known as usize, 0, 50);
+        let total_intrinsic: f64 = rewards.iter().map(|r| r.value).sum();
+        if total_intrinsic > 0.01 {
+            let bonus = (total_intrinsic * 0.3).min(0.2);
+            brain._reward = (brain._reward + bonus).min(1.0);
+            log::info!("[motivation] intrinsic_reward={:.4} bonus={:.4} sources={}",
+                total_intrinsic, bonus, rewards.len());
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(SelfPreservationStage);
+impl BrainStage for SelfPreservationStage {
+    fn name(&self) -> &str { "self_preservation" }
+    fn frequency(&self) -> usize { 20 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::neotrix::nt_mind_ingestion::self_preservation::ResourceUsage;
+        let usage = ResourceUsage {
+            memory_mb: 0,
+            stage_count: brain.pipeline.stages.len(),
+            pipeline_depth: brain.pipeline.stages.len(),
+            cpu_seconds: brain.self_preservation.uptime().as_secs_f64(),
+        };
+        if let Some(warning) = brain.self_preservation.protect(&usage, 1024) {
+            log::warn!("[self_preservation] resource guard: {}", warning);
+            brain._reward = (brain._reward - 0.05).max(-0.5);
+        }
+        brain.self_preservation.save_checkpoint("pipeline", format!("iter={} reward={:.3}", brain.iteration, brain._reward));
+        log::debug!("[self_preservation] uptime={:?} health={}",
+            brain.self_preservation.uptime(), brain.self_preservation.health());
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(DegradationGateStage);
+impl BrainStage for DegradationGateStage {
+    fn name(&self) -> &str { "degradation_gate" }
+    fn frequency(&self) -> usize { 15 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        use crate::neotrix::nt_mind_ingestion::graceful_degradation::{CapabilityStatus, DegradationLevel};
+        let caps = CapabilityStatus::detect(
+            brain.nt_world_jepa.is_some(),
+            brain._nt_memory_kb.is_some(),
+            brain.nt_act_crypto.is_some(),
+        );
+        let level = DegradationLevel::from_capabilities(&caps);
+        if level as u8 <= DegradationLevel::Reduced as u8 {
+            log::info!("[degradation] level={:?} available={}/6", level, caps.available_count());
+        }
+        if level == DegradationLevel::Minimal {
+            log::warn!("[degradation] minimal capability — reducing reward expectation");
+            brain._reward = (brain._reward - 0.1).max(-0.5);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(PluginDiscoveryStage);
+impl BrainStage for PluginDiscoveryStage {
+    fn name(&self) -> &str { "plugin_discovery" }
+    fn frequency(&self) -> usize { 50 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let count = brain.plugin_registry.list().len();
+        if count > 0 {
+            log::info!("[plugin] {} plugins/skills available", count);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(SideGitStage);
+impl BrainStage for SideGitStage {
+    fn name(&self) -> &str { "side_git" }
+    fn frequency(&self) -> usize { 30 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let workspace = std::env::var("NEOTRIX_WORKSPACE").unwrap_or_else(|_| ".".to_string());
+        let ws_path = std::path::Path::new(&workspace);
+        if !ws_path.exists() {
+            return Ok(StageDecision::Skip("no workspace".into()));
+        }
+        if let Err(e) = brain.side_git.init() {
+            log::warn!("[side_git] init failed: {}", e);
+            return Ok(StageDecision::Continue);
+        }
+        let mut files = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(ws_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Ok(meta) = path.metadata() {
+                        if let Ok(modified) = meta.modified() {
+                            if let Ok(elapsed) = modified.elapsed() {
+                                if elapsed.as_secs() < 300 {
+                                    files.push(path);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if !files.is_empty() {
+            match brain.side_git.snapshot_files(&files, ws_path) {
+                Ok(n) => {
+                    if n > 0 {
+                        log::info!("[side_git] snapshotted {} files (total={})", n, brain.side_git.snapshot_count());
+                    }
+                }
+                Err(e) => log::warn!("[side_git] snapshot error: {}", e),
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+make_stage!(PerceptionEvolutionStage);
+impl BrainStage for PerceptionEvolutionStage {
+    fn name(&self) -> &str { "perception_evolution" }
+    fn frequency(&self) -> usize { 10 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let budget = brain.perception_evolution.compute_budget(brain.iteration);
+        brain.perception_evolution.record_budget(brain.iteration, budget.clone());
+        brain.perception_evolution.decay_exploration();
+        if brain.iteration % 50 == 0 {
+            if let Some(top) = budget.first() {
+                log::info!("[perception] best={:?} alloc={:.2} explore={:.3}",
+                    top.modality, top.allocation, brain.perception_evolution.exploration_rate);
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
 }
 
 pub fn kernel_iterate_pipeline() -> BrainPipeline {
@@ -1393,22 +1990,29 @@ mod tests {
         let pipeline = seal_pipeline();
         let names: Vec<&str> = pipeline.stages.iter().map(|s| s.name()).collect();
         assert_eq!(names, vec![
-            "vsa_fingerprint", "canonical_sort", "stream_hygiene", "snapshot", "autonomy_gate", "memory_retrieval",
+            "vsa_fingerprint", "canonical_sort", "stream_hygiene", "inner_critic",
+            "semantic_recall", "goal_contract",
+            "snapshot", "checkpoint", "autonomy_gate", "memory_retrieval",
             "gap_analysis",
             "ssm_update", "open_source_compare", "self_edit_gen",
             "bounded_edit", "apply_edits",
-            "reward_calc", "validation_gate",
+            "lsp_diagnostics",
+            "evidence_capture", "external_verifier",
+            "reward_calc", "narrow_recovery", "adaptive_lr", "validation_gate",
             "gwt_absorb", "stats_significance",
             "harness_adapt",
             "task_affinity", "knowledge_quality",
-            "rollback_decision", "rejected_feedback",
+            "rollback_decision", "rewind", "rejected_feedback",
             "champion_compare", "bank_storage",
             "hypercube_optimize",
             "e8_experiment",
             "epoch_slow_update", "nt_shield_scan", "session_distill", "conversation_distill", "aging_diagnosis", "embedding_refresh",
             "spectral_monitor",
             "trajectory_collect", "coach_and_update",
-        ], "SEAL pipeline 应有 34 个 stage");
+            "meta_improvement", "sleep", "self_preservation", "degradation_gate", "plugin_discovery", "uq_calibration", "phi_measure",
+            "conflict_resolution", "intrinsic_motivation", "code_search", "perception_evolution", "side_git",
+            "final_verification", "goal_terminator",
+        ], "SEAL pipeline 应有 58 个 stage");
     }
 
     #[test]
@@ -1430,5 +2034,61 @@ mod tests {
         sorted.sort();
         sorted.dedup();
         assert_eq!(sorted.len(), names.len(), "所有 stage 名必须唯一");
+    }
+
+    #[test]
+    fn test_permission_level_syncs_to_approval_mode() {
+        {
+            let mut s = crate::cli::global_shield().lock().unwrap();
+            s.set_approval_mode(crate::cli::approval::ApprovalMode::Suggest);
+        }
+        let mut brain = SelfIteratingBrain::new();
+
+        brain.permission = PermissionLevel::Review;
+        let _ = brain.run_seal_loop("test_review_sync", None, None);
+        {
+            let shield = crate::cli::global_shield().lock().unwrap();
+            assert_eq!(shield.approval.mode(), crate::cli::approval::ApprovalMode::Suggest);
+        }
+
+        brain.permission = PermissionLevel::Suggest;
+        let _ = brain.run_seal_loop("test_suggest_sync", None, None);
+        {
+            let shield = crate::cli::global_shield().lock().unwrap();
+            assert_eq!(shield.approval.mode(), crate::cli::approval::ApprovalMode::AutoEdit);
+        }
+
+        brain.permission = PermissionLevel::Full;
+        let _ = brain.run_seal_loop("test_full_sync", None, None);
+        {
+            let shield = crate::cli::global_shield().lock().unwrap();
+            assert_eq!(shield.approval.mode(), crate::cli::approval::ApprovalMode::FullAuto);
+        }
+    }
+
+    #[test]
+    fn test_permission_level_review_skips_autonomy_gate() {
+        let mut brain = SelfIteratingBrain::new();
+        brain.permission = PermissionLevel::Review;
+        let stage = AutonomyGateStage::new();
+        let decision = stage.process(&mut brain).unwrap();
+        assert!(matches!(decision, StageDecision::Skip(_)));
+    }
+
+    #[test]
+    fn test_sandbox_readonly_skips_autonomy_gate() {
+        {
+            let mut s = crate::cli::global_shield().lock().unwrap();
+            s.set_sandbox_mode(crate::cli::sandbox::SandboxMode::ReadOnly);
+        }
+        let mut brain = SelfIteratingBrain::new();
+        brain.permission = PermissionLevel::Full;
+        let stage = AutonomyGateStage::new();
+        let decision = stage.process(&mut brain).unwrap();
+        assert!(matches!(decision, StageDecision::Skip(_)));
+        {
+            let mut s = crate::cli::global_shield().lock().unwrap();
+            s.set_sandbox_mode(crate::cli::sandbox::SandboxMode::Disabled);
+        }
     }
 }

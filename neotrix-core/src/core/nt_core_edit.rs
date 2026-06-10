@@ -61,6 +61,28 @@ pub struct SelfEdit {
     pub config_overrides: HashMap<String, f64>,
 }
 
+impl SelfEdit {
+    pub fn evaluate_by_negentropy(&self, delta_n: f64, threshold: f64) -> bool {
+        delta_n > threshold
+    }
+
+    pub fn negentropy_verdict(&self, delta_n: f64) -> &'static str {
+        if delta_n > 0.05 {
+            "accept: positive negentropy gain"
+        } else if delta_n > 0.0 {
+            "accept: marginal gain"
+        } else if delta_n > -0.05 {
+            "reject: neutral or slightly negative"
+        } else {
+            "revert: significant negentropy loss"
+        }
+    }
+
+    pub fn should_revert(&self, delta_n: f64) -> bool {
+        delta_n < -0.05
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCall {
     pub tool: String,
@@ -164,5 +186,46 @@ mod tests {
         };
         assert_eq!(tc.tool, "web_scrape");
         assert_eq!(tc.params.get("url").expect("value should be ok in test"), "https://example.com");
+    }
+
+    #[test]
+    fn test_evaluate_by_negentropy_accepts_positive() {
+        let edit = SelfEdit {
+            task_type: crate::core::TaskType::General,
+            target_dimensions: vec![],
+            adjustment_magnitude: 0.1,
+            tool_calls: Vec::new(),
+            config_overrides: HashMap::new(),
+        };
+        assert!(edit.evaluate_by_negentropy(0.1, 0.0));
+        assert!(!edit.evaluate_by_negentropy(-0.1, 0.0));
+    }
+
+    #[test]
+    fn test_negentropy_verdict_labels() {
+        let edit = SelfEdit {
+            task_type: crate::core::TaskType::General,
+            target_dimensions: vec![],
+            adjustment_magnitude: 0.0,
+            tool_calls: Vec::new(),
+            config_overrides: HashMap::new(),
+        };
+        assert_eq!(edit.negentropy_verdict(0.1), "accept: positive negentropy gain");
+        assert_eq!(edit.negentropy_verdict(-0.1), "revert: significant negentropy loss");
+        assert_eq!(edit.negentropy_verdict(-0.01), "reject: neutral or slightly negative");
+    }
+
+    #[test]
+    fn test_should_revert_on_large_negative() {
+        let edit = SelfEdit {
+            task_type: crate::core::TaskType::General,
+            target_dimensions: vec![],
+            adjustment_magnitude: 0.0,
+            tool_calls: Vec::new(),
+            config_overrides: HashMap::new(),
+        };
+        assert!(edit.should_revert(-0.1));
+        assert!(!edit.should_revert(-0.01));
+        assert!(!edit.should_revert(0.05));
     }
 }

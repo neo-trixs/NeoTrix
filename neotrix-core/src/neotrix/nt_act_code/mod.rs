@@ -20,6 +20,7 @@ pub mod pipeline_autofixer;
 pub mod safe_applier;
 pub mod semantic_entropy;
 pub mod template_registry;
+pub mod verifier_stage;
 
 pub use agentic_reasoning::{
     AgenticCodeReasoner, ReasoningStep, SemiFormalTemplate,
@@ -33,3 +34,4 @@ pub use pipeline_autofixer::PipelineAutoFixer;
 pub use safe_applier::SafeCodeApplier;
 pub use semantic_entropy::{SemanticEntropy, SemanticEntropyGate, EntropyAction, EntropyRecord, EditContext, TrendDirection};
 pub use template_registry::{CodeTemplate, CodeTemplateRegistry, TemplateCategory};
+pub use verifier_stage::{SafeWriteGate, VerifierStage};

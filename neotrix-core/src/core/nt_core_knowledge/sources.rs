@@ -70,6 +70,7 @@ impl KnowledgeSource {
 //            KnowledgeSource::SiaWeightUpdate => "SIA Weight Update (arXiv 2605.27276) — RL weight update capability",
 //            KnowledgeSource::SiaFeedbackLoop => "SIA Feedback Loop (arXiv 2605.27276) — three-body feedback architecture",
 //            KnowledgeSource::HyperAgents => "DGM-HyperAgents (arXiv 2603.19461) — self-referential self-improving agents",
+            KnowledgeSource::SocialFeed => "social-feed/negentropy-scored",
             _ => "external/unknown",
         }
     }
@@ -124,6 +125,7 @@ impl KnowledgeSource {
             KnowledgeSource::SiaWeightUpdate,
             KnowledgeSource::SiaFeedbackLoop,
             KnowledgeSource::HyperAgents,
+            KnowledgeSource::SocialFeed,
         ]
     }
 
@@ -202,6 +204,7 @@ impl KnowledgeSource {
             KnowledgeSource::SiaWeightUpdate => 0.85,
             KnowledgeSource::SiaFeedbackLoop => 0.95,
             KnowledgeSource::HyperAgents => 0.93,
+            KnowledgeSource::SocialFeed => 0.75,
         }
     }
 

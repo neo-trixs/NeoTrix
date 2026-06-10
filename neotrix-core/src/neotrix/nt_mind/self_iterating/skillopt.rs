@@ -1,6 +1,7 @@
 use super::SelfIteratingBrain;
 use super::super::self_edit::MicroEdit;
 use super::pipeline::{BrainStage, StageDecision};
+use super::curvature_rl::{CurvaturePolicy, CurvatureRegime};
 use crate::neotrix::nt_core_error::NeoTrixError;
 use std::collections::VecDeque;
 
@@ -38,6 +39,7 @@ pub enum LrScheduler {
     Constant(usize),
     Cosine { max_lr: usize, min_lr: usize, total_steps: usize, current: usize },
     Linear { start: usize, end: usize, total_steps: usize, current: usize },
+    CurvatureAware { base: usize, min_lr: usize, max_lr: usize, curvature: CurvaturePolicy },
 }
 
 impl LrScheduler {
@@ -55,6 +57,11 @@ impl LrScheduler {
                 let lr = *start as f64 + (*end as f64 - *start as f64) * progress;
                 (lr.round() as usize).max(1)
             }
+            LrScheduler::CurvatureAware { base, min_lr, max_lr, curvature } => {
+                let multiplier = curvature.tracker.lr_multiplier();
+                let budget = (*base as f64 * multiplier).round() as usize;
+                budget.clamp(*min_lr, *max_lr)
+            }
         }
     }
 
@@ -63,6 +70,9 @@ impl LrScheduler {
             LrScheduler::Constant(_) => {}
             LrScheduler::Cosine { current, .. } => *current += 1,
             LrScheduler::Linear { current, .. } => *current += 1,
+            LrScheduler::CurvatureAware { curvature, .. } => {
+                curvature.tracker.window.clear();
+            }
         }
     }
 
@@ -71,6 +81,28 @@ impl LrScheduler {
             LrScheduler::Constant(_) => {}
             LrScheduler::Cosine { current, .. } => *current = 0,
             LrScheduler::Linear { current, .. } => *current = 0,
+            LrScheduler::CurvatureAware { curvature, .. } => {
+                curvature.tracker.window.clear();
+                curvature.tracker.first_derivatives.clear();
+                curvature.tracker.second_derivatives.clear();
+                curvature.tracker.regime_history.clear();
+            }
+        }
+    }
+
+    /// Feed a reward signal into the curvature tracker (only for CurvatureAware).
+    pub fn observe_reward(&mut self, reward: f64) {
+        if let LrScheduler::CurvatureAware { curvature, .. } = self {
+            curvature.adapt_lr(reward);
+        }
+    }
+
+    /// Get the current curvature regime (only for CurvatureAware).
+    pub fn curvature_regime(&self) -> Option<CurvatureRegime> {
+        if let LrScheduler::CurvatureAware { curvature, .. } = self {
+            Some(curvature.regime())
+        } else {
+            None
         }
     }
 }

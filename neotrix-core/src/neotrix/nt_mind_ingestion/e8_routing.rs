@@ -11,6 +11,7 @@ pub fn source_type_to_e8_mode(source: SourceType) -> Option<String> {
         SourceType::Conversation => 5,  // Pair Review — dialogue-mode reasoning
         SourceType::Finance => 24,      // Data Analysis — quantitative reasoning
         SourceType::Media => 14,        // Brainstorm — creative ideation
+        SourceType::Social => 48,       // Default to Pattern Match
     };
     Some(MODE_NAMES[idx].to_string())
 }
@@ -24,6 +25,7 @@ pub fn apply_source_e8_routing(brain: &mut SelfIteratingBrain, source_type: Sour
         SourceType::Conversation => 5,
         SourceType::Finance => 24,
         SourceType::Media => 14,
+        SourceType::Social => 48,
     };
     let mode = ReasoningHexagram(idx);
     brain._e8_policy.set_previous(mode);
@@ -67,6 +69,7 @@ mod tests {
                 SourceType::Conversation => 5,
                 SourceType::Finance => 24,
                 SourceType::Media => 14,
+                SourceType::Social => 48,
             };
             assert!(modes.insert(idx), "duplicate mode {} for {:?}", idx, st);
         }

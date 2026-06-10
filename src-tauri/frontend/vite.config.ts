@@ -32,13 +32,18 @@ export default defineConfig({
     sourcemap: !!process.env.TAURI_DEBUG,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom", "zustand"],
-          editor: ["@xyflow/react"],
-          terminal: ["@xterm/xterm", "@xterm/addon-fit"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@xyflow") || id.includes("reactflow")) return "editor";
+            if (id.includes("@xterm")) return "terminal";
+            if (id.includes("react-dom") || id.includes("react/") || id.includes("scheduler")) return "vendor-react";
+            if (id.includes("zustand")) return "vendor-state";
+            if (id.includes("dompurify") || id.includes("marked")) return "vendor-content";
+            return "vendor-other";
+          }
         },
       },
     },
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 300,
   },
 });

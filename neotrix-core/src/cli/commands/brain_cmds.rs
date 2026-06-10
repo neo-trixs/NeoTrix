@@ -1,4 +1,4 @@
-//! Brain 交互命令 — Absorb / Evolve / Mem / Save / Trace / Avatar
+//! Brain interaction commands — Absorb / Evolve / Mem / Save / Trace / Avatar
 
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::RwLock;
@@ -18,7 +18,7 @@ pub struct AbsorbCmd;
 impl CliCommand for AbsorbCmd {
     fn name(&self) -> &str { "/absorb" }
     fn aliases(&self) -> Vec<&str> { vec!["/a"] }
-    fn description(&self) -> &str { "吸收知识: /absorb HeroUI" }
+    fn description(&self) -> &str { "Absorb knowledge from a source: /absorb <source>" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let source_name = args.iter().find(|a| *a != "--json").map(|s| s.as_str()).unwrap_or("");
@@ -53,7 +53,7 @@ pub struct EvolveCmd;
 impl CliCommand for EvolveCmd {
     fn name(&self) -> &str { "/evolve" }
     fn aliases(&self) -> Vec<&str> { vec!["/e"] }
-    fn description(&self) -> &str { "SEAL 进化: /evolve <url> | /evolve (internal SEAL loop)" }
+    fn description(&self) -> &str { "SEAL evolution: /evolve <url> | /evolve (internal SEAL loop)" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let url = args.iter().find(|a| *a != "--json").map(|s| s.as_str()).unwrap_or("");
@@ -113,7 +113,7 @@ impl CliCommand for MemCmd {
     fn name(&self) -> &str { "/mem" }
     fn aliases(&self) -> Vec<&str> { vec!["/memory"] }
     fn description(&self) -> &str {
-        "白盒记忆管理:\n  /mem view <id>                     查看记忆详情\n  /mem list [--tag <tag>] [--source <s>]  列出/过滤记忆\n  /mem search <query>                 搜索记忆\n  /mem edit <id> <内容>               编辑记忆(保存原始)\n  /mem tag <id> <tag1,tag2,...>       更新标签\n  /mem delete <id>                    删除记忆\n  /mem pin <id>                       固定/取消固定\n  /mem checkpoint create <描述>       创建检查点\n  /mem checkpoint list                列出检查点\n  /mem rollback <checkpoint_id>       回滚到检查点\n  /mem dream                          手动梦境周期\n  /mem dream toggle                   开关自动梦境\n  /mem stats                          记忆统计"
+        "Memory management: /mem view/list/search/edit/tag/delete/pin/checkpoint/dream/stats"
     }
 
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -367,7 +367,7 @@ pub struct SaveCmd;
 impl CliCommand for SaveCmd {
     fn name(&self) -> &str { "/save" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "保存状态到 ~/.neotrix/brain.json" }
+    fn description(&self) -> &str { "Save brain state to ~/.neotrix/brain.json" }
     fn execute(&self, _args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if let Some(b) = brain {
             let a = b.blocking_read();
@@ -387,7 +387,7 @@ pub struct TraceCmd;
 impl CliCommand for TraceCmd {
     fn name(&self) -> &str { "/trace" }
     fn aliases(&self) -> Vec<&str> { vec!["/tree", "/chain"] }
-    fn description(&self) -> &str { "显示推理因果链 (参考 witr --tree)" }
+    fn description(&self) -> &str { "Show reasoning trace chain (similar to witr --tree)" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let limit = args.iter().find_map(|a| {
@@ -416,7 +416,7 @@ pub struct AvatarCmd;
 impl CliCommand for AvatarCmd {
     fn name(&self) -> &str { "/avatar" }
     fn aliases(&self) -> Vec<&str> { vec!["/av"] }
-    fn description(&self) -> &str { "Avatar 管理: /avatar list | /avatar create <archetype> | /avatar status <id> | /avatar harvest <id> | /avatar evolve" }
+    fn description(&self) -> &str { "Avatar management: /avatar list | /avatar create <archetype> | /avatar status <id> | /avatar harvest <id> | /avatar evolve" }
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         if args.is_empty() || (args.len() == 1 && args[0] == "--json") {

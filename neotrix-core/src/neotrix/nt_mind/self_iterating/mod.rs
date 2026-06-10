@@ -12,7 +12,14 @@ pub mod validation;
 pub mod skillopt;
 pub mod harness_adapter;
 pub mod aging_monitor;
+pub mod checkpoint;
 pub mod secret_scanner;
+pub mod stage_contracts;
+pub mod recipe;
+pub mod curvature_rl;
+pub mod goal_contract;
+pub mod fingerprint_reconciler;
+pub mod skill_crystallizer;
 
 pub use brain_impl::{ReasoningBrain, AbsorbValidator, DefaultAbsorbValidator, SelfIteration, EvaluationRecord};
 pub use loop_impl::SelfIteratingBrain;

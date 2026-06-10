@@ -1,7 +1,7 @@
 use tauri::{Emitter, Manager};
 
 pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    use tauri::menu::{MenuBuilder, MenuItemBuilder};
+    use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
     use tauri::tray::TrayIconBuilder;
 
     let show = MenuItemBuilder::with_id("show", "Show Window").build(app)?;

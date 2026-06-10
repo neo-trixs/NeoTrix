@@ -5,13 +5,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use clap::Parser;
-use tauri::{Manager, State, Emitter};
+use tauri::{Manager, State, Emitter, Listener};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use neotrix::neotrix::nt_mind::{ReasoningBank, ReasoningBrain};
 use neotrix::neotrix::nt_shield::permissions::PermissionManager;
-use neotrix::neotrix::nt_io_user_avatar::DistillationEngine;
+use neotrix::neotrix::nt_io_avatar::DistillationEngine;
 
+mod browser_host;
 mod commands;
 mod permission_dialog;
 
@@ -141,10 +142,10 @@ fn auto_sync_cycle(sync_state: &commands::SyncState, handle: &tauri::AppHandle) 
     let _ = handle.emit("sync-complete", payload);
 
     if let Some(tray) = handle.tray_by_id("main-tray") {
-        let _ = tray.set_tooltip(&format!(
+        let _ = tray.set_tooltip(Some(&format!(
             "NeoTrix Desktop — Last sync: {}",
             now.format("%H:%M:%S")
-        ));
+        )));
     }
 }
 
@@ -175,6 +176,9 @@ fn main() {
             let sync_state: commands::SyncState = Arc::new(Mutex::new(None));
             let sync_state_bg = sync_state.clone();
 
+            // X 自动浏览状态
+            let x_scroll_state = commands::XAutoScrollState::new();
+
             tauri::Builder::default()
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_dialog::init())
@@ -189,6 +193,7 @@ fn main() {
                 .manage(permission_manager)
                 .manage(distillation_engine)
                 .manage(sync_state)
+                .manage(x_scroll_state)
                 .invoke_handler(tauri::generate_handler![
                     commands::get_brain_stats, commands::absorb_source,
                     commands::session_list, commands::session_create,
@@ -218,10 +223,7 @@ fn main() {
                     commands::cmd_permission_approve,
                     commands::cmd_permission_deny,
                     commands::brain_stats,
-                    commands::test_provider,
-                    commands::save_provider_config,
                     commands::search_knowledge,
-                    commands::send_notification,
                     commands::get_user_avatar,
                     commands::get_distillation_flow,
                     commands::distill_message,
@@ -230,8 +232,6 @@ fn main() {
                     commands::get_chain_stats,
                     commands::brain_write_back,
                     commands::auto_distill,
-                    commands::execute_terminal_command,
-                    commands::cli_command,
                     commands::request_capability,
                     commands::check_auth,
                     commands::grant_capability,
@@ -252,6 +252,12 @@ fn main() {
                     commands::sync_preview,
                     commands::sync_start,
                     commands::sync_status,
+                    commands::browser_x_start_session,
+                    commands::browser_x_login,
+                    commands::browser_x_human_scroll,
+                    commands::browser_x_stop_session,
+                    commands::browser_x_status,
+                    commands::browser_x_human_profile,
                 ])
                 .setup(move |app| {
                     neotrix_tauri::setup_tray(app).expect("failed to setup tray");
@@ -303,7 +309,8 @@ fn main() {
                     // 监听系统托盘 "Sync Now" 事件
                     let sync_state_trigger = sync_state_bg.clone();
                     let handle_trigger = app.handle().clone();
-                    app.listen("sync-trigger", move |_| {
+                    let handle_trigger_listener = handle_trigger.clone();
+                    handle_trigger_listener.listen("sync-trigger", move |_| {
                         let state = sync_state_trigger.clone();
                         let handle = handle_trigger.clone();
                         std::thread::spawn(move || {

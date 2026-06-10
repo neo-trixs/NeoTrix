@@ -411,7 +411,7 @@ impl BackgroundLoop {
 
     async fn handle_plugin_tick(&self) {
         use crate::neotrix::nt_io_plugin::PluginEvent;
-        self.plugin_registry.dispatch(&PluginEvent::BrainTick).await;
+        self.plugin_registry.dispatch(&PluginEvent::BrainTick);
     }
 
     /// Periodic agent discovery listener — sweep for UDP broadcasts.
@@ -427,6 +427,7 @@ impl BackgroundLoop {
     }
 
     /// Curiosity drive: knowledge gaps → GWT attention → exploration queries
+    /// Wired to negentropy: gap sparsity → negentropy proxy → curiosity calibration
     async fn handle_curiosity(&mut self) {
         use crate::neotrix::nt_mind::hypercube_bridge::HyperCubeBridge;
         let gap_reports = {
@@ -435,6 +436,17 @@ impl BackgroundLoop {
         };
 
         self.curiosity_drive.ingest_gap_reports(&gap_reports);
+
+        // Negentropy alignment: use gap sparsity as inverse negentropy proxy
+        // sparsity ↑ → order ↓ → negentropy ↓ → curiosity ↑
+        let n_total_proxy = if gap_reports.is_empty() {
+            0.5
+        } else {
+            let avg_sparsity: f64 = gap_reports.iter().map(|r| r.sparsity_score).sum::<f64>() / gap_reports.len() as f64;
+            (1.0 - avg_sparsity).clamp(0.0, 1.0)
+        };
+        self.curiosity_drive.calibrate_to_negentropy(n_total_proxy, 0.0);
+
         let queries = self.curiosity_drive.drain_queries();
 
         if !queries.is_empty() {

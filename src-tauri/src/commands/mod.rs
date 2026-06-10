@@ -17,9 +17,11 @@ pub mod project_cmds;
 pub mod diff_cmds;
 pub mod perms_cmds;
 pub mod sync_cmds;
+pub mod browser_cmds;
 
 // Re-exports for convenience (frontend/tauri registration)
 pub use types::*;
+#[cfg(feature = "stealth-net")]
 pub use proxy_cmds::*;
 pub use brain_cmds::*;
 pub use session_cmds::*;
@@ -28,6 +30,7 @@ pub use project_cmds::*;
 pub use diff_cmds::*;
 pub use perms_cmds::*;
 pub use sync_cmds::*;
+pub use browser_cmds::*;
 
 // ========== Tests ==========
 

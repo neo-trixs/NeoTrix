@@ -121,6 +121,8 @@ impl NeotrixGapDetector {
                         "affected_modules": gap.affected_modules,
                         "fill_strategy": gap.fill_strategy,
                     })),
+                    version: 1,
+                    superseded_by: None,
                 };
                 let conn = kb.conn.lock().map_err(|e| e.to_string())?;
                 let _ = store::insert_node(&conn, &node);

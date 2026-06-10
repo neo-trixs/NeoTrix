@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct TodoStore {
@@ -58,17 +57,83 @@ pub struct DependencyGraph {
 }
 
 impl TodoStore {
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let path_str = path.as_ref().to_string_lossy().to_string();
-        let content = std::fs::read_to_string(path.as_ref())
+    pub fn load(path: &str) -> Result<Self, String> {
+        let content = std::fs::read_to_string(path)
             .map_err(|e| format!("读取 TODO.yml 失败: {}", e))?;
-        let raw: serde_yaml::Value = serde_yaml::from_str(&content)
-            .map_err(|e| format!("解析 TODO.yml 失败: {}", e))?;
+        let mut store = TodoStore::new(path.to_string());
+        let mut in_items = false;
+        let mut current_item: Option<TodoItem> = None;
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed == "items:" {
+                in_items = true;
+                continue;
+            }
+            if in_items {
+                if trimmed.starts_with("- id:") {
+                    if let Some(item) = current_item.take() {
+                        store.items.push(item);
+                    }
+                    current_item = Some(TodoItem {
+                        id: trimmed.trim_start_matches("- id:").trim().trim_matches('\'').to_string(),
+                        title: String::new(),
+                        status: ItemStatus::Pending,
+                        priority: ItemPriority::Medium,
+                        created: String::new(),
+                        updated: String::new(),
+                        session: None,
+                        files: Vec::new(),
+                        depends_on: Vec::new(),
+                        notes: String::new(),
+                    });
+                } else if let Some(ref mut item) = current_item {
+                    if let Some(val) = trimmed.strip_prefix("title:") {
+                        item.title = val.trim().to_string();
+                    } else if let Some(val) = trimmed.strip_prefix("status:") {
+                        item.status = match val.trim() {
+                            "done" => ItemStatus::Done,
+                            "in_progress" => ItemStatus::InProgress,
+                            "blocked" => ItemStatus::Blocked,
+                            _ => ItemStatus::Pending,
+                        };
+                    } else if let Some(val) = trimmed.strip_prefix("priority:") {
+                        item.priority = match val.trim() {
+                            "high" => ItemPriority::High,
+                            "low" => ItemPriority::Low,
+                            _ => ItemPriority::Medium,
+                        };
+                    } else if let Some(val) = trimmed.strip_prefix("notes:") {
+                        item.notes = val.trim().to_string();
+                    }
+                }
+            } else if let Some(val) = trimmed.strip_prefix("generated_at:") {
+                store.meta.generated_at = val.trim().trim_matches('\'').to_string();
+            } else if let Some(val) = trimmed.strip_prefix("total_items:") {
+                store.meta.total_items = val.trim().parse().unwrap_or(0);
+            }
+        }
+        if let Some(item) = current_item.take() {
+            store.items.push(item);
+        }
+        Ok(store)
+    }
 
-        let meta = parse_meta(&raw["meta"])?;
-        let items = parse_items(&raw["items"])?;
-
-        Ok(Self { meta, items, path: path_str })
+    pub fn new(path: String) -> Self {
+        Self {
+            meta: TodoMeta {
+                conflicts: 0,
+                generated_at: String::new(),
+                total_items: 0,
+                v1_completed: 0,
+                session_distilled: false,
+                total_tests: 0,
+                compile_default: String::new(),
+                compile_full: String::new(),
+                p0_ready_not_started: 0,
+            },
+            items: Vec::new(),
+            path,
+        }
     }
 
     pub fn save(&self) -> Result<(), String> {
@@ -250,66 +315,7 @@ impl DependencyGraph {
     }
 }
 
-fn parse_meta(v: &serde_yaml::Value) -> Result<TodoMeta, String> {
-    Ok(TodoMeta {
-        conflicts: v["conflicts"].as_u64().unwrap_or(0),
-        generated_at: v["generated_at"].as_str().unwrap_or("").to_string(),
-        total_items: v["total_items"].as_u64().unwrap_or(0),
-        v1_completed: v["v1_completed"].as_u64().unwrap_or(0),
-        session_distilled: v["session_distilled"].as_bool().unwrap_or(false),
-        total_tests: v["total_tests"].as_u64().unwrap_or(0),
-        compile_default: v["compile_default"].as_str().unwrap_or("").to_string(),
-        compile_full: v["compile_full"].as_str().unwrap_or("").to_string(),
-        p0_ready_not_started: v["p0_ready_not_started"].as_u64().unwrap_or(0),
-    })
-}
 
-fn parse_items(v: &serde_yaml::Value) -> Result<Vec<TodoItem>, String> {
-    let arr = v.as_sequence().ok_or("items 不是数组")?;
-    let mut items = Vec::with_capacity(arr.len());
-    for (i, item) in arr.iter().enumerate() {
-        let status = match item["status"].as_str() {
-            Some("done") => ItemStatus::Done,
-            Some("pending") => ItemStatus::Pending,
-            Some("in_progress") => ItemStatus::InProgress,
-            Some("blocked") => ItemStatus::Blocked,
-            Some(other) => return Err(format!("items[{}]: 未知状态 '{}'", i, other)),
-            None => return Err(format!("items[{}]: 缺少 status", i)),
-        };
-        let priority = match item["priority"].as_str() {
-            Some("high") => ItemPriority::High,
-            Some("medium") => ItemPriority::Medium,
-            Some("low") => ItemPriority::Low,
-            Some(other) => return Err(format!("items[{}]: 未知优先级 '{}'", i, other)),
-            None => ItemPriority::Medium,
-        };
-        let files = match &item["files"] {
-            serde_yaml::Value::Sequence(seq) => {
-                seq.iter().filter_map(|v| v.as_str().map(String::from)).collect()
-            }
-            _ => Vec::new(),
-        };
-        let depends_on = match &item["depends_on"] {
-            serde_yaml::Value::Sequence(seq) => {
-                seq.iter().filter_map(|v| v.as_str().map(String::from)).collect()
-            }
-            _ => Vec::new(),
-        };
-        items.push(TodoItem {
-            id: item["id"].as_str().unwrap_or("").to_string(),
-            title: item["title"].as_str().unwrap_or("").to_string(),
-            status,
-            priority,
-            created: item["created"].as_str().unwrap_or("").to_string(),
-            updated: item["updated"].as_str().unwrap_or("").to_string(),
-            session: item["session"].as_str().map(String::from),
-            files,
-            depends_on,
-            notes: item["notes"].as_str().unwrap_or("").to_string(),
-        });
-    }
-    Ok(items)
-}
 
 fn count_done_external(items: &[TodoItem]) -> u64 {
     items.iter().filter(|i| i.id.starts_with("S19-") && i.status == ItemStatus::Done).count() as u64

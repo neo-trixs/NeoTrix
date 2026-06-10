@@ -16,7 +16,7 @@ impl CliCommand for BenchmarkCmd {
     }
 
     fn description(&self) -> &str {
-        "运行 E8→GWT→SelfIteration 管线基准测试"
+        "Run E8→GWT→SelfIteration pipeline benchmarks"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

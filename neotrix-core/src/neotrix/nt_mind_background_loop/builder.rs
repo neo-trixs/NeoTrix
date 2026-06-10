@@ -86,7 +86,7 @@ impl BackgroundLoop {
         let _ = rt.block_on(async {
             let logging: Box<dyn crate::neotrix::nt_io_plugin::Plugin> =
                 Box::new(crate::neotrix::nt_io_plugin::builtin::logging::LoggingPlugin);
-            if let Err(e) = reg.register(logging).await {
+            if let Err(e) = reg.register(logging) {
                 log::error!("[plugin] register logging: {}", e);
             }
         });

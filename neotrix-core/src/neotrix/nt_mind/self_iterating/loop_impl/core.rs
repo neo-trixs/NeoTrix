@@ -9,12 +9,17 @@ use super::super::super::cortex_memory::CortexMemory;
 use super::super::super::change_archive::ChangeArchive;
 use super::super::super::sleep::{SleepEngine, SleepStats};
 use crate::neotrix::nt_world_model::TaskType;
+use crate::neotrix::nt_mind::skill_evolution::SkillEvolver;
+use crate::neotrix::nt_mind::perception_evolution::PerceptionEvolution;
+use crate::neotrix::nt_mind::side_git::SideGit;
 use crate::neotrix::nt_core_signal::select::SelectableOperator;
 use crate::neotrix::nt_core_signal::core::SelectiveState;
 use crate::neotrix::nt_act_crypto::CryptoAgent;
 use crate::neotrix::nt_mind_ingestion::scratchpad::IngestionScratchpad;
 use super::super::super::stagnation::StagnationDetector;
 use super::super::pipeline::{BrainPipeline, BrainSnapshot, AutonomyLevel, StageResult, seal_pipeline};
+use super::super::curvature_rl::CurvaturePolicy;
+use super::super::recipe::RecipeRegistry;
 use super::super::super::goal_loop::GoalLoop;
 use crate::neotrix::nt_mind::goal_register::GoalRegister;
 use super::super::skillopt::{LrScheduler, ValidationGate, RejectedEditBuffer};
@@ -28,7 +33,10 @@ use crate::core::{
     },
 };
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
+use crate::neotrix::nt_mind_ingestion::self_preservation::SelfPreservation;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
+use crate::neotrix::nt_io_plugin::PluginRegistry;
+use crate::neotrix::nt_mind::self_iterating::goal_contract::{GoalContract, PhaseEvidence};
 use crate::neotrix::nt_act_autonomy::knowledge_distiller::KnowledgeDistiller;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -54,6 +62,7 @@ pub struct SelfIteratingBrain {
     pub archive: ChangeArchive,
     pub champion: Option<BrainSnapshot>,
     pub autonomy: AutonomyLevel,
+    pub permission: super::super::pipeline::PermissionLevel,
     pub goal_loop: GoalLoop,
     pub goal_register: GoalRegister,
     pub entropy_crisis_level: f64,
@@ -68,6 +77,7 @@ pub struct SelfIteratingBrain {
     pub(crate) _micro_edits: Vec<MicroEdit>,
     pub tool_call_count: usize,
     pub tool_traces: Vec<(String, u64, bool)>,
+    pub skill_evolver: SkillEvolver,
     pub _open_source_insights: Option<String>,
     pub _open_source_edits: Vec<super::super::super::self_edit::MicroEdit>,
     pub stagnation: StagnationDetector,
@@ -104,6 +114,26 @@ pub struct SelfIteratingBrain {
     pub(crate) _consciousness_stream: ConsciousnessStream,
     pub(crate) _inner_critic: InnerCritic,
     pub(crate) _cognitive_load: CognitiveLoadMonitor,
+    pub _narrative_self: crate::core::nt_core_consciousness::NarrativeSelf,
+    pub _sleep_gate: crate::core::nt_core_consciousness::sleep_gate::SleepGate,
+    pub _valence_axis: crate::core::nt_core_consciousness::ValenceAxis,
+    pub _meta_agent: Option<crate::neotrix::nt_mind_ingestion::meta_improvement::MetaAgent>,
+    pub meta_additions: Vec<Box<dyn super::super::pipeline::BrainStage>>,
+    pub checkpoint_manager: super::super::checkpoint::CheckpointManager,
+    pub code_search_cache: Option<String>,
+    pub recipe_registry: RecipeRegistry,
+    pub curvature_policy: CurvaturePolicy,
+    pub self_preservation: SelfPreservation,
+    pub plugin_registry: PluginRegistry,
+    pub perception_evolution: PerceptionEvolution,
+    pub side_git: SideGit,
+    pub(crate) _goal_contract: Option<GoalContract>,
+    pub(crate) _phase_evidence: VecDeque<PhaseEvidence>,
+    pub(crate) _goal_complete: bool,
+    pub(crate) _remote_control_state: Option<std::sync::Arc<tokio::sync::RwLock<crate::neotrix::nt_act_remote_control::RemoteBrainState>>>,
+    pub(crate) _tom: crate::neotrix::nt_mind::theory_of_mind::TheoryOfMind,
+    pub(crate) _negentropy: crate::neotrix::nt_core_negentropy::NegentropyCalculator,
+    pub(crate) _negentropy_nvsa_pool: Vec<Vec<u8>>,
 }
 
 impl SelfIteratingBrain {
@@ -136,6 +166,7 @@ impl SelfIteratingBrain {
             archive: ChangeArchive::new(),
             champion: None,
             autonomy: AutonomyLevel::Full,
+            permission: super::super::pipeline::PermissionLevel::Full,
             _current_task: String::new(),
             _current_task_type: TaskType::General,
             _task_embedding: None,
@@ -146,6 +177,7 @@ impl SelfIteratingBrain {
             _micro_edits: Vec::new(),
             tool_call_count: 0,
             tool_traces: Vec::new(),
+            skill_evolver: SkillEvolver::new(),
             _open_source_insights: None,
             _open_source_edits: Vec::new(),
             stagnation: StagnationDetector::new(),
@@ -184,6 +216,51 @@ impl SelfIteratingBrain {
             _consciousness_stream: ConsciousnessStream::new(1024),
             _inner_critic: InnerCritic::new(),
             _cognitive_load: CognitiveLoadMonitor::new(),
+            _narrative_self: {
+                let mut ns = crate::core::nt_core_consciousness::NarrativeSelf::load()
+                    .unwrap_or_else(|| {
+                        let mut ns = crate::core::nt_core_consciousness::NarrativeSelf::new();
+                        ns.start_new_session();
+                        ns
+                    });
+                if ns.session_end.is_some() {
+                    ns.start_new_session();
+                }
+                ns
+            },
+            _sleep_gate: crate::core::nt_core_consciousness::sleep_gate::SleepGate::new(),
+            _valence_axis: crate::core::nt_core_consciousness::ValenceAxis::new(),
+            _meta_agent: {
+                let mut agent = crate::neotrix::nt_mind_ingestion::meta_improvement::MetaAgent::new();
+                agent.meta_layer_can_rewrite_self = true;
+                Some(agent)
+            },
+            meta_additions: Vec::new(),
+            checkpoint_manager: super::super::checkpoint::CheckpointManager::new(),
+            code_search_cache: None,
+            recipe_registry: {
+                let mut reg = RecipeRegistry::new();
+                reg.register(super::super::recipe::preset_standard());
+                reg.register(super::super::recipe::preset_kernel());
+                reg.register(super::super::recipe::preset_debug());
+                reg.register(super::super::recipe::preset_design());
+                reg
+            },
+            curvature_policy: CurvaturePolicy::new(0.1, 0.01, 0.5, 0.2, 20),
+            self_preservation: SelfPreservation::new(10),
+            plugin_registry: {
+                let reg = PluginRegistry::new();
+                reg
+            },
+            perception_evolution: PerceptionEvolution::new(),
+            side_git: SideGit::new(),
+            _goal_contract: None,
+            _phase_evidence: VecDeque::with_capacity(32),
+            _goal_complete: false,
+            _remote_control_state: None,
+            _tom: crate::neotrix::nt_mind::theory_of_mind::TheoryOfMind::new(),
+            _negentropy: crate::neotrix::nt_core_negentropy::NegentropyCalculator::new(),
+            _negentropy_nvsa_pool: Vec::new(),
         }
     }
 
@@ -237,6 +314,9 @@ impl SelfIteratingBrain {
     pub(crate) fn _external_reward(&self) -> Option<f64> { self._external_reward }
     pub(crate) fn _snapshot_score(&self) -> f64 { self._snapshot.as_ref().map(|s| s.score).unwrap_or(0.0) }
     pub(crate) fn _snapshot_lr(&self) -> f64 { self._snapshot.as_ref().map(|s| s.learning_rate).unwrap_or(0.01) }
+    pub fn pipeline_status(&self) -> String {
+        format!("iter={}, reward={:.3}, task='{}'", self.iteration, self._reward, self._current_task)
+    }
     pub(crate) fn _snapshot_capability(&self) -> CapabilityVector {
         self._snapshot.as_ref().map(|s| s.capability.clone()).unwrap_or_default()
     }

@@ -9,6 +9,7 @@ pub mod nt_memory_gwtq;
 pub mod nt_memory_embed;
 pub mod nt_memory_ingest;
 pub mod nt_memory_api;
+pub mod vector_adapter;
 mod nt_memory_schema;
 
 use std::path::PathBuf;
@@ -63,6 +64,11 @@ impl KnowledgeBase {
     pub fn get_node(&self, id: &str) -> Result<Option<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         nt_memory_store::get_node(&conn, id).map_err(|e| format!("Get error: {}", e))
+    }
+
+    pub fn get_node_history(&self, id: &str) -> Result<Vec<KnowledgeNode>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        nt_memory_store::get_node_history(&conn, id).map_err(|e| format!("History error: {}", e))
     }
 
     pub fn find_by_url(&self, url: &str) -> Result<Option<KnowledgeNode>, String> {
@@ -167,6 +173,20 @@ impl KnowledgeBase {
     pub fn enqueue_seed_urls(&self, urls: &[(&str, i64, &str)]) -> Result<usize, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
         let r = nt_memory_crawl::enqueue_seed_urls(&conn, urls).map_err(|e| format!("Enqueue error: {}", e))?;
+        self.mark_bm25_dirty();
+        Ok(r)
+    }
+
+    pub fn discover_wiki_category(&self, category: &str, max_pages: usize, max_depth: u32, enqueue: bool) -> Result<(usize, usize, usize), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let r = nt_memory_crawl::discover_wiki_category_members(&conn, category, max_pages, max_depth, enqueue)?;
+        self.mark_bm25_dirty();
+        Ok(r)
+    }
+
+    pub fn enqueue_search_results(&self, query: &str, max_results: usize, priority: i64) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let r = nt_memory_crawl::enqueue_search_results_from_engine(&conn, query, max_results, priority)?;
         self.mark_bm25_dirty();
         Ok(r)
     }
