@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use crate::core::nt_core_hcube::QuantizedVSA;
 
 /// Result of a single safety gate check.
 #[derive(Debug, Clone)]
@@ -207,8 +208,8 @@ impl SafetyGate {
         let a: Vec<u8> = (0..64).map(|i| i as u8).collect();
         let b: Vec<u8> = (0..64).map(|i| (i as u8).wrapping_mul(3)).collect();
 
-        // bind (XOR)
-        let bound: Vec<u8> = a.iter().zip(b.iter()).map(|(x, y)| x ^ y).collect();
+        // bind (FFT-HRR circular convolution)
+        let bound = QuantizedVSA::bind(&a, &b);
         m.insert("bind", bound);
 
         // bundle (majority-add)

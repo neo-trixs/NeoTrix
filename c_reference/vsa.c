@@ -4,8 +4,60 @@
 #include <stdio.h>
 #include <math.h>
 
-#define VSA_BYTES 64      
+#define VSA_BYTES 64
 #define VSA_BITS  (VSA_BYTES * 8)
+#define FFT_N     128
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+typedef struct { double re, im; } Complex;
+
+static Complex c_add(Complex a, Complex b) { Complex r = {a.re + b.re, a.im + b.im}; return r; }
+static Complex c_sub(Complex a, Complex b) { Complex r = {a.re - b.re, a.im - b.im}; return r; }
+static Complex c_mul(Complex a, Complex b) {
+    Complex r = {a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re};
+    return r;
+}
+static Complex c_conj(Complex a) { Complex r = {a.re, -a.im}; return r; }
+
+/* Cooley-Tukey radix-2 FFT in-place (n must be power of 2) */
+static void fft_inplace(Complex *x, int n) {
+    /* bit-reversal permutation */
+    for (int i = 1, j = 0; i < n; i++) {
+        int bit = n >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) { Complex t = x[i]; x[i] = x[j]; x[j] = t; }
+    }
+    /* iterative butterfly */
+    for (int len = 2; len <= n; len <<= 1) {
+        double ang = -2.0 * M_PI / len;
+        Complex wlen = {cos(ang), sin(ang)};
+        for (int i = 0; i < n; i += len) {
+            Complex w = {1.0, 0.0};
+            int half = len >> 1;
+            for (int j = 0; j < half; j++) {
+                Complex u = x[i + j];
+                Complex v = c_mul(w, x[i + j + half]);
+                x[i + j] = c_add(u, v);
+                x[i + j + half] = c_sub(u, v);
+                w = c_mul(w, wlen);
+            }
+        }
+    }
+}
+
+/* IFFT in-place: conjugate, FFT, conjugate + divide by n */
+static void ifft_inplace(Complex *x, int n) {
+    for (int i = 0; i < n; i++) x[i].im = -x[i].im;
+    fft_inplace(x, n);
+    for (int i = 0; i < n; i++) {
+        x[i].im = -(x[i].im / n);
+        x[i].re /= n;
+    }
+}
 
 /* utility: print VSA vector as hex */
 static void print_vec(const uint8_t v[VSA_BYTES]) {
@@ -24,9 +76,73 @@ static int parse_vec(const char *hex, uint8_t out[VSA_BYTES]) {
     return 0;
 }
 
-/* 1. bind: XOR of two vectors */
+/* normalize byte [0,255] → double [-1, 1]; binary {0,1} maps to {-1,1} */
+static double norm_byte(uint8_t b) {
+    switch (b) {
+        case 0:   return -1.0;
+        case 1:   return  1.0;
+        default:  return (b / 127.5) - 1.0;
+    }
+}
+
+/* bound double back to binary {0,1} — match Rust f64_to_binary */
+static uint8_t unorm_double(double d) {
+    double clamped = (d > 1.0) ? 1.0 : (d < -1.0) ? -1.0 : d;
+    int u8val = (int)((clamped + 1.0) * 127.5);
+    return (u8val >= 128) ? 1 : 0;
+}
+
+/* 1a. bind: FFT-HRR circular convolution — IFFT(FFT(a) * FFT(b)) */
 static void op_bind(const uint8_t a[VSA_BYTES], const uint8_t b[VSA_BYTES],
                      uint8_t out[VSA_BYTES]) {
+    Complex fa[FFT_N], fb[FFT_N], fc[FFT_N];
+
+    for (int i = 0; i < VSA_BYTES; i++) {
+        fa[i].re = norm_byte(a[i]); fa[i].im = 0.0;
+        fb[i].re = norm_byte(b[i]); fb[i].im = 0.0;
+    }
+    for (int i = VSA_BYTES; i < FFT_N; i++) {
+        fa[i].re = 0.0; fa[i].im = 0.0;
+        fb[i].re = 0.0; fb[i].im = 0.0;
+    }
+
+    fft_inplace(fa, FFT_N);
+    fft_inplace(fb, FFT_N);
+
+    for (int i = 0; i < FFT_N; i++) fc[i] = c_mul(fa[i], fb[i]);
+
+    ifft_inplace(fc, FFT_N);
+
+    for (int i = 0; i < VSA_BYTES; i++) out[i] = unorm_double(fc[i].re);
+}
+
+/* 1b. unbind: IFFT(FFT(c) * conj(FFT(a))) — recovers b approximately */
+static void op_unbind(const uint8_t c[VSA_BYTES], const uint8_t a[VSA_BYTES],
+                       uint8_t out[VSA_BYTES]) {
+    Complex fc[FFT_N], fa[FFT_N];
+
+    for (int i = 0; i < VSA_BYTES; i++) {
+        fc[i].re = norm_byte(c[i]); fc[i].im = 0.0;
+        fa[i].re = norm_byte(a[i]); fa[i].im = 0.0;
+    }
+    for (int i = VSA_BYTES; i < FFT_N; i++) {
+        fc[i].re = 0.0; fc[i].im = 0.0;
+        fa[i].re = 0.0; fa[i].im = 0.0;
+    }
+
+    fft_inplace(fc, FFT_N);
+    fft_inplace(fa, FFT_N);
+
+    for (int i = 0; i < FFT_N; i++) fc[i] = c_mul(fc[i], c_conj(fa[i]));
+
+    ifft_inplace(fc, FFT_N);
+
+    for (int i = 0; i < VSA_BYTES; i++) out[i] = unorm_double(fc[i].re);
+}
+
+/* 1c. xor_bind: original XOR binding (kept for reference) */
+static void op_xor_bind(const uint8_t a[VSA_BYTES], const uint8_t b[VSA_BYTES],
+                         uint8_t out[VSA_BYTES]) {
     for (int i = 0; i < VSA_BYTES; i++) out[i] = a[i] ^ b[i];
 }
 
@@ -117,7 +233,7 @@ static void print_u32(uint32_t v) {
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <op> [args...]\n", argv[0]);
-        fprintf(stderr, "Ops: bind, bundle, permute, negate, similarity,\n");
+        fprintf(stderr, "Ops: bind, unbind, xor_bind, bundle, permute, negate, similarity,\n");
         fprintf(stderr, "     cosine, hamming_distance, random_vector\n");
         return 1;
     }
@@ -130,6 +246,16 @@ int main(int argc, char **argv) {
         if (argc != 4) { fprintf(stderr, "bind <hex_a> <hex_b>\n"); return 1; }
         if (parse_vec(argv[2], a) || parse_vec(argv[3], b)) return 1;
         op_bind(a, b, out);
+        print_vec(out);
+    } else if (strcmp(op, "unbind") == 0) {
+        if (argc != 4) { fprintf(stderr, "unbind <hex_c> <hex_a>\n"); return 1; }
+        if (parse_vec(argv[2], a) || parse_vec(argv[3], b)) return 1;
+        op_unbind(a, b, out);
+        print_vec(out);
+    } else if (strcmp(op, "xor_bind") == 0) {
+        if (argc != 4) { fprintf(stderr, "xor_bind <hex_a> <hex_b>\n"); return 1; }
+        if (parse_vec(argv[2], a) || parse_vec(argv[3], b)) return 1;
+        op_xor_bind(a, b, out);
         print_vec(out);
     } else if (strcmp(op, "bundle") == 0) {
         if (argc < 4) { fprintf(stderr, "bundle <hex_a> <hex_b> [hex_c ...]\n"); return 1; }

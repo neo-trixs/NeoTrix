@@ -3,6 +3,114 @@ use rand::Rng;
 pub const VSA_DIM: usize = 4096;
 pub const BINARY_THRESHOLD: u8 = 128;
 
+// === FFT-based Holographic Reduced Representation (FFT-HRR) ===
+// Inline FFT implementation, zero external dependencies.
+// VSA_DIM = 4096 = 2^12, perfect for radix-2 Cooley-Tukey.
+
+#[derive(Clone, Copy, Debug)]
+struct Complex {
+    re: f64,
+    im: f64,
+}
+
+impl Complex {
+    fn new(re: f64, im: f64) -> Self {
+        Complex { re, im }
+    }
+}
+
+fn complex_mul(a: Complex, b: Complex) -> Complex {
+    Complex::new(
+        a.re * b.re - a.im * b.im,
+        a.re * b.im + a.im * b.re,
+    )
+}
+
+fn is_power_of_two(n: usize) -> bool {
+    n != 0 && (n & (n - 1)) == 0
+}
+
+fn fft_inplace(x: &mut [Complex]) {
+    let n = x.len();
+    if n <= 1 {
+        return;
+    }
+    debug_assert!(is_power_of_two(n), "FFT requires power of 2 length, got {}", n);
+
+    // Bit-reversal permutation
+    let mut j = 0;
+    for i in 1..n {
+        let mut bit = n >> 1;
+        while j & bit != 0 {
+            j ^= bit;
+            bit >>= 1;
+        }
+        j ^= bit;
+        if i < j {
+            x.swap(i, j);
+        }
+    }
+
+    // Cooley-Tukey radix-2 in-place FFT
+    let mut len = 2;
+    while len <= n {
+        let half = len / 2;
+        let angle = -2.0 * std::f64::consts::PI / len as f64;
+        let wlen_re = angle.cos();
+        let wlen_im = angle.sin();
+        for i in (0..n).step_by(len) {
+            let mut w_re = 1.0;
+            let mut w_im = 0.0;
+            for j in 0..half {
+                let i1 = i + j;
+                let i2 = i + j + half;
+                let u_re = x[i1].re;
+                let u_im = x[i1].im;
+                let v_re = x[i2].re * w_re - x[i2].im * w_im;
+                let v_im = x[i2].re * w_im + x[i2].im * w_re;
+                x[i1] = Complex::new(u_re + v_re, u_im + v_im);
+                x[i2] = Complex::new(u_re - v_re, u_im - v_im);
+                let nw_re = w_re * wlen_re - w_im * wlen_im;
+                let nw_im = w_re * wlen_im + w_im * wlen_re;
+                w_re = nw_re;
+                w_im = nw_im;
+            }
+        }
+        len *= 2;
+    }
+}
+
+fn ifft_inplace(x: &mut [Complex]) {
+    // IFFT via conjugate → FFT → conjugate and scale
+    for c in x.iter_mut() {
+        c.im = -c.im;
+    }
+    fft_inplace(x);
+    let n = x.len() as f64;
+    for c in x.iter_mut() {
+        c.im = -c.im;
+        c.re /= n;
+        c.im /= n;
+    }
+}
+
+/// Convert u8 value to f64 in [-1, 1].
+/// Binary {0, 1} maps exactly to {-1, 1}. Non-binary values use linear scale.
+fn u8_to_f64(x: u8) -> f64 {
+    match x {
+        0 => -1.0,
+        1 => 1.0,
+        _ => (x as f64 / 127.5) - 1.0,
+    }
+}
+
+/// Convert f64 in [-1, 1] to u8, then binarize at threshold 128.
+fn f64_to_binary(x: f64) -> u8 {
+    let clamped = x.max(-1.0).min(1.0);
+    let u8val = ((clamped + 1.0) * 127.5) as u8;
+    if u8val >= 128 { 1 } else { 0 }
+}
+
 #[derive(Debug, Clone)]
 pub struct QuantizedVSA {
     dim: usize,
@@ -40,7 +148,57 @@ impl QuantizedVSA {
     }
 
     pub fn bind(a: &[u8], b: &[u8]) -> Vec<u8> {
-        a.iter().zip(b.iter()).map(|(x, y)| x ^ y).collect()
+        let n = a.len().min(b.len());
+        let fft_len = n.next_power_of_two();
+
+        let mut fa: Vec<Complex> = (0..fft_len).map(|_| Complex::new(0.0, 0.0)).collect();
+        let mut fb: Vec<Complex> = (0..fft_len).map(|_| Complex::new(0.0, 0.0)).collect();
+
+        for i in 0..n {
+            fa[i] = Complex::new(u8_to_f64(a[i]), 0.0);
+            fb[i] = Complex::new(u8_to_f64(b[i]), 0.0);
+        }
+
+        fft_inplace(&mut fa);
+        fft_inplace(&mut fb);
+
+        // Element-wise complex multiply in frequency domain → circular convolution
+        let mut fc: Vec<Complex> = (0..fft_len).map(|_| Complex::new(0.0, 0.0)).collect();
+        for i in 0..fft_len {
+            fc[i] = complex_mul(fa[i], fb[i]);
+        }
+
+        ifft_inplace(&mut fc);
+
+        fc.iter().take(n).map(|c| f64_to_binary(c.re)).collect()
+    }
+
+    /// FFT-HRR unbind: IFFT(FFT(c) * conj(FFT(a))) — circular cross-correlation,
+    /// which approximates the inverse of bind for random VSA vectors.
+    pub fn unbind(c: &[u8], a: &[u8]) -> Vec<u8> {
+        let n = c.len().min(a.len());
+        let fft_len = n.next_power_of_two();
+
+        let mut fc: Vec<Complex> = (0..fft_len).map(|_| Complex::new(0.0, 0.0)).collect();
+        let mut fa: Vec<Complex> = (0..fft_len).map(|_| Complex::new(0.0, 0.0)).collect();
+
+        for i in 0..n {
+            fc[i] = Complex::new(u8_to_f64(c[i]), 0.0);
+            fa[i] = Complex::new(u8_to_f64(a[i]), 0.0);
+        }
+
+        fft_inplace(&mut fc);
+        fft_inplace(&mut fa);
+
+        // Element-wise multiply by conjugate: fc * conj(fa)
+        let mut fb: Vec<Complex> = (0..fft_len).map(|_| Complex::new(0.0, 0.0)).collect();
+        for i in 0..fft_len {
+            fb[i] = complex_mul(fc[i], Complex::new(fa[i].re, -fa[i].im));
+        }
+
+        ifft_inplace(&mut fb);
+
+        fb.iter().take(n).map(|c| f64_to_binary(c.re)).collect()
     }
 
     pub fn bundle(vectors: &[&[u8]]) -> Vec<u8> {
@@ -125,6 +283,32 @@ impl QuantizedVSA {
     pub fn dim(&self) -> usize {
         self.dim
     }
+
+    pub fn negate(v: &[u8]) -> Vec<u8> {
+        v.iter().map(|&x| !x).collect()
+    }
+
+    pub fn majority_bundle(vectors: &[&[u8]]) -> Vec<u8> {
+        if vectors.is_empty() {
+            return vec![0; VSA_DIM];
+        }
+        let n = vectors.len();
+        let dim = vectors[0].len().min(VSA_DIM);
+        let mut counts = vec![0i32; dim];
+        for v in vectors {
+            for (c, &x) in counts.iter_mut().zip(v.iter()) {
+                if x >= BINARY_THRESHOLD {
+                    *c += 1;
+                }
+            }
+        }
+        let threshold = (n as i32) / 2;
+        counts.iter().map(|&c| if c > threshold { 255 } else { 0 }).collect()
+    }
+
+    pub fn xor_bind(a: &[u8], b: &[u8]) -> Vec<u8> {
+        a.iter().zip(b.iter()).map(|(x, y)| x ^ y).collect()
+    }
 }
 
 /// Pack 8 binary values (each 0 or 1) into each byte for fast hamming distance.
@@ -179,19 +363,27 @@ mod tests {
     }
 
     #[test]
-    fn test_bind_self_returns_zero() {
+    fn test_bind_self_is_not_zero() {
         let a = QuantizedVSA::random_binary();
         let bound = QuantizedVSA::bind(&a, &a);
-        assert!(bound.iter().all(|&x| x == 0), "a XOR a should be all zeros");
+        // FHRR self-bind ≠ all zeros (unlike XOR). Check output is valid binary.
+        assert_eq!(bound.len(), VSA_DIM);
+        assert!(!bound.iter().all(|&x| x == 0), "FHRR self-bind should NOT be all zeros");
+        for &x in &bound {
+            assert!(x == 0 || x == 1, "FHRR output must be binary");
+        }
     }
 
     #[test]
-    fn test_bind_inverse() {
+    fn test_bind_inverse_via_unbind() {
         let a = QuantizedVSA::random_binary();
-        let ones: Vec<u8> = vec![1; VSA_DIM];
-        let inverted = QuantizedVSA::bind(&a, &ones);
-        assert!(QuantizedVSA::similarity(&a, &inverted) < 0.01,
-            "a XOR all-ones should be permutation of a (dissimilar)");
+        let b = QuantizedVSA::random_binary();
+        let bound = QuantizedVSA::bind(&a, &b);
+        let recovered = QuantizedVSA::unbind(&bound, &a);
+        let sim = QuantizedVSA::similarity(&recovered, &b);
+        // unbind(bind(a,b), a) ≈ b (circular deconvolution approximate inverse)
+        assert!(sim > 0.5,
+            "unbind(bind(a,b), a) should recover b approximately; sim = {}", sim);
     }
 
     #[test]
@@ -272,12 +464,12 @@ mod tests {
     }
 
     #[test]
-    fn test_bind_non_commutative_xor() {
+    fn test_bind_commutative() {
         let a = QuantizedVSA::random_binary();
         let b = QuantizedVSA::random_binary();
         let ab = QuantizedVSA::bind(&a, &b);
         let ba = QuantizedVSA::bind(&b, &a);
-        assert_eq!(ab, ba, "XOR is commutative");
+        assert_eq!(ab, ba, "FFT-HRR circular convolution is commutative");
     }
 
     #[test]
