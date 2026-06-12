@@ -17,14 +17,15 @@
 
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![deny(warnings)]
-#![deny(dead_code)]
 
 pub mod core;
 pub mod agent;
 pub mod cli;
 pub mod server;
 pub mod neotrix;
+
+/// VSA dimension: 4096 bits = 512 bytes.
+pub const VSA_DIM: usize = 4096;
 
 pub use neotrix::nt_mind;
 pub use neotrix::nt_mind::{
