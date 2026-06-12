@@ -1,3 +1,7 @@
+// DEPRECATED: Superseded by core/nt_core_scheduler/ (OpenClaw-inspired scheduler with
+// anchor mechanism, context gates, job history, auto-retry). Will be removed in a future
+// cleanup pass. All new scheduling should use SchedulerEngine from nt_core_scheduler.
+
 use std::path::Path;
 use std::fs;
 use serde::{Serialize, Deserialize};

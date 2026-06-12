@@ -72,9 +72,20 @@ pub mod nt_core_prm;
 pub mod nt_core_iface;
 pub mod nt_core_pred;
 pub mod nt_core_aura;
+pub mod nt_core_context;
 pub mod nt_core_consciousness;
 pub mod nt_core_negentropy;
 pub mod nt_core_vector_store;
+pub mod nt_core_decision;
+pub mod nt_core_experience;
+pub mod nt_core_input;
+pub mod nt_core_codegen;
+pub mod nt_core_network;
+pub mod nt_core_ctm;
+pub mod nt_core_reasoning;
+pub mod nt_core_protect;
+pub mod nt_core_loop;
+pub mod nt_core_scheduler;
 
 // Re-export consciousness types to core layer
 pub use nt_core_consciousness::{
@@ -87,8 +98,8 @@ pub use nt_core_consciousness::{
 // Re-export 主要类型到 core 层顶层
 pub use nt_core_cap::CapabilityVector;
 pub use nt_core_knowledge::{KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, SourceAccessTracker, SourceAccessRecord};
-pub use nt_core_accessor::{Accessor, AccessionReport, SourceType, UrlAccessor};
-pub use nt_core_edit::{SelfEdit, MicroEdit, ToolCall};
+pub use nt_core_accessor::{Accessor, AccessionReport, UrlAccessor};
+pub use nt_core_edit::{SelfEdit, MicroEdit, ToolCall, DgmhPlan, DgmhPlanStep, DgmhPlanStatus};
 pub use nt_core_bank::{ReasoningBank, ReasoningMemory, TemporalContext, MemoryTier, MemoryLifecycle, ReasoningBankStats};
 pub use nt_core_ssm::{SelectiveState, SelectableOperator, SparseMatrix, ConsciousnessTier, SemanticType, SemanticBlock};
 pub use nt_core_absorb::AbsorbValidator;
@@ -163,3 +174,82 @@ pub use nt_core_mcp::McpServer;
 
 pub use nt_core_abstr::{ContrastiveAbstraction, AbstractState, AbstractTransitionMatrix};
 pub use nt_core_cdwm::{CDWM, EnvironmentPathway, InterventionPathway};
+
+// Re-export context types
+pub use nt_core_context::{
+    AllocatedSlice, AssembledContext, CompactionIntent, CompactionPriority, ContextBudget, SourceType,
+    ContextGatherer, ContextFragment, ContextSourceMeta, GatheredContext, ContextSource,
+    WorkingMemory, WorkingMemoryItem, BindingOp, ContextOS, ContextOSStats,
+};
+
+// Re-export decision compression types
+pub use nt_core_decision::{
+    VsaDecisionEncoder, DecisionVSA, DecisionTrace, DecisionOutcome,
+    DecisionSurface, DecisionPoint,
+    DecisionCompressor, CompressedDecision, CompressionLevel, CompressionStats,
+    BeliefStateBottleneck, BeliefState, BeliefVariable,
+    MinimalSufficientDecision, MinimalSufficientFinder, DecisionStep,
+};
+
+// Re-export experience (Phase 5) types
+pub use nt_core_experience::{
+    // consolidation_bridge
+    ConsolidationBridgeV2, BridgeConfig, BridgeV2Stats, ConsolidatedMemory,
+    // reflector
+    Heuristic, HeuristicCategory, HeuristicFilter, ExperienceReflector, ReflectorConfig,
+    // skill_acc
+    VSASkill, SkillAccumulator, SkillFilter, SkillComposition,
+    // curriculum
+    TaskTemplate, DifficultyLevel, CurriculumGenerator, GeneratorConfig,
+    // policy_repair
+    FailurePattern, FailureType, RepairPolicy, RepairMode, PolicyRepairEngine,
+    // epistemic
+    EpistemicState, DomainConfidence, ConceptNode, EpistemicSelfModel, EpistemicConfig,
+};
+
+// Re-export Phase 8 — Self-Referential Consciousness Core (SRCC) types
+// Memory Physics
+pub use nt_core_hcube::attractor_basin::{
+    AttractorBasin, AttractorBasinDynamics, BasinType, BasinStats,
+};
+pub use nt_core_hcube::ebbinghaus_decay::{
+    MemoryTrace, EbbinghausDecay, DecayConfig,
+};
+pub use nt_core_hcube::dream_consolidation::{
+    DreamConsolidation, DreamConfig, DreamEvent, DreamReport, DreamPhase,
+};
+// Self-Referential Processing
+pub use nt_core_consciousness::{
+    EmergentReasoningMode, EmergentReasoningConfig, ReasoningMode, ModeTransition,
+    ReflexiveUnit, ReflexiveConfig,
+    EpistemicHonesty, HonestyConfig, CalibrationBin, EpistemicReport,
+    PersonalityMatrix, PersonalityConfig, TraitState, OCEANTrait,
+    CognitiveStateIngestion, CognitiveState, IngestionConfig, DimSnapshot,
+    MasterConsciousness, MasterConsciousnessConfig, ConsciousnessMetrics, ConsciousnessEvolution,
+    ReconstructiveNarrative, ReconstructiveConfig, ReconstructedNarrative, NarrativeThread, ThreadType,
+    ProofSearchSelfModification, ProofSearchConfig, ModificationProposal, VerificationResult, SafetyLevel, SelfModificationProof,
+};
+
+// Re-export loop engineering types
+pub use nt_core_loop::{
+    LoopEngine, LoopPhase, LoopStats, LoopState,
+    LoopVerifier, Verdict, LoopGoal, GoalStatus, GoalRegistry,
+    HandlerDiscovery, CoverageReport,
+    PipelineGraph, PipelineConditions, PipelineNodeData, NodeGroup, GraphStats,
+};
+
+// Re-export scheduler types
+pub use nt_core_scheduler::{
+    SchedulerEngine, ScheduledJob, ScheduleType, ContextGate,
+    JobRunRecord, JobRunHistory, SchedulerStats, default_scheduler,
+};
+
+// Re-export self-protection types
+pub use nt_core_protect::{
+    SelfProtection, ProtectionStats, IntegrityGuard, IntegrityReport,
+    EnvironmentValidator, HoneypotNode, HoneypotCategory, HoneypotForest,
+    SecurityEnclave, QuantumSafePipeline, AnomalyMonitor, ImmutableAudit,
+    PermissionController, TrafficShield, Obfuscated, obfuscate_str, reveal_bytes,
+    SafeError, install_panic_filter, sanitize_panic, strip_source_path,
+    VsaFableRouter, FableTier, FablePacket, FableRoutingDecision, FableRouterStats,
+};

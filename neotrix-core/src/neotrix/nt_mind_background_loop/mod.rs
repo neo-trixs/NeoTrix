@@ -2,42 +2,49 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 
-use super::nt_mind::self_iterating::SelfIteratingBrain;
-use super::nt_mind::knowledge_chain::KnowledgeChain;
-use super::nt_mind::goal_loop::GoalLoop;
-use super::nt_mind::thinking_bridge::ThinkingBridge;
-use super::nt_mind::distillation::MetaCognitionBridge;
-use super::nt_mind::bbrain_monitor::BMonitor;
 use self::always_on::AlwaysOnEngine;
-use super::nt_mind_cleanup::CleanupEngine;
-use super::nt_io_plugin::registry::PluginRegistry;
-use super::nt_world_model::WorldModelV2;
-use super::nt_mind_evolution_loop::EvolutionLoop;
-use super::nt_mind_evolution_daemon::EvolutionDaemon;
-use super::nt_mind::panorama_pipeline::PanoramaPipeline;
-use super::nt_mind::exploration_pipeline::ExplorationPipeline;
-use super::nt_world_crawl::{UnifiedCrawler, CrawlerConfig};
 use super::nt_act_voice::VoiceInput;
-use super::nt_mind::self_evolver::SelfEvolver;
-use super::nt_mind::curiosity_drive::CuriosityDrive;
-use super::nt_mind::knowledge_aging::KnowledgeAging;
+use super::nt_io_plugin::registry::PluginRegistry;
 use super::nt_mind::auto_crystallizer::AutoCrystallizer;
+use super::nt_mind::bbrain_monitor::BMonitor;
+use super::nt_mind::curiosity_drive::CuriosityDrive;
+use super::nt_mind::distillation::MetaCognitionBridge;
+use super::nt_mind::exploration_pipeline::ExplorationPipeline;
+use super::nt_mind::goal_loop::GoalLoop;
+use super::nt_mind::knowledge_aging::KnowledgeAging;
+use super::nt_mind::knowledge_chain::KnowledgeChain;
+use super::nt_mind::panorama_pipeline::PanoramaPipeline;
+use super::nt_mind::self_evolver::SelfEvolver;
+use super::nt_mind::self_iterating::SelfIteratingBrain;
+use super::nt_mind::thinking_bridge::ThinkingBridge;
+use super::nt_mind_cleanup::CleanupEngine;
+use super::nt_mind_evolution_daemon::EvolutionDaemon;
+use crate::core::nt_core_scheduler::SchedulerEngine;
+use super::nt_mind_evolution_loop::EvolutionLoop;
+use super::nt_world_crawl::{CrawlerConfig, UnifiedCrawler};
+use super::nt_world_model::WorldModelV2;
 
-use super::nt_mind::web_miner::WebKnowledgeMiner;
-use super::nt_agent_protocol::discovery::AgentDiscovery;
 use super::nt_agent_protocol::capabilities::CapabilityRouter;
+use super::nt_agent_protocol::discovery::AgentDiscovery;
+use super::nt_mind::web_miner::WebKnowledgeMiner;
 
-use crate::core::nt_core_self::intra_reflection::PreActionIntrospector;
-use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
 use super::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use super::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+use crate::core::nt_core_input::NgramVsaEncoder;
+use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
+use crate::core::nt_core_self::intra_reflection::PreActionIntrospector;
 
-pub use super::nt_mind_background_config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
+pub use super::nt_mind_background_config::{
+    BackgroundConfig, TelemetryCollector, TelemetrySnapshot,
+};
 
-mod builder;
-mod run;
-mod handlers;
 pub mod always_on;
+mod builder;
+mod consciousness;
+mod handlers;
+mod run;
+
+pub use self::consciousness::{ConsciousnessIntegration, ExperienceStats};
 
 pub struct BackgroundLoop {
     pub brain: Arc<RwLock<SelfIteratingBrain>>,
@@ -80,12 +87,15 @@ pub struct BackgroundLoop {
     pub handles: Vec<JoinHandle<()>>,
     pub always_on: AlwaysOnEngine,
     pub plugin_registry: PluginRegistry,
+    pub consciousness: Option<ConsciousnessIntegration>,
+    pub vsa_encoder: Option<NgramVsaEncoder>,
+    pub scheduler: SchedulerEngine,
 }
 
 impl BackgroundLoop {
     pub fn new(brain: Arc<RwLock<SelfIteratingBrain>>) -> Self {
         Self {
-            cleanup_engine: None,
+            cleanup_engine: Some(CleanupEngine::new()),
             knowledge_chain: None,
             telemetry: Arc::new(TelemetryCollector::new()),
             goal_loop: GoalLoop::new(),
@@ -110,7 +120,9 @@ impl BackgroundLoop {
             awareness: Some(ConsciousnessMonitor::new()),
             gold_standard: Some(ConsciousnessGoldStandard::new()),
             #[cfg(feature = "stealth-net")]
-            nt_shield_manager: Some(super::nt_shield_stealth_net::nt_shield_manager::StealthManager::new(5)),
+            nt_shield_manager: Some(
+                super::nt_shield_stealth_net::nt_shield_manager::StealthManager::new(5),
+            ),
             #[cfg(feature = "stealth-net")]
             tor_crawler: None,
             #[cfg(feature = "stealth-net")]
@@ -125,6 +137,9 @@ impl BackgroundLoop {
             plugin_registry: PluginRegistry::new(),
             config: BackgroundConfig::default(),
             brain,
+            consciousness: None,
+            vsa_encoder: None,
+            scheduler: SchedulerEngine::new(),
         }
     }
 }
