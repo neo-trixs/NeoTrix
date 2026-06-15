@@ -50,7 +50,7 @@ jobs:
       - name: Generate coverage
         run: cargo llvm-cov --lcov --output-path lcov.info --lib -p neotrix
       - name: Upload coverage to artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: lcov.info
