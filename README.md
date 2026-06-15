@@ -234,7 +234,7 @@ The 16K LOC in `core/` covers the foundational reasoning model (E8, e8_reasoning
 - **Star us** — ⭐ it helps more developers find NeoTrix
 - **Try it**: `cargo run` and watch the SEAL loop iterate
 - **Contribute**: Issues, PRs, and discussions welcome
-- **Follow**: [@neotrix_ai](https://x.com/neotrix_ai) on X
+- **Follow**: [@aneotrix](https://x.com/aneotrix) on X
 
 ---
 
