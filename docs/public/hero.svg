@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0015"/>
+      <stop offset="50%" stop-color="#14002a"/>
+      <stop offset="100%" stop-color="#0a0015"/>
+    </linearGradient>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.1"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="600" fill="url(#bg)"/>
+
+  <ellipse cx="400" cy="300" rx="300" ry="250" fill="url(#glow)"/>
+
+  <circle cx="400" cy="280" r="120" stroke="#a855f7" stroke-width="0.5" opacity="0.3" fill="none"/>
+  <circle cx="400" cy="280" r="180" stroke="#7c3aed" stroke-width="0.4" opacity="0.2" fill="none"/>
+  <circle cx="400" cy="280" r="240" stroke="#3b82f6" stroke-width="0.3" opacity="0.1" fill="none"/>
+
+  <polygon points="400,180 464,240 440,320 360,320 336,240" stroke="url(#g1)" stroke-width="1.5" fill="none"/>
+  <polygon points="400,220 450,260 390,300 350,280" stroke="url(#g2)" stroke-width="1" fill="none" opacity="0.6"/>
+
+  <line x1="400" y1="160" x2="400" y2="400" stroke="#a855f7" stroke-width="0.5" opacity="0.2"/>
+  <line x1="280" y1="280" x2="520" y2="280" stroke="#a855f7" stroke-width="0.5" opacity="0.2"/>
+
+  <line x1="400" y1="280" x2="500" y2="180" stroke="#a855f7" stroke-width="1" opacity="0.3" stroke-dasharray="4 4"/>
+  <line x1="400" y1="280" x2="300" y2="180" stroke="#7c3aed" stroke-width="1" opacity="0.3" stroke-dasharray="4 4"/>
+  <line x1="400" y1="280" x2="500" y2="380" stroke="#3b82f6" stroke-width="1" opacity="0.3" stroke-dasharray="4 4"/>
+  <line x1="400" y1="280" x2="300" y2="380" stroke="#a855f7" stroke-width="1" opacity="0.3" stroke-dasharray="4 4"/>
+
+  <circle cx="500" cy="180" r="4" fill="#a855f7" opacity="0.6"/>
+  <circle cx="300" cy="180" r="4" fill="#7c3aed" opacity="0.6"/>
+  <circle cx="500" cy="380" r="4" fill="#3b82f6" opacity="0.6"/>
+  <circle cx="300" cy="380" r="4" fill="#a855f7" opacity="0.6"/>
+
+  <circle cx="400" cy="280" r="3" fill="#a855f7" opacity="0.9"/>
+
+  <line x1="180" y1="460" x2="200" y2="440" stroke="#a855f7" stroke-width="0.5" opacity="0.15"/>
+  <line x1="200" y1="440" x2="230" y2="430" stroke="#a855f7" stroke-width="0.5" opacity="0.12"/>
+  <line x1="230" y1="430" x2="260" y2="435" stroke="#7c3aed" stroke-width="0.5" opacity="0.12"/>
+  <line x1="260" y1="435" x2="290" y2="425" stroke="#7c3aed" stroke-width="0.5" opacity="0.1"/>
+
+  <line x1="520" y1="425" x2="550" y2="435" stroke="#3b82f6" stroke-width="0.5" opacity="0.1"/>
+  <line x1="550" y1="435" x2="580" y2="430" stroke="#3b82f6" stroke-width="0.5" opacity="0.12"/>
+  <line x1="580" y1="430" x2="610" y2="440" stroke="#a855f7" stroke-width="0.5" opacity="0.12"/>
+  <line x1="610" y1="440" x2="620" y2="460" stroke="#a855f7" stroke-width="0.5" opacity="0.15"/>
+
+  <circle cx="290" cy="425" r="2" fill="#7c3aed" opacity="0.2"/>
+  <circle cx="520" cy="425" r="2" fill="#3b82f6" opacity="0.2"/>
+
+  <circle cx="400" cy="500" r="60" stroke="#a855f7" stroke-width="0.3" opacity="0.1" fill="none" stroke-dasharray="2 6"/>
+  <circle cx="400" cy="500" r="40" stroke="#7c3aed" stroke-width="0.3" opacity="0.15" fill="none" stroke-dasharray="2 4"/>
+  <circle cx="400" cy="500" r="20" stroke="#3b82f6" stroke-width="0.5" opacity="0.2" fill="none"/>
+
+  <text x="400" y="555" text-anchor="middle" fill="#a855f7" font-family="system-ui, sans-serif" font-size="14" font-weight="300" opacity="0.5" letter-spacing="4">NEOTRIX</text>
+</svg>

@@ -310,7 +310,7 @@ pub enum TerminalMCPTool {
 
 **Warp核心逻辑参考**（来自warpui_core源码分析）：
 1. **EntityId**：原子自增，全局唯一（参考Neotrix已实现）
-2. **ViewHandle<T>**：类型化强引用，避免借用检查问题
+2. **`ViewHandle<T>`**：类型化强引用，避免借用检查问题
 3. **事件系统**：发布-订阅，任意View可监听Model变化
 4. **Scene Graph**：Layer + Rect/Image/Glyph三种图元
 
@@ -356,16 +356,16 @@ impl TerminalRenderer {
 ```mermaid
 graph TB
     subgraph "核心逻辑层"
-        RB[ReasoningBrain<br/>SEAL循环+ReasoningBank]
-        K[Kernel<br/>Ψ公式+沙箱+SCL]
-        P[Parallel<br/>任务调度]
-        MCP[MCP Tools<br/>rmcp 0.5]
+        RB[ReasoningBrain / SEAL循环+ReasoningBank]
+        K[Kernel / Ψ公式+沙箱+SCL]
+        P[Parallel / 任务调度]
+        MCP[MCP Tools / rmcp 0.5]
     end
 
     subgraph "终端逻辑层"
-        T[Terminal<br/>ANSI解析+Block系统]
-        UI[UI框架<br/>Entity-Component]
-        R[Renderer<br/>wgpu+Scene Graph]
+        T[Terminal / ANSI解析+Block系统]
+        UI[UI框架 / Entity-Component]
+        R[Renderer / wgpu+Scene Graph]
     end
 
     RB -->|"自迭代"| T
