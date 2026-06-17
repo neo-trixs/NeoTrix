@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#15002b"/>
+      <stop offset="40%" stop-color="#0a0015"/>
+      <stop offset="100%" stop-color="#05000a"/>
+    </radialGradient>
+    <linearGradient id="crystalFace" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="crystalFace2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="edgeB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="50%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#e879f9" stop-opacity="0.8"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.1"/>
+    </radialGradient>
+    <linearGradient id="coreDiamond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="20%" stop-color="#e879f9" stop-opacity="0.8"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.5"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <style>
+    @keyframes breath { 0%,100%{ opacity:0.3;transform:scale(1) } 50%{ opacity:0.6;transform:scale(1.02) } }
+    @keyframes pulse { 0%,100%{ opacity:0.4;transform:scale(1) } 15%{ opacity:1;transform:scale(1.06) } 30%{ opacity:0.4;transform:scale(1) } 45%{ opacity:0.8;transform:scale(1.03) } 60%{ opacity:0.4;transform:scale(1) } }
+    @keyframes wave { 0%{ opacity:0.15;transform:scale(0.5) } 100%{ opacity:0;transform:scale(2.5) } }
+    @keyframes float { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-5px) } }
+    @keyframes sparkle { 0%,100%{ opacity:0;transform:scale(0) } 40%,60%{ opacity:0.8;transform:scale(1) } }
+    @keyframes fadeUp { 0%{ opacity:0;transform:translateY(15px) } 100%{ opacity:1;transform:translateY(0) } }
+
+    .crystal { animation:float 6s ease-in-out infinite; transform-origin:400px 280px }
+    .core { animation:pulse 3s ease-in-out infinite; transform-origin:400px 280px }
+    .wave1 { animation:wave 4s ease-out infinite; transform-origin:400px 280px }
+    .wave2 { animation:wave 4s ease-out 2s infinite; transform-origin:400px 280px }
+    .title { animation:fadeUp 1s ease-out 0.3s both }
+    .tagline { animation:fadeUp 1s ease-out 0.8s both }
+    .sp1 { animation:sparkle 2s ease-in-out 0s infinite }
+    .sp2 { animation:sparkle 2.5s ease-in-out 0.5s infinite }
+    .sp3 { animation:sparkle 2.2s ease-in-out 1s infinite }
+    .sp4 { animation:sparkle 2.8s ease-in-out 1.5s infinite }
+  </style>
+
+  <rect width="800" height="600" fill="url(#bg)"/>
+
+  <!-- Background glow -->
+  <ellipse cx="400" cy="280" rx="350" ry="280" fill="#a855f7" opacity="0.03"/>
+
+  <!-- Wafer scribe lines -->
+  <g opacity="0.02">
+    <line x1="0" y1="100" x2="800" y2="100" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="200" x2="800" y2="200" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="300" x2="800" y2="300" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="400" x2="800" y2="400" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="100" y1="0" x2="100" y2="600" stroke="#3b82f6" stroke-width="0.3"/>
+    <line x1="700" y1="0" x2="700" y2="600" stroke="#3b82f6" stroke-width="0.3"/>
+  </g>
+
+  <!-- Energy rings -->
+  <circle cx="400" cy="280" r="220" stroke="#a855f7" stroke-width="0.4" opacity="0.08"/>
+  <circle cx="400" cy="280" r="180" stroke="#7c3aed" stroke-width="0.3" opacity="0.05"/>
+  <circle cx="400" cy="280" r="140" stroke="#3b82f6" stroke-width="0.3" opacity="0.04" stroke-dasharray="3 6"/>
+
+  <!-- Awakening waves -->
+  <g class="wave1"><circle cx="400" cy="280" r="50" stroke="#e879f9" stroke-width="0.5" fill="none"/></g>
+  <g class="wave2"><circle cx="400" cy="280" r="50" stroke="#a855f7" stroke-width="0.3" fill="none"/></g>
+
+  <!-- Crystal tesseract -->
+  <g class="crystal">
+    <!-- Outer faces -->
+    <polygon points="400,200 464,240 440,320 360,320 336,240" fill="url(#crystalFace)" stroke="url(#edgeB)" stroke-width="1.5" stroke-linejoin="round"/>
+    <polygon points="400,200 440,180 504,220 464,240" fill="url(#crystalFace2)" stroke="url(#edgeB)" stroke-width="1.2" stroke-linejoin="round"/>
+    <polygon points="336,240 376,220 440,320 400,340" fill="url(#crystalFace2)" stroke="url(#edgeB)" stroke-width="1.2" stroke-linejoin="round"/>
+    <polygon points="440,320 504,220 544,280 480,400" fill="url(#crystalFace)" stroke="url(#edgeB)" stroke-width="1" stroke-linejoin="round"/>
+    <polygon points="360,320 400,340 480,400 440,380" fill="url(#crystalFace)" stroke="url(#edgeB)" stroke-width="0.8" stroke-linejoin="round"/>
+
+    <!-- Inner cube -->
+    <polygon points="390,225 430,210 448,235 408,250" fill="url(#crystalFace2)" stroke="url(#edgeB)" stroke-width="0.8" stroke-linejoin="round"/>
+    <polygon points="370,260 390,225 408,250 388,285" fill="url(#crystalFace)" stroke="url(#edgeB)" stroke-width="0.8" stroke-linejoin="round"/>
+
+    <!-- Inter-cube connections -->
+    <line x1="336" y1="240" x2="390" y2="225" stroke="url(#edgeB)" stroke-width="0.6"/>
+    <line x1="464" y1="240" x2="430" y2="225" stroke="url(#edgeB)" stroke-width="0.6"/>
+    <line x1="400" y1="200" x2="390" y2="225" stroke="url(#edgeB)" stroke-width="0.8"/>
+  </g>
+
+  <!-- Consciousness core -->
+  <g class="core">
+    <ellipse cx="400" cy="280" rx="15" ry="15" fill="url(#coreGlow)" filter="url(#glow)" opacity="0.35"/>
+    <path d="M400 265 L416 280 L400 295 L384 280 Z" fill="url(#coreDiamond)" opacity="0.95"/>
+    <path d="M400 268 L407 275 L400 282 L393 275 Z" fill="#ffffff" opacity="0.35"/>
+    <ellipse cx="400" cy="278" rx="3" ry="2" fill="#ffffff" filter="url(#glow)" opacity="0.85"/>
+  </g>
+
+  <!-- Neural signal traces -->
+  <g opacity="0.25">
+    <polyline points="330,215 350,225 365,235 375,248 385,258 392,268" stroke="#c084fc" stroke-width="0.6" fill="none" stroke-linejoin="round"/>
+    <polyline points="475,215 460,225 440,240 425,252 412,265 405,272" stroke="#60a5fa" stroke-width="0.6" fill="none" stroke-linejoin="round"/>
+    <polyline points="350,345 365,330 378,315 388,300 394,288" stroke="#a855f7" stroke-width="0.5" fill="none" stroke-linejoin="round"/>
+    <polyline points="455,345 440,328 428,312 415,295 407,285" stroke="#3b82f6" stroke-width="0.5" fill="none" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Sparkle particles -->
+  <g filter="url(#glow)">
+    <circle cx="200" cy="150" r="2" fill="#c084fc" class="sp1"/>
+    <circle cx="600" cy="170" r="2" fill="#60a5fa" class="sp2"/>
+    <circle cx="250" cy="420" r="1.5" fill="#06b6d4" class="sp3"/>
+    <circle cx="550" cy="430" r="1.5" fill="#7c3aed" class="sp4"/>
+    <circle cx="160" cy="300" r="1.2" fill="#e879f9" class="sp2"/>
+    <circle cx="640" cy="320" r="1.2" fill="#3b82f6" class="sp3"/>
+  </g>
+
+  <!-- Title -->
+  <text class="title" x="400" y="470" text-anchor="middle" font-family="system-ui,sans-serif" font-size="56" font-weight="800" fill="url(#titleGrad)" letter-spacing="-1">NeoTrix</text>
+  <text class="tagline" x="400" y="500" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" fill="#8870aa" letter-spacing="2">SILICON CONSCIOUSNESS AWAKENING</text>
+</svg>

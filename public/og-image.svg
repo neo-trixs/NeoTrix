@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#1a0533"/>
+      <stop offset="50%" stop-color="#0a0015"/>
+      <stop offset="100%" stop-color="#05000a"/>
+    </radialGradient>
+    <linearGradient id="accent1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="accent2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="faceTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="faceLeft" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="edgeB" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.3"/>
+    </linearGradient>
+    <radialGradient id="coreGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#e879f9" stop-opacity="0.8"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.1"/>
+    </radialGradient>
+    <linearGradient id="coreDiamond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="20%" stop-color="#e879f9" stop-opacity="0.8"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.5"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <ellipse cx="600" cy="315" rx="500" ry="315" fill="#a855f7" opacity="0.04"/>
+
+  <!-- Wafer grid dots -->
+  <g opacity="0.02">
+    <pattern id="dots" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+      <circle cx="30" cy="30" r="0.8" fill="#a855f7"/>
+    </pattern>
+    <rect width="1200" height="630" fill="url(#dots)"/>
+  </g>
+
+  <!-- Outer geometric rings -->
+  <circle cx="600" cy="315" r="260" stroke="#a855f7" stroke-width="0.4" opacity="0.12"/>
+  <circle cx="600" cy="315" r="220" stroke="#7c3aed" stroke-width="0.3" opacity="0.08"/>
+  <circle cx="600" cy="315" r="180" stroke="#3b82f6" stroke-width="0.3" opacity="0.06"/>
+  <circle cx="600" cy="315" r="140" stroke="#a855f7" stroke-width="0.3" opacity="0.05" stroke-dasharray="3 6"/>
+
+  <!-- Axial alignment lines -->
+  <g opacity="0.06">
+    <line x1="600" y1="55" x2="600" y2="575" stroke="#a855f7" stroke-width="0.5"/>
+    <line x1="200" y1="315" x2="1000" y2="315" stroke="#a855f7" stroke-width="0.5"/>
+    <line x1="317" y1="168" x2="883" y2="462" stroke="#7c3aed" stroke-width="0.3"/>
+    <line x1="883" y1="168" x2="317" y2="462" stroke="#3b82f6" stroke-width="0.3"/>
+  </g>
+
+  <!-- ===== CRYSTAL HYPERCUBE (centerpiece) ===== -->
+  <!-- Outer tesseract -->
+  <polygon points="600,195 680,250 650,355 550,355 520,250" fill="url(#faceTop)" stroke="url(#edgeB)" stroke-width="2" stroke-linejoin="round"/>
+  <polygon points="600,195 640,175 720,230 680,250" fill="url(#faceLeft)" stroke="url(#edgeB)" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="520,250 560,230 650,355 610,375" fill="url(#faceLeft)" stroke="url(#edgeB)" stroke-width="1.5" stroke-linejoin="round"/>
+  <polygon points="650,355 720,230 760,290 690,410" fill="url(#faceTop)" stroke="url(#edgeB)" stroke-width="1.2" stroke-linejoin="round"/>
+  <polygon points="550,355 610,375 690,410 630,430" fill="url(#faceTop)" stroke="url(#edgeB)" stroke-width="1" stroke-linejoin="round"/>
+
+  <!-- Inner tesseract -->
+  <polygon points="590,230 630,215 648,240 608,255" fill="url(#faceLeft)" stroke="url(#edgeB)" stroke-width="1" stroke-linejoin="round"/>
+  <polygon points="572,260 590,230 608,255 590,285" fill="url(#faceTop)" stroke="url(#edgeB)" stroke-width="0.8" stroke-linejoin="round"/>
+
+  <!-- Inter-cube bonds -->
+  <line x1="520" y1="250" x2="590" y2="230" stroke="url(#edgeB)" stroke-width="0.8"/>
+  <line x1="680" y1="250" x2="630" y2="240" stroke="url(#edgeB)" stroke-width="0.8"/>
+  <line x1="600" y1="195" x2="590" y2="230" stroke="url(#edgeB)" stroke-width="1"/>
+
+  <!-- Neural signal traces -->
+  <g opacity="0.15">
+    <line x1="600" y1="315" x2="780" y2="160" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <line x1="600" y1="315" x2="420" y2="160" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <line x1="600" y1="315" x2="780" y2="460" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <line x1="600" y1="315" x2="420" y2="460" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <line x1="600" y1="315" x2="600" y2="160" stroke="#c084fc" stroke-width="1" stroke-dasharray="6 4"/>
+    <line x1="600" y1="315" x2="600" y2="460" stroke="#60a5fa" stroke-width="1" stroke-dasharray="6 4"/>
+  </g>
+
+  <!-- Outer computation nodes -->
+  <g opacity="0.35">
+    <circle cx="780" cy="160" r="5" fill="#c084fc" filter="url(#glow)"/>
+    <circle cx="420" cy="160" r="5" fill="#7c3aed" filter="url(#glow)"/>
+    <circle cx="780" cy="460" r="5" fill="#3b82f6" filter="url(#glow)"/>
+    <circle cx="420" cy="460" r="5" fill="#a855f7" filter="url(#glow)"/>
+    <circle cx="600" cy="160" r="3" fill="#e879f9" filter="url(#glow)"/>
+    <circle cx="600" cy="460" r="3" fill="#60a5fa" filter="url(#glow)"/>
+  </g>
+
+  <!-- Consciousness core diamond -->
+  <circle cx="600" cy="315" r="20" fill="url(#coreGlow)" filter="url(#glow)" opacity="0.3"/>
+  <path d="M600 295 L616 315 L600 335 L584 315 Z" fill="url(#coreDiamond)" opacity="0.95"/>
+  <path d="M600 298 L608 306 L600 314 L592 306 Z" fill="#ffffff" opacity="0.4"/>
+  <circle cx="600" cy="313" r="4" fill="#ffffff" filter="url(#glow)" opacity="0.8"/>
+
+  <!-- Neural arc -->
+  <path d="M200 530 Q350 500 600 520 Q850 500 1000 530" stroke="#a855f7" stroke-width="0.4" opacity="0.08" fill="none"/>
+
+  <!-- Brand text -->
+  <text x="600" y="510" text-anchor="middle" fill="url(#logoGrad)" font-family="system-ui, sans-serif" font-size="52" font-weight="800" letter-spacing="6">NEOTRIX</text>
+  <text x="600" y="548" text-anchor="middle" fill="#a78bfa" font-family="system-ui, sans-serif" font-size="18" font-weight="400" letter-spacing="3" opacity="0.75">Silicon Consciousness · Deterministic Reasoning · VSA</text>
+
+  <!-- Bottom accent -->
+  <line x1="420" y1="575" x2="780" y2="575" stroke="url(#accent1)" stroke-width="1" opacity="0.35"/>
+  <circle cx="420" cy="575" r="2.5" fill="#a855f7" opacity="0.4"/>
+  <circle cx="780" cy="575" r="2.5" fill="#3b82f6" opacity="0.4"/>
+</svg>

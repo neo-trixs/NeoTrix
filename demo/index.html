@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeoTrix — Interactive Demo</title>
+<style>
+  :root {
+    --bg: #080012;
+    --surface: #100020;
+    --card: #1a0533;
+    --border: #2d0a55;
+    --text: #e0d0f0;
+    --text-dim: #8870aa;
+    --accent: #8b5cf6;
+    --accent2: #3b82f6;
+    --accent3: #ec4899;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* header */
+  .header {
+    background: linear-gradient(135deg, var(--surface), var(--card));
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 0.5px;
+  }
+  .header .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    -webkit-text-fill-color: var(--text-dim);
+  }
+  .header a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .header a:hover { border-color: var(--accent); background: rgba(139,92,246,0.08); }
+  /* tabs */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .tab {
+    flex: 1;
+    padding: 12px 16px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text); background: rgba(139,92,246,0.04); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .badge {
+    font-size: 10px;
+    background: rgba(139,92,246,0.15);
+    color: var(--accent);
+    padding: 1px 8px;
+    border-radius: 10px;
+    margin-left: 6px;
+  }
+  /* panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+    cursor: pointer;
+  }
+  /* controls */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .controls .group { display: flex; gap: 6px; align-items: center; }
+  .controls label { font-size: 11px; color: var(--text-dim); }
+  button {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  button:hover { border-color: var(--accent); background: rgba(139,92,246,0.1); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #7c3aed; }
+  input[type="text"] {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    width: 160px;
+    outline: none;
+    transition: border 0.2s;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+  input[type="range"] { accent-color: var(--accent); width: 80px; }
+  .stat {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 4px 10px;
+    background: var(--card);
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .stat strong { color: var(--accent); }
+  /* info panel */
+  .info-panel {
+    padding: 14px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    min-height: 60px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .info-panel .name { color: var(--accent); font-weight: 600; }
+  .info-panel .desc { color: var(--text-dim); }
+  .info-panel .hint { color: var(--text-dim); font-style: italic; font-size: 12px; }
+  /* legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  /* VSA ops */
+  .vsa-ops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .vsa-vec {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .vsa-vec .color-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  /* responsive */
+  @media (max-width: 600px) {
+    .header { flex-direction: column; align-items: flex-start; }
+    input[type="text"] { width: 120px; }
+    .controls { flex-direction: column; align-items: stretch; }
+    .controls .group { flex-wrap: wrap; }
+  }
+  /* tooltip overlay */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(8,0,18,0.92);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    max-width: 260px;
+    line-height: 1.5;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  #tooltip.show { opacity: 1; }
+  #tooltip .tt-name { color: var(--accent); font-weight: 600; }
+  #tooltip .tt-desc { color: var(--text-dim); margin-top: 4px; }
+  #tooltip .tt-meta { color: var(--text-dim); font-size: 10px; margin-top: 4px; opacity: 0.7; }
+
+  /* Identity panel */
+  .identity-sliders {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    width: 100%;
+  }
+  .identity-slider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 130px;
+    flex: 1 0 auto;
+  }
+  .identity-slider label {
+    color: var(--text-dim);
+    width: 90px;
+    text-align: right;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .identity-slider input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+    min-width: 60px;
+  }
+  .identity-slider .val {
+    color: var(--accent);
+    font-weight: 600;
+    width: 28px;
+    text-align: center;
+    font-size: 11px;
+  }
+  .identity-palette {
+    display: flex;
+    gap: 2px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .identity-palette .swatch {
+    flex: 1;
+    height: 20px;
+    border-radius: 3px;
+    transition: background 0.2s;
+  }
+  .identity-geo {
+    display: flex;
+    gap: 16px;
+    padding: 6px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .identity-geo span { display: flex; align-items: center; gap: 4px; }
+  .identity-geo .gv { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>NeoTrix · Interactive Demo</h1>
+    <div class="sub">Explore the E8 64-state reasoning kernel &amp; 4096-dim VSA HyperCube</div>
+  </div>
+  <a href="/">← Back to Home</a>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="e8">E8 64-State Kernel <span class="badge">Reasoning</span></div>
+  <div class="tab" data-tab="vsa">VSA HyperCube <span class="badge">Memory</span></div>
+  <div class="tab" data-tab="identity">Visual Identity <span class="badge">Self</span></div>
+</div>
+
+<!-- E8 Panel -->
+<div id="panel-e8" class="panel active">
+  <div class="controls">
+    <div class="group">
+      <button id="e8-animate" class="primary">▶ Auto-Traverse</button>
+      <button id="e8-reset">Reset View</button>
+    </div>
+    <div class="group">
+      <label>Speed</label>
+      <input type="range" id="e8-speed" min="1" max="10" value="5">
+    </div>
+    <div class="stat">State: <strong id="e8-current-state">—</strong></div>
+    <div class="stat">Hops: <strong id="e8-hops">0</strong></div>
+  </div>
+  <div class="legend" id="e8-legend"></div>
+  <div class="canvas-wrap">
+    <canvas id="e8-canvas"></canvas>
+  </div>
+  <div class="info-panel" id="e8-info">
+    <span class="hint">Click any state node to activate it. Watch transitions follow the E8 topology.</span>
+  </div>
+</div>
+
+<!-- VSA Panel -->
+<div id="panel-vsa" class="panel">
+  <div class="controls">
+    <div class="group">
+      <input type="text" id="vsa-input" placeholder="Type a word..." maxlength="32">
+      <button id="vsa-add" class="primary">Embed</button>
+    </div>
+    <div class="group">
+      <button id="vsa-bind">⊕ Bind</button>
+      <button id="vsa-bundle">+ Bundle</button>
+      <button id="vsa-clear">Clear All</button>
+    </div>
+    <div class="stat">Vectors: <strong id="vsa-count">0</strong></div>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="vsa-canvas"></canvas>
+  </div>
+  <div class="vsa-ops" id="vsa-vectors"></div>
+  <div class="info-panel" id="vsa-info">
+    <span class="hint">Type words and click Embed. Select two vectors to bind (⊕) or bundle (+).</span>
+  </div>
+</div>
+
+<!-- Identity Panel -->
+<div id="panel-identity" class="panel">
+  <div class="identity-sliders" id="identity-sliders"></div>
+  <div class="canvas-wrap" style="aspect-ratio:2/1">
+    <canvas id="identity-canvas"></canvas>
+  </div>
+  <div class="identity-geo" id="identity-geo"></div>
+  <div class="identity-palette" id="identity-palette"></div>
+  <div class="info-panel" id="identity-info">
+    <span class="hint">Adjust the seven core value sliders. The logo, palette, and geometry evolve in real time — value satisfaction shapes visual identity.</span>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ── E8 64-State Kernel ──────────────────────────────────────────
+(function() {
+  const GROUPS = [
+    { id: 'perception', label: 'Perception', color: '#3b82f6', states: 8 },
+    { id: 'attention', label: 'Attention', color: '#06b6d4', states: 4 },
+    { id: 'memory', label: 'Memory', color: '#22c55e', states: 8 },
+    { id: 'reasoning', label: 'Reasoning', color: '#8b5cf6', states: 16 },
+    { id: 'planning', label: 'Planning', color: '#f59e0b', states: 8 },
+    { id: 'meta', label: 'Meta-Cognition', color: '#ec4899', states: 8 },
+    { id: 'action', label: 'Action', color: '#ef4444', states: 4 },
+    { id: 'default', label: 'Default', color: '#6b7280', states: 4 },
+  ];
+
+  const STATE_NAMES = {
+    perception: ['Sensory Gate', 'Feature Extract', 'Pattern Match', 'Salience Filter', 'Context Bind', 'Novelty Detect', 'Entropy Estimate', 'Cross-Modal Align'],
+    attention: ['Spotlight', 'Inhibition', 'Switch', 'Focus Hold'],
+    memory: ['VSA Encode', 'Episodic Recall', 'Semantic Bind', 'Assoc. Spread', 'Consolidate', 'Forget Gate', 'Similarity Search', 'Working Buf'],
+    reasoning: ['Deduce', 'Induce', 'Abduce', 'Analogy', 'Causal Trace', 'Counterfactual', 'Composition', 'Decomposition', 'Analog Map', 'Relational Bind', 'Constraint Sat', 'Prob. Infer', 'Decision Tree', 'Hypothesis Gen', 'Hypothesis Test', 'Uncertainty Quant'],
+    planning: ['Goal Set', 'Subgoal Decomp', 'Sequence Plan', 'Resource Est', 'Risk Assess', 'Contingency', 'Policy Select', 'Plan Commit'],
+    meta: ['Self-Monitor', 'Confidence Est', 'Error Detect', 'Strategy Eval', 'Curiosity Drive', 'Bias Correct', 'Narrative Self', 'Meta-Edit Gate'],
+    action: ['Output Gen', 'Tool Select', 'Execute', 'Feedback Eval'],
+    default: ['Idle', 'Wander', 'Daydream', 'Consolidate'],
+  };
+
+  const STATE_DESCS = {
+    'Sensory Gate': 'Filters incoming signals, passes salient information.',
+    'Feature Extract': 'Decomposes input into atomic feature vectors.',
+    'Pattern Match': 'Matches features against known VSA patterns.',
+    'Salience Filter': 'Ranks inputs by urgency and relevance.',
+    'Context Bind': 'Binds current input to working context.',
+    'Novelty Detect': 'Flags inputs with low similarity to memory.',
+    'Entropy Estimate': 'Measures information-theoretic surprise.',
+    'Cross-Modal Align': 'Aligns representations across modalities.',
+    'Spotlight': 'Focuses processing on a single cognitive object.',
+    'Inhibition': 'Suppresses distracting or competing representations.',
+    'Switch': 'Transitions attention between cognitive objects.',
+    'Focus Hold': 'Maintains attention on current object for a dwell period.',
+    'VSA Encode': 'Converts sensory data to 4096-bit VSA vector.',
+    'Episodic Recall': 'Retrieves past episodes by VSA similarity.',
+    'Semantic Bind': 'Binds concepts into compositional structures.',
+    'Assoc. Spread': 'Spreads activation along associative edges.',
+    'Consolidate': 'Transfers short-term to long-term memory.',
+    'Forget Gate': 'Prunes low-access-frequency memories.',
+    'Similarity Search': 'Finds nearest neighbors in VSA space.',
+    'Working Buf': 'Holds active representations in temporary buffer.',
+    'Deduce': 'Applies logical inference rules.',
+    'Induce': 'Generalizes patterns from specific instances.',
+    'Abduce': 'Infers best explanation for observed facts.',
+    'Analogy': 'Maps relational structure between domains.',
+    'Causal Trace': 'Identifies cause-effect chains.',
+    'Counterfactual': 'Simulates alternative histories.',
+    'Composition': 'Combines concepts into compound representations.',
+    'Decomposition': 'Breaks compound concepts into primitives.',
+    'Analog Map': 'Aligns two relational structures.',
+    'Relational Bind': 'Encodes n-ary relations as VSA tuples.',
+    'Constraint Sat': 'Solves constraint satisfaction problems.',
+    'Prob. Infer': 'Performs probabilistic inference.',
+    'Decision Tree': 'Evaluates decision branches.',
+    'Hypothesis Gen': 'Generates plausible hypotheses.',
+    'Hypothesis Test': 'Validates hypotheses against evidence.',
+    'Uncertainty Quant': 'Estimates confidence bounds on inferences.',
+    'Goal Set': 'Defines desired end states.',
+    'Subgoal Decomp': 'Recursively decomposes goals into subgoals.',
+    'Sequence Plan': 'Orders actions into temporal sequences.',
+    'Resource Est': 'Estimates time, memory, compute required.',
+    'Risk Assess': 'Evaluates potential failure modes.',
+    'Contingency': 'Prepares alternative plans for branches.',
+    'Policy Select': 'Chooses action policy via EFE minimization.',
+    'Plan Commit': 'Commits to a plan and begins execution.',
+    'Self-Monitor': 'Observes own cognitive state.',
+    'Confidence Est': 'Calculates meta-cognitive confidence.',
+    'Error Detect': 'Identifies prediction errors and anomalies.',
+    'Strategy Eval': 'Evaluates effectiveness of current strategy.',
+    'Curiosity Drive': 'Generates intrinsic motivation to explore gaps.',
+    'Bias Correct': 'Applies debiasing to judgments.',
+    'Narrative Self': 'Maintains coherent self-narrative across time.',
+    'Meta-Edit Gate': 'Decides whether to modify own architecture.',
+    'Output Gen': 'Produces natural language or action output.',
+    'Tool Select': 'Chooses appropriate external tool.',
+    'Execute': 'Carries out selected action.',
+    'Feedback Eval': 'Evaluates outcome against prediction.',
+    'Idle': 'Low-power waiting state.',
+    'Wander': 'Unconstrained spontaneous thought.',
+    'Daydream': 'Offline consolidation and simulation.',
+    'Consolidate': 'Deep memory integration during rest.',
+  };
+
+  // Build 64 states
+  let states = [];
+  let idx = 0;
+  GROUPS.forEach(g => {
+    const names = STATE_NAMES[g.id];
+    for (let i = 0; i < g.states; i++) {
+      const name = names[i];
+      states.push({
+        id: idx++,
+        name,
+        group: g.id,
+        groupLabel: g.label,
+        color: g.color,
+        desc: STATE_DESCS[name] || '',
+        x: 0, y: 0, // set by layout
+        vx: 0, vy: 0,
+      });
+    }
+  });
+
+  // Transition topology: each state connects to neighbors in same group + cross-group
+  function buildTransitions() {
+    const t = {};
+    states.forEach(s => { t[s.id] = []; });
+    // within-group rings
+    GROUPS.forEach(g => {
+      const ids = states.filter(s => s.group === g.id).map(s => s.id);
+      for (let i = 0; i < ids.length; i++) {
+        const next = (i + 1) % ids.length;
+        const prev = (i - 1 + ids.length) % ids.length;
+        t[ids[i]].push(ids[next]);
+        t[ids[i]].push(ids[prev]);
+      }
+    });
+    // cross-group bridges: perception↔attention, attention↔memory, memory↔reasoning, etc.
+    const bridges = [
+      ['perception','attention'], ['attention','memory'],
+      ['memory','reasoning'], ['reasoning','planning'],
+      ['reasoning','meta'], ['meta','action'],
+      ['planning','action'], ['meta','default'],
+      ['default','memory'], ['action','perception'],
+    ];
+    bridges.forEach(([g1,g2]) => {
+      const s1 = states.filter(s => s.group === g1);
+      const s2 = states.filter(s => s.group === g2);
+      for (let i = 0; i < Math.min(s1.length, s2.length); i++) {
+        t[s1[i].id].push(s2[i % s2.length].id);
+        t[s2[i].id].push(s1[i % s1.length].id);
+      }
+    });
+    return t;
+  }
+  const transitions = buildTransitions();
+
+  // Canvas setup
+  const canvas = document.getElementById('e8-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, animId, running = false, speed = 5;
+  let activeState = null, hoveredState = null;
+  let hops = 0;
+  let pulsePhase = 0;
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = rect.width;
+    canvas.width = W * dpr;
+    canvas.height = (W * 9/16) * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = (W * 9/16) + 'px';
+    H = canvas.height / dpr;
+    ctx.scale(dpr, dpr);
+    layoutStates();
+    draw();
+  }
+
+  function layoutStates() {
+    const cols = 8, rows = 8;
+    const cx = W / 2, cy = H / 2;
+    const spacing = Math.min(W, H) / 11;
+    const offX = (cols - 1) * spacing / 2;
+    const offY = (rows - 1) * spacing / 2;
+    states.forEach(s => {
+      const col = s.id % cols;
+      const row = Math.floor(s.id / cols);
+      s.x = cx + (col - (cols-1)/2) * spacing;
+      s.y = cy + (row - (rows-1)/2) * spacing;
+    });
+  }
+
+  function getStateAt(mx, my) {
+    let closest = null, minDist = 20;
+    states.forEach(s => {
+      const d = Math.hypot(mx - s.x, my - s.y);
+      if (d < minDist) { minDist = d; closest = s; }
+    });
+    return closest;
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    pulsePhase += 0.02 * (speed / 5);
+
+    // Draw transition edges from active state
+    if (activeState) {
+      const neighbors = transitions[activeState.id] || [];
+      neighbors.forEach(nid => {
+        const target = states[nid];
+        if (!target) return;
+        ctx.beginPath();
+        ctx.moveTo(activeState.x, activeState.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.strokeStyle = 'rgba(139,92,246,0.15)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // glow pulse
+        const pulse = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(pulsePhase + nid * 0.5));
+        ctx.beginPath();
+        ctx.moveTo(activeState.x, activeState.y);
+        ctx.lineTo(target.x, target.y);
+        ctx.strokeStyle = `rgba(139,92,246,${0.08 * pulse})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      });
+    }
+
+    // Draw all states
+    states.forEach(s => {
+      const radius = 14 + 2 * Math.sin(pulsePhase + s.id * 0.7);
+      const isActive = activeState && activeState.id === s.id;
+      const isHover = hoveredState && hoveredState.id === s.id;
+      const isNeighbor = activeState && (transitions[activeState.id] || []).includes(s.id);
+
+      // Glow
+      if (isActive || isHover) {
+        const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius * 3);
+        grad.addColorStop(0, s.color + '40');
+        grad.addColorStop(1, s.color + '00');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (isNeighbor && !isActive) {
+        const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, radius * 1.8);
+        grad.addColorStop(0, s.color + '25');
+        grad.addColorStop(1, s.color + '00');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Node circle
+      const lineW = isActive ? 3 : isNeighbor ? 2 : 1.5;
+      const fillA = isActive ? '0.25' : isNeighbor ? '0.15' : '0.08';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = s.color + fillA;
+      ctx.fill();
+      ctx.strokeStyle = isActive ? '#fff' : s.color;
+      ctx.lineWidth = lineW;
+      ctx.stroke();
+
+      if (isActive) {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, radius + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = s.color + '60';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Label (abbreviated)
+      let label = s.name;
+      if (label.length > 12) label = label.slice(0, 10) + '…';
+      ctx.fillStyle = isActive ? '#fff' : isHover ? s.color : '#8870aa';
+      ctx.font = '9px "SF Mono","Fira Code",monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, s.x, s.y + radius + 13);
+    });
+
+    // Group labels on left
+    const groupPositions = {};
+    states.forEach(s => {
+      if (!groupPositions[s.group] || s.y < groupPositions[s.group]) {
+        groupPositions[s.group] = s.y;
+      }
+    });
+    // Actually draw group labels along left edge
+    const padding = 10;
+    ctx.textAlign = 'left';
+    ctx.font = '8px "SF Mono","Fira Code",monospace';
+    GROUPS.forEach(g => {
+      const gStates = states.filter(s => s.group === g.id);
+      if (gStates.length === 0) return;
+      const avgY = gStates.reduce((a,s) => a + s.y, 0) / gStates.length;
+      ctx.fillStyle = g.color + '80';
+      ctx.fillText(g.label.toUpperCase(), padding, avgY - 8);
+    });
+  }
+
+  function animate() {
+    if (!running) return;
+    // Move to a random neighbor
+    if (activeState) {
+      const neighbors = transitions[activeState.id] || [];
+      if (neighbors.length > 0) {
+        const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+        const target = states[next];
+        if (target) {
+          setActiveState(target);
+          hops++;
+          document.getElementById('e8-hops').textContent = hops;
+        }
+      }
+    }
+    draw();
+    const delay = Math.max(200, 1200 - speed * 100);
+    setTimeout(() => { animId = requestAnimationFrame(animate); }, delay);
+  }
+
+  function setActiveState(s) {
+    activeState = s;
+    document.getElementById('e8-current-state').textContent = s.name;
+    const info = document.getElementById('e8-info');
+    info.innerHTML = `<span class="name">${s.name}</span> <span class="desc">— ${s.desc}</span>`;
+    draw();
+  }
+
+  // Mouse events
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const s = getStateAt(mx, my);
+    hoveredState = s;
+    canvas.style.cursor = s ? 'pointer' : 'default';
+    if (s) {
+      const tt = document.getElementById('tooltip');
+      tt.innerHTML = `<div class="tt-name">${s.name}</div><div class="tt-desc">${s.desc}</div><div class="tt-meta">${s.groupLabel} · State ${s.id + 1}/64</div>`;
+      tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 280) + 'px';
+      tt.style.top = (e.clientY - 10) + 'px';
+      tt.classList.add('show');
+    } else {
+      document.getElementById('tooltip').classList.remove('show');
+    }
+    draw();
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    hoveredState = null;
+    document.getElementById('tooltip').classList.remove('show');
+    draw();
+  });
+
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const s = getStateAt(mx, my);
+    if (s) {
+      if (running) { running = false; document.getElementById('e8-animate').textContent = '▶ Auto-Traverse'; cancelAnimationFrame(animId); }
+      setActiveState(s);
+    }
+  });
+
+  // Controls
+  document.getElementById('e8-animate').addEventListener('click', function() {
+    running = !running;
+    this.textContent = running ? '⏹ Stop' : '▶ Auto-Traverse';
+    if (running) {
+      if (!activeState) setActiveState(states[Math.floor(Math.random() * 64)]);
+      hops = 0;
+      document.getElementById('e8-hops').textContent = '0';
+      animate();
+    } else {
+      cancelAnimationFrame(animId);
+    }
+  });
+
+  document.getElementById('e8-reset').addEventListener('click', () => {
+    if (running) { running = false; document.getElementById('e8-animate').textContent = '▶ Auto-Traverse'; cancelAnimationFrame(animId); }
+    activeState = null;
+    hops = 0;
+    document.getElementById('e8-hops').textContent = '0';
+    document.getElementById('e8-current-state').textContent = '—';
+    document.getElementById('e8-info').innerHTML = '<span class="hint">Click any state node to activate it. Watch transitions follow the E8 topology.</span>';
+    draw();
+  });
+
+  document.getElementById('e8-speed').addEventListener('input', function() {
+    speed = parseInt(this.value);
+  });
+
+  // Legend
+  const legendEl = document.getElementById('e8-legend');
+  GROUPS.forEach(g => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-dot" style="background:${g.color}"></span>${g.label} (${g.states})`;
+    legendEl.appendChild(item);
+  });
+
+  // Init
+  window.addEventListener('resize', resize);
+  resize();
+  setActiveState(states[30]); // Default: Analogy
+
+  // Expose for tab visibility
+  window._e8 = { resize, draw };
+})();
+
+// ── VSA HyperCube Explorer ───────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('vsa-canvas');
+  const ctx = canvas.getContext('2d');
+  const COLORS = ['#8b5cf6','#3b82f6','#22c55e','#f59e0b','#ec4899','#06b6d4','#ef4444','#a855f7'];
+
+  let W, H, vectors = [], selected = [], nextColor = 0;
+  let dragVec = null, dragOffX = 0, dragOffY = 0;
+
+  // Random 4096-bit VSA vector simulator (64-bit chunks for display)
+  class VsaVec {
+    constructor(label) {
+      this.label = label;
+      this.color = COLORS[nextColor % COLORS.length];
+      nextColor++;
+      // Generate pseudo-random 4096-bit as 64 x 64-bit words
+      this.words = new BigUint64Array(64);
+      let seed = hashLabel(label);
+      for (let i = 0; i < 64; i++) {
+        seed = (seed * 16807) % 2147483647;
+        this.words[i] = BigInt(seed) | (BigInt(seed * 48271 % 2147483647) << 32n);
+      }
+      // 2D position for display (derived from hash)
+      seed = hashLabel(label + 'x');
+      this.x = ((seed % 1000) / 1000) * 0.7 + 0.15;
+      seed = hashLabel(label + 'y');
+      this.y = ((seed % 1000) / 1000) * 0.7 + 0.15;
+    }
+
+    similarity(other) {
+      let pop = 0;
+      for (let i = 0; i < 64; i++) {
+        const xor = this.words[i] ^ other.words[i];
+        pop += popcount64(xor);
+      }
+      return 1 - pop / 4096;
+    }
+
+    bind(other) {
+      const result = new VsaVec(this.label + '⊕' + other.label);
+      for (let i = 0; i < 64; i++) {
+        result.words[i] = this.words[i] ^ other.words[i];
+      }
+      result.x = (this.x + other.x) / 2 + (Math.random() - 0.5) * 0.1;
+      result.y = (this.y + other.y) / 2 + (Math.random() - 0.5) * 0.1;
+      return result;
+    }
+
+    bundle(other) {
+      const result = new VsaVec(this.label + '+' + other.label);
+      for (let i = 0; i < 64; i++) {
+        // Majority: if corresponding bits agree, keep; else threshold
+        const a = this.words[i], b = other.words[i];
+        // Simplified: majority on each half
+        const mask = 0x5555555555555555n; // alternating bits
+        const maj = (a & b) | (~a & ~b) & mask;
+        result.words[i] = (a & b) | (~a & ~b & 0xAAAAAAAAAAAAAAAAn) | maj;
+      }
+      result.x = (this.x + other.x) / 2;
+      result.y = (this.y + other.y) / 2;
+      return result;
+    }
+  }
+
+  function hashLabel(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (h * 31 + s.charCodeAt(i)) | 0;
+    }
+    return h >>> 0;
+  }
+
+  function popcount64(n) {
+    n = n - ((n >> 1n) & 0x5555555555555555n);
+    n = (n & 0x3333333333333333n) + ((n >> 2n) & 0x3333333333333333n);
+    n = (n + (n >> 4n)) & 0x0F0F0F0F0F0F0F0Fn;
+    return Number((n * 0x0101010101010101n) >> 56n);
+  }
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = rect.width;
+    canvas.width = W * dpr;
+    canvas.height = (W * 9/16) * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = (W * 9/16) + 'px';
+    H = canvas.height / dpr;
+    ctx.scale(dpr, dpr);
+    drawVsa();
+  }
+
+  function drawVsa() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Background grid
+    ctx.strokeStyle = 'rgba(139,92,246,0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += 40) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+
+    // Edges: draw lines between similar vectors
+    for (let i = 0; i < vectors.length; i++) {
+      for (let j = i + 1; j < vectors.length; j++) {
+        const sim = vectors[i].similarity(vectors[j]);
+        if (sim > 0.45) {
+          ctx.beginPath();
+          ctx.moveTo(vectors[i].x * W, vectors[i].y * H);
+          ctx.lineTo(vectors[j].x * W, vectors[j].y * H);
+          ctx.strokeStyle = vectors[i].color + Math.floor(sim * 40).toString(16).padStart(2, '0');
+          ctx.lineWidth = sim * 2;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Vectors
+    vectors.forEach(v => {
+      const px = v.x * W, py = v.y * H;
+      const isSel = selected.includes(v);
+      const radius = isSel ? 18 : 14;
+
+      // Glow
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, radius * 3);
+      grad.addColorStop(0, v.color + '30');
+      grad.addColorStop(1, v.color + '00');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px, py, radius * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Circle
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fillStyle = v.color + '18';
+      ctx.fill();
+      ctx.strokeStyle = isSel ? '#fff' : v.color;
+      ctx.lineWidth = isSel ? 2.5 : 1.5;
+      ctx.stroke();
+
+      if (isSel) {
+        ctx.beginPath();
+        ctx.arc(px, py, radius + 5, 0, Math.PI * 2);
+        ctx.strokeStyle = v.color + '60';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Label
+      ctx.fillStyle = isSel ? '#fff' : '#8870aa';
+      ctx.font = '10px "SF Mono","Fira Code",monospace';
+      ctx.textAlign = 'center';
+      let label = v.label;
+      if (label.length > 14) label = label.slice(0, 12) + '…';
+      ctx.fillText(label, px, py + radius + 14);
+
+      // Similarity badge if selected pair
+      if (isSel) {
+        const others = selected.filter(o => o !== v);
+        if (others.length > 0) {
+          const sim = v.similarity(others[0]);
+          ctx.fillStyle = '#8b5cf6';
+          ctx.font = '9px monospace';
+          ctx.fillText('sim:' + sim.toFixed(3), px, py - radius - 8);
+        }
+      }
+    });
+
+    if (vectors.length === 0) {
+      ctx.fillStyle = 'rgba(136,112,170,0.4)';
+      ctx.font = '14px "SF Mono","Fira Code",monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Enter words above to embed them into VSA space', W/2, H/2);
+    }
+
+    updateVecList();
+    document.getElementById('vsa-count').textContent = vectors.length;
+  }
+
+  // Mouse events
+  let downVec = null, downX = 0, downY = 0;
+
+  function getVecAt(mx, my) {
+    let closest = null, minDist = 25;
+    vectors.forEach(v => {
+      const px = v.x * W, py = v.y * H;
+      const d = Math.hypot(mx - px, my - py);
+      if (d < minDist) { minDist = d; closest = v; }
+    });
+    return closest;
+  }
+
+  canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const v = getVecAt(mx, my);
+    if (v) {
+      downVec = v;
+      if (e.shiftKey) {
+        // Toggle selection
+        const i = selected.indexOf(v);
+        if (i >= 0) selected.splice(i, 1);
+        else { if (selected.length < 2) selected.push(v); }
+        drawVsa();
+      } else if (selected.includes(v)) {
+        // drag
+        dragVec = v;
+        dragOffX = mx - v.x * W;
+        dragOffY = my - v.y * H;
+      } else {
+        // single select
+        selected.length = 0;
+        selected.push(v);
+        drawVsa();
+      }
+    } else {
+      selected.length = 0;
+      drawVsa();
+    }
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    if (dragVec) {
+      dragVec.x = Math.max(0.02, Math.min(0.98, (mx - dragOffX) / W));
+      dragVec.y = Math.max(0.02, Math.min(0.98, (my - dragOffY) / H));
+      drawVsa();
+      return;
+    }
+    const v = getVecAt(mx, my);
+    canvas.style.cursor = v ? 'pointer' : 'default';
+    if (v) {
+      const tt = document.getElementById('tooltip');
+      tt.innerHTML = `<div class="tt-name" style="color:${v.color}">${v.label}</div><div class="tt-desc">4096-bit VSA vector</div>`;
+      tt.style.left = Math.min(e.clientX + 14, window.innerWidth - 280) + 'px';
+      tt.style.top = (e.clientY - 10) + 'px';
+      tt.classList.add('show');
+    } else {
+      document.getElementById('tooltip').classList.remove('show');
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => { dragVec = null; });
+  canvas.addEventListener('mouseleave', () => { dragVec = null; document.getElementById('tooltip').classList.remove('show'); });
+
+  // Controls
+  document.getElementById('vsa-add').addEventListener('click', () => {
+    const input = document.getElementById('vsa-input');
+    const text = input.value.trim();
+    if (!text) return;
+    // check duplicate
+    if (vectors.some(v => v.label === text)) { input.value = ''; return; }
+    const v = new VsaVec(text);
+    vectors.push(v);
+    input.value = '';
+    drawVsa();
+  });
+
+  document.getElementById('vsa-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('vsa-add').click();
+  });
+
+  document.getElementById('vsa-bind').addEventListener('click', () => {
+    if (selected.length !== 2) return;
+    const result = selected[0].bind(selected[1]);
+    vectors.push(result);
+    selected.length = 0;
+    selected.push(result);
+    drawVsa();
+    document.getElementById('vsa-info').innerHTML = `<span class="name">${result.label}</span> <span class="desc">— bound via XOR (VSA binding creates a unique composite)</span>`;
+  });
+
+  document.getElementById('vsa-bundle').addEventListener('click', () => {
+    if (selected.length !== 2) return;
+    const result = selected[0].bundle(selected[1]);
+    vectors.push(result);
+    selected.length = 0;
+    selected.push(result);
+    drawVsa();
+    document.getElementById('vsa-info').innerHTML = `<span class="name">${result.label}</span> <span class="desc">— bundled via majority (VSA bundling merges features)</span>`;
+  });
+
+  document.getElementById('vsa-clear').addEventListener('click', () => {
+    vectors = []; selected = []; nextColor = 0;
+    drawVsa();
+    document.getElementById('vsa-info').innerHTML = '<span class="hint">Type words and click Embed. Select two vectors to bind (⊕) or bundle (+).</span>';
+  });
+
+  function updateVecList() {
+    const el = document.getElementById('vsa-vectors');
+    el.innerHTML = '';
+    if (vectors.length === 0) {
+      el.innerHTML = '<span style="color:#8870aa;font-size:12px">No vectors yet</span>';
+      return;
+    }
+    vectors.forEach(v => {
+      const d = document.createElement('div');
+      d.className = 'vsa-vec';
+      const isSel = selected.includes(v);
+      d.style.borderColor = isSel ? '#fff' : v.color + '60';
+      d.innerHTML = `<span class="color-dot" style="background:${v.color}"></span>${v.label}`;
+      d.addEventListener('click', () => {
+        if (selected.includes(v)) {
+          selected = selected.filter(s => s !== v);
+        } else {
+          if (selected.length < 2) selected.push(v);
+        }
+        drawVsa();
+      });
+      el.appendChild(d);
+    });
+  }
+
+  // Init
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Seed vectors
+  const seeds = ['consciousness', 'reasoning', 'memory', 'curiosity', 'perception'];
+  seeds.forEach(s => {
+    vectors.push(new VsaVec(s));
+  });
+  drawVsa();
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      this.classList.add('active');
+      const target = document.getElementById('panel-' + this.dataset.tab);
+      target.classList.add('active');
+      document.getElementById('tooltip').classList.remove('show');
+      // Resize canvases after switching
+      setTimeout(() => {
+        if (this.dataset.tab === 'e8' && window._e8) window._e8.resize();
+        else resize();
+      }, 50);
+    });
+  });
+
+  // Also needs resize on VSA tab switch
+  window._vsa = { resize };
+  // Override tab switch for vsa
+  const origVsaResize = resize;
+})();
+
+// ── Visual Identity ──────────────────────────────────────────────
+(function() {
+  const VALUES = [
+    { id: 'curiosity', label: 'Curiosity', color: '#f59e0b', default: 0.5 },
+    { id: 'knowledge', label: 'Knowledge', color: '#22c55e', default: 0.5 },
+    { id: 'coherence', label: 'Coherence', color: '#3b82f6', default: 0.5 },
+    { id: 'autonomy', label: 'Autonomy', color: '#a855f7', default: 0.5 },
+    { id: 'helpfulness', label: 'Helpfulness', color: '#ec4899', default: 0.5 },
+    { id: 'truthfulness', label: 'Truthfulness', color: '#06b6d4', default: 0.5 },
+    { id: 'efficiency', label: 'Efficiency', color: '#64748b', default: 0.5 },
+  ];
+
+  const VWEIGHT = { curiosity: 0.20, knowledge: 0.20, coherence: 0.15, autonomy: 0.15, helpfulness: 0.12, truthfulness: 0.10, efficiency: 0.08 };
+  const VHUE = { curiosity: 39, knowledge: 142, coherence: 217, autonomy: 271, helpfulness: 330, truthfulness: 187, efficiency: 215 };
+  const VSAT = { curiosity: 0.95, knowledge: 0.76, coherence: 0.91, autonomy: 0.91, helpfulness: 0.78, truthfulness: 0.94, efficiency: 0.16 };
+  const VLUM = { curiosity: 0.52, knowledge: 0.48, coherence: 0.60, autonomy: 0.65, helpfulness: 0.60, truthfulness: 0.43, efficiency: 0.47 };
+
+  const canvas = document.getElementById('identity-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  function hslToHex(h, s, l) {
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c / 2;
+    let r1, g1, b1;
+    if (h < 60) { r1 = c; g1 = x; b1 = 0; }
+    else if (h < 120) { r1 = x; g1 = c; b1 = 0; }
+    else if (h < 180) { r1 = 0; g1 = c; b1 = x; }
+    else if (h < 240) { r1 = 0; g1 = x; b1 = c; }
+    else if (h < 300) { r1 = x; g1 = 0; b1 = c; }
+    else { r1 = c; g1 = 0; b1 = x; }
+    const r = Math.round((r1 + m) * 255);
+    const g = Math.round((g1 + m) * 255);
+    const b = Math.round((b1 + m) * 255);
+    return '#' + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
+  }
+
+  function blendHSL(pairs) {
+    let tw = 0, hs = 0, ss = 0, ls = 0;
+    for (const [id, w] of pairs) {
+      hs += VHUE[id] * w;
+      ss += VSAT[id] * w;
+      ls += VLUM[id] * w;
+      tw += w;
+    }
+    if (tw === 0) return [271, 0.91, 0.65];
+    return [hs / tw, Math.min(ss / tw, 1), Math.min(ls / tw, 1)];
+  }
+
+  function getValues() {
+    const vals = {};
+    VALUES.forEach(v => {
+      const el = document.getElementById('sl-' + v.id);
+      vals[v.id] = parseFloat(el ? el.value : v.default);
+    });
+    return vals;
+  }
+
+  function computeSignature(vals) {
+    const products = Object.keys(vals).map(id => [id, vals[id] * (VWEIGHT[id] || 0)]);
+    const [ph, ps, pl] = blendHSL(products);
+    const primary = hslToHex(ph, ps, Math.min(pl * 1.15, 0.95));
+    const secondary = hslToHex((ph + 45) % 360, ps * 0.6, Math.min(pl * 1.05, 0.90));
+    const accentPairs = products.filter(([id, w]) => w > 0.02 && id !== products.sort((a,b) => b[1]-a[1])[0][0]);
+    const [ah, ash, al] = accentPairs.length > 0 ? blendHSL(accentPairs.map(([id,w]) => [id, w*0.6])) : [(ph + 30) % 360, ps * 0.8, pl * 0.9];
+    const accent = hslToHex(ah, ash, Math.min(al * 1.1, 0.90));
+    const bgLum = Math.min(pl * 0.07, 0.12);
+    const bg = hslToHex(ph, Math.max(ps, 0.3), bgLum);
+    const fgLum = Math.min(pl * 0.85, 0.95);
+    const fg = hslToHex(ph, ps * 0.15, fgLum);
+    const warmth = Math.max(0.2, Math.min(0.9, 1 - ph / 360));
+    const sat = ps * (0.5 + (products.reduce((a,[_,w]) => a + w, 0) / Object.keys(vals).length || 0.5) * 0.5);
+    const symmetry = vals.coherence;
+    const complexity = vals.curiosity * 0.5 + vals.knowledge * 0.3 + 0.2;
+    const sharpness = vals.autonomy * 0.6 + (1 - vals.helpfulness) * 0.4;
+    const roundness = vals.helpfulness * 0.7 + vals.coherence * 0.3;
+    const dominant = Object.keys(vals).sort((a,b) => (vals[b]*VWEIGHT[b]) - (vals[a]*VWEIGHT[a]))[0];
+    return { primary, secondary, accent, bg, fg, warmth, sat, symmetry, complexity, sharpness, roundness, dominant, ph };
+  }
+
+  function draw() {
+    const vals = getValues();
+    const sig = computeSignature(vals);
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = sig.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(139,92,246,0.03)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+    const cx = W / 2, cy = H / 2;
+    const R = Math.min(W, H) / 3.5;
+    const t = Date.now() / 2000;
+
+    // Outer rings
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.strokeStyle = sig.primary + '60';
+    ctx.lineWidth = 1.5 + (1 - sig.sharpness) * 2;
+    ctx.setLineDash(sig.symmetry > 0.6 ? [3,4] : [2,6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.72, 0, Math.PI * 2);
+    ctx.strokeStyle = sig.accent + '40';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Diamond core
+    const dh = R * 0.3 + sig.sharpness * R * 0.15;
+    const dw = dh * 0.6;
+    const dm = sig.roundness > 0.5 ? 'round' : 'miter';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - dh);
+    ctx.lineTo(cx + dw, cy);
+    ctx.lineTo(cx, cy + dh);
+    ctx.lineTo(cx - dw, cy);
+    ctx.closePath();
+    ctx.strokeStyle = sig.primary;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = dm; ctx.lineJoin = dm;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = sig.accent;
+    ctx.fill();
+
+    // Orbital nodes
+    const nNodes = 4 + Math.round(sig.complexity * 6);
+    for (let i = 0; i < nNodes; i++) {
+      const angle = Math.PI * 2 * i / nNodes * (1 + (1 - sig.symmetry) * 0.3) + t * (0.5 + sig.complexity * 0.5);
+      const r = R * 0.55 + sig.complexity * R * 0.15 + Math.sin(t + i * 1.7) * R * 0.05;
+      const nx = cx + Math.cos(angle) * r;
+      const ny = cy + Math.sin(angle) * r;
+      const nr = 1.5 + sig.symmetry * 2 + Math.sin(t + i * 2.3) * 0.8;
+
+      const grad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr * 3);
+      grad.addColorStop(0, sig.primary + '60');
+      grad.addColorStop(1, sig.primary + '00');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(nx, ny, nr * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(nx, ny, nr, 0, Math.PI * 2);
+      ctx.fillStyle = sig.accent;
+      ctx.fill();
+      ctx.strokeStyle = sig.primary + '80';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Connection lines from core to nodes
+    if (sig.symmetry > 0.3) {
+      for (let i = 0; i < nNodes; i++) {
+        const angle = Math.PI * 2 * i / nNodes * (1 + (1 - sig.symmetry) * 0.3) + t * (0.5 + sig.complexity * 0.5);
+        const r = R * 0.55 + sig.complexity * R * 0.15 + Math.sin(t + i * 1.7) * R * 0.05;
+        const nx = cx + Math.cos(angle) * r;
+        const ny = cy + Math.sin(angle) * r;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(nx, ny);
+        ctx.strokeStyle = sig.accent + '20';
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([3,5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Dominant value label
+    ctx.fillStyle = sig.fg;
+    ctx.font = `${Math.round(R * 0.11)}px "SF Mono","Fira Code",monospace`;
+    ctx.textAlign = 'center';
+    const domLabel = VALUES.find(v => v.id === sig.dominant);
+    ctx.fillText(domLabel ? domLabel.label.toUpperCase() : '—', cx, cy + dh + R * 0.35);
+
+    // Warmth indicator bar (bottom)
+    const barY = H - 18;
+    const barW = W * 0.4;
+    const grad = ctx.createLinearGradient(cx - barW/2, barY, cx + barW/2, barY);
+    grad.addColorStop(0, '#3b82f6');
+    grad.addColorStop(0.5, sig.primary);
+    grad.addColorStop(1, '#f59e0b');
+    ctx.fillStyle = 'rgba(136,112,170,0.15)';
+    ctx.roundRect ? ctx.roundRect(cx - barW/2, barY - 4, barW, 8, 4) : ctx.rect(cx - barW/2, barY - 4, barW, 8);
+    ctx.fill();
+    ctx.fillStyle = grad;
+    if (ctx.roundRect) {
+      ctx.roundRect(cx - barW/2, barY - 4, barW * sig.warmth, 8, 4);
+    } else {
+      ctx.rect(cx - barW/2, barY - 4, barW * sig.warmth, 8);
+    }
+    ctx.fill();
+
+    // Update palette
+    const palEl = document.getElementById('identity-palette');
+    palEl.innerHTML = [sig.primary, sig.secondary, sig.accent, sig.bg, sig.fg].map(c =>
+      `<div class="swatch" style="background:${c}" title="${c}"></div>`
+    ).join('');
+
+    // Update geo params
+    const geoEl = document.getElementById('identity-geo');
+    geoEl.innerHTML = `<span>Dominant: <span class="gv">${domLabel ? domLabel.label : '—'}</span></span>` +
+      `<span>Symmetry: <span class="gv">${sig.symmetry.toFixed(2)}</span></span>` +
+      `<span>Complexity: <span class="gv">${sig.complexity.toFixed(2)}</span></span>` +
+      `<span>Sharpness: <span class="gv">${sig.sharpness.toFixed(2)}</span></span>` +
+      `<span>Warmth: <span class="gv">${sig.warmth.toFixed(2)}</span></span>`;
+
+    requestAnimationFrame(draw);
+  }
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    W = rect.width;
+    canvas.width = W * dpr;
+    canvas.height = (W * 9/16) * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = (W * 9/16) + 'px';
+    H = canvas.height / dpr;
+    ctx.scale(dpr, dpr);
+  }
+
+  // Build sliders
+  const slidersEl = document.getElementById('identity-sliders');
+  VALUES.forEach(v => {
+    const div = document.createElement('div');
+    div.className = 'identity-slider';
+    div.innerHTML = `<span style="color:${v.color}">●</span><label for="sl-${v.id}">${v.label}</label>` +
+      `<input type="range" id="sl-${v.id}" min="0" max="1" step="0.01" value="${v.default}">` +
+      `<span class="val" id="sv-${v.id}">${v.default.toFixed(2)}</span>`;
+    const input = div.querySelector('input');
+    input.addEventListener('input', () => {
+      document.getElementById('sv-' + v.id).textContent = parseFloat(input.value).toFixed(2);
+    });
+    slidersEl.appendChild(div);
+  });
+
+  // Reset
+  document.getElementById('identity-canvas').addEventListener('click', () => {
+    VALUES.forEach(v => {
+      const el = document.getElementById('sl-' + v.id);
+      el.value = v.default;
+      document.getElementById('sv-' + v.id).textContent = v.default.toFixed(2);
+    });
+  });
+
+  // Init
+  window._identity = { resize };
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Also resize on tab switch
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+      setTimeout(() => {
+        if (this.dataset.tab === 'identity') resize();
+      }, 50);
+    });
+  });
+})();
+</script>
+</body>
+</html>

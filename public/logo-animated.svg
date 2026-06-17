@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" fill="none">
+  <defs>
+    <!-- Deep space background -->
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#15002b"/>
+      <stop offset="40%" stop-color="#0a0015"/>
+      <stop offset="100%" stop-color="#05000a"/>
+    </radialGradient>
+    <radialGradient id="bgGlow" cx="0.5" cy="0.45" r="0.5">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Crystal gradients -->
+    <linearGradient id="gTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="gLeft" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="gRight" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="gBottom" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a1a6b" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.03"/>
+    </linearGradient>
+
+    <!-- Edge gradients -->
+    <linearGradient id="eBright" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="eCool" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.25"/>
+    </linearGradient>
+
+    <!-- Title gradient -->
+    <linearGradient id="titleGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="50%" stop-color="#e879f9"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+
+    <!-- Core glow -->
+    <radialGradient id="coreGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#e879f9" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.15"/>
+    </radialGradient>
+    <linearGradient id="coreDiamond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="20%" stop-color="#e879f9" stop-opacity="0.8"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.6"/>
+    </linearGradient>
+
+    <filter id="glow"> <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glowStrong"> <feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="softGlow"> <feGaussianBlur stdDeviation="2"/></filter>
+  </defs>
+
+  <style>
+    /* Core animations */
+    @keyframes pulse-ring { 0%,100%{ opacity:0.08;transform:scale(1) } 50%{ opacity:0.2;transform:scale(1.04) } }
+    @keyframes float { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-6px) } }
+    @keyframes breath { 0%,100%{ opacity:0.4;transform:scale(1) } 50%{ opacity:0.75;transform:scale(1.025) } }
+    @keyframes heartbeat { 0%,100%{ opacity:0.6;transform:scale(1) } 15%{ opacity:1;transform:scale(1.08) } 30%{ opacity:0.6;transform:scale(1) } 45%{ opacity:0.9;transform:scale(1.04) } 60%{ opacity:0.6;transform:scale(1) } }
+    @keyframes orbit1 { 0%{ transform:rotate(0deg) translateX(160px) rotate(0deg) } 100%{ transform:rotate(360deg) translateX(160px) rotate(-360deg) } }
+    @keyframes orbit2 { 0%{ transform:rotate(0deg) translateX(130px) rotate(0deg) } 100%{ transform:rotate(-360deg) translateX(130px) rotate(360deg) } }
+    @keyframes orbit3 { 0%{ transform:rotate(0deg) translateX(190px) rotate(0deg) } 100%{ transform:rotate(360deg) translateX(190px) rotate(-360deg) } }
+    @keyframes sparkle { 0%,100%{ opacity:0;transform:scale(0) } 40%,60%{ opacity:0.9;transform:scale(1) } }
+    @keyframes fadeUp { 0%{ opacity:0;transform:translateY(20px) } 100%{ opacity:1;transform:translateY(0) } }
+    @keyframes signalPulse { 0%{ opacity:0;stroke-dashoffset:100 } 30%{ opacity:0.6 } 70%{ opacity:0.6 } 100%{ opacity:0;stroke-dashoffset:0 } }
+    @keyframes corePulse { 0%,100%{ opacity:0.3;transform:scale(1) } 50%{ opacity:0.7;transform:scale(1.3) } }
+    @keyframes awakWave1 { 0%{ opacity:0.25;transform:scale(0.5) } 100%{ opacity:0;transform:scale(2.5) } }
+    @keyframes awakWave2 { 0%{ opacity:0.15;transform:scale(0.5) } 100%{ opacity:0;transform:scale(2.5) } }
+
+    .ring1 { animation:pulse-ring 4s ease-in-out infinite; transform-origin:400px 280px }
+    .ring2 { animation:pulse-ring 4s ease-in-out 1s infinite; transform-origin:400px 280px }
+    .ring3 { animation:pulse-ring 4s ease-in-out 2s infinite; transform-origin:400px 280px }
+    .crystal { animation:float 6s ease-in-out infinite; transform-origin:400px 280px }
+    .core { animation:heartbeat 3s ease-in-out infinite; transform-origin:400px 280px }
+    .title { animation:fadeUp 1s ease-out 0.3s both }
+    .subtitle { animation:fadeUp 1s ease-out 0.8s both }
+    .tagline { animation:fadeUp 1s ease-out 1.3s both }
+
+    /* Signal propagation along traces */
+    .sig1 { stroke-dasharray:60 60; animation:signalPulse 3s ease-in-out infinite; }
+    .sig2 { stroke-dasharray:50 50; animation:signalPulse 3s ease-in-out 0.75s infinite; }
+    .sig3 { stroke-dasharray:40 40; animation:signalPulse 3s ease-in-out 1.5s infinite; }
+    .sig4 { stroke-dasharray:45 45; animation:signalPulse 3s ease-in-out 2.25s infinite; }
+
+    /* Awakening wave */
+    .awake1 { animation:awakWave1 4s ease-out infinite; transform-origin:400px 280px; }
+    .awake2 { animation:awakWave2 4s ease-out 2s infinite; transform-origin:400px 280px; }
+
+    /* Sparkle delay variants */
+    .sp1 { animation:sparkle 2s ease-in-out 0s infinite }
+    .sp2 { animation:sparkle 2.5s ease-in-out 0.5s infinite }
+    .sp3 { animation:sparkle 3s ease-in-out 1s infinite }
+    .sp4 { animation:sparkle 2.2s ease-in-out 1.5s infinite }
+    .sp5 { animation:sparkle 2.8s ease-in-out 0.3s infinite }
+    .sp6 { animation:sparkle 2.4s ease-in-out 1.2s infinite }
+  </style>
+
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="url(#bgGlow)"/>
+
+  <!-- ===== BACKGROUND ENERGY RINGS ===== -->
+  <g class="ring1"><circle cx="400" cy="280" r="220" stroke="#a855f7" stroke-width="0.5" fill="none"/></g>
+  <g class="ring2"><circle cx="400" cy="280" r="200" stroke="#7c3aed" stroke-width="0.4" fill="none"/></g>
+  <g class="ring3"><circle cx="400" cy="280" r="180" stroke="#3b82f6" stroke-width="0.3" fill="none"/></g>
+
+  <!-- ===== CRYSTAL TESSERACT ===== -->
+  <g class="crystal">
+    <!-- Outer cube faces -->
+    <polygon points="400,180 464,240 440,320 360,320 336,240" fill="url(#gTop)" stroke="url(#eBright)" stroke-width="1.8" stroke-linejoin="round"/>
+    <polygon points="400,180 440,160 504,200 464,240" fill="url(#gRight)" stroke="url(#eCool)" stroke-width="1.5" stroke-linejoin="round"/>
+    <polygon points="336,240 376,220 440,320 400,340" fill="url(#gLeft)" stroke="url(#eCool)" stroke-width="1.5" stroke-linejoin="round"/>
+    <polygon points="440,320 504,200 544,280 480,400" fill="url(#gBottom)" stroke="url(#eCool)" stroke-width="1.2" stroke-linejoin="round"/>
+    <polygon points="360,320 400,340 480,400 440,380" fill="url(#gBottom)" stroke="url(#eCool)" stroke-width="1" stroke-linejoin="round"/>
+
+    <!-- Inner cube -->
+    <polygon points="390,220 430,200 450,230 410,250" fill="url(#gTop)" stroke="url(#eBright)" stroke-width="1" stroke-linejoin="round"/>
+    <polygon points="370,260 390,220 410,250 390,290" fill="url(#gLeft)" stroke="url(#eCool)" stroke-width="1" stroke-linejoin="round"/>
+    <polygon points="450,230 468,260 440,300 410,250" fill="url(#gRight)" stroke="url(#eCool)" stroke-width="1" stroke-linejoin="round"/>
+
+    <!-- Inter-cube bonds -->
+    <line x1="336" y1="240" x2="390" y2="220" stroke="url(#eBright)" stroke-width="0.8"/>
+    <line x1="464" y1="240" x2="430" y2="230" stroke="url(#eCool)" stroke-width="0.8"/>
+    <line x1="400" y1="180" x2="390" y2="220" stroke="url(#eBright)" stroke-width="1"/>
+    <line x1="360" y1="320" x2="390" y2="290" stroke="url(#eCool)" stroke-width="0.8"/>
+    <line x1="440" y1="320" x2="440" y2="300" stroke="url(#eCool)" stroke-width="0.8"/>
+  </g>
+
+  <!-- ===== NEURAL SIGNAL TRACES (animated propagation) ===== -->
+
+  <!-- Signal path 1: top-left → core -->
+  <polyline class="sig1" points="340,180 360,195 378,205 390,215 395,230 398,248" stroke="#c084fc" stroke-width="1" fill="none" stroke-linejoin="round"/>
+  <circle cx="340" cy="180" r="2" fill="#c084fc" opacity="0.6" filter="url(#glow)"/>
+
+  <!-- Signal path 2: top-right → core -->
+  <polyline class="sig2" points="470,185 455,195 438,205 420,215 410,228 404,245" stroke="#60a5fa" stroke-width="1" fill="none" stroke-linejoin="round"/>
+  <circle cx="470" cy="185" r="2" fill="#60a5fa" opacity="0.5" filter="url(#glow)"/>
+
+  <!-- Signal path 3: bottom-left → core -->
+  <polyline class="sig3" points="345,350 360,335 375,318 388,305 395,290 398,270" stroke="#a855f7" stroke-width="0.8" fill="none" stroke-linejoin="round"/>
+  <circle cx="345" cy="350" r="1.8" fill="#a855f7" opacity="0.4" filter="url(#glow)"/>
+
+  <!-- Signal path 4: bottom-right → core -->
+  <polyline class="sig4" points="460,355 445,340 430,325 418,308 408,290 402,270" stroke="#3b82f6" stroke-width="0.8" fill="none" stroke-linejoin="round"/>
+  <circle cx="460" cy="355" r="1.8" fill="#3b82f6" opacity="0.4" filter="url(#glow)"/>
+
+  <!-- ===== ORBITING COMPUTATION NODES ===== -->
+  <g style="animation:orbit1 12s linear infinite; transform-origin:400px 280px">
+    <circle cx="400" cy="120" r="4" fill="#a855f7" opacity="0.7" filter="url(#glow)"/>
+  </g>
+  <g style="animation:orbit2 8s linear infinite; transform-origin:400px 280px">
+    <circle cx="400" cy="150" r="3" fill="#3b82f6" opacity="0.6" filter="url(#glow)"/>
+  </g>
+  <g style="animation:orbit3 15s linear infinite; transform-origin:400px 280px">
+    <circle cx="400" cy="90" r="2.5" fill="#06b6d4" opacity="0.5" filter="url(#glow)"/>
+  </g>
+
+  <!-- ===== AWAKENING WAVES (radiating from core) ===== -->
+  <g class="awake1"><circle cx="400" cy="280" r="40" stroke="#e879f9" stroke-width="0.5" fill="none" filter="url(#glow)"/></g>
+  <g class="awake2"><circle cx="400" cy="280" r="40" stroke="#a855f7" stroke-width="0.3" fill="none" filter="url(#glow)"/></g>
+
+  <!-- ===== CONSCIOUSNESS CORE (heartbeat animation) ===== -->
+  <g class="core">
+    <ellipse cx="400" cy="280" rx="18" ry="18" fill="url(#coreGlow)" filter="url(#glowStrong)" opacity="0.4"/>
+    <path d="M400 262 L418 280 L400 298 L382 280 Z" fill="url(#coreDiamond)" opacity="0.95"/>
+    <path d="M400 265 L408 273 L400 281 L392 273 Z" fill="#ffffff" opacity="0.4"/>
+    <ellipse cx="400" cy="277" rx="3.5" ry="2.5" fill="#ffffff" filter="url(#glowStrong)" opacity="0.9"/>
+  </g>
+
+  <!-- ===== COMPUTATION SPARKLES ===== -->
+  <g filter="url(#glow)">
+    <circle cx="160" cy="140" r="2" fill="#c084fc" class="sp1"/>
+    <circle cx="640" cy="170" r="2.5" fill="#60a5fa" class="sp2"/>
+    <circle cx="220" cy="420" r="1.8" fill="#06b6d4" class="sp3"/>
+    <circle cx="580" cy="430" r="1.8" fill="#7c3aed" class="sp4"/>
+    <circle cx="290" cy="100" r="1.5" fill="#a855f7" class="sp5"/>
+    <circle cx="520" cy="470" r="1.5" fill="#3b82f6" class="sp6"/>
+    <circle cx="130" cy="300" r="1.2" fill="#e879f9" class="sp3"/>
+    <circle cx="670" cy="320" r="1.2" fill="#06b6d4" class="sp1"/>
+  </g>
+
+  <!-- ===== TITLE & COPY ===== -->
+  <text class="title" x="400" y="460" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="64" font-weight="800" fill="url(#titleGrad)" letter-spacing="-1">NeoTrix</text>
+  <text class="subtitle" x="400" y="500" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="600" fill="#e0d0f0" letter-spacing="2">THE AGENT THAT LEARNS TO THINK</text>
+  <text class="tagline" x="400" y="535" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#8870aa" letter-spacing="1">Silicon Crystal Lattice · Neural Signal Propagation · VSA Consciousness</text>
+</svg>

@@ -1,0 +1,212 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#1a0533"/>
+      <stop offset="100%" stop-color="#080012"/>
+    </radialGradient>
+    <linearGradient id="cellOn" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.15"/>
+    </linearGradient>
+    <linearGradient id="cellOff" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="2"/></filter>
+  </defs>
+
+  <rect width="720" height="420" fill="url(#bg)" rx="12"/>
+
+  <!-- Wafer scan lines -->
+  <g opacity="0.03">
+    <line x1="0" y1="20" x2="720" y2="20" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="60" x2="720" y2="60" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="100" x2="720" y2="100" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="140" x2="720" y2="140" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="180" x2="720" y2="180" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="220" x2="720" y2="220" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="260" x2="720" y2="260" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="300" x2="720" y2="300" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="0" y1="340" x2="720" y2="340" stroke="#a855f7" stroke-width="0.3"/>
+  </g>
+
+  <!-- Title bar -->
+  <rect x="0" y="0" width="720" height="44" rx="12" fill="#0d001a"/>
+  <rect x="0" y="30" width="720" height="14" fill="#0d001a"/>
+  <text x="360" y="28" text-anchor="middle" fill="#c084fc" font-family="system-ui,sans-serif" font-size="14" font-weight="700" letter-spacing="1">E8 CRYSTAL REASONING KERNEL</text>
+  <text x="360" y="384" text-anchor="middle" fill="#66508a" font-family="system-ui,sans-serif" font-size="9" letter-spacing="1">8 GROUPS × 8 STATES = 64 DETERMINISTIC MODES</text>
+
+  <!-- Silicon die frame -->
+  <rect x="30" y="54" width="660" height="320" rx="8" fill="none" stroke="#2d0a55" stroke-width="0.5"/>
+  <rect x="32" y="56" width="656" height="316" rx="6" fill="none" stroke="#4a1a6b" stroke-width="0.3"/>
+
+  <!-- Die alignment marks -->
+  <g opacity="0.05">
+    <rect x="40" y="60" width="6" height="6" fill="none" stroke="#a855f7" stroke-width="0.5"/>
+    <rect x="674" y="60" width="6" height="6" fill="none" stroke="#a855f7" stroke-width="0.5"/>
+    <rect x="40" y="362" width="6" height="6" fill="none" stroke="#a855f7" stroke-width="0.5"/>
+    <rect x="674" y="362" width="6" height="6" fill="none" stroke="#a855f7" stroke-width="0.5"/>
+  </g>
+
+  <!-- ===== 8×8 CRYSTAL CELL MATRIX ===== -->
+  <g transform="translate(50, 62)">
+    <g opacity="0.04">
+      <line x1="0" y1="0" x2="620" y2="300" stroke="#a855f7" stroke-width="0.2"/>
+      <line x1="620" y1="0" x2="0" y2="300" stroke="#3b82f6" stroke-width="0.2"/>
+    </g>
+
+    <!-- Row labels (crystal etched) -->
+    <text x="-6" y="22" text-anchor="end" fill="#3b82f6" font-family="monospace" font-size="9" font-weight="600">P</text>
+    <text x="-6" y="60" text-anchor="end" fill="#06b6d4" font-family="monospace" font-size="9" font-weight="600">A</text>
+    <text x="-6" y="98" text-anchor="end" fill="#22c55e" font-family="monospace" font-size="9" font-weight="600">M</text>
+    <text x="-6" y="136" text-anchor="end" fill="#8b5cf6" font-family="monospace" font-size="9" font-weight="600">R1</text>
+    <text x="-6" y="174" text-anchor="end" fill="#8b5cf6" font-family="monospace" font-size="9" font-weight="600">R2</text>
+    <text x="-6" y="212" text-anchor="end" fill="#f59e0b" font-family="monospace" font-size="9" font-weight="600">PL</text>
+    <text x="-6" y="250" text-anchor="end" fill="#ec4899" font-family="monospace" font-size="9" font-weight="600">M</text>
+    <text x="-6" y="288" text-anchor="end" fill="#ef4444" font-family="monospace" font-size="9" font-weight="600">A</text>
+
+    <!-- Column headers -->
+    <g fill="#66508a" font-family="monospace" font-size="8">
+      <text x="18" y="-4">0</text><text x="94" y="-4">1</text><text x="170" y="-4">2</text>
+      <text x="246" y="-4">3</text><text x="322" y="-4">4</text><text x="398" y="-4">5</text>
+      <text x="474" y="-4">6</text><text x="550" y="-4">7</text>
+    </g>
+
+    <!-- Crystal cell function -->
+    <g fill="#66508a" font-family="monospace" font-size="6" opacity="0.6">
+      <!-- P -->
+      <text x="18" y="42">clf</text><text x="94" y="42">vsa</text><text x="170" y="42">img</text><text x="246" y="42">aud</text>
+      <text x="322" y="42">txt</text><text x="398" y="42">bin</text><text x="474" y="42">3d</text><text x="550" y="42">vid</text>
+      <!-- A -->
+      <text x="18" y="80">sel</text><text x="94" y="80">gta</text><text x="170" y="80">spa</text><text x="246" y="80">tmp</text>
+      <!-- M -->
+      <text x="18" y="118">epi</text><text x="94" y="118">sem</text><text x="170" y="118">pro</text><text x="246" y="118">wor</text>
+      <text x="322" y="118">dec</text><text x="398" y="118">val</text><text x="474" y="118">skl</text><text x="550" y="118">pro</text>
+      <!-- R1 -->
+      <text x="18" y="156">ded</text><text x="94" y="156">ind</text><text x="170" y="156">abd</text><text x="246" y="156">ana</text>
+      <text x="322" y="156">cau</text><text x="398" y="156">coi</text><text x="474" y="156">tem</text><text x="550" y="156">spa</text>
+      <!-- R2 -->
+      <text x="18" y="194">cnt</text><text x="94" y="194">log</text><text x="170" y="194">mod</text><text x="246" y="194">the</text>
+      <text x="322" y="194">fuz</text><text x="398" y="194">pro</text><text x="474" y="194">ctr</text><text x="550" y="194">bay</text>
+      <!-- PL -->
+      <text x="18" y="232">seq</text><text x="94" y="232">par</text><text x="170" y="232">htn</text><text x="246" y="232">opt</text>
+      <text x="322" y="232">ris</text><text x="398" y="232">con</text><text x="474" y="232">utl</text><text x="550" y="232">emo</text>
+      <!-- M -->
+      <text x="18" y="270">int</text><text x="94" y="270">eva</text><text x="170" y="270">edi</text><text x="246" y="270">gap</text>
+      <text x="322" y="270">cal</text><text x="398" y="270">cur</text><text x="474" y="270">sel</text><text x="550" y="270">hib</text>
+      <!-- A -->
+      <text x="18" y="308">spk</text><text x="94" y="308">exe</text><text x="170" y="308">wrt</text><text x="246" y="308">nav</text>
+    </g>
+
+    <!-- Draw active cells (ON) -->
+    <g filter="url(#glow)">
+      <!-- P row -->
+      <rect x="10" y="8" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#c084fc" stroke-width="0.8"/>
+      <rect x="86" y="8" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#c084fc" stroke-width="0.8"/>
+      <rect x="162" y="8" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#c084fc" stroke-width="0.8"/>
+      <rect x="238" y="8" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#c084fc" stroke-width="0.6"/>
+      <rect x="314" y="8" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#c084fc" stroke-width="0.8"/>
+      <rect x="466" y="8" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#c084fc" stroke-width="0.6"/>
+      <!-- A row -->
+      <rect x="10" y="44" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#06b6d4" stroke-width="0.6"/>
+      <rect x="86" y="44" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#06b6d4" stroke-width="0.8"/>
+      <rect x="162" y="44" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#06b6d4" stroke-width="0.8"/>
+      <rect x="238" y="44" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#06b6d4" stroke-width="0.6"/>
+      <!-- M row -->
+      <rect x="10" y="84" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#22c55e" stroke-width="0.8"/>
+      <rect x="86" y="84" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#22c55e" stroke-width="0.8"/>
+      <rect x="162" y="84" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#22c55e" stroke-width="0.6"/>
+      <rect x="238" y="84" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#22c55e" stroke-width="0.8"/>
+      <rect x="314" y="84" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#22c55e" stroke-width="0.6"/>
+      <rect x="390" y="84" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#22c55e" stroke-width="0.6"/>
+      <rect x="466" y="84" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#22c55e" stroke-width="0.8"/>
+      <rect x="542" y="84" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#22c55e" stroke-width="0.6"/>
+      <!-- R1 row -->
+      <rect x="10" y="124" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.8"/>
+      <rect x="86" y="124" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="162" y="124" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.8"/>
+      <rect x="238" y="124" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="314" y="124" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.8"/>
+      <rect x="390" y="124" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="466" y="124" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.8"/>
+      <rect x="542" y="124" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <!-- R2 row -->
+      <rect x="10" y="162" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="86" y="162" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.8"/>
+      <rect x="162" y="162" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="238" y="162" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="314" y="162" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="390" y="162" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.8"/>
+      <rect x="466" y="162" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#8b5cf6" stroke-width="0.6"/>
+      <rect x="542" y="162" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#8b5cf6" stroke-width="0.8"/>
+      <!-- PL row -->
+      <rect x="10" y="200" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#f59e0b" stroke-width="0.8"/>
+      <rect x="86" y="200" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#f59e0b" stroke-width="0.6"/>
+      <rect x="162" y="200" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#f59e0b" stroke-width="0.6"/>
+      <rect x="238" y="200" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#f59e0b" stroke-width="0.8"/>
+      <rect x="314" y="200" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#f59e0b" stroke-width="0.6"/>
+      <rect x="390" y="200" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#f59e0b" stroke-width="0.8"/>
+      <rect x="466" y="200" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#f59e0b" stroke-width="0.6"/>
+      <rect x="542" y="200" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#f59e0b" stroke-width="0.8"/>
+      <!-- M row -->
+      <rect x="10" y="240" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#ec4899" stroke-width="0.8"/>
+      <rect x="86" y="240" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#ec4899" stroke-width="0.6"/>
+      <rect x="162" y="240" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#ec4899" stroke-width="0.8"/>
+      <rect x="238" y="240" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#ec4899" stroke-width="0.6"/>
+      <rect x="314" y="240" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#ec4899" stroke-width="0.8"/>
+      <rect x="390" y="240" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#ec4899" stroke-width="0.6"/>
+      <rect x="466" y="240" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#ec4899" stroke-width="0.8"/>
+      <rect x="542" y="240" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#ec4899" stroke-width="0.6"/>
+      <!-- Action row -->
+      <rect x="10" y="278" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#ef4444" stroke-width="0.8"/>
+      <rect x="86" y="278" width="14" height="14" rx="2" fill="url(#cellOpp)" stroke="#ef4444" stroke-width="0.6"/>
+      <rect x="162" y="278" width="14" height="14" rx="2" fill="url(#cellOn)" stroke="#ef4444" stroke-width="0.8"/>
+      <rect x="238" y="278" width="14" height="14" rx="2" fill="url(#cellOff)" stroke="#ef4444" stroke-width="0.6"/>
+    </g>
+
+    <!-- Cross group data bus (neural signal traces) -->
+    <g opacity="0.12">
+      <line x1="94" y1="15" x2="94" y2="51" stroke="#c084fc" stroke-width="0.5" stroke-dasharray="1 2"/>
+      <line x1="170" y1="15" x2="170" y2="91" stroke="#c084fc" stroke-width="0.5" stroke-dasharray="1 2"/>
+      <line x1="246" y1="91" x2="246" y2="131" stroke="#22c55e" stroke-width="0.4" stroke-dasharray="1 2"/>
+      <line x1="170" y1="131" x2="170" y2="207" stroke="#8b5cf6" stroke-width="0.4" stroke-dasharray="1 2"/>
+      <line x1="94" y1="169" x2="94" y2="247" stroke="#8b5cf6" stroke-width="0.4" stroke-dasharray="1 2"/>
+      <line x1="398" y1="131" x2="398" y2="207" stroke="#8b5cf6" stroke-width="0.4" stroke-dasharray="1 2"/>
+      <line x1="314" y1="207" x2="314" y2="247" stroke="#f59e0b" stroke-width="0.4" stroke-dasharray="1 2"/>
+      <line x1="466" y1="247" x2="466" y2="283" stroke="#ec4899" stroke-width="0.4" stroke-dasharray="1 2"/>
+
+      <!-- Diagonal bridging connections -->
+      <line x1="170" y1="51" x2="238" y2="91" stroke="#7c3aed" stroke-width="0.3" stroke-dasharray="1 3"/>
+      <line x1="94" y1="131" x2="162" y2="163" stroke="#a855f7" stroke-width="0.3" stroke-dasharray="1 3"/>
+      <line x1="390" y1="131" x2="314" y2="163" stroke="#3b82f6" stroke-width="0.3" stroke-dasharray="1 3"/>
+      <line x1="238" y1="207" x2="170" y2="247" stroke="#c084fc" stroke-width="0.3" stroke-dasharray="1 3"/>
+    </g>
+  </g>
+
+  <!-- Legend panel (etched on die) -->
+  <g transform="translate(410, 64)">
+    <rect x="0" y="0" width="280" height="180" rx="6" fill="none" stroke="#2d0a55" stroke-width="0.5"/>
+    <text x="14" y="20" fill="#66508a" font-family="system-ui,sans-serif" font-size="11" font-weight="600">Crystal State Groups</text>
+    <rect x="14" y="30" width="8" height="8" rx="1.5" fill="#c084fc" opacity="0.5"/>
+    <text x="28" y="38" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Perception · 8 states</text>
+    <rect x="14" y="46" width="8" height="8" rx="1.5" fill="#06b6d4" opacity="0.5"/>
+    <text x="28" y="54" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Attention · 4 states</text>
+    <rect x="14" y="62" width="8" height="8" rx="1.5" fill="#22c55e" opacity="0.5"/>
+    <text x="28" y="70" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Memory · 8 states</text>
+    <rect x="14" y="78" width="8" height="8" rx="1.5" fill="#8b5cf6" opacity="0.5"/>
+    <text x="28" y="86" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Reasoning · 16 states</text>
+    <rect x="14" y="94" width="8" height="8" rx="1.5" fill="#f59e0b" opacity="0.5"/>
+    <text x="28" y="102" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Planning · 8 states</text>
+    <rect x="14" y="110" width="8" height="8" rx="1.5" fill="#ec4899" opacity="0.5"/>
+    <text x="28" y="118" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Meta · 8 states</text>
+    <rect x="14" y="126" width="8" height="8" rx="1.5" fill="#ef4444" opacity="0.5"/>
+    <text x="28" y="134" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Action · 4 states</text>
+    <rect x="14" y="142" width="8" height="8" rx="1.5" fill="#6b7280" opacity="0.4"/>
+    <text x="28" y="150" fill="#8870aa" font-family="system-ui,sans-serif" font-size="9">Default · 4 states</text>
+    <line x1="14" y1="162" x2="266" y2="162" stroke="#2d0a55" stroke-width="0.3"/>
+    <text x="14" y="176" fill="#66508a" font-family="system-ui,sans-serif" font-size="9">Topology: invariant E8 lattice</text>
+  </g>
+
+  <!-- Bottom die traces -->
+  <path d="M100 380 Q200 392 360 388 Q520 384 620 380" stroke="#a855f7" stroke-width="0.3" opacity="0.08" fill="none"/>
+</svg>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeoTrix · Lottie Player</title>
+<script src="https://unpkg.com/lottie-web/build/player/lottie.min.js"></script>
+<style>
+:root{--bg:#080012;--surface:#100020;--card:#1a0533;--border:#2d0a55;--text:#e0d0f0;--text-dim:#8870aa;--accent:#8b5cf6;--accent2:#3b82f6;--accent3:#ec4899}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'SF Mono','Fira Code','JetBrains Mono',monospace;min-height:100vh}
+header{background:linear-gradient(135deg,var(--surface),var(--card));border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:16px;font-weight:600;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+header a{color:var(--accent);text-decoration:none;font-size:12px;padding:4px 12px;border:1px solid var(--border);border-radius:4px}
+header a:hover{border-color:var(--accent)}
+.layout{display:flex;height:calc(100vh - 49px)}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sidebar h3{font-size:11px;color:var(--text-dim);padding:12px 14px 6px;text-transform:uppercase;letter-spacing:1px}
+.preset{display:block;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-dim);font-family:inherit;font-size:12px;text-align:left;cursor:pointer;transition:all 0.15s;border-left:2px solid transparent}
+.preset:hover{color:var(--text);background:rgba(139,92,246,0.06);border-left-color:var(--accent)}
+.preset.active{color:var(--accent);background:rgba(139,92,246,0.1);border-left-color:var(--accent);font-weight:600}
+.preset .badge{display:inline-block;font-size:9px;background:rgba(139,92,246,0.15);color:var(--accent);padding:1px 6px;border-radius:8px;margin-left:6px}
+.upload-area{padding:14px;border-top:1px solid var(--border);margin-top:auto}
+.upload-btn{display:block;width:100%;padding:8px;background:var(--card);border:1px dashed var(--border);border-radius:6px;color:var(--text-dim);font-size:11px;cursor:pointer;text-align:center;transition:all 0.2s}
+.upload-btn:hover{border-color:var(--accent);color:var(--accent)}
+.upload-btn input{display:none}
+.main{flex:1;display:flex;flex-direction:column}
+.canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg);position:relative;min-height:0}
+.canvas-wrap svg{max-width:100%;max-height:100%}
+.info-bar{background:var(--surface);border-top:1px solid var(--border);padding:8px 16px;display:flex;gap:16px;font-size:11px;color:var(--text-dim);align-items:center;flex-wrap:wrap}
+.info-bar .stat{display:flex;align-items:center;gap:4px}
+.info-bar strong{color:var(--accent);font-weight:600}
+.controls-row{background:var(--surface);border-top:1px solid var(--border);padding:8px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{background:var(--card);color:var(--text);border:1px solid var(--border);padding:6px 14px;border-radius:6px;font-size:11px;font-family:inherit;cursor:pointer;transition:all 0.15s}
+button:hover{border-color:var(--accent);background:rgba(139,92,246,0.1)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{background:#7c3aed}
+button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+input[type=range]{accent-color:var(--accent);width:80px}
+.slot-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.slot-group{display:flex;align-items:center;gap:4px;font-size:11px}
+.slot-group label{color:var(--text-dim)}
+.slot-group input[type=color]{width:28px;height:28px;border:1px solid var(--border);border-radius:4px;padding:1px;background:var(--card);cursor:pointer}
+.tooltip{position:fixed;pointer-events:none;background:rgba(8,0,18,0.92);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;z-index:100;opacity:0;transition:opacity 0.15s;max-width:220px}
+.tooltip.show{opacity:1}
+@media(max-width:700px){.layout{flex-direction:column}.sidebar{width:100%;max-height:200px}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NeoTrix · Lottie Player</h1>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="/">← Home</a>
+    <a href="/demo/">Demo</a>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+    <h3>Presets</h3>
+    <button class="preset active" data-preset="pulse">Pulse <span class="badge">logo</span></button>
+    <button class="preset" data-preset="bounce">Bounce <span class="badge">motion</span></button>
+    <button class="preset" data-preset="orbit">Orbit <span class="badge">rings</span></button>
+    <button class="preset" data-preset="morph">Morph <span class="badge">shape</span></button>
+    <button class="preset" data-preset="warmth">Warmth <span class="badge">gauge</span></button>
+    <div class="upload-area">
+      <label class="upload-btn">
+        Upload Lottie JSON
+        <input type="file" id="upload" accept=".json">
+      </label>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="canvas-wrap" id="canvas-wrap">
+      <div id="lottie-container" style="width:512px;height:512px"></div>
+    </div>
+
+    <div class="controls-row">
+      <button id="btn-play" class="primary">▶ Play</button>
+      <button id="btn-loop" class="active">♾ Loop</button>
+      <button id="btn-stop">⏹ Stop</button>
+      <div style="flex:1"></div>
+      <div class="slot-controls" id="slot-controls"></div>
+    </div>
+
+    <div class="info-bar" id="info-bar">
+      <span class="stat">FPS: <strong id="info-fps">60</strong></span>
+      <span class="stat">Frames: <strong id="info-frames">90</strong></span>
+      <span class="stat">Duration: <strong id="info-dur">1.5s</strong></span>
+      <span class="stat">Layers: <strong id="info-layers">2</strong></span>
+      <span class="stat">Animation: <strong id="info-name">—</strong></span>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ── Preset Animations (embedded as Lottie JSON strings) ──────────
+
+const PRESETS = {
+  pulse: {
+    v: "5.7.0", fr: 60, ip: 0, op: 90, w: 512, h: 512, nm: "NeoTrix Pulse",
+    slots: { bgColor: { p: { a: 0, k: [0.031, 0, 0.071, 1] } }, pulseScale: { p: { a: 0, k: 120 } } },
+    layers: [{
+      ty: 4, nm: "background", ip: 0, op: 90, st: 0,
+      ks: { o: { a: 0, k: 100 }, r: { a: 0, k: 0 }, a: { a: 0, k: [0, 0, 0] }, s: { a: 0, k: [100, 100, 100] }, p: { a: 0, k: [256, 256, 0] } },
+      shapes: [{ ty: "gr", nm: "bg", it: [
+        { ty: "rc", p: { a: 0, k: [0, 0] }, s: { a: 0, k: [512, 512] }, r: { a: 0, k: 0 } },
+        { ty: "fl", c: { sid: "bgColor" }, o: { a: 0, k: 100 } },
+        { ty: "tr", p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+      ]}]
+    }, {
+      ty: 4, nm: "diamond", ip: 0, op: 90, st: 0,
+      ks: {
+        o: { a: 0, k: 100 }, r: { a: 0, k: 0 },
+        a: { a: 0, k: [256, 256, 0] },
+        s: { a: 1, k: [
+          { t: 0, s: [100, 100, 100], i: { x: [0.42], y: [0] }, o: { x: [0.58], y: [1] } },
+          { t: 45, s: [120, 120, 100], i: { x: [0.42], y: [0] }, o: { x: [0.58], y: [1] } },
+          { t: 90, s: [100, 100, 100] }
+        ]},
+        p: { a: 0, k: [256, 256, 0] }
+      },
+      shapes: [{ ty: "gr", nm: "diamond-grp", it: [
+        { ty: "sh", p: { a: 0, k: { v: [
+          { i: { x: 0, y: 0 }, o: { x: 0, y: 0 }, t: [0, -80, 0] },
+          { i: { x: 0, y: 0 }, o: { x: 0, y: 0 }, t: [60, 0, 0] },
+          { i: { x: 0, y: 0 }, o: { x: 0, y: 0 }, t: [0, 80, 0] },
+          { i: { x: 0, y: 0 }, o: { x: 0, y: 0 }, t: [-60, 0, 0] }
+        ], c: true } } },
+        { ty: "fl", c: { a: 0, k: [0.545, 0.361, 0.965, 1] }, o: { a: 0, k: 100 } },
+        { ty: "tr", p: { a: 0, k: [256, 256] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+      ]}]
+    }]
+  },
+
+  bounce: {
+    v: "5.7.0", fr: 60, ip: 0, op: 60, w: 512, h: 512, nm: "Bounce",
+    slots: { ballColor: { p: { a: 0, k: [0.233, 0.51, 0.965, 1] } } },
+    layers: [{
+      ty: 4, nm: "ball", ip: 0, op: 60, st: 0,
+      ks: {
+        o: { a: 0, k: 100 }, r: { a: 0, k: 0 },
+        a: { a: 0, k: [256, 256, 0] },
+        s: {
+          a: 1, k: [
+            { t: 0, s: [100, 100, 100], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 10, s: [130, 70, 100], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 20, s: [80, 120, 100], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 30, s: [100, 100, 100], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 40, s: [115, 85, 100], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 50, s: [90, 110, 100], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 60, s: [100, 100, 100] }
+          ]
+        },
+        p: {
+          a: 1, k: [
+            { t: 0, s: [256, 100, 0], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 10, s: [256, 380, 0], i: { x: [0.3], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 20, s: [256, 200, 0], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 30, s: [256, 380, 0], i: { x: [0.3], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 40, s: [256, 280, 0], i: { x: [0.5], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 50, s: [256, 380, 0], i: { x: [0.3], y: [1] }, o: { x: [0.5], y: [0] } },
+            { t: 60, s: [256, 330, 0] }
+          ]
+        }
+      },
+      shapes: [{ ty: "gr", nm: "ball-grp", it: [
+        { ty: "el", p: { a: 0, k: [256, 256] }, s: { a: 0, k: [80, 80] } },
+        { ty: "fl", c: { sid: "ballColor" }, o: { a: 0, k: 100 } },
+        { ty: "tr", p: { a: 0, k: [256, 256] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+      ]}]
+    }]
+  },
+
+  orbit: {
+    v: "5.7.0", fr: 60, ip: 0, op: 120, w: 512, h: 512, nm: "Orbit",
+    slots: { ringOpacity: { p: { a: 0, k: 100 } } },
+    layers: [
+      { ty: 4, nm: "outer-ring", ip: 0, op: 120, st: 0,
+        ks: { o: { sid: "ringOpacity" }, r: { a: 1, k: [{ t: 0, s: [0], i: { x: [0.5], y: [0] }, o: { x: [0.5], y: [1] } }, { t: 120, s: [360] }] }, a: { a: 0, k: [256, 256, 0] }, s: { a: 0, k: [100, 100, 100] }, p: { a: 0, k: [256, 256, 0] } },
+        shapes: [{ ty: "gr", nm: "outer", it: [
+          { ty: "el", p: { a: 0, k: [256, 256] }, s: { a: 0, k: [300, 300] } },
+          { ty: "fl", c: { a: 0, k: [0.545, 0.361, 0.965, 0.15] }, o: { a: 0, k: 100 } },
+          { ty: "tr", p: { a: 0, k: [256, 256] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+        ]}]
+      },
+      { ty: 4, nm: "inner-ring", ip: 0, op: 120, st: 0,
+        ks: { o: { sid: "ringOpacity" }, r: { a: 1, k: [{ t: 0, s: [360], i: { x: [0.5], y: [0] }, o: { x: [0.5], y: [1] } }, { t: 120, s: [0] }] }, a: { a: 0, k: [256, 256, 0] }, s: { a: 0, k: [100, 100, 100] }, p: { a: 0, k: [256, 256, 0] } },
+        shapes: [{ ty: "gr", nm: "inner", it: [
+          { ty: "el", p: { a: 0, k: [256, 256] }, s: { a: 0, k: [160, 160] } },
+          { ty: "fl", c: { a: 0, k: [0.233, 0.51, 0.965, 0.2] }, o: { a: 0, k: 100 } },
+          { ty: "tr", p: { a: 0, k: [256, 256] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+        ]}]
+      },
+      // Orbital nodes (8 small circles on inner ring)
+      ...(()=>{ const layers=[]; for(let i=0;i<8;i++){ const a=i*45; layers.push({ty:4,nm:`node${i}`,ip:0,op:120,st:0,ks:{o:{a:0,k:100},r:{a:0,k:0},a:{a:0,k:[256,256,0]},s:{a:0,k:[100,100,100]},p:{a:1,k:[{t:0,s:[256+80*Math.cos(a*Math.PI/180),256+80*Math.sin(a*Math.PI/180),0],i:{x:[0.5],y:[0]},o:{x:[0.5],y:[1]}},{t:120,s:[256+80*Math.cos((a+360)*Math.PI/180),256+80*Math.sin((a+360)*Math.PI/180),0]}]}},shapes:[{ty:"gr",nm:`node-grp${i}`,it:[{ty:"el",p:{a:0,k:[256,256]},s:{a:0,k:[12,12]}},{ty:"fl",c:{a:0,k:[0.545,0.361,0.965,0.8]},o:{a:0,k:100}},{ty:"tr",p:{a:0,k:[256,256]},a:{a:0,k:[0,0]},s:{a:0,k:[100,100]},r:{a:0,k:0},o:{a:0,k:100}}]}]});} return layers; })()
+    ]
+  },
+
+  morph: {
+    v: "5.7.0", fr: 60, ip: 0, op: 60, w: 512, h: 512, nm: "Morph",
+    slots: { morphColor: { p: { a: 0, k: [0.925, 0.286, 0.6, 1] } } },
+    layers: [{
+      ty: 4, nm: "shape", ip: 0, op: 60, st: 0,
+      ks: { o: { a: 0, k: 100 }, r: { a: 1, k: [{ t: 0, s: [0] }, { t: 60, s: [360] }] }, a: { a: 0, k: [256, 256, 0] }, s: { a: 0, k: [100, 100, 100] }, p: { a: 0, k: [256, 256, 0] } },
+      shapes: [{
+        ty: "gr", nm: "morph-grp", it: [
+          { ty: "rc", p: { a: 0, k: [256, 256] }, s: { a: 1, k: [{ t: 0, s: [160, 160] }, { t: 30, s: [140, 140] }, { t: 60, s: [160, 160] }] }, r: { a: 1, k: [{ t: 0, s: [0] }, { t: 30, s: [80] }, { t: 60, s: [0] }] } },
+          { ty: "fl", c: { sid: "morphColor" }, o: { a: 0, k: 100 } },
+          { ty: "tr", p: { a: 0, k: [256, 256] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+        ]
+      }]
+    }]
+  },
+
+  warmth: {
+    v: "5.7.0", fr: 60, ip: 0, op: 90, w: 512, h: 512, nm: "Warmth",
+    slots: { warmthLevel: { p: { a: 0, k: 0.5 } } },
+    layers: [
+      { ty: 4, nm: "bg", ip: 0, op: 90, st: 0,
+        ks: { o: { a: 0, k: 100 }, r: { a: 0, k: 0 }, a: { a: 0, k: [0,0,0] }, s: { a: 0, k: [100,100,100] }, p: { a: 0, k: [256,256,0] } },
+        shapes: [{ ty: "gr", nm: "bg-grp", it: [
+          { ty: "rc", p: { a: 0, k: [0, 0] }, s: { a: 0, k: [512, 512] }, r: { a: 0, k: 0 } },
+          { ty: "fl", c: { a: 0, k: [0.031, 0, 0.071, 1] }, o: { a: 0, k: 100 } },
+          { ty: "tr", p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+        ]}]
+      },
+      { ty: 4, nm: "gauge-bg", ip: 0, op: 90, st: 0,
+        ks: { o: { a: 0, k: 30 }, r: { a: 0, k: 0 }, a: { a: 0, k: [0,0,0] }, s: { a: 0, k: [100,100,100] }, p: { a: 0, k: [256,256,0] } },
+        shapes: [{ ty: "gr", nm: "gauge-bg-grp", it: [
+          { ty: "rc", p: { a: 0, k: [56, 256] }, s: { a: 0, k: [40, 300] }, r: { a: 0, k: 20 } },
+          { ty: "fl", c: { a: 0, k: [0.2, 0.15, 0.3, 1] }, o: { a: 0, k: 100 } },
+          { ty: "tr", p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+        ]}]
+      },
+      { ty: 4, nm: "gauge-fill", ip: 0, op: 90, st: 0,
+        ks: { o: { a: 0, k: 80 }, r: { a: 0, k: 0 }, a: { a: 0, k: [0,0,0] }, s: { a: 1, k: [{ t: 0, s: [0, 100, 100], i: { x: [0.42], y: [0] }, o: { x: [0.58], y: [1] } }, { t: 45, s: [100, 100, 100], i: { x: [0.42], y: [0] }, o: { x: [0.58], y: [1] } }, { t: 90, s: [60, 100, 100] }] }, p: { a: 0, k: [256, 256, 0] } },
+        shapes: [{ ty: "gr", nm: "fill-grp", it: [
+          { ty: "rc", p: { a: 0, k: [256, 256] }, s: { a: 0, k: [32, 288] }, r: { a: 0, k: 16 } },
+          { ty: "fl", c: { a: 0, k: [0.961, 0.62, 0.043, 1] }, o: { a: 0, k: 100 } },
+          { ty: "tr", p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } }
+        ]}]
+      }
+    ]
+  }
+};
+
+// ── Player ─────────────────────────────────────────────────────
+
+let anim = null;
+let isPlaying = false;
+let isLoop = true;
+
+const container = document.getElementById('lottie-container');
+const info = { fps: document.getElementById('info-fps'), frames: document.getElementById('info-frames'), dur: document.getElementById('info-dur'), layers: document.getElementById('info-layers'), name: document.getElementById('info-name') };
+
+function loadAnimation(data) {
+  if (anim) { anim.destroy(); anim = null; }
+  document.getElementById('slot-controls').innerHTML = '';
+
+  anim = lottie.loadAnimation({
+    container,
+    renderer: 'svg',
+    loop: isLoop,
+    autoplay: false,
+    animationData: data
+  });
+
+  info.fps.textContent = data.fr || 60;
+  info.frames.textContent = data.op || 0;
+  info.dur.textContent = ((data.op || 0) / (data.fr || 60)).toFixed(1) + 's';
+  info.layers.textContent = (data.layers || []).length;
+  info.name.textContent = data.nm || '—';
+
+  // Slot controls
+  if (data.slots) {
+    const slotDiv = document.getElementById('slot-controls');
+    Object.entries(data.slots).forEach(([sid, slot]) => {
+      const val = slot.p.k;
+      const group = document.createElement('div');
+      group.className = 'slot-group';
+      const label = document.createElement('label');
+      label.textContent = sid;
+      group.appendChild(label);
+
+      if (Array.isArray(val) && val.length === 4) {
+        // Color picker
+        const picker = document.createElement('input');
+        picker.type = 'color';
+        const r = Math.round(val[0] * 255), g = Math.round(val[1] * 255), b = Math.round(val[2] * 255);
+        picker.value = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+        picker.addEventListener('input', () => {
+          if (anim) {
+            const hex = picker.value;
+            const r = parseInt(hex.slice(1,3),16)/255;
+            const g = parseInt(hex.slice(3,5),16)/255;
+            const b = parseInt(hex.slice(5,7),16)/255;
+            try { anim.renderer.elements.forEach(el => { if (el.slots && el.slots[sid] !== undefined) anim.renderer.elements.forEach(e => { try { e.slotValue(sid, [r,g,b,1]); } catch(e){} }); }); } catch(e) {}
+          }
+        });
+        group.appendChild(picker);
+      } else if (typeof val === 'number') {
+        const slider = document.createElement('input');
+        slider.type = 'range'; slider.min = 0; slider.max = 100; slider.step = 1; slider.value = val;
+        slider.addEventListener('input', () => {
+          // lottie-web doesn't natively support slots in all versions, but we try
+        });
+        group.appendChild(slider);
+      }
+      slotDiv.appendChild(group);
+    });
+  }
+
+  isPlaying = false;
+  document.getElementById('btn-play').textContent = '▶ Play';
+  anim.goToAndStop(0, true);
+}
+
+function togglePlay() {
+  if (!anim) return;
+  if (isPlaying) {
+    anim.pause();
+    document.getElementById('btn-play').textContent = '▶ Play';
+  } else {
+    anim.play();
+    document.getElementById('btn-play').textContent = '⏸ Pause';
+  }
+  isPlaying = !isPlaying;
+}
+
+// ── Controls ──────────────────────────────────────────────────
+
+document.getElementById('btn-play').addEventListener('click', togglePlay);
+
+document.getElementById('btn-loop').addEventListener('click', function() {
+  isLoop = !isLoop;
+  this.classList.toggle('active');
+  if (anim) anim.loop = isLoop;
+});
+
+document.getElementById('btn-stop').addEventListener('click', () => {
+  if (anim) { anim.goToAndStop(0, true); isPlaying = false; document.getElementById('btn-play').textContent = '▶ Play'; }
+});
+
+// ── Presets ───────────────────────────────────────────────────
+
+document.querySelectorAll('.preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const name = btn.dataset.preset;
+    if (PRESETS[name]) loadAnimation(JSON.parse(JSON.stringify(PRESETS[name])));
+  });
+});
+
+// ── Upload ────────────────────────────────────────────────────
+
+document.getElementById('upload').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      document.querySelectorAll('.preset').forEach(b => b.classList.remove('active'));
+      loadAnimation(data);
+    } catch(err) { alert('Invalid Lottie JSON: ' + err.message); }
+  };
+  reader.readAsText(file);
+  this.value = '';
+});
+
+// ── Init ──────────────────────────────────────────────────────
+
+loadAnimation(JSON.parse(JSON.stringify(PRESETS.pulse)));
+</script>
+</body>
+</html>

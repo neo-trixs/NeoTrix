@@ -1,0 +1,355 @@
+openapi: "3.0.3"
+info:
+  title: NeoTrix Web API
+  version: "0.18.0"
+  description: REST API for the NeoTrix self-evolving reasoning engine
+  contact:
+    email: security@neotrix.ai
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: http://localhost:8080
+    description: Default web UI port
+security:
+  - BearerAuth: []
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: API token from ~/.config/neotrix/config.toml or NEOTRIX_API_TOKEN env var
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+    BrainStats:
+      type: object
+      properties:
+        iteration: { type: integer }
+        absorb_count: { type: integer }
+        capability_sum: { type: number }
+        memory_count: { type: integer }
+        engine_active: { type: boolean }
+        capability_vector: { type: array, items: { type: number } }
+    SessionInfo:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        message_count: { type: integer }
+        created: { type: integer }
+    AgentStatus:
+      type: object
+      properties:
+        running: { type: boolean }
+        current_task: { type: string, nullable: true }
+        uptime_secs: { type: integer }
+    DiffBlock:
+      type: object
+      properties:
+        type: { type: string }
+        content: { type: string }
+        line_start: { type: integer }
+    FileNode:
+      type: object
+      properties:
+        name: { type: string }
+        path: { type: string }
+        is_dir: { type: boolean }
+        children: { type: array, items: { "$ref": "#/components/schemas/FileNode" } }
+    ProjectInfo:
+      type: object
+      properties:
+        name: { type: string }
+        path: { type: string }
+        language: { type: string }
+        file_count: { type: integer }
+    ProviderConfig:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        model: { type: string }
+        api_key: { type: string }
+        base_url: { type: string }
+        learning_rate: { type: number }
+paths:
+  /api/brain/stats:
+    get:
+      summary: Get brain statistics
+      responses:
+        "200":
+          description: Current brain stats
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/BrainStats"
+  /api/brain/absorb:
+    post:
+      summary: Absorb a knowledge source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source: { type: string }
+      responses:
+        "200":
+          description: Absorption result
+  /api/brain/knowledge/search:
+    get:
+      summary: Search knowledge base
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Search results
+  /api/brain/reason:
+    post:
+      summary: Run reasoning engine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt: { type: string }
+      responses:
+        "200":
+          description: Reasoning result
+  /api/sessions:
+    get:
+      summary: List all sessions
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/SessionInfo"
+    post:
+      summary: Create a new session
+      responses:
+        "201":
+          description: Session created
+  /api/sessions/{id}:
+    delete:
+      summary: Delete a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session deleted
+  /api/sessions/{id}/switch:
+    post:
+      summary: Switch to a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session switched
+  /api/sessions/{id}/fork:
+    post:
+      summary: Fork a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Session forked
+  /api/sessions/{id}/export:
+    get:
+      summary: Export a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Exported session JSON
+  /api/sessions/import:
+    post:
+      summary: Import a session
+      responses:
+        "200":
+          description: Session imported
+  /api/agent/status:
+    get:
+      summary: Get agent status
+      responses:
+        "200":
+          description: Agent status
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AgentStatus"
+  /api/agent/start:
+    post:
+      summary: Start the agent
+      responses:
+        "200":
+          description: Agent started
+  /api/agent/stop:
+    post:
+      summary: Stop the agent
+      responses:
+        "200":
+          description: Agent stopped
+  /api/agent/reason-stream:
+    get:
+      summary: Stream reasoning output (SSE)
+      responses:
+        "200":
+          description: SSE stream of tokens
+  /api/project/tree:
+    get:
+      summary: Get project file tree
+      parameters:
+        - name: path
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: File tree
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/FileNode"
+  /api/project/file:
+    get:
+      summary: Read a file
+      parameters:
+        - name: path
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: File content
+    post:
+      summary: Write a file
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path: { type: string }
+                content: { type: string }
+      responses:
+        "200":
+          description: File written
+  /api/project/detect:
+    get:
+      summary: Detect project type
+      parameters:
+        - name: path
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Project info
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ProjectInfo"
+  /api/diff/staged:
+    get:
+      summary: Get staged diff
+      responses:
+        "200":
+          description: Diff blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "#/components/schemas/DiffBlock"
+  /api/diff/unstaged:
+    get:
+      summary: Get unstaged diff
+      responses:
+        "200":
+          description: Diff blocks
+  /api/diff/file:
+    get:
+      summary: Get diff for a file
+      parameters:
+        - name: path
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Diff blocks
+  /api/permissions/pending:
+    get:
+      summary: List pending permission requests
+      responses:
+        "200":
+          description: Pending permissions
+  /api/permissions/request:
+    post:
+      summary: Create a permission request
+      responses:
+        "200":
+          description: Permission request created
+  /api/permissions/{id}/approve:
+    post:
+      summary: Approve a permission request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Permission approved
+  /api/permissions/{id}/deny:
+    post:
+      summary: Deny a permission request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Permission denied
+  /api/mcp/test-provider:
+    post:
+      summary: Test provider connection
+      responses:
+        "200":
+          description: Connection test result
+  /api/mcp/save-provider:
+    post:
+      summary: Save provider config
+      responses:
+        "200":
+          description: Provider saved
+  /api/mcp/command:
+    post:
+      summary: Execute CLI command via API
+      responses:
+        "200":
+          description: Command result

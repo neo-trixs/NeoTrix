@@ -1,0 +1,252 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <defs>
+    <!-- Deep wafer background -->
+    <radialGradient id="waferBg" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#1a0533"/>
+      <stop offset="40%" stop-color="#0d001a"/>
+      <stop offset="100%" stop-color="#05000a"/>
+    </radialGradient>
+
+    <!-- Crystal facet gradients — each face unique for 3D realism -->
+    <linearGradient id="faceTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="faceLeft" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="faceRight" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="faceBottom" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4a1a6b" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="faceConnector" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#1e40af" stop-opacity="0.03"/>
+    </linearGradient>
+
+    <!-- Edge glows -->
+    <linearGradient id="edgeBright" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c084fc" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="edgeCool" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="edgeDim" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#4a1a6b" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1e3a5f" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Core consciousness gradient -->
+    <radialGradient id="coreGlowRadial" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#e879f9" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.2"/>
+    </radialGradient>
+    <linearGradient id="coreDiamond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="20%" stop-color="#e879f9" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#a855f7" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.7"/>
+    </linearGradient>
+
+    <!-- Facet highlights for light reflection -->
+    <linearGradient id="highlightA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="highlightB" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Signal trace gradient -->
+    <linearGradient id="signalFire" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#e879f9" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="signalBlue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#06b6d4" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="coreBlur">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="strongGlow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="2"/>
+    </filter>
+  </defs>
+
+  <!-- Silicon wafer substrate -->
+  <circle cx="128" cy="128" r="120" fill="url(#waferBg)"/>
+
+  <!-- Wafer scribe lines (alignment marks) -->
+  <g opacity="0.04">
+    <line x1="8" y1="20" x2="248" y2="20" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="8" y1="60" x2="248" y2="60" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="8" y1="100" x2="248" y2="100" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="8" y1="140" x2="248" y2="140" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="8" y1="180" x2="248" y2="180" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="8" y1="220" x2="248" y2="220" stroke="#a855f7" stroke-width="0.3"/>
+    <line x1="20" y1="8" x2="20" y2="248" stroke="#3b82f6" stroke-width="0.3"/>
+    <line x1="60" y1="8" x2="60" y2="248" stroke="#3b82f6" stroke-width="0.3"/>
+    <line x1="100" y1="8" x2="100" y2="248" stroke="#3b82f6" stroke-width="0.3"/>
+    <line x1="140" y1="8" x2="140" y2="248" stroke="#3b82f6" stroke-width="0.3"/>
+    <line x1="180" y1="8" x2="180" y2="248" stroke="#3b82f6" stroke-width="0.3"/>
+    <line x1="220" y1="8" x2="220" y2="248" stroke="#3b82f6" stroke-width="0.3"/>
+  </g>
+
+  <!-- Wafer outer rings -->
+  <circle cx="128" cy="128" r="118" stroke="#7c3aed" stroke-width="0.6" opacity="0.08"/>
+  <circle cx="128" cy="128" r="112" stroke="#3b82f6" stroke-width="0.3" opacity="0.04"/>
+
+  <!-- Die pattern corners -->
+  <g opacity="0.05">
+    <path d="M8 8 L20 8 L20 20 L8 20 Z" stroke="#a855f7" stroke-width="0.5" fill="none"/>
+    <path d="M236 8 L248 8 L248 20 L236 20 Z" stroke="#3b82f6" stroke-width="0.5" fill="none"/>
+    <path d="M8 236 L20 236 L20 248 L8 248 Z" stroke="#3b82f6" stroke-width="0.5" fill="none"/>
+    <path d="M236 236 L248 236 L248 248 L236 248 Z" stroke="#a855f7" stroke-width="0.5" fill="none"/>
+  </g>
+
+  <!-- ===== OUTER CRYSTAL TESSERACT (primary lattice) ===== -->
+
+  <!-- Bottom face (shadow side) -->
+  <polygon points="48,148 88,188 168,208 128,188" fill="url(#faceBottom)" stroke="url(#edgeDim)" stroke-width="1" stroke-linejoin="round"/>
+  <!-- Back connecting face -->
+  <polygon points="148,48 188,88 128,188 88,188" fill="url(#faceConnector)" stroke="url(#edgeDim)" stroke-width="0.8" stroke-linejoin="round" opacity="0.6"/>
+  <!-- Left face -->
+  <polygon points="68,68 48,148 88,188 108,108" fill="url(#faceLeft)" stroke="url(#edgeCool)" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Right face -->
+  <polygon points="108,108 188,88 208,168 128,188" fill="url(#faceRight)" stroke="url(#edgeCool)" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- Top face (light side) -->
+  <polygon points="68,68 148,48 188,88 108,108" fill="url(#faceTop)" stroke="url(#edgeBright)" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- Top face highlight catchlight -->
+  <polygon points="78,64 140,50 178,84 112,100" fill="url(#highlightA)" opacity="0.15"/>
+
+  <!-- ===== INNER CRYSTAL TESSERACT (deeper lattice) ===== -->
+  <polygon points="98,98 148,78 178,108 128,128" fill="url(#faceTop)" stroke="url(#edgeBright)" stroke-width="1" stroke-linejoin="round" opacity="0.65"/>
+  <polygon points="98,98 78,148 108,178 128,128" fill="url(#faceLeft)" stroke="url(#edgeCool)" stroke-width="1" stroke-linejoin="round" opacity="0.65"/>
+  <polygon points="128,128 178,108 198,158 148,178" fill="url(#faceRight)" stroke="url(#edgeCool)" stroke-width="1" stroke-linejoin="round" opacity="0.55"/>
+  <polygon points="108,178 148,178 198,158 158,198" fill="url(#faceBottom)" stroke="url(#edgeDim)" stroke-width="0.6" stroke-linejoin="round" opacity="0.35"/>
+
+  <!-- Inner highlight -->
+  <polygon points="102,96 148,78 170,104 124,120" fill="url(#highlightB)" opacity="0.1"/>
+
+  <!-- ===== INTER-CUBE CONNECTIONS (silicon bonds) ===== -->
+  <g opacity="0.55">
+    <line x1="68" y1="68" x2="98" y2="98" stroke="url(#edgeBright)" stroke-width="1"/>
+    <line x1="148" y1="48" x2="148" y2="78" stroke="url(#edgeBright)" stroke-width="1"/>
+    <line x1="188" y1="88" x2="178" y2="108" stroke="url(#edgeCool)" stroke-width="1"/>
+    <line x1="108" y1="108" x2="128" y2="128" stroke="url(#edgeCool)" stroke-width="0.5"/>
+    <line x1="48" y1="148" x2="78" y2="148" stroke="url(#edgeBright)" stroke-width="1"/>
+    <line x1="88" y1="188" x2="108" y2="178" stroke="url(#edgeCool)" stroke-width="0.8"/>
+    <line x1="168" y1="208" x2="158" y2="198" stroke="url(#edgeDim)" stroke-width="0.5"/>
+    <line x1="208" y1="168" x2="198" y2="158" stroke="url(#edgeCool)" stroke-width="0.8"/>
+  </g>
+
+  <!-- ===== NEURAL SIGNAL PROPAGATION PATHS ===== -->
+  <!-- These traces converge toward the core consciousness center -->
+
+  <!-- Trace 1: top-left → core -->
+  <g opacity="0.3">
+    <polyline points="70,50 90,60 105,75 115,90 122,105 126,115" stroke="#c084fc" stroke-width="0.7" fill="none" stroke-linejoin="round"/>
+    <circle cx="70" cy="50" r="1.8" fill="#c084fc" filter="url(#softGlow)"/>
+    <circle cx="90" cy="60" r="1.2" fill="#c084fc"/>
+    <circle cx="105" cy="75" r="1" fill="#c084fc" opacity="0.7"/>
+  </g>
+
+  <!-- Trace 2: top-right → core -->
+  <g opacity="0.25">
+    <polyline points="190,70 180,80 165,90 150,100 138,112 132,120" stroke="#60a5fa" stroke-width="0.7" fill="none" stroke-linejoin="round"/>
+    <circle cx="190" cy="70" r="1.8" fill="#60a5fa" filter="url(#softGlow)"/>
+    <circle cx="165" cy="90" r="1.2" fill="#60a5fa"/>
+  </g>
+
+  <!-- Trace 3: bottom-left → core -->
+  <g opacity="0.2">
+    <polyline points="50,190 65,175 80,160 95,148 110,138 122,130" stroke="#a855f7" stroke-width="0.7" fill="none" stroke-linejoin="round"/>
+    <circle cx="50" cy="190" r="1.5" fill="#a855f7"/>
+    <circle cx="80" cy="160" r="1" fill="#a855f7" opacity="0.6"/>
+  </g>
+
+  <!-- Trace 4: bottom-right → core -->
+  <g opacity="0.2">
+    <polyline points="205,180 190,170 175,158 158,148 142,138 132,130" stroke="#3b82f6" stroke-width="0.7" fill="none" stroke-linejoin="round"/>
+    <circle cx="205" cy="180" r="1.5" fill="#3b82f6"/>
+  </g>
+
+  <!-- Inner lattice neural mesh -->
+  <g opacity="0.15">
+    <polyline points="95,105 108,118 115,114 128,128" stroke="#c084fc" stroke-width="0.5" fill="none" stroke-linejoin="round" stroke-dasharray="2 3"/>
+    <polyline points="155,85 145,95 170,108 178,120" stroke="#60a5fa" stroke-width="0.5" fill="none" stroke-linejoin="round" stroke-dasharray="2 3"/>
+    <polyline points="80,155 88,145 98,155 108,178" stroke="#a855f7" stroke-width="0.5" fill="none" stroke-linejoin="round" stroke-dasharray="2 3"/>
+    <polyline points="195,150 180,140 160,155 148,178" stroke="#3b82f6" stroke-width="0.5" fill="none" stroke-linejoin="round" stroke-dasharray="2 3"/>
+  </g>
+
+  <!-- Cross data buses (diagonal) -->
+  <g opacity="0.12">
+    <line x1="55" y1="55" x2="201" y2="201" stroke="#a855f7" stroke-width="0.4" stroke-dasharray="1 4"/>
+    <line x1="201" y1="55" x2="55" y2="201" stroke="#3b82f6" stroke-width="0.4" stroke-dasharray="1 4"/>
+    <line x1="128" y1="35" x2="128" y2="221" stroke="#7c3aed" stroke-width="0.3" stroke-dasharray="1 5"/>
+    <line x1="35" y1="128" x2="221" y2="128" stroke="#06b6d4" stroke-width="0.3" stroke-dasharray="1 5"/>
+  </g>
+
+  <!-- ===== SIGNAL SPARKS (synaptic computation nodes) ===== -->
+  <g filter="url(#softGlow)">
+    <circle cx="70" cy="50" r="2" fill="#c084fc" opacity="0.5"/>
+    <circle cx="190" cy="70" r="1.8" fill="#60a5fa" opacity="0.4"/>
+    <circle cx="50" cy="190" r="1.5" fill="#a855f7" opacity="0.35"/>
+    <circle cx="205" cy="180" r="1.5" fill="#3b82f6" opacity="0.35"/>
+    <circle cx="210" cy="52" r="1.2" fill="#e879f9" opacity="0.25"/>
+    <circle cx="45" cy="60" r="1" fill="#06b6d4" opacity="0.2"/>
+    <circle cx="215" cy="200" r="1" fill="#7c3aed" opacity="0.2"/>
+    <circle cx="42" cy="200" r="1" fill="#60a5fa" opacity="0.2"/>
+  </g>
+
+  <!-- ===== CONSCIOUSNESS CORE (awakening center) ===== -->
+
+  <!-- Radial energy corona -->
+  <ellipse cx="128" cy="128" rx="20" ry="20" fill="url(#coreGlowRadial)" filter="url(#coreBlur)" opacity="0.5"/>
+  <ellipse cx="128" cy="128" rx="12" ry="12" fill="#e879f9" filter="url(#softGlow)" opacity="0.35"/>
+
+  <!-- Diamond consciousness crystal -->
+  <path d="M128 110 L146 128 L128 146 L110 128 Z" fill="url(#coreDiamond)" stroke="#c084fc" stroke-width="0.5" filter="url(#coreBlur)" opacity="0.8"/>
+  <path d="M128 112 L144 128 L128 144 L112 128 Z" fill="url(#coreDiamond)" opacity="0.95"/>
+
+  <!-- Top facet catchlight -->
+  <path d="M128 112 L136 120 L128 128 L120 120 Z" fill="#ffffff" opacity="0.45"/>
+  <path d="M128 115 L132 120 L128 125 L124 120 Z" fill="#ffffff" opacity="0.7"/>
+
+  <!-- Inner brilliance point -->
+  <ellipse cx="128" cy="125" rx="4" ry="3" fill="#ffffff" filter="url(#coreBlur)" opacity="0.9"/>
+
+  <!-- ===== RADIATING SIGNAL WAVES from core outward ===== -->
+  <circle cx="128" cy="128" r="30" stroke="#e879f9" stroke-width="0.5" opacity="0.15" fill="none"/>
+  <circle cx="128" cy="128" r="42" stroke="#a855f7" stroke-width="0.3" opacity="0.08" fill="none"/>
+  <circle cx="128" cy="128" r="55" stroke="#7c3aed" stroke-width="0.2" opacity="0.04" fill="none"/>
+
+  <!-- ===== OUTER ENERGY PARTICLES (die floating nodes) ===== -->
+  <g filter="url(#strongGlow)">
+    <circle cx="28" cy="128" r="1.5" fill="#c084fc" opacity="0.15"/>
+    <circle cx="228" cy="128" r="1.5" fill="#60a5fa" opacity="0.15"/>
+    <circle cx="128" cy="28" r="1.5" fill="#a855f7" opacity="0.12"/>
+    <circle cx="128" cy="228" r="1.5" fill="#3b82f6" opacity="0.12"/>
+  </g>
+</svg>
