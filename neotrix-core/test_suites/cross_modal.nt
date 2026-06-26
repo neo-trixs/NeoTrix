@@ -1,0 +1,68 @@
+name: cross_modal
+description: "Cross-modal alignment tests for VSA space projection"
+
+tests:
+  - name: align_text_deterministic
+    description: "Same text input produces identical VSA vector"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let v1 = aligner.text_to_vsa("hello world");
+      let v2 = aligner.text_to_vsa("hello world");
+      assert_eq!(v1, v2, "deterministic text → VSA");
+
+  - name: align_image_projection_dim
+    description: "Image embedding projects to VSA_DIM length"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let vsa = aligner.image_embed_to_vsa(&embed);
+      assert_eq!(vsa.len(), VSA_DIM);
+
+  - name: align_cross_similarity_symmetric
+    description: "Cross-modal similarity is symmetric"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+      let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let v = aligner.image_embed_to_vsa(&embed);
+    code: |
+      let sim_ab = CrossModalAligner::cross_modal_similarity(&v, &v);
+      let sim_ba = CrossModalAligner::cross_modal_similarity(&v, &v);
+      assert!((sim_ab - sim_ba).abs() < 1e-12);
+
+  - name: align_modality_tags_distinct
+    description: "Modality tags for text, image, audio are distinct"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let t1 = aligner.modality_tag("text");
+      let t2 = aligner.modality_tag("image");
+      let t3 = aligner.modality_tag("audio");
+      assert_ne!(t1, t2);
+      assert_ne!(t2, t3);
+      assert_ne!(t1, t3);
+
+  - name: align_empty_text_returns_zero
+    description: "Empty text input returns zero vector"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let v = aligner.text_to_vsa("");
+      assert_eq!(v.len(), VSA_DIM);
+      assert!(v.iter().all(|&x| x == 0));

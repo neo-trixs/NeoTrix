@@ -1,0 +1,17 @@
+[package]
+name = "nt-migrate"
+version.workspace = true
+edition = "2021"
+
+[[bin]]
+name = "nt-migrate"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+anyhow = "1"
+walkdir = "2"
+syn = { version = "2", features = ["full"] }
+quote = "1"
+log = "0.4"

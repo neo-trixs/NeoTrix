@@ -1,0 +1,67 @@
+name: core_consciousness_first_person_ref
+description: "FirstPersonRef self-identity anchor tests"
+
+tests:
+  - name: bootstrap_creates_reference
+    description: "bootstrap creates a 4096-dim self vector tagged as Self"
+    imports:
+      - "neotrix::core::nt_core_consciousness::first_person_ref::FirstPersonRef"
+    code: |
+      let fpr = FirstPersonRef::bootstrap(0);
+      assert_eq!(fpr.self_vector().len(), 4096);
+      assert!(fpr.birth_step() == 0);
+      assert!(fpr.self_tagged().is_self());
+
+  - name: self_coherence_high_for_self
+    description: "coherence_with self_vector returns ~1.0"
+    imports:
+      - "neotrix::core::nt_core_consciousness::first_person_ref::FirstPersonRef"
+    code: |
+      let fpr = FirstPersonRef::bootstrap(0);
+      let coherence = fpr.coherence_with(fpr.self_vector());
+      assert!((coherence - 1.0).abs() < 1e-10);
+
+  - name: is_self_coherent_validates_tag
+    description: "is_self_coherent returns false for world-tagged vectors"
+    imports:
+      - "neotrix::core::nt_core_consciousness::first_person_ref::FirstPersonRef"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaWorldCategory"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let fpr = FirstPersonRef::bootstrap(0);
+      let world_tagged = VsaTagged::new(
+          QuantizedVSA::random_binary(),
+          VsaOrigin::World(VsaWorldCategory::UserInput),
+      );
+      assert!(!fpr.is_self_coherent(&world_tagged));
+
+  - name: evolve_self_updates_threshold
+    description: "evolve_self records coherence (verified via average_coherence)"
+    imports:
+      - "neotrix::core::nt_core_consciousness::first_person_ref::FirstPersonRef"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let mut fpr = FirstPersonRef::bootstrap(0);
+      let other = QuantizedVSA::random_binary();
+      fpr.evolve_self(&other, 1);
+      assert!(fpr.average_coherence() > 0.0);
+
+  - name: average_coherence_tracks
+    description: "record_coherence updates average_coherence correctly"
+    imports:
+      - "neotrix::core::nt_core_consciousness::first_person_ref::FirstPersonRef"
+    code: |
+      let mut fpr = FirstPersonRef::bootstrap(0);
+      fpr.record_coherence(0.8);
+      fpr.record_coherence(0.9);
+      assert!((fpr.average_coherence() - 0.85).abs() < 1e-9);
+
+  - name: empty_coherence_returns_zero
+    description: "average_coherence returns 0 for empty history"
+    imports:
+      - "neotrix::core::nt_core_consciousness::first_person_ref::FirstPersonRef"
+    code: |
+      let fpr = FirstPersonRef::bootstrap(0);
+      assert!((fpr.average_coherence() - 0.0).abs() < 1e-9);

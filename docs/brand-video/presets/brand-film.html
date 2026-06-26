@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NeoTrix — Brand Film</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#080012;display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;color:#e0d0f0;font-family:system-ui,sans-serif}
+  canvas{display:block;width:100vw;height:100vh}
+</style></head>
+<body><canvas id="c"></canvas>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');let W,H;
+function resize(){W=c.width=c.clientWidth*devicePixelRatio;H=c.height=c.clientHeight*devicePixelRatio}
+resize();window.addEventListener('resize',resize);
+
+// 4D tesseract vertices
+const v4=[];for(let i=0;i<16;i++)v4.push([(i&1)?1:-1,(i&2)?1:-1,(i&4)?1:-1,(i&8)?1:-1]);
+const ed=[];for(let i=0;i<16;i++)for(let d=0;d<4;d++){let j=i^(1<<d);if(i<j)ed.push([i,j])}
+
+function r4(v,a,[a1,a2]){let C=Math.cos(a),S=Math.sin(a),r=[...v];r[a1]=v[a1]*C-v[a2]*S;r[a2]=v[a1]*S+v[a2]*C;return r}
+function pr(v,w,cam,s,cx,cy){let w2=w/(w+v[3]),v3=[v[0]*w2,v[1]*w2,v[2]*w2],s2=cam/(cam+v3[2]);return{x:v3[0]*s2*s+cx,y:v3[1]*s2*s+cy,z:s2}}
+
+const particles=[];
+for(let i=0;i<50;i++)particles.push({a:Math.random()*6.28,r:80+Math.random()*200,sp:0.1+Math.random()*0.3,sz:0.5+Math.random()*1.5,ph:Math.random()*6.28,h:260+Math.random()*60});
+
+function eoc(t){return 1-Math.pow(1-t,3)}
+function eio(t){return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2}
+
+// Scene definitions
+const scenes=[
+  {start:0, dur:4, name:'logo'},     // Crystal logo rotating
+  {start:4, dur:3, name:'matrix'},   // E8 matrix burst
+  {start:7, dur:3, name:'reveal'},   // Architecture pipeline
+  {start:10,dur:4, name:'finale'},   // Brand title card
+];
+
+function dr(t){
+  let Ww=c.width/devicePixelRatio,Hh=c.height/devicePixelRatio;
+  x.clearRect(0,0,Ww,Hh);
+  let cx=Ww/2,cy=Hh/2,baseS=Math.min(Ww,Hh)/5.5;
+  let sceneIdx=-1,sceneT=0;
+  for(let i=0;i<scenes.length;i++){if(t>=scenes[i].start&&t<scenes[i].start+scenes[i].dur){sceneIdx=i;sceneT=(t-scenes[i].start)/scenes[i].dur;break}}
+  if(t>=scenes[3].start+scenes[3].dur){sceneIdx=3;sceneT=1}
+
+  const rot=t*0.2;
+  let rv=v4.map(v=>{let r=r4(v,rot,[0,1]);r=r4(r,rot*.6,[0,2]);r=r4(r,rot*.4,[0,3]);r=r4(r,rot*.2,[1,2]);r=r4(r,rot*.3,[1,3]);r=r4(r,rot*.1,[2,3]);return r});
+  let pj=rv.map(v=>pr(v,3,4.5,baseS,cx,cy));
+
+  // === SCENE 0: Crystal Logo ===
+  if(sceneIdx===0){
+    let sp=eoc(sceneT);
+    let sc=baseS*(0.3+1.7*sp);
+    let pj2=rv.map(v=>pr(v,3,4.5,sc,cx,cy));
+
+    // Faces
+    let fc=[];
+    for(let d=0;d<4;d++)for(let s=-1;s<=1;s+=2){let f=[];for(let i=0;i<16;i++)if(((i>>d)&1)===(s===1?1:0))f.push(i);if(f.length===8)fc.push(f)}
+    fc.forEach((f,i)=>{
+      let p=f.map(j=>pj2[j]);let a=0.04+0.05*Math.sin(t+i);
+      x.beginPath();x.moveTo(p[0].x,p[0].y);
+      for(let j=1;j<p.length;j++)x.lineTo(p[j].x,p[j].y);
+      x.closePath();
+      let cl=['rgba(192,132,252,','rgba(59,130,246,','rgba(124,58,237,','rgba(6,182,212,'];
+      x.fillStyle=cl[i%4]+(a*sp)+')';x.fill();
+      x.strokeStyle=cl[i%4]+((a*2+0.02)*sp)+')';x.lineWidth=.5;x.stroke();
+    });
+    ed.forEach(([i,j])=>{
+      let p1=pj2[i],p2=pj2[j];let a=Math.max(0.05,(p1.z+p2.z)/2+0.2)*sp;
+      x.strokeStyle=`rgba(168,85,247,${a})`;x.lineWidth=.6+p1.z*.4;
+      x.beginPath();x.moveTo(p1.x,p1.y);x.lineTo(p2.x,p2.y);x.stroke();
+    });
+
+    // Core
+    let pulse=0.6+0.4*Math.sin(t*1.5);
+    let g=x.createRadialGradient(cx,cy,0,cx,cy,20*pulse);
+    g.addColorStop(0,`rgba(232,121,249,${0.12*pulse})`);g.addColorStop(1,'rgba(232,121,249,0)');
+    x.fillStyle=g;x.fillRect(cx-25,cy-25,50,50);
+    let cs=(4+2*Math.sin(t*2))*sp;if(cs>.5){
+      x.beginPath();x.moveTo(cx,cy-cs);x.lineTo(cx+cs*.7,cy);x.lineTo(cx,cy+cs);x.lineTo(cx-cs*.7,cy);x.closePath();
+      let g2=x.createLinearGradient(cx-cs,cy-cs,cx+cs,cy+cs);
+      g2.addColorStop(0,'#fff');g2.addColorStop(0.4,'#e879f9');g2.addColorStop(1,'#3b82f6');x.fillStyle=g2;x.fill();
+    }
+
+    // Particles
+    particles.forEach(p=>{
+      let ang=p.a+t*p.sp,r=p.r+10*Math.sin(t*p.sp*.5+p.ph),px=cx+Math.cos(ang)*r,py=cy+Math.sin(ang)*r;
+      let a=(0.1+0.3*Math.sin(t*p.sp+p.ph))*sp;if(a>.02){x.beginPath();x.arc(px,py,p.sz*sp,0,6.28);x.fillStyle=`hsla(${p.h},80%,70%,${a})`;x.fill()}
+    });
+  }
+
+  // === SCENE 1: E8 Matrix Burst ===
+  if(sceneIdx===1){
+    let sp=eoc(sceneT);
+    // Crystal shrinks slightly, matrix grid expands
+    let sc=baseS*(1.6-0.6*sp);
+    let pj2=rv.map(v=>pr(v,3,4.5,sc,cx,cy));
+
+    // Semi-transparent crystal overlay
+    ed.forEach(([i,j])=>{
+      let p1=pj2[i],p2=pj2[j];
+      let a=(0.05+0.1*Math.sin(t*0.5+i))*eio(1-sp);
+      x.strokeStyle=`rgba(168,85,247,${a})`;x.lineWidth=.5;
+      x.beginPath();x.moveTo(p1.x,p1.y);x.lineTo(p2.x,p2.y);x.stroke();
+    });
+
+    // Matrix grid burst
+    let gridS=20+60*sp;
+    let gridAlpha=0.3*sp;
+    x.strokeStyle=`rgba(139,92,246,${gridAlpha})`;
+    x.lineWidth=.5;
+    for(let row=-6;row<=6;row++){
+      for(let col=-6;col<=6;col++){
+        let gx=cx+col*gridS,gy=cy+row*gridS;
+        if(Math.abs(col)<=1&&Math.abs(row)<=1)continue;
+        let dist=Math.sqrt(col*col+row*row);
+        let da=gridAlpha*Math.max(0,1-dist/8);
+        x.fillStyle=`rgba(139,92,246,${da})`;
+        x.fillRect(gx-1,gy-1,2,2);
+      }
+    }
+
+    // Center core pulses
+    let pulse=0.5+0.5*Math.sin(t*2.5);
+    x.beginPath();x.arc(cx,cy,3+2*pulse,0,6.28);
+    x.fillStyle=`rgba(232,121,249,${0.5*pulse})`;x.fill();
+  }
+
+  // === SCENE 2: Architecture Pipeline ===
+  if(sceneIdx===2){
+    let sp=eoc(sceneT);
+    // Draw pipeline stages
+    let stages=['INPUT','E8','VSA','GWT','SEAL'];
+    let nStages=5,spacing=Math.min(Ww,Hh)/6,startX=cx-(nStages-1)*spacing/2;
+    let pipeAlpha=0.8*sp;
+
+    // Pipeline blocks
+    let colors=['#3b82f6','#8b5cf6','#22c55e','#f59e0b','#ec4899'];
+    let names=['Sensory','64-State','4096-Dim','Spotlight','Self-Edit'];
+    stages.forEach((s,i)=>{
+      let bx=startX+i*spacing,by=cy-50,bw=70,bh=100;
+      let phase=Math.max(0,Math.min(1,(sp-i*0.15)));
+      if(phase<=0)return;
+      let pa=eoc(phase)*pipeAlpha;
+      x.fillStyle=colors[i].replace(')',`${0.15*pa})`).replace('#','rgba(')+')';
+      // Handle hex properly
+      let hex=colors[i];let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+      x.fillStyle=`rgba(${r},${g},${b},${0.15*pa})`;
+      x.strokeStyle=`rgba(${r},${g},${b},${0.6*pa})`;
+      x.lineWidth=1.2;
+      // Crystal facet look - angled top
+      x.beginPath();
+      x.moveTo(bx,by);x.lineTo(bx+bw,by-10);x.lineTo(bx+bw+5,by+bh);x.lineTo(bx-5,by+bh+10);x.closePath();
+      x.fill();x.stroke();
+
+      x.fillStyle=`rgba(${r},${g},${b},${0.8*pa})`;
+      x.font='600 10px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';
+      x.fillText(s,bx+bw/2,by+bh*0.3);
+      x.fillStyle=`rgba(${r+80},${g+80},${b+80},${0.5*pa})`;
+      x.font='8px system-ui,sans-serif';
+      x.fillText(names[i],bx+bw/2,by+bh*0.55);
+    });
+  }
+
+  // === SCENE 3: Finale ===
+  if(sceneIdx>=3){
+    let sp=sceneIdx===3?eoc(sceneT):1;
+    let sc=baseS*(1.5-0.3*sp);
+    let pj2=rv.map(v=>pr(v,3,4.5,sc,cx,cy));
+
+    // Crystal as background element
+    ed.forEach(([i,j])=>{
+      let p1=pj2[i],p2=pj2[j];
+      let a=Math.max(0.03,(p1.z+p2.z)/2+0.1)*0.5;
+      x.strokeStyle=`rgba(168,85,247,${a})`;x.lineWidth=.5;
+      x.beginPath();x.moveTo(p1.x,p1.y);x.lineTo(p2.x,p2.y);x.stroke();
+    });
+
+    // Center core
+    let pulse=0.6+0.4*Math.sin(t*1.5);
+    x.beginPath();x.moveTo(cx,cy-6*pulse);x.lineTo(cx+4*pulse,cy);x.lineTo(cx,cy+6*pulse);x.lineTo(cx-4*pulse,cy);x.closePath();
+    let g2=x.createLinearGradient(cx-4,cy-6,cx+4,cy+6);
+    g2.addColorStop(0,'#fff');g2.addColorStop(0.4,'#e879f9');g2.addColorStop(1,'#3b82f6');
+    x.fillStyle=g2;x.fill();
+
+    // Text
+    x.textAlign='center';x.textBaseline='middle';x.globalAlpha=sp;
+    x.font='600 44px system-ui, sans-serif';
+    x.fillStyle='#c084fc';x.fillText('NEOTRIX',cx,cy-20);
+    x.font='16px system-ui, sans-serif';x.fillStyle='#8870aa';
+    x.fillText('The Agent That Learns to Think',cx,cy+30);
+    x.font='11px system-ui, sans-serif';x.fillStyle='#66508a';
+    x.fillText('Silicon Lattice · E8 Reasoning · VSA Memory · SEAL Evolution',cx,cy+58);
+    x.globalAlpha=1;
+  }
+}
+function loop(t){dr(t/1000);requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script></body></html>

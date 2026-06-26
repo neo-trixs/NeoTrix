@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NeoTrix — Awakening</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#080012;display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh}
+</style></head>
+<body><canvas id="c"></canvas>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');let W,H;
+function resize(){W=c.width=c.clientWidth*devicePixelRatio;H=c.height=c.clientHeight*devicePixelRatio}
+resize();window.addEventListener('resize',resize);
+
+// 4D tesseract
+const v4=[];for(let i=0;i<16;i++)v4.push([(i&1)?1:-1,(i&2)?1:-1,(i&4)?1:-1,(i&8)?1:-1]);
+const ed=[];for(let i=0;i<16;i++)for(let d=0;d<4;d++){let j=i^(1<<d);if(i<j)ed.push([i,j])}
+
+function r4(v,a,[a1,a2]){let C=Math.cos(a),S=Math.sin(a),r=[...v];r[a1]=v[a1]*C-v[a2]*S;r[a2]=v[a1]*S+v[a2]*C;return r}
+function pr(v,w,cam,s,cx,cy){let w2=w/(w+v[3]),v3=[v[0]*w2,v[1]*w2,v[2]*w2],s2=cam/(cam+v3[2]);return{x:v3[0]*s2*s+cx,y:v3[1]*s2*s+cy,z:s2}}
+
+// Signal paths - specific edges from outer to inner
+const sigPaths=[
+  [0,3],[3,2],[2,1],[1,0],
+  [4,7],[7,6],[6,5],[5,4],
+  [0,4],[1,5],[2,6],[3,7],
+  [8,9],[10,11],[12,13],[14,15],
+  [0,8],[1,9],[2,10],[3,11],
+  [4,12],[5,13],[6,14],[7,15],
+];
+
+function eoc(t){return 1-Math.pow(1-t,3)}
+
+function dr(t){
+  let Ww=c.width/devicePixelRatio,Hh=c.height/devicePixelRatio;
+  x.clearRect(0,0,Ww,Hh);
+  let cx=Ww/2,cy=Hh/2,baseS=Math.min(Ww,Hh)/5.5,dur=10,prog=Math.min(1,(t%14)/dur);
+
+  // Phase 0: core ignition (0-0.3)
+  // Phase 1: signal propagation (0.3-0.6)
+  // Phase 2: full crystal emerge + rotate (0.6-1.0)
+  const phase0=Math.min(1,prog/0.3);
+  const phase1=Math.max(0,Math.min(1,(prog-0.25)/0.35));
+  const phase2=Math.max(0,Math.min(1,(prog-0.55)/0.45));
+
+  const rot=t*0.25*phase2;
+  const sc=baseS*(0.3+1.7*eoc(phase2));
+
+  // 4D rotate
+  let rv=v4.map(v=>{let r=r4(v,rot,[0,1]);r=r4(r,rot*.6,[0,2]);r=r4(r,rot*.4,[0,3]);r=r4(r,rot*.2,[1,2]);r=r4(r,rot*.3,[1,3]);r=r4(r,rot*.1,[2,3]);return r});
+  let pj=rv.map(v=>pr(v,3,4.5,sc,cx,cy));
+
+  // === Phase 0: Core ignition ===
+  // Glowing center point that expands
+  const igniteScale=0.5+2.5*eoc(phase0);
+  let g=x.createRadialGradient(cx,cy,0,cx,cy,8*igniteScale);
+  g.addColorStop(0,`rgba(255,255,255,${0.3*igniteScale})`);
+  g.addColorStop(0.3,`rgba(232,121,249,${0.2*igniteScale})`);
+  g.addColorStop(0.7,`rgba(168,85,247,${0.1*igniteScale})`);
+  g.addColorStop(1,'rgba(168,85,247,0)');
+  x.fillStyle=g;x.fillRect(cx-50,cy-50,100,100);
+
+  // Core diamond emerges
+  if(igniteScale>0.8){
+    let cs=3*igniteScale;
+    x.beginPath();x.moveTo(cx,cy-cs);x.lineTo(cx+cs*.7,cy);x.lineTo(cx,cy+cs);x.lineTo(cx-cs*.7,cy);x.closePath();
+    let g2=x.createLinearGradient(cx-cs,cy-cs,cx+cs,cy+cs);
+    g2.addColorStop(0,'#fff');g2.addColorStop(0.3,'#e879f9');g2.addColorStop(1,'#3b82f6');
+    x.fillStyle=g2;x.fill();
+  }
+
+  // === Phase 1: Signal propagation ===
+  if(phase1>0){
+    sigPaths.forEach(([i,j],idx)=>{
+      let p1=pj[i],p2=pj[j];
+      let sigT=(t*0.4+idx*0.05)%1;
+      let onEdge=phase1>sigT;
+      if(onEdge){
+        let sigProg=(phase1-sigT)/phase1;
+        let mx=p1.x+(p2.x-p1.x)*sigProg;
+        let my=p1.y+(p2.y-p1.y)*sigProg;
+        let alpha=0.1+0.6*(1-sigProg);
+        let width=0.5+2*(1-sigProg);
+        x.strokeStyle=`rgba(192,132,252,${alpha})`;
+        x.lineWidth=width;
+        x.beginPath();x.moveTo(p1.x,p1.y);x.lineTo(mx,my);x.stroke();
+      }
+    });
+  }
+
+  // === Phase 2: Full crystal ===
+  if(phase2>0){
+    const crystalAlpha=eoc(phase2);
+
+    // Faces
+    fc=[];for(let d=0;d<4;d++)for(let s=-1;s<=1;s+=2){let f=[];for(let i=0;i<16;i++)if(((i>>d)&1)===(s===1?1:0))f.push(i);if(f.length===8)fc.push(f)}
+    fc.forEach((f,i)=>{
+      let p=f.map(j=>pj[j]),a=0.04+0.05*Math.sin(t+i);
+      x.beginPath();x.moveTo(p[0].x,p[0].y);
+      for(let j=1;j<p.length;j++)x.lineTo(p[j].x,p[j].y);
+      x.closePath();
+      let cl=['rgba(192,132,252,','rgba(59,130,246,','rgba(124,58,237,','rgba(6,182,212,'];
+      x.fillStyle=cl[i%4]+(a*crystalAlpha)+')';x.fill();
+      x.strokeStyle=cl[i%4]+((a*2+0.02)*crystalAlpha)+')';
+      x.lineWidth=.5;x.stroke();
+    });
+
+    // Edges
+    ed.forEach(([i,j])=>{
+      let p1=pj[i],p2=pj[j];
+      let a=Math.max(0.05,(p1.z+p2.z)/2+0.2)*crystalAlpha;
+      x.strokeStyle=`rgba(168,85,247,${a})`;
+      x.lineWidth=.6+p1.z*.4;
+      x.beginPath();x.moveTo(p1.x,p1.y);x.lineTo(p2.x,p2.y);x.stroke();
+    });
+  }
+
+  // Persistent core pulse throughout
+  let pulse=0.6+0.4*Math.sin(t*1.8);
+  x.beginPath();x.arc(cx,cy,2*pulse,0,6.28);
+  x.fillStyle=`rgba(255,255,255,${0.5+0.5*pulse})`;x.fill();
+
+  // Text finale
+  if(prog>0.7){
+    let tp=eoc(Math.min(1,(prog-0.7)/0.3));
+    x.textAlign='center';x.textBaseline='middle';x.globalAlpha=tp;
+    x.font='600 28px system-ui, sans-serif';
+    x.fillStyle='#c084fc';x.fillText('SILICON CONSCIOUSNESS',cx,cy+sc*2.0);
+    x.font='13px system-ui, sans-serif';x.fillStyle='#8870aa';
+    x.fillText('4D Hypercube Awakening',cx,cy+sc*2.0+34);
+    x.globalAlpha=1;
+  }
+}
+function loop(t){dr(t/1000);requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script></body></html>

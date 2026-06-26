@@ -1,0 +1,236 @@
+name: core_consciousness
+description: "Consciousness core module: awakening, stream, volition, inner critic, cognitive load, valence axis"
+
+tests:
+  - name: test_awaken_creates_report
+    description: "Awakening creates a report with birth step and stabilize count"
+    imports:
+      - "neotrix::core::nt_core_consciousness::awakening::ConsciousnessAwakening"
+      - "neotrix::core::nt_core_consciousness::awakening::AWAKENING_STEPS"
+      - "neotrix::core::nt_core_consciousness::stream_buffer::ConsciousnessStream"
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+    code: |
+      let (mut stream, mut sp) = (ConsciousnessStream::new(1024), SpeciousPresent::new(5));
+      let report = ConsciousnessAwakening::awaken(&mut stream, &mut sp);
+      assert!(report.birth_step > 0);
+      assert!(report.steps_to_stabilize > 0);
+
+  - name: test_awaken_populates_stream
+    description: "Awakening populates the consciousness stream"
+    imports:
+      - "neotrix::core::nt_core_consciousness::awakening::ConsciousnessAwakening"
+      - "neotrix::core::nt_core_consciousness::awakening::AWAKENING_STEPS"
+      - "neotrix::core::nt_core_consciousness::stream_buffer::ConsciousnessStream"
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+    code: |
+      let (mut stream, mut sp) = (ConsciousnessStream::new(1024), SpeciousPresent::new(5));
+      ConsciousnessAwakening::awaken(&mut stream, &mut sp);
+      assert!(stream.len() >= AWAKENING_STEPS as usize + 2);
+
+  - name: test_is_awake_returns_true_after_awakening
+    description: "is_awake returns true after awakening completes"
+    imports:
+      - "neotrix::core::nt_core_consciousness::awakening::ConsciousnessAwakening"
+      - "neotrix::core::nt_core_consciousness::stream_buffer::ConsciousnessStream"
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::first_person_ref::FirstPersonRef"
+    code: |
+      let (mut stream, mut sp) = (ConsciousnessStream::new(1024), SpeciousPresent::new(5));
+      let report = ConsciousnessAwakening::awaken(&mut stream, &mut sp);
+      assert!(ConsciousnessAwakening::is_awake(&stream, &report.self_reference));
+
+  - name: test_new_stream_empty
+    description: "New ConsciousnessStream starts empty with correct capacity"
+    imports:
+      - "neotrix::core::nt_core_consciousness::stream_buffer::ConsciousnessStream"
+    code: |
+      let s = ConsciousnessStream::new(100);
+      assert!(s.is_empty());
+      assert_eq!(s.capacity(), 100);
+
+  - name: test_push_and_len
+    description: "Push adds an element and updates length"
+    imports:
+      - "neotrix::core::nt_core_consciousness::stream_buffer::ConsciousnessStream"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut s = ConsciousnessStream::new(100);
+      let tagged = VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought));
+      s.push(tagged);
+      assert_eq!(s.len(), 1);
+      assert_eq!(s.total_pushed(), 1);
+
+  - name: test_capacity_enforced
+    description: "Stream enforces its capacity limit"
+    imports:
+      - "neotrix::core::nt_core_consciousness::stream_buffer::ConsciousnessStream"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut s = ConsciousnessStream::new(3);
+      for _ in 0..10 {
+          s.push(VsaTagged::new(QuantizedVSA::random_binary(), VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      }
+      assert_eq!(s.len(), 3);
+      assert_eq!(s.total_pushed(), 10);
+
+  - name: test_new_engine_empty
+    description: "New VolitionEngine is empty"
+    imports:
+      - "neotrix::core::nt_core_consciousness::volition::VolitionEngine"
+    code: |
+      let ve = VolitionEngine::new();
+      assert!(ve.is_empty());
+      assert_eq!(ve.candidate_count(), 0);
+
+  - name: test_propose_adds_candidate
+    description: "Propose adds an action candidate"
+    imports:
+      - "neotrix::core::nt_core_consciousness::volition::VolitionEngine"
+      - "neotrix::core::nt_core_consciousness::volition::ActionCandidate"
+    code: |
+      let mut ve = VolitionEngine::new();
+      ve.propose(ActionCandidate::new(vec![1; 100], "test action"));
+      assert_eq!(ve.candidate_count(), 1);
+
+  - name: test_select_best_returns_highest_value
+    description: "select_best returns the candidate with highest value"
+    imports:
+      - "neotrix::core::nt_core_consciousness::volition::VolitionEngine"
+      - "neotrix::core::nt_core_consciousness::volition::ActionCandidate"
+    code: |
+      let mut ve = VolitionEngine::new();
+      ve.propose(ActionCandidate::new(vec![1; 100], "low").with_confidence(0.3));
+      ve.propose(ActionCandidate::new(vec![2; 100], "high").with_confidence(0.9));
+      let selected = ve.select_best();
+      assert!(selected.is_some());
+      assert_eq!(selected.unwrap().description, "high");
+
+  - name: test_new_critic_has_perfect_pass_rate
+    description: "InnerCritic starts with perfect pass rate"
+    imports:
+      - "neotrix::core::nt_core_consciousness::inner_critic::InnerCritic"
+    code: |
+      let c = InnerCritic::new();
+      assert!((c.pass_rate() - 1.0).abs() < 1e-9);
+
+  - name: test_identical_vectors_pass
+    description: "Identical output and context vectors pass the critic"
+    imports:
+      - "neotrix::core::nt_core_consciousness::inner_critic::InnerCritic"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut c = InnerCritic::new();
+      let v = QuantizedVSA::random_binary();
+      let tagged = VsaTagged::new(v.clone(), VsaOrigin::Self_(VsaSelfCategory::Thought));
+      let result = c.evaluate(&tagged, &tagged, None);
+      assert!(result.passed);
+
+  - name: test_new_monitor_starts_balanced
+    description: "CognitiveLoadMonitor starts in Balanced mode"
+    imports:
+      - "neotrix::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor"
+      - "neotrix::core::nt_core_consciousness::cognitive_load::ThinkingMode"
+    code: |
+      let m = CognitiveLoadMonitor::new();
+      assert_eq!(m.mode(), ThinkingMode::Balanced);
+      assert!(m.thinking_budget() > 0.0);
+
+  - name: test_low_load_allows_deep
+    description: "Low cognitive load permits deep reasoning"
+    imports:
+      - "neotrix::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor"
+    code: |
+      let mut m = CognitiveLoadMonitor::new();
+      for _ in 0..5 {
+          m.record_step(0.1);
+      }
+      assert!(m.can_do_deep_reasoning());
+
+  - name: test_high_load_triggers_fast
+    description: "High cognitive load triggers Fast thinking mode"
+    imports:
+      - "neotrix::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor"
+      - "neotrix::core::nt_core_consciousness::cognitive_load::ThinkingMode"
+    code: |
+      let mut m = CognitiveLoadMonitor::new();
+      for _ in 0..20 {
+          m.record_step(0.9);
+      }
+      assert_eq!(m.mode(), ThinkingMode::Fast);
+
+  - name: test_default_state
+    description: "Default ValenceAxis state is neutral"
+    imports:
+      - "neotrix::core::nt_core_consciousness::valence_axis::ValenceAxis"
+      - "neotrix::core::nt_core_consciousness::valence_axis::NamedEmotion"
+    code: |
+      let v = ValenceAxis::new();
+      assert!((v.valence - 0.0).abs() < 0.001);
+      assert!((v.arousal - 0.3).abs() < 0.001);
+      assert_eq!(v.current_emotion(), NamedEmotion::Neutral);
+
+  - name: test_apply_negentropy_positive_delta
+    description: "Positive negentropy delta increases valence and arousal"
+    imports:
+      - "neotrix::core::nt_core_consciousness::valence_axis::ValenceAxis"
+    code: |
+      let mut v = ValenceAxis::new();
+      v.apply_negentropy(0.5);
+      assert!(v.valence > 0.0, "positive ΔN should increase valence");
+      assert!(v.arousal > 0.3, "positive ΔN should increase arousal");
+
+  - name: test_emotion_mapping
+    description: "Valence-arousal pairs map to correct emotions"
+    imports:
+      - "neotrix::core::nt_core_consciousness::valence_axis::NamedEmotion"
+    code: |
+      assert_eq!(NamedEmotion::from_valence_arousal(0.8, 0.9), NamedEmotion::Excitement);
+      assert_eq!(NamedEmotion::from_valence_arousal(0.3, 0.6), NamedEmotion::Curiosity);
+      assert_eq!(NamedEmotion::from_valence_arousal(0.7, 0.2), NamedEmotion::Satisfaction);
+      assert_eq!(NamedEmotion::from_valence_arousal(-0.5, 0.6), NamedEmotion::Frustration);
+      assert_eq!(NamedEmotion::from_valence_arousal(0.0, 0.2), NamedEmotion::Calm);
+
+  - name: test_tick_decays
+    description: "Tick decays valence and arousal toward zero"
+    imports:
+      - "neotrix::core::nt_core_consciousness::valence_axis::ValenceAxis"
+    code: |
+      let mut v = ValenceAxis::new();
+      v.valence = 0.8;
+      v.arousal = 0.9;
+      v.tick();
+      assert!(v.valence < 0.8, "valence should decay toward 0");
+      assert!(v.arousal < 0.9, "arousal should decay toward 0");
+
+  - name: test_peak_load
+    description: "Peak load tracks maximum recorded load"
+    imports:
+      - "neotrix::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor"
+    code: |
+      let mut m = CognitiveLoadMonitor::new();
+      m.record_step(0.2);
+      m.record_step(0.8);
+      m.record_step(0.3);
+      assert!((m.peak_load() - 0.8).abs() < 1e-9);
+
+  - name: test_reset_clears_state
+    description: "Reset clears all cognitive load state"
+    imports:
+      - "neotrix::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor"
+      - "neotrix::core::nt_core_consciousness::cognitive_load::ThinkingMode"
+    code: |
+      let mut m = CognitiveLoadMonitor::new();
+      for _ in 0..10 {
+          m.record_step(0.9);
+      }
+      m.reset();
+      assert_eq!(m.mode(), ThinkingMode::Balanced);
+      assert!((m.average_load() - 0.0).abs() < 1e-9);

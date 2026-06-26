@@ -1,0 +1,150 @@
+name: core_consciousness_specious_present
+description: "SpeciousPresent temporal window tests"
+
+tests:
+  - name: new_specious_present_empty
+    description: "New SpeciousPresent starts empty with correct window_size"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+    code: |
+      let sp = SpeciousPresent::new(5);
+      assert!(sp.is_empty());
+      assert_eq!(sp.window_size(), 5);
+
+  - name: push_adds_element
+    description: "push adds a VsaTagged element"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut sp = SpeciousPresent::new(3);
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      assert_eq!(sp.len(), 1);
+      assert!(sp.current().is_some());
+
+  - name: window_does_not_exceed_size
+    description: "Window never exceeds configured size"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let mut sp = SpeciousPresent::new(3);
+      for _ in 0..10 {
+          sp.push(VsaTagged::new(QuantizedVSA::random_binary(), VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      }
+      assert_eq!(sp.len(), 3);
+
+  - name: previous_returns_correct
+    description: "previous(n) returns the nth item back from current"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let mut sp = SpeciousPresent::new(5);
+      let v1 = QuantizedVSA::random_binary();
+      let v2 = QuantizedVSA::random_binary();
+      let v3 = QuantizedVSA::random_binary();
+      sp.push(VsaTagged::new(v1.clone(), VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(v2.clone(), VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(v3.clone(), VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      assert_eq!(sp.previous(1).unwrap().vector, v2);
+      assert_eq!(sp.previous(2).unwrap().vector, v1);
+
+  - name: temporal_integral_returns_bundle
+    description: "temporal_integral returns a bundled vector"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut sp = SpeciousPresent::new(3);
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      let integral = sp.temporal_integral();
+      assert!(integral.is_some());
+      assert_eq!(integral.unwrap().len(), 100);
+
+  - name: temporal_difference
+    description: "temporal_difference returns non-zero for divergent vectors"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut sp = SpeciousPresent::new(5);
+      let v1 = vec![0; 100];
+      let v2 = vec![1; 100];
+      sp.push(VsaTagged::new(v1, VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(v2, VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      let diff = sp.temporal_difference();
+      assert!(diff.is_some());
+      assert!(diff.unwrap() > 0.5);
+
+  - name: empty_integral_returns_none
+    description: "temporal_integral returns None on empty window"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+    code: |
+      let sp = SpeciousPresent::new(3);
+      assert!(sp.temporal_integral().is_none());
+
+  - name: stability_detection
+    description: "is_temporally_stable is true for similar vectors"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut sp = SpeciousPresent::new(3);
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      assert!(sp.is_temporally_stable());
+
+  - name: clear_resets_state
+    description: "clear() empties the window"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut sp = SpeciousPresent::new(3);
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.clear();
+      assert!(sp.is_empty());
+
+  - name: step_counter_increments
+    description: "step_counter increments with each push"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaTagged"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaOrigin"
+      - "neotrix::core::nt_core_consciousness::vsa_tag::VsaSelfCategory"
+    code: |
+      let mut sp = SpeciousPresent::new(3);
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      sp.push(VsaTagged::new(vec![1; 100], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+      assert_eq!(sp.step_counter(), 2);
+
+  - name: window_size_clamping
+    description: "window_size clamps to [MIN_WINDOW_SIZE, MAX_WINDOW_SIZE]"
+    imports:
+      - "neotrix::core::nt_core_consciousness::specious_present::SpeciousPresent"
+    code: |
+      let sp = SpeciousPresent::new(100);
+      assert_eq!(sp.window_size(), 10);
+      let sp = SpeciousPresent::new(1);
+      assert_eq!(sp.window_size(), 3);

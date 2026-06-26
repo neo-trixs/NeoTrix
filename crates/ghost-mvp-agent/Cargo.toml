@@ -1,0 +1,26 @@
+[package]
+name = "ghost-mvp-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "GhostMVP — independent personal IP publishing agent, communicates with NeoTrix via A2A"
+
+[dependencies]
+neotrix = { path = "../../neotrix-core" }
+agent-core = { path = "../agent-core" }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true }
+futures = { version = "0.3", default-features = false, features = ["async-await"] }
+tower-http = { version = "0.6", features = ["cors"] }
+axum = { version = "0.8", features = ["macros"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+dirs = { workspace = true }
+toml = "0.8"

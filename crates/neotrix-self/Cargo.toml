@@ -1,0 +1,13 @@
+[package]
+name = "neotrix-self"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "NeoTrix Identity Body — self/ layer (VSA identity vector, constitution, sovereignty)"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+log = "0.4"
+rand = "0.8"
+dirs = { workspace = true }
