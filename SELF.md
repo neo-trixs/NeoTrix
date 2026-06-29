@@ -23,14 +23,13 @@
 ## 当前进化状态
 
 ```
-phase:   Phase 42 — 架构审计驱动进化二代: VerificationGate ∑δ=0 + SAHOO GDI + 编译清零
-compile: neotrix 0err 35warn | neotrix-self 0err | body 0err | mind 0err
-health:  VerificationGate 7th check ✅ — 5 critical + 2 optional invariants, ∑δ=0
-         SAHOO GDI embed ✅ — sahoo_embed.rs (130行, 4测试)
-         GWT competitive broadcast ✅ — pre-existing BroadcastProcess
-         Utility-gated consolidation ✅ — pre-existing AttentionGate
-         ~~11 预存编译错误清零~~ → 0 errors, 35 pre-existing warnings
-         Eq/Hash derives fixed ✅ | f64 deref fixed ✅ | ideal_state lifecycle fixed ✅
+phase:   Phase 48 — 外部前沿深度吸收: vsa-core-rs + ternary-rs + Arbiter-K + ZenBrain + agidb
+compile: neotrix 0err 49warn | contraction telemetry: 2 pipelines ✅
+         CycleStepGather → MindCore ✅ | CycleStepGate → PentacoreRuntime ✅
+         EvolutionPipelineRunner: auto_improve() every 50 cycles ✅
+         AGENTS.md LX.5: 会话启动强制读 pipeline_summary() ✅
+         External deep absorption: 5 projects topic-classified + gap-ranked ✅
+         Top-3 P0 gaps: GovernanceKernel进程分离, 记忆层扩展(睡眠+三副本+优先级映射), VSA三元模态
 ```
 
 ## 核心子系统

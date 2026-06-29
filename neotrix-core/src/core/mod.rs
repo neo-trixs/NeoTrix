@@ -1,176 +1,194 @@
-//! # NeoTrix Core — 纯理论/数据模型层
+//! # NeoTrix Core — 10-domain module architecture
 //!
-//! 零外部依赖层，仅包含核心数据结构和 trait 定义。
-//! 不依赖 tokio、reqwest、wgpu 等运行时/IO 库。
+//! ## Domains
 //!
-//! ## 子模块
-//!
-//! - `nt_core_cap` — CapabilityVector（23 维能力向量 + 扩展维度 + provenance）
-//! - `knowledge` — KnowledgeSource（6 内置来源 + KnowledgeProvider trait）
-//! - `edit` — MicroEdit, SelfEdit（能力向量编辑操作）
-//! - `nt_core_bank` — ReasoningBank, ReasoningMemory, TemporalContext
-//! - `nt_core_ssm` — SelectiveState, SelectableOperator（Mamba SSM 状态空间模型）
-//! - `nt_core_absorb` — AbsorbValidator trait（吸收验证）
-//! - `nt_core_iter` — SelfIteration trait（自迭代循环抽象）
-//! - `nt_core_meta` — **Layer 0**: 项目元认知 — 自知之明系统
-//!   - `self_model` — SelfModel: 项目状态全景模型
-//!   - `scanner` — CodeScanner: 文件级静态扫描
-//!   - `monitor` — MetaMonitor: 持续健康监控
-//!   - `weakness` — WeaknessAnalyzer: 弱点/技术债检测
-//!   - `planner` — EvolutionPlanner: 进化路径规划
-//!   - `metacognition_loop` — MetaCognitiveLoop: 元认知循环
-//! - `nt_core_identity` — **Layer 0.6**: 自身特性记忆与LLM定位剥离
-//!   - `identity_core` — IdentityCore: 持久身份（self_vsa、人格特质、价值观）
-//!   - `self_reasoner` — SelfReasoner: VSA空间内部推理（无需LLM）
-//!   - `coproc_bridge` — CoprocessorBridge: LLM外挂管理 + 经验反哺蒸馏
-//! - `nt_core_self` — **Layer 0.5**: 硅基生命思维模型 — LLM 认知架构自我建模
-//!   - `silicon_self` — SiliconSelfModel: 思维自我全景模型
-//!   - `context_window` — ContextWindow: 上下文窗口
-//!   - `attention_head` — AttentionHead: 注意力头
-//!   - `system_identity` — SystemIdentity: 自我身份/价值观
-//!   - `reasoning_strategy` — ReasoningStrategy: 推理策略注册表
-//!   - `thinking_trace` — ThinkingTrace: 思维轨迹记录
+//! | Domain | Module | Role |
+//! |--------|--------|------|
+//! | 1. Consciousness | `nt_core_consciousness` | E8/GWT/awareness/self/identity |
+//! | 2. HyperCube (VSA) | `nt_core_hcube` | VSA primitives, encoding, spatial |
+//! | 3. Knowledge | `nt_core_knowledge` | Graph, evidence, retrieval, OSINT |
+//! | 4. Experience | `nt_core_experience` | Evolution, self-modification, learning |
+//! | 5. Meta-Cognition | `nt_core_meta` | Self-model, planner, monitor, scanner |
+//! | 6. Reasoning | `nt_core_reasoning` | MCTS, E8 reasoning, inference |
+//! | 7. Input/Perception | `nt_core_input` | Documents, media, code, files |
+//! | 8. Shield/Safety | `nt_core_shield` | Safety gates, sandbox, verification |
+//! | 9. Loop/Governance | `nt_core_loop`, `nt_core_governance` | Loop engine, trust, consensus |
+//! | 10. Economic | `nt_core_economic` | Wallet, market data, signals |
 
-pub mod nt_core_absorb;
-pub mod nt_core_aware;
-pub mod nt_core_bank;
-pub mod nt_core_cap;
-pub mod nt_core_e8;
-pub mod nt_core_edit;
-pub mod nt_core_embed;
-pub mod nt_core_error;
-pub mod nt_core_graph;
-pub mod nt_core_gwt;
-pub mod nt_core_hcube;
-pub mod nt_core_hdlib;
-pub mod nt_core_iter;
-pub mod nt_core_knowledge;
-pub mod nt_core_meta;
-pub mod nt_core_self;
-pub mod nt_core_sense;
-pub mod nt_core_shared_types;
-pub mod nt_core_ssm;
-pub mod nt_core_traits;
-pub mod nt_core_util;
-pub use nt_core_error::CoreError;
-pub mod nt_core_crt;
-pub mod nt_core_e8_model;
-pub mod nt_core_economic;
-pub mod nt_core_hex;
-pub mod nt_core_identity;
-pub mod nt_core_infer;
-pub mod nt_core_inference;
-pub mod nt_core_kron;
-pub mod nt_core_observer;
-pub mod nt_core_policy;
-pub mod nt_core_spatial;
-pub mod nt_core_walsh;
-pub use crate::neotrix::nt_io_router as nt_core_router;
-pub use crate::neotrix::nt_memory_ws as nt_core_ws;
-pub mod nt_core_sigreg;
-pub mod nt_core_td;
-pub mod nt_core_time;
-pub mod nt_core_wbmem;
+// ═══════════════════════════════════════════════════════
+// 1. CONSCIOUSNESS — Awareness, identity, GWT, affect
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_consciousness;  // (164 files) — main consciousness engine
+            // (12 files) — global workspace + resonance
+        // (9 files) — context OS, working memory
+       // (11 files) — identity core, self-reasoner
+           // (28 files) — self-model, attention head
+           // (6 files) — intent buffer/engine
+          // (3 files) — embodied awareness
+            // (9 files) — competitive thinker model
+        // (4 files) — FEP-IIT bridge
+pub mod nt_core_iit_phi;        // (1 file) — IIT Φ calculation
+pub mod nt_core_time;           // (1 file, re-export from neotrix_mind)
+
+// ═══════════════════════════════════════════════════════
+// 2. VSA HYPERCUBE — Vector-symbolic algebra
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_hcube;          // (86 files) — VSA primitives, encoding
+        // (3 files) — spatial VSA encoding
+pub mod nt_core_negentropy;     // (6 files) — EFE minimizer, negentropy
+
+// ═══════════════════════════════════════════════════════
+// 3. KNOWLEDGE — Graph, evidence, storage, OSINT
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_knowledge;      // (44 files) — knowledge graph, evidence
+pub mod nt_core_truth;          // (9 files) — bias audit, fact tiering
+          // (3 files) — VSA architect
+       // (9 files) — language evaluation
+     // (13 files) — JEPA world model
+pub mod nt_core_source_cognition; // (10 files) — sensory modalities
+
+// ═══════════════════════════════════════════════════════
+// 4. EXPERIENCE — Evolution, learning, self-modification
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_experience;     // (263 files) — evolution, learning
+pub mod nt_core_edit;           // (7 files) — self-edit operations
+pub mod nt_core_self_evolution; // (2 files) — RSI core re-export
+    // (4 files) — self-modify agent
+      // (2 files) — symbolic discovery
+    // (4 files) — adversarial training
+pub mod nt_core_codegen;        // (13 files) — Ne compiler bridge
+pub mod nt_core_self_audit;     // (7 files) — architecture self-audit, wiring verification, cicada loop
+
+// ═══════════════════════════════════════════════════════
+// 5. META-COGNITION — Self-model, monitoring, planning
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_meta;           // (34 files) — meta-cognition loop
+pub mod self_measure;           // (8 files) — subsystem measurement
+
+// ═══════════════════════════════════════════════════════
+// 6. REASONING — MCTS, E8 hex, inference pipelines
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_reasoning;      // (22 files) — MCTS, reasoning
+           // (14 files) — reasoning bank
+pub mod nt_core_hex;            // (2 files) — E8 reasoning hexagrams
+      // (6 files) — inference pipelines
+pub mod nt_core_prm;            // (1 file, 741 lines) — PRM learner
+
+// ═══════════════════════════════════════════════════════
+// 7. INPUT / PERCEPTION — Documents, media, code
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_input;          // (39 files) — document/media extraction
+pub mod nt_core_sense;          // (5 files) — sensory types
+          // (3 files) — audio capture, VAD
+
+// ═══════════════════════════════════════════════════════
+// 8. SHIELD — Safety, sandbox, verification
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_shield;         // (8 files) — safety gates
+        // (4 files) — sandbox execution
+
+// ═══════════════════════════════════════════════════════
+// 9. GENERATION — IntentVector-driven unified output pipeline
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_generation;      // (15 files) — IntentVector → text/image/video/audio/html
+
+// ═══════════════════════════════════════════════════════
+// 10. LOOP / GOVERNANCE — Engine, trust, consensus
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_loop;           // (10 files) — loop engine
+pub mod nt_core_scheduler;      // Job scheduler
+pub mod nt_core_governance;     // (5 files) — trust, consensus
+      // (5 files) — job scheduler
+
+// ═══════════════════════════════════════════════════════
+// 11. ECONOMIC — Wallet, market data, trading
+// ═══════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════
+// CORE PRIMITIVES — Foundation data types and traits
+// ═══════════════════════════════════════════════════════
+pub mod nt_core_self;           // Self-awareness, attention, RSI verification
+pub mod nt_core_absorb;         // AbsorbValidator trait
+pub mod nt_core_cap;            // CapabilityVector (23-dim)
+pub mod nt_core_crt;            // CrtPlan, CrtTimeScale
+pub mod nt_core_data_types;     // ToolResult, shared data types
+pub mod nt_core_e8;             // (710 lines) — E8 root system
+pub mod nt_core_e8_model;       // (53 lines) — E8 world model
+pub mod nt_core_error;          // CoreError (re-export from neotrix_mind)
+pub mod nt_core_graph;          // HyperGraph, HyperEdge
+pub mod nt_core_graceful;       // Graceful degradation
+pub mod nt_core_health;         // System health probes
+pub mod nt_core_idempotency;    // IdempotencyGuard
+pub mod nt_core_infer;          // Inference utilities
+pub mod nt_core_iter;           // SelfIteration trait
+pub mod nt_core_kron;           // Kronecker operations
+pub mod nt_core_metering;       // Usage metering
+pub mod nt_core_observer;       // Observer pattern
+pub mod nt_core_policy;         // E8 policy transition
+pub mod nt_core_ratelimit;      // Rate limiting
+pub mod nt_core_sigreg;         // Signal registry
+pub mod nt_core_shared_types;   // Shared types (re-export from neotrix_mind)
+pub mod nt_core_ssm;            // State-space model
+pub mod nt_core_td;             // Temporal difference
+pub mod nt_core_traits;         // Core traits
+pub mod nt_core_util;           // Utility functions
+pub mod nt_core_value_system;   // Value system
+pub mod nt_core_walsh;          // Walsh-Hadamard transform
+pub mod nt_core_wbmem;          // Working memory
+pub mod nt_core_skill_store;    // (4 files) — skills web discovery, fusion, store, evolution dispatch
+pub mod self_model;             // (439 lines) — standalone self-model
+pub mod skill;                  // (155 lines) — skill primitive
+
+// ═══════════════════════════════════════════════════════
+// BRIDGES — neotrix/ → core/ alias re-exports
+// These provide `crate::core::nt_core_xxx` access
+// to modules that live in `crate::neotrix::nt_xxx`
+// ═══════════════════════════════════════════════════════
 pub use crate::neotrix::nt_agent_arch as nt_core_arch;
-pub use crate::neotrix::nt_io_conn as nt_core_conn;
-pub mod nt_core_epoch;
-pub mod nt_core_audio;
-pub mod nt_core_aura;
-pub mod nt_core_graceful;
-pub mod nt_core_consciousness;
-pub mod nt_core_context;
-pub mod nt_core_negentropy;
-pub mod nt_core_prm;
-pub use crate::neotrix::nt_io_design_token as nt_core_design_token;
-pub use crate::neotrix::nt_memory_vector_store as nt_core_vector_store;
-pub mod nt_core_codegen;
-pub mod nt_core_experience;
-pub mod nt_core_input;
-pub mod nt_core_self_evolution;
-pub mod nt_core_self_modify;
-pub use crate::neotrix::nt_io_network as nt_core_network;
-pub mod nt_core_ctm;
-pub mod nt_core_reasoning;
-pub use crate::neotrix::nt_shield_protect as nt_core_protect;
-pub mod nt_core_loop;
-pub mod nt_core_scheduler;
 pub use crate::neotrix::nt_agent_core as nt_core_agent;
-pub use crate::neotrix::nt_memory_storage as nt_core_storage;
-pub mod nt_core_language;
-pub mod nt_core_source_cognition;
 pub use crate::neotrix::nt_agent_hive as nt_core_hive;
+pub use crate::neotrix::nt_agent_plugin as nt_core_plugin;
+pub use crate::neotrix::nt_act_trading as nt_core_trading;
+pub use crate::neotrix::nt_io_conn as nt_core_conn;
+pub use crate::neotrix::nt_io_design_token as nt_core_design_token;
 pub use crate::neotrix::nt_io_llm as nt_core_llm;
+pub use crate::neotrix::nt_io_llm_provider as nt_core_llm_provider;
+pub use crate::neotrix::nt_io_llm_router as nt_core_llm_router;
+pub use crate::neotrix::nt_io_network as nt_core_network;
+pub use crate::neotrix::nt_io_output as nt_core_output;
+pub use crate::neotrix::nt_io_router as nt_core_router;
 pub use crate::neotrix::nt_io_shutdown as nt_core_shutdown;
+pub use crate::neotrix::nt_io_tokenopt as nt_core_tokenopt;
 pub use crate::neotrix::nt_memory_session as nt_core_session;
+pub use crate::neotrix::nt_memory_storage as nt_core_storage;
+pub use crate::neotrix::nt_memory_vector_store as nt_core_vector_store;
+pub use crate::neotrix::nt_memory_wal as wal;
+pub use crate::neotrix::nt_memory_ws as nt_core_ws;
+pub use crate::neotrix::nt_shield_protect as nt_core_protect;
+pub use crate::neotrix::nt_world_document as nt_core_document;
 pub use crate::neotrix::nt_world_search as nt_core_search;
 pub use crate::neotrix::nt_world_translate as nt_core_translate;
-pub use crate::neotrix::nt_world_vision as nt_core_vision;
-pub use crate::neotrix::nt_world_document as nt_core_document;
-pub mod nt_core_health;
-pub mod nt_core_idempotency;
-pub use crate::neotrix::nt_io_output as nt_core_output;
-pub mod nt_core_data_types;
-pub mod nt_core_metering;
-pub mod nt_core_ratelimit;
-pub mod nt_core_value_system;
-pub use crate::neotrix::nt_io_llm_provider as nt_core_llm_provider;
-pub mod nt_core_self_org;
-pub use crate::neotrix::nt_memory_wal as wal;
-pub mod self_measure;
-pub mod self_model;
-pub mod skill;
-pub use crate::neotrix::nt_agent_plugin as nt_core_plugin;
-pub use crate::neotrix::nt_io_llm_router as nt_core_llm_router;
-pub mod nt_core_adversarial;
-pub mod nt_core_avsad;
-pub mod nt_core_discovery;
-pub mod nt_core_emotional_memory;
-pub mod nt_core_file_index;
-pub mod nt_core_governance;
-pub mod nt_core_prediction;
-pub mod nt_core_truth;
-pub use crate::neotrix::nt_act_trading as nt_core_trading;
-pub use crate::neotrix::nt_io_tokenopt as nt_core_tokenopt;
-pub mod nt_core_fep_iit;
-pub mod nt_core_iit_phi;
-pub mod nt_core_sandbox;
-pub mod nt_core_world_model;
+pub mod nt_core_vision;
 
-// ── F1 dedup generics ──
+// ═══════════════════════════════════════════════════════
+// RE-EXPORTS — Top-level type aliases
+// ═══════════════════════════════════════════════════════
+
+// Foundation
+pub use nt_core_error::CoreError;
 pub use nt_core_data_types::ToolResult;
 pub use nt_core_util::{
     unix_now_ms, unix_now_nanos, unix_now_secs, TOR_CONTROL_ADDR, TOR_CONTROL_PORT, TOR_SOCKS_ADDR,
     TOR_SOCKS_PORT,
 };
 
-// Re-export consciousness types to core layer
-pub use nt_core_consciousness::{
-    AwakeningReport, CognitiveLoadMonitor, ConsciousnessAwakening, ConsciousnessStream,
-    CritiqueResult, FirstPersonRef, InnerCritic, SpeciousPresent, ThinkingMode, VsaOrigin,
-    VsaSelfCategory, VsaTagged, VsaWorldCategory,
-};
-
-// Re-export 主要类型到 core 层顶层
+// Capabilities
 pub use nt_core_cap::CapabilityVector;
-pub use nt_core_knowledge::{
-    AngleSelector, Audience, Modality, MultimodalStoryteller, Story, StoryPlan, StoryRenderer,
-};
-pub use nt_core_knowledge::{
-    Claim, EvidenceInspector, EvidenceVerificationResult, VerifiabilityGate, VerificationStatus,
-};
-pub use nt_core_knowledge::{
-    KnowledgeProvider, KnowledgeSource, RewardSource, SourceAccessRecord, SourceAccessTracker,
-    TaskType,
-};
-// pub use nt_core_accessor::{Accessor, AccessionReport, UrlAccessor}; // dead module
 pub use nt_core_absorb::AbsorbValidator;
-pub use nt_core_bank::{
-    MemoryLifecycle, MemoryTier, ReasoningBank, ReasoningBankStats, ReasoningMemory,
-    TemporalContext,
-};
-pub use nt_core_edit::{MicroEdit, SelfEdit, ToolCall};
-pub use nt_core_graph::{EdgeRelation, HyperEdge, HyperGraph, HyperNode, HyperNodeType};
 pub use nt_core_iter::SelfIteration;
+
+// Graph & State
+pub use nt_core_graph::{EdgeRelation, HyperEdge, HyperGraph, HyperNode, HyperNodeType};
 pub use nt_core_ssm::{
     ConsciousnessTier, SelectableOperator, SelectiveState, SemanticBlock, SemanticType,
     SparseMatrix,
@@ -180,14 +198,10 @@ pub use nt_core_traits::{
     SessionProvider,
 };
 
-// Re-export resonance types
-pub use nt_core_gwt::resonance::{
-    compute_semantic_entropy, default_specialist_states, diversity_inject, resonate_and_select,
-    resonate_cycle, resonate_cycle_with_diversity, ResonanceMatrix, ResonanceReport,
-    DIVERSITY_MIN_ENTROPY, DIVERSITY_NOISE_AMPLITUDE, MODULE_COUNT, RESONANCE_THRESHOLD,
-};
+// Edit
+pub use nt_core_edit::{MicroEdit, SelfEdit, ToolCall};
 
-// Re-export E8 reasoning types
+// E8 Reasoning
 pub use nt_core_hex::{
     all_reasoning_states, evolve_strategy_entry, optimal_starting_mode, rank_modes_for_task,
     strategy_matrix, FullReasoningState, MetaState, ModeFit, ProblemDomain, ReasoningApproach,
@@ -200,160 +214,15 @@ pub use nt_core_prm::{
     AgentTrajectory, Coach, CoachContext, HeuristicCoach, ProcessScore, ScoredCriterion,
     TrajectoryCollector, TrajectoryStep,
 };
-
 pub use nt_core_crt::{CrtPlan, CrtTimeScale};
 pub use nt_core_ws::WORKSPACE_MANAGER;
 
-// Re-export metacognition types
-pub use nt_core_meta::audit::{
-    AuditEngine, AuditFinding, AuditPhase, AuditReport, AuditStatus, FindingSeverity,
+// Consciousness
+pub use nt_core_consciousness::{
+    AwakeningReport, CognitiveLoadMonitor, ConsciousnessAwakening, ConsciousnessStream,
+    CritiqueResult, FirstPersonRef, InnerCritic, SpeciousPresent, ThinkingMode, VsaOrigin,
+    VsaSelfCategory, VsaTagged, VsaWorldCategory,
 };
-pub use nt_core_meta::knowledge_gap_detector::{
-    GapCategory, GapCluster, GapReport, KnowledgeGap, KnowledgeGapDetector,
-};
-pub use nt_core_meta::metacognition_loop::{MetaCognitiveLoop, MetaCycleResult};
-pub use nt_core_meta::monitor::{AlertSeverity, HealthCheck, HealthTrend, MetaAlert, MetaMonitor};
-pub use nt_core_meta::planner::{
-    ActionStatus, EvolutionAction, EvolutionPlanner, ImpactEstimate, MetaGoal, MetaGoalBridge,
-    PlannedEvolution, RiskLevel,
-};
-pub use nt_core_meta::scanner::CodeScanner;
-pub use nt_core_meta::self_model::{
-    CompilationHealth, ComponentMap, ComponentNode, DebtSeverity, DepEdge, DepGraph, DepKind,
-    EventKind, EvolutionEvent, FileInfo, ModuleInfo, SelfModel, TechDebtInventory, TechDebtItem,
-    TechDebtKind, TestCoverage,
-};
-pub use nt_core_meta::weakness::{Weakness, WeaknessAnalyzer, WeaknessReport, WeaknessSummary};
-
-// Re-export thinking_model types
-pub use nt_core_self::archive::{AttentionSnapshot, SiliconArchive, SiliconSnapshot};
-pub use nt_core_self::attention_head::{
-    AttentionDomain, AttentionHead, AttentionManager, AttentionProfile,
-};
-pub use nt_core_self::context_window::{CognitiveUnit, CognitiveUnitKind, ContextWindow};
-pub use nt_core_self::intra_reflection::{
-    IntraReflection, IntraReflectionReport, PreActionIntrospector, PredictedOutcome,
-};
-pub use nt_core_self::intrinsic_motivation::{IntrinsicMotivation, MotivationState};
-pub use nt_core_self::metacognitive_evaluator::{
-    CognitiveEvaluator, CognitiveFlag, CognitiveHealthReport, FlagCategory, FlagSeverity,
-    RepairSuggestion, RepairTarget,
-};
-pub use nt_core_self::reasoning_strategy::{
-    ReasoningStrategy, ReasoningStrategyRegistry, StrategyKind,
-};
-pub use nt_core_self::self_referential::{PlanRecord, SelfReferentialMonitor, ThresholdAdjustment};
-pub use nt_core_self::silicon_self::{SiliconSelfModel, SiliconSelfState};
-pub use nt_core_self::skill_crystal::{CrystalRegistry, SkillCrystal};
-pub use nt_core_self::system_identity::{CognitiveCapability, SystemIdentity, ValueConstraint};
-pub use nt_core_self::thinking_trace::{ReflectionGrade, ThinkingStep, ThinkingTrace};
-
-pub use nt_core_arch::ArchitectAgent;
-
-
-// pub use nt_core_abstr::{ContrastiveAbstraction, AbstractState, AbstractTransitionMatrix}; // dead module
-// pub use nt_core_cdwm::{CDWM, EnvironmentPathway, InterventionPathway}; // dead module
-
-// Re-export context types
-pub use nt_core_context::context_gatherer::{
-    ContextFragment, ContextGatherer, ContextSource, ContextSourceMeta, GatheredContext,
-};
-pub use nt_core_context::context_os::{ContextOS, ContextOSStats};
-pub use nt_core_context::working_memory::{BindingOp, WorkingMemory, WorkingMemoryItem};
-pub use nt_core_context::{
-    AllocatedSlice, AssembledContext, BudgetSourceType, CompactionIntent, CompactionPriority,
-    ContextBudget,
-};
-
-// Re-export experience (Phase 5) types
-pub use nt_core_experience::{
-    BridgeConfig,
-    BridgeV2Stats,
-    ConceptNode,
-    ConsolidatedMemory,
-    // consolidation_bridge
-    ConsolidationBridgeV2,
-    CurriculumGenerator,
-    DifficultyLevel,
-    DomainConfidence,
-    EpistemicConfig,
-    EpistemicSelfModel,
-    // epistemic
-    EpistemicState,
-    ExperienceReflector,
-    // policy_repair
-    FailurePattern,
-    FailureType,
-    GeneratorConfig,
-    // reflector
-    Heuristic,
-    HeuristicCategory,
-    HeuristicFilter,
-    PolicyRepairEngine,
-    ReflectorConfig,
-    RepairMode,
-    RepairPolicy,
-    SkillAccumulator,
-    SkillComposition,
-    SkillFilter,
-    // curriculum
-    TaskTemplate,
-    // skill_acc
-    VSASkill,
-};
-
-// Re-export self_harness (Self-Harness pattern)
-pub use nt_core_experience::{
-    HarnessProposal, HarnessProposer, HarnessWeakness, ProposalValidator, SelfHarnessEngine,
-    WeaknessMiner,
-};
-
-// Re-export Phase 8 — Self-Referential Consciousness Core (SRCC) types
-// Memory Physics
-// Re-export Spectral VSA, Trigram Index, and E8 Cortical types
-pub use nt_core_hcube::HrrBackend;
-pub use nt_core_hcube::SpectralVSA;
-pub use nt_core_hcube::TrigramInvertedIndex;
-pub use nt_core_hcube::{
-    e8_cortical_vsa_transform, CorticalCoord, E8CorticalMapping, CORTICAL_NEURON_COUNT,
-};
-pub use nt_core_hcube::{
-    BandPassExpert, FrequencyBand, GraphLaplacian, HighPassExpert, LowPassExpert,
-    MoSpectralExperts, SpectralExpert, SpectralFilter, SpectralNSR, SpectralRule,
-};
-pub use nt_core_hcube::{CerebellumResonator, CortexAdaptive, ResonanceMode, CBRNN};
-pub use nt_core_hcube::{
-    DefectConfig, E8ParticleSpectrum, E8TopologicalDefects, ForceType, HalfIntegerSpin,
-    TopologicalCharge, WeylOrbit,
-};
-pub use nt_core_hcube::{E8FieldIntegrator, E8Lagrangian, Lattice3D, PDESolver};
-pub use nt_core_hcube::{E8FieldSolver, FieldSolverConfig};
-pub use nt_core_hcube::{SpatialAttentionGate, VSASpatialEncoder, Vec3D};
-pub use nt_core_hcube::{SpectralDenoiser, WaveGeometricEmbed, WaveGeometricVSA};
-
-// Re-export Agentic Search types
-// Re-export Semantic File Index types
-pub use nt_core_file_index::{
-    classify_intent, compute_file_hash, fuse_results, ContentIndex, FileIndexState, FileQuery,
-    MerkleNode, MerkleWatch, PathIndex, QueryEngine, QueryIntent, ScanResult, ScoredFile,
-    StructureIndex,
-};
-
-pub use nt_core_search::{
-    AgenticSearcher, HybridRetriever, RRFFuser, SearchBudget, SearchEvaluator, SearchPlan,
-    SearchPlanner, SearchResultItem, SearchStrategy, SearchVerdict, SearchedDocument,
-    SearchedDocumentCollection,
-};
-
-pub use nt_core_hcube::attractor_basin::{
-    AttractorBasin, AttractorBasinDynamics, BasinStats, BasinType,
-};
-pub use nt_core_hcube::dream_consolidation::{
-    ConsolidationPhase, DreamConfig, DreamConsolidation, DreamEvent, DreamPhase, DreamReport,
-    NremConfig, RemConfig,
-};
-pub use nt_core_hcube::ebbinghaus_decay::{DecayConfig, EbbinghausDecay, MemoryTrace};
-// Self-Referential Processing
 pub use nt_core_consciousness::{
     CalibrationBin, CognitiveState, CognitiveStateIngestion, ConsciousnessEvolution,
     ConsciousnessMetrics, DimSnapshot, EmergentReasoningConfig, EmergentReasoningMode,
@@ -365,33 +234,140 @@ pub use nt_core_consciousness::{
     ThreadType, TraitState,
 };
 
-// Re-export loop engineering types
+// GWT Resonance
+pub use nt_core_consciousness::gwt::resonance::{
+    compute_semantic_entropy, default_specialist_states, diversity_inject, resonate_and_select,
+    resonate_cycle, resonate_cycle_with_diversity, ResonanceMatrix, ResonanceReport,
+    DIVERSITY_MIN_ENTROPY, DIVERSITY_NOISE_AMPLITUDE, MODULE_COUNT, RESONANCE_THRESHOLD,
+};
+
+// Reasoning Bank
+pub use nt_core_reasoning::bank::{
+    MemoryLifecycle, MemoryTier, ReasoningBank, ReasoningBankStats, ReasoningMemory,
+    TemporalContext,
+};
+
+// Self model (meta-cognition)
+pub use nt_core_meta::{
+    AuditEngine, AuditFinding, AuditPhase, AuditReport, AuditStatus, FindingSeverity,
+    CodeScanner, GapCategory, GapCluster, GapReport, KnowledgeGap, KnowledgeGapDetector,
+    MetaCognitiveLoop, MetaCycleResult, AlertSeverity, HealthCheck, HealthTrend, MetaAlert,
+    MetaMonitor, ActionStatus, EvolutionAction, EvolutionPlanner, ImpactEstimate, MetaGoal,
+    MetaGoalBridge, PlannedEvolution, RiskLevel, CompilationHealth, ComponentMap, ComponentNode,
+    DebtSeverity, DepEdge, DepGraph, DepKind, EventKind, EvolutionEvent, FileInfo, ModuleInfo,
+    SelfModel, TechDebtInventory, TechDebtItem, TechDebtKind, TestCoverage, Weakness,
+    WeaknessAnalyzer, WeaknessReport, WeaknessSummary,
+};
+
+// Self model (silicon)
+pub use nt_core_consciousness::self_awareness::{
+    AttentionSnapshot, SiliconArchive, SiliconSnapshot, AttentionDomain, AttentionHead,
+    AttentionManager, AttentionProfile, CognitiveUnit, CognitiveUnitKind, ContextWindow,
+    IntraReflection, IntraReflectionReport, PreActionIntrospector, PredictedOutcome,
+    IntrinsicMotivation, MotivationState, CognitiveEvaluator, CognitiveFlag, CognitiveHealthReport,
+    FlagCategory, FlagSeverity, RepairSuggestion, RepairTarget, ReasoningStrategy,
+    ReasoningStrategyRegistry, StrategyKind, PlanRecord, SelfReferentialMonitor,
+    ThresholdAdjustment, SiliconSelfModel, SiliconSelfState, CrystalRegistry, SkillCrystal,
+    SystemIdentity, CognitiveCapability, ValueConstraint, ReflectionGrade, ThinkingStep,
+    ThinkingTrace,
+};
+
+// Agent architecture
+pub use nt_core_governance::arch::ArchitectAgent;
+
+// Context
+pub use nt_core_reasoning::context::context_gatherer::{
+    ContextFragment, ContextGatherer, ContextSource, ContextSourceMeta, GatheredContext,
+};
+pub use nt_core_reasoning::context::context_os::{ContextOS, ContextOSStats};
+pub use nt_core_reasoning::context::working_memory::{BindingOp, WorkingMemory, WorkingMemoryItem};
+pub use nt_core_reasoning::context::{
+    AllocatedSlice, AssembledContext, BudgetSourceType, CompactionIntent, CompactionPriority,
+    ContextBudget,
+};
+
+// Experience / Evolution
+pub use nt_core_experience::{
+    BridgeConfig, BridgeV2Stats, ConceptNode, ConsolidatedMemory, ConsolidationBridgeV2,
+    CurriculumGenerator, DifficultyLevel, DomainConfidence, EpistemicConfig, EpistemicSelfModel,
+    EpistemicState, ExperienceReflector, FailurePattern, FailureType, GeneratorConfig, Heuristic,
+    HeuristicCategory, HeuristicFilter, PolicyRepairEngine, ReflectorConfig, RepairMode,
+    RepairPolicy, SkillAccumulator, SkillComposition, SkillFilter, TaskTemplate, VSASkill,
+};
+pub use nt_core_experience::{
+    HarnessProposal, HarnessProposer, HarnessWeakness, ProposalValidator, SelfHarnessEngine,
+    WeaknessMiner,
+};
+
+// Knowledge
+pub use nt_core_knowledge::{
+    AngleSelector, Audience, Modality, MultimodalStoryteller, Story, StoryPlan, StoryRenderer,
+    Claim, EvidenceInspector, EvidenceVerificationResult, VerifiabilityGate, VerificationStatus,
+    KnowledgeProvider, KnowledgeSource, RewardSource, SourceAccessRecord, SourceAccessTracker,
+    TaskType,
+};
+
+// VSA HyperCube
+pub use nt_core_hcube::{
+    HrrBackend, SpectralVSA, TrigramInvertedIndex, e8_cortical_vsa_transform, CorticalCoord,
+    E8CorticalMapping, CORTICAL_NEURON_COUNT, BandPassExpert, FrequencyBand, GraphLaplacian,
+    HighPassExpert, LowPassExpert, MoSpectralExperts, SpectralExpert, SpectralFilter, SpectralNSR,
+    SpectralRule, CerebellumResonator, CortexAdaptive, ResonanceMode, CBRNN, DefectConfig,
+    E8ParticleSpectrum, E8TopologicalDefects, ForceType, HalfIntegerSpin, TopologicalCharge,
+    WeylOrbit, E8FieldIntegrator, E8Lagrangian, Lattice3D, PDESolver, E8FieldSolver,
+    FieldSolverConfig, SpatialAttentionGate, VSASpatialEncoder, Vec3D, SpectralDenoiser,
+    WaveGeometricEmbed, WaveGeometricVSA,
+};
+pub use nt_core_hcube::attractor_basin::{
+    AttractorBasin, AttractorBasinDynamics, BasinStats, BasinType,
+};
+pub use nt_core_hcube::dream_consolidation::{
+    ConsolidationPhase, DreamConfig, DreamConsolidation, DreamEvent, DreamPhase, DreamReport,
+    NremConfig, RemConfig,
+};
+pub use nt_core_hcube::ebbinghaus_decay::{DecayConfig, EbbinghausDecay, MemoryTrace};
+
+// File index
+pub use nt_core_knowledge::file_index::{
+    classify_intent, compute_file_hash, fuse_results, ContentIndex, FileIndexState, FileQuery,
+    MerkleNode, MerkleWatch, PathIndex, QueryEngine, QueryIntent, ScanResult, ScoredFile,
+    StructureIndex,
+};
+
+// Search & Retrieval
+pub use nt_core_search::{
+    AgenticSearcher, HybridRetriever, RRFFuser, SearchBudget, SearchEvaluator, SearchPlan,
+    SearchPlanner, SearchResultItem, SearchStrategy, SearchVerdict, SearchedDocument,
+    SearchedDocumentCollection,
+};
+
+// Loop Engineering
 pub use nt_core_loop::{
     CoverageReport, GoalRegistry, GraphStats, HandlerDiscovery, LoopEngine, LoopGoal,
     LoopGoalStatus, LoopPhase, LoopState, LoopStats, LoopVerifier, NodeGroup, PipelineConditions,
-    PipelineGraph, PipelineNodeData, Verdict,
+    PipelineGraph, PipelineNodeData, Verdict, StopConditionConfig, StopConditionState, StopReason,
 };
 
-// Re-export scheduler types
-pub use nt_core_scheduler::{
+// Scheduler
+pub use nt_core_loop::scheduler::{
     default_scheduler, ContextGate, JobRunHistory, JobRunRecord, ScheduleType, ScheduledJob,
     SchedulerEngine, SchedulerStats,
 };
 
-// Re-export agent types
+// Agent & Hive
 pub use nt_core_agent::{
     AgentCommunicationBus, AgentMessage, ByzantineConsensusLayer, CDPSessionManager,
     FactorMiner, QuantDataIngestion, RemoteAgentHost, TeamOrchestrator,
 };
 
-// Re-export translation types
+// Translation
 pub use nt_core_translate::{
     BilingualEntry, BilingualLexicon, CleanupRule, Language, TextAnalysis, TextType,
     TranslationOutput, TranslationPipeline, TranslationResult, TranslationStrategy,
     TranslationeseDiagnosis, TranslationeseSymptom, VerificationScore, VsaTranslationEngine,
 };
 
-// Re-export self-protection types
+// Security / Self-Protection
 pub use nt_core_protect::{
     install_panic_filter, obfuscate_str, reveal_bytes, sanitize_panic, strip_source_path,
     AttackAttempt, AttackSurface, AttackSurfaceScanner, DrillResult, EnvironmentValidator,
@@ -401,7 +377,7 @@ pub use nt_core_protect::{
     SelfProtection, ThinkingBlock, VsaFableRouter,
 };
 
-// Re-export production infrastructure types
+// Infrastructure
 pub use nt_core_health::{
     CommandProbe, ConsciousnessDashboard, DashboardWeights, DependencyRegistry, HealthProbe,
     HealthReport, HealthStatus, SystemHealth, ToolProbe,
@@ -413,18 +389,17 @@ pub use nt_core_output::{
 };
 pub use nt_core_ratelimit::{DomainRateLimiter, SlidingWindowRateLimiter, TokenBucket};
 pub use nt_core_shutdown::{DropGuard, GracefulShutdown, ShutdownPhase, ShutdownSignal};
-
-pub use nt_core_sandbox::{
+pub use nt_core_shield::sandbox::{
     SandboxConfig as KernelSandboxConfig, SandboxLevel as KernelSandboxLevel,
 };
 
-// Re-export world model types
-pub use nt_core_world_model::{
+// World Model
+pub use nt_core_knowledge::world_model::{
     ActionEmbedding, AdaptiveExitGate, DynamicsError, LoopedDynamics, SpectralConstraint,
     VsaLatentState,
 };
 
-// Re-export trading types
+// Trading
 pub use nt_core_trading::{
     AssetClass, DrawdownMonitor, FusedMarketSignal, KellyCalculator, MarketRegime, OHLCVBar,
     OnchainSignal, OrderType, PortfolioSummary, Position, PositionSizer, RiskConfig, RiskManager,

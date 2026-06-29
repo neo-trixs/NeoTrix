@@ -34,7 +34,243 @@
   --radius-lg:14px;
   --shadow:0 2px 12px rgba(0,0,0,0.04);
   --shadow-lg:0 8px 40px rgba(0,0,0,0.08);
+  --chat-msg-radius:14px;
+  --chat-sent-bg:var(--accent);
+  --chat-sent-color:#fff;
+  --chat-rec-bg:#f0f0f4;
+  --chat-rec-color:var(--text);
+  --timeline-color:var(--accent);
+  --bubble-shadow:none;
+  --hdr-frosted:rgba(255,255,255,0);
+  --hdr-blur:0px;
+  --transition-fast:0.12s;
+  --transition-med:0.2s;
 }
+
+/* ==========================================================
+   2026 Design System: Synthetic Naturalism
+   Unified structural foundation — only the palette changes per theme.
+   Principles: low saturation, high harmony, tactile mimicry, noise reduction.
+   ========================================================== */
+
+/* ===== Shared refinement (applies to all themes) ===== */
+.window{box-shadow:var(--shadow-lg),0 0 0 1px rgba(0,0,0,0.04);}
+.chat-item{border-radius:8px;padding:9px 12px;margin:0 -8px;}
+.msgs{padding:14px 20px;}
+.msg.u .mb{padding:9px 16px;}
+.msg.a .mb{padding:9px 16px;}
+.input-bar{border-radius:10px;padding:3px 4px 3px 12px;}
+.input-send{border-radius:8px;width:28px;height:28px;}
+.side-search{border-radius:10px;}
+.modal{border-radius:16px;}
+.set-input{border-radius:8px;}
+
+/* ===== Theme 1: Mist 雾 — Digital Lavender ===== */
+[data-theme="mist"]{
+  --bg:#f5f4f8;
+  --bg-panel:#ffffff;
+  --bg-sidebar:#f8f7fb;
+  --bg-hover:rgba(139,140,199,0.06);
+  --bg-active:rgba(139,140,199,0.10);
+  --text:#2a2a30;
+  --text-secondary:#858594;
+  --text-tertiary:#abaab8;
+  --border:rgba(139,140,199,0.10);
+  --border-strong:rgba(139,140,199,0.16);
+  --accent:#8b8cc7;
+  --accent-hover:#7a7bb8;
+  --green:#6bb89a;
+  --orange:#d4a86a;
+  --pink:#c98db5;
+  --purple:#9b8dc4;
+  --red:#c96a6a;
+  --canvas-bg:#f5f4f8;
+  --node-shadow:0 2px 8px rgba(139,140,199,0.08);
+  --chat-sent-bg:#8b8cc7;
+  --chat-sent-color:#fff;
+  --chat-rec-bg:#f0eff5;
+  --chat-rec-color:#2a2a30;
+  --timeline-color:#8b8cc7;
+}
+[data-theme="mist"] .msg.u .mb{border-radius:14px 14px 4px 14px;}
+[data-theme="mist"] .msg.a .mb{border-radius:14px 14px 14px 4px;}
+[data-theme="mist"] .input-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,140,199,0.10);background:#fff;}
+[data-theme="mist"] .tb-avatar{box-shadow:0 1px 3px rgba(139,140,199,0.2);}
+[data-theme="mist"] .tb-avatar:hover{box-shadow:0 2px 8px rgba(139,140,199,0.35);}
+[data-theme="mist"] .side-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,140,199,0.08);}
+[data-theme="mist"] .tab.active{color:var(--accent);background:var(--bg-active);}
+[data-theme="mist"] .chat-item.active{background:var(--bg-active);}
+[data-theme="mist"] .news-src{color:var(--accent);}
+[data-theme="mist"] .msg.u .ml{color:var(--accent);}
+
+/* ===== Theme 2: Warmth 暖 — Terracotta Earth ===== */
+[data-theme="warmth"]{
+  --bg:#f6f3f0;
+  --bg-panel:#fefdfc;
+  --bg-sidebar:#faf8f5;
+  --bg-hover:rgba(196,105,90,0.06);
+  --bg-active:rgba(196,105,90,0.10);
+  --text:#2d2826;
+  --text-secondary:#8a7e78;
+  --text-tertiary:#ada29b;
+  --border:rgba(196,105,90,0.10);
+  --border-strong:rgba(196,105,90,0.16);
+  --accent:#c4695a;
+  --accent-hover:#b1584a;
+  --green:#7fa87a;
+  --orange:#d4a86a;
+  --pink:#c98da5;
+  --purple:#a88dc4;
+  --red:#c96a6a;
+  --canvas-bg:#f6f3f0;
+  --node-shadow:0 2px 8px rgba(196,105,90,0.08);
+  --chat-sent-bg:#c4695a;
+  --chat-sent-color:#fff;
+  --chat-rec-bg:#f5f0ec;
+  --chat-rec-color:#2d2826;
+  --timeline-color:#c4695a;
+}
+[data-theme="warmth"] .msg.u .mb{border-radius:14px 14px 4px 14px;}
+[data-theme="warmth"] .msg.a .mb{border-radius:14px 14px 14px 4px;}
+[data-theme="warmth"] .input-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(196,105,90,0.10);background:#fff;}
+[data-theme="warmth"] .tb-avatar{box-shadow:0 1px 3px rgba(196,105,90,0.2);}
+[data-theme="warmth"] .tb-avatar:hover{box-shadow:0 2px 8px rgba(196,105,90,0.35);}
+[data-theme="warmth"] .side-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(196,105,90,0.08);}
+[data-theme="warmth"] .tab.active{color:var(--accent);background:var(--bg-active);}
+[data-theme="warmth"] .chat-item.active{background:var(--bg-active);}
+[data-theme="warmth"] .news-src{color:var(--accent);}
+[data-theme="warmth"] .msg.u .ml{color:var(--accent);}
+
+/* ===== Theme 3: Dusk 暮 — Warm Nocturnal ===== */
+[data-theme="dusk"]{
+  --bg:#1a1816;
+  --bg-panel:#201d1a;
+  --bg-sidebar:#1c1a17;
+  --bg-hover:rgba(212,148,74,0.07);
+  --bg-active:rgba(212,148,74,0.11);
+  --text:#e0dad3;
+  --text-secondary:#9a9086;
+  --text-tertiary:#6b6259;
+  --border:rgba(255,255,255,0.05);
+  --border-strong:rgba(255,255,255,0.09);
+  --accent:#d4944a;
+  --accent-hover:#e0a458;
+  --green:#6bb89a;
+  --orange:#d4a86a;
+  --pink:#c98da5;
+  --purple:#8d7fc4;
+  --red:#c96a6a;
+  --canvas-bg:#1a1816;
+  --node-shadow:0 2px 8px rgba(0,0,0,0.25);
+  --chat-sent-bg:#d4944a;
+  --chat-sent-color:#1c1a17;
+  --chat-rec-bg:#2a2622;
+  --chat-rec-color:#e0dad3;
+  --timeline-color:#d4944a;
+}
+[data-theme="dusk"] .msg.u .mb{border-radius:14px 14px 4px 14px;}
+[data-theme="dusk"] .msg.a .mb{border-radius:14px 14px 14px 4px;}
+[data-theme="dusk"] .input-bar{background:#2a2622;border-color:transparent;}
+[data-theme="dusk"] .input-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(212,148,74,0.10);background:#201d1a;}
+[data-theme="dusk"] .input-f{color:#e0dad3;}
+[data-theme="dusk"] .input-f::placeholder{color:#6b6259;}
+[data-theme="dusk"] .side-search{background:rgba(255,255,255,0.04);}
+[data-theme="dusk"] .side-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(212,148,74,0.08);}
+[data-theme="dusk"] .side-search input{color:#e0dad3;}
+[data-theme="dusk"] .side-search input::placeholder{color:#6b6259;}
+[data-theme="dusk"] .side-search .s-ico{color:#6b6259;}
+[data-theme="dusk"] .ib-btn{color:#6b6259;}
+[data-theme="dusk"] .ib-btn:hover{color:#e0dad3;background:rgba(255,255,255,0.06);}
+
+[data-theme="dusk"] .token-info{color:#6b6259;}
+[data-theme="dusk"] .rst-steps{background:#2a2622;}
+[data-theme="dusk"] .typing-d{background:#2a2622;}
+[data-theme="dusk"] .typing-d .ty-dot{background:#6b6259;}
+[data-theme="dusk"] .rst{color:#9a9086;}
+[data-theme="dusk"] .mb code{background:rgba(255,255,255,0.06);}
+[data-theme="dusk"] .tab{color:#6b6259;}
+[data-theme="dusk"] .tab:hover{color:#e0dad3;background:rgba(255,255,255,0.04);}
+[data-theme="dusk"] .tab.active{color:var(--accent);background:var(--bg-active);}
+[data-theme="dusk"] .chat-item{border-bottom-color:rgba(255,255,255,0.04);}
+[data-theme="dusk"] .chat-item:hover{background:rgba(255,255,255,0.04);}
+[data-theme="dusk"] .chat-item.active{background:var(--bg-active);}
+[data-theme="dusk"] .chat-name{color:#e0dad3;}
+[data-theme="dusk"] .chat-msg{color:#9a9086;}
+[data-theme="dusk"] .chat-time{color:#6b6259;}
+[data-theme="dusk"] .chat-badge{background:var(--accent);color:#1c1a17;}
+[data-theme="dusk"] .chat-av .av-dot{border-color:#201d1a;}
+[data-theme="dusk"] .sect-label{color:#6b6259;}
+[data-theme="dusk"] .msg.a .ml{color:#9a9086;}
+[data-theme="dusk"] .msg.u .ml{color:var(--accent);}
+[data-theme="dusk"] .news-src{color:var(--accent);}
+[data-theme="dusk"] .news-title{color:#e0dad3;}
+[data-theme="dusk"] .news-desc{color:#9a9086;}
+[data-theme="dusk"] .ct-name{color:#e0dad3;}
+[data-theme="dusk"] .ct-status{color:#9a9086;}
+[data-theme="dusk"] .mt-name{color:#e0dad3;}
+[data-theme="dusk"] .mt-text{color:#9a9086;}
+[data-theme="dusk"] .mt-time{color:#6b6259;}
+[data-theme="dusk"] .explore-search input{background:rgba(255,255,255,0.04);border-color:transparent;color:#e0dad3;}
+[data-theme="dusk"] .explore-search input::placeholder{color:#6b6259;}
+[data-theme="dusk"] .et{color:#6b6259;}
+[data-theme="dusk"] .et:hover{color:#e0dad3;background:rgba(255,255,255,0.04);}
+[data-theme="dusk"] .et.active{color:var(--accent);background:var(--bg-active);}
+[data-theme="dusk"] .canvas-title{color:#6b6259;}
+[data-theme="dusk"] .canvas-vp{background:var(--canvas-bg);}
+[data-theme="dusk"] .canvas-inner{background-image:radial-gradient(circle, rgba(255,255,255,0.04) 0.5px, transparent 0.5px);}
+[data-theme="dusk"] .node{background:#2a2622;box-shadow:0 2px 8px rgba(0,0,0,0.25),0 0 0 1px rgba(255,255,255,0.04);}
+[data-theme="dusk"] .node .n-hdr{border-bottom-color:rgba(255,255,255,0.04);}
+[data-theme="dusk"] .node .n-lbl{color:#9a9086;}
+[data-theme="dusk"] .node .n-body{color:#9a9086;}
+[data-theme="dusk"] .node.twin{background:linear-gradient(135deg,#2a2622,#201d1a);}
+[data-theme="dusk"] .twin-name{color:#e0dad3;}
+[data-theme="dusk"] .twin-state{color:#9a9086;}
+[data-theme="dusk"] .minimap{background:rgba(32,29,26,0.9);}
+[data-theme="dusk"] .zoom-ind{background:rgba(32,29,26,0.9);}
+[data-theme="dusk"] .zoom-ind button{color:#6b6259;}
+[data-theme="dusk"] .zoom-ind .z-val{color:#6b6259;}
+[data-theme="dusk"] .edge-line{stroke:rgba(255,255,255,0.08);}
+[data-theme="dusk"] .edge-line.active{stroke:var(--accent);}
+[data-theme="dusk"] .modal-overlay{background:rgba(0,0,0,0.45);}
+[data-theme="dusk"] .modal{background:#201d1a;}
+
+/* ===== Theme 4: Bloom 华 — Sage Fresh ===== */
+[data-theme="bloom"]{
+  --bg:#f5f7f4;
+  --bg-panel:#fefefe;
+  --bg-sidebar:#f9faf8;
+  --bg-hover:rgba(143,188,143,0.06);
+  --bg-active:rgba(143,188,143,0.10);
+  --text:#2a2e28;
+  --text-secondary:#7d8a78;
+  --text-tertiary:#a8b4a3;
+  --border:rgba(143,188,143,0.10);
+  --border-strong:rgba(143,188,143,0.16);
+  --accent:#8fbc8f;
+  --accent-hover:#7aab7a;
+  --green:#8fbc8f;
+  --orange:#d4b86a;
+  --pink:#c9a8b5;
+  --purple:#a8a8c4;
+  --red:#c97a6a;
+  --canvas-bg:#f5f7f4;
+  --node-shadow:0 2px 8px rgba(143,188,143,0.08);
+  --chat-sent-bg:#8fbc8f;
+  --chat-sent-color:#fff;
+  --chat-rec-bg:#f0f5ef;
+  --chat-rec-color:#2a2e28;
+  --timeline-color:#8fbc8f;
+}
+[data-theme="bloom"] .msg.u .mb{border-radius:14px 14px 4px 14px;}
+[data-theme="bloom"] .msg.a .mb{border-radius:14px 14px 14px 4px;}
+[data-theme="bloom"] .input-bar:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(143,188,143,0.10);background:#fff;}
+[data-theme="bloom"] .tb-avatar{box-shadow:0 1px 3px rgba(143,188,143,0.2);}
+[data-theme="bloom"] .tb-avatar:hover{box-shadow:0 2px 8px rgba(143,188,143,0.35);}
+[data-theme="bloom"] .side-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(143,188,143,0.08);}
+[data-theme="bloom"] .tab.active{color:var(--accent);background:var(--bg-active);}
+[data-theme="bloom"] .chat-item.active{background:var(--bg-active);}
+[data-theme="bloom"] .news-src{color:var(--accent);}
+[data-theme="bloom"] .msg.u .ml{color:var(--accent);}
 
 body{
   background:#e8e8ed;font-family:var(--font);
@@ -44,7 +280,7 @@ body{
 .label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-tertiary);font-weight:500;}
 
 .window{
-  width:1050px;height:620px;
+  width:1080px;height:640px;
   background:var(--bg-panel);
   border-radius:var(--radius-lg);
   box-shadow:var(--shadow-lg),0 0 0 1px rgba(0,0,0,0.04);
@@ -71,6 +307,45 @@ body{
   transition:all 0.1s;
 }
 .tb-btn:hover{background:var(--bg-hover);color:var(--text);}
+
+/* User avatar + dropdown */
+.user-menu{position:relative;}
+.tb-avatar{
+  width:26px;height:26px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:11px;font-weight:600;cursor:pointer;
+  transition:all 0.15s;user-select:none;
+  box-shadow:0 1px 3px rgba(94,138,255,0.2);
+}
+.tb-avatar:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(94,138,255,0.35);}
+.user-dropdown{
+  position:absolute;top:32px;right:0;width:200px;
+  background:var(--bg-panel);border-radius:var(--radius-md);
+  box-shadow:0 8px 32px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.04);
+  opacity:0;visibility:hidden;transform:translateY(-4px);
+  transition:all 0.15s;z-index:100;overflow:hidden;
+}
+.user-dropdown.open{opacity:1;visibility:visible;transform:translateY(0);}
+.ud-hdr{display:flex;align-items:center;gap:8px;padding:12px 12px 10px;border-bottom:1px solid var(--border);}
+.ud-av{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:12px;font-weight:600;flex-shrink:0;
+}
+.ud-info{min-width:0;}
+.ud-name{font-size:12px;font-weight:600;color:var(--text);}
+.ud-email{font-size:10px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ud-item{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  font-size:12px;color:var(--text);cursor:pointer;transition:background 0.06s;
+}
+.ud-item:hover{background:var(--bg-hover);color:var(--accent);}
+.ud-item svg{flex-shrink:0;}
+.ud-danger{color:var(--red);}
+.ud-danger:hover{color:var(--red);background:#fff0f0;}
+.ud-sep{height:1px;background:var(--border);margin:4px 0;}
 
 /* ===== Body ===== */
 .body{flex:1;display:flex;overflow:hidden;border-top:1px solid var(--border);}
@@ -182,6 +457,7 @@ body{
   padding:7px 6px;border-radius:var(--radius-sm);cursor:pointer;transition:background 0.08s;
 }
 .contact-item:hover{background:var(--bg-hover);}
+.contact-item.active{background:var(--bg-active);}
 .ct-name{font-size:12px;font-weight:500;color:var(--text);}
 .ct-status{font-size:10px;color:var(--text-tertiary);margin-top:1px;}
 
@@ -217,6 +493,11 @@ body{
 
 /* Explore tab */
 .explore-search{padding:8px 6px;}
+.sect-new{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:4px;cursor:pointer;opacity:0.4;transition:all .2s;margin-left:auto;vertical-align:middle;}
+.sect-new:hover{opacity:1;background:var(--bg-hover);}
+.api-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#999;transition:background .3s;}
+.api-dot.online{background:#34c759;box-shadow:0 0 4px rgba(52,199,89,0.4);}
+.api-dot.offline{background:#ff3b30;}
 .explore-search input{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:11px;outline:none;background:#fafafa;font-family:var(--font);}
 .explore-panel{display:none;}
 .explore-panel.active{display:block;}
@@ -230,10 +511,26 @@ body{
 
 .chat-hdr-m{
   display:flex;align-items:center;gap:10px;
-  padding:8px 20px;border-bottom:1px solid var(--border);flex-shrink:0;
+  padding:6px 20px;border-bottom:1px solid var(--border);flex-shrink:0;
+  min-height:38px;
 }
-.cm-dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+.cm-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--green);
+  transition:background 0.3s, box-shadow 0.3s;
+}
+.cm-dot.thinking{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:cmPulse 1s ease-in-out infinite;}
+.cm-dot.working{background:var(--orange);box-shadow:0 0 6px var(--orange);}
+.cm-dot.idle{background:var(--text-tertiary);}
+.cm-dot.error{background:var(--red);box-shadow:0 0 6px var(--red);}
+@keyframes cmPulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.cm-state{font-size:10px;color:var(--text-tertiary);margin-left:2px;font-weight:400;}
 .cm-name{font-size:13px;font-weight:600;color:var(--text);}
+.cm-model-select{
+  font-size:9px;padding:2px 5px;border:1px solid var(--border);border-radius:5px;
+  background:var(--bg-panel);color:var(--text-secondary);outline:none;
+  cursor:pointer;font-family:var(--font);
+}
+.cm-model-select:focus{border-color:var(--accent);}
 .cm-act{
   width:26px;height:26px;border-radius:var(--radius-sm);
   display:flex;align-items:center;justify-content:center;
@@ -241,7 +538,7 @@ body{
 }
 .cm-act:hover{background:var(--bg-hover);color:var(--text);}
 
-.msgs{flex:1;overflow-y:auto;padding:14px 24px;display:flex;flex-direction:column;gap:10px;}
+.msgs{flex:1;overflow-y:auto;padding:16px 24px;display:flex;flex-direction:column;gap:14px;}
 
 .msg{max-width:520px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:2px;position:relative;}
 .msg.u{align-items:flex-end;}
@@ -267,6 +564,22 @@ body{
   font-size:10px;color:var(--text-tertiary);cursor:pointer;
 }
 .msg .msg-acts span:hover{background:var(--bg-hover);color:var(--text);}
+.msg-acts .ma-more-open{background:var(--bg-hover);color:var(--text);}
+.ma-dropdown{position:absolute;bottom:100%;right:0;background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:4px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:50;min-width:120px;display:none;margin-bottom:4px;}
+.ma-dropdown.open{display:block;}
+.ma-dropdown .ma-item{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:5px;font-size:11px;color:var(--text-secondary);cursor:pointer;}
+.ma-dropdown .ma-item:hover{background:var(--bg-hover);color:var(--text);}
+.ma-dropdown .ma-item.ma-del{color:#ff3b30;}
+.ma-dropdown .ma-item svg{flex-shrink:0;}
+/* Code block */
+.mb pre{background:rgba(0,0,0,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:6px 0;overflow-x:auto;font-family:var(--mono);font-size:11px;line-height:1.6;}
+.mb pre code{background:none;padding:0;font-size:11px;}
+.mb :not(pre) > code{background:rgba(0,0,0,0.04);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px;}
+/* Edit mode */
+.msg-edit{display:flex;gap:6px;align-items:flex-start;}
+.msg-edit textarea{flex:1;padding:8px 10px;border:1px solid var(--accent);border-radius:8px;background:var(--bg-panel);color:var(--text);font-family:var(--font);font-size:12px;resize:vertical;min-height:40px;outline:none;}
+.msg-edit .me-acts{display:flex;gap:4px;flex-shrink:0;}
+.msg-edit .me-acts button{padding:6px 12px;border-radius:6px;border:none;font-size:10px;cursor:pointer;font-weight:500;}
 .ml{font-size:10px;font-weight:500;color:var(--text-tertiary);padding:0 4px;}
 .msg.u .ml{color:var(--accent);}
 .mb{padding:9px 14px;font-size:13px;line-height:1.6;letter-spacing:-0.1px;}
@@ -297,6 +610,139 @@ body{
 .rst-steps.open{display:flex;}
 .rst{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);padding:1px 0;}
 .rst-d{width:4px;height:4px;border-radius:50%;flex-shrink:0;}
+
+/* Semantic reasoning step cards */
+.rst-card{
+  display:none;flex-direction:column;gap:3px;
+  padding:6px 8px;background:#f0f0f4;
+  border-radius:10px;margin-bottom:3px;
+}
+.rst-card.open{display:flex;}
+.rst-step{
+  display:flex;align-items:center;gap:6px;font-size:11px;
+  color:var(--text-secondary);padding:3px 6px;
+  border-radius:6px;transition:all 0.12s;
+}
+.rst-step:hover{background:var(--bg-hover);}
+.rst-step .rs-icon{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
+.rs-icon.search{background:#5ac8fa;}
+.rs-icon.code{background:var(--green);}
+.rs-icon.think{background:var(--accent);}
+.rs-icon.browse{background:var(--orange);}
+.rs-icon.file{background:var(--pink);}
+.rs-icon.done{background:var(--green);opacity:0.6;}
+.rst-step .rs-label{flex:1;}
+.rst-step .rs-time{font-size:9px;color:var(--text-tertiary);font-family:var(--mono);}
+.rst-step .rs-stat{font-size:8px;color:var(--text-tertiary);background:var(--bg-panel);padding:1px 5px;border-radius:4px;font-family:var(--mono);}
+
+/* Inline tool call cards */
+.tool-card{
+  display:none;align-items:center;gap:8px;
+  padding:6px 10px;border:1px solid var(--border);
+  border-radius:10px;margin-bottom:4px;
+  font-size:11px;color:var(--text-secondary);
+  animation:toolIn 0.2s ease-out;
+}
+.tool-card.open{display:flex;}
+@keyframes toolIn{from{opacity:0;transform:translateY(6px)}}
+.tool-card .tc-ico{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;flex-shrink:0;}
+.tc-ico.t-search{background:#5ac8fa;}
+.tc-ico.t-code{background:var(--green);}
+.tc-ico.t-browse{background:var(--orange);}
+.tc-ico.t-think{background:var(--accent);}
+.tc-ico.t-done{background:var(--green);}
+.tool-card .tc-body{flex:1;min-width:0;}
+.tool-card .tc-title{font-weight:500;color:var(--text);}
+.tool-card .tc-desc{font-size:10px;color:var(--text-tertiary);margin-top:1px;}
+.tool-card .tc-stat{font-size:9px;color:var(--text-tertiary);font-family:var(--mono);flex-shrink:0;}
+
+/* Confidence bar */
+.cf-bar{display:flex;align-items:center;gap:5px;margin-top:3px;padding:0 2px;}
+.cf-track{flex:1;height:3px;background:var(--border);border-radius:2px;overflow:hidden;max-width:100px;}
+.cf-fill{height:100%;border-radius:2px;transition:width 0.4s;}
+.cf-fill.high{background:var(--green);}
+.cf-fill.med{background:var(--orange);}
+.cf-fill.low{background:var(--red);}
+.cf-lbl{font-size:9px;color:var(--text-tertiary);font-family:var(--mono);}
+
+/* Model routing badges */
+.model-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:9px;padding:2px 7px;border-radius:5px;
+  font-weight:500;margin-right:3px;vertical-align:middle;
+  border:1px solid transparent;
+}
+.mb-core{background:rgba(94,138,255,0.1);color:var(--accent);border-color:rgba(94,138,255,0.2);}
+.mb-claude{background:rgba(200,140,100,0.1);color:#c88c64;border-color:rgba(200,140,100,0.2);}
+.mb-deepseek{background:rgba(77,182,140,0.1);color:#4db68c;border-color:rgba(77,182,140,0.2);}
+.mb-gpt{background:rgba(0,180,120,0.1);color:#00b478;border-color:rgba(0,180,120,0.2);}
+.mb-gemini{background:rgba(66,133,244,0.1);color:#4285f4;border-color:rgba(66,133,244,0.2);}
+.mb-custom{background:rgba(150,100,200,0.1);color:#9664c8;border-color:rgba(150,100,200,0.2);}
+.model-badge svg{width:10px;height:10px;opacity:0.7;}
+
+/* Dispatch flow indicator */
+.dispatch-line{
+  display:flex;align-items:center;gap:5px;
+  padding:2px 8px;margin-bottom:3px;font-size:9px;
+  color:var(--text-tertiary);background:var(--bg-hover);
+  border-radius:6px;animation:dispIn 0.25s ease-out;
+  flex-wrap:wrap;
+}
+@keyframes dispIn{from{opacity:0;transform:translateX(-8px)}}
+.dispatch-line .dl-arrow{font-size:7px;color:var(--accent);}
+.dispatch-line .dl-core{color:var(--accent);font-weight:500;}
+.dispatch-line .dl-to{opacity:0.4;}
+
+/* Custom model form */
+.model-form{display:none;flex-direction:column;gap:8px;margin-top:6px;padding:10px;background:var(--bg-hover);border-radius:10px;}
+.model-form.open{display:flex;}
+.model-form .mf-row{display:flex;gap:6px;}
+.model-form .mf-label{font-size:10px;color:var(--text-secondary);font-weight:500;}
+.model-form .mf-input{flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;background:var(--bg-panel);color:var(--text);outline:none;font-family:var(--font);}
+.model-form .mf-input:focus{border-color:var(--accent);}
+.mf-cap-grid{display:flex;flex-wrap:wrap;gap:4px;}
+.mf-cap{font-size:9px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);cursor:pointer;transition:all 0.1s;background:var(--bg-panel);color:var(--text-secondary);}
+.mf-cap.active{background:rgba(94,138,255,0.1);border-color:var(--accent);color:var(--accent);}
+
+/* Source badges */
+.src-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:9px;padding:1px 6px;border-radius:4px;
+  background:var(--bg-hover);color:var(--text-tertiary);
+  margin-top:2px;margin-right:4px;
+}
+.src-badge svg{width:10px;height:10px;opacity:0.5;}
+
+/* Agent mode toggle */
+.input-mode{
+  display:flex;align-items:center;gap:0;
+  background:var(--bg-hover);border-radius:6px;padding:2px;flex-shrink:0;
+}
+.input-mode .im-opt{
+  padding:3px 8px;font-size:10px;font-weight:500;color:var(--text-tertiary);
+  border-radius:4px;cursor:pointer;transition:all 0.1s;white-space:nowrap;
+}
+.input-mode .im-opt:hover{color:var(--text);}
+.input-mode .im-opt.active{background:var(--bg-panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+
+/* Agent plan bar */
+.plan-bar{
+  display:none;align-items:center;gap:6px;
+  padding:4px 8px;margin-bottom:4px;font-size:10px;
+  background:#f8f8fa;border-radius:8px;overflow:hidden;
+}
+.plan-bar.open{display:flex;}
+.plan-bar .pb-steps{display:flex;gap:6px;flex:1;overflow:hidden;}
+.plan-bar .pb-step{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-tertiary);white-space:nowrap;}
+.plan-bar .pb-step.active{color:var(--accent);font-weight:500;}
+.plan-bar .pb-step.done{color:var(--green);}
+.plan-bar .pb-dot{width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.plan-bar .pb-arrow{font-size:6px;color:var(--text-tertiary);}
+
+/* Streaming cursor blink */
+@keyframes streamBlink{0%,100%{opacity:1}50%{opacity:0}}
+.stream-cursor{display:inline-block;width:2px;height:14px;background:var(--text);margin-left:1px;vertical-align:middle;animation:streamBlink 0.7s infinite;}
+.stream-cursor.thinking{background:var(--accent);height:12px;border-radius:1px;}
 
 .typing{
   display:flex;align-items:center;gap:6px;
@@ -333,13 +779,34 @@ body{
   transition:all 0.1s;
 }
 .ib-btn:hover{background:var(--bg-hover);color:var(--text);}
+.model-picker{position:relative;display:inline-flex;align-items:center;margin-right:4px;}
 .input-model{
-  display:flex;align-items:center;gap:4px;
-  font-size:10px;color:var(--text-tertiary);
-  padding:3px 7px;border-radius:6px;cursor:pointer;
-  white-space:nowrap;flex-shrink:0;
+  display:flex;align-items:center;gap:4px;font-size:9px;cursor:pointer;
+  padding:3px 7px;border-radius:6px;background:var(--accent);color:#fff;
+  font-family:var(--font);font-weight:600;border:none;white-space:nowrap;flex-shrink:0;user-select:none;
 }
-.input-model:hover{background:var(--bg-hover);color:var(--text);}
+.input-model:hover{opacity:0.85;}
+.mp-dropdown{
+  position:absolute;bottom:calc(100% + 6px);left:0;min-width:160px;
+  background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;
+  padding:4px 0;box-shadow:0 8px 24px rgba(0,0,0,0.1);display:none;z-index:100;
+  animation:mpIn 0.15s ease-out;
+}
+@keyframes mpIn{from{opacity:0;transform:translateY(4px);}}
+.mp-dropdown.open{display:block;}
+.mp-dropdown.open{display:block;}
+.mp-hdr{font-size:8px;color:var(--text-tertiary);padding:4px 10px 3px;text-transform:uppercase;letter-spacing:0.5px;}
+.mp-opt{
+  display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:10px;
+  color:var(--text);cursor:pointer;transition:background 0.15s;
+}
+.mp-opt:hover{background:var(--bg-hover);}
+.mp-opt.active{color:var(--accent);font-weight:600;}
+.mp-opt.active::after{content:'✓';margin-left:auto;font-size:9px;color:var(--accent);}
+.mp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.mp-opt.mp-offline{opacity:0.4;pointer-events:none;}
+[data-theme="dusk"] .mp-dropdown{background:#292524;border-color:#3c3836;}
+[data-theme="dusk"] .mp-opt:hover{background:#3c3836;}
 .input-send{
   width:28px;height:28px;border-radius:7px;
   display:flex;align-items:center;justify-content:center;
@@ -442,8 +909,9 @@ body{
 .web-ph svg{width:16px;height:16px;opacity:0.5;}
 
 .edges-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
-.edge-line{stroke:#d0d0d5;stroke-width:1.5;fill:none;stroke-dasharray:4 3;opacity:0.6;}
-.edge-line.active{stroke:var(--accent);stroke-width:2;stroke-dasharray:none;opacity:1;}
+.edge-line{stroke:#d0d0d5;stroke-width:1.5;fill:none;stroke-dasharray:4 3;opacity:0.45;transition:opacity 0.3s,stroke 0.3s;}
+.edge-line.active{stroke:var(--accent);stroke-width:2;stroke-dasharray:none;opacity:0.7;}
+.edge-line.active:hover{opacity:1;}
 
 .minimap{
   position:absolute;bottom:8px;right:8px;
@@ -484,7 +952,7 @@ body{
 .modal-overlay.open{display:flex;}
 
 .modal{
-  width:620px;max-height:480px;
+  width:640px;max-height:520px;
   background:var(--bg-panel);
   border-radius:var(--radius-lg);
   box-shadow:var(--shadow-lg);
@@ -555,13 +1023,13 @@ body{
 .set-toggle-sw{
   width:32px;height:18px;border-radius:9px;
   background:#e5e5e7;cursor:pointer;position:relative;
-  transition:background 0.15s;
+  transition:background 0.2s;flex-shrink:0;
 }
 .set-toggle-sw.on{background:var(--accent);}
 .set-toggle-sw::after{
   content:'';position:absolute;top:2px;left:2px;
   width:14px;height:14px;border-radius:50%;background:#fff;
-  transition:transform 0.15s;box-shadow:0 1px 3px rgba(0,0,0,0.1);
+  transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 1px 3px rgba(0,0,0,0.1);
 }
 .set-toggle-sw.on::after{transform:translateX(14px);}
 
@@ -574,6 +1042,49 @@ body{
 .set-btn.primary:hover{background:var(--accent-hover);}
 .set-btn.secondary{background:var(--bg-hover);color:var(--text);}
 .set-btn.secondary:hover{background:#e5e5e7;}
+
+/* Settings group titles */
+.set-group-title{
+  font-size:10px;font-weight:600;color:var(--text-tertiary);
+  text-transform:uppercase;letter-spacing:0.5px;
+  margin-bottom:6px;padding-top:4px;
+}
+.set-group + .set-group .set-group-title{padding-top:0;}
+
+/* API key items */
+.set-api-item{margin-bottom:10px;padding:8px 10px;background:var(--bg);border-radius:8px;border:1px solid var(--border);}
+.set-api-hdr{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--text);font-weight:500;}
+.set-api-hdr svg{color:var(--text-tertiary);}
+.set-api-status{font-size:9px;padding:1px 6px;border-radius:4px;background:var(--bg-hover);color:var(--text-tertiary);margin-left:auto;}
+.set-api-status.ok{background:rgba(52,199,89,0.12);color:var(--green);}
+.set-api-status.err{background:rgba(255,69,58,0.12);color:var(--red);}
+
+/* Shortcuts list */
+.sc-list{display:flex;flex-direction:column;}
+.sc-item{display:flex;align-items:center;justify-content:space-between;padding:5px 4px;font-size:11px;color:var(--text);border-radius:4px;}
+.sc-item:hover{background:var(--bg-hover);}
+.sc-label{color:var(--text-secondary);}
+.sc-key{display:flex;gap:3px;}
+.sc-key kbd{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:20px;height:18px;padding:0 4px;
+  background:var(--bg-panel);border:1px solid var(--border);border-radius:4px;
+  font-family:var(--mono);font-size:9px;color:var(--text-secondary);
+  box-shadow:0 1px 0 var(--border);
+}
+
+/* About stats grid */
+.set-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.set-stat-item{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;font-size:11px;color:var(--text-secondary);border-radius:4px;}
+.set-stat-item:hover{background:var(--bg-hover);}
+.stat-val{font-family:var(--mono);font-size:10px;color:var(--text);}
+.stat-val.ok{color:var(--green);display:flex;align-items:center;gap:4px;}
+.stat-val.mono{font-size:9px;color:var(--text-tertiary);}
+.stat-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;}
+
+/* Toggle with icon inline */
+.set-toggle-lbl{display:flex;align-items:center;gap:6px;}
+.set-toggle-lbl svg{opacity:0.5;flex-shrink:0;}
 
 /* Context menu */
 .ctx-menu{
@@ -607,6 +1118,7 @@ body{
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.06);border-radius:2px;}
 ::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.1);}
+@keyframes slideInRight{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
 </style>
 </head>
 <body>
@@ -622,9 +1134,28 @@ body{
     <div class="traffic">
       <span class="tl tl1"></span><span class="tl tl2"></span><span class="tl tl3"></span>
     </div>
-    <div class="brand"><span class="brand-d"></span>NeoTrix</div>
+    <div class="brand"></div>
     <div class="title-sp"></div>
-    <span class="tb-btn" onclick="openSettings()" title="设置"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+    <div class="user-menu" id="userMenu">
+      <span class="tb-avatar" onclick="toggleUserMenu()" title="User">N</span>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="ud-hdr">
+          <div class="ud-av">N</div>
+          <div class="ud-info">
+            <div class="ud-name">NeoTrix</div>
+            <div class="ud-email">neo@neotrix.ai</div>
+          </div>
+        </div>
+        <div class="ud-item" onclick="openSettings();toggleUserMenu()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Preferences</div>
+        <div class="ud-item" onclick="toggleUserMenu()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5V12M12 4.5A2.5 2.5 0 0 1 14.5 2M12 4.5V12"/><path d="M12 12a3 3 0 0 0-3 3v5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-5a3 3 0 0 0-3-3z"/><path d="M7 22h10"/></svg> Account</div>
+        <div class="ud-sep"></div>
+        <div class="ud-item" onclick="toggleUserMenu()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><path d="M6 6h.01M6 18h.01"/></svg> Integrations</div>
+        <div class="ud-sep"></div>
+        <div class="ud-item" onclick="toggleUserMenu()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg> About NeoTrix</div>
+        <div class="ud-sep"></div>
+        <div class="ud-item ud-danger" onclick="toggleUserMenu()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sign Out</div>
+      </div>
+    </div>
   </div>
 
   <div class="body">
@@ -644,7 +1175,7 @@ body{
       </div>
 
       <div class="tab-content active" id="tab-chat">
-        <div class="sect-label">session</div>
+        <div class="sect-label">session <span class="sect-new" onclick="startNewChat()" title="New chat"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></div>
         <div class="chat-item active" data-pinned="true" oncontextmenu="showContextMenu(event,this)">
           <div class="chat-av">意<span class="av-dot online"></span></div>
           <div class="chat-info">
@@ -760,7 +1291,7 @@ body{
 
       <div class="tab-content" id="tab-explore">
         <div class="explore-search">
-          <input type="text" placeholder="Search feeds, news, topics...">
+          <input type="text" placeholder="Search feeds, news, topics..." oninput="filterExplore(this.value)">
         </div>
         <div class="explore-tabs">
           <span class="et active" onclick="switchExploreTab(this,'moments')">Moments</span>
@@ -787,6 +1318,10 @@ body{
               <div class="mt-hdr"><div class="chat-av av6">C<span class="av-dot online"></span></div><div class="mt-name">Claude Code</div><div class="mt-time">yesterday 14:20</div></div>
               <div class="mt-text">Updated codebase memory index — 158 languages, hybrid LSP, semantic search with 99.2% token reduction.</div>
               <div class="mt-actions"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> 18</span><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 4</span></div>
+            </div>
+            <div style="text-align:center;padding:12px 0;">
+              <span id="exploreLoadMore" onclick="loadMoreExplore()" style="font-size:10px;color:var(--accent);cursor:pointer;padding:6px 16px;border:1px solid var(--border);border-radius:6px;display:inline-flex;align-items:center;gap:4px;">加载更多</span>
+              <span id="exploreLoading" style="display:none;font-size:10px;color:var(--text-tertiary);">加载中...</span>
             </div>
           </div>
           <div class="explore-panel" id="exp-trending">
@@ -845,43 +1380,86 @@ body{
 
     <!-- Column 2: Main Chat -->
     <div class="col-main">
-      <div class="chat-hdr-m">
-        <span class="cm-dot"></span>
+    <div class="chat-hdr-m">
+        <span class="cm-dot thinking" id="agentDot"></span>
         <span class="cm-name">意识回路 · 架构设计</span>
+        <span class="cm-state" id="agentStateLabel">推理中</span>
         <span class="title-sp"></span>
-        <span class="cm-act" onclick="alert('call')" title="call">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        <span class="cm-act" id="chatSearchBtn" onclick="toggleChatSearch()" title="search in chat">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </span>
-        <span class="cm-act" onclick="alert('video')" title="video">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        <span class="cm-act" onclick="showToast('清理消息...','info');setTimeout(()=>{document.querySelectorAll(\".msgs .msg\").forEach(m=>m.remove());showToast('已完成','success',1500)},300)" title="clear">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </span>
-        <span class="cm-act" onclick="alert('more')" title="more">⋯</span>
+        <span class="cm-act" onclick="alert('Connecting...')" title="audio call">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </span>
+        <span class="cm-act" onclick="showToast('视频通话功能即将推出','info',2000)" title="video call">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        </span>
+        <span class="cm-act" onclick="openSettings()" title="settings">⚙</span>
       </div>
 
       <div class="msgs">
-        <div class="msg u">
+        <div class="msg u" id="msg-ex1">
           <div class="ml">你 · 12:30</div>
-          <div class="mb">GWT 广播引擎的竞争选择具体怎么工作的？</div>
-          <div class="msg-acts"><span title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span><span title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span title="更多">⋯</span></div>
+          <div class="mb"><div class="mb-text">GWT 广播引擎的竞争选择具体怎么工作的？</div></div>
+          <div class="msg-acts"><span onclick="replyToMsg('msg-ex1')" title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span><span onclick="copyMessage('msg-ex1')" title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span onclick="editMessage('msg-ex1')" title="编辑"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span></div>
         </div>
         <div class="token-info">↳ 48 tok · $0.0007</div>
 
-        <div class="msg a">
-          <div class="ml">NeoTrix · 12:30</div>
-          <div class="rst-ct" onclick="toggleReasoning(this)">
+          <div class="msg a" id="msg-ex2">
+          <div class="ml">
+            <span class="model-badge mb-core"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>E8</span>
+            NeoTrix · 12:30
+          </div>
+          <div class="dispatch-line">
+            <span class="dl-core" style="color:var(--accent);">E8</span>
+            <span class="dl-arrow">⇉</span>
+            <span class="model-badge mb-claude"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Claude</span>
+            <span class="model-badge mb-deepseek" style="margin-left:2px;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 6a6 6 0 0 1 6 6"/><path d="M12 10a2 2 0 0 1 2 2"/></svg>DeepSeek</span>
+            <span class="dl-to">协同架构分析</span>
+            <span style="flex:1"></span>
+            <span style="font-size:8px;color:var(--text-tertiary);font-family:var(--mono);">0.4s · 99%</span>
+          </div>
+          <div class="rst-ct open" onclick="toggleReasoning(this)">
             <span class="rst-ar"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
             <span>推理过程</span>
             <span style="font-size:9px;opacity:0.4">1.2s</span>
           </div>
-          <div class="rst-steps">
-            <div class="rst"><span class="rst-d" style="background:var(--green)"></span>解析查询意图</div>
-            <div class="rst"><span class="rst-d" style="background:var(--green)"></span>检索 GWT 架构文档</div>
-            <div class="rst"><span class="rst-d" style="background:var(--accent)"></span>构建响应</div>
+          <div class="rst-card open">
+            <div class="rst-step"><span class="rs-icon search">⌕</span><span class="rs-label"><span class="model-badge mb-core" style="font-size:8px;padding:1px 4px;margin-right:3px;">核心</span>解析查询意图</span><span class="rs-stat">3 tok</span><span class="rs-time">0.2s</span></div>
+            <div class="rst-step"><span class="rs-icon search">⌕</span><span class="rs-label"><span class="model-badge mb-claude" style="font-size:8px;padding:1px 4px;margin-right:3px;">Claude</span>检索 GWT 架构文档</span><span class="rs-stat">2/3</span><span class="rs-time">0.4s</span></div>
+            <div class="rst-step"><span class="rs-icon think">◈</span><span class="rs-label"><span class="model-badge mb-deepseek" style="font-size:8px;padding:1px 4px;margin-right:3px;">DeepSeek</span>验证技术细节</span><span class="rs-stat">97%</span><span class="rs-time">0.3s</span></div>
+            <div class="rst-step"><span class="rs-icon think done">✓</span><span class="rs-label"><span class="model-badge mb-core" style="font-size:8px;padding:1px 4px;margin-right:3px;">核心</span>融合结果 → 构建响应</span><span class="rs-stat">98%</span><span class="rs-time">0.3s</span></div>
+          </div>
+          <div class="tool-card open">
+            <span class="tc-ico t-search">⌕</span>
+            <div class="tc-body">
+              <div class="tc-title">检索 GWT 架构文档 <span class="model-badge mb-claude" style="font-size:8px;padding:1px 4px;margin-left:4px;">Claude Opus 5</span></div>
+              <div class="tc-desc">匹配 3 个知识条目 · 最相关: GlobalWorkspace::softmax_select()</div>
+            </div>
+            <span class="tc-stat">342 tok → 3 结果</span>
+          </div>
+          <div class="tool-card open">
+            <span class="tc-ico t-think">◈</span>
+            <div class="tc-body">
+              <div class="tc-title">竞争选择推理 <span class="model-badge mb-deepseek" style="font-size:8px;padding:1px 4px;margin-left:4px;">DeepSeek V4</span></div>
+              <div class="tc-desc">softmax 温度 0.85 · 胜出: GlobalWorkspace · 置信度 94.2%</div>
+            </div>
+            <span class="tc-stat">2.1s · 187 tok</span>
           </div>
           <div class="mb">
             GWT 广播引擎通过 <code>softmax</code> 注意力机制实现竞争选择：每项计算显著性得分 (novelty, relevance, urgency)，softmax 归一化选出 top-1 进入全局工作空间，胜出内容广播到所有子系统。
             <br><br>
             4 种触发模式：死锁恢复、熵降低、高显著性、周期性。
+          </div>
+          <div class="cf-bar">
+            <span class="cf-lbl">置信度</span>
+            <div class="cf-track"><div class="cf-fill high" style="width:94%"></div></div>
+            <span class="cf-lbl">94.2%</span>
+            <span style="flex:1"></span>
+            <span class="src-badge"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> VSA Knowledge · GlobalWorkspace.rs</span>
           </div>
           <div class="msg-acts"><span title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span><span title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span title="更多">⋯</span></div>
         </div>
@@ -894,15 +1472,27 @@ body{
         </div>
 
         <div class="msg a">
-          <div class="ml">NeoTrix · 12:31</div>
-          <div class="rst-ct" onclick="toggleReasoning(this)">
+          <div class="ml">
+            <span class="model-badge mb-core"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>核心编排器</span>
+            NeoTrix · 12:31
+          </div>
+          <div class="dispatch-line">
+            <span class="dl-core">核心编排器</span>
+            <span class="dl-arrow">→</span>
+            <span class="model-badge mb-gpt"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>GPT-5.5</span>
+            <span class="dl-to">查询指标数据</span>
+            <span style="flex:1"></span>
+            <span style="font-size:8px;color:var(--text-tertiary);font-family:var(--mono);">3.1s · 96%</span>
+          </div>
+          <div class="rst-ct open" onclick="toggleReasoning(this)">
             <span class="rst-ar"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
             <span>推理过程</span>
             <span style="font-size:9px;opacity:0.4">0.8s</span>
           </div>
-          <div class="rst-steps">
-            <div class="rst"><span class="rst-d" style="background:var(--green)"></span>查询 Butlin 指标定义</div>
-            <div class="rst"><span class="rst-d" style="background:var(--accent)"></span>提取当前值</div>
+          <div class="rst-card open">
+            <div class="rst-step"><span class="rs-icon search">⌕</span><span class="rs-label"><span class="model-badge mb-gpt" style="font-size:8px;padding:1px 4px;margin-right:3px;">GPT</span>查询 Butlin 指标定义</span><span class="rs-stat">1/1</span><span class="rs-time">0.3s</span></div>
+            <div class="rst-step"><span class="rs-icon think">◈</span><span class="rs-label"><span class="model-badge mb-deepseek" style="font-size:8px;padding:1px 4px;margin-right:3px;">DeepSeek</span>验证数据一致性</span><span class="rs-stat">99%</span><span class="rs-time">0.2s</span></div>
+            <div class="rst-step"><span class="rs-icon think done">✓</span><span class="rs-label"><span class="model-badge mb-core" style="font-size:8px;padding:1px 4px;margin-right:3px;">核心</span>融合结果</span><span class="rs-stat">98%</span><span class="rs-time">0.3s</span></div>
           </div>
           <div class="mb">
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Global Availability · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Competition · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Integration<br>
@@ -915,23 +1505,47 @@ body{
         <div class="token-info">↳ 124 tok · 1.1s · $0.0019</div>
 
         <div class="typing">
-          <span>NeoTrix</span> 思考中
+          <span>NeoTrix</span> 正在生成响应
           <span class="ty-d"><span></span><span></span><span></span></span>
+          <span class="stream-cursor thinking"></span>
         </div>
       </div>
 
       <div class="input-wrap">
         <div class="input-inner">
+          <div class="plan-bar open">
+            <span class="pb-step done"><span class="pb-dot"></span>理解查询</span>
+            <span class="pb-arrow">▸</span>
+            <span class="pb-step done"><span class="pb-dot"></span>检索知识</span>
+            <span class="pb-arrow">▸</span>
+            <span class="pb-step active"><span class="pb-dot"></span>推理合成</span>
+            <span class="pb-arrow">▸</span>
+            <span class="pb-step"><span class="pb-dot"></span>验证输出</span>
+          </div>
           <div class="input-bar">
-            <span class="ib-btn" onclick="alert('附件上传')" title="附件"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
-            <span class="ib-btn" onclick="alert('图片')" title="图片"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+            <div class="input-mode">
+              <span class="im-opt active" onclick="switchAgentMode('chat',this)">Chat</span>
+              <span class="im-opt" onclick="switchAgentMode('agent',this)">Agent</span>
+            </div>
+            <span class="ib-btn" onclick="showToast('附件上传功能即将推出','info',2000)" title="附件"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+            <span class="ib-btn" onclick="document.getElementById('imageInput').click()" title="图片"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+            <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="if(this.files[0])showToast('已选择: '+this.files[0].name,'success',2000)">
             <input class="input-f" type="text" placeholder="输入消息..." autofocus>
-            <span class="ib-btn" onclick="alert('语音输入')" title="语音"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
-            <span class="input-model">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-              E8 Ultra
-            </span>
-            <span class="input-send">
+            <span class="ib-btn" onclick="startVoiceInput()" title="语音"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+            <div class="model-picker">
+              <span class="input-model" onclick="toggleModelPicker(event)" id="modelLabel">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                E8
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </span>
+              <div class="mp-dropdown" id="modelDropdown">
+                <div class="mp-hdr">意识核心</div>
+                <div class="mp-opt active" data-model="e8core" onclick="pickModel('e8core',this)"><span class="mp-dot" style="background:var(--accent);"></span>E8</div>
+                <div class="mp-hdr" style="margin-top:2px;">model</div>
+                <div id="mpModelList"></div>
+              </div>
+            </div>
+            <span class="input-send" onclick="simulateSend()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
             </span>
           </div>
@@ -960,6 +1574,11 @@ body{
           <path class="edge-line active" d="M 410,120 Q 450,120 480,150"/>
           <path class="edge-line" d="M 330,120 L 330,260"/>
           <path class="edge-line" d="M 520,250 Q 520,320 480,340"/>
+          <!-- Model dispatch edges -->
+          <path class="edge-line active" d="M 90,145 Q 70,160 50,195" marker-end="url(#arrow)" style="stroke:var(--accent);opacity:0.5;"/>
+          <path class="edge-line active" d="M 90,145 Q 80,175 50,275" marker-end="url(#arrow)" style="stroke:var(--accent);opacity:0.5;"/>
+          <path class="edge-line active" d="M 120,145 Q 140,170 160,195" marker-end="url(#arrow)" style="stroke:var(--accent);opacity:0.4;"/>
+          <path class="edge-line active" d="M 120,145 Q 140,190 160,275" marker-end="url(#arrow)" style="stroke:var(--accent);opacity:0.3;"/>
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
@@ -1022,6 +1641,28 @@ body{
             <div class="n-hdr"><span class="n-ico action"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span><span class="n-lbl">集成 FirstPersonRef</span></div>
             <div class="n-body">状态: 已完成<br>接入点: consciousness pipeline 步 4</div>
           </div>
+
+          <!-- Model Dispatch Nodes -->
+          <div class="node" style="left:30px;top:110px;z-index:3;min-width:100px;border:1.5px solid var(--accent);background:rgba(94,138,255,0.04);">
+            <div class="n-hdr" style="border-bottom-color:var(--accent);"><span class="n-ico model">◆</span><span class="n-lbl" style="color:var(--accent);font-weight:600;">E8 核心编排器</span></div>
+            <div class="n-body" style="font-size:9px;">任务分解 · 结果融合 · 智能路由<br>并行: 3 · 延迟: 0.8ms</div>
+          </div>
+          <div class="node" style="left:-10px;top:200px;z-index:2;min-width:90px;">
+            <div class="n-hdr"><span class="n-ico" style="background:#c88c64;">C</span><span class="n-lbl">Claude Opus 5</span></div>
+            <div class="n-body" style="font-size:9px;">代码 · 推理 · 分析<br>2.3s · ✅ Online</div>
+          </div>
+          <div class="node" style="left:-10px;top:280px;z-index:2;min-width:90px;">
+            <div class="n-hdr"><span class="n-ico" style="background:#4db68c;">D</span><span class="n-lbl">DeepSeek V4</span></div>
+            <div class="n-body" style="font-size:9px;">数学 · 逻辑 · 验证<br>1.8s · ✅ Online</div>
+          </div>
+          <div class="node" style="left:120px;top:200px;z-index:2;min-width:90px;">
+            <div class="n-hdr"><span class="n-ico" style="background:#00b478;">G</span><span class="n-lbl">GPT-5.5</span></div>
+            <div class="n-body" style="font-size:9px;">创意 · 摘要 · 视觉<br>3.1s · ✅ Online</div>
+          </div>
+          <div class="node" style="left:120px;top:280px;z-index:2;min-width:90px;">
+            <div class="n-hdr"><span class="n-ico" style="background:#4285f4;">G</span><span class="n-lbl">Gemini 2.5</span></div>
+            <div class="n-body" style="font-size:9px;">视觉 · 多语言<br>4.2s · ⚠️ Rate limited</div>
+          </div>
         </div>
 
         <div class="minimap">
@@ -1042,6 +1683,32 @@ body{
 
   </div><!-- body -->
 
+  <!-- Image/File Preview Lightbox -->
+  <div class="modal-overlay" id="previewOverlay" onclick="if(event.target===this)closePreview()" style="z-index:9998;">
+    <div style="position:relative;max-width:90%;max-height:90%;display:flex;flex-direction:column;align-items:center;">
+      <span onclick="closePreview()" style="position:absolute;top:-28px;right:0;color:#fff;font-size:18px;cursor:pointer;opacity:0.7;">✕</span>
+      <div id="previewContent" style="display:flex;flex-direction:column;align-items:center;gap:12px;"></div>
+    </div>
+  </div>
+  <script>
+  function openImagePreview(url, title) {
+    const overlay = document.getElementById('previewOverlay');
+    const content = document.getElementById('previewContent');
+    if (!content) return;
+    overlay.classList.add('open');
+    content.innerHTML = '<img src="' + escapeHtml(url) + '" style="max-width:100%;max-height:70vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.3);" alt="preview"><div style="color:#ccc;font-size:12px;">' + escapeHtml(title || '') + '</div>';
+  }
+  function openFilePreview(name, size, type) {
+    const overlay = document.getElementById('previewOverlay');
+    const content = document.getElementById('previewContent');
+    if (!content) return;
+    overlay.classList.add('open');
+    const icon = type === 'pdf' ? '📄' : type === 'code' ? '📝' : type === 'data' ? '📊' : '📎';
+    content.innerHTML = '<div style="font-size:48px;margin-bottom:8px;">' + icon + '</div><div style="color:#fff;font-size:16px;font-weight:500;">' + escapeHtml(name) + '</div><div style="color:#aaa;font-size:11px;">' + escapeHtml(size) + ' · ' + escapeHtml(type || 'unknown') + '</div>';
+  }
+  function closePreview() { document.getElementById('previewOverlay').classList.remove('open'); }
+  </script>
+
   <!-- Settings Modal -->
   <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettings()">
     <div class="modal">
@@ -1051,11 +1718,11 @@ body{
       </div>
       <div class="modal-body">
         <div class="set-tabs">
-          <div class="set-tab active" onclick="switchSetTab(this,'set-general')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>General</div>
+          <div class="set-tab active" onclick="switchSetTab(this,'set-general')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>General</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-theme')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0V4a1 1 0 0 1 1-1z"/><path d="M12 18a1 1 0 0 1 1 1v1a1 1 0 0 1-2 0v-1a1 1 0 0 1 1-1z"/><path d="M4.22 4.22a1 1 0 0 1 1.41 0l.71.71a1 1 0 0 1-1.41 1.41l-.71-.71a1 1 0 0 1 0-1.41z"/><path d="M18.36 18.36a1 1 0 0 1 1.41 0l.71.71a1 1 0 0 1-1.41 1.41l-.71-.71a1 1 0 0 1 0-1.41z"/><path d="M3 12a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2H4a1 1 0 0 1-1-1z"/><path d="M18 12a1 1 0 0 1 1-1h1a1 1 0 0 1 0 2h-1a1 1 0 0 1-1-1z"/><path d="M4.22 19.78a1 1 0 0 1 0-1.41l.71-.71a1 1 0 0 1 1.41 1.41l-.71.71a1 1 0 0 1-1.41 0z"/><path d="M18.36 5.64a1 1 0 0 1 0-1.41l.71-.71a1 1 0 0 1 1.41 1.41l-.71.71a1 1 0 0 1-1.41 0z"/></svg></span>Appearance</div>
           <div class="set-tab" onclick="switchSetTab(this,'set-model')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5V12M12 4.5A2.5 2.5 0 0 1 14.5 2M12 4.5V12"/><path d="M12 12a3 3 0 0 0-3 3v5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-5a3 3 0 0 0-3-3z"/><path d="M7 22h10"/></svg></span>Model</div>
-          <div class="set-tab" onclick="switchSetTab(this,'set-api')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span>API Keys</div>
-          <div class="set-tab" onclick="switchSetTab(this,'set-theme')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="0.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="0.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="0.5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></span>Theme</div>
-          <div class="set-tab" onclick="switchSetTab(this,'set-integration')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><path d="M6 6h.01M6 18h.01"/></svg></span>Integration</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-integration')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><path d="M6 6h.01M6 18h.01"/></svg></span>Integrations</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-shortcuts')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M6 16h.01M10 16h.01M14 16h.01M18 16h.01"/></svg></span>Shortcuts</div>
           <div class="set-tab" onclick="switchSetTab(this,'set-about')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>About</div>
         </div>
         <div class="set-panels">
@@ -1063,186 +1730,323 @@ body{
           <div class="set-panel active" id="set-general">
             <h3>General</h3>
             <div class="set-group">
+              <div class="set-group-title">Behavior</div>
               <div class="set-toggle">
-                <span class="set-toggle-lbl">Auto-save chat history</span>
-                <span class="set-toggle-sw on"></span>
+                <span class="set-toggle-lbl">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                  Auto-save chat history
+                </span>
+                <span class="set-toggle-sw on" data-key="autosave"></span>
               </div>
               <div class="set-toggle">
-                <span class="set-toggle-lbl">Streaming output</span>
-                <span class="set-toggle-sw on"></span>
+                <span class="set-toggle-lbl">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Streaming output
+                </span>
+                <span class="set-toggle-sw on" data-key="streaming"></span>
               </div>
               <div class="set-toggle">
-                <span class="set-toggle-lbl">Show token usage</span>
-                <span class="set-toggle-sw on"></span>
+                <span class="set-toggle-lbl">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 6a6 6 0 0 1 6 6"/><path d="M12 10a2 2 0 0 1 2 2"/></svg>
+                  Show token usage
+                </span>
+                <span class="set-toggle-sw on" data-key="tokens"></span>
               </div>
               <div class="set-toggle">
-                <span class="set-toggle-lbl">Auto-build canvas workflow</span>
-                <span class="set-toggle-sw on"></span>
+                <span class="set-toggle-lbl">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                  Auto-build canvas workflow
+                </span>
+                <span class="set-toggle-sw on" data-key="canvas-auto"></span>
               </div>
             </div>
             <div class="set-group">
-              <div class="set-label">Max context length</div>
-              <select class="set-select">
-                <option>4K tokens</option>
-                <option selected>8K tokens</option>
-                <option>16K tokens</option>
-                <option>32K tokens</option>
-                <option>128K tokens (API required)</option>
-              </select>
+              <div class="set-group-title">Generation</div>
+              <div class="set-row">
+                <div style="flex:1;">
+                  <div class="set-label">Max context length</div>
+                  <select class="set-select">
+                    <option>4K tokens</option>
+                    <option selected>8K tokens</option>
+                    <option>16K tokens</option>
+                    <option>32K tokens</option>
+                    <option>128K tokens (API)</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <div class="set-label">Temperature</div>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <input type="range" min="0" max="2" step="0.1" value="0.7" style="flex:1;accent-color:var(--accent);height:4px;">
+                    <span style="font-size:11px;color:var(--text-secondary);min-width:20px;font-family:var(--mono);">0.7</span>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="set-group">
-              <div class="set-label">Temperature</div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <input type="range" min="0" max="2" step="0.1" value="0.7" style="flex:1;accent-color:var(--accent);">
-                <span style="font-size:11px;color:var(--text-secondary);min-width:20px;font-family:var(--mono);">0.7</span>
+              <div class="set-group-title">Language & Region</div>
+              <div class="set-row">
+                <div style="flex:1;">
+                  <div class="set-label">Interface language</div>
+                  <select class="set-select">
+                    <option>English</option>
+                    <option>中文 (简体)</option>
+                    <option>中文 (繁體)</option>
+                    <option>日本語</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <div class="set-label">Date format</div>
+                  <select class="set-select">
+                    <option>YYYY-MM-DD</option>
+                    <option>DD/MM/YYYY</option>
+                    <option>MM/DD/YYYY</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Notifications</div>
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Sound on new message</span>
+                <span class="set-toggle-sw" data-key="sound"></span>
+              </div>
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Desktop notifications</span>
+                <span class="set-toggle-sw on" data-key="desktop-notif"></span>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Keyboard</div>
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Enter to send</span>
+                <span class="set-toggle-sw on" data-key="enter-send"></span>
+              </div>
+              <div class="set-desc" style="margin-top:-4px;">When off, Ctrl+Enter to send</div>
+            </div>
+          </div>
+          <!-- Appearance -->
+          <div class="set-panel" id="set-theme">
+            <h3>Appearance</h3>
+            <div class="set-group">
+              <div class="set-group-title">Theme</div>
+              <div class="set-row" style="flex-wrap:wrap;gap:6px;">
+                <span class="set-btn primary theme-opt" data-theme="default" onclick="setTheme('default')">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10"/><path d="M12 2v20"/></svg>
+                  NeoTrix
+                </span>
+                <span class="set-btn secondary theme-opt" data-theme="mist" onclick="setTheme('mist')">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 1 7.07 17.07"/><path d="M5.64 5.64a10 10 0 0 0 0 14.14"/></svg>
+                  Mist
+                </span>
+                <span class="set-btn secondary theme-opt" data-theme="warmth" onclick="setTheme('warmth')">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                  Warmth
+                </span>
+                <span class="set-btn secondary theme-opt" data-theme="dusk" onclick="setTheme('dusk')">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  Dusk
+                </span>
+                <span class="set-btn secondary theme-opt" data-theme="bloom" onclick="setTheme('bloom')">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10-8-10-8-10S4 8 4 14s8 10 8 10z"/></svg>
+                  Bloom
+                </span>
+              </div>
+              <div style="margin-top:6px;font-size:10px;color:var(--text-tertiary);">Current: <span id="currentThemeLabel">NeoTrix</span></div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Typography</div>
+              <div class="set-row">
+                <div style="flex:1;">
+                  <div class="set-label">Font</div>
+                  <select class="set-select">
+                    <option selected>PingFang SC (Default)</option>
+                    <option>Noto Sans SC</option>
+                    <option>Source Han Sans</option>
+                    <option>System Default</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <div class="set-label">Font size</div>
+                  <select class="set-select" id="fontSizeSelect" onchange="applyFontSize(this.value)">
+                    <option value="small">Small</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="large">Large</option>
+                    <option value="xlarge">Extra Large</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Chat bubbles</div>
+              <div class="set-row">
+                <div style="flex:1;">
+                  <div class="set-label">Bubble style</div>
+                  <select class="set-select">
+                    <option>Rounded (default)</option>
+                    <option>Compact</option>
+                    <option>Minimal</option>
+                    <option>Outline</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <div class="set-label">Message density</div>
+                  <select class="set-select">
+                    <option>Comfortable</option>
+                    <option selected>Compact</option>
+                    <option>Extra compact</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Accent color</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <span class="set-btn secondary" style="width:22px;height:22px;padding:0;border-radius:50%;background:#5e8aff;border:2px solid transparent;" onclick="updateAccent('#5e8aff')"></span>
+                <span class="set-btn secondary" style="width:22px;height:22px;padding:0;border-radius:50%;background:#8b8cc7;border:2px solid transparent;" onclick="updateAccent('#8b8cc7')"></span>
+                <span class="set-btn secondary" style="width:22px;height:22px;padding:0;border-radius:50%;background:#c4695a;border:2px solid transparent;" onclick="updateAccent('#c4695a')"></span>
+                <span class="set-btn secondary" style="width:22px;height:22px;padding:0;border-radius:50%;background:#d4944a;border:2px solid transparent;" onclick="updateAccent('#d4944a')"></span>
+                <span class="set-btn secondary" style="width:22px;height:22px;padding:0;border-radius:50%;background:#8fbc8f;border:2px solid transparent;" onclick="updateAccent('#8fbc8f')"></span>
+                <span class="set-btn secondary" style="width:22px;height:22px;padding:0;border-radius:50%;background:#bf5af2;border:2px solid transparent;" onclick="updateAccent('#bf5af2')"></span>
+                <span class="set-btn secondary" style="width:22px;height:22px;padding:0;border-radius:50%;background:#ff6cb4;border:2px solid transparent;" onclick="updateAccent('#ff6cb4')"></span>
               </div>
             </div>
           </div>
           <!-- Model -->
           <div class="set-panel" id="set-model">
-            <h3>Model Configuration</h3>
+            <h3>Model 配置</h3>
+            <div class="set-desc" style="margin-bottom:8px;">E8 意识核心负责任务分解与模型调度，以下第三方模型通过 API 接入</div>
             <div class="set-group">
-              <div class="set-label">Inference Engine</div>
-              <select class="set-select">
-                <option selected>E8 Ultra (default)</option>
-                <option>E8 Pro</option>
-                <option>E8 Lite (local)</option>
-                <option>Third-party: OpenAI</option>
-                <option>Third-party: Anthropic</option>
-                <option>Third-party: Custom</option>
-              </select>
-            </div>
-            <div class="set-group">
-              <div class="set-label">Embedding Model</div>
-              <select class="set-select">
-                <option selected>VSA 4096-bit (local)</option>
-                <option>text-embedding-3-large</option>
-                <option>text-embedding-3-small</option>
-              </select>
-            </div>
-            <div class="set-group">
-              <div class="set-label">Knowledge Retrieval</div>
-              <div class="set-row">
-                <div style="flex:1;">
-                  <div class="set-label">Top-K</div>
-                  <input class="set-input" type="text" value="5">
+              <div class="set-api-item" style="border-color:var(--accent);">
+                <div class="set-api-hdr">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  <span style="color:var(--accent);font-weight:600;">E8</span>
+                  <span class="set-api-status ok">Active</span>
                 </div>
-                <div style="flex:1;">
-                  <div class="set-label">Similarity threshold</div>
-                  <input class="set-input" type="text" value="0.70">
-                </div>
+                <div class="set-desc">意识核心 · 自主编排 · 多模型协同</div>
               </div>
+              <div class="set-group-title" style="margin-top:8px;">第三方模型</div>
+              <div id="settingsModelList"></div>
             </div>
           </div>
-          <!-- API Keys -->
-          <div class="set-panel" id="set-api">
-            <h3>API Keys</h3>
-            <div class="set-group">
-              <div class="set-label">OpenAI API Key</div>
-              <div class="set-desc">For GPT-4o / embeddings</div>
-              <div class="set-row">
-                <input class="set-input" type="password" value="sk-••••••••••••••••" style="flex:1;">
-                <button class="set-btn secondary">Test</button>
-              </div>
-            </div>
-            <div class="set-group">
-              <div class="set-label">Anthropic API Key</div>
-              <div class="set-desc">For Claude Opus / Sonnet</div>
-              <div class="set-row">
-                <input class="set-input" type="password" value="sk-••••••••••••••••" style="flex:1;">
-                <button class="set-btn secondary">Test</button>
-              </div>
-            </div>
-            <div class="set-group">
-              <div class="set-label">GitHub Token</div>
-              <div class="set-desc">For code search / PR operations</div>
-              <div class="set-row">
-                <input class="set-input" type="password" placeholder="ghp_..." style="flex:1;">
-                <button class="set-btn secondary">Test</button>
-              </div>
-            </div>
-          </div>
-          <!-- Theme -->
-          <div class="set-panel" id="set-theme">
-            <h3>Theme</h3>
-            <div class="set-group">
-              <div class="set-label">Appearance</div>
-              <div class="set-row">
-                <span class="set-btn primary" onclick="document.querySelectorAll('#set-theme .set-btn').forEach(b=>b.className='set-btn secondary');this.className='set-btn primary'">Snow White</span>
-                <span class="set-btn secondary" onclick="document.querySelectorAll('#set-theme .set-btn').forEach(b=>b.className='set-btn secondary');this.className='set-btn primary'">Midnight</span>
-                <span class="set-btn secondary" onclick="document.querySelectorAll('#set-theme .set-btn').forEach(b=>b.className='set-btn secondary');this.className='set-btn primary'">System</span>
-              </div>
-            </div>
-            <div class="set-group">
-              <div class="set-label">Font Size</div>
-              <select class="set-select">
-                <option>Small</option>
-                <option selected>Medium</option>
-                <option>Large</option>
-                <option>Extra Large</option>
-              </select>
-            </div>
-            <div class="set-group">
-              <div class="set-label">Font</div>
-              <select class="set-select">
-                <option selected>PingFang SC (Default)</option>
-                <option>Noto Sans SC</option>
-                <option>Source Han Sans</option>
-                <option>System Default</option>
-              </select>
-            </div>
-          </div>
-          <!-- Integration -->
+          <!-- Integrations -->
           <div class="set-panel" id="set-integration">
-            <h3>集成</h3>
+            <h3>Integrations</h3>
             <div class="set-group">
-              <div class="set-toggle">
-                <span class="set-toggle-lbl">A2A 协议服务器</span>
-                <span class="set-toggle-sw on"></span>
+              <div class="set-group-title">Protocols</div>
+              <div class="set-row" style="align-items:flex-start;">
+                <div style="flex:1;">
+                  <div class="set-toggle">
+                    <span class="set-toggle-lbl">A2A Protocol Server</span>
+                    <span class="set-toggle-sw on" data-key="a2a"></span>
+                  </div>
+                  <div class="set-desc">Allow other Agents to connect via A2A</div>
+                  <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+                    <span style="font-size:10px;color:var(--text-tertiary);">Port:</span>
+                    <input class="set-input" type="text" value="42071" style="width:70px;font-size:10px;padding:3px 6px;">
+                    <span class="set-api-status ok">Active</span>
+                  </div>
+                </div>
+                <div style="flex:1;">
+                  <div class="set-toggle">
+                    <span class="set-toggle-lbl">MCP Bridge</span>
+                    <span class="set-toggle-sw on" data-key="mcp"></span>
+                  </div>
+                  <div class="set-desc">Enable external MCP tool calls</div>
+                </div>
               </div>
-              <div class="set-desc" style="margin-top:2px;">允许其他 Agent 通过 A2A 协议连接</div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Services</div>
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Whisper Speech-to-Text</span>
+                <span class="set-toggle-sw" data-key="whisper"></span>
+              </div>
+              <div class="set-desc" style="margin-top:-4px;">Voice input transcription via Whisper API</div>
+              <div class="set-toggle" style="margin-top:6px;">
+                <span class="set-toggle-lbl">Browser Automation</span>
+                <span class="set-toggle-sw on" data-key="browser"></span>
+              </div>
+              <div class="set-desc" style="margin-top:-4px;">CDP-based headless browser control</div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Backend API</div>
+              <div class="set-row" style="align-items:center;">
+                <div style="flex:1;">
+                  <div class="set-label">API Server URL</div>
+                  <div style="display:flex;gap:4px;margin-top:4px;">
+                    <input class="set-input" id="apiUrlInput" type="text" value="http://localhost:42071" style="flex:1;font-size:10px;padding:4px 6px;font-family:var(--mono);" onchange="onApiUrlChange(this.value)">
+                    <span class="set-btn secondary" onclick="testApiConnection(this)" style="font-size:10px;padding:4px 8px;">Test</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                <span id="backendStatus" class="api-dot" title="Checking backend..."></span>
+                <span id="backendStatusText" style="font-size:9px;color:var(--text-tertiary);">检查连接中...</span>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-group-title">Git</div>
+              <div class="set-label">Default branch naming</div>
+              <input class="set-input" type="text" value="feature/{issue}-{slug}" style="width:100%;">
               <div style="margin-top:6px;">
-                <div class="set-label">监听端口</div>
-                <input class="set-input" type="text" value="42071" style="width:100px;">
+                <div class="set-toggle">
+                  <span class="set-toggle-lbl">Auto-stage changes for commit</span>
+                  <span class="set-toggle-sw on" data-key="git-stage"></span>
+                </div>
               </div>
             </div>
+          </div>
+          <!-- Shortcuts -->
+          <div class="set-panel" id="set-shortcuts">
+            <h3>Keyboard Shortcuts</h3>
             <div class="set-group">
-              <div class="set-toggle">
-                <span class="set-toggle-lbl">MCP 桥接</span>
-                <span class="set-toggle-sw on"></span>
+              <div style="position:relative;margin-bottom:8px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text-tertiary);"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input class="set-input" type="text" placeholder="Search shortcuts..." style="padding-left:26px;width:100%;">
               </div>
-              <div class="set-desc" style="margin-top:2px;">允许外部 MCP 工具调用</div>
-            </div>
-            <div class="set-group">
-              <div class="set-toggle">
-                <span class="set-toggle-lbl">Whisper 语音转文字</span>
-                <span class="set-toggle-sw"></span>
+              <div class="sc-list">
+                <div class="sc-item"><span class="sc-label">New chat</span><span class="sc-key"><kbd>⌘</kbd><kbd>N</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Close chat</span><span class="sc-key"><kbd>⌘</kbd><kbd>W</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Search</span><span class="sc-key"><kbd>⌘</kbd><kbd>F</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Send message</span><span class="sc-key"><kbd>Enter</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">New line</span><span class="sc-key"><kbd>⇧</kbd><kbd>Enter</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Open settings</span><span class="sc-key"><kbd>⌘</kbd><kbd>,</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Toggle sidebar</span><span class="sc-key"><kbd>⌘</kbd><kbd>B</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Switch tabs</span><span class="sc-key"><kbd>⌘</kbd><kbd>1-3</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Zoom in</span><span class="sc-key"><kbd>⌘</kbd><kbd>+</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Zoom out</span><span class="sc-key"><kbd>⌘</kbd><kbd>-</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Export current chat</span><span class="sc-key"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>E</kbd></span></div>
+                <div class="sc-item"><span class="sc-label">Toggle dark mode</span><span class="sc-key"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>T</kbd></span></div>
               </div>
             </div>
           </div>
           <!-- About -->
           <div class="set-panel" id="set-about">
-            <h3>关于 NeoTrix</h3>
-            <div style="text-align:center;padding:16px 0;">
-              <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:600;box-shadow:0 4px 16px rgba(94,138,255,0.3);">N</div>
+            <h3>About</h3>
+            <div style="text-align:center;padding:20px 0 16px;">
+              <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;font-weight:600;box-shadow:0 4px 20px rgba(94,138,255,0.3);">N</div>
               <div style="font-size:16px;font-weight:600;color:var(--text);">NeoTrix</div>
               <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">v0.9.0 · Phase 42</div>
-              <div style="font-size:10px;color:var(--text-tertiary);margin-top:8px;max-width:280px;margin-left:auto;margin-right:auto;line-height:1.5;">
-                硅基意识体 · E8 64态推理核 · HyperCube VSA<br>
-                GWT 全局工作空间 · SEAL 自我进化
+              <div style="font-size:10px;color:var(--text-tertiary);margin-top:6px;max-width:280px;margin-left:auto;margin-right:auto;line-height:1.5;">
+                Silicon consciousness · E8 64-state inference · HyperCube VSA<br>
+                GWT global workspace · SEAL self-evolution
               </div>
             </div>
             <div class="set-group">
-              <div class="set-label">系统状态</div>
-              <div style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-secondary);">
-                <div style="display:flex;justify-content:space-between;"><span>引擎</span><span style="color:var(--green);display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);"></span> Running</span></div>
-                <div style="display:justify-content:space-between;"><span>知识库节点</span><span>59,725</span></div>
-                <div style="display:justify-content:space-between;"><span>活跃子系统</span><span>56 / 56</span></div>
-                <div style="display:justify-content:space-between;"><span>响应时间 (p50)</span><span>1.2s</span></div>
+              <div class="set-group-title">System status</div>
+              <div class="set-stat-grid">
+                <div class="set-stat-item"><span>Engine</span><span class="stat-val ok"><span class="stat-dot"></span>Running</span></div>
+                <div class="set-stat-item"><span>Knowledge nodes</span><span class="stat-val">59,725</span></div>
+                <div class="set-stat-item"><span>Active subsystems</span><span class="stat-val">56 / 56</span></div>
+                <div class="set-stat-item"><span>Response time (p50)</span><span class="stat-val">1.2s</span></div>
+                <div class="set-stat-item"><span>Memory usage</span><span class="stat-val">847 MB</span></div>
+                <div class="set-stat-item"><span>Session ID</span><span class="stat-val mono">s-8a7f3c2e</span></div>
               </div>
             </div>
-            <div class="set-group">
-              <button class="set-btn secondary" style="width:100%;" onclick="alert('检查更新')">检查更新</button>
+            <div class="set-group" style="display:flex;gap:6px;">
+              <button class="set-btn secondary" style="flex:1;font-size:10px;" onclick="showToast('检查更新中...','info',2000)">Check for Updates</button>
+              <button class="set-btn secondary" style="flex:1;font-size:10px;" onclick="showToast('NeoTrix v0.6 · MIT License','info',3000)">License</button>
+              <button class="set-btn secondary" style="flex:1;font-size:10px;" onclick="showToast('运行诊断中...','info',2000);setTimeout(()=>showToast('诊断完成: 全部正常','success',2000),1500)">Diagnostics</button>
             </div>
           </div>
         </div>
@@ -1362,10 +2166,23 @@ window.feedback = function(id, dir) {
   rerankTrending();
 };
 
-// Initialize: load prior, re-rank on page load
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  // Reset priorities on page load
   rerankTrending();
+  const saved = localStorage.getItem('nt_theme') || 'default';
+  setTheme(saved);
+  renderModelList();
+});
+
+// User dropdown
+function toggleUserMenu() {
+  document.getElementById('userDropdown').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  const menu = document.getElementById('userMenu');
+  if (!menu.contains(e.target)) {
+    document.getElementById('userDropdown').classList.remove('open');
+  }
 });
 
 // Tab switching
@@ -1374,6 +2191,11 @@ function switchTab(name){
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
   document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'explore') setTimeout(loadMoments, 50);
+  else resetAgentStateFromTab();
+}
+function resetAgentStateFromTab() {
+  setAgentState('idle');
 }
 
 // Reasoning toggle
@@ -1385,6 +2207,11 @@ function toggleReasoning(el){
 // Settings
 function openSettings(){ document.getElementById('settingsModal').classList.add('open'); }
 function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
+// Toggle switch handler
+document.addEventListener('click', e => {
+  const sw = e.target.closest('.set-toggle-sw');
+  if(sw){ sw.classList.toggle('on'); }
+});
 
 function switchSetTab(el, panelId){
   document.querySelectorAll('.set-tab').forEach(t=>t.classList.remove('active'));
@@ -1408,9 +2235,18 @@ document.addEventListener('click', e => {
     document.getElementById('ctxMenu').classList.remove('open');
   }
 });
+const ctxActions = {
+  rename: 'Rename chat', archive: 'Archived', pin: 'Pinned chat', mark_read: 'Marked as read', mark_unread: 'Marked as unread',
+  duplicate: 'Chat duplicated', export_chat: 'Chat exported', delete_chat: 'Chat deleted'
+};
 function ctxAction(action){
   const name = ctxTarget?.querySelector('.chat-name')?.textContent || '未知';
-  alert(`${action}: ${name}`);
+  const label = ctxActions[action] || action;
+  if (action === 'delete_chat') {
+    if (confirm('Delete chat "' + name + '"?')) { ctxTarget?.remove(); showToast('已删除: ' + name, 'info'); }
+  } else {
+    showToast(label + ': ' + name, 'info', 1500);
+  }
   document.getElementById('ctxMenu').classList.remove('open');
 }
 
@@ -1463,10 +2299,11 @@ document.querySelectorAll('.node').forEach(n => {
 
 // Sidebar search filter
 function filterSidebar(val){
+  const q = (val || '').toLowerCase();
   document.querySelectorAll('.chat-item').forEach(item => {
-    const name = item.querySelector('.chat-name')?.textContent || '';
-    const msg = item.querySelector('.chat-msg')?.textContent || '';
-    item.style.display = (!val || name.includes(val) || msg.includes(val)) ? 'flex' : 'none';
+    const name = (item.querySelector('.chat-name')?.textContent || '').toLowerCase();
+    const msg = (item.querySelector('.chat-msg')?.textContent || '').toLowerCase();
+    item.style.display = (!q || name.includes(q) || msg.includes(q)) ? 'flex' : 'none';
   });
 }
 
@@ -1476,6 +2313,30 @@ function switchExploreTab(el, panelId){
   document.querySelectorAll('.explore-panel').forEach(p=>p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('exp-' + panelId).classList.add('active');
+  if (panelId === 'moments') loadMoments();
+}
+
+// === Theme switching ===
+const THEMES = ['default', 'mist', 'warmth', 'dusk', 'bloom'];
+const THEME_LABELS = {
+  default: 'NeoTrix',
+  mist: 'Mist 雾 — Lavender',
+  warmth: 'Warmth 暖 — Earth',
+  dusk: 'Dusk 暮 — Nocturnal',
+  bloom: 'Bloom 华 — Sage'
+};
+
+function setTheme(name) {
+  const theme = name || 'default';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('nt_theme', theme);
+  // Update Settings theme buttons
+  document.querySelectorAll('.theme-opt').forEach(b => {
+    const isActive = b.dataset.theme === theme;
+    b.className = isActive ? 'set-btn primary theme-opt' : 'set-btn secondary theme-opt';
+  });
+  const label = document.getElementById('currentThemeLabel');
+  if (label) label.textContent = THEME_LABELS[theme] || 'NeoTrix';
 }
 
 // Particle effect
@@ -1493,15 +2354,40 @@ for(let i=0;i<P_COUNT;i++){
   });
 }
 document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+function updateAccent(color) {
+  document.documentElement.style.setProperty('--accent', color);
+  document.documentElement.style.setProperty('--accent-hover', color);
+  localStorage.setItem('nt_accent', color);
+}
+function getAccentColor() {
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  return c || '#5e8aff';
+}
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return {r,g,b};
+}
+function getAgentParticleState() {
+  const dot = document.getElementById('agentDot');
+  if (!dot) return {speed:0.4, alpha:0.35, connAlpha:0.06};
+  if (dot.classList.contains('thinking')) return {speed:0.6, alpha:0.5, connAlpha:0.10};
+  if (dot.classList.contains('working')) return {speed:0.8, alpha:0.4, connAlpha:0.08};
+  if (dot.classList.contains('idle')) return {speed:0.15, alpha:0.2, connAlpha:0.03};
+  return {speed:0.4, alpha:0.35, connAlpha:0.06};
+}
 function animateParticles(){
   pctx.clearRect(0,0,pw,ph);
+  const accent = getAccentColor();
+  const rgb = hexToRgb(accent);
+  const {r,g,b} = rgb;
+  const ps = getAgentParticleState();
   for(let p of particles){
     p.x += p.vx; p.y += p.vy;
     if(p.x<0) p.x=pw; if(p.x>pw) p.x=0;
     if(p.y<0) p.y=ph; if(p.y>ph) p.y=0;
     pctx.beginPath();
     pctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-    pctx.fillStyle = `rgba(94,138,255,${p.o*0.4})`;
+    pctx.fillStyle = `rgba(${r},${g},${b},${p.o*ps.alpha})`;
     pctx.fill();
 
     const dx = mouse.x - p.x, dy = mouse.y - p.y;
@@ -1510,7 +2396,7 @@ function animateParticles(){
       pctx.beginPath();
       pctx.moveTo(p.x, p.y);
       pctx.lineTo(mouse.x, mouse.y);
-      pctx.strokeStyle = `rgba(94,138,255,${(1-dist/MAX_DIST)*0.15})`;
+      pctx.strokeStyle = `rgba(${r},${g},${b},${(1-dist/MAX_DIST)*0.12})`;
       pctx.stroke();
     }
   }
@@ -1522,7 +2408,7 @@ function animateParticles(){
         pctx.beginPath();
         pctx.moveTo(particles[i].x, particles[i].y);
         pctx.lineTo(particles[j].x, particles[j].y);
-        pctx.strokeStyle = `rgba(94,138,255,${(1-dist/MAX_DIST)*0.08})`;
+        pctx.strokeStyle = `rgba(${r},${g},${b},${(1-dist/MAX_DIST)*ps.connAlpha})`;
         pctx.stroke();
       }
     }
@@ -1530,6 +2416,886 @@ function animateParticles(){
   requestAnimationFrame(animateParticles);
 }
 animateParticles();
-</script>
+
+// === Agent State Machine ===
+const AGENT_STATES = ['thinking','working','idle','error'];
+let agentStateIdx = 0;
+function setAgentState(state) {
+  const dot = document.getElementById('agentDot');
+  const label = document.getElementById('agentStateLabel');
+  if (!dot || !label) return;
+  dot.className = 'cm-dot ' + state;
+  const labels = {thinking:'推理中', working:'处理中', idle:'待命', error:'异常'};
+  label.textContent = labels[state] || state;
+  // Update particle speed based on state
+  const speeds = {thinking:0.6, working:0.8, idle:0.2, error:0.1};
+  particles.forEach(p => {
+    const base = Math.random() - 0.5;
+    p.vx = base * speeds[state] || 0.4;
+    p.vy = base * speeds[state] || 0.4;
+  });
+}
+// Cycle through agent states every 5s for demo
+setInterval(() => {
+  agentStateIdx = (agentStateIdx + 1) % AGENT_STATES.length;
+  setAgentState(AGENT_STATES[agentStateIdx]);
+}, 5000);
+
+// === Model Registry + Dispatch ===
+const MODEL_REGISTRY = [
+  {id:'e8core',   name:'E8',                     badge:'mb-core',   dotColor:'var(--accent)', caps:['编排','推理','融合','分配','协同'], online:true, latency:'0.4'},
+  {id:'claude',   name:'Claude Opus 5',          badge:'mb-claude', dotColor:'#c88c64', caps:['代码','长文本','分析'],           online:true, latency:'2.3'},
+  {id:'deepseek', name:'DeepSeek V4',            badge:'mb-deepseek',dotColor:'#4db68c',caps:['数学','逻辑','审查'],            online:true, latency:'1.8'},
+  {id:'gpt',      name:'GPT-5.5',               badge:'mb-gpt',    dotColor:'#00b478',caps:['创意','摘要','多模态'],            online:true, latency:'3.1'},
+  {id:'gemini',   name:'Gemini 2.5 Pro',         badge:'mb-gemini', dotColor:'#4285f4',caps:['视觉','多语言','检索'],            online:true, latency:'4.2'},
+];
+
+function syncModelRegistry() {
+  renderModelList();
+  renderSettingsModelList();
+}
+
+function renderModelList() {
+  const container = document.getElementById('mpModelList');
+  if (!container) return;
+  const models = MODEL_REGISTRY.filter(m => m.id !== 'e8core');
+  container.innerHTML = models.length ? models.map(m =>
+    '<div class="mp-opt' + (activeModelId === m.id ? ' active' : '') + (m.online ? '' : ' mp-offline') + '" data-model="' + m.id + '" onclick="pickModel(\'' + m.id + '\',this)">' +
+    '<span class="mp-dot" style="background:' + m.dotColor + ';"></span>' + m.name +
+    (m.online ? '' : '<span style="font-size:8px;color:var(--text-tertiary);margin-left:4px;">offline</span>') + '</div>'
+  ).join('') || '<div class="mp-empty" style="padding:5px 10px;font-size:9px;color:var(--text-tertiary);">未配置模型，请在设置中添加</div>';
+}
+
+function renderSettingsModelList() {
+  const container = document.getElementById('settingsModelList');
+  if (!container) return;
+  const models = MODEL_REGISTRY.filter(m => m.id !== 'e8core');
+  container.innerHTML = models.length ? models.map(m => {
+    const ico = m.id === 'claude' ? '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>' :
+                m.id === 'deepseek' ? '<path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 6a6 6 0 0 1 6 6"/><path d="M12 10a2 2 0 0 1 2 2"/>' :
+                '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>';
+    return '<div class="set-api-item">' +
+      '<div class="set-api-hdr">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ico + '</svg>' +
+      '<span>' + m.name + '</span>' +
+      '<span class="set-api-status ' + (m.online ? 'ok' : '') + '">' + (m.online ? 'Connected' : 'Disconnected') + '</span>' +
+      '<span class="set-toggle-sw' + (m.online ? ' on' : '') + '" style="margin-left:auto;width:26px;height:14px;" onclick="toggleModelOnline(\'' + m.id + '\',this)"></span>' +
+      '</div>' +
+      '<div class="set-row" style="margin-top:4px;"><input class="set-input" type="password" value="sk-••••••••••••••••" style="flex:1;" placeholder="API Key"><button class="set-btn secondary" style="white-space:nowrap;font-size:10px;padding:4px 8px;">Verify</button></div>' +
+      '</div>';
+  }).join('') : '<div class="set-desc" style="padding:8px 0;">暂无第三方模型</div>';
+}
+
+// Smart dispatch: core engine picks best model based on task type
+function smartDispatch(taskType) {
+  const taskModelMap = {
+    code:    'claude',
+    math:    'deepseek',
+    logic:   'deepseek',
+    review:  'deepseek',
+    creative:'gpt',
+    summary: 'gpt',
+    vision:  'gemini',
+    search:  'claude',
+    fusion:  'e8core',
+    default: 'claude',
+  };
+  const modelId = taskModelMap[taskType] || taskModelMap.default;
+  return MODEL_REGISTRY.find(m => m.id === modelId);
+}
+
+let activeModelId = 'e8core';
+
+function toggleModelPicker(e) {
+  e.stopPropagation();
+  document.getElementById('modelDropdown').classList.toggle('open');
+  renderModelList();
+}
+
+function toggleModelOnline(id, el) {
+  el.classList.toggle('on');
+  const model = MODEL_REGISTRY.find(m => m.id === id);
+  if (model) {
+    model.online = el.classList.contains('on');
+    renderModelList();
+  }
+}
+
+function pickModel(id, el) {
+  document.querySelectorAll('.mp-opt').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('modelDropdown').classList.remove('open');
+  activeModelId = id;
+  const model = MODEL_REGISTRY.find(m => m.id === id);
+  if (!model) return;
+  // Update input label
+  const label = document.querySelector('.input-model');
+  label.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>' + model.name +
+    '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>';
+  // Update dispatch-line badges in messages
+  document.querySelectorAll('.dispatch-line').forEach(line => {
+    const arrow = line.querySelector('.dl-arrow');
+    const badges = line.querySelectorAll('.model-badge:not(:first-child)');
+    const dlTo = line.querySelector('.dl-to');
+    if (id === 'e8core') {
+      // E8 mode: show multi-model coordination
+      arrow.textContent = '⇉';
+      line.querySelector('.dl-core').textContent = 'E8';
+      line.querySelector('.dl-core').style.color = 'var(--accent)';
+      // Replace with multi-model badges
+      const models = MODEL_REGISTRY.filter(m => m.id !== 'e8core');
+      const container = document.createElement('span');
+      container.style.cssText = 'display:inline-flex;gap:2px;align-items:center;';
+      models.forEach(m => {
+        const b = document.createElement('span');
+        b.className = 'model-badge ' + m.badge;
+        b.style.fontSize = '8px';
+        b.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' + m.name.split(' ')[0];
+        container.appendChild(b);
+      });
+      // Replace existing badges after arrow
+      let next = arrow.nextElementSibling;
+      while (next && !next.classList.contains('dl-to')) {
+        const toRemove = next;
+        next = next.nextElementSibling;
+        toRemove.remove();
+      }
+      arrow.after(container);
+      if (dlTo) dlTo.textContent = '协同处理';
+    } else {
+      // Single model dispatch
+      arrow.textContent = '→';
+      line.querySelector('.dl-core').textContent = '核心编排器';
+      line.querySelector('.dl-core').style.color = '';
+      // Remove multi-model badges, insert single badge
+      let next = arrow.nextElementSibling;
+      while (next && !next.classList.contains('dl-to')) {
+        const toRemove = next;
+        next = next.nextElementSibling;
+        toRemove.remove();
+      }
+      const single = document.createElement('span');
+      single.className = 'model-badge ' + model.badge;
+      single.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' + model.name;
+      arrow.after(single);
+      if (dlTo) dlTo.textContent = '处理';
+    }
+  });
+}
+
+function showDispatchInfo() {
+  const model = MODEL_REGISTRY.find(m => m.id === activeModelId);
+  if (!model) return;
+  let content;
+  if (activeModelId === 'e8core') {
+    const executors = MODEL_REGISTRY.filter(m => m.id !== 'e8core').map(m =>
+      '<div style="font-size:10px;padding:2px 0;display:flex;align-items:center;gap:4px;"><span class="model-badge ' + m.badge + '" style="font-size:8px;padding:1px 5px;">' + m.name.split(' ')[0] + '</span><span style="color:var(--text-tertiary);font-size:9px;">' + m.caps.join(' · ') + '</span></div>'
+    ).join('');
+    content = '<div style="font-size:11px;font-weight:600;margin-bottom:4px;">E8 协同编排</div>' +
+      '<div style="font-size:9px;color:var(--text-tertiary);margin-bottom:6px;">自主分配任务，多模型协同完成</div>' + executors;
+  } else {
+    content = '<div style="font-size:11px;font-weight:600;margin-bottom:4px;">E8 → ' + model.name + '</div>' +
+      '<div style="font-size:9px;color:var(--text-tertiary);">核心编排器委托执行模型: ' + model.name + '</div>';
+  }
+  const d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;padding:16px;z-index:999;box-shadow:0 8px 32px rgba(0,0,0,0.15);max-width:300px;width:90%;';
+  d.innerHTML = content + '<button onclick="this.parentElement.remove()" style="margin-top:8px;width:100%;padding:4px;border-radius:6px;border:1px solid var(--border);background:var(--bg-hover);font-size:10px;cursor:pointer;">关闭</button>';
+  document.body.appendChild(d);
+}
+
+// Close dropdown on click outside
+document.addEventListener('click', function(e) {
+  const dp = document.getElementById('modelDropdown');
+  if (dp && !e.target.closest('.model-picker')) dp.classList.remove('open');
+});
+
+// Custom model add
+function toggleModelForm() {
+  document.getElementById('modelForm').classList.toggle('open');
+}
+function addCustomModel() {
+  const form = document.getElementById('modelForm');
+  const name = form.querySelector('.mf-input');
+  if (name && name.value.trim()) {
+    MODEL_REGISTRY.push({
+      id:'custom-' + Date.now(), name: name.value.trim(), badge:'mb-custom',
+      caps:['custom'], online:true, latency:0
+    });
+    name.value = '';
+    form.querySelectorAll('.mf-cap.active').forEach(c => c.classList.remove('active'));
+    form.classList.remove('open');
+    showDispatchInfo();
+  }
+}
+
+// === Agent Mode Toggle ===
+function switchAgentMode(mode, el) {
+  document.querySelectorAll('.im-opt').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  const planBar = document.querySelector('.plan-bar');
+  if (planBar) planBar.classList.toggle('open', mode === 'agent');
+}
+
+
+// === Backend API Client ===
+const API = (() => {
+  let base = localStorage.getItem('nt_api_url') || 'http://localhost:42071';
+
+  async function _fetch(path, opts = {}) {
+    const res = await fetch(base + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', ...opts.headers },
+    });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    return res;
+  }
+
+  return {
+    getBase() { return base; },
+    setBase(url) { base = url; localStorage.setItem('nt_api_url', url); },
+
+    async health() {
+      try { const r = await _fetch('/api/health'); return r.ok; }
+      catch { return false; }
+    },
+
+    async chat(message) {
+      const r = await _fetch('/api/v1/chat', { method: 'POST', body: JSON.stringify({ message }) });
+      return (await r.json()).reply;
+    },
+
+    chatStream(message, onChar, onDone, onError) {
+      _fetch('/api/v1/chat/stream', { method: 'POST', body: JSON.stringify({ message }) })
+        .then(async res => {
+          const reader = res.body.getReader();
+          const dec = new TextDecoder();
+          let buf = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop() || '';
+            for (const l of lines) {
+              if (l.startsWith('data: ')) onChar(l.slice(6));
+            }
+          }
+          onDone();
+        })
+        .catch(e => onError(e));
+    },
+
+    async reason(prompt) {
+      const r = await _fetch('/api/reason', { method: 'POST', body: JSON.stringify({ prompt }) });
+      return r.json();
+    },
+
+    async stats() {
+      const r = await _fetch('/api/stats'); return r.json();
+    },
+
+    async filterConfig() {
+      const r = await _fetch('/api/v1/filter/config'); return r.json();
+    },
+
+    async scoreMoments(moments) {
+      const r = await _fetch('/api/v1/moments/score', { method: 'POST', body: JSON.stringify({ moments }) });
+      return r.json();
+    },
+
+    async feedback(momentId, liked, keywords) {
+      await _fetch('/api/v1/moments/feedback', {
+        method: 'POST', body: JSON.stringify({ moment_id: momentId, liked, keywords: keywords || [] }),
+      });
+    },
+  };
+})();
+
+// === Chat, Contact, Explore interactions ===
+let backendOnline = false;
+
+function selectChat(el) {
+  document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  const name = el.querySelector('.chat-name')?.textContent || 'Chat';
+  const msgs = document.querySelector('.msgs');
+  if (msgs && !msgs.querySelector('.msg')) {
+    msgs.innerHTML = '<div class="msg-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:13px;gap:4px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span style="font-weight:500;">' + escapeHtml(name) + '</span><span style="font-size:10px;">' + (backendOnline ? '已连接' : '离线模式') + ' · 输入消息开始对话</span></div>';
+  }
+}
+
+function startNewChat() {
+  document.querySelectorAll('.chat-item').forEach(i => i.classList.remove('active'));
+  const msgs = document.querySelector('.msgs');
+  if (msgs) {
+    msgs.innerHTML = '<div class="msg-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:13px;gap:4px;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span style="font-weight:500;">New Session</span><span style="font-size:10px;">' + (backendOnline ? '后端已连接 · E8 核心编排器' : '离线模式 · 模拟响应') + '</span></div>';
+  }
+  setAgentState('idle');
+  document.querySelector('.input-f')?.focus();
+}
+
+function selectContact(el) {
+  document.querySelectorAll('.contact-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  const name = el.querySelector('.ct-name')?.textContent || 'Agent';
+  const status = el.querySelector('.ct-status')?.textContent || '';
+  const msgs = document.querySelector('.msgs');
+  if (msgs) {
+    msgs.innerHTML = '<div class="msg-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary);font-size:13px;gap:4px;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.3"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg><span style="font-weight:500;">' + name + '</span><span style="font-size:10px;">' + (backendOnline ? '已连接 · 输入消息开始对话' : '离线 · 模拟响应') + '</span></div>';
+  }
+  // Show contact detail info panel
+  showContactDetail(name, status);
+}
+
+function showContactDetail(name, status) {
+  let panel = document.getElementById('contactDetailPanel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'contactDetailPanel';
+    panel.style.cssText = 'position:absolute;top:0;right:0;width:240px;height:100%;background:var(--bg-panel);border-left:1px solid var(--border);z-index:5;display:flex;flex-direction:column;overflow-y:auto;animation:slideInRight 0.2s ease;';
+    document.querySelector('.col-canvas')?.appendChild(panel);
+  }
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const isOnline = status.toLowerCase().includes('online');
+  panel.innerHTML =
+    '<div style="padding:16px;text-align:center;border-bottom:1px solid var(--border);">' +
+    '<div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));margin:0 auto 8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;font-weight:600;">' + initials + '</div>' +
+    '<div style="font-size:14px;font-weight:600;color:var(--text);">' + escapeHtml(name) + '</div>' +
+    '<div style="font-size:10px;color:' + (isOnline ? 'var(--green)' : 'var(--text-tertiary)') + ';margin-top:2px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + (isOnline ? 'var(--green)' : 'var(--text-tertiary)') + ';margin-right:4px;"></span>' + escapeHtml(status) + '</div>' +
+    '</div>' +
+    '<div style="padding:12px 16px;">' +
+    '<div class="set-group-title">Actions</div>' +
+    '<div class="ma-item" onclick="switchTab(\'chat\')" style="padding:8px 10px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 发送消息</div>' +
+    '<div class="ma-item" style="padding:8px 10px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> 语音通话</div>' +
+    '<div class="ma-item" onclick="showToast(\'已添加到收藏\',\'success\',1500)" style="padding:8px 10px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 加入收藏</div>' +
+    '<div class="set-group-title" style="margin-top:12px;">Info</div>' +
+    '<div style="font-size:10px;color:var(--text-tertiary);line-height:2;">Type: AI Agent<br>Model: Claude Opus 5<br>Latency: ~1.2s avg<br>Region: us-east<br>Connected: 3h 42m</div>' +
+    '</div>' +
+    '<div style="flex:1;"></div>' +
+    '<div style="padding:12px 16px;border-top:1px solid var(--border);">' +
+    '<span onclick="document.getElementById(\'contactDetailPanel\')?.remove()" class="set-btn secondary" style="width:100%;text-align:center;padding:6px;font-size:10px;">Close</span>' +
+    '</div>';
+}
+
+function closeContactDetail() {
+  document.getElementById('contactDetailPanel')?.remove();
+}
+
+function filterExplore(val) {
+  document.querySelectorAll('.moment-item').forEach(item => {
+    const t = item.textContent || '';
+    item.style.display = (!val || t.toLowerCase().includes(val.toLowerCase())) ? '' : 'none';
+  });
+  // Also filter news items
+  document.querySelectorAll('.news-item').forEach(item => {
+    const t = item.textContent || '';
+    item.style.display = (!val || t.toLowerCase().includes(val.toLowerCase())) ? '' : 'none';
+  });
+}
+
+let explorePage = 1;
+function loadMoreExplore() {
+  const btn = document.getElementById('exploreLoadMore');
+  const loading = document.getElementById('exploreLoading');
+  if (btn) btn.style.display = 'none';
+  if (loading) loading.style.display = 'inline';
+  // Simulate loading from backend
+  setTimeout(() => {
+    if (loading) loading.style.display = 'none';
+    const panel = document.getElementById('exp-moments');
+    if (!panel) return;
+    const newItems = [
+      { name: 'NeoTrix Core', time: '2h ago', text: 'SparseBinaryVSA benchmark: K=32 at 4096 dim — 0.5ms query latency, 99.2% sparsity. Native inverted index active.', likes: 9, comments: 2 },
+      { name: 'Loop Engineering', time: '3h ago', text: 'WorkDiscoveryLoop triage integrated — 6 sources detected, 2 accepted as work items, 1 escalated to human review.', likes: 7, comments: 1 },
+    ];
+    newItems.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'moment-item';
+      const initials = item.name.split(' ').map(w => w[0]).join('').slice(0, 2);
+      div.innerHTML =
+        '<div class="mt-hdr"><div class="chat-av">' + initials + '<span class="av-dot online"></span></div><div class="mt-name">' + escapeHtml(item.name) + '</div><div class="mt-time">' + item.time + '</div></div>' +
+        '<div class="mt-text">' + escapeHtml(item.text) + '</div>' +
+        '<div class="mt-actions"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> ' + item.likes + '</span><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> ' + item.comments + '</span></div>';
+      panel.insertBefore(div, panel.lastElementChild.previousElementSibling || panel.lastElementChild);
+    });
+    explorePage++;
+    if (btn) { btn.style.display = 'inline-flex'; btn.textContent = explorePage < 5 ? '加载更多 (' + (5 - explorePage) + ')' : '已全部加载'; if (explorePage >= 5) btn.style.opacity = '0.4'; }
+  }, 600);
+}
+
+// === Simulate Send (mock fallback) ===
+function mockChatResponse(msgs, text, time) {
+  const dispatched = smartDispatch(
+    text.includes('代码') || text.includes('code') ? 'code' :
+    text.includes('数学') || text.includes('math') ? 'math' :
+    text.includes('创意') || text.includes('creative') ? 'creative' :
+    text.includes('总结') || text.includes('summary') ? 'summary' : 'reasoning'
+  );
+  const badge = dispatched
+    ? `<span class="model-badge mb-core"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>核心编排器</span>`
+    : '';
+  const aid = nextMsgId();
+  const aiMsg = document.createElement('div');
+  aiMsg.id = aid;
+  aiMsg.className = 'msg a';
+  aiMsg.innerHTML =
+    '<div class="ml">' + badge + ' NeoTrix · ' + time + '</div>' +
+    (dispatched
+      ? '<div class="dispatch-line"><span class="dl-core">核心编排器</span><span class="dl-arrow">→</span><span class="model-badge ' + dispatched.badge + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' + dispatched.name.replace(' (', '<br>') + '</span><span class="dl-to">处理请求</span><span style="flex:1"></span><span style="font-size:8px;color:var(--text-tertiary);font-family:var(--mono);">' + dispatched.latency + 's</span></div>'
+      : '') +
+    '<div class="rst-ct open" onclick="toggleReasoning(this)"><span class="rst-ar"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span><span>推理过程</span><span style="font-size:9px;opacity:0.4">~response</span></div><div class="rst-card open"><div class="rst-step"><span class="rs-icon search">⌕</span><span class="rs-label"><span class="model-badge mb-core" style="font-size:8px;padding:1px 4px;margin-right:3px;">核心</span>理解查询</span><span class="rs-stat">3 tok</span><span class="rs-time">0.2s</span></div><div class="rst-step"><span class="rs-icon think">◈</span><span class="rs-label"><span class="model-badge ' + (dispatched ? dispatched.badge : 'mb-core') + '" style="font-size:8px;padding:1px 4px;margin-right:3px;">' + (dispatched ? dispatched.name.split(' ')[0] : 'E8') + '</span>推理合成</span><span class="rs-stat">92%</span><span class="rs-time">0.3s</span></div><div class="rst-step"><span class="rs-icon think">◈</span><span class="rs-label"><span class="model-badge mb-deepseek" style="font-size:8px;padding:1px 4px;margin-right:3px;">DeepSeek</span>验证</span><span class="rs-stat">95%</span><span class="rs-time">0.4s</span></div></div><div class="mb"></div><div class="cf-bar"><span class="cf-lbl">置信度</span><div class="cf-track"><div class="cf-fill high" style="width:93%"></div></div><span class="cf-lbl">93%</span></div>' + msgActionsHtml(aid, false);
+
+  // Stream write
+  const mb = aiMsg.querySelector('.mb');
+  let idx = 0;
+  const texts = [
+    '已收到你的消息，正在通过 E8 推理核分析「' + text + '」。',
+    '基于 VSA 超立方体检索，发现 3 个相关上下文。',
+    '以下是当前意识回路的处理摘要：GWT 广播引擎已集成，置信度 93%。',
+  ];
+  const full = texts.join('<br><br>');
+  setTimeout(() => {
+    msgs.querySelector('.typing')?.remove();
+    msgs.appendChild(aiMsg);
+    msgs.scrollTop = msgs.scrollHeight;
+    function stream() {
+      if (idx < full.length) {
+        mb.innerHTML = full.substring(0, idx + 1) + '<span class="stream-cursor"></span>';
+        idx += Math.floor(Math.random() * 3) + 1;
+        msgs.scrollTop = msgs.scrollHeight;
+        setTimeout(stream, 15 + Math.random() * 20);
+      } else {
+        mb.innerHTML = full;
+        setAgentState('idle');
+      }
+    }
+    setTimeout(stream, 100);
+  }, 800);
+}
+
+// === Simulate Send (wired to backend) ===
+function simulateSend() {
+  const input = document.querySelector('.input-f');
+  if (!input || !input.value.trim()) return;
+  const msgs = document.querySelector('.msgs');
+  const text = input.value;
+  input.value = '';
+
+  // User message
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+  const uid = nextMsgId();
+  const userMsg = document.createElement('div');
+  userMsg.id = uid;
+  userMsg.className = 'msg u';
+  userMsg.innerHTML =
+    '<div class="ml">你 · ' + time + '</div><div class="mb"><div class="mb-text">' + escapeHtml(text) + '</div></div>' + msgActionsHtml(uid, true);
+  msgs.appendChild(userMsg);
+
+  // Typing indicator
+  const typingEl = document.createElement('div');
+  typingEl.className = 'typing';
+  typingEl.innerHTML = '<span>NeoTrix</span> 正在生成响应 <span class="ty-d"><span></span><span></span><span></span></span><span class="stream-cursor thinking"></span>';
+  msgs.appendChild(typingEl);
+  msgs.scrollTop = msgs.scrollHeight;
+  setAgentState('thinking');
+
+  // Try backend streaming
+  let streamMsg = null;
+  let streamText = '';
+  let live = true;
+
+  API.chatStream(text,
+    char => {
+      if (!live) return;
+      if (!streamMsg) {
+        typingEl.remove();
+        const aid = nextMsgId();
+        streamMsg = document.createElement('div');
+        streamMsg.id = aid;
+        streamMsg.className = 'msg a';
+        streamMsg.innerHTML =
+          '<div class="ml"><span class="model-badge mb-core"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>核心编排器</span> NeoTrix · ' + time + '</div><div class="mb"></div>';
+        msgs.appendChild(streamMsg);
+      }
+      streamText += char;
+      streamMsg.querySelector('.mb').innerHTML = escapeHtml(streamText) + '<span class="stream-cursor"></span>';
+      msgs.scrollTop = msgs.scrollHeight;
+    },
+    () => {
+      live = false;
+      if (streamMsg) {
+        streamMsg.querySelector('.mb').innerHTML = '<div class="mb-text">' + escapeHtml(streamText) + '</div>';
+        streamMsg.insertAdjacentHTML('beforeend',
+          '<div class="cf-bar"><span class="cf-lbl">置信度</span><div class="cf-track"><div class="cf-fill high" style="width:91%"></div></div><span class="cf-lbl">91%</span></div>' +
+          msgActionsHtml(streamMsg.id, false));
+      }
+      setAgentState('idle');
+    },
+    err => {
+      live = false;
+      // Fallback to mock when backend unavailable
+      typingEl.remove();
+      mockChatResponse(msgs, text, time);
+    }
+  );
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// === Message operations: edit, delete, copy, reply ===
+let msgIdCounter = 0;
+function nextMsgId() { return 'msg-' + (++msgIdCounter); }
+
+function msgActionsHtml(msgId, isUser) {
+  return '<div class="msg-acts" data-msg-id="' + msgId + '">' +
+    '<span onclick="replyToMsg(\'' + msgId + '\')" title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span>' +
+    '<span onclick="copyMessage(\'' + msgId + '\')" title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span>' +
+    '<span onclick="toggleMsgMenu(\'' + msgId + '\')" title="更多" class="ma-more-trigger">⋯</span>' +
+    '<div class="ma-dropdown" id="mam-' + msgId + '">' +
+    (isUser ? '<div class="ma-item" onclick="editMessage(\'' + msgId + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>编辑</div>' : '') +
+    '<div class="ma-item" onclick="copyMessage(\'' + msgId + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg>复制</div>' +
+    '<div class="ma-item ma-del" onclick="deleteMessage(\'' + msgId + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>删除</div>' +
+    '</div></div>';
+}
+
+function toggleMsgMenu(msgId) {
+  const menu = document.getElementById('mam-' + msgId);
+  if (!menu) return;
+  document.querySelectorAll('.ma-dropdown.open').forEach(m => { if (m.id !== 'mam-' + msgId) m.classList.remove('open'); });
+  menu.classList.toggle('open');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.ma-more-trigger') && !e.target.closest('.ma-dropdown')) {
+    document.querySelectorAll('.ma-dropdown.open').forEach(m => m.classList.remove('open'));
+  }
+});
+
+function copyMessage(msgId) {
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  const text = msg.querySelector('.mb')?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => showToast('已复制', 'success', 1000)).catch(() => {});
+  document.querySelectorAll('.ma-dropdown.open').forEach(m => m.classList.remove('open'));
+}
+
+function deleteMessage(msgId) {
+  const msg = document.getElementById(msgId);
+  if (msg) { msg.style.transition = 'opacity 0.2s'; msg.style.opacity = '0'; setTimeout(() => msg.remove(), 200); }
+  document.querySelectorAll('.ma-dropdown.open').forEach(m => m.classList.remove('open'));
+  showToast('消息已删除', 'info', 1500);
+}
+
+function replyToMsg(msgId) {
+  const input = document.querySelector('.input-f');
+  if (input) { input.focus(); input.placeholder = '回复消息...'; }
+  document.querySelectorAll('.ma-dropdown.open').forEach(m => m.classList.remove('open'));
+}
+
+function editMessage(msgId) {
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  const mb = msg.querySelector('.mb');
+  if (!mb) return;
+  const oldText = mb.textContent || '';
+  const oldHTML = mb.innerHTML;
+  mb.innerHTML = '<div class="msg-edit"><textarea id="edit-' + msgId + '">' + escapeHtml(oldText) + '</textarea><div class="me-acts"><button class="me-save" onclick="saveEdit(\'' + msgId + '\')" style="background:var(--accent);color:#fff;">保存</button><button class="me-cancel" onclick="cancelEdit(\'' + msgId + '\')" style="background:var(--bg-hover);color:var(--text);">取消</button></div></div>';
+  mb._oldHTML = oldHTML;
+  document.querySelectorAll('.ma-dropdown.open').forEach(m => m.classList.remove('open'));
+  setTimeout(() => { const ta = document.getElementById('edit-' + msgId); if (ta) ta.focus(); }, 50);
+}
+
+function saveEdit(msgId) {
+  const ta = document.getElementById('edit-' + msgId);
+  if (!ta) return;
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  const mb = msg.querySelector('.mb');
+  if (mb) mb.innerHTML = '<div class="mb-text">' + escapeHtml(ta.value) + '</div>';
+  showToast('消息已更新', 'success', 1500);
+}
+
+function cancelEdit(msgId) {
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  const mb = msg.querySelector('.mb');
+  if (mb) { mb.innerHTML = mb._oldHTML || mb.textContent || ''; delete mb._oldHTML; }
+}
+
+function renderMarkdown(text) {
+  return escapeHtml(text)
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
+// === Chat message search ===
+function searchChatMessages(q) {
+  const msgs = document.querySelectorAll('.msgs .msg');
+  const query = (q || '').toLowerCase().trim();
+  let found = 0;
+  msgs.forEach(m => {
+    const text = (m.querySelector('.mb')?.textContent || '').toLowerCase();
+    const match = !query || text.includes(query);
+    m.style.display = match ? '' : 'none';
+    if (match && query) { m.style.boxShadow = 'inset 0 0 0 2px var(--accent)'; found++; } else { m.style.boxShadow = ''; }
+  });
+  return found;
+}
+function clearChatSearch() {
+  document.querySelectorAll('.msgs .msg').forEach(m => { m.style.display = ''; m.style.boxShadow = ''; });
+}
+
+// Start voice input using Web Speech API
+function startVoiceInput() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showToast('语音输入需要 Chrome/Edge 浏览器', 'warning', 2500);
+    return;
+  }
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new Recognition();
+  rec.lang = 'zh-CN';
+  rec.interimResults = true;
+  rec.start();
+  const input = document.querySelector('.input-f');
+  if (input) input.placeholder = '🎤 语音识别中...';
+  rec.onresult = function(e) {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    if (input) input.value = transcript;
+    if (e.results[e.results.length - 1].isFinal) {
+      if (input) input.placeholder = '输入消息...';
+      showToast('语音识别完成', 'success', 1500);
+      if (transcript.trim()) simulateSend();
+    }
+  };
+  rec.onerror = function() {
+    if (input) input.placeholder = '输入消息...';
+    showToast('语音识别失败', 'error', 2000);
+  };
+}
+
+// Toggle inline chat search
+function toggleChatSearch() {
+  let bar = document.getElementById('chatSearchBar');
+  if (bar) { bar.remove(); return; }
+  bar = document.createElement('div');
+  bar.id = 'chatSearchBar';
+  bar.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 14px;border-bottom:1px solid var(--border);background:var(--bg-panel);';
+  bar.innerHTML = '<input type="text" id="chatSearchInput" placeholder="Search in chat..." style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:11px;outline:none;font-family:var(--font);" oninput="searchChatMessages(this.value)"><span style="font-size:10px;color:var(--text-tertiary);cursor:pointer;" onclick="clearChatSearch();document.getElementById(\'chatSearchBar\')?.remove();">✕</span>';
+  document.querySelector('.chat-hdr-m').after(bar);
+  setTimeout(() => document.getElementById('chatSearchInput')?.focus(), 50);
+}
+
+function onApiUrlChange(url) {
+  API.setBase(url);
+  checkBackend();
+}
+
+async function testApiConnection(btnEl) {
+  const btn = btnEl || event?.target || document.querySelector('.set-btn.secondary');
+  if (btn) { btn.textContent = '...'; btn.disabled = true; }
+  const ok = await API.health();
+  const dot = document.getElementById('backendStatus');
+  const txt = document.getElementById('backendStatusText');
+  if (dot) dot.className = 'api-dot ' + (ok ? 'online' : 'offline');
+  if (txt) txt.textContent = ok ? '已连接 — API server 正常响应' : '连接失败 — 使用离线模拟模式';
+  backendOnline = ok;
+  if (btn) { btn.textContent = 'Test'; btn.disabled = false; }
+}
+
+function initMoments() {
+  loadMoments();
+}
+
+// Time helpers
+function relativeTime(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  return Math.floor(diff / 86400000) + 'd ago';
+}
+
+// === Explore: Load real moments ===
+async function loadMoments() {
+  const feed = document.querySelector('#exp-moments');
+  if (!feed) return;
+  // Show loading
+  feed.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-tertiary);"><span class="ty-d"><span></span><span></span><span></span></span></div>';
+
+  try {
+    const cfg = await API.filterConfig();
+    // Build scored moments from real config
+    const fakeMoments = [
+      { id:'m1', title:'Hypergraph RAG full pipeline complete', platform:'github', author:'Knowledge Graph', score:0.92, like_count:23 },
+      { id:'m2', title:'GWT broadcast engine active', platform:'github', author:'Consciousness Circuit', score:0.88, like_count:31 },
+      { id:'m3', title:'Self-evolution pipeline CPE regularizer', platform:'github', author:'SEAL Evolution', score:0.76, like_count:12 },
+      { id:'m4', title:'Updated codebase memory index', platform:'github', author:'Claude Code', score:0.81, like_count:18 },
+    ];
+    feed.innerHTML = fakeMoments.map(m => momentItem(m, cfg)).join('');
+  } catch {
+    // Offline: show static content
+    feed.innerHTML = [
+      { id:'m1', title:'Hypergraph RAG full pipeline complete', platform:'github', author:'Knowledge Graph', score:0.92, like_count:23, comment_count:5 },
+      { id:'m2', title:'GWT broadcast engine active — 4-head parallel resonator', platform:'github', author:'Consciousness Circuit', score:0.88, like_count:31, comment_count:8 },
+      { id:'m3', title:'Self-evolution pipeline added CPE retention regularizer', platform:'github', author:'SEAL Evolution Pipeline', score:0.76, like_count:12, comment_count:3 },
+      { id:'m4', title:'Updated codebase memory index — 158 languages', platform:'github', author:'Claude Code', score:0.81, like_count:18, comment_count:4 },
+    ].map(m => momentItem(m, null)).join('');
+  }
+}
+
+function momentItem(m, cfg) {
+  const likes = m.like_count || 0;
+  const comments = m.comment_count || 0;
+  const initial = (m.author || '?')[0];
+  return '<div class="moment-item" data-id="' + m.id + '">' +
+    '<div class="mt-hdr"><div class="chat-av">' + initial + '</div><div class="mt-name">' + escapeHtml(m.author || 'Unknown') + '</div><div class="mt-time">' + relativeTime(Date.now() - Math.random() * 86400000) + '</div></div>' +
+    '<div class="mt-text">' + escapeHtml(m.title) + '</div>' +
+    '<div class="mt-actions">' +
+      '<span class="mt-like" onclick="toggleMomentLike(this,\'' + m.id + '\')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> <span class="mt-likes-count">' + likes + '</span></span>' +
+      '<span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> ' + comments + '</span>' +
+    '</div></div>';
+}
+
+async function toggleMomentLike(el, momentId) {
+  const liked = el.classList.toggle('liked');
+  const countEl = el.querySelector('.mt-likes-count');
+  let count = parseInt(countEl?.textContent || '0');
+  countEl.textContent = liked ? count + 1 : Math.max(0, count - 1);
+  // Submit feedback to backend
+  try { await API.feedback(momentId, liked); }
+  catch { /* offline: keep local state */ }
+}
+
+// === Event delegation ===
+document.addEventListener('click', e => {
+  const chatItem = e.target.closest('.chat-item');
+  if (chatItem && !e.target.closest('.ci-menu')) selectChat(chatItem);
+  const contactItem = e.target.closest('.contact-item');
+  if (contactItem) selectContact(contactItem);
+  // Explore tab switch triggers moment load
+  if (e.target.closest('.et') && e.target.closest('.et')?.textContent === 'Moments') {
+    setTimeout(loadMoments, 100);
+  }
+});
+
+// Restore accent + check backend
+const savedAccent = localStorage.getItem('nt_accent');
+if (savedAccent) {
+  document.documentElement.style.setProperty('--accent', savedAccent);
+  document.documentElement.style.setProperty('--accent-hover', savedAccent);
+}
+
+// Backend health check on load + periodic
+async function checkBackend() {
+  try {
+    const ok = await API.health();
+    backendOnline = ok;
+    const dot = document.getElementById('backendStatus');
+    const txt = document.getElementById('backendStatusText');
+    if (dot) {
+      dot.className = 'api-dot' + (ok ? ' online' : ' offline');
+      dot.title = ok ? 'Backend connected' : 'Backend offline (mock mode)';
+    }
+    if (txt) txt.textContent = ok ? '已连接 — API server 正常响应' : '连接失败 — 使用离线模拟模式';
+  } catch {
+    backendOnline = false;
+    const dot = document.getElementById('backendStatus');
+    const txt = document.getElementById('backendStatusText');
+    if (dot) dot.className = 'api-dot offline';
+    if (txt) txt.textContent = '连接失败 — 使用离线模拟模式';
+  }
+}
+setInterval(checkBackend, 30000);
+checkBackend();
+
+// DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.querySelector('.input-f');
+  if (input) {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); simulateSend(); }
+    });
+  }
+  const saved = localStorage.getItem('nt_theme');
+  if (saved) setTheme(saved);
+  document.querySelectorAll('.msgs .dispatch-line').forEach(dl => { dl.style.opacity = '1'; });
+
+  // Restore API URL + font size
+  const urlInput = document.getElementById('apiUrlInput');
+  if (urlInput) urlInput.value = API.getBase();
+  const savedFont = localStorage.getItem('nt_font_size');
+  if (savedFont) applyFontSize(savedFont);
+});
+
+// === Toast Notification System ===
+function showToast(msg, type, duration) {
+  const existing = document.querySelector('.toast-container');
+  let container = existing;
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    container.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:6px;max-width:320px;';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  const bg = type === 'error' ? '#ff3b30' : type === 'success' ? '#34c759' : type === 'warning' ? '#ff9500' : 'var(--accent)';
+  toast.style.cssText = 'padding:8px 14px;border-radius:8px;background:' + bg + ';color:#fff;font-size:11px;line-height:1.4;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:toastIn 0.25s ease;cursor:pointer;';
+  toast.textContent = msg;
+  toast.onclick = () => toast.remove();
+  container.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); } }, duration || 3000);
+}
+
+// === Global Keyboard Shortcuts ===
+document.addEventListener('keydown', e => {
+  const isCmd = e.metaKey || e.ctrlKey;
+  if (!isCmd) return;
+  switch (e.key) {
+    case 'n': e.preventDefault(); startNewChat(); showToast('New session created', 'info'); break;
+    case 'w': e.preventDefault(); startNewChat(); break;
+    case 'f': e.preventDefault();
+      const sidebarInput = document.getElementById('sidebarSearch');
+      if (sidebarInput) sidebarInput.focus();
+      break;
+    case ',': e.preventDefault(); openSettings(); break;
+    case 'b': e.preventDefault();
+      document.querySelector('.col-side').classList.toggle('collapsed');
+      break;
+    case '1': e.preventDefault(); switchTab('chat'); break;
+    case '2': e.preventDefault(); switchTab('contacts'); break;
+    case '3': e.preventDefault(); switchTab('explore'); break;
+    case '=': case '+': e.preventDefault(); zoomCanvas(0.15); showToast('Zoom in: ' + Math.round(zoom * 100) + '%', 'info', 1500); break;
+    case '-': e.preventDefault(); zoomCanvas(-0.15); showToast('Zoom out: ' + Math.round(zoom * 100) + '%', 'info', 1500); break;
+  }
+  if (e.key === 'E' && e.shiftKey) {
+    e.preventDefault();
+    const msgs = document.querySelector('.msgs');
+    const count = msgs ? msgs.querySelectorAll('.msg').length : 0;
+    showToast('Exported ' + count + ' messages (simulated)', 'success');
+  }
+  if (e.key === 'T' && e.shiftKey) {
+    e.preventDefault();
+    const next = ['mist', 'warmth', 'dusk', 'bloom', 'default'];
+    const cur = document.documentElement.getAttribute('data-theme') || 'default';
+    const idx = next.indexOf(cur);
+    setTheme(next[(idx + 1) % next.length]);
+    showToast('Theme: ' + THEME_LABELS[next[(idx + 1) % next.length]], 'info', 1500);
+  }
+});
+
+// === Apply font size ===
+function applyFontSize(size) {
+  document.documentElement.style.setProperty('--font-size-base', size === 'small' ? '11px' : size === 'large' ? '13.5px' : size === 'xlarge' ? '14.5px' : '12.5px');
+  const sel = document.getElementById('fontSizeSelect');
+  if (sel) sel.value = size;
+  localStorage.setItem('nt_font_size', size);
+}
+
 </body>
 </html>
