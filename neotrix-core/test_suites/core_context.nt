@@ -1,0 +1,188 @@
+name: core_context
+description: "Context OS pipeline: gatherer, working memory, OS, budget, compression"
+
+tests:
+  - name: test_empty_gatherer
+    description: "Empty gatherer returns empty context"
+    imports:
+      - "neotrix::core::nt_core_context::context_gatherer::ContextGatherer"
+    code: |
+      let mut g = ContextGatherer::new(1000);
+      let ctx = g.gather_all(&[]);
+      assert!(ctx.fragments.is_empty());
+      assert_eq!(ctx.total_sources, 0);
+
+  - name: test_context_os_new
+    description: "New ContextOS has correct defaults"
+    imports:
+      - "neotrix::core::nt_core_context::context_os::ContextOS"
+    code: |
+      let os = ContextOS::new(4000);
+      let stats = os.stats();
+      assert_eq!(stats.total_assemblies, 0);
+      assert!(stats.wm_load >= 0.0);
+
+  - name: test_gather_basic
+    description: "Basic gather returns context with the given budget"
+    imports:
+      - "neotrix::core::nt_core_context::context_os::ContextOS"
+    code: |
+      let mut os = ContextOS::new(1000);
+      let ctx = os.gather(&[]);
+      assert_eq!(ctx.budget, 1000);
+      assert!(os.last_assembly().is_some());
+
+  - name: test_chunk_wm
+    description: "Working memory chunking combines items"
+    imports:
+      - "neotrix::core::nt_core_context::context_os::ContextOS"
+    code: |
+      let mut os = ContextOS::new(1000);
+      os.update_working_memory("a".into(), 0.7, None);
+      os.update_working_memory("b".into(), 0.6, None);
+      let chunk = os.chunk_working_memory(&[1, 2], "pair".into());
+      assert!(chunk.is_some());
+
+  - name: test_gather_with_wm
+    description: "Gather with working memory produces valid context"
+    imports:
+      - "neotrix::core::nt_core_context::context_os::ContextOS"
+    code: |
+      let mut os = ContextOS::new(2000);
+      os.update_working_memory("working data".into(), 0.9, None);
+      let ctx = os.gather_with_working_memory(&[]);
+      assert!(ctx.total_used <= ctx.budget);
+
+  - name: test_push_and_count
+    description: "WorkingMemory push adds items and updates load"
+    imports:
+      - "neotrix::core::nt_core_context::working_memory::WorkingMemory"
+    code: |
+      let mut wm = WorkingMemory::new(5);
+      wm.push("item1".into(), 0.9, None);
+      wm.push("item2".into(), 0.8, None);
+      assert_eq!(wm.item_count(), 2);
+      assert_eq!(wm.load(), 0.4);
+
+  - name: test_capacity_eviction
+    description: "WorkingMemory enforces capacity by evicting oldest"
+    imports:
+      - "neotrix::core::nt_core_context::working_memory::WorkingMemory"
+    code: |
+      let mut wm = WorkingMemory::new(3);
+      wm.push("a".into(), 0.9, None);
+      wm.push("b".into(), 0.8, None);
+      wm.push("c".into(), 0.7, None);
+      wm.push("d".into(), 1.0, None);
+      assert_eq!(wm.item_count(), 3);
+
+  - name: test_clear_resets_all
+    description: "Clear resets WorkingMemory to empty"
+    imports:
+      - "neotrix::core::nt_core_context::working_memory::WorkingMemory"
+    code: |
+      let mut wm = WorkingMemory::new(5);
+      wm.push("x".into(), 0.5, None);
+      wm.push("y".into(), 0.5, None);
+      wm.clear();
+      assert_eq!(wm.item_count(), 0);
+      assert_eq!(wm.load(), 0.0);
+
+  - name: test_default_allocation_sums_to_one
+    description: "Default budget allocation sums to 1.0"
+    imports:
+      - "neotrix::core::nt_core_context::context_budget::ContextBudget"
+    code: |
+      let alloc = ContextBudget::default_allocation();
+      let sum: f64 = alloc.values().sum();
+      assert!((sum - 1.0).abs() < 1e-9);
+
+  - name: test_assemble_trims_oversized_content
+    description: "Assemble trims content that exceeds budget"
+    imports:
+      - "neotrix::core::nt_core_context::context_budget::ContextBudget"
+      - "neotrix::core::nt_core_context::context_budget::SourceType"
+    code: |
+      let budget = ContextBudget::new(100);
+      let kb_content = "A".repeat(400);
+      let sources = vec![(SourceType::KnowledgeBase, kb_content), (SourceType::System, "hello".to_string())];
+      let ctx = budget.assemble(&sources);
+      assert!(ctx.total_used <= ctx.budget);
+      assert_eq!(ctx.slices.len(), 2);
+
+  - name: test_compress_passthrough
+    description: "CompressionStore passthrough returns correct metadata"
+    imports:
+      - "neotrix::core::nt_core_context::ccr::CompressionStore"
+      - "neotrix::core::nt_core_context::ccr::CompressionStrategy"
+    code: |
+      let mut store = CompressionStore::new(100, 3600);
+      let block = store.compress("hello world");
+      assert_eq!(block.original_length, 11);
+      assert!(block.ratio <= 1.0);
+      assert_eq!(block.strategy, CompressionStrategy::Whitespace);
+
+  - name: test_compress_and_retrieve_roundtrip
+    description: "Compress and retrieve roundtrip preserves content"
+    imports:
+      - "neotrix::core::nt_core_context::ccr::CompressionStore"
+    code: |
+      let mut store = CompressionStore::new(100, 3600);
+      let content = "The quick brown fox jumps over the lazy dog.";
+      let block = store.compress(content);
+      let retrieved = store.retrieve(&block.fingerprint);
+      assert!(retrieved.is_some());
+      assert_eq!(String::from_utf8(retrieved.unwrap()).unwrap(), content);
+
+  - name: test_ttl_expiration
+    description: "Zero TTL causes immediate expiration"
+    imports:
+      - "neotrix::core::nt_core_context::ccr::CompressionStore"
+    code: |
+      let mut store = CompressionStore::new(100, 0);
+      let block = store.compress("ephemeral content");
+      assert!(!store.is_cached(&block.fingerprint));
+
+  - name: test_stats_accuracy
+    description: "Compression stats track entries accurately"
+    imports:
+      - "neotrix::core::nt_core_context::ccr::CompressionStore"
+    code: |
+      let mut store = CompressionStore::new(100, 3600);
+      store.compress("hello");
+      store.compress("world");
+      let stats = store.stats();
+      assert_eq!(stats.entries, 2);
+      assert_eq!(stats.capacity, 100);
+
+  - name: test_adaptive_rate_controller_initial
+    description: "AdaptiveRateController uses initial rate"
+    imports:
+      - "neotrix::core::nt_core_context::ccr::AdaptiveRateController"
+    code: |
+      let controller = AdaptiveRateController::new(0.5, 10);
+      assert_eq!(controller.current_rate(), 0.5);
+      assert_eq!(controller.hit_rate(), 0.5);
+
+  - name: test_adaptive_rate_increases_on_misses
+    description: "Misses cause adaptive rate to increase"
+    imports:
+      - "neotrix::core::nt_core_context::ccr::AdaptiveRateController"
+    code: |
+      let mut controller = AdaptiveRateController::new(0.5, 10);
+      for _ in 0..5 {
+          controller.record_access(false);
+      }
+      controller.adjust_rate();
+      assert!(controller.current_rate() > 0.5);
+
+  - name: test_remaining_budget
+    description: "Remaining budget is correctly calculated"
+    imports:
+      - "neotrix::core::nt_core_context::context_budget::ContextBudget"
+      - "neotrix::core::nt_core_context::context_budget::SourceType"
+    code: |
+      let budget = ContextBudget::new(100);
+      let ctx = budget.assemble(&[(SourceType::System, "test".to_string())]);
+      let remaining = budget.remaining(&ctx);
+      assert_eq!(remaining, 100 - ctx.total_used);

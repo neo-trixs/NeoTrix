@@ -1,0 +1,23 @@
+[package]
+name = "neotrix-body"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "NeoTrix Physical Body — body/ layer (IO drivers, security chain, agent bus)"
+
+[dependencies]
+neotrix-mind = { path = "../neotrix-mind" }
+async-trait = "0.1"
+dirs = { workspace = true }
+futures = "0.3"
+log = "0.4"
+rand = "0.8"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "multipart", "rustls-tls"] }
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+
+[features]
+telemetry = []

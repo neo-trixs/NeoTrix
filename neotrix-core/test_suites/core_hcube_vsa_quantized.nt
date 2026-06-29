@@ -1,0 +1,225 @@
+name: core_hcube_vsa_quantized
+description: "QuantizedVSA binary vector operations — full test suite"
+
+tests:
+  - name: vsa_random_vector_dim
+    description: "Random vector has correct dimension"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let v = QuantizedVSA::random_vector();
+      assert_eq!(v.len(), VSA_DIM);
+
+  - name: vsa_binary_vector_is_binary
+    description: "Random binary vector elements are 0 or 1"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let v = QuantizedVSA::random_binary();
+      for &x in &v {
+          assert!(x == 0 || x == 1);
+      }
+
+  - name: vsa_bind_self_returns_zero
+    description: "a XOR a is all zeros"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let a = QuantizedVSA::random_binary();
+      let bound = QuantizedVSA::bind(&a, &a);
+      assert!(bound.iter().all(|&x| x == 0));
+
+  - name: vsa_bind_inverse
+    description: "a XOR all-ones is dissimilar to a"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let a = QuantizedVSA::random_binary();
+      let ones: Vec<u8> = vec![1; VSA_DIM];
+      let inverted = QuantizedVSA::bind(&a, &ones);
+      assert!(QuantizedVSA::similarity(&a, &inverted) < 0.01);
+
+  - name: vsa_bind_commutative
+    description: "XOR is commutative"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let a = QuantizedVSA::random_binary();
+      let b = QuantizedVSA::random_binary();
+      let ab = QuantizedVSA::bind(&a, &b);
+      let ba = QuantizedVSA::bind(&b, &a);
+      assert_eq!(ab, ba, "XOR is commutative");
+
+  - name: vsa_bundle_non_empty
+    description: "Bundled vector is similar to at least one component"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let a = QuantizedVSA::random_binary();
+      let b = QuantizedVSA::random_binary();
+      let bundled = QuantizedVSA::bundle(&[&a, &b]);
+      assert_eq!(bundled.len(), VSA_DIM);
+      let sim_a = QuantizedVSA::similarity(&bundled, &a);
+      let sim_b = QuantizedVSA::similarity(&bundled, &b);
+      assert!(sim_a > 0.4 || sim_b > 0.4);
+
+  - name: vsa_bundle_empty
+    description: "Bundling empty slice returns zero vector"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let bundled = QuantizedVSA::bundle(&[]);
+      assert_eq!(bundled.len(), VSA_DIM);
+      assert!(bundled.iter().all(|&x| x == 0));
+
+  - name: vsa_permute_reversible
+    description: "Permute is reversible"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let v = QuantizedVSA::random_binary();
+      let p = QuantizedVSA::permute(&v, 100);
+      let r = QuantizedVSA::permute(&p, -100);
+      let sim = QuantizedVSA::similarity(&r, &v);
+      assert!((sim - 1.0).abs() < 1e-10);
+
+  - name: vsa_self_similarity_one
+    description: "A vector's similarity to itself is 1.0"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let v = QuantizedVSA::random_binary();
+      let sim = QuantizedVSA::similarity(&v, &v);
+      assert!((sim - 1.0).abs() < 1e-10);
+
+  - name: vsa_orthogonal_similarity_zero
+    description: "All-zeros vs all-ones similarity is 0.0"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let zeros = vec![0u8; VSA_DIM];
+      let ones = vec![1u8; VSA_DIM];
+      let sim = QuantizedVSA::similarity(&zeros, &ones);
+      assert!((sim - 0.0).abs() < 1e-10);
+
+  - name: vsa_hamming_distance_counts
+    description: "Hamming distance between zeros and ones equals VSA_DIM"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let zeros = vec![0u8; VSA_DIM];
+      let ones = vec![1u8; VSA_DIM];
+      let dist = QuantizedVSA::hamming_distance(&zeros, &ones);
+      assert_eq!(dist, VSA_DIM as u32);
+
+  - name: vsa_hamming_range
+    description: "Hamming distance never exceeds VSA_DIM"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let a = QuantizedVSA::random_binary();
+      let b = QuantizedVSA::random_binary();
+      let dist = QuantizedVSA::hamming_distance(&a, &b);
+      assert!(dist <= VSA_DIM as u32);
+
+  - name: vsa_cosine_self_similarity
+    description: "Cosine similarity to self is 1.0"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let v = QuantizedVSA::random_vector();
+      let sim = QuantizedVSA::cosine(&v, &v);
+      assert!((sim - 1.0).abs() < 0.01);
+
+  - name: vsa_dim
+    description: "QuantizedVSA reports correct dimensions"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let q = QuantizedVSA::new(2048);
+      assert_eq!(q.dim(), 2048);
+
+  - name: vsa_binarize_zero
+    description: "Binarize zero values yields all zeros"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let v = vec![0u8; 100];
+      let b = QuantizedVSA::binarize(&v);
+      assert!(b.iter().all(|&x| x == 0));
+
+  - name: vsa_binarize_high
+    description: "Binarize high values yields all ones"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let v = vec![200u8; 100];
+      let b = QuantizedVSA::binarize(&v);
+      assert!(b.iter().all(|&x| x == 1));
+
+  - name: vsa_pack_binary_roundtrip
+    description: "pack_binary reduces dimension by factor of 8"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::pack_binary"
+    code: |
+      let original = QuantizedVSA::random_binary();
+      assert_eq!(original.len(), VSA_DIM);
+      let packed = pack_binary(&original);
+      assert_eq!(packed.len(), VSA_DIM / 8);
+
+  - name: vsa_pack_identical_zero_distance
+    description: "Identical packed vectors have zero Hamming distance"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::pack_binary"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::hamming_distance_packed"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::similarity_packed"
+    code: |
+      let v = vec![1u8; VSA_DIM];
+      let packed = pack_binary(&v);
+      assert_eq!(hamming_distance_packed(&packed, &packed), 0);
+      assert!((similarity_packed(&packed, &packed) - 1.0).abs() < 1e-6);
+
+  - name: vsa_pack_zeros_vs_ones
+    description: "All-zeros vs all-ones packed distance equals VSA_DIM"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::pack_binary"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::hamming_distance_packed"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::similarity_packed"
+    code: |
+      let zeros = vec![0u8; VSA_DIM];
+      let ones = vec![1u8; VSA_DIM];
+      let pz = pack_binary(&zeros);
+      let po = pack_binary(&ones);
+      assert_eq!(hamming_distance_packed(&pz, &po), VSA_DIM as u32);
+      assert!((similarity_packed(&pz, &po) - 0.0).abs() < 1e-6);
+
+  - name: vsa_pack_preserves_information
+    description: "Alternating bits pack to 0x55"
+    imports:
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::pack_binary"
+    code: |
+      let mut v = vec![0u8; VSA_DIM];
+      for i in (0..VSA_DIM).step_by(2) { v[i] = 1; }
+      let packed = pack_binary(&v);
+      assert_eq!(packed.len(), VSA_DIM / 8);
+      for &byte in &packed {
+          assert_eq!(byte, 0b01010101, "alternating bits should pack to 0x55");
+      }

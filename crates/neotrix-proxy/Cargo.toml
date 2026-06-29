@@ -1,0 +1,13 @@
+[package]
+name = "neotrix-proxy"
+version.workspace = true
+edition = "2021"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NeoTrix minimal HTTP CONNECT proxy with TLS fingerprint rotation"
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+neotrix-proxy-kernel = { path = "../neotrix-proxy-kernel" }
+log = "0.4"

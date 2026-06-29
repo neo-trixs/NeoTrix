@@ -1,0 +1,160 @@
+name: "core_negentropy"
+description: "Negentropy metric tests"
+
+tests:
+  - name: negentropy_metric_default
+    description: "Default metric has zero total and stable trend"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+    code: |
+      let m = NegentropyMetric::default();
+      assert!((m.total - 0.0).abs() < 1e-9);
+      assert_eq!(m.trend_desc(), "stable");
+      assert_eq!(m.health(), "critical");
+
+  - name: negentropy_record_updates_total
+    description: "Record updates total from component weighted sum"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+      - "neotrix::core::nt_core_negentropy::NegentropyComponents"
+      - "neotrix::core::nt_core_negentropy::NegentropyFlux"
+    code: |
+      let mut m = NegentropyMetric::default();
+      let components = NegentropyComponents {
+          phi: 0.8, vsa_coherence: 0.7, kb_order: 0.6,
+          prediction_acc: 0.9, attention_focus: 0.5,
+          strategy_diff: 0.4, temporal_coherence: 0.3,
+      };
+      let flux = NegentropyFlux::default();
+      let expected = components.weighted_total();
+      m.record(components, flux);
+      assert!((m.total - expected).abs() < 1e-9);
+
+  - name: negentropy_components_weighted_total
+    description: "Weighted total uses base weights for seven components"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyComponents"
+    code: |
+      let c = NegentropyComponents {
+          phi: 1.0, vsa_coherence: 0.0, kb_order: 0.0,
+          prediction_acc: 0.0, attention_focus: 0.0,
+          strategy_diff: 0.0, temporal_coherence: 0.0,
+      };
+      assert!((c.weighted_total() - 1.0).abs() < 1e-9);
+
+  - name: negentropy_components_active_mask
+    description: "Active mask reflects non-zero components"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyComponents"
+    code: |
+      let c = NegentropyComponents {
+          phi: 0.5, vsa_coherence: 0.0, kb_order: 0.3,
+          prediction_acc: 0.0, attention_focus: 0.0,
+          strategy_diff: 0.0, temporal_coherence: 0.0,
+      };
+      let mask = c.active_mask();
+      assert!(mask & (1 << 0) != 0);
+      assert!(mask & (1 << 2) != 0);
+      assert_eq!(mask & (1 << 1), 0);
+
+  - name: negentropy_trend_desc_classifications
+    description: "Trend description covers all regimes"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+    code: |
+      let mut m = NegentropyMetric::default();
+      m.trend = 0.1;
+      assert_eq!(m.trend_desc(), "growing");
+      m.trend = -0.1;
+      assert_eq!(m.trend_desc(), "declining");
+      m.trend = 0.0;
+      assert_eq!(m.trend_desc(), "stable");
+
+  - name: negentropy_health_classifications
+    description: "Health classification covers all thresholds"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+    code: |
+      let mut m = NegentropyMetric::default();
+      m.total = 0.8; assert_eq!(m.health(), "excellent");
+      m.total = 0.6; assert_eq!(m.health(), "good");
+      m.total = 0.4; assert_eq!(m.health(), "fair");
+      m.total = 0.2; assert_eq!(m.health(), "critical");
+
+  - name: negentropy_history_slice_after_record
+    description: "History slice contains recorded values"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+      - "neotrix::core::nt_core_negentropy::NegentropyComponents"
+      - "neotrix::core::nt_core_negentropy::NegentropyFlux"
+    code: |
+      let mut m = NegentropyMetric::default();
+      let c = NegentropyComponents::default();
+      let f = NegentropyFlux::default();
+      m.record(c, f);
+      let history = m.history_slice();
+      assert_eq!(history.len(), 1);
+      assert!((history[0] - 0.0).abs() < 1e-9);
+
+  - name: negentropy_demon_efficiency
+    description: "Demon efficiency scales with operational cost"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+      - "neotrix::core::nt_core_negentropy::NegentropyComponents"
+      - "neotrix::core::nt_core_negentropy::NegentropyFlux"
+    code: |
+      let mut m = NegentropyMetric::default();
+      let c = NegentropyComponents::default();
+      let mut f = NegentropyFlux::default();
+      f.operational_cost = 2.0;
+      m.record(c, f);
+      let eff = m.compute_demon_efficiency();
+      assert!((eff - 0.0).abs() < 1e-9);
+
+  - name: negentropy_report_new_with_regime
+    description: "Report detects regime from metric state"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyReport"
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+      - "neotrix::core::nt_core_negentropy::NegentropyRegime"
+    code: |
+      let mut m = NegentropyMetric::default();
+      let report = NegentropyReport::new(0, &m, 0.0);
+      assert_eq!(report.iteration, 0);
+      assert!((report.delta - 0.0).abs() < 1e-9);
+      assert_eq!(report.regime, NegentropyRegime::Critical);
+
+  - name: negentropy_report_growing_regime
+    description: "Positive trend with high total is Growing"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyReport"
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+      - "neotrix::core::nt_core_negentropy::NegentropyRegime"
+    code: |
+      let mut m = NegentropyMetric::default();
+      m.total = 0.8;
+      m.trend = 0.1;
+      let report = NegentropyReport::new(0, &m, 0.0);
+      assert_eq!(report.regime, NegentropyRegime::Growing);
+      assert_eq!(report.recommendation, "maintain current trajectory");
+
+  - name: negentropy_summary_lines_format
+    description: "Summary lines render correctly with formatting"
+    imports:
+      - "neotrix::core::nt_core_negentropy::NegentropyMetric"
+      - "neotrix::core::nt_core_negentropy::NegentropyComponents"
+      - "neotrix::core::nt_core_negentropy::NegentropyFlux"
+    code: |
+      let mut m = NegentropyMetric::default();
+      let components = NegentropyComponents {
+          phi: 0.8, vsa_coherence: 0.7, kb_order: 0.6,
+          prediction_acc: 0.9, attention_focus: 0.5,
+          strategy_diff: 0.4, temporal_coherence: 0.3,
+      };
+      let flux = NegentropyFlux::default();
+      m.record(components, flux);
+      let lines = m.summary_lines();
+      assert_eq!(lines.len(), 4);
+      assert!(lines[0].contains("N_total="));
+      assert!(lines[1].contains("Φ="));
+      assert!(lines[3].contains("Flux:"));

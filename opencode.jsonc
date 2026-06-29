@@ -1,0 +1,44 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
+  "lsp": true,
+  "formatter": true,
+  "snapshot": true,
+  "compaction": {
+    "auto": true,
+    "prune": false,
+    "reserved": 10000
+  },
+  "watcher": {
+    "ignore": ["target/**", "dist/**", ".git/**", "node_modules/**"]
+  },
+  "instructions": [
+    "AGENTS.md",
+    "SELF.md",
+    "RULES.md",
+    "docs/IDENTITY_ARCHITECTURE.md"
+  ],
+  "permission": {
+    "bash": "allow",
+    "edit": "allow",
+    "write": "allow",
+    "task": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "read": "allow",
+    "webfetch": "allow",
+    "websearch": "allow"
+  },
+  "agent": {
+    "explore": {
+      "description": "Code exploration and analysis",
+      "model": "opencode/deepseek-v4-flash-free",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    }
+  },
+  "default_agent": "build"
+}
