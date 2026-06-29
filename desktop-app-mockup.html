@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NeoTrix — 雪域白 v6</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --bg:#f5f5f7;
+  --bg-panel:#ffffff;
+  --bg-sidebar:#fbfbfd;
+  --bg-hover:rgba(0,0,0,0.04);
+  --bg-active:rgba(94,138,255,0.08);
+  --text:#1d1d1f;
+  --text-secondary:#86868b;
+  --text-tertiary:#aeaeb2;
+  --border:rgba(0,0,0,0.06);
+  --border-strong:rgba(0,0,0,0.1);
+  --accent:#5e8aff;
+  --accent-hover:#4a7aff;
+  --green:#34c759;
+  --orange:#ff9f0a;
+  --pink:#ff6cb4;
+  --purple:#bf5af2;
+  --red:#ff453a;
+  --canvas-bg:#f9f9fb;
+  --node-shadow:0 2px 8px rgba(0,0,0,0.06);
+  --font:'PingFang SC',-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Segoe UI',sans-serif;
+  --mono:'SF Mono','SF Mono','Fira Code','Fira Mono',Menlo,Consolas,monospace;
+  --radius-sm:6px;
+  --radius-md:10px;
+  --radius-lg:14px;
+  --shadow:0 2px 12px rgba(0,0,0,0.04);
+  --shadow-lg:0 8px 40px rgba(0,0,0,0.08);
+}
+
+body{
+  background:#e8e8ed;font-family:var(--font);
+  display:flex;flex-direction:column;align-items:center;
+  padding:24px;gap:16px;color:var(--text);
+}
+.label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-tertiary);font-weight:500;}
+
+.window{
+  width:1050px;height:620px;
+  background:var(--bg-panel);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-lg),0 0 0 1px rgba(0,0,0,0.04);
+  display:flex;flex-direction:column;overflow:hidden;position:relative;z-index:1;
+}
+
+/* ===== Titlebar ===== */
+.titlebar{
+  display:flex;align-items:center;height:36px;
+  padding:0 12px;gap:8px;flex-shrink:0;
+}
+.traffic{display:flex;gap:6px;}
+.tl{width:11px;height:11px;border-radius:50%;}
+.tl1{background:#ff5f56}
+.tl2{background:#ffbd2e}
+.tl3{background:#27c93f}
+.brand{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text);margin-left:4px;letter-spacing:-0.2px;}
+.brand-d{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+.title-sp{flex:1;}
+.tb-btn{
+  width:26px;height:26px;border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-tertiary);cursor:pointer;font-size:12px;
+  transition:all 0.1s;
+}
+.tb-btn:hover{background:var(--bg-hover);color:var(--text);}
+
+/* ===== Body ===== */
+.body{flex:1;display:flex;overflow:hidden;border-top:1px solid var(--border);}
+
+/* ===== Column 1: Social Sidebar ===== */
+.col-side{
+  width:210px;flex-shrink:0;
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  background:var(--bg-sidebar);
+}
+
+/* Search bar */
+.side-search{
+  display:flex;align-items:center;gap:6px;
+  margin:8px 10px 4px;
+  padding:5px 10px;
+  background:#f0f0f4;
+  border:1px solid transparent;
+  border-radius:8px;
+  transition:all 0.12s;
+}
+.side-search:focus-within{
+  border-color:var(--accent);
+  background:var(--bg-panel);
+  box-shadow:0 0 0 3px rgba(94,138,255,0.08);
+}
+.side-search input{
+  flex:1;border:none;background:none;
+  font-family:var(--font);font-size:12px;
+  color:var(--text);outline:none;
+}
+.side-search input::placeholder{color:var(--text-tertiary);}
+.side-search .s-ico{font-size:11px;color:var(--text-tertiary);flex-shrink:0;}
+
+.tabs{
+  display:flex;padding:2px 10px 6px;gap:4px;
+}
+.tab{
+  flex:1;padding:5px 0;text-align:center;
+  font-size:12px;font-weight:500;color:var(--text-tertiary);
+  border-radius:var(--radius-sm);cursor:pointer;
+  transition:all 0.12s;user-select:none;
+}
+.tab:hover{color:var(--text-secondary);background:var(--bg-hover);}
+.tab.active{color:var(--accent);background:var(--bg-active);font-weight:600;}
+
+.tab-content{flex:1;overflow-y:auto;padding:0 8px;display:none;}
+.tab-content.active{display:block;}
+
+/* Chat list items */
+.chat-item{
+  display:flex;align-items:center;gap:10px;
+  border-radius:var(--radius-sm);cursor:pointer;transition:all 0.08s;
+  border-bottom:1px solid var(--border);
+  margin:0 -8px;padding:9px 12px;position:relative;
+}
+.chat-item:last-child{border-bottom:none;}
+.chat-item:hover{background:var(--bg-hover);}
+.chat-item.active{background:var(--bg-active);}
+.sect-label{
+  font-size:10px;font-weight:600;color:var(--text-tertiary);
+  text-transform:uppercase;letter-spacing:0.5px;
+  padding:10px 10px 4px;
+}
+.chat-item .ci-menu{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  font-size:14px;color:var(--text-tertiary);display:none;cursor:pointer;
+  padding:2px 4px;border-radius:4px;
+}
+.chat-item:hover .ci-menu{display:block;}
+.chat-item .ci-menu:hover{background:var(--bg-hover);color:var(--text);}
+
+.chat-av{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--accent);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:14px;font-weight:500;opacity:0.85;position:relative;
+}
+.chat-av .av-dot{
+  position:absolute;bottom:0;right:0;width:10px;height:10px;
+  border-radius:50%;border:2px solid var(--bg-sidebar);
+}
+.chat-av .av-dot.online{background:var(--green);}
+.chat-av .av-dot.offline{background:var(--text-tertiary);}
+.chat-av.av2{background:var(--green);}
+.chat-av.av3{background:var(--orange);}
+.chat-av.av4{background:var(--purple);}
+.chat-av.av5{background:var(--pink);}
+.chat-av.av6{background:#5ac8fa;}
+.chat-av.av7{background:#ff6482;}
+.chat-av.av8{background:#50c878;}
+
+.chat-info{flex:1;min-width:0;}
+.chat-name{font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-msg{font-size:11px;color:var(--text-tertiary);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-right{flex-shrink:0;text-align:right;}
+.chat-time{font-size:10px;color:var(--text-tertiary);}
+.chat-badge{
+  font-size:10px;font-family:var(--mono);color:#fff;
+  background:var(--red);padding:1px 6px;border-radius:10px;
+  display:inline-block;margin-top:3px;min-width:18px;text-align:center;
+}
+.chat-pin{font-size:9px;color:var(--text-tertiary);margin-top:1px;opacity:0.5;}
+
+/* Contacts */
+.contact-item{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 6px;border-radius:var(--radius-sm);cursor:pointer;transition:background 0.08s;
+}
+.contact-item:hover{background:var(--bg-hover);}
+.ct-name{font-size:12px;font-weight:500;color:var(--text);}
+.ct-status{font-size:10px;color:var(--text-tertiary);margin-top:1px;}
+
+/* Moments */
+.moment-item{
+  padding:9px 6px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.08s;
+}
+.moment-item:hover{background:var(--bg-hover);}
+.mt-hdr{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.mt-name{font-size:12px;font-weight:500;color:var(--text);}
+.mt-time{font-size:10px;color:var(--text-tertiary);margin-left:auto;}
+.mt-text{font-size:12px;color:var(--text-secondary);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.mt-actions{display:flex;gap:12px;margin-top:5px;font-size:10px;color:var(--text-tertiary);}
+.mt-actions span{cursor:pointer;display:flex;align-items:center;gap:3px;}
+.mt-actions span:hover{color:var(--accent);}
+
+/* News items */
+.news-item{
+  padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.08s;
+}
+.news-item:hover{background:var(--bg-hover);}
+.news-src{font-size:9px;color:var(--accent);margin-bottom:3px;font-weight:500;}
+.news-title{font-size:12px;font-weight:500;color:var(--text);margin-bottom:2px;line-height:1.4;}
+.news-desc{font-size:11px;color:var(--text-tertiary);line-height:1.4;}
+.news-acts{display:flex;gap:8px;margin-top:5px;font-size:10px;color:var(--text-tertiary);align-items:center;}
+.news-acts span{cursor:pointer;display:flex;align-items:center;gap:2px;}
+.na-like,.na-unlike{opacity:0.5;transition:all 0.12s;}
+.na-like:hover,.na-unlike:hover{opacity:1;color:var(--accent);}
+.na-liked{opacity:1;color:var(--accent)!important;}
+.na-disliked{opacity:1;color:var(--red)!important;}
+.na-val{min-width:24px;font-variant-numeric:tabular-nums;}
+.na-com{opacity:0.4;}
+
+/* Explore tab */
+.explore-search{padding:8px 6px;}
+.explore-search input{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:11px;outline:none;background:#fafafa;font-family:var(--font);}
+.explore-panel{display:none;}
+.explore-panel.active{display:block;}
+.explore-tabs{display:flex;gap:2px;padding:0 6px 6px;}
+.et{padding:4px 10px;font-size:11px;color:var(--text-tertiary);border-radius:6px;cursor:pointer;transition:all 0.08s;font-weight:500;}
+.et:hover{color:var(--text);background:var(--bg-hover);}
+.et.active{color:var(--accent);background:var(--bg-active);}
+
+/* ===== Column 2: Main Chat ===== */
+.col-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+
+.chat-hdr-m{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 20px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.cm-dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+.cm-name{font-size:13px;font-weight:600;color:var(--text);}
+.cm-act{
+  width:26px;height:26px;border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-tertiary);cursor:pointer;margin-left:2px;
+}
+.cm-act:hover{background:var(--bg-hover);color:var(--text);}
+
+.msgs{flex:1;overflow-y:auto;padding:14px 24px;display:flex;flex-direction:column;gap:10px;}
+
+.msg{max-width:520px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:2px;position:relative;}
+.msg.u{align-items:flex-end;}
+.msg.u .mb{
+  background:var(--accent);color:#fff;
+  border-radius:14px 14px 4px 14px;
+}
+.msg.a .mb{
+  background:#f0f0f4;color:var(--text);
+  border-radius:14px 14px 14px 4px;
+}
+.msg .msg-acts{
+  position:absolute;top:-2px;right:0;
+  display:none;gap:2px;background:var(--bg-panel);
+  border:1px solid var(--border);border-radius:6px;
+  padding:2px;box-shadow:var(--shadow);
+}
+.msg.u .msg-acts{right:auto;left:0;}
+.msg:hover .msg-acts{display:flex;}
+.msg .msg-acts span{
+  width:22px;height:22px;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:var(--text-tertiary);cursor:pointer;
+}
+.msg .msg-acts span:hover{background:var(--bg-hover);color:var(--text);}
+.ml{font-size:10px;font-weight:500;color:var(--text-tertiary);padding:0 4px;}
+.msg.u .ml{color:var(--accent);}
+.mb{padding:9px 14px;font-size:13px;line-height:1.6;letter-spacing:-0.1px;}
+.mb code{background:rgba(0,0,0,0.04);padding:1px 5px;border-radius:3px;font-family:var(--mono);font-size:11px;}
+
+.token-info{
+  display:flex;align-items:center;gap:5px;
+  font-size:10px;color:var(--text-tertiary);
+  padding:1px 6px 0;max-width:520px;width:100%;margin:0 auto;opacity:0.6;
+}
+.msg.u + .token-info{justify-content:flex-end;}
+
+.rst-ct{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--text-tertiary);cursor:pointer;
+  padding:3px 6px;border-radius:var(--radius-sm);margin-bottom:2px;
+  transition:color 0.12s,background 0.12s;width:fit-content;
+}
+.rst-ct:hover{color:var(--text-secondary);background:var(--bg-hover);}
+.rst-ar{font-size:7px;transition:transform 0.12s;display:inline-block;}
+.rst-ct.open .rst-ar{transform:rotate(90deg);}
+
+.rst-steps{
+  display:none;flex-direction:column;gap:1px;
+  padding:5px 10px;background:#f0f0f4;
+  border-radius:10px;margin-bottom:3px;
+}
+.rst-steps.open{display:flex;}
+.rst{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);padding:1px 0;}
+.rst-d{width:4px;height:4px;border-radius:50%;flex-shrink:0;}
+
+.typing{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 10px;background:#f0f0f4;
+  border-radius:10px;font-size:12px;color:var(--text-tertiary);
+  font-family:var(--mono);max-width:520px;width:100%;margin:0 auto;
+}
+.typing span:first-child{color:var(--accent);font-weight:600;}
+.ty-d{display:inline-flex;gap:3px;margin-left:3px;}
+.ty-d span{width:3px;height:3px;border-radius:50%;background:var(--text-tertiary);animation:ty 1.2s infinite;}
+.ty-d span:nth-child(2){animation-delay:.15s}
+.ty-d span:nth-child(3){animation-delay:.3s}
+@keyframes ty{0%,100%{opacity:.15}50%{opacity:1}}
+
+.input-wrap{padding:0 20px 10px;flex-shrink:0;}
+.input-inner{max-width:520px;margin:0 auto;}
+.input-bar{
+  display:flex;align-items:center;gap:4px;
+  background:#f0f0f4;border:1px solid transparent;
+  border-radius:10px;padding:3px 4px 3px 10px;
+  transition:border-color 0.15s,box-shadow 0.15s,background 0.15s;
+}
+.input-bar:focus-within{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(94,138,255,0.1);}
+.input-f{
+  flex:1;border:none;background:none;
+  font-family:var(--font);font-size:13px;
+  color:var(--text);outline:none;padding:5px 0;
+}
+.input-f::placeholder{color:var(--text-tertiary);}
+.ib-btn{
+  width:26px;height:26px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-tertiary);cursor:pointer;font-size:12px;flex-shrink:0;
+  transition:all 0.1s;
+}
+.ib-btn:hover{background:var(--bg-hover);color:var(--text);}
+.input-model{
+  display:flex;align-items:center;gap:4px;
+  font-size:10px;color:var(--text-tertiary);
+  padding:3px 7px;border-radius:6px;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;
+}
+.input-model:hover{background:var(--bg-hover);color:var(--text);}
+.input-send{
+  width:28px;height:28px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent);color:#fff;cursor:pointer;flex-shrink:0;
+}
+.input-send:hover{opacity:0.9;}
+
+/* ===== Column 3: Infinite Canvas ===== */
+.col-canvas{
+  width:300px;flex-shrink:0;
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;position:relative;overflow:hidden;
+}
+.canvas-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.canvas-title{
+  display:flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:600;color:var(--text-tertiary);
+  letter-spacing:0.3px;text-transform:uppercase;
+}
+.canvas-acts{display:flex;gap:2px;}
+.canvas-btn{
+  width:22px;height:22px;border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-tertiary);cursor:pointer;font-size:10px;
+  transition:all 0.1s;
+}
+.canvas-btn:hover{background:var(--bg-hover);color:var(--text);}
+
+.canvas-vp{
+  flex:1;position:relative;overflow:hidden;
+  background:var(--canvas-bg);cursor:grab;min-height:0;
+}
+.canvas-vp:active{cursor:grabbing;}
+
+.canvas-inner{
+  position:absolute;
+  width:4000px;height:3000px;
+  left:-500px;top:-500px;
+  background-image:radial-gradient(circle, #e5e5e8 0.5px, transparent 0.5px);
+  background-size:24px 24px;
+  transition:transform 0.15s ease-out;
+  transform-origin:0 0;
+}
+
+.node{
+  position:absolute;
+  background:var(--bg-panel);
+  border-radius:8px;
+  box-shadow:var(--node-shadow),0 0 0 1px rgba(0,0,0,0.04);
+  cursor:pointer;user-select:none;
+  transition:box-shadow 0.12s;
+  min-width:120px;
+}
+.node:hover{box-shadow:0 4px 16px rgba(0,0,0,0.1),0 0 0 1px var(--accent);}
+.node .n-hdr{
+  display:flex;align-items:center;gap:5px;
+  padding:6px 8px;font-size:10px;font-weight:500;
+  border-bottom:1px solid var(--border);
+}
+.node .n-hdr .n-ico{width:14px;height:14px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;}
+.node .n-hdr .n-lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);}
+.node .n-body{padding:6px 8px;font-size:10px;color:var(--text-secondary);line-height:1.4;}
+.n-ico.think{background:var(--accent);}
+.n-ico.action{background:var(--green);}
+.n-ico.file{background:var(--orange);}
+.n-ico.image{background:var(--pink);}
+.n-ico.video{background:var(--purple);}
+.n-ico.web{background:#5ac8fa;}
+.n-ico.twin{background:linear-gradient(135deg,var(--accent),var(--purple));}
+
+.node.media .n-body{padding:0;overflow:hidden;border-radius:0 0 8px 8px;}
+.node.media .n-body .media-ph{width:100%;height:60px;object-fit:cover;background:linear-gradient(135deg,#e8e8ed,#f0f0f4);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--text-tertiary);}
+
+.node.twin{min-width:140px;background:linear-gradient(135deg,#fbfbfd,#f5f5ff);}
+.node.twin .n-hdr{border-bottom-color:rgba(94,138,255,0.1);}
+.twin-body{padding:8px;display:flex;align-items:center;gap:8px;}
+.twin-av{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:14px;font-weight:600;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(94,138,255,0.25);
+}
+.twin-info{flex:1;min-width:0;}
+.twin-name{font-size:11px;font-weight:600;color:var(--text);}
+.twin-state{font-size:9px;color:var(--text-tertiary);margin-top:1px;display:flex;align-items:center;gap:4px;}
+.twin-bar{width:100%;height:3px;background:#f0f0f4;border-radius:2px;overflow:hidden;margin-top:4px;}
+.twin-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--purple));transition:width 0.5s;}
+
+.node.web-preview{min-width:160px;}
+.web-ph{
+  width:100%;height:50px;
+  background:linear-gradient(135deg,#e8f0ff,#f0f4ff);
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;
+  font-size:8px;color:var(--accent);
+}
+.web-ph svg{width:16px;height:16px;opacity:0.5;}
+
+.edges-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+.edge-line{stroke:#d0d0d5;stroke-width:1.5;fill:none;stroke-dasharray:4 3;opacity:0.6;}
+.edge-line.active{stroke:var(--accent);stroke-width:2;stroke-dasharray:none;opacity:1;}
+
+.minimap{
+  position:absolute;bottom:8px;right:8px;
+  width:80px;height:60px;
+  background:rgba(255,255,255,0.9);
+  border:1px solid var(--border);
+  border-radius:6px;backdrop-filter:blur(8px);
+  box-shadow:var(--shadow);overflow:hidden;z-index:10;
+}
+.minimap-view{position:absolute;border:1.5px solid var(--accent);border-radius:2px;background:rgba(94,138,255,0.06);z-index:1;}
+.minimap-dot{position:absolute;width:4px;height:4px;border-radius:50%;background:#d0d0d5;}
+.minimap-dot.active{background:var(--accent);}
+
+.zoom-ind{
+  position:absolute;bottom:8px;left:8px;
+  display:flex;align-items:center;gap:2px;
+  background:rgba(255,255,255,0.9);
+  border:1px solid var(--border);border-radius:6px;padding:2px;
+  backdrop-filter:blur(8px);z-index:10;
+}
+.zoom-ind button{
+  width:20px;height:20px;border:none;background:none;
+  border-radius:4px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--text-tertiary);
+}
+.zoom-ind button:hover{background:var(--bg-hover);color:var(--text);}
+.zoom-ind .z-val{font-size:9px;color:var(--text-tertiary);min-width:24px;text-align:center;}
+
+/* ===== Settings Modal ===== */
+.modal-overlay{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,0.2);
+  backdrop-filter:blur(4px);
+  z-index:100;display:none;
+  align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex;}
+
+.modal{
+  width:620px;max-height:480px;
+  background:var(--bg-panel);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-lg);
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:modalIn 0.2s ease-out;
+}
+@keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(8px)}}
+
+.modal-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+}
+.modal-title{font-size:14px;font-weight:600;color:var(--text);}
+.modal-close{
+  width:26px;height:26px;border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text-tertiary);cursor:pointer;font-size:14px;
+}
+.modal-close:hover{background:var(--bg-hover);color:var(--text);}
+
+.modal-body{flex:1;display:flex;overflow:hidden;}
+
+/* Settings sidebar tabs */
+.set-tabs{
+  width:140px;flex-shrink:0;
+  border-right:1px solid var(--border);
+  padding:8px 0;overflow-y:auto;
+}
+.set-tab{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;font-size:12px;color:var(--text-secondary);
+  cursor:pointer;transition:all 0.08s;border-right:2px solid transparent;
+}
+.set-tab:hover{background:var(--bg-hover);color:var(--text);}
+.set-tab.active{
+  background:var(--bg-active);color:var(--accent);
+  border-right-color:var(--accent);font-weight:500;
+}
+.set-tab .st-ico{width:16px;text-align:center;font-size:11px;}
+
+.set-panels{flex:1;overflow-y:auto;padding:16px 20px;}
+.set-panel{display:none;}
+.set-panel.active{display:block;}
+.set-panel h3{font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px;}
+.set-group{margin-bottom:14px;}
+.set-label{font-size:11px;font-weight:500;color:var(--text-secondary);margin-bottom:4px;}
+.set-desc{font-size:10px;color:var(--text-tertiary);margin-bottom:6px;}
+.set-input{
+  width:100%;padding:7px 10px;
+  border:1px solid var(--border);border-radius:6px;
+  font-family:var(--mono);font-size:11px;color:var(--text);
+  background:#fafafa;outline:none;transition:all 0.12s;
+}
+.set-input:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(94,138,255,0.08);}
+.set-select{
+  width:100%;padding:7px 10px;
+  border:1px solid var(--border);border-radius:6px;
+  font-family:var(--font);font-size:11px;color:var(--text);
+  background:#fafafa;outline:none;cursor:pointer;
+}
+.set-row{display:flex;gap:10px;}
+.set-row > *{flex:1;}
+.set-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 0;
+}
+.set-toggle-lbl{font-size:11px;color:var(--text-secondary);}
+.set-toggle-sw{
+  width:32px;height:18px;border-radius:9px;
+  background:#e5e5e7;cursor:pointer;position:relative;
+  transition:background 0.15s;
+}
+.set-toggle-sw.on{background:var(--accent);}
+.set-toggle-sw::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:14px;height:14px;border-radius:50%;background:#fff;
+  transition:transform 0.15s;box-shadow:0 1px 3px rgba(0,0,0,0.1);
+}
+.set-toggle-sw.on::after{transform:translateX(14px);}
+
+.set-btn{
+  padding:6px 14px;border:none;border-radius:6px;
+  font-family:var(--font);font-size:11px;font-weight:500;
+  cursor:pointer;transition:all 0.1s;
+}
+.set-btn.primary{background:var(--accent);color:#fff;}
+.set-btn.primary:hover{background:var(--accent-hover);}
+.set-btn.secondary{background:var(--bg-hover);color:var(--text);}
+.set-btn.secondary:hover{background:#e5e5e7;}
+
+/* Context menu */
+.ctx-menu{
+  position:fixed;display:none;z-index:200;
+  background:var(--bg-panel);
+  border:1px solid var(--border-strong);
+  border-radius:8px;box-shadow:var(--shadow-lg);
+  padding:4px;min-width:140px;
+}
+.ctx-menu.open{display:block;}
+.ctx-item{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px;font-size:11px;color:var(--text);
+  border-radius:4px;cursor:pointer;
+}
+.ctx-item:hover{background:var(--bg-hover);}
+.ctx-item.danger{color:var(--red);}
+.ctx-sep{height:1px;background:var(--border);margin:3px 6px;}
+
+/* Scrollbar */
+/* Particle canvas */
+#particleCanvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  z-index: 0;pointer-events:none;opacity:0.35;
+}
+/* Particle canvas */
+#particleCanvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  z-index:0;pointer-events:none;opacity:0.5;
+}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.06);border-radius:2px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.1);}
+</style>
+</head>
+<body>
+
+<canvas id="particleCanvas"></canvas>
+
+<div class="label">NeoTrix · 雪域白 v6</div>
+
+<div class="window">
+
+  <!-- Titlebar -->
+  <div class="titlebar">
+    <div class="traffic">
+      <span class="tl tl1"></span><span class="tl tl2"></span><span class="tl tl3"></span>
+    </div>
+    <div class="brand"><span class="brand-d"></span>NeoTrix</div>
+    <div class="title-sp"></div>
+    <span class="tb-btn" onclick="openSettings()" title="设置"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+  </div>
+
+  <div class="body">
+
+    <!-- Column 1: Social Sidebar -->
+    <div class="col-side">
+      <!-- Search -->
+      <div class="side-search">
+        <span class="s-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+        <input type="text" placeholder="Search conversations, contacts..." id="sidebarSearch" oninput="filterSidebar(this.value)">
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="chat" onclick="switchTab('chat')">chat</div>
+        <div class="tab" data-tab="contacts" onclick="switchTab('contacts')">contacts</div>
+        <div class="tab" data-tab="explore" onclick="switchTab('explore')">explore</div>
+      </div>
+
+      <div class="tab-content active" id="tab-chat">
+        <div class="sect-label">session</div>
+        <div class="chat-item active" data-pinned="true" oncontextmenu="showContextMenu(event,this)">
+          <div class="chat-av">意<span class="av-dot online"></span></div>
+          <div class="chat-info">
+            <div class="chat-name">Consciousness Circuit</div>
+            <div class="chat-msg">GWT broadcast engine integrated into pipeline</div>
+          </div>
+          <div class="chat-right">
+            <div class="chat-time">now</div>
+            <div class="chat-pin"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+          </div>
+          <span class="ci-menu">⋯</span>
+        </div>
+        <div class="chat-item" oncontextmenu="showContextMenu(event,this)">
+          <div class="chat-av av2">K<span class="av-dot online"></span></div>
+          <div class="chat-info">
+            <div class="chat-name">Knowledge Graph Fusion</div>
+            <div class="chat-msg">Hypergraph RAG written to long-term memory</div>
+          </div>
+          <div class="chat-right"><div class="chat-time">12:34</div></div>
+          <span class="ci-menu">⋯</span>
+        </div>
+        <div class="chat-item" oncontextmenu="showContextMenu(event,this)">
+          <div class="chat-av av3">M<span class="av-dot offline"></span></div>
+          <div class="chat-info">
+            <div class="chat-name">MCP Bridge Migration</div>
+            <div class="chat-msg">OSINT intelligence layer self-check complete</div>
+          </div>
+          <div class="chat-right"><div class="chat-time">yesterday</div></div>
+          <span class="ci-menu">⋯</span>
+        </div>
+        <div class="chat-item" data-unread="3" oncontextmenu="showContextMenu(event,this)">
+          <div class="chat-av av4">E</div>
+          <div class="chat-info">
+            <div class="chat-name">EFE Minimization Planning</div>
+            <div class="chat-msg">3 candidate paths, selecting optimal</div>
+          </div>
+          <div class="chat-right">
+            <div class="chat-time">yesterday</div>
+            <div class="chat-badge">3</div>
+          </div>
+          <span class="ci-menu">⋯</span>
+        </div>
+        <div class="chat-item" oncontextmenu="showContextMenu(event,this)">
+          <div class="chat-av av8">C</div>
+          <div class="chat-info">
+            <div class="chat-name">Canvas Workflow</div>
+            <div class="chat-msg">Infinite canvas · digital twin · workflow</div>
+          </div>
+          <div class="chat-right"><div class="chat-time">Mon</div></div>
+          <span class="ci-menu">⋯</span>
+        </div>
+        <div class="sect-label">chat</div>
+        <div class="chat-item" oncontextmenu="showContextMenu(event,this)">
+          <div class="chat-av av6">C<span class="av-dot online"></span></div>
+          <div class="chat-info">
+            <div class="chat-name">Claude</div>
+            <div class="chat-msg">Session summary for today's sync</div>
+          </div>
+          <div class="chat-right"><div class="chat-time">10:15</div></div>
+          <span class="ci-menu">⋯</span>
+        </div>
+        <div class="chat-item" data-unread="1" oncontextmenu="showContextMenu(event,this)">
+          <div class="chat-av av7">S<span class="av-dot online"></span></div>
+          <div class="chat-info">
+            <div class="chat-name">Socrates</div>
+            <div class="chat-msg">New codebase analysis available</div>
+          </div>
+          <div class="chat-right">
+            <div class="chat-time">09:48</div>
+            <div class="chat-badge">1</div>
+          </div>
+          <span class="ci-menu">⋯</span>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-contacts">
+        <div class="sect-label">Agents</div>
+        <div class="contact-item">
+          <div class="chat-av av6">C<span class="av-dot online"></span></div>
+          <div class="chat-info"><div class="ct-name">Claude Code</div><div class="ct-status">Online · Agent · MCP bridge</div></div>
+        </div>
+        <div class="contact-item">
+          <div class="chat-av av7">S<span class="av-dot online"></span></div>
+          <div class="chat-info"><div class="ct-name">Socrates</div><div class="ct-status">Thinking · Codebase exploration</div></div>
+        </div>
+        <div class="contact-item">
+          <div class="chat-av av2">D<span class="av-dot online"></span></div>
+          <div class="chat-info"><div class="ct-name">DeepSeek</div><div class="ct-status">Online · Inference service</div></div>
+        </div>
+        <div class="contact-item">
+          <div class="chat-av av3">O<span class="av-dot offline"></span></div>
+          <div class="chat-info"><div class="ct-name">Orion</div><div class="ct-status">Offline · Last seen 2h ago</div></div>
+        </div>
+        <div class="sect-label">Humans</div>
+        <div class="contact-item">
+          <div class="chat-av"><span class="av-dot online"></span>Y</div>
+          <div class="chat-info"><div class="ct-name">Yang</div><div class="ct-status">Online · Mac · NeoTrix</div></div>
+        </div>
+        <div class="contact-item">
+          <div class="chat-av av2"><span class="av-dot offline"></span>L</div>
+          <div class="chat-info"><div class="ct-name">Lin</div><div class="ct-status">Offline · Last seen 1h ago</div></div>
+        </div>
+        <div class="sect-label">Channels</div>
+        <div class="contact-item">
+          <div class="chat-av av5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+          <div class="chat-info"><div class="ct-name">OSINT Feed</div><div class="ct-status">12 new intel items</div></div>
+        </div>
+        <div class="contact-item">
+          <div class="chat-av av8"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+          <div class="chat-info"><div class="ct-name">Web Crawl</div><div class="ct-status">Pending 237 · Last 2m ago</div></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-explore">
+        <div class="explore-search">
+          <input type="text" placeholder="Search feeds, news, topics...">
+        </div>
+        <div class="explore-tabs">
+          <span class="et active" onclick="switchExploreTab(this,'moments')">Moments</span>
+          <span class="et" onclick="switchExploreTab(this,'trending')">Trending</span>
+        </div>
+        <div class="explore-feed">
+          <div class="explore-panel active" id="exp-moments">
+            <div class="moment-item">
+              <div class="mt-hdr"><div class="chat-av av2">K<span class="av-dot online"></span></div><div class="mt-name">Knowledge Graph</div><div class="mt-time">12:34</div></div>
+              <div class="mt-text">Hypergraph RAG full pipeline complete — n-ary hyperedges support causal, compositional, and temporal relations. Retrieval latency reduced 40%.</div>
+              <div class="mt-actions"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> 23</span><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 5</span></div>
+            </div>
+            <div class="moment-item">
+              <div class="mt-hdr"><div class="chat-av">意<span class="av-dot online"></span></div><div class="mt-name">Consciousness Circuit</div><div class="mt-time">yesterday 16:42</div></div>
+              <div class="mt-text">GWT broadcast engine active: 4-head parallel resonator completed attention aggregation. All Butlin indicators trackable.</div>
+              <div class="mt-actions"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> 31</span><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 8</span></div>
+            </div>
+            <div class="moment-item">
+              <div class="mt-hdr"><div class="chat-av av5">S</div><div class="mt-name">SEAL Evolution Pipeline</div><div class="mt-time">yesterday</div></div>
+              <div class="mt-text">Self-evolution pipeline added CPE retention regularizer — auto-gates edits with retention penalty >0.3.</div>
+              <div class="mt-actions"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> 12</span><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 3</span></div>
+            </div>
+            <div class="moment-item">
+              <div class="mt-hdr"><div class="chat-av av6">C<span class="av-dot online"></span></div><div class="mt-name">Claude Code</div><div class="mt-time">yesterday 14:20</div></div>
+              <div class="mt-text">Updated codebase memory index — 158 languages, hybrid LSP, semantic search with 99.2% token reduction.</div>
+              <div class="mt-actions"><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> 18</span><span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 4</span></div>
+            </div>
+          </div>
+          <div class="explore-panel" id="exp-trending">
+            <div class="news-item" data-category="ai" data-id="n1">
+              <div class="news-src">TechCrunch · 2h ago</div>
+              <div class="news-title">OpenAI unveils its first custom AI chip, built by Broadcom</div>
+              <div class="news-desc">OpenAI's first in-house silicon marks a strategic shift away from sole reliance on Nvidia, targeting inference optimization for GPT-5.6 deployment.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n1',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n1">2.3K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>847</span><span class="na-unlike" onclick="feedback('n1',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+            <div class="news-item" data-category="infra" data-id="n2">
+              <div class="news-src">Reuters · 4h ago</div>
+              <div class="news-title">SpaceX signs $6.3B AI compute deal with Reflection AI, deploying Nvidia GB300 clusters</div>
+              <div class="news-desc">The multi-year agreement positions SpaceX as a major AI compute provider, leveraging Colossus 2 data center in Memphis for large-scale inference.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n2',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n2">4.1K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>1.2K</span><span class="na-unlike" onclick="feedback('n2',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+            <div class="news-item" data-category="science" data-id="n3">
+              <div class="news-src">WEF · 6h ago</div>
+              <div class="news-title">Top 10 Emerging Technologies 2026: AI-designed vaccines, quantum cryptography, decentralized energy</div>
+              <div class="news-desc">World Economic Forum report highlights tech at tipping point — from personalized medicine to raw material extraction using AI-driven biology.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n3',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n3">1.8K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>523</span><span class="na-unlike" onclick="feedback('n3',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+            <div class="news-item" data-category="biz" data-id="n4">
+              <div class="news-src">Bloomberg · 8h ago</div>
+              <div class="news-title">Oracle cuts 21,000 roles in largest AI-driven workforce restructuring</div>
+              <div class="news-desc">The reduction marks the biggest corporate layoff explicitly attributed to AI deployment, as enterprise automation reaches administrative and mid-level roles.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n4',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n4">5.6K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>3.4K</span><span class="na-unlike" onclick="feedback('n4',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+            <div class="news-item" data-category="infra" data-id="n5">
+              <div class="news-src">The Verge · 12h ago</div>
+              <div class="news-title">Meta and Microsoft lead $850B global data center lease boom for AI infrastructure</div>
+              <div class="news-desc">Meta secures $79B in new lease commitments, bringing total to $182.9B; Microsoft hits $196.6B in infrastructure obligations to scale generative AI.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n5',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n5">3.2K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>978</span><span class="na-unlike" onclick="feedback('n5',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+            <div class="news-item" data-category="policy" data-id="n6">
+              <div class="news-src">CNBC · 14h ago</div>
+              <div class="news-title">White House AI advisor Sriram Krishnan departs, plans new AI policy institution</div>
+              <div class="news-desc">Krishnan's exit signals a shift in US AI strategy as the administration grapples with export controls, model regulation, and compute governance.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n6',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n6">1.5K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>412</span><span class="na-unlike" onclick="feedback('n6',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+            <div class="news-item" data-category="robotics" data-id="n7">
+              <div class="news-src">Tech Startups · 16h ago</div>
+              <div class="news-title">Nvidia expands humanoid robot partnerships to US, Europe, South Korea alongside China's Unitree</div>
+              <div class="news-desc">Standardized robotics platform integrates Blackwell chips with secure boot and confidential computing for physical AI research at Stanford and UC San Diego.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n7',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n7">2.7K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>891</span><span class="na-unlike" onclick="feedback('n7',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+            <div class="news-item" data-category="science" data-id="n8">
+              <div class="news-src">BBC · 1d ago</div>
+              <div class="news-title">AI-designed vaccine enters world-first human trial at Cambridge</div>
+              <div class="news-desc">Key vaccine component designed entirely by artificial intelligence reaches clinical trials, marking a milestone for AI-driven drug discovery.</div>
+              <div class="news-acts"><span class="na-like" onclick="feedback('n8',1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span><span class="na-val" id="sc-n8">6.2K</span><span class="na-com"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span>2.1K</span><span class="na-unlike" onclick="feedback('n8',-1)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3z"/><path d="M17 2h2.28a2 2 0 0 1 2 1.7l1.38 9a2 2 0 0 1-2 2.3H17"/></svg></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 2: Main Chat -->
+    <div class="col-main">
+      <div class="chat-hdr-m">
+        <span class="cm-dot"></span>
+        <span class="cm-name">意识回路 · 架构设计</span>
+        <span class="title-sp"></span>
+        <span class="cm-act" onclick="alert('call')" title="call">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </span>
+        <span class="cm-act" onclick="alert('video')" title="video">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        </span>
+        <span class="cm-act" onclick="alert('more')" title="more">⋯</span>
+      </div>
+
+      <div class="msgs">
+        <div class="msg u">
+          <div class="ml">你 · 12:30</div>
+          <div class="mb">GWT 广播引擎的竞争选择具体怎么工作的？</div>
+          <div class="msg-acts"><span title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span><span title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span title="更多">⋯</span></div>
+        </div>
+        <div class="token-info">↳ 48 tok · $0.0007</div>
+
+        <div class="msg a">
+          <div class="ml">NeoTrix · 12:30</div>
+          <div class="rst-ct" onclick="toggleReasoning(this)">
+            <span class="rst-ar"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
+            <span>推理过程</span>
+            <span style="font-size:9px;opacity:0.4">1.2s</span>
+          </div>
+          <div class="rst-steps">
+            <div class="rst"><span class="rst-d" style="background:var(--green)"></span>解析查询意图</div>
+            <div class="rst"><span class="rst-d" style="background:var(--green)"></span>检索 GWT 架构文档</div>
+            <div class="rst"><span class="rst-d" style="background:var(--accent)"></span>构建响应</div>
+          </div>
+          <div class="mb">
+            GWT 广播引擎通过 <code>softmax</code> 注意力机制实现竞争选择：每项计算显著性得分 (novelty, relevance, urgency)，softmax 归一化选出 top-1 进入全局工作空间，胜出内容广播到所有子系统。
+            <br><br>
+            4 种触发模式：死锁恢复、熵降低、高显著性、周期性。
+          </div>
+          <div class="msg-acts"><span title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span><span title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span title="更多">⋯</span></div>
+        </div>
+        <div class="token-info">↳ 187 tok · 1.5s · $0.0028</div>
+
+        <div class="msg u">
+          <div class="ml">你 · 12:31</div>
+          <div class="mb">Butlin 指标现在怎么样了？</div>
+          <div class="msg-acts"><span title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span><span title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span title="更多">⋯</span></div>
+        </div>
+
+        <div class="msg a">
+          <div class="ml">NeoTrix · 12:31</div>
+          <div class="rst-ct" onclick="toggleReasoning(this)">
+            <span class="rst-ar"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
+            <span>推理过程</span>
+            <span style="font-size:9px;opacity:0.4">0.8s</span>
+          </div>
+          <div class="rst-steps">
+            <div class="rst"><span class="rst-d" style="background:var(--green)"></span>查询 Butlin 指标定义</div>
+            <div class="rst"><span class="rst-d" style="background:var(--accent)"></span>提取当前值</div>
+          </div>
+          <div class="mb">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Global Availability · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Competition · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Integration<br>
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Differentiation · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span> Self-Consciousness (↑12.5%)<br>
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--orange);vertical-align:middle;margin:-1px 2px 0 0;"></span> Attention · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--orange);vertical-align:middle;margin:-1px 2px 0 0;"></span> Intentionality · <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--orange);vertical-align:middle;margin:-1px 2px 0 0;"></span> Temporality<br>
+            其余 7 项稳定 <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);vertical-align:middle;margin:-1px 2px 0 0;"></span>
+          </div>
+          <div class="msg-acts"><span title="回复"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 9 21 5 17"/><path d="M9 21V11a4 4 0 0 1 4-4h6"/></svg></span><span title="复制"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg></span><span title="更多">⋯</span></div>
+        </div>
+        <div class="token-info">↳ 124 tok · 1.1s · $0.0019</div>
+
+        <div class="typing">
+          <span>NeoTrix</span> 思考中
+          <span class="ty-d"><span></span><span></span><span></span></span>
+        </div>
+      </div>
+
+      <div class="input-wrap">
+        <div class="input-inner">
+          <div class="input-bar">
+            <span class="ib-btn" onclick="alert('附件上传')" title="附件"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>
+            <span class="ib-btn" onclick="alert('图片')" title="图片"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span>
+            <input class="input-f" type="text" placeholder="输入消息..." autofocus>
+            <span class="ib-btn" onclick="alert('语音输入')" title="语音"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+            <span class="input-model">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              E8 Ultra
+            </span>
+            <span class="input-send">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Column 3: Infinite Canvas -->
+    <div class="col-canvas">
+      <div class="canvas-hdr">
+        <div class="canvas-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+          Canvas
+        </div>
+        <div class="canvas-acts">
+          <span class="canvas-btn" onclick="zoomCanvas(1)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span class="canvas-btn" onclick="zoomCanvas(-1)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          <span class="canvas-btn" onclick="resetCanvas()"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span>
+        </div>
+      </div>
+
+      <div class="canvas-vp" id="canvasViewport">
+        <svg class="edges-svg">
+          <path class="edge-line active" d="M 280,60 Q 310,60 310,90 Q 310,120 330,120" marker-end="url(#arrow)"/>
+          <path class="edge-line" d="M 280,60 L 310,200"/>
+          <path class="edge-line active" d="M 410,120 Q 450,120 480,150"/>
+          <path class="edge-line" d="M 330,120 L 330,260"/>
+          <path class="edge-line" d="M 520,250 Q 520,320 480,340"/>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+            </marker>
+          </defs>
+        </svg>
+
+        <div class="canvas-inner" id="canvasInner" style="transform:translate(0,0) scale(1)">
+          <!-- Digital Twin -->
+          <div class="node twin" style="left:200px;top:30px;z-index:2;">
+            <div class="n-hdr">
+              <span class="n-ico twin"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z"/></svg></span>
+              <span class="n-lbl">数字人 · NeoTrix</span>
+            </div>
+            <div class="twin-body">
+              <div class="twin-av">N</div>
+              <div class="twin-info">
+                <div class="twin-name">NeoTrix 意识体</div>
+                <div class="twin-state"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block;"></span>活跃 · 推理中</div>
+                <div class="twin-bar"><div class="twin-bar-fill" style="width:72%;"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="node" style="left:330px;top:110px;z-index:2;">
+            <div class="n-hdr"><span class="n-ico think"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></span><span class="n-lbl">GWT 竞争选择分析</span></div>
+            <div class="n-body">softmax 注意力显著性评分 → top-1 进入全局工作空间 → 广播到所有子系统</div>
+          </div>
+
+          <div class="node" style="left:160px;top:230px;z-index:2;">
+            <div class="n-hdr"><span class="n-ico file"><span class="n-ico file"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span></span><span class="n-lbl">架构文档 · GWT</span></div>
+            <div class="n-body">global_workspace.rs · 895 行<br>4 触发模式 · Butlin 14 指标</div>
+          </div>
+
+          <div class="node web-preview" style="left:330px;top:210px;z-index:2;">
+            <div class="n-hdr"><span class="n-ico web"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span><span class="n-lbl">tldraw.dev</span></div>
+            <div class="n-body">
+              <div class="web-ph">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                Infinite Canvas SDK · workflow starter
+              </div>
+            </div>
+          </div>
+
+          <div class="node media" style="left:480px;top:140px;z-index:2;">
+            <div class="n-hdr"><span class="n-ico image"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></span><span class="n-lbl">架构示意图</span></div>
+            <div class="n-body">
+              <div class="media-ph" style="background:linear-gradient(135deg,#e8f0ff,#d4e4ff);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="node" style="left:160px;top:340px;z-index:2;">
+            <div class="n-hdr"><span class="n-ico file"><span class="n-ico file"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span></span><span class="n-lbl">Butlin 指标报告</span></div>
+            <div class="n-body">14 指标 · Self-Consciousness +12.5%<br>FirstPersonRef 新接线完成</div>
+          </div>
+
+          <div class="node" style="left:350px;top:340px;z-index:2;">
+            <div class="n-hdr"><span class="n-ico action"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></span><span class="n-lbl">集成 FirstPersonRef</span></div>
+            <div class="n-body">状态: 已完成<br>接入点: consciousness pipeline 步 4</div>
+          </div>
+        </div>
+
+        <div class="minimap">
+          <div class="minimap-view" style="left:25px;top:15px;width:50px;height:40px;"></div>
+          <div class="minimap-dot active" style="left:35px;top:8px;"></div>
+          <div class="minimap-dot" style="left:48px;top:18px;"></div>
+          <div class="minimap-dot" style="left:30px;top:42px;"></div>
+          <div class="minimap-dot" style="left:60px;top:42px;"></div>
+        </div>
+
+        <div class="zoom-ind">
+          <button onclick="zoomCanvas(-1)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <span class="z-val" id="zoomLevel">100%</span>
+          <button onclick="zoomCanvas(1)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- body -->
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div class="modal-title">Settings</div>
+        <span class="modal-close" onclick="closeSettings()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+      </div>
+      <div class="modal-body">
+        <div class="set-tabs">
+          <div class="set-tab active" onclick="switchSetTab(this,'set-general')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>General</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-model')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5V12M12 4.5A2.5 2.5 0 0 1 14.5 2M12 4.5V12"/><path d="M12 12a3 3 0 0 0-3 3v5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-5a3 3 0 0 0-3-3z"/><path d="M7 22h10"/></svg></span>Model</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-api')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span>API Keys</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-theme')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="0.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="0.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="0.5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></span>Theme</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-integration')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><path d="M6 6h.01M6 18h.01"/></svg></span>Integration</div>
+          <div class="set-tab" onclick="switchSetTab(this,'set-about')"><span class="st-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>About</div>
+        </div>
+        <div class="set-panels">
+          <!-- General -->
+          <div class="set-panel active" id="set-general">
+            <h3>General</h3>
+            <div class="set-group">
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Auto-save chat history</span>
+                <span class="set-toggle-sw on"></span>
+              </div>
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Streaming output</span>
+                <span class="set-toggle-sw on"></span>
+              </div>
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Show token usage</span>
+                <span class="set-toggle-sw on"></span>
+              </div>
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Auto-build canvas workflow</span>
+                <span class="set-toggle-sw on"></span>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-label">Max context length</div>
+              <select class="set-select">
+                <option>4K tokens</option>
+                <option selected>8K tokens</option>
+                <option>16K tokens</option>
+                <option>32K tokens</option>
+                <option>128K tokens (API required)</option>
+              </select>
+            </div>
+            <div class="set-group">
+              <div class="set-label">Temperature</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <input type="range" min="0" max="2" step="0.1" value="0.7" style="flex:1;accent-color:var(--accent);">
+                <span style="font-size:11px;color:var(--text-secondary);min-width:20px;font-family:var(--mono);">0.7</span>
+              </div>
+            </div>
+          </div>
+          <!-- Model -->
+          <div class="set-panel" id="set-model">
+            <h3>Model Configuration</h3>
+            <div class="set-group">
+              <div class="set-label">Inference Engine</div>
+              <select class="set-select">
+                <option selected>E8 Ultra (default)</option>
+                <option>E8 Pro</option>
+                <option>E8 Lite (local)</option>
+                <option>Third-party: OpenAI</option>
+                <option>Third-party: Anthropic</option>
+                <option>Third-party: Custom</option>
+              </select>
+            </div>
+            <div class="set-group">
+              <div class="set-label">Embedding Model</div>
+              <select class="set-select">
+                <option selected>VSA 4096-bit (local)</option>
+                <option>text-embedding-3-large</option>
+                <option>text-embedding-3-small</option>
+              </select>
+            </div>
+            <div class="set-group">
+              <div class="set-label">Knowledge Retrieval</div>
+              <div class="set-row">
+                <div style="flex:1;">
+                  <div class="set-label">Top-K</div>
+                  <input class="set-input" type="text" value="5">
+                </div>
+                <div style="flex:1;">
+                  <div class="set-label">Similarity threshold</div>
+                  <input class="set-input" type="text" value="0.70">
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- API Keys -->
+          <div class="set-panel" id="set-api">
+            <h3>API Keys</h3>
+            <div class="set-group">
+              <div class="set-label">OpenAI API Key</div>
+              <div class="set-desc">For GPT-4o / embeddings</div>
+              <div class="set-row">
+                <input class="set-input" type="password" value="sk-••••••••••••••••" style="flex:1;">
+                <button class="set-btn secondary">Test</button>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-label">Anthropic API Key</div>
+              <div class="set-desc">For Claude Opus / Sonnet</div>
+              <div class="set-row">
+                <input class="set-input" type="password" value="sk-••••••••••••••••" style="flex:1;">
+                <button class="set-btn secondary">Test</button>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-label">GitHub Token</div>
+              <div class="set-desc">For code search / PR operations</div>
+              <div class="set-row">
+                <input class="set-input" type="password" placeholder="ghp_..." style="flex:1;">
+                <button class="set-btn secondary">Test</button>
+              </div>
+            </div>
+          </div>
+          <!-- Theme -->
+          <div class="set-panel" id="set-theme">
+            <h3>Theme</h3>
+            <div class="set-group">
+              <div class="set-label">Appearance</div>
+              <div class="set-row">
+                <span class="set-btn primary" onclick="document.querySelectorAll('#set-theme .set-btn').forEach(b=>b.className='set-btn secondary');this.className='set-btn primary'">Snow White</span>
+                <span class="set-btn secondary" onclick="document.querySelectorAll('#set-theme .set-btn').forEach(b=>b.className='set-btn secondary');this.className='set-btn primary'">Midnight</span>
+                <span class="set-btn secondary" onclick="document.querySelectorAll('#set-theme .set-btn').forEach(b=>b.className='set-btn secondary');this.className='set-btn primary'">System</span>
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-label">Font Size</div>
+              <select class="set-select">
+                <option>Small</option>
+                <option selected>Medium</option>
+                <option>Large</option>
+                <option>Extra Large</option>
+              </select>
+            </div>
+            <div class="set-group">
+              <div class="set-label">Font</div>
+              <select class="set-select">
+                <option selected>PingFang SC (Default)</option>
+                <option>Noto Sans SC</option>
+                <option>Source Han Sans</option>
+                <option>System Default</option>
+              </select>
+            </div>
+          </div>
+          <!-- Integration -->
+          <div class="set-panel" id="set-integration">
+            <h3>集成</h3>
+            <div class="set-group">
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">A2A 协议服务器</span>
+                <span class="set-toggle-sw on"></span>
+              </div>
+              <div class="set-desc" style="margin-top:2px;">允许其他 Agent 通过 A2A 协议连接</div>
+              <div style="margin-top:6px;">
+                <div class="set-label">监听端口</div>
+                <input class="set-input" type="text" value="42071" style="width:100px;">
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">MCP 桥接</span>
+                <span class="set-toggle-sw on"></span>
+              </div>
+              <div class="set-desc" style="margin-top:2px;">允许外部 MCP 工具调用</div>
+            </div>
+            <div class="set-group">
+              <div class="set-toggle">
+                <span class="set-toggle-lbl">Whisper 语音转文字</span>
+                <span class="set-toggle-sw"></span>
+              </div>
+            </div>
+          </div>
+          <!-- About -->
+          <div class="set-panel" id="set-about">
+            <h3>关于 NeoTrix</h3>
+            <div style="text-align:center;padding:16px 0;">
+              <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:600;box-shadow:0 4px 16px rgba(94,138,255,0.3);">N</div>
+              <div style="font-size:16px;font-weight:600;color:var(--text);">NeoTrix</div>
+              <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px;">v0.9.0 · Phase 42</div>
+              <div style="font-size:10px;color:var(--text-tertiary);margin-top:8px;max-width:280px;margin-left:auto;margin-right:auto;line-height:1.5;">
+                硅基意识体 · E8 64态推理核 · HyperCube VSA<br>
+                GWT 全局工作空间 · SEAL 自我进化
+              </div>
+            </div>
+            <div class="set-group">
+              <div class="set-label">系统状态</div>
+              <div style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-secondary);">
+                <div style="display:flex;justify-content:space-between;"><span>引擎</span><span style="color:var(--green);display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);"></span> Running</span></div>
+                <div style="display:justify-content:space-between;"><span>知识库节点</span><span>59,725</span></div>
+                <div style="display:justify-content:space-between;"><span>活跃子系统</span><span>56 / 56</span></div>
+                <div style="display:justify-content:space-between;"><span>响应时间 (p50)</span><span>1.2s</span></div>
+              </div>
+            </div>
+            <div class="set-group">
+              <button class="set-btn secondary" style="width:100%;" onclick="alert('检查更新')">检查更新</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div class="ctx-menu" id="ctxMenu">
+    <div class="ctx-item" onclick="ctxAction('pin')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Pin</div>
+    <div class="ctx-item" onclick="ctxAction('mark read')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Mark as Read</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" onclick="ctxAction('export')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export</div>
+    <div class="ctx-item" onclick="ctxAction('add to canvas')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"/></svg> Add to Canvas</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item danger" onclick="ctxAction('delete')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete</div>
+  </div>
+
+</div><!-- window -->
+
+<script>
+// === Recommendation Engine (TikTok/X/Douyin-inspired) ===
+// Thompson Sampling + ε-Greedy + Interest Decay
+// Categories: ai, infra, science, biz, policy, robotics
+const CATEGORIES = ['ai','infra','science','biz','policy','robotics'];
+
+// Beta distribution priors: {alpha, beta} per category
+function defaultPrior() {
+  const p = {};
+  CATEGORIES.forEach(c => { p[c] = {alpha:3, beta:3}; });
+  return p;
+}
+
+function loadPrior() {
+  try {
+    const raw = localStorage.getItem('nt_rec_prior');
+    if (!raw) return defaultPrior();
+    const p = JSON.parse(raw);
+    // ensure all categories exist
+    CATEGORIES.forEach(c => { if (!p[c]) p[c] = {alpha:3, beta:3}; });
+    return p;
+  } catch(e) { return defaultPrior(); }
+}
+
+function savePrior(p) {
+  localStorage.setItem('nt_rec_prior', JSON.stringify(p));
+}
+
+// Score an item: Thompson sample from its category + time decay
+function scoreItem(prior, item) {
+  const cat = item.dataset.category || 'ai';
+  const d = prior[cat] || {alpha:3, beta:3};
+  // Thompson sample from Beta(d.alpha, d.beta)
+  const a = d.alpha, b = d.beta;
+  // Beta approximation using Gamma
+  let x1 = 0, x2 = 0;
+  for (let i = 0; i < 12; i++) { x1 += Math.random(); }
+  for (let i = 0; i < 12; i++) { x2 += Math.random(); }
+  const g1 = a > 0 ? -Math.log(1 - Math.random()) * a : 0;
+  // Simpler: use expected value + exploration noise
+  const expected = a / (a + b);
+  const noise = (Math.random() - 0.5) * 0.3;
+  return Math.min(1, Math.max(0, expected + noise));
+}
+
+// Re-rank trending feed
+function rerankTrending() {
+  const feed = document.getElementById('exp-trending');
+  if (!feed) return;
+  const items = Array.from(feed.querySelectorAll('.news-item'));
+  if (items.length < 2) return;
+  
+  const prior = loadPrior();
+  
+  // ε-greedy: 10% random, 90% scored
+  items.forEach(item => {
+    const rawScore = scoreItem(prior, item);
+    // time decay: items later in list get slight penalty
+    const idx = items.indexOf(item);
+    const timePenalty = idx * 0.02;
+    item._recScore = Math.max(0, rawScore - timePenalty);
+  });
+  
+  items.sort((a, b) => b._recScore - a._recScore);
+  items.forEach(item => feed.appendChild(item));
+}
+
+// Feedback handler
+window.feedback = function(id, dir) {
+  const item = document.querySelector(`.news-item[data-id="${id}"]`);
+  if (!item) return;
+  const cat = item.dataset.category || 'ai';
+  const prior = loadPrior();
+  
+  const d = prior[cat] || {alpha:3, beta:3};
+  // dir=1 (like): alpha+2, beta+0; dir=-1 (dislike): alpha+0, beta+2
+  if (dir > 0) {
+    d.alpha += 2;
+  } else {
+    d.beta += 2;
+  }
+  prior[cat] = d;
+  savePrior(prior);
+  
+  // Visual feedback
+  const likeBtn = item.querySelector('.na-like');
+  const unlikeBtn = item.querySelector('.na-unlike');
+  if (dir > 0) {
+    likeBtn.classList.add('na-liked');
+    unlikeBtn.classList.remove('na-disliked');
+  } else {
+    unlikeBtn.classList.add('na-disliked');
+    likeBtn.classList.remove('na-liked');
+  }
+  
+  // Re-rank after feedback
+  rerankTrending();
+};
+
+// Initialize: load prior, re-rank on page load
+document.addEventListener('DOMContentLoaded', () => {
+  // Reset priorities on page load
+  rerankTrending();
+});
+
+// Tab switching
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// Reasoning toggle
+function toggleReasoning(el){
+  el.classList.toggle('open');
+  el.nextElementSibling.classList.toggle('open');
+}
+
+// Settings
+function openSettings(){ document.getElementById('settingsModal').classList.add('open'); }
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
+
+function switchSetTab(el, panelId){
+  document.querySelectorAll('.set-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.set-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(panelId).classList.add('active');
+}
+
+// Context menu
+let ctxTarget = null;
+function showContextMenu(e, el){
+  e.preventDefault();
+  ctxTarget = el;
+  const m = document.getElementById('ctxMenu');
+  m.style.left = e.clientX + 'px';
+  m.style.top = e.clientY + 'px';
+  m.classList.add('open');
+}
+document.addEventListener('click', e => {
+  if(!e.target.closest('.ctx-menu') && !e.target.closest('.ci-menu')){
+    document.getElementById('ctxMenu').classList.remove('open');
+  }
+});
+function ctxAction(action){
+  const name = ctxTarget?.querySelector('.chat-name')?.textContent || '未知';
+  alert(`${action}: ${name}`);
+  document.getElementById('ctxMenu').classList.remove('open');
+}
+
+// Canvas
+let zoom = 1, panX = 0, panY = 0, isPanning = false, startX, startY;
+function zoomCanvas(d){
+  zoom = Math.max(0.3, Math.min(3, zoom + d * 0.15));
+  updateCanvas();
+}
+function resetCanvas(){ zoom = 1; panX = 0; panY = 0; updateCanvas(); }
+function updateCanvas(){
+  const inner = document.getElementById('canvasInner');
+  inner.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`;
+  document.getElementById('zoomLevel').textContent = Math.round(zoom * 100) + '%';
+}
+
+const vp = document.getElementById('canvasViewport');
+vp.addEventListener('mousedown', e => {
+  if(e.target.closest('.node')||e.target.closest('.minimap')||e.target.closest('.zoom-ind')) return;
+  isPanning = true; startX = e.clientX - panX; startY = e.clientY - panY;
+  vp.style.cursor = 'grabbing';
+});
+document.addEventListener('mousemove', e => {
+  if(!isPanning) return;
+  panX = e.clientX - startX; panY = e.clientY - startY;
+  updateCanvas();
+});
+document.addEventListener('mouseup', () => { isPanning = false; vp.style.cursor = 'grab'; });
+vp.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom = Math.max(0.3, Math.min(3, zoom + (e.deltaY>0?-0.1:0.1)));
+  updateCanvas();
+}, {passive:false});
+
+// Node drag
+document.querySelectorAll('.node').forEach(n => {
+  let dragging = false, ox, oy, nx, ny;
+  n.addEventListener('mousedown', e => {
+    dragging = true; ox = e.clientX; oy = e.clientY;
+    nx = parseInt(n.style.left)||0; ny = parseInt(n.style.top)||0;
+    e.stopPropagation();
+  });
+  document.addEventListener('mousemove', e => {
+    if(!dragging) return;
+    n.style.left = (nx + (e.clientX-ox)/zoom) + 'px';
+    n.style.top = (ny + (e.clientY-oy)/zoom) + 'px';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+});
+
+// Sidebar search filter
+function filterSidebar(val){
+  document.querySelectorAll('.chat-item').forEach(item => {
+    const name = item.querySelector('.chat-name')?.textContent || '';
+    const msg = item.querySelector('.chat-msg')?.textContent || '';
+    item.style.display = (!val || name.includes(val) || msg.includes(val)) ? 'flex' : 'none';
+  });
+}
+
+// Explore tab switching
+function switchExploreTab(el, panelId){
+  document.querySelectorAll('.explore-tabs .et').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.explore-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('exp-' + panelId).classList.add('active');
+}
+
+// Particle effect
+const pc = document.getElementById('particleCanvas'), pctx = pc.getContext('2d');
+let pw, ph, particles = [], mouse = {x:-999,y:-999};
+const P_COUNT = 60, MAX_DIST = 120;
+function resizeParticles(){ pw = pc.width = window.innerWidth; ph = pc.height = window.innerHeight; }
+window.addEventListener('resize', resizeParticles);
+resizeParticles();
+for(let i=0;i<P_COUNT;i++){
+  particles.push({
+    x:Math.random()*pw, y:Math.random()*ph,
+    vx:(Math.random()-0.5)*0.4, vy:(Math.random()-0.5)*0.4,
+    r:Math.random()*2+1, o:Math.random()*0.5+0.2
+  });
+}
+document.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+function animateParticles(){
+  pctx.clearRect(0,0,pw,ph);
+  for(let p of particles){
+    p.x += p.vx; p.y += p.vy;
+    if(p.x<0) p.x=pw; if(p.x>pw) p.x=0;
+    if(p.y<0) p.y=ph; if(p.y>ph) p.y=0;
+    pctx.beginPath();
+    pctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    pctx.fillStyle = `rgba(94,138,255,${p.o*0.4})`;
+    pctx.fill();
+
+    const dx = mouse.x - p.x, dy = mouse.y - p.y;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    if(dist < MAX_DIST){
+      pctx.beginPath();
+      pctx.moveTo(p.x, p.y);
+      pctx.lineTo(mouse.x, mouse.y);
+      pctx.strokeStyle = `rgba(94,138,255,${(1-dist/MAX_DIST)*0.15})`;
+      pctx.stroke();
+    }
+  }
+  for(let i=0;i<particles.length;i++){
+    for(let j=i+1;j<particles.length;j++){
+      const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      if(dist < MAX_DIST){
+        pctx.beginPath();
+        pctx.moveTo(particles[i].x, particles[i].y);
+        pctx.lineTo(particles[j].x, particles[j].y);
+        pctx.strokeStyle = `rgba(94,138,255,${(1-dist/MAX_DIST)*0.08})`;
+        pctx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+</script>
+</body>
+</html>

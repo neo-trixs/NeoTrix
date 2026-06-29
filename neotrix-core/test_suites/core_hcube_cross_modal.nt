@@ -1,0 +1,176 @@
+name: core_hcube_cross_modal
+description: "Cross-modal alignment tests — full test suite"
+
+tests:
+  - name: align_text_deterministic
+    description: "Same text input produces identical VSA vector"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let v1 = aligner.text_to_vsa("hello world");
+      let v2 = aligner.text_to_vsa("hello world");
+      assert_eq!(v1, v2, "deterministic text → VSA");
+
+  - name: align_text_different_inputs
+    description: "Different text inputs produce different VSA vectors"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let v1 = aligner.text_to_vsa("hello world");
+      let v2 = aligner.text_to_vsa("goodbye world");
+      assert_ne!(v1, v2, "different inputs must differ");
+
+  - name: align_image_projection_dim
+    description: "Image embedding projects to VSA_DIM length"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let vsa = aligner.image_embed_to_vsa(&embed);
+      assert_eq!(vsa.len(), VSA_DIM);
+
+  - name: align_image_projection_binary
+    description: "Image embedding projection output is binary (0 or 1)"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let vsa = aligner.image_embed_to_vsa(&embed);
+      for &x in &vsa {
+          assert!(x == 0 || x == 1, "element must be binary, got {}", x);
+      }
+
+  - name: align_image_projection_deterministic
+    description: "Same seed + embedding produces identical projection"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let embed: Vec<f32> = (0..768).map(|i| (i as f32).cos()).collect();
+    code: |
+      let a1 = CrossModalAligner::new(VSA_DIM, 99);
+      let a2 = CrossModalAligner::new(VSA_DIM, 99);
+      let v1 = a1.image_embed_to_vsa(&embed);
+      let v2 = a2.image_embed_to_vsa(&embed);
+      assert_eq!(v1, v2, "deterministic projection");
+
+  - name: align_image_projection_different_embeddings
+    description: "Different embeddings produce different VSA vectors"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let embed_a: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let embed_b: Vec<f32> = (0..512).map(|i| (i as f32).cos()).collect();
+      let vsa_a = aligner.image_embed_to_vsa(&embed_a);
+      let vsa_b = aligner.image_embed_to_vsa(&embed_b);
+      assert_ne!(vsa_a, vsa_b, "different embeddings must differ");
+
+  - name: align_cross_similarity_symmetric
+    description: "Cross-modal similarity is symmetric"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+      let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let v = aligner.image_embed_to_vsa(&embed);
+    code: |
+      let sim_ab = CrossModalAligner::cross_modal_similarity(&v, &v);
+      let sim_ba = CrossModalAligner::cross_modal_similarity(&v, &v);
+      assert!((sim_ab - sim_ba).abs() < 1e-12);
+
+  - name: align_modality_tags_distinct
+    description: "Modality tags for text, image, audio are distinct"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let t1 = aligner.modality_tag("text");
+      let t2 = aligner.modality_tag("image");
+      let t3 = aligner.modality_tag("audio");
+      assert_ne!(t1, t2);
+      assert_ne!(t2, t3);
+      assert_ne!(t1, t3);
+
+  - name: align_modality_tag_consistent
+    description: "Modality tag is deterministic"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let t1 = aligner.modality_tag("text");
+      let t2 = aligner.modality_tag("text");
+      assert_eq!(t1, t2, "modality_tag must be deterministic");
+
+  - name: align_bind_with_modality_changes_vector
+    description: "Binding with modality changes the vector"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let vsa = aligner.image_embed_to_vsa(&embed);
+      let bound = aligner.bind_with_modality(&vsa, "image");
+      assert_ne!(bound, vsa, "binding must change the vector");
+
+  - name: align_bind_with_modality_preserves_similarity
+    description: "Same-modality binding preserves similarity"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let embed_a: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let embed_b: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let vsa_a = aligner.image_embed_to_vsa(&embed_a);
+      let vsa_b = aligner.image_embed_to_vsa(&embed_b);
+      let bound_a = aligner.bind_with_modality(&vsa_a, "image");
+      let bound_b = aligner.bind_with_modality(&vsa_b, "image");
+      let raw_sim = CrossModalAligner::cross_modal_similarity(&vsa_a, &vsa_b);
+      let bound_sim = CrossModalAligner::cross_modal_similarity(&bound_a, &bound_b);
+      assert!((raw_sim - bound_sim).abs() < 0.01);
+
+  - name: align_empty_text_returns_zero
+    description: "Empty text input returns zero vector"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    setup: |
+      let aligner = CrossModalAligner::new(VSA_DIM, 42);
+    code: |
+      let v = aligner.text_to_vsa("");
+      assert_eq!(v.len(), VSA_DIM);
+      assert!(v.iter().all(|&x| x == 0));
+
+  - name: align_seeded_random_projection_deterministic
+    description: "seeded_random_projection is deterministic"
+    imports:
+      - "neotrix::core::nt_core_hcube::cross_modal::CrossModalAligner"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::VSA_DIM"
+    code: |
+      let embed: Vec<f32> = (0..512).map(|i| (i as f32).sin()).collect();
+      let v1 = CrossModalAligner::seeded_random_projection(&embed, VSA_DIM, 7);
+      let v2 = CrossModalAligner::seeded_random_projection(&embed, VSA_DIM, 7);
+      assert_eq!(v1, v2);

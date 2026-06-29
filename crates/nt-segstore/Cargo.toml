@@ -1,0 +1,17 @@
+[package]
+name = "nt-segstore"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "NTSSEG — Native Segment Storage Engine: zero-dependency append-only binary storage with VSA similarity index"
+
+[lib]
+name = "nt_segstore"
+
+[features]
+default = []
+
+[dependencies]
+log = "0.4"
+serde = { workspace = true, features = ["derive"] }
+

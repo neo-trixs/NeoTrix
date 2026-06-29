@@ -1,0 +1,56 @@
+name: demo_pipeline
+description: Phase 2b demo — VSA pipeline module
+vsa_dim: 4096
+
+imports:
+  - path: "core::nt_core_hcube::QuantizedVSA"
+    alias: ~
+
+functions:
+  - name: encode_sensor
+    params:
+      - { name: raw, type: "vec_u8" }
+    returns: "vec_u8"
+    body: "return bundle(raw, negate(raw))"
+    description: "Encode sensor input via VSA bundle + negate"
+
+  - name: fuse_context
+    params:
+      - { name: visual, type: "vec_u8" }
+      - { name: textual, type: "vec_u8" }
+    returns: "vec_u8"
+    body: "let fused = bind(visual, textual)\nreturn fused"
+    description: "Bind visual and textual VSA vectors"
+
+  - name: classify
+    params:
+      - { name: context, type: "vec_u8" }
+      - { name: prototype, type: "vec_u8" }
+    returns: f64
+    body: "similarity(context, prototype)"
+    description: "VSA cosine similarity classification"
+
+pipeline:
+  name: SensorFusionPipeline
+  stages:
+    - { name: encode_visual, input: "vec_u8", output: "vec_u8", using: encode_sensor }
+    - { name: encode_textual, input: "vec_u8", output: "vec_u8", using: encode_sensor }
+
+tests:
+  - name: test_encode_sensor
+    description: Sensor encoding produces valid VSA
+    imports: ["core::nt_core_hcube::QuantizedVSA"]
+    setup: "let raw = QuantizedVSA::random_vector();"
+    code: "let encoded = encode_sensor(raw); assert!(encoded.len() == 4096);"
+
+  - name: test_fuse_context
+    description: VSA binding produces new vector
+    imports: ["core::nt_core_hcube::QuantizedVSA"]
+    setup: ~
+    code: "let v = QuantizedVSA::random_vector(); let t = QuantizedVSA::random_vector(); let f = fuse_context(v, t); assert!(f.len() == 4096);"
+
+  - name: test_pipeline_encode_visual
+    description: Pipeline stage runs
+    imports: ["core::nt_core_hcube::QuantizedVSA"]
+    setup: "let raw = QuantizedVSA::random_vector();"
+    code: "let out = SensorFusionPipeline::encode_visual(raw); assert!(out.len() == 4096);"

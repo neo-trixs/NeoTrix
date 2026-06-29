@@ -1,0 +1,209 @@
+[package]
+name = "neotrix"
+version.workspace = true
+edition = "2021"
+autobins = false
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[lib]
+name = "neotrix"
+
+[[bin]]
+name = "neotrix"
+path = "src/main.rs"
+
+# neotrix-web, nt_design_token, neotrix-transit, ne-dialog consolidated into
+# main `neotrix` binary via --tui, --web, token, transit subcommands.
+# Source files kept in src/bin/ for reference.
+
+[dependencies]
+neotrix-types = { path = "../crates/neotrix-types" }
+neotrix-body = { path = "../crates/neotrix-body" }
+neotrix-mind = { path = "../crates/neotrix-mind" }
+nt-segstore = { path = "../crates/nt-segstore" }
+nt-lang = { path = "../crates/nt-lang" }
+ne-surface = { path = "../crates/ne_surface", package = "ne_surface" }
+serde = { workspace = true, features = ["rc"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["rt"] }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dirs = { workspace = true }
+log = "0.4"
+hmac = "0.12"
+sha2 = "0.10"
+sha1 = "0.10"
+aes = "0.8"
+num-bigint = "0.4"
+# TODO(reqwest-version-conflict): upgrade to 0.12 to eliminate duplicate
+# hyper 0.14 / rustls 0.21 stack (3 other crates already on 0.12 + 0.23).
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "multipart", "socks", "rustls-tls", "stream"] }
+url = "2"
+rand = "0.8"
+async-trait = "0.1"
+pin-project-lite = "0.2"
+# REMOVED — axuielement was DORMANT with zero cfg(feature) gates in .rs code.
+# File preserved in git history; re-add if native accessibility tree scanning needed.
+# axuielement = { version = "0.5", optional = true }
+lru = "0.12"
+base64 = "0.22"
+hex = "0.4"
+filetime = "0.2"
+k256 = { version = "0.13", features = ["ecdsa", "ecdh"] }
+sha3 = "0.10"
+argon2 = "0.5"
+glob = "0.3"
+regex = "1"
+aho-corasick = "1"
+strsim = "0.11"
+syn = { version = "2", features = ["full", "visit", "extra-traits", "printing"] }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+walkdir = "2"
+toml = "0.8.19"
+fs2 = "0.4"
+futures = "0.3"
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+chromiumoxide = { version = "0.7", default-features = false, features = ["tokio-runtime"], optional = true }
+egg = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-log = "0.2"
+ratatui = "0.30.0"
+crossterm = "0.29.0"
+axum = { version = "0.8", features = ["ws"] }
+shellexpand = { version = "3", features = ["tilde"] }
+clap = { version = "4", features = ["derive"] }
+colored = "2"
+indicatif = "0.17"
+clap_complete = "4"
+# REMOVED - libc had zero usage sites; was unused
+# libc = "0.2"
+wasmtime = { version = "24", optional = true }
+aes-gcm = "0.10"
+hkdf = "0.12"
+ml-kem = { version = "0.3", features = ["zeroize", "getrandom"] }
+zeroize = { version = "1", features = ["zeroize_derive"] }
+keyring = { version = "3", optional = true }
+rkyv = { version = "0.8", features = ["std", "bytecheck"], optional = true }
+memmap2 = { version = "0.9", optional = true }
+opentelemetry = { version = "0.27", optional = true }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.27", optional = true }
+tracing-opentelemetry = { version = "0.28", optional = true }
+rcgen = { version = "0.13", features = ["x509-parser"] }
+# TODO(reqwest-version-conflict): upgrade to 0.23 to match other crates.
+#  `dangerous_configuration` → `rustls::crypto::aws_lc_rs::danger::` in 0.23.
+rustls = { version = "0.21", features = ["dangerous_configuration"] }
+ed25519-dalek = "2"
+self_update = { version = "0.42", default-features = false, features = ["rustls"], optional = true }
+agent-sandbox = { version = "0.4", optional = true }
+holon = { git = "https://github.com/watmin/holon-rs", optional = true }
+notify = "7"
+fastrand = "2"
+flate2 = "1"
+sentry = { version = "0.34", default-features = false, features = ["anyhow", "backtrace", "contexts", "panic"], optional = true }
+rusqlite = { version = "0.31", features = ["bundled"] }
+bdk_wallet = { version = "3", default-features = false, features = ["std", "keys-bip39"] }
+rustfft = "6.2"
+num-complex = "0.4"
+whatlang = "0.16"
+
+[dev-dependencies]
+    tempfile = "3"
+    criterion = { version = "0.5", features = ["html_reports"] }
+    serial_test = { workspace = true }
+    mockall = "0.12"
+
+# E2E integration tests — gated behind integration_tests feature + NEOTRIX_TEST env var.
+# Run with: NEOTRIX_TEST=1 cargo test --features integration_tests -p neotrix
+[[test]]
+name = "e2e_consciousness"
+path = "../tests/e2e/consciousness_test.rs"
+required-features = ["integration_tests"]
+
+[[test]]
+name = "e2e_basic_cycle"
+path = "../tests/e2e/basic_cycle_test.rs"
+required-features = ["integration_tests"]
+
+[[test]]
+name = "e2e_agent_workflow"
+path = "../tests/e2e/agent_workflow_test.rs"
+required-features = ["integration_tests"]
+
+[[bench]]
+name = "core_bench"
+harness = false
+
+[[bench]]
+name = "vector_ops"
+harness = false
+
+[[bench]]
+name = "seal_loop"
+harness = false
+
+[[bench]]
+name = "real_tasks"
+harness = false
+
+[features]
+# axuielement was removed — see dependency section comment
+default = []
+stealth-net = []
+stealth-browser = ["dep:chromiumoxide"]
+sandbox = ["dep:wasmtime", "dep:agent-sandbox"]
+telemetry = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry", "dep:sentry"]
+rkyv-storage = ["dep:rkyv", "dep:memmap2"]
+keyring = ["dep:keyring"]
+simd-vsa = ["dep:holon"]
+self-update = ["dep:self_update"]
+integration_tests = []
+network_tests = []
+e8-theory = []
+quantum = []
+lse = []  # Learning Self-Evolution: RL-based mutation policy
+hgm = []  # Hierarchical Gradient Mapping: branch CMP metric for evolution coherence
+parl = []  # Parallel Reinforcement Learning: batch evaluation of SEAL mutations
+cuda = []
+# REMOVED — remote-control was DORMANT after nt_act_remote_control module deletion.
+# remote-control = []
+full = [
+    # Activate local features so their #[cfg(feature)] gates are set
+    "stealth-net",
+    "sandbox",
+    "telemetry",
+    "rkyv-storage",
+    "keyring",
+    "simd-vsa",
+    "self-update",
+    "lse",
+    "hgm",
+    "parl",
+    # Propagate to neotrix-types sub-features
+    "neotrix-types/simd-vsa",
+    "neotrix-types/rkyv-storage",
+    "neotrix-types/e8-theory",
+    "e8-theory",
+    # stealth-browser excluded intentionally: heavy chromiumoxide build dependency (~50MB).
+    # Enable manually via --features stealth-browser when needed.
+    # quantum is experimental — excluded from full until stable.
+    "neotrix-types/full",
+]
+
+[lints]
+rust.unexpected_cfgs = "warn"
+
+[[example]]
+name = "evolve"
+path = "examples/evolve.rs"
+
+

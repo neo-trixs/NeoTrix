@@ -1,0 +1,14 @@
+[package]
+name = "neotrix-bridge"
+version.workspace = true
+edition = "2021"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "NeoTrix ConsciousnessAbility trait — all external capabilities as VSA-native bridge modules"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }

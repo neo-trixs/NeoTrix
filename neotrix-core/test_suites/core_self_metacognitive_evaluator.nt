@@ -1,0 +1,113 @@
+name: "core_self_metacognitive_evaluator"
+description: "Metacognitive evaluator tests"
+
+tests:
+  - name: metacognitive_evaluator_new
+    description: "Fresh evaluator has zero count and empty history"
+    imports:
+      - "neotrix::core::nt_core_self::CognitiveEvaluator"
+    code: |
+      let evaluator = CognitiveEvaluator::new();
+      assert_eq!(evaluator.evaluation_count, 0);
+      assert!(evaluator.history.is_empty());
+      assert!(evaluator.latest_report().is_none());
+
+  - name: metacognitive_evaluate_initial
+    description: "Initial evaluation on default model produces expected flags"
+    imports:
+      - "neotrix::core::nt_core_self::CognitiveEvaluator"
+      - "neotrix::core::nt_core_self::SiliconSelfModel"
+      - "neotrix::core::nt_core_self::FlagSeverity"
+      - "neotrix::core::nt_core_self::FlagCategory"
+    code: |
+      let model = SiliconSelfModel::new();
+      let mut evaluator = CognitiveEvaluator::new();
+      let report = evaluator.evaluate(&model);
+      assert_eq!(report.evaluation_id, 0);
+      assert!((report.attention_health - 0.0).abs() < 1e-6);
+      assert!((report.strategy_diversity - 0.0).abs() < 1e-6);
+      assert!((report.trace_quality - 0.0).abs() < 1e-6);
+      assert!((report.context_pressure - 0.0).abs() < 1e-6);
+      assert_eq!(report.flags.len(), 3);
+      let has_critical_attention = report.flags.iter().any(|f| {
+          matches!(f.severity, FlagSeverity::Critical) && matches!(f.category, FlagCategory::Attention)
+      });
+      let has_warning_strategy = report.flags.iter().any(|f| {
+          matches!(f.severity, FlagSeverity::Warning) && matches!(f.category, FlagCategory::Strategy)
+      });
+      let has_critical_trace = report.flags.iter().any(|f| {
+          matches!(f.severity, FlagSeverity::Critical) && matches!(f.category, FlagCategory::Trace)
+      });
+      assert!(has_critical_attention);
+      assert!(has_warning_strategy);
+      assert!(has_critical_trace);
+      assert!(evaluator.latest_report().is_some());
+
+  - name: metacognitive_traces_improve_quality
+    description: "Adding good traces improves trace quality score"
+    imports:
+      - "neotrix::core::nt_core_self::CognitiveEvaluator"
+      - "neotrix::core::nt_core_self::SiliconSelfModel"
+      - "neotrix::core::nt_core_self::ThinkingTrace"
+      - "neotrix::core::nt_core_self::ThinkingStep"
+      - "neotrix::core::nt_core_self::StrategyKind"
+    setup: |
+      let mut model = SiliconSelfModel::new();
+      let mut evaluator = CognitiveEvaluator::new();
+    code: |
+      let report_before = evaluator.evaluate(&model);
+      assert!((report_before.trace_quality - 0.0).abs() < 1e-6);
+      for i in 0..5 {
+          let mut trace = ThinkingTrace::new(i, &format!("task {}", i));
+          trace.add_step(ThinkingStep::new(1, "step", StrategyKind::Direct));
+          trace.add_step(ThinkingStep::new(2, "step", StrategyKind::ChainOfThought));
+          trace.set_grade_from_accuracy(0.95);
+          model.add_thinking_trace(trace);
+      }
+      let report_after = evaluator.evaluate(&model);
+      assert!((report_after.trace_quality - 1.0).abs() < 1e-6);
+      assert!(report_after.trace_quality > report_before.trace_quality);
+
+  - name: metacognitive_has_degraded
+    description: "Fresh model with repeated evaluations does not degrade"
+    imports:
+      - "neotrix::core::nt_core_self::CognitiveEvaluator"
+      - "neotrix::core::nt_core_self::SiliconSelfModel"
+    setup: |
+      let model = SiliconSelfModel::new();
+      let mut evaluator = CognitiveEvaluator::new();
+    code: |
+      assert!(!evaluator.has_degraded(0.1));
+      evaluator.evaluate(&model);
+      assert!(!evaluator.has_degraded(0.1));
+      evaluator.evaluate(&model);
+      assert!(!evaluator.has_degraded(0.1));
+
+  - name: metacognitive_summary_format
+    description: "Summary follows expected format"
+    imports:
+      - "neotrix::core::nt_core_self::CognitiveEvaluator"
+      - "neotrix::core::nt_core_self::SiliconSelfModel"
+    setup: |
+      let model = SiliconSelfModel::new();
+      let mut evaluator = CognitiveEvaluator::new();
+    code: |
+      let empty_summary = evaluator.summary();
+      assert_eq!(empty_summary, "CognitiveEvaluator: no evaluations performed");
+      evaluator.evaluate(&model);
+      let summary = evaluator.summary();
+      assert!(summary.starts_with("Evaluation #"));
+      assert!(summary.contains("stability="));
+      assert!(summary.contains("attention="));
+      assert!(summary.contains("diversity="));
+      assert!(summary.contains("quality="));
+      assert!(summary.contains("pressure="));
+
+  - name: metacognitive_flag_severity_order
+    description: "FlagSeverity enum has correct ordering"
+    imports:
+      - "neotrix::core::nt_core_self::FlagSeverity"
+    code: |
+      assert!(FlagSeverity::Critical > FlagSeverity::Warning);
+      assert!(FlagSeverity::Warning > FlagSeverity::Info);
+      assert!(FlagSeverity::Critical > FlagSeverity::Info);

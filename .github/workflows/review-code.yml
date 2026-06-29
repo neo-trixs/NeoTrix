@@ -1,0 +1,91 @@
+name: Multi-Agent Code Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: short
+
+jobs:
+  review:
+    name: Parallel Multi-Agent Code Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Generate git diff for review
+        id: diff
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.event.after }}"
+          fi
+          git diff "$BASE_SHA".."$HEAD_SHA" -- '*.rs' > /tmp/review_diff.diff
+          echo "diff_lines=$(wc -l < /tmp/review_diff.diff)" >> $GITHUB_OUTPUT
+
+      - name: Run parallel multi-agent code review
+        id: review
+        if: steps.diff.outputs.diff_lines != '0'
+        run: |
+          cargo run -- review all --full > /tmp/review_report.md 2>&1
+          echo "report_exit=$?" >> $GITHUB_OUTPUT
+
+      - name: Check severity thresholds
+        id: thresholds
+        if: steps.review.outputs.report_exit == '0'
+        run: |
+          CRITICAL=$(grep -c "Critical" /tmp/review_report.md || true)
+          HIGH=$(grep -c "High" /tmp/review_report.md || true)
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "THRESHOLD_FAIL=critical" >> $GITHUB_OUTPUT
+            echo "::warning::Critical issues found ($CRITICAL) — manual review required"
+          elif [ "$HIGH" -gt 5 ]; then
+            echo "THRESHOLD_FAIL=high" >> $GITHUB_OUTPUT
+            echo "::warning::High severity issues exceed threshold ($HIGH > 5)"
+          fi
+
+      - name: Post review comment on PR
+        if: github.event_name == 'pull_request' && steps.review.outputs.report_exit == '0'
+        uses: mshick/add-pr-comment@v3
+        with:
+          message-path: /tmp/review_report.md
+          message-fail: true
+
+      - name: Upload review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-review-report
+          path: /tmp/review_report.md
+
+      - name: Fail on critical issues
+        if: steps.thresholds.outputs.THRESHOLD_FAIL == 'critical'
+        run: |
+          echo "❌ Critical issues found — review required before merge"
+          exit 1
+
+      - name: Warn on high severity threshold
+        if: steps.thresholds.outputs.THRESHOLD_FAIL == 'high'
+        run: |
+          echo "⚠️  High severity issues exceed threshold — recommended to address before merge"
