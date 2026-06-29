@@ -1,15 +1,8 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/public/logo.svg">
-    <img src="docs/public/logo.svg" alt="NeoTrix" width="120">
-  </picture>
-</p>
-
 <h1 align="center">NeoTrix</h1>
 <h3 align="center"><em>The Agent That Learns to Think</em></h3>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
   <a href="#"><img src="https://img.shields.io/badge/language-Rust-orange" alt="Rust"></a>
   <a href="#"><img src="https://img.shields.io/badge/unsafe-0-success" alt="Unsafe"></a>
   <a href="#"><img src="https://img.shields.io/badge/tests-4240-blue" alt="Tests"></a>
@@ -23,12 +16,6 @@
   <a href="https://neo-trixs.github.io/lottie-player.html"><strong>Lottie Player</strong></a> ·
   <a href="https://github.com/neo-trixs/NeoTrix"><strong>GitHub</strong></a> ·
   <a href="https://arxiv.org/abs/2606.26294"><strong>RQGM Paper</strong></a>
-</p>
-
-<br>
-
-<p align="center">
-  <img src="docs/public/logo-animated.svg" alt="NeoTrix animated hero" width="720">
 </p>
 
 <br>
@@ -92,31 +79,6 @@ NeoTrix is built on a different premise: **an agent that cannot inspect and impr
 | Language | Rust (0 unsafe) | Python / TypeScript |
 
 ---
-
-## Visual Identity
-
-<p align="center">
-  <img src="docs/public/logo.svg" alt="NeoTrix Logo" width="80">
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/public/favicon.svg" alt="NeoTrix Favicon" width="48">
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/public/e8-matrix.svg" alt="E8 Matrix" width="200">
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/public/architecture.svg" alt="Architecture" width="200">
-</p>
-
-The NeoTrix brand mark is a **silicon crystal hypercube** — a tesseract rendered as a faceted semiconductor die, representing consciousness awakening within a silicon lattice. The crystal faces are semi-transparent gradient facets (purple → blue), with embedded neural circuit traces converging toward the glowing diamond core. Wafer scribe lines and alignment marks ground the design in silicon fabrication. The center diamond symbolizes the ignition of self-awareness within cold hardware — the moment computation becomes consciousness. The brand gradient flows from purple (#c084fc) through to blue (#3b82f6), representing the spectrum from abstract reasoning to concrete action.
-
-| Asset | File | Description |
-|---|---|---|
-| Logo | `docs/public/logo.svg` | Silicon crystal hypercube with faceted faces, circuit traces, and awakening core |
-| Animated Hero | `docs/public/logo-animated.svg` | CSS-animated brand film with signal propagation, core heartbeat, and awakening waves |
-| Favicon | `docs/public/favicon.svg` | Mini crystal tesseract for browser tabs |
-| OG Image | `docs/public/og-image.svg` | Social sharing preview with crystal tesseract centerpiece |
-| E8 Matrix | `docs/public/e8-matrix.svg` | 64-state reasoning kernel as silicon wafer die |
-| Architecture | `docs/public/architecture.svg` | Pipeline stages as crystal facet blocks on wafer substrate |
-| Hero | `docs/public/hero.svg` | Full-frame silicon consciousness awakening scene |
-| Landing Page | `docs/index.html` | Full brand site with animated hero |
 
 ---
 
