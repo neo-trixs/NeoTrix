@@ -67,7 +67,7 @@ jobs:
 
       - name: Post review comment on PR
         if: github.event_name == 'pull_request' && steps.review.outputs.report_exit == '0'
-        uses: mshick/add-pr-comment@v2
+        uses: mshick/add-pr-comment@v3
         with:
           message-path: /tmp/review_report.md
           message-fail: true
