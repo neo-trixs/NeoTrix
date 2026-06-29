@@ -1,0 +1,27 @@
+[package]
+name = "nt-proxy-daemon"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# REMOVED - libc had zero usage sites; was unused
+# libc = "0.2"
+rustls = "0.23"
+webpki-roots = "0.26"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+
+# HTTP/2 MUX — defeats encapsulated TLS handshake detection (USENIX Security '24).
+# Enables: cargo build --features mux
+# Detection rate without MUX: 77%, with MUX: 14.84% (5× reduction).
+h2 = { version = "0.4", optional = true, features = ["stream"] }
+bytes = { version = "1", optional = true }
+http = { version = "1", optional = true }
+tokio = { workspace = true, optional = true, features = ["rt", "rt-multi-thread", "net", "io-util", "macros", "time"] }
+tokio-rustls = { version = "0.26", optional = true }
+futures-util = { version = "0.3", optional = true }
+futures-core = { version = "0.3", optional = true }
+
+[features]
+mux = ["h2", "bytes", "http", "tokio", "tokio-rustls", "futures-util", "futures-core"]

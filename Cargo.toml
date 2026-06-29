@@ -1,0 +1,61 @@
+[workspace]
+members = [
+    "crates/neotrix-self",
+    "crates/neotrix-mind",
+    "crates/neotrix-body",
+    "neotrix-core",
+    "src-tauri",
+    "crates/neotrix-types",
+    "crates/nt-lang",
+    "crates/neotrix-bridge",
+    "crates/neotrix-proxy-kernel",
+    "crates/ne_surface",
+    "crates/nt-segstore",
+    "crates/nt-sub-fetcher",
+    "crates/neotrix-tun",
+    "packages/nt-domain",
+    "packages/nt-db",
+]
+
+resolver = "2"
+
+# TODO(reqwest-version-conflict): neotrix-core uses reqwest 0.11 + rustls 0.21, but
+#  5 other crates use reqwest 0.12 + rustls 0.23, and Tauri pulls reqwest 0.13.
+#  This causes 2 full HTTP/TLS stacks in the final binary. Fix: upgrade
+#  neotrix-core to reqwest 0.12 + rustls 0.23 in a dedicated session.
+#  See AGENTS.md — rustls/reqwest version conflict tracking.
+
+[workspace.package]
+version = "0.18.0"
+edition = "2021"
+rust-version = "1.81"
+authors = ["NeoTrix Team"]
+license = "MIT"
+repository = "https://github.com/neotrix/neotrix"
+description = "NeoTrix - Self-evolving reasoning kernel with 18 stages of neural architecture"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6.0.0"
+uuid = { version = "1", features = ["v4", "serde"] }
+serde_yaml = "0.9"
+thiserror = "2"
+serial_test = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+overflow-checks = true
+
+[profile.dev]
+overflow-checks = true
+codegen-units = 16
+debug = 1
+
+[profile.bench]
+inherits = "release"
+debug = true

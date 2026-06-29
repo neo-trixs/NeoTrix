@@ -1,0 +1,13 @@
+[package]
+name = "neotrix-tun"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Transparent TUN proxy — routes all system traffic through rotating proxy pool"
+
+[dependencies]
+tun = "0.7"
+smoltcp = { version = "0.13", default-features = false, features = ["std", "proto-ipv4", "socket-tcp", "medium-ip"] }
+log = "0.4"
+env_logger = "0.11"
+serde = { workspace = true, features = ["derive"] }

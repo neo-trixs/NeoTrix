@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeoTrix Brand Video Studio</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #080012; color: #e0d0f0; font-family: system-ui, sans-serif; display: flex; height: 100vh; }
+  .sidebar { width: 280px; background: #0d001a; border-right: 1px solid #1a0533; padding: 24px; overflow-y: auto; }
+  .sidebar h1 { font-size: 18px; color: #c084fc; margin-bottom: 8px; letter-spacing: 1px; }
+  .sidebar p { font-size: 12px; color: #66508a; margin-bottom: 24px; }
+  .preset { padding: 12px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 8px; transition: all .2s; }
+  .preset:hover { background: #1a0533; }
+  .preset.active { background: #1a0533; border-left: 3px solid #a855f7; }
+  .preset h3 { font-size: 13px; color: #c084fc; margin-bottom: 4px; }
+  .preset p { font-size: 11px; color: #66508a; margin: 0; }
+  .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
+  .player-wrap { width: 100%; max-width: 720px; border-radius: 16px; overflow: hidden; border: 1px solid #1a0533; background: #05000a; }
+  .player-wrap iframe { width: 100%; aspect-ratio: 16/9; border: none; display: block; }
+  .controls { margin-top: 24px; display: flex; gap: 12px; align-items: center; }
+  .controls button { padding: 10px 24px; border-radius: 8px; border: 1px solid #a855f7; background: transparent; color: #c084fc; font-size: 13px; cursor: pointer; transition: all .2s; }
+  .controls button:hover { background: #a855f7; color: #fff; }
+  .controls .render-btn { background: linear-gradient(135deg, #a855f7, #3b82f6); border: none; color: #fff; }
+  .controls .render-btn:hover { opacity: 0.9; }
+  .controls span { font-size: 12px; color: #66508a; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+  .badge.browser { background: #1a3a1a; color: #4ade80; }
+  .badge.mp4 { background: #3a1a3a; color: #c084fc; }
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <h1>✦ NeoTrix</h1>
+  <p>Silicon Crystal Video Studio</p>
+  <div id="presets"></div>
+</div>
+<div class="main">
+  <div class="player-wrap">
+    <iframe id="player" src="presets/logo-reveal.html"></iframe>
+  </div>
+  <div class="controls">
+    <button onclick="document.getElementById('player').contentWindow.location.reload()">↻ Replay</button>
+    <a id="dl-link" href="output/logo-reveal.mp4" download style="text-decoration:none"><button class="render-btn">⬇ MP4</button></a>
+    <span>Browser preview · MP4 download · Render with <code>bash render.sh &lt;preset&gt;</code></span>
+  </div>
+</div>
+<script>
+  const presets = [
+    { id: 'logo-reveal', name: 'Logo Reveal', desc: 'Crystal zoom in + brand text (6s, 836KB)', badge: 'mp4', url: 'output/logo-reveal.mp4' },
+    { id: 'crystal-spin', name: 'Crystal Spin', desc: '360° rotation + hue cycle (6s, 3.8MB)', badge: 'mp4', url: 'output/crystal-spin.mp4' },
+    { id: 'awakening', name: 'Awakening', desc: 'Dark → glow → logo + text reveal (13s, 696KB)', badge: 'mp4', url: 'output/awakening.mp4' },
+    { id: 'brand-film', name: 'Brand Film', desc: '4-scene story: logo → E8 → Arch → Finale (10s, 3.0MB)', badge: 'mp4', url: 'output/brand-film.mp4' },
+  ];
+  const list = document.getElementById('presets');
+  presets.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'preset' + (p.id === 'logo-reveal' ? ' active' : '');
+    el.innerHTML = `<h3>${p.name} <span class="badge ${p.badge}">${p.badge}</span></h3><p>${p.desc}</p>`;
+    el.onclick = () => {
+      document.querySelectorAll('.preset').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('player').src = 'presets/' + p.id + '.html';
+      document.getElementById('dl-link').href = p.url;
+    };
+    list.appendChild(el);
+  });
+</script>
+</body>
+</html>

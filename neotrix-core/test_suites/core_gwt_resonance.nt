@@ -1,0 +1,327 @@
+name: "core_gwt_resonance"
+description: "Resonance attention mechanism tests"
+
+tests:
+  - name: resonance_matrix_self_resonance
+    description: "Self-resonance is always 6"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+    code: |
+      for i in 0..MODULE_COUNT {
+          assert_eq!(matrix.get(i, i), 6, "Self-resonance must be 6");
+      }
+
+  - name: resonance_effective_salience_boost
+    description: "Effective salience is higher than raw due to resonance"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+      let raw = [0.1; MODULE_COUNT];
+    code: |
+      let eff = matrix.effective_salience(&raw);
+      for i in 0..MODULE_COUNT {
+          assert!(eff[i] > raw[i], "Module {i} should get resonance boost");
+      }
+
+  - name: resonance_select_picks_highest
+    description: "Winner is the module with highest raw salience"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+      - "neotrix::core::resonate_and_select"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+      let mut raw = [0.1; MODULE_COUNT];
+      raw[3] = 0.9;
+    code: |
+      let (winner, _, _) = resonate_and_select(&raw, &matrix);
+      assert_eq!(winner, 3);
+
+  - name: resonance_cluster_overtakes_solo
+    description: "Mutual resonance in cluster beats isolated module"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+      - "neotrix::core::resonate_and_select"
+      - "neotrix::core::ReasoningHexagram"
+    setup: |
+      let mut states = default_specialist_states();
+      states[9] = ReasoningHexagram(0);
+      states[10] = ReasoningHexagram(0);
+      states[0] = ReasoningHexagram(63);
+      let matrix = ResonanceMatrix::from_states(&states);
+      let mut raw = [0.1; MODULE_COUNT];
+      raw[0] = 0.5;
+      raw[9] = 0.5;
+      raw[10] = 0.5;
+    code: |
+      let (_, eff, _) = resonate_and_select(&raw, &matrix);
+      assert!(eff[9] > eff[0],
+          "Resonant cluster should beat isolated. eff9={}, eff0={}", eff[9], eff[0]);
+
+  - name: resonance_boost_general
+    description: "All modules receive positive resonance boost"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+      let mut raw = [0.1; MODULE_COUNT];
+      raw[0] = 0.4;
+      raw[1] = 0.41;
+    code: |
+      let eff = matrix.effective_salience(&raw);
+      assert!(eff[0] > raw[0], "Module 0 should get resonance boost");
+      assert!(eff[1] > raw[1], "Module 1 should get resonance boost");
+
+  - name: resonance_report_has_valid_fields
+    description: "Resonance report contains valid winner and entropy"
+    imports:
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+      - "neotrix::core::resonate_cycle"
+    setup: |
+      let states = default_specialist_states();
+      let mut raw = [0.3; MODULE_COUNT];
+      raw[0] = 0.9;
+    code: |
+      let report = resonate_cycle(&raw, &states);
+      assert!(report.winner < MODULE_COUNT, "Winner must be a valid module index");
+      assert!(report.effective_saliences[report.winner] > 0.5);
+      assert!(report.entropy > 0.0);
+
+  - name: resonance_resonators_nonempty
+    description: "Default specialists have at least one resonator each"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::default_specialist_states"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+    code: |
+      let resonators = matrix.resonators(0);
+      assert!(resonators.len() > 0);
+
+  - name: resonance_entropy_focused_vs_distributed
+    description: "Focused attention has lower entropy than distributed"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+      - "neotrix::core::resonate_and_select"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+    code: |
+      let mut focused_raw = [0.01; MODULE_COUNT];
+      focused_raw[0] = 0.99;
+      let (_, _, focused_entropy) = resonate_and_select(&focused_raw, &matrix);
+      let distributed_raw = [0.5; MODULE_COUNT];
+      let (_, _, distributed_entropy) = resonate_and_select(&distributed_raw, &matrix);
+      assert!(focused_entropy < distributed_entropy,
+          "Focused should have lower entropy. focused={focused_entropy}, distributed={distributed_entropy}");
+
+  - name: oscillator_phase_coherence_full_sync
+    description: "Fully synchronized oscillators have coherence 1.0"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let mut net = OscillatorNetwork::new(5);
+      for o in &mut net.oscillators {
+          o.phase = 0.0;
+      }
+    code: |
+      let r = net.phase_coherence();
+      assert!((r - 1.0).abs() < 1e-6);
+
+  - name: oscillator_phase_coherence_fixed_phases
+    description: "Phase coherence stays in valid range for specific phases"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let mut net = OscillatorNetwork::new(5);
+      net.oscillators[0].phase = 0.0;
+      net.oscillators[1].phase = 1.2;
+      net.oscillators[2].phase = 2.5;
+      net.oscillators[3].phase = 3.8;
+      net.oscillators[4].phase = 5.0;
+    code: |
+      let r = net.phase_coherence();
+      assert!(r >= 0.0 && r <= 1.0);
+
+  - name: oscillator_synchronize_increases_coherence
+    description: "Synchronization steps increase or maintain coherence"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let mut net = OscillatorNetwork::new(3);
+      net.oscillators[0].phase = 0.0;
+      net.oscillators[1].phase = std::f64::consts::PI;
+      net.oscillators[2].phase = std::f64::consts::PI / 2.0;
+    code: |
+      let before = net.phase_coherence();
+      net.synchronize(50);
+      let after = net.phase_coherence();
+      assert!(after >= before - 0.1,
+          "coherence should not decrease significantly: before={:.4}, after={:.4}", before, after);
+
+  - name: oscillator_broadcast_weights_positive
+    description: "Synchronized oscillators have positive broadcast weights"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let mut net = OscillatorNetwork::new(3);
+      for o in &mut net.oscillators {
+          o.phase = 0.1;
+          o.amplitude = 1.0;
+      }
+    code: |
+      let weights = net.broadcast_weights();
+      assert_eq!(weights.len(), 3);
+      for w in &weights {
+          assert!(*w > 0.0, "synchronized oscillators should have positive weight");
+      }
+
+  - name: oscillator_is_bound_full_sync
+    description: "Full synchronous phase gives bound state"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let mut net = OscillatorNetwork::new(3);
+      for o in &mut net.oscillators {
+          o.phase = 0.0;
+      }
+    code: |
+      assert!(net.is_bound());
+
+  - name: oscillator_is_bound_anti_phase
+    description: "Anti-phase configuration is not bound or has low coherence"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let mut net = OscillatorNetwork::new(3);
+      net.oscillators[0].phase = 0.0;
+      net.oscillators[1].phase = std::f64::consts::PI;
+      net.oscillators[2].phase = 0.0;
+    code: |
+      assert!(!net.is_bound() || net.phase_coherence() < 0.71);
+
+  - name: oscillator_update_amplitudes
+    description: "Update amplitudes from salience vector"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let mut net = OscillatorNetwork::new(3);
+    code: |
+      let saliences = [0.9, 0.5, 0.1];
+      net.update_amplitudes(&saliences);
+      assert!((net.oscillators[0].amplitude - 0.9).abs() < 1e-6);
+      assert!((net.oscillators[1].amplitude - 0.5).abs() < 1e-6);
+      assert!((net.oscillators[2].amplitude - 0.1).abs() < 1e-6);
+
+  - name: resonance_with_oscillation_enhancement
+    description: "Oscillation enhancement decorates report with coherence data"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::ResonanceReport"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+      - "neotrix::core::resonate_and_select"
+      - "neotrix::core::nt_core_gwt::resonance::OscillatorNetwork"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+      let raw = [0.5; MODULE_COUNT];
+      let (winner, eff, entropy) = resonate_and_select(&raw, &matrix);
+      let report = ResonanceReport {
+          winner,
+          effective_saliences: eff,
+          raw_saliences: raw,
+          entropy,
+          resonator_clusters: vec![],
+          complement_activated: false,
+      };
+    code: |
+      let net = OscillatorNetwork::new(MODULE_COUNT);
+      let enhanced = report.with_oscillation(&net);
+      assert!(enhanced.coherence >= 0.0 && enhanced.coherence <= 1.0);
+      assert_eq!(enhanced.broadcast_weights.len(), MODULE_COUNT);
+
+  - name: efc_broadcast_weights_initialization
+    description: "EFC weights start at 0.5 with empty history"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::EfcBroadcastWeights"
+      - "neotrix::core::MODULE_COUNT"
+    setup: |
+      let weights = EfcBroadcastWeights::new(MODULE_COUNT);
+    code: |
+      assert_eq!(weights.weights.len(), MODULE_COUNT);
+      assert_eq!(weights.efc_history.len(), MODULE_COUNT);
+      for w in &weights.weights {
+          assert!((*w - 0.5).abs() < 1e-6, "each weight should start at 0.5");
+      }
+      for hist in &weights.efc_history {
+          assert!(hist.is_empty(), "history should start empty");
+      }
+
+  - name: efc_broadcast_weights_respond_to_record
+    description: "Recording EFC values adjusts weights accordingly"
+    imports:
+      - "neotrix::core::nt_core_gwt::resonance::EfcBroadcastWeights"
+    setup: |
+      let mut weights = EfcBroadcastWeights::new(3);
+    code: |
+      assert!((weights.weight(0) - 0.5).abs() < 1e-6);
+      weights.record(0, 0.9);
+      assert!(weights.weight(0) > 0.5, "high EFC should increase weight");
+      weights.record(1, 0.1);
+      assert!(weights.weight(1) < 0.5, "low EFC should decrease weight");
+      assert!(weights.weight(0) <= 1.0, "weight must not exceed 1.0");
+      assert!(weights.weight(1) >= 0.0, "weight must not go below 0.0");
+
+  - name: efc_broadcast_weights_apply_to_resonance
+    description: "Applying EFC weights reduces resonance for low-EFC specialists"
+    imports:
+      - "neotrix::core::ResonanceMatrix"
+      - "neotrix::core::MODULE_COUNT"
+      - "neotrix::core::default_specialist_states"
+      - "neotrix::core::nt_core_gwt::resonance::EfcBroadcastWeights"
+      - "neotrix::core::nt_core_gwt::resonance::resonate_with_efc"
+    setup: |
+      let states = default_specialist_states();
+      let matrix = ResonanceMatrix::from_states(&states);
+      let original = matrix.clone();
+      let mut efc_weights = EfcBroadcastWeights::new(MODULE_COUNT);
+      efc_weights.record(0, 0.0);
+      efc_weights.record(0, 0.0);
+      efc_weights.record(0, 0.0);
+    code: |
+      let mut adjusted = matrix.clone();
+      efc_weights.apply_to_resonance(&mut adjusted);
+      for j in 0..MODULE_COUNT {
+          assert!(adjusted.strengths[0][j] <= original.strengths[0][j],
+              "specialist 0 resonance row should be reduced");
+          assert!(adjusted.strengths[j][0] <= original.strengths[j][0],
+              "specialist 0 resonance col should be reduced");
+      }
+      let efc_matrix = resonate_with_efc(&states, &efc_weights);
+      for i in 0..MODULE_COUNT {
+          for j in 0..MODULE_COUNT {
+              assert_eq!(efc_matrix.strengths[i][j], adjusted.strengths[i][j],
+                  "resonate_with_efc should match apply_to_resonance");
+          }
+      }

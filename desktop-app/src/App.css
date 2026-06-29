@@ -1,0 +1,21 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.route-page {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.route-page h2 {
+  margin-bottom: var(--space-md);
+}
+
+.route-page p {
+  color: var(--text-secondary);
+  line-height: 1.8;
+}

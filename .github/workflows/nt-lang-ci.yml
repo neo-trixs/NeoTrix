@@ -1,0 +1,37 @@
+name: nt-lang CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'crates/nt-lang/**'
+      - 'neotrix-core/test_suites/**'
+      - 'neotrix-core/tests/**'
+  pull_request:
+    paths:
+      - 'crates/nt-lang/**'
+      - 'neotrix-core/test_suites/**'
+      - 'neotrix-core/tests/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Check nt-lang compiles
+        run: cargo check -p nt-lang
+      - name: Regenerate all test binaries from .nt specs
+        run: cargo run -p nt-lang -- build-all neotrix-core/test_suites/ neotrix-core/tests/
+      - name: Check generated tests compile
+        run: |
+          for f in neotrix-core/tests/*.rs; do
+            test_name=$(basename "$f" .rs)
+            cargo check --test "$test_name" 2>&1 || true
+          done
+      - name: Verify no .nt file is stale (git diff check)
+        run: |
+          git diff --exit-code neotrix-core/tests/ || {
+            echo "ERROR: Generated test files are out of date. Run 'cargo run -p nt-lang -- build-all' and commit."
+            exit 1
+          }

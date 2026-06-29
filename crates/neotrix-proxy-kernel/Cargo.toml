@@ -1,0 +1,31 @@
+[package]
+name = "neotrix-proxy-kernel"
+version = "0.18.0"
+edition = "2021"
+
+[dependencies]
+vpn-link-serde = "0.1"
+shadowsocks = { version = "1.24" }
+hysteria2 = "0.1"
+rustls = "0.23"
+rustls-pki-types = "1"
+webpki-roots = "0.26"
+tokio = { workspace = true, features = ["full"] }
+tokio-rustls = "0.26"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+base64 = "0.22"
+url = "2"
+anyhow = "1"
+chrono = { workspace = true }
+sha2 = "0.10"
+uuid = { workspace = true }
+md-5 = "0.10"
+hmac = "0.12"
+aes = "0.8"
+cfb-mode = "0.8"
+aes-gcm = "0.10"
+chacha20 = "0.9"
+poly1305 = "0.8"
+rand = "0.8"
+fnv = "1"
