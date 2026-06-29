@@ -1,0 +1,229 @@
+name: core_experience
+description: "Self-evolving experience loop: reflector, skill accumulator, curriculum generator, policy repair, epistemic model"
+
+tests:
+  - name: test_reflect_creates_heuristic
+    description: "Reflect creates a heuristic from context and action"
+    imports:
+      - "neotrix::core::nt_core_experience::reflector::ExperienceReflector"
+      - "neotrix::core::nt_core_experience::reflector::ReflectorConfig"
+    code: |
+      let mut r = ExperienceReflector::new(ReflectorConfig { max_heuristics: 100, min_confidence_threshold: 0.3, similarity_threshold: 0.75, decay_factor: 0.97 });
+      let id = r.reflect("ctx_test", "action_test", true, 0.9);
+      assert!(id.is_some());
+      assert_eq!(r.heuristic_count(), 1);
+
+  - name: test_reflect_updates_existing_on_similar
+    description: "Reflect updates existing heuristic on similar patterns"
+    imports:
+      - "neotrix::core::nt_core_experience::reflector::ExperienceReflector"
+      - "neotrix::core::nt_core_experience::reflector::ReflectorConfig"
+    code: |
+      let mut r = ExperienceReflector::new(ReflectorConfig { max_heuristics: 100, min_confidence_threshold: 0.3, similarity_threshold: 0.75, decay_factor: 0.97 });
+      let id1 = r.reflect("same_context", "same_action", true, 0.9).unwrap();
+      let id2 = r.reflect("same_context", "same_action", true, 0.9).unwrap();
+      assert_eq!(id1, id2);
+      assert_eq!(r.heuristic_count(), 1);
+
+  - name: test_retrieve_returns_by_similarity
+    description: "Retrieve returns heuristics by VSA similarity"
+    imports:
+      - "neotrix::core::nt_core_experience::reflector::ExperienceReflector"
+      - "neotrix::core::nt_core_experience::reflector::ReflectorConfig"
+      - "neotrix::core::nt_core_experience::reflector::HeuristicCategory"
+      - "neotrix::core::nt_core_hcube::vsa_quantized::QuantizedVSA"
+    code: |
+      let mut r = ExperienceReflector::new(ReflectorConfig { max_heuristics: 100, min_confidence_threshold: 0.3, similarity_threshold: 0.75, decay_factor: 0.97 });
+      r.reflect("alpha_context", "alpha_action", true, 0.9);
+      let seed = HeuristicCategory::ActionSelection.seed();
+      let vec = QuantizedVSA::seeded_random(seed, 4096);
+      let results = r.retrieve(&vec, 5);
+      assert!(!results.is_empty());
+
+  - name: test_prune_keeps_high_confidence
+    description: "Prune does not remove high-confidence heuristics"
+    imports:
+      - "neotrix::core::nt_core_experience::reflector::ExperienceReflector"
+      - "neotrix::core::nt_core_experience::reflector::ReflectorConfig"
+    code: |
+      let mut r = ExperienceReflector::new(ReflectorConfig { max_heuristics: 100, min_confidence_threshold: 0.3, similarity_threshold: 0.75, decay_factor: 0.97 });
+      r.reflect("ctx", "act", true, 0.9);
+      let pruned = r.prune(0.1);
+      assert_eq!(pruned, 0);
+      assert_eq!(r.heuristic_count(), 1);
+
+  - name: test_accumulate_creates_skill
+    description: "Accumulate creates a new skill entry"
+    imports:
+      - "neotrix::core::nt_core_experience::skill_acc::SkillAccumulator"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut acc = SkillAccumulator::new(100);
+      let id = acc.accumulate("test_skill", "trigger", "action", "outcome", AttentionDomain::Code, true, vec![]);
+      assert!(id.is_some());
+      assert_eq!(acc.skill_count(), 1);
+
+  - name: test_accumulate_updates_existing
+    description: "Same trigger reuses existing skill and increments use count"
+    imports:
+      - "neotrix::core::nt_core_experience::skill_acc::SkillAccumulator"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut acc = SkillAccumulator::new(100);
+      let id1 = acc.accumulate("skill1", "same_trigger", "act", "out", AttentionDomain::Code, true, vec![]).unwrap();
+      let id2 = acc.accumulate("skill2", "same_trigger", "act", "out", AttentionDomain::Code, false, vec![]).unwrap();
+      assert_eq!(id1, id2);
+      assert_eq!(acc.skill_count(), 1);
+      let best = acc.best_skills(5);
+      assert!(best.iter().any(|s| s.use_count == 2));
+
+  - name: test_find_by_domain_filters
+    description: "Find by domain filters skills by attention domain"
+    imports:
+      - "neotrix::core::nt_core_experience::skill_acc::SkillAccumulator"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut acc = SkillAccumulator::new(100);
+      acc.accumulate("s1", "t1", "a1", "o1", AttentionDomain::Code, true, vec![]);
+      acc.accumulate("s2", "t2", "a2", "o2", AttentionDomain::Semantic, true, vec![]);
+      let code_skills = acc.find_by_domain(&AttentionDomain::Code);
+      assert_eq!(code_skills.len(), 1);
+      assert_eq!(code_skills[0].name, "s1");
+
+  - name: test_generate_task_creates_template
+    description: "Generate task creates a curriculum template"
+    imports:
+      - "neotrix::core::nt_core_experience::curriculum::CurriculumGenerator"
+      - "neotrix::core::nt_core_experience::curriculum::GeneratorConfig"
+      - "neotrix::core::nt_core_experience::curriculum::DifficultyLevel"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut gen = CurriculumGenerator::new(GeneratorConfig { max_templates: 100, tasks_per_domain: 20, min_gap_severity: 0.4, novelty_rate: 0.0 });
+      let id = gen.generate_task(&AttentionDomain::Code, &[]);
+      assert!(id.is_some());
+      assert_eq!(gen.template_count(), 1);
+
+  - name: test_domain_mastery_increases_with_successes
+    description: "Domain mastery increases with successful outcomes"
+    imports:
+      - "neotrix::core::nt_core_experience::curriculum::CurriculumGenerator"
+      - "neotrix::core::nt_core_experience::curriculum::GeneratorConfig"
+      - "neotrix::core::nt_core_experience::curriculum::DifficultyLevel"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut gen = CurriculumGenerator::new(GeneratorConfig { max_templates: 100, tasks_per_domain: 20, min_gap_severity: 0.4, novelty_rate: 0.0 });
+      for _ in 0..10 {
+          gen.register_outcome(AttentionDomain::Code, true);
+      }
+      assert_eq!(gen.domain_mastery(&AttentionDomain::Code), DifficultyLevel::Mastery);
+
+  - name: test_detect_failure_creates_pattern
+    description: "Detect failure creates a failure pattern entry"
+    imports:
+      - "neotrix::core::nt_core_experience::policy_repair::PolicyRepairEngine"
+      - "neotrix::core::nt_core_experience::policy_repair::FailureType"
+    code: |
+      let mut eng = PolicyRepairEngine::new(50);
+      let id = eng.detect_failure("deadlock in loop", FailureType::DecisionDeadlock, 0.8);
+      assert!(id > 0);
+      assert_eq!(eng.pattern_count(), 1);
+
+  - name: test_detect_failure_all_six_types
+    description: "All six failure types are detectable"
+    imports:
+      - "neotrix::core::nt_core_experience::policy_repair::PolicyRepairEngine"
+      - "neotrix::core::nt_core_experience::policy_repair::FailureType"
+    code: |
+      let types = vec![FailureType::DecisionDeadlock, FailureType::ConflictingGoals, FailureType::InsufficientContext, FailureType::ReasoningError, FailureType::ResourceExhaustion, FailureType::KnowledgeGap];
+      let mut eng = PolicyRepairEngine::new(50);
+      for (i, ft) in types.iter().enumerate() {
+          let ctx = format!("failure_type_{}", i);
+          let id = eng.detect_failure(&ctx, ft.clone(), 0.5 + i as f64 * 0.05);
+          assert!(id > 0);
+      }
+      assert_eq!(eng.pattern_count(), 6);
+
+  - name: test_frequent_failure_generates_repair
+    description: "Frequent failures trigger automatic repair generation"
+    imports:
+      - "neotrix::core::nt_core_experience::policy_repair::PolicyRepairEngine"
+      - "neotrix::core::nt_core_experience::policy_repair::FailureType"
+      - "neotrix::core::nt_core_experience::policy_repair::RepairMode"
+    code: |
+      let mut eng = PolicyRepairEngine::new(50);
+      for _ in 0..3 {
+          eng.detect_failure("recurring", FailureType::DecisionDeadlock, 0.9);
+      }
+      assert_eq!(eng.policy_count(), 1);
+      let best = eng.best_policies(5);
+      assert!(best.iter().any(|p| p.mode == RepairMode::ChangeStrategy));
+
+  - name: test_calibrate_updates_expected_and_observed
+    description: "Calibrate updates expected and observed success rates"
+    imports:
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicSelfModel"
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicConfig"
+      - "neotrix::core::nt_core_experience::epistemic::DomainConfidence"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut model = EpistemicSelfModel::new(EpistemicConfig { min_samples_for_calibration: 2, calibration_learning_rate: 0.1, uncertainty_decay: 0.95, max_concepts: 100, novelty_threshold: 0.35 });
+      model.calibrate(&AttentionDomain::Code, 0.8, true);
+      let state = model.snapshot();
+      let entry = &state.domain_confidence[&AttentionDomain::Code];
+      assert!(entry.sample_count >= 1);
+      assert!(entry.observed_success > 0.5);
+
+  - name: test_calibrate_reduces_uncertainty
+    description: "Repeated calibration reduces domain uncertainty"
+    imports:
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicSelfModel"
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicConfig"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut model = EpistemicSelfModel::new(EpistemicConfig { min_samples_for_calibration: 2, calibration_learning_rate: 0.1, uncertainty_decay: 0.95, max_concepts: 100, novelty_threshold: 0.35 });
+      let state_before = model.snapshot();
+      let uncert_before = state_before.domain_confidence.get(&AttentionDomain::Code).map(|d| d.uncertainty).unwrap_or(1.0);
+      for _ in 0..10 {
+          model.calibrate(&AttentionDomain::Code, 0.7, true);
+      }
+      let state_after = model.snapshot();
+      assert!(state_after.domain_confidence[&AttentionDomain::Code].uncertainty < uncert_before);
+
+  - name: test_track_concept_creates_node
+    description: "Track concept creates a new epistemic concept node"
+    imports:
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicSelfModel"
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicConfig"
+    code: |
+      let mut model = EpistemicSelfModel::new(EpistemicConfig { min_samples_for_calibration: 2, calibration_learning_rate: 0.1, uncertainty_decay: 0.95, max_concepts: 100, novelty_threshold: 0.35 });
+      let id = model.track_concept("recursion", 0.6, &[]);
+      assert!(id > 0);
+      let gaps = model.identify_gaps(1.0);
+      assert!(gaps.iter().any(|c| c.label == "recursion"));
+
+  - name: test_identify_gaps_returns_low_confidence
+    description: "Identify gaps returns concepts below confidence threshold"
+    imports:
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicSelfModel"
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicConfig"
+    code: |
+      let mut model = EpistemicSelfModel::new(EpistemicConfig { min_samples_for_calibration: 2, calibration_learning_rate: 0.1, uncertainty_decay: 0.95, max_concepts: 100, novelty_threshold: 0.35 });
+      model.track_concept("weak_concept", 0.2, &[]);
+      model.track_concept("strong_concept", 0.8, &[]);
+      let gaps = model.identify_gaps(0.5);
+      assert!(gaps.iter().any(|c| c.label == "weak_concept"));
+      assert!(!gaps.iter().any(|c| c.label == "strong_concept"));
+
+  - name: test_best_domains_returns_sorted
+    description: "Best domains returns sorted by observed success"
+    imports:
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicSelfModel"
+      - "neotrix::core::nt_core_experience::epistemic::EpistemicConfig"
+      - "neotrix::core::AttentionDomain"
+    code: |
+      let mut model = EpistemicSelfModel::new(EpistemicConfig { min_samples_for_calibration: 2, calibration_learning_rate: 0.1, uncertainty_decay: 0.95, max_concepts: 100, novelty_threshold: 0.35 });
+      model.calibrate(&AttentionDomain::Code, 0.9, true);
+      model.calibrate(&AttentionDomain::Creativity, 0.3, false);
+      let best = model.best_domains(3);
+      assert!(!best.is_empty());
+      assert!(best[0].1 >= best[1].1);

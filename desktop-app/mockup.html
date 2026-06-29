@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeoTrix Desktop — UI Mockup</title>
+<style>
+:root[data-theme="dark"] {
+  --bg-primary: #0b0b0f;
+  --bg-glass: rgba(255,255,255,0.045);
+  --bg-glass-hover: rgba(255,255,255,0.08);
+  --accent: #5e8aff;
+  --accent-muted: rgba(94,138,255,0.12);
+  --accent-glass: rgba(94,138,255,0.08);
+  --border-glass: rgba(255,255,255,0.08);
+  --border-glass-strong: rgba(255,255,255,0.12);
+  --text-primary: #e8e8ed;
+  --text-secondary: #9898a3;
+  --text-tertiary: #5a5a66;
+  --success: #48b87a;
+  --warning: #e8a030;
+  --error: #e04e4e;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --glass-blur: 16px;
+  --shadow-glass: 0 4px 24px rgba(0,0,0,0.4);
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ====== Top Bar ====== */
+.top-bar {
+  display: flex; align-items: center; height: 32px;
+  padding: 0 12px; gap: 6px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border-glass);
+}
+.top-brand { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.top-brand-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.top-spacer { flex: 1; }
+.top-view-modes { display: flex; gap: 1px; margin-right: 4px; }
+.top-view-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 16px; font-size: 9px; font-weight: 600;
+  border-radius: 3px; color: var(--text-tertiary); cursor: pointer;
+  font-family: var(--font-mono); background: none; border: none;
+}
+.top-view-btn:hover { color: var(--text-secondary); background: var(--bg-glass-hover); }
+.top-view-btn.active { color: var(--accent); background: var(--accent-muted); }
+.top-action {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 5px;
+  color: var(--text-tertiary); cursor: pointer; background: none; border: none;
+}
+.top-action:hover { color: var(--text-primary); background: var(--bg-glass-hover); }
+
+/* ====== Main ====== */
+.main-area { flex: 1; display: flex; min-height: 0; position: relative; overflow: hidden; }
+
+/* ====== Status Bar ====== */
+.status-bar {
+  display: flex; align-items: center; height: 20px;
+  padding: 0 12px; gap: 8px; flex-shrink: 0;
+  font-size: 9px; color: var(--text-tertiary);
+  border-top: 1px solid var(--border-glass);
+  background: var(--bg-glass);
+}
+.status-item { display: flex; align-items: center; gap: 3px; }
+.status-dot { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
+.status-val { font-weight: 600; color: var(--text-secondary); }
+.status-sep { width: 1px; height: 8px; background: var(--border-glass); }
+.status-spacer { flex: 1; }
+
+/* ====== Panel Overlay ====== */
+.panel-overlay { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+.panel-overlay.active { pointer-events: auto; }
+.panel-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.3); }
+.panel-container {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 300px;
+  background: var(--bg-glass); backdrop-filter: blur(24px);
+  border-right: 1px solid var(--border-glass);
+  display: flex; flex-direction: column;
+  animation: slideIn 0.15s ease-out;
+}
+@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; border-bottom: 1px solid var(--border-glass);
+}
+.panel-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary); }
+.panel-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 4px;
+  color: var(--text-tertiary); cursor: pointer;
+}
+.panel-close:hover { background: var(--bg-glass-hover); color: var(--text-primary); }
+.panel-body { flex: 1; overflow-y: auto; min-height: 0; }
+
+/* ====== Panel Tabs ====== */
+.panel-tabs { display: flex; gap: 2px; padding: 4px 8px 6px; border-bottom: 1px solid var(--border-glass); }
+.panel-tab {
+  background: none; border: none; padding: 3px 8px; font-size: 9px; font-weight: 500;
+  color: var(--text-tertiary); cursor: pointer; border-radius: 4px;
+}
+.panel-tab:hover { color: var(--text-secondary); background: var(--bg-glass-hover); }
+.panel-tab.active { color: var(--accent); background: var(--accent-muted); }
+
+/* ====== Session Sidebar ====== */
+.session-sidebar { padding: 8px; display: flex; flex-direction: column; gap: 1px; }
+.sidebar-placeholder { padding: 4px; }
+.sidebar-label {
+  font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-tertiary); padding: 0 4px 6px;
+}
+.session-item {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 5px 6px; border-radius: 4px; cursor: pointer;
+  font-size: 11px; transition: background 0.1s;
+}
+.session-item:hover { background: var(--bg-glass-hover); }
+.session-item.active { background: var(--accent-muted); border-left: 2px solid var(--accent); }
+.session-item-header { display: flex; align-items: center; gap: 5px; }
+.session-status { font-size: 8px; width: 12px; text-align: center; flex-shrink: 0; }
+.session-label { flex: 1; font-size: 10px; color: var(--text-primary); font-weight: 500; }
+.session-step-badge {
+  font-size: 8px; font-family: var(--font-mono); color: var(--text-tertiary);
+  padding: 1px 4px; border-radius: 3px; background: var(--bg-glass);
+}
+.session-item-meta { display: flex; align-items: center; gap: 6px; padding-left: 17px; }
+.session-meta-progress { font-size: 8px; font-family: var(--font-mono); color: var(--text-tertiary); opacity: 0.6; }
+
+/* ====== Contact Hub ====== */
+.contact-hub { display: flex; flex-direction: column; padding: 8px; }
+.contact-hub-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 4px 6px; border-bottom: 1px solid var(--border-glass);
+}
+.contact-hub-header h3 { font-size: 11px; font-weight: 600; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px; }
+.contact-count { font-size: 9px; background: var(--bg-glass); padding: 1px 6px; border-radius: 8px; color: var(--text-secondary); }
+.contact-search { margin: 6px 0; }
+.contact-search-input {
+  width: 100%; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 4px;
+  padding: 4px 6px; font-size: 10px; color: var(--text-primary); outline: none;
+}
+.contact-item {
+  display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-radius: 4px;
+  cursor: pointer; font-size: 10px;
+}
+.contact-item:hover { background: var(--bg-glass-hover); }
+.contact-avatar { font-size: 13px; width: 20px; text-align: center; }
+.contact-body { flex: 1; min-width: 0; }
+.contact-name { font-size: 10px; font-weight: 500; color: var(--text-primary); }
+.contact-name-row { display: flex; align-items: center; gap: 4px; }
+.contact-type-tag { font-size: 7px; color: var(--text-tertiary); background: var(--bg-glass); padding: 0 4px; border-radius: 3px; }
+.contact-meta { display: flex; align-items: center; gap: 3px; margin-top: 1px; }
+.contact-status-dot { width: 4px; height: 4px; border-radius: 50%; }
+.contact-status { font-size: 8px; color: var(--text-tertiary); }
+.contact-sep { color: var(--border-glass); font-size: 8px; }
+.contact-step { font-size: 8px; color: var(--text-tertiary); }
+.contact-action-btn {
+  background: none; border: none; width: 20px; height: 20px;
+  color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.contact-action-btn:hover { background: var(--bg-glass-hover); }
+
+/* ====== Session Tree ====== */
+.stree-container { padding: 8px; }
+.stree-header { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px; border-bottom: 1px solid var(--border-glass); }
+.stree-header h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.stree-node { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 10px; }
+.stree-node:hover { background: var(--bg-glass-hover); }
+.stree-toggle { font-size: 8px; color: var(--text-tertiary); width: 10px; text-align: center; cursor: pointer; }
+.stree-dot { width: 5px; height: 5px; border-radius: 50%; }
+.stree-dot.status-running { background: #48b87a; }
+.stree-label { flex: 1; font-size: 10px; color: var(--text-primary); }
+.stree-step { font-size: 8px; color: var(--text-tertiary); }
+.stree-status { font-size: 7px; padding: 1px 4px; border-radius: 3px; }
+.stree-status.status-running { background: rgba(72,184,122,0.15); color: #48b87a; }
+.stree-count { font-size: 8px; background: var(--bg-glass); padding: 0 4px; border-radius: 6px; color: var(--text-tertiary); }
+
+/* ====== Context Inspector ====== */
+.ctx-inspector { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ctx-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding: 0 4px 4px; }
+.ctx-header h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.ctx-prune-btn {
+  display: flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 9px;
+  border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-secondary);
+  cursor: pointer; background: none;
+}
+.ctx-prune-btn:hover { background: var(--accent-muted); border-color: var(--accent); color: var(--accent); }
+.ctx-stats { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
+.ctx-stat-card { background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; padding: 5px 6px; text-align: center; }
+.ctx-stat-card.accent { border-color: var(--accent); background: rgba(94,138,255,0.08); }
+.ctx-stat-label { font-size: 8px; color: var(--text-tertiary); text-transform: uppercase; }
+.ctx-stat-value { font-size: 13px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+.ctx-saving-bar { display: flex; align-items: center; gap: 6px; }
+.ctx-saving-track { flex: 1; height: 4px; background: var(--bg-glass); border-radius: 2px; overflow: hidden; }
+.ctx-saving-fill { height: 100%; background: linear-gradient(90deg, #48b87a, #6cffaa); border-radius: 2px; }
+.ctx-saving-label { font-size: 9px; font-weight: 600; color: #48b87a; }
+.ctx-detail { background: var(--bg-glass); border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 3px; }
+.ctx-detail-row { display: flex; justify-content: space-between; font-size: 10px; }
+.ctx-detail-label { color: var(--text-secondary); }
+.ctx-detail-value { color: var(--text-primary); font-family: var(--font-mono); font-size: 9px; }
+.ctx-strategies-toggle { font-size: 10px; color: var(--text-secondary); cursor: pointer; padding: 4px 0; }
+.ctx-strategies-toggle:hover { color: var(--text-primary); }
+.ctx-strategies { display: flex; flex-direction: column; gap: 2px; }
+.ctx-strategy { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 10px; }
+.ctx-strategy:hover { background: var(--bg-glass-hover); }
+.ctx-strategy.active { background: var(--accent-muted); }
+.ctx-strategy-dot { width: 5px; height: 5px; border-radius: 50%; }
+.ctx-strategy-name { color: var(--text-primary); }
+.ctx-strategy-check { font-size: 10px; color: var(--accent); font-weight: 600; }
+
+/* ====== Reasoning View ====== */
+.reasoning-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.reasoning-output { flex: 1; overflow-y: auto; padding: 16px 20px 8px; }
+.reasoning-output-inner { max-width: 620px; margin: 0 auto; }
+.activity-log { display: flex; flex-direction: column; gap: 1px; font-family: var(--font-mono); font-size: 12px; }
+.activity-entry {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 6px; border-radius: 4px; transition: background 0.1s;
+}
+.activity-entry:hover { background: var(--bg-glass-hover); }
+.activity-time { font-size: 9px; color: var(--text-tertiary); min-width: 32px; }
+.activity-step { font-size: 9px; font-weight: 600; min-width: 44px; }
+.activity-gather .activity-step { color: #6c8cff; }
+.activity-reflect .activity-step { color: #8a6cff; }
+.activity-reason .activity-step { color: #ff6cb4; }
+.activity-plan .activity-step { color: #ffb86c; }
+.activity-act .activity-step { color: #4caf7d; }
+.activity-record .activity-step { color: #6ccfff; }
+.activity-metric .activity-step { color: #ff6c6c; }
+.activity-evolve .activity-step { color: #c86cff; }
+.activity-sleep .activity-step { color: #6c6cff; }
+.activity-meta .activity-step { color: #ff9a6c; }
+.activity-veto .activity-step { color: #ff6c8a; }
+.activity-awaken .activity-step { color: #6cffd4; }
+.activity-label { flex: 1; font-size: 12px; color: var(--text-secondary); }
+
+/* ====== Consciousness Cycle Banner ====== */
+.cycle-banner {
+  margin: 0 20px 8px; max-width: 620px;
+  border-radius: var(--radius-md);
+  background: var(--bg-glass); backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border-glass);
+  padding: 8px 12px;
+}
+.cycle-track { display: flex; align-items: center; gap: 0; overflow-x: auto; }
+.cycle-step { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 2px 0; width: 38px; border-radius: 4px; }
+.cycle-step.current { background: rgba(94,138,255,0.14); }
+.cycle-step-icon { font-size: 11px; }
+.cycle-step.current .cycle-step-icon { animation: pulse 1.4s infinite; }
+.cycle-step.pending .cycle-step-icon { opacity: 0.3; }
+.cycle-step-label { font-size: 6px; font-weight: 600; }
+.cycle-step.current .cycle-step-label { color: #5e8aff; }
+.cycle-step.done .cycle-step-label { color: var(--text-tertiary); }
+.cycle-step.pending .cycle-step-label { opacity: 0.4; }
+.cycle-step-bar { width: 16px; height: 2px; background: var(--border-glass); border-radius: 1px; overflow: hidden; margin-top: 1px; }
+.cycle-step-fill { height: 100%; background: #5e8aff; border-radius: 1px; }
+.cycle-connector { width: 8px; height: 2px; background: var(--border-glass); border-radius: 1px; margin-bottom: 10px; }
+.cycle-connector.done { background: rgba(94,138,255,0.3); }
+.cycle-banner-metrics { display: flex; gap: 10px; padding-top: 4px; margin-top: 4px; border-top: 1px solid var(--border-glass); }
+.cycle-metric { display: flex; align-items: center; gap: 3px; font-size: 9px; color: var(--text-tertiary); }
+.cycle-metric-dot { width: 4px; height: 4px; border-radius: 50%; }
+.cycle-metric-value { font-weight: 600; color: var(--text-secondary); }
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+/* ====== Dock Panel ====== */
+.dock-panel {
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--border-glass);
+  width: 280px; flex-shrink: 0; overflow: hidden;
+}
+.dock-tab-bar {
+  display: flex; border-bottom: 1px solid var(--border-glass);
+  overflow-x: auto; flex-shrink: 0;
+}
+.dock-tab {
+  display: flex; align-items: center; gap: 3px;
+  padding: 5px 8px; font-size: 9px; color: var(--text-tertiary);
+  cursor: pointer; border-bottom: 1px solid transparent;
+  white-space: nowrap;
+}
+.dock-tab:hover { color: var(--text-secondary); background: var(--bg-glass); }
+.dock-tab.active { border-bottom-color: var(--accent); color: var(--text-primary); }
+.dock-panel-content { flex: 1; overflow-y: auto; min-height: 0; }
+
+/* ====== Causal Graph (Dock) ====== */
+.causal-graph { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.causal-graph-header { display: flex; justify-content: space-between; padding: 0 4px 4px; border-bottom: 1px solid var(--border-glass); }
+.causal-graph-header h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.causal-graph-canvas { background: var(--bg-glass); border-radius: 6px; border: 1px solid var(--border-glass); overflow: hidden; }
+.causal-timeline-node { display: flex; align-items: flex-start; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+.causal-timeline-node:hover { background: var(--bg-glass-hover); }
+.causal-timeline-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid; flex-shrink: 0; margin-top: 2px; }
+.causal-timeline-label { font-size: 10px; color: var(--text-primary); font-weight: 500; }
+.causal-timeline-duration { font-size: 8px; color: var(--text-tertiary); }
+
+/* ====== Memory Graph ====== */
+.memgraph-container { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.memgraph-header { display: flex; justify-content: space-between; padding: 0 4px 4px; border-bottom: 1px solid var(--border-glass); }
+.memgraph-header h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.memgraph-view-tab { background: none; border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 5px; font-size: 8px; color: var(--text-tertiary); cursor: pointer; }
+.memgraph-view-tab.active { background: var(--accent-muted); border-color: var(--accent); color: var(--accent); }
+.memgraph-filters { display: flex; flex-direction: column; gap: 3px; }
+.memgraph-filter-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.memgraph-select { background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 4px; font-size: 9px; color: var(--text-primary); }
+.memgraph-search { flex: 1; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 6px; font-size: 9px; color: var(--text-primary); }
+.memgraph-label { font-size: 8px; color: var(--text-tertiary); }
+.memgraph-slider { flex: 1; max-width: 80px; accent-color: var(--accent); }
+.memgraph-check { font-size: 8px; color: var(--text-tertiary); display: flex; align-items: center; gap: 2px; cursor: pointer; }
+.memgraph-canvas-wrap { flex: 1; min-height: 120px; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; overflow: hidden; }
+.memgraph-stats { display: flex; gap: 6px; font-size: 8px; color: var(--text-tertiary); }
+.memgraph-stat-sep { width: 1px; height: 8px; background: var(--border-glass); }
+
+/* ====== Absorption Pipeline ====== */
+.absorb-container { padding: 0 20px; max-width: 620px; margin: 0 auto; }
+.absorb-mini { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; background: var(--bg-glass); border: 1px solid var(--border-glass); width: fit-content; }
+.absorb-mini-btn { background: none; border: none; width: 20px; height: 20px; border-radius: 4px; color: var(--text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.absorb-mini-btn:hover { color: var(--accent); background: var(--bg-glass-hover); }
+.absorb-done { font-size: 9px; color: var(--text-tertiary); cursor: pointer; }
+.abs-pipeline { padding: 10px 12px; border-radius: 8px; background: var(--bg-glass); border: 1px solid var(--border-glass); }
+.abs-phases { display: flex; gap: 6px; margin-bottom: 8px; }
+.abs-phase { flex: 1; padding: 6px 8px; border-radius: 4px; font-size: 10px; text-align: center; background: var(--bg-glass); border: 1px solid var(--border-glass); }
+.abs-phase.running { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.abs-phase.done { border-color: var(--success); color: var(--success); }
+.abs-flow { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.abs-flow-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-secondary); }
+.abs-flow-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.abs-flow-label { color: var(--text-primary); }
+.abs-cards { display: flex; flex-direction: column; gap: 4px; }
+.abs-card { padding: 6px 8px; border-radius: 4px; background: var(--bg-glass); border: 1px solid var(--border-glass); border-left-width: 2px; font-size: 10px; }
+.abs-card-type { font-size: 8px; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.abs-card-header { display: flex; align-items: center; gap: 4px; margin-bottom: 2px; }
+
+/* ====== Input Area ====== */
+.input-area { padding: 0 20px 12px; max-width: 620px; margin: 0 auto; }
+.input-glass { background: var(--bg-glass); backdrop-filter: blur(16px); border: 1px solid var(--border-glass-strong); border-radius: 8px; padding: 6px 10px; }
+.input-row { display: flex; align-items: center; gap: 6px; }
+.input-prompt { font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+.input-field { flex: 1; border: none; background: none; padding: 4px 0; color: var(--text-primary); font-family: var(--font-mono); font-size: 13px; outline: none; }
+.input-field::placeholder { color: var(--text-tertiary); }
+.send-btn { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; color: var(--text-tertiary); cursor: pointer; background: none; border: none; }
+.send-btn:hover { color: var(--accent); background: var(--bg-glass-hover); }
+
+/* ====== Side Chat ====== */
+.side-chat {
+  position: absolute; right: 280px; top: 0; bottom: 0; width: 300px;
+  background: var(--bg-glass); backdrop-filter: blur(24px);
+  border-left: 1px solid var(--border-glass);
+  display: flex; flex-direction: column;
+  animation: slideInRight 0.15s ease-out;
+}
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.side-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-glass); }
+.side-chat-close { background: none; border: none; color: var(--text-tertiary); cursor: pointer; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
+.side-chat-body { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.chat-msg { padding: 6px 8px; border-radius: 6px; font-size: 10px; max-width: 80%; }
+.chat-msg.user { background: var(--accent-muted); align-self: flex-end; }
+.chat-msg.assistant { background: var(--bg-glass); align-self: flex-start; }
+.side-chat-input { padding: 6px 8px; border-top: 1px solid var(--border-glass); display: flex; gap: 4px; }
+.side-chat-input input { flex: 1; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 6px; font-size: 10px; color: var(--text-primary); outline: none; }
+</style>
+</head>
+<body>
+
+<!-- ====== Top Bar ====== -->
+<header class="top-bar">
+  <div class="top-brand">
+    <span class="top-brand-dot"></span>
+    NeoTrix
+  </div>
+  <div class="top-spacer"></div>
+  <div class="top-view-modes">
+    <button class="top-view-btn active">N</button>
+    <button class="top-view-btn">V</button>
+    <button class="top-view-btn">S</button>
+  </div>
+  <button class="top-action">⧉</button>
+  <button class="top-action">⌕</button>
+</header>
+
+<!-- ====== Main ====== -->
+<div class="main-area">
+
+  <!-- Panel Overlay (⌘1 sessions active with Tree tab) -->
+  <div class="panel-overlay active">
+    <div class="panel-backdrop"></div>
+    <div class="panel-container">
+      <div class="panel-header">
+        <span class="panel-title">Sessions</span>
+        <div class="panel-close">✕</div>
+      </div>
+      <div class="panel-body">
+
+        <!-- Panel tabs: List / Tree -->
+        <div class="panel-tabs">
+          <button class="panel-tab">List</button>
+          <button class="panel-tab active">Tree</button>
+        </div>
+
+        <!-- Session Tree view -->
+        <div class="stree-container">
+          <div class="stree-header">
+            <h3>Session Branch Tree</h3>
+            <div class="stree-actions">
+              <button class="stree-action-btn" style="background:none;border:1px solid var(--border-glass);border-radius:4px;width:20px;height:20px;color:var(--text-tertiary);cursor:pointer">+</button>
+            </div>
+          </div>
+          <div class="stree-tree" style="margin-top:4px">
+            <div class="stree-node">
+              <span class="stree-toggle">▾</span>
+              <span class="stree-dot status-running"></span>
+              <span class="stree-label">Main Cycle</span>
+              <span class="stree-step">ACT</span>
+              <span class="stree-status status-running">running</span>
+              <span class="stree-count">3</span>
+            </div>
+            <div class="stree-node" style="padding-left:28px">
+              <span class="stree-toggle">▾</span>
+              <span class="stree-dot status-running"></span>
+              <span class="stree-label">Research</span>
+              <span class="stree-step">REFLECT</span>
+              <span class="stree-status status-running">running</span>
+              <span class="stree-count">2</span>
+            </div>
+            <div class="stree-node" style="padding-left:48px">
+              <span class="stree-toggle invisible">▸</span>
+              <span class="stree-dot status-idle"></span>
+              <span class="stree-label">Deep Search</span>
+              <span class="stree-step">GATHER</span>
+              <span class="stree-status status-idle">idle</span>
+            </div>
+            <div class="stree-node" style="padding-left:48px">
+              <span class="stree-toggle invisible">▸</span>
+              <span class="stree-dot status-completed"></span>
+              <span class="stree-label">Paper Review</span>
+              <span class="stree-step">—</span>
+              <span class="stree-status status-completed" style="background:rgba(94,138,255,0.15);color:#5e8aff">done</span>
+            </div>
+            <div class="stree-node" style="padding-left:28px">
+              <span class="stree-toggle invisible">▸</span>
+              <span class="stree-dot status-paused"></span>
+              <span class="stree-label">Self-Evolution</span>
+              <span class="stree-step">META</span>
+              <span class="stree-status status-paused" style="background:rgba(232,160,48,0.15);color:#e8a030">paused</span>
+            </div>
+            <div class="stree-node">
+              <span class="stree-toggle invisible">▸</span>
+              <span class="stree-dot status-completed"></span>
+              <span class="stree-label">Memory Consol.</span>
+              <span class="stree-step">—</span>
+              <span class="stree-status status-completed" style="color:#5e8aff">done</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Main Content Area ====== -->
+  <div class="reasoning-view">
+
+    <!-- Consciousness Cycle Banner -->
+    <div class="cycle-banner">
+      <div class="cycle-track">
+        <div class="cycle-step done"><span class="cycle-step-icon" style="color:#6c8cff">◈</span><span class="cycle-step-label">GATHER</span><div class="cycle-step-bar"><div class="cycle-step-fill" style="width:100%"></div></div></div>
+        <div class="cycle-connector done"></div>
+        <div class="cycle-step done"><span class="cycle-step-icon" style="color:#8a6cff">◎</span><span class="cycle-step-label">REFLECT</span><div class="cycle-step-bar"><div class="cycle-step-fill" style="width:100%"></div></div></div>
+        <div class="cycle-connector done"></div>
+        <div class="cycle-step done"><span class="cycle-step-icon" style="color:#ff6cb4">◇</span><span class="cycle-step-label">REASON</span><div class="cycle-step-bar"><div class="cycle-step-fill" style="width:100%"></div></div></div>
+        <div class="cycle-connector done"></div>
+        <div class="cycle-step current"><span class="cycle-step-icon" style="color:#ffb86c">◈</span><span class="cycle-step-label">PLAN</span><div class="cycle-step-bar"><div class="cycle-step-fill" style="width:60%"></div></div></div>
+        <div class="cycle-connector"></div>
+        <div class="cycle-step pending"><span class="cycle-step-icon" style="color:#4caf7d">▸</span><span class="cycle-step-label">ACT</span><div class="cycle-step-bar"><div class="cycle-step-fill" style="width:0%"></div></div></div>
+        <div class="cycle-connector"></div>
+        <div class="cycle-step pending"><span class="cycle-step-icon" style="color:#6ccfff">◉</span><span class="cycle-step-label">RECORD</span></div>
+        <div class="cycle-connector"></div>
+        <div class="cycle-step pending"><span class="cycle-step-icon" style="color:#ff6c6c">◆</span><span class="cycle-step-label">METRIC</span></div>
+      </div>
+      <div class="cycle-banner-metrics">
+        <div class="cycle-metric"><span class="cycle-metric-dot" style="background:#5e8aff"></span>C(t) <span class="cycle-metric-value">68%</span></div>
+        <div class="cycle-metric"><span class="cycle-metric-dot" style="background:#c86cff"></span>Φ <span class="cycle-metric-value">3.42</span></div>
+        <div class="cycle-metric"><span class="cycle-metric-dot" style="background:#48b87a"></span>Coh <span class="cycle-metric-value">72%</span></div>
+      </div>
+    </div>
+
+    <!-- Absorption Pipeline -->
+    <div class="absorb-container" style="margin-bottom:8px">
+      <div class="absorb-mini">
+        <button class="absorb-mini-btn">↻</button>
+        <span class="absorb-done">20 patterns · 6 features ▾</span>
+      </div>
+      <div class="abs-pipeline" style="margin-top:6px">
+        <div class="abs-cards" style="margin-bottom:8px">
+          <div class="abs-card" style="border-left-color:#48b87a;border-left-width:2px">
+            <div class="abs-card-header">
+              <span class="abs-card-type" style="color:#48b87a">ACTIVE</span>
+              <span style="font-size:10px;font-weight:600;color:var(--text-primary);flex:1">Unified Layout Engine</span>
+            </div>
+            <div class="abs-card-insight" style="font-size:9px">Grid/Canvas/Contact/Tree 四模式, VSA 编码布局状态</div>
+            <div style="font-size:8px;color:var(--text-tertiary);margin-top:2px">VSA: SpatialArrangement, SessionLayout · 3 sources</div>
+          </div>
+          <div class="abs-card" style="border-left-color:#48b87a;border-left-width:2px">
+            <div class="abs-card-header">
+              <span class="abs-card-type" style="color:#48b87a">ACTIVE</span>
+              <span style="font-size:10px;font-weight:600;color:var(--text-primary);flex:1">Consciousness Context Prune</span>
+            </div>
+            <div class="abs-card-insight" style="font-size:9px">3 阶段裁剪: 系统规则/agent/全局优化, 10 策略</div>
+          </div>
+          <div class="abs-card" style="border-left-color:#48b87a;border-left-width:2px">
+            <div class="abs-card-header">
+              <span class="abs-card-type" style="color:#48b87a">ACTIVE</span>
+              <span style="font-size:10px;font-weight:600;color:var(--text-primary);flex:1">Memory Three-View</span>
+            </div>
+            <div class="abs-card-insight" style="font-size:9px">Graph(力导向)/Hive(径向)/Matrix(矩阵), 共享过滤</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="reasoning-output">
+      <div class="reasoning-output-inner">
+        <div class="activity-log">
+          <div class="activity-entry activity-gather">
+            <span class="activity-time">10:23</span>
+            <span class="activity-step">GATHER</span>
+            <span class="activity-label">Scanning VSA state from 56 subsystems</span>
+          </div>
+          <div class="activity-entry activity-reflect">
+            <span class="activity-time">10:23</span>
+            <span class="activity-step">REFLECT</span>
+            <span class="activity-label">Calculating negentropy gradient: ΔN = +3.2% over last 10 cycles</span>
+          </div>
+          <div class="activity-entry activity-reason">
+            <span class="activity-time">10:24</span>
+            <span class="activity-step">REASON</span>
+            <span class="activity-label">Context pruned: 12.4K → 5.2K tokens (58% saving, Sinew+ACP fused)</span>
+          </div>
+          <div class="activity-entry activity-plan">
+            <span class="activity-time">10:24</span>
+            <span class="activity-step">PLAN</span>
+            <span class="activity-label">Generating plan: implement LayoutEngine grid split + ContactHub sync</span>
+          </div>
+          <div class="activity-entry activity-act">
+            <span class="activity-time">10:25</span>
+            <span class="activity-step">ACT</span>
+            <span class="activity-label">ContactHub: synced 4 agents from session manager</span>
+          </div>
+          <div class="activity-entry activity-record">
+            <span class="activity-time">10:25</span>
+            <span class="activity-step">RECORD</span>
+            <span class="activity-label">Memory graph: 21 nodes, 25 edges, 6 types</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-area">
+      <div class="input-glass">
+        <div class="input-row">
+          <span class="input-prompt">❯</span>
+          <input class="input-field" placeholder="Ask me anything..." value="Show me the session tree" disabled>
+          <button class="send-btn">➤</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Dock Panel (right) ====== -->
+  <div class="dock-panel">
+    <div class="dock-tab-bar">
+      <div class="dock-tab active">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><line x1="12" y1="12" x2="19" y2="5"/><line x1="12" y1="12" x2="5" y2="19"/></svg>
+        Graph
+      </div>
+      <div class="dock-tab">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Memory
+      </div>
+    </div>
+    <div class="dock-panel-content">
+      <!-- Causal Graph -->
+      <div class="causal-graph">
+        <div class="causal-graph-header">
+          <h3>Consciousness Graph</h3>
+          <span style="font-size:9px;color:var(--text-tertiary)">12 steps</span>
+        </div>
+        <div class="causal-graph-canvas">
+          <svg width="264" height="80" viewBox="0 0 264 80" style="display:block">
+            <!-- Step nodes as circles in a horizontal flow -->
+            <circle cx="15" cy="40" r="6" fill="#6c8cff33" stroke="#6c8cff" stroke-width="1.5"/>
+            <circle cx="35" cy="40" r="6" fill="#8a6cff33" stroke="#8a6cff" stroke-width="1.5"/>
+            <circle cx="55" cy="40" r="6" fill="#ff6cb433" stroke="#ff6cb4" stroke-width="1.5"/>
+            <circle cx="75" cy="40" r="6" fill="#ffb86c44" stroke="#ffb86c" stroke-width="2" style="animation:pulse 1.4s infinite"/>
+            <circle cx="95" cy="40" r="6" fill="#4caf7d22" stroke="#4caf7d" stroke-width="1" opacity="0.5"/>
+            <circle cx="115" cy="40" r="6" fill="#6ccfff22" stroke="#6ccfff" stroke-width="1" opacity="0.4"/>
+            <circle cx="135" cy="40" r="6" fill="#ff6c6c22" stroke="#ff6c6c" stroke-width="1" opacity="0.3"/>
+            <circle cx="155" cy="40" r="6" fill="#c86cff22" stroke="#c86cff" stroke-width="1" opacity="0.3"/>
+            <circle cx="175" cy="20" r="6" fill="#6c6cff22" stroke="#6c6cff" stroke-width="1" opacity="0.3"/>
+            <circle cx="195" cy="20" r="6" fill="#ff9a6c22" stroke="#ff9a6c" stroke-width="1" opacity="0.3"/>
+            <circle cx="215" cy="60" r="6" fill="#ff6c8a22" stroke="#ff6c8a" stroke-width="1" opacity="0.3"/>
+            <circle cx="235" cy="60" r="6" fill="#6cffd422" stroke="#6cffd4" stroke-width="1" opacity="0.3"/>
+          </svg>
+        </div>
+        <div class="causal-timeline-node">
+          <div class="causal-timeline-dot" style="background:#ffb86c;border-color:#ffb86c"></div>
+          <div><div class="causal-timeline-label">PLAN · 340ms</div><div class="causal-timeline-duration">8 tool calls queued</div></div>
+        </div>
+        <div class="causal-timeline-node">
+          <div class="causal-timeline-dot" style="background:#8a6cff;border-color:#8a6cff"></div>
+          <div><div class="causal-timeline-label">REFLECT · 210ms</div><div class="causal-timeline-duration">Negentropy: +3.2%</div></div>
+        </div>
+      </div>
+
+      <!-- Memory Graph (hidden behind tab) →
+      <div class="memgraph-container">...</div> -->
+    </div>
+  </div>
+
+  <!-- ====== Side Chat (⌘;) ====== -->
+  <div class="side-chat">
+    <div class="side-chat-header">
+      <span style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase">Chat</span>
+      <div class="side-chat-close">✕</div>
+    </div>
+    <div class="side-chat-body">
+      <div class="chat-msg user">Show me the session tree</div>
+      <div class="chat-msg assistant">Here's the session branch tree. Main Cycle has 3 sub-branches: Research (forked for deep search), Self-Evolution, and Memory Consolidation.</div>
+      <div class="chat-msg user">How much context are we using?</div>
+      <div class="chat-msg assistant">Context: 5.2K tokens (58% saved via pruning). 7 strategies active, 23 system rule hits this cycle.</div>
+    </div>
+    <div class="side-chat-input">
+      <input placeholder="Ask about current context..." value="What's our context usage?" disabled>
+    </div>
+  </div>
+
+</div>
+
+<!-- ====== Status Bar ====== -->
+<footer class="status-bar">
+  <span class="status-item">
+    <span class="status-dot" style="background:#5e8aff"></span>
+    C(t) <span class="status-val">68%</span>
+  </span>
+  <span class="status-sep"></span>
+  <span class="status-item">
+    <span class="status-dot" style="background:#ff6cb4"></span>
+    Φ <span class="status-val">3.42</span>
+  </span>
+  <span class="status-sep"></span>
+  <span class="status-item">
+    <span class="status-dot" style="background:#48b87a"></span>
+    Coh <span class="status-val">72%</span>
+  </span>
+  <span class="status-sep"></span>
+  <span class="status-item">
+    <span class="status-dot" style="background:#c86cff"></span>
+    VSA <span class="status-val">4.2K/s</span>
+  </span>
+  <span class="status-sep"></span>
+  <span class="status-item" title="Context usage">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.4">
+      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+    </svg>
+    <span class="status-val" style="font-size:9px">62%</span>
+  </span>
+  <span class="status-spacer"></span>
+  <span class="status-item">
+    <span class="status-dot" style="background:#48b87a"></span>
+    Main Cycle
+  </span>
+  <span class="status-sep"></span>
+  <span class="status-item">
+    step <span class="status-val">PLAN</span>
+  </span>
+  <span class="status-sep"></span>
+  <span class="status-item">Sessions</span>
+</footer>
+
+<script>
+// Simulate cycle tick
+const steps = document.querySelectorAll('.cycle-step');
+const stepIcons = ['◈','◎','◇','◈','▸','◉','◆','✦','◐','⊙','◉','◈'];
+const stepColors = ['#6c8cff','#8a6cff','#ff6cb4','#ffb86c','#4caf7d','#6ccfff','#ff6c6c','#c86cff','#6c6cff','#ff9a6c','#ff6c8a','#6cffd4'];
+let currentIdx = 3;
+setInterval(() => {
+  steps.forEach((s, i) => {
+    s.className = 'cycle-step';
+    if (i < currentIdx) s.classList.add('done');
+    else if (i === currentIdx) s.classList.add('current');
+    else s.classList.add('pending');
+  });
+  currentIdx = (currentIdx + 1) % 12;
+}, 2000);
+</script>
+</body>
+</html>

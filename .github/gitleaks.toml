@@ -1,0 +1,7 @@
+[allowlist]
+description = "NeoTrix gitleaks allowlist"
+paths = [
+  "(node_modules)",
+  "(target)",
+  "(.git)",
+]

@@ -1,0 +1,44 @@
+[package]
+name = "neotrix-tauri"
+version.workspace = true
+description = "NeoTrix Desktop - Tauri 2.0 Integration"
+authors = ["NeoTrix Team"]
+edition.workspace = true
+
+[[bin]]
+name = "neotrix-tauri"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-http = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-updater = "2"
+clap = { version = "4", features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+portable-pty = "0.9.0"
+neotrix = { path = "../neotrix-core" }
+neotrix-types = { path = "../crates/neotrix-types" }
+chrono = { workspace = true }
+dirs = { workspace = true }
+uuid = { workspace = true }
+tokio = { version = "1", features = ["sync", "rt", "macros"] }
+log = "0.4"
+reqwest = { version = "0.11", features = ["blocking"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+libloading = "0.8"
+zip = "0.6"
+
+[features]
+default = []
+stealth-net = ["neotrix/stealth-net"]
+extra-commands = []  # intentionally empty: gates modules that depend on core subsystems with pre-existing compilation errors. Enable manually when those subsystems compile.
+telemetry = ["neotrix/telemetry"]
