@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1030"/>
+      <stop offset="100%" stop-color="#080012"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="20" fill="url(#sg)"/>
+  <!-- Outer square -->
+  <rect x="20" y="20" width="80" height="80" rx="8" fill="none" stroke="url(#pg)" stroke-width="1.5" opacity="0.4"/>
+  <!-- Inner rotated square (tesseract effect) -->
+  <rect x="35" y="35" width="50" height="50" rx="4" fill="none" stroke="url(#pg)" stroke-width="1.5" opacity="0.6"
+        transform="rotate(45 60 60)"/>
+  <!-- Diamond core -->
+  <polygon points="60,28 78,60 60,92 42,60" fill="url(#pg)" opacity="0.9"/>
+  <!-- Glow -->
+  <polygon points="60,35 72,60 60,85 48,60" fill="#ffffff" opacity="0.2"/>
+  <!-- Circuit traces -->
+  <line x1="20" y1="60" x2="42" y2="60" stroke="#c084fc" stroke-width="0.8" opacity="0.5"/>
+  <line x1="78" y1="60" x2="100" y2="60" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+  <line x1="60" y1="20" x2="60" y2="35" stroke="#c084fc" stroke-width="0.8" opacity="0.5"/>
+  <line x1="60" y1="85" x2="60" y2="100" stroke="#3b82f6" stroke-width="0.8" opacity="0.5"/>
+</svg>

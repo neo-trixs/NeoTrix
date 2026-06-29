@@ -1,5 +1,9 @@
-<h1 align="center">NeoTrix</h1>
-<h3 align="center"><em>The Agent That Learns to Think</em></h3>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/public/logo-animated.svg">
+    <img src="docs/public/logo-animated.svg" alt="NeoTrix" width="720">
+  </picture>
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">

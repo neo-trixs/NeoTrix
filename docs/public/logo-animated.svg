@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="200" viewBox="0 0 720 200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080012"/>
+      <stop offset="50%" stop-color="#0d0221"/>
+      <stop offset="100%" stop-color="#080012"/>
+    </linearGradient>
+    <linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#00d4ff" stroke-width="0.3" opacity="0.05"/>
+    </pattern>
+  </defs>
+  <rect width="720" height="200" fill="url(#bg)"/>
+  <rect width="720" height="200" fill="url(#grid)"/>
+  <!-- Diamond logo -->
+  <polygon points="100,100 130,60 160,100 130,140" fill="url(#pg)" opacity="0.9"/>
+  <polygon points="100,100 130,65 160,100 130,135" fill="#ffffff" opacity="0.15"/>
+  <!-- Text -->
+  <text x="200" y="95" font-family="Inter, system-ui, sans-serif" font-size="48" font-weight="700" letter-spacing="4" fill="#e4e0e8">Neo<span fill="#00d4ff" font-weight="400">—</span>TRIX</text>
+  <text x="200" y="125" font-family="Georgia, serif" font-size="14" font-style="italic" fill="#8880a0">The Agent That Learns to Think</text>
+  <!-- Stats -->
+  <text x="200" y="155" font-family="monospace" font-size="9" fill="#555070" letter-spacing="1">236K+ LOC · 4,240 tests · 0 unsafe · 47 subsystems</text>
+  <!-- Signal dots -->
+  <circle cx="620" cy="60" r="2" fill="#00d4ff" opacity="0.3"/>
+  <circle cx="635" cy="60" r="2.5" fill="#00d4ff" opacity="0.6"/>
+  <circle cx="652" cy="60" r="3" fill="#00d4ff" opacity="0.9"/>
+  <circle cx="671" cy="60" r="2" fill="#00d4ff" opacity="0.5"/>
+</svg>
