@@ -1,0 +1,5 @@
+pub use self::inner::TuiApp;
+
+mod inner {
+    pub struct TuiApp;
+}

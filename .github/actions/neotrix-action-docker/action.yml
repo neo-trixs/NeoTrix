@@ -1,0 +1,54 @@
+name: 'NeoTrix (Docker)'
+description: 'Run NeoTrix AI coding agent via the official Docker image — fully hermetic, no host toolchain required.'
+author: 'NeoTrix'
+
+inputs:
+  prompt:
+    description: 'The task prompt for NeoTrix'
+    required: true
+  api-key:
+    description: 'LLM API key (e.g. OpenAI, Anthropic)'
+    required: true
+  model:
+    description: 'LLM model to use'
+    required: false
+    default: ''
+  provider:
+    description: 'LLM provider (openai, anthropic, etc.)'
+    required: false
+    default: 'openai'
+  max-budget-usd:
+    description: 'Maximum budget in USD'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Working directory mounted into the container'
+    required: false
+    default: ${{ github.workspace }}
+  image:
+    description: 'NeoTrix Docker image (tag or digest)'
+    required: false
+    default: 'ghcr.io/neotrix/neotrix:latest'
+  version:
+    description: 'NeoTrix version to install inside the image (overrides image default)'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'docker'
+  image: ${{ inputs.image }}
+  env:
+    NEOTRIX_PROVIDER: ${{ inputs.provider }}
+    NEOTRIX_API_KEY: ${{ inputs.api-key }}
+    NEOTRIX_MAX_BUDGET_USD: ${{ inputs.max-budget-usd }}
+  args:
+    - exec
+    - --json
+    - ${{ inputs.prompt }}
+  volumes:
+    - ${{ inputs.working-directory }}:/workspace
+  working-directory: /workspace
+
+branding:
+  icon: 'terminal'
+  color: 'purple'

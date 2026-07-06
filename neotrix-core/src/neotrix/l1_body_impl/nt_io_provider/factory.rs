@@ -1,0 +1,552 @@
+//! Provider 工厂和配置
+//!
+//! 2026-07-04: ProviderCatalog 自动注册 — 自我/客体分离
+//! - Local (主体): Ollama/LM Studio/llama.cpp 自动探测注册
+//! - Proxy (客体): 自定义 OpenAI 兼容代理通过 NEOTRIX_PROXY_* 注册
+//! - Cloud (客体): 主流 API 通过各自 env var 自动注册
+
+use super::types::LlmProvider;
+use super::openai::OpenAiProvider;
+use super::anthropic::AnthropicProvider;
+use super::ollama::OllamaProvider;
+use super::gemini::GeminiProvider;
+use super::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
+use super::gateway::GatewayV2;
+use super::provider_catalog::ProviderCategory;
+use crate::core::nt_io_telemetry::CostTracker;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum LlmProviderType {
+    OpenAI,
+    Anthropic,
+    Gemini,
+    Ollama,
+    Groq,
+    OpenRouter,
+    Cerebras,
+    SambaNova,
+    Pollinations,
+    BazaarLink,
+    FreeTheAi,
+    ZeroLimit,
+    FreeApi,
+    CustomProxy,
+    // New free providers
+    Cloudflare,
+    Nvidia,
+    GitHubModels,
+    HuggingFace,
+    Cohere,
+    TogetherFree,
+    Llm7,
+    Kilo,
+    SiliconFlow,
+    ZAI,
+    OpenCodeZen,
+    Ovh,
+    DeepSeekFree,
+    ModelScope,
+}
+
+impl LlmProviderType {
+    /// Map a provider name string to its LlmProviderType variant
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "openai" => Some(Self::OpenAI),
+            "anthropic" => Some(Self::Anthropic),
+            "gemini" => Some(Self::Gemini),
+            "ollama" => Some(Self::Ollama),
+            "groq" => Some(Self::Groq),
+            "openrouter" => Some(Self::OpenRouter),
+            "cerebras" => Some(Self::Cerebras),
+            "sambanova" => Some(Self::SambaNova),
+            "pollinations" => Some(Self::Pollinations),
+            "bazaarlink" => Some(Self::BazaarLink),
+            "freetheai" => Some(Self::FreeTheAi),
+            "zerolimit" => Some(Self::ZeroLimit),
+            "cloudflare" => Some(Self::Cloudflare),
+            "nvidia" => Some(Self::Nvidia),
+            "github-models" | "github_models" => Some(Self::GitHubModels),
+            "huggingface" | "hf" => Some(Self::HuggingFace),
+            "cohere" => Some(Self::Cohere),
+            "together-free" | "together_free" => Some(Self::TogetherFree),
+            "llm7" => Some(Self::Llm7),
+            "kilo" => Some(Self::Kilo),
+            "siliconflow" => Some(Self::SiliconFlow),
+            "zai" | "z.ai" => Some(Self::ZAI),
+            "opencode-zen" | "opencode_zen" => Some(Self::OpenCodeZen),
+            "ovh" => Some(Self::Ovh),
+            "deepseek-free" | "deepseek_free" => Some(Self::DeepSeekFree),
+            "modelscope" => Some(Self::ModelScope),
+            _ => None,
+        }
+    }
+
+    pub fn is_free(self) -> bool {
+        matches!(self,
+            Self::Gemini | Self::Groq | Self::OpenRouter | Self::Cerebras |
+            Self::SambaNova | Self::Pollinations | Self::BazaarLink | Self::FreeTheAi |
+            Self::ZeroLimit | Self::FreeApi | Self::Ollama |
+            Self::Cloudflare | Self::Nvidia | Self::GitHubModels | Self::HuggingFace |
+            Self::TogetherFree | Self::Llm7 | Self::Kilo | Self::SiliconFlow |
+            Self::ZAI | Self::OpenCodeZen | Self::Ovh | Self::DeepSeekFree | Self::ModelScope
+        )
+    }
+
+    pub fn needs_api_key(self) -> bool {
+        matches!(self,
+            Self::OpenAI | Self::Anthropic | Self::Gemini | Self::Groq |
+            Self::OpenRouter | Self::Cerebras | Self::SambaNova | Self::BazaarLink |
+            Self::ZeroLimit | Self::CustomProxy |
+            Self::Cloudflare | Self::Nvidia | Self::GitHubModels | Self::HuggingFace |
+            Self::Cohere | Self::TogetherFree | Self::SiliconFlow | Self::ZAI |
+            Self::DeepSeekFree
+        )
+    }
+
+    pub fn category(self) -> ProviderCategory {
+        match self {
+            Self::Ollama => ProviderCategory::Local,
+            Self::CustomProxy => ProviderCategory::Proxy,
+            _ => ProviderCategory::Cloud,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ProviderConfig {
+    pub provider_type: LlmProviderType,
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub model: Option<String>,
+    pub timeout_secs: u64,
+}
+
+impl Default for ProviderConfig {
+    fn default() -> Self {
+        Self {
+            provider_type: LlmProviderType::Anthropic,
+            api_key: None,
+            base_url: None,
+            model: None,
+            timeout_secs: 120,
+        }
+    }
+}
+
+impl ProviderConfig {
+    pub fn from_env() -> Self {
+        let provider = std::env::var("NEOTRIX_PROVIDER")
+            .unwrap_or_else(|_| "anthropic".to_string())
+            .to_lowercase();
+
+        let provider_type = match provider.as_str() {
+            "openai" => LlmProviderType::OpenAI,
+            "anthropic" => LlmProviderType::Anthropic,
+            "gemini" => LlmProviderType::Gemini,
+            "ollama" => LlmProviderType::Ollama,
+            "groq" => LlmProviderType::Groq,
+            "openrouter" => LlmProviderType::OpenRouter,
+            "cerebras" => LlmProviderType::Cerebras,
+            "pollinations" => LlmProviderType::Pollinations,
+            "bazaarlink" => LlmProviderType::BazaarLink,
+            "freetheai" => LlmProviderType::FreeTheAi,
+            "zerolimit" => LlmProviderType::ZeroLimit,
+            "proxy" | "custom-proxy" => LlmProviderType::CustomProxy,
+            "free" | "freeapi" => LlmProviderType::FreeApi,
+            "cloudflare" => LlmProviderType::Cloudflare,
+            "nvidia" => LlmProviderType::Nvidia,
+            "github-models" | "github_models" => LlmProviderType::GitHubModels,
+            "huggingface" | "hf" => LlmProviderType::HuggingFace,
+            "cohere" => LlmProviderType::Cohere,
+            "together-free" | "together_free" => LlmProviderType::TogetherFree,
+            "llm7" => LlmProviderType::Llm7,
+            "kilo" => LlmProviderType::Kilo,
+            "siliconflow" => LlmProviderType::SiliconFlow,
+            "zai" | "z.ai" => LlmProviderType::ZAI,
+            "opencode-zen" | "opencode_zen" => LlmProviderType::OpenCodeZen,
+            "ovh" => LlmProviderType::Ovh,
+            "deepseek-free" | "deepseek_free" => LlmProviderType::DeepSeekFree,
+            "modelscope" => LlmProviderType::ModelScope,
+            _ => LlmProviderType::Anthropic,
+        };
+
+        Self {
+            provider_type,
+            api_key: std::env::var("NEOTRIX_API_KEY").ok(),
+            base_url: std::env::var("NEOTRIX_BASE_URL").ok(),
+            model: std::env::var("NEOTRIX_MODEL").ok(),
+            timeout_secs: std::env::var("NEOTRIX_TIMEOUT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(120),
+        }
+    }
+}
+
+pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
+    // ShieldEnforcer governance check for provider access
+    if let Ok(shield) = crate::cli::shield_enforcer::global_shield().lock() {
+        let domain = config.base_url.as_deref().unwrap_or("api.anthropic.com");
+        match shield.policy.decide("network_request") {
+            crate::neotrix::nt_shield::policy::PolicyDecision::Allow => {}
+            crate::neotrix::nt_shield::policy::PolicyDecision::RequireConfirmation => {
+                log::info!("[shield] Provider access requires confirmation for {}", domain);
+            }
+            crate::neotrix::nt_shield::policy::PolicyDecision::Deny => {
+                if !shield.policy.is_domain_allowed(domain) {
+                    log::warn!("[shield] Provider domain '{}' not in allowlist, but allowing (R6 non-blocking)", domain);
+                }
+            }
+        }
+    }
+    match config.provider_type {
+        LlmProviderType::OpenAI => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("OPENAI_API_KEY").unwrap_or_default()
+            });
+            let mut provider = OpenAiProvider::new(api_key);
+            if let Some(url) = config.base_url {
+                provider = provider.with_base_url(&url);
+            }
+            Box::new(provider)
+        }
+        LlmProviderType::Anthropic => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("ANTHROPIC_API_KEY").unwrap_or_default()
+            });
+            Box::new(AnthropicProvider::new(api_key))
+        }
+        LlmProviderType::Ollama => {
+            let mut provider = OllamaProvider::new();
+            if let Some(url) = config.base_url {
+                provider = provider.with_base_url(&url);
+            }
+            Box::new(provider)
+        }
+        LlmProviderType::Gemini => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("GOOGLE_API_KEY").unwrap_or_default()
+            });
+            Box::new(GeminiProvider::new(api_key))
+        }
+        LlmProviderType::Groq => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("GROQ_API_KEY").unwrap_or_default()
+            });
+            let mut provider = GroqProvider::new(api_key);
+            if let Some(url) = config.base_url {
+                provider = provider.with_base_url(&url);
+            }
+            Box::new(provider)
+        }
+        LlmProviderType::OpenRouter => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("OPENROUTER_API_KEY").unwrap_or_default()
+            });
+            let mut provider = OpenRouterProvider::new(api_key);
+            if let Some(url) = config.base_url {
+                provider = provider.with_base_url(&url);
+            }
+            Box::new(provider)
+        }
+        LlmProviderType::Cerebras => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("CEREBRAS_API_KEY").unwrap_or_default()
+            });
+            Box::new(CerebrasProvider::new(api_key))
+        }
+        LlmProviderType::Pollinations | LlmProviderType::FreeApi => {
+            Box::new(PollinationsProvider::new())
+        }
+        LlmProviderType::BazaarLink => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("BAZAARLINK_API_KEY").unwrap_or_default()
+            });
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url("https://api.bazaarlink.ai/v1");
+            Box::new(provider)
+        }
+        LlmProviderType::FreeTheAi => {
+            // Keyless — uses community API, OpenAI-compatible
+            let mut provider = OpenAiProvider::new(String::new());
+            provider = provider.with_base_url("https://api.freetheai.com/v1");
+            Box::new(provider)
+        }
+        LlmProviderType::ZeroLimit => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("ZEROLIMIT_API_KEY").unwrap_or_default()
+            });
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url("https://api.zerolimit.ai/v1");
+            Box::new(provider)
+        }
+        LlmProviderType::SambaNova => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("SAMBANOVA_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.sambanova.ai/v1".to_string());
+            let mut provider = GroqProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::CustomProxy => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_PROXY_API_KEY").unwrap_or_default()
+            });
+            let mut provider = OpenAiProvider::new(api_key);
+            let base_url = config.base_url.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_PROXY_BASE_URL").unwrap_or_else(|_| "http://localhost:3000/v1".to_string())
+            });
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+
+        // ── Free cloud providers ──
+        LlmProviderType::Cloudflare => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("CLOUDFLARE_API_TOKEN").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.cloudflare.com/client/v4/ai".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Nvidia => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("NVIDIA_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://integrate.api.nvidia.com/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::GitHubModels => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("GITHUB_TOKEN").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://models.inference.ai.azure.com/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::HuggingFace => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("HF_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://api-inference.huggingface.co/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Cohere => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("COHERE_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.cohere.ai/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::TogetherFree => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("TOGETHER_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.together.xyz/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Llm7 => {
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.llm7.ai/v1".to_string());
+            let mut provider = OpenAiProvider::new(String::new());
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Kilo => {
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.kilocode.ai/v1".to_string());
+            let mut provider = OpenAiProvider::new(String::new());
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::SiliconFlow => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("SILICONFLOW_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.siliconflow.cn/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::ZAI => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("ZAI_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://open.bigmodel.cn/api/paas/v4".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::OpenCodeZen => {
+            let base_url = config.base_url.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_ZEN_URL").unwrap_or_else(|_| "https://api.opencode.ai/zen/v1".to_string())
+            });
+            let mut provider = OpenAiProvider::new(String::new());
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Ovh => {
+            let base_url = config.base_url.unwrap_or_else(|| "https://ai-endpoints.ovh.net/v1".to_string());
+            let mut provider = OpenAiProvider::new(String::new());
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::DeepSeekFree => {
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("DEEPSEEK_API_KEY").unwrap_or_default()
+            });
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.deepseek.com/v1".to_string());
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::ModelScope => {
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.modelscope.cn/v1".to_string());
+            let mut provider = OpenAiProvider::new(String::new());
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+    }
+}
+
+pub fn create_provider_from_type(provider_type: LlmProviderType, api_key: Option<String>) -> Box<dyn LlmProvider> {
+    create_provider(ProviderConfig {
+        provider_type,
+        api_key,
+        ..Default::default()
+    })
+}
+
+/// 探测本地 Ollama 端点是否可达
+async fn probe_ollama() -> bool {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()
+        .ok();
+    let client = match client {
+        Some(c) => c,
+        None => return false,
+    };
+    match client.head("http://localhost:11434/api/tags").send().await {
+        Ok(resp) => resp.status().is_success(),
+        Err(_) => false,
+    }
+}
+
+/// 构建统一网关 — 自动注册所有可用提供者
+///
+/// 注册策略:
+/// 1. Local (主体): 自动探测 Ollama/LM Studio/llama.cpp/vLLM 本地端点
+/// 2. Proxy (客体): 如果配置了 NEOTRIX_PROXY_BASE_URL, 注册自定义代理
+/// 3. Cloud (客体): 根据环境变量自动注册所有可用云端 API
+pub async fn create_gateway_async() -> GatewayV2 {
+    let mut gateway = GatewayV2::new();
+
+    // ── 1. Local (主体): 自动探测本地推理端点 ──
+    if probe_ollama().await {
+        let ollama = create_provider_from_type(LlmProviderType::Ollama, None);
+        gateway.register_provider_with_category("ollama", ollama, true, ProviderCategory::Local);
+        log::info!("[gateway] Auto-registered: ollama (local)");
+    }
+
+    // ── 2. Proxy (客体): 自定义 OpenAI 兼容代理 ──
+    let proxy_base_url = std::env::var("NEOTRIX_PROXY_BASE_URL").ok();
+    let proxy_api_key = std::env::var("NEOTRIX_PROXY_API_KEY").ok();
+    if let Some(url) = proxy_base_url {
+        if !url.is_empty() {
+            let provider = create_provider(ProviderConfig {
+                provider_type: LlmProviderType::CustomProxy,
+                api_key: proxy_api_key,
+                base_url: Some(url.clone()),
+                ..Default::default()
+            });
+            gateway.register_provider_with_category("custom-proxy", provider, false, ProviderCategory::Proxy);
+            log::info!("[gateway] Auto-registered: custom-proxy ({})", url);
+        }
+    }
+
+    // ── 3. Cloud (客体): 根据环境变量自动注册 ──
+    macro_rules! register_if {
+        ($var:expr, $name:expr, $provider_type:expr, $is_free:expr) => {
+            if let Ok(key) = std::env::var($var) {
+                if !key.is_empty() {
+                    let provider = create_provider_from_type($provider_type, Some(key));
+                    gateway.register_provider_with_category($name, provider, $is_free, ProviderCategory::Cloud);
+                    log::info!("[gateway] Auto-registered: {} (cloud)", $name);
+                }
+            }
+        };
+    }
+
+    register_if!("OPENAI_API_KEY", "openai", LlmProviderType::OpenAI, false);
+    register_if!("ANTHROPIC_API_KEY", "anthropic", LlmProviderType::Anthropic, false);
+    register_if!("GOOGLE_API_KEY", "gemini", LlmProviderType::Gemini, true);
+    register_if!("GROQ_API_KEY", "groq", LlmProviderType::Groq, true);
+    register_if!("OPENROUTER_API_KEY", "openrouter", LlmProviderType::OpenRouter, true);
+    register_if!("CEREBRAS_API_KEY", "cerebras", LlmProviderType::Cerebras, true);
+    register_if!("SAMBANOVA_API_KEY", "sambanova", LlmProviderType::SambaNova, true);
+    register_if!("BAZAARLINK_API_KEY", "bazaarlink", LlmProviderType::BazaarLink, true);
+    register_if!("ZEROLIMIT_API_KEY", "zerolimit", LlmProviderType::ZeroLimit, true);
+    register_if!("CLOUDFLARE_API_TOKEN", "cloudflare", LlmProviderType::Cloudflare, true);
+    register_if!("NVIDIA_API_KEY", "nvidia", LlmProviderType::Nvidia, true);
+    register_if!("GITHUB_TOKEN", "github-models", LlmProviderType::GitHubModels, true);
+    register_if!("HF_API_KEY", "huggingface", LlmProviderType::HuggingFace, true);
+    register_if!("COHERE_API_KEY", "cohere", LlmProviderType::Cohere, false);
+    register_if!("TOGETHER_API_KEY", "together-free", LlmProviderType::TogetherFree, true);
+    register_if!("SILICONFLOW_API_KEY", "siliconflow", LlmProviderType::SiliconFlow, true);
+    register_if!("ZAI_API_KEY", "zai", LlmProviderType::ZAI, true);
+    register_if!("DEEPSEEK_API_KEY", "deepseek-free", LlmProviderType::DeepSeekFree, true);
+
+    // 始终注册 keyless 免费提供者
+    let pollinations = PollinationsProvider::new();
+    gateway.register_provider_with_category("pollinations", Box::new(pollinations), true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: pollinations");
+
+    let freetheai = create_provider_from_type(LlmProviderType::FreeTheAi, None);
+    gateway.register_provider_with_category("freetheai", freetheai, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: freetheai");
+
+    // Keyless free providers — auto register always
+    let llm7 = create_provider_from_type(LlmProviderType::Llm7, None);
+    gateway.register_provider_with_category("llm7", llm7, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: llm7");
+
+    let kilo = create_provider_from_type(LlmProviderType::Kilo, None);
+    gateway.register_provider_with_category("kilo", kilo, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: kilo");
+
+    let opencode_zen = create_provider_from_type(LlmProviderType::OpenCodeZen, None);
+    gateway.register_provider_with_category("opencode-zen", opencode_zen, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: opencode-zen");
+
+    let ovh = create_provider_from_type(LlmProviderType::Ovh, None);
+    gateway.register_provider_with_category("ovh", ovh, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: ovh");
+
+    let modelscope = create_provider_from_type(LlmProviderType::ModelScope, None);
+    gateway.register_provider_with_category("modelscope", modelscope, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: modelscope");
+
+    // Install CostTracker for per-query budget enforcement
+    let tracker = CostTracker::new();
+    gateway.set_cost_tracker(tracker);
+
+    gateway
+}
+
+/// 同步版本 — 保留向后兼容 (内部调用 block_on)
+pub fn create_gateway() -> GatewayV2 {
+    let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime for gateway init");
+    rt.block_on(create_gateway_async())
+}

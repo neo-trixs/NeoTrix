@@ -1,0 +1,18 @@
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { RouterProvider } from "react-router-dom";
+import router from "./router";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { captureConsoleErrors } from "./lib/error-reporter";
+import "@xterm/xterm/css/xterm.css";
+import "./styles/global.css";
+
+captureConsoleErrors();
+
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <RouterProvider router={router} />
+    </ErrorBoundary>
+  </React.StrictMode>,
+);

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.neotrix.kb-crawl</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/neotrix-kb-crawl</string>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/Users/neo/.neotrix/crawl-daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/neo/.neotrix/crawl-daemon.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>RUST_LOG</key>
+        <string>info</string>
+    </dict>
+    <key>UserName</key>
+    <string>neo</string>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>3600</integer>
+</dict>
+</plist>

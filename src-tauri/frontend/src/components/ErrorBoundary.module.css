@@ -1,0 +1,16 @@
+.errorBoundary {
+  padding: 2rem;
+  margin: 1rem;
+  text-align: center;
+}
+.errorBoundary h3 {
+  margin-bottom: 0.5rem;
+  color: var(--nt-danger, #E85454);
+}
+.errorBoundary pre {
+  font-size: 0.85rem;
+  color: var(--nt-text-secondary, #707078);
+  margin-bottom: 1rem;
+  max-height: 200px;
+  overflow: auto;
+}

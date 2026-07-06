@@ -1,0 +1,85 @@
+.menu {
+  position: fixed;
+  z-index: 500;
+  min-width: 180px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: var(--nt-radius-sm);
+  border: 1px solid var(--nt-border);
+  animation: contextMenuIn 0.12s ease;
+}
+
+@keyframes contextMenuIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--nt-text);
+  text-align: left;
+  transition: background var(--nt-transition);
+  user-select: none;
+}
+
+.item:hover {
+  background: var(--nt-primary-light);
+  color: var(--nt-primary);
+}
+
+.disabled {
+  color: var(--nt-text-muted);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.disabled:hover {
+  background: none;
+  color: var(--nt-text-muted);
+}
+
+.icon {
+  width: 18px;
+  text-align: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shortcut {
+  font-size: 10px;
+  color: var(--nt-text-muted);
+  font-family: 'SF Mono', Menlo, monospace;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--nt-border);
+  margin: 3px 8px;
+}
+
+[data-theme="dark"] .menu {
+  background: rgba(40, 40, 44, 0.97);
+}

@@ -1,0 +1,33 @@
+# Gitleaks configuration for NeoTrix
+
+title = "NeoTrix Secret Scanning Config"
+
+[extend]
+# Use the default gitleaks rules as base
+useDefault = true
+
+# Whitelist specific files/paths from scanning
+[allowlist]
+description = "Exclude non-sensitive paths"
+paths = [
+    # Test fixtures and mock data
+    "(?i)test.*fixture",
+    "(?i)test.*mock",
+    "(?i)test.*data",
+    "(?i).*_test\\.rs",
+    # Lock files don't contain secrets
+    "Cargo\\.lock",
+    "package-lock\\.json",
+    # Documentation references containing example keys
+    "docs/",
+    ".*\\.md",
+    # Test files with dummy secrets
+    "(?i).*prompt_guard/tests\\.rs",
+    "(?i).*security/scanning\\.rs",
+    "(?i).*secret_scanner\\.rs",
+    # Contract addresses (false positives)
+    "(?i).*crypto_agent/evm\\.rs",
+    # Build artifacts
+    "target/",
+    "node_modules/",
+]

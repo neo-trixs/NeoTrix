@@ -1,0 +1,125 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  width: 440px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--nt-border);
+}
+
+.steps {
+  display: flex;
+  gap: 8px;
+}
+
+.stepDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nt-text-muted);
+  transition: all var(--nt-transition);
+}
+
+.stepDotActive {
+  background: var(--nt-primary);
+  transform: scale(1.2);
+}
+
+.stepDotDone {
+  background: var(--nt-success);
+}
+
+.stepLabel {
+  font-size: 12px;
+  color: var(--nt-text-secondary);
+}
+
+.body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stepContent p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--nt-text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--nt-border);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--nt-text-secondary);
+  cursor: pointer;
+}
+
+.checkbox input {
+  accent-color: var(--nt-primary);
+}
+
+.footerActions {
+  display: flex;
+  gap: 8px;
+}
+
+[data-theme="dark"] .modal {
+  background: rgba(40, 40, 44, 0.95);
+}

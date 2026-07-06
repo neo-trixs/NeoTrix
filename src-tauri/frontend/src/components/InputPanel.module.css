@@ -1,0 +1,328 @@
+.cic {
+  width: 100%;
+  border-radius: var(--nt-radius-2xl, 24px);
+  padding: 16px;
+  background: var(--nt-glass-L2-bg);
+  backdrop-filter: var(--nt-glass-L2-blur);
+  -webkit-backdrop-filter: var(--nt-glass-L2-blur);
+  border: 1px solid var(--nt-border-strong, rgba(0,0,0,0.10));
+  box-shadow: var(--nt-shadow-sm);
+  transition: var(--nt-transition);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.cic:focus-within {
+  border-color: var(--nt-border-strong, rgba(0,0,0,0.10));
+  box-shadow: var(--nt-shadow-md);
+}
+
+.field {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: var(--nt-font-family);
+  font-size: var(--nt-font-size-body-lg, 14px);
+  line-height: var(--nt-line-height-normal, 1.5);
+  color: var(--nt-text);
+  min-height: 64px;
+  padding: 2px 2px;
+}
+
+.field::placeholder {
+  color: var(--nt-text-muted);
+}
+
+.cicActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cicLeft {
+  display: flex;
+  align-items: center;
+}
+
+.cicAttach {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--nt-transition);
+  color: var(--nt-text-muted);
+  border: none;
+  background: transparent;
+}
+
+.cicAttach:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.cicAttach svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cicMulti {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--nt-transition);
+  color: var(--nt-text-muted);
+  border: none;
+  background: transparent;
+}
+
+.cicMulti:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.cicMulti svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+
+.cicMulti.active {
+  color: var(--nt-primary);
+  background: var(--nt-active-bg);
+}
+
+.cicRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vcBtn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--nt-transition);
+  border: none;
+  background: transparent;
+  color: var(--nt-text-muted);
+  position: relative;
+}
+
+.vcBtn:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text-secondary);
+}
+
+.vcBtn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vcLang svg {
+  stroke-width: 1.6;
+}
+
+.vcSend {
+  background: var(--nt-bg-raised);
+  border: 1px solid var(--nt-border);
+  width: 36px;
+  height: 36px;
+}
+
+.vcSend:hover {
+  background: var(--nt-primary);
+  border-color: var(--nt-primary);
+  color: #fff;
+}
+
+.vcSend:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.vcSend:disabled:hover {
+  background: var(--nt-bg-raised);
+  border-color: var(--nt-border);
+  color: var(--nt-text-muted);
+}
+
+.vcSend svg {
+  width: 18px;
+  height: 14px;
+  stroke-width: 2;
+  transition: opacity var(--nt-duration-normal, 0.25s), transform var(--nt-duration-normal, 0.25s);
+}
+
+.vcSend .s-mic {
+  position: absolute;
+}
+
+.vcSend .s-wav {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.vcSend:hover:not(:disabled) .s-mic {
+  opacity: 0;
+  transform: scale(0.6) rotate(-15deg);
+}
+
+.vcSend:hover:not(:disabled) .s-wav {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.chipBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  width: 100%;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  background: var(--nt-hover, rgba(0,0,0,0.04));
+  border: 1px solid var(--nt-border, rgba(0,0,0,0.08));
+  border-radius: var(--nt-radius-sm, 6px);
+  font-size: 11px;
+  animation: chipIn 0.15s ease;
+}
+
+@keyframes chipIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.chipThumb {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.chipInfo {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.chipName {
+  color: var(--nt-text);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipSize {
+  color: var(--nt-text-muted);
+  font-size: 9px;
+}
+
+.chipRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--nt-text-muted);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.chipRemove:hover {
+  background: var(--nt-danger-bg);
+  color: var(--nt-danger, #E85454);
+}
+
+.dragOver {
+  border-color: var(--nt-primary);
+  box-shadow: 0 0 0 2px rgba(232,84,84,0.15);
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--nt-glass-bg-strong, rgba(255,255,255,0.82));
+  backdrop-filter: blur(4px);
+  border-radius: inherit;
+  color: var(--nt-primary);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 10;
+  animation: fadeIn 0.1s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.stopBtn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  background: var(--nt-danger-bg);
+  color: var(--nt-danger);
+  transition: var(--nt-transition);
+}
+
+.stopBtn:hover {
+  background: var(--nt-danger);
+  color: #fff;
+}
+
+.recording {
+  color: var(--nt-danger);
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

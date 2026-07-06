@@ -7,6 +7,11 @@ export default defineConfig({
   lang: 'en-US',
   lastUpdated: true,
 
+  rewrites: {
+    '4-GUIDES/:slug': 'guide/:slug',
+    '3-API/:slug': 'api/:slug',
+  },
+
   head: [
     ['link', { rel: 'icon', href: '/favicon.ico' }],
     ['meta', { name: 'theme-color', content: '#1a0533' }],

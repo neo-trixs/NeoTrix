@@ -1,0 +1,49 @@
+.loading { color: var(--nt-text-muted); font-size: 0.85em; }
+
+.headerWrap { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+.headerTitle { margin: 0; }
+
+.headerHint { font-size: 0.75em; color: var(--nt-text-muted); }
+
+.list { display: flex; flex-direction: column; gap: 8px; }
+
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.85em;
+}
+
+.cardAvailable {
+  background: var(--nt-success-bg);
+  border: 1px solid rgba(52, 199, 89, 0.2);
+}
+
+.cardUnavailable {
+  background: var(--nt-danger-bg);
+  border: 1px solid color-mix(in srgb, var(--nt-danger) 20%, transparent);
+}
+
+.left { display: flex; align-items: center; gap: 8px; }
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.name { font-weight: 600; }
+
+.freeBadge {
+  font-size: 0.7em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--nt-success-bg);
+  color: var(--nt-success);
+}
+
+.right { display: flex; gap: 16px; color: var(--nt-text-muted); font-size: 0.85em; }

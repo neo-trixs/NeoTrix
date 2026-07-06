@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "name": "NeoTrix Documentation Blueprint",
+  "description": "Canonical documentation structure manifest",
+  "layers": [
+    { "id": "0-ARCHITECTURE", "label": "System Architecture", "description": "High-level system architecture, pillars, and structural decisions" },
+    { "id": "1-DESIGN", "label": "Detailed Design", "description": "Component-level design, analysis, and deep-dive documents" },
+    { "id": "2-PLANS", "label": "Plans & Roadmaps", "description": "Implementation plans, evolution roadmaps, TODOs, and experience trees" },
+    { "id": "3-API", "label": "API Documentation", "description": "HTTP/WebSocket API references and endpoint documentation" },
+    { "id": "4-GUIDES", "label": "User Guides", "description": "Getting started, CLI, desktop, configuration, and development guides" },
+    { "id": "5-LEARNING", "label": "Tutorials & Learning", "description": "Tutorials, examples, and learning paths" },
+    { "id": "6-REFERENCE", "label": "Reference", "description": "OpenAPI spec, release checklists, coding standards" }
+  ],
+  "rules": {
+    "every_directory_must_have_00_INDEX": true,
+    "adr_format": "docs/2-PLANS/ADR-YYYY-MM-DD-N.md",
+    "max_depth": 2,
+    "anchor_required": true,
+    "anchor_path": ".anchor/session.md"
+  },
+  "integrity": {
+    "check_command": "scripts/neotrix-doc-system.sh check",
+    "last_validated": "2026-07-01"
+  }
+}

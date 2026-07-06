@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "browser": "chromium",
+  "headless": true,
+  "screenshot_dir": "/tmp/neotrix_screenshots",
+  "timeout_ms": 30000,
+  "playwright_cli_path": null
+}

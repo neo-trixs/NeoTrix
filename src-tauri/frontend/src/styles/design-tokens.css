@@ -1,0 +1,338 @@
+/* ======================================================
+   NeoTrix Design Tokens v2 — "Consciousness Glass"
+   Merged from preview-ui-v2.html design system
+   Core principle: CCW (counter-clockwise) rotation
+   ====================================================== */
+
+:root {
+  /* ════════════════════════════════════════
+     Layer 1: Base Tokens (raw values)
+     ════════════════════════════════════════ */
+
+  /* ── Brand Palette ── */
+  --nt-red: #E85454;
+  --nt-green: #4CAF50;
+  --nt-yellow: #FFC107;
+  --nt-orange: #FF9800;
+  --nt-primary: var(--nt-red);
+  --nt-primary-hover: #D04040;
+  --nt-primary-light: #F26B6B;
+
+  /* ── Neutral Scale (light) ── */
+  --nt-white: #FFFFFF;
+  --nt-gray-50: #F5F5F7;
+  --nt-gray-100: #E8E8EC;
+  --nt-gray-200: #D4D4D8;
+  --nt-gray-300: #B0B0B8;
+  --nt-gray-400: #909098;
+  --nt-gray-500: #707078;
+  --nt-gray-600: #5A5A62;
+  --nt-gray-700: #3A3A42;
+  --nt-gray-800: #2A2A30;
+  --nt-gray-900: #1A1A20;
+  --nt-black: #0A0A0E;
+
+  /* ── Semantic Aliases ── */
+  --nt-danger: var(--nt-red);
+  --nt-success: var(--nt-green);
+  --nt-warning: var(--nt-yellow);
+  --nt-error: var(--nt-danger);
+
+  /* ── Spacing Scale (4px base) ── */
+  --nt-space-0: 0px;
+  --nt-space-1: 2px;
+  --nt-space-2: 4px;
+  --nt-space-3: 6px;
+  --nt-space-4: 8px;
+  --nt-space-5: 10px;
+  --nt-space-6: 12px;
+  --nt-space-7: 14px;
+  --nt-space-8: 16px;
+  --nt-space-10: 20px;
+  --nt-space-12: 24px;
+  --nt-space-14: 28px;
+  --nt-space-16: 32px;
+  --nt-space-20: 40px;
+  --nt-space-24: 48px;
+
+  /* ── Legacy gap aliases ── */
+  --nt-gap-xs: var(--nt-space-2);
+  --nt-gap-sm: var(--nt-space-3);
+  --nt-gap-md: var(--nt-space-5);
+  --nt-gap-lg: var(--nt-space-8);
+  --nt-gap-xl: var(--nt-space-12);
+
+  /* ── Radius Scale ── */
+  --nt-radius-xs: 4px;
+  --nt-radius-sm: 8px;
+  --nt-radius-md: 12px;
+  --nt-radius-lg: 16px;
+  --nt-radius-xl: 20px;
+  --nt-radius-2xl: 24px;
+  --nt-radius: var(--nt-radius-md);
+  --nt-radius-full: 9999px;
+
+  /* ── Typography ── */
+  --nt-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Noto Sans SC", sans-serif;
+  --nt-font-serif: Georgia, Cambria, "Times New Roman", "Noto Serif SC", serif;
+  --nt-font-mono: "SF Mono", "JetBrains Mono", "Source Code Pro", Menlo, monospace;
+
+  --nt-font-size-caption: 10px;
+  --nt-font-size-small: 11px;
+  --nt-font-size-body: 13px;
+  --nt-font-size-body-lg: 14px;
+  --nt-font-size-heading: 15px;
+  --nt-font-size-display: 20px;
+  --nt-font-size-hero: 28px;
+
+  --nt-font-weight-regular: 400;
+  --nt-font-weight-medium: 500;
+  --nt-font-weight-semibold: 600;
+  --nt-font-weight-bold: 700;
+
+  --nt-line-height-tight: 1.3;
+  --nt-line-height-normal: 1.5;
+  --nt-line-height-loose: 1.55;
+  --nt-line-height-code: 1.4;
+
+  /* ── Shadow Map ── */
+  --nt-shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --nt-shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --nt-shadow-lg: 0 12px 40px rgba(0,0,0,0.07);
+  --nt-shadow-xl: 0 24px 60px rgba(0,0,0,0.08);
+
+  /* ── Motion ── */
+  --nt-ease-out-expo: cubic-bezier(0.22,1,0.36,1);
+  --nt-ease-in-out: cubic-bezier(0.4,0,0.2,1);
+  --nt-ease-out: cubic-bezier(0,0,0.2,1);
+  --nt-duration-fast: 0.15s;
+  --nt-duration-normal: 0.25s;
+  --nt-duration-slow: 0.4s;
+  --nt-duration-long: 0.6s;
+  --nt-transition: 0.25s var(--nt-ease-out-expo);
+
+  /* ════════════════════════════════════════
+     Layer 2: Semantic Tokens (purpose-bound)
+     ════════════════════════════════════════ */
+
+  /* ── Solid Surface Depth System (L0-L4) ── */
+  --nt-glass-L0-bg: #EAE7E1;
+  --nt-glass-L0-blur: none;
+  --nt-glass-L1-bg: #ECE9E3;
+  --nt-glass-L1-blur: none;
+  --nt-glass-L2-bg: #EFECE6;
+  --nt-glass-L2-blur: none;
+  --nt-glass-L3-bg: #F2EFE9;
+  --nt-glass-L3-blur: none;
+  --nt-glass-L4-bg: #F5F2EC;
+  --nt-glass-L4-blur: none;
+
+  /* ── Surface Tokens ── */
+  --nt-bg: var(--nt-gray-50);
+  --nt-bg-base: var(--nt-gray-50);
+  --nt-bg-surface: var(--nt-glass-L2-bg);
+  --nt-bg-elevated: var(--nt-glass-L2-bg);
+  --nt-bg-raised: var(--nt-glass-L3-bg);
+  --nt-bg-glass: var(--nt-glass-L2-bg);
+
+  /* ── Legacy background aliases ── */
+  --nt-sidebar: rgba(255, 255, 255, 0.72);
+  --nt-chat: rgba(255, 255, 255, 0.65);
+  --nt-sidebar-glass: rgba(255, 255, 255, 0.75);
+  --nt-content-glass: rgba(255, 255, 255, 0.55);
+
+  /* ── Border Tokens ── */
+  --nt-border: rgba(0,0,0,0.06);
+  --nt-border-strong: rgba(0,0,0,0.10);
+  --nt-border-glass: rgba(255,255,255,0.25);
+  --nt-border-subtle: rgba(0,0,0,0.04);
+
+  /* ── Interaction Tokens ── */
+  --nt-hover: rgba(0,0,0,0.03);
+  --nt-hover-strong: rgba(0,0,0,0.06);
+  --nt-active: rgba(232,84,84,0.08);
+  --nt-active-bg: rgba(232,84,84,0.08);
+  --nt-primary-glow: rgba(232,84,84,0.06);
+  --nt-primary-light-bg: rgba(232,84,84,0.08);
+
+  /* ── Text Tokens ── */
+  --nt-text: #1A1A20;
+  --nt-text-secondary: #707078;
+  --nt-text-muted: #B0B0B8;
+  --nt-text-tertiary: #D4D4D8;
+  --nt-text-inverse: #FFFFFF;
+
+  /* ── Overlay ── */
+  --nt-overlay: rgba(0, 0, 0, 0.30);
+  --nt-overlay-light: rgba(0, 0, 0, 0.06);
+  --nt-overlay-dark: rgba(0, 0, 0, 0.50);
+
+  /* ── Glass layer ── */
+  --nt-edge-width: 0.5px;
+  --nt-highlight-width: 1px;
+  --nt-inner-stroke: 0.5px;
+  --nt-highlight-opacity: 0.5;
+  --nt-highlight-blur: 2px;
+  --nt-noise-opacity: 0.015;
+
+  /* ── Glass colors ── */
+  --nt-glass-bg: rgba(255, 255, 255, 0.65);
+  --nt-glass-bg-strong: rgba(255, 255, 255, 0.82);
+  --nt-glass-bg-subtle: rgba(255, 255, 255, 0.35);
+  --nt-glass-border: rgba(0, 0, 0, 0.06);
+  --nt-glass-border-strong: rgba(0, 0, 0, 0.12);
+  --nt-glass-highlight: rgba(255, 255, 255, 0.6);
+  --nt-glass-inner: rgba(0, 0, 0, 0.03);
+  --nt-glass-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+
+  /* ── Layout ── */
+  --nt-sidebar-width: 250px;
+  --nt-sidebar-collapsed: 64px;
+  --nt-file-panel-width: 260px;
+  --nt-right-panel-width: 280px;
+  --nt-panel-gap: 8px;
+
+  /* ════════════════════════════════════════
+     Layer 3: Component Tokens (pre-composed)
+     ════════════════════════════════════════ */
+
+  --nt-blur-sm: 8px;
+  --nt-blur-md: 16px;
+  --nt-blur-lg: 28px;
+  --nt-blur-xl: 40px;
+  --nt-blur: var(--nt-blur-sm);
+  --nt-blur-generic: var(--nt-glass-L2-blur);
+
+  /* ── Glass opacity ── */
+  --nt-glass-opacity: 0.72;
+  --nt-glass-opacity-high: 0.85;
+  --nt-glass-opacity-low: 0.45;
+  --nt-glass-opacity-clear: 0.25;
+
+  /* ── Transition ── */
+  --nt-transition-fast: 0.12s cubic-bezier(0.25, 0.1, 0.25, 1);
+  --nt-transition-slow: 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* ── Semantic state colors ── */
+  --nt-danger-bg: rgba(232, 84, 84, 0.10);
+  --nt-success-bg: rgba(76, 175, 80, 0.10);
+  --nt-warning-bg: rgba(255, 193, 7, 0.12);
+  --nt-info: #5AB0FF;
+  --nt-info-bg: rgba(90, 176, 255, 0.12);
+  --nt-info-border: rgba(90, 176, 255, 0.30);
+  --nt-purple: #5856D6;
+  --nt-warning-border: rgba(255, 193, 7, 0.30);
+
+  /* ════════════════════════════════════════
+     Layer 4: Z-index Map
+     ════════════════════════════════════════ */
+  --z-bg: -1;
+  --z-sidebar-float: 100;
+  --z-traffic: 150;
+  --z-overlay: 200;
+  --z-popover: 300;
+  --z-toast: 400;
+  --z-tooltip: 500;
+}
+
+/* ════════════════════════════════════════
+   Dark Theme Overrides
+   ════════════════════════════════════════ */
+
+[data-theme="dark"] {
+  /* ── Brand Palette (brighter for dark) ── */
+  --nt-red: #FF6B6B;
+  --nt-green: #66BB6A;
+  --nt-yellow: #FFD54F;
+  --nt-primary: var(--nt-red);
+  --nt-primary-hover: #E85555;
+  --nt-primary-light: #FF8888;
+  --nt-orange: #FFB74D;
+
+  /* ── Neutral Scale (inverted) ── */
+  --nt-gray-900: #EDEDED;
+  --nt-gray-800: #C0C0C8;
+  --nt-gray-700: #A0A0A8;
+  --nt-gray-600: #808088;
+  --nt-gray-500: #606068;
+  --nt-gray-400: #505058;
+  --nt-gray-300: #404048;
+  --nt-gray-200: #303038;
+  --nt-gray-100: #202028;
+  --nt-gray-50: #181820;
+  --nt-white: #101018;
+  --nt-black: #08080E;
+
+  /* ── Surface Depth System (dark) ── */
+  --nt-glass-L0-bg: #14141C;
+  --nt-glass-L1-bg: #16161E;
+  --nt-glass-L2-bg: #181820;
+  --nt-glass-L3-bg: #1B1B24;
+  --nt-glass-L4-bg: #1E1E28;
+
+  /* ── Surface Tokens (dark) ── */
+  --nt-bg: var(--nt-gray-50);
+  --nt-bg-base: var(--nt-gray-50);
+  --nt-bg-surface: var(--nt-glass-L2-bg);
+  --nt-bg-elevated: var(--nt-glass-L2-bg);
+  --nt-bg-raised: var(--nt-glass-L3-bg);
+  --nt-bg-glass: var(--nt-glass-L2-bg);
+
+  --nt-sidebar: rgba(35, 35, 40, 0.75);
+  --nt-chat: rgba(40, 40, 45, 0.7);
+  --nt-sidebar-glass: rgba(35, 35, 40, 0.75);
+  --nt-content-glass: rgba(30, 30, 35, 0.6);
+
+  /* ── Border (lighter for dark) ── */
+  --nt-border: rgba(255,255,255,0.06);
+  --nt-border-strong: rgba(255,255,255,0.10);
+  --nt-border-glass: rgba(255,255,255,0.12);
+
+  /* ── Interaction (dark) ── */
+  --nt-hover: rgba(255,255,255,0.03);
+  --nt-hover-strong: rgba(255,255,255,0.06);
+  --nt-active: rgba(255,107,107,0.10);
+  --nt-active-bg: rgba(255,107,107,0.10);
+  --nt-primary-glow: rgba(255,107,107,0.08);
+  --nt-primary-light-bg: rgba(232,84,84,0.10);
+
+  /* ── Text (dark) ── */
+  --nt-text: #EDEDED;
+  --nt-text-secondary: #808088;
+  --nt-text-muted: #505058;
+  --nt-text-tertiary: #404048;
+  --nt-text-inverse: #08080E;
+
+  /* ── Shadow (deeper for dark) ── */
+  --nt-shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --nt-shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+  --nt-shadow-lg: 0 12px 40px rgba(0,0,0,0.4);
+  --nt-shadow-xl: 0 24px 60px rgba(0,0,0,0.5);
+
+  /* ── Glass colors (dark) ── */
+  --nt-glass-bg: rgba(35, 35, 40, 0.72);
+  --nt-glass-bg-strong: rgba(45, 45, 50, 0.85);
+  --nt-glass-bg-subtle: rgba(35, 35, 40, 0.35);
+  --nt-glass-border: rgba(255, 255, 255, 0.06);
+  --nt-glass-border-strong: rgba(255, 255, 255, 0.12);
+  --nt-glass-highlight: rgba(255, 255, 255, 0.08);
+  --nt-glass-inner: rgba(255, 255, 255, 0.03);
+  --nt-glass-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+
+  --nt-overlay: rgba(0, 0, 0, 0.50);
+  --nt-overlay-light: rgba(0, 0, 0, 0.12);
+  --nt-overlay-dark: rgba(0, 0, 0, 0.70);
+  --nt-danger-bg: rgba(255, 107, 107, 0.15);
+  --nt-success-bg: rgba(102, 187, 106, 0.15);
+  --nt-warning-bg: rgba(255, 213, 79, 0.15);
+  --nt-info-bg: rgba(90, 176, 255, 0.15);
+}
+
+/* ════════════════════════════════════════
+   Light Theme — warm cream canvas override
+   ════════════════════════════════════════ */
+
+[data-theme="light"] {
+  --nt-bg: #F5F2EC;
+  --nt-bg-base: #F5F2EC;
+}

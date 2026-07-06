@@ -1,0 +1,22 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # 每周日凌晨
+  push:
+    paths:
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-action@v2.0.0
+        with:
+          allow-warnings: true

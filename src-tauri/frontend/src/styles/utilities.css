@@ -1,0 +1,42 @@
+/* ======================================================
+   NeoTrix Utility Classes — replaces common inline styles
+   ====================================================== */
+
+/* ── Flex helpers ── */
+.u-flex { display: flex; }
+.u-flex-col { display: flex; flex-direction: column; }
+.u-flex-1 { flex: 1; }
+.u-flex-center { display: flex; align-items: center; }
+.u-flex-center-center { display: flex; align-items: center; justify-content: center; }
+.u-flex-between { display: flex; align-items: center; justify-content: space-between; }
+.u-gap-xs { gap: 4px; }
+.u-gap-sm { gap: 6px; }
+.u-gap-md { gap: 8px; }
+.u-gap-lg { gap: 16px; }
+.u-gap-xl { gap: 24px; }
+
+/* ── Spacing helpers ── */
+.u-m-0 { margin: 0; }
+.u-mt-xs { margin-top: 4px; }
+.u-mt-sm { margin-top: 8px; }
+.u-mt-md { margin-top: 12px; }
+.u-mt-lg { margin-top: 16px; }
+.u-ml-sm { margin-left: 8px; }
+.u-ml-md { margin-left: 12px; }
+.u-p-sm { padding: 8px; }
+.u-p-md { padding: 12px; }
+.u-p-lg { padding: 20px; }
+
+/* ── Text helpers ── */
+.u-text-xs { font-size: 0.75em; }
+.u-text-sm { font-size: 0.85em; }
+.u-text-secondary { color: var(--nt-text-secondary); }
+.u-text-muted { color: var(--nt-text-muted); }
+.u-text-danger { color: var(--nt-danger); }
+.u-text-success { color: var(--nt-success); }
+.u-text-warning { color: var(--nt-warning); }
+
+/* ── Misc ── */
+.u-min-h-0 { min-height: 0; }
+.u-break-all { word-break: break-all; }
+.u-self-center { align-self: center; }

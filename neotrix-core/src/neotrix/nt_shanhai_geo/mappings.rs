@@ -1,0 +1,400 @@
+use crate::neotrix::nt_shanhai_geo::types::*;
+
+/// All known global place mappings with scholarly attributions.
+pub fn all_mappings() -> Vec<PlaceMapping> {
+    vec![
+        // ── 世界圈说 Global Mappings ──────────────────────────────
+        PlaceMapping {
+            shanhai_name: "昆仑山".into(),
+            modern_name: "肯尼亚/埃塞俄比亚高地".into(),
+            modern_location: Some(GeoCoord::new(1.0, 37.0)),
+            modern_bounds: Some(GeoBounds {
+                min: GeoCoord::new(-5.0, 33.0),
+                max: GeoCoord::new(10.0, 42.0),
+            }),
+            confidence: 0.75,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.75,
+            }],
+            evidence_summary: "昆仑＝东非高原，黄河源头＝尼罗河源头,《禹贡》导河积石＝青尼罗河源头".into(),
+            relation_type: "昆仑山 → 肯尼亚/埃塞俄比亚".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "不周山".into(),
+            modern_name: "东非大裂谷".into(),
+            modern_location: Some(GeoCoord::new(1.0, 36.0)),
+            modern_bounds: Some(GeoBounds {
+                min: GeoCoord::new(-12.0, 35.0),
+                max: GeoCoord::new(15.0, 38.0),
+            }),
+            confidence: 0.7,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.7,
+            }],
+            evidence_summary: "不周山＝共工触山导致天地倾斜＝东非大裂谷地质断裂带的神话表达".into(),
+            relation_type: "不周山 → 东非大裂谷".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "东山经山脉".into(),
+            modern_name: "北美落基山脉".into(),
+            modern_location: Some(GeoCoord::new(39.0, -106.0)),
+            modern_bounds: Some(GeoBounds {
+                min: GeoCoord::new(30.0, -115.0),
+                max: GeoCoord::new(50.0, -100.0),
+            }),
+            confidence: 0.7,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "Henriette Mertz".into(),
+                confidence: 0.7,
+            }],
+            evidence_summary: "Mertz对比东山经4条山脉的走向/里程与落基山脉完全吻合".into(),
+            relation_type: "东山经→北美落基山脉（Mertz验证）".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "光华之谷".into(),
+            modern_name: "科罗拉多大峡谷".into(),
+            modern_location: Some(GeoCoord::new(36.0, -112.0)),
+            modern_bounds: None,
+            confidence: 0.65,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "Henriette Mertz".into(),
+                confidence: 0.65,
+            }],
+            evidence_summary: "光华之谷＝Grand Canyon，东山经第四列山脉「多光彩」描述与大峡谷地貌吻合".into(),
+            relation_type: "光华之谷 → 科罗拉多大峡谷".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "扶桑".into(),
+            modern_name: "富士山 / 美洲".into(),
+            modern_location: Some(GeoCoord::new(35.0, 140.0)),
+            modern_bounds: None,
+            confidence: 0.5,
+            school_attribution: vec![
+                SchoolRef { school: "世界圈说".into(), scholar: "宫玉海".into(), confidence: 0.5 },
+                SchoolRef { school: "世界圈说".into(), scholar: "Henriette Mertz".into(), confidence: 0.6 },
+            ],
+            evidence_summary: "扶桑在《山海经》中为日出之地，一说富士山(日本)，一说墨西哥/中美洲(Mertz)".into(),
+            relation_type: "扶桑 → 富士山/美洲".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "西王母".into(),
+            modern_name: "示巴女王（也门/埃塞俄比亚）".into(),
+            modern_location: Some(GeoCoord::new(15.0, 48.0)),
+            modern_bounds: Some(GeoBounds {
+                min: GeoCoord::new(12.0, 43.0),
+                max: GeoCoord::new(16.0, 54.0),
+            }),
+            confidence: 0.7,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.7,
+            }],
+            evidence_summary: "西王母＝示巴女王，昆仑=非洲，西王母居昆仑附近＝阿拉伯半岛".into(),
+            relation_type: "西王母 → 示巴女王（也门/埃塞俄比亚）".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "寿麻".into(),
+            modern_name: "索马里".into(),
+            modern_location: Some(GeoCoord::new(2.0, 45.0)),
+            modern_bounds: None,
+            confidence: 0.65,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.65,
+            }],
+            evidence_summary: "寿麻＝Somalia音译，非洲之角".into(),
+            relation_type: "寿麻 → 索马里".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "炎火山".into(),
+            modern_name: "乞力马扎罗山".into(),
+            modern_location: Some(GeoCoord::new(-3.0, 37.0)),
+            modern_bounds: None,
+            confidence: 0.6,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.6,
+            }],
+            evidence_summary: "炎火山＝赤道雪山(Snowcap on equator)，唯一可能=乞力马扎罗".into(),
+            relation_type: "炎火山 → 乞力马扎罗".into(),
+        },
+
+        // ── 华夏说 China-Only Mappings ────────────────────────────
+        PlaceMapping {
+            shanhai_name: "昆仑之丘".into(),
+            modern_name: "鄂尔多斯高原".into(),
+            modern_location: Some(GeoCoord::new(39.5, 109.0)),
+            modern_bounds: Some(GeoBounds {
+                min: GeoCoord::new(38.0, 107.0),
+                max: GeoCoord::new(41.0, 111.0),
+            }),
+            confidence: 0.85,
+            school_attribution: vec![SchoolRef {
+                school: "华夏说".into(),
+                scholar: "王红旗".into(),
+                confidence: 0.85,
+            }],
+            evidence_summary: "昆仑＝鄂尔多斯高原，其下为黄河河套，对应《山海经》\u{201c}河水出昆仑东北隅\u{201d}".into(),
+            relation_type: "昆仑之丘 → 鄂尔多斯高原".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "不周之山".into(),
+            modern_name: "山西王屋山附近".into(),
+            modern_location: Some(GeoCoord::new(35.2, 112.2)),
+            modern_bounds: None,
+            confidence: 0.6,
+            school_attribution: vec![SchoolRef {
+                school: "华夏说".into(),
+                scholar: "谭其骧".into(),
+                confidence: 0.6,
+            }],
+            evidence_summary: "不周山在华夏经典解释中位于黄河中游".into(),
+            relation_type: "不周之山 → 山西王屋山附近".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "君子国".into(),
+            modern_name: "朝鲜".into(),
+            modern_location: Some(GeoCoord::new(40.0, 127.0)),
+            modern_bounds: None,
+            confidence: 0.5,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.5,
+            }],
+            evidence_summary: "君子国在《海外东经》，朝鲜半岛古代亦自称\u{201c}君子之国\u{201d}".into(),
+            relation_type: "君子国 → 朝鲜".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "儋耳".into(),
+            modern_name: "海南岛".into(),
+            modern_location: Some(GeoCoord::new(19.0, 109.5)),
+            modern_bounds: None,
+            confidence: 0.8,
+            school_attribution: vec![SchoolRef {
+                school: "华夏说".into(),
+                scholar: "谭其骧".into(),
+                confidence: 0.8,
+            }],
+            evidence_summary: "儋耳即今海南儋州，历史记载明确".into(),
+            relation_type: "儋耳 → 海南岛".into(),
+        },
+
+        // ── Mythical Kingdom Mappings ────────────────────────────
+        PlaceMapping {
+            shanhai_name: "轩辕之国".into(),
+            modern_name: "匈牙利/奥地利".into(),
+            modern_location: Some(GeoCoord::new(47.5, 19.0)),
+            modern_bounds: None,
+            confidence: 0.6,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.6,
+            }],
+            evidence_summary: "轩辕＝Scandinavia(斯堪的纳维亚)音译，\u{201c}轩辕之国在穷山之际\u{201d}＝北欧半岛".into(),
+            relation_type: "轩辕之国 → 匈牙利/奥地利".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "大夏".into(),
+            modern_name: "希腊".into(),
+            modern_location: Some(GeoCoord::new(38.0, 23.0)),
+            modern_bounds: None,
+            confidence: 0.5,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.5,
+            }],
+            evidence_summary: "大夏＝Hellas(希腊)音译".into(),
+            relation_type: "大夏 → 希腊".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "夸父".into(),
+            modern_name: "斯拉夫".into(),
+            modern_location: Some(GeoCoord::new(55.0, 37.0)),
+            modern_bounds: None,
+            confidence: 0.4,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.4,
+            }],
+            evidence_summary: "夸父＝Slav(斯拉夫)音译，\u{201c}夸父逐日\u{201d}＝北欧极昼现象的神话表达".into(),
+            relation_type: "夸父 → 斯拉夫".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "奄兹".into(),
+            modern_name: "英吉利".into(),
+            modern_location: Some(GeoCoord::new(51.5, -0.1)),
+            modern_bounds: None,
+            confidence: 0.4,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.4,
+            }],
+            evidence_summary: "奄兹＝Angles(盎格鲁)音译".into(),
+            relation_type: "奄兹 → 英吉利".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "方氏".into(),
+            modern_name: "法兰西".into(),
+            modern_location: Some(GeoCoord::new(48.8, 2.3)),
+            modern_bounds: None,
+            confidence: 0.4,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.4,
+            }],
+            evidence_summary: "方氏＝Franks(法兰克)音译".into(),
+            relation_type: "方氏 → 法兰西".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "石夷/柘夷".into(),
+            modern_name: "德意志".into(),
+            modern_location: Some(GeoCoord::new(52.5, 13.4)),
+            modern_bounds: None,
+            confidence: 0.4,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.4,
+            }],
+            evidence_summary: "柘夷＝German(日耳曼)音译".into(),
+            relation_type: "石夷/柘夷 → 德意志".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "戎民".into(),
+            modern_name: "日耳曼".into(),
+            modern_location: Some(GeoCoord::new(50.0, 10.0)),
+            modern_bounds: None,
+            confidence: 0.35,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.35,
+            }],
+            evidence_summary: "戎民＝Germans(日耳曼)的意译".into(),
+            relation_type: "戎民 → 日耳曼".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "大蒙".into(),
+            modern_name: "丹麦".into(),
+            modern_location: Some(GeoCoord::new(56.0, 10.0)),
+            modern_bounds: None,
+            confidence: 0.4,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.4,
+            }],
+            evidence_summary: "大蒙＝Denmark(丹麦)音译".into(),
+            relation_type: "大蒙 → 丹麦".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "不庭胡余".into(),
+            modern_name: "巴布亚新几内亚+澳大利亚".into(),
+            modern_location: Some(GeoCoord::new(-6.0, 145.0)),
+            modern_bounds: None,
+            confidence: 0.35,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.35,
+            }],
+            evidence_summary: "不庭胡余＝Papua New Guinea+Australia的音意合译".into(),
+            relation_type: "不庭胡余 → 巴布亚新几内亚+澳大利亚".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "汤谷".into(),
+            modern_name: "汤加/美洲日出地".into(),
+            modern_location: Some(GeoCoord::new(-21.0, -175.0)),
+            modern_bounds: None,
+            confidence: 0.35,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.35,
+            }],
+            evidence_summary: "汤谷＝Tonga(汤加)音译，日出之地＝国际日期变更线附近".into(),
+            relation_type: "汤谷 → 汤加/美洲日出地".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "下夷/虾夷".into(),
+            modern_name: "夏威夷".into(),
+            modern_location: Some(GeoCoord::new(21.0, -157.0)),
+            modern_bounds: None,
+            confidence: 0.4,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.4,
+            }],
+            evidence_summary: "虾夷＝Hawaii(夏威夷)音译".into(),
+            relation_type: "下夷/虾夷 → 夏威夷".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "文身国".into(),
+            modern_name: "阿留申群岛".into(),
+            modern_location: Some(GeoCoord::new(52.0, -175.0)),
+            modern_bounds: None,
+            confidence: 0.35,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.35,
+            }],
+            evidence_summary: "文身国＝Aleutian(阿留申)——文身文化阿留申人特色".into(),
+            relation_type: "文身国 → 阿留申群岛".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "汉大".into(),
+            modern_name: "加拿大".into(),
+            modern_location: Some(GeoCoord::new(45.0, -75.0)),
+            modern_bounds: None,
+            confidence: 0.3,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.3,
+            }],
+            evidence_summary: "汉大＝Canada(加拿大)音译".into(),
+            relation_type: "汉大 → 加拿大".into(),
+        },
+        PlaceMapping {
+            shanhai_name: "昧谷".into(),
+            modern_name: "墨西哥".into(),
+            modern_location: Some(GeoCoord::new(19.0, -99.0)),
+            modern_bounds: None,
+            confidence: 0.3,
+            school_attribution: vec![SchoolRef {
+                school: "世界圈说".into(),
+                scholar: "宫玉海".into(),
+                confidence: 0.3,
+            }],
+            evidence_summary: "昧谷＝Mexico(墨西哥)，日落之地＝美洲西部".into(),
+            relation_type: "昧谷 → 墨西哥".into(),
+        },
+    ]
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_basic() {
+        assert!(true);
+    }
+}

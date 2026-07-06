@@ -1,0 +1,77 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--nt-glass-inner);
+  border-radius: var(--nt-radius-sm);
+  font-size: 11px;
+  color: var(--nt-text-secondary);
+  min-height: 28px;
+}
+
+.busy {
+  background: rgba(255,149,0,0.08);
+}
+
+.left,
+.right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dotIdle {
+  background: var(--nt-success);
+}
+
+.dotBusy {
+  background: var(--nt-warning);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--nt-text-secondary);
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.btn:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.proxyIndicator {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.proxyOn {
+  color: var(--nt-success);
+}
+
+.proxyOff {
+  color: var(--nt-text-secondary);
+  opacity: 0.5;
+}
+
+.terminalStatus {
+  color: var(--nt-success);
+  font-size: 10px;
+}

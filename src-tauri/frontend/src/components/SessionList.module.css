@@ -1,0 +1,228 @@
+.sidebar {
+  width: var(--nt-sidebar-width, 260px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--nt-border-subtle, var(--nt-border));
+  background: var(--nt-surface, var(--nt-bg));
+  transition: width 0.15s ease;
+}
+
+.sidebarCollapsed {
+  width: 56px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--nt-border);
+  flex-shrink: 0;
+}
+
+.header h2 {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.searchBar {
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 11px;
+  border: 0.5px solid var(--nt-border);
+  border-radius: var(--nt-radius-sm, 6px);
+  background: var(--nt-bg, #fff);
+  color: var(--nt-text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.searchInput:focus {
+  border-color: var(--nt-primary, #E85454);
+}
+
+.searchInput::placeholder {
+  color: var(--nt-text-muted);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+}
+
+.emptyHint {
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--nt-text-muted);
+}
+
+.groupLabel {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--nt-text-muted);
+  padding: 6px 8px 3px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--nt-radius-sm);
+  cursor: pointer;
+  transition: background var(--nt-transition);
+  margin-bottom: 1px;
+  position: relative;
+}
+
+.item:hover {
+  background: var(--nt-hover);
+}
+
+.itemActive {
+  background: var(--nt-active);
+}
+
+.itemPinned::before {
+  content: "★";
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  font-size: 8px;
+  color: var(--nt-primary, #E85454);
+  opacity: 0.4;
+}
+
+.itemDot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: 10px;
+  color: var(--nt-text-muted);
+}
+
+.renameInput {
+  width: 100%;
+  font-size: 12px;
+  padding: 2px 4px;
+  border: 0.5px solid var(--nt-primary, #E85454);
+  border-radius: 3px;
+  background: var(--nt-bg, #fff);
+  color: var(--nt-text);
+  font-family: inherit;
+  outline: none;
+}
+
+.itemActions {
+  display: none;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.item:hover .itemActions {
+  display: flex;
+}
+
+.actionBtn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--nt-text-muted);
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.actionBtn:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.iconAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--nt-accent-light, rgba(0,122,255,0.12));
+  color: var(--nt-primary, #E85454);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.userBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--nt-border);
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.userBar:hover {
+  background: var(--nt-hover, rgba(0,0,0,0.03));
+}
+
+.userAvatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--nt-primary, #E85454), var(--nt-primary, #E85454));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.userName {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--nt-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userChevron {
+  color: var(--nt-text-muted);
+  flex-shrink: 0;
+}

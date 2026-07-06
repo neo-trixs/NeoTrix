@@ -1,0 +1,46 @@
+[advisories]
+vulnerability = "deny"
+unmaintained = "warn"
+notice = "warn"
+yanked = "warn"
+ignore = [
+    # wasmtime RCE — transitive via cap-std, no direct usage, pending upstream patch
+    "RUSTSEC-2024-0370",
+    # hickory-proto — transitive via trust-dns-resolver, no direct DNS usage
+    "RUSTSEC-2024-0382",
+    # rustls-webpki — unbounded memory growth, pending upstream fix
+    "RUSTSEC-2024-0417",
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "Zlib",
+    "ISC",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "Unlicense",
+]
+deny = []
+copyleft = "deny"
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+skip-tree = [
+    { name = "tokio", version = "1" },
+    { name = "hyper", version = "0" },
+    { name = "rustls", version = "0" },
+]
+skip = [
+    # quick-xml 0.31→0.41 migration complete; both may coexist during transition
+    { name = "quick-xml", version = "0.31" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = []

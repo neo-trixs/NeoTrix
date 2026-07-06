@@ -1,0 +1,504 @@
+/* ═══════════════════════════════════════════
+   Settings Modal — st-* classes
+   From preview-ui-v2.html lines 1096-1166
+   Mapped to var(--nt-*) design tokens
+   ═══════════════════════════════════════════ */
+
+/* ─── Overlay ─── */
+.st-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--nt-overlay);
+  backdrop-filter: blur(4px);
+  z-index: var(--z-overlay, 200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: stFadeIn 0.15s ease-out;
+}
+
+/* ─── Modal shell ─── */
+.st-modal {
+  width: 720px;
+  max-width: calc(100vw - 60px);
+  height: 560px;
+  max-height: calc(100vh - 60px);
+  display: flex;
+  border-radius: var(--nt-radius-xl, 20px);
+  overflow: hidden;
+  background: var(--nt-glass-L4-bg);
+  border: 1px solid var(--nt-glass-border);
+  box-shadow:
+    0 0 0 0.5px rgba(0,0,0,0.02),
+    0 16px 48px rgba(0,0,0,0.15);
+  animation: stModalIn 0.25s ease-out;
+  position: relative;
+}
+
+/* ─── Sidebar ─── */
+.st-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid var(--nt-border);
+  background: rgba(0,0,0,0.02);
+  overflow-y: auto;
+}
+
+/* ─── Search ─── */
+.st-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.st-search-icon {
+  position: absolute;
+  left: 10px;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: var(--nt-text-muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.st-search input {
+  width: 100%;
+  padding: 7px 10px 7px 30px;
+  border-radius: var(--nt-radius-sm, 8px);
+  border: 1px solid var(--nt-border);
+  background: var(--nt-glass-L1-bg);
+  font-size: var(--nt-font-size-caption, 10px);
+  font-family: var(--nt-font-family);
+  color: var(--nt-text);
+  outline: none;
+  transition: var(--nt-transition);
+}
+
+.st-search input:focus {
+  border-color: var(--nt-text-muted);
+}
+
+.st-search input::placeholder {
+  color: var(--nt-text-muted);
+}
+
+.st-kbd {
+  position: absolute;
+  right: 8px;
+  font-size: 10px;
+  font-family: var(--nt-font-mono);
+  color: var(--nt-text-muted);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--nt-border);
+  background: var(--nt-glass-L1-bg);
+  pointer-events: none;
+}
+
+/* ─── Group label ─── */
+.st-grp {
+  font-size: 10px;
+  font-weight: var(--nt-font-weight-semibold, 600);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--nt-text-muted);
+  padding: 12px 10px 4px 10px;
+}
+
+/* ─── Nav item ─── */
+.st-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: var(--nt-font-size-caption, 10px);
+  color: var(--nt-text-secondary);
+  cursor: pointer;
+  transition: var(--nt-transition);
+  border: none;
+  background: transparent;
+  font-family: var(--nt-font-family);
+  text-align: left;
+  width: 100%;
+}
+
+.st-item:hover {
+  background: var(--nt-hover);
+}
+
+.st-item.on {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+  font-weight: var(--nt-font-weight-medium, 500);
+}
+
+.st-item svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+/* ─── Content area ─── */
+.st-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.st-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  flex-shrink: 0;
+}
+
+.st-title {
+  font-size: var(--nt-font-size-heading, 15px);
+  font-weight: var(--nt-font-weight-semibold, 600);
+  color: var(--nt-text);
+}
+
+.st-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--nt-text-muted);
+  padding: 4px;
+  border-radius: var(--nt-radius-sm, 8px);
+  display: flex;
+  align-items: center;
+  transition: var(--nt-transition);
+}
+
+.st-close:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.st-close svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ─── Body ─── */
+.st-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px 24px 24px;
+}
+
+/* ─── Section ─── */
+.st-section {
+  display: none;
+}
+
+.st-section.open {
+  display: block;
+  animation: stSectionIn 0.15s ease-out;
+}
+
+/* ─── Section heading ─── */
+.st-h2 {
+  font-size: var(--nt-font-size-body-lg, 14px);
+  font-weight: var(--nt-font-weight-semibold, 600);
+  color: var(--nt-text);
+  margin-bottom: 16px;
+}
+
+/* ─── Card ─── */
+.st-card {
+  border-radius: var(--nt-radius-md, 12px);
+  border: 1px solid var(--nt-border);
+  background: var(--nt-glass-L1-bg);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.st-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.st-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.st-lbl {
+  font-size: var(--nt-font-size-body, 13px);
+  font-weight: var(--nt-font-weight-semibold, 600);
+  color: var(--nt-text);
+}
+
+.st-desc {
+  font-size: var(--nt-font-size-caption, 10px);
+  color: var(--nt-text-muted);
+  line-height: 1.4;
+}
+
+/* ─── Avatar ─── */
+.st-av {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--nt-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--nt-font-weight-bold, 700);
+  color: var(--nt-text);
+  border: 1px solid var(--nt-border);
+  flex-shrink: 0;
+  font-size: var(--nt-font-size-body, 13px);
+}
+
+/* ─── Input field wrapper ─── */
+.st-field {
+  margin-bottom: 16px;
+}
+
+.st-field .st-lbl {
+  display: block;
+  margin-bottom: 5px;
+  font-size: var(--nt-font-size-caption, 10px);
+}
+
+/* ─── Text/select input ─── */
+.st-input {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: var(--nt-radius-sm, 8px);
+  border: 1px solid var(--nt-border);
+  background: var(--nt-glass-L1-bg);
+  font-size: var(--nt-font-size-body, 13px);
+  font-family: var(--nt-font-family);
+  color: var(--nt-text);
+  outline: none;
+  transition: var(--nt-transition);
+  box-sizing: border-box;
+}
+
+.st-input:focus {
+  border-color: var(--nt-text-muted);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.04);
+}
+
+.st-input::placeholder {
+  color: var(--nt-text-muted);
+}
+
+select.st-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 3l2 2 2-2' fill='none' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 10px;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+/* ─── Switch toggle ─── */
+.st-switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.st-switch input {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: 1px solid var(--nt-border-strong);
+  background: var(--nt-hover);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  position: relative;
+  transition: var(--nt-transition);
+  margin: 0;
+}
+
+.st-switch input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--nt-text-muted);
+  transition: var(--nt-transition);
+}
+
+.st-switch input:checked {
+  background: var(--nt-primary);
+  border-color: var(--nt-primary);
+}
+
+.st-switch input:checked::after {
+  left: 18px;
+  background: #fff;
+}
+
+/* ─── Shortcut rows ─── */
+.st-shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+.st-shortcut-row + .st-shortcut-row {
+  border-top: 1px solid var(--nt-border-subtle);
+}
+
+.st-shortcut-row kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  padding: 3px 8px;
+  background: var(--nt-hover);
+  border: 1px solid var(--nt-border);
+  border-radius: 4px;
+  font-family: var(--nt-font-mono);
+  font-size: 11px;
+  color: var(--nt-text-secondary);
+}
+
+.st-shortcut-row span {
+  font-size: 13px;
+  color: var(--nt-text);
+}
+
+/* ─── Animations ─── */
+@keyframes stFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes stModalIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes stSectionIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 780px) {
+  .st-modal {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .st-sidebar {
+    width: 160px;
+    padding: 12px 8px;
+  }
+
+  .st-top {
+    padding: 12px 16px;
+  }
+
+  .st-body {
+    padding: 0 16px 16px;
+  }
+}
+
+@media (max-width: 500px) {
+  .st-sidebar {
+    display: none;
+  }
+}
+
+/* ─── Dark mode overrides ─── */
+[data-theme="dark"] .st-overlay {
+  background: var(--nt-overlay);
+}
+
+[data-theme="dark"] .st-modal {
+  background: var(--nt-glass-L0-bg);
+  border-color: var(--nt-glass-border);
+}
+
+[data-theme="dark"] .st-sidebar {
+  background: var(--nt-glass-L2-bg);
+  border-right-color: var(--nt-glass-border);
+}
+
+[data-theme="dark"] .st-search input {
+  background: var(--nt-glass-L1-bg);
+  border-color: var(--nt-glass-border);
+  color: var(--nt-text);
+}
+
+[data-theme="dark"] .st-input {
+  background: var(--nt-glass-L1-bg);
+  border-color: var(--nt-glass-border);
+  color: var(--nt-text);
+}
+
+[data-theme="dark"] .st-card {
+  background: var(--nt-glass-L1-bg);
+  border-color: var(--nt-glass-border);
+}
+
+[data-theme="dark"] .st-item.on {
+  background: var(--nt-glass-L3-bg);
+  color: var(--nt-text);
+}
+
+[data-theme="dark"] .st-kbd {
+  background: var(--nt-glass-L1-bg);
+  border-color: var(--nt-glass-border);
+  color: var(--nt-gray-700);
+}
+
+[data-theme="dark"] .st-switch input {
+  background: var(--nt-gray-400);
+  border-color: var(--nt-border-strong);
+}
+
+[data-theme="dark"] .st-switch input:checked {
+  background: var(--nt-primary);
+  border-color: var(--nt-primary);
+}

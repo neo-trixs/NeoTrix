@@ -67,7 +67,7 @@ impl BrowserHost {
         // 窗口关闭由 Tauri 自动管理, 不需要轮询
         // 浏览器窗口关闭时, 前端通过 emit("browser:closed") 通知状态变更
         let _window_clone = window.clone();
-        let _ = window.on_window_event(move |event| {
+        window.on_window_event(move |event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let _ = close_handle.emit("browser:closed", ());
             }
@@ -203,11 +203,9 @@ fn strip_html(html: &str) -> String {
                         }
                     }
                 }
-            }
-            if in_style {
-                if i + 7 < chars.len() {
-                    let end: String = chars[i..(i + 8.min(chars.len() - i))].iter().collect();
-                    if end.starts_with("</style") || end.starts_with("</STYLE") {
+            if in_style && i + 7 < chars.len() {
+                let end: String = chars[i..(i + 8.min(chars.len() - i))].iter().collect();
+                if end.starts_with("</style") || end.starts_with("</STYLE") {
                         in_style = false;
                         if let Some(close) = end.find('>') {
                             skip_chars = close;

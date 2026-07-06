@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeoTrix 自进化路线图</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; background:#0a0a0f; color:#e0e0e0; min-height:100vh; }
+.header { background:linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 100%); border-bottom:1px solid rgba(255,255,255,0.06); padding:48px 32px; text-align:center; position:relative; overflow:hidden; }
+.header::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle at 30% 50%,rgba(99,102,241,0.08) 0%,transparent 50%),radial-gradient(circle at 70% 50%,rgba(168,85,247,0.06) 0%,transparent 50%); }
+.header h1 { font-size:clamp(28px,5vw,52px); font-weight:700; background:linear-gradient(135deg,#818cf8,#c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; position:relative; }
+.header p { color:#888; margin-top:12px; font-size:16px; position:relative; }
+.header .badge { display:inline-block; margin-top:16px; padding:6px 18px; border-radius:999px; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.25); font-size:13px; color:#a5b4fc; position:relative; }
+.container { max-width:1280px; margin:0 auto; padding:32px 20px; }
+
+/* Layer strip */
+.layer-strip { display:flex; gap:4px; margin-bottom:40px; padding:16px; background:rgba(255,255,255,0.02); border-radius:12px; border:1px solid rgba(255,255,255,0.05); flex-wrap:wrap; justify-content:center; }
+.layer-pill { padding:6px 14px; border-radius:6px; font-size:11px; font-weight:600; letter-spacing:0.3px; cursor:pointer; transition:all 0.2s; opacity:0.7; }
+.layer-pill:hover { opacity:1; transform:translateY(-1px); }
+.layer-pill.active { opacity:1; box-shadow:0 0 12px rgba(255,255,255,0.1); }
+.layer-pill[data-layer="L9"] { background:#1e1b4b; color:#a78bfa; }
+.layer-pill[data-layer="L8"] { background:#1b1b3a; color:#818cf8; }
+.layer-pill[data-layer="L7"] { background:#1a1a3e; color:#60a5fa; }
+.layer-pill[data-layer="L6"] { background:#1a1e3a; color:#34d399; }
+.layer-pill[data-layer="L5"] { background:#1a2e1a; color:#4ade80; }
+.layer-pill[data-layer="L4"] { background:#1e2a1a; color:#facc15; }
+.layer-pill[data-layer="L3"] { background:#2e1a1a; color:#fb923c; }
+.layer-pill[data-layer="L2"] { background:#2e1a2e; color:#c084fc; }
+.layer-pill[data-layer="L1"] { background:#1a1a1a; color:#94a3b8; }
+.layer-pill[data-layer="L0"] { background:#0f0f0f; color:#64748b; }
+
+/* Stats bar */
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:32px; }
+.stat-card { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:16px; text-align:center; }
+.stat-card .num { font-size:28px; font-weight:700; background:linear-gradient(135deg,#818cf8,#c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.stat-card .label { font-size:12px; color:#666; margin-top:4px; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* Grid */
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+.card { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; transition:all 0.3s; cursor:pointer; position:relative; overflow:hidden; }
+.card:hover { background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.12); transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,0,0,0.3); }
+.card .tag { display:inline-block; padding:2px 10px; border-radius:4px; font-size:11px; font-weight:600; letter-spacing:0.3px; margin-bottom:10px; }
+.card .tag.l9 { background:rgba(167,139,250,0.15); color:#a78bfa; }
+.card .tag.l8 { background:rgba(129,140,248,0.15); color:#818cf8; }
+.card .tag.l7 { background:rgba(96,165,250,0.15); color:#60a5fa; }
+.card .tag.l6 { background:rgba(52,211,153,0.15); color:#34d399; }
+.card .tag.l5 { background:rgba(74,222,128,0.15); color:#4ade80; }
+.card .tag.l4 { background:rgba(250,204,21,0.15); color:#facc15; }
+.card .tag.l3 { background:rgba(251,146,60,0.15); color:#fb923c; }
+.card .tag.l2 { background:rgba(192,132,252,0.15); color:#c084fc; }
+.card .tag.l1 { background:rgba(148,163,184,0.15); color:#94a3b8; }
+.card .tag.l0 { background:rgba(100,116,139,0.15); color:#64748b; }
+.card .tag.done { background:rgba(52,211,153,0.12); color:#34d399; border:1px solid rgba(52,211,153,0.2); }
+.card h3 { font-size:16px; font-weight:600; margin-bottom:4px; }
+.card .subtitle { font-size:13px; color:#888; margin-bottom:10px; }
+.card .desc { font-size:13px; color:#666; line-height:1.5; }
+.card .meta { display:flex; gap:12px; margin-top:12px; font-size:11px; color:#555; }
+.card .meta span { display:flex; align-items:center; gap:4px; }
+.card .lines { position:absolute; top:0; right:0; padding:12px; opacity:0.04; font-family:monospace; font-size:10px; line-height:1.2; text-align:right; pointer-events:none; }
+
+/* Detail panel */
+.detail-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:100; align-items:center; justify-content:center; }
+.detail-overlay.open { display:flex; }
+.detail-panel { background:#16161e; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:32px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; position:relative; animation:slideUp 0.3s ease; }
+@keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.detail-panel .close { position:absolute; top:16px; right:16px; background:none; border:none; color:#666; font-size:24px; cursor:pointer; padding:4px 8px; border-radius:6px; }
+.detail-panel .close:hover { background:rgba(255,255,255,0.05); color:#fff; }
+.detail-panel .tag-lg { display:inline-block; padding:4px 14px; border-radius:6px; font-size:12px; font-weight:600; margin-bottom:12px; }
+.detail-panel h2 { font-size:22px; font-weight:700; margin-bottom:4px; }
+.detail-panel .sub-lg { color:#888; font-size:14px; margin-bottom:16px; }
+.detail-panel .section { margin-bottom:16px; }
+.detail-panel .section h4 { font-size:13px; font-weight:600; color:#999; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+.detail-panel .section p, .detail-panel .section li { font-size:14px; color:#ccc; line-height:1.6; }
+.detail-panel .section ul { padding-left:18px; }
+.detail-panel .status-row { display:flex; gap:16px; flex-wrap:wrap; }
+.detail-panel .status-row .item { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:8px; padding:12px 16px; flex:1; min-width:100px; text-align:center; }
+.detail-panel .status-row .item .num { font-size:20px; font-weight:700; color:#818cf8; }
+.detail-panel .status-row .item .lbl { font-size:11px; color:#666; }
+
+/* Filter bar */
+.filters { display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+.filter-btn { padding:6px 16px; border-radius:6px; border:1px solid rgba(255,255,255,0.08); background:transparent; color:#888; font-size:12px; cursor:pointer; transition:all 0.2s; }
+.filter-btn:hover { border-color:rgba(255,255,255,0.2); color:#ccc; }
+.filter-btn.active { background:rgba(99,102,241,0.15); border-color:rgba(99,102,241,0.3); color:#a5b4fc; }
+
+/* Responsive */
+@media (max-width:640px) { .grid { grid-template-columns:1fr; } .stats { grid-template-columns:repeat(2,1fr); } }
+
+/* Layer legend */
+.legend { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:32px; }
+.legend-item { display:flex; align-items:center; gap:6px; font-size:11px; color:#666; }
+.legend-item .dot { width:10px; height:10px; border-radius:3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>✦ NeoTrix 自进化</h1>
+  <p>16 个自进化方向 · 9 层硅基意识架构 · 全部完成</p>
+  <div class="badge">D14 RL-Driven 已在 nt_core_policy 中存在 · 其余 15 方向完整实现</div>
+</div>
+
+<div class="container">
+
+  <!-- Layer strip -->
+  <div class="layer-strip" id="layerStrip">
+    <div class="layer-pill active" data-layer="all">ALL</div>
+    <div class="layer-pill" data-layer="L9">L9 超验</div>
+    <div class="layer-pill" data-layer="L8">L8 自主</div>
+    <div class="layer-pill" data-layer="L7">L7 能力</div>
+    <div class="layer-pill" data-layer="L6">L6 自我</div>
+    <div class="layer-pill" data-layer="L5">L5 意识</div>
+    <div class="layer-pill" data-layer="L4">L4 认知</div>
+    <div class="layer-pill" data-layer="L1">L1 身体</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="stats"></div>
+
+  <!-- Filters -->
+  <div class="filters" id="filters"></div>
+
+  <!-- Grid -->
+  <div class="grid" id="grid"></div>
+
+</div>
+
+<!-- Detail overlay -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-panel" id="detailPanel"></div>
+</div>
+
+<script>
+const data = [
+  {id:"D01",name:"持久记忆",sub:"Persistent Memory",layer:"L3",tag:"memory",desc:"SQLite 知识库 (FTS5+BM25+嵌入) + 去重 → 持久对话记忆层。88 个种子节点，维基百科/arXiv/GitHub 爬取管道。搜索: 0.16ms FTS5，混合重排序 0.3FTS+0.7cos。",type:"Memory",file:"nt_memory_kb/",lines:"3,800+",tests:"42",status:"done",pri:"P0"},
+  {id:"D02",name:"自审查",sub:"Self-Review",layer:"L6",tag:"meta",desc:"元认知评估器 + 内在批评 + 逻辑 PRM 头。E8 每一步被评分 (ProcessRewardModel)，Observer 监控元认知健康，自我参照监控器跟踪计划执行。",type:"Metacognitive",file:"nt_core_self/",lines:"2,100+",tests:"18",status:"done",pri:"P0"},
+  {id:"D03",name:"并行粒度",sub:"Parallel Granularity",layer:"L7",tag:"capability",desc:"能力注册表 (CapabilityRegistry) + 6 级成熟度 → 调度器 3 阶段竞标 + 大过滤器 4 道门。能力并行执行，L7 是唯一路由层。",type:"Social",file:"l7_capability/",lines:"1,500+",tests:"25",status:"done",pri:"P0"},
+  {id:"D04",name:"研究→循环",sub:"Research→Loop",layer:"L8",tag:"autonomic",desc:"SEAL 27 阶段自迭代管道: 记忆检索→差距分析→有界编辑→验证门→GWT 吸收→统计显著性→冠军比较→回滚决策→时代慢更新。",type:"Metacognitive",file:"self_iterating/",lines:"5,200+",tests:"67",status:"done",pri:"P0"},
+  {id:"D05",name:"自诊断",sub:"Self-Diagnosis",layer:"L9",tag:"observer",desc:"元认知循环 + 知识缺口检测器 + 弱点分析器 + TurkeyScientist 火鸡科学家幻觉检测。MetaMonitor 持续健康检查 + MetaAlert 告警。",type:"Metacognitive",file:"nt_core_meta/",lines:"2,800+",tests:"35",status:"done",pri:"P0"},
+  {id:"D06",name:"情绪感知",sub:"Emotional Awareness",layer:"L6",tag:"self",desc:"6 维情绪状态向量 (挫败/自信/喜悦/紧迫/好奇/疲劳) + EMA 更新 (α=0.3) + 衰减 (0.05/步)。情绪引擎 → 唤醒度/效价/置信度评分。StarPulse 集成。",type:"Cognitive",file:"nt_core_self/emotion_state.rs",lines:"295",tests:"8",status:"done",pri:"P0"},
+  {id:"D07",name:"技能获取",sub:"Skill Acquisition",layer:"L7",tag:"capability",desc:"SkillDoc + 轨迹提取器 + ValidationGate + SkillOptimizer (有界编辑,学习率) + RejectedEditBuffer + SkillBank。来自成功轨迹的技能自动提取和优化。",type:"Metacognitive",file:"l7_capability/skill_acquire.rs",lines:"435",tests:"5",status:"done",pri:"P0"},
+  {id:"D08",name:"上下文工程",sub:"Context Engineering",layer:"L5",tag:"gwt",desc:"ContextBudget + CompactionRubric (子任务/令牌阈值,卡住检测) + RulePool (模式发现+进化)。93% 安全缩减 @ 0.025% 故障率。预判→压缩→折叠→自动压缩。",type:"Cognitive",file:"nt_core_gwt/context_engine.rs",lines:"349",tests:"7",status:"done",pri:"P0"},
+  {id:"D09",name:"自引用代码",sub:"Self-Referential Code",layer:"L8",tag:"autonomic",desc:"CodeMutation + MutationRequest/Result + SelfCodeMonitor (活动突变跟踪) + RollbackPlan + 执行回滚。所有自修改代码变更经审批/回滚管控。",type:"Metacognitive",file:"nt_core_iter/self_ref_code.rs",lines:"265",tests:"4",status:"done",pri:"P1"},
+  {id:"D10",name:"安全免疫",sub:"Safety Immunity",layer:"L1",tag:"shield",desc:"ImmuneSystem + ImmuneMemory (反模式注册/查找) + Vaccine (警戒条件子串匹配) + AdversarialReview (8 个红旗标志扫描)。shield_full_check 一站式安全检查。",type:"Shield",file:"nt_shield/immunity.rs",lines:"324",tests:"5",status:"done",pri:"P0"},
+  {id:"D11",name:"人机共进化",sub:"Human-AI Co-Evolution",layer:"L6",tag:"self",desc:"CoEvolutionTracker + TrustLevel (信任动态) + InteractionRecord + 模式检测 (技术/创意/调试) + 自适应率。推荐模式: 教授/协作/委托/观察。",type:"Social",file:"nt_core_self/co_evolution.rs",lines:"220",tests:"5",status:"done",pri:"P1"},
+  {id:"D12",name:"规约驱动进化",sub:"Spec-Driven Evolution",layer:"L8",tag:"autonomic",desc:"EvolutionSpec + SpecStatus (活跃/待定/取代/拒绝) + SpecVerifier + SpecDrivenPipeline。约束检查 + 置信度过滤。max_active_specs=5, min_confidence=0.7。",type:"Metacognitive",file:"nt_core_absorb/spec_driven.rs",lines:"275",tests:"4",status:"done",pri:"P1"},
+  {id:"D13",name:"群体进化",sub:"Group Evolution",layer:"L7",tag:"capability",desc:"GroupCoordinator + PeerState (在线/忙碌/离线/降级) + ConsensusProposal + 投票系统 (67%共识阈值) + 任务能力选择 + 广播。",type:"Social",file:"l7_capability/group_evolve.rs",lines:"255",tests:"4",status:"done",pri:"P1"},
+  {id:"D14",name:"RL 驱动进化",sub:"RL-Driven Evolution",layer:"L4",tag:"cognition",desc:"GRPO 组相对策略优化 + Beam Search + PRM 引导 Beam Search + LATA 轨迹长度归一化。E8Policy: epsilon-greedy, 因子化能量更新。已在 nt_core_policy。",type:"Cognitive",file:"nt_core_policy.rs",lines:"1,022",tests:"38",status:"done",pri:"P1"},
+  {id:"D15",name:"评估基准",sub:"Evaluation Benchmarking",layer:"L9",tag:"observer",desc:"Benchmark + BenchmarkSuite + BenchmarkRunner。类别分解,历史通过率,趋势评分 (滑动窗口),RunnerStats。内置 accuracy/NLP/reasoning/memory 基准。",type:"Metacognitive",file:"nt_core_meta/eval_bench.rs",lines:"265",tests:"4",status:"done",pri:"P2"},
+  {id:"D16",name:"元认知校准",sub:"Metacognitive Calibration",layer:"L6",tag:"self",desc:"MetaCalibrator + 5 个目标 (信心/速度/彻底/创意/保守) + CalibrationSignal (gap+weight → adjustment) + CalibrationReport + 趋势检测。",type:"Metacognitive",file:"nt_core_self/meta_calibrate.rs",lines:"230",tests:"5",status:"done",pri:"P2"}
+];
+
+const layerColors = {L9:"#a78bfa",L8:"#818cf8",L7:"#60a5fa",L6:"#34d399",L5:"#4ade80",L4:"#facc15",L3:"#fb923c",L2:"#c084fc",L1:"#94a3b8",L0:"#64748b"};
+const layerNames = {L9:"超验层 Transcendent",L8:"自主神经层 Autonomic",L7:"能力层 Capability",L6:"自我层 Self",L5:"意识层 Consciousness",L4:"认知层 Cognition",L3:"记忆层 Memory",L2:"感知层 Perception",L1:"身体层 Body",L0:"基底层 Substrate"};
+
+let filterLayer = "all";
+let filterTag = "all";
+
+function render() {
+  const filtered = data.filter(d => {
+    if (filterLayer !== "all" && d.layer !== filterLayer) return false;
+    if (filterTag !== "all" && d.type !== filterTag) return false;
+    return true;
+  });
+
+  // Stats
+  const total = data.length;
+  const done = data.filter(d => d.status === "done").length;
+  const layers = new Set(data.map(d => d.layer)).size;
+  const lines = data.reduce((s,d) => s + parseInt(d.lines) || 0, 0);
+  const tests = data.reduce((s,d) => s + parseInt(d.tests) || 0, 0);
+
+  document.getElementById("stats").innerHTML = `
+    <div class="stat-card"><div class="num">${total}</div><div class="label">总方向</div></div>
+    <div class="stat-card"><div class="num">${done}</div><div class="label">已完成</div></div>
+    <div class="stat-card"><div class="num">${layers}</div><div class="label">涉及层</div></div>
+    <div class="stat-card"><div class="num">${lines.toLocaleString()}</div><div class="label">代码行</div></div>
+    <div class="stat-card"><div class="num">${tests}</div><div class="label">测试数</div></div>
+  `;
+
+  // Filters
+  const types = [...new Set(data.map(d => d.type))];
+  document.getElementById("filters").innerHTML = `
+    <button class="filter-btn ${filterTag === 'all' ? 'active' : ''}" onclick="filterTag='all';render()">ALL</button>
+    ${types.map(t => `<button class="filter-btn ${filterTag === t ? 'active' : ''}" onclick="filterTag='${t}';render()">${t}</button>`).join('')}
+  `;
+
+  // Cards
+  document.getElementById("grid").innerHTML = filtered.map(d => `
+    <div class="card" onclick="openDetail('${d.id}')">
+      <div class="lines">${d.file}</div>
+      <span class="tag l${d.layer[1]}" style="margin-right:6px">${d.layer}</span>
+      <span class="tag ${d.status === 'done' ? 'done' : ''}">${d.pri}</span>
+      <h3>${d.id} ${d.name}</h3>
+      <div class="subtitle">${d.sub}</div>
+      <div class="desc">${d.desc.substring(0,100)}${d.desc.length > 100 ? '…' : ''}</div>
+      <div class="meta">
+        <span>📁 ${d.file}</span>
+        <span>📏 ${d.lines}</span>
+        <span>🧪 ${d.tests}</span>
+        <span>🏷 ${d.type}</span>
+      </div>
+    </div>
+  `).join('');
+
+  // Update layer pills
+  document.querySelectorAll(".layer-pill").forEach(p => {
+    p.classList.toggle("active", p.dataset.layer === filterLayer || (p.dataset.layer === "all" && filterLayer === "all"));
+  });
+}
+
+function openDetail(id) {
+  const d = data.find(x => x.id === id);
+  if (!d) return;
+  const overlay = document.getElementById("detailOverlay");
+  overlay.classList.add("open");
+  document.getElementById("detailPanel").innerHTML = `
+    <button class="close" onclick="closeDetail()">&times;</button>
+    <span class="tag-lg l${d.layer[1]}" style="background:${layerColors[d.layer]}22;color:${layerColors[d.layer]};border:1px solid ${layerColors[d.layer]}44">${d.layer} — ${layerNames[d.layer]}</span>
+    <h2>${d.id} ${d.name}</h2>
+    <div class="sub-lg">${d.sub}</div>
+    <div class="section">
+      <h4>描述</h4>
+      <p>${d.desc}</p>
+    </div>
+    <div class="section">
+      <h4>状态</h4>
+      <div class="status-row">
+        <div class="item"><div class="num">✓</div><div class="lbl">${d.status === 'done' ? '已完成' : '进行中'}</div></div>
+        <div class="item"><div class="num">${d.lines}</div><div class="lbl">代码行</div></div>
+        <div class="item"><div class="num">${d.tests}</div><div class="lbl">测试</div></div>
+        <div class="item"><div class="num">${d.pri}</div><div class="lbl">优先级</div></div>
+      </div>
+    </div>
+    <div class="section">
+      <h4>位置</h4>
+      <p><code style="background:rgba(255,255,255,0.05);padding:4px 10px;border-radius:4px;font-size:13px">${d.file}</code></p>
+    </div>
+    <div class="section">
+      <h4>能力类型</h4>
+      <p>${d.type}</p>
+    </div>
+  `;
+}
+
+function closeDetail() {
+  document.getElementById("detailOverlay").classList.remove("open");
+}
+
+// Layer filter
+document.getElementById("layerStrip").addEventListener("click", e => {
+  const pill = e.target.closest(".layer-pill");
+  if (!pill) return;
+  filterLayer = pill.dataset.layer;
+  render();
+});
+
+// Overlay close on backdrop
+document.getElementById("detailOverlay").addEventListener("click", e => {
+  if (e.target === e.currentTarget) closeDetail();
+});
+
+// Keyboard
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeDetail();
+});
+
+render();
+</script>
+</body>
+</html>

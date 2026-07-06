@@ -1,0 +1,51 @@
+name: Evolution-Driven Release
+
+on:
+  schedule:
+    # Daily at 03:00 UTC — auto-release if evolution daemon has accumulated fixes
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Release reason"
+        required: false
+        default: "manual evolution trigger"
+
+jobs:
+  check-evolution:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check evolution state
+        id: check
+        run: |
+          # Check if any evolution-driven changes exist since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          COMMITS_SINCE=$(git rev-list "$LAST_TAG..HEAD" --count 2>/dev/null || echo 0)
+          # Check for auto-fix commits (evolution daemon commits start with "🤖")
+          EVO_COMMITS=$(git log "$LAST_TAG..HEAD" --oneline --grep="🤖" --count 2>/dev/null || echo 0)
+
+          if [ "$EVO_COMMITS" -gt 0 ] || [ "$COMMITS_SINCE" -gt 5 ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            # Increment patch version
+            CURRENT=$(echo "$LAST_TAG" | sed 's/v//')
+            NEW_VERSION=$(echo "$CURRENT" | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+            echo "version=v$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "✅ Evolution detected: $EVO_COMMITS auto-fix commits, $COMMITS_SINCE total since $LAST_TAG"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "⏹ No evolution-driven changes since $LAST_TAG"
+          fi
+
+  release:
+    needs: check-evolution
+    if: needs.check-evolution.outputs.should_release == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.check-evolution.outputs.version }}
+    secrets: inherit

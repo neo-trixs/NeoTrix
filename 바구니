@@ -1,0 +1,8 @@
+   Compiling neotrix v0.18.0 (/Users/neo/Downloads/neotrix/neotrix-core)
+   Compiling neotrix v0.18.0 (/Users/neo/Downloads/neotrix/neotrix-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.40s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.40s
+     Running unittests src/lib.rs (target/debug/deps/neotrix-59eabfcda42b08ec)
+     Running unittests src/lib.rs (target/debug/deps/neotrix-59eabfcda42b08ec)
+error: test failed, to rerun pass `-p neotrix --lib`
+error: test failed, to rerun pass `-p neotrix --lib`

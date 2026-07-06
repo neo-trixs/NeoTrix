@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version"
+        required: true
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    outputs:
+      changelog: ${{ steps.git-cliff.outputs.content }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate changelog
+        id: git-cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+
+  build-cli:
+    needs: changelog
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: macos_x64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: macos_arm64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: linux_x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: windows_x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          bin: neotrix
+          target: ${{ matrix.target }}
+          archive: neotrix-${{ matrix.suffix }}
+          checksum: sha256
+          token: ${{ secrets.GITHUB_TOKEN }}
+          features: self-update
+
+  build-desktop:
+    needs: changelog
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            suffix: macos_arm64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            suffix: linux_x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            suffix: windows_x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Install Windows deps
+        if: matrix.os == 'windows-latest'
+        run: choco install -y webview2-runtime
+      - name: Build frontend
+        run: npm ci && npm run build
+        working-directory: src-tauri/frontend
+      - name: Build desktop app
+        uses: tauri-apps/tauri-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "NeoTrix Desktop v${{ github.ref_name }}"
+          releaseBody: "See CLI release notes below."
+          releaseDraft: true
+          args: --target ${{ matrix.target }}
+
+  release:
+    needs: [build-cli, build-desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: neotrix-*
+          merge-multiple: true
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            neotrix-*.tar.gz
+            neotrix-*.tar.gz.sha256
+            NeoTrix_*.AppImage
+            NeoTrix_*.dmg
+            NeoTrix_*.msi
+          generate_release_notes: true
+          body: |
+            ## Changelog
+
+            ${{ needs.changelog.outputs.changelog || 'See GitHub release notes below.' }}
+
+            ## Installation
+
+            ### CLI
+            ```bash
+            curl -fsSL https://neotrix.ai/install.sh | bash
+            # or
+            brew install neotrix/tap/neotrix
+            # or
+            cargo install neotrix --features self-update
+            ```
+
+            ### Desktop
+            Download the installer for your platform from the assets below.
+
+            After installation, run `neotrix update` to check for updates.

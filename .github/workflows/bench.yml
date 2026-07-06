@@ -1,0 +1,62 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'neotrix-core/src/**'
+      - 'neotrix-core/benches/**'
+      - 'neotrix-core/Cargo.toml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'neotrix-core/src/**'
+      - 'neotrix-core/benches/**'
+      - 'neotrix-core/Cargo.toml'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  bench:
+    name: cargo bench
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: neotrix-core -> target
+
+      - name: Show toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Build benches (sanity)
+        working-directory: neotrix-core
+        run: cargo bench --no-run --bench core_bench --bench vector_ops --bench seal_loop --bench real_tasks
+
+      - name: Run benches (quick, 1 sample, short measurement)
+        working-directory: neotrix-core
+        run: |
+          cargo bench \
+            --bench core_bench --bench vector_ops --bench seal_loop --bench real_tasks \
+            -- --warm-up-time 2 --measurement-time 5 --sample-size 5
+
+      - name: Upload bench results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: neotrix-core/target/criterion
+          retention-days: 30
+          if-no-files-found: ignore

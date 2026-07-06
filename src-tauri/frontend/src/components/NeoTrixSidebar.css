@@ -1,0 +1,350 @@
+/* ════════════════════════════════════════
+   NeoTrix Sidebar — Liquid Glass v2
+   Matches preview-ui-v2 design
+   ════════════════════════════════════════ */
+
+.nt-sidebar {
+  width: var(--nt-sidebar-width);
+  min-width: var(--nt-sidebar-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--nt-bg-base);
+  border-right: 1px solid var(--nt-border);
+  position: relative;
+  z-index: 5;
+}
+
+.nt-sidebar-top {
+  padding: var(--nt-space-7) var(--nt-space-7) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nt-space-7);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── Traffic Lights ── */
+.nt-traffic {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-3);
+  flex-shrink: 0;
+  height: 28px;
+}
+
+.nt-traffic-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.nt-traffic-r { background: #ff5f57; }
+.nt-traffic-y { background: #febc2e; }
+.nt-traffic-g { background: #28c840; }
+
+/* ── Sidebar Header Actions ── */
+.nt-sb-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-3);
+  justify-content: flex-end;
+}
+
+.nt-sb-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nt-radius-sm);
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--nt-text-tertiary);
+  transition: var(--nt-transition);
+}
+
+.nt-sb-btn:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.nt-sb-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Segmented Mode Tabs ── */
+.nt-seg {
+  display: flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--nt-bg-raised);
+}
+
+.nt-segb {
+  flex: 1;
+  text-align: center;
+  padding: var(--nt-space-3) 0;
+  font-size: var(--nt-font-size-caption);
+  font-weight: var(--nt-font-weight-medium);
+  color: var(--nt-text-muted);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: var(--nt-transition);
+  border: none;
+  background: transparent;
+  font-family: var(--nt-font-family);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nt-space-2);
+}
+
+.nt-segb:hover { color: var(--nt-text-secondary); }
+
+.nt-segb.on {
+  background: var(--nt-bg-raised);
+  color: var(--nt-primary);
+  box-shadow: 0 0 16px rgba(232, 84, 84, 0.15);
+  font-weight: var(--nt-font-weight-semibold);
+}
+
+[data-theme="dark"] .nt-segb.on {
+  background: rgba(232, 84, 84, 0.12);
+  box-shadow: 0 0 20px rgba(232, 84, 84, 0.08);
+}
+
+.nt-segb svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nt-transition);
+}
+
+.nt-segb:hover svg {
+  transform: rotate(-72deg) scale(1.1);
+}
+
+/* ── Nav List ── */
+.nt-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.nt-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-5);
+  padding: var(--nt-space-7) var(--nt-space-5);
+  border-radius: var(--nt-radius-sm);
+  cursor: pointer;
+  transition: var(--nt-transition);
+  font-size: var(--nt-font-size-body);
+  font-weight: var(--nt-font-weight-medium);
+  color: var(--nt-text-secondary);
+  position: relative;
+  border: none;
+  background: transparent;
+  font-family: var(--nt-font-family);
+  width: 100%;
+  text-align: left;
+}
+
+.nt-nav-item:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.nt-nav-item.on {
+  background: var(--nt-active);
+  color: var(--nt-primary);
+  font-weight: var(--nt-font-weight-semibold);
+}
+
+.nt-nav-item.on::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--nt-primary);
+}
+
+.nt-nav-item svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  transition: transform var(--nt-transition);
+}
+
+.nt-nav-item:hover svg {
+  transform: rotate(-72deg) scale(1.15);
+}
+
+.nt-nav-item.on svg {
+  stroke-width: 2;
+}
+
+/* ── Recents ── */
+.nt-recents {
+  padding: 0 var(--nt-space-5);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.nt-recents-header {
+  font-size: var(--nt-font-size-caption);
+  font-weight: var(--nt-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--nt-text-muted);
+  margin-bottom: var(--nt-space-2);
+  padding: 0 var(--nt-space-1);
+}
+
+.nt-recent-item {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-4);
+  padding: var(--nt-space-3) var(--nt-space-3);
+  border-radius: var(--nt-radius-sm);
+  cursor: pointer;
+  transition: var(--nt-transition);
+  font-size: var(--nt-font-size-small);
+  color: var(--nt-text-secondary);
+}
+
+.nt-recent-item:hover {
+  background: var(--nt-hover);
+  color: var(--nt-text);
+}
+
+.nt-recent-item.ghost {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
+.nt-recent-item.ghost .nt-recent-name { font-style: italic; }
+
+.nt-recent-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--nt-primary);
+  flex-shrink: 0;
+}
+
+.nt-recent-circle {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--nt-text-muted);
+  flex-shrink: 0;
+}
+
+.nt-recent-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── User Bar ── */
+.nt-user-bar {
+  position: relative;
+  padding: var(--nt-space-4) var(--nt-space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-4);
+  border-top: 1px solid var(--nt-border);
+  background: var(--nt-bg-surface);
+  box-shadow: inset 0 1px 0 var(--nt-border-glass);
+  flex-shrink: 0;
+}
+
+.nt-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--nt-primary), var(--nt-primary-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--nt-font-size-small);
+  font-weight: var(--nt-font-weight-bold);
+  color: var(--nt-text-inverse);
+  flex-shrink: 0;
+}
+
+.nt-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.nt-user-name {
+  font-size: var(--nt-font-size-body);
+  font-weight: var(--nt-font-weight-medium);
+  color: var(--nt-text);
+}
+
+.nt-user-plan {
+  font-size: 9px;
+  color: var(--nt-text-muted);
+}
+
+.nt-user-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nt-space-1);
+}
+
+.nt-sf-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--nt-radius-sm);
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--nt-text-tertiary);
+  transition: var(--nt-transition);
+}
+
+.nt-sf-btn:hover {
+  background: var(--nt-hover-strong);
+  color: var(--nt-text);
+}
+
+.nt-sf-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

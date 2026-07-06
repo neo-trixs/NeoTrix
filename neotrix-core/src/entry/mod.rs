@@ -33,6 +33,9 @@ fn warn(msg: impl AsRef<str>) -> String {
 fn err(msg: impl AsRef<str>) -> String {
     msg.as_ref().red().to_string()
 }
+fn dim(msg: impl AsRef<str>) -> String {
+    msg.as_ref().dimmed().to_string()
+}
 
 pub fn check_provider_config() -> bool {
     let cfg = crate::config::NeoTrixConfig::load();
@@ -188,11 +191,35 @@ fn init_brain(profile: &str) -> (ReasoningBrain, ReasoningBank) {
     }
 }
 
-/// Public entry point for clap-based CLI dispatch.
-/// Each function wraps the existing async sub-mode logic.
+fn set_default_model_from_config(agent: &mut SelfIteratingBrain) {
+    let cfg = crate::config::NeoTrixConfig::load();
+    if let Some(ref model) = cfg.default_model {
+        if !model.is_empty() {
+            agent.default_model = model.clone();
+        }
+    }
+}
 
-#[allow(dead_code)]
-pub(crate) fn run_server_mode(_addr: &str, profile: &str) {
+/// 将 config.toml 中的 provider/api_key 提升为环境变量，使 GatewayV2 能发现
+fn ensure_provider_env_from_config() {
+    let cfg = crate::config::NeoTrixConfig::load();
+    if let (Some(provider), Some(api_key)) = (&cfg.provider, &cfg.api_key) {
+        if !api_key.is_empty() {
+            let env_var = match provider.as_str() {
+                "openai" => "OPENAI_API_KEY",
+                "anthropic" => "ANTHROPIC_API_KEY",
+                _ => return,
+            };
+            if std::env::var(env_var).is_err() {
+                std::env::set_var(env_var, api_key);
+            }
+        }
+    }
+}
+
+/// Public entry point for clap-based CLI dispatch: runs background loop daemon.
+/// Named "daemon" to distinguish from the actual HTTP server in server.rs.
+pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
     println!("{} v{}", info("NeoTrix Server"), env!("CARGO_PKG_VERSION"));
     println!("{}", info("Starting background services... Press Ctrl+C to stop."));
     let server_rt = tokio::runtime::Runtime::new().expect("tokio runtime");
@@ -211,12 +238,15 @@ pub(crate) fn run_server_mode(_addr: &str, profile: &str) {
             bg = bg.with_world_consciousness();
         }
         println!("{}", info("[server] all services initialized."));
-        tokio::select! {
-            _ = bg.start() => {},
-            _ = tokio::signal::ctrl_c() => {
-                println!("\n{}", info("[server] shutting down..."));
-            }
+        bg.start().await;
+        tokio::signal::ctrl_c().await.unwrap_or_default();
+        println!("\n{}", info("[server] shutting down..."));
+        // Persist E8 state on graceful shutdown (SIGTERM/Ctrl+C)
+        // Without this hook, up to 5 iterations of transition matrix learning can be lost.
+        if let Ok(brain_guard) = bg.brain.try_read() {
+            brain_guard.shutdown_save_e8();
         }
+        bg.shutdown().await;
     });
 }
 
@@ -262,7 +292,6 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     if !mentions.is_empty() && !json_output {
         eprintln!("📎 Resolved {} file mention(s)", mentions.len());
     }
-    let prompt = prompt;
     let start = std::time::Instant::now();
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
 
@@ -276,6 +305,8 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
             let mut agent = SelfIteratingBrain::new();
             agent.brain = brain;
             agent.reasoning_bank = bank;
+            set_default_model_from_config(&mut agent);
+            ensure_provider_env_from_config();
             agent.init_reasoning_engine();
 
             let timeout = tokio::time::Duration::from_secs(timeout_secs);
@@ -317,6 +348,8 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
             let mut agent = SelfIteratingBrain::new();
             agent.brain = brain;
             agent.reasoning_bank = bank;
+            set_default_model_from_config(&mut agent);
+            ensure_provider_env_from_config();
             agent.init_reasoning_engine();
 
             if let Some(ref mut engine) = agent.reasoning_engine {
@@ -349,6 +382,8 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
             let mut agent = SelfIteratingBrain::new();
             agent.brain = brain;
             agent.reasoning_bank = bank;
+            set_default_model_from_config(&mut agent);
+            ensure_provider_env_from_config();
             agent.init_reasoning_engine();
 
             let timeout = tokio::time::Duration::from_secs(timeout_secs);
@@ -390,7 +425,6 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     if !mentions.is_empty() {
         eprintln!("📎 Resolved {} file mention(s)", mentions.len());
     }
-    let prompt = prompt;
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
 
     if stream {
@@ -400,6 +434,8 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
             let mut agent = SelfIteratingBrain::new();
             agent.brain = brain;
             agent.reasoning_bank = bank;
+            set_default_model_from_config(&mut agent);
+            ensure_provider_env_from_config();
             agent.init_reasoning_engine();
 
             let result = if let Some(ref mut engine) = agent.reasoning_engine {
@@ -452,6 +488,8 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
             let mut agent = SelfIteratingBrain::new();
             agent.brain = brain;
             agent.reasoning_bank = bank;
+            set_default_model_from_config(&mut agent);
+            ensure_provider_env_from_config();
             agent.init_reasoning_engine();
 
             let pb = indicatif::ProgressBar::new(100);
@@ -738,12 +776,14 @@ pub fn run_daemon(profile: &str) {
             bg = bg.with_world_consciousness();
         }
         println!("{} {}", info("[daemon]"), info("NeoTrix background daemon started"));
-        tokio::select! {
-            _ = bg.start() => {},
-            _ = tokio::signal::ctrl_c() => {
-                println!("\n{}", info("[daemon] shutting down..."));
-            }
+        bg.start().await;
+        tokio::signal::ctrl_c().await.unwrap_or_default();
+        println!("\n{}", info("[daemon] shutting down..."));
+        // Persist E8 state on graceful shutdown (SIGTERM/Ctrl+C)
+        if let Ok(brain_guard) = bg.brain.try_read() {
+            brain_guard.shutdown_save_e8();
         }
+        bg.shutdown().await;
     });
 }
 
@@ -763,7 +803,6 @@ pub fn run_daemon_evolution(profile: &str) {
             bg = bg.with_world_consciousness();
         }
         println!("{} {}", info("[daemon]"), info("NeoTrix evolution daemon started"));
-        let daemon_handle = bg.start();
         let daemon = std::sync::Arc::new(std::sync::Mutex::new(
             neotrix::neotrix::nt_mind_evolution_daemon::EvolutionDaemon::default()
         ));
@@ -771,19 +810,21 @@ pub fn run_daemon_evolution(profile: &str) {
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                let mut d = daemon_clone.lock().expect("daemon lock");
+                let mut d = daemon_clone.lock().unwrap_or_else(|e| e.into_inner());
                 let report = d.run_cycle_goal();
                 if report.fixes_applied > 0 {
                     println!("[evolution] 🔧 {} fixes applied (cycle {})", report.fixes_applied, report.cycle);
                 }
             }
         });
-        tokio::select! {
-            _ = daemon_handle => {},
-            _ = tokio::signal::ctrl_c() => {
-                println!("\n{}", info("[daemon] shutting down..."));
-            }
+        bg.start().await;
+        tokio::signal::ctrl_c().await.unwrap_or_default();
+        println!("\n{}", info("[daemon] shutting down..."));
+        // Persist E8 state on graceful shutdown (SIGTERM/Ctrl+C)
+        if let Ok(brain_guard) = bg.brain.try_read() {
+            brain_guard.shutdown_save_e8();
         }
+        bg.shutdown().await;
     });
 }
 
@@ -814,6 +855,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         agent.brain = brain;
         agent.reasoning_bank = bank;
         agent.load_cortex();
+        set_default_model_from_config(&mut agent);
         agent.init_reasoning_engine();
         agent.quality_threshold = 0.7;
         agent.auto_absorb = true;
@@ -830,7 +872,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
 
         let mut skills_engine = SkillsEngine::new();
         let skill_count = skills_engine.init().len();
-        println!("{}: {} {}", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)), "");
+        println!("{}: {} ", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)));
         println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
 
         let mut mcp_registry = McpRegistry::new();
@@ -844,11 +886,13 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
                     args: vec![],
                 },
                 input_schema: serde_json::json!({"type": "object"}),
+                schema_version: None,
             },
         ];
         builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
         neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
+        neotrix::cli::commands::agent_cmds::set_mcp_registry(mcp_registry.clone());
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
@@ -874,7 +918,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         bg_goal_loop.load();
         let agent_team = Arc::new(Mutex::new(AgentTeam::new("default", ProcessType::Sequential)));
         bg_goal_loop = bg_goal_loop.with_agent_team(agent_team);
-        let _ = tokio::spawn(async move {
+        tokio::spawn(async move {
             let mut bg = BackgroundLoop::new(bg_agent)
                 .with_goal_loop(bg_goal_loop)
                 .with_nt_world_model(WorldModelV2::new(8, 64));
@@ -884,6 +928,36 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
             }
             bg.start().await;
         });
+
+        // Session Recovery
+        {
+            use neotrix::neotrix::nt_io_session_recovery::SessionRecoveryManager;
+            let recovery_mgr = SessionRecoveryManager::new("default")
+                .with_auto_recover(true);
+            if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
+                println!("{}: {} (session #{}, {} messages)",
+                    info("SessionRecovery"), success("restored"),
+                    snapshot.session_id, snapshot.message_count);
+            } else {
+                println!("{}: {} — no previous session found",
+                    info("SessionRecovery"), dim("fresh start"));
+            }
+        }
+
+        // AGENTS.md
+        {
+            use neotrix::neotrix::nt_io_agents_md::AgentsMdReader;
+            let agents_reader = AgentsMdReader::new();
+            if let Ok(rules) = agents_reader.load_project_rules(&std::path::Path::new(".")) {
+                if !rules.is_empty() {
+                    println!("{}: {} ({} sections)",
+                        info("AGENTS.md"), success("loaded"), rules.sections.len());
+                } else {
+                    println!("{}: {} — no rules found",
+                        info("AGENTS.md"), dim("skipped"));
+                }
+            }
+        }
 
         let sp = indicatif::ProgressBar::new_spinner();
         sp.set_style(
@@ -915,7 +989,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
     use tokio::sync::RwLock;
 
     if let Some(level) = &cfg.log_level {
-        let _ = std::env::set_var("RUST_LOG", format!("neotrix={}", level));
+        std::env::set_var("RUST_LOG", format!("neotrix={}", level));
     }
 
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
@@ -926,6 +1000,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         agent.brain = brain;
         agent.reasoning_bank = bank;
         agent.load_cortex();
+        set_default_model_from_config(&mut agent);
         agent.init_reasoning_engine();
         agent.quality_threshold = 0.7;
         agent.auto_absorb = true;
@@ -942,7 +1017,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
 
         let mut skills_engine = SkillsEngine::new();
         let skill_count = skills_engine.init().len();
-        println!("{}: {} {}", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)), "");
+        println!("{}: {} ", info("SkillsEngine"), success(format!("{} local skills loaded", skill_count)));
         println!("  -> {} /skills list to browse, /skills ecc <id> to load from ECC community", info("/skills"));
 
         let mut mcp_registry = McpRegistry::new();
@@ -956,6 +1031,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
                     args: vec![],
                 },
                 input_schema: serde_json::json!({"type": "object"}),
+                schema_version: None,
             },
         ];
         builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
@@ -990,7 +1066,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
 
         let agent_team = Arc::new(Mutex::new(AgentTeam::new("default", ProcessType::Sequential)));
         {
-            let mut team = agent_team.lock().expect("lock");
+            let mut team = agent_team.lock().unwrap_or_else(|e| e.into_inner());
             team.add_agent(AgentRole {
                 name: "planner".into(),
                 role: "Task Planner".into(),
@@ -1001,7 +1077,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         }
         bg_goal_loop = bg_goal_loop.with_agent_team(agent_team);
 
-        let _ = tokio::spawn(async move {
+        tokio::spawn(async move {
             let mut bg = BackgroundLoop::new(bg_agent)
                 .with_goal_loop(bg_goal_loop)
                 .with_nt_world_model(WorldModelV2::new(8, 64))
@@ -1026,6 +1102,40 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
             let pre_actions = hr.execute_event(&pre_ctx);
             if let Some(block_reason) = HookRegistry::check_blocked(&pre_actions) {
                 eprintln!("Hook blocked TUI session: {}", block_reason);
+            }
+        }
+
+        // Session Recovery — 加载上次会话快照
+        {
+            use neotrix::neotrix::nt_io_session_recovery::SessionRecoveryManager;
+            let recovery_mgr = SessionRecoveryManager::new("default")
+                .with_auto_recover(true);
+            if let Some(snapshot) = recovery_mgr.load_latest_snapshot() {
+                println!("{}: {} (session #{}, {} messages, {} e8 states)",
+                    info("SessionRecovery"), success("restored"),
+                    snapshot.session_id, snapshot.message_count, snapshot.e8_state_sequence.len());
+            } else {
+                println!("{}: {} — no previous session found",
+                    info("SessionRecovery"), dim("fresh start"));
+            }
+        }
+
+        // AGENTS.md — 扫描项目规则文件
+        {
+            use neotrix::neotrix::nt_io_agents_md::AgentsMdReader;
+            let agents_reader = AgentsMdReader::new();
+            if let Ok(rules) = agents_reader.load_project_rules(&std::path::Path::new(".")) {
+                if !rules.is_empty() {
+                    let sections: Vec<&str> = rules.sections.keys().map(|k| k.as_str()).collect();
+                    println!("{}: {} ({}) — {} sections: {}",
+                        info("AGENTS.md"), success("loaded"),
+                        rules.source_files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "),
+                        rules.sections.len(),
+                        sections.join(", "));
+                } else {
+                    println!("{}: {} — no rules found in current directory",
+                        info("AGENTS.md"), dim("skipped"));
+                }
             }
         }
 
@@ -1247,7 +1357,7 @@ pub fn run_config_encrypt_keys() {
         println!("  {} No plaintext API keys or secrets found in config", info("ℹ"));
         return;
     }
-    let output = toml::to_string_pretty(&cfg).unwrap_or_else(|_| content);
+    let output = toml::to_string_pretty(&cfg).unwrap_or(content);
     if let Err(e) = std::fs::write(&config_path, &output) {
         eprintln!("{} Failed to write config: {}", err("Error:"), e);
         return;
@@ -1303,15 +1413,14 @@ pub fn run_config_decrypt_keys() {
         println!("  {} No encrypted values found in config", info("ℹ"));
         return;
     }
-    let output = toml::to_string_pretty(&cfg).unwrap_or_else(|_| content);
+    let output = toml::to_string_pretty(&cfg).unwrap_or(content);
     if let Err(e) = std::fs::write(&config_path, &output) {
         eprintln!("{} Failed to write config: {}", err("Error:"), e);
         return;
     }
     println!(
-        "{} {}",
-        warn("⚠"),
-        "API keys are now stored in plaintext. Consider re-encrypting with `neotrix config encrypt-keys`."
+        "{} API keys are now stored in plaintext. Consider re-encrypting with `neotrix config encrypt-keys`.",
+        warn("⚠")
     );
     println!("  {} Config written to {}", success("✓"), config_path.display());
 }

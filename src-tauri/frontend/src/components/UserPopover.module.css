@@ -1,0 +1,92 @@
+.popover {
+  position: fixed;
+  bottom: 52px;
+  left: 12px;
+  width: 200px;
+  background: var(--nt-bg-elevated, var(--nt-bg));
+  border: 1px solid var(--nt-border);
+  border-radius: var(--nt-radius-lg, 12px);
+  box-shadow: var(--nt-shadow-lg, 0 8px 30px rgba(0,0,0,0.12));
+  z-index: 300;
+  padding: 6px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 8px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--nt-primary, #E85454), var(--nt-primary, #E85454));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nt-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.divider {
+  height: 1px;
+  background: var(--nt-border);
+  margin: 4px 8px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: var(--nt-radius-sm, 6px);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--nt-text);
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.item:hover {
+  background: var(--nt-hover, rgba(0,0,0,0.05));
+}
+
+.item svg {
+  flex-shrink: 0;
+  color: var(--nt-text-muted);
+}
+
+.logout {
+  color: var(--nt-danger, #E85454);
+}
+
+.logout svg {
+  color: var(--nt-danger, #E85454);
+}
+
+.logout:hover {
+  background: var(--nt-danger-bg);
+}

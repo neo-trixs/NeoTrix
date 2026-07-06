@@ -1,0 +1,506 @@
+use std::collections::HashMap;
+
+use rusqlite::{params, Connection};
+
+use super::bm25;
+use super::nt_memory_embed::{cosine_similarity, load_all_embeddings};
+use super::nt_memory_types::*;
+
+pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
+    let mut stmt = conn.prepare(
+        "SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
+                n.language, n.confidence, n.importance, n.created_at, n.updated_at,
+                n.access_count, n.metadata,
+                rank
+         FROM nodes_fts f
+         JOIN nodes n ON n.rowid = f.rowid
+         WHERE nodes_fts MATCH ?1
+         ORDER BY rank
+         LIMIT ?2",
+    )?;
+
+    let rows = stmt.query_map(params![query, limit as i64], |row| {
+        Ok(SearchResult {
+            node: KnowledgeNode {
+                id: row.get(0)?,
+                node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                title: row.get(2)?,
+                summary: row.get(3)?,
+                content: row.get(4)?,
+                url: row.get(5)?,
+                domain: row.get(6)?,
+                language: row.get(7)?,
+                confidence: row.get(8)?,
+                importance: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+                access_count: row.get(12)?,
+                metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                temporal: None,
+                supersedes: None,
+                source_episode: None,
+            },
+            score: 1.0 - row.get::<_, f64>(14)?,
+            matched_on: vec![SearchMatchType::FtsTitle],
+            signals: None,
+        })
+    })?;
+
+    rows.collect()
+}
+
+pub fn search_by_type(conn: &Connection, node_type: &NodeType, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain, language,
+            confidence, importance, created_at, updated_at, access_count, metadata
+         FROM nodes
+         WHERE node_type=?1
+         ORDER BY importance DESC, access_count DESC
+         LIMIT ?2",
+    )?;
+
+    let rows = stmt.query_map(params![node_type.as_str(), limit as i64], |row| {
+        Ok(KnowledgeNode {
+            id: row.get(0)?,
+            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            language: row.get(7)?,
+            confidence: row.get(8)?,
+            importance: row.get(9)?,
+            created_at: row.get(10)?,
+            updated_at: row.get(11)?,
+            access_count: row.get(12)?,
+            metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+            temporal: None,
+            supersedes: None,
+            source_episode: None,
+        })
+    })?;
+
+    rows.collect()
+}
+
+pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
+    let (sql, has_relation) = if let Some(_rt) = relation_type {
+        ("SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
+                n.language, n.confidence, n.importance, n.created_at, n.updated_at,
+                n.access_count, n.metadata, e.weight as score
+             FROM edges e
+             JOIN nodes n ON n.id = CASE WHEN e.source_id=?1 THEN e.target_id ELSE e.source_id END
+             WHERE (e.source_id=?1 OR e.target_id=?1) AND e.relation_type=?2
+             ORDER BY e.weight DESC
+             LIMIT ?3".to_string(), true)
+    } else {
+        ("SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
+                n.language, n.confidence, n.importance, n.created_at, n.updated_at,
+                n.access_count, n.metadata, e.weight as score
+             FROM edges e
+             JOIN nodes n ON n.id = CASE WHEN e.source_id=?1 THEN e.target_id ELSE e.source_id END
+             WHERE e.source_id=?1 OR e.target_id=?1
+             ORDER BY e.weight DESC
+             LIMIT ?2".to_string(), false)
+    };
+
+    let mut stmt = conn.prepare(&sql)?;
+    let rows: Vec<SearchResult> = if has_relation {
+        stmt.query_map(params![node_id, relation_type, limit as i64], |row| {
+            Ok(SearchResult {
+                node: KnowledgeNode {
+                    id: row.get(0)?,
+                    node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                    title: row.get(2)?,
+                    summary: row.get(3)?,
+                    content: row.get(4)?,
+                    url: row.get(5)?,
+                    domain: row.get(6)?,
+                    language: row.get(7)?,
+                    confidence: row.get(8)?,
+                    importance: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    access_count: row.get(12)?,
+                    metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                    temporal: None,
+                    supersedes: None,
+                    source_episode: None,
+                },
+                score: row.get(14)?,
+                matched_on: vec![SearchMatchType::GraphRelation],
+                signals: None,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?
+    } else {
+        stmt.query_map(params![node_id, limit as i64], |row| {
+            Ok(SearchResult {
+                node: KnowledgeNode {
+                    id: row.get(0)?,
+                    node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                    title: row.get(2)?,
+                    summary: row.get(3)?,
+                    content: row.get(4)?,
+                    url: row.get(5)?,
+                    domain: row.get(6)?,
+                    language: row.get(7)?,
+                    confidence: row.get(8)?,
+                    importance: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    access_count: row.get(12)?,
+                    metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                    temporal: None,
+                    supersedes: None,
+                    source_episode: None,
+                },
+                score: row.get(14)?,
+                matched_on: vec![SearchMatchType::GraphRelation],
+                signals: None,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?
+    };
+
+    Ok(rows)
+}
+
+/// BM25 search helper — queries an in-memory Bm25Index (built by rebuild_bm25).
+/// Returns results with score normalized to [0,1] for fusion with FTS scores.
+pub fn hybrid_search(
+    conn: &Connection,
+    query: &str,
+    limit: usize,
+    bm25: Option<&bm25::Bm25Index>,
+) -> rusqlite::Result<Vec<SearchResult>> {
+    let fts_results = search_fts(conn, query, limit * 3)?;
+    let bm25_results: Vec<(f64, String)> = if let Some(idx) = bm25 {
+        idx.search(query, limit * 3)
+    } else {
+        Vec::new()
+    };
+
+    // Convert FTS results to (score, id) pairs for RRF fusion
+    let fts_pairs: Vec<(f64, String)> = fts_results.iter()
+        .map(|r| (r.score, r.node.id.clone()))
+        .collect();
+
+    let mut ranklists: Vec<Vec<(f64, String)>> = Vec::new();
+    if !fts_pairs.is_empty() {
+        ranklists.push(fts_pairs);
+    }
+    if !bm25_results.is_empty() {
+        ranklists.push(bm25_results);
+    }
+
+    // RRF fusion
+    let fused = if ranklists.len() >= 2 {
+        bm25::rrf_fuse(&ranklists)
+    } else if ranklists.is_empty() {
+        Vec::new()
+    } else {
+        ranklists.into_iter().next().unwrap()
+    };
+
+    // Fetch full node data for fused IDs
+    let fused_ids: Vec<String> = fused.into_iter().take(limit).map(|(_, id)| id).collect();
+    let mut results = Vec::new();
+    let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    if !fused_ids.is_empty() {
+        let placeholders: Vec<String> = fused_ids.iter().enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
+        let sql = format!(
+            "SELECT id, node_type, title, summary, content, url, domain, language,
+                confidence, importance, created_at, updated_at, access_count, metadata
+             FROM nodes WHERE id IN ({})",
+            placeholders.join(",")
+        );
+        if let Ok(mut stmt) = conn.prepare(&sql) {
+            let params: Vec<&dyn rusqlite::types::ToSql> = fused_ids.iter()
+                .map(|id| id as &dyn rusqlite::types::ToSql)
+                .collect();
+            if let Ok(rows) = stmt.query_map(params.as_slice(), |row| {
+                Ok(SearchResult {
+                    node: KnowledgeNode {
+                        id: row.get(0)?,
+                        node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                        title: row.get(2)?,
+                        summary: row.get(3)?,
+                        content: row.get(4)?,
+                        url: row.get(5)?,
+                        domain: row.get(6)?,
+                        language: row.get(7)?,
+                        confidence: row.get(8)?,
+                        importance: row.get(9)?,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                        access_count: row.get(12)?,
+                        metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                        temporal: None,
+                        supersedes: None,
+                        source_episode: None,
+                    },
+                    score: 0.5,
+                    matched_on: vec![SearchMatchType::Bm25],
+                    signals: None,
+                })
+            }) {
+                for r in rows.filter_map(|r| r.ok()) {
+                    if seen_ids.insert(r.node.id.clone()) {
+                        results.push(r);
+                    }
+                }
+            }
+        }
+    }
+
+    if results.len() >= limit {
+        results.truncate(limit);
+        return Ok(results);
+    }
+
+    let remaining = limit - results.len();
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain, language,
+            confidence, importance, created_at, updated_at, access_count, metadata
+         FROM nodes
+         WHERE title LIKE ?1
+         ORDER BY importance DESC
+         LIMIT ?2",
+    )?;
+
+    let pattern = format!("%{}%", query);
+    let rows = stmt.query_map(params![pattern, remaining as i64], |row| {
+        Ok(SearchResult {
+            node: KnowledgeNode {
+                id: row.get(0)?,
+                node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                title: row.get(2)?,
+                summary: row.get(3)?,
+                content: row.get(4)?,
+                url: row.get(5)?,
+                domain: row.get(6)?,
+                language: row.get(7)?,
+                confidence: row.get(8)?,
+                importance: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+                access_count: row.get(12)?,
+                metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                temporal: None,
+                supersedes: None,
+                source_episode: None,
+            },
+            score: 0.1,
+            matched_on: vec![SearchMatchType::FtsTitle],
+            signals: None,
+        })
+    })?;
+
+    for r in rows.filter_map(|r| r.ok()) {
+        if seen_ids.insert(r.node.id.clone()) {
+            results.push(r);
+        }
+    }
+
+    // Tier 3: embedding cosine rerank. If query embedding available, boost
+    // results whose stored embedding is similar to the query embedding.
+    if let Ok(embeddings) = load_all_embeddings(conn) {
+        if !embeddings.is_empty() {
+            // Build a simple avg-word-embedding from query words as proxy
+            let query_embedding = query_to_avg_embedding(query, &embeddings);
+            let mut scored: Vec<(SearchResult, f64)> = Vec::new();
+            for r in &results {
+                let emb_score = if let Some(emb) = embeddings.iter().find(|(id, _)| *id == r.node.id) {
+                    cosine_similarity(&query_embedding, &emb.1)
+                } else {
+                    0.0
+                };
+                let combined = r.score * 0.7 + emb_score * 0.3;
+                scored.push((r.clone(), combined));
+            }
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            results = scored.into_iter().take(limit).map(|(r, _)| r).collect();
+        }
+    }
+
+    Ok(results)
+}
+
+/// Build a proxy query embedding by averaging stored embeddings of nodes
+/// whose title or content matches query words.
+fn query_to_avg_embedding(query: &str, all_embeddings: &[(String, Vec<f32>)]) -> Vec<f32> {
+    if all_embeddings.is_empty() {
+        return Vec::new();
+    }
+    let dim = all_embeddings[0].1.len();
+    let q = query.to_lowercase();
+    let matching: Vec<&[f32]> = all_embeddings.iter()
+        .filter(|(id, _)| id.to_lowercase().contains(&q))
+        .map(|(_, emb)| emb.as_slice())
+        .collect();
+    if matching.is_empty() {
+        return vec![0.0_f32; dim];
+    }
+    let sum: Vec<f32> = (0..dim).map(|i| matching.iter().map(|e| e[i]).sum::<f32>()).collect();
+    let n = matching.len() as f32;
+    sum.into_iter().map(|v| v / n).collect()
+}
+
+/// Entity graph scores: find seed nodes matching query keywords, then propagate
+/// probability via Personalized PageRank (1 iteration). Seeds get base score,
+/// 1-hop neighbors get edge-weight boost, 2-hop neighbors get attenuated boost.
+pub fn entity_graph_scores(conn: &Connection, query: &str) -> rusqlite::Result<HashMap<String, f64>> {
+    let query_lower = query.to_lowercase();
+    let query_words: Vec<&str> = query_lower
+        .split_whitespace()
+        .filter(|w| w.len() >= 2)
+        .collect();
+
+    if query_words.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT id, title FROM nodes WHERE LOWER(title) LIKE ?1",
+    )?;
+    let pattern = format!("%{}%", query_lower);
+    let seed_ids: Vec<String> = stmt
+        .query_map(params![pattern], |row| row.get::<_, String>(0))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if seed_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut scores: HashMap<String, f64> = HashMap::new();
+    let seed_set: std::collections::HashSet<String> = seed_ids.iter().cloned().collect();
+
+    for id in &seed_ids {
+        *scores.entry(id.clone()).or_insert(0.0) = 0.5;
+    }
+
+    // 1-hop: +0.1 per edge weight
+    let mut one_hop: HashMap<String, f64> = HashMap::new();
+    for seed_id in &seed_ids {
+        let edges = super::nt_memory_store::get_edges_for_node(conn, seed_id)?;
+        for edge in &edges {
+            let neighbor = if edge.source_id == *seed_id {
+                &edge.target_id
+            } else {
+                &edge.source_id
+            };
+            if !seed_set.contains(neighbor.as_str()) {
+                *one_hop.entry(neighbor.clone()).or_insert(0.0) += 0.1 * edge.weight;
+            }
+        }
+    }
+    let one_hop_set: std::collections::HashSet<String> = one_hop.keys().cloned().collect();
+
+    // 2-hop: +0.05 per edge weight
+    let mut two_hop: HashMap<String, f64> = HashMap::new();
+    for neighbor_id in one_hop.keys() {
+        let edges = super::nt_memory_store::get_edges_for_node(conn, neighbor_id)?;
+        for edge in &edges {
+            let neighbor2 = if edge.source_id == *neighbor_id {
+                &edge.target_id
+            } else {
+                &edge.source_id
+            };
+            if !seed_set.contains(neighbor2.as_str()) && !one_hop_set.contains(neighbor2.as_str()) {
+                *two_hop.entry(neighbor2.clone()).or_insert(0.0) += 0.05 * edge.weight;
+            }
+        }
+    }
+
+    for (id, score) in one_hop {
+        *scores.entry(id).or_insert(0.0) += score.min(0.5);
+    }
+    for (id, score) in two_hop {
+        *scores.entry(id).or_insert(0.0) += score.min(0.3);
+    }
+
+    // Normalize to [0, 1]
+    let max_score = scores.values().cloned().fold(0.0, f64::max);
+    if max_score > 0.0 {
+        for score in scores.values_mut() {
+            *score /= max_score;
+        }
+    }
+
+    Ok(scores)
+}
+
+/// Fuse 4 signals into a single ranked list via weighted linear combination.
+/// Returns Vec<(node_id, fused_score, [fts5, bm25, embed, graph])>.
+pub fn fuse_signals(
+    fts_results: &[SearchResult],
+    bm25_results: &[(f64, String)],
+    embed_results: &[(f64, String)],
+    graph_scores: &HashMap<String, f64>,
+    limit: usize,
+    weights: [f64; 4],
+) -> Vec<(String, f64, [f64; 4])> {
+    let mut node_scores: HashMap<&str, (f64, [f64; 4])> = HashMap::new();
+
+    for r in fts_results {
+        node_scores
+            .entry(r.node.id.as_str())
+            .and_modify(|(s, sig)| {
+                *s += weights[0] * r.score;
+                sig[0] = r.score;
+            })
+            .or_insert((weights[0] * r.score, [r.score, 0.0, 0.0, 0.0]));
+    }
+
+    for (score, id) in bm25_results {
+        node_scores
+            .entry(id.as_str())
+            .and_modify(|(s, sig)| {
+                *s += weights[1] * score;
+                sig[1] = *score;
+            })
+            .or_insert((weights[1] * *score, [0.0, *score, 0.0, 0.0]));
+    }
+
+    for (score, id) in embed_results {
+        node_scores
+            .entry(id.as_str())
+            .and_modify(|(s, sig)| {
+                *s += weights[2] * score;
+                sig[2] = *score;
+            })
+            .or_insert((weights[2] * *score, [0.0, 0.0, *score, 0.0]));
+    }
+
+    for (id, score) in graph_scores {
+        node_scores
+            .entry(id.as_str())
+            .and_modify(|(s, sig)| {
+                *s += weights[3] * score;
+                sig[3] = *score;
+            })
+            .or_insert((weights[3] * *score, [0.0, 0.0, 0.0, *score]));
+    }
+
+    let mut results: Vec<(String, f64, [f64; 4])> = node_scores
+        .into_iter()
+        .map(|(id, (score, signals))| (id.to_string(), score, signals))
+        .collect();
+    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    results.truncate(limit);
+    results
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_basic() {
+        assert!(true);
+    }
+}

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.neotrix.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/neo/Downloads/neotrix/target/debug/daemon</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/neo/Downloads/neotrix</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/local/cargo/bin:/opt/homebrew/bin</string>
+        <key>NEOTRIX_HOME</key>
+        <string>/Users/neo/.neotrix</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/neotrix_daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/neotrix_daemon.log</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+</dict>
+</plist>

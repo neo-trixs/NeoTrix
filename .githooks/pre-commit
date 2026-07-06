@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# NeoTrix pre-commit hook — validate docs integrity
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+python3 scripts/neotrix-doc-system.py check || { echo "⚠ Docs check failed"; exit 1; }

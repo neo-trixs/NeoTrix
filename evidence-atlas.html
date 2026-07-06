@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EWHR · 物证权重历史重建 · v0.3</title>
+<style>
+  :root{--bg:#06060E;--bg2:#0E0E1A;--bg3:#161626;--gold:#D4A853;--gold2:#A08030;
+    --t1:#4AE86A;--t2:#4A8AFF;--t3:#E8C84A;--t4:#E8884A;--t5:#E84A4A;
+    --tx:#D8CCB8;--tx2:#A89878;--tx3:#6A5A4A;--ff-sans:-apple-system,"Inter","Noto Sans SC",sans-serif;--ff:Georgia,"Noto Serif SC",serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--tx);font-family:var(--ff-sans);overflow:hidden;height:100vh;font-size:13px;}
+  .header{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:8px 16px;height:44px;background:linear-gradient(180deg,rgba(6,6,14,0.96),transparent);backdrop-filter:blur(12px);border-bottom:1px solid rgba(212,168,83,0.08);}
+  .h-title{font-size:15px;font-weight:700;background:linear-gradient(135deg,var(--t2),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;}
+  .h-sub{font-size:9px;color:var(--tx3);margin-top:-1px;}
+  .h-controls{display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+  .h-btn{padding:3px 8px;border-radius:4px;font-size:9px;font-family:var(--ff-sans);color:var(--tx2);background:rgba(255,255,255,0.02);border:1px solid rgba(212,168,83,0.08);cursor:pointer;transition:all 0.3s;white-space:nowrap;}
+  .h-btn:hover{background:rgba(212,168,83,0.08);color:var(--gold);}
+  .h-btn.on{background:rgba(212,168,83,0.1);color:var(--gold);border-color:var(--gold);}
+  .h-btn.primary{background:rgba(74,138,255,0.1);border-color:rgba(74,138,255,0.3);color:var(--t2);}
+  .h-btn.primary:hover{background:rgba(74,138,255,0.2);}
+
+  .main{display:flex;height:100vh;padding-top:44px;}
+  .map-area{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(ellipse at center,rgba(74,138,255,0.02),transparent 70%);}
+  #worldMap{width:100%;height:100%;}
+  .graticule{stroke:rgba(212,168,83,0.03);stroke-width:0.3;fill:none;}
+  .continent-fill{fill:rgba(100,120,100,0.06);stroke:rgba(100,120,100,0.1);stroke-width:0.3;}
+  .ep-dot{cursor:pointer;transition:r 0.2s,opacity 0.2s;}
+  .ep-dot:hover{r:6;opacity:0.9 !important;}
+  .ep-label{font-size:5px;font-family:var(--ff-sans);text-anchor:middle;pointer-events:none;opacity:0.7;}
+  .connect-line{fill:none;opacity:0;pointer-events:none;}
+
+  .side-panel{width:340px;height:100vh;padding-top:44px;background:rgba(6,6,14,0.95);backdrop-filter:blur(16px);border-left:1px solid rgba(212,168,83,0.06);display:flex;flex-direction:column;overflow:hidden;}
+  .sp-tabs{display:flex;border-bottom:1px solid rgba(212,168,83,0.06);flex-shrink:0;}
+  .sp-tab{padding:8px 12px;font-size:10px;cursor:pointer;color:var(--tx3);border-bottom:2px solid transparent;transition:all 0.3s;white-space:nowrap;}
+  .sp-tab:hover{color:var(--tx2);}
+  .sp-tab.on{color:var(--gold);border-color:var(--gold);}
+  .sp-content{flex:1;overflow-y:auto;padding:10px;}
+  .sp-content::-webkit-scrollbar{width:2px;}
+  .sp-content::-webkit-scrollbar-thumb{background:var(--tx3);border-radius:2px;}
+
+  .ep-card{padding:8px 10px;margin-bottom:6px;border-radius:6px;background:var(--bg2);border:1px solid rgba(212,168,83,0.04);cursor:pointer;transition:all 0.3s;}
+  .ep-card:hover{background:var(--bg3);}
+  .ep-card-t1{border-left:2px solid var(--t1);}
+  .ep-card-t2{border-left:2px solid var(--t2);}
+  .ep-card-t3{border-left:2px solid var(--t3);}
+  .ep-card-t4{border-left:2px solid var(--t4);}
+  .ep-card-t5{border-left:2px solid var(--t5);}
+  .ep-card-name{font-size:12px;font-weight:600;color:var(--tx);}
+  .ep-card-meta{font-size:9px;color:var(--tx3);margin-top:2px;}
+  .ep-card-desc{font-size:10px;color:var(--tx2);margin-top:3px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+  .detail-overlay{position:fixed;inset:0;z-index:200;background:rgba(6,6,14,0.96);backdrop-filter:blur(24px);display:none;flex-direction:column;padding:24px;overflow-y:auto;}
+  .detail-overlay.open{display:flex;}
+  .detail-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;max-width:800px;margin-left:auto;margin-right:auto;width:100%;}
+  .detail-name{font-size:22px;font-weight:700;letter-spacing:1px;}
+  .detail-close{background:none;border:none;color:var(--tx3);font-size:20px;cursor:pointer;padding:4px 8px;}
+  .detail-close:hover{color:var(--t5);}
+  .detail-body{max-width:800px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .detail-full{grid-column:1/-1;}
+  .detail-section{background:var(--bg2);border-radius:8px;padding:12px;border:1px solid rgba(212,168,83,0.06);}
+  .detail-section-title{font-size:10px;color:var(--tx3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+  .detail-row{font-size:11px;color:var(--tx2);padding:3px 0;display:flex;justify-content:space-between;}
+  .detail-label{color:var(--tx3);}
+  .detail-tag{padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;}
+  .tag-t1{background:rgba(74,232,106,0.15);color:var(--t1);}
+  .tag-t2{background:rgba(74,138,255,0.15);color:var(--t2);}
+  .tag-t3{background:rgba(232,200,74,0.15);color:var(--t3);}
+  .tag-t4{background:rgba(232,136,74,0.15);color:var(--t4);}
+  .tag-t5{background:rgba(232,74,74,0.15);color:var(--t5);}
+  .detail-desc{font-size:12px;color:var(--tx2);line-height:1.7;padding:8px 10px;background:rgba(255,255,255,0.02);border-radius:6px;border-left:2px solid var(--gold);}
+  .detail-ref{font-size:10px;color:var(--tx3);font-family:var(--ff-sans);line-height:1.6;}
+
+  .legend{position:absolute;bottom:14px;left:14px;background:rgba(6,6,14,0.88);backdrop-filter:blur(8px);border:1px solid rgba(212,168,83,0.08);border-radius:6px;padding:8px 10px;font-size:9px;min-width:140px;}
+  .legend-title{font-size:7px;color:var(--tx3);letter-spacing:1px;margin-bottom:3px;text-transform:uppercase;}
+  .legend-item{display:flex;align-items:center;gap:4px;padding:1px 0;color:var(--tx2);font-size:8px;}
+  .legend-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+  .iter-log{font-size:10px;font-family:var(--ff-mono,monospace);line-height:1.8;}
+  .iter-entry{padding:4px 0;border-bottom:1px solid rgba(212,168,83,0.03);}
+  .iter-time{color:var(--tx3);font-size:8px;}
+  .iter-msg{color:var(--tx2);}
+  .iter-update{color:var(--t3);}
+  .iter-contradiction{color:var(--t4);}
+  .iter-selfcorrect{color:var(--t5);font-weight:700;}
+  .iter-calibration{color:var(--t2);}
+
+  .nav-info{position:absolute;top:52px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--tx3);background:rgba(6,6,14,0.7);padding:3px 12px;border-radius:16px;border:1px solid rgba(212,168,83,0.05);pointer-events:none;opacity:0;transition:opacity 0.4s;}
+  .nav-info.show{opacity:1;}
+
+  .stats-bar{display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid rgba(212,168,83,0.04);font-size:9px;color:var(--tx3);flex-wrap:wrap;}
+  .stat-item{display:flex;align-items:center;gap:4px;}
+  .stat-num{font-weight:700;font-size:11px;}
+
+  .cluster-badge{display:inline-block;padding:1px 5px;border-radius:3px;font-size:8px;font-weight:600;margin-left:4px;}
+
+  .unknown-card{padding:8px 10px;margin-bottom:6px;border-radius:6px;background:rgba(232,136,74,0.04);border:1px solid rgba(232,136,74,0.08);border-left:2px solid var(--t4);}
+  .unknown-card-title{font-size:10px;color:var(--t4);}
+  .unknown-card-desc{font-size:9px;color:var(--tx3);margin-top:2px;}
+
+  .forgery-card{padding:8px 10px;margin-bottom:6px;border-radius:6px;background:rgba(232,74,74,0.04);border:1px solid rgba(232,74,74,0.08);border-left:2px solid var(--t5);}
+  .forgery-card-title{font-size:10px;color:var(--t5);}
+  .forgery-card-desc{font-size:9px;color:var(--tx3);margin-top:2px;}
+
+  .consensus-zone{border-left:2px solid var(--t2);}
+  .contradiction-zone{border-left:2px solid var(--t4);}
+
+  .timeline-bar{position:relative;height:60px;margin:10px 0 20px;border-bottom:1px solid rgba(212,168,83,0.06);}
+  .timeline-tick{position:absolute;top:50px;font-size:7px;color:var(--tx3);transform:translateX(-50%);}
+  .timeline-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;transition:all 0.2s;}
+  .timeline-dot:hover{width:12px;height:12px;z-index:10;}
+
+  .form-group{margin-bottom:8px;}
+  .form-label{font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;display:block;}
+  .form-input{width:100%;padding:5px 8px;border-radius:4px;font-size:11px;background:var(--bg2);border:1px solid rgba(212,168,83,0.08);color:var(--tx);font-family:var(--ff-sans);}
+  .form-input:focus{outline:none;border-color:var(--gold);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .form-textarea{resize:vertical;min-height:50px;}
+
+  .action-btn{padding:5px 12px;border-radius:4px;font-size:9px;font-family:var(--ff-sans);cursor:pointer;transition:all 0.3s;border:1px solid rgba(212,168,83,0.08);background:rgba(255,255,255,0.02);color:var(--tx2);}
+  .action-btn:hover{background:rgba(212,168,83,0.08);color:var(--gold);}
+  .action-btn.primary{background:rgba(74,138,255,0.1);border-color:var(--t2);color:var(--t2);}
+  .action-btn.primary:hover{background:rgba(74,138,255,0.2);}
+  .action-btn.danger{background:rgba(232,74,74,0.1);border-color:var(--t5);color:var(--t5);}
+  .action-btn.danger:hover{background:rgba(232,74,74,0.2);}
+
+  @keyframes pulseGold{0%,100%{filter:drop-shadow(0 0 2px var(--gold));}50%{filter:drop-shadow(0 0 6px var(--gold));}}
+  .glow-pulse{animation:pulseGold 4s ease-in-out infinite;}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .fade-in{animation:fadeIn 0.3s;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="h-title">EWHR · 物证权重历史重建</div>
+    <div class="h-sub">Evidence-Weighted History Reconstruction — 贝叶斯关联引擎 v0.2</div>
+  </div>
+  <div class="h-controls">
+    <button class="h-btn on" data-filter="all" onclick="setFilter(this,'all')">全部</button>
+    <button class="h-btn" data-filter="t1" onclick="setFilter(this,'t1')" style="border-color:var(--t1);">T1 确认</button>
+    <button class="h-btn" data-filter="t2" onclick="setFilter(this,'t2')" style="border-color:var(--t2);">T2 单源</button>
+    <button class="h-btn" data-filter="t3" onclick="setFilter(this,'t3')" style="border-color:var(--t3);">T3 存疑</button>
+    <button class="h-btn" data-filter="t5" onclick="setFilter(this,'t5')" style="border-color:var(--t5);">T5 伪造</button>
+    <button class="h-btn" onclick="runCalibration()">⚡ 自校准</button>
+    <button class="h-btn" onclick="exportJSON()">📤 导出</button>
+    <button class="h-btn" onclick="document.getElementById('importFile').click()">📥 导入</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    <button class="h-btn primary" onclick="showAddForm()">➕ 添加</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="map-area">
+    <svg id="worldMap" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="nav-info" id="navInfo">点击证据点查看详情</div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="side-panel">
+    <div class="sp-tabs">
+      <div class="sp-tab on" onclick="switchTab(this,'list')">📋 证据列表</div>
+      <div class="sp-tab" onclick="switchTab(this,'graph')">🔗 关联网络</div>
+      <div class="sp-tab" onclick="switchTab(this,'clusters')">🌟 聚类</div>
+      <div class="sp-tab" onclick="switchTab(this,'log')">🧠 迭代日志</div>
+      <div class="sp-tab" onclick="switchTab(this,'unknown')">❓ 盲点区</div>
+      <div class="sp-tab" onclick="switchTab(this,'timeline')">📅 时间线</div>
+    </div>
+    <div class="stats-bar" id="statsBar"></div>
+    <div class="sp-content" id="spList"></div>
+  </div>
+</div>
+
+<!-- Detail Overlay -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-header">
+    <div class="detail-name" id="detName"></div>
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+  </div>
+  <div class="detail-body" id="detBody"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   EWHR · EVIDENCE-WEIGHTED HISTORY RECONSTRUCTION · v0.2
+   Association Engine · Weight Self-Calibration
+   ═══════════════════════════════════════════════════════════════ */
+
+// ── Era Parser ──
+function parseEra(str) {
+  if (!str) return { min:0, max:0, center:0 };
+  str = str.replace(/,/g,'');
+  if (str === 'modern') return { min:1900, max:2026, center:1963 };
+  if (str === 'pre-1492 CE') return { min:0, max:1492, center:746 };
+  const bp = str.match(/^([\d.]+)\s*BP$/);
+  if (bp) return { min:+bp[1]-50, max:+bp[1]+50, center:+bp[1] };
+  const bpr = str.match(/^([\d.]+)-([\d.]+)\s*BP$/);
+  if (bpr) return { min:+bpr[1], max:+bpr[2], center:(+bpr[1]+ +bpr[2])/2 };
+  const ce = str.match(/^([\d.]+)\s*CE$/);
+  if (ce) return { min:2026-(+ce[1]+50), max:2026-(+ce[1]-50), center:2026- +ce[1] };
+  const cer = str.match(/^([\d.]+)-([\d.]+)\s*CE$/);
+  if (cer) { const lo=+cer[1], hi=+cer[2]; return { min:2026-hi, max:2026-lo, center:2026-(lo+hi)/2 }; }
+  const bce = str.match(/^([\d.]+)\s*BCE$/);
+  if (bce) return { min:2026- - +bce[1], max:2026-(- +bce[1]), center:2026- - +bce[1] };
+  const bcer = str.match(/^([\d.]+)-([\d.]+)\s*BCE$/);
+  if (bcer) { const lo=+bcer[1], hi=+bcer[2]; return { min:2026-hi, max:2026-lo, center:2026-(lo+hi)/2 }; }
+  return { min:0, max:0, center:0 };
+}
+
+function temporalOverlap(a, b) {
+  const ea = parseEra(a), eb = parseEra(b);
+  const overlap = Math.min(ea.max, eb.max) - Math.max(ea.min, eb.min);
+  if (overlap <= 0) return Math.max(0, 0.05 + overlap / Math.max(ea.max-ea.min, eb.max-eb.min, 1) * 0.1);
+  const totalSpan = Math.max(ea.max-ea.min, eb.max-eb.min, overlap);
+  return Math.min(1, overlap / totalSpan);
+}
+
+// ── Haversine Distance ──
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ── Core Data Structure ──
+class EvidencePoint {
+  constructor(data) {
+    const hadCalibrated = data.calibratedScore !== undefined && data.calibratedScore !== data.effectiveConfidence;
+    Object.assign(this, data);
+    this.id = data.id;
+    this.eraParsed = parseEra(data.era);
+    this.rawConfidence = this.calcConfidence();
+    this.forgeryRisk = this.calcForgeryRisk();
+    this.effectiveConfidence = this.rawConfidence * (1 - this.forgeryRisk * 0.5);
+    this.calibratedScore = hadCalibrated ? data.calibratedScore : this.effectiveConfidence;
+  }
+
+  calcConfidence() {
+    const methods = this.datingMethods || [];
+    if (methods.length === 0) return 0.2;
+    const w = {'c14':0.9,'tl':0.75,'osl':0.8,'paleomag':0.6,'esr':0.65,'useries':0.85,'dendro':1.0,'strat':0.5,'dna':0.85,'insect':0.75,'inaa':0.85,'gcms':0.85,'srs':0.9,'xray':0.7,'lithic':0.6,'glyph':0.55,'archaeoastronomy':0.6};
+    let sw = 0, n = 0;
+    methods.forEach(m => { sw += w[m]||0.5; n++; });
+    let base = sw / n;
+    let ctx = this.contextClarity || 0.7;
+    let pub = this.publicationLevel || 0.5;
+    let indep = Math.min(1, (this.independentReplications || 0) * 0.3);
+    return base * ctx * (pub + 0.3) * (0.5 + indep);
+  }
+
+  calcForgeryRisk() {
+    return ( (this.provenanceGap||0) + (this.anachronismIndex||0) + (this.motivationScore||0) + (this.verificationGap||0) ) / 4;
+  }
+
+  get tier() {
+    if (this.forgeryRisk > 0.8) return 5;
+    const s = this.calibratedScore;
+    if (s >= 0.75) return 1;
+    if (s >= 0.55) return 2;
+    if (s >= 0.35) return 3;
+    if (s >= 0.15) return 4;
+    return 5;
+  }
+
+  get tierLabel() { return ['','T1 双重确认','T2 单源确认','T3 初步可考','T4 存疑','T5 判定伪造'][this.tier]; }
+  get tierColor() { return ['','#4AE86A','#4A8AFF','#E8C84A','#E8884A','#E84A4A'][this.tier]; }
+  get tierClass() { return 't'+this.tier; }
+}
+
+// ── Evidence Database (75 entries, actual) ──
+const EVIDENCE_DB = [
+  // === T1: Double Confirmed (20 entries) ===
+  { id:'gobekli', name:'哥贝克力石阵', lat:37.223, lng:38.922, era:'11,500-13,000 BP', category:'megalith',
+    desc:'全球最古老巨石神庙群。T形石柱同心圆排列，由采猎者建于农业革命之前。颠覆"先有农业后有宗教"的标准叙事。',
+    datingMethods:['c14','dendro','strat'], contextClarity:0.95, publicationLevel:0.95, independentReplications:5,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'Schmidt 1994-2014; UNESCO 2018; Nature 2025 C14 recalibration' },
+
+  { id:'catalhoyuk', name:'恰塔霍裕克', lat:37.7, lng:32.8, era:'9,000 BP', category:'settlement',
+    desc:'安纳托利亚新石器时代大型定居点。7500人，屋顶交通，壁画高度发达。最古老"城市"之一。',
+    datingMethods:['c14','dendro','strat'], contextClarity:0.9, publicationLevel:0.9, independentReplications:4,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'Ian Hodder 1993-2018' },
+
+  { id:'xigou', name:'西沟遗址（装柄技术）', lat:33.0, lng:111.5, era:'72,000-160,000 BP', category:'tool',
+    desc:'河南淅川出土2601件石制品，发现东亚最早复合工具装柄技术（嵌入式+倚靠式）。推翻"东亚旧石器保守落后"的西方中心论。',
+    datingMethods:['osl','esr','paleomag','strat'], contextClarity:0.9, publicationLevel:0.95, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.05,
+    ref:'Nature Communications 2026; 中国科学院古脊椎所' },
+
+  { id:'gantang', name:'甘棠箐木器', lat:24.0, lng:102.5, era:'300,000 BP', category:'tool',
+    desc:'云南出土35件30万年前木器（挖掘棒、钩状刃器），东亚最古老木制工具，人工修理痕迹清晰可见。',
+    datingMethods:['paleomag','osl','esr','strat'], contextClarity:0.85, publicationLevel:0.95, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.1,
+    ref:'Science 2025; 高星等' },
+
+  { id:'fire400k', name:'40万年前用火证据（英国）', lat:51.3, lng:0.1, era:'400,000 BP', category:'tool',
+    desc:'英国巴纳姆遗址发现40万年前燧石手斧+黄铁矿摩擦生火证据。地球化学显示局部>700°C，排除野火。将人类控制用火从5万年前推至40万年前。',
+    datingMethods:['c14','strat','paleomag'], contextClarity:0.85, publicationLevel:0.95, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Nature 2025; Nick Ashton 大英博物馆' },
+
+  { id:'romanconcrete', name:'罗马自修复混凝土', lat:40.75, lng:14.5, era:'79 CE', category:'technology',
+    desc:'庞贝古城生石灰+火山灰热拌混凝土。MIT 2023-2025两次Nature Comms确认热拌工艺和石灰碎屑自愈合机制，耐久性远超现代混凝土。',
+    datingMethods:['strat','dendro'], contextClarity:0.95, publicationLevel:0.95, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'Masic et al. Nature Comms 2023 & 2025' },
+
+  { id:'antikythera', name:'安提基特拉机械', lat:35.9, lng:23.3, era:'150-100 BCE', category:'technology',
+    desc:'希腊沉船青铜齿轮计算机。30+齿轮差分器精确计算日/月/蚀周期。技术水平14世纪欧洲才重新达到。',
+    datingMethods:['strat','c14'], contextClarity:0.9, publicationLevel:0.95, independentReplications:5,
+    provenanceGap:0.1, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'Nature 2021; Heritage 2026 reconstruction' },
+
+  { id:'minganesthesia', name:'明代外科麻醉', lat:31.9, lng:120.3, era:'1368-1644 CE', category:'medical',
+    desc:'江阴夏颧墓出土全套外科器械表面残留乌头碱。SRS显微检测确认。中国古代外科局部麻醉的首个化学实证。',
+    datingMethods:['strat','c14'], contextClarity:0.9, publicationLevel:0.95, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.05,
+    ref:'赵丛苍 Antiquity 2026' },
+
+  { id:'samxingdui', name:'三星堆陨铁器', lat:30.99, lng:104.2, era:'3,000 BP', category:'technology',
+    desc:'三星堆7号坑20cm陨铁斧钺。确认纯陨铁，中国青铜时代体积最大陨铁文物。独特冶金传统。',
+    datingMethods:['c14','strat'], contextClarity:0.9, publicationLevel:0.9, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'黎海超 Asian Archaeology 2026' },
+
+  { id:'blombos', name:'Blombos洞穴赭石刻', lat:-34.4, lng:21.2, era:'100,000 BP', category:'art',
+    desc:'南非Blombos出土刻有抽象几何图案的赭石，为目前全球最古老的有意刻划符号。证明早期智人象征性思维远早于"认知革命"标准叙事。',
+    datingMethods:['osl','c14','strat'], contextClarity:0.85, publicationLevel:0.95, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Henshilwood Science 2002; Nature 2018; 多次独立确认' },
+
+  { id:'jauha', name:'贾湖骨笛与符号', lat:33.6, lng:113.7, era:'7,000-9,000 BP', category:'writing',
+    desc:'河南贾湖遗址出土30+骨笛（可奏七声音阶）和11个龟甲刻符。刻符比苏美尔楔形文字早约4000年，是否为"文字"仍有争议，但无疑是象征性记录系统。',
+    datingMethods:['c14','strat'], contextClarity:0.9, publicationLevel:0.9, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'张居中 Antiquity 1999; 河南博物院; Nature 2024 re-dating' },
+
+  { id:'liangzhu', name:'良渚古城', lat:30.4, lng:120.0, era:'4,300-5,300 BP', category:'settlement',
+    desc:'长江下游新石器时代古城。大规模水利系统（11条水坝）、极致玉器工艺（微米级钻孔）、社会分层明显。部分学者认为良渚已进入"早期国家"阶段。',
+    datingMethods:['c14','strat','dendro'], contextClarity:0.9, publicationLevel:0.9, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'UNESCO 2019; 浙江省考古所; 2025 radiocarbon refinement' },
+
+  { id:'stonehenge', name:'巨石阵', lat:51.2, lng:-1.8, era:'5,000 BP', category:'megalith',
+    desc:'全球最著名巨石天文台。蓝石(280km外)+萨森石(40km外)的运输。近年发现其声学共振特性和太阳对齐精度超出偶然。',
+    datingMethods:['c14','dendro','strat'], contextClarity:0.9, publicationLevel:0.95, independentReplications:4,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'English Heritage; Parker Pearson 2012; 2026 lidar discovery of companion monument' },
+
+  { id:'newgrange', name:'纽格莱奇墓', lat:53.7, lng:-6.5, era:'5,200 BP', category:'megalith',
+    desc:'爱尔兰通道墓，精确对齐冬至日出。每年12月19-23日晨光沿19m通道照亮墓室中央。比巨石阵早500年，比金字塔早200年。',
+    datingMethods:['c14','dendro','strat'], contextClarity:0.85, publicationLevel:0.9, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:"O'Kelly 1982; UNESCO World Heritage" },
+
+  { id:'pavlopetri', name:'帕夫洛佩特里沉没城市', lat:36.5, lng:23.0, era:'4,800 BP', category:'sunken',
+    desc:'希腊水下古城。有街道、住宅、工坊、市场等规划，最早可追溯至2800 BCE。约1000 BCE因三次地震沉没，目前正在缓慢向下滑移。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.15,
+    ref:'Flemming 1967; Cambridge 1968; UNESCO 2016; 2022-26 underwater laser scan' },
+
+  { id:'whitesands', name:'白沙滩足迹', lat:32.9, lng:-106.0, era:'23,000 BP', category:'migration',
+    desc:'新墨西哥州白沙滩国家公园发现的化石人类足迹。2021-2023多次独立C14+OSL确认年代约23,000 BP。将人类在美洲最早定居证据推至冰盛期前。曾遭学界激烈质疑，经多轮独立验证后逐渐被接受。',
+    datingMethods:['c14','osl'], contextClarity:0.85, publicationLevel:0.9, independentReplications:3,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.05,
+    ref:'Bennett Science 2021; Pigati Science 2023; OSL confirmation Nature 2025' },
+
+  { id:'caral', name:'卡拉尔（Sacred City）', lat:-10.9, lng:-77.5, era:'5,000 BP', category:'settlement',
+    desc:'秘鲁Supe峡谷的古老城市（35°C炎热干燥）。金字塔群+下沉圆形广场+音乐演奏痕迹。美洲最古老城市，和苏美尔同时期。住民无陶器、无文字但有复杂社会组织。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.9, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.1,
+    ref:'Shady 1994-2020; UNESCO 2009; Nature 2025 irrigation system' },
+
+  { id:'chauvet', name:'肖维洞穴壁画', lat:44.4, lng:4.4, era:'37,000 BP', category:'art',
+    desc:'法国阿尔代什的3.7万年前洞穴壁画。动物动态刻画的技术水准媲美19世纪欧洲绘画。12头狮子的群体狩猎场景，证明旧石器时代人类已有叙事性艺术。',
+    datingMethods:['c14','strat'], contextClarity:0.9, publicationLevel:0.95, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'Clottes 1995-2010; UNESCO World Heritage; Nature 2025 genetic dating' },
+
+  { id:'olduvai', name:'奥杜威峡谷石器', lat:-2.9, lng:35.3, era:'2,600,000 BP', category:'tool',
+    desc:'坦桑尼亚奥杜威峡谷，人类最早的石器工具（Oldowan技术）。Leakey家族系统发掘的经典遗址。人类技术进化的起点。',
+    datingMethods:['paleomag','strat','useries'], contextClarity:0.9, publicationLevel:0.95, independentReplications:5,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'Leakey 1959-1998; Nature 2025 latest dating' },
+
+  { id:'mohenjo', name:'摩亨佐-达罗', lat:27.3, lng:68.1, era:'4,500 BP', category:'settlement',
+    desc:'印度河流域文明两大城市之一。先进城市规划（正交网格+排水系统+标准砖+浴室），大浴池中央布局暗示仪式清洁。印章文字仍未被破译。突然衰落原因不明。',
+    datingMethods:['c14','strat'], contextClarity:0.9, publicationLevel:0.9, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'UNESCO; Wheeler 1950s; Kenoyer 1990s; 2026 Harappan DNA study' },
+
+  // === T2: Single Confirmed (25 entries) ===
+  { id:'venetianbeads', name:'阿拉斯加前哥伦布玻璃珠', lat:67.5, lng:-162.0, era:'pre-1492 CE', category:'contact',
+    desc:'阿拉斯加Late Prehistoric Eskimo遗址出土威尼斯玻璃珠。INAA+AMS C14确认早于哥伦布。首个确凿的欧亚大陆→美洲前哥伦布陆路传播证据。',
+    datingMethods:['c14','inaa'], contextClarity:0.85, publicationLevel:0.9, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.2,
+    ref:'Kunz & Mills American Antiquity 2021' },
+
+  { id:'coca', name:'埃及木乃伊可卡因/尼古丁', lat:30.0, lng:31.2, era:'1000-300 BCE', category:'contact',
+    desc:'Balabanova 1992年GC-MS检测埃及女祭司Henut Taui头发中发现可卡因和尼古丁。多具不同时期木乃伊中检出。可卡因仅来源南美古柯，尼古丁来源美洲烟草。',
+    datingMethods:['gcms','insect','c14'], contextClarity:0.75, publicationLevel:0.85, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.25, motivationScore:0.1, verificationGap:0.25,
+    ref:'Balabanova 1992; Parsche 1995; Buckland Antiquity 2001; Görlitz 2016' },
+
+  { id:'romanhead', name:'墨西哥罗马陶头', lat:19.3, lng:-99.7, era:'II-III CE', category:'contact',
+    desc:'1933年Calixtlahuaca金字塔下完整墓葬层出土小陶人头。风格鉴定为罗马II-III世纪作品。TL测年确认1780±400 BP。三层地板之下排除殖民混入。',
+    datingMethods:['tl','strat'], contextClarity:0.8, publicationLevel:0.85, independentReplications:1,
+    provenanceGap:0.15, anachronismIndex:0.15, motivationScore:0.15, verificationGap:0.3,
+    ref:'García Payón 1961; Hristov & Genovés Ancient Mesoamerica 1999; TL Heidelberg 1995' },
+
+  { id:'sharedplants', name:'98种前哥伦布共有作物', lat:0, lng:0, era:'pre-1492', category:'contact',
+    desc:'系统性研究确认98种植物在哥伦布前已存在于东西半球。涵盖植物考古、古DNA、古代艺术和文献交叉验证。',
+    datingMethods:['dna','c14','strat'], contextClarity:0.7, publicationLevel:0.8, independentReplications:3,
+    provenanceGap:0.1, anachronismIndex:0.15, motivationScore:0.05, verificationGap:0.2,
+    ref:'Sino-Platonic Papers #133 2006; Johannessen, Jett, Carter' },
+
+  { id:'hookworm', name:'巴西7200年钩虫证据', lat:-15.0, lng:-45.0, era:'7,200 BP', category:'contact',
+    desc:'巴西7200年前粪化石中检测到钩虫（需热带连续传播）。无法通过寒冷白令陆桥传入。跨太平洋接触独立寄生虫学证据。',
+    datingMethods:['c14','dna'], contextClarity:0.8, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.2, motivationScore:0.05, verificationGap:0.2,
+    ref:'Allison 1973; Araújo 1988; Reinhard 1992' },
+
+  { id:'khambhat', name:'Khambhat湾沉没城市', lat:21.5, lng:72.5, era:'9,500 BP', category:'sunken',
+    desc:'印度坎贝湾水下36m发现8×3km网格状结构。NIOT 2000年声纳+C14测年木器给出9,500 BP。确认人为建造则将比苏美尔早约5000年。',
+    datingMethods:['c14'], contextClarity:0.4, publicationLevel:0.6, independentReplications:0,
+    provenanceGap:0.15, anachronismIndex:0.25, motivationScore:0.15, verificationGap:0.5,
+    ref:'NIOT 2000-2002; BBC 2001; Marine Archaeology ongoing' },
+
+  { id:'nabta', name:'Nabta Playa天文石阵', lat:22.5, lng:30.7, era:'7,500-6,500 BP', category:'megalith',
+    desc:'撒哈拉新石器时代巨石圈，精确对齐夏至日出。比巨石阵早1000+年。当时为草原。石室下发现牛墓葬。',
+    datingMethods:['c14','strat'], contextClarity:0.75, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.15,
+    ref:'Wendorf 1990s; Astrophysics 2020 alignment' },
+
+  { id:'quipu', name:'印加Quipu结绳记事', lat:-13.5, lng:-72.0, era:'1400-1532 CE', category:'writing',
+    desc:'安第斯结绳信息系统。结的位置/数量/颜色编码数值和叙事。近年DNA+CT确认部分编码七进制数据。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Urton 2000s; Harvard Quipu database' },
+
+  { id:'sacsayhuaman', name:'萨索华曼巨石墙', lat:-13.5, lng:-72.0, era:'1400-1532 CE', category:'megalith',
+    desc:'秘鲁库斯科上方巨石堡垒。多边形巨石无缝拼接，巨石间连刀片都无法插入。最大石块重约200吨。印加人按承自己的建筑在此前已存在。',
+    datingMethods:['strat','c14','archaeoastronomy'], contextClarity:0.75, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.15, motivationScore:0.05, verificationGap:0.2,
+    ref:'USMP 1990s; Protzen 1993; 2026 laser scan' },
+
+  { id:'monteverde', name:'蒙特维尔德遗址', lat:-41.5, lng:-73.0, era:'14,500 BP', category:'migration',
+    desc:'智利南部最早人类遗址之一。木结构+石具+食物残渣。多次独立C14确认。曾是"克洛维斯优先"的最大挑战者。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.9, independentReplications:3,
+    provenanceGap:0.05, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.1,
+    ref:'Dillehay 1997; Nature 2015; 2025 sediment DNA' },
+
+  { id:'nazca', name:'纳斯卡线条', lat:-14.7, lng:-75.1, era:'200 BCE-650 CE', category:'art',
+     desc:"秘鲁纳斯卡沙漠巨型地画。数百个几何/生物图案，最大超300m。2025年AI发现新图案303个。'天空中的禅绕画'——只有高空可见。",
+    datingMethods:['c14','strat','archaeoastronomy'], contextClarity:0.75, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.15,
+    ref:'Reindel 2000s; Sakai 2019; AI discovery Nature 2025' },
+
+  { id:'tiwanaku', name:'蒂瓦纳科', lat:-16.6, lng:-68.7, era:'500-1000 CE', category:'settlement',
+    desc:'玻利维亚高海拔古城（3850m）。太阳门上的V形神像（Staff God）与查文/瓦里/印加神祇有连续谱系。南美安第斯文明2000年跨区域宗教一致性的证据。精密切割石头带金属夹。',
+    datingMethods:['c14','strat','useries'], contextClarity:0.75, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.2,
+    ref:'Kolata 1993; Vranich 2016; 2026 astronomical recalibration' },
+
+  { id:'greatzim', name:'大津巴布韦', lat:-20.3, lng:30.9, era:'1100-1450 CE', category:'settlement',
+    desc:'撒哈拉以南非洲最大石构建筑群。椭圆形围场+巨大塔楼。殖民时代被白人学者否认"黑人有此技术"，现经考古确认纯非洲本地建造。暗示东南非洲曾存在复杂王国。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.05, motivationScore:0.1, verificationGap:0.15,
+    ref:'Wieschhoff 1940s; Garlake 1973; Chirikure 2017' },
+
+  { id:'tichitt', name:'提希特-瓦拉塔', lat:18.5, lng:-9.5, era:'4,000 BP', category:'settlement',
+    desc:'毛里塔尼亚撒哈拉地区，西非最早的城市化定居点。400处石壁村落遗址，中心为精英区，证明撒哈拉荒漠化前曾有复杂社会。',
+    datingMethods:['c14','strat'], contextClarity:0.75, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.25,
+    ref:'Munson 1971; Vernet 1990s; 2024 lidar survey' },
+
+  { id:'nanmadol', name:'南马都尔', lat:6.9, lng:158.3, era:'1200-1600 CE', category:'settlement',
+    desc:'密克罗尼西亚波纳佩岛旁的"太平洋威尼斯"。92个人工珊瑚礁岛上巨石建筑，运河系统。Saudeleur王朝统治中心。废弃后丛林吞噬，至今大片未发掘。',
+    datingMethods:['c14','strat'], contextClarity:0.75, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.15, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.3,
+    ref:'UNESCO 2016; Ayres 2000s; 2024 mapping expedition' },
+
+  { id:'easterisland', name:'复活节岛摩艾', lat:-27.1, lng:-109.4, era:'1250-1600 CE', category:'megalith',
+    desc:'拉帕努伊摩艾石像。800+尊，平均13吨，最大约82吨。近年实验证明"行走"运输法可行。石像的帽子（普卡奥）来自另一采石场。社会因资源耗尽而崩溃的典型"生态自杀"案例——但此叙事近年遭到挑战。',
+    datingMethods:['c14','strat'], contextClarity:0.8, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Hunt & Lipo 2011; Rapa Nui Journal; 2025 new arrival chronology' },
+
+  { id:'lapita', name:'拉皮塔陶器', lat:-21.0, lng:165.0, era:'3,500-2,500 BP', category:'migration',
+    desc:'大洋洲拉皮塔文化（新喀里多尼亚-斐济-萨摩亚）。独特齿压纹陶器。人类首次殖民太平洋深远岛屿的遗存，代表了最伟大的人类海洋扩张之一。',
+    datingMethods:['c14','strat'], contextClarity:0.8, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.2,
+    ref:'Kirch 2000; Summerhayes 2010; 2024 genomic study' },
+
+  { id:'denisova', name:'丹尼索瓦洞', lat:51.4, lng:84.7, era:'30,000-200,000 BP', category:'migration',
+    desc:'阿尔泰山丹尼索瓦洞发现的古人类新种—丹尼索瓦人。仅以指骨+牙齿碎片通过古DNA确认。与尼安德特人、智人混血。现代美拉尼西亚和澳大利亚土著携带4-6%丹尼索瓦DNA。',
+    datingMethods:['c14','strat','dna'], contextClarity:0.85, publicationLevel:0.9, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Krause & Paabo Nature 2010; Nature 2025 oldest hominin hybrid' },
+
+  { id:'nihewan', name:'泥河湾盆地', lat:40.2, lng:114.5, era:'1,660,000 BP', category:'tool',
+    desc:'河北泥河湾盆地马圈沟遗址发现约166万年前石制品。东亚最早的人类活动遗存之一。将东亚人类历史向前推进到早更新世。古地磁+动物群+ESR交叉定年。',
+    datingMethods:['paleomag','esr','strat'], contextClarity:0.8, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Zhu et al. Nature 2004; 2025 new excavations' },
+
+  { id:'tarimmummies', name:'塔里木盆地干尸', lat:40.5, lng:88.0, era:'4,000-2,000 BP', category:'migration',
+    desc:'新疆塔里木盆地小河墓地/楼兰等地发现的欧罗巴人种干尸。保存极好的凯尔特风格编织品+奶酪。2021年古DNA确认其源于古欧亚北部人（ANE），并非后期迁徙而来。',
+    datingMethods:['c14','dna','strat'], contextClarity:0.85, publicationLevel:0.9, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.15,
+    ref:'Mallory 1989; Mair 1995; Nature 2021 genetics; 2025 cheese analysis' },
+
+  { id:'mehrgarh', name:'梅赫尔格尔', lat:29.2, lng:67.6, era:'7,000-5,000 BP', category:'settlement',
+    desc:'巴基斯坦俾路支斯坦，南亚最早农业定居点。大麦小麦+绵羊山羊驯化。牙齿钻孔（最早牙科手术）。印度河文明的前身。',
+    datingMethods:['c14','strat'], contextClarity:0.8, publicationLevel:0.85, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.15,
+    ref:'Jarrige 1974-2010; Lukacs 1990s dental evidence' },
+
+  { id:'nebra', name:'内布拉星象盘', lat:51.3, lng:11.7, era:'3,600 BP', category:'technology',
+    desc:'德国出土青铜星象盘，镶嵌黄金太阳/月亮/昴星团。精确表现夏至/冬至日出日落夹角。2026年同步辐射分析确认黄金来源为康沃尔，显示青铜时代欧洲已存在长距离知识交流。',
+    datingMethods:['c14','strat','srs'], contextClarity:0.8, publicationLevel:0.88, independentReplications:1,
+    provenanceGap:0.15, anachronismIndex:0.1, motivationScore:0.1, verificationGap:0.2,
+    ref:'Meller 2002; Nature 2025 synchrotron origin' },
+
+  { id:'vinca', name:'文查符号', lat:44.8, lng:21.0, era:'5,700-4,500 BP', category:'writing',
+    desc:'巴尔干文查文化的陶器符号系统。700+不同符号，规律性排布。部分学者认为是最早的"前文字"系统，比苏美尔早1000年。主流持保守态度——但符号的统计结构确实不同于随机装饰。',
+    datingMethods:['c14','strat'], contextClarity:0.7, publicationLevel:0.7, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.15, motivationScore:0.05, verificationGap:0.3,
+    ref:'Gimbutas 1970s; Winn 1981; Haarmann 2008' },
+
+  { id:'clovis', name:'克洛维斯尖状器', lat:32.5, lng:-103.5, era:'13,000 BP', category:'tool',
+    desc:'北美克洛维斯文化的标志性石制投射尖状器。遍布北美大陆。工艺高度标准化，表明快速扩张的熟练猎人群体。20世纪长期被认为是美洲最古老文化（"克洛维斯优先"）。',
+    datingMethods:['c14','strat','lithic'], contextClarity:0.85, publicationLevel:0.9, independentReplications:4,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Frison 1990s; Meltzer 2009; 2026 Clovis DNA' },
+
+  // === T3: Plausible (15 entries) ===
+  { id:'pumapunku', name:'普马彭古', lat:-16.6, lng:-68.7, era:'500-1000 CE', category:'megalith',
+    desc:'蒂瓦纳科的精密切割石头群。精密到0.5mm公差、复杂三维切割面、标准化的H形/I形金属夹。Tiwanaku文化遗址，但部分研究者认为技术特征超过当时可行水平。2025年3D扫描确认切割面含亚毫米精度。',
+    datingMethods:['c14','strat'], contextClarity:0.6, publicationLevel:0.65, independentReplications:0,
+    provenanceGap:0.15, anachronismIndex:0.2, motivationScore:0.05, verificationGap:0.35,
+    ref:'Vranich 2016; Protzen 2023; 2025 lidar scanning' },
+
+  { id:'yonaguni', name:'与那国岛水下结构', lat:24.4, lng:123.0, era:'未知', category:'sunken',
+    desc:'日本与那国岛海岸附近水下20-40m的巨型台阶式岩层。1986年发现。部分学者（木村政昭）主张为人工建造台阶/道路/人脸雕刻。主流地质学认为为砂岩节理+海蚀自然形成。真伪未定。',
+    datingMethods:[], contextClarity:0.3, publicationLevel:0.4, independentReplications:0,
+    provenanceGap:0.2, anachronismIndex:0.4, motivationScore:0.15, verificationGap:0.6,
+    ref:'木村政昭 1986-2020; Okinawa地质所; Natural vs Man-made debate ongoing' },
+
+  { id:'sundaland', name:'巽他大陆冰期文明', lat:-3.0, lng:108.0, era:'15,000-10,000 BP', category:'sunken',
+     desc:"冰期时东南亚巽他大陆架出露180万km²，现淹没40-120m。周边岛屿旧石器遗址暗示大陆架上可能存在被淹没遗迹。水下考古几乎空白。'已知未知'标志性案例。",
+    datingMethods:[], contextClarity:0.3, publicationLevel:0.5, independentReplications:0,
+    provenanceGap:0.3, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.7,
+    ref:'地质学共识: 巽他大陆存在; Archaeology: 尚未系统水下探测' },
+
+  { id:'povertypoint', name:'波弗蒂角', lat:32.6, lng:-91.4, era:'3,400 BP', category:'megalith',
+     desc:"美国路易斯安那史前土墩群。6个同心半圆脊+鸟型土墩。精确的天文对齐（至点/昼夜平分点/北极星）。当时北美洲最大最复杂的土方工程。'陶器时代的巨石阵'。",
+    datingMethods:['c14','strat','archaeoastronomy'], contextClarity:0.75, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.25,
+    ref:'UNESCO 2014; Kidder 2000s; Astronomy alignment 2022' },
+
+  { id:'cahokia', name:'卡霍基亚', lat:38.7, lng:-90.1, era:'1000-1350 CE', category:'settlement',
+    desc:'伊利诺伊州密西西比文化城市遗址。僧侣土墩高30m，底部大于基奥普斯金字塔。约20000人口，是当时北美最大城市。有明确社会分层、天文观测和跨区域贸易。约1350年突然废弃。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.88, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'UNESCO; Fowler 1990s; Pauketat 2004; 2026 woodhenge recalibration' },
+
+  { id:'sweetpotato', name:'红薯在波利尼西亚', lat:-17.0, lng:-150.0, era:'1000-1300 CE', category:'contact',
+    desc:'红薯（Ipomoea batatas）原产南美洲，但波利尼西亚人在欧洲人到来前已广泛种植。C14+语言学证实约1000-1200 CE引入，可能是波利尼西亚人航行至南美带回。反向传播：波利尼西亚的葫芦也出现在美洲。',
+    datingMethods:['c14','dna','glyph'], contextClarity:0.7, publicationLevel:0.78, independentReplications:1,
+    provenanceGap:0.15, anachronismIndex:0.15, motivationScore:0.05, verificationGap:0.25,
+    ref:'Green 2005; Roullier 2013; Nature Plants 2018; 2026 linguistic study' },
+
+  { id:'laneaux', name:'兰塞奥兹牧草地', lat:51.6, lng:-55.5, era:'1000 CE', category:'contact',
+    desc:'纽芬兰岛维京人定居点遗址。8个草皮木构建筑，铁器+青铜器+维京风格石灯。C14确认约1000 CE。唯一被普遍接受的前哥伦布欧洲人在美洲的证据。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.9, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Ingstad 1960; UNESCO; Nature 2021 solar storm dating' },
+
+  { id:'gunungpadang', name:'巴东山（25,000年金字塔？）', lat:-6.8, lng:107.1, era:'25,000 BP?', category:'megalith',
+    desc:'西爪哇的层层巨石结构。2023年发表主张核心为25,000 BP的人工建造。但2024年被Archaeological Prospection撤稿。但该地确实存在多层古老石构（至少3,500 BP）。火山熔岩与人工构造边界模糊。',
+    datingMethods:['c14','osl','strat'], contextClarity:0.3, publicationLevel:0.3, independentReplications:0,
+    provenanceGap:0.3, anachronismIndex:0.5, motivationScore:0.25, verificationGap:0.6,
+    ref:'Natawidjaja 2023 (retracted); 独立地质学家分析: >3500 BP confirmed' },
+
+  { id:'guanches', name:'关切斯木乃伊', lat:28.3, lng:-16.6, era:'1000-1400 CE', category:'contact',
+    desc:'加那利群岛关切斯土著（柏柏尔人后裔）的木乃伊。古DNA确认北非柏柏尔人起源。红头发+浅肤色描述曾引发"北欧人在非洲"传说。实际上反映的是古代北非（含欧洲混血）的遗传连续性。',
+    datingMethods:['c14','dna','strat'], contextClarity:0.8, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.2,
+    ref:'Nature 2018 genetics; Museo de Naturaleza Arqueología' },
+
+  { id:'spiritcave', name:'泰国仙人洞（Spirit Cave）', lat:19.0, lng:98.5, era:'12,000-8,000 BP', category:'settlement',
+    desc:'泰国西北部石灰岩洞穴遗址，出土早期植物栽培证据（豌豆、葫芦、荸荠等）。曾经主张为世界上最古老的农业（早于新月沃地），但后来新C14指示年代更晚。重新分析中。',
+    datingMethods:['c14','strat'], contextClarity:0.6, publicationLevel:0.65, independentReplications:0,
+    provenanceGap:0.15, anachronismIndex:0.15, motivationScore:0.05, verificationGap:0.4,
+    ref:'Gorman 1970s; C14 recalibration 2010s; ongoing debate' },
+
+  { id:'lassca', name:'拉斯科洞穴壁画', lat:45.1, lng:1.2, era:'17,000 BP', category:'art',
+    desc:'法国拉斯科洞穴旧石器时代壁画。600+动物画+对看不懂的几何符号。被称"旧石器时代的西斯廷教堂"。已关闭保护。2000多幅画的意图至今不明确。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.9, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.15,
+    ref:'UNESCO; Breuil 1940; 2025 3D recreation' },
+
+  { id:'bimini', name:'比米尼路', lat:25.5, lng:-79.2, era:'未知', category:'sunken',
+    desc:'巴哈马比米尼岛海岸水下3-6m的规则长方形石块排列。1968年发现。主张者认为是用过加工的巨石墙。主流地质学认为是更新世海滩岩（beachrock）的自然断裂。该区域确实存在更新世人类活动证据（但为少数研究）。',
+    datingMethods:[], contextClarity:0.2, publicationLevel:0.3, independentReplications:0,
+    provenanceGap:0.3, anachronismIndex:0.4, motivationScore:0.1, verificationGap:0.7,
+    ref:'Valentine 1968; Gifford & Ball 1980; 2024 geological reanalysis' },
+
+  { id:'titicacatemple', name:'的的喀喀湖神庙', lat:-15.8, lng:-69.3, era:'500-1000 CE', category:'sunken',
+    desc:'的的喀喀湖底发现的疑似神庙/遗迹（2000年由Akakor团队水下发现）。台阶、道路、动物雕塑、墙壁。附近有Tiwanaku遗址。水下考古受限，研究进度缓慢。',
+    datingMethods:['strat'], contextClarity:0.3, publicationLevel:0.4, independentReplications:0,
+    provenanceGap:0.35, anachronismIndex:0.2, motivationScore:0.1, verificationGap:0.65,
+    ref:'Busby 2000; INHAM 2013; 2024 side-scan sonar' },
+
+  { id:'nihewan3000', name:'泥河湾80万年前用火', lat:40.2, lng:114.5, era:'800,000 BP', category:'tool',
+    desc:'河北泥河湾盆地岑家湾遗址发现疑似800 ka控制用火证据（烧石+灰烬层+空间分布分析）。如果得到确认将是东亚最古老用火之一（同时期周口店烧骨存疑）。目前尚在同行评审中。',
+    datingMethods:['paleomag','strat'], contextClarity:0.4, publicationLevel:0.4, independentReplications:0,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.55,
+    ref:'岑家湾遗址2023-2025; PaleoAsia workshop 2025' },
+
+  { id:'loulan', name:'楼兰古城', lat:40.5, lng:89.9, era:'200 BCE-400 CE', category:'settlement',
+    desc:'新疆罗布泊西北沙漠中的古国遗址（"丝绸之路上的庞贝"）。1900年斯文·赫定重新发现。楼兰美女干尸（3800 BP）。出土佉卢文、汉文、粟特文多种文书。曾为东西方文化交汇枢纽。',
+    datingMethods:['c14','strat'], contextClarity:0.7, publicationLevel:0.75, independentReplications:1,
+    provenanceGap:0.15, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.25,
+    ref:'Hedin 1900; Stein 1906; Chinese Systematic excavation 1979-' },
+
+  // === T4: Suspect (5 entries) ===
+  { id:'fire700k', name:'周口店70万年前用火争议', lat:39.7, lng:115.9, era:'700,000 BP', category:'tool',
+    desc:'周口店北京人遗址灰烬层，传统认为控制在用火。近年CNRS重新分析指出灰烬层可能是自然火灾沉积+积水沉积交替的结果。至今争议未定。',
+    datingMethods:['strat','paleomag'], contextClarity:0.5, publicationLevel:0.6, independentReplications:1,
+    provenanceGap:0.05, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.3,
+    ref:'Jia Lanpo 1980s; CNRS质疑 2010s' },
+
+  { id:'popolvuh', name:'波波尔·乌（玛雅创世）', lat:15.0, lng:-90.0, era:'pre-1500 CE', category:'writing',
+    desc:'基切玛雅人的创世与英雄史诗。1701年Chichicastenango抄本（拉丁字母记录的口传），原始版本推测为玛雅象形文字。玉米人、冥府双胞胎、5次创世。与美索不达米亚/印度创世神话结构异常相似。',
+    datingMethods:['glyph','c14'], contextClarity:0.5, publicationLevel:0.7, independentReplications:0,
+    provenanceGap:0.4, anachronismIndex:0.15, motivationScore:0.15, verificationGap:0.4,
+    ref:'Tedlock 1985; Christenson 2003; 2024 reanalysis' },
+
+  { id:'chachapoya', name:'查查波亚（云战士）', lat:-6.2, lng:-77.8, era:'800-1500 CE', category:'settlement',
+    desc:'秘鲁北部的"云战士"文化。库拉普城堡（Kuelap）——石墙顶部有巨大石建筑。木乃伊+石棺。曾被印加和西班牙人征服。其巨型石灰石建筑上的雕刻风格与Aztecs/Some Tiwanaku有相似处。',
+    datingMethods:['c14','strat'], contextClarity:0.7, publicationLevel:0.7, independentReplications:1,
+    provenanceGap:0.1, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.3,
+    ref:'Museo Leymebamba; Nystrom 2000s; 2025 Kuelap lidar' },
+
+  { id:'casarabe', name:'萨拉贝（亚马逊城市）', lat:-13.5, lng:-67.5, era:'500-1400 CE', category:'settlement',
+    desc:'玻利维亚亚马逊地区Lidar发现的大型城市网络。2024-25年报道。运河+堤道+金字塔形平台+大规模水利工程。证明亚马逊不是"原始森林"，曾存在复杂文明。累计人口估计10万+。',
+    datingMethods:['c14','strat','lithic'], contextClarity:0.7, publicationLevel:0.8, independentReplications:1,
+    provenanceGap:0.15, anachronismIndex:0.1, motivationScore:0.05, verificationGap:0.3,
+    ref:'Prümers Nature 2024; Heiko 2025; 正在系统勘察' },
+
+  { id:'akrotiri', name:'阿克罗蒂里（圣托里尼）', lat:36.4, lng:25.4, era:'1,600 BCE', category:'settlement',
+    desc:'希腊圣托里尼岛青铜时代港口城市（米诺斯文明）。精妙多层建筑+壁画。被火山灰掩埋（与庞贝类似）。保存极好的壁画和陶器。与亚特兰蒂斯传说可能有关联。',
+    datingMethods:['c14','dendro','strat'], contextClarity:0.85, publicationLevel:0.88, independentReplications:2,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.15,
+    ref:'Marinatos 1967; Doumas 1990s; 2026 tsunami analysis' },
+
+  // === T5: Confirmed Forgery (5 entries) ===
+  { id:'coso', name:'Coso火花塞（自然误认）', lat:36.2, lng:-117.9, era:'modern', category:'forgery',
+    desc:'1961年加州Olancha地质结核中的人造物声称为50万年前的火花塞。2018年华盛顿大学鉴定确认为1920年代Champion火花塞，结核为铁锈自然形成(<100年快速结核)。自然+误认经典。',
+    provenanceGap:0.6, anachronismIndex:1.0, motivationScore:0.3, verificationGap:0.0,
+    ref:'Stromberg & Heinrich 2000; Pacific Science Center 2019' },
+
+  { id:'kensingston', name:'Kensington如尼石（恶作剧）', lat:45.9, lng:-95.4, era:'modern', category:'forgery',
+    desc:'1898年明尼苏达州瑞典移民发现的如尼石刻。语言学家证实其如尼字母为19世纪晚期变体。风化分析显示埋藏仅约25年。',
+    provenanceGap:0.5, anachronismIndex:0.9, motivationScore:0.5, verificationGap:0.0,
+    ref:'Williams runology; 2010s 3D scanning & weathering' },
+
+  { id:'ica', name:'Ica Stones（经济欺诈）', lat:-14.5, lng:-75.5, era:'modern', category:'forgery',
+    desc:'1960年代秘鲁刻字安山岩，内容为恐龙与人共存等。刻痕工具分析确认使用现代钢制工具。农民Uschuya 1970s承认伪造，目的是卖钱。',
+    provenanceGap:0.8, anachronismIndex:1.0, motivationScore:1.0, verificationGap:0.0,
+    ref:'Uschuya confession 1977; 地质学&考古学共识' },
+
+  { id:'piltdown', name:'皮尔当人（学术欺诈）', lat:50.9, lng:0.1, era:'modern', category:'forgery',
+    desc:'1912年"最早英国人"化石。1953年氟含量检测揭穿为现代猩猩下颌+人类颅骨拼合+锉磨染色。人类学研究中最恶劣的伪造案。',
+    provenanceGap:0.7, anachronismIndex:0.9, motivationScore:0.8, verificationGap:0.0,
+    ref:'Dawson 1912; Oakley 1953; Weiner et al. 1955' },
+
+  { id:'mexaliens', name:'墨西哥"外星人"木乃伊', lat:-14.7, lng:-75.1, era:'modern', category:'forgery',
+    desc:'2023年记者Maussan在墨西哥国会展示的"非人类"木乃伊。CT+DNA确认前哥伦布儿童木乃伊+动物骨骼拼接。Maussan此前2017年已有同样欺诈行为。',
+    provenanceGap:0.9, anachronismIndex:0.9, motivationScore:1.0, verificationGap:0.0,
+    ref:'Reuters 2023; Julieta Fierro UNAM; 多国科学界否认' },
+
+  // Global shared items (not rendered on map, counted in stats)
+  { id:'globalplants', name:'[Global] 跨半球共有植物群', lat:0, lng:0, era:'pre-1492', category:'contact',
+    desc:'98种植物在哥伦布前已存在于东西半球。玉米/甘薯/可可/葫芦等交叉分布。来源涵盖植物考古、古DNA、艺术和文献。',
+    datingMethods:['dna','c14','strat'], contextClarity:0.7, publicationLevel:0.8, independentReplications:3,
+    provenanceGap:0.1, anachronismIndex:0.15, motivationScore:0.05, verificationGap:0.2,
+    ref:'Sino-Platonic Papers #133 2006' },
+
+  { id:'globalhookworm', name:'[Global] 钩虫全球分布', lat:0, lng:0, era:'7,200 BP', category:'contact',
+    desc:'美洲钩虫在南美巴西和北美的前哥伦布分布。生命周期要求热带环境中持续传播，无法通过白令陆桥。跨太平洋接触的独立寄生虫学证据。',
+    datingMethods:['c14','dna','insect'], contextClarity:0.7, publicationLevel:0.8, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.2, motivationScore:0.05, verificationGap:0.2,
+    ref:'Allison 1973; Araújo 1988; Reinhard 1992; 日本学者复现' },
+
+  { id:'franchthi', name:'Franchthi 洞穴', lat:37.417, lng:23.133, era:'38,000-5,000 BP', category:'settlement',
+    desc:'东地中海最早且最长的连续居住序列之一。从旧石器中期到新石器时代的完整地层，显示了农业从安纳托利亚传入欧洲的过渡。含最早的爱琴海海底黑曜石贸易证据（来自米洛斯岛，约11,000 BP）。',
+    datingMethods:['c14','strat','paleomag'], contextClarity:0.9, publicationLevel:0.9, independentReplications:4,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.05,
+    ref:'Jacobsen 1976; Perlès 2001; Farrand 1993' },
+
+  { id:'greatzimbabwe', name:'大津巴布韦', lat:-20.268, lng:30.934, era:'900-500 BP', category:'megalith',
+    desc:'撒哈拉以南非洲最大的中世纪石构建筑群。干石砌墙技术无需砂浆，卫城与神殿建筑展示高度社会组织和远程贸易网络（波斯陶器、中国青瓷、阿拉伯玻璃珠）。19世纪殖民考古长期否认其非洲原创性，认为是腓尼基人或所罗门王建造。',
+    datingMethods:['c14','strat'], contextClarity:0.85, publicationLevel:0.9, independentReplications:4,
+    provenanceGap:0.05, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.1,
+    ref:'Garlake 1973; Huffman 2007; Chirikure 2020' },
+
+  { id:'costaspheres', name:'哥斯达黎加石球', lat:8.894, lng:-83.476, era:'2,000-1,000 BP', category:'art',
+    desc:'哥斯达黎加迪基斯三角洲发现的数百颗完美花岗闪长岩石球，直径从几厘米到2.5米，误差小于5毫米。制作技术远超前哥伦布时期的工具水平。20世纪30年代香蕉公司推土机推平大量遗址，多数石球被移动或破坏。',
+    datingMethods:['strat','lithic'], contextClarity:0.5, publicationLevel:0.6, independentReplications:1,
+    provenanceGap:0.2, anachronismIndex:0.15, motivationScore:0.05, verificationGap:0.3,
+    ref:'Lothrop 1963; Stone 1977; Lines 1992' },
+
+  { id:'sican', name:'锡坎黄金面具', lat:-6.466, lng:-79.895, era:'1,100-900 BP', category:'art',
+    desc:'秘鲁北部Sicán（Lambayeque）文化金合金面具与礼仪用刀（Tumi），工艺精湛，含多种贵金属合金技术。王室墓室中超过一吨黄金制品，证明前哥伦布时期大规模采矿与冶金能力。1991年盗墓者摧毁大量未记录遗址。',
+    datingMethods:['c14','strat','xray'], contextClarity:0.75, publicationLevel:0.8, independentReplications:2,
+    provenanceGap:0.1, anachronismIndex:0.05, motivationScore:0.05, verificationGap:0.2,
+    ref:'Shimada 1995; Shimada & Wagner 2001' },
+];
+
+// ── Association Engine ──
+class BayesianAssociationEngine {
+  constructor(evidenceDB) {
+    this.db = evidenceDB;
+    this.links = [];
+    this.clusters = [];
+    this.computeAll();
+  }
+
+  computeAll() {
+    this.links = [];
+    this.clusters = [];
+    for (let i = 0; i < this.db.length; i++) {
+      for (let j = i + 1; j < this.db.length; j++) {
+        const prob = this.computeConnectionProb(this.db[i], this.db[j]);
+        if (prob > 0.12) {
+          this.links.push({
+            from: this.db[i].id,
+            to: this.db[j].id,
+            probability: prob,
+            strength: prob > 0.3 ? 'strong' : prob > 0.2 ? 'medium' : 'weak',
+            factors: this.computeFactors(this.db[i], this.db[j])
+          });
+        }
+      }
+    }
+    this.links.sort((a,b) => b.probability - a.probability);
+    this.detectClusters();
+  }
+
+  computeConnectionProb(a, b) {
+    // Prior: base probability any two given evidence are connected
+    let prior = 0.08;
+
+    // Spatial factor: inverse distance → closer = more likely to be connected
+    const dist = haversineKm(a.lat, a.lng, b.lat, b.lng);
+    const spatialFactor = Math.exp(-(dist*dist) / (2*3000*3000));
+
+    // Temporal factor: era overlap
+    const tempFactor = temporalOverlap(a.era, b.era);
+
+    // Category factor: same category = 2x, related category = 1.5x
+    const sameCat = a.category === b.category;
+    const relatedCats = {
+      'megalith':['technology','art'], 'technology':['megalith','tool'],
+      'contact':['migration','writing'], 'migration':['contact','tool'],
+      'settlement':['sunken','megalith'], 'art':['writing','tool','megalith'],
+      'tool':['art','technology'], 'writing':['art','contact'],
+      'sunken':['settlement'], 'medical':['technology'], 'forgery':[]
+    };
+    let catFactor = 1.0;
+    if (sameCat) catFactor = 2.0;
+    else if ((relatedCats[a.category]||[]).includes(b.category) || (relatedCats[b.category]||[]).includes(a.category)) catFactor = 1.5;
+
+    // Method factor: shared dating methods = more confidence
+    const sharedMethods = (a.datingMethods||[]).filter(m => (b.datingMethods||[]).includes(m)).length;
+    const methodFactor = 1 + sharedMethods * 0.15;
+
+    // Confidence factor: both high confidence = more likely a real connection
+    const aScore = a.effectiveConfidence || 0.5;
+    const bScore = b.effectiveConfidence || 0.5;
+    const confFactor = (aScore + bScore) / 2;
+
+    // Final association probability
+    let prob = prior * spatialFactor * tempFactor * catFactor * methodFactor * (0.5 + confFactor);
+    prob = Math.min(0.99, Math.max(0, prob));
+    return prob;
+  }
+
+  computeFactors(a, b) {
+    const dist = haversineKm(a.lat, a.lng, b.lat, b.lng);
+    const temp = temporalOverlap(a.era, b.era);
+    return {
+      distance_km: Math.round(dist),
+      distance_factor: +Math.exp(-(dist*dist) / (2*3000*3000)).toFixed(3),
+      temporal_overlap: +temp.toFixed(3),
+      same_category: a.category === b.category,
+      shared_methods: (a.datingMethods||[]).filter(m => (b.datingMethods||[]).includes(m)).length
+    };
+  }
+
+  detectClusters() {
+    // Build graph adjacency
+    const adj = {};
+    this.db.forEach(e => adj[e.id] = []);
+    this.links.forEach(l => {
+      if (l.probability > 0.2) {
+        adj[l.from].push({id:l.to, prob:l.probability});
+        adj[l.to].push({id:l.from, prob:l.probability});
+      }
+    });
+
+    // Find connected components (clusters) of size >= 3
+    const visited = new Set();
+    this.clusters = [];
+    this.db.forEach(e => {
+      if (visited.has(e.id)) return;
+      const component = [];
+      const queue = [e.id];
+      visited.add(e.id);
+      while (queue.length) {
+        const cur = queue.shift();
+        component.push(cur);
+        (adj[cur]||[]).forEach(n => {
+          if (!visited.has(n.id)) { visited.add(n.id); queue.push(n.id); }
+        });
+      }
+      if (component.length >= 3) {
+        const members = component.map(id => {
+          const ep = this.db.find(x => x.id === id);
+          return { id, name: ep?.name||id, lat: ep?.lat, lng: ep?.lng, tier: ep?.tier, score: ep?.effectiveConfidence };
+        });
+        const avgScore = members.reduce((s,m) => s+(m.score||0),0)/members.length;
+        const avgLat = members.reduce((s,m) => s+m.lat,0)/members.length;
+        const avgLng = members.reduce((s,m) => s+m.lng,0)/members.length;
+        const internalLinks = this.links.filter(l => component.includes(l.from) && component.includes(l.to));
+        this.clusters.push({
+          id: 'C'+this.clusters.length,
+          members,
+          avgScore,
+          avgLat, avgLng,
+          internalLinks: internalLinks.length,
+          size: component.length,
+          name: '聚类 '+(this.clusters.length+1)
+        });
+      }
+    });
+    this.clusters.sort((a,b) => b.avgScore - a.avgScore);
+    this.clusters.forEach((c,i) => {
+      const topAreas = [...new Set(c.members.map(m => EVIDENCE_DB.find(e=>e.id===m.id)?.category||'').filter(Boolean))];
+      c.name = '聚类'+(i+1)+': '+topAreas.slice(0,3).join('/');
+    });
+  }
+
+  getLinksForEvidence(id) {
+    return this.links.filter(l => l.from === id || l.to === id);
+  }
+}
+
+// ── Weight Self-Calibrator ──
+class WeightCalibrator {
+  constructor(evidenceDB, bayesian) {
+    this.db = evidenceDB;
+    this.bayesian = bayesian;
+    this.history = [];
+  }
+
+  run() {
+    this.db.forEach(ep => {
+      const links = this.bayesian.getLinksForEvidence(ep.id);
+      if (links.length === 0) { ep.calibratedScore = ep.effectiveConfidence; return; }
+
+      // Compute neighbor-weighted confidence
+      let numerator = 0, denominator = 0;
+      links.forEach(l => {
+        const neighborId = l.from === ep.id ? l.to : l.from;
+        const neighbor = this.db.find(e => e.id === neighborId);
+        if (!neighbor) return;
+        const weight = l.probability * (l.probability > 0.3 ? 1.5 : 1);
+        numerator += weight * (neighbor.effectiveConfidence || 0.5);
+        denominator += weight;
+      });
+      const neighborAvg = denominator > 0 ? numerator / denominator : 0.5;
+
+      // Network-adjusted score: pull toward neighbor consensus
+      const pullStrength = Math.min(0.15, links.length * 0.02);
+      const adjusted = ep.effectiveConfidence + pullStrength * (neighborAvg - ep.effectiveConfidence);
+
+      // Degree centrality boost: more connections = slightly more reliable
+      const degree = links.length;
+      const centralityBoost = Math.min(0.08, degree * 0.01);
+
+      ep.calibratedScore = Math.max(0.01, Math.min(1, adjusted + centralityBoost));
+    });
+
+    this.history.push({
+      time: new Date().toISOString(),
+      type:'calibration',
+      msg: `全局权重自校准完成。${this.db.length} 条物证通过贝叶斯网络重新均衡。`
+    });
+    return this.history[this.history.length-1];
+  }
+}
+
+// ── Blind Spot Predictor ──
+class BlindSpotPredictor {
+  constructor(evidenceDB) {
+    this.db = evidenceDB;
+    this.blindSpots = [];
+    this.compute();
+  }
+
+  compute() {
+    this.blindSpots = [];
+    // Grid: 15° x 15° cells
+    const grid = {};
+    const G = 10;
+    for (let lat = -90; lat < 90; lat += G) {
+      for (let lng = -180; lng < 180; lng += G) {
+        const key = `${Math.floor(lat/G)},${Math.floor(lng/G)}`;
+        grid[key] = { lat:lat+G/2, lng:lng+G/2, count:0, neighbors:0 };
+      }
+    }
+    this.db.forEach(ep => {
+      if (ep.lat === 0 && ep.lng === 0) return;
+      const key = `${Math.floor(ep.lat/G)},${Math.floor(ep.lng/G)}`;
+      if (grid[key]) grid[key].count++;
+    });
+
+    // Find blind spots: cells with 0 evidence but surrounded by ≥2 cells with evidence
+    Object.entries(grid).forEach(([key, cell]) => {
+      if (cell.count > 0) return;
+      const parts = key.split(',').map(Number);
+      let neighborCount = 0;
+      for (let dl = -1; dl <= 1; dl++) {
+        for (let dg = -1; dg <= 1; dg++) {
+          if (dl === 0 && dg === 0) continue;
+          const nk = `${parts[0]+dl},${parts[1]+dg}`;
+          if (grid[nk] && grid[nk].count > 0) neighborCount++;
+        }
+      }
+      if (neighborCount >= 2) {
+        this.blindSpots.push({
+          lat: cell.lat, lng: cell.lng,
+          neighborCount,
+          priority: neighborCount >= 4 ? 'high' : neighborCount >= 3 ? 'medium' : 'low'
+        });
+      }
+    });
+
+    this.blindSpots.sort((a,b) => b.neighborCount - a.neighborCount);
+  }
+
+  describeSpot(spot) {
+    const areas = {
+      '0,0': '中大西洋', '1,2': '非洲', '-1,-1': '南大西洋', '0,1': '中非',
+      '0,-1': '中美洲', '-1,0': '南美洲北部', '2,0': '中亚', '2,1': '中亚/蒙古',
+      '1,-1': '亚马逊', '-1,-2': '秘鲁外海', '3,0': '西伯利亚', '3,1': '中西伯利亚',
+      '2,-2': '太平洋', '-2,-2': '南太平洋', '-2,3': '南印度洋', '2,3': '东南亚',
+      '5,5': '北冰洋'
+    };
+    const key = `${Math.floor(spot.lat/10)},${Math.floor(spot.lng/10)}`;
+    const area = areas[key] || `格 ${key}`;
+    return { area, ...spot };
+  }
+}
+
+// ── Self-Iteration Engine ──
+class SelfIterationEngine {
+  constructor() {
+    this.log = [
+      { time: new Date().toISOString(), type:'init', msg:'EWHR v0.3 关联引擎初始化。物证库 '+EVIDENCE_DB.length+' 条。' },
+      { time: new Date().toISOString(), type:'observation', msg:'前哥伦布接触物证(T2)密度与主流学术接受度严重不匹配 → 标记学术抑制区。' },
+      { time: new Date().toISOString(), type:'observation', msg:'技术失传模式: 罗马混凝土/安提基特拉/明代麻醉 → 高级技术全球周期性失传。线性进步叙事不符。' },
+      { time: new Date().toISOString(), type:'selfcorrect', msg:'元依赖警告: 本系统依赖已发表研究，无法独立验证原始物证。需引入原始数据分析层。' },
+      { time: new Date().toISOString(), type:'observation', msg:'白沙滩足迹(23ka)和蒙特维尔德(14.5ka)联合挑战"克洛维斯优先"模型 → 人类进入美洲的时间正在持续回溯。' },
+      { time: new Date().toISOString(), type:'observation', msg:'哥贝克力(13ka)+肖维(37ka)+Blombos(100ka)→ 人类象征能力的出现远早于"认知革命"框架。' },
+    ];
+  }
+
+  addEntry(type, msg) {
+    this.log.unshift({ time:new Date().toISOString(), type, msg });
+    while (this.log.length > 300) this.log.pop();
+  }
+}
+
+// ── Initialize System ──
+const engine = new SelfIterationEngine();
+const bayesian = new BayesianAssociationEngine(EVIDENCE_DB);
+const calibrator = new WeightCalibrator(EVIDENCE_DB, bayesian);
+const blindSpotter = new BlindSpotPredictor(EVIDENCE_DB);
+
+// Run calibration on startup
+calibrator.run();
+
+// ── Map Builder ──
+let currentFilter = 'all';
+let currentTab = 'list';
+
+function ll(lon, lat) { return { x:(lon+180)/360*1000, y:(90-lat)/180*500 }; }
+
+function buildMap() {
+  const svg = document.getElementById('worldMap');
+  svg.innerHTML = '';
+
+  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bg.setAttribute('width','1000'); bg.setAttribute('height','500');
+  bg.setAttribute('fill','var(--bg)');
+  svg.appendChild(bg);
+
+  // Continents
+  fetch('https://cdn.jsdelivr.net/npm/world-map-path@1.0.2/world.json')
+    .then(r => r.json())
+    .then(data => {
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      data.features.forEach(f => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d',f.d);
+        path.setAttribute('class','continent-fill');
+        g.appendChild(path);
+      });
+      svg.insertBefore(g, svg.firstChild);
+    }).catch(() => {});
+
+  // Graticule
+  for (let lat=-80; lat<=80; lat+=20) {
+    const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1','0'); l.setAttribute('y1',ll(0,lat).y);
+    l.setAttribute('x2','1000'); l.setAttribute('y2',ll(0,lat).y);
+    l.setAttribute('class','graticule'); svg.appendChild(l);
+  }
+  for (let lon=-160; lon<=160; lon+=20) {
+    const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',ll(lon,0).x); l.setAttribute('y1','0');
+    l.setAttribute('x2',ll(lon,0).x); l.setAttribute('y2','500');
+    l.setAttribute('class','graticule'); svg.appendChild(l);
+  }
+
+  // Equator
+  const eq = document.createElementNS('http://www.w3.org/2000/svg','line');
+  const eqy = ll(0,0).y;
+  eq.setAttribute('x1','0'); eq.setAttribute('y1',eqy);
+  eq.setAttribute('x2','1000'); eq.setAttribute('y2',eqy);
+  eq.setAttribute('stroke','rgba(212,168,83,0.05)'); eq.setAttribute('stroke-width','0.5');
+  svg.appendChild(eq);
+
+  // Connection lines layer
+  const connG = document.createElementNS('http://www.w3.org/2000/svg','g');
+  connG.setAttribute('id','connLayer');
+  svg.appendChild(connG);
+
+  // Evidence dots layer
+  const dotG = document.createElementNS('http://www.w3.org/2000/svg','g');
+  dotG.setAttribute('id','dotLayer');
+  svg.appendChild(dotG);
+
+  // Render connection lines (only strong + medium)
+  bayesian.links.forEach(l => {
+    if (l.probability < 0.18) return;
+    const from = EVIDENCE_DB.find(e => e.id === l.from);
+    const to = EVIDENCE_DB.find(e => e.id === l.to);
+    if (!from||!to) return;
+    if ((from.lat===0&&from.lng===0)||(to.lat===0&&to.lng===0)) return;
+    const p1 = ll(from.lng, from.lat), p2 = ll(to.lng, to.lat);
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',p1.x); line.setAttribute('y1',p1.y);
+    line.setAttribute('x2',p2.x); line.setAttribute('y2',p2.y);
+    const opacity = Math.min(0.6, l.probability * 1.5);
+    line.setAttribute('stroke',`rgba(212,168,83,${opacity})`);
+    line.setAttribute('class','connect-line');
+    line.style.opacity = (currentFilter==='all') ? '1' : '0';
+    connG.appendChild(line);
+  });
+
+  // Render evidence dots
+  EVIDENCE_DB.forEach(ep => {
+    const epo = new EvidencePoint(ep);
+    if (ep.lat===0&&ep.lng===0) return;
+    const p = ll(ep.lng, ep.lat);
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.dataset.epId = ep.id;
+    g.dataset.tier = epo.tier;
+    g.addEventListener('click', () => showDetail(epo));
+
+    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',p.x); dot.setAttribute('cy',p.y);
+    const r = epo.tier <= 1 ? 4.5 : epo.tier === 2 ? 3.5 : epo.tier === 5 ? 2.5 : 3;
+    dot.setAttribute('r',r);
+    dot.setAttribute('fill',epo.tierColor);
+    dot.setAttribute('opacity',epo.tier===5?'0.5':'0.8');
+    dot.setAttribute('class','ep-dot');
+    if (epo.tier <= 1) dot.classList.add('glow-pulse');
+    g.appendChild(dot);
+
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x',p.x); lbl.setAttribute('y',p.y+(epo.tier<=1?9:7));
+    lbl.setAttribute('class','ep-label');
+    lbl.setAttribute('fill',epo.tierColor);
+    lbl.textContent = ep.name;
+    g.appendChild(lbl);
+
+    dotG.appendChild(g);
+  });
+
+  applyFilter();
+  updateLegend();
+  updateStats();
+  renderCurrentTab();
+}
+
+function applyFilter() {
+  document.querySelectorAll('#dotLayer > g').forEach(g => {
+    const tier = parseInt(g.dataset.tier);
+    g.style.display = (currentFilter==='all'||tier===parseInt(currentFilter.replace('t',''))) ? 'block' : 'none';
+  });
+  document.querySelectorAll('#connLayer > line').forEach(l => {
+    l.style.opacity = (currentFilter==='all') ? '1' : '0';
+  });
+}
+
+function setFilter(btn, f) {
+  document.querySelectorAll('.h-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  currentFilter = f;
+  applyFilter();
+  const info = document.getElementById('navInfo');
+  info.classList.add('show');
+  info.textContent = {all:'全部层级',t1:'T1 双重确认',t2:'T2 单源确认',t3:'T3 初步可考',t5:'T5 已知伪造'}[f]||'';
+  setTimeout(()=>info.classList.remove('show'),2500);
+}
+
+// ── Detail Panel ──
+function showDetail(ep) {
+  const o = document.getElementById('detailOverlay');
+  document.getElementById('detName').innerHTML = `${ep.name} <span class="detail-tag tag-${ep.tierClass}">${ep.tierLabel}</span>`;
+
+  const risk = (ep.forgeryRisk*100).toFixed(1);
+  const dm = (ep.datingMethods||[]).join(', ') || '暂无';
+  const links = bayesian.getLinksForEvidence(ep.id).sort((a,b)=>b.probability-a.probability);
+  const topLinks = links.slice(0,6).map(l => {
+    const otherId = l.from===ep.id ? l.to : l.from;
+    const other = EVIDENCE_DB.find(e=>e.id===otherId);
+    return other ? `${other.name} (${(l.probability*100).toFixed(0)}%)` : otherId;
+  }).join('; ') || '暂无贝叶斯关联';
+
+  const eraStr = ep.eraParsed ? `${ep.eraParsed.center.toFixed(0)} BP [${ep.eraParsed.min.toFixed(0)}-${ep.eraParsed.max.toFixed(0)}]` : '未知';
+
+  document.getElementById('detBody').innerHTML = `
+    <div class="detail-section detail-full"><div class="detail-desc">${ep.desc||'暂无描述'}</div></div>
+    <div class="detail-section">
+      <div class="detail-section-title">📊 置信度评估</div>
+      <div class="detail-row"><span class="detail-label">原始置信度</span><span style="color:var(--t2);">${(ep.rawConfidence*100).toFixed(1)}%</span></div>
+      <div class="detail-row"><span class="detail-label">伪造调整后</span><span>${(ep.effectiveConfidence*100).toFixed(1)}%</span></div>
+      <div class="detail-row"><span class="detail-label">⚡ 校准后分数</span><span style="color:${ep.tierColor};font-weight:700">${(ep.calibratedScore*100).toFixed(1)}%</span></div>
+      <div class="detail-row"><span class="detail-label">层级</span><span>${ep.tierLabel}</span></div>
+      <div class="detail-row"><span class="detail-label">测年方法</span><span>${dm}</span></div>
+      <div class="detail-row"><span class="detail-label">独立复现</span><span>${ep.independentReplications||0} 次</span></div>
+      <div class="detail-row"><span class="detail-label">地层清晰度</span><span>${((ep.contextClarity||0)*100).toFixed(0)}%</span></div>
+      <div class="detail-row"><span class="detail-label">归一化年代</span><span style="font-size:9px;color:var(--tx3)">${eraStr}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">⚠️ 伪造风险评估</div>
+      <div class="detail-row"><span class="detail-label">综合风险</span><span style="color:${risk>50?'var(--t5)':risk>25?'var(--t4)':'var(--t2)'};">${risk}%</span></div>
+      <div class="detail-row"><span class="detail-label">来源链断裂</span><span>${(ep.provenanceGap*100).toFixed(0)}%</span></div>
+      <div class="detail-row"><span class="detail-label">时代错位</span><span>${(ep.anachronismIndex*100).toFixed(0)}%</span></div>
+      <div class="detail-row"><span class="detail-label">发现者动机</span><span>${(ep.motivationScore*100).toFixed(0)}%</span></div>
+      <div class="detail-row"><span class="detail-label">验证缺口</span><span>${(ep.verificationGap*100).toFixed(0)}%</span></div>
+    </div>
+    <div class="detail-section detail-full">
+      <div class="detail-section-title">🔗 关联网络 (Top-6)</div>
+      <div class="detail-row" style="flex-direction:column;align-items:flex-start;"><span class="detail-label">直接关联</span><span style="font-size:10px;margin-top:3px;">${topLinks}</span></div>
+    </div>
+    <div class="detail-section detail-full">
+      <div class="detail-section-title">📚 来源文献</div>
+      <div class="detail-ref">${ep.ref||'未记录'}</div>
+    </div>
+  `;
+  o.classList.add('open');
+}
+
+function closeDetail() { document.getElementById('detailOverlay').classList.remove('open'); }
+
+// ── Tab System ──
+function switchTab(el, tab) {
+  document.querySelectorAll('.sp-tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  currentTab = tab;
+  renderCurrentTab();
+}
+
+function renderCurrentTab() {
+  switch(currentTab) {
+    case 'list': renderEvidenceList(); break;
+    case 'graph': renderConnections(); break;
+    case 'clusters': renderClusters(); break;
+    case 'log': renderLog(); break;
+    case 'unknown': renderUnknown(); break;
+    case 'timeline': renderTimeline(); break;
+  }
+}
+
+function renderEvidenceList() {
+  const el = document.getElementById('spList');
+  let html = `<div style="font-size:9px;color:var(--tx3);margin-bottom:6px;">共 ${EVIDENCE_DB.length} 条 · 按校准后置信度排序</div>`;
+  const sorted = [...EVIDENCE_DB].map(d=>new EvidencePoint(d)).sort((a,b) => b.calibratedScore - a.calibratedScore);
+  sorted.forEach(ep => {
+    html += `<div class="ep-card ep-card-${ep.tierClass}" data-evidence-id="${ep.id.replace(/['"]/g,'')}">
+      <div class="ep-card-name">${ep.name} <span class="detail-tag tag-${ep.tierClass}" style="font-size:8px;">${ep.tierLabel}</span>
+        <span style="float:right;font-size:9px;color:var(--tx3);">${(ep.calibratedScore*100).toFixed(0)}%</span></div>
+      <div class="ep-card-meta">${ep.era} · ${ep.category} · ${ep.datingMethods?.length||0}种测年</div>
+      <div class="ep-card-desc">${(ep.desc||'').slice(0,80)}…</div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderConnections() {
+  const el = document.getElementById('spList');
+  const byStrength = bayesian.links.filter(l => l.probability > 0.12);
+  let html = `<div style="font-size:10px;color:var(--tx3);margin-bottom:8px;">
+    关联网络: ${byStrength.length} 条自动计算关联 (阈值 > 0.12)</div>`;
+  html += `<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+    <span class="detail-tag" style="background:rgba(212,168,83,0.1);color:var(--gold);font-size:8px;">强 >0.30</span>
+    <span class="detail-tag" style="background:rgba(212,168,83,0.06);color:var(--tx2);font-size:8px;">中 >0.20</span>
+    <span class="detail-tag" style="background:rgba(212,168,83,0.03);color:var(--tx3);font-size:8px;">弱 >0.12</span>
+  </div>`;
+
+  byStrength.forEach(l => {
+    const from = EVIDENCE_DB.find(e=>e.id===l.from);
+    const to = EVIDENCE_DB.find(e=>e.id===l.to);
+    if (!from||!to) return;
+    const f = l.strength === 'strong' ? 'gold' : l.strength === 'medium' ? 'var(--tx2)' : 'var(--tx3)';
+    html += `<div class="ep-card" style="border-left:2px solid ${f};padding:6px 8px;">
+      <div style="font-size:11px;color:var(--tx);">${from.name} <span style="color:var(--tx3)">↔</span> ${to.name}</div>
+      <div style="font-size:9px;color:var(--tx3);">关联概率 ${(l.probability*100).toFixed(0)}% · ${l.strength}
+        · ${l.factors.distance_km}km · 共${l.factors.shared_methods}种测年</div>
+    </div>`;
+  });
+  if (byStrength.length === 0) html += '<div style="color:var(--tx3);font-size:10px;padding:10px;">暂未发现关联</div>';
+  el.innerHTML = html;
+}
+
+function renderClusters() {
+  const el = document.getElementById('spList');
+  const clusters = bayesian.clusters;
+  let html = `<div style="font-size:10px;color:var(--tx3);margin-bottom:8px;">
+    自动检测聚类: ${clusters.length} 个 (≥3个物证, 内部关联 >0.2)</div>`;
+
+  clusters.forEach(c => {
+    const t1c = c.members.filter(m=>m.tier===1).length;
+    const t2c = c.members.filter(m=>m.tier===2).length;
+    html += `<div class="ep-card consensus-zone" style="padding:8px 10px;">
+      <div style="font-size:11px;font-weight:600;color:var(--tx);">${c.name}
+        <span class="detail-tag" style="background:rgba(74,138,255,0.1);color:var(--t2);font-size:8px;">${c.size} 成员</span></div>
+      <div style="font-size:9px;color:var(--tx3);margin:3px 0;">
+        T1: ${t1c} · T2: ${t2c} · 平均置信度 ${(c.avgScore*100).toFixed(0)}% · 内部关联 ${c.internalLinks} 条</div>
+      <div style="font-size:9px;color:var(--tx2);">
+        ${c.members.sort((a,b)=> (b.score||0)-(a.score||0)).slice(0,8).map(m =>
+          `<span style="display:inline-block;margin:1px 3px 1px 0;">${m.name}</span>`
+        ).join('')}
+      </div>
+    </div>`;
+  });
+
+  if (clusters.length === 0) html += '<div style="color:var(--tx3);font-size:10px;padding:10px;">暂无聚类</div>';
+  el.innerHTML = html;
+}
+
+function renderLog() {
+  const el = document.getElementById('spList');
+  const typeMap = { init:'🧠', observation:'🔍', update:'📝', selfcorrect:'⚠️', contradiction:'⚡', calibration:'⚖️' };
+  el.innerHTML = `<div style="font-size:10px;color:var(--tx3);margin-bottom:6px;">系统认知迭代日志 · 共 ${engine.log.length} 条</div>
+    <div class="iter-log">${engine.log.slice(0,50).map(e =>
+      `<div class="iter-entry"><span class="iter-time">${new Date(e.time).toLocaleString()}</span> ${typeMap[e.type]||'❓'} <span class="iter-${e.type}">${e.msg}</span></div>`
+    ).join('')}</div>`;
+}
+
+function renderUnknown() {
+  const el = document.getElementById('spList');
+
+  // Predicted blind spots
+  const spots = blindSpotter.blindSpots.slice(0,8);
+  let blindHtml = spots.map(s => {
+    const desc = blindSpotter.describeSpot(s);
+    const priColor = s.priority === 'high' ? 'var(--t5)' : s.priority === 'medium' ? 'var(--t4)' : 'var(--t3)';
+    return `<div class="unknown-card">
+      <div class="unknown-card-title">${desc.area} <span style="font-size:8px;color:${priColor};">(${s.priority} 优先级)</span></div>
+      <div class="unknown-card-desc">周围 ${s.neighborCount} 个有物证的网格围绕但本格无记录·中心坐标 ${s.lat.toFixed(1)}°, ${s.lng.toFixed(1)}°</div>
+    </div>`;
+  }).join('') || '<div style="color:var(--tx3);font-size:10px;padding:5px;">暂无盲点预测</div>';
+
+  el.innerHTML = `<div style="font-size:10px;color:var(--tx3);margin-bottom:6px;">❓ 自动预测盲点区 — 周围已有物证但本格空白的区域</div>
+    ${blindHtml}
+
+    <div style="font-size:10px;color:var(--tx3);margin-top:12px;padding:6px;border-top:1px solid rgba(212,168,83,0.06);">⚠️ 已知伪造物证 (已排除)</div>
+    ${EVIDENCE_DB.filter(e=>new EvidencePoint(e).tier===5).map(ep => {
+      const e = new EvidencePoint(ep);
+      const safe = JSON.stringify(e).replace(/"/g,'&quot;');
+      return `<div class="forgery-card" onclick='showDetail(${safe})'>
+        <div class="forgery-card-title">${ep.name}</div>
+        <div class="forgery-card-desc">${(ep.desc||'').slice(0,120)} <span style="color:var(--tx3);">[详情]</span></div>
+      </div>`;
+    }).join('')}`;
+}
+
+// ── Tier Change Tracking ──
+function trackTierChanges() {
+  const before = EVIDENCE_DB.map(e => ({id:e.id, tier:new EvidencePoint(e).tier}));
+  bayesian.computeAll();
+  blindSpotter.compute();
+  calibrator.run();
+
+  const after = EVIDENCE_DB.map(e => ({id:e.id, tier:new EvidencePoint(e).tier}));
+  let changes = [];
+  before.forEach((b,i) => {
+    if (b.tier !== after[i].tier) {
+      const ep = EVIDENCE_DB.find(e => e.id === b.id);
+      changes.push(`${ep?.name||b.id}: T${b.tier}→T${after[i].tier}`);
+    }
+  });
+  return changes;
+}
+
+function runCalibration() {
+  const changes = trackTierChanges();
+  const result = calibrator.history[calibrator.history.length-1] || { type:'calibration', msg:'校准完成' };
+  engine.addEntry(result.type, result.msg);
+
+  const t1s = EVIDENCE_DB.filter(e => new EvidencePoint(e).tier === 1);
+  const t5s = EVIDENCE_DB.filter(e => new EvidencePoint(e).tier === 5);
+  engine.addEntry('observation', `校准后: T1=${t1s.length} T5=${t5s.length} 比率=${(t1s.length/t5s.length).toFixed(1)}`);
+
+  if (changes.length > 0) {
+    engine.addEntry('selfcorrect', `层级变更: ${changes.join('; ')}`);
+  }
+
+  saveData();
+  buildMap();
+}
+
+// ── Persistence ──
+const STORAGE_KEY = 'ewhr_v02_data';
+
+function stripComputed(obj) {
+  const clean = {...obj};
+  delete clean.eraParsed; delete clean.rawConfidence; delete clean.forgeryRisk;
+  delete clean.effectiveConfidence; delete clean.calibratedScore;
+  return clean;
+}
+
+function saveData() {
+  try {
+    const data = {
+      evidence: EVIDENCE_DB.map(e => stripComputed(e)),
+      log: engine.log,
+      calibrations: calibrator.history
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) { /* storage full or unavailable */ }
+}
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+
+    // Restore evidence (merge with defaults for new fields)
+    if (data.evidence && data.evidence.length > 0) {
+      EVIDENCE_DB.length = 0;
+      data.evidence.forEach(e => EVIDENCE_DB.push(stripComputed(e)));
+    }
+
+    // Restore log
+    if (data.log) engine.log = data.log;
+
+    // Restore calibration history
+    if (data.calibrations) calibrator.history = data.calibrations;
+
+    engine.addEntry('update', `持久化数据恢复: ${EVIDENCE_DB.length} 条物证, ${engine.log.length} 条日志`);
+    return true;
+  } catch(e) { return false; }
+}
+
+function exportJSON() {
+  const data = {
+    version: '0.2',
+    exported: new Date().toISOString(),
+    evidence: EVIDENCE_DB.map(e => stripComputed(e)),
+    log: engine.log,
+    stats: {
+      total: EVIDENCE_DB.length,
+      t1: EVIDENCE_DB.filter(e=>new EvidencePoint(e).tier===1).length,
+      t2: EVIDENCE_DB.filter(e=>new EvidencePoint(e).tier===2).length,
+      t3: EVIDENCE_DB.filter(e=>new EvidencePoint(e).tier===3).length,
+      t4: EVIDENCE_DB.filter(e=>new EvidencePoint(e).tier===4).length,
+      t5: EVIDENCE_DB.filter(e=>new EvidencePoint(e).tier===5).length,
+      clusters: bayesian.clusters.length,
+      strongLinks: bayesian.links.filter(l=>l.probability>0.25).length
+    }
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `ewhr-export-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.evidence || !Array.isArray(data.evidence)) {
+        alert('无效的EWHR导出文件');
+        return;
+      }
+      const count = data.evidence.length;
+      data.evidence.forEach(ep => {
+        if (!EVIDENCE_DB.find(x => x.id === ep.id)) EVIDENCE_DB.push(stripComputed(ep));
+      });
+      engine.addEntry('update', `导入 ${count} 条物证 (去重后新增)`);
+      saveData();
+      bayesian.computeAll();
+      blindSpotter.compute();
+      calibrator.run();
+      buildMap();
+    } catch(err) { alert('导入失败: '+err.message); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ── Evidence Add/Edit Form ──
+function showAddForm(existingId) {
+  const existing = existingId ? EVIDENCE_DB.find(e => e.id === existingId) : null;
+  const title = existing ? '编辑物证' : '添加新物证';
+  const e = existing || {};
+  const safeVal = (v) => (v||'').toString().replace(/"/g,'&quot;');
+  const checked = (v,d) => v !== undefined ? v : d;
+
+  document.getElementById('detName').textContent = title;
+  document.getElementById('detBody').innerHTML = `
+    <div class="detail-section detail-full">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">ID</label><input class="form-input" id="f-id" value="${safeVal(e.id)}" placeholder="唯一标识"></div>
+        <div class="form-group"><label class="form-label">名称</label><input class="form-input" id="f-name" value="${safeVal(e.name)}" placeholder="物证名称"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">纬度</label><input class="form-input" id="f-lat" type="number" step="0.1" value="${checked(e.lat,'')}" placeholder="-90~90"></div>
+        <div class="form-group"><label class="form-label">经度</label><input class="form-input" id="f-lng" type="number" step="0.1" value="${checked(e.lng,'')}" placeholder="-180~180"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">年代</label><input class="form-input" id="f-era" value="${safeVal(e.era)}" placeholder="如: 5,000 BP"></div>
+        <div class="form-group"><label class="form-label">分类</label>
+          <select class="form-input" id="f-category">
+            ${['megalith','settlement','tool','technology','art','writing','medical','contact','migration','sunken','forgery'].map(c =>
+              `<option value="${c}" ${e.category===c?'selected':''}>${c}</option>`).join('')}
+          </select></div>
+      </div>
+      <div class="form-group"><label class="form-label">描述</label><textarea class="form-input form-textarea" id="f-desc">${safeVal(e.desc)}</textarea></div>
+      <div class="form-group"><label class="form-label">文献来源</label><input class="form-input" id="f-ref" value="${safeVal(e.ref)}"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">测年方法 (逗号分隔)</label><input class="form-input" id="f-methods" value="${safeVal((e.datingMethods||[]).join(','))}"></div>
+        <div class="form-group"><label class="form-label">独立复现次数</label><input class="form-input" id="f-repl" type="number" min="0" value="${checked(e.independentReplications,0)}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">地层清晰度 (0-1)</label><input class="form-input" id="f-ctx" type="number" step="0.05" min="0" max="1" value="${checked(e.contextClarity,0.7)}"></div>
+        <div class="form-group"><label class="form-label">发表水平 (0-1)</label><input class="form-input" id="f-pub" type="number" step="0.05" min="0" max="1" value="${checked(e.publicationLevel,0.5)}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">来源链断裂 (0-1)</label><input class="form-input" id="f-pgap" type="number" step="0.05" min="0" max="1" value="${checked(e.provenanceGap,0.1)}"></div>
+        <div class="form-group"><label class="form-label">时代错位 (0-1)</label><input class="form-input" id="f-ai" type="number" step="0.05" min="0" max="1" value="${checked(e.anachronismIndex,0.1)}"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">动机风险 (0-1)</label><input class="form-input" id="f-ms" type="number" step="0.05" min="0" max="1" value="${checked(e.motivationScore,0.05)}"></div>
+        <div class="form-group"><label class="form-label">验证缺口 (0-1)</label><input class="form-input" id="f-vg" type="number" step="0.05" min="0" max="1" value="${checked(e.verificationGap,0.1)}"></div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:10px;">
+        <button class="action-btn primary" data-action="save-evidence" data-existing-id="${(existingId||'').replace(/['"]/g,'')}">💾 保存</button>
+        <button class="action-btn" data-action="close-detail">取消</button>
+      </div>
+    </div>`;
+  document.getElementById('detailOverlay').classList.add('open');
+}
+
+function saveEvidenceForm(existingId) {
+  const g = (id) => document.getElementById(id);
+  const data = {
+    id: g('f-id').value.trim() || 'ev_'+Date.now(),
+    name: g('f-name').value.trim() || '未命名',
+    lat: parseFloat(g('f-lat').value) || 0,
+    lng: parseFloat(g('f-lng').value) || 0,
+    era: g('f-era').value.trim() || '未知',
+    category: g('f-category').value,
+    desc: g('f-desc').value.trim(),
+    ref: g('f-ref').value.trim(),
+    datingMethods: g('f-methods').value.split(',').map(s=>s.trim()).filter(Boolean),
+    independentReplications: parseInt(g('f-repl').value) || 0,
+    contextClarity: parseFloat(g('f-ctx').value) ?? 0.7,
+    publicationLevel: parseFloat(g('f-pub').value) ?? 0.5,
+    provenanceGap: parseFloat(g('f-pgap').value) ?? 0.1,
+    anachronismIndex: parseFloat(g('f-ai').value) ?? 0.1,
+    motivationScore: parseFloat(g('f-ms').value) ?? 0.05,
+    verificationGap: parseFloat(g('f-vg').value) ?? 0.1,
+  };
+
+  if (existingId) {
+    const idx = EVIDENCE_DB.findIndex(e => e.id === existingId);
+    if (idx >= 0) Object.assign(EVIDENCE_DB[idx], data);
+    engine.addEntry('update', `编辑物证: ${data.name}`);
+  } else {
+    if (EVIDENCE_DB.find(e => e.id === data.id)) {
+      alert('ID已存在，请使用唯一ID');
+      return;
+    }
+    EVIDENCE_DB.push(data);
+    engine.addEntry('update', `新增物证: ${data.name} [${data.era}]`);
+  }
+
+  saveData();
+  bayesian.computeAll();
+  blindSpotter.compute();
+  calibrator.run();
+  closeDetail();
+  buildMap();
+}
+
+// ── Blind Spot Resolution Improvement (10° grid) ──
+// Replaced inside BlindSpotPredictor class (changed from 15° to 10°)
+// Already applied in the class definition above.
+
+// ── Timeline View ──
+function renderTimeline() {
+  const el = document.getElementById('spList');
+  const items = EVIDENCE_DB.filter(e => e.lat !== 0 || e.lng !== 0)
+    .map(e => new EvidencePoint(e))
+    .filter(e => e.eraParsed.center > 0)
+    .sort((a,b) => a.eraParsed.center - b.eraParsed.center);
+
+  if (items.length === 0) {
+    el.innerHTML = '<div style="color:var(--tx3);font-size:10px;padding:10px;">暂无年代数据</div>';
+    return;
+  }
+
+  const minYear = items[0].eraParsed.center;
+  const maxYear = items[items.length-1].eraParsed.center;
+  const range = Math.max(1, maxYear - minYear);
+
+  // Group into eras
+  const eras = {
+    '1万年内': { min:0, max:10000, items:[] },
+    '1-5万年': { min:10000, max:50000, items:[] },
+    '5-50万年': { min:50000, max:500000, items:[] },
+    '50万-200万年': { min:500000, max:2000000, items:[] },
+    '>200万年': { min:2000000, max:Infinity, items:[] }
+  };
+
+  items.forEach(item => {
+    const y = item.eraParsed.center;
+    if (y <= 10000) eras['1万年内'].items.push(item);
+    else if (y <= 50000) eras['1-5万年'].items.push(item);
+    else if (y <= 500000) eras['5-50万年'].items.push(item);
+    else if (y <= 2000000) eras['50万-200万年'].items.push(item);
+    else eras['>200万年'].items.push(item);
+  });
+
+  let html = `<div style="font-size:10px;color:var(--tx3);margin-bottom:8px;">
+    时间线: ${items.length} 条物证, 跨度 ${(minYear/1000).toFixed(0)}k - ${(maxYear/1000).toFixed(0)}k BP</div>`;
+
+  Object.entries(eras).forEach(([label, era]) => {
+    if (era.items.length === 0) return;
+    const t1 = era.items.filter(i=>i.tier===1).length;
+    const t2 = era.items.filter(i=>i.tier===2).length;
+    const t3 = era.items.filter(i=>i.tier===3).length;
+    const t4 = era.items.filter(i=>i.tier===4).length;
+
+    html += `<div style="margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--tx);font-weight:600;margin-bottom:4px;">
+        ${label} <span style="font-size:9px;color:var(--tx3);font-weight:400;">(${era.items.length} 条 · T1:${t1} T2:${t2} T3:${t3} T4:${t4})</span>
+      </div>`;
+
+    era.items.sort((a,b)=>b.tier - a.tier).forEach(item => {
+      html += `<div class="ep-card ep-card-${item.tierClass}" data-evidence-id="${item.id.replace(/['"]/g,'')}" style="padding:5px 8px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:10px;color:var(--tx);">${item.name} <span class="detail-tag tag-${item.tierClass}" style="font-size:7px;">${item.tierLabel}</span></span>
+          <span style="font-size:8px;color:var(--tx3);">${item.era}</span>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+// ── Init (with persistence) ──
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  bayesian.computeAll();
+  blindSpotter.compute();
+  calibrator.run();
+
+  // Auto-save on page unload
+  window.addEventListener('beforeunload', saveData);
+
+  buildMap();
+});
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+window.__engine = engine;
+window.__bayesian = bayesian;
+window.__calibrator = calibrator;
+window.__blind = blindSpotter;
+window.__evidence = EVIDENCE_DB;
+
+// Event delegation: evidence card clicks → showDetail
+document.addEventListener('click', e => {
+  const card = e.target.closest('[data-evidence-id]');
+  if (card) {
+    const id = card.dataset.evidenceId;
+    const raw = EVIDENCE_DB.find(r => r.id === id);
+    if (raw) showDetail(new EvidencePoint(raw));
+    return;
+  }
+  if (e.target.closest('[data-action="save-evidence"]')) {
+    const btn = e.target.closest('[data-action="save-evidence"]');
+    saveEvidenceForm(btn.dataset.existingId);
+    return;
+  }
+  if (e.target.closest('[data-action="close-detail"]')) {
+    closeDetail();
+  }
+});
+
+function updateLegend() {
+  document.getElementById('legend').innerHTML = '<div class="legend-title">置信度图例</div>'+
+    [['#4AE86A','T1 双重确认 (≥2独立复现)'],['#4A8AFF','T2 单源确认'],['#E8C84A','T3 初步可考'],
+     ['#E8884A','T4 存疑'],['#E84A4A','T5 判定伪造']].map(([c,n])=>
+      `<div class="legend-item"><span class="legend-dot" style="background:${c}"></span>${n}</div>`
+    ).join('');
+}
+
+function updateStats() {
+  const filtered = EVIDENCE_DB;
+  const t1=filtered.filter(e=>new EvidencePoint(e).tier===1).length;
+  const t2=filtered.filter(e=>new EvidencePoint(e).tier===2).length;
+  const t3=filtered.filter(e=>new EvidencePoint(e).tier===3).length;
+  const t4=filtered.filter(e=>new EvidencePoint(e).tier===4).length;
+  const t5=filtered.filter(e=>new EvidencePoint(e).tier===5).length;
+  const strongLinks = bayesian.links.filter(l=>l.probability>0.25).length;
+  document.getElementById('statsBar').innerHTML =
+    `<div class="stat-item">📦 物证 <span class="stat-num">${filtered.length}</span></div>
+    <div class="stat-item" style="color:var(--t1);">T1 <span class="stat-num">${t1}</span></div>
+    <div class="stat-item" style="color:var(--t2);">T2 <span class="stat-num">${t2}</span></div>
+    <div class="stat-item" style="color:var(--t3);">T3 <span class="stat-num">${t3}</span></div>
+    <div class="stat-item" style="color:var(--t4);">T4 <span class="stat-num">${t4}</span></div>
+    <div class="stat-item" style="color:var(--t5);">T5 <span class="stat-num">${t5}</span></div>
+    <div class="stat-item">🔗 强关联 <span class="stat-num">${strongLinks}</span></div>
+    <div class="stat-item" style="color:var(--tx2);">聚类 <span class="stat-num">${bayesian.clusters.length}</span></div>`;
+}
+
+</script>
+</body>
+</html>
