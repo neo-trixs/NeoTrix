@@ -55,6 +55,9 @@ fn cmd_sync(args: &[String]) -> CommandOutput {
             let mut msg = format!("Wiki sync: {} pages, {} edges", report.synced, report.edges_created);
             if !report.errors.is_empty() {
                 msg.push_str(&format!(" ({} errors)", report.errors.len()));
+                for (stem, err) in report.errors.iter().take(5) {
+                    msg.push_str(&format!("\n  {}: {}", stem, err));
+                }
             }
             CommandOutput::ok(&msg)
         }

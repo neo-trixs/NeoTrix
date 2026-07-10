@@ -573,6 +573,39 @@ impl BackgroundLoopHandle {
             }
         }
     }
+
+    async fn handle_crawl_queue(&mut self) {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::{claim_next_crawl_url, mark_crawl_complete};
+        if self.kb_pipeline.kb.is_none() {
+            log::warn!("[bg] crawl_queue: kb not attached");
+            return;
+        }
+        loop {
+            let (id, url) = {
+                let kb = self.kb_pipeline.kb.as_ref().unwrap();
+                let conn = kb.conn.lock().unwrap();
+                match claim_next_crawl_url(&conn) {
+                    Ok(Some(item)) => (item.id, item.url),
+                    _ => return,
+                }
+            };
+            log::info!("[bg] crawl claimed: {} (domain tracked)", url);
+            match self.kb_pipeline.absorb_url(&url) {
+                Ok(report) => {
+                    log::info!("[bg] crawl absorbed: {} -> {} nodes", report.url, report.nodes_created);
+                    let kb = self.kb_pipeline.kb.as_ref().unwrap();
+                    let conn = kb.conn.lock().unwrap();
+                    let _ = mark_crawl_complete(&conn, &id, true, None);
+                }
+                Err(e) => {
+                    log::warn!("[bg] crawl failed: {}: {:?}", url, e);
+                    let kb = self.kb_pipeline.kb.as_ref().unwrap();
+                    let conn = kb.conn.lock().unwrap();
+                    let _ = mark_crawl_complete(&conn, &id, false, Some(&e));
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

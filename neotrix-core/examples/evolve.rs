@@ -49,7 +49,7 @@ fn main() {
     // ── 主循环 ──
     // 使用 loop + 终态条件; Ctrl+C 由 OS 处理
     loop {
-        let result = crawler.run_cycle(&mut brain, &mut bank);
+        let result = crawler.run_cycle(&mut brain.capability, &mut bank);
         cycle_count = result.cycle;
 
         if result.absorbed {

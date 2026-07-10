@@ -15,6 +15,8 @@ pub mod context_engine;
 pub mod nt_gwt_geo;
 pub mod nt_gwt_reviewer;
 pub mod nt_gwt_graph_memory;
+pub mod cognitive_orchestrator;
+pub mod consensus_resonance;
 pub mod pipeline;
 pub mod cognitive_tick;
 

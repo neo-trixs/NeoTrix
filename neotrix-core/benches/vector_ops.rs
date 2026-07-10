@@ -2,8 +2,7 @@
 //! 测试 CapabilityVector 和 signal::ops 的性能
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use ndarray::Array1;
-use neotrix::neotrix::nt_mind::core::CapabilityVector;
+use neotrix::core::CapabilityVector;
 use neotrix::neotrix::nt_core_signal::ops;
 
 /// 生成随机向量（指定维度）
@@ -15,29 +14,29 @@ fn random_vector(dim: usize) -> Vec<f64> {
 fn random_capability_vector() -> CapabilityVector {
     let v = random_vector(23);
     let mut cv = CapabilityVector::default();
-    cv.typography = v[0];
-    cv.grid = v[1];
-    cv.color = v[2];
-    cv.whitespace = v[3];
-    cv.data_viz = v[4];
-    cv.emotion = v[5];
-    cv.minimalism = v[6];
-    cv.experimental = v[7];
-    cv.inference_depth = v[8];
-    cv.creativity = v[9];
-    cv.analysis = v[10];
-    cv.synthesis = v[11];
-    cv.domain_specificity = v[12];
-    cv.accessibility = v[13];
-    cv.compound_composition = v[14];
-    cv.tailwind_proficiency = v[15];
-    cv.react_aria_usage = v[16];
-    cv.bem_naming = v[17];
-    cv.figma_integration = v[18];
-    cv.ai_native_states = v[19];
-    cv.semantic_layer = v[20];
-    cv.quality_gates = v[21];
-    cv.verification = v[22];
+    cv.set_typography(v[0]);
+    cv.set_grid(v[1]);
+    cv.set_color(v[2]);
+    cv.set_whitespace(v[3]);
+    cv.set_data_viz(v[4]);
+    cv.set_emotion(v[5]);
+    cv.set_minimalism(v[6]);
+    cv.set_experimental(v[7]);
+    cv.set_inference_depth(v[8]);
+    cv.set_creativity(v[9]);
+    cv.set_analysis(v[10]);
+    cv.set_synthesis(v[11]);
+    cv.set_domain_specificity(v[12]);
+    cv.set_accessibility(v[13]);
+    cv.set_compound_composition(v[14]);
+    cv.set_tailwind_proficiency(v[15]);
+    cv.set_react_aria_usage(v[16]);
+    cv.set_bem_naming(v[17]);
+    cv.set_figma_integration(v[18]);
+    cv.set_ai_native_states(v[19]);
+    cv.set_semantic_layer(v[20]);
+    cv.set_quality_gates(v[21]);
+    cv.set_verification(v[22]);
     cv
 }
 
@@ -74,23 +73,23 @@ fn benchmark_capability_vector_ops(c: &mut Criterion) {
 
     // 基准测试：from_array() + to_array()
     group.bench_function("from_array_23d", |b| {
-        let arr = Array1::from_vec(random_vector(23));
+        let arr = random_vector(23);
         b.iter(|| black_box(CapabilityVector::from_array(&arr).expect("invalid array for capability vector")))
     });
 
     group.finish();
 
-    // 测试不同维度的 ndarray 向量操作
-    let mut group = c.benchmark_group("ndarray_ops");
+    // 测试不同维度的 Vec 向量操作
+    let mut group = c.benchmark_group("vec_ops");
 
     for dim in [22, 100, 1000].iter() {
         let dim = *dim;
-        let v1 = Array1::from_vec(random_vector(dim));
-        let v2 = Array1::from_vec(random_vector(dim));
+        let v1 = random_vector(dim);
+        let v2 = random_vector(dim);
 
         // 点积
         group.bench_function(&format!("dot_product_{}d", dim), |b| {
-            b.iter(|| black_box(v1.dot(&v2)))
+            b.iter(|| black_box(v1.iter().zip(v2.iter()).map(|(a, b)| a * b).sum::<f64>()))
         });
 
         // L2 范数

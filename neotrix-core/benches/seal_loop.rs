@@ -1,6 +1,7 @@
 //! SEAL 循环和 ReasoningBank 基准测试
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use neotrix::core::TaskType;
 use neotrix::neotrix::nt_mind::{
     self_iterating::SelfIteratingBrain,
     core::{CapabilityVector, KnowledgeSource},
@@ -12,7 +13,7 @@ use std::time::Duration;
 /// 生成测试用的 SelfEdit
 fn make_test_edit(_task: &str) -> SelfEdit {
     SelfEdit {
-        task_type: neotrix::neotrix::nt_world_model::TaskType::Design,
+        task_type: TaskType::Design,
         target_dimensions: vec!["typography".to_string(), "color".to_string()],
         adjustment_magnitude: 0.1,
         tool_calls: vec![],
@@ -34,8 +35,9 @@ fn benchmark_reasoning_bank_retrieval(c: &mut Criterion) {
 
                 // 填充记忆
                 for i in 0..mem_count {
-                    let mut memory = ReasoningMemory::new(
+                    let mut memory = ReasoningMemory::from_self_edit(
                         &format!("设计任务 {}", i),
+                        TaskType::Design,
                         &make_test_edit(&format!("task {}", i)),
                         if i % 2 == 0 { 0.8 } else { 0.3 },
                     );
@@ -44,7 +46,7 @@ fn benchmark_reasoning_bank_retrieval(c: &mut Criterion) {
                 }
 
                 b.iter(|| {
-                    black_box(bank.retrieve_relevant("设计", 5))
+                    black_box(bank.retrieve_relevant("设计", None, 5))
                 })
             },
         );
@@ -57,8 +59,9 @@ fn benchmark_reasoning_bank_retrieval(c: &mut Criterion) {
 
                 // 填充记忆（带 embedding）
                 for i in 0..mem_count {
-                    let mut memory = ReasoningMemory::new(
+                    let mut memory = ReasoningMemory::from_self_edit(
                         &format!("任务 {}", i),
+                        TaskType::Design,
                         &make_test_edit(&format!("task {}", i)),
                         0.5,
                     );
@@ -71,7 +74,7 @@ fn benchmark_reasoning_bank_retrieval(c: &mut Criterion) {
                 let query_emb: Vec<f64> = (0..23).map(|j| ((j * 5) as f64).sin().abs()).collect();
 
                 b.iter(|| {
-                    black_box(bank.retrieve_relevant_by_embedding(&query_emb, 5))
+                    black_box(bank.retrieve_relevant_by_embedding(&query_emb, None, 5))
                 })
             },
         );
@@ -92,8 +95,9 @@ fn benchmark_seal_loop(c: &mut Criterion) {
 
         // 预填充一些记忆
         for i in 0..10 {
-            let memory = ReasoningMemory::new(
+            let memory = ReasoningMemory::from_self_edit(
                 &format!("历史任务 {}", i),
+                TaskType::Design,
                 &make_test_edit(&format!("task {}", i)),
                 0.7,
             );
@@ -110,10 +114,10 @@ fn benchmark_seal_loop(c: &mut Criterion) {
 
     // 基准测试：批量 SEAL 循环
     group.bench_function("run_seal_loop_batch_3", |b| {
-        let tasks: Vec<(String, Option<Vec<f64>>)> = vec![
-            ("设计 React 组件".to_string(), None),
-            ("分析代码性能".to_string(), None),
-            ("优化数据库查询".to_string(), None),
+        let tasks: Vec<(String, Option<Vec<f64>>, Option<f64>)> = vec![
+            ("设计 React 组件".to_string(), None, None),
+            ("分析代码性能".to_string(), None, None),
+            ("优化数据库查询".to_string(), None, None),
         ];
 
         b.iter(|| {

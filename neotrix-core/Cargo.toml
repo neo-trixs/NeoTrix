@@ -83,6 +83,10 @@ path = "src/bin/session_ingest_0703.rs"
 name = "neotrix-world-novel-ingest"
 path = "src/bin/nt_world_novel_ingest.rs"
 
+[[bin]]
+name = "absorb_crawl"
+path = "src/bin/absorb_crawl.rs"
+
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
 serde = { workspace = true }

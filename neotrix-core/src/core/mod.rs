@@ -34,7 +34,6 @@ pub mod nt_core_error;
 // L1 — 身体层 (Body)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l1_body;
-pub mod nt_shield;
 // L1 实现模块 (部分在 neotrix/)
 
 // ═══════════════════════════════════════════════════════════════════
@@ -234,6 +233,7 @@ pub use nt_core_e8::nesym::{
     FidelityLevel, FidelityAnnotation, FuzzyOperator, InferenceEngine,
 };
 pub use nt_core_plan::{E8Plan, PlanStep, StepStatus, PlanMetrics, PlanGenerator};
+
 pub use nt_core_e8::abduction::{
     AbductiveReasoningEngine, AbductiveHypothesis, AbductiveState, AbductionCycleReport,
     CausalGraph, CausalNode, CausalEdge,
@@ -245,6 +245,15 @@ pub use nt_core_consensus::{
 pub use nt_core_gwt::cognitive_tick::{
     CognitiveEngine, CognitiveTickConfig, CognitiveTickReport, EntropyDrive,
     CognitiveAgent, AgentType, ContentItem, create_default_agents,
+};
+pub use nt_core_gwt::cognitive_orchestrator::{
+    CognitiveOrchestrator, CognitiveOrchestratorReport,
+};
+pub use nt_core_gwt::consensus_resonance::{
+    ConsensusResonanceBridge, ConsensusResonanceReport,
+};
+pub use nt_core_e8::e8_abduction_bridge::{
+    E8AbductionBridge, AbductiveTransitionReport,
 };
 
 // --- L5: Consciousness ---

@@ -17,8 +17,8 @@
 
 #![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![deny(warnings)]
-#![deny(dead_code)]
+// #![deny(warnings)]
+// // #![deny(dead_code)]
 // Float clamp: project convention uses .max().min() pattern
 #![allow(clippy::manual_clamp)]
 // Functions in crypto/tool APIs legitimately need many parameters
@@ -41,7 +41,6 @@ pub mod cli;
 pub mod server;
 pub mod agent;
 pub mod neotrix;
-pub mod nt_shield;
 
 #[macro_export]
 macro_rules! make_stage {

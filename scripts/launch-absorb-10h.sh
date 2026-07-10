@@ -24,12 +24,12 @@ fi
 # ── 2. KB structural fixes ──
 echo ""
 echo "═══ Phase 1: KB Structural Fixes ═══"
-python3 scripts/kb-structural-fix.py
+neotrix /kb fix structural
 echo ""
 
 # ── 3. Inject crawl queue seeds ──
 echo "═══ Phase 2: Inject Crawl Queue Seeds ═══"
-python3 scripts/kb-seed-crawl-queue.py
+neotrix /kb seed crawl-queue
 echo ""
 
 # ── 4. KB stats before absorption ──

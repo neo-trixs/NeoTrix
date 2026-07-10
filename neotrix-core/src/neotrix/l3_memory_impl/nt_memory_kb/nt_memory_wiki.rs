@@ -57,8 +57,13 @@ pub fn sync_directory(kb: &KnowledgeBase, dir: &Path, prefix: &str) -> Result<Wi
         match kb.insert_node(&node) {
             Ok(()) => report.synced += 1,
             Err(e) => {
-                report.errors.push((file_stem, e));
-                continue;
+                match kb.update_node(&node) {
+                    Ok(()) => report.synced += 1,
+                    Err(e2) => {
+                        report.errors.push((file_stem, format!("insert: {}/update: {}", e, e2)));
+                        continue;
+                    }
+                }
             }
         }
 

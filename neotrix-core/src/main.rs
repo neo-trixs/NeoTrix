@@ -153,6 +153,11 @@ enum Commands {
         #[command(subcommand)]
         command: neotrix::cli::commands::evidence_cmds::EvidenceCommand,
     },
+    #[command(name = "wiki", about = "Wiki KB: generate|status|sync|graph|query")]
+    Wiki {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -387,6 +392,17 @@ fn main() {
         Some(Commands::Evidence { command }) => {
             if let Err(e) = neotrix::cli::commands::evidence_cmds::handle_evidence_command(command) {
                 eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::Wiki { args }) => {
+            use neotrix::cli::commands::types::CliCommand;
+            let cmd = neotrix::cli::commands::wiki_cmds::WikiCmd;
+            let out = cmd.execute(&args, None);
+            if out.success {
+                println!("{}", out.message);
+            } else {
+                eprintln!("{}", out.message);
                 std::process::exit(1);
             }
         }

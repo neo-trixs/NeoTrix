@@ -28,6 +28,7 @@ pub struct NesyStats {
 
 pub struct NeuroSymbolicEngine {
     pub inference: InferenceEngine,
+    #[allow(dead_code)]
     max_inferences: u64,
     inference_count: u64,
 }

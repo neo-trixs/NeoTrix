@@ -11,6 +11,7 @@ use crate::core::nt_core_bank::ReasoningBank;
 use super::classifier::ClassifiedContent;
 use super::config::{CrawlFormat, CrawlTopic};
 
+#[derive(Debug)]
 pub struct MappedKnowledge {
     pub url: String,
     pub title: String,

@@ -9,6 +9,7 @@
 //!   6. 50 (Dayan) - 1 (observer) = 49 (observable dof) ↔ 49 = 7² = 248-199
 
 pub mod domain_transition;
+pub mod e8_abduction_bridge;
 pub mod e8_lattice_quantizer;
 pub mod ewhr_bridge;
 pub mod nt_core_community_ingester;
