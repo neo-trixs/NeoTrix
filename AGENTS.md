@@ -330,25 +330,50 @@ Defects:   nt_shield三重路径；TorCrawler脱离生产管道；ProxyPool有�
 | **P2 Triple Registration** | nt_shield | 2,000+ | Maintenance nightmare |
 | **P0 KB Embedding** | 0 embeddings | — | Semantic search = dead |
 
-## Active TODO (Cycle 33 — Architecture Rebirth)
+## Active TODO (Cycle 34 — Wiki KB + Root Cleanup)
 
-### P0 — Pipeline Connectivity (Data Flow Fixes)
-1. **Connect UnifiedCrawler → KB**: Add KbBridge output to UnifiedCrawler::run_cycle
-2. **Seed crawl_queue on startup**: Wire enqueue_seed_urls into absorption pipeline init
-3. **Connect ExplorationEngine → KB**: Call attach_kb in BackgroundLoop builder
-4. **Wire BackgroundLoop's nt_world_crawl into run**: Move from BackgroundLoop struct into BackgroundLoopHandle, add crawl tick handler
+### P0 — Wiki System Completion
+1. **Run `/wiki sync docs`**: Inject documentation into KB to verify sync pipeline
+2. **Run `/wiki graph wiki-graph.html`**: Generate knowledge graph visualization
+3. **Set `NEOTRIX_EMBEDDING_API_KEY`**: Wire kb-generate-embeddings.py for semantic search
 
 ### P1 — Dead Code Eradication (Cataclysm Pruning)
-5. **Remove bin-archive directory**: Archive to git tag v33-cataclysm, clean workspace, fix Cargo.toml
-6. **Remove nt_core_jepa**: Confirm 0 production callers, delete
-7. **Remove oracle_gate + cross_session_memory**: 0 consumers, delete
-8. **Merge nt_shield triple registration**: Pick `neotrix/l1_body_impl/nt_shield*/` canonical, delete `core/nt_shield/` and `src/nt_shield/`
+4. **Remove bin-archive directory**: Archive to git tag v33-cataclysm, clean workspace, fix Cargo.toml
+5. **Remove nt_core_jepa**: Confirm 0 production callers, delete
+6. **Remove oracle_gate + cross_session_memory**: 0 consumers, delete
+7. **Merge nt_shield triple registration**: Pick `neotrix/l1_body_impl/nt_shield*/` canonical, delete `core/nt_shield/` and `src/nt_shield/`
 
 ### P2 — Structural Hardening (Dragonflight Specialization)
-9. **KB embeddings**: Document API key requirement in startup warning; add startup check; wire kb-generate-embeddings.py equivalent in Rust
-10. **Consolidate Python/Rust pipelines**: Port auto-absorb.py 7-stage logic into nt_world_absorber as Rust phases
-11. **Fix nt_agent_mcp_registry stub**: Remove stub, redirect to nt_agent_mcp_transport
-12. **Factory.rs refactor**: Replace 35+ provider boilerplate with ProviderCatalog metadata-driven pattern
+8. **KB embeddings**: Document API key requirement in startup warning; add startup check; wire kb-generate-embeddings.py equivalent in Rust
+9. **Consolidate Python/Rust pipelines**: Port auto-absorb.py 7-stage logic into nt_world_absorber as Rust phases
+10. **Fix nt_agent_mcp_registry stub**: Remove stub, redirect to nt_agent_mcp_transport
+11. **Factory.rs refactor**: Replace 35+ provider boilerplate with ProviderCatalog metadata-driven pattern
+
+### P3 — Pipeline Connectivity (Carried from Cycle 33)
+12. **Connect UnifiedCrawler → KB**: Add KbBridge output to UnifiedCrawler::run_cycle
+13. **Seed crawl_queue on startup**: Wire enqueue_seed_urls into absorption pipeline init
+14. **Connect ExplorationEngine → KB**: Call attach_kb in BackgroundLoop builder
+15. **Wire BackgroundLoop's nt_world_crawl into run**: Move from BackgroundLoop struct into BackgroundLoopHandle, add crawl tick handler
+
+## Experience Tree — 2026-07-10 Cycle 34 (Wiki KB + Root Cleanup)
+
+### Session: Root Reorganization + KB Wiki System
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| Root cleanup | Moved 64 entries into `deploy/`, `scripts/`, `assets/`, `design/`, `outputs/`, `notes/`, `e2e/`, `docs/` | 94 → 30 root entries |
+| Dead file removal | Deleted `libneotrix_core_gwt.rlib`, `libneotrix_spoof/`, `바구니`, empty `qidian-mcp-server/`, legacy `src/` | -5 dead entries |
+| KB Wiki module | Created `nt_memory_wiki.rs` with `sync_directory`, `build_graph`, `generate_graph_html`, `query` | New module compiles clean |
+| KB type system | Added `WikiPage`/`WikiLink` to `NodeType`/`RelationType` | Bridge `nt_memory_kb_bridge.rs` patched both directions |
+| CLI `/wiki` | Added `wiki_cmds.rs` with `generate\|status\|sync\|graph\|query` subcommands | Registered in `registry.rs` |
+| Stub fixes | Fixed 4 dead stubs in `nt_act_autonomy/mod.rs` | Compilation unblocked for autonomy module |
+
+### Build Baseline Update
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ⚠️ 57 errors | All `deny(dead_code)`, zero type errors from wiki changes |
+| Wiki module errors | 🟢 0 | Own code compiles clean |
 
 ## Experience Tree — 2026-07-06 Cycle 33 (Architecture Rebirth)
 

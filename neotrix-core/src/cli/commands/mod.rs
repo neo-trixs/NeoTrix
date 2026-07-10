@@ -39,6 +39,7 @@ pub mod provider_cmds;
 pub mod free_cmds;
 pub mod consolidated_cmds;
 pub mod kb_cmds;
+pub mod wiki_cmds;
 
 pub use types::*;
 pub use sandbox_cmds::*;
@@ -75,3 +76,4 @@ pub use explore_cmds::*;
 pub use automation_cmds::*;
 pub use session_recovery_cmds::*;
 pub use kb_cmds::*;
+pub use wiki_cmds::*;

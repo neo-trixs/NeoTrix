@@ -78,6 +78,7 @@ pub enum NodeType {
     Skill,
     /// Reference — external reference link
     Reference,
+    WikiPage,
 }
 
 impl NodeType {
@@ -115,6 +116,7 @@ impl NodeType {
             NodeType::Guide => "guide",
             NodeType::Skill => "skill",
             NodeType::Reference => "reference",
+            NodeType::WikiPage => "wiki_page",
         }
     }
 
@@ -152,6 +154,7 @@ impl NodeType {
             "guide" => NodeType::Guide,
             "skill" => NodeType::Skill,
             "reference" => NodeType::Reference,
+            "wiki_page" => NodeType::WikiPage,
             _ => NodeType::Concept,
         }
     }
@@ -226,6 +229,7 @@ pub enum RelationType {
     BrandFor,
     /// Illustrates a concept
     Illustrates,
+    WikiLink,
 }
 
 impl RelationType {
@@ -268,6 +272,7 @@ impl RelationType {
             RelationType::Visualizes => "visualizes",
             RelationType::BrandFor => "brand_for",
             RelationType::Illustrates => "illustrates",
+            RelationType::WikiLink => "wiki_link",
         }
     }
 

@@ -33,6 +33,7 @@ use crate::cli::commands::skill_cmds::SkillCmd;
 use crate::cli::commands::provider_cmds::ProviderCmd;
 use crate::cli::commands::free_cmds::FreeCmd;
 use crate::cli::commands::kb_cmds::KbCmd;
+use crate::cli::commands::wiki_cmds::WikiCmd;
 use crate::cli::commands::consolidated_cmds::{
     FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd,
 };
@@ -101,6 +102,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(SearchCmd));
     reg.register(Box::new(BoardCmd));
     reg.register(Box::new(KbCmd));
+    reg.register(Box::new(WikiCmd));
 
     // UI/Layout
     reg.register(Box::new(UiAggCmd));

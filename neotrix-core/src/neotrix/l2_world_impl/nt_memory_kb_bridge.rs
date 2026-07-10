@@ -41,6 +41,7 @@ pub enum NodeType {
     Guide,
     Skill,
     Reference,
+    WikiPage,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -390,6 +391,7 @@ mod conv {
             super::NodeType::Guide => real_types::NodeType::Guide,
             super::NodeType::Skill => real_types::NodeType::Skill,
             super::NodeType::Reference => real_types::NodeType::Reference,
+            super::NodeType::WikiPage => real_types::NodeType::WikiPage,
         }
     }
 
@@ -427,6 +429,7 @@ mod conv {
             real_types::NodeType::Guide => super::NodeType::Guide,
             real_types::NodeType::Skill => super::NodeType::Skill,
             real_types::NodeType::Reference => super::NodeType::Reference,
+            real_types::NodeType::WikiPage => super::NodeType::WikiPage,
         }
     }
 

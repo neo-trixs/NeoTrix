@@ -28,6 +28,7 @@ pub mod nt_memory_types;
 pub mod nt_memory_unify;
 pub mod nt_memory_content_distiller;
 pub mod nt_memory_panorama;
+pub mod nt_memory_wiki;
 pub mod privacy;
 pub mod user_memory;
 pub mod vector_adapter;
@@ -48,6 +49,7 @@ pub use nt_memory_agent_driven::{AgentMemory, AgentMemoryEntry, MemoryConfig, Me
 pub use nt_memory_agent_session::{AgentSessionManager, AgentSession, AgentSessionEntry};
 pub use nt_memory_svaf_gate::{SvafGate, SvafDecision, SvafEvaluation};
 pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRecord, MemoryProficiencyReport};
+pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
 
 use rusqlite::Connection;
@@ -877,6 +879,20 @@ impl KnowledgeBase {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_seed::seed_foundational_knowledge(&conn)
             .map_err(|e| format!("seed: {}", e))
+    }
+
+    // ── Wiki ──
+
+    pub fn wiki_sync(&self, dir: &std::path::Path, prefix: &str) -> Result<nt_memory_wiki::WikiSyncReport, String> {
+        nt_memory_wiki::sync_directory(self, dir, prefix)
+    }
+
+    pub fn wiki_graph_html(&self) -> Result<String, String> {
+        nt_memory_wiki::generate_graph_html(self)
+    }
+
+    pub fn wiki_query(&self, query: &str, limit: usize) -> Result<Vec<nt_memory_wiki::WikiSearchResult>, String> {
+        nt_memory_wiki::query(self, query, limit)
     }
 
     // ── Embeddings ──
