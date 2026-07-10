@@ -16,6 +16,7 @@ pub mod ghrr_vsa;
 pub mod octonion;
 pub mod e8_lattice;
 pub mod topology;
+pub mod aif;
 
 #[cfg(feature = "simd-vsa")]
 pub mod vsa_holon;

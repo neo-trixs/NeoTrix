@@ -28,15 +28,15 @@ impl EvolutionArchive {
         }
     }
 
-    fn select_by_best(&self) -> Option<&ArchiveEntry> {
+    pub fn select_by_best(&self) -> Option<&ArchiveEntry> {
         self.entries.iter().max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
     }
 
-    fn select_by_latest(&self) -> Option<&ArchiveEntry> {
+    pub fn select_by_latest(&self) -> Option<&ArchiveEntry> {
         self.entries.iter().max_by_key(|e| e.timestamp)
     }
 
-    fn select_by_random(&self) -> Option<&ArchiveEntry> {
+    pub fn select_by_random(&self) -> Option<&ArchiveEntry> {
         if self.entries.is_empty() {
             return None;
         }

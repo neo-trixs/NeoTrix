@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_e8_root_norms() {
         let rs = E8RootSystem::new();
-        for (&r, &n) in rs.roots.iter().zip(rs.norms.iter()) {
+        for (&r, &_n) in rs.roots.iter().zip(rs.norms.iter()) {
             let sq_norm: i16 = r.iter().map(|&x| (x * x) as i16).sum();
             assert!(sq_norm == 4 || sq_norm == 8,
                 "E8 root norm must be 4 (type II) or 8 (type I), got {} for {:?}", sq_norm, r);

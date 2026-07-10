@@ -250,7 +250,7 @@ impl DependencyGraph {
     }
 }
 
-fn parse_meta(v: &serde_json::Value) -> Result<TodoMeta, String> {
+fn parse_meta(v: &serde_yaml::Value) -> Result<TodoMeta, String> {
     Ok(TodoMeta {
         conflicts: v["conflicts"].as_u64().unwrap_or(0),
         generated_at: v["generated_at"].as_str().unwrap_or("").to_string(),
@@ -264,7 +264,7 @@ fn parse_meta(v: &serde_json::Value) -> Result<TodoMeta, String> {
     })
 }
 
-fn parse_items(v: &serde_json::Value) -> Result<Vec<TodoItem>, String> {
+fn parse_items(v: &serde_yaml::Value) -> Result<Vec<TodoItem>, String> {
     let arr = v.as_sequence().ok_or("items 不是数组")?;
     let mut items = Vec::with_capacity(arr.len());
     for (i, item) in arr.iter().enumerate() {

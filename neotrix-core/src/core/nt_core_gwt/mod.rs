@@ -16,6 +16,7 @@ pub mod nt_gwt_geo;
 pub mod nt_gwt_reviewer;
 pub mod nt_gwt_graph_memory;
 pub mod pipeline;
+pub mod cognitive_tick;
 
 pub use geometry_sync::{
     CycleReport, CrossDimensionalResonator, DimensionLayer, GeometrySync, IitPhiCalculator,

@@ -42,7 +42,6 @@ pub mod nt_shield;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l2_perception;
 pub mod nt_core_sense;
-pub mod nt_core_jepa;
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -52,6 +51,7 @@ pub mod l3_memory;
 pub mod nt_core_hcube;
 pub mod nt_core_bank;
 pub mod nt_core_fhrr;
+pub mod nt_core_consensus;
 pub mod nt_core_graph;
 pub mod nt_core_walsh;
 pub mod nt_core_kron;
@@ -229,7 +229,23 @@ pub use nt_core_sae::{
 };
 pub use nt_core_sae_bridge::SAEBridge;
 pub use nt_core_e8_vsa::E8VsaEmbedding;
+pub use nt_core_e8::nesym::{
+    NeuroSymbolicEngine, NesyValue, NesyFact, NesyRule, NesyInference, NesyStats,
+    FidelityLevel, FidelityAnnotation, FuzzyOperator, InferenceEngine,
+};
 pub use nt_core_plan::{E8Plan, PlanStep, StepStatus, PlanMetrics, PlanGenerator};
+pub use nt_core_e8::abduction::{
+    AbductiveReasoningEngine, AbductiveHypothesis, AbductiveState, AbductionCycleReport,
+    CausalGraph, CausalNode, CausalEdge,
+};
+pub use nt_core_consensus::{
+    AbductiveExplanation, AbductiveSolver, ConsensusConfig, ConsensusReport, ReflectionHead,
+    ReflectionPipeline, ReflectionResult,
+};
+pub use nt_core_gwt::cognitive_tick::{
+    CognitiveEngine, CognitiveTickConfig, CognitiveTickReport, EntropyDrive,
+    CognitiveAgent, AgentType, ContentItem, create_default_agents,
+};
 
 // --- L5: Consciousness ---
 pub use nt_core_gwt::resonance::{
@@ -249,6 +265,9 @@ pub use nt_core_self::metacognitive_evaluator::{
 pub use nt_core_self::reasoning_strategy::{ReasoningStrategy, ReasoningStrategyRegistry, StrategyKind};
 pub use nt_core_self::self_referential::{SelfReferentialMonitor, PlanRecord, ThresholdAdjustment};
 pub use nt_core_self::silicon_self::{SiliconSelfModel, SiliconSelfState};
+pub use nt_core_self::seal::{
+    CurriculumTask, EditType, SealIterationReport, SealPipeline, SelfEdit,
+};
 pub use nt_core_self::skill_crystal::{SkillCrystal, CrystalRegistry};
 pub use nt_core_self::system_identity::{SystemIdentity, CognitiveCapability, ValueConstraint};
 pub use nt_core_self::thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
@@ -277,7 +296,7 @@ pub use nt_core_observer_error::{
 pub use nt_core_cap::CapabilityVector;
 pub use nt_core_knowledge::{KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, SourceAccessTracker, SourceAccessRecord};
 pub use nt_core_accessor::{Accessor, AccessionReport, SourceType, UrlAccessor};
-pub use nt_core_edit::{SelfEdit, MicroEdit, ToolCall};
+pub use nt_core_edit::{MicroEdit, ToolCall};
 pub use nt_core_bank::{ReasoningBank, ReasoningMemory, TemporalContext, MemoryTier, MemoryLifecycle, ReasoningBankStats};
 pub use nt_core_absorb::AbsorbValidator;
 pub use nt_core_iter::SelfIteration;
@@ -301,6 +320,12 @@ pub use nt_core_hcube::ghrr_vsa::{
 };
 pub use nt_core_hcube::{
     VSAEngine, VsaBackend,
+};
+pub use nt_core_hcube::aif::{
+    FreeEnergyEngine, GenerativeModel, PolicyEvaluator, AiStepReport,
+};
+pub use nt_core_hcube::aif::belief::{
+    POMDPBeliefUpdater, FactorialPOMDP, FactorGraphBeliefPropagation,
 };
 pub use nt_core_cache::{SemanticCache, CacheStats};
 pub use nt_core_mcp::McpServer;

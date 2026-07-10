@@ -2061,6 +2061,7 @@ mod tests {
             min_confidence: 0.0,
             enable_incremental_updates: true,
             max_graph_size: 10000,
+            extraction_mode: ExtractionMode::Heuristic,
         }
     }
 
@@ -2672,6 +2673,7 @@ mod tests {
             min_confidence: 0.0,
             enable_incremental_updates: true,
             max_graph_size: 10000,
+            extraction_mode: ExtractionMode::Heuristic,
         });
 
         let entities = vec![

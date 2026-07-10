@@ -218,6 +218,7 @@ fn infer_task_type(task: &TodoItem) -> TaskType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::todo_store::ItemPriority;
 
     fn project_root_todo() -> String {
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));

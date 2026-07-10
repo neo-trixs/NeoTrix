@@ -18,6 +18,8 @@ pub mod nt_core_trajectory_prm;
 pub mod state_machine;
 pub mod thinking_budget;
 pub mod trace_compression;
+pub mod abduction;
+pub mod nesym;
 
 #[cfg(test)]
 use std::collections::HashSet;

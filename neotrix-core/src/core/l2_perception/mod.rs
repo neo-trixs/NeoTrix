@@ -9,8 +9,3 @@
 //! - L2 不负责存储（那是 L3 的工作）
 
 pub use crate::core::nt_core_sense as sense;
-pub use crate::core::nt_core_jepa as jepa;
-
-pub use crate::core::nt_core_jepa::{
-    VlJepaBridge, ModalEmbedding, Modality, MultimodalFusion,
-};

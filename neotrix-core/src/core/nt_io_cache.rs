@@ -334,7 +334,7 @@ mod tests {
         // Second hit
         let _ = cache.get_semantic(&emb);
         // Verify hit_count was incremented by checking internal state
-        let embed_key = SemanticCache::hash_embedding(&emb);
+        let _embed_key = SemanticCache::hash_embedding(&emb);
         // We can't access private fields, but we can verify the value is still there
         let result = cache.get_semantic(&emb);
         assert_eq!(result, Some("value"));

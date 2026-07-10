@@ -12,6 +12,7 @@ pub mod self_referential;
 pub mod silicon_self;
 pub mod skill_crystal;
 pub mod system_identity;
+pub mod seal;
 pub mod thinking_trace;
 
 pub use archive::{SiliconArchive, SiliconSnapshot, AttentionSnapshot};

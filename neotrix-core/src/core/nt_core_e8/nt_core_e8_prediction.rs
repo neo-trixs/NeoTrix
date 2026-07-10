@@ -679,7 +679,6 @@ impl E8PredictionOracle {
 #[cfg(test)]
 mod tests {
     use super::*;
-use crate::core::nt_core_e8::e8_lattice_quantizer::E8LatticeQuantizer;
 use crate::core::nt_core_e8::E8TransitionMatrix;
 
     fn make_tm() -> E8TransitionMatrix {
