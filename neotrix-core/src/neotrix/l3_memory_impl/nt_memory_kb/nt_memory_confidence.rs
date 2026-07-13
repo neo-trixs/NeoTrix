@@ -1098,6 +1098,9 @@ mod tests {
                 crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_proficiency::MemoryProficiency::new(),
             ),
             graphrag_store: std::sync::RwLock::new(None),
+            tech_reserve: std::sync::RwLock::new(
+                crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_tech_reserve::TechReserveStore::new(),
+            ),
         };
 
         let high_conf_id = Uuid::new_v4();

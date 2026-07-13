@@ -29,6 +29,8 @@ pub mod nt_io_web;
 pub mod nt_io_map_tile;
 pub mod nt_io_session_recovery;
 pub mod nt_io_agents_md;
+pub mod nt_io_surface_bridge;
+pub mod nt_io_grep;
 
 // Shield
 pub mod nt_shield;
@@ -43,9 +45,12 @@ pub mod nt_shield_sentry;
 #[cfg(feature = "stealth-net")]
 pub mod nt_shield_stealth_net;
 pub mod nt_shield_traffic;
+pub mod nt_shield_approval;
+pub mod nt_shield_skill_scanner;
 
 // Act
 pub mod nt_act_autonomy;
+pub mod nt_act_parallel_scheduler;
 pub mod nt_act_code;
 pub mod nt_act_crypto;
 pub mod nt_act_earn;
@@ -58,7 +63,6 @@ pub mod nt_act_social;
 pub mod nt_act_spear;
 pub mod nt_act_sub_agent_middleware;
 pub mod nt_act_sync;
-pub mod nt_act_worktree;
 pub mod nt_act_voice;
 
 // Misc
@@ -76,7 +80,8 @@ pub mod nt_agent_orchestrator;
 pub mod nt_agent_protocol;
 pub mod nt_agent_subagent;
 
-// MCP Bridge & Registry & Media Consumer
+// MCP Bridge & Registry & Gateway & Media Consumer
 pub mod mcp_bridge;
 pub mod mcp_media;
 pub mod nt_agent_mcp_registry;
+pub mod nt_agent_mcp_gateway;

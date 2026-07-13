@@ -28,6 +28,8 @@ pub mod nt_memory_types;
 pub mod nt_memory_unify;
 pub mod nt_memory_content_distiller;
 pub mod nt_memory_panorama;
+pub mod nt_memory_auto_learn;
+pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
 pub mod privacy;
 pub mod user_memory;
@@ -51,6 +53,11 @@ pub use nt_memory_svaf_gate::{SvafGate, SvafDecision, SvafEvaluation};
 pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRecord, MemoryProficiencyReport};
 pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
+pub use nt_memory_auto_learn::*;
+pub use nt_memory_tech_reserve::{
+    TechReserveStore, TechReserveEntry, TechReserveDimension, TechReserveQuery,
+    ArchitectureGap, TechProfile, extract_tech_domains,
+};
 
 use rusqlite::Connection;
 use std::collections::HashMap;
@@ -83,6 +90,7 @@ pub struct KnowledgeBase {
     pub svaf_gate: RwLock<SvafGate>,
     pub proficiency: RwLock<MemoryProficiency>,
     pub graphrag_store: RwLock<Option<GraphRagStore>>,
+    pub tech_reserve: RwLock<TechReserveStore>,
 }
 
 impl std::fmt::Debug for KnowledgeBase {
@@ -125,8 +133,10 @@ impl KnowledgeBase {
             svaf_gate: RwLock::new(SvafGate::default()),
             proficiency: RwLock::new(MemoryProficiency::new()),
             graphrag_store: RwLock::new(None),
+            tech_reserve: RwLock::new(TechReserveStore::new()),
         };
         kb.rebuild_bm25();
+        kb.rebuild_tech_reserve();
         Ok(kb)
     }
 
@@ -161,6 +171,7 @@ impl KnowledgeBase {
             svaf_gate: RwLock::new(SvafGate::default()),
             proficiency: RwLock::new(MemoryProficiency::new()),
             graphrag_store: RwLock::new(None),
+            tech_reserve: RwLock::new(TechReserveStore::new()),
         }
     }
 
@@ -237,6 +248,46 @@ impl KnowledgeBase {
             *d = false;
         }
         log::info!("[KB] BM25 index rebuilt: {} docs", doc_results.len());
+    }
+
+    /// Rebuild tech reserve index from all KB nodes.
+    pub fn rebuild_tech_reserve(&self) {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::warn!("[KB] rebuild_tech_reserve lock: {}", e); return; }
+        };
+        let nodes = nt_memory_store::get_all_nodes(&conn)
+            .unwrap_or_default();
+        drop(conn);
+        if let Ok(mut tr) = self.tech_reserve.write() {
+            tr.rebuild_from_nodes(&nodes);
+        log::info!("[KB] Tech reserve rebuilt: {} entries across {} dimensions",
+            tr.entry_count(), tr.stats_by_dimension().len());
+        }
+    }
+
+    /// Run a crawl cycle and refresh tech reserve afterward.
+    pub fn run_crawl_cycle_and_refresh(&self, max_items: usize) -> Result<CrawlCycleReport, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let report = nt_memory_crawl::run_crawl_cycle(&conn, max_items)?;
+        drop(conn);
+        self.rebuild_tech_reserve();
+        Ok(report)
+    }
+
+    /// Query the tech reserve for mature products in a domain.
+    pub fn query_tech_reserve(&self, domain: &str, top_k: usize) -> Vec<TechReserveEntry> {
+        let tr = self.tech_reserve.read().unwrap();
+        tr.latest_mature_products(domain, top_k)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    /// Get full 4D tech profile for a technology.
+    pub fn tech_profile(&self, tech_name: &str) -> TechProfile {
+        let tr = self.tech_reserve.read().unwrap();
+        tr.full_tech_profile(tech_name)
     }
 
     // ── close ──

@@ -445,6 +445,53 @@ The 15 "nt_world_crawl extractor" errors in the original baseline were **cached 
 
 **Recommendation**: Phase 3 of Cataclysm should add `#[allow(dead_code)]` to the 12 specific source files with dead code, then re-enable `#![deny(dead_code)]` at the crate level so all NEW modules (including the 4 fusion nodes) must have zero dead code.
 
+## Experience Tree — 2026-07-13 Cycle 80 (Crawl Queue Absorber Optimization)
+
+### Session: Meta-Cognitive Crawl Optimization + Queue Cleanup
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| Wikipedia REST API | Removed dead `json["links"]` code path (summary endpoint never returns `links`) | -1 API call wasted per Wikipedia fetch |
+| Phase 2→3 clone | Replaced `(*r).clone()` with `HashMap::remove()` taking ownership | Eliminates clone of entire `Result<String, String>` per URL (saves MB for large batches) |
+| `extract_html_content` | Removed redundant `text.reserve(bytes.len() / 4)` after `with_capacity(html.len() / 4)` | -1 redundant capacity reservation per HTML page |
+| `extract_links` | Replaced single-quote-only `find("href=\"")` with byte-level case-insensitive `windows(4).position(w.eq_ignore_ascii_case(b"href"))` + single/double/unquoted value parsing | Catches `href='`, `HREF="`, `HREF='`, `href=` patterns |
+| `extract_xml_tag` | Replaced `format!("<{}>", tag)` / `format!("</{}>", tag)` with byte pattern matching (`windows(open_len).position(open_tag)`) | Eliminates 2 String allocations per call |
+| `mark_dead_link` eviction | Replaced `.cloned().collect()` + sequential `.remove()` with single `retain()` + counter | Avoids cloning 5000 entries per eviction |
+| RSS memory monitor | Added `memory-stats` crate; `current_rss_bytes()` returns RSS in bytes; 500MB threshold → 25% batch reduction, 1GB → 50% reduction; logged at cycle end | Adaptive batch sizing under memory pressure |
+| Batch DB claim | Added `claim_n_crawl_urls(conn, n)` — single `SELECT ... LIMIT N` replaces N sequential `claim_next_crawl_url` loops | 2 DB queries vs 2N (N=100 → 98% reduction) |
+| Google Books blocked | Added `books.google.co.jp`, `books.google.com` to `BLOCKED_DOMAINS` + inline test | Blocks 34,539 pending entries from single book ID |
+| Pending queue cleanup | Added `cleanup_blocked_pending(conn)` — marks all pending entries from blocked domains as `skipped` via `UPDATE ... WHERE status='pending' AND domain LIKE ?` | Prevents crawler from wasting time on dead entries |
+| `reqwest` features | Added `gzip`, `cookies` features to unlock `cookie_store(true)` and compressed response support | Enables cookie persistence across fetches |
+| Pre-filter unhealthy domains | Added per-domain failure rate check before Phase 2 HTTP fetch (`should_skip_domain`); >80% failure → skip | Eliminates wasted requests to dead domains |
+| UA pool expansion | `BROWSER_CLIENTS` increased 5→8 | Matches parallelism cap of 6 with headroom |
+| Phase 3 error clones | Replaced `url_owned.clone()` → `url_owned` move in both fetch+ingest error paths | -1 String clone per failed URL |
+| Summary truncation | Replaced `text.chars().take(2000).collect<String>()` allocation with `text.truncate()` on existing buffer | -1 ephemeral String allocation per content page |
+| Wikipedia dead loop | Removed `for link_title in &links` (always empty after REST API fix); simplified `fetch_wikipedia_data` return to `(String, String)` | -12 lines dead code
+
+### Build Baseline
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors in crawl/store modules | 11 pre-existing errors in other modules (nt_core_session_memory, nt_core_memory_tier) |
+| Crawl module | 🟢 0 | All 15 optimization patches compile clean |
+| Store module | 🟢 0 | `claim_n_crawl_urls` + `CrawlQueueItem` types clean |
+
+### Crawl Queue Pending State (Discovered 2026-07-13)
+
+| Status | Count | Note |
+|--------|-------|------|
+| **pending** | 34,539 | All `books.google.co.jp`, priority 0, one book ID `qQK_RBUyX9cC` |
+| completed | 9,209 | Real useful work |
+| failed | 2,216 | Various errors |
+| processing | 873 | Stale (crashed sessions) |
+| **Total** | **47,382** | |
+
+**Key Finding**: The crawl queue has a 34K-entry tail of Google Books blocked-domain URLs. These were enqueued from Wikipedia seed pages that happened to link to Google Books. Without `BLOCKED_DOMAINS` protection, the crawler would waste ~34K cycles on these entries. The new `cleanup_blocked_pending()` + `claim_n_crawl_urls()` combo prevents this class of issue.
+
+### Meta-Cognitive Actions
+
+1. **File truncation bug**: During the session, the edited file was silently reverted to git-clean (522-line) version, losing all optimization work. Recovered from git stash (`refs/stash@{0}` had the uncommitted 1461-line version). Root cause unclear — possibly the file was never actually written to disk and only cached in read buffer. **Action**: Always verify with `wc -l` after writes to sensitive files.
+
 ## Experience Tree — 2026-07-06 Cycle 33 (Architecture Rebirth)
 
 ### 11-Project Absorption Analysis (Cycle 32)
@@ -525,7 +572,91 @@ The 15 "nt_world_crawl extractor" errors in the original baseline were **cached 
 | Layer violations / dead modules | 🟢 0 |
 | Community datasets | 68 |
 | Architecture meta-analysis completed | ✅ Cycle 33 |
-| qidian-mcp-server registered | ✅ opencode.json |
-| `opencode.json` | ✅ qidian MCP server + schema |
+| qidian-mcp-server removed | ✅ git rm + .gitignore (use /mcp publish) |
+| `opencode.json` | ❌ 已删除，NeoTrix 用自有 McpGateway |
 | KB ops Rustified | ✅ 20 Python scripts removed |
 | nt_shield triple registration resolved | ✅ `core/nt_shield/` + `src/nt_shield/` deleted |
+
+## Experience Tree — 2026-07-13 Cycle 80b (Mass Parallel Build: 9 Modules, 3124 Lines, 0 Errors)
+
+### Session: 并行 Agent 构建 Phase 1-4 融合计划 (8 独立工作流)
+
+| 计划 | Phase | 文件 | 行数 | 测试 | 状态 |
+|------|-------|------|------|------|------|
+| **P1.5** spec CLI | 1.5 | `cli/commands/spec_cmds.rs` | 290 | 5 | ✅ |
+| **P2.1** UnifiedMemory | 2 | `core/nt_core_unified_memory.rs` | 317 | 11 | ✅ |
+| **P2.2** Worktree TTL | 2 | `worktree_manager.rs` (touch_used, prune_older_than) | +40 | 3 | ✅ |
+| **P2.3** ApprovalGate | 2 | `l1_body_impl/nt_shield_approval.rs` | 458 | 11 | ✅ |
+| **P3.1** SymbolicMemory | 3 | `core/nt_core_symbolic_memory.rs` | 582 | 19 | ✅ |
+| **P3.2** SurfaceBridge | 3 | `l1_body_impl/nt_io_surface_bridge.rs` | 417 | 16 | ✅ |
+| **P3.3** SkillScanner | 3 | `l1_body_impl/nt_shield_skill_scanner.rs` | 754 | 19 | ✅ |
+| **P4** VectorMemory | 4 | `core/nt_core_vector_memory.rs` | 306 | 16 | ✅ |
+| — | 修复 | `nt_core_memory_tier.rs` (添加 SessionMemTier) | +1 | — | ✅ |
+| — | 注册 | `mod.rs` + `registry.rs` × 4 处 | — | — | ✅ |
+
+**总计**: 8 Agent → 9 新/改文件 → **3124 行** → **97 测试**
+
+### 修复清单
+| 问题 | 修复 |
+|------|------|
+| `once_cell::sync::Lazy` → `static Mutex::new()` | spec_cmds.rs once_cell 未依赖 |
+| `unwrap_or_else(\|e\| e.into_inner())` → `unwrap()` | 类型推断歧义 |
+| `(&str, &str)` vs `(String, String)` | skill_scanner builtin_patterns 返回类型改为 &str |
+| Em dash \u{2014} 在字符串中 | Rust 2021 保留前缀标识符 |
+| `r#"open("/etc/"#"#` 原始字符串歧义 | 改为简单 `/etc/` 模式 |
+| `nt_core_session_memory` 未注册 | 添加到 `core/mod.rs` |
+| `SessionMemTier` 类型别名缺失 | 添加到 `nt_core_memory_tier.rs` |
+
+### 元认知发现 (Cycle 80b)
+
+1. **8 个独立 Agent 全部成功无冲突**: 每个掌握独立文件，零文件重叠。文件所有权分区是并行 Agent 安全的必要条件。
+2. **修复 cascade 效应**: Agent 代码倾向于"first draft"质量——5/9 模块(55%)需要编译修复(once_cell 未依赖、类型不匹配、原始字符串歧义)。这些是常见的 Agent 生成缺陷模式。
+3. **AGENTS.md 被 git stash 回退**: 工作目录状态在 Agent 执行期间被静默回退到旧版本(578行 vs 3154行)——同样的"写入后回退"模式在 Cycle 80 爬虫优化中发现过。**需要 post-session `git stash drop` 清理。**
+
+### Build Baseline (Cycle 80b)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors, 67 warnings** | 所有新模块零错误 |
+| 新模块 | 🟢 0 | 9/9 编译 |
+| 总新增测试 | +97 | spec(5) + unified(11) + symbolic(19) + vector(16) + approval(11) + scanner(19) + surface(16) |
+| 剩余预存错误 | 0 (lib) | 测试编译有 ~8 预存错误 (self_questioning/meta_agent 模块,非我们的变更) |
+
+## Experience Tree — 2026-07-13 Cycle 81 (MCP Gateway + 4D Tech Reserve)
+
+### Session: 统一外部 MCP 调用接口 + 四维技术储备知识库
+
+| 模块 | 文件 | 行数 | 测试 | 功能 |
+|------|------|------|------|------|
+| **McpGateway** | `l1_body_impl/nt_agent_mcp_gateway.rs` | 355 | 10 | 统一外部 MCP 服务调用入口，替代 `opencode mcp add` |
+| **TechReserveStore** | `l3_memory_impl/nt_memory_kb/nt_memory_tech_reserve.rs` | 473 | 11 | 四维技术分类 + 版本追踪 + 架构差距分析 |
+| KB 集成 | `nt_memory_kb/mod.rs` | +3 | — | `KnowledgeBase.tech_reserve` 字段 + `rebuild_tech_reserve()` |
+| 修复 | `nt_memory_confidence.rs` | +5 | — | 测试中补 `tech_reserve` 字段 |
+| 修复 | `opencode.json` | `git rm` | — | 彻底移除 + .gitignore 防护 |
+
+**总计**: 2 新模块 + 2 修复 → **~830 行** → **21 测试**
+
+### 架构决策
+
+1. **不自运行 MCP 服务端**: McpGateway 只做客户端——调用外部 MCP server 时不写任何本地配置文件
+2. **替代 `opencode mcp add`**: 使用 NeoTrix 的 `/mcp publish` 或 `McpGateway::register_local()`，不生成 `opencode.json`
+3. **四维分类自动推导**: `TechReserveDimension::from_node_type()` 从已有 NodeType 自动映射，无需手动标签
+4. **架构差距自检**: `analyze_gaps()` 检查 N 个领域在 4 个维度的覆盖率，输出优先级排序的缺口列表
+
+### 修复清单
+
+| 问题 | 修复 |
+|------|------|
+| `opencode mcp add` 在项目根生成 `opencode.json` | `git rm` + `.gitignore` + 建议使用 `McpGateway::register_local()` |
+| `KnowledgeBase` 测试缺 `tech_reserve` 字段 | 补结构体初始化 |
+| `TechProfile` 引用生命周期问题 | 改为 owned `Vec<TechReserveEntry>` |
+
+### Build Baseline (Cycle 81)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors, 67 warnings | McpGateway + TechReserveStore 均零错误 |
+| 新模块编译 | 🟢 0 | 2/2 |
+| 总新增测试 | +21 | gateway(10) + tech_reserve(11) |
+| McpGateway tests | 🟢 10/10 pass | 注册、查询、发现、NativeTool 导出 |
+| TechReserveStore tests | 🟢 11/11 pass | 四维分类、查询、产品查找、差距分析 |
