@@ -13,3 +13,7 @@ models/
 
 # Generated nt-test files
 neotrix-core/tests/*.rs
+
+# Prevent opencode CLI from re-creating project-level config
+# NeoTrix manages MCP via its own /mcp publish mechanism (nt_agent_mcp_*)
+opencode.json
