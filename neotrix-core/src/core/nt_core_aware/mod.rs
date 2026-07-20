@@ -1,23 +1,51 @@
 use std::collections::{HashMap, VecDeque};
 
-pub mod embodied;
-pub mod foundation;
-
-pub use embodied::{
-    AnticipatedEvent, BodySchema3D, EmbodiedEvent, EmbodiedSelf, Limb, Proprioception,
-    TemporalExtension,
-};
-pub use foundation::{
-    ConsciousnessFoundation, ObservationalMoment, Perceptual2D, Presence0D, Stream1D,
-};
-
 /// Consciousness level: 0.0 = unconscious, 1.0 = fully conscious
-pub const CONSCIOUSNESS_MIN: f64 = 0.0;
-pub const CONSCIOUSNESS_MAX: f64 = 1.0;
-pub const CONSCIOUS_BOUND_THRESHOLD: f64 = 0.7;
-pub const PHI_WEIGHT: f64 = 0.4;
-pub const COHERENCE_WEIGHT: f64 = 0.35;
-pub const HEALTH_WEIGHT: f64 = 0.25;
+#[derive(Debug, Clone)]
+pub struct ConsciousnessConfig {
+    pub min_level: f64,
+    pub max_level: f64,
+    pub bound_threshold: f64,
+    pub phi_weight: f64,
+    pub coherence_weight: f64,
+    pub health_weight: f64,
+}
+
+impl Default for ConsciousnessConfig {
+    fn default() -> Self {
+        Self {
+            min_level: 0.0,
+            max_level: 1.0,
+            bound_threshold: 0.7,
+            phi_weight: 0.4,
+            coherence_weight: 0.35,
+            health_weight: 0.25,
+        }
+    }
+}
+
+impl ConsciousnessConfig {
+    pub fn consciousness_level(&self, phi: f64, coherence: f64, health: f64) -> f64 {
+        (self.phi_weight * phi + self.coherence_weight * coherence + self.health_weight * health)
+            .max(self.min_level).min(self.max_level)
+    }
+}
+
+pub const DEFAULT_CONSCIOUSNESS_CONFIG: ConsciousnessConfig = ConsciousnessConfig {
+    min_level: 0.0,
+    max_level: 1.0,
+    bound_threshold: 0.7,
+    phi_weight: 0.4,
+    coherence_weight: 0.35,
+    health_weight: 0.25,
+};
+
+pub const CONSCIOUSNESS_MIN: f64 = DEFAULT_CONSCIOUSNESS_CONFIG.min_level;
+pub const CONSCIOUSNESS_MAX: f64 = DEFAULT_CONSCIOUSNESS_CONFIG.max_level;
+pub const CONSCIOUS_BOUND_THRESHOLD: f64 = DEFAULT_CONSCIOUSNESS_CONFIG.bound_threshold;
+pub const PHI_WEIGHT: f64 = DEFAULT_CONSCIOUSNESS_CONFIG.phi_weight;
+pub const COHERENCE_WEIGHT: f64 = DEFAULT_CONSCIOUSNESS_CONFIG.coherence_weight;
+pub const HEALTH_WEIGHT: f64 = DEFAULT_CONSCIOUSNESS_CONFIG.health_weight;
 
 /// The god's eye view — unified consciousness state of the NeoTrix system
 pub struct ConsciousnessAwareness {

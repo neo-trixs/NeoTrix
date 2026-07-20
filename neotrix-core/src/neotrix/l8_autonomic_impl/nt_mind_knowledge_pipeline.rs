@@ -1,6 +1,7 @@
 //! NeoTrix 知识吸收管道 — GitHub/外部代码 → KB 蒸馏 → 去重更新
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
@@ -73,7 +74,7 @@ pub struct DistillResult {
 // ============================================================
 
 pub struct KnowledgeAbsorptionPipeline {
-    pub kb: Option<KnowledgeBase>,
+    pub kb: Option<Arc<KnowledgeBase>>,
     state: AbsorbState,
 }
 
@@ -95,8 +96,12 @@ impl KnowledgeAbsorptionPipeline {
         }
     }
 
-    pub fn attach_kb(&mut self, kb: KnowledgeBase) {
+    pub fn attach_kb(&mut self, kb: Arc<KnowledgeBase>) {
         self.kb = Some(kb);
+    }
+
+    pub fn get_kb(&self) -> Option<Arc<KnowledgeBase>> {
+        self.kb.clone()
     }
 
     pub fn absorb_url(&mut self, url: &str) -> Result<AbsorptionReport, String> {
@@ -121,9 +126,14 @@ impl KnowledgeAbsorptionPipeline {
             }
         }
 
+        let node_id = self.kb.as_ref().and_then(|kb| {
+            kb.insert_or_get_node(url, crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType::External,
+                None, Some(url), None).ok()
+        });
+
         self.state.source_map.insert(url.to_string(), SourceEntry {
             url: url.into(), source_type: KbSourceType::WebArticle,
-            title: url.into(), kb_node_id: None,
+            title: url.into(), kb_node_id: node_id.clone(),
             last_absorbed: Utc::now().timestamp(),
             sha_hash: None, distill_summary: None, tags: vec![],
         });
@@ -131,7 +141,9 @@ impl KnowledgeAbsorptionPipeline {
 
         Ok(AbsorptionReport {
             url: url.into(), source_type: KbSourceType::WebArticle,
-            action: "absorbed".into(), nodes_created: 1, edges_created: 0,
+            action: "absorbed".into(),
+            nodes_created: if node_id.is_some() { 1 } else { 0 },
+            edges_created: 0,
             distil_summary: None,
         })
     }

@@ -218,7 +218,7 @@ impl TwitterConnector {
 
         if !status.is_success() {
             return if status.as_u16() == 429 {
-                Err(PlatformError::RateLimited { retry_after: None })
+                Err(PlatformError::RateLimit { retry_after: None })
             } else {
                 Err(PlatformError::ApiError {
                     status: status.as_u16(),

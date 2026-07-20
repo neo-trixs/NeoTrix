@@ -64,7 +64,7 @@ pub enum PlatformError {
     NotAuthenticated,
     AuthFailed(String),
     ApiError { status: u16, message: String },
-    RateLimited { retry_after: Option<u64> },
+    RateLimit { retry_after: Option<u64> },
     Network(String),
     ParseError(String),
     UploadFailed(String),
@@ -78,7 +78,7 @@ impl fmt::Display for PlatformError {
             PlatformError::ApiError { status, message } => {
                 write!(f, "API error {}: {}", status, message)
             }
-            PlatformError::RateLimited { retry_after } => {
+            PlatformError::RateLimit { retry_after } => {
                 if let Some(secs) = retry_after {
                     write!(f, "rate limited, retry after {}s", secs)
                 } else {

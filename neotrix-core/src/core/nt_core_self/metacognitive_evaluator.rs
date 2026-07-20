@@ -408,3 +408,21 @@ mod tests {
         assert!(FlagSeverity::Critical > FlagSeverity::Info);
     }
 }
+
+impl crate::core::nt_core_self_test::SelfTest for CognitiveEvaluator {
+    fn name(&self) -> &str { "cognitive_evaluator" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut evaluator = CognitiveEvaluator::new();
+        let model = SiliconSelfModel::new();
+
+        let report = evaluator.evaluate(&model);
+        let mut failures = Vec::new();
+        if report.flags.iter().any(|f| f.severity == FlagSeverity::Critical && f.metric_value > 1.0) {
+            failures.push("cognitive_evaluator: critical flag with impossible metric".into());
+        }
+        if !(0.0..=1.0).contains(&report.stability_score) {
+            failures.push(format!("cognitive_evaluator: stability {} out of [0,1]", report.stability_score));
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}

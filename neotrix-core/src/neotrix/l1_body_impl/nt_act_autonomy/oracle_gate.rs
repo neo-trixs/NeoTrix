@@ -203,6 +203,33 @@ impl Default for OracleGate {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for OracleGate {
+    fn name(&self) -> &str {
+        "oracle_gate"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut gate = OracleGate::new();
+        if gate.oracle_call_count != 0 {
+            failures.push("oracle_call_count should start at 0".into());
+        }
+        let report = crate::neotrix::nt_act_autonomy::awareness_monitor::AwarenessReport {
+            gaps: vec![],
+            total_gap: 0.0,
+            critical_count: 0,
+            significant_count: 0,
+            recommended_focus: vec![],
+            overall_health: 1.0,
+        };
+        let decision = gate.evaluate(&report, "test task");
+        if decision.needs_oracle {
+            failures.push("should not need oracle on clean report".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

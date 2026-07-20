@@ -192,8 +192,25 @@ pub fn subscribe_layer(bus: &EventBus, layer: LayerId) -> tokio::task::JoinHandl
         loop {
             match rx.recv().await {
                 Ok(event) => {
-                    if filter_event_for_layer(&event, layer) {
-                        log::trace!("[event-bus:{}] {:?}", layer_label, event);
+                    if !filter_event_for_layer(&event, layer) {
+                        continue;
+                    }
+                    match &event {
+                        crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "critical" => {
+                            log::error!("[event-bus:{}] CRITICAL: {}: {}", layer_label, component, error);
+                        }
+                        crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "error" => {
+                            log::warn!("[event-bus:{}] ERROR: {}: {}", layer_label, component, error);
+                        }
+                        crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
+                            log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
+                        }
+                        crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < 0.3 => {
+                            log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
+                        }
+                        _ => {
+                            log::trace!("[event-bus:{}] {:?}", layer_label, event);
+                        }
                     }
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
@@ -245,8 +262,25 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
                 }
                 match rx.try_recv() {
                     Ok(event) => {
-                        if filter_event_for_layer(&event, layer) {
-                            log::trace!("[event-bus:{}] {:?}", layer_label, event);
+                        if !filter_event_for_layer(&event, layer) {
+                            continue;
+                        }
+                        match &event {
+                            crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "critical" => {
+                                log::error!("[event-bus:{}] CRITICAL: {}: {}", layer_label, component, error);
+                            }
+                            crate::core::nt_core_event::CoreEvent::SystemError { severity, component, error } if severity == "error" => {
+                                log::warn!("[event-bus:{}] ERROR: {}: {}", layer_label, component, error);
+                            }
+                            crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
+                                log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
+                            }
+                            crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < 0.3 => {
+                                log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
+                            }
+                            _ => {
+                                log::trace!("[event-bus:{}] {:?}", layer_label, event);
+                            }
                         }
                     }
                     Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {

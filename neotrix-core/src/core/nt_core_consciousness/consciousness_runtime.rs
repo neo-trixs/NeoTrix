@@ -61,12 +61,75 @@ impl ConsciousnessRuntime {
                 self.volition.propose(candidate);
             }
         }
-        // Re-borrow world_item for critique
-        let critique = match self.specious_present.current() {
+        // Select the best action candidate (was never called before)
+        let selected_action = self.volition.select_best();
+        // Compute temporal integral and difference for richer critique
+        let _temporal_integral = self.specious_present.temporal_integral();
+        let _temporal_delta = self.specious_present.temporal_difference();
+        // Re-borrow for critique
+        let mut critique = match self.specious_present.current() {
             Some(current) => self.critic.evaluate(current, current, Some(&self.specious_present)),
             None => return None,
         };
+        // Attach selected action info to critique
+        if let Some(action) = selected_action {
+            critique.selected_action = Some(action.description.clone());
+        }
+        critique.temporal_delta = _temporal_delta;
         Some(critique)
+    }
+
+    /// Get a reference to the volition engine for inspection
+    pub fn volition(&self) -> &VolitionEngine {
+        &self.volition
+    }
+
+    /// Get a mutable reference to the volition engine
+    pub fn volition_mut(&mut self) -> &mut VolitionEngine {
+        &mut self.volition
+    }
+
+    /// Get the current specious present coherence
+    pub fn coherence(&self) -> f64 {
+        self.specious_present.average_coherence()
+    }
+
+    /// Clear all candidates from the volition engine
+    pub fn clear_volition(&mut self) {
+        self.volition.clear();
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for ConsciousnessRuntime {
+    fn name(&self) -> &str { "consciousness_runtime" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        // Test 1: new runtime is not awakened
+        if self.awakened {
+            failures.push("new runtime should not be awakened".into());
+        }
+        // Test 2: tick returns None before awaken
+        let mut cr = ConsciousnessRuntime::new();
+        if cr.tick("test").is_some() {
+            failures.push("tick before awaken should return None".into());
+        }
+        // Test 3: awaken sets awakened flag
+        cr.awaken();
+        if !cr.awakened {
+            failures.push("awaken should set awakened=true".into());
+        }
+        // Test 4: tick_count increments
+        let count_before = cr.tick_count;
+        let _ = cr.tick("test resonance");
+        if cr.tick_count != count_before + 1 {
+            failures.push("tick should increment tick_count".into());
+        }
+        // Test 5: tick after awaken returns Some
+        let result = cr.tick("after awaken");
+        if result.is_none() {
+            failures.push("tick after awaken should return Some critique".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
     }
 }
 

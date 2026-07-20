@@ -29,8 +29,10 @@ pub mod nt_memory_unify;
 pub mod nt_memory_content_distiller;
 pub mod nt_memory_panorama;
 pub mod nt_memory_auto_learn;
+pub mod nt_memory_code_query;
 pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
+pub mod nt_memory_visual_rag;
 pub mod privacy;
 pub mod user_memory;
 pub mod vector_adapter;
@@ -43,7 +45,7 @@ pub use nt_memory_types::*;
 pub use nt_memory_embed::EmbeddingConfig;
 pub use user_memory::UserMemory;
 pub use nt_memory_commitment::EmbeddingCommitmentStore;
-pub use nt_memory_confidence::{ConfidenceStore, DecayConfig, search_with_confidence, UncertainResult, RetrievalStrategy};
+pub use nt_memory_confidence::{ConfidenceStore, ConfidenceWeights, DecayConfig, search_with_confidence, UncertainResult, RetrievalStrategy};
 pub use nt_memory_community::{CommunityAwareSearch, CommunityDetector, CommunityQueryMode, CommunityResult};
 pub use privacy::{PrivacyEnforcer, PrivacyConfig, PrivacyMode};
 pub use vector_adapter::KbVectorAdapter;
@@ -54,9 +56,17 @@ pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRec
 pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
 pub use nt_memory_auto_learn::*;
+pub use nt_memory_code_query::{
+    CodeEntity, CodeEntityKind, DependencyChain, Hop, CodeGraphStats,
+    find_code_path, reachable_subgraph, code_graph_stats,
+};
 pub use nt_memory_tech_reserve::{
     TechReserveStore, TechReserveEntry, TechReserveDimension, TechReserveQuery,
     ArchitectureGap, TechProfile, extract_tech_domains,
+};
+pub use nt_memory_visual_rag::{
+    VisualRagIndex, VisualRagConfig, VisualSearchResult, VisualEmbedding,
+    cosine_similarity, l2_normalize,
 };
 
 use rusqlite::Connection;
@@ -115,6 +125,7 @@ impl KnowledgeBase {
         let confidence_store = ConfidenceStore::new(DecayConfig::default());
         let community_search = CommunityAwareSearch::new(CommunityDetector::default());
         let privacy = PrivacyEnforcer::new(PrivacyConfig::default());
+        let db_path_str = db_path.display().to_string();
         let kb = Self {
             conn: Mutex::new(conn),
             db_path,
@@ -135,8 +146,16 @@ impl KnowledgeBase {
             graphrag_store: RwLock::new(None),
             tech_reserve: RwLock::new(TechReserveStore::new()),
         };
-        kb.rebuild_bm25();
-        kb.rebuild_tech_reserve();
+        log::info!("[KB] opened at {db_path_str} — BM25/tech-reserve lazy (rebuild on first use)");
+
+        // Warn if embeddings are not configured (semantic search disabled)
+        if std::env::var("NEOTRIX_EMBEDDING_API_KEY").is_err() {
+            log::warn!(
+                "[KB] NEOTRIX_EMBEDDING_API_KEY not set — semantic search disabled. \
+                Set it to enable vector embedding support."
+            );
+        }
+
         Ok(kb)
     }
 
@@ -210,59 +229,117 @@ impl KnowledgeBase {
         if !needs_rebuild {
             return;
         }
-        let conn = match self.conn.lock() {
-            Ok(c) => c,
-            Err(e) => {
-                log::warn!("[KB] rebuild_bm25 lock: {}", e);
+
+        let total = {
+            let conn = match self.conn.lock() {
+                Ok(c) => c,
+                Err(e) => { log::warn!("[KB] rebuild_bm25 lock: {}", e); return; }
+            };
+            nt_memory_store::count_nodes(&conn).unwrap_or(0)
+        };
+        if total == 0 {
+            if let Ok(mut d) = self.bm25_dirty.write() { *d = false; }
+            return;
+        }
+
+        use crate::core::nt_core_memory_budget;
+        let budget = nt_core_memory_budget::global();
+        let page_size = budget.check().suggested_batch_size().max(100);
+
+        let mut index = bm25::Bm25Index::empty();
+        let mut offset = 0;
+        let mut processed = 0;
+        loop {
+            if budget.should_throttle() {
+                log::warn!("[KB] rebuild_bm25 throttled at {} docs — resuming later", processed);
                 return;
             }
-        };
-        let mut stmt = match conn.prepare(
-            "SELECT id, COALESCE(title,'') || ' ' || COALESCE(summary,'') || ' ' || COALESCE(content,'') FROM nodes",
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                log::warn!("[KB] rebuild_bm25 prepare: {}", e);
-                return;
+            let conn = match self.conn.lock() {
+                Ok(c) => c,
+                Err(e) => { log::warn!("[KB] rebuild_bm25 lock: {}", e); break; }
+            };
+            let page = match nt_memory_store::get_nodes_page(&conn, offset, page_size) {
+                Ok(p) => p,
+                Err(e) => { log::warn!("[KB] rebuild_bm25 page: {}", e); break; }
+            };
+            drop(conn);
+            if page.is_empty() {
+                break;
             }
-        };
-        let doc_results: Vec<bm25::Bm25Document> = match stmt.query_map([], |row| {
-            Ok(bm25::Bm25Document {
-                id: row.get(0)?,
-                text: row.get(1)?,
-            })
-        }) {
-            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
-            Err(e) => {
-                log::warn!("[KB] rebuild_bm25 query_map: {}", e);
-                return;
+            for node in &page {
+                let text = format!("{} {} {}",
+                    node.title,
+                    node.summary.as_deref().unwrap_or(""),
+                    node.content.as_deref().unwrap_or(""),
+                );
+                index.add_document(&bm25::Bm25Document { id: node.id.clone(), text });
             }
-        };
-        drop(stmt);
-        drop(conn);
-        let index = bm25::Bm25Index::build(&doc_results);
+            processed += page.len();
+            offset += page.len();
+            if page.len() < page_size {
+                break;
+            }
+        }
+
         if let Ok(mut bm25) = self.bm25.write() {
             *bm25 = Some(index);
         }
         if let Ok(mut d) = self.bm25_dirty.write() {
             *d = false;
         }
-        log::info!("[KB] BM25 index rebuilt: {} docs", doc_results.len());
+        log::info!("[KB] BM25 index rebuilt: {} docs (page_size={})", processed, page_size);
     }
 
-    /// Rebuild tech reserve index from all KB nodes.
+    /// Rebuild tech reserve index from all KB nodes (streaming, page-by-page).
     pub fn rebuild_tech_reserve(&self) {
-        let conn = match self.conn.lock() {
-            Ok(c) => c,
-            Err(e) => { log::warn!("[KB] rebuild_tech_reserve lock: {}", e); return; }
+        use crate::core::nt_core_memory_budget;
+        let budget = nt_core_memory_budget::global();
+        let page_size = budget.check().suggested_batch_size().max(100);
+
+        let total = {
+            let conn = match self.conn.lock() {
+                Ok(c) => c,
+                Err(e) => { log::warn!("[KB] rebuild_tech_reserve lock: {}", e); return; }
+            };
+            nt_memory_store::count_nodes(&conn).unwrap_or(0)
         };
-        let nodes = nt_memory_store::get_all_nodes(&conn)
-            .unwrap_or_default();
-        drop(conn);
-        if let Ok(mut tr) = self.tech_reserve.write() {
-            tr.rebuild_from_nodes(&nodes);
-        log::info!("[KB] Tech reserve rebuilt: {} entries across {} dimensions",
-            tr.entry_count(), tr.stats_by_dimension().len());
+        if total == 0 { return; }
+
+        {
+            if let Ok(mut tr) = self.tech_reserve.write() {
+                tr.clear();
+            }
+        }
+
+        let mut offset = 0;
+        let mut processed = 0;
+        loop {
+            if budget.should_throttle() {
+                log::warn!("[KB] rebuild_tech_reserve throttled at {} nodes", processed);
+                if let Ok(mut tr) = self.tech_reserve.write() {
+                    tr.clear();
+                }
+                return;
+            }
+            let conn = match self.conn.lock() {
+                Ok(c) => c,
+                Err(e) => { log::warn!("[KB] rebuild_tech_reserve lock: {}", e); break; }
+            };
+            let page = nt_memory_store::get_nodes_page(&conn, offset, page_size).unwrap_or_default();
+            drop(conn);
+            if page.is_empty() { break; }
+            if let Ok(mut tr) = self.tech_reserve.write() {
+                for node in &page {
+                    tr.add_node(node);
+                }
+            }
+            processed += page.len();
+            offset += page.len();
+            if page.len() < page_size { break; }
+        }
+        if let Ok(tr) = self.tech_reserve.read() {
+            log::info!("[KB] Tech reserve rebuilt: {} entries across {} dimensions (streamed, page_size={})",
+                tr.entry_count(), tr.stats_by_dimension().len(), page_size);
         }
     }
 
@@ -439,6 +516,7 @@ impl KnowledgeBase {
         let r = nt_memory_store::insert_node(&conn, node).map_err(|e| format!("insert_node: {}", e));
         if r.is_ok() {
             self.mark_bm25_dirty();
+            let _ = nt_memory_crawl::on_node_inserted(&conn, node);
         }
         r
     }

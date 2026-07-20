@@ -14,7 +14,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
+use syn;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Severity {
@@ -150,9 +152,66 @@ impl ArchLayer {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SelfReviewConfig {
+    pub unwrap_max: usize,
+    pub expect_max: usize,
+    pub todo_max: usize,
+    pub unimplemented_max: usize,
+    pub allow_dead_max: usize,
+    pub empty_match_max: usize,
+    pub index_multiplier: usize,
+    pub index_absolute: usize,
+    pub lock_unwrap_max: usize,
+    pub exit_max: usize,
+    pub observer_quality_threshold: f64,
+    pub uncovered_test_max: usize,
+    pub unwrap_in_lazy_max: usize,
+    pub unused_imports_max: usize,
+    pub karpathy_simplicity_max: usize,
+    pub karpathy_surgical_files: usize,
+    pub karpathy_surgical_lines: usize,
+    pub karpathy_complexity_max: usize,
+    pub karpathy_goal_driven_max: usize,
+    pub seal_stub_max: usize,
+    pub min_test_line_count: usize,
+    pub scan_safety_bound: usize,
+}
+
+impl Default for SelfReviewConfig {
+    fn default() -> Self {
+        Self {
+            unwrap_max: 120,
+            expect_max: 50,
+            todo_max: 5,
+            unimplemented_max: 3,
+            allow_dead_max: 50,
+            empty_match_max: 15,
+            index_multiplier: 5,
+            index_absolute: 50,
+            lock_unwrap_max: 3,
+            exit_max: 3,
+            observer_quality_threshold: 0.3,
+            uncovered_test_max: 5,
+            unwrap_in_lazy_max: 3,
+            unused_imports_max: 20,
+            karpathy_simplicity_max: 30,
+            karpathy_surgical_files: 10,
+            karpathy_surgical_lines: 500,
+            karpathy_complexity_max: 20,
+            karpathy_goal_driven_max: 30,
+            seal_stub_max: 3,
+            min_test_line_count: 50,
+            scan_safety_bound: 300,
+        }
+    }
+}
+
 pub struct SelfReviewGate {
     pub strict_mode: bool,
     pub findings: Vec<ReviewFinding>,
+    /// Configurable threshold overrides
+    pub config: SelfReviewConfig,
     /// Optional observer feedback: quality score from OneObserver (0.0–1.0)
     pub observer_quality: Option<f64>,
     /// Optional observer patterns detected
@@ -164,9 +223,24 @@ impl Default for SelfReviewGate {
         Self {
             strict_mode: true,
             findings: Vec::new(),
+            config: SelfReviewConfig::default(),
             observer_quality: None,
             observer_patterns: Vec::new(),
         }
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for SelfReviewGate {
+    fn name(&self) -> &str { "self_review_gate" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        if self.config.min_test_line_count < 1 {
+            failures.push("self_review_gate: min_test_line_count must be >= 1".into());
+        }
+        if self.config.scan_safety_bound < 1 {
+            failures.push("self_review_gate: scan_safety_bound must be >= 1".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
     }
 }
 
@@ -175,6 +249,7 @@ impl SelfReviewGate {
         Self {
             strict_mode,
             findings: Vec::new(),
+            config: SelfReviewConfig::default(),
             observer_quality: None,
             observer_patterns: Vec::new(),
         }
@@ -184,6 +259,13 @@ impl SelfReviewGate {
         self.observer_quality = Some(quality);
         self.observer_patterns = patterns;
         self
+    }
+
+    pub fn syn_depth(&self, code: &str) -> usize {
+        match syn::parse_file(code) {
+            Ok(file) => syn_file_max_depth(&file),
+            Err(_) => estimate_brace_depth(code),
+        }
     }
 
     pub fn check(&mut self, condition: bool, severity: Severity, category: impl Into<String>, message: String, file: impl Into<String>, line: u32) {
@@ -293,14 +375,14 @@ impl SelfReviewGate {
 
     fn check_no_unwrap_in_production(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let unwrap_count = scan_for_pattern(&src_dir, ".unwrap(");
-        let expect_count = scan_for_pattern(&src_dir, ".expect(");
+        let unwrap_count = scan_for_patterns("", &[PatternConfig { name: "unwrap".into(), pattern: regex::escape(".unwrap(") }], Some(&src_dir)).len();
+        let expect_count = scan_for_patterns("", &[PatternConfig { name: "expect".into(), pattern: regex::escape(".expect(") }], Some(&src_dir)).len();
         let msg = format!(
             "PA001-PA002: {} .unwrap() and {} .expect() calls in src/ (excludes #[cfg(test)])",
             unwrap_count, expect_count
         );
         self.check(
-            unwrap_count <= 120 && expect_count <= 50,
+            unwrap_count <= self.config.unwrap_max && expect_count <= self.config.expect_max,
             Severity::Warning,
             "unwrap_safety",
             msg,
@@ -318,7 +400,7 @@ impl SelfReviewGate {
             todo_count, unimpl_count
         );
         self.check(
-            todo_count < 5 && unimpl_count < 3,
+            todo_count < self.config.todo_max && unimpl_count < self.config.unimplemented_max,
             Severity::Warning,
             "todo_check",
             msg,
@@ -329,13 +411,13 @@ impl SelfReviewGate {
 
     fn check_no_dead_code_without_allow(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let allow_dead = scan_for_pattern(&src_dir, "#[allow(dead_code)]");
+        let allow_dead = scan_for_patterns("", &[PatternConfig { name: "allow_dead_code".into(), pattern: regex::escape("#[allow(dead_code)]") }], Some(&src_dir)).len();
         let msg = format!(
             "Found {} #[allow(dead_code)] annotations in src/ (potential dead code)",
             allow_dead
         );
         self.check(
-            allow_dead < 50,
+            allow_dead < self.config.allow_dead_max,
             Severity::Warning,
             "dead_code",
             msg,
@@ -346,9 +428,9 @@ impl SelfReviewGate {
 
     fn check_public_api_has_docs(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let pub_fn = scan_for_pattern(&src_dir, "pub fn ");
-        let pub_struct = scan_for_pattern(&src_dir, "pub struct ");
-        let doc_lines = scan_for_pattern(&src_dir, "///");
+        let pub_fn = scan_for_patterns("", &[PatternConfig { name: "pub_fn".into(), pattern: regex::escape("pub fn ") }], Some(&src_dir)).len();
+        let pub_struct = scan_for_patterns("", &[PatternConfig { name: "pub_struct".into(), pattern: regex::escape("pub struct ") }], Some(&src_dir)).len();
+        let doc_lines = scan_for_patterns("", &[PatternConfig { name: "doc_comment".into(), pattern: regex::escape("///") }], Some(&src_dir)).len();
         let msg = format!(
             "{} pub fn, {} pub struct, {} doc comments — doc ratio: {:.1}%",
             pub_fn,
@@ -368,13 +450,13 @@ impl SelfReviewGate {
 
     fn check_no_empty_match_arms(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let empty_match = scan_for_pattern(&src_dir, " => {},");
+        let empty_match = scan_for_patterns("", &[PatternConfig { name: "empty_match".into(), pattern: regex::escape(" => {},") }], Some(&src_dir)).len();
         let msg = format!(
             "Found {} empty match arms ( => {{}},) in src/",
             empty_match
         );
         self.check(
-            empty_match < 15,
+            empty_match < self.config.empty_match_max,
             Severity::Warning,
             "empty_match",
             msg,
@@ -416,7 +498,7 @@ impl SelfReviewGate {
             raw_idx, get_calls
         );
         self.check(
-            raw_idx < get_calls * 5 || raw_idx < 50,
+            raw_idx < get_calls * self.config.index_multiplier || raw_idx < self.config.index_absolute,
             Severity::Info,
             "indexing_panic",
             msg,
@@ -454,7 +536,7 @@ impl SelfReviewGate {
             lock_unwrap
         );
         self.check(
-            lock_unwrap < 3 || mutex_unwrap == 0,
+            lock_unwrap < self.config.lock_unwrap_max || mutex_unwrap == 0,
             Severity::Warning,
             "mutex_poison",
             msg,
@@ -472,7 +554,7 @@ impl SelfReviewGate {
             exit_count
         );
         self.check(
-            exit_count < 3,
+            exit_count < self.config.exit_max,
             Severity::Warning,
             "process_exit",
             msg,
@@ -487,7 +569,7 @@ impl SelfReviewGate {
         if !core_dir.exists() {
             return;
         }
-        let violation_count = scan_for_pattern_in_dir(&core_dir, "use crate::neotrix");
+        let violation_count = scan_for_patterns("", &[PatternConfig { name: "layer_violation".into(), pattern: regex::escape("use crate::neotrix") }], Some(&core_dir)).len();
         let msg = format!(
             "Layer violation: {} `use crate::neotrix` imports found in core/ (L0→L9 violation)",
             violation_count
@@ -561,7 +643,7 @@ impl SelfReviewGate {
         let observer_feedback = self.observer_quality;
         let has_critical = self.observer_patterns.iter().any(|p| p.contains("oscillation") || p.contains("stuck"));
         if let Some(q) = observer_feedback {
-            let degraded = q < 0.3;
+            let degraded = q < self.config.observer_quality_threshold;
             let msg = format!(
                 "Observer feedback: quality={:.2}, critical_patterns={} — reasoning trajectory {}",
                 q,
@@ -686,7 +768,7 @@ impl SelfReviewGate {
             uncovered.len(),
         );
         self.check(
-            uncovered.len() < 5,
+            uncovered.len() < self.config.uncovered_test_max,
             Severity::Warning,
             "test_density",
             msg,
@@ -699,14 +781,14 @@ impl SelfReviewGate {
     /// Distilled from Cycle 24 fix: 7 LazyLock unwrap→expect in session.rs, fetcher.rs.
     fn check_init_safety(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let lazy_unwrap = scan_for_pattern(&src_dir, "LazyLock::new(||");
+        let lazy_unwrap = scan_for_patterns("", &[PatternConfig { name: "lazy_lock_init".into(), pattern: regex::escape("LazyLock::new(||") }], Some(&src_dir)).len();
         let unwrap_in_lazy = scan_for_pattern_in_lazy_init(&src_dir);
         let msg = format!(
             "Init safety: {} LazyLock inits, {} with unwrap/expect in closure — prefer expect() or fallback",
             lazy_unwrap, unwrap_in_lazy,
         );
         self.check(
-            unwrap_in_lazy < 3,
+            unwrap_in_lazy < self.config.unwrap_in_lazy_max,
             Severity::Warning,
             "init_safety",
             msg,
@@ -764,7 +846,7 @@ impl SelfReviewGate {
     /// (simple heuristic: count `use crate::` and `use std::` patterns not followed by usage).
     fn check_unused_imports(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let total_imports = scan_for_pattern(&src_dir, "use ");
+        let total_imports = scan_for_patterns("", &[PatternConfig { name: "use_statement".into(), pattern: regex::escape("use ") }], Some(&src_dir)).len();
         // Simple heuristic: detect "dead use" patterns where import is the only reference
         let unused_imports = scan_for_unused_import_patterns(&src_dir);
         let msg = format!(
@@ -772,7 +854,7 @@ impl SelfReviewGate {
             total_imports, unused_imports,
         );
         self.check(
-            unused_imports < 20,
+            unused_imports < self.config.unused_imports_max,
             Severity::Info,
             "unused_imports",
             msg,
@@ -923,12 +1005,12 @@ impl SelfReviewGate {
     /// Bug found at: nt_memory_store.rs:38-46, 51-72 (insert_node skip, update_node no sync)
     fn check_fts_desync(&mut self) {
         let src_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let nodes_inserts = scan_for_pattern_in_dir(&src_dir, "INSERT INTO nodes");
-        let nodes_fts_inserts = scan_for_pattern_in_dir(&src_dir, "INSERT INTO nodes_fts");
-        let nodes_updates = scan_for_pattern_in_dir(&src_dir, "UPDATE nodes SET");
-        let nodes_fts_updates = scan_for_pattern_in_dir(&src_dir, "UPDATE nodes_fts SET");
-        let nodes_deletes = scan_for_pattern_in_dir(&src_dir, "DELETE FROM nodes WHERE");
-        let nodes_fts_deletes = scan_for_pattern_in_dir(&src_dir, "DELETE FROM nodes_fts");
+        let nodes_inserts = scan_for_patterns("", &[PatternConfig { name: "nodes_insert".into(), pattern: regex::escape("INSERT INTO nodes") }], Some(&src_dir)).len();
+        let nodes_fts_inserts = scan_for_patterns("", &[PatternConfig { name: "nodes_fts_insert".into(), pattern: regex::escape("INSERT INTO nodes_fts") }], Some(&src_dir)).len();
+        let nodes_updates = scan_for_patterns("", &[PatternConfig { name: "nodes_update".into(), pattern: regex::escape("UPDATE nodes SET") }], Some(&src_dir)).len();
+        let nodes_fts_updates = scan_for_patterns("", &[PatternConfig { name: "nodes_fts_update".into(), pattern: regex::escape("UPDATE nodes_fts SET") }], Some(&src_dir)).len();
+        let nodes_deletes = scan_for_patterns("", &[PatternConfig { name: "nodes_delete".into(), pattern: regex::escape("DELETE FROM nodes WHERE") }], Some(&src_dir)).len();
+        let nodes_fts_deletes = scan_for_patterns("", &[PatternConfig { name: "nodes_fts_delete".into(), pattern: regex::escape("DELETE FROM nodes_fts") }], Some(&src_dir)).len();
 
         let mut msgs = Vec::new();
         if nodes_inserts > nodes_fts_inserts {
@@ -1068,7 +1150,7 @@ impl SelfReviewGate {
             issues, unused_generics, deep_nesting, long_fns, single_traits,
         );
         self.check(
-            issues < 30,
+            issues < self.config.karpathy_simplicity_max,
             Severity::Warning,
             "karpathy_simplicity_first",
             msg,
@@ -1089,7 +1171,7 @@ impl SelfReviewGate {
             files_changed, lines_added,
         );
         self.check(
-            files_changed <= 10 && lines_added <= 500,
+            files_changed <= self.config.karpathy_surgical_files && lines_added <= self.config.karpathy_surgical_lines,
             Severity::Info,
             "karpathy_surgical_changes",
             msg,
@@ -1113,7 +1195,7 @@ impl SelfReviewGate {
             issues, long_chains, many_arms, many_params,
         );
         self.check(
-            issues < 20,
+            issues < self.config.karpathy_complexity_max,
             Severity::Warning,
             "karpathy_complexity_budget",
             msg,
@@ -1137,7 +1219,7 @@ impl SelfReviewGate {
             issues, todos_no_test, mut_no_result, missing_goals,
         );
         self.check(
-            issues < 30,
+            issues < self.config.karpathy_goal_driven_max,
             Severity::Warning,
             "karpathy_goal_driven_execution",
             msg,
@@ -1187,7 +1269,7 @@ impl SelfReviewGate {
             stub_count, total,
         );
         self.check(
-            stub_count <= 3,
+            stub_count <= self.config.seal_stub_max,
             Severity::Warning,
             "seal_stage_health",
             msg,
@@ -1312,6 +1394,21 @@ impl SelfReviewGate {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PatternConfig {
+    pub name: String,
+    pub pattern: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PatternMatch {
+    pub file: String,
+    pub line: usize,
+    pub column: usize,
+    pub pattern_name: String,
+    pub matched_text: String,
+}
+
 // ─── Scanner helpers ───
 
 fn count_rs_files(dir: &Path) -> usize {
@@ -1330,38 +1427,69 @@ fn count_rs_files(dir: &Path) -> usize {
     count
 }
 
-fn scan_for_pattern(dir: &Path, pattern: &str) -> usize {
-    let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                count += scan_for_pattern(&path, pattern);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    count += content.matches(pattern).count();
+pub fn scan_for_patterns(
+    source: &str,
+    patterns: &[PatternConfig],
+    dir: Option<&Path>,
+) -> Vec<PatternMatch> {
+    let compiled: Vec<(&PatternConfig, Regex)> = patterns
+        .iter()
+        .filter_map(|pc| Regex::new(&pc.pattern).ok().map(|r| (pc, r)))
+        .collect();
+    if compiled.is_empty() {
+        return Vec::new();
+    }
+    let mut results = Vec::new();
+    if let Some(d) = dir {
+        let mut file_list = Vec::new();
+        collect_rs_files_recursive(d, &mut file_list);
+        for file_path in file_list {
+            if let Ok(content) = std::fs::read_to_string(&file_path) {
+                for (pc, re) in &compiled {
+                    for m in re.find_iter(&content) {
+                        let line = content[..m.start()].matches('\n').count() + 1;
+                        let col = m.start() - content[..m.start()].rfind('\n').map_or(0, |i| i + 1);
+                        results.push(PatternMatch {
+                            file: file_path.to_string_lossy().to_string(),
+                            line,
+                            column: col,
+                            pattern_name: pc.name.clone(),
+                            matched_text: m.as_str().to_string(),
+                        });
+                    }
                 }
             }
         }
+    } else {
+        for (pc, re) in &compiled {
+            for m in re.find_iter(source) {
+                let line = source[..m.start()].matches('\n').count() + 1;
+                let col = m.start() - source[..m.start()].rfind('\n').map_or(0, |i| i + 1);
+                results.push(PatternMatch {
+                    file: String::new(),
+                    line,
+                    column: col,
+                    pattern_name: pc.name.clone(),
+                    matched_text: m.as_str().to_string(),
+                });
+            }
+        }
     }
-    count
+    results
 }
 
-fn scan_for_pattern_in_dir(dir: &Path, pattern: &str) -> usize {
-    let mut count = 0usize;
+fn collect_rs_files_recursive(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                count += scan_for_pattern_in_dir(&path, pattern);
+                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
+                collect_rs_files_recursive(&path, out);
             } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    count += content.matches(pattern).count();
-                }
+                out.push(path);
             }
         }
     }
-    count
 }
 
 fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
@@ -1377,7 +1505,17 @@ fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
                 count += scan_for_pattern_excluding_tests(&path, pattern);
             } else if path.extension().is_some_and(|e| e == "rs") {
                 if let Ok(content) = fs::read_to_string(&path) {
-                    count += content.matches(pattern).count();
+                    let mut in_test = false;
+                    for line in content.lines() {
+                        if line.trim().starts_with("#[cfg(test)]") {
+                            in_test = true;
+                        } else if in_test && line.trim().starts_with("}") && line.trim().len() == 1 {
+                            in_test = false;
+                            continue;
+                        }
+                        if in_test { continue; }
+                        count += line.matches(pattern).count();
+                    }
                 }
             }
         }
@@ -1434,7 +1572,7 @@ fn collect_rs_stems(dir: &Path, out: &mut Vec<String>) {
     }
 }
 
-/// Scan a directory tree for .rs files >50 lines without #[test].
+/// Scan a directory tree for .rs files without #[test].
 /// Appends uncovered file stems to `uncovered`.
 fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -1446,7 +1584,7 @@ fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
             } else if path.extension().is_some_and(|e| e == "rs") {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     let line_count = content.lines().count();
-                    if line_count > 50 && !content.contains("#[test]") {
+                    if line_count > SelfReviewConfig::default().min_test_line_count && !content.contains("#[test]") {
                         if let Some(stem) = path.file_stem() {
                             uncovered.push(stem.to_string_lossy().to_string());
                         }
@@ -1911,7 +2049,7 @@ fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
                                         arms += 1;
                                     }
                                 }
-                                if j - i > 300 { i = j; break; }
+                                if j - i > SelfReviewConfig::default().scan_safety_bound { i = j; break; }
                             }
                             if arms > max_arms { count += 1; }
                         }
@@ -2092,6 +2230,142 @@ fn count_lines_in_last_commit(repo_dir: &Path) -> usize {
     }
 }
 
+fn estimate_brace_depth(code: &str) -> usize {
+    let mut depth = 0usize;
+    let mut max_depth = 0usize;
+    for c in code.chars() {
+        if c == '{' {
+            depth += 1;
+            max_depth = max_depth.max(depth);
+        } else if c == '}' {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    max_depth
+}
+
+fn syn_file_max_depth(file: &syn::File) -> usize {
+    file.items.iter()
+        .map(|item| syn_item_max_depth(item, 0))
+        .max()
+        .unwrap_or(0)
+}
+
+fn syn_item_max_depth(item: &syn::Item, depth: usize) -> usize {
+    match item {
+        syn::Item::Fn(f) => syn_block_max_depth(&f.block, depth),
+        syn::Item::Impl(imp) => {
+            let d = depth + 1;
+            d.max(imp.items.iter()
+                .map(|ii| syn_impl_item_max_depth(ii, d))
+                .max()
+                .unwrap_or(d))
+        }
+        syn::Item::Trait(t) => {
+            let d = depth + 1;
+            d.max(t.items.iter()
+                .map(|ti| syn_trait_item_max_depth(ti, d))
+                .max()
+                .unwrap_or(d))
+        }
+        syn::Item::Mod(m) => {
+            match &m.content {
+                Some((_, items)) => {
+                    let d = depth + 1;
+                    d.max(items.iter()
+                        .map(|i| syn_item_max_depth(i, d))
+                        .max()
+                        .unwrap_or(d))
+                }
+                None => depth,
+            }
+        }
+        syn::Item::ForeignMod(fm) => {
+            let d = depth + 1;
+            d.max(fm.items.iter()
+                .map(|fi| syn_foreign_item_max_depth(fi, d))
+                .max()
+                .unwrap_or(d))
+        }
+        syn::Item::Const(c) => syn_expr_max_depth(&c.expr, depth),
+        syn::Item::Static(s) => syn_expr_max_depth(&s.expr, depth),
+        _ => depth,
+    }
+}
+
+fn syn_impl_item_max_depth(item: &syn::ImplItem, depth: usize) -> usize {
+    match item {
+        syn::ImplItem::Fn(f) => syn_block_max_depth(&f.block, depth),
+        syn::ImplItem::Const(c) => syn_expr_max_depth(&c.expr, depth),
+        _ => depth,
+    }
+}
+
+fn syn_trait_item_max_depth(item: &syn::TraitItem, depth: usize) -> usize {
+    match item {
+        syn::TraitItem::Fn(f) => f.default.as_ref()
+            .map(|b| syn_block_max_depth(b, depth))
+            .unwrap_or(depth),
+        syn::TraitItem::Const(c) => c.default.as_ref()
+            .map(|(_, e)| syn_expr_max_depth(e, depth))
+            .unwrap_or(depth),
+        _ => depth,
+    }
+}
+
+fn syn_foreign_item_max_depth(_item: &syn::ForeignItem, depth: usize) -> usize {
+    depth
+}
+
+fn syn_block_max_depth(block: &syn::Block, depth: usize) -> usize {
+    let d = depth + 1;
+    d.max(syn_stmts_max_depth(&block.stmts, d))
+}
+
+fn syn_stmts_max_depth(stmts: &[syn::Stmt], depth: usize) -> usize {
+    stmts.iter()
+        .map(|s| syn_stmt_max_depth(s, depth))
+        .max()
+        .unwrap_or(depth)
+}
+
+fn syn_stmt_max_depth(stmt: &syn::Stmt, depth: usize) -> usize {
+    match stmt {
+        syn::Stmt::Item(item) => syn_item_max_depth(item, depth),
+        syn::Stmt::Expr(expr, _) => syn_expr_max_depth(expr, depth),
+        syn::Stmt::Local(local) => local.init.as_ref()
+            .map(|init| syn_expr_max_depth(&init.expr, depth))
+            .unwrap_or(depth),
+        _ => depth,
+    }
+}
+
+fn syn_expr_max_depth(expr: &syn::Expr, depth: usize) -> usize {
+    match expr {
+        syn::Expr::Block(eb) => syn_block_max_depth(&eb.block, depth),
+        syn::Expr::If(ei) => {
+            let then_max = syn_block_max_depth(&ei.then_branch, depth);
+            let else_max = ei.else_branch.as_ref()
+                .map(|(_, e)| syn_expr_max_depth(e, depth))
+                .unwrap_or(0);
+            then_max.max(else_max)
+        }
+        syn::Expr::While(w) => syn_block_max_depth(&w.body, depth),
+        syn::Expr::ForLoop(fl) => syn_block_max_depth(&fl.body, depth),
+        syn::Expr::Loop(l) => syn_block_max_depth(&l.body, depth),
+        syn::Expr::Match(m) => {
+            let d = depth + 1;
+            d.max(m.arms.iter()
+                .map(|arm| syn_expr_max_depth(&arm.body, d))
+                .max()
+                .unwrap_or(d))
+        }
+        syn::Expr::Unsafe(u) => syn_block_max_depth(&u.block, depth),
+        syn::Expr::Closure(c) => syn_expr_max_depth(&c.body, depth),
+        _ => depth,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2227,4 +2501,30 @@ mod tests {
             .collect();
         assert!(findings.len() <= 1, "Should have at most 1 finding for goal_driven_execution check");
     }
+
+    #[test]
+    fn test_syn_depth_tracks_nesting() {
+        let gate = SelfReviewGate::new(false);
+
+        let d1 = gate.syn_depth("fn a() { let x = 1; }");
+        assert_eq!(d1, 1, "single fn block should have depth 1");
+
+        let d2 = gate.syn_depth("fn a() { fn b() { let x = 1; } }");
+        assert_eq!(d2, 2, "nested fn should have depth 2");
+
+        let d3 = gate.syn_depth("let x = 1;");
+        assert_eq!(d3, 0, "invalid Rust should fallback to brace count (0)");
+    }
+
+    #[test]
+    fn test_syn_depth_control_flow() {
+        let gate = SelfReviewGate::new(false);
+
+        let d = gate.syn_depth("fn a() { if true { let x = 1; } }");
+        assert_eq!(d, 2, "fn + if block should have depth 2");
+
+        let d = gate.syn_depth("fn a() { loop { break; } }");
+        assert_eq!(d, 2, "fn + loop block should have depth 2");
+    }
 }
+

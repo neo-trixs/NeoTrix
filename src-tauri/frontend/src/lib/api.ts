@@ -324,6 +324,155 @@ export async function getDeepLinkUrl(): Promise<string | null> {
   }
 }
 
+// ========== Project API ==========
+
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  project_type: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+  pinned: boolean;
+  archived: boolean;
+  color: string | null;
+  icon: string | null;
+}
+
+export interface ProjectChat {
+  id: string;
+  project_id: string;
+  name: string;
+  session_id: string | null;
+  message_count: number;
+  created_at: number;
+  updated_at: number;
+  pinned: boolean;
+  archived: boolean;
+}
+
+export interface ProjectSource {
+  id: string;
+  project_id: string;
+  source_type: string;
+  path: string | null;
+  url: string | null;
+  name: string;
+  enabled: boolean;
+  created_at: number;
+}
+
+export interface ProjectInstruction {
+  id: string;
+  project_id: string;
+  content: string;
+  enabled: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export async function projectList(): Promise<Project[]> {
+  return invoke<Project[]>("project_list");
+}
+
+export async function projectCreate(
+  name: string,
+  path: string,
+  projectType?: string,
+  description?: string,
+  color?: string,
+  icon?: string
+): Promise<Project> {
+  return invoke<Project>("project_create", { name, path, projectType, description, color, icon });
+}
+
+export async function projectGet(id: string): Promise<Project | null> {
+  return invoke<Project | null>("project_get", { id });
+}
+
+export async function projectUpdate(
+  id: string,
+  updates: Partial<Pick<Project, "name" | "description" | "color" | "icon" | "pinned" | "archived">>
+): Promise<Project> {
+  return invoke<Project>("project_update", { id, ...updates });
+}
+
+export async function projectDelete(id: string): Promise<void> {
+  return invoke("project_delete", { id });
+}
+
+export async function projectScanDirectory(path: string): Promise<Project> {
+  return invoke<Project>("project_scan_directory", { path });
+}
+
+export async function projectChatList(projectId: string): Promise<ProjectChat[]> {
+  return invoke<ProjectChat[]>("project_chat_list", { projectId });
+}
+
+export async function projectChatCreate(
+  projectId: string,
+  name: string,
+  sessionId?: string
+): Promise<ProjectChat> {
+  return invoke<ProjectChat>("project_chat_create", { projectId, name, sessionId });
+}
+
+export async function projectChatUpdate(
+  chatId: string,
+  updates: Partial<Pick<ProjectChat, "name" | "pinned" | "archived" | "message_count">>
+): Promise<ProjectChat> {
+  return invoke<ProjectChat>("project_chat_update", { chatId, ...updates });
+}
+
+export async function projectChatDelete(chatId: string): Promise<void> {
+  return invoke("project_chat_delete", { chatId });
+}
+
+export async function projectSourceList(projectId: string): Promise<ProjectSource[]> {
+  return invoke<ProjectSource[]>("project_source_list", { projectId });
+}
+
+export async function projectSourceAdd(
+  projectId: string,
+  sourceType: string,
+  path: string | undefined,
+  url: string | undefined,
+  name: string
+): Promise<ProjectSource> {
+  return invoke<ProjectSource>("project_source_add", { projectId, sourceType, path, url, name });
+}
+
+export async function projectSourceUpdate(
+  sourceId: string,
+  updates: Partial<Pick<ProjectSource, "enabled" | "name">>
+): Promise<ProjectSource> {
+  return invoke<ProjectSource>("project_source_update", { sourceId, ...updates });
+}
+
+export async function projectSourceDelete(sourceId: string): Promise<void> {
+  return invoke("project_source_delete", { sourceId });
+}
+
+export async function projectInstructionList(projectId: string): Promise<ProjectInstruction[]> {
+  return invoke<ProjectInstruction[]>("project_instruction_list", { projectId });
+}
+
+export async function projectInstructionAdd(projectId: string, content: string): Promise<ProjectInstruction> {
+  return invoke<ProjectInstruction>("project_instruction_add", { projectId, content });
+}
+
+export async function projectInstructionUpdate(
+  instructionId: string,
+  updates: Partial<Pick<ProjectInstruction, "content" | "enabled">>
+): Promise<ProjectInstruction> {
+  return invoke<ProjectInstruction>("project_instruction_update", { instructionId, ...updates });
+}
+
+export async function projectInstructionDelete(instructionId: string): Promise<void> {
+  return invoke("project_instruction_delete", { instructionId });
+}
+
 // ========== Provider Status API ==========
 
 export interface ProviderStateInfo {

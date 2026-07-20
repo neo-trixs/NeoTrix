@@ -40,6 +40,9 @@ pub mod free_cmds;
 pub mod consolidated_cmds;
 pub mod kb_cmds;
 pub mod wiki_cmds;
+pub mod consciousness_cmds;
+pub mod osint_cmds;
+pub mod self_audit_cmds;
 
 pub use types::*;
 pub use sandbox_cmds::*;
@@ -77,3 +80,6 @@ pub use automation_cmds::*;
 pub use session_recovery_cmds::*;
 pub use kb_cmds::*;
 pub use wiki_cmds::*;
+pub use consciousness_cmds::*;
+pub use osint_cmds::*;
+pub use self_audit_cmds::*;

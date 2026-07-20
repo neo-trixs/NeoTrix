@@ -108,6 +108,10 @@ pub struct DepGraph {
 }
 
 impl DepGraph {
+    pub fn is_empty(&self) -> bool {
+        self.edges.is_empty()
+    }
+
     pub fn find_cycles(&self) -> Vec<Vec<String>> {
         let edges: Vec<(String, String)> = self.edges.iter()
             .map(|e| (e.from.clone(), e.to.clone()))

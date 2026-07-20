@@ -126,8 +126,20 @@ pub fn build_router(state: AppState) -> Router {
 }
 
 pub async fn start_server(port: u16) {
-    let brain = crate::neotrix::nt_mind::ReasoningBrain::new();
-    let bank = crate::neotrix::nt_mind::ReasoningBank::new(10000);
+    start_server_with(port,
+        Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::ReasoningBrain::new()),
+        crate::core::ReasoningBank::new(10000),
+    ).await;
+}
+
+/// Inner server start — accepts pre-constructed brain and bank
+/// to avoid L1→L8 direct dependency. Callers from L8/binaries
+/// construct the brain and pass it in.
+pub async fn start_server_with(
+    port: u16,
+    brain: Box<dyn crate::core::nt_core_traits::BrainProvider>,
+    bank: crate::core::ReasoningBank,
+) {
 
     // Read api_token from config.toml
     let api_token = std::env::var("NEOTRIX_API_TOKEN").ok().or_else(|| {

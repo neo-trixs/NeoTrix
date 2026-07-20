@@ -368,3 +368,50 @@ export interface IdentityInfo {
   edition: number;
   verified: boolean;
 }
+
+// ========== Projects & Chats (Codex-style) ==========
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  project_type: string;
+  description: string | null;
+  created_at: number;
+  updated_at: number;
+  pinned: boolean;
+  archived: boolean;
+  color: string | null;
+  icon: string | null;
+}
+
+export interface ProjectChat {
+  id: string;
+  project_id: string;
+  name: string;
+  session_id: string | null;
+  message_count: number;
+  created_at: number;
+  updated_at: number;
+  pinned: boolean;
+  archived: boolean;
+}
+
+export interface ProjectSource {
+  id: string;
+  project_id: string;
+  source_type: string;
+  path: string | null;
+  url: string | null;
+  name: string;
+  enabled: boolean;
+  created_at: number;
+}
+
+export interface ProjectInstruction {
+  id: string;
+  project_id: string;
+  content: string;
+  enabled: boolean;
+  created_at: number;
+  updated_at: number;
+}

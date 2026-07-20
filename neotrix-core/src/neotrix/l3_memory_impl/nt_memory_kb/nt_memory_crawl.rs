@@ -30,6 +30,16 @@ fn now() -> i64 {
         .as_secs() as i64
 }
 
+pub fn on_node_inserted(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
+    let ts = now();
+    if let Some(ref url) = node.url {
+        let domain = extract_domain(url);
+        let priority = (node.importance * 10.0) as i64;
+        store::upsert_crawl_queue(conn, url, 1, &domain, priority, ts)?;
+    }
+    Ok(())
+}
+
 pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) -> rusqlite::Result<usize> {
     let ts = now();
     let mut count = 0;

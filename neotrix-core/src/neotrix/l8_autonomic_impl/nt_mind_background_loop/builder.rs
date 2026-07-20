@@ -136,4 +136,9 @@ impl BackgroundLoop {
         }
         self
     }
+
+    pub fn with_kb(mut self, kb: Option<std::sync::Arc<KnowledgeBase>>) -> Self {
+        self.kb = kb;
+        self
+    }
 }

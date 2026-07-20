@@ -448,6 +448,27 @@ impl BrowserSecurityScanner {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for BrowserSecurityScanner {
+    fn name(&self) -> &str {
+        "BrowserSecurityScanner"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        if self.checks.is_empty() && self.results.is_empty() {
+            // Accept empty state — scanner may not have been initialized with default checks
+        }
+        if self.config.target_url.is_empty() {
+            failures.push("target_url is empty".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

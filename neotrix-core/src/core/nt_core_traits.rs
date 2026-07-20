@@ -81,6 +81,16 @@ pub trait BrainProvider: Send + Sync {
     fn capability_vector(&self) -> CapabilityVector;
     fn absorb_knowledge(&mut self, source: KnowledgeSource) -> AbsorptionRecord;
     fn run_seal_iteration(&mut self) -> SealResult;
+    fn total_absorb_count(&self) -> u64 { 0 }
+    fn absorb(&mut self, source: KnowledgeSource) { self.absorb_knowledge(source); }
+    fn register_knowledge_source(&mut self, _name: &str, _vector: CapabilityVector) {}
+    fn absorb_from_custom(&mut self, _name: &str) -> bool { false }
+}
+
+/// SkillRunner — L8 SkillEngine 的 L1 抽象接口，避免 L1→L8 直接依赖
+pub trait SkillRunner: Send + Sync {
+    fn run_skill(&mut self, name: &str) -> Result<String, String>;
+    fn has_skill(&self, name: &str) -> bool;
 }
 
 /// EngineProvider — 推理引擎抽象

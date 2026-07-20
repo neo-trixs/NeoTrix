@@ -21,7 +21,7 @@ impl CliCommand for ExploreCmd {
         fn try_prepare_pipeline() -> KnowledgeAbsorptionPipeline {
             let mut p = KnowledgeAbsorptionPipeline::new();
             if let Some(kb) = try_open_kb() {
-                p.attach_kb(kb);
+                p.attach_kb(std::sync::Arc::new(kb));
             }
             p
         }

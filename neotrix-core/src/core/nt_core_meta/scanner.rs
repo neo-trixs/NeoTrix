@@ -258,6 +258,36 @@ impl CodeScanner {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for CodeScanner {
+    fn name(&self) -> &str {
+        "code_scanner"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        // Self-referential integrity: the scanner must find ITSELF
+        let model = self.scan();
+        let self_found = model.modules.iter().any(|m| m.name.contains("scanner"));
+        if !self_found {
+            failures.push("CodeScanner: scanner module not found in its own scan (self-referential)".into());
+        }
+
+        // Must find core modules
+        let has_core = model.modules.iter().any(|m| m.name.contains("core"));
+        if !has_core {
+            failures.push("CodeScanner: no module with 'core' found".into());
+        }
+
+        // Dep graph must be non-empty
+        if model.dep_graph.edges.is_empty() && model.modules.len() > 1 {
+            failures.push("CodeScanner: dependency graph empty despite having modules".into());
+        }
+
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

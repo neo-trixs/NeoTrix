@@ -729,6 +729,30 @@ impl ToolInspector for CheckRegistry {
     }
 }
 
+// ── SelfTest ──────────────────────────────────────────────
+
+impl crate::core::nt_core_self_test::SelfTest for CheckRegistry {
+    fn name(&self) -> &str {
+        "CheckRegistry"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        if self.checks.is_empty() {
+            failures.push("no checks registered".into());
+        }
+        let safe = self.evaluate("echo", &serde_json::json!(["hello"]), &super::ToolSource::User);
+        if safe.iter().any(|(_, v)| matches!(v, super::CheckVerdict::Fail(_))) {
+            failures.push("echo hello was blocked unexpectedly".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────
 
 #[cfg(test)]

@@ -31,6 +31,13 @@ pub mod nt_io_session_recovery;
 pub mod nt_io_agents_md;
 pub mod nt_io_surface_bridge;
 pub mod nt_io_grep;
+pub mod nt_io_humanize;
+pub mod nt_io_humanize_detector;
+pub mod nt_io_skill_review;
+pub mod nt_io_supertonic;
+pub mod nt_io_hyperframes;
+pub mod nt_io_digital_human;
+pub mod nt_io_neocodex;
 
 // Shield
 pub mod nt_shield;
@@ -46,11 +53,13 @@ pub mod nt_shield_sentry;
 pub mod nt_shield_stealth_net;
 pub mod nt_shield_traffic;
 pub mod nt_shield_approval;
-pub mod nt_shield_skill_scanner;
+pub mod nt_shield_redteam;
+pub mod nt_shield_agentic_scan;
 
 // Act
 pub mod nt_act_autonomy;
 pub mod nt_act_parallel_scheduler;
+pub mod nt_act_run_history;
 pub mod nt_act_code;
 pub mod nt_act_crypto;
 pub mod nt_act_earn;
@@ -64,6 +73,10 @@ pub mod nt_act_spear;
 pub mod nt_act_sub_agent_middleware;
 pub mod nt_act_sync;
 pub mod nt_act_voice;
+pub mod nt_act_persona_capture;
+pub mod nt_act_a2a_client;
+pub mod nt_act_goose_bridge;
+pub mod nt_agent_agent_team;
 
 // Misc
 pub mod nt_tools;

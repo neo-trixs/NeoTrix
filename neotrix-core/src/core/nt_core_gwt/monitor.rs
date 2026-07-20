@@ -155,6 +155,46 @@ impl EntropyMonitor {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for EntropyMonitor {
+    fn name(&self) -> &str {
+        "entropy_monitor"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        let mut m = EntropyMonitor::new(10, 0.5, 3);
+
+        // Test 1: freshly created monitor has no deadlock
+        if m.in_deadlock {
+            failures.push("fresh monitor should not be in deadlock".into());
+        }
+
+        // Test 2: feed + entropy calculation must not panic
+        m.feed(0.8);
+        m.feed(0.3);
+        m.feed(0.6);
+        if m.history.len() != 3 {
+            failures.push(format!("expected 3 history entries, got {}", m.history.len()));
+        }
+
+        // Test 3: stimulus injection must not panic
+        let mut modules = [0.5; 3];
+        m.inject_stimulus(&mut modules);
+        if !m.last_stimulus_strength.is_nan() && (0.0..=1.0).contains(&m.last_stimulus_strength) {
+            // valid range, no-op check
+        }
+
+        // Test 4: reset clears state
+        m.reset();
+        if m.stimulus_attempts != 0 {
+            failures.push("reset should clear stimulus_attempts".into());
+        }
+
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

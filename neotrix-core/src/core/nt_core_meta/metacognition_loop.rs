@@ -187,3 +187,17 @@ mod tests {
         assert_eq!(results.len(), 2);
     }
 }
+
+impl crate::core::nt_core_self_test::SelfTest for MetaCognitiveLoop {
+    fn name(&self) -> &str { "metacognitive_loop" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        if self.max_iterations == 0 {
+            failures.push("metacognitive_loop: max_iterations must be > 0".into());
+        }
+        if self.iteration > self.max_iterations {
+            failures.push("metacognitive_loop: iteration exceeded max_iterations".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}

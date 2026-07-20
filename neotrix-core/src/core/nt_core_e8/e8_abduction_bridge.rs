@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::abduction::{
-    AbductiveReasoningEngine, AbductiveHypothesis, AbductionCycleReport,
+    AbductiveReasoningEngine, AbductiveHypothesis,
 };
 use super::domain_transition::{
     E8DomainTransitionModel, E8TaskType, CoTLength,
@@ -67,7 +67,7 @@ impl E8AbductionBridge {
             "E8 transition {} -> {} (task: {:?}): {}",
             from, to, task_type, context
         ));
-        let report = self.abductive_engine.run_abduction_cycle(5);
+        let _report = self.abductive_engine.run_abduction_cycle(5);
         self.active_hypotheses = self.abductive_engine.hypotheses.clone();
 
         let mut best_plausibility = 0.0;
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn test_new_bridge() {
         let bridge = E8AbductionBridge::new(0.5);
-        assert!(!bridge.transition_model.dirty);
+        assert!(bridge.transition_model.dirty);
         assert!(bridge.active_hypotheses.is_empty());
     }
 

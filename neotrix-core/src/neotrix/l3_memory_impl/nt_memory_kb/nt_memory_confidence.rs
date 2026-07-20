@@ -8,6 +8,34 @@ use uuid::Uuid;
 use super::nt_memory_types::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfidenceWeights {
+    pub w_source: f64,
+    pub w_grounding: f64,
+    pub w_consensus: f64,
+    pub w_recency: f64,
+    pub reconfirm_source_boost: f64,
+    pub reconfirm_grounding_boost: f64,
+    pub reconfirm_consensus_boost: f64,
+}
+
+impl Default for ConfidenceWeights {
+    fn default() -> Self {
+        Self {
+            w_source: 0.30,
+            w_grounding: 0.30,
+            w_consensus: 0.25,
+            w_recency: 0.15,
+            reconfirm_source_boost: 0.3,
+            reconfirm_grounding_boost: 0.2,
+            reconfirm_consensus_boost: 0.1,
+        }
+    }
+}
+
+pub static CONFIDENCE_WEIGHTS: std::sync::LazyLock<ConfidenceWeights> =
+    std::sync::LazyLock::new(ConfidenceWeights::default);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpistemicConfidence {
     pub source_confidence: f64,
     pub grounding_confidence: f64,
@@ -18,17 +46,13 @@ pub struct EpistemicConfidence {
 }
 
 impl EpistemicConfidence {
-    const W_SOURCE: f64 = 0.30;
-    const W_GROUNDING: f64 = 0.30;
-    const W_CONSENSUS: f64 = 0.25;
-    const W_RECENCY: f64 = 0.15;
-
     pub fn aggregate(&self) -> f64 {
-        let numerator = Self::W_SOURCE + Self::W_GROUNDING + Self::W_CONSENSUS + Self::W_RECENCY;
-        let denominator = Self::W_SOURCE / (self.source_confidence + 1e-10)
-            + Self::W_GROUNDING / (self.grounding_confidence + 1e-10)
-            + Self::W_CONSENSUS / (self.consensus_confidence + 1e-10)
-            + Self::W_RECENCY / (self.recency_confidence + 1e-10);
+        let w = &CONFIDENCE_WEIGHTS;
+        let numerator = w.w_source + w.w_grounding + w.w_consensus + w.w_recency;
+        let denominator = w.w_source / (self.source_confidence + 1e-10)
+            + w.w_grounding / (self.grounding_confidence + 1e-10)
+            + w.w_consensus / (self.consensus_confidence + 1e-10)
+            + w.w_recency / (self.recency_confidence + 1e-10);
         (numerator / denominator).max(0.0).min(1.0)
     }
 
@@ -39,12 +63,13 @@ impl EpistemicConfidence {
     }
 
     pub fn reconfirm(&mut self, strength: f64) {
+        let w = &CONFIDENCE_WEIGHTS;
         let s = strength.max(0.0).min(1.0);
-        self.source_confidence = self.source_confidence + (1.0 - self.source_confidence) * s * 0.3;
+        self.source_confidence = self.source_confidence + (1.0 - self.source_confidence) * s * w.reconfirm_source_boost;
         self.grounding_confidence =
-            self.grounding_confidence + (1.0 - self.grounding_confidence) * s * 0.2;
+            self.grounding_confidence + (1.0 - self.grounding_confidence) * s * w.reconfirm_grounding_boost;
         self.consensus_confidence =
-            self.consensus_confidence + (1.0 - self.consensus_confidence) * s * 0.1;
+            self.consensus_confidence + (1.0 - self.consensus_confidence) * s * w.reconfirm_consensus_boost;
         self.recency_confidence = 1.0;
         let ts = now_ts();
         self.last_confirmed_at = ts;

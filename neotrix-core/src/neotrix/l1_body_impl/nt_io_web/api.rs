@@ -105,15 +105,16 @@ pub async fn brain_stats_handler(
 ) -> Json<serde_json::Value> {
     let brain = state.brain.lock().unwrap_or_else(|e| e.into_inner());
     let bank = state.bank.lock().unwrap_or_else(|e| e.into_inner());
-    let stats = brain.get_statistics();
+    let cv = brain.capability_vector();
+    let cap_sum = cv.typography() + cv.grid() + cv.color() + cv.accessibility() + cv.compound_composition();
     json_ok(BrainStats {
         iteration: 0,
-        absorb_count: brain.total_absorb_count,
-        capability_sum: stats.capability_sum,
+        absorb_count: brain.total_absorb_count(),
+        capability_sum: cap_sum,
         memory_count: bank.memories().len(),
         engine_active: false,
-        capability_vector: brain.capability.arr().to_vec(),
-        dimension_names: (0..brain.capability.total_dim())
+        capability_vector: cv.arr().to_vec(),
+        dimension_names: (0..cv.total_dim())
             .map(|i| format!("dim_{}", i))
             .collect(),
     })
@@ -129,12 +130,12 @@ pub async fn absorb_source_handler(
     Json(body): Json<AbsorbBody>,
 ) -> Result<Json<serde_json::Value>, (axum::http::StatusCode, Json<serde_json::Value>)> {
     let source = match body.source.to_lowercase().as_str() {
-        "heroui" => crate::neotrix::nt_mind::KnowledgeSource::HeroUI,
-        "baseui" => crate::neotrix::nt_mind::KnowledgeSource::BaseUI,
-        "arcui" => crate::neotrix::nt_mind::KnowledgeSource::ArcUI,
-        "cortexui" => crate::neotrix::nt_mind::KnowledgeSource::CortexUI,
-        "agenticds" => crate::neotrix::nt_mind::KnowledgeSource::AgenticDS,
-        "designphilosophy" => crate::neotrix::nt_mind::KnowledgeSource::DesignPhilosophy,
+        "heroui" => crate::core::KnowledgeSource::HeroUI,
+        "baseui" => crate::core::KnowledgeSource::BaseUI,
+        "arcui" => crate::core::KnowledgeSource::ArcUI,
+        "cortexui" => crate::core::KnowledgeSource::CortexUI,
+        "agenticds" => crate::core::KnowledgeSource::AgenticDS,
+        "designphilosophy" => crate::core::KnowledgeSource::DesignPhilosophy,
         _ => {
             return Err(json_err(
                 "Unknown source. Options: HeroUI, BaseUI, ArcUI, CortexUI, AgenticDS, DesignPhilosophy",
@@ -144,7 +145,7 @@ pub async fn absorb_source_handler(
     let mut brain = state.brain.lock().unwrap_or_else(|e| e.into_inner());
     brain.absorb(source);
     Ok(json_ok(serde_json::json!({
-        "absorbed": brain.total_absorb_count
+        "absorbed": brain.total_absorb_count()
     })))
 }
 

@@ -6,6 +6,8 @@ pub mod self_edit_gen;
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::nt_core_self::self_audit::{AuditReport, converge_check};
+
 pub use self::curriculum::{
     CalibratedCurriculumGenerator, CurriculumRecord, IterationValidator, LearnabilityWindowAnalyzer,
     ValidationResult,
@@ -99,6 +101,10 @@ impl SealPipeline {
             curriculum_difficulty: self.curriculum.difficulty_level,
             convergence,
         }
+    }
+
+    pub fn converge_check(&self, src_dir: &str) -> AuditReport {
+        converge_check(src_dir)
     }
 
     pub fn run_curriculum(&mut self, tasks: &[CurriculumTask]) -> Vec<SealIterationReport> {

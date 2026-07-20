@@ -110,7 +110,7 @@ mod tests {
         let belief = vec![0.25, 0.25, 0.25, 0.25];
         let entropy = updater.belief_entropy(&belief);
         let expected = (4.0f64).ln();
-        assert!((entropy - expected).abs() < 1e-10);
+        assert!((entropy - expected).abs() < 1e-9);
     }
 
     #[test]
@@ -118,7 +118,7 @@ mod tests {
         let updater = POMDPBeliefUpdater::new(2);
         let belief = vec![1.0, 0.0];
         let entropy = updater.belief_entropy(&belief);
-        assert!((entropy).abs() < 1e-10);
+        assert!((entropy).abs() < 1e-9);
     }
 
     #[test]

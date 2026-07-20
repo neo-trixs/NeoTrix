@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::resonance::{ResonanceMatrix, MODULE_COUNT, RESONANCE_THRESHOLD};
 use crate::core::nt_core_consensus::{
-    ReflectionPipeline, ConsensusReport, ConsensusConfig, ReflectionHead,
+    ReflectionPipeline, ConsensusConfig, ReflectionHead,
 };
 use crate::core::nt_core_hex::ReasoningHexagram;
 

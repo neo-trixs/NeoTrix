@@ -60,6 +60,7 @@ pub mod dp_sgd_stage;
 pub mod creusot_proof_gate;
 pub mod benchmark_gate;
 pub mod data_synthesis;
+pub mod openspace_evolution;
 pub mod stage_contracts;
 pub use dpo_stage::{DpoStage, DpoBuffer, PreferencePair};
 pub use constitutional_stage::{ConstitutionalSelfCritiqueStage, ConstitutionalReport, PrincipleEvaluation, Principle};
@@ -67,6 +68,7 @@ pub use safety_stage::{SafetyCheckStage, SafetyCheckDetail, ThreatCategory};
 
 pub use dp_sgd_stage::DpSgdStage;
 pub use stage_contracts::ContractAwareStage;
+pub use openspace_evolution::{OpenSpaceEvolveStage, OpenSpaceStats, EvolutionTrigger};
 
 // Goal contract re-exports
 pub use goal_contract::{

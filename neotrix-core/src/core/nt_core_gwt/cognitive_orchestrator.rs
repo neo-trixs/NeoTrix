@@ -1,12 +1,10 @@
 #![forbid(unsafe_code)]
 
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use super::cognitive_tick::{
-    CognitiveEngine, CognitiveTickConfig, CognitiveTickReport, ContentItem,
-    CognitiveAgent, AgentType, create_default_agents,
+    CognitiveEngine, CognitiveTickConfig, AgentType,
 };
 use super::module_def::{
     OrchestratorAgent, OrchestratorPhase, SpecialistModule, SpecialistType,
@@ -136,6 +134,7 @@ impl CognitiveOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_gwt::cognitive_tick::create_default_agents;
 
     #[test]
     fn test_new_orchestrator() {
@@ -148,8 +147,13 @@ mod tests {
 
     #[test]
     fn test_single_tick() {
-        let config = CognitiveTickConfig::default();
+        let mut config = CognitiveTickConfig::default();
+        config.enable_entropy_drive = false;
         let mut orch = CognitiveOrchestrator::new("test", "task-1", "test", config);
+        // Add default agents so tick can activate them
+        for agent in create_default_agents() {
+            orch.cognitive_engine.add_agent(agent);
+        }
         let report = orch.tick();
         assert!(report.tick_id > 0);
         assert!(report.agents_activated > 0);

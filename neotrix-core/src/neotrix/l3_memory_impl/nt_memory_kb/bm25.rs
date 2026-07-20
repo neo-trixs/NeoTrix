@@ -74,6 +74,44 @@ impl Bm25Index {
         }
     }
 
+    pub fn add_document(&mut self, doc: &Bm25Document) {
+        let tokens = tokenize(&doc.text);
+        let mut tf: HashMap<String, f64> = HashMap::new();
+        for t in &tokens {
+            *tf.entry(t.clone()).or_insert(0.0) += 1.0;
+        }
+        for term in tf.keys() {
+            *self.df.entry(term.clone()).or_insert(0) += 1;
+        }
+        let field_len = tokens.len();
+        let n = self.n_docs;
+        self.avg_doc_len = if n == 0 {
+            field_len as f64
+        } else {
+            (self.avg_doc_len * n as f64 + field_len as f64) / (n + 1) as f64
+        };
+        self.docs.push(DocEntry {
+            doc_id: doc.id.clone(),
+            field_length: field_len,
+            term_freqs: tf,
+        });
+        self.n_docs += 1;
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        if other.n_docs == 0 {
+            return;
+        }
+        let total_docs = self.n_docs + other.n_docs;
+        let avg_sum = self.avg_doc_len * self.n_docs as f64 + other.avg_doc_len * other.n_docs as f64;
+        self.avg_doc_len = avg_sum / total_docs as f64;
+        for (term, count) in other.df {
+            *self.df.entry(term).or_insert(0) += count;
+        }
+        self.docs.extend(other.docs);
+        self.n_docs = total_docs;
+    }
+
     pub fn search(&self, query: &str, k: usize) -> Vec<(f64, String)> {
         if self.n_docs == 0 {
             return Vec::new();

@@ -23,11 +23,6 @@ pub use crate::core::nt_core_absorb::spec_driven::{
     SpecStatus, SpecVerification, SpecVerifier,
 };
 
-// 睡眠巩固（从 consciousness 移入）
-pub use crate::core::nt_core_consciousness::sleep_gate::{
-    SleepGate, SleepReport,
-};
-
 // 梦境巩固（HyperCube 子系统）
 pub use crate::core::nt_core_hcube::dream_consolidation::{
     DreamConfig, DreamEvent, DreamReport, DreamPhase,

@@ -1,13 +1,35 @@
 use super::*;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use tokio::sync::Mutex;
+
+pub struct ConsciousnessThresholds {
+    pub warn_quality: f64,
+    pub critical_quality: f64,
+    pub eventbus_critical: f64,
+}
+
+impl Default for ConsciousnessThresholds {
+    fn default() -> Self {
+        Self {
+            warn_quality: 0.3,
+            critical_quality: 0.2,
+            eventbus_critical: 0.2,
+        }
+    }
+}
+
+pub static CONSCIOUSNESS_THRESHOLDS: LazyLock<ConsciousnessThresholds> =
+    LazyLock::new(ConsciousnessThresholds::default);
+use crate::core::nt_core_self_constitution::ConstitutionLoader;
 use crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine;
 use crate::neotrix::l8_autonomic_impl::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
 use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager;
 use crate::neotrix::nt_core_event_bus::{EventBus, subscribe_all_layers_sync};
 use crate::neotrix::nt_mind::distillation::MetaCognitionBridge;
+use crate::core::nt_core_event::CoreEvent;
 
 impl BackgroundLoop {
     /// Spawn all background handlers as independent tokio tasks.
@@ -26,8 +48,31 @@ impl BackgroundLoop {
         let event_bus = Arc::new(EventBus::new(1024));
         subscribe_all_layers_sync(&event_bus);
 
+        // ── Load Constitution at startup ──
+        let agents_md_path = std::path::Path::new("AGENTS.md");
+        if agents_md_path.exists() {
+            match ConstitutionLoader::load_from_file(agents_md_path) {
+                Ok(constitution) => {
+                    log::info!("[constitution] Loaded {} rules, {} experiences, {} tree-growth, {} absorption",
+                        constitution.rules.len(),
+                        constitution.experiences.len(),
+                        constitution.tree_growth_rules.len(),
+                        constitution.absorption_rules.len());
+                }
+                Err(e) => log::warn!("[constitution] Failed to load AGENTS.md: {}", e),
+            }
+        } else {
+            log::warn!("[constitution] AGENTS.md not found at {}", agents_md_path.display());
+        }
+
         // Wrap self so each spawned task gets its own reference.
         let cleanup_engine = self.cleanup_engine.take();
+        let kb = self.kb.clone();
+
+        let mut kb_pipeline = KnowledgeAbsorptionPipeline::new();
+        if let Some(ref kb_ref) = kb {
+            kb_pipeline.attach_kb(kb_ref.clone());
+        }
 
         let this = Arc::new(Mutex::new(BackgroundLoopHandle {
             brain: self.brain.clone(),
@@ -56,7 +101,7 @@ impl BackgroundLoop {
             skill_engine: SkillEngine::new(PathBuf::from(
                 &dirs::home_dir().unwrap_or_default().join(".claude").join("skills"),
             )),
-            kb_pipeline: KnowledgeAbsorptionPipeline::new(),
+            kb_pipeline,
             session_recovery: self.session_recovery.take(),
             event_bus: Some(event_bus.as_ref().clone()),
             metacognition: self.metacognition.take(),
@@ -65,6 +110,13 @@ impl BackgroundLoop {
             #[cfg(not(feature = "stealth-net"))]
             world_consciousness: None,
             consciousness_runtime: std::mem::take(&mut self.consciousness_runtime),
+            consciousness_tree: self.consciousness_tree.take(),
+            fep_iit_bridge: self.fep_iit_bridge.take(),
+cognitive_load: self.cognitive_load.take(),
+            bbrain: std::mem::take(&mut self.bbrain),
+            cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
+            kb,
+            cognitive_mode: 0,
         }));
 
         macro_rules! spawn_handler {
@@ -96,7 +148,20 @@ impl BackgroundLoop {
 
         // ── Each handler is an independent task with its own ticker ──
         let cfg = self.config.clone();
-        spawn_handler!(cfg.save_interval_secs, |h| h.handle_save().await);
+        macro_rules! emit_event {
+            ($h:expr, $event:expr) => {
+                if let Some(ref bus) = $h.event_bus {
+                    bus.emit($event);
+                }
+            };
+        }
+
+        spawn_handler!(cfg.save_interval_secs, |h| {
+            h.handle_save().await;
+            emit_event!(h, crate::core::nt_core_event::CoreEvent::TaskSubmitted {
+                task: "save".into(), task_type: "storage".into(), priority: 2,
+            });
+        });
         spawn_handler!(cfg.consolidate_interval_secs, |h| h.handle_consolidate().await);
         spawn_handler!(cfg.goal_interval_secs, |h| h.handle_goal().await);
         spawn_handler!(cfg.knowledge_chain_interval_secs, |h| h.handle_knowledge_chain().await);
@@ -117,9 +182,47 @@ impl BackgroundLoop {
         spawn_handler!(cfg.nt_world_sense_interval_secs, |h| h.handle_world_sense().await);
         spawn_handler!(3600, |h| h.handle_skill_scan().await);
         spawn_handler!(600, |h| h.handle_avatar_auto_distill().await);
-        spawn_handler!(7200, |h| h.handle_kb_absorb().await);
+        spawn_handler!(7200, |h| {
+            h.handle_kb_absorb().await;
+        });
+        spawn_handler!(86400, |h| h.handle_seed_crawl_queue().await);
         spawn_handler!(600, |h| h.handle_session_recovery().await);
-        spawn_handler!(5, |h| h.handle_consciousness_tick().await);
+        spawn_handler!(300, |h| h.handle_crawl_queue().await);
+        spawn_handler!(3600, |h| h.handle_architecture_audit().await);
+        // ── Constitution hot-reload ──
+        spawn_handler!(86400, |h| h.handle_constitution_reload().await);
+        // 3600s — consciousness evolves at architecture-audit tempo, not real-time
+        spawn_handler!(3600, |h| h.handle_consciousness_tick().await);
+
+        // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
+        {
+            let mut event_rx = event_bus.subscribe();
+            let h = this.clone();
+            let mut rx = shutdown_rx.clone();
+            self.handles.push(tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        biased;
+                        result = event_rx.recv() => {
+                            match result {
+                                Ok(event) => {
+                                    let mut handle = h.lock().await;
+                                    handle.handle_event_bus_event(event).await;
+                                }
+                                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                    log::warn!("[bg] event_bus consumer lagged {} events", n);
+                                }
+                            }
+                        }
+                        _ = rx.changed() => {
+                            log::trace!("[bg] event_bus consumer shutting down");
+                            break;
+                        }
+                    }
+                }
+            }));
+        }
 
         if self.agent_discovery.is_some() {
             let server = Arc::new(
@@ -137,7 +240,7 @@ impl BackgroundLoop {
 }
 
 /// Lightweight inner state for concurrent handler access.
-struct BackgroundLoopHandle {
+pub struct BackgroundLoopHandle {
     brain: Arc<RwLock<SelfIteratingBrain>>,
     cleanup_engine: Option<CleanupEngine>,
     config: BackgroundConfig,
@@ -170,9 +273,21 @@ struct BackgroundLoopHandle {
     metacognition: Option<MetaCognitionBridge>,
     world_consciousness: Option<crate::neotrix::nt_world_sense::WorldConsciousness>,
     consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
+    consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
+    fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
+    cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
+    kb: Option<Arc<KnowledgeBase>>,
+    bbrain: crate::neotrix::nt_mind::bbrain_monitor::BMonitor,
+    cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
+    /// 0=Balanced, 1=Deep, 2=Fast — updated by consciousness tick, consumed by batch loops.
+    cognitive_mode: u8,
 }
 
 impl BackgroundLoopHandle {
+    fn try_emit(&self, event: crate::core::nt_core_event::CoreEvent) {
+        if let Some(ref bus) = self.event_bus { bus.emit(event); }
+    }
+
     async fn handle_save(&mut self) {
         let b = self.brain.read().await;
         if let Err(e) = b.brain.save() { eprintln!("[bg] save: {}", e); }
@@ -540,27 +655,457 @@ impl BackgroundLoopHandle {
     async fn handle_kb_absorb(&mut self) {
         let report = match self.kb_pipeline.update_panorama() {
             Ok(r) => r,
-            Err(_) => return,
+            Err(e) => {
+                log::error!("[bg] kb_absorb failed: {}", e);
+                self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                    component: "kb_absorb".into(), error: e.to_string(), severity: "error".into(),
+                });
+                return;
+            }
         };
         log::info!("[bg] kb_absorb: {} sources", report.total_sources);
+        self.try_emit(crate::core::nt_core_event::CoreEvent::TaskSubmitted {
+            task: "kb_absorb".into(), task_type: "ingestion".into(), priority: 3,
+        });
     }
     async fn handle_consciousness_tick(&mut self) {
+        // ── Collect real context from brain + KB ──
+        let (iteration, caps_mean) = match self.brain.try_read() {
+            Ok(b) => {
+                let mean = b.brain.capability.arr.iter().sum::<f64>() / 23.0_f64.max(1.0);
+                (b.iteration, mean)
+            }
+            Err(_) => (0, 0.0),
+        };
+        let (kb_nodes, kb_edges, kb_crawl) = self.kb.as_ref()
+            .and_then(|kb| kb.stats().ok())
+            .map(|s| (s.total_nodes as u64, s.total_edges as u64, s.crawl_pending as u64))
+            .unwrap_or((0, 0, 0));
+
+        // ── Phase 1: ConsciousnessTree Growth Cycle (Soil → Roots → Trunk → Branches → Fruits → Core) ──
+        if let Some(ref mut tree) = self.consciousness_tree {
+            tree.soil.kb_node_count = kb_nodes;
+            tree.soil.kb_edge_count = kb_edges;
+            tree.soil.crawl_queue_depth = kb_crawl;
+            if let Some(ref monitor) = self.awareness {
+                let report = monitor.get_report();
+                tree.trunk.phi = report.phi;
+                tree.trunk.coherence = report.coherence;
+            }
+            tree.trunk.gwt_resonance_active = self.panorama.is_some();
+            tree.trunk.workspace_size = 23;
+            // Branch health is now set from SelfTest results in handle_architecture_audit
+            // No simulated fallback here — real data or neutral 0.5 from set_branch_health_from_self_tests
+            let growth_report = tree.run_growth_cycle();
+            log::debug!("[bg] consciousness_tree cycle {}: absorbed={} phi={:.3} fruits={} guidance={}",
+                tree.cycle, growth_report.phase1_absorbed, growth_report.phase2_phi,
+                growth_report.phase3_fruits, growth_report.phase4_guidance);
+        }
+
+        // ── Phase 2: Consciousness Runtime Tick with REAL resonance content ──
         if let Some(ref mut cr) = self.consciousness_runtime {
             if !cr.awakened {
                 let report = cr.awaken();
                 log::info!("[bg] consciousness awakened: step={} coherence={:.3}",
                     report.birth_step, report.initial_coherence);
             }
-            let iteration = match self.brain.try_read() {
-                Ok(b) => b.iteration,
-                Err(_) => 0,
-            };
-            let resonance = format!("[consciousness_tick] iteration={}", iteration);
+            let gwt_active = self.panorama.as_ref()
+                .map(|p| p.gwt.active_specialists().len()).unwrap_or(0);
+            let resonance = format!(
+                "[consciousness_tick] iteration={} caps={:.3} kb={} gwt={}",
+                iteration, caps_mean, kb_nodes, gwt_active,
+            );
             let critique = cr.tick(&resonance);
             if let Some(c) = critique {
-                if c.overall_quality < 0.3 {
-                    log::warn!("[bg] consciousness: low quality ({:.3})", c.overall_quality);
+                if c.overall_quality < CONSCIOUSNESS_THRESHOLDS.warn_quality {
+                    log::warn!("[bg] consciousness: LOW QUALITY ({:.3}) — reasons: {:?}",
+                        c.overall_quality, c.reasons);
+                    if c.overall_quality < CONSCIOUSNESS_THRESHOLDS.critical_quality {
+                        // BEHAVIORAL RESPONSE: enqueue self-review goal on critical quality
+                        if let Ok(mut brain) = self.brain.try_write() {
+                            self.goal_loop.enqueue_goal(
+                                &mut brain,
+                                "consciousness_recovery: quality critically low — initiating self-review",
+                                None,
+                            );
+                        }
+                    }
+                } else if c.overall_quality > 0.7 {
+                    log::info!("[bg] consciousness: good quality ({:.3}) selected_action={:?}",
+                        c.overall_quality, c.selected_action);
+                } else {
+                    log::debug!("[bg] consciousness: quality={:.3} relevance={:.3} consistency={:.3}",
+                        c.overall_quality, c.relevance_score, c.consistency_score);
                 }
+                self.try_emit(crate::core::nt_core_event::CoreEvent::ConsciousnessCritique {
+                    quality: c.overall_quality,
+                    relevance: c.relevance_score,
+                    consistency: c.consistency_score,
+                    timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default().as_secs() as i64,
+                });
+                if let Ok(mut brain) = self.brain.try_write() {
+                    brain._last_consciousness_quality = c.overall_quality;
+                    brain._consciousness_critique_count += 1;
+                }
+            }
+        }
+
+        // ── Phase 3: FEPIITBridge — compute unified consciousness score ──
+        if let Some(ref fep_iit) = self.fep_iit_bridge {
+            if let Some(ref monitor) = self.awareness {
+                let report = monitor.get_report();
+                
+                // Data-driven Free Energy derivation (replaces synthetic: (1.0 - consciousness) * 10.0)
+                // health_worseness = 1.0 - (bbrain_health / 100.0), load_factor = cognitive_load average
+                let health_worseness = if let Some(bbrain_report) = self.bbrain.latest_report() {
+                    1.0 - (bbrain_report.health_score / 100.0).max(0.0).min(1.0)
+                } else {
+                    0.5 // neutral if no bbrain report yet
+                };
+                let load_factor = self.cognitive_load.as_ref()
+                    .map(|c| c.average_load().max(0.0).min(1.0))
+                    .unwrap_or(0.5);
+                
+                // TODO: replace with real FreeEnergyReport when available
+                let fe_val = (health_worseness * 0.7 + load_factor * 0.3) * 10.0;
+                
+                let score = fep_iit.compute_consciousness_score(fe_val, report.phi, report.coherence);
+                log::debug!("[bg] fep_iit: unified_score={:.3} phi={:.3} coherence={:.3} fe={:.3} (health_worseness={:.3}, load={:.3})",
+                    score, report.phi, report.coherence, fe_val, health_worseness, load_factor);
+            }
+        }
+
+        // ── Phase 4: ConsciousnessMonitor — self-observation cycle ──
+        if let Some(ref mut monitor) = self.awareness {
+            monitor.observe();
+            let report = monitor.get_report();
+            log::debug!("[bg] consciousness_monitor: level={:.3} phi={:.3} coherence={:.3} health={:.3}",
+                report.consciousness, report.phi, report.coherence, report.health);
+
+            // ── CognitiveLoadMonitor: record load from consciousness metrics ──
+            if let Some(ref mut clm) = self.cognitive_load {
+                let load = (1.0 - report.consciousness.max(0.0).min(1.0)) * 0.6
+                    + (1.0 - report.coherence.max(0.0).min(1.0)) * 0.4;
+                let prev_mode = clm.mode();
+                clm.record_step(load);
+                let new_mode = clm.mode();
+
+                // Update cognitive_mode field for behavioral consumption by other handlers
+                self.cognitive_mode = match new_mode {
+                    crate::core::nt_core_consciousness::ThinkingMode::Deep => 1,
+                    crate::core::nt_core_consciousness::ThinkingMode::Fast => 2,
+                    _ => 0,
+                };
+
+                log::debug!("[bg] cognitive_load: mode={:?} load={:.3} budget={:.3} avg={:.3}",
+                    new_mode, load, clm.thinking_budget(), clm.average_load());
+
+                // Track mode transitions for behavioral logging
+                if prev_mode != new_mode {
+                    log::info!("[bg] cognitive_load: mode transition {:?} -> {:?} (budget={:.3}, avg_load={:.3})",
+                        prev_mode, new_mode, clm.thinking_budget(), clm.average_load());
+                }
+
+                // BEHAVIORAL RESPONSE: When deep reasoning is available, trigger deeper reasoning cycle
+                if clm.can_do_deep_reasoning() {
+                    clm.record_deep_step(load);
+                    // Enqueue high-priority goal to trigger deep reasoning in goal loop
+                    if let Ok(mut brain) = self.brain.try_write() {
+                        self.goal_loop.enqueue_goal(
+                            &mut brain,
+                            "deep_reasoning_available: cognitive budget healthy — initiating extended analysis cycle",
+                            None,
+                        );
+                    }
+                    log::info!("[bg] cognitive_load: DEEP mode active — enqueued deep_reasoning goal");
+                }
+            }
+        }
+
+        // ── Phase 4b: BMonitor — observe from consciousness metrics + read report ──
+        {
+            let phi = self.awareness.as_ref().map(|m| m.get_report().phi).unwrap_or(0.0);
+            let coherence = self.awareness.as_ref().map(|m| m.get_report().coherence).unwrap_or(0.0);
+            let load = self.cognitive_load.as_ref().map(|c| c.average_load()).unwrap_or(0.5);
+            self.bbrain.observe_from_metrics(phi, coherence, load);
+        }
+        if let Some(report) = self.bbrain.latest_report() {
+            let trend = self.bbrain.health_trend();
+            log::debug!("[bg] bbrain_monitor: health={:.2} trend={:+.2} flags={} intervention={}",
+                report.health_score, trend, report.flags.len(), report.needs_intervention);
+            if report.needs_intervention {
+                log::warn!("[bg] bbrain: intervention needed — score={:.2} flags={:?}",
+                    report.health_score, report.flags);
+            }
+        }
+
+        // ── Phase 4c: CognitiveEvaluator — read persistent metacognitive evaluation ──
+        if let Some(report) = self.cog_eval.latest_report() {
+            log::debug!("[bg] cognitive_evaluator: id={} stability={:.3} attention={:.2} diversity={:.2} quality={:.2} pressure={:.2} n_flags={}",
+                report.evaluation_id, report.stability_score, report.attention_health,
+                report.strategy_diversity, report.trace_quality, report.context_pressure,
+                report.flags.len());
+            if self.cog_eval.has_degraded(0.15) {
+                log::warn!("[bg] cognitive_evaluator: stability degraded >0.15");
+            }
+        }
+
+        // ── Phase 5: ConsciousnessGoldStandard — dual-threshold detection ──
+        if let Some(ref mut gs) = self.gold_standard {
+            let state = match self.brain.try_read() {
+                Ok(b) => {
+                    b.brain.capability.arr.iter().copied().collect::<Vec<_>>()
+                }
+                Err(_) => vec![0.0; 23],
+            };
+
+            // Get E8 hexagram states from WorldModelV2
+            let hexagram_states = self.nt_world_model.as_ref()
+                .map(|wm| {
+                    wm.e8.current_state.vector.iter().enumerate()
+                        .map(|(i, &activation)| crate::neotrix::nt_mind_consciousness_gold_standard::E8HexagramState {
+                            index: i as u8,
+                            activation: activation.max(0.0).min(1.0),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+
+            let gs_report = gs.evaluate(&state, &hexagram_states);
+            log::debug!("[bg] gold_standard: conscious={} phi={:.3} coherence={:.3} trend={:?}",
+                gs_report.is_conscious_like, gs_report.phi, gs_report.coherence, gs_report.detection_streak);
+        }
+    }
+
+    /// EventBus behavioral consumer (D30) — responds to events with brain/KB actions, not just logs.
+    async fn handle_event_bus_event(&mut self, event: CoreEvent) {
+        match &event {
+            CoreEvent::SystemError { severity, component, error } if severity == "critical" => {
+                log::error!("[bg] event_bus: CRITICAL {}: {}", component, error);
+                if let Ok(mut brain) = self.brain.try_write() {
+                    self.goal_loop.enqueue_goal(&mut brain,
+                        &format!("event_bus_critical: {} - {}", component, error), None);
+                }
+            }
+            CoreEvent::GlobalHalt { reason, source } => {
+                log::error!("[bg] event_bus: GLOBAL HALT {} from {}", reason, source);
+                if let Some(ref kb) = self.kb {
+                    let _ = kb.kv_set("event_bus", "global_halt", &serde_json::json!({
+                        "reason": reason, "source": source,
+                        "timestamp": std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default().as_secs(),
+                    }).to_string());
+                }
+                if let Ok(mut brain) = self.brain.try_write() {
+                    self.goal_loop.enqueue_goal(&mut brain,
+                        &format!("event_bus_recovery: {} - {}", source, reason), None);
+                }
+            }
+            CoreEvent::ConsciousnessCritique { quality, .. } if *quality < CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
+                log::warn!("[bg] event_bus: consciousness CRITICAL ({:.3})", quality);
+                if let Some(ref kb) = self.kb {
+                    let _ = kb.kv_set("event_bus", "consciousness_critical", &serde_json::json!({
+                        "quality": quality,
+                        "timestamp": std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default().as_secs(),
+                    }).to_string());
+                }
+            }
+            CoreEvent::TaskSubmitted { task, task_type, priority } if *priority >= 3 => {
+                log::info!("[bg] event_bus: high-priority task {} ({})", task, task_type);
+            }
+            _ => {
+                log::trace!("[bg] event_bus: {:?}", event);
+            }
+        }
+    }
+
+    async fn handle_architecture_audit(&mut self) {
+        use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
+        use crate::core::nt_core_self::self_audit::{converge_check, ConvergeCheckFn};
+        use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+        use crate::core::nt_core_meta::scanner::CodeScanner;
+        use crate::core::nt_core_gwt::monitor::EntropyMonitor;
+        use crate::core::nt_core_consciousness::inner_critic::InnerCritic;
+        use crate::core::nt_core_self_review::SelfReviewGate;
+        use crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor;
+        use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
+        use crate::core::nt_core_meta::monitor::MetaMonitor;
+        use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
+        use crate::core::nt_core_meta::self_model::SelfModel;
+
+        let mut watchdog = SchemaWatchdog::new();
+        let mut gaps = 0;
+        for (type_name, fields) in &[
+            ("KnowledgeNode", vec!["id", "title", "node_type", "content", "summary", "url", "domain", "language", "confidence", "importance", "access_count", "metadata", "created_at", "updated_at"]),
+            ("NodeType", vec!["Concept", "Paper", "Repository", "Person", "Event", "Source", "Tool", "Framework", "Algorithm", "Theory", "Method", "Dataset", "Benchmark", "Organization", "Book", "Course", "Article", "CodeSnippet", "Idea", "Question", "Insight", "HarnessProfile", "Image", "EvolutionPattern", "ConversationEvolution", "Textbook", "Resource", "External", "Summary", "Guide", "Skill", "Reference", "WikiPage"]),
+        ] {
+            let f: Vec<String> = fields.iter().map(|s| s.to_string()).collect();
+            if watchdog.detect_drift(type_name, &f).is_some() {
+                gaps += 1;
+            }
+        }
+        if gaps > 0 {
+            log::warn!("[bg] arch_audit: {} schema gaps detected", gaps);
+        } else {
+            log::info!("[bg] arch_audit: clean — all schemas match");
+        }
+        let report = converge_check(".");
+        if !report.findings.is_empty() {
+            log::warn!("[bg] converge_check: {} ghosts, {} orphans, {} stale",
+                report.ghost_count, report.stale_count, report.orphan_count);
+        }
+
+        // ── Inline self-test: types WITHOUT persistent fields use fresh instances (acceptable) ──
+        let model = SelfModel::new();
+        let scanner = CodeScanner::new(".");
+        let entropy = EntropyMonitor::new(10, 0.5, 3);
+        let meta_auditor = MetaAuditor::new();
+        let arch_lint = ArchLint::new();
+        let meta_monitor = MetaMonitor::new(model.clone());
+        let meta_cog_loop = MetaCognitiveLoop::new(model);
+
+        let mut self_tests = SelfTestRegistry::new();
+        self_tests.register(Box::new(watchdog));
+        self_tests.register(Box::new(ConvergeCheckFn));
+        self_tests.register(Box::new(scanner));
+        self_tests.register(Box::new(entropy));
+        self_tests.register(Box::new(InnerCritic::new()));
+        self_tests.register(Box::new(SelfReviewGate::new(false)));
+        self_tests.register(Box::new(meta_auditor));
+        self_tests.register(Box::new(arch_lint));
+        self_tests.register(Box::new(meta_monitor));
+        self_tests.register(Box::new(meta_cog_loop));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_self_diagnose::SelfDiagnose));
+        self_tests.register(Box::new(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default()));
+        self_tests.register(Box::new(crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_act_autonomy::oracle_gate::OracleGate::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_act_code::semantic_entropy::SemanticEntropyGate::new()));
+        self_tests.register(Box::new(crate::core::nt_core_consciousness_review::ConsciousnessReview::new()));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::consciousness_bridge::ConsciousnessBridge::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::browser_security::BrowserSecurityScanner::new(
+            crate::neotrix::l1_body_impl::nt_shield::browser_security::BrowserSecurityConfig::default(),
+        )));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new()));
+        self_tests.register(Box::new(crate::core::nt_core_telemetry::TelemetryStore::new(100)));
+
+        // ── Absorbed module SelfTests (Cycle 113) ──
+        crate::core::nt_core_self_test_integration::register_absorbed_modules(&mut self_tests);
+
+        // ── Inline self-test: types WITH persistent fields — clone or call self_test() directly ──
+        // KnowledgeGapDetector
+        if let Some(ref gap_detector) = self.gap_detector {
+            match gap_detector.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] KnowledgeGapDetector ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] KnowledgeGapDetector ❌ FAIL: {}", failures.join("; ")),
+            }
+        } else {
+            self_tests.register(Box::new(crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector::new()));
+        }
+
+        // BMonitor (direct field, not Option)
+        match self.bbrain.self_test() {
+            Ok(()) => log::info!("[SELF-TEST] BMonitor ✅ pass"),
+            Err(failures) => log::warn!("[SELF-TEST] BMonitor ❌ FAIL: {}", failures.join("; ")),
+        }
+
+        // CognitiveEvaluator (direct field)
+        match self.cog_eval.self_test() {
+            Ok(()) => log::info!("[SELF-TEST] CognitiveEvaluator ✅ pass"),
+            Err(failures) => log::warn!("[SELF-TEST] CognitiveEvaluator ❌ FAIL: {}", failures.join("; ")),
+        }
+
+        // ConsciousnessTree
+        if let Some(ref tree) = self.consciousness_tree {
+            match tree.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] ConsciousnessTree ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] ConsciousnessTree ❌ FAIL: {}", failures.join("; ")),
+            }
+        } else {
+            self_tests.register(Box::new(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()));
+        }
+
+        // ConsciousnessRuntime
+        if let Some(ref cr) = self.consciousness_runtime {
+            match cr.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] ConsciousnessRuntime ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] ConsciousnessRuntime ❌ FAIL: {}", failures.join("; ")),
+            }
+        } else {
+            self_tests.register(Box::new(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()));
+        }
+
+        // ConsciousnessMonitor (awareness)
+        if let Some(ref monitor) = self.awareness {
+            match monitor.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] ConsciousnessMonitor ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] ConsciousnessMonitor ❌ FAIL: {}", failures.join("; ")),
+            }
+        } else {
+            let mut cm = crate::neotrix::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
+            cm.observe();
+            self_tests.register(Box::new(cm));
+        }
+
+        // FEPIITBridge
+        if let Some(ref bridge) = self.fep_iit_bridge {
+            match bridge.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] FEPIITBridge ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] FEPIITBridge ❌ FAIL: {}", failures.join("; ")),
+            }
+        } else {
+            self_tests.register(Box::new(crate::neotrix::l5_consciousness_impl::nt_core_fep_iit::bridge::FEPIITBridge::new()));
+        }
+
+        // ConsciousnessGoldStandard
+        if let Some(ref gs) = self.gold_standard {
+            match gs.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] ConsciousnessGoldStandard ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] ConsciousnessGoldStandard ❌ FAIL: {}", failures.join("; ")),
+            }
+        } else {
+            self_tests.register(Box::new(crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
+        }
+
+        // CognitiveLoadMonitor (existing clone pattern)
+        if let Some(ref clm) = self.cognitive_load {
+            match clm.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] CognitiveLoadMonitor ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] CognitiveLoadMonitor ❌ FAIL: {}", failures.join("; ")),
+            }
+        } else {
+            self_tests.register(Box::new(crate::core::nt_core_consciousness::CognitiveLoadMonitor::new()));
+        }
+
+        // ── Run registry self-tests for remaining modules ──
+        let results = self_tests.run_all();
+        let mut failure_count = 0;
+        for r in &results {
+            if r.passed {
+                log::info!("{}", r.summary());
+            } else {
+                log::warn!("{}", r.summary());
+                failure_count += 1;
+            }
+        }
+        
+        // Pass SelfTest results to ConsciousnessTree for real branch health
+        if let Some(ref mut tree) = self.consciousness_tree {
+            tree.set_branch_health_from_self_tests(&results);
+            log::debug!("[bg] consciousness_tree: branch health updated from {} SelfTest results", results.len());
+        }
+        
+        if !report.findings.is_empty() || failure_count > 0 {
+            let reason = format!(
+                "arch_audit: {} converge issues + {} self-test failures — enqueueing self-review",
+                report.findings.len(), failure_count,
+            );
+            log::warn!("[bg] {}", reason);
+            if let Ok(mut brain) = self.brain.try_write() {
+                self.goal_loop.enqueue_goal(&mut brain, &reason, None);
             }
         }
     }
@@ -580,13 +1125,35 @@ impl BackgroundLoopHandle {
             log::warn!("[bg] crawl_queue: kb not attached");
             return;
         }
+        
+        // Batch size adjusted by cognitive mode (from consciousness tick Phase 4)
+        // 0=Balanced, 1=Deep, 2=Fast
+        let base_batch_size: usize = 50;
+        let batch_size = match self.cognitive_mode {
+            1 => base_batch_size * 2,    // Deep: 2x batch
+            2 => base_batch_size / 2,    // Fast: 0.5x batch
+            _ => base_batch_size,         // Balanced: default
+        };
+        
+        let mode_name = match self.cognitive_mode {
+            1 => "Deep",
+            2 => "Fast",
+            _ => "Balanced",
+        };
+        log::info!("[COGNITIVE MODE] {:?} — batch size adjusted to {}", mode_name, batch_size);
+        
+        let mut processed = 0;
         loop {
+            if processed >= batch_size {
+                log::debug!("[bg] crawl_queue: batch limit reached ({})", batch_size);
+                break;
+            }
             let (id, url) = {
                 let kb = self.kb_pipeline.kb.as_ref().unwrap();
                 let conn = kb.conn.lock().unwrap();
                 match claim_next_crawl_url(&conn) {
                     Ok(Some(item)) => (item.id, item.url),
-                    _ => return,
+                    _ => break,
                 }
             };
             log::info!("[bg] crawl claimed: {} (domain tracked)", url);
@@ -604,6 +1171,73 @@ impl BackgroundLoopHandle {
                     let _ = mark_crawl_complete(&conn, &id, false, Some(&e));
                 }
             }
+            processed += 1;
+        }
+        if let Some(kb) = self.kb_pipeline.kb.as_ref() {
+            kb.rebuild_bm25();
+            kb.rebuild_tech_reserve();
+            log::info!("[bg] crawl_queue: BM25 + tech reserve rebuilt after batch ({} processed)", processed);
+        }
+    }
+
+    async fn handle_constitution_reload(&mut self) {
+        use crate::core::nt_core_self_constitution::ConstitutionLoader;
+        let path = std::path::Path::new("AGENTS.md");
+        if path.exists() {
+            match ConstitutionLoader::load_from_file(path) {
+                Ok(constitution) => {
+                    log::info!("[constitution] Hot-reload: {} rules, {} experiences, {} tree-growth, {} absorption",
+                        constitution.rules.len(),
+                        constitution.experiences.len(),
+                        constitution.tree_growth_rules.len(),
+                        constitution.absorption_rules.len());
+                    // Note: Global Constitution is LazyLock, so can't be replaced.
+                    // In production, use a Mutex<Constitution> for true hot-reload.
+                    // This reload validates the file is parseable.
+                }
+                Err(e) => log::warn!("[constitution] Hot-reload failed: {}", e),
+            }
+        }
+    }
+
+    /// Seed the crawl queue when nearly empty — runs daily.
+    async fn handle_seed_crawl_queue(&mut self) {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::count_nodes_by_domain;
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::enqueue_seed_urls;
+        if self.kb_pipeline.kb.is_none() {
+            log::warn!("[bg] seed_crawl: kb not attached");
+            return;
+        }
+        let kb = self.kb_pipeline.kb.as_ref().unwrap();
+        let conn = match kb.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::warn!("[bg] seed_crawl lock: {}", e); return; }
+        };
+        let domains = count_nodes_by_domain(&conn).unwrap_or_default();
+        let seed_count = domains.len();
+        if seed_count == 0 {
+            let seed_info: [(&str, i64, &str); 5] = [
+                ("rust", 10, "programming"),
+                ("machine learning", 10, "ai"),
+                ("distributed-systems", 10, "computer-science"),
+                ("webassembly", 5, "programming"),
+                ("neural-networks", 10, "ai"),
+            ];
+            let enqueued: Vec<String> = seed_info.iter()
+                .map(|(topic, _, _)| format!("https://en.wikipedia.org/api/rest_v1/page/summary/{}", topic))
+                .collect();
+            let refs: Vec<(&str, i64, &str)> = enqueued.iter().enumerate()
+                .map(|(i, url)| (url.as_str(), seed_info[i].1, seed_info[i].2))
+                .collect();
+            match enqueue_seed_urls(&conn, &refs) {
+                Ok(n) => log::info!("[bg] seed_crawl: enqueued {} Wikipedia seed topics", n),
+                Err(e) => log::warn!("[bg] seed_crawl: enqueue failed: {}", e),
+            }
+            drop(conn);
+            kb.rebuild_bm25();
+            log::info!("[bg] seed_crawl: BM25 rebuilt after seeding");
+        } else {
+            log::info!("[bg] seed_crawl: {} domains already in KB, auto-seeding complete", seed_count);
         }
     }
 }

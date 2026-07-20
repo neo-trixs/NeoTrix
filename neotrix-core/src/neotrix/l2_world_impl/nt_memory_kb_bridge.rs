@@ -83,6 +83,7 @@ pub enum RelationType {
     Visualizes,
     BrandFor,
     Illustrates,
+    WikiLink,
 }
 
 #[derive(Debug, Clone)]
@@ -91,8 +92,13 @@ pub struct KnowledgeNode {
     pub title: String,
     pub node_type: NodeType,
     pub content: Option<String>,
+    pub summary: Option<String>,
     pub url: Option<String>,
     pub domain: Option<String>,
+    pub language: String,
+    pub confidence: f64,
+    pub importance: f64,
+    pub access_count: i64,
     pub metadata: Option<serde_json::Value>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -282,33 +288,87 @@ impl KnowledgeBase {
         )
     }
 
+    fn node_type_from_str(s: &str) -> NodeType {
+        match s.to_lowercase().as_str() {
+            "concept" => NodeType::Concept,
+            "paper" => NodeType::Paper,
+            "repository" => NodeType::Repository,
+            "person" => NodeType::Person,
+            "event" => NodeType::Event,
+            "source" => NodeType::Source,
+            "tool" => NodeType::Tool,
+            "framework" => NodeType::Framework,
+            "algorithm" => NodeType::Algorithm,
+            "theory" => NodeType::Theory,
+            "method" => NodeType::Method,
+            "dataset" => NodeType::Dataset,
+            "benchmark" => NodeType::Benchmark,
+            "organization" => NodeType::Organization,
+            "book" => NodeType::Book,
+            "course" => NodeType::Course,
+            "article" => NodeType::Article,
+            "code_snippet" => NodeType::CodeSnippet,
+            "idea" => NodeType::Idea,
+            "question" => NodeType::Question,
+            "insight" => NodeType::Insight,
+            "harness_profile" => NodeType::HarnessProfile,
+            "image" => NodeType::Image,
+            "evolution_pattern" => NodeType::EvolutionPattern,
+            "conversation_evolution" => NodeType::ConversationEvolution,
+            "textbook" => NodeType::Textbook,
+            "resource" => NodeType::Resource,
+            "external" => NodeType::External,
+            "summary" => NodeType::Summary,
+            "guide" => NodeType::Guide,
+            "skill" => NodeType::Skill,
+            "reference" => NodeType::Reference,
+            "wiki_page" => NodeType::WikiPage,
+            _ => NodeType::External,
+        }
+    }
+
     pub fn find_repositories(
         &self,
         domain: &str,
         min_stars: Option<i64>,
     ) -> Result<Vec<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let all =
-            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::get_all_nodes(&conn)
-                .map_err(|e| format!("get_all_nodes: {}", e))?;
-        drop(conn);
-        let local_all: Vec<KnowledgeNode> = all.into_iter().map(conv::from_real_node).collect();
-        let repos: Vec<KnowledgeNode> = local_all
-            .into_iter()
-            .filter(|n| n.node_type == NodeType::Repository)
-            .filter(|n| n.domain.as_deref() == Some(domain))
-            .filter(|n| {
-                if let Some(min) = min_stars {
-                    n.metadata
-                        .as_ref()
-                        .and_then(|m| m.get("stars").and_then(|v| v.as_i64()))
-                        .map(|s| s >= min)
-                        .unwrap_or(false)
-                } else {
-                    true
-                }
+        let min_val = min_stars.unwrap_or(0);
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, node_type, title, summary, content, url, domain, \
+                  language, confidence, importance, access_count, metadata, \
+                  created_at, updated_at FROM nodes WHERE node_type = 'Repository' \
+                 AND domain LIKE ?1 \
+                 AND CAST(COALESCE(json_extract(metadata, '$.stars'), '0') AS INTEGER) >= ?2",
+            )
+            .map_err(|e| format!("prepare: {}", e))?;
+        let rows = stmt
+            .query_map(rusqlite::params![domain, min_val], |row| {
+                Ok(KnowledgeNode {
+                    id: row.get(0)?,
+                    node_type: Self::node_type_from_str(&row.get::<_, String>(1)?),
+                    title: row.get(2)?,
+                    summary: row.get(3)?,
+                    content: row.get(4)?,
+                    url: row.get(5)?,
+                    domain: row.get(6)?,
+                    language: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                    confidence: row.get::<_, Option<f64>>(8)?.unwrap_or(0.5),
+                    importance: row.get::<_, Option<f64>>(9)?.unwrap_or(0.5),
+                    access_count: row.get::<_, Option<i64>>(10)?.unwrap_or(0),
+                    metadata: row
+                        .get::<_, Option<String>>(11)?
+                        .and_then(|m| serde_json::from_str(&m).ok()),
+                    created_at: row.get(12)?,
+                    updated_at: row.get(13)?,
+                })
             })
-            .collect();
+            .map_err(|e| format!("query_map: {}", e))?;
+        let mut repos = Vec::new();
+        for row in rows {
+            repos.push(row.map_err(|e| format!("row: {}", e))?);
+        }
         Ok(repos)
     }
 
@@ -472,6 +532,50 @@ mod conv {
             super::RelationType::Visualizes => real_types::RelationType::Visualizes,
             super::RelationType::BrandFor => real_types::RelationType::BrandFor,
             super::RelationType::Illustrates => real_types::RelationType::Illustrates,
+            super::RelationType::WikiLink => real_types::RelationType::WikiLink,
+        }
+    }
+
+    pub fn from_real_rt(rt: &real_types::RelationType) -> super::RelationType {
+        match rt {
+            real_types::RelationType::References => super::RelationType::References,
+            real_types::RelationType::SubclassOf => super::RelationType::SubclassOf,
+            real_types::RelationType::InstanceOf => super::RelationType::InstanceOf,
+            real_types::RelationType::Causes => super::RelationType::Causes,
+            real_types::RelationType::PrerequisiteOf => super::RelationType::PrerequisiteOf,
+            real_types::RelationType::Contradicts => super::RelationType::Contradicts,
+            real_types::RelationType::Supports => super::RelationType::Supports,
+            real_types::RelationType::BeforeInTime => super::RelationType::BeforeInTime,
+            real_types::RelationType::AfterInTime => super::RelationType::AfterInTime,
+            real_types::RelationType::Related => super::RelationType::Related,
+            real_types::RelationType::PartOf => super::RelationType::PartOf,
+            real_types::RelationType::DevelopedBy => super::RelationType::DevelopedBy,
+            real_types::RelationType::ImplementedIn => super::RelationType::ImplementedIn,
+            real_types::RelationType::InspiredBy => super::RelationType::InspiredBy,
+            real_types::RelationType::Citation => super::RelationType::Citation,
+            real_types::RelationType::ExtensionOf => super::RelationType::ExtensionOf,
+            real_types::RelationType::DependsOn => super::RelationType::DependsOn,
+            real_types::RelationType::Improves => super::RelationType::Improves,
+            real_types::RelationType::Outperforms => super::RelationType::Outperforms,
+            real_types::RelationType::RelatedTo => super::RelationType::RelatedTo,
+            real_types::RelationType::EvolvedFrom => super::RelationType::EvolvedFrom,
+            real_types::RelationType::ResourceFor => super::RelationType::ResourceFor,
+            real_types::RelationType::AboutTopic => super::RelationType::AboutTopic,
+            real_types::RelationType::BelongsTo => super::RelationType::BelongsTo,
+            real_types::RelationType::SubTopicOf => super::RelationType::SubTopicOf,
+            real_types::RelationType::CrossDomain => super::RelationType::CrossDomain,
+            real_types::RelationType::Contains => super::RelationType::Contains,
+            real_types::RelationType::Influenced => super::RelationType::Influenced,
+            real_types::RelationType::ArchPartOf => super::RelationType::ArchPartOf,
+            real_types::RelationType::Categorized => super::RelationType::Categorized,
+            real_types::RelationType::RelatesTo => super::RelationType::RelatesTo,
+            real_types::RelationType::InsightAbout => super::RelationType::InsightAbout,
+            real_types::RelationType::Implements => super::RelationType::Implements,
+            real_types::RelationType::Uses => super::RelationType::Uses,
+            real_types::RelationType::Visualizes => super::RelationType::Visualizes,
+            real_types::RelationType::BrandFor => super::RelationType::BrandFor,
+            real_types::RelationType::Illustrates => super::RelationType::Illustrates,
+            real_types::RelationType::WikiLink => super::RelationType::WikiLink,
         }
     }
 
@@ -481,8 +585,13 @@ mod conv {
             title: node.title,
             node_type: from_real_nt(&node.node_type),
             content: node.content,
+            summary: node.summary,
             url: node.url,
             domain: node.domain,
+            language: node.language,
+            confidence: node.confidence,
+            importance: node.importance,
+            access_count: node.access_count,
             metadata: node.metadata,
             created_at: node.created_at,
             updated_at: node.updated_at,

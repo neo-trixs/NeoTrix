@@ -1,11 +1,6 @@
-pub mod active_inference;
 pub mod bridge;
 pub mod types;
 
-#[cfg(test)]
-pub mod tests;
-
-pub use active_inference::{ActionProposal, ActiveInferenceLoop, compute_expected_free_energy, update_precision};
 pub use bridge::FEPIITBridge;
 pub use types::{BridgeReport, FepIitHypervector, VSAUnifiedState};
 

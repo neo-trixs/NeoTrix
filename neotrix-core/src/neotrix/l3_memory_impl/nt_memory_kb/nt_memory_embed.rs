@@ -133,17 +133,42 @@ pub fn get_embedding(conn: &Connection, node_id: &str) -> rusqlite::Result<Optio
     }
 }
 
+pub fn embedding_count(conn: &Connection) -> rusqlite::Result<usize> {
+    conn.query_row("SELECT COUNT(*) FROM embeddings JOIN nodes ON nodes.id = embeddings.node_id", [], |row| row.get(0))
+}
+
+pub fn load_embeddings_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
+    let mut stmt = conn.prepare(
+        "SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id ORDER BY e.node_id LIMIT ?1 OFFSET ?2"
+    )?;
+    let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
+        let node_id: String = row.get(0)?;
+        let blob: Vec<u8> = row.get(1)?;
+        Ok((node_id, blob_to_vector(&blob)))
+    })?;
+    let mut result = Vec::with_capacity(limit.min(4096));
+    for row in rows {
+        result.push(row?);
+    }
+    Ok(result)
+}
+
 /// Load all (node_id, embedding) pairs from the database.
+/// Warning: loads entire embedding table into memory — use `load_embeddings_page` for large datasets.
 pub fn load_all_embeddings(conn: &Connection) -> rusqlite::Result<Vec<(String, Vec<f32>)>> {
     let mut stmt = conn.prepare(
         "SELECT e.node_id, e.vector FROM embeddings e JOIN nodes n ON n.id = e.node_id"
     )?;
+    let mut results = Vec::new();
     let rows = stmt.query_map([], |row| {
         let node_id: String = row.get(0)?;
         let blob: Vec<u8> = row.get(1)?;
         Ok((node_id, blob_to_vector(&blob)))
     })?;
-    rows.collect()
+    for row in rows {
+        results.push(row?);
+    }
+    Ok(results)
 }
 
 /// Find nodes without embeddings.

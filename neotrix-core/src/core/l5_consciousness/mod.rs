@@ -29,7 +29,4 @@ pub use crate::core::nt_core_consciousness::specious_present::SpeciousPresent;
 pub use crate::core::nt_core_consciousness::cognitive_load::{
     CognitiveLoadMonitor, ThinkingMode,
 };
-pub use crate::core::nt_core_consciousness::confidence_calibrator::ConfidenceCalibrator;
-pub use crate::core::nt_core_consciousness::conformal_uq::{ConformalUQ, ConformalSet};
-pub use crate::core::nt_core_consciousness::resource_pool::{ResourcePool, PoolTier, Resource};
-pub use crate::core::nt_core_consciousness::authority::{Constitution, ConflictResolution};
+

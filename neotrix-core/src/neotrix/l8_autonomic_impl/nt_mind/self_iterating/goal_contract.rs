@@ -215,20 +215,39 @@ impl ExternalVerifierStage {
 impl Default for ExternalVerifierStage { fn default() -> Self { Self } }
 impl BrainStage for ExternalVerifierStage {
     fn name(&self) -> &str { "external_verifier" }
+    fn frequency(&self) -> usize { 5 }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        // Run external grounding check every 5 iterations to break self-validation loop
+        if brain.iteration > 0 && !brain.iteration.is_multiple_of(5) {
+            return Ok(StageDecision::Continue);
+        }
         if let Some(ref engine) = brain.reasoning_engine {
             let traj_len = engine.state_trajectory.len();
-            let verified = brain._reward > 0.3;
+            // External grounding: verify reward against cargo check
+            let build_result = std::process::Command::new("cargo")
+                .args(["check", "--lib", "-q", "-p", "neotrix"])
+                .status();
+            let build_ok = build_result.map(|s| s.success()).unwrap_or(false);
+            let reward_aligns_with_build = if build_ok { brain._reward >= 0.0 } else { brain._reward < 0.0 };
+            let verified = brain._reward > 0.3 && build_ok;
+            if !verified && brain._reward > 0.3 && !build_ok {
+                log::warn!("[external_verifier] SELF-DECEPTION FLAG: reward={:.4} positive but cargo check FAILED", brain._reward);
+            }
+            if !reward_aligns_with_build {
+                log::warn!("[external_verifier] MISALIGNED: reward={:.4} but build={} — overriding internal signal",
+                    brain._reward, if build_ok { "OK" } else { "FAIL" });
+                if !build_ok { brain._set_reward(-0.5); }
+            }
             brain._phase_evidence.push_back(PhaseEvidence {
                 phase: GoalPhase::Verify,
-                description: format!("external_verified={} traj_len={} reward={:.4}",
-                    verified, traj_len, brain._reward),
+                description: format!("external_verified={} build_ok={} traj_len={} reward={:.4} align={}",
+                    verified, build_ok, traj_len, brain._reward, reward_aligns_with_build),
             });
-            if brain._phase_evidence.len() > 32 {
+            while brain._phase_evidence.len() > 32 {
                 brain._phase_evidence.pop_front();
             }
-            log::trace!("[external_verifier] trajectory len={} verified={} reward={:.4}",
-                traj_len, verified, brain._reward);
+            log::trace!("[external_verifier] traj_len={} build_ok={} verified={} reward={:.4}",
+                traj_len, build_ok, verified, brain._reward);
         }
         Ok(StageDecision::Continue)
     }

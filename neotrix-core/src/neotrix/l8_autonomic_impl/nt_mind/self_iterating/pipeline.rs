@@ -25,6 +25,7 @@ use super::goal_contract::{
 };
 
 use super::secret_scanner::SecretScanner;
+use super::openspace_evolution::OpenSpaceEvolveStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::safety_stage::SafetyCheckStage;
 use super::hypercore::SafetyCheckResult;
@@ -148,6 +149,7 @@ pub fn seal_pipeline() -> BrainPipeline {
         stages: vec![
             Box::new(CheckpointStage::new()),
             Box::new(RecipeStage::new(Box::new(RewardCalculationStage::new())).with_frequency(3)),
+            Box::new(ConsciousnessRewardStage::new()),
             Box::new(DpoWrapperStage::new()),
             Box::new(ConstitutionalWrapperStage::new()),
             Box::new(SafetyWrapperStage::new()),
@@ -199,6 +201,12 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(MemoryConsolidationStage::new()),
             Box::new(CacheCleanupStage::new()),
             Box::new(ExternalKnowledgeAbsorbStage::new()),
+            Box::new(ConvergenceCheckStage::new()),
+            Box::new(SelfTestStage::new()),
+            Box::new(OpenSpaceEvolveStage::new()
+                .with_fix_enabled(true)
+                .with_derived_enabled(true)
+                .with_captured_enabled(true)),
         ],
     }
 }
@@ -1667,6 +1675,166 @@ impl BrainStage for RewardCalculationStage {
         };
         brain._set_reward(reward);
         brain._set_reward_source(source);
+        Ok(StageDecision::Continue)
+    }
+}
+
+// ── ConvergenceCheckStage ────────────────────────────────────
+// Architecture self-audit: every 50 iterations, scan for ghost modules + orphan files.
+
+pub struct ConvergenceCheckStage;
+
+impl ConvergenceCheckStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl BrainStage for ConvergenceCheckStage {
+    fn name(&self) -> &str {
+        "convergence_check"
+    }
+
+    fn frequency(&self) -> usize {
+        50
+    }
+
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let _ = brain; // unused: the audit runs on the source tree, not brain state
+        use crate::core::nt_core_self::self_audit::converge_check;
+        let report = converge_check(".");
+        if !report.findings.is_empty() {
+            log::warn!("[seal] converge_check iter: {} ghosts, {} orphans, {} stale",
+                report.ghost_count, report.stale_count, report.orphan_count);
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+// ── SelfTestStage ───────────────────────────────────────────
+// Meta-audit: every 100 iterations, verify that detection modules themselves are intact.
+
+pub struct SelfTestStage;
+
+impl SelfTestStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl BrainStage for SelfTestStage {
+    fn name(&self) -> &str {
+        "self_test"
+    }
+
+    fn frequency(&self) -> usize {
+        100
+    }
+
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let _ = brain;
+        use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
+        use crate::core::nt_core_self::self_audit::ConvergeCheckFn;
+        use crate::core::nt_core_self_test::SelfTestRegistry;
+        use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
+        use crate::core::nt_core_meta::scanner::CodeScanner;
+        use crate::core::nt_core_gwt::monitor::EntropyMonitor;
+        use crate::neotrix::l8_autonomic_impl::nt_mind::bbrain_monitor::BMonitor;
+        use crate::core::nt_core_consciousness::inner_critic::InnerCritic;
+        use crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
+        use crate::core::nt_core_self_review::SelfReviewGate;
+        use crate::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor;
+        use crate::core::nt_core_consciousness_tree::ConsciousnessTree;
+        use crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor;
+        use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
+        use crate::core::nt_core_meta::monitor::MetaMonitor;
+        use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
+        use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
+        use crate::core::nt_core_meta::self_model::SelfModel;
+        let mut registry = SelfTestRegistry::new();
+        registry.register(Box::new(SchemaWatchdog::new()));
+        registry.register(Box::new(ConvergeCheckFn));
+        registry.register(Box::new(KnowledgeGapDetector::new()));
+        registry.register(Box::new(CodeScanner::new(".")));
+        registry.register(Box::new(EntropyMonitor::new(10, 0.5, 3)));
+        registry.register(Box::new(BMonitor::default()));
+        registry.register(Box::new(InnerCritic::new()));
+        registry.register(Box::new(ConsciousnessRuntime::new()));
+        registry.register(Box::new(SelfReviewGate::new(false)));
+        registry.register(Box::new(ConsciousnessTree::new()));
+        registry.register(Box::new(MetaAuditor::new()));
+        registry.register(Box::new(ArchLint::new()));
+        let sm = SelfModel::new();
+        registry.register(Box::new(MetaMonitor::new(sm.clone())));
+        registry.register(Box::new(MetaCognitiveLoop::new(sm)));
+        registry.register(Box::new(CognitiveLoadMonitor::new()));
+        registry.register(Box::new(CognitiveEvaluator::new()));
+        registry.register(Box::new({
+            let mut cm = crate::neotrix::nt_mind_consciousness_monitor::ConsciousnessMonitor::new();
+            cm.observe();
+            cm
+        }));
+        registry.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_self_diagnose::SelfDiagnose));
+        registry.register(Box::new(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default()));
+        registry.register(Box::new(crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new()));
+        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_autonomy::oracle_gate::OracleGate::new()));
+        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_code::semantic_entropy::SemanticEntropyGate::new()));
+        registry.register(Box::new(crate::core::nt_core_consciousness_review::ConsciousnessReview::new()));
+        registry.register(Box::new(crate::neotrix::l5_consciousness_impl::nt_core_fep_iit::bridge::FEPIITBridge::new()));
+        registry.register(Box::new(crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
+        registry.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::consciousness_bridge::ConsciousnessBridge::new()));
+        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::browser_security::BrowserSecurityScanner::new(
+            crate::neotrix::l1_body_impl::nt_shield::browser_security::BrowserSecurityConfig::default(),
+        )));
+        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new()));
+        registry.register(Box::new(crate::core::nt_core_telemetry::TelemetryStore::new(100)));
+        let results = registry.run_all();
+        let passed = results.iter().filter(|r| r.passed).count();
+        let total = results.len();
+        if passed < total {
+            log::error!("[seal] self_test: {}/{} passed — DETECTION SYSTEM DEGRADED", passed, total);
+            for r in &results {
+                if !r.passed {
+                    log::error!("[seal] self_test: {}", r.summary());
+                }
+            }
+        }
+        Ok(StageDecision::Continue)
+    }
+}
+
+// ── ConsciousnessRewardStage ──────────────────────────────────
+// Bridges the consciousness quality score into the SEAL reward signal.
+// Every N iterations, reads _last_consciousness_quality from SelfIteratingBrain
+// and applies a quality-based bonus/penalty to _reward.
+
+make_stage!(ConsciousnessRewardStage);
+impl BrainStage for ConsciousnessRewardStage {
+    fn name(&self) -> &str { "consciousness_reward" }
+    fn frequency(&self) -> usize { 5 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let q = brain._last_consciousness_quality;
+        let count = brain._consciousness_critique_count;
+        if count == 0 {
+            return Ok(StageDecision::Continue);
+        }
+        let reward_adj = if q >= 0.8 {
+            0.05
+        } else if q >= 0.6 {
+            0.02
+        } else if q >= 0.4 {
+            -0.02
+        } else if q >= 0.2 {
+            -0.08
+        } else {
+            -0.15
+        };
+        let current = brain._reward;
+        brain._reward = (current + reward_adj).clamp(-1.0, 1.0);
+        log::info!(
+            "[seal] consciousness_reward: quality={:.3} count={} adj={:+.3} reward={:.3}",
+            q, count, reward_adj, brain._reward,
+        );
         Ok(StageDecision::Continue)
     }
 }

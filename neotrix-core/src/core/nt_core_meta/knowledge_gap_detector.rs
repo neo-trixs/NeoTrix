@@ -397,6 +397,34 @@ impl KnowledgeGapDetector {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for KnowledgeGapDetector {
+    fn name(&self) -> &str {
+        "knowledge_gap_detector"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        if self.known_sources.is_empty() {
+            failures.push("known_sources is empty".into());
+        }
+        if self.target_categories.is_empty() {
+            failures.push("target_categories is empty".into());
+        }
+        if self.min_severity_threshold <= 0.0 {
+            failures.push("min_severity_threshold must be > 0.0".into());
+        }
+        if !self.target_categories.contains(&super::GapCategory::MissingModule) {
+            failures.push("MissingModule must be in target_categories".into());
+        }
+        if !self.target_categories.contains(&super::GapCategory::MissingKnowledgeSource) {
+            failures.push("MissingKnowledgeSource must be in target_categories".into());
+        }
+
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -14,6 +14,8 @@ import IdentityManagerPage from "./pages/IdentityManagerPage";
 import ProxyPage from "./pages/ProxyPage";
 import ChatPage from "./pages/ChatPage";
 import ManagePage from "./pages/ManagePage";
+import ProjectsPage from "./pages/ProjectsPage";
+import PlanPage from "./pages/PlanPage";
 import type { Attachment } from "./types";
 export interface AppOutletContext {
   input: string;
@@ -43,10 +45,12 @@ const router = createBrowserRouter([
       { path: "identity", element: <IdentityManagerPage /> },
       { path: "proxy", element: <ProxyPage /> },
       { path: "chat", element: <ChatPage /> },
+      { path: "projects", element: <ProjectsPage /> },
     ],
   },
   { path: "/settings", element: <SettingsPage /> },
   { path: "/manage", element: <ManagePage /> },
+  { path: "/plan", element: <PlanPage /> },
 ]);
 
 export default router;

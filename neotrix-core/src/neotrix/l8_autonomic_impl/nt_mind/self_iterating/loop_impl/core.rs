@@ -112,6 +112,11 @@ pub struct SelfIteratingBrain {
     pub(crate) _per_loop: Option<crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop>,
     pub(crate) _oracle_gate: Option<crate::neotrix::nt_act_autonomy::OracleGate>,
     pub(crate) _cross_session_memory: Option<crate::neotrix::nt_act_autonomy::CrossSessionMemory>,
+
+    /// Last consciousness quality score from InnerCritic (0.0–1.0)
+    pub(crate) _last_consciousness_quality: f64,
+    /// Total consciousness critiques received
+    pub(crate) _consciousness_critique_count: u64,
 }
 
 impl SelfIteratingBrain {
@@ -201,6 +206,8 @@ impl SelfIteratingBrain {
             _cross_session_memory: Some(crate::neotrix::nt_act_autonomy::CrossSessionMemory::new(
                 std::path::PathBuf::from("~/.neotrix/cross_session_memory.json"),
             )),
+            _last_consciousness_quality: 0.0,
+            _consciousness_critique_count: 0,
         }
     }
 

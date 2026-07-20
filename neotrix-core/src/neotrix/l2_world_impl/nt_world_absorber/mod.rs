@@ -338,16 +338,13 @@ impl UnifiedAbsorber {
     /// Status of the absorption pipeline
     pub fn status(&self) -> Result<AbsorberStatus, String> {
         let repos = self.kb.find_repositories("github.com", None).unwrap_or_default();
-        let all_nodes = {
-            let conn = self.kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-            nt_memory_store::get_all_nodes(&conn).map_err(|e| format!("get_all: {}", e))?
-        };
-        let repo_count = repos.len();
-        let paper_count = all_nodes.iter().filter(|n| n.node_type == NodeType::Paper).count();
-        let article_count = all_nodes.iter().filter(|n| n.node_type == NodeType::Article).count();
-        let concept_count = all_nodes.iter().filter(|n| n.node_type == NodeType::Concept).count();
-        let code_count = all_nodes.iter().filter(|n| n.node_type == NodeType::CodeSnippet).count();
-        let insight_count = all_nodes.iter().filter(|n| n.node_type == NodeType::Insight).count();
+        let conn = self.kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let total_nodes = nt_memory_store::count_nodes(&conn).map_err(|e| format!("count: {}", e))?;
+        let paper_count = nt_memory_store::count_nodes_by_type(&conn, "Paper").map_err(|e| format!("count_papers: {}", e))?;
+        let article_count = nt_memory_store::count_nodes_by_type(&conn, "Article").map_err(|e| format!("count_articles: {}", e))?;
+        let concept_count = nt_memory_store::count_nodes_by_type(&conn, "Concept").map_err(|e| format!("count_concepts: {}", e))?;
+        let code_count = nt_memory_store::count_nodes_by_type(&conn, "CodeSnippet").map_err(|e| format!("count_code: {}", e))?;
+        let insight_count = nt_memory_store::count_nodes_by_type(&conn, "Insight").map_err(|e| format!("count_insights: {}", e))?;
         let stale_repos = repos.iter().filter(|n| {
             n.metadata.as_ref()
                 .map(|m| {
@@ -357,10 +354,11 @@ impl UnifiedAbsorber {
                 })
                 .unwrap_or(false)
         }).count();
+        drop(conn);
 
         Ok(AbsorberStatus {
-            total_nodes: all_nodes.len(),
-            repositories: repo_count,
+            total_nodes,
+            repositories: repos.len(),
             papers: paper_count,
             articles: article_count,
             concepts: concept_count,
@@ -472,8 +470,13 @@ mod nt_memory_store {
             title: n.title,
             node_type: nt,
             content: n.content,
+            summary: n.summary,
             url: n.url,
             domain: n.domain,
+            language: n.language,
+            confidence: n.confidence,
+            importance: n.importance,
+            access_count: n.access_count,
             metadata: n.metadata,
             created_at: n.created_at,
             updated_at: n.updated_at,
@@ -485,6 +488,12 @@ mod nt_memory_store {
     }
     pub fn upsert_crawl_queue(conn: &Connection, url: &str, depth: i64, domain: &str, priority: i64, ts: i64) -> rusqlite::Result<()> {
         crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::upsert_crawl_queue(conn, url, depth, domain, priority, ts)
+    }
+    pub fn count_nodes(conn: &Connection) -> rusqlite::Result<usize> {
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::count_nodes(conn)
+    }
+    pub fn count_nodes_by_type(conn: &Connection, node_type: &str) -> rusqlite::Result<usize> {
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::count_nodes_by_type(conn, node_type)
     }
 }
 

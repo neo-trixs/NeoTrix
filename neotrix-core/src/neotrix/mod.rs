@@ -75,6 +75,7 @@ pub use l3_memory_impl::nt_memory_kb;
 pub use l3_memory_impl::nt_memory_knowledge_populator;
 pub use l3_memory_impl::nt_memory_spatial;
 pub use l3_memory_impl::nt_memory_historian;
+pub use l3_memory_impl::nt_memory_leann_store;
 
 // L2 — Perception (感知层) — 感知
 pub use l2_world_impl::nt_world_map;
@@ -96,6 +97,9 @@ pub use l2_world_impl::nt_world_vision;
 pub use l2_world_impl::nt_world_parse;
 pub use l2_world_impl::nt_world_journal_index;
 pub use l2_world_impl::nt_world_code_search;
+pub use l2_world_impl::nt_world_geo;
+pub use l2_world_impl::nt_world_video_pipeline;
+pub use l2_world_impl::nt_world_osint;
 
 // L1 — Body (身体层) — 行动、界面、安全
 pub use l1_body_impl::nt_io_logging;
@@ -122,6 +126,13 @@ pub use l1_body_impl::nt_io_acp;
 pub use l1_body_impl::nt_io_session_recovery;
 pub use l1_body_impl::nt_io_agents_md;
 pub use l1_body_impl::nt_io_surface_bridge;
+pub use l1_body_impl::nt_io_grep;
+pub use l1_body_impl::nt_io_humanize;
+pub use l1_body_impl::nt_io_humanize_detector;
+pub use l1_body_impl::nt_io_skill_review;
+pub use l1_body_impl::nt_io_supertonic;
+pub use l1_body_impl::nt_io_hyperframes;
+pub use l1_body_impl::nt_io_digital_human;
 
 pub use l1_body_impl::nt_shield;
 pub use l1_body_impl::nt_shield_audit;
@@ -133,6 +144,10 @@ pub use l1_body_impl::nt_shield_sandbox;
 pub use l1_body_impl::nt_shield_manager;
 #[cfg(feature = "stealth-net")]
 pub use l1_body_impl::nt_shield_stealth_net;
+
+pub use l1_body_impl::nt_shield_redteam;
+pub use l1_body_impl::nt_shield_approval;
+pub use l1_body_impl::nt_shield_agentic_scan;
 
 pub use l1_body_impl::nt_act_code;
 pub use l1_body_impl::nt_act_goal;
@@ -152,6 +167,10 @@ pub use l1_body_impl::nt_act_sub_agent_middleware;
 pub use l1_body_impl::nt_act_orchestrator;
 pub use l1_body_impl::nt_act_project_manager;
 pub use l1_body_impl::nt_act_remote_control;
+pub use l1_body_impl::nt_act_a2a_client;
+pub use l1_body_impl::nt_act_goose_bridge;
+pub use l1_body_impl::nt_act_persona_capture;
+pub use l1_body_impl::nt_agent_agent_team;
 
 pub use l1_body_impl::nt_agent_protocol;
 pub use l1_body_impl::nt_agent_subagent;
@@ -188,6 +207,7 @@ pub use l8_autonomic_impl::nt_mind::export_import::ReasoningBankExporter;
 pub use l1_body_impl::nt_io_server::{NeoTrixACPServer, ServerInfo};
 pub use l1_body_impl::nt_io_acp::AcpAgent;
 pub use crate::neotrix::nt_core_code_query::CodeQueryEngine;
+pub use crate::core::nt_core_answer_engine::{AnswerEngine, AnswerEngineConfig, AnswerMode, AnswerResult, AnswerSegment, SearchResult, SourceType, WidgetKind, WidgetProvider, ContextBuilder, ContextSource, PreparedQuery};
 pub use l2_world_impl::nt_world_scrape::{ScraperConfig, ScrapeResult, BrowserScraper, RequestScraper, AntiDetect};
 pub use l1_body_impl::nt_shield_audit::{
     SecurityAuditor, AuditReport, AuditMode, AuditDimension, VulnDomain, Severity,

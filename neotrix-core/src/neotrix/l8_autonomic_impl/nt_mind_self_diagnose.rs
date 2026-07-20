@@ -349,6 +349,37 @@ impl ActionExecutor {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for SelfDiagnose {
+    fn name(&self) -> &str {
+        "self_diagnose"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let snapshot = crate::neotrix::l8_autonomic_impl::nt_mind_evolution_loop::ProjectSnapshot {
+            total_files: 10,
+            total_lines: 1000,
+            large_files: vec!["src/main.rs".into()],
+            modules_without_tests: vec!["src/utils.rs".into()],
+            file_unsafe_hotspots: vec![],
+            unsafe_count: 0,
+            unwrap_count: 5,
+            todo_count: 3,
+            compile_errors: 0,
+            compile_warnings: 2,
+            test_count: 50,
+            test_failures: 0,
+        };
+        let (items, _) = SelfDiagnose::run_diagnosis(&snapshot, 0);
+        for item in &items {
+            if !(0.0..=100.0).contains(&item.composite_score) {
+                failures.push(format!("item has out-of-range score {}", item.composite_score));
+            }
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 // ============================================================
 // 测试
 // ============================================================

@@ -369,6 +369,32 @@ impl Default for ConsciousnessMonitor {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for ConsciousnessMonitor {
+    fn name(&self) -> &str {
+        "consciousness_monitor"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut cm = ConsciousnessMonitor::new();
+        cm.observe();
+        let report = cm.get_report();
+        if !(0.0..=1.0).contains(&report.consciousness) {
+            failures.push("consciousness out of [0,1] range".into());
+        }
+        if !(0.0..=1.0).contains(&report.coherence) {
+            failures.push("coherence out of [0,1] range".into());
+        }
+        if report.phi < 0.0 {
+            failures.push("phi is negative".into());
+        }
+        if report.timestamp.is_empty() {
+            failures.push("empty timestamp".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

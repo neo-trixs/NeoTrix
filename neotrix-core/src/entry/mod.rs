@@ -232,7 +232,13 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
         let mut bg = BackgroundLoop::new(bg_agent.clone());
         bg.goal_loop = neotrix::neotrix::nt_mind::goal_loop::GoalLoop::new();
         bg.nt_world_model = Some(WorldModelV2::new(8, 64));
-        bg.panorama = Some(PanoramaPipeline::new());
+        let mut panorama = PanoramaPipeline::new();
+        if let Ok(kb) = neotrix::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
+            let kb = std::sync::Arc::new(kb);
+            panorama.attach_kb(kb.clone());
+            bg.kb = Some(kb);
+        }
+        bg.panorama = Some(panorama);
         #[cfg(feature = "stealth-net")]
         {
             bg = bg.with_world_consciousness();
@@ -1077,11 +1083,21 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         }
         bg_goal_loop = bg_goal_loop.with_agent_team(agent_team);
 
+        let mut panorama = PanoramaPipeline::new();
+        let bg_kb: Option<std::sync::Arc<neotrix::neotrix::nt_memory_kb::KnowledgeBase>>;
+        if let Ok(kb) = neotrix::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
+            let kb = std::sync::Arc::new(kb);
+            panorama.attach_kb(kb.clone());
+            bg_kb = Some(kb);
+        } else {
+            bg_kb = None;
+        }
         tokio::spawn(async move {
             let mut bg = BackgroundLoop::new(bg_agent)
                 .with_goal_loop(bg_goal_loop)
                 .with_nt_world_model(WorldModelV2::new(8, 64))
-                .with_panorama(PanoramaPipeline::new())
+                .with_panorama(panorama)
+                .with_kb(bg_kb)
                 .with_nt_world_crawl(std::path::PathBuf::from("."))
                 .with_exploration_pipeline(std::path::PathBuf::from("."))
                 .with_knowledge_chain(std::path::PathBuf::from("."))

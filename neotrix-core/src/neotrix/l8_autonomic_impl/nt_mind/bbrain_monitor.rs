@@ -60,10 +60,50 @@ impl ComponentScores {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct BMonitorConfig {
+    pub cognitive_weight: f64,
+    pub motivation_weight: f64,
+    pub plan_weight: f64,
+    pub archive_weight: f64,
+    pub skills_weight: f64,
+    pub green_threshold: f64,
+    pub yellow_threshold: f64,
+    pub cognitive_flag_threshold: f64,
+    pub motivation_flag_threshold: f64,
+    pub plan_flag_threshold: f64,
+    pub critical_flag_penalty: f64,
+    pub max_useful_archives: f64,
+    pub default_empty_skill_score: f64,
+    pub max_history: usize,
+}
+
+impl Default for BMonitorConfig {
+    fn default() -> Self {
+        Self {
+            cognitive_weight: 0.30,
+            motivation_weight: 0.25,
+            plan_weight: 0.20,
+            archive_weight: 0.10,
+            skills_weight: 0.15,
+            green_threshold: 70.0,
+            yellow_threshold: 40.0,
+            cognitive_flag_threshold: 40.0,
+            motivation_flag_threshold: 40.0,
+            plan_flag_threshold: 30.0,
+            critical_flag_penalty: 15.0,
+            max_useful_archives: 20.0,
+            default_empty_skill_score: 15.0,
+            max_history: 20,
+        }
+    }
+}
+
 pub struct BMonitor {
     pub report_count: usize,
     pub history: VecDeque<BMonitorReport>,
     pub max_history: usize,
+    pub config: BMonitorConfig,
 }
 
 impl Default for BMonitor {
@@ -77,7 +117,8 @@ impl BMonitor {
         Self {
             report_count: 0,
             history: VecDeque::new(),
-            max_history: 20,
+            max_history: BMonitorConfig::default().max_history,
+            config: BMonitorConfig::default(),
         }
     }
 
@@ -104,29 +145,30 @@ impl BMonitor {
             skill_richness,
         };
 
-        let health_score = cognitive_health * 0.30
-            + motivation_health * 0.25
-            + plan_quality * 0.20
-            + archive_depth * 0.10
-            + skill_richness * 0.15;
+        let cfg = &self.config;
+        let health_score = cognitive_health * cfg.cognitive_weight
+            + motivation_health * cfg.motivation_weight
+            + plan_quality * cfg.plan_weight
+            + archive_depth * cfg.archive_weight
+            + skill_richness * cfg.skills_weight;
 
         let health_score = health_score.clamp(0.0, 100.0);
-        let alert_level = if health_score >= 70.0 {
+        let alert_level = if health_score >= cfg.green_threshold {
             AlertLevel::Green
-        } else if health_score >= 40.0 {
+        } else if health_score >= cfg.yellow_threshold {
             AlertLevel::Yellow
         } else {
             AlertLevel::Red
         };
 
         let mut flags: Vec<String> = Vec::new();
-        if cognitive_health < 40.0 {
+        if cognitive_health < cfg.cognitive_flag_threshold {
             flags.push(format!("cognitive health low: {:.1}", cognitive_health));
         }
-        if motivation_health < 40.0 {
+        if motivation_health < cfg.motivation_flag_threshold {
             flags.push(format!("motivation health low: {:.1}", motivation_health));
         }
-        if plan_quality < 30.0 {
+        if plan_quality < cfg.plan_flag_threshold {
             flags.push(format!("plan quality degraded: {:.1}", plan_quality));
         }
         if monitor.needs_intervention() {
@@ -160,7 +202,7 @@ impl BMonitor {
         let raw = report.stability_score * 100.0;
         let penalty = report.flags.iter().filter(|f| {
             matches!(f.severity, crate::core::nt_core_self::FlagSeverity::Critical)
-        }).count() as f64 * 15.0;
+        }).count() as f64 * self.config.critical_flag_penalty;
         (raw - penalty).clamp(0.0, 100.0)
     }
 
@@ -202,16 +244,16 @@ impl BMonitor {
         if count == 0 {
             return 20.0;
         }
-        let max_useful = 20.0_f64;
+        let max_useful = self.config.max_useful_archives;
         let raw = (count as f64 / max_useful * 100.0).min(100.0);
         raw.clamp(0.0, 100.0)
     }
 
     fn score_skills(&self, skills: &CrystalRegistry) -> f64 {
         if skills.crystals.is_empty() {
-            return 15.0;
+            return self.config.default_empty_skill_score;
         }
-        let count_score = (skills.crystals.len() as f64 / 20.0 * 100.0).min(100.0) * 0.4;
+        let count_score = (skills.crystals.len() as f64 / self.config.max_useful_archives * 100.0).min(100.0) * 0.4;
         let best_eff = skills.crystals.iter().map(|c| c.effectiveness).fold(0.0_f64, f64::max);
         let eff_score = best_eff * 100.0 * 0.4;
         let total_use = skills.crystals.iter().map(|c| c.use_count).sum::<usize>();
@@ -221,6 +263,49 @@ impl BMonitor {
 
     pub fn latest_report(&self) -> Option<&BMonitorReport> {
         self.history.back()
+    }
+
+    pub fn observe_from_metrics(&mut self, phi: f64, coherence: f64, load: f64) -> BMonitorReport {
+        let cognitive_health = (phi * 0.6 + coherence * 0.4) * 100.0;
+        let motivation_health = (100.0 - load * 100.0).max(0.0).min(100.0);
+        let health_score = cognitive_health * self.config.cognitive_weight
+            + motivation_health * self.config.motivation_weight
+            + 50.0 * self.config.plan_weight
+            + 50.0 * self.config.archive_weight
+            + 50.0 * self.config.skills_weight;
+        let health_score = health_score.max(0.0).min(100.0);
+        let alert_level = if health_score >= self.config.green_threshold {
+            AlertLevel::Green
+        } else if health_score >= self.config.yellow_threshold {
+            AlertLevel::Yellow
+        } else {
+            AlertLevel::Red
+        };
+        let report = BMonitorReport {
+            health_score,
+            alert_level,
+            component_scores: ComponentScores {
+                cognitive_health,
+                motivation_health,
+                plan_quality: 50.0,
+                archive_depth: 50.0,
+                skill_richness: 50.0,
+            },
+            flags: if alert_level == AlertLevel::Red {
+                vec![format!("health critical: {:.1}", health_score)]
+            } else {
+                vec![]
+            },
+            needs_intervention: alert_level.needs_intervention(),
+            report_id: self.report_count,
+            iteration: self.report_count,
+        };
+        self.report_count += 1;
+        self.history.push_back(report.clone());
+        if self.history.len() > self.max_history {
+            self.history.pop_front();
+        }
+        report
     }
 
     pub fn health_trend(&self) -> f64 {
@@ -304,6 +389,28 @@ impl BMonitor {
         let filled = filled.min(width);
         let empty = width.saturating_sub(filled);
         format!("{}{}", "█".repeat(filled), "░".repeat(empty))
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for BMonitor {
+    fn name(&self) -> &str {
+        "bmonitor"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        if self.config.max_history == 0 {
+            failures.push("max_history must be > 0".into());
+        }
+        if self.config.green_threshold > self.config.yellow_threshold {
+            failures.push("green_threshold > yellow_threshold is invalid".into());
+        }
+        if self.history.len() > self.config.max_history {
+            failures.push("history exceeds max_history".into());
+        }
+
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
     }
 }
 
@@ -521,5 +628,15 @@ mod tests {
             bm.evaluate(&eval, &mot, &mon, &archive, &skills, i);
         }
         assert_eq!(bm.history.len(), 3);
+    }
+
+    #[test]
+    fn test_observe_from_metrics() {
+        let mut bm = BMonitor::new();
+        let report = bm.observe_from_metrics(0.8, 0.7, 0.3);
+        assert!(report.health_score > 50.0);
+        assert!(bm.latest_report().is_some());
+        let alert_report = bm.observe_from_metrics(0.1, 0.1, 0.9);
+        assert_eq!(alert_report.alert_level, AlertLevel::Red);
     }
 }

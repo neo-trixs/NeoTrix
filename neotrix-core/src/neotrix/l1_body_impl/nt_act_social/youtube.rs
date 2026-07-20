@@ -210,7 +210,7 @@ impl YouTubeConnector {
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
             if status.as_u16() == 429 || status.as_u16() == 403 {
-                return Err(PlatformError::RateLimited { retry_after: None });
+                return Err(PlatformError::RateLimit { retry_after: None });
             }
             return Err(PlatformError::ApiError {
                 status: status.as_u16(),

@@ -25,6 +25,7 @@ use crate::neotrix::nt_mind::curiosity_drive::CuriosityDrive;
 use crate::neotrix::nt_mind::knowledge_aging::KnowledgeAging;
 use crate::neotrix::nt_mind::auto_crystallizer::AutoCrystallizer;
 use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager;
+use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 use crate::neotrix::nt_mind::web_miner::WebKnowledgeMiner;
 use crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery;
@@ -34,6 +35,7 @@ use crate::core::nt_core_self::intra_reflection::PreActionIntrospector;
 use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
 use crate::neotrix::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use crate::neotrix::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+use crate::core::nt_core_consciousness::CognitiveLoadMonitor;
 
 pub use crate::neotrix::nt_mind_background_config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
 
@@ -41,6 +43,8 @@ mod builder;
 mod run;
 mod handlers;
 pub mod always_on;
+
+pub use run::BackgroundLoopHandle;
 
 /// Broadcast shutdown signal to all background handler tasks.
 /// Created in `start()`, consumed in `shutdown()`.
@@ -107,6 +111,10 @@ pub struct BackgroundLoop {
     pub plugin_registry: PluginRegistry,
     pub session_recovery: Option<SessionRecoveryManager>,
     pub consciousness_runtime: Option<crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime>,
+    pub consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
+    pub fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
+    pub cognitive_load: Option<CognitiveLoadMonitor>,
+    pub kb: Option<Arc<KnowledgeBase>>,
 }
 
 impl BackgroundLoop {
@@ -160,6 +168,10 @@ impl BackgroundLoop {
             started: false,
             session_recovery: Some(SessionRecoveryManager::new("bg-loop")),
             consciousness_runtime: Some(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()),
+            consciousness_tree: Some(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()),
+            fep_iit_bridge: Some(crate::neotrix::nt_core_fep_iit::FEPIITBridge::new()),
+            cognitive_load: Some(CognitiveLoadMonitor::new()),
+            kb: None,
         }
     }
 }

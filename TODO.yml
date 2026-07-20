@@ -1,23 +1,23 @@
 conflicts: []
 meta:
   conflicts: 0
-    generated_at: '2026-06-01'
-     total_items: 60
-    v1_completed: 107
-   v2_phase: all_done
-   v2_r1_completed: 5
-   v2_r1_total: 5
-   session_distilled: false
-         total_tests: 3200
-     compile_default: 'pending'
-     compile_full: 'pending'
-     last_session: '2026-06-01'
-       total_tests_session32: 1673
-       unwrap_removed: 880
-       production_unwrap: 0
-       clippy_before: 404
-       clippy_after: 0
-       v_next: earn_agent_verify
+  generated_at: '2026-06-01'
+  total_items: 60
+  v1_completed: 107
+  v2_phase: all_done
+  v2_r1_completed: 5
+  v2_r1_total: 5
+  session_distilled: false
+  total_tests: 3200
+  compile_default: 'pending'
+  compile_full: 'pending'
+  last_session: '2026-06-01'
+  total_tests_session32: 1673
+  unwrap_removed: 880
+  production_unwrap: 0
+  clippy_before: 404
+  clippy_after: 0
+  v_next: earn_agent_verify
 
 items:
   # ===========================================================================
@@ -54,7 +54,7 @@ items:
     notes: exec_local/exec_docker 均改用 split+args 零 shell; +Wasm 模式(feature-gated)
 
   - id: R1-02
-    title: agent_workflow.rs:162 shell 注入消除
+    title: 'agent_workflow.rs:162 shell 注入消除'
     status: done
     priority: high
     created: '2026-05-23'
@@ -215,7 +215,7 @@ items:
     notes: 39 新 tests (4 文件); 26/28 文件 (93%) 覆盖
 
   - id: R3-03
-    title: 重复模块合并: permission.rs vs permissions.rs
+    title: '重复模块合并: permission.rs vs permissions.rs'
     status: done
     priority: low
     created: '2026-05-23'
@@ -227,7 +227,7 @@ items:
     notes: permission.rs 已删除; 仅保留 permissions.rs
 
   - id: R3-04
-    title: 死模块清理: reasoning_kernel/ 删除
+    title: '死模块清理: reasoning_kernel/ 删除'
     status: done
     priority: low
     created: '2026-05-23'
@@ -239,7 +239,7 @@ items:
     notes: 25 文件 → 3 forwarding shim (mod/circuits/decoder); 4.4K LOC 已清理
 
   - id: R3-05
-    title: 死模块清理: harness/ infopool/ plugin_system/
+    title: '死模块清理: harness/ infopool/ plugin_system/'
     status: done
     priority: low
     created: '2026-05-23'

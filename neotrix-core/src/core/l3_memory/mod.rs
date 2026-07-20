@@ -23,6 +23,3 @@ pub use crate::core::nt_core_consciousness::vsa_tag::{
 pub use crate::core::nt_core_consciousness::source_hierarchy::{
     SourceHierarchy, KnowledgeLayer, ProvenanceChain,
 };
-pub use crate::core::nt_core_consciousness::authority::{
-    AuthorityLevel, AuthorityTag, AuthorityResolver,
-};

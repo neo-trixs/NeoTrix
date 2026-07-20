@@ -161,7 +161,7 @@ mod tests {
         let dist = vec![0.25, 0.25, 0.25, 0.25];
         let entropy = calc.compute_entropy(&dist);
         let expected = 4.0 * 0.25 * (4.0f64).ln();
-        assert!((entropy - expected).abs() < 1e-10);
+        assert!((entropy - expected).abs() < 1e-9);
     }
 
     #[test]

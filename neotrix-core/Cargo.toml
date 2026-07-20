@@ -89,6 +89,7 @@ path = "src/bin/absorb_crawl.rs"
 
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
+thiserror = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

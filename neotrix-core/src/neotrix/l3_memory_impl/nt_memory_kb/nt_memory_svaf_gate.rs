@@ -165,6 +165,39 @@ impl SvafGate {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for SvafGate {
+    fn name(&self) -> &str {
+        "svaf_gate"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let gate = SvafGate::default();
+        let eval = gate.evaluate_content_only("machine learning transformer architecture", "arxiv");
+        if eval.novelty < 0.0 || eval.novelty > 1.0 {
+            failures.push("novelty out of [0,1] range".into());
+        }
+        if eval.coherence < 0.0 || eval.coherence > 1.0 {
+            failures.push("coherence out of [0,1] range".into());
+        }
+        if eval.relevance < 0.0 || eval.relevance > 1.0 {
+            failures.push("relevance out of [0,1] range".into());
+        }
+        if eval.authority < 0.0 || eval.authority > 1.0 {
+            failures.push("authority out of [0,1] range".into());
+        }
+        let known = gate.authority_score("arxiv");
+        if known < 0.5 {
+            failures.push("arxiv authority unexpectedly low".into());
+        }
+        let unknown = gate.authority_score("unknown_xyz_forum");
+        if unknown > 0.5 {
+            failures.push("unknown source authority too high".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

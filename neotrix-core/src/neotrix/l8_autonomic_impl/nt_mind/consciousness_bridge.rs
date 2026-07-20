@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_self::AttentionDomain;
@@ -30,7 +31,7 @@ pub struct ConsciousnessBridge {
     pub poll_interval: u64,
     pub iterations_since_last_poll: u64,
     pub last_broadcast: Option<String>,
-    pub kb: Option<KnowledgeBase>,
+    pub kb: Option<Arc<KnowledgeBase>>,
 }
 
 impl ConsciousnessBridge {
@@ -43,7 +44,7 @@ impl ConsciousnessBridge {
         }
     }
 
-    pub fn attach_kb(&mut self, kb: KnowledgeBase) {
+    pub fn attach_kb(&mut self, kb: Arc<KnowledgeBase>) {
         self.kb = Some(kb);
     }
 
@@ -161,13 +162,28 @@ impl ConsciousnessBridge {
         }
     }
 
-    /// 记录当前意识状态到 KB
+    /// 记录当前意识状态到 KB (使用真实 GWT 数据而非硬编码 0.0)
     fn log_consciousness_snapshot(&self, gwt: &GlobalWorkspace) {
         if let Some(ref kb) = self.kb {
             let active_count = gwt.active_specialists().len();
             let content = gwt.active_content.as_deref().unwrap_or("");
-            let details = format!("GWT broadcast: {}, specialists: {}", content, active_count);
-            let _ = kb.record_consciousness_snapshot(0.0, 0.0, active_count > 0, "bridge_cycle", &details);
+            let specialists: Vec<String> = gwt.active_specialists()
+                .iter().map(|m| m.name.clone()).collect();
+            // Compute phi from geometry_sync if available, else resonance entropy
+            let phi = gwt.geometry_sync.as_ref()
+                .map(|gs| gs.current_phi().iit_phi)
+                .unwrap_or_else(|| {
+                    gwt.last_resonance.as_ref().map(|r| {
+                        (1.0 - r.entropy / 11.0_f64.max(1.0)).max(0.0).min(1.0)
+                    }).unwrap_or(0.0)
+                });
+            let coherence = active_count as f64 / gwt.specialists.len().max(1) as f64
+                * gwt.active_specialists().iter()
+                    .map(|m| m.activation)
+                    .sum::<f64>().max(0.0);
+            let details = format!("GWT broadcast: {}, specialists: {:?} (phi={:.3}, coherence={:.3})",
+                content, specialists, phi, coherence);
+            let _ = kb.record_consciousness_snapshot(phi, coherence, active_count > 0, "bridge_cycle", &details);
         }
     }
 
@@ -204,6 +220,17 @@ impl ConsciousnessBridge {
 impl Default for ConsciousnessBridge {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for ConsciousnessBridge {
+    fn name(&self) -> &str { "consciousness_bridge" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        if self.poll_interval == 0 {
+            failures.push("consciousness_bridge: poll_interval must be > 0".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
     }
 }
 

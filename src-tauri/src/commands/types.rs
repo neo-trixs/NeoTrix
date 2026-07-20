@@ -159,3 +159,53 @@ pub struct ProxyConfigData {
     pub system_proxy_enabled: bool,
     pub direct_timeout_secs: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub project_type: String,
+    pub description: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub pinned: bool,
+    pub archived: bool,
+    pub color: Option<String>,
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectChat {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub session_id: Option<String>,
+    pub message_count: usize,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub pinned: bool,
+    pub archived: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectSource {
+    pub id: String,
+    pub project_id: String,
+    pub source_type: String,
+    pub path: Option<String>,
+    pub url: Option<String>,
+    pub name: String,
+    pub enabled: bool,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectInstruction {
+    pub id: String,
+    pub project_id: String,
+    pub content: String,
+    pub enabled: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}

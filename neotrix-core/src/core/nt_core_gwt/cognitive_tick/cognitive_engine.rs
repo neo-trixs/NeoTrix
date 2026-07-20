@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::agents::CognitiveAgent;
 use super::entropy_drive::EntropyDrive;
+use crate::core::nt_core_self_constitution::{Constitution, DevRule};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentItem {
@@ -63,6 +64,8 @@ pub struct CognitiveEngine {
     pub tick_count: u64,
     pub entropy_drive: EntropyDrive,
     next_item_id: usize,
+    /// Internalized constitution for guided reasoning
+    constitution: Option<&'static Constitution>,
 }
 
 impl CognitiveEngine {
@@ -75,7 +78,25 @@ impl CognitiveEngine {
             tick_count: 0,
             entropy_drive: EntropyDrive::new(target_entropy),
             next_item_id: 0,
+            constitution: None,
         }
+    }
+
+    /// Load constitution into the engine for guided reasoning
+    pub fn load_constitution(&mut self, constitution: &'static Constitution) {
+        self.constitution = Some(constitution);
+    }
+
+    /// Get relevant rules for a given task context
+    pub fn get_relevant_rules(&self, task_desc: &str, top_k: usize) -> Vec<&DevRule> {
+        self.constitution
+            .map(|c| c.relevant_rules_for_task(task_desc, top_k))
+            .unwrap_or_default()
+    }
+
+    /// Check if an action complies with constitution
+    pub fn check_compliance(&self, action_desc: &str) -> Option<crate::core::nt_core_self_constitution::ComplianceReport> {
+        self.constitution.map(|c| c.verify_compliance(action_desc))
     }
 
     pub fn add_agent(&mut self, agent: CognitiveAgent) {
@@ -293,6 +314,7 @@ mod tests {
     fn test_activation_count_capping() {
         let config = CognitiveTickConfig {
             max_agents_per_tick: 1,
+            enable_entropy_drive: false,
             ..Default::default()
         };
         let mut engine = CognitiveEngine::new(config);

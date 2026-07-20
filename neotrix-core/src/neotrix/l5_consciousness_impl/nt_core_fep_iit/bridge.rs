@@ -413,13 +413,41 @@ impl FEPIITBridge {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for FEPIITBridge {
+    fn name(&self) -> &str { "fep_iit_bridge" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        if self.alpha <= 0.0 || self.beta <= 0.0 || self.gamma <= 0.0 {
+            failures.push("fep_iit_bridge: weights must be positive".into());
+        }
+        if self.phi_sigma <= 0.0 || self.phi_sigma > 1.0 {
+            failures.push("fep_iit_bridge: phi_sigma out of range (0,1]".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_placeholder() {
         let _instance = FEPIITBridge::new();
         assert!(true);
+    }
+
+    #[test]
+    fn test_self_test_valid() {
+        let bridge = FEPIITBridge::new();
+        assert!(bridge.self_test().is_ok());
+    }
+
+    #[test]
+    fn test_self_test_invalid() {
+        let mut bridge = FEPIITBridge::new();
+        bridge.alpha = 0.0;
+        assert!(bridge.self_test().is_err());
     }
 }

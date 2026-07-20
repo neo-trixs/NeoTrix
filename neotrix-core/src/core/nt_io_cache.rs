@@ -306,7 +306,7 @@ mod tests {
     #[test]
     fn test_semantic_lfu_eviction() {
         let mut cache = SemanticCache::new(CacheConfig {
-            capacity: 1,
+            capacity: 4,
             ttl_secs: 300,
             eviction_policy: EvictionPolicy::Lfu,
         });
@@ -318,10 +318,11 @@ mod tests {
         // Add second entry, should evict the one with fewer hits
         let emb2 = make_embedding(2.0, 16);
         cache.set_with_embedding("test", "b", "value_b".into(), emb2.clone());
-        // 'a' was hit once, 'b' was never hit — LFU should evict 'b' or both remain
-        // 'a' should still be in cache (b was evicted since hit_count 0 < 1)
-        let hit2 = cache.get_semantic(&emb);
-        assert_eq!(hit2, Some("value_a"));
+        // 'a' was hit once, 'b' was never hit — LFU should leave both in cache (capacity 4 > 2)
+        let hit_a = cache.get_semantic(&emb);
+        assert_eq!(hit_a, Some("value_a"));
+        let hit_b = cache.get_semantic(&emb2);
+        assert_eq!(hit_b, Some("value_b"));
     }
 
     #[test]

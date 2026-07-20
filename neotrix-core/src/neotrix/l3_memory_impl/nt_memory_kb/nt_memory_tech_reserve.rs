@@ -160,52 +160,61 @@ impl TechReserveStore {
         }
     }
 
-    /// 从 KB 节点重建索引
-    pub fn rebuild_from_nodes(&mut self, nodes: &[KnowledgeNode]) {
+    /// 清除所有条目
+    pub fn clear(&mut self) {
         self.entries.clear();
         self.domain_index.clear();
         self.dimension_index.clear();
+    }
 
+    /// 从单个 KnowledgeNode 生成并添加一个 tech reserve entry（若符合维度分类）
+    pub fn add_node(&mut self, node: &KnowledgeNode) {
+        let Some(dimension) = TechReserveDimension::from_node_type(&node.node_type) else {
+            return;
+        };
+
+        let metadata = node.metadata.as_ref();
+        let domain_tags: Vec<String> = metadata
+            .and_then(|m| m.get("tags"))
+            .and_then(|t| t.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        let maturity = metadata
+            .and_then(|m| m.get("maturity"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5);
+
+        let latest_version = metadata
+            .and_then(|m| m.get("latest_version"))
+            .and_then(|v| v.as_str().map(String::from));
+
+        let entry = TechReserveEntry {
+            node_id: node.id.clone(),
+            title: node.title.clone(),
+            dimension,
+            domain_tags: domain_tags.clone(),
+            maturity,
+            latest_version,
+            updated_at: node.updated_at,
+            url: node.url.clone(),
+            summary: node.summary.clone(),
+        };
+
+        let idx = self.entries.len();
+        self.entries.push(entry);
+
+        for tag in &domain_tags {
+            self.domain_index.entry(tag.clone()).or_default().push(idx);
+        }
+        self.dimension_index.entry(dimension).or_default().push(idx);
+    }
+
+    /// 从 KB 节点重建索引 (兼容保留 — 大数据集请用 `clear()` + `add_node()` 流式)
+    pub fn rebuild_from_nodes(&mut self, nodes: &[KnowledgeNode]) {
+        self.clear();
         for node in nodes {
-            let Some(dimension) = TechReserveDimension::from_node_type(&node.node_type) else {
-                continue;
-            };
-
-            let metadata = node.metadata.as_ref();
-            let domain_tags: Vec<String> = metadata
-                .and_then(|m| m.get("tags"))
-                .and_then(|t| t.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-                .unwrap_or_default();
-
-            let maturity = metadata
-                .and_then(|m| m.get("maturity"))
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.5);
-
-            let latest_version = metadata
-                .and_then(|m| m.get("latest_version"))
-                .and_then(|v| v.as_str().map(String::from));
-
-            let entry = TechReserveEntry {
-                node_id: node.id.clone(),
-                title: node.title.clone(),
-                dimension,
-                domain_tags: domain_tags.clone(),
-                maturity,
-                latest_version,
-                updated_at: node.updated_at,
-                url: node.url.clone(),
-                summary: node.summary.clone(),
-            };
-
-            let idx = self.entries.len();
-            self.entries.push(entry);
-
-            for tag in &domain_tags {
-                self.domain_index.entry(tag.clone()).or_default().push(idx);
-            }
-            self.dimension_index.entry(dimension).or_default().push(idx);
+            self.add_node(node);
         }
     }
 

@@ -22,6 +22,7 @@ pub mod free_providers;
 pub mod free_pool;
 pub mod gateway;
 pub mod provider_catalog;
+pub mod provider_swap;
 
 // Re-export 核心类型
 pub use types::{
@@ -55,3 +56,4 @@ pub use rate_limiter::TokenBucket;
 
 // Re-export ProviderCatalog
 pub use provider_catalog::{ProviderCategory, ProviderInfo, PROVIDER_CATALOG, lookup_provider, providers_by_category, providers_with_key, keyless_providers};
+pub use provider_swap::{ProviderSwapManager, ProviderHealth, SwapRule, GLOBAL_SWAP_MANAGER, ProviderHealthSummary};

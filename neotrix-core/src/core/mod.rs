@@ -93,6 +93,9 @@ pub mod nt_core_aware;
 
 // L6 中的 consciousness 组件（过渡期保留原路径）
 pub mod nt_core_consciousness;
+pub mod nt_core_consciousness_tree;
+pub mod nt_core_consciousness_review;
+pub mod nt_core_self_constitution;
 
 // ═══════════════════════════════════════════════════════════════════
 // L7 — 能力层 (Capability) — *** 核心新增 ***
@@ -100,6 +103,8 @@ pub mod nt_core_consciousness;
 pub mod l7_capability;
 pub mod nt_core_skill_manifest;
 pub mod nt_core_talent;
+pub mod nt_core_model_skills;
+pub mod nt_core_agent_patterns;
 
 // ═══════════════════════════════════════════════════════════════════
 // L8 — 自主神经层 (Autonomic)
@@ -143,7 +148,14 @@ pub mod nt_core_source_edit;
 pub mod nt_core_vector_store;
 pub mod nt_core_resource_pool;
 pub mod nt_core_data_pipeline;
-
+pub mod nt_core_schema_watchdog;
+pub mod nt_core_self_test;
+pub mod nt_core_memory_budget;
+pub mod nt_core_bounded_collections;
+pub mod nt_core_telemetry;
+pub mod nt_core_answer_engine;
+pub mod nt_core_answer_bridge;
+pub mod nt_core_self_test_integration;
 // Formal verification proof harnesses
 #[cfg(test)]
 pub mod kani_proofs;
@@ -281,6 +293,13 @@ pub use nt_core_self::skill_crystal::{SkillCrystal, CrystalRegistry};
 pub use nt_core_self::system_identity::{SystemIdentity, CognitiveCapability, ValueConstraint};
 pub use nt_core_self::thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
 pub use nt_core_self::intra_reflection::{PreActionIntrospector, IntraReflection, IntraReflectionReport, PredictedOutcome};
+pub use nt_core_self_constitution::{
+    Constitution, DevRule, ExperienceEntry, RuleCategory, ComplianceReport, ComplianceViolation,
+    ConstitutionLoader, global_constitution, reload_constitution,
+};
+pub use nt_core_self_test::{
+    SelfTest, SelfTestRegistry, SelfTestResult, ConstitutionComplianceTest, report as selftest_report,
+};
 
 // --- L9: Transcendent ---
 pub use nt_core_meta::self_model::{

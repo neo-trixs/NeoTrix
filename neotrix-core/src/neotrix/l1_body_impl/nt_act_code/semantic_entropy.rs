@@ -22,6 +22,25 @@ impl Default for SemanticEntropyGate {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for SemanticEntropyGate {
+    fn name(&self) -> &str {
+        "semantic_entropy_gate"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let gate = SemanticEntropyGate::new();
+        if (gate.entropy_threshold - 0.7).abs() > 1e-6 {
+            failures.push("entropy_threshold should default to 0.7".into());
+        }
+        let entropy = SemanticEntropyGate::compute_entropy("hello world test code", &[]);
+        if !(0.0..=1.0).contains(&entropy) {
+            failures.push("entropy out of [0,1] range".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 impl SemanticEntropyGate {
     pub fn new() -> Self {
         Self {

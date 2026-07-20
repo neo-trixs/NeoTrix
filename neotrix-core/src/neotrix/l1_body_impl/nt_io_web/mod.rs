@@ -77,8 +77,8 @@ pub struct ProviderConfigPayload {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub brain: Arc<Mutex<crate::neotrix::nt_mind::ReasoningBrain>>,
-    pub bank: Arc<Mutex<crate::neotrix::nt_mind::ReasoningBank>>,
+    pub brain: Arc<Mutex<Box<dyn crate::core::nt_core_traits::BrainProvider>>>,
+    pub bank: Arc<Mutex<crate::core::ReasoningBank>>,
     pub sessions: Arc<Mutex<Vec<SessionInfo>>>,
     pub permission_counter: Arc<AtomicU64>,
     pub pending_permissions: Arc<Mutex<Vec<PermissionRequest>>>,

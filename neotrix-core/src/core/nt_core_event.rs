@@ -52,6 +52,13 @@ pub enum CoreEvent {
         error: String,
         severity: String,
     },
+    #[serde(rename = "consciousness_critique")]
+    ConsciousnessCritique {
+        quality: f64,
+        relevance: f64,
+        consistency: f64,
+        timestamp: i64,
+    },
 }
 
 // ── Backward-compatible type aliases ──────────────────────────────────────
@@ -111,6 +118,14 @@ mod tests {
     }
 
     #[test]
+    fn test_consciousness_critique() {
+        let e = CoreEvent::ConsciousnessCritique { quality: 0.7, relevance: 0.8, consistency: 0.9, timestamp: 1000 };
+        assert!((e.quality() - 0.7).abs() < 0.01);
+        assert!((e.relevance() - 0.8).abs() < 0.01);
+        assert!((e.consistency() - 0.9).abs() < 0.01);
+    }
+
+    #[test]
     fn test_json_roundtrip() {
         let e = CoreEvent::GoalCompleted { goal_id: "g1".into(), goal: "test".into(), iterations: 5, score: 0.8 };
         let json = serde_json::to_string(&e).unwrap();
@@ -143,4 +158,7 @@ impl CoreEvent {
     pub fn action(&self) -> &str { match self { Self::AgentTeam { action, .. } => action, _ => "" } }
     pub fn component(&self) -> &str { match self { Self::SystemError { component, .. } => component, _ => "" } }
     pub fn severity(&self) -> &str { match self { Self::SystemError { severity, .. } => severity, _ => "" } }
+    pub fn quality(&self) -> f64 { match self { Self::ConsciousnessCritique { quality, .. } => *quality, _ => 0.0 } }
+    pub fn relevance(&self) -> f64 { match self { Self::ConsciousnessCritique { relevance, .. } => *relevance, _ => 0.0 } }
+    pub fn consistency(&self) -> f64 { match self { Self::ConsciousnessCritique { consistency, .. } => *consistency, _ => 0.0 } }
 }

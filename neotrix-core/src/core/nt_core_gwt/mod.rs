@@ -19,6 +19,7 @@ pub mod cognitive_orchestrator;
 pub mod consensus_resonance;
 pub mod pipeline;
 pub mod cognitive_tick;
+pub mod selection_strategy;
 
 pub use geometry_sync::{
     CycleReport, CrossDimensionalResonator, DimensionLayer, GeometrySync, IitPhiCalculator,

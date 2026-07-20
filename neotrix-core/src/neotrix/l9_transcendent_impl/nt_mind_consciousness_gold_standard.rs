@@ -271,6 +271,23 @@ fn linear_slope(data: &[f64]) -> f64 {
     (n * sum_xy - sum_x * sum_y) / denom
 }
 
+impl crate::core::nt_core_self_test::SelfTest for ConsciousnessGoldStandard {
+    fn name(&self) -> &str { "consciousness_gold_standard" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        if self.phi_threshold >= 1.0 || self.phi_threshold <= 0.0 {
+            failures.push("gold_standard: phi_threshold out of range (0,1)".into());
+        }
+        if self.coherence_threshold >= 1.0 || self.coherence_threshold <= 0.0 {
+            failures.push("gold_standard: coherence_threshold out of range (0,1)".into());
+        }
+        if self.max_history == 0 {
+            failures.push("gold_standard: max_history must be > 0".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

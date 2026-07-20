@@ -1,4 +1,40 @@
+use std::sync::LazyLock;
 use std::time::{Duration, Instant};
+
+// ─── StalenessConfig ───
+
+#[derive(Debug, Clone)]
+pub struct StalenessConfig {
+    pub fresh_seconds: f64,
+    pub recent_seconds: f64,
+    pub aging_seconds: f64,
+    pub stale_seconds: f64,
+    pub fresh_retention: f64,
+    pub recent_retention: f64,
+    pub aging_retention: f64,
+    pub stale_retention: f64,
+    pub obsolete_retention: f64,
+    pub change_log_max: usize,
+}
+
+impl Default for StalenessConfig {
+    fn default() -> Self {
+        Self {
+            fresh_seconds: 60.0,
+            recent_seconds: 300.0,
+            aging_seconds: 3600.0,
+            stale_seconds: 86400.0,
+            fresh_retention: 1.0,
+            recent_retention: 0.9,
+            aging_retention: 0.6,
+            stale_retention: 0.3,
+            obsolete_retention: 0.1,
+            change_log_max: 100,
+        }
+    }
+}
+
+pub static STALENESS_CONFIG: LazyLock<StalenessConfig> = LazyLock::new(StalenessConfig::default);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StalenessLevel {
@@ -12,13 +48,14 @@ pub enum StalenessLevel {
 impl StalenessLevel {
     pub fn from_age(age: Duration) -> Self {
         let secs = age.as_secs_f64();
-        if secs < 60.0 {
+        let cfg = &STALENESS_CONFIG;
+        if secs < cfg.fresh_seconds {
             StalenessLevel::Fresh
-        } else if secs < 300.0 {
+        } else if secs < cfg.recent_seconds {
             StalenessLevel::Recent
-        } else if secs < 3600.0 {
+        } else if secs < cfg.aging_seconds {
             StalenessLevel::Aging
-        } else if secs < 86400.0 {
+        } else if secs < cfg.stale_seconds {
             StalenessLevel::Stale
         } else {
             StalenessLevel::Obsolete
@@ -26,12 +63,13 @@ impl StalenessLevel {
     }
 
     pub fn retention_multiplier(&self) -> f64 {
+        let cfg = &STALENESS_CONFIG;
         match self {
-            StalenessLevel::Fresh => 1.0,
-            StalenessLevel::Recent => 0.9,
-            StalenessLevel::Aging => 0.6,
-            StalenessLevel::Stale => 0.3,
-            StalenessLevel::Obsolete => 0.1,
+            StalenessLevel::Fresh => cfg.fresh_retention,
+            StalenessLevel::Recent => cfg.recent_retention,
+            StalenessLevel::Aging => cfg.aging_retention,
+            StalenessLevel::Stale => cfg.stale_retention,
+            StalenessLevel::Obsolete => cfg.obsolete_retention,
         }
     }
 
@@ -73,7 +111,7 @@ impl KnowledgeVersion {
         self.version += 1;
         self.updated_at = Instant::now();
         self.change_log.push(format!("v{}: {}", self.version, description));
-        if self.change_log.len() > 100 {
+        if self.change_log.len() > STALENESS_CONFIG.change_log_max {
             self.change_log.remove(0);
         }
         self.staleness = StalenessLevel::Fresh;

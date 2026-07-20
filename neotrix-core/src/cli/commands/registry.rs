@@ -4,6 +4,7 @@ use crate::cli::commands::types::CommandRegistry;
 use crate::cli::commands::bench_cmds::BenchmarkCmd;
 use crate::cli::commands::agent_cmds::{AgentCmd, DiscoverCmd, McpCmd};
 use crate::cli::commands::brain_cmds::E8Cmd;
+use crate::cli::commands::consciousness_cmds::ConsciousnessCmd;
 use crate::cli::commands::core_cmds::{ClearCmd, CompletionsCmd, ExitCmd, HelpCmd, StatsCmd, VersionCmd, ConfigCmd};
 use crate::cli::commands::cost_cmds::{CostCmd, ApprovalCmd};
 use crate::cli::commands::budget_cmds::BudgetCmd;
@@ -34,6 +35,8 @@ use crate::cli::commands::provider_cmds::ProviderCmd;
 use crate::cli::commands::free_cmds::FreeCmd;
 use crate::cli::commands::kb_cmds::KbCmd;
 use crate::cli::commands::wiki_cmds::WikiCmd;
+use crate::cli::commands::self_audit_cmds::SelfAuditCmd;
+use crate::cli::commands::osint_cmds::OsintCmd;
 use crate::cli::commands::consolidated_cmds::{
     FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd,
 };
@@ -51,6 +54,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ConfigCmd));
     reg.register(Box::new(DoctorCmd));
     reg.register(Box::new(BenchmarkCmd));
+    reg.register(Box::new(ConsciousnessCmd));
 
     // E8 (diagnostic, kept as System)
     reg.register(Box::new(E8Cmd));
@@ -136,6 +140,10 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ConsolidatedAgentCmd));
     reg.register(Box::new(GitAggCmd));
     reg.register(Box::new(SessionAggCmd));
+
+    // L4 capability: Rust-native OSINT and self-audit
+    reg.register(Box::new(OsintCmd));
+    reg.register(Box::new(SelfAuditCmd));
 
     reg
 }

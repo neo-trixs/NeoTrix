@@ -14,6 +14,7 @@ pub mod skill_crystal;
 pub mod system_identity;
 pub mod seal;
 pub mod thinking_trace;
+pub mod self_audit;
 
 pub use archive::{SiliconArchive, SiliconSnapshot, AttentionSnapshot};
 pub use attention_head::{AttentionHead, AttentionDomain, AttentionProfile, AttentionManager};

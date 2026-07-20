@@ -7,6 +7,8 @@ pub mod metacognition_loop;
 pub mod knowledge_gap_detector;
 pub mod scaling_law;
 pub mod eval_bench;
+pub mod nt_core_meta_auditor;
+pub mod nt_core_arch_lint;
 
 pub use self_model::{
     SelfModel, ModuleInfo, FileInfo, DepGraph, DepEdge, DepKind,
@@ -27,3 +29,5 @@ pub use eval_bench::{
     Benchmark, BenchmarkMetric, BenchmarkRunner, BenchmarkSuite,
     EvalResult, RunnerStats,
 };
+pub use nt_core_meta_auditor::MetaAuditor;
+pub use nt_core_arch_lint::ArchLint;

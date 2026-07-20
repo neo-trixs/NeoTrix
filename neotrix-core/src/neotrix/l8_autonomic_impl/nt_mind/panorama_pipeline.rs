@@ -5,6 +5,7 @@ use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_gwt::module_def::{SpecialistModule, SpecialistType};
 use crate::core::nt_core_bank::ReasoningMemory;
 use crate::core::nt_core_edit::MicroEdit;
+use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_world_model::{WorldModelV2, TaskType};
 use crate::neotrix::nt_world_infer::FreeEnergyReport;
 use crate::neotrix::l5_consciousness_impl::nt_core_iit_phi::PhiReport;
@@ -43,6 +44,7 @@ pub struct PanoramaPipeline {
     pub last_forecast: Option<HorizonForecast>,
     pub total_anomalies: u64,
     pub repairs_triggered: u64,
+    pub consciousness: ConsciousnessBridge,
 }
 
 impl PanoramaPipeline {
@@ -57,7 +59,16 @@ impl PanoramaPipeline {
             last_forecast: None,
             total_anomalies: 0,
             repairs_triggered: 0,
+            consciousness: ConsciousnessBridge::new(),
         }
+    }
+
+    pub fn attach_kb(&mut self, kb: std::sync::Arc<KnowledgeBase>) {
+        self.consciousness.attach_kb(kb);
+    }
+
+    pub fn get_kb(&self) -> Option<std::sync::Arc<KnowledgeBase>> {
+        self.consciousness.kb.clone()
     }
 
     /// 运行全景循环: 预测 → 存储 → GWT广播 → 目标生成
@@ -134,7 +145,7 @@ impl PanoramaPipeline {
         );
         self.last_forecast = Some(new_forecast);
 
-        ConsciousnessBridge::from_seal(brain, &mut self.gwt);
+        self.consciousness.maybe_poll(brain, &mut self.gwt);
         let _gwt_count = self.gwt.active_specialists().len();
 
         if anomaly {

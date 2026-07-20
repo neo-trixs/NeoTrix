@@ -240,3 +240,16 @@ mod tests {
         assert!(AlertSeverity::Critical as u8 == 0);
     }
 }
+
+impl crate::core::nt_core_self_test::SelfTest for MetaMonitor {
+    fn name(&self) -> &str { "meta_monitor" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        for alert in &self.alerts {
+            if alert.module.is_some() && alert.module.as_ref().unwrap().trim().is_empty() {
+                failures.push("meta_monitor: alert with empty module name".into());
+            }
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}

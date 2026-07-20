@@ -71,7 +71,7 @@ pub enum ResponseStatus {
     Success,
     Error,
     Unauthorized,
-    RateLimited,
+    RateLimit,
     ShuttingDown,
 }
 
@@ -102,7 +102,7 @@ impl RemoteResponse {
 
     pub fn rate_limited() -> Self {
         Self {
-            status: ResponseStatus::RateLimited,
+            status: ResponseStatus::RateLimit,
             data: serde_json::Value::Null,
             error: Some("Rate limited".into()),
         }

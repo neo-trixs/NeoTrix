@@ -61,27 +61,12 @@ pub use crate::core::nt_core_self::emotion_state::{
 
 // 从 consciousness 移入 L6（自我组件）
 pub use crate::core::nt_core_consciousness::first_person_ref::FirstPersonRef;
-pub use crate::core::nt_core_consciousness::narrative_self::{
-    NarrativeSelf, NarrativeEvent,
-};
 pub use crate::core::nt_core_consciousness::volition::{
     VolitionEngine, ActionCandidate,
 };
 pub use crate::core::nt_core_consciousness::inner_critic::{
     InnerCritic, CritiqueResult,
 };
-pub use crate::core::nt_core_consciousness::value_system::{
-    ValueSystem, CoreValue,
-};
-pub use crate::core::nt_core_consciousness::value_alignment::{
-    ValueAlignment, UserSignal, UserProfile,
-};
 pub use crate::core::nt_core_consciousness::awakening::{
     ConsciousnessAwakening, AwakeningReport,
-};
-pub use crate::core::nt_core_consciousness::default_mode_network::{
-    DefaultModeNetwork, DMNActivity,
-};
-pub use crate::core::nt_core_consciousness::valence_axis::{
-    ValenceAxis, NamedEmotion,
 };

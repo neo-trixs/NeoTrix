@@ -19,7 +19,7 @@ impl PolicyEvaluator {
     pub fn evaluate_policy(
         &self,
         policy: &[usize],
-        belief: &[f64],
+        _belief: &[f64],
         model: &GenerativeModel,
     ) -> f64 {
         let calc = FreeEnergyCalculator::new();

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{params, Connection};
@@ -435,6 +436,145 @@ pub fn upsert_edge(
         metadata: None,
     };
     insert_edge(conn, &edge)
+}
+
+pub fn count_nodes(conn: &Connection) -> rusqlite::Result<usize> {
+    conn.query_row("SELECT COUNT(*) FROM nodes", [], |row| row.get(0))
+}
+
+pub fn count_nodes_by_type(conn: &Connection, node_type: &str) -> rusqlite::Result<usize> {
+    conn.query_row(
+        "SELECT COUNT(*) FROM nodes WHERE node_type=?1",
+        params![node_type],
+        |row| row.get(0),
+    )
+}
+
+pub fn count_edges(conn: &Connection) -> rusqlite::Result<usize> {
+    conn.query_row("SELECT COUNT(*) FROM edges", [], |row| row.get(0))
+}
+
+pub fn count_nodes_by_type_map(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
+    let mut stmt = conn.prepare("SELECT node_type, COUNT(*) FROM nodes GROUP BY node_type")?;
+    let rows = stmt.query_map([], |row| {
+        let node_type: String = row.get(0)?;
+        let count: usize = row.get(1)?;
+        Ok((node_type, count))
+    })?;
+    let mut map = HashMap::new();
+    for row in rows {
+        let (k, v) = row?;
+        map.insert(k, v);
+    }
+    Ok(map)
+}
+
+pub fn count_nodes_by_domain(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
+    let mut stmt = conn.prepare("SELECT COALESCE(domain,'unknown'), COUNT(*) FROM nodes GROUP BY domain")?;
+    let rows = stmt.query_map([], |row| {
+        let domain: String = row.get(0)?;
+        let count: usize = row.get(1)?;
+        Ok((domain, count))
+    })?;
+    let mut map = HashMap::new();
+    for row in rows {
+        let (k, v) = row?;
+        map.insert(k, v);
+    }
+    Ok(map)
+}
+
+pub fn count_edges_by_type(conn: &Connection) -> rusqlite::Result<HashMap<String, usize>> {
+    let mut stmt = conn.prepare("SELECT relation_type, COUNT(*) FROM edges GROUP BY relation_type")?;
+    let rows = stmt.query_map([], |row| {
+        let rel_type: String = row.get(0)?;
+        let count: usize = row.get(1)?;
+        Ok((rel_type, count))
+    })?;
+    let mut map = HashMap::new();
+    for row in rows {
+        let (k, v) = row?;
+        map.insert(k, v);
+    }
+    Ok(map)
+}
+
+pub fn count_nodes_by_domain_and_type(conn: &Connection) -> rusqlite::Result<Vec<(String, String, usize)>> {
+    let mut stmt = conn.prepare(
+        "SELECT COALESCE(domain,'unknown'), node_type, COUNT(*) FROM nodes GROUP BY domain, node_type ORDER BY domain"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, usize>(2)?))
+    })?;
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row?);
+    }
+    Ok(results)
+}
+
+pub fn get_stale_node_count(conn: &Connection, older_than_days: i64) -> rusqlite::Result<usize> {
+    let cutoff = now() - older_than_days * 86400;
+    conn.query_row(
+        "SELECT COUNT(*) FROM nodes WHERE updated_at < ?1",
+        params![cutoff],
+        |row| row.get(0),
+    )
+}
+
+pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata FROM nodes ORDER BY rowid LIMIT ?1 OFFSET ?2"
+    )?;
+    let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
+        Ok(KnowledgeNode {
+            id: row.get(0)?,
+            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+            title: row.get(2)?,
+            summary: row.get(3)?,
+            content: row.get(4)?,
+            url: row.get(5)?,
+            domain: row.get(6)?,
+            language: row.get(7)?,
+            confidence: row.get(8)?,
+            importance: row.get(9)?,
+            created_at: row.get(10)?,
+            updated_at: row.get(11)?,
+            access_count: row.get(12)?,
+            metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+            temporal: None,
+            supersedes: None,
+            source_episode: None,
+        })
+    })?;
+    let mut nodes = Vec::with_capacity(limit.min(4096));
+    for row in rows {
+        nodes.push(row?);
+    }
+    Ok(nodes)
+}
+
+pub fn get_edges_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeEdge>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, source_id, target_id, relation_type, weight, description, created_at, metadata FROM edges ORDER BY rowid LIMIT ?1 OFFSET ?2"
+    )?;
+    let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
+        Ok(KnowledgeEdge {
+            id: row.get(0)?,
+            source_id: row.get(1)?,
+            target_id: row.get(2)?,
+            relation_type: RelationType::from_str(&row.get::<_, String>(3)?),
+            weight: row.get(4)?,
+            description: row.get(5)?,
+            created_at: row.get(6)?,
+            metadata: row.get::<_, Option<String>>(7)?.and_then(|m| serde_json::from_str(&m).ok()),
+        })
+    })?;
+    let mut edges = Vec::with_capacity(limit.min(4096));
+    for row in rows {
+        edges.push(row?);
+    }
+    Ok(edges)
 }
 
 pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> {

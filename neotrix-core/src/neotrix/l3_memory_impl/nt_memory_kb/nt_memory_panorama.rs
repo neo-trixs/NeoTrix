@@ -174,63 +174,157 @@ impl KnowledgePanoramaBuilder {
         Ok(pano)
     }
 
-    /// 生成简化的知识链路视图（用于快速查看）
+    /// 生成简化的知识链路视图（用于快速查看）— SQL COUNT-based
     pub fn build_quick_summary(&self) -> Result<String, String> {
-        let all_nodes = {
-            let conn = self.kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-            store::get_all_nodes(&conn).map_err(|e| format!("get_all: {}", e))?
-        };
-        let all_edges = {
-            let conn = self.kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-            store::get_all_edges(&conn).map_err(|e| format!("get_all_edges: {}", e))?
-        };
+        let conn = self.kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
 
-        let by_type = self.compute_type_distribution(&all_nodes);
-        let by_domain = self.compute_domain_summary(&all_nodes);
-        let freshness = self.compute_freshness(&all_nodes);
-        let gaps = self.detect_gaps(
-            &self.compute_domain_coverage(&all_nodes, &all_edges),
-            &all_nodes,
-            &all_edges,
-        );
+        let by_type = store::count_nodes_by_type_map(&conn)
+            .map_err(|e| format!("count_by_type: {}", e))?;
+        let total_nodes: usize = by_type.values().sum();
+        let total_edges = store::count_edges(&conn)
+            .map_err(|e| format!("count_edges: {}", e))?;
+        let by_domain = store::count_nodes_by_domain(&conn)
+            .map_err(|e| format!("count_by_domain: {}", e))?;
+        let stale_count = store::get_stale_node_count(&conn, 90)
+            .map_err(|e| format!("stale: {}", e))?;
+
+        let now_ts = now();
+        let day_secs: i64 = 86400;
+        let week_secs = 7 * day_secs;
+        let month_secs = 30 * day_secs;
+
+        let today_count: usize = conn.query_row(
+            "SELECT COUNT(*) FROM nodes WHERE ?1 - updated_at <= ?2",
+            rusqlite::params![now_ts, day_secs], |row| row.get(0),
+        ).map_err(|e| format!("today: {}", e))?;
+        let week_count: usize = conn.query_row(
+            "SELECT COUNT(*) FROM nodes WHERE ?1 - updated_at <= ?2",
+            rusqlite::params![now_ts, week_secs], |row| row.get(0),
+        ).map_err(|e| format!("week: {}", e))?;
+        let month_count: usize = conn.query_row(
+            "SELECT COUNT(*) FROM nodes WHERE ?1 - updated_at <= ?2",
+            rusqlite::params![now_ts, month_secs], |row| row.get(0),
+        ).map_err(|e| format!("month: {}", e))?;
+        let avg_age: f64 = conn.query_row(
+            "SELECT COALESCE(AVG(?1 - updated_at), 0.0) FROM nodes",
+            rusqlite::params![now_ts], |row| row.get(0),
+        ).map_err(|e| format!("avg_age: {}", e))?;
+        let avg_age_days = avg_age / 86400.0;
+
+        let target_domains = [
+            "github.com", "arxiv.org", "wikipedia.org", "github.com/topic",
+            "neotrix", "mathematics", "physics", "computer_science",
+            "philosophy", "neuroscience", "cognitive_science",
+            "programming_language", "package_ecosystem", "distiller",
+            "github_absorber", "consciousness",
+        ];
+
+        let mut type_vec: Vec<_> = by_type.into_iter().collect();
+        type_vec.sort_by(|a, b| b.1.cmp(&a.1));
+        let mut domain_vec: Vec<_> = by_domain.into_iter().collect();
+        domain_vec.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let gaps = self.build_gap_lines(&target_domains, &domain_vec, stale_count, &conn)?;
+
+        drop(conn);
 
         let mut lines = Vec::new();
         lines.push("╔══════════════════════════════════════╗".into());
         lines.push("║     Knowledge Panorama Summary       ║".into());
         lines.push("╚══════════════════════════════════════╝".into());
         lines.push(String::new());
-        lines.push(format!("📊 Total: {} nodes, {} edges", all_nodes.len(), all_edges.len()));
+        lines.push(format!("📊 Total: {} nodes, {} edges", total_nodes, total_edges));
         lines.push(String::new());
         lines.push("📁 By Type:".into());
-        for (ntype, count) in &by_type {
+        for (ntype, count) in &type_vec {
             if *count > 0 {
                 lines.push(format!("  • {}: {}", ntype, count));
             }
         }
         lines.push(String::new());
         lines.push("🌐 By Domain:".into());
-        for (domain, count) in &by_domain {
+        for (domain, count) in &domain_vec {
             if *count > 0 {
                 lines.push(format!("  • {}: {} nodes", domain, count));
             }
         }
         lines.push(String::new());
         lines.push("⏱ Freshness:".into());
-        lines.push(format!("  • Today: {} | Week: {} | Month: {}", freshness.nodes_updated_today, freshness.nodes_updated_this_week, freshness.nodes_updated_this_month));
-        lines.push(format!("  • Stale (>90d): {} | Avg age: {:.1} days", freshness.stale_nodes, freshness.avg_age_days));
+        lines.push(format!("  • Today: {} | Week: {} | Month: {}", today_count, week_count, month_count));
+        lines.push(format!("  • Stale (>90d): {} | Avg age: {:.1} days", stale_count, avg_age_days));
         lines.push(String::new());
         lines.push("⚠ Gaps:".into());
         for gap in &gaps {
-            let icon = match gap.severity {
-                GapSeverity::Critical => "🔴",
-                GapSeverity::Major => "🟠",
-                GapSeverity::Minor => "🟡",
-                GapSeverity::Suggestion => "💡",
-            };
-            lines.push(format!("  {} [{}] {}: {}", icon, gap.gap_type.gap_type_name(), gap.domain, gap.description));
+            lines.push(gap.clone());
         }
 
         Ok(lines.join("\n"))
+    }
+
+    // ── Private: Gap lines for quick summary ──
+
+    fn build_gap_lines(
+        &self,
+        target_domains: &[&str],
+        domain_vec: &[(String, usize)],
+        stale_count: usize,
+        conn: &rusqlite::Connection,
+    ) -> Result<Vec<String>, String> {
+        let domain_map: std::collections::HashMap<&str, usize> =
+            domain_vec.iter().map(|(d, c)| (d.as_str(), *c)).collect();
+
+        let mut gaps: Vec<String> = Vec::new();
+        for domain in target_domains {
+            let count = domain_map.get(domain).copied().unwrap_or(0);
+            if count == 0 {
+                gaps.push(format!(
+                    "  🔴 [Missing Domain] {}: No knowledge nodes in '{}' domain",
+                    domain, domain
+                ));
+            } else {
+                let threshold = match *domain {
+                    "github.com" => 20.0,
+                    "arxiv.org" => 10.0,
+                    "wikipedia.org" => 50.0,
+                    "mathematics" | "physics" | "computer_science" | "philosophy" => 15.0,
+                    "neotrix" => 10.0,
+                    _ => 5.0,
+                };
+                let coverage = (count as f64 / threshold).min(1.0);
+                if coverage < 0.3 {
+                    gaps.push(format!(
+                        "  🟠 [Underserved] {}: Only {} nodes (coverage {:.1}%)",
+                        domain,
+                        count,
+                        coverage * 100.0
+                    ));
+                }
+            }
+        }
+
+        if stale_count > 0 {
+            gaps.push(format!(
+                "  🔴 [Stale] global: {} nodes not updated in 90+ days",
+                stale_count
+            ));
+        }
+
+        let orphan_count: usize = conn
+            .query_row(
+                "SELECT COUNT(*) FROM nodes n WHERE NOT EXISTS \
+                 (SELECT 1 FROM edges e WHERE e.source_id = n.id OR e.target_id = n.id)",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("orphan_count: {}", e))?;
+        if orphan_count > 0 {
+            gaps.push(format!(
+                "  💡 [Orphaned] global: {} nodes have no connections",
+                orphan_count
+            ));
+        }
+
+        Ok(gaps)
     }
 
     // ── Private: Stats ──

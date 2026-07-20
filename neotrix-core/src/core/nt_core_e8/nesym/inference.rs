@@ -136,17 +136,21 @@ impl InferenceEngine {
         for _step in 0..max_steps {
             let mut added = false;
             for rule in &self.rules {
-                for fact in &derived {
-                    if let Some(_bindings) = self.unify(&rule.head, fact) {
-                        let all_body_match = rule.body.iter().all(|b| {
-                            derived.iter().any(|f| self.unify(b, f).is_some())
-                        });
-                        if all_body_match {
-                            let conf = rule.weight * fact.confidence;
+                for fact in &derived.clone() {
+                    if rule.body.len() == 1 {
+                        if let Some(bindings) = self.unify(&rule.body[0], fact) {
+                            let new_args: Vec<NesyValue> = rule.head.args.iter()
+                                .map(|arg| match arg {
+                                    NesyValue::Variable(var) => bindings.get(var)
+                                        .cloned()
+                                        .unwrap_or_else(|| NesyValue::Variable(var.clone())),
+                                    other => other.clone(),
+                                })
+                                .collect();
                             let candidate = NesyFact {
                                 predicate: rule.head.predicate.clone(),
-                                args: rule.head.args.clone(),
-                                confidence: conf,
+                                args: new_args,
+                                confidence: rule.weight * fact.confidence,
                             };
                             if !derived.iter().any(|f| {
                                 f.predicate == candidate.predicate && f.args == candidate.args

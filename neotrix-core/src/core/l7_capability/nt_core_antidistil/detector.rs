@@ -384,6 +384,34 @@ fn detect_repetition(text: &str) -> f64 {
     1.0 - (unique.len() as f64 / total)
 }
 
+impl crate::core::nt_core_self_test::SelfTest for DistillationDetector {
+    fn name(&self) -> &str {
+        "distillation_detector"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let d = DistillationDetector::new();
+        if !d.enabled {
+            failures.push("detector should be enabled by default".into());
+        }
+        if !d.alert_history.is_empty() {
+            failures.push("alert_history should be empty initially".into());
+        }
+        let mut d2 = DistillationDetector::new();
+        d2.record_request("test_source", "prompt content", 0.7, 512, 256);
+        let stats = d2.stats();
+        if stats.total_alerts != 0 {
+            failures.push("unexpected alerts after one request".into());
+        }
+        let analysis = analyze_response_pattern("The answer is A. Therefore we choose A. Finally we use A.");
+        if analysis.score < 0.0 || analysis.score > 1.0 {
+            failures.push("analysis score out of [0,1] range".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
