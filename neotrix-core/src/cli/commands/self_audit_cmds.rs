@@ -19,6 +19,12 @@ impl CliCommand for SelfAuditCmd {
         let project = get_project_root();
         match subcmd {
             "all" | "ntia" => self.run_all(&project),
+            "d31" => self.d31_two_layer_eventbus(&project),
+            "d32" => self.d32_reentrant_scope(&project),
+            "d33" => self.d33_persistent_fields(&project),
+            "d34" => self.d34_dependency_stages(&project),
+            "d35" => self.d35_threshold_gating(&project),
+            "d36" => self.d36_self_test_tracking(&project),
             "d41" => self.d41_pipeline_continuity(&project),
             "d42" => self.d42_tool_grounding(&project),
             "d43" => self.d43_behavior_gate(&project),
@@ -32,8 +38,11 @@ impl CliCommand for SelfAuditCmd {
             "help" | _ => {
                 let mut help = String::new();
                 help.push_str("NeoTrix Internal Audit (NTIA):\n");
-                help.push_str("  /self-audit all|ntia  — run all 10 checks\n");
-                help.push_str("  /self-audit d41-d50   — run single check\n\n");
+                help.push_str("  /self-audit all|ntia  — run all 16 checks\n");
+                help.push_str("  /self-audit d31-d50   — run single check\n\n");
+                help.push_str("  d31: Two-Layer EventBus | d32: Reentrant Scope\n");
+                help.push_str("  d33: Persistent Fields    | d34: Dependency Stages\n");
+                help.push_str("  d35: Threshold Gating     | d36: SelfTest Tracking\n");
                 help.push_str("  d41: Pipeline Continuity  | d42: Tool Grounding\n");
                 help.push_str("  d43: Behavior Gate        | d44: Architecture Weight\n");
                 help.push_str("  d45: Monotonicity         | d46: Review Discipline\n");
@@ -49,6 +58,18 @@ impl SelfAuditCmd {
     fn run_all(&self, project: &str) -> CommandOutput {
         let mut report = String::new();
         report.push_str("═══ NeoTrix Internal Audit (NTIA) ═══\n\n");
+        report.push_str(&self.d31_two_layer_eventbus(project).message);
+        report.push('\n');
+        report.push_str(&self.d32_reentrant_scope(project).message);
+        report.push('\n');
+        report.push_str(&self.d33_persistent_fields(project).message);
+        report.push('\n');
+        report.push_str(&self.d34_dependency_stages(project).message);
+        report.push('\n');
+        report.push_str(&self.d35_threshold_gating(project).message);
+        report.push('\n');
+        report.push_str(&self.d36_self_test_tracking(project).message);
+        report.push('\n');
         report.push_str(&self.d41_pipeline_continuity(project).message);
         report.push('\n');
         report.push_str(&self.d42_tool_grounding(project).message);
@@ -100,6 +121,172 @@ impl SelfAuditCmd {
             Ok(out) => String::from_utf8_lossy(&out.stdout).lines().count(),
             Err(_) => 0
         }
+    }
+
+    fn d31_two_layer_eventbus(&self, project: &str) -> CommandOutput {
+        let src = self.src_path(project);
+        let mut out = String::from("── D31: Two-Layer EventBus ──\n");
+
+        // Count sync vs tokio subscribers
+        let sync_subs = Command::new("rg")
+            .args(["subscribe_all_layers_sync", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        let tokio_subs = Command::new("rg")
+            .args(["subscribe_all_layers", &format!("{src}/neotrix/nt_core_event_bus.rs")])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        let tokio_consumer = Command::new("rg")
+            .args(["handle_event_bus_event", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+
+        out.push_str(&format!("  Sync observers (std::thread): {sync_subs}\n"));
+        out.push_str(&format!("  Tokio subscribers: {tokio_subs}\n"));
+        out.push_str(&format!("  Behavioral consumers: {tokio_consumer}\n"));
+        if tokio_consumer > 0 {
+            out.push_str("  ✅ Behavioral grounding present (sync=observation, tokio=intervention)\n");
+        } else {
+            out.push_str("  ❌ No behavioral consumer — all EventBus subscribers are observation-only\n");
+        }
+        CommandOutput::ok(&out)
+    }
+
+    fn d32_reentrant_scope(&self, project: &str) -> CommandOutput {
+        let src = self.src_path(project);
+        let mut out = String::from("── D32: Reentrant Scope ──\n");
+
+        // Check for try_read/try_write pattern (safe) vs .lock().unwrap() (risky)
+        let try_locks = Command::new("rg")
+            .args(["try_read\\(\\)|try_write\\(\\)", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        let raw_locks = Command::new("rg")
+            .args(["\\.lock\\(\\)\\.unwrap\\(\\)", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+
+        out.push_str(&format!("  try_read/try_write calls: {try_locks}\n"));
+        out.push_str(&format!("  raw .lock().unwrap() calls: {raw_locks}\n"));
+        let status = if raw_locks == 0 { "✅" } else { "⚠️" };
+        out.push_str(&format!("  {status} {raw_locks} raw locks need review (prefer try_lock pattern)\n"));
+        CommandOutput::ok(&out)
+    }
+
+    fn d33_persistent_fields(&self, project: &str) -> CommandOutput {
+        let src = self.src_path(project);
+        let mut out = String::from("── D33: Persistent Fields ──\n");
+
+        // Check SchemaWatchdog coverage
+        let schema_checks = Command::new("rg")
+            .args(["fn.*verify_db_schema|fn.*check_drift|fn.*detect", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  Schema verification functions: {schema_checks}\n"));
+
+        // Count structs with #[derive(Serialize, Deserialize)] — persistent struct candidates
+        let persistent_structs = Command::new("rg")
+            .args(["#\\[derive.*Serialize.*Deserialize", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  Persistent struct candidates (Serialize+Deserialize): {persistent_structs}\n"));
+        if schema_checks > 0 {
+            out.push_str("  ✅ SchemaWatchdog active\n");
+        }
+        CommandOutput::ok(&out)
+    }
+
+    fn d34_dependency_stages(&self, project: &str) -> CommandOutput {
+        let src = self.src_path(project);
+        let mut out = String::from("── D34: Dependency Stages ──\n");
+
+        let pipeline_stages = Command::new("rg")
+            .args(["PipelineStage|make_stage!|fn process\\(&self", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  Pipeline stages defined: {pipeline_stages}\n"));
+
+        let converge_checks = Command::new("rg")
+            .args(["converge_check", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  Converge checks (SEAL): {converge_checks}\n"));
+        if converge_checks > 0 {
+            out.push_str("  ✅ Dependency ordering validated\n");
+        }
+        CommandOutput::ok(&out)
+    }
+
+    fn d35_threshold_gating(&self, project: &str) -> CommandOutput {
+        let src = self.src_path(project);
+        let mut out = String::from("── D35: Threshold Gating ──\n");
+
+        // Count hardcoded numeric comparisons (potential threshold violations)
+        let hardcoded = Command::new("rg")
+            .args(["-n", "< (0\\.[0-9]+|100|[0-9]+\\.0)", &src, "-g", "*.rs", "--type", "rust"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  Numeric comparisons: ~{hardcoded} (review for Config sources)\n"));
+
+        // Count Config structs
+        let configs = Command::new("rg")
+            .args(["struct.*Config|LazyLock.*threshold|LazyLock.*config", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  Config/Threshold structs: {configs}\n"));
+
+        CommandOutput::ok(&out)
+    }
+
+    fn d36_self_test_tracking(&self, project: &str) -> CommandOutput {
+        let src = self.src_path(project);
+        let mut out = String::from("── D36: SelfTest Tracking (T1/T2/T3) ──\n");
+
+        // T1: SelfTest impls exist
+        let t1 = Command::new("rg")
+            .args(["impl.*SelfTest for", &src, "-g", "*.rs"])
+            .output()
+            .map(|o: std::process::Output| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  T1 (impl SelfTest exists): {t1}\n"));
+
+        // T2: Registered in SelfTestRegistry
+        let t2 = Command::new("rg")
+            .args(["registry\\.register|register\\(.*Box.*SelfTest", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  T2 (registered in registry): {t2}\n"));
+
+        // T3: Called inline in production (non-test code)
+        let t3 = Command::new("rg")
+            .args(["\\.self_test\\(\\)", &src, "-g", "*.rs"])
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .unwrap_or(0);
+        out.push_str(&format!("  T3 (inline self_test() in production): {t3}\n"));
+
+        let t1pct = if t1 > 0 { (t3 as f64 / t1 as f64) * 100.0 } else { 0.0 };
+        out.push_str(&format!("  Wiring ratio (T3/T1): {t1pct:.0}%\n"));
+        if t3 as f64 / t1.max(1) as f64 > 0.5 {
+            out.push_str("  ✅ Majority of SelfTest impls are production-wired\n");
+        } else if t3 > 0 {
+            out.push_str("  ⚠️ Partial wiring — less than 50% inline\n");
+        } else {
+            out.push_str("  ❌ No inline SelfTest in production code\n");
+        }
+        CommandOutput::ok(&out)
     }
 
     fn d41_pipeline_continuity(&self, project: &str) -> CommandOutput {

@@ -45,6 +45,7 @@ mod handlers;
 pub mod always_on;
 
 pub use run::BackgroundLoopHandle;
+pub use run::CONSCIOUSNESS_THRESHOLDS;
 
 /// Broadcast shutdown signal to all background handler tasks.
 /// Created in `start()`, consumed in `shutdown()`.

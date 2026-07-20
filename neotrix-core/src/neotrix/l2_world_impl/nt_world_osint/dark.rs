@@ -1,3 +1,4 @@
+use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
 use reqwest::Client;
@@ -174,26 +175,107 @@ fn clean_html(input: &str) -> String {
     result
 }
 
-pub async fn investigate(target: &OsintTarget, client: &Client, _config: &OsintConfig) -> Result<DarkFindings, String> {
+/// Check if a Tor SOCKS5 proxy is available at 127.0.0.1:9050
+fn check_tor_proxy() -> bool {
+    let addr = match "127.0.0.1:9050".to_socket_addrs() {
+        Ok(mut addrs) => match addrs.next() {
+            Some(a) => a,
+            None => return false,
+        },
+        Err(_) => return false,
+    };
+    // Try TCP connect with short timeout
+    TcpStream::connect_timeout(&addr, Duration::from_millis(1500)).is_ok()
+}
+
+/// Create a Tor-proxied reqwest client (SOCKS5h to 127.0.0.1:9050)
+fn build_tor_client(timeout_secs: u64) -> Result<Client, String> {
+    let proxy = reqwest::Proxy::all("socks5h://127.0.0.1:9050")
+        .map_err(|e| format!("proxy error: {e}"))?;
+    Client::builder()
+        .proxy(proxy)
+        .timeout(Duration::from_secs(timeout_secs))
+        .https_only(false) // allow .onion via Tor
+        .build()
+        .map_err(|e| format!("client error: {e}"))
+}
+
+/// Search Ahmia through Tor for dark web content
+async fn search_ahmia_via_tor(query: &str, tor_client: &Client) -> Vec<DarkWebResult> {
+    // Ahmia .onion service
+    let url = format!("http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion/search/?q={}", urlencode(query));
+    match tor_client.get(&url)
+        .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36")
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            let body = resp.text().await.unwrap_or_default();
+            let mut results = Vec::new();
+            for line in body.lines() {
+                if line.contains("class=\"result\"") || line.contains("class=\"search-result\"") {
+                    let title = extract_between(line, "<h3>", "</h3>")
+                        .or_else(|| extract_between(line, "<a", "</a>"))
+                        .unwrap_or("result");
+                    let snippet = extract_between(line, "<p>", "</p>").unwrap_or("");
+                    results.push(DarkWebResult {
+                        title: clean_html(title),
+                        url: extract_href(line).unwrap_or_default(),
+                        snippet: clean_html(snippet),
+                        source: "ahmia-tor".to_string(),
+                        host: None,
+                    });
+                }
+            }
+            results.truncate(30);
+            results
+        }
+        _ => vec![],
+    }
+}
+
+pub async fn investigate(target: &OsintTarget, client: &Client, config: &OsintConfig) -> Result<DarkFindings, String> {
     let domain = target.domain.as_ref().ok_or("no domain specified")?;
     let mut findings = DarkFindings {
         domain: domain.to_string(),
         ..Default::default()
     };
 
-    // Search Ahmia for the domain
-    let ahmia_results = search_ahmia(domain, client).await;
-    if !ahmia_results.is_empty() {
-        findings.results.extend(ahmia_results);
+    // Detect Tor proxy
+    let tor_available = if config.use_proxy {
+        let available = check_tor_proxy();
+        if !available {
+            log::warn!("[dark] Tor proxy not found at 127.0.0.1:9050 — falling back to clearnet Ahmia");
+        }
+        available
+    } else {
+        false
+    };
+
+    if tor_available {
+        // Full dark web capability via Tor
+        if let Ok(tor_client) = build_tor_client(config.timeout_secs) {
+            let ahmia_tor = search_ahmia_via_tor(domain, &tor_client).await;
+            if !ahmia_tor.is_empty() {
+                findings.results.extend(ahmia_tor);
+                log::info!("[dark] {} results from Ahmia .onion", findings.results.len());
+            }
+        }
+    } else {
+        // Clearnet fallback: search Ahmia (clearnet) + Facebook Watcher + .onion reference scanning
+        let ahmia_results = search_ahmia(domain, client).await;
+        if !ahmia_results.is_empty() {
+            findings.results.extend(ahmia_results);
+        }
+
+        let fw_results = search_facebook_watch(domain, client).await;
+        if !fw_results.is_empty() {
+            findings.results.extend(fw_results);
+        }
     }
 
-    // Search Facebook Watcher
-    let fw_results = search_facebook_watch(domain, client).await;
-    if !fw_results.is_empty() {
-        findings.results.extend(fw_results);
-    }
-
-    // Search for .onion references in clearnet
+    // Always scan clearnet for .onion references
     let url = format!("https://duckduckgo.com/html/?q={}+site%3Aonion", urlencode(domain));
     match client.get(&url)
         .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
@@ -205,7 +287,6 @@ pub async fn investigate(target: &OsintTarget, client: &Client, _config: &OsintC
             let body = resp.text().await.unwrap_or_default();
             for line in body.lines() {
                 if line.contains(".onion") {
-                    // Extract .onion URLs
                     let mut rest = line;
                     while let Some(start) = rest.find("http") {
                         let candidate = &rest[start..];

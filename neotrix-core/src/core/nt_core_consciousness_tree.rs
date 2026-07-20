@@ -224,6 +224,9 @@ impl ConsciousnessTree {
             "Fruit-Bound: Every module registers in consciousness tree".into(),
             "Branch Health Gate: Health >= 0.5 before new growth".into(),
             "Hexagram Derivation: Config from E8 state, not static YAML".into(),
+            "Dual-Process: Fast intuitive (GWT) + Slow reflective (ConsciousnessTree) as separate architectural slots".into(),
+            "Principle-Absorption: Encode principle-level abstractions over instance-level copies".into(),
+            "Self-Referential Audit: Audit protocol must audit itself for open-ended evolution".into(),
         ];
         self.roots.active_rule_categories = vec![
             "TreeGrowth".into(),

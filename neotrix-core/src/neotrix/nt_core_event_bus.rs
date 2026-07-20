@@ -205,7 +205,7 @@ pub fn subscribe_layer(bus: &EventBus, layer: LayerId) -> tokio::task::JoinHandl
                         crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                             log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                         }
-                        crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < 0.3 => {
+                            crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::neotrix::l8_autonomic_impl::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
                             log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                         }
                         _ => {
@@ -275,7 +275,7 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
                             crate::core::nt_core_event::CoreEvent::GlobalHalt { reason, source } => {
                                 log::error!("[event-bus:{}] GLOBAL HALT: {} from {}", layer_label, reason, source);
                             }
-                            crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < 0.3 => {
+                        crate::core::nt_core_event::CoreEvent::ConsciousnessCritique { quality, .. } if *quality < crate::neotrix::l8_autonomic_impl::nt_mind_background_loop::CONSCIOUSNESS_THRESHOLDS.eventbus_critical => {
                                 log::warn!("[event-bus:{}] consciousness quality LOW ({:.3})", layer_label, quality);
                             }
                             _ => {
