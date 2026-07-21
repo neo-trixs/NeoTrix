@@ -102,7 +102,7 @@ check_api() {
 
 check_api "opencode" "https://api.opencode.ai/v1/models" ""
 check_api "xiaohuxing" "https://api.xiaohuxing.eu.org/v1/models" \
-  "Authorization: Bearer sk-OWmevZU06pTOqF6FzmFXYwCYpGhJEmloWfu0fbF6310OF18v"
+  "Authorization: Bearer ${XIAOHUXING_API_KEY:?XIAOHUXING_API_KEY not set}"
 
 if $QUICK; then
   echo ""
