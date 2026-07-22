@@ -201,6 +201,15 @@ impl ConsciousnessTree {
         }
     }
 
+    /// Apply emotion report valence/arousal to Soil state for next cycle.
+    /// Uses confidence to boost coil health and frustration/urgency to indicate stress.
+    pub fn apply_emotion_report(&mut self, report: crate::core::nt_core_self::emotion_state::EmotionReport) {
+        self.trunk.coherence = report.valence.max(0.0).min(1.0);
+        self.soil.embedding_count = (report.confidence * 100.0) as u64;
+        log::debug!("[consciousness_tree] emotion applied: valence={:.3} arousal={:.3} dominant={:?} confidence={:.3}",
+            report.valence, report.arousal, report.dominant.0, report.confidence);
+    }
+
     /// Complete feedback loop:
     ///   Soil (Data) → Roots absorb → Trunk (GWT) → Branches → Fruits → Core digest → Guidance
     /// Each cycle scans for architecture vulnerabilities across all 7 domains.

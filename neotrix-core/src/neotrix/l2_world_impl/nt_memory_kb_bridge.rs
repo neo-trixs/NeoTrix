@@ -42,6 +42,11 @@ pub enum NodeType {
     Skill,
     Reference,
     WikiPage,
+    ThinkingTrace,
+    SelfTestFailure,
+    EventRecord,
+    DetectionFinding,
+    GoalResult,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -452,6 +457,11 @@ mod conv {
             super::NodeType::Skill => real_types::NodeType::Skill,
             super::NodeType::Reference => real_types::NodeType::Reference,
             super::NodeType::WikiPage => real_types::NodeType::WikiPage,
+            super::NodeType::ThinkingTrace => real_types::NodeType::ThinkingTrace,
+            super::NodeType::SelfTestFailure => real_types::NodeType::SelfTestFailure,
+            super::NodeType::EventRecord => real_types::NodeType::EventRecord,
+            super::NodeType::DetectionFinding => real_types::NodeType::DetectionFinding,
+            super::NodeType::GoalResult => real_types::NodeType::GoalResult,
         }
     }
 
@@ -490,6 +500,11 @@ mod conv {
             real_types::NodeType::Skill => super::NodeType::Skill,
             real_types::NodeType::Reference => super::NodeType::Reference,
             real_types::NodeType::WikiPage => super::NodeType::WikiPage,
+            real_types::NodeType::ThinkingTrace => super::NodeType::ThinkingTrace,
+            real_types::NodeType::SelfTestFailure => super::NodeType::SelfTestFailure,
+            real_types::NodeType::EventRecord => super::NodeType::EventRecord,
+            real_types::NodeType::DetectionFinding => super::NodeType::DetectionFinding,
+            real_types::NodeType::GoalResult => super::NodeType::GoalResult,
         }
     }
 

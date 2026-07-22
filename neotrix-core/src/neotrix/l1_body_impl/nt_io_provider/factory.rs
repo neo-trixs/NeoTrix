@@ -546,7 +546,14 @@ pub async fn create_gateway_async() -> GatewayV2 {
 }
 
 /// 同步版本 — 保留向后兼容 (内部调用 block_on)
+/// 如果已在 tokio runtime 上下文中，使用 Handle::current() 避免嵌套
 pub fn create_gateway() -> GatewayV2 {
-    let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime for gateway init");
-    rt.block_on(create_gateway_async())
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        tokio::task::block_in_place(|| {
+            handle.block_on(create_gateway_async())
+        })
+    } else {
+        let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime for gateway init");
+        rt.block_on(create_gateway_async())
+    }
 }

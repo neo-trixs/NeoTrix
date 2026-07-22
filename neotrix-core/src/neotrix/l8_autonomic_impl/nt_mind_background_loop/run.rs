@@ -30,6 +30,10 @@ use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager
 use crate::neotrix::nt_core_event_bus::{EventBus, subscribe_all_layers_sync};
 use crate::neotrix::nt_mind::distillation::MetaCognitionBridge;
 use crate::core::nt_core_event::CoreEvent;
+use crate::core::nt_core_scoring_substrate::ScoringSubstrate;
+use crate::core::nt_core_state_substrate::StateSubstrate;
+use crate::core::nt_core_delegate_engine::DelegateEngine;
+use crate::core::nt_core_simulate_engine::SimulateEngine;
 
 impl BackgroundLoop {
     /// Spawn all background handlers as independent tokio tasks.
@@ -68,6 +72,40 @@ impl BackgroundLoop {
         // Wrap self so each spawned task gets its own reference.
         let cleanup_engine = self.cleanup_engine.take();
         let kb = self.kb.clone();
+
+        // ── Import knowledge assets at startup ──
+        if let Some(ref kb_ref) = kb {
+            let assets_path = std::path::Path::new("assets/knowledge_data.json");
+            if assets_path.exists() {
+                match kb_ref.import_knowledge_assets(assets_path) {
+                    Ok(report) => {
+                        if report.imported > 0 || report.edges_created > 0 {
+                            log::info!("[knowledge-assets] Imported {} nodes, {} edges ({} errors)",
+                                report.imported, report.edges_created, report.errors.len());
+                        }
+                    }
+                    Err(e) => log::warn!("[knowledge-assets] Import failed: {}", e),
+                }
+            } else {
+                log::warn!("[knowledge-assets] {} not found, skipping", assets_path.display());
+            }
+        }
+
+        // ── Import review findings at startup ──
+        if let Some(ref kb_ref) = kb {
+            let review_path = std::path::Path::new("design/review-findings.json");
+            if review_path.exists() {
+                match kb_ref.import_review_findings(review_path) {
+                    Ok(report) => {
+                        if report.imported > 0 {
+                            log::info!("[review-findings] Imported {} defects ({} errors)",
+                                report.imported, report.errors.len());
+                        }
+                    }
+                    Err(e) => log::warn!("[review-findings] Import failed: {}", e),
+                }
+            }
+        }
 
         let mut kb_pipeline = KnowledgeAbsorptionPipeline::new();
         if let Some(ref kb_ref) = kb {
@@ -115,8 +153,20 @@ impl BackgroundLoop {
 cognitive_load: self.cognitive_load.take(),
             bbrain: std::mem::take(&mut self.bbrain),
             cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
+            second_brain: {
+                let mut sb = SecondBrain::new();
+                if let Some(ref kb_ref) = kb {
+                    sb.attach_kb(kb_ref.clone());
+                }
+                Some(sb)
+            },
             kb,
+            emotion_restored: std::sync::atomic::AtomicBool::new(false),
             cognitive_mode: 0,
+            scoring: ScoringSubstrate::new().with_threshold(0.5),
+            state: StateSubstrate::new(),
+            delegate: DelegateEngine::new(),
+            simulate: SimulateEngine::new(),
         }));
 
         macro_rules! spawn_handler {
@@ -193,6 +243,24 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(86400, |h| h.handle_constitution_reload().await);
         // 3600s — consciousness evolves at architecture-audit tempo, not real-time
         spawn_handler!(3600, |h| h.handle_consciousness_tick().await);
+        // 600s — Second Brain auto-sync (emotion + session notes to KB)
+        spawn_handler!(600, |h| h.handle_second_brain_tick().await);
+        // Startup: restore emotion state from KB (deferred 5s, then skips)
+        spawn_handler!(5, |h| {
+            if !h.emotion_restored.load(std::sync::atomic::Ordering::Relaxed) {
+                if let Some(kb) = &h.kb {
+                    if let Ok(Some(json)) = kb.kv_get("emotion", "engine_state") {
+                        if let Ok(engine) = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json) {
+                            if let Some(ref mut cr) = h.consciousness_runtime {
+                                cr.set_emotion_engine(engine);
+                                log::info!("[bg] emotion state restored from KB");
+                            }
+                        }
+                    }
+                }
+                h.emotion_restored.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        });
 
         // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
         {
@@ -276,11 +344,17 @@ pub struct BackgroundLoopHandle {
     consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
     cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
+    second_brain: Option<SecondBrain>,
     kb: Option<Arc<KnowledgeBase>>,
+    emotion_restored: std::sync::atomic::AtomicBool,
     bbrain: crate::neotrix::nt_mind::bbrain_monitor::BMonitor,
     cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
     /// 0=Balanced, 1=Deep, 2=Fast — updated by consciousness tick, consumed by batch loops.
     cognitive_mode: u8,
+    scoring: ScoringSubstrate,
+    state: StateSubstrate,
+    delegate: DelegateEngine,
+    simulate: SimulateEngine,
 }
 
 impl BackgroundLoopHandle {
@@ -750,29 +824,20 @@ impl BackgroundLoopHandle {
                 }
             }
         }
+        // Record state metrics from the runtime tick
+        self.state.record_metric("phi", self.awareness.as_ref().map(|m| m.get_report().phi).unwrap_or(0.0));
+        self.state.record_metric("coherence", self.awareness.as_ref().map(|m| m.get_report().coherence).unwrap_or(0.0));
 
         // ── Phase 3: FEPIITBridge — compute unified consciousness score ──
         if let Some(ref fep_iit) = self.fep_iit_bridge {
             if let Some(ref monitor) = self.awareness {
                 let report = monitor.get_report();
                 
-                // Data-driven Free Energy derivation (replaces synthetic: (1.0 - consciousness) * 10.0)
-                // health_worseness = 1.0 - (bbrain_health / 100.0), load_factor = cognitive_load average
-                let health_worseness = if let Some(bbrain_report) = self.bbrain.latest_report() {
-                    1.0 - (bbrain_report.health_score / 100.0).max(0.0).min(1.0)
-                } else {
-                    0.5 // neutral if no bbrain report yet
-                };
-                let load_factor = self.cognitive_load.as_ref()
-                    .map(|c| c.average_load().max(0.0).min(1.0))
-                    .unwrap_or(0.5);
-                
-                // TODO: replace with real FreeEnergyReport when available
-                let fe_val = (health_worseness * 0.7 + load_factor * 0.3) * 10.0;
-                
+                // Free Energy from StateSubstrate (unified: 1 - phi*coherence + load*0.5)
+                let fe_val = self.state.free_energy.max(0.0).min(1.0) * 10.0;
                 let score = fep_iit.compute_consciousness_score(fe_val, report.phi, report.coherence);
-                log::debug!("[bg] fep_iit: unified_score={:.3} phi={:.3} coherence={:.3} fe={:.3} (health_worseness={:.3}, load={:.3})",
-                    score, report.phi, report.coherence, fe_val, health_worseness, load_factor);
+                log::debug!("[bg] fep_iit: unified_score={:.3} phi={:.3} coherence={:.3} fe={:.3}",
+                    score, report.phi, report.coherence, fe_val);
             }
         }
 
@@ -787,30 +852,31 @@ impl BackgroundLoopHandle {
             if let Some(ref mut clm) = self.cognitive_load {
                 let load = (1.0 - report.consciousness.max(0.0).min(1.0)) * 0.6
                     + (1.0 - report.coherence.max(0.0).min(1.0)) * 0.4;
-                let prev_mode = clm.mode();
+                self.state.record_metric("load", load);
+                self.state.tick(); // updates free_energy + thinking mode
+
+                let prev_mode_clm = clm.mode();
                 clm.record_step(load);
-                let new_mode = clm.mode();
+                let new_state_mode = self.state.active_mode;
 
                 // Update cognitive_mode field for behavioral consumption by other handlers
-                self.cognitive_mode = match new_mode {
-                    crate::core::nt_core_consciousness::ThinkingMode::Deep => 1,
-                    crate::core::nt_core_consciousness::ThinkingMode::Fast => 2,
+                self.cognitive_mode = match new_state_mode {
+                    crate::core::nt_core_state_substrate::ThinkingMode::Deep => 1,
+                    crate::core::nt_core_state_substrate::ThinkingMode::Fast => 2,
                     _ => 0,
                 };
 
-                log::debug!("[bg] cognitive_load: mode={:?} load={:.3} budget={:.3} avg={:.3}",
-                    new_mode, load, clm.thinking_budget(), clm.average_load());
+                log::debug!("[bg] cognitive_load: mode={:?} load={:.3} free_energy={:.3}",
+                    new_state_mode, load, self.state.free_energy);
 
                 // Track mode transitions for behavioral logging
-                if prev_mode != new_mode {
-                    log::info!("[bg] cognitive_load: mode transition {:?} -> {:?} (budget={:.3}, avg_load={:.3})",
-                        prev_mode, new_mode, clm.thinking_budget(), clm.average_load());
+                if prev_mode_clm != clm.mode() {
+                    log::info!("[bg] cognitive_load: mode transition (CLM) {:?} -> {:?}",
+                        prev_mode_clm, clm.mode());
                 }
 
-                // BEHAVIORAL RESPONSE: When deep reasoning is available, trigger deeper reasoning cycle
-                if clm.can_do_deep_reasoning() {
-                    clm.record_deep_step(load);
-                    // Enqueue high-priority goal to trigger deep reasoning in goal loop
+                // BEHAVIORAL RESPONSE: When deep mode is active, trigger deeper reasoning cycle
+                if new_state_mode == crate::core::nt_core_state_substrate::ThinkingMode::Deep {
                     if let Ok(mut brain) = self.brain.try_write() {
                         self.goal_loop.enqueue_goal(
                             &mut brain,
@@ -827,7 +893,7 @@ impl BackgroundLoopHandle {
         {
             let phi = self.awareness.as_ref().map(|m| m.get_report().phi).unwrap_or(0.0);
             let coherence = self.awareness.as_ref().map(|m| m.get_report().coherence).unwrap_or(0.0);
-            let load = self.cognitive_load.as_ref().map(|c| c.average_load()).unwrap_or(0.5);
+            let load = self.state.metric("load").and_then(|m| m.latest()).unwrap_or(0.5);
             self.bbrain.observe_from_metrics(phi, coherence, load);
         }
         if let Some(report) = self.bbrain.latest_report() {
@@ -876,6 +942,26 @@ impl BackgroundLoopHandle {
             log::debug!("[bg] gold_standard: conscious={} phi={:.3} coherence={:.3} trend={:?}",
                 gs_report.is_conscious_like, gs_report.phi, gs_report.coherence, gs_report.detection_streak);
         }
+
+        // ── Phase 6: DelegateEngine — delegate cross-domain tasks ──
+        if self.delegate.delegate("consciousness_tick", "nt_mind_background_loop", 0).is_none() {
+            log::warn!("[bg] delegate: consciousness_tick delegation rejected — max concurrent reached");
+        }
+        let pending = self.delegate.synchronize();
+        let delegated_total = self.delegate.total_tasks();
+        if delegated_total > 0 {
+            log::debug!("[bg] delegate: {} pending of {} total tasks, success_rate={:.2}",
+                pending, delegated_total, self.delegate.success_rate());
+        }
+
+        // ── Phase 7: SimulateEngine — run grounding scenario ──
+        let ctx = format!("Predict consciousness quality from phi={:.3} coherence={:.3}",
+            self.state.metric("phi").and_then(|m| m.latest()).unwrap_or(0.0),
+            self.state.metric("coherence").and_then(|m| m.latest()).unwrap_or(0.0));
+        let sim_id = self.simulate.create_scenario("consciousness_health", &ctx);
+        if self.simulate.simulate(sim_id.clone(), "stable").is_ok() {
+            log::debug!("[bg] simulate: scenario={} created", sim_id);
+        }
     }
 
     /// EventBus behavioral consumer (D30) — responds to events with brain/KB actions, not just logs.
@@ -919,6 +1005,28 @@ impl BackgroundLoopHandle {
             }
             _ => {
                 log::trace!("[bg] event_bus: {:?}", event);
+            }
+        }
+    }
+
+    async fn handle_second_brain_tick(&mut self) {
+        if let Some(ref mut sb) = self.second_brain {
+            if let Some(ref mut cr) = self.consciousness_runtime {
+                let report = cr.tick_emotion();
+                if let Some(ref mut tree) = self.consciousness_tree {
+                    tree.apply_emotion_report(report);
+                }
+                let note = format!(
+                    "consciousness_tick iteration={} quality={:.3}",
+                    self.brain.try_read().map(|b| b.iteration).unwrap_or(0),
+                    cr.last_quality().unwrap_or(0.0),
+                );
+                sb.tick(Some(cr.emotion_engine()), Some(&note));
+                // Persist emotion state to KB every tick (600s)
+                let engine = cr.emotion_engine();
+                sb.save_emotion_raw(engine);
+            } else {
+                sb.tick(None, None);
             }
         }
     }
@@ -994,6 +1102,18 @@ impl BackgroundLoopHandle {
 
         // ── Absorbed module SelfTests (Cycle 113) ──
         crate::core::nt_core_self_test_integration::register_absorbed_modules(&mut self_tests);
+
+        // ── Substrate + Engine SelfTests (Cycle 119 architecture refactor) ──
+        self_tests.register(Box::new(crate::core::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5)));
+        self_tests.register(Box::new(crate::core::nt_core_state_substrate::StateSubstrate::new()));
+        self_tests.register(Box::new(crate::core::nt_core_delegate_engine::DelegateEngine::new()));
+        self_tests.register(Box::new(crate::core::nt_core_simulate_engine::SimulateEngine::new()));
+        if let Some(ref sb) = self.second_brain {
+            match sb.self_test() {
+                Ok(()) => log::info!("[SELF-TEST] SecondBrain ✅ pass"),
+                Err(failures) => log::warn!("[SELF-TEST] SecondBrain ❌ FAIL: {}", failures.join("; ")),
+            }
+        }
 
         // ── Inline self-test: types WITH persistent fields — clone or call self_test() directly ──
         // KnowledgeGapDetector
@@ -1079,6 +1199,10 @@ impl BackgroundLoopHandle {
         } else {
             self_tests.register(Box::new(crate::core::nt_core_consciousness::CognitiveLoadMonitor::new()));
         }
+
+        // ── L1 Shield + IO SelfTest registrations ──
+        // (disabled: these types don't implement SelfTest yet)
+        self_tests.register(Box::new(crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
 
         // ── Run registry self-tests for remaining modules ──
         let results = self_tests.run_all();

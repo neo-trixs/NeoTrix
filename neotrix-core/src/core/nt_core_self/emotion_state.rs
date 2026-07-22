@@ -1,8 +1,8 @@
-#![forbid(unsafe_code)]
-
 use std::collections::VecDeque;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EmotionDimension {
     Frustration,
     Confidence,
@@ -31,7 +31,7 @@ impl EmotionDimension {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionConfig {
     pub alpha: f64,
     pub decay_rate: f64,
@@ -48,7 +48,7 @@ impl Default for EmotionConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionState {
     values: [f64; 6],
 }
@@ -126,7 +126,7 @@ impl Default for EmotionState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionObservation {
     pub dimension: EmotionDimension,
     pub value: f64,
@@ -134,7 +134,7 @@ pub struct EmotionObservation {
     pub timestamp: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionReport {
     pub frustration: f64,
     pub confidence: f64,
@@ -149,7 +149,7 @@ pub struct EmotionReport {
     pub observation_count: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionEngine {
     pub state: EmotionState,
     pub config: EmotionConfig,
@@ -205,6 +205,14 @@ impl EmotionEngine {
 
     pub fn recent_triggers(&self, n: usize) -> Vec<String> {
         self.history.iter().rev().take(n).map(|o| o.trigger.clone()).collect()
+    }
+
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
     }
 }
 

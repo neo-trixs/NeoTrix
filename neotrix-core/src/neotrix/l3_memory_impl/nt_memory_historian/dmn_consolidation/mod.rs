@@ -268,7 +268,7 @@ mod tests {
 
         dmn.encode("important".to_string(), 0.9);
         dmn.encode("trivial".to_string(), 0.1);
-        let report = dmn.consolidate();
+        let _report = dmn.consolidate();
         // "important" (0.9) first moves short→medium, then medium→long (passes 0.8 threshold)
         // "trivial" (0.1) stays short-term
         assert!(dmn.short_term.len() >= 1);

@@ -156,6 +156,14 @@ pub mod nt_core_telemetry;
 pub mod nt_core_answer_engine;
 pub mod nt_core_answer_bridge;
 pub mod nt_core_self_test_integration;
+pub mod nt_core_intel_pipeline;
+pub mod nt_core_io_capability;
+pub mod nt_core_second_brain;
+pub mod nt_core_delegate_engine;
+pub mod nt_core_scoring_substrate;
+pub mod nt_core_state_substrate;
+pub mod nt_core_subagent;
+pub mod nt_core_simulate_engine;
 // Formal verification proof harnesses
 #[cfg(test)]
 pub mod kani_proofs;

@@ -878,7 +878,8 @@ impl ReasoningEngine {
             let (tx, rx) = std::sync::mpsc::channel();
             let gateway_ref = gateway.clone();
             std::thread::spawn(move || {
-                let result = futures::executor::block_on(gateway_ref.complete(&request));
+                let rt = tokio::runtime::Runtime::new().expect("tokio runtime for LLM call");
+                let result = rt.block_on(gateway_ref.complete(&request));
                 let _ = tx.send(result);
             });
             let response = rx

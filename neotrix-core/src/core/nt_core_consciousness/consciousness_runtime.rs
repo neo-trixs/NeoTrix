@@ -1,23 +1,20 @@
-//! # Consciousness Runtime (nt_core_consciousness_runtime)
-//!
-//! Unifies StreamBuffer + SpeciousPresent + VolitionEngine + InnerCritic
-//! into a single tick method callable from the background loop or GWT cycle.
-
 use super::stream_buffer::ConsciousnessStream;
 use super::specious_present::SpeciousPresent;
 use super::volition::{ActionCandidate, VolitionEngine};
 use super::inner_critic::{CritiqueResult, InnerCritic};
 use super::awakening::{AwakeningReport, ConsciousnessAwakening};
 use super::vsa_tag::VsaTagged;
+use crate::core::nt_core_self::emotion_state::{EmotionEngine, EmotionReport, EmotionDimension};
 
-/// Unified consciousness runtime: compiles stream, present, volition, and critic.
 pub struct ConsciousnessRuntime {
     pub stream: ConsciousnessStream,
     pub specious_present: SpeciousPresent,
     pub volition: VolitionEngine,
     pub critic: InnerCritic,
+    pub emotion_engine: EmotionEngine,
     pub awakened: bool,
     pub last_report: Option<AwakeningReport>,
+    pub last_quality: f64,
     pub tick_count: u64,
 }
 
@@ -28,18 +25,54 @@ impl ConsciousnessRuntime {
             specious_present: SpeciousPresent::new(12),
             volition: VolitionEngine::new(),
             critic: InnerCritic::new(),
+            emotion_engine: EmotionEngine::default(),
             awakened: false,
             last_report: None,
+            last_quality: 0.0,
             tick_count: 0,
         }
     }
 
-    /// Initialize consciousness: awaken the stream and specious present.
     pub fn awaken(&mut self) -> &AwakeningReport {
         let report = ConsciousnessAwakening::awaken(&mut self.stream, &mut self.specious_present);
         self.awakened = true;
         self.last_report = Some(report.clone());
         self.last_report.as_ref().unwrap()
+    }
+
+    pub fn tick_emotion(&mut self) -> EmotionReport {
+        self.emotion_engine.tick();
+        self.emotion_engine.report()
+    }
+
+    pub fn observe_from_critique(&mut self, critique: &CritiqueResult) {
+        let quality = critique.overall_quality;
+        self.last_quality = quality;
+        self.emotion_engine.observe(EmotionDimension::Confidence, quality, "critique_quality");
+        if quality < 0.3 {
+            self.emotion_engine.observe(EmotionDimension::Frustration, 0.7 - quality, "low_quality_critique");
+        }
+        if let Some(ref action) = critique.selected_action {
+            if action.contains("explore") || action.contains("curious") {
+                self.emotion_engine.observe(EmotionDimension::Curiosity, 0.8, action);
+            }
+        }
+    }
+
+    pub fn emotion_engine(&self) -> &EmotionEngine {
+        &self.emotion_engine
+    }
+
+    pub fn emotion_engine_mut(&mut self) -> &mut EmotionEngine {
+        &mut self.emotion_engine
+    }
+
+    pub fn last_quality(&self) -> Option<f64> {
+        if self.tick_count > 0 { Some(self.last_quality) } else { None }
+    }
+
+    pub fn set_emotion_engine(&mut self, engine: EmotionEngine) {
+        self.emotion_engine = engine;
     }
 
     /// Advance one consciousness tick.
@@ -76,6 +109,7 @@ impl ConsciousnessRuntime {
             critique.selected_action = Some(action.description.clone());
         }
         critique.temporal_delta = _temporal_delta;
+        self.observe_from_critique(&critique);
         Some(critique)
     }
 

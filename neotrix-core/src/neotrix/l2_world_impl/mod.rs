@@ -32,3 +32,5 @@ pub mod nt_world_pipeline_factory;
 pub mod nt_world_video;
 pub mod nt_world_video_pipeline;
 pub mod nt_world_osint;
+pub mod nt_world_auto_absorb;
+pub mod nt_world_md_absorb;

@@ -31,6 +31,7 @@ use crate::neotrix::nt_mind::web_miner::WebKnowledgeMiner;
 use crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery;
 use crate::neotrix::nt_agent_protocol::capabilities::CapabilityRouter;
 
+use crate::core::nt_core_second_brain::SecondBrain;
 use crate::core::nt_core_self::intra_reflection::PreActionIntrospector;
 use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
 use crate::neotrix::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
@@ -115,6 +116,7 @@ pub struct BackgroundLoop {
     pub consciousness_tree: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     pub fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
     pub cognitive_load: Option<CognitiveLoadMonitor>,
+    pub second_brain: Option<SecondBrain>,
     pub kb: Option<Arc<KnowledgeBase>>,
 }
 
@@ -172,6 +174,7 @@ impl BackgroundLoop {
             consciousness_tree: Some(crate::core::nt_core_consciousness_tree::ConsciousnessTree::new()),
             fep_iit_bridge: Some(crate::neotrix::nt_core_fep_iit::FEPIITBridge::new()),
             cognitive_load: Some(CognitiveLoadMonitor::new()),
+            second_brain: Some(SecondBrain::new()),
             kb: None,
         }
     }

@@ -42,7 +42,7 @@ impl RuleCategory {
             10 | 19 | 23 | 26 | 28 | 37 | 39 => RuleCategory::MetaCognition,
             43 => RuleCategory::AbsorptionProtocol,
             42 | 44 | 45 | 46 | 47 | 48 => RuleCategory::TreeGrowth,
-            3 | 4 | 5 | 6 | 7 | 8 | 11 | 31 | 40 => RuleCategory::CodeQualityPattern,
+             11 | 31 | 40 => RuleCategory::CodeQualityPattern,
             14 | 15 | 16 | 18 | 38 => RuleCategory::Reliability,
             _ => RuleCategory::CodeQualityPattern,
         }

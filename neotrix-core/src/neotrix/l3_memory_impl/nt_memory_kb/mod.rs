@@ -32,7 +32,9 @@ pub mod nt_memory_auto_learn;
 pub mod nt_memory_code_query;
 pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
+pub mod nt_memory_knowledge_assets;
 pub mod nt_memory_visual_rag;
+pub mod nt_memory_commit_tracker;
 pub mod privacy;
 pub mod user_memory;
 pub mod vector_adapter;
@@ -614,21 +616,35 @@ impl KnowledgeBase {
     /// Query KB for Repository nodes by domain, with optional min_stars filter
     pub fn find_repositories(&self, domain: &str, min_stars: Option<i64>) -> Result<Vec<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let all = nt_memory_store::get_all_nodes(&conn)
-            .map_err(|e| format!("get_all_nodes: {}", e))?;
-        drop(conn);
-        let repos: Vec<KnowledgeNode> = all.into_iter()
-            .filter(|n| n.node_type == NodeType::Repository)
-            .filter(|n| n.domain.as_deref() == Some(domain))
-            .filter(|n| {
-                if let Some(min) = min_stars {
-                    n.metadata.as_ref()
-                        .and_then(|m| m.get("stars").and_then(|v| v.as_i64()))
-                        .map(|s| s >= min)
-                        .unwrap_or(false)
-                } else { true }
+        let mut sql = "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata FROM nodes WHERE node_type = 'Repository'".to_string();
+        if !domain.is_empty() {
+            sql.push_str(" AND domain = ?1");
+        }
+        if let Some(min) = min_stars {
+            sql.push_str(&format!(" AND CAST(json_extract(metadata, '$.stars') AS INTEGER) >= {}", min));
+        }
+        sql.push_str(" ORDER BY rowid DESC");
+        let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare: {}", e))?;
+        let mapper = |row: &rusqlite::Row| {
+            Ok(KnowledgeNode {
+                id: row.get(0)?, node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                title: row.get(2)?, summary: row.get(3)?, content: row.get(4)?,
+                url: row.get(5)?, domain: row.get(6)?, language: row.get(7)?,
+                confidence: row.get(8)?, importance: row.get(9)?,
+                created_at: row.get(10)?, updated_at: row.get(11)?, access_count: row.get(12)?,
+                metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
+                temporal: None, supersedes: None, source_episode: None,
             })
-            .collect();
+        };
+        let mapped_rows = if domain.is_empty() {
+            stmt.query_map([], mapper).map_err(|e| format!("query: {}", e))?
+        } else {
+            stmt.query_map([domain], mapper).map_err(|e| format!("query: {}", e))?
+        };
+        let mut repos = Vec::new();
+        for row in mapped_rows {
+            repos.push(row.map_err(|e| format!("row: {}", e))?);
+        }
         Ok(repos)
     }
 
@@ -1022,6 +1038,16 @@ impl KnowledgeBase {
 
     pub fn wiki_query(&self, query: &str, limit: usize) -> Result<Vec<nt_memory_wiki::WikiSearchResult>, String> {
         nt_memory_wiki::query(self, query, limit)
+    }
+
+    // ── Knowledge Assets ──
+
+    pub fn import_knowledge_assets(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_knowledge_assets(self, path)
+    }
+
+    pub fn import_review_findings(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_review_findings(self, path)
     }
 
     // ── Embeddings ──

@@ -79,6 +79,16 @@ pub enum NodeType {
     /// Reference — external reference link
     Reference,
     WikiPage,
+    /// Thinking trace — RL training record from SiliconSelf.add_thinking_trace()
+    ThinkingTrace,
+    /// Self-test failure — detection module's self_test() result
+    SelfTestFailure,
+    /// Event record — EventBus event persisted for traceability
+    EventRecord,
+    /// Detection finding — evaluate() output from a detection module
+    DetectionFinding,
+    /// Goal result — goal completion/failure record from goal_loop
+    GoalResult,
 }
 
 impl NodeType {
@@ -117,6 +127,11 @@ impl NodeType {
             NodeType::Skill => "skill",
             NodeType::Reference => "reference",
             NodeType::WikiPage => "wiki_page",
+            NodeType::ThinkingTrace => "thinking_trace",
+            NodeType::SelfTestFailure => "self_test_failure",
+            NodeType::EventRecord => "event_record",
+            NodeType::DetectionFinding => "detection_finding",
+            NodeType::GoalResult => "goal_result",
         }
     }
 
@@ -155,6 +170,11 @@ impl NodeType {
             "skill" => NodeType::Skill,
             "reference" => NodeType::Reference,
             "wiki_page" => NodeType::WikiPage,
+            "thinking_trace" => NodeType::ThinkingTrace,
+            "self_test_failure" => NodeType::SelfTestFailure,
+            "event_record" => NodeType::EventRecord,
+            "detection_finding" => NodeType::DetectionFinding,
+            "goal_result" => NodeType::GoalResult,
             _ => NodeType::Concept,
         }
     }

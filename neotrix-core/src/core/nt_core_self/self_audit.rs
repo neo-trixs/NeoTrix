@@ -186,6 +186,28 @@ pub fn verify_persistence(file_path: &str, expected_pattern: &str) -> bool {
     }
 }
 
+/// Verify that a list of claimed module files from a prior session actually exist on disk.
+/// P68: Session Re-entry Blindspot — cross-session claims must be independently verified.
+pub fn verify_prior_session_claims(claimed_modules: &[(&str, &str)]) -> Vec<AuditFinding> {
+    let mut findings = Vec::new();
+    for (module_name, expected_path) in claimed_modules {
+        let path = Path::new(expected_path);
+        if !path.exists() {
+            findings.push(AuditFinding {
+                category: "phantom-claim",
+                severity: AuditSeverity::Error,
+                file: expected_path.to_string(),
+                line: None,
+                message: format!(
+                    "P68: Prior-session claim '{}' at '{}' does not exist on disk",
+                    module_name, expected_path
+                ),
+            });
+        }
+    }
+    findings
+}
+
 pub fn converge_check<P: AsRef<Path>>(root: P) -> AuditReport {
     let ghost = scan_ghost_modules(root.as_ref());
     let ghost_count = ghost.len();
@@ -233,6 +255,20 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergeCheckFn {
             failures.push("verify_persistence: should find [package] in Cargo.toml".into());
         }
 
+        // Test 4: P68 — Session Re-entry Blindspot: verify claimed prior-session modules
+        // This test checks modules that were "created and tested" in prior sessions
+        // but might not have persisted to disk.
+        let prior_session_claims: &[(&str, &str)] = &[
+            ("nt_mind_absorption_registry",
+             "neotrix-core/src/neotrix/l8_autonomic_impl/nt_mind_absorption_registry.rs"),
+        ];
+        let phantom_claims = verify_prior_session_claims(prior_session_claims);
+        if !phantom_claims.is_empty() {
+            for claim in &phantom_claims {
+                failures.push(format!("P68 phantom-claim: {} — {}", claim.file, claim.message));
+            }
+        }
+
         if failures.is_empty() { Ok(()) } else { Err(failures) }
     }
 }
@@ -276,5 +312,21 @@ mod tests {
         assert!(verify_persistence(test_file, "pub mod test_module"));
         assert!(!verify_persistence(test_file, "non_existent_pattern"));
         let _ = std::fs::remove_file(test_file);
+    }
+
+    #[test]
+    fn test_verify_prior_session_claims() {
+        // Known-existing file should pass
+        let claims = &[("Cargo.toml", "Cargo.toml")];
+        let findings = verify_prior_session_claims(claims);
+        let phantom: Vec<_> = findings.iter().filter(|f| f.category == "phantom-claim").collect();
+        assert!(phantom.is_empty(), "Cargo.toml should exist: {:?}", phantom);
+
+        // Non-existent file should fail
+        let bad_claims = &[("phantom_module", "/tmp/neotrix_phantom.rs")];
+        let findings = verify_prior_session_claims(bad_claims);
+        let phantom: Vec<_> = findings.iter().filter(|f| f.category == "phantom-claim").collect();
+        assert_eq!(phantom.len(), 1, "Should find 1 phantom claim");
+        assert!(phantom[0].message.contains("P68"));
     }
 }

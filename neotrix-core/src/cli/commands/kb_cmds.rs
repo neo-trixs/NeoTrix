@@ -73,7 +73,7 @@ impl CliCommand for KbCmd {
         vec!["/knowledge", "/knowledge-base"]
     }
     fn description(&self) -> &str {
-        "Knowledge base operations: /kb stats | /kb search <query> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id>"
+        "Knowledge base operations: /kb stats | /kb search <query> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets"
     }
     fn execute(
         &self,
@@ -92,7 +92,9 @@ impl CliCommand for KbCmd {
                   /kb cluster [--min-size 3]     社区发现分析\n\
                   /kb central [--top-k 20]       中心性分析 (PageRank)\n\
                   /kb serve [--port 8337]        启动 MCP 知识服务\n\
-                  /kb export <node_id> [--format json|svg]  导出子图",
+                  /kb export <node_id> [--format json|svg]  导出子图\n\
+                  /kb import-assets [path]       导入 assets/knowledge_data.json 到 KB\n\
+                  /kb import-review [path]      导入 review-findings.json 缺陷记录到 KB",
             );
         }
 
@@ -108,11 +110,75 @@ impl CliCommand for KbCmd {
             "central" => cmd_central(rest),
             "serve" => cmd_serve(rest),
             "export" => cmd_export(rest),
+            "import-assets" => cmd_import_assets(rest),
+            "import-review" => cmd_import_review(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export",
+                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review",
                 sub
             )),
         }
+    }
+}
+
+fn cmd_import_assets(args: &[String]) -> CommandOutput {
+    let path = args.first().map(|s| s.as_str()).unwrap_or("assets/knowledge_data.json");
+    let path = std::path::Path::new(path);
+
+    if !path.exists() {
+        return CommandOutput::err(&format!("File not found: {}", path.display()));
+    }
+
+    let kb = match KnowledgeBase::open(None) {
+        Ok(kb) => kb,
+        Err(e) => return CommandOutput::err(&format!("Cannot open KB: {}", e)),
+    };
+
+    match kb.import_knowledge_assets(path) {
+        Ok(report) => {
+            let mut msg = format!(
+                "Knowledge assets import:\n  imported: {} nodes\n  edges created: {}\n",
+                report.imported, report.edges_created,
+            );
+            if !report.errors.is_empty() {
+                msg.push_str(&format!("  errors: {}", report.errors.len()));
+                for err in report.errors.iter().take(5) {
+                    msg.push_str(&format!("\n    - {}", err));
+                }
+            }
+            CommandOutput::ok(&msg)
+        }
+        Err(e) => CommandOutput::err(&format!("Import failed: {}", e)),
+    }
+}
+
+fn cmd_import_review(_args: &[String]) -> CommandOutput {
+    let path = "design/review-findings.json";
+    let path = std::path::Path::new(path);
+
+    if !path.exists() {
+        return CommandOutput::err(&format!("File not found: {}", path.display()));
+    }
+
+    let kb = match KnowledgeBase::open(None) {
+        Ok(kb) => kb,
+        Err(e) => return CommandOutput::err(&format!("Cannot open KB: {}", e)),
+    };
+
+    match kb.import_review_findings(path) {
+        Ok(report) => {
+            let mut msg = format!(
+                "Review findings import:\n  imported: {} defects\n",
+                report.imported,
+            );
+            if !report.errors.is_empty() {
+                msg.push_str(&format!("  errors: {}", report.errors.len()));
+                for err in report.errors.iter().take(5) {
+                    msg.push_str(&format!("\n    - {}", err));
+                }
+            }
+            CommandOutput::ok(&msg)
+        }
+        Err(e) => CommandOutput::err(&format!("Import failed: {}", e)),
     }
 }
 
