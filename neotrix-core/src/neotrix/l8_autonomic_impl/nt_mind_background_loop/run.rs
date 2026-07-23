@@ -1349,8 +1349,28 @@ impl BackgroundLoopHandle {
             self_tests.register(Box::new(crate::core::nt_core_consciousness::CognitiveLoadMonitor::new()));
         }
 
-        // ── L1 Shield + IO SelfTest registrations ──
-        // (disabled: these types don't implement SelfTest yet)
+        // ── Shield SelfTest registrations (now all have SelfTest impls) ──
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::guard::SecurityGuard::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::permissions::PermissionManager::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::safety_kernel::SafetyKernel::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::policy::ActionPolicy::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::perm_chain::PermissionChain::default()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield_prompt::screeners::PromptGuard::default()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield_prompt::screeners::OutputScreener::default()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield_prompt::screeners::ActionScreener::default()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield_traffic::analyzer::TrafficAnalyzer::new()));
+
+        // ── Mind SelfTest registrations (all already have SelfTest impls) ──
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::stagnation::StagnationDetector::default()));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::code_review::CodeReviewEngine::default()));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::self_iterating::safety_stage::SafetyCheckStage::new()));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::self_iterating::constitutional_stage::ConstitutionalSelfCritiqueStage::new()));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::self_iterating::secret_scanner::SecretScanner::new()));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::CleanupEngine::new()));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_ingestion::reflection_loop::QualityMonitor::new(0.5)));
+        self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_ingestion::graceful_degradation::CapabilityStatus::all_available()));
+
+        // ── IO SelfTest registrations ──
         self_tests.register(Box::new(crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
 
         // ── Run registry self-tests for remaining modules ──
