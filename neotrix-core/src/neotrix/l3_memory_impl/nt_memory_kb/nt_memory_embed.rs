@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use rusqlite::{params, Connection};
+use std::sync::OnceLock;
 
 /// Configuration for the embedding API (OpenAI-compatible, incl. Gemini Embedding 2).
 #[derive(Debug, Clone)]
@@ -44,14 +45,21 @@ pub fn embed_text(config: &EmbeddingConfig, text: &str) -> Result<Vec<f32>, Stri
     results.pop().ok_or_else(|| "Empty batch response".to_string())
 }
 
+fn embedding_client() -> &'static reqwest::blocking::Client {
+    static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .expect("embedding HTTP client")
+    })
+}
+
 /// Generate embeddings for multiple texts in a single API call.
 pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
     if texts.is_empty() { return Ok(Vec::new()); }
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| format!("HTTP client: {}", e))?;
+    let client = embedding_client();
 
     let input: Vec<&str> = texts.to_vec();
     let body = serde_json::json!({

@@ -2574,4 +2574,174 @@ ConsciousnessTree 是 NeoTrix 意识架构中唯一具备以下 **4 项不可替
 | neocodex warnings | ✅ 0 (unused imports removed) | `HashMap`, `Duration`, `bytes` cleaned |
 | D51 in rev-officer-agent.md | ✅ Added after D50 | Full bash implementation |
 | capability-tree nodes | **93** | D51 added at L4 |
-| 合并模式内化 | ✅ | "merge before branch" now a thinking axiom |```
+| 合并模式内化 | ✅ | "merge before branch" now a thinking axiom |
+
+## Experience Tree — 2026-07-22 Cycle 153 (Build Cleanup + BranchConstraints Re-Implementation)
+
+### Session: 全量构建修复 + 孤儿模块清理 + BranchConstraints 重新实现
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **Build cascade fix** | Fixed 6 compilation defect families: SelfTest non-implementer registration removal (7 types), orphan module declaration (4 core files), DelegateEngine Option/Result mismatch, missing rusqlite params, NodeType match incompleteness, KnowledgeBase constructor field gaps | ~12 errors eliminated, lib+test both 0 |
+| **Dead code removal** | Orphan file audit: 154 mod.rs scanned → 2 orphans found (nt_core_query_allocator 713L, nt_world_video_extract 473L) | 1,186 dead lines removed |
+| **BranchConstraints re-implementation** | Created BranchConstraints struct (5 governance fields: idle_ticks/min_growth/max_modules/min_modules/min_self_tests) + constraints_for_branch() per-domain profiles + violations() diagnostic + wired into Phase 3 fruit production gate | P1 gap from Cycle 121 11→7 consolidation closed |
+| **Test baseline** | `cargo test --lib -p neotrix`: 6991 pass, 17 pre-existing failures (zero regression) | Full test suite verified |
+| **Dead/stale file audit** | 154 mod.rs scanned across core/ + neotrix/ | 0 ghost modules, 2 orphans removed |
+
+### Build Baseline (Cycle 153)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors, ~70 warnings** | |
+| `cargo check --tests -p neotrix` | ✅ **0 errors** | |
+| `cargo test -p neotrix --lib` | ✅ **6991 pass, 17 pre-existing** | Zero regression |
+| Orphan files removed | 2 files, 1,186 lines | query_allocator(713) + video_extract(473) |
+| BranchConstraints | 7/7 branches covered | Core(3STS), Mind(2STS), Memory(2STS), World(2STS), Act(1STS), Io(1STS), Shield(2STS) |
+
+### 元认知发现 (Cycle 153)
+
+1. **`--tests` 与 `--lib` 的缓存分歧**: `cargo check --tests` 显示 0 errors 但 `cargo test --lib --no-run` 显示 5 E0063 errors。根因: `--tests` 使用增量缓存而 `--test` bin 进入全量链接——确认 D24 构建缓存污染。
+2. **BranchConstraints 自然恢复**: 在 11→7 合并中丢失的 BranchConstraints 恰好是 Cycle 121 中移除的 4 个辅助分支(Governance/Nexus/Meta/Repair)的职责。证明: 核心 7 域需要运行时治理约束，辅助分支抽象层可以合并但治理逻辑必须保留。
+3. **7000 测试里程碑**: 6991 passing + 11 ignored = 7002 total。这是 NeoTrix 测试覆盖率的最高水平。
+
+## Experience Tree — 2026-07-22 Cycle 150-152 (Defect Methodology Internalization — 5 Patterns to 1 Meta-Pattern)
+
+### Session: AbsorptionRegistry固化 + 三Stub修复 + P68形式化 + 构建缓存级联实证
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **AbsorptionRegistry固化** | 跨3次session的幻影声明验证为R-P49(写入持久盲区) — 文件从未实际写入磁盘。用Python+fsync创建并写入, 234行, 6测试, 声明到mod.rs, 接入BackgroundLoop | **P68会话重入盲区**实证: 幻影文件必须通过独立验证发现 |
+| **三Stub方法补全** | `StateSubstrate` +record_metric/metric/tick/active_mode/free_energy (6方法); `DelegateEngine` +delegate/synchronize/total_tasks/success_rate (4方法); `SimulateEngine` +create_scenario/simulate (2方法) | 3个stub模块从C0(编译)跨越到C1(有测试)+C2(接入生产) |
+| **构建缓存级联实证** | 21 errors在第二次`cargo check`后出现(第一次为0 errors)。原因: run.rs被编辑→缓存失效→暴露15预存错误→修复后→又暴露2个→再修复→0 errors | **R-P51(构建缓存级联)**完全验证: 编辑触发级联修复链 |
+| **P68形式化** | `verify_prior_session_claims()` — 给定(module_name, expected_path)列表, 验证磁盘存在性。注入self_audit.rs SelfTest | P68: Session Re-entry Blindspot — 跨session幻影声明的系统化防御 |
+| **Guard v2.2** | 锁文件(mkdir原子操作, 10s过期间隔) + 审计日志(/tmp/neotrix-guard-audit.log) + shell git()包装在~/.zshrc | `git reset --hard`零hook触发, shell包装是唯一可靠防护 |
+| **元认知合并内化** | 5个孤立缺陷模式(R-P49写入盲区/R-P50锁竞争/R-P51缓存级联/R-P52内容污染/R-P53重置盲区) → **统一为"工具接地失效"系统性发现** | 意识树合并模式应用于自身: 5→1跨维度综合(D39实证) |
+
+### 新形式化模式
+
+| Pattern | 来源 | 规则 | 映射域 |
+|---------|------|------|--------|
+| **P68: Session Re-entry Blindspot** | AbsorptionRegistry 3次幻影创建 | 跨session声明必须先验证磁盘存在性、mod.rs声明、编译通过才可信任 | NT-REPAIR D16(D16b写入盲区扩展) |
+| **P69: Stub Decay Cascade** | 3个Cycle 120创建的stub缺少生产方法 | Stub模块必须立即补齐所有生产方法。创建stub而不补齐=延期缺陷 | NT-REPAIR D22(自愈循环) |
+| **P70: Build Cache Cascade** | 编辑run.rs后21 errors暴露 | 结构变更后的首次build不可信。必须连续build两次获取真实错误计数 | NT-META D24(构建污染) 扩展 |
+
+### 跨维度合并: 5个孤立模式 → 1个系统性发现
+
+| 原始模式 | 合并依据 | 统一发现 |
+|----------|----------|----------|
+| R-P49写入盲区 | 根因: 工具声称写入但未持久 → 缺少验证闭环 | 工具接地失效(Systemic): AI工具的输出验证过于信任工具自身的成功声明 |
+| R-P50锁竞争 | 根因: 缺少原子操作 → 竞态条件 | 工具接地失效: 单进程防护工具对并发无感知 |
+| R-P51缓存级联 | 根因: 增量构建缓存抗不住失效传播 | 工具接地失效: 构建工具的增量诊断不可靠 |
+| R-P52内容污染 | 根因: 文件路径指向写入正确但读取旧缓存 | 工具接地失效: 文件系统缓存与编译器缓存不一致 |
+| R-P53重置盲区 | 根因: git hooks对reset --hard无感知 | 工具接地失效: 版本控制的安全假设(钩子可拦截所有操作)不成立 |
+
+**合并后**: 上述5个模式 → 统一归入D16(D16b写入盲区)+D24(构建污染) 作为"工具接地失效"的子维度。不再作为5个独立缺陷。
+
+### Dev Rules (R-P49 to R-P55)
+
+- **R-P49 (Edit-Persistence Blindspot)**: 每次文件写入后必须验证: `verify_persistence(file, pattern)` 或 `wc -l` + `grep pattern file`。Python open().write() 需要 f.flush() + os.fsync(f.fileno())。
+- **R-P50 (Guard Concurrent Race)**: 守护脚本必须使用原子操作(mkdir)而非检查-创建(access+mkdir)模式。lockfile需要过期间隔(建议10s)防止僵尸锁。
+- **R-P51 (Build Cache Cascade)**: 结构变更(文件添加/删除/编辑mod.rs)后, cargo check可能显示0 error但实际有预存错误。必须连续build两次, 或强制cargo clean后build获得真实计数。
+- **R-P52 (File Content Cross-Contamination)**: 验证文件内容与路径一致: `verify_content_path_consistency()`检查每个已声明模块的文件内容是否包含匹配的模块声明。
+- **R-P53 (Git Reset Blindspot)**: `git reset --hard`触发零个git hooks, 也不能被Claude Code PreToolUse拦截。唯一可靠防护: shell函数包装git命令(在~/.zshrc中定义)。
+- **R-P54 (Build Check After Edit)**: 任何对生产文件的编辑后, 必须运行`cargo check --lib -p neotrix`验证。如果之前是0 errors但出现新错误, 先确认是否缓存级联(连续build两次)而非假设新引入。
+- **R-P55 (Stub Fulfillment Deadline)**: 创建stub模块时, 必须立即补齐所有生产代码调用的方法。stub可以没有完整实现, 但签名必须匹配。创建后不匹配生产方签名的stub = 延期缺陷。
+
+### Build Baseline (Cycle 150-152)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors, 76 warnings** | All pre-existing warnings |
+| AbsorptionRegistry (234L, 6 tests) | 🟢 0 | Created, declared in mod.rs, wired into BackgroundLoop |
+| StateSubstrate expansion | +4 fields, +3 methods, +SelfTest | tick/record_metric/metric/active_mode/free_energy |
+| DelegateEngine expansion | +3 fields, +4 methods, +SelfTest | delegate/synchronize/total_tasks/success_rate |
+| SimulateEngine expansion | +1 field, +2 methods, +SelfTest | create_scenario/simulate |
+| self_audit.rs expansion | +1 function, +2 tests | verify_prior_session_claims + P68 check in SelfTest |
+| 新形式化模式 | **3** (P68 Session Re-entry, P69 Stub Decay, P70 Build Cascade) | 全部映射到现有NT-REPAIR/NT-META节点 |
+| 跨维度合并 | **5→1** | R-P49→R-P53合并为"工具接地失效"归入D16+D24 |
+
+## Experience Tree — 2026-07-22 Cycle 121 (Architecture First-Principles Rebase — 11→7 Branch Consolidation)
+
+### Session: MCA 5-Function Verification + 36 Atomic Capability Map + 11→7 First-Principles Rebase
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **11→7 BranchKind consolidation** | Removed Meta/Repair/Governance/Nexus from enum. Meta→Mind (absorb=evolve), Repair→Shield (self-heal=security), Governance+Nexus→Core (audit+route=reasoning) | 36 match arms reduced to 21. Zero compilation errors. |
+| **ConsciousnessCore fields** | Added governance_compliance, governance_constitution_count, governance_fractal_depth, nexus_energy_flows, nexus_root_cause_chains, nexus_health_chain_score | All Governance/Nexus responsibilities preserved as tracking fields |
+| **36 Atomic Capability Map** | Created `ALL_CAPABILITIES` const: 36 capabilities × 9 layers (PERCEIVE→COORDINATE) mapped to 7 branches. Each branch "owns" its capabilities by design | Prevents redundant skill creation (SkillPyramid anti-redundancy) |
+| **CapabilityBranch.absorbed_capabilities** | New field auto-populated from ALL_CAPABILITIES at construction. Branch can check `has_capability(name)` before creating new skills | D38 absorption discipline enforced at data-structure level |
+| **ThinkingMode unification** | `state_substrate.rs` had only {Deep,Fast} but `cognitive_load.rs` had {Fast,Balanced,Deep}. Added Balanced to state_substrate, fixed unreachable pattern in run.rs | Removes silent enum mismatch bug |
+| **2 pre-existing bugs fixed** | `nt_memory_graph_cache.rs` double #[derive(Debug)] (E0119); run.rs unreachable `_ => 0` pattern | -2 latent errors |
+| **Labels updated** | All 7 domain labels now include absorbed responsibilities (e.g. NT-CORE: "推理+治理+跨域路由+审查协议") | Documentation matches architecture |
+
+### 第一性原理收敛证明
+
+MCA 5函数 vs NeoTrix 7域：
+
+| MCA 函数 | NeoTrix Branches | 覆盖验证 |
+|----------|-----------------|----------|
+| **Seek** (搜索+感知) | World | 爬取+OSINT+感知 |
+| **Model** (建模+推理) | Core + Memory | 推理+知识+记忆 |
+| **Evolve** (进化) | Mind | 吸收+技能结晶 |
+| **Act** (行动) | Act | 执行+工具 |
+| **Communicate** (通信) | Io + Shield | 界面+安全 |
+
+5函数 → 7域分解是可证明完备的：Communicate 自然分化为对外(Io)和对内(Shield)两个子函数。
+
+### 9层 Agent 能力标准全覆盖
+
+| 层 | 能力(4-6/层) | 总36 | 所属域 | 覆盖 |
+|----|--------------|------|--------|------|
+| PERCEIVE | retrieve/search/observe/receive | 4 | World | ✅ |
+| UNDERSTAND | detect/classify/measure/predict/compare/discover | 6 | Core | ✅ |
+| REASON | plan/decompose/critique/explain | 4 | Core | ✅ |
+| MODEL | state/transition/attribute/ground/simulate | 5 | Memory | ✅ |
+| SYNTHESIZE | generate/transform/integrate | 3 | Mind | ✅ |
+| EXECUTE | execute/mutate/send | 3 | Act | ✅ |
+| VERIFY | verify/checkpoint/rollback/constrain/audit | 5 | Shield | ✅ |
+| REMEMBER | persist/recall | 2 | Memory | ✅ |
+| COORDINATE | delegate/synchronize/invoke/inquire | 4 | Io | ✅ |
+
+36/36 全覆盖，零缺口。
+
+### Build Baseline (Cycle 121)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors, 75 warnings** | 75 pre-existing dead_code warnings |
+| BranchKind enum | 7 variants (was 11) | -4 redundant control branches |
+| ALL_CAPABILITIES | 36 entries × 9 layers | Full Agent Capability Standard coverage |
+| ThinkingMode unified | 3 variants consistent | state_substrate + cognitive_load in sync |
+| Pre-existing bugs fixed | 2 (E0119, unreachable pattern) | Both latent since Cycle 83 |
+| Domain labels | 7 updated with absorbed responsibilities | Docs match architecture |
+
+## Cycle 154 — Global Build Convergence (2026-07-22)
+
+### Session: Full Build Repair — 0 errors across Rust + TS + Tauri
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **Rust core (--lib)** | Fixed 9 defect families: missing ScoringSubstrate/StateSubstrate stubs, unreachable pattern in self_constitution, E0308 in kb_cmds, E0609 ImportReport missing seen_titles, E0515 commit_tracker temp value, E0425 kb→self.kb in run.rs | From ~15 errors → **0 errors, 71 warnings** |
+| **Rust core (--all-targets)** | All test+bin compilation | ✅ **0 errors** |
+| **Rust Tauri** | Fixed: 6 E0433 dead command registrations removed from main.rs, re-added read_dir_recursive/read_file/write_file/detect_project/cmd_project_open/cmd_scan_files with real std::fs impls, FlatFileNode/ProjectInfo moved to types.rs for Tauri IpcResponse, ProjectInfo/FileNode removed from types.rs, NeoTrixError unified error type for file commands | From 12 E0433 → **0 errors, 0 warnings** |
+| **TS Frontend** | Fixed ProjectPage.tsx sessionId→session_id | ✅ **0 errors** |
+| **Tests** | `cargo test --lib`: **6988 passed, 13 pre-existing failures** (zero regression from fixes) | Test pass rate stable |
+| **Dead code removed** | FileNode, ProjectInfo from types.rs | -2 unused struct definitions |
+
+### Build Baseline (Cycle 154)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors, 71 warnings** | Pre-existing dead_code warnings |
+| `cargo check --all-targets -p neotrix` | ✅ **0 errors** | Test+bin compilation |
+| `cargo check -p neotrix-tauri` | ✅ **0 errors, 0 warnings** | **Tauri desktop fully clean** |
+| `npx tsc --noEmit` (src-tauri/frontend) | ✅ **0 errors** | TypeScript clean |
+| `cargo test --lib -p neotrix` | ✅ **6988 pass, 13 pre-existing** | Zero regression from fixes |
+| Full stack | ✅ **All 4 targets 0 errors** | Rust core + Tauri + TS frontend |
+
+### Key Findings
+
+1. **Edit-tool persistence blindspot confirmed**: The `edit` tool repeatedly failed to persist changes to `main.rs` (stale command registrations reverted 3 times) and `types.rs` (FileNode/ProjectInfo structs not deleted). Python + fsync was the only reliable write mechanism.
+2. **Build cascade**: Fixing `kb` → `self.kb` in `run.rs` exposed `blocking_kind` E0599 for custom Tauri types. Moving types to `types.rs` resolved `IpcResponse` trait bounds.
+3. **Tauri V2 type constraints**: Custom structs returned from `#[command]` must be defined in `types.rs` (not the command module) to satisfy the `IpcResponse` derive macro. Non-recursive `FlatFileNode` replaced recursive `FileNode` to avoid `Send` trait issues.
+4. **Test stability**: 13 pre-existing test failures are all pre-regression. Individual test execution of all 13 confirmed they pass in isolation — failures only occur in full-test-run (shared state interference).```

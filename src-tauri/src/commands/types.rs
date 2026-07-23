@@ -53,22 +53,6 @@ pub struct DiffBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileNode {
-    pub name: String,
-    pub path: String,
-    pub is_dir: bool,
-    pub children: Option<Vec<FileNode>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectInfo {
-    pub name: String,
-    pub path: String,
-    pub language: String,
-    pub file_count: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReasonRequest {
     pub prompt: String,
 }
@@ -209,3 +193,20 @@ pub struct ProjectInstruction {
     pub created_at: i64,
     pub updated_at: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlatFileNode {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub depth: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectInfo {
+    pub name: String,
+    pub path: String,
+    pub language: String,
+    pub file_count: usize,
+}
+

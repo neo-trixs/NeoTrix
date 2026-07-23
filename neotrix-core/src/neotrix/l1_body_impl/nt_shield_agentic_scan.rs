@@ -234,7 +234,7 @@ impl AgenticScanner {
         let mut confirmed = Vec::new();
         for finding in self.findings.iter_mut() {
             if finding.status == FindingStatus::Candidate {
-                let confident = finding.cvss.base_score > 4.0;
+                let confident = finding.cvss.base_score > 6.0;
                 finding.status = if confident { FindingStatus::Confirmed } else { FindingStatus::Rejected };
                 if confident {
                     confirmed.push(finding.id);

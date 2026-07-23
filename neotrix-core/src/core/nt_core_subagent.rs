@@ -96,7 +96,7 @@ impl SubAgentDefParser {
             } else if let Some(val) = line.strip_prefix("memory:") {
                 memory = Some(Self::parse_scalar(val));
             } else if let Some(val) = line.strip_prefix("background:") {
-                background = Self::parse_scalar(val) == "true";
+                background = Some(Self::parse_scalar(val).as_str() == "true");
             } else if let Some(val) = line.strip_prefix("isolation:") {
                 isolation = Some(Self::parse_scalar(val));
             } else if let Some(val) = line.strip_prefix("effort:") {
@@ -202,7 +202,8 @@ impl SubAgentRegistry {
             errors: Vec::new(),
         };
 
-        for dir in &self.source_dirs {
+        let source_dirs = self.source_dirs.clone();
+        for dir in &source_dirs {
             let scan = self.scan_directory(dir);
             report.new += scan.new;
             report.updated += scan.updated;
@@ -586,24 +587,26 @@ body"#;
     #[test]
     fn test_registry_register_file() {
         let mut reg = SubAgentRegistry::new();
-        let dir = std::env::temp_dir().join("neotrix-test-agents");
-        let _ = std::fs::create_dir_all(&dir);
-        let file_path = dir.join("test-agent.md");
+        let tmp_root = std::env::temp_dir().join("neotrix-test-agents");
+        let agent_dir = tmp_root.join(".neotrix").join("agents");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        let file_path = agent_dir.join("test-agent.md");
         std::fs::write(&file_path, SAMPLE_AGENT_MD).unwrap();
 
-        reg.add_project_dir(dir.parent().unwrap().to_path_buf());
+        reg.add_project_dir(tmp_root.clone());
         let report = reg.scan_all();
         assert_eq!(report.new, 1);
         assert!(reg.get("code-reviewer").is_some());
 
-        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&tmp_root);
     }
 
     #[test]
     fn test_registry_search() {
         let mut reg = SubAgentRegistry::new();
-        let dir = std::env::temp_dir().join("neotrix-test-search");
-        let _ = std::fs::create_dir_all(&dir);
+        let tmp_root = std::env::temp_dir().join("neotrix-test-search");
+        let agent_dir = tmp_root.join(".neotrix").join("agents");
+        std::fs::create_dir_all(&agent_dir).unwrap();
 
         let agent1 = r#"---
 name: security-scanner
@@ -615,17 +618,17 @@ name: test-runner
 description: Run tests and report results
 tools: [Bash, Read]
 ---"#;
-        std::fs::write(dir.join("security-scanner.md"), agent1).unwrap();
-        std::fs::write(dir.join("test-runner.md"), agent2).unwrap();
+        std::fs::write(agent_dir.join("security-scanner.md"), agent1).unwrap();
+        std::fs::write(agent_dir.join("test-runner.md"), agent2).unwrap();
 
-        reg.add_project_dir(dir.parent().unwrap().to_path_buf());
+        reg.add_project_dir(tmp_root.clone());
         reg.scan_all();
 
         let results = reg.search("security");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "security-scanner");
 
-        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&tmp_root);
     }
 
     #[test]

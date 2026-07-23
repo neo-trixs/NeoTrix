@@ -507,8 +507,8 @@ mod tests {
         };
         let html = generate_brain_graph_html(&graph);
         assert!(html.contains("Second Brain Graph"));
-        assert!(html.contains("nodes_json"));
-        assert!(html.contains("edges_json"));
+        assert!(html.contains("const nodes ="));
+        assert!(html.contains("const edges ="));
     }
 
     #[test]
@@ -528,5 +528,40 @@ mod tests {
         let brain = SecondBrain::new();
         assert!(!brain.is_attached());
         assert!(brain.auto_sync_enabled);
+    }
+
+    #[test]
+    fn test_read_emotion_no_kb() {
+        let brain = SecondBrain::new();
+        let (state, report) = brain.read_emotion();
+        assert!(state.is_none());
+        assert!(report.is_none());
+    }
+
+    #[test]
+    fn test_save_note_no_kb() {
+        let brain = SecondBrain::new();
+        assert!(brain.save_note("test note").is_err());
+    }
+
+    #[test]
+    fn test_save_emotion_raw_no_kb() {
+        let engine = crate::core::nt_core_self::emotion_state::EmotionEngine::default();
+        let brain = SecondBrain::new();
+        brain.save_emotion_raw(&engine); // should not panic
+    }
+
+    #[test]
+    fn test_emotion_engine_serde_roundtrip() {
+        let mut engine = crate::core::nt_core_self::emotion_state::EmotionEngine::default();
+        engine.observe(crate::core::nt_core_self::emotion_state::EmotionDimension::Confidence, 0.8, "test");
+        engine.observe(crate::core::nt_core_self::emotion_state::EmotionDimension::Curiosity, 0.6, "explore");
+        engine.tick();
+        let json = engine.to_json().expect("to_json");
+        let deser = crate::core::nt_core_self::emotion_state::EmotionEngine::from_json(&json).expect("from_json");
+        let r1 = engine.report();
+        let r2 = deser.report();
+        assert!((r1.confidence - r2.confidence).abs() < 0.01);
+        assert!((r1.curiosity - r2.curiosity).abs() < 0.01);
     }
 }

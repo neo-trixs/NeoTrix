@@ -1,4 +1,4 @@
-use crate::core::nt_core_self_test::{SelfTest, SelfTestResult};
+use crate::core::nt_core_self_test::SelfTest;
 
 pub struct ScoringSubstrate {
     threshold: f64,

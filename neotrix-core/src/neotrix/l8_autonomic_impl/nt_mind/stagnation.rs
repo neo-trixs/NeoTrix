@@ -90,8 +90,8 @@ mod tests {
     /// 离线运行, 不依赖网络
     #[test]
     fn test_stagnation_integration_with_brain() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut brain = super::super::SelfIteratingBrain::new();
         brain.stagnation = StagnationDetector {
             pause_duration_secs: 0,

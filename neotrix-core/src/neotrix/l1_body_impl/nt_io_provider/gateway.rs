@@ -131,7 +131,7 @@ impl GatewayV2 {
             providers: HashMap::new(),
             states: RwLock::new(HashMap::new()),
             default_name: RwLock::new(String::new()),
-            prefer_free: true,
+            prefer_free: false,
             observer: RwLock::new(None),
             tracer: RwLock::new(None),
             cost_tracker: RwLock::new(None),
@@ -529,7 +529,8 @@ impl GatewayV2 {
                     }
                     return Ok(response);
                 }
-                Err(_) => {
+                Err(err) => {
+                    log::warn!("[gateway] Aggressive retry failed for '{}': {}", name, err);
                     {
                         let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get_mut(name) {
@@ -720,6 +721,40 @@ impl GatewayV2 {
         }
 
         Err(LlmError::Unknown("Aggressive streaming retry exhausted — all providers failed".to_string()))
+    }
+
+    /// Register providers from FreeModelCatalog discovered entries.
+    /// For each entry where the required API key env var is set (or keyless),
+    /// create a provider and register it.
+    pub fn register_from_catalog(&mut self, entries: &[super::free_catalog::FreeModelEntry]) {
+        for entry in entries {
+            let name = format!("{}/{}", entry.provider, entry.model_id);
+            if self.providers.contains_key(&name) {
+                continue; // already registered
+            }
+            // Check if we have the required API key
+            let api_key = if entry.requires_api_key {
+                if let Some(ref env_var) = entry.api_key_env {
+                    match std::env::var(env_var) {
+                        Ok(key) if !key.is_empty() => Some(key),
+                        _ => continue, // skip — no key for this entry
+                    }
+                } else {
+                    continue; // requires key but no env var specified
+                }
+            } else {
+                None
+            };
+            let provider = super::factory::create_provider(super::factory::ProviderConfig {
+                provider_type: entry.provider_type,
+                api_key,
+                base_url: Some(entry.base_url.clone()),
+                model: Some(entry.model_id.clone()),
+                timeout_secs: 60,
+            });
+            self.register_provider_with_category(&name, provider, entry.is_free, ProviderCategory::Cloud);
+            log::info!("[gateway] Registered from catalog: {} ({})", name, entry.display_name);
+        }
     }
 
     pub fn provider_status(&self) -> Vec<serde_json::Value> {

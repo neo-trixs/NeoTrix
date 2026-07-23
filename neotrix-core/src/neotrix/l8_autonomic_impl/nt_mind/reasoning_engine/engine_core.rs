@@ -874,18 +874,15 @@ impl ReasoningEngine {
 
     pub fn call_llm(&mut self, prompt: &str) -> NeoTrixResult<String> {
         if let Some(ref gateway) = self.gateway {
+            eprintln!("[DEBUG-call_llm] model={}, prompt_len={}, gateway={:p}", self.default_model, prompt.len(), gateway as *const _);
+            std::io::stderr().flush().ok();
             let request = LlmRequest::new(&self.default_model, prompt);
-            let (tx, rx) = std::sync::mpsc::channel();
             let gateway_ref = gateway.clone();
-            std::thread::spawn(move || {
-                let rt = tokio::runtime::Runtime::new().expect("tokio runtime for LLM call");
-                let result = rt.block_on(gateway_ref.complete(&request));
-                let _ = tx.send(result);
-            });
-            let response = rx
-                .recv_timeout(std::time::Duration::from_secs(120))
-                .map_err(|_| NeoTrixError::Brain("LLM call timed out after 120s".into()))?
-                .map_err(|e| NeoTrixError::Brain(format!("LLM call failed: {}", e)))?;
+            let response = tokio::task::block_in_place(|| {
+                let handle = tokio::runtime::Handle::current();
+                handle.block_on(gateway_ref.complete(&request))
+            })
+            .map_err(|e| NeoTrixError::Brain(format!("LLM call failed: {}", e)))?;
             let prompt_tokens = response.usage.prompt_tokens;
             let completion_tokens = response.usage.completion_tokens;
             if let Some(ref mut ct) = self.cost_tracker {

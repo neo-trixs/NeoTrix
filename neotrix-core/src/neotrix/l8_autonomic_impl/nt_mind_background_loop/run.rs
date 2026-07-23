@@ -73,6 +73,19 @@ impl BackgroundLoop {
         let cleanup_engine = self.cleanup_engine.take();
         let kb = self.kb.clone();
 
+        // Session start event (obsidian-mind SessionStart pattern)
+        if let Some(ref kb_ref) = kb {
+            let _result: Result<usize, String> = kb_ref.rebuild_skills_library();
+            let _ = kb_ref.rebuild_graph_cache();
+            let summary = format!("session_start: cycle_{}", chrono::Utc::now().timestamp());
+            let title = format!("session-start-{}", chrono::Utc::now().timestamp());
+            let _ = kb_ref.insert_or_get_node(&title, crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType::Session, Some(&summary), None, Some("neotrix"));
+            let issues = kb_ref.integrity_check();
+            if !issues.is_empty() {
+                log::warn!("[session-start] KB integrity issues: {:?}", issues);
+            }
+        }
+
         // ── Import knowledge assets at startup ──
         if let Some(ref kb_ref) = kb {
             let assets_path = std::path::Path::new("assets/knowledge_data.json");
@@ -103,6 +116,70 @@ impl BackgroundLoop {
                         }
                     }
                     Err(e) => log::warn!("[review-findings] Import failed: {}", e),
+                }
+            }
+        }
+
+        // ── Sync brain state to KB at startup ──
+        if let Some(ref kb_ref) = kb {
+            let brain_dir = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix");
+            if brain_dir.join("brain.json").exists() {
+                match kb_ref.import_brain_state(&brain_dir) {
+                    Ok(report) => {
+                        if report.imported > 0 {
+                            log::info!("[brain-state] Synced {} nodes, {} edges ({} errors)",
+                                report.imported, report.edges_created, report.errors.len());
+                        }
+                    }
+                    Err(e) => log::warn!("[brain-state] Sync failed: {}", e),
+                }
+            }
+        }
+
+        // ── Import absorption report at startup ──
+        if let Some(ref kb_ref) = kb {
+            let abs_path = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix/absorption_report.json");
+            if abs_path.exists() {
+                match kb_ref.import_absorption_report(&abs_path) {
+                    Ok(report) => {
+                        if report.imported > 0 {
+                            log::info!("[absorption-report] Imported {} nodes, {} edges ({} errors)",
+                                report.imported, report.edges_created, report.errors.len());
+                        }
+                    }
+                    Err(e) => log::warn!("[absorption-report] Import failed: {}", e),
+                }
+            }
+        }
+
+        // ── Import knowledge engine data at startup ──
+        if let Some(ref kb_ref) = kb {
+            let ke_path = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix/knowledge_engine.json");
+            if ke_path.exists() {
+                match kb_ref.import_knowledge_engine(&ke_path) {
+                    Ok(report) => {
+                        if report.imported > 0 {
+                            log::info!("[knowledge-engine] Imported {} entries ({} errors)",
+                                report.imported, report.errors.len());
+                        }
+                    }
+                    Err(e) => log::warn!("[knowledge-engine] Import failed: {}", e),
+                }
+            }
+        }
+
+        // ── Import reasoning memories at startup ──
+        if let Some(ref kb_ref) = kb {
+            let rb_path = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix/reasoning_bank.json");
+            if rb_path.exists() {
+                match kb_ref.import_reasoning_memories(&rb_path) {
+                    Ok(report) => {
+                        if report.imported > 0 {
+                            log::info!("[reasoning-memories] Imported {} traces ({} errors)",
+                                report.imported, report.errors.len());
+                        }
+                    }
+                    Err(e) => log::warn!("[reasoning-memories] Import failed: {}", e),
                 }
             }
         }
@@ -155,7 +232,7 @@ cognitive_load: self.cognitive_load.take(),
             cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator::new(),
             second_brain: {
                 let mut sb = SecondBrain::new();
-                if let Some(ref kb_ref) = kb {
+        if let Some(ref kb_ref) = self.kb {
                     sb.attach_kb(kb_ref.clone());
                 }
                 Some(sb)
@@ -617,6 +694,14 @@ impl BackgroundLoopHandle {
             }
         }
     }
+    /// Log a session event to KB (obsidian-mind SessionStart/Stop pattern).
+    /// Creates a node with type=Session with event type and summary.
+    async fn log_session_event(&self, event_type: &str, summary: &str) {
+        let Some(ref kb) = self.kb else { return };
+        let title = format!("session-{}-{}", event_type, chrono::Utc::now().timestamp());
+        let _ = kb.insert_or_get_node(&title, crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType::Session, Some(summary), None, Some("neotrix"));
+    }
+
     async fn handle_knowledge_chain(&mut self) {
         if let Some(ref mut chain) = self.knowledge_chain {
             if !chain.has_pending() { chain.init_default_discovery(); }

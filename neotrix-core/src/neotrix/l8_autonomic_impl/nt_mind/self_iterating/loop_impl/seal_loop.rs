@@ -636,9 +636,9 @@ impl SelfIteratingBrain {
             let emb_cfg = crate::neotrix::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
             if !emb_cfg.api_key.is_empty() {
                 kb = kb.with_embedding(emb_cfg);
-                if let Err(e) = kb.ensure_embeddings() {
-                    log::warn!("[KB] embedding warmup: {}", e);
-                }
+                // Note: ensure_embeddings uses reqwest::blocking which panics
+                // when called from within a tokio runtime context.
+                // Embeddings are generated lazily on first semantic search.
             }
             // Load E8 transition matrix from KB (cross-session persistence)
             // Then seed with community dataset priors (12 datasets, 2M+ traces)

@@ -89,6 +89,8 @@ pub enum NodeType {
     DetectionFinding,
     /// Goal result — goal completion/failure record from goal_loop
     GoalResult,
+    /// Session — session lifecycle event (start/stop/checkpoint)
+    Session,
 }
 
 impl NodeType {
@@ -132,6 +134,7 @@ impl NodeType {
             NodeType::EventRecord => "event_record",
             NodeType::DetectionFinding => "detection_finding",
             NodeType::GoalResult => "goal_result",
+            NodeType::Session => "session",
         }
     }
 
@@ -175,6 +178,7 @@ impl NodeType {
             "event_record" => NodeType::EventRecord,
             "detection_finding" => NodeType::DetectionFinding,
             "goal_result" => NodeType::GoalResult,
+            "session" => NodeType::Session,
             _ => NodeType::Concept,
         }
     }

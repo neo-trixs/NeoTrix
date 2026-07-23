@@ -184,9 +184,9 @@ const ProjectsPage: React.FC<ProjectsPageProps> = () => {
 
   const handleOpenChat = async (chat: ProjectChat) => {
     setSelectedChatId(chat.id);
-    if (chat.sessionId) {
+    if (chat.session_id) {
       const allSessions = await invoke<any[]>("session_list");
-      const idx = allSessions.findIndex((s) => s.id === chat.sessionId);
+      const idx = allSessions.findIndex((s) => s.id === chat.session_id);
       if (idx >= 0) {
         setActiveSessionIndex(idx);
       }

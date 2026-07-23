@@ -76,7 +76,7 @@ pub fn absorb_event(
     event_type: &str,
     payload: &serde_json::Value,
 ) -> Result<String, String> {
-    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
     let dedup_key = format!("event/{}/{}", event_type, ts);
     let title = format!("event: {} @ {}", event_type, ts);
     let summary = format!("event_type={} at {}", event_type, ts);

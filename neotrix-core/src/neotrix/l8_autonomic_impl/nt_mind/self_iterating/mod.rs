@@ -97,8 +97,8 @@ mod tests {
 
     #[test]
     fn test_seal_rl_loop_single_task() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut brain = SelfIteratingBrain::new();
         brain.brain.learning_rate = 0.05;
 
@@ -123,8 +123,8 @@ mod tests {
 
     #[test]
     fn test_seal_rl_loop_batch() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut brain = SelfIteratingBrain::new();
         brain.brain.learning_rate = 0.05;
 
@@ -150,8 +150,8 @@ mod tests {
 
     #[test]
     fn test_rollback_on_negative_reward() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut brain = SelfIteratingBrain::new();
         let _original_capability = brain.brain.capability.clone();
 
@@ -234,8 +234,8 @@ mod tests {
 
     #[test]
     fn test_reasoning_bank_integration() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut brain = SelfIteratingBrain::new();
 
         // 第一次运行
@@ -255,8 +255,8 @@ mod tests {
 
     #[test]
     fn test_full_seal_algorithm2() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         // 完整 SEAL Algorithm 2 测试
         let mut brain = SelfIteratingBrain::new();
         brain.brain.learning_rate = 0.05;

@@ -84,6 +84,10 @@ name = "neotrix-world-novel-ingest"
 path = "src/bin/nt_world_novel_ingest.rs"
 
 [[bin]]
+name = "neotrix-kb-import-all"
+path = "src/bin/kb_import_all.rs"
+
+[[bin]]
 name = "absorb_crawl"
 path = "src/bin/absorb_crawl.rs"
 

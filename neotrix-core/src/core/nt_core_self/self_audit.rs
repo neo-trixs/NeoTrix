@@ -287,6 +287,51 @@ mod tests {
         assert!(ghost_modules.is_empty(), "Ghost modules found: {:?}", ghost_modules);
     }
 
+
+    #[test]
+    fn test_no_new_python_kb_scripts() {
+        let scripts_dir = std::path::Path::new("scripts");
+        if !scripts_dir.exists() {
+            return;
+        }
+        let whitelist: Vec<&str> = vec![
+            "auto-absorb.py",
+            "crawl-queue-absorb.sh",
+            "mass_queue_processor.py",
+            "novel-world-absorb.py",
+            "generate-evolution-todo.py",
+            "kb-generate-embeddings.py",
+            "diagnose_absorption.py",
+            "kb-init-schema.py",
+            "launch-absorb-10h.sh",
+            "neotrix-auto-absorb.py",
+            "nt_comm_router.py",
+            "deep-absorb-resources.py",
+            "deep-absorb-fable5.py",
+        ];
+        let mut violators = Vec::new();
+        for entry in std::fs::read_dir(scripts_dir).unwrap() {
+            let entry = entry.unwrap();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.ends_with(".py") && !name.ends_with(".sh") {
+                continue;
+            }
+            if whitelist.contains(&name.as_str()) {
+                continue;
+            }
+            let content = std::fs::read_to_string(entry.path()).unwrap_or_default();
+            if content.contains("sqlite3.connect") {
+                violators.push(name);
+            }
+        }
+        assert!(
+            violators.is_empty(),
+            "New Python/Shell scripts directly writing to KB via sqlite3.connect: {:?}\nAll production data writes must go through Rust modules.",
+            violators
+        );
+    }
+
+
     #[test]
     fn test_no_orphans_in_core() {
         let src = Path::new("src/core");
@@ -330,3 +375,6 @@ mod tests {
         assert!(phantom[0].message.contains("P68"));
     }
 }
+
+
+

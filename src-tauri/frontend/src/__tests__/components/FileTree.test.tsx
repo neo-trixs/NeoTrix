@@ -21,16 +21,28 @@ const fileNodes: FileNode[] = [
     path: "/project/src",
     is_dir: true,
     size: undefined,
-    children: [
-      { name: "main.rs", path: "/project/src/main.rs", is_dir: false, size: 512 },
-      { name: "lib.rs", path: "/project/src/lib.rs", is_dir: false, size: 128 },
-    ],
+    depth: 0,
+  },
+  {
+    name: "main.rs",
+    path: "/project/src/main.rs",
+    is_dir: false,
+    size: 512,
+    depth: 1,
+  },
+  {
+    name: "lib.rs",
+    path: "/project/src/lib.rs",
+    is_dir: false,
+    size: 128,
+    depth: 1,
   },
   {
     name: "Cargo.toml",
     path: "/project/Cargo.toml",
     is_dir: false,
     size: 256,
+    depth: 0,
   },
 ];
 

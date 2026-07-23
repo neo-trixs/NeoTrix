@@ -74,6 +74,9 @@ impl LlmProvider for OpenAiProvider {
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let url = format!("{}/chat/completions", self.base_url);
         let body = self.build_body(request, false);
+        let model_name = request.model.as_str();
+
+        log::info!("[openai] calling {} with model={}, stream=false", url, model_name);
 
         let response = self.client
             .post(&url)
@@ -86,6 +89,10 @@ impl LlmProvider for OpenAiProvider {
 
         let status = response.status();
         let text = response.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            log::warn!("[openai] HTTP {} from {}: {}", status.as_u16(), url, text.chars().take(500).collect::<String>());
+        }
 
         match status.as_u16() {
             200 => {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestResult};
+use crate::core::nt_core_self_test::SelfTest;
 
 struct Scenario {
     name: String,

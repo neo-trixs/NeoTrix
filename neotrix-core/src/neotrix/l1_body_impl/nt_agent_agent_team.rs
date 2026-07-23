@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -205,8 +205,20 @@ impl AgentTeam {
     }
 
     pub fn get_ready_tasks(&self) -> Vec<&TeamTask> {
+        let completed_ids: HashSet<usize> = self.tasks.iter()
+            .filter(|t| t.status == TaskStatus::Completed)
+            .map(|t| t.id)
+            .collect();
         self.tasks.iter()
-            .filter(|t| t.status == TaskStatus::Assigned || t.status == TaskStatus::Pending)
+            .filter(|t| {
+                if t.status == TaskStatus::Assigned {
+                    true
+                } else if t.status == TaskStatus::Pending {
+                    t.dependencies.iter().all(|dep_id| completed_ids.contains(dep_id))
+                } else {
+                    false
+                }
+            })
             .collect()
     }
 

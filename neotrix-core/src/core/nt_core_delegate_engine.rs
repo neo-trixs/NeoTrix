@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestResult};
+use crate::core::nt_core_self_test::SelfTest;
 
 struct TaskRecord {
     id: String,

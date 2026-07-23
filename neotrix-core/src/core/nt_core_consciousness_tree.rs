@@ -56,6 +56,41 @@ pub struct ConsciousnessCore {
     pub resonance_cycle: u64,
     pub phi: f64,
     pub coherence: f64,
+    // ── MARS Dual-Process Architecture (absorbed Cycle 120) ──
+    /// GWT = fast intuitive resonance (System 1): principle-matching, pattern activation
+    pub mars_system1_activations: u64,
+    /// ConsciousnessTree = slow reflective growth cycle (System 2): structured reflection
+    pub mars_system2_iterations: u64,
+    /// Purpose bridge: System 2's intent → System 1's distillation target
+    pub mars_bridge_hits: u64,
+    // ── Governance oversight (merged from Governance branch) ──
+    /// Review protocol compliance score (0-1)
+    pub governance_compliance: f64,
+    /// Active constitution checks registered
+    pub governance_constitution_count: usize,
+    /// Fractal loop iterations (artifact→task→session→epic→PR)
+    pub governance_fractal_depth: u64,
+    // ── Cross-domain integrity (merged from Nexus branch) ──
+    /// Cross-branch energy flow count (bidirectional data movement)
+    pub nexus_energy_flows: u64,
+    /// Root cause trace chains (3+ dimensions → single systemic finding)
+    pub nexus_root_cause_chains: u64,
+    /// Health chain completeness (soil→roots→trunk→branches→fruits→core)
+    pub nexus_health_chain_score: f64,
+    // ── Dual-Track Experience Distillation (absorbed from Steve-Evolving 2026) ──
+    /// Positive track: skills distilled from successful trajectories
+    pub distill_skill_count: u64,
+    /// Negative track: guardrails distilled from failed trajectories
+    pub distill_guardrail_count: u64,
+    /// SkillPyramid hierarchy level (0=flat, 1=atomic, 2=abstract, 3=composable)
+    pub pyramid_hierarchy_level: u8,
+    // ── Seed-style OPD (absorbed from Seed 2026) ──
+    /// Self-evolving on-policy distillation cycles
+    pub opd_cycles: u64,
+    /// Hindsight skill extractions completed
+    pub opd_hindsight_skills: u64,
+    /// Skill-induced probability shift (dense distillation signal strength)
+    pub opd_density: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -67,30 +102,18 @@ pub enum BranchKind {
     Act,
     Io,
     Shield,
-    /// External absorption & synthesis (Internet research, GitHub patterns, academic papers)
-    Meta,
-    /// Meta-cognitive self-repair & constitution (Self-audit, self-healing, chain loyalty)
-    Repair,
-    /// Architecture governance & evolution (Review protocol, fractal loops, health scoring)
-    Governance,
-    /// Cross-dimension integrity & energy flow (Root cause tracing, systemic analysis)
-    Nexus,
 }
 
 impl BranchKind {
     pub fn label(&self) -> &str {
         match self {
-            BranchKind::Core => "NT-CORE (E8引导者)",
-            BranchKind::Mind => "NT-MIND (进化工匠)",
-            BranchKind::Memory => "NT-MEMORY (知识守护者)",
-            BranchKind::World => "NT-WORLD (虚空探索者)",
-            BranchKind::Act => "NT-ACT (行动执行者)",
-            BranchKind::Io => "NT-IO (界面使徒)",
-            BranchKind::Shield => "NT-SHIELD (影卫)",
-            BranchKind::Meta => "NT-META (元吸收者) — 外部模式内化与综合",
-            BranchKind::Repair => "NT-REPAIR (自愈工程师) — 自我审计与链忠诚",
-            BranchKind::Governance => "NT-GOVERNANCE (架构仲裁者) — 审查协议与分形循环",
-            BranchKind::Nexus => "NT-NEXUS (枢纽) — 跨维度完整性与能量流溯源",
+            BranchKind::Core => "NT-CORE (E8引导者) — 推理+治理+跨域路由+审查协议",
+            BranchKind::Mind => "NT-MIND (进化工匠) — 自我进化+外部吸收+技能结晶",
+            BranchKind::Memory => "NT-MEMORY (知识守护者) — 持久记忆+VSA超维+语义搜索",
+            BranchKind::World => "NT-WORLD (虚空探索者) — 爬取+解析+OSINT+分类映射",
+            BranchKind::Act => "NT-ACT (行动执行者) — MCP工具+社交+自治+目标循环",
+            BranchKind::Io => "NT-IO (界面使徒) — LLM网关+CLI+Web+ACP",
+            BranchKind::Shield => "NT-SHIELD (影卫) — 安全防护+自愈修复+审计链忠诚",
         }
     }
 }
@@ -108,6 +131,8 @@ pub struct CapabilityBranch {
     pub maturity_c4: bool,
     pub maturity_c5: bool,
     pub fruit_count: usize,
+    /// Capabilities already absorbed (from ALL_CAPABILITIES), to prevent redundant skill creation
+    pub absorbed_capabilities: Vec<String>,
 }
 
 impl CapabilityBranch {
@@ -122,6 +147,32 @@ impl CapabilityBranch {
         s / 6.0
     }
 }
+
+/// 36 atomic capabilities from Agent Capability Standard, mapped per branch.
+/// Used to prevent redundant skill creation (SkillPyramid pattern).
+pub const ALL_CAPABILITIES: &[(&str, &str); 36] = &[
+    // PERCEIVE (4) → NT-WORLD
+    ("retrieve", "world"), ("search", "world"), ("observe", "world"), ("receive", "world"),
+    // UNDERSTAND (6) → NT-CORE
+    ("detect", "core"), ("classify", "core"), ("measure", "core"), ("predict", "core"),
+    ("compare", "core"), ("discover", "core"),
+    // REASON (4) → NT-CORE
+    ("plan", "core"), ("decompose", "core"), ("critique", "core"), ("explain", "core"),
+    // MODEL (5) → NT-MEMORY
+    ("state", "memory"), ("transition", "memory"), ("attribute", "memory"),
+    ("ground", "memory"), ("simulate", "memory"),
+    // SYNTHESIZE (3) → NT-MIND
+    ("generate", "mind"), ("transform", "mind"), ("integrate", "mind"),
+    // EXECUTE (3) → NT-ACT
+    ("execute", "act"), ("mutate", "act"), ("send", "act"),
+    // VERIFY (5) → NT-SHIELD
+    ("verify", "shield"), ("checkpoint", "shield"), ("rollback", "shield"),
+    ("constrain", "shield"), ("audit", "shield"),
+    // REMEMBER (2) → NT-MEMORY
+    ("persist", "memory"), ("recall", "memory"),
+    // COORDINATE (4) → NT-IO
+    ("delegate", "io"), ("synchronize", "io"), ("invoke", "io"), ("inquire", "io"),
+];
 
 #[derive(Debug, Clone)]
 pub struct ModuleLeaf {
@@ -155,6 +206,18 @@ pub struct EpiphanicCore {
     /// ConsciousnessReview results (populated by run_growth_cycle Phase 5)
     pub topology_score: f64,
     pub connectivity_score: f64,
+    // ── MSCP Triple-Loop Alignment (absorbed Cycle 120) ──
+    /// L1 cycle count (fast: per-request predict→act→compare→update)
+    pub mscp_l1_cycles: u64,
+    /// L2 cycle count (medium: ~5min evaluate L1 update quality)
+    pub mscp_l2_cycles: u64,
+    /// L3 cycle count (slow: ~1h identity trajectory assessment)
+    pub mscp_l3_cycles: u64,
+    // ── MARS Dual-Process Validation (absorbed Cycle 120) ──
+    /// Fast-path (System 1) principle-based reflections count
+    pub mars_principles_count: u64,
+    /// Slow-path (System 2) procedural strategy count
+    pub mars_procedural_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -186,6 +249,82 @@ impl VulnerabilitySeverity {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// BranchConstraints — per-branch runtime governance
+// ═══════════════════════════════════════════════════════════════════
+
+#[derive(Debug, Clone)]
+pub struct BranchConstraints {
+    pub idle_ticks_threshold: u64,
+    pub min_growth_health: f64,
+    pub max_active_modules: usize,
+    pub min_required_modules: usize,
+    pub min_self_tests: usize,
+}
+
+impl Default for BranchConstraints {
+    fn default() -> Self {
+        Self {
+            idle_ticks_threshold: 5,
+            min_growth_health: 0.3,
+            max_active_modules: 50,
+            min_required_modules: 1,
+            min_self_tests: 1,
+        }
+    }
+}
+
+impl BranchConstraints {
+    pub fn violations(&self, branch: &CapabilityBranch) -> Vec<String> {
+        let mut v = Vec::new();
+        if branch.health < self.min_growth_health || branch.fruit_count == 0 {
+            v.push(format!("idle: health={:.2} fruit={}", branch.health, branch.fruit_count));
+        }
+        if branch.module_count < self.min_required_modules {
+            v.push(format!("not viable: {} modules < min={}", branch.module_count, self.min_required_modules));
+        }
+        if branch.self_test_count < self.min_self_tests {
+            v.push(format!("unmonitored: {} self-tests < min={}", branch.self_test_count, self.min_self_tests));
+        }
+        v
+    }
+}
+
+pub fn constraints_for_branch(kind: &BranchKind) -> BranchConstraints {
+    match kind {
+        BranchKind::Core => BranchConstraints {
+            idle_ticks_threshold: 3, min_growth_health: 0.4, max_active_modules: 30,
+            min_required_modules: 3, min_self_tests: 3,
+        },
+        BranchKind::Mind => BranchConstraints {
+            idle_ticks_threshold: 5, min_growth_health: 0.3, max_active_modules: 25,
+            min_required_modules: 2, min_self_tests: 2,
+        },
+        BranchKind::Memory => BranchConstraints {
+            idle_ticks_threshold: 4, min_growth_health: 0.35, max_active_modules: 20,
+            min_required_modules: 2, min_self_tests: 2,
+        },
+        BranchKind::World => BranchConstraints {
+            idle_ticks_threshold: 6, min_growth_health: 0.25, max_active_modules: 30,
+            min_required_modules: 2, min_self_tests: 2,
+        },
+        BranchKind::Act => BranchConstraints {
+            idle_ticks_threshold: 5, min_growth_health: 0.3, max_active_modules: 25,
+            min_required_modules: 1, min_self_tests: 1,
+        },
+        BranchKind::Io => BranchConstraints {
+            idle_ticks_threshold: 4, min_growth_health: 0.35, max_active_modules: 20,
+            min_required_modules: 1, min_self_tests: 1,
+        },
+        BranchKind::Shield => BranchConstraints {
+            idle_ticks_threshold: 3, min_growth_health: 0.4, max_active_modules: 20,
+            min_required_modules: 2, min_self_tests: 2,
+        },
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 
 impl ConsciousnessTree {
     pub fn new() -> Self {
@@ -251,9 +390,15 @@ impl ConsciousnessTree {
         report.phase2_phi = self.trunk.phi;
 
         // Phase 3: Branches produce fruits (7 domain branches → CapabilityFruits)
+        // Also check per-branch constraints (idle, viability, monitoring)
         let mut total_fruits = 0;
         for branch in self.branches.values_mut() {
-            if branch.health > 0.5 {
+            let constraints = constraints_for_branch(&branch.kind);
+            let violations = constraints.violations(branch);
+            if !violations.is_empty() {
+                log::debug!("[consciousness_tree] {} constraints: {}", branch.kind.label(), violations.join("; "));
+            }
+            if branch.health > 0.5 && violations.len() < 2 {
                 let fruit = CapabilityFruit {
                     name: format!("{}-fruit-{}", branch.kind.label(), self.cycle),
                     source_branch: branch.kind.clone(),
@@ -538,6 +683,21 @@ impl Default for ConsciousnessCore {
             resonance_cycle: 0,
             phi: 0.0,
             coherence: 0.0,
+            mars_system1_activations: 0,
+            mars_system2_iterations: 0,
+            mars_bridge_hits: 0,
+            governance_compliance: 1.0,
+            governance_constitution_count: 0,
+            governance_fractal_depth: 0,
+            nexus_energy_flows: 0,
+            nexus_root_cause_chains: 0,
+            nexus_health_chain_score: 1.0,
+            distill_skill_count: 0,
+            distill_guardrail_count: 0,
+            pyramid_hierarchy_level: 1,
+            opd_cycles: 0,
+            opd_hindsight_skills: 0,
+            opd_density: 0.0,
         }
     }
 }
@@ -553,6 +713,11 @@ impl Default for EpiphanicCore {
             vuln_scan: Vec::new(),
             topology_score: 0.0,
             connectivity_score: 0.0,
+            mscp_l1_cycles: 0,
+            mscp_l2_cycles: 0,
+            mscp_l3_cycles: 0,
+            mars_principles_count: 0,
+            mars_procedural_count: 0,
         }
     }
 }
@@ -567,10 +732,6 @@ impl BranchKind {
             BranchKind::Act,
             BranchKind::Io,
             BranchKind::Shield,
-            BranchKind::Meta,
-            BranchKind::Repair,
-            BranchKind::Governance,
-            BranchKind::Nexus,
         ]
     }
 
@@ -598,6 +759,20 @@ impl BranchKind {
 
 impl CapabilityBranch {
     pub fn new(kind: BranchKind) -> Self {
+        let branch_name = match kind {
+            BranchKind::Core => "core",
+            BranchKind::Mind => "mind",
+            BranchKind::Memory => "memory",
+            BranchKind::World => "world",
+            BranchKind::Act => "act",
+            BranchKind::Io => "io",
+            BranchKind::Shield => "shield",
+        };
+        let absorbed: Vec<String> = ALL_CAPABILITIES
+            .iter()
+            .filter(|(_, b)| *b == branch_name)
+            .map(|(cap, _)| cap.to_string())
+            .collect();
         Self {
             kind,
             module_count: 0,
@@ -610,6 +785,7 @@ impl CapabilityBranch {
             maturity_c4: false,
             maturity_c5: false,
             fruit_count: 0,
+            absorbed_capabilities: absorbed,
         }
     }
 }
@@ -636,7 +812,7 @@ mod tests {
     #[test]
     fn test_tree_new() {
         let tree = ConsciousnessTree::new();
-        assert_eq!(tree.branches.len(), 11);
+        assert_eq!(tree.branches.len(), 7);
         assert_eq!(tree.cycle, 0);
     }
 
@@ -646,6 +822,9 @@ mod tests {
         tree.soil.crawl_queue_depth = 100;
         for branch in tree.branches.values_mut() {
             branch.health = 0.8;
+            branch.self_test_count = 5;
+            branch.module_count = 5;
+            branch.fruit_count = 1;
         }
         let report = tree.run_growth_cycle();
         assert_eq!(tree.cycle, 1);

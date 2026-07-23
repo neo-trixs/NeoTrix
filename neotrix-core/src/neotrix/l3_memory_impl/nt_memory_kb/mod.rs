@@ -35,6 +35,7 @@ pub mod nt_memory_wiki;
 pub mod nt_memory_knowledge_assets;
 pub mod nt_memory_visual_rag;
 pub mod nt_memory_commit_tracker;
+pub mod nt_memory_graph_cache;
 pub mod privacy;
 pub mod user_memory;
 pub mod vector_adapter;
@@ -90,6 +91,7 @@ pub struct KnowledgeBase {
     pub bm25: RwLock<Option<Bm25Index>>,
     pub bm25_dirty: RwLock<bool>,
     pub embedding_config: RwLock<Option<EmbeddingConfig>>,
+    pub graph_cache: RwLock<nt_memory_graph_cache::GraphCache>,
     pub fused_cache: Mutex<LruCache<String, Vec<SearchResult>>>,
     pub adaptive: AdaptiveRetrieval,
     pub commitment_store: RwLock<EmbeddingCommitmentStore>,
@@ -103,6 +105,7 @@ pub struct KnowledgeBase {
     pub proficiency: RwLock<MemoryProficiency>,
     pub graphrag_store: RwLock<Option<GraphRagStore>>,
     pub tech_reserve: RwLock<TechReserveStore>,
+    pub skills_library: RwLock<nt_memory_knowledge_assets::SkillsLibrary>,
 }
 
 impl std::fmt::Debug for KnowledgeBase {
@@ -111,6 +114,8 @@ impl std::fmt::Debug for KnowledgeBase {
             .field("db_path", &self.db_path)
             .field("bm25_dirty", &self.bm25_dirty)
             .field("embedding_config", &self.embedding_config)
+            .field("graph_cache", &self.graph_cache)
+            .field("skills_library", &self.skills_library)
             .finish()
     }
 }
@@ -147,7 +152,15 @@ impl KnowledgeBase {
             proficiency: RwLock::new(MemoryProficiency::new()),
             graphrag_store: RwLock::new(None),
             tech_reserve: RwLock::new(TechReserveStore::new()),
+            skills_library: RwLock::new(nt_memory_knowledge_assets::SkillsLibrary::new()),
+            graph_cache: RwLock::new(nt_memory_graph_cache::GraphCache::empty()),
         };
+        {
+            let conn = kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+            let mut cache = kb.graph_cache.write().map_err(|e| format!("Lock: {}", e))?;
+            *cache = nt_memory_graph_cache::GraphCache::new(&conn).unwrap_or_else(|_| nt_memory_graph_cache::GraphCache::empty());
+            log::info!("[KB] graph_cache built: {} edges, {} nodes", cache.edge_count, cache.node_count);
+        }
         log::info!("[KB] opened at {db_path_str} — BM25/tech-reserve lazy (rebuild on first use)");
 
         // Warn if embeddings are not configured (semantic search disabled)
@@ -174,6 +187,7 @@ impl KnowledgeBase {
         let confidence_store = ConfidenceStore::new(DecayConfig::default());
         let community_search = CommunityAwareSearch::new(CommunityDetector::default());
         let privacy = PrivacyEnforcer::new(PrivacyConfig::default());
+        let cache = nt_memory_graph_cache::GraphCache::new(&conn).unwrap_or_else(|_| nt_memory_graph_cache::GraphCache::empty());
         Self {
             conn: Mutex::new(conn),
             db_path,
@@ -193,7 +207,85 @@ impl KnowledgeBase {
             proficiency: RwLock::new(MemoryProficiency::new()),
             graphrag_store: RwLock::new(None),
             tech_reserve: RwLock::new(TechReserveStore::new()),
+            skills_library: RwLock::new(nt_memory_knowledge_assets::SkillsLibrary::new()),
+            graph_cache: RwLock::new(cache),
         }
+    }
+
+    pub fn rebuild_skills_library(&self) -> Result<usize, String> {
+        let mut lib = self.skills_library.write().map_err(|e| format!("Lock: {}", e))?;
+        lib.rebuild_from_kb(self)
+    }
+
+    pub fn rebuild_graph_cache(&self) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let mut cache = self.graph_cache.write().map_err(|e| format!("Lock: {}", e))?;
+        *cache = nt_memory_graph_cache::GraphCache::new(&conn)
+            .unwrap_or_else(|_| nt_memory_graph_cache::GraphCache::empty());
+        log::info!("[KB] graph_cache rebuilt: {} edges, {} nodes", cache.edge_count, cache.node_count);
+        Ok(())
+    }
+
+    pub fn embedding_available(&self) -> bool {
+        self.embedding_config.read().map_or(false, |c| c.is_some())
+    }
+
+    pub fn integrity_check(&self) -> Vec<String> {
+        let mut issues: Vec<String> = Vec::new();
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(e) => {
+                issues.push(format!("Lock error: {}", e));
+                return issues;
+            }
+        };
+        // 1. Check dangling edges
+        if let Ok(mut dangling) = conn.prepare(
+            "SELECT e.id FROM edges e LEFT JOIN nodes n ON e.source_id = n.id WHERE n.id IS NULL \
+             UNION ALL SELECT e.id FROM edges e LEFT JOIN nodes n ON e.target_id = n.id WHERE n.id IS NULL"
+        ) {
+            let count: usize = dangling.query_map([], |_| Ok(()))
+                .map(|r| r.count())
+                .unwrap_or(0);
+            if count > 0 {
+                issues.push(format!("Dangling edges: {} edges reference non-existent nodes", count));
+            }
+        }
+        // 2. Check orphan nodes (no edges)
+        if let Ok(mut orphans) = conn.prepare(
+            "SELECT COUNT(*) FROM nodes n WHERE n.id NOT IN (SELECT source_id FROM edges) \
+             AND n.id NOT IN (SELECT target_id FROM edges)"
+        ) {
+            if let Ok(count) = orphans.query_row([], |row| row.get::<_, usize>(0)) {
+                if count > 0 {
+                    issues.push(format!("Orphan nodes: {} nodes have no connections", count));
+                }
+            }
+        }
+        // 3. Check stale data (nodes created >30 days ago, never accessed)
+        let stale_threshold = chrono::Utc::now().timestamp() - 2_592_000;
+        if let Ok(mut stale) = conn.prepare(
+            "SELECT COUNT(*) FROM nodes WHERE created_at < ?1 AND last_accessed < ?1"
+        ) {
+            if let Ok(count) = stale.query_row([stale_threshold], |row| row.get::<_, usize>(0)) {
+                if count > 0 {
+                    issues.push(format!("Stale nodes: {} nodes untouched for >30 days", count));
+                }
+            }
+        }
+        // 4. Check embedding count vs node count
+        if let Ok(emb_count) = conn.query_row(
+            "SELECT COUNT(*) FROM embeddings WHERE embedding IS NOT NULL", [], |row| row.get::<_, usize>(0)
+        ) {
+            if let Ok(node_count) = conn.query_row("SELECT COUNT(*) FROM nodes", [], |row| row.get::<_, usize>(0)) {
+                if node_count > 0 && emb_count < node_count / 10 {
+                    issues.push(format!(
+                        "Embedding gap: {}/{} nodes have embeddings (<10%)", emb_count, node_count
+                    ));
+                }
+            }
+        }
+        issues
     }
 
     /// Open a clone connection to the same DB (for sharing across subsystems)
@@ -616,7 +708,7 @@ impl KnowledgeBase {
     /// Query KB for Repository nodes by domain, with optional min_stars filter
     pub fn find_repositories(&self, domain: &str, min_stars: Option<i64>) -> Result<Vec<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-        let mut sql = "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata FROM nodes WHERE node_type = 'Repository'".to_string();
+        let mut sql = "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata FROM nodes WHERE node_type = 'repository'".to_string();
         if !domain.is_empty() {
             sql.push_str(" AND domain = ?1");
         }
@@ -1048,6 +1140,38 @@ impl KnowledgeBase {
 
     pub fn import_review_findings(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
         nt_memory_knowledge_assets::import_review_findings(self, path)
+    }
+
+    pub fn import_brain_state(&self, base_path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_brain_state(self, base_path)
+    }
+
+    pub fn import_absorption_report(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_absorption_report(self, path)
+    }
+
+    pub fn import_knowledge_engine(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_knowledge_engine(self, path)
+    }
+
+    pub fn import_reasoning_memories(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_reasoning_memories(self, path)
+    }
+
+    pub fn import_bandit_data(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_bandit_data(self, path)
+    }
+
+    pub fn import_e8_state(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_e8_state(self, path)
+    }
+
+    pub fn import_avatar_chain(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_avatar_chain(self, path)
+    }
+
+    pub fn import_proxy_pool(&self, path: &std::path::Path) -> Result<nt_memory_knowledge_assets::ImportReport, String> {
+        nt_memory_knowledge_assets::import_proxy_pool(self, path)
     }
 
     // ── Embeddings ──

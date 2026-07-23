@@ -175,8 +175,8 @@ impl LeannGraphStore {
                 }
                 RecomputeStrategy::Cached => false,
                 RecomputeStrategy::Adaptive => {
-                    if node.stored_embedding {
-                        false
+                    if !node.stored_embedding {
+                        true
                     } else {
                         node.access_count >= self.config.recompute_threshold
                     }
@@ -188,6 +188,7 @@ impl LeannGraphStore {
     pub fn mark_stored(&mut self, id: usize) {
         if let Some(node) = self.nodes.get_mut(&id) {
             node.stored_embedding = true;
+            node.access_count = 0;
         }
     }
 

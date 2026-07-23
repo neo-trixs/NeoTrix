@@ -17,8 +17,8 @@ mod tests {
 
     #[test]
     fn test_seal_loop_basic() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut system = SelfIteratingBrain::new();
 
         let reward = system.run_seal_loop("design a UI component", None, None);
@@ -32,8 +32,8 @@ mod tests {
 
     #[test]
     fn test_seal_loop_with_embedding() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut system = SelfIteratingBrain::new();
 
         let embedding = vec![0.5, 0.3, 0.8, 0.2, 0.6];
@@ -49,8 +49,8 @@ mod tests {
 
     #[test]
     fn test_seal_loop_multiple_iterations() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut system = SelfIteratingBrain::new();
 
         let tasks = ["design UI", "analyze code", "review nt_shield"];
@@ -64,8 +64,8 @@ mod tests {
 
     #[test]
     fn test_seal_loop_reward_threshold() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut system = SelfIteratingBrain::new();
         system.quality_threshold = 0.5;
 
@@ -100,8 +100,8 @@ mod tests {
 
     #[test]
     fn test_seal_with_memory() {
-        let _rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = _rt.enter();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
         let mut system = SelfIteratingBrain::new();
 
         let _ = system.run_seal_loop("design a UI component with accessibility", None, None);

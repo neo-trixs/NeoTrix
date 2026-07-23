@@ -205,13 +205,34 @@ fn ensure_provider_env_from_config() {
     let cfg = crate::config::NeoTrixConfig::load();
     if let (Some(provider), Some(api_key)) = (&cfg.provider, &cfg.api_key) {
         if !api_key.is_empty() {
-            let env_var = match provider.as_str() {
-                "openai" => "OPENAI_API_KEY",
-                "anthropic" => "ANTHROPIC_API_KEY",
-                _ => return,
-            };
-            if std::env::var(env_var).is_err() {
-                std::env::set_var(env_var, api_key);
+            match provider.as_str() {
+                "openai" => {
+                    if std::env::var("OPENAI_API_KEY").is_err() {
+                        std::env::set_var("OPENAI_API_KEY", api_key);
+                    }
+                }
+                "anthropic" => {
+                    if std::env::var("ANTHROPIC_API_KEY").is_err() {
+                        std::env::var("ANTHROPIC_API_KEY").ok();
+                        std::env::set_var("ANTHROPIC_API_KEY", api_key);
+                    }
+                }
+                "custom" => {
+                    if std::env::var("NEOTRIX_API_KEY").is_err() {
+                        std::env::set_var("NEOTRIX_API_KEY", api_key);
+                    }
+                    if let Some(ref endpoint) = cfg.custom_endpoint {
+                        if std::env::var("NEOTRIX_BASE_URL").is_err() {
+                            std::env::set_var("NEOTRIX_BASE_URL", endpoint);
+                        }
+                    }
+                    if let Some(ref model) = cfg.default_model {
+                        if std::env::var("NEOTRIX_MODEL").is_err() {
+                            std::env::set_var("NEOTRIX_MODEL", model);
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }

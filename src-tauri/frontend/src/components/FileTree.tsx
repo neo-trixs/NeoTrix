@@ -107,6 +107,9 @@ const FileTree: React.FC<Props> = ({ rootPath, onClose, onStatusChange }) => {
     const indent = depth * 16;
     const isExpanded = expanded.has(node.path);
 
+    // Hide children of collapsed directories
+    if (node.is_dir && !isExpanded) return null;
+
     return (
       <div key={node.path}>
         <div
@@ -132,7 +135,6 @@ const FileTree: React.FC<Props> = ({ rootPath, onClose, onStatusChange }) => {
             <span className="file-size">{formatSize(node.size)}</span>
           )}
         </div>
-        {node.is_dir && isExpanded && node.children?.map((child) => renderNode(child, depth + 1))}
       </div>
     );
   };
@@ -153,7 +155,7 @@ const FileTree: React.FC<Props> = ({ rootPath, onClose, onStatusChange }) => {
         ) : nodes.length === 0 ? (
           <div className="file-empty">空目录</div>
         ) : (
-          nodes.map((node) => renderNode(node, 0))
+          nodes.map((node) => renderNode(node, node.depth))
         )}
       </div>
 

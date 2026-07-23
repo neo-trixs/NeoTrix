@@ -71,8 +71,8 @@ impl FreeModelCatalog {
                     base_url: "https://openrouter.ai/api/v1".into(),
                     tier,
                     is_free: true,
-                    requires_api_key: false,
-                    api_key_env: None,
+                    requires_api_key: true,
+                    api_key_env: Some("OPENROUTER_API_KEY".into()),
                     provider_type: LlmProviderType::FreeApi,
                 }
             })
@@ -144,6 +144,7 @@ impl FreeModelCatalog {
         merged.extend(Self::discover_together_free());
         merged.extend(Self::discover_siliconflow_models());
         merged.extend(Self::discover_zai_models());
+        merged.extend(Self::discover_api_airforce_models());
         let mut seen = HashSet::new();
         merged.retain(|e| seen.insert(format!("{}/{}", e.provider, e.model_id)));
         self.entries = merged.clone();
@@ -286,85 +287,74 @@ impl FreeModelCatalog {
         ]
     }
 
-    /// 发现 Keyless 免费提供者 (无 API Key 要求)
+    /// 发现 Keyless/Key-required 免费提供者 (OpenCode Zen free models with free-tier API key)
     pub fn discover_keyless_providers() -> Vec<FreeModelEntry> {
         let mut entries = Vec::new();
-        // LLM7
-        entries.push(FreeModelEntry {
-            provider: "llm7".into(),
-            model_id: "gpt-oss-20b".into(),
-            display_name: "GPT-OSS 20B (LLM7)".into(),
-            base_url: "https://api.llm7.ai/v1".into(), tier: "t2-balanced".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::Llm7,
-        });
-        entries.push(FreeModelEntry {
-            provider: "llm7".into(),
-            model_id: "llama-3.1-8b".into(),
-            display_name: "Llama 3.1 8B (LLM7)".into(),
-            base_url: "https://api.llm7.ai/v1".into(), tier: "t1-standard".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::Llm7,
-        });
-        // Kilo
-        entries.push(FreeModelEntry {
-            provider: "kilo".into(),
-            model_id: "nemotron-70b".into(),
-            display_name: "Nemotron 70B (Kilo)".into(),
-            base_url: "https://api.kilocode.ai/v1".into(), tier: "t3-powerful".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::Kilo,
-        });
-        entries.push(FreeModelEntry {
-            provider: "kilo".into(),
-            model_id: "deepseek-v4-flash".into(),
-            display_name: "DeepSeek V4 Flash (Kilo)".into(),
-            base_url: "https://api.kilocode.ai/v1".into(), tier: "t3-powerful".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::Kilo,
-        });
-        // OpenCode Zen
+        // Only OpenCode Zen — verified working with free tier API key (opencode.ai)
+        // LLM7/Kilo/OVH/ModelScope endpoints all dead as of 2026-07-22 (404/timeout)
+        let zen_base = "https://opencode.ai/zen/v1";
         entries.push(FreeModelEntry {
             provider: "opencode-zen".into(),
             model_id: "deepseek-v4-flash-free".into(),
             display_name: "DeepSeek V4 Flash Free (OpenCode)".into(),
-            base_url: "https://api.opencode.ai/zen/v1".into(), tier: "t2-balanced".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::OpenCodeZen,
+            base_url: zen_base.into(), tier: "t4-frontier".into(),
+            is_free: true, requires_api_key: true,
+            api_key_env: Some("OPENCODE_API_KEY".into()),
+            provider_type: LlmProviderType::OpenCodeZen,
         });
         entries.push(FreeModelEntry {
             provider: "opencode-zen".into(),
-            model_id: "deepseek-v4-flash".into(),
-            display_name: "DeepSeek V4 Flash (OpenCode)".into(),
-            base_url: "https://api.opencode.ai/zen/v1".into(), tier: "t3-powerful".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::OpenCodeZen,
-        });
-        // OVH
-        entries.push(FreeModelEntry {
-            provider: "ovh".into(),
-            model_id: "Qwen3.5-397B-A22B".into(),
-            display_name: "Qwen3.5 397B (OVH)".into(),
-            base_url: "https://ai-endpoints.ovh.net/v1".into(), tier: "t4-frontier".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::Ovh,
+            model_id: "mimo-v2.5-free".into(),
+            display_name: "MiMo V2.5 Free (OpenCode)".into(),
+            base_url: zen_base.into(), tier: "t4-frontier".into(),
+            is_free: true, requires_api_key: true,
+            api_key_env: Some("OPENCODE_API_KEY".into()),
+            provider_type: LlmProviderType::OpenCodeZen,
         });
         entries.push(FreeModelEntry {
-            provider: "ovh".into(),
-            model_id: "meta-llama/Llama-3.3-70B-Instruct".into(),
-            display_name: "Llama 3.3 70B (OVH)".into(),
-            base_url: "https://ai-endpoints.ovh.net/v1".into(), tier: "t3-powerful".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::Ovh,
+            provider: "opencode-zen".into(),
+            model_id: "qwen3.6-plus-free".into(),
+            display_name: "Qwen 3.6 Plus Free (OpenCode)".into(),
+            base_url: zen_base.into(), tier: "t4-frontier".into(),
+            is_free: true, requires_api_key: true,
+            api_key_env: Some("OPENCODE_API_KEY".into()),
+            provider_type: LlmProviderType::OpenCodeZen,
         });
-        // ModelScope
         entries.push(FreeModelEntry {
-            provider: "modelscope".into(),
-            model_id: "Qwen/Qwen3-235B-A22B".into(),
-            display_name: "Qwen3 235B (ModelScope)".into(),
-            base_url: "https://api.modelscope.cn/v1".into(), tier: "t4-frontier".into(),
-            is_free: true, requires_api_key: false,
-            api_key_env: None, provider_type: LlmProviderType::ModelScope,
+            provider: "opencode-zen".into(),
+            model_id: "minimax-m3-free".into(),
+            display_name: "MiniMax M3 Free (OpenCode)".into(),
+            base_url: zen_base.into(), tier: "t3-powerful".into(),
+            is_free: true, requires_api_key: true,
+            api_key_env: Some("OPENCODE_API_KEY".into()),
+            provider_type: LlmProviderType::OpenCodeZen,
+        });
+        entries.push(FreeModelEntry {
+            provider: "opencode-zen".into(),
+            model_id: "nemotron-3-ultra-free".into(),
+            display_name: "Nemotron 3 Ultra Free (OpenCode)".into(),
+            base_url: zen_base.into(), tier: "t3-powerful".into(),
+            is_free: true, requires_api_key: true,
+            api_key_env: Some("OPENCODE_API_KEY".into()),
+            provider_type: LlmProviderType::OpenCodeZen,
+        });
+        entries.push(FreeModelEntry {
+            provider: "opencode-zen".into(),
+            model_id: "north-mini-code-free".into(),
+            display_name: "North Mini Code Free (OpenCode)".into(),
+            base_url: zen_base.into(), tier: "t1-standard".into(),
+            is_free: true, requires_api_key: true,
+            api_key_env: Some("OPENCODE_API_KEY".into()),
+            provider_type: LlmProviderType::OpenCodeZen,
+        });
+        entries.push(FreeModelEntry {
+            provider: "opencode-zen".into(),
+            model_id: "big-pickle".into(),
+            display_name: "Big Pickle (OpenCode)".into(),
+            base_url: zen_base.into(), tier: "t4-frontier".into(),
+            is_free: true, requires_api_key: true,
+            api_key_env: Some("OPENCODE_API_KEY".into()),
+            provider_type: LlmProviderType::OpenCodeZen,
         });
         entries
     }
@@ -480,6 +470,51 @@ impl FreeModelCatalog {
         ]
     }
 
+    /// 发现 ApiAirforce 免费模型（truly keyless）
+    /// Verified 2026-07-22: 209+ models with `:free` suffix at api.airforce
+    /// Accepts any Bearer token (even empty/not-needed), rate-limited to ~1 req/s
+    pub fn discover_api_airforce_models() -> Vec<FreeModelEntry> {
+        let base = "https://api.airforce/v1";
+        vec![
+            FreeModelEntry {
+                provider: "api-airforce".into(),
+                model_id: "grok-4.1-mini:free".into(),
+                display_name: "Grok 4.1 Mini (ApiAirforce)".into(),
+                base_url: base.into(), tier: "t4-frontier".into(),
+                is_free: true, requires_api_key: false,
+                api_key_env: None,
+                provider_type: LlmProviderType::ApiAirforce,
+            },
+            FreeModelEntry {
+                provider: "api-airforce".into(),
+                model_id: "deepseek-v3.2:free".into(),
+                display_name: "DeepSeek V3.2 (ApiAirforce)".into(),
+                base_url: base.into(), tier: "t4-frontier".into(),
+                is_free: true, requires_api_key: false,
+                api_key_env: None,
+                provider_type: LlmProviderType::ApiAirforce,
+            },
+            FreeModelEntry {
+                provider: "api-airforce".into(),
+                model_id: "gemma3-270m:free".into(),
+                display_name: "Gemma 3 270M (ApiAirforce)".into(),
+                base_url: base.into(), tier: "t0-cheap".into(),
+                is_free: true, requires_api_key: false,
+                api_key_env: None,
+                provider_type: LlmProviderType::ApiAirforce,
+            },
+            FreeModelEntry {
+                provider: "api-airforce".into(),
+                model_id: "step-3.5-flash:free".into(),
+                display_name: "Step 3.5 Flash (ApiAirforce)".into(),
+                base_url: base.into(), tier: "t2-balanced".into(),
+                is_free: true, requires_api_key: false,
+                api_key_env: None,
+                provider_type: LlmProviderType::ApiAirforce,
+            },
+        ]
+    }
+
     /// 格式化显示
     pub fn format_list(entries: &[FreeModelEntry]) -> String {
         let mut output = format!("╭─ Free Models ({}) ─────────────────────────╮\n", entries.len());
@@ -517,6 +552,7 @@ impl FreeModelCatalog {
                         "ovh" => "\u{2601}\u{fe0f}",
                         "deepseek-free" => "\u{1f9d0}",
                         "modelscope" => "\u{1f30d}",
+                        "api-airforce" => "\u{2708}\u{fe0f}",
                         _ => "\u{1f4e6}",
                     };
                     let key = if m.requires_api_key { " \u{1f511}" } else { " \u{1f512}" };

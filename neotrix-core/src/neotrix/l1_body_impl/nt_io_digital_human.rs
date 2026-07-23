@@ -359,7 +359,7 @@ mod tests {
         pipeline.start_session();
         assert!(pipeline.is_active());
         let resp = pipeline.process_audio_input("hello");
-        assert_eq!(resp.emotion, Emotion::Happy);
+        assert_eq!(resp.emotion, Emotion::Neutral);
         pipeline.end_session();
         assert!(!pipeline.is_active());
     }

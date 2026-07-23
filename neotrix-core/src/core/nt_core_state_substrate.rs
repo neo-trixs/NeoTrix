@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-use crate::core::nt_core_self_test::{SelfTest, SelfTestResult};
+use crate::core::nt_core_self_test::SelfTest;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ThinkingMode {
     Deep,
     Fast,
+    Balanced,
 }
 
 #[derive(Clone)]

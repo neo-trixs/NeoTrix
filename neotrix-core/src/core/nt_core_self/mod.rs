@@ -14,6 +14,7 @@ pub mod skill_crystal;
 pub mod system_identity;
 pub mod seal;
 pub mod thinking_trace;
+pub mod evolution_analysis;
 pub mod self_audit;
 
 pub use archive::{SiliconArchive, SiliconSnapshot, AttentionSnapshot};
@@ -37,6 +38,7 @@ pub use silicon_self::{SiliconSelfModel, SiliconSelfState};
 pub use skill_crystal::{SkillCrystal, CrystalRegistry};
 pub use system_identity::{SystemIdentity, CognitiveCapability, ValueConstraint};
 pub use thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
+pub use evolution_analysis::{KbDefect, KbHealthReport, analyze_kb_health, store_report_to_kb, print_report};
 pub use intra_reflection::{PreActionIntrospector, IntraReflection, IntraReflectionReport, PredictedOutcome};
 pub use meta_calibrate::{
     CalibrationReport, CalibrationSignal, CalibrationState, CalibrationTarget,

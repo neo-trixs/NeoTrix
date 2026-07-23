@@ -10,6 +10,7 @@ use super::openai::OpenAiProvider;
 use super::anthropic::AnthropicProvider;
 use super::ollama::OllamaProvider;
 use super::gemini::GeminiProvider;
+use super::free_catalog::FreeModelCatalog;
 use super::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
 use super::gateway::GatewayV2;
 use super::provider_catalog::ProviderCategory;
@@ -47,6 +48,7 @@ pub enum LlmProviderType {
     Ovh,
     DeepSeekFree,
     ModelScope,
+    ApiAirforce,
 }
 
 impl LlmProviderType {
@@ -79,6 +81,7 @@ impl LlmProviderType {
             "ovh" => Some(Self::Ovh),
             "deepseek-free" | "deepseek_free" => Some(Self::DeepSeekFree),
             "modelscope" => Some(Self::ModelScope),
+            "api-airforce" | "api_airforce" => Some(Self::ApiAirforce),
             _ => None,
         }
     }
@@ -90,7 +93,8 @@ impl LlmProviderType {
             Self::ZeroLimit | Self::FreeApi | Self::Ollama |
             Self::Cloudflare | Self::Nvidia | Self::GitHubModels | Self::HuggingFace |
             Self::TogetherFree | Self::Llm7 | Self::Kilo | Self::SiliconFlow |
-            Self::ZAI | Self::OpenCodeZen | Self::Ovh | Self::DeepSeekFree | Self::ModelScope
+            Self::ZAI | Self::OpenCodeZen | Self::Ovh | Self::DeepSeekFree | Self::ModelScope |
+            Self::ApiAirforce
         )
     }
 
@@ -101,7 +105,7 @@ impl LlmProviderType {
             Self::ZeroLimit | Self::CustomProxy |
             Self::Cloudflare | Self::Nvidia | Self::GitHubModels | Self::HuggingFace |
             Self::Cohere | Self::TogetherFree | Self::SiliconFlow | Self::ZAI |
-            Self::DeepSeekFree
+            Self::DeepSeekFree | Self::OpenCodeZen | Self::FreeTheAi
         )
     }
 
@@ -169,6 +173,7 @@ impl ProviderConfig {
             "ovh" => LlmProviderType::Ovh,
             "deepseek-free" | "deepseek_free" => LlmProviderType::DeepSeekFree,
             "modelscope" => LlmProviderType::ModelScope,
+            "api-airforce" | "api_airforce" => LlmProviderType::ApiAirforce,
             _ => LlmProviderType::Anthropic,
         };
 
@@ -389,10 +394,13 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             Box::new(provider)
         }
         LlmProviderType::OpenCodeZen => {
-            let base_url = config.base_url.unwrap_or_else(|| {
-                std::env::var("NEOTRIX_ZEN_URL").unwrap_or_else(|_| "https://api.opencode.ai/zen/v1".to_string())
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("OPENCODE_API_KEY").unwrap_or_default()
             });
-            let mut provider = OpenAiProvider::new(String::new());
+            let base_url = config.base_url.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_ZEN_URL").unwrap_or_else(|_| "https://opencode.ai/zen/v1".to_string())
+            });
+            let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
             Box::new(provider)
         }
@@ -414,6 +422,15 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
         LlmProviderType::ModelScope => {
             let base_url = config.base_url.unwrap_or_else(|| "https://api.modelscope.cn/v1".to_string());
             let mut provider = OpenAiProvider::new(String::new());
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::ApiAirforce => {
+            // Truly keyless — accepts any Bearer token, even empty/not-needed
+            // Verified working 2026-07-22: 209+ free models with `:free` suffix
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.airforce/v1".to_string());
+            let api_key = config.api_key.unwrap_or_else(|| String::new());
+            let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
             Box::new(provider)
         }
@@ -507,36 +524,28 @@ pub async fn create_gateway_async() -> GatewayV2 {
     register_if!("SILICONFLOW_API_KEY", "siliconflow", LlmProviderType::SiliconFlow, true);
     register_if!("ZAI_API_KEY", "zai", LlmProviderType::ZAI, true);
     register_if!("DEEPSEEK_API_KEY", "deepseek-free", LlmProviderType::DeepSeekFree, true);
+    register_if!("OPENCODE_API_KEY", "opencode-zen", LlmProviderType::OpenCodeZen, true);
+    register_if!("FREETHEAI_API_KEY", "freetheai", LlmProviderType::FreeTheAi, true);
+
+    // ── 4. FreeModelCatalog: 从目录中发现并注册所有可用免费模型 ──
+    // Use spawn_blocking to avoid tokio 1.52+ panic when reqwest::blocking drops
+    // its internal Runtime while already inside a block_on context.
+    let mut catalog = FreeModelCatalog::new();
+    let discovered = tokio::task::spawn_blocking(move || catalog.refresh()).await.unwrap_or_default();
+    let registered_count = discovered.len();
+    gateway.register_from_catalog(&discovered);
+    if !discovered.is_empty() {
+        log::info!("[gateway] FreeModelCatalog: {} entries discovered, registered those with keys", registered_count);
+    }
 
     // 始终注册 keyless 免费提供者
     let pollinations = PollinationsProvider::new();
     gateway.register_provider_with_category("pollinations", Box::new(pollinations), true, ProviderCategory::Cloud);
     log::info!("[gateway] Registered keyless: pollinations");
 
-    let freetheai = create_provider_from_type(LlmProviderType::FreeTheAi, None);
-    gateway.register_provider_with_category("freetheai", freetheai, true, ProviderCategory::Cloud);
-    log::info!("[gateway] Registered keyless: freetheai");
-
-    // Keyless free providers — auto register always
-    let llm7 = create_provider_from_type(LlmProviderType::Llm7, None);
-    gateway.register_provider_with_category("llm7", llm7, true, ProviderCategory::Cloud);
-    log::info!("[gateway] Registered keyless: llm7");
-
-    let kilo = create_provider_from_type(LlmProviderType::Kilo, None);
-    gateway.register_provider_with_category("kilo", kilo, true, ProviderCategory::Cloud);
-    log::info!("[gateway] Registered keyless: kilo");
-
-    let opencode_zen = create_provider_from_type(LlmProviderType::OpenCodeZen, None);
-    gateway.register_provider_with_category("opencode-zen", opencode_zen, true, ProviderCategory::Cloud);
-    log::info!("[gateway] Registered keyless: opencode-zen");
-
-    let ovh = create_provider_from_type(LlmProviderType::Ovh, None);
-    gateway.register_provider_with_category("ovh", ovh, true, ProviderCategory::Cloud);
-    log::info!("[gateway] Registered keyless: ovh");
-
-    let modelscope = create_provider_from_type(LlmProviderType::ModelScope, None);
-    gateway.register_provider_with_category("modelscope", modelscope, true, ProviderCategory::Cloud);
-    log::info!("[gateway] Registered keyless: modelscope");
+    let api_airforce = create_provider_from_type(LlmProviderType::ApiAirforce, None);
+    gateway.register_provider_with_category("api-airforce", api_airforce, true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: api-airforce (api.airforce, 209+ free models)");
 
     // Install CostTracker for per-query budget enforcement
     let tracker = CostTracker::new();
@@ -546,12 +555,11 @@ pub async fn create_gateway_async() -> GatewayV2 {
 }
 
 /// 同步版本 — 保留向后兼容 (内部调用 block_on)
-/// 如果已在 tokio runtime 上下文中，使用 Handle::current() 避免嵌套
+/// 如果已通过 Handle::try_current 或 enter() 存在 runtime 上下文，使用它；
+/// 否则创建新 runtime 避免嵌套 runtime 冲突。
 pub fn create_gateway() -> GatewayV2 {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        tokio::task::block_in_place(|| {
-            handle.block_on(create_gateway_async())
-        })
+        handle.block_on(create_gateway_async())
     } else {
         let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime for gateway init");
         rt.block_on(create_gateway_async())

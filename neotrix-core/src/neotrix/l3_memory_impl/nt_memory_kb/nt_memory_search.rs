@@ -496,11 +496,106 @@ pub fn fuse_signals(
 }
 
 
+// ── FTS5 Optimization Configuration (absorbed from ZSTD+FTS5 180,000× pattern 2026) ──
+pub struct Fts5OptimizerConfig {
+    /// cache_size in KB (negative = KB, positive = pages). Default: -256000 (256MB)
+    pub cache_size: i64,
+    /// mmap_size for memory-mapped I/O. Default: 268435456 (256MB)
+    pub mmap_size: i64,
+    /// page_size (512-65536, power of 2). Default: 4096
+    pub page_size: i64,
+    /// synchronous mode. Default: "NORMAL"
+    pub synchronous: &'static str,
+    /// journal mode. Default: "WAL"
+    pub journal_mode: &'static str,
+    /// busy_timeout in ms. Default: 5000
+    pub busy_timeout: i64,
+    /// Auto-ANALYZE after bulk inserts for query planner optimization
+    pub auto_analyze: bool,
+}
+
+impl Default for Fts5OptimizerConfig {
+    fn default() -> Self {
+        Self {
+            cache_size: -256000,
+            mmap_size: 268435456,
+            page_size: 4096,
+            synchronous: "NORMAL",
+            journal_mode: "WAL",
+            busy_timeout: 5000,
+            auto_analyze: true,
+        }
+    }
+}
+
+impl Fts5OptimizerConfig {
+    pub fn apply_pragmas(&self, conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+        conn.pragma_update(None, "cache_size", self.cache_size)?;
+        conn.pragma_update(None, "mmap_size", self.mmap_size)?;
+        conn.pragma_update(None, "page_size", self.page_size)?;
+        conn.pragma_update(None, "synchronous", self.synchronous)?;
+        conn.pragma_update(None, "journal_mode", self.journal_mode)?;
+        conn.pragma_update(None, "busy_timeout", self.busy_timeout)?;
+        if self.auto_analyze {
+            conn.execute_batch("ANALYZE;").ok();
+        }
+        Ok(())
+    }
+
+    /// Contentless FTS5 table schema: stores only the inverted index, not the full text.
+    /// Requires a secondary `nodes` table join for full text retrieval.
+    /// Trade-off: halves FTS storage at cost of one extra lookup per result.
+    pub const CONTENTLESS_FTS_SCHEMA: &'static str =
+        "CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
+            title, summary, content,
+            content='nodes',
+            content_rowid='rowid',
+            tokenize='unicode61 remove_diacritics=2'
+        );";
+
+    /// Triggers to keep FTS index in sync with nodes table changes
+    pub const FTS_SYNC_TRIGGERS: &'static str = r#"
+        CREATE TRIGGER IF NOT EXISTS nodes_ai AFTER INSERT ON nodes BEGIN
+            INSERT INTO nodes_fts(rowid, title, summary, content)
+            VALUES (new.rowid, new.title, new.summary, new.content);
+        END;
+        CREATE TRIGGER IF NOT EXISTS nodes_ad AFTER DELETE ON nodes BEGIN
+            INSERT INTO nodes_fts(nodes_fts, rowid, title, summary, content)
+            VALUES ('delete', old.rowid, old.title, old.summary, old.content);
+        END;
+        CREATE TRIGGER IF NOT EXISTS nodes_au AFTER UPDATE ON nodes BEGIN
+            INSERT INTO nodes_fts(nodes_fts, rowid, title, summary, content)
+            VALUES ('delete', old.rowid, old.title, old.summary, old.content);
+            INSERT INTO nodes_fts(rowid, title, summary, content)
+            VALUES (new.rowid, new.title, new.summary, new.content);
+        END;
+    "#;
+
+    pub fn rebuild_fts(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+        conn.execute_batch("INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild');")
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_fts5_config_defaults() {
+        let cfg = super::Fts5OptimizerConfig::default();
+        assert_eq!(cfg.cache_size, -256000);
+        assert_eq!(cfg.synchronous, "NORMAL");
+        assert!(cfg.auto_analyze);
+    }
+
+    #[test]
+    fn test_contentless_schema_const() {
+        let schema = super::Fts5OptimizerConfig::CONTENTLESS_FTS_SCHEMA;
+        assert!(schema.contains("fts5"));
+        assert!(schema.contains("content='nodes'"));
     }
 }

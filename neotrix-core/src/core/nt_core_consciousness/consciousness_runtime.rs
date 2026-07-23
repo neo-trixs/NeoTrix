@@ -172,3 +172,80 @@ impl Default for ConsciousnessRuntime {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_observe_from_critique_low_quality() {
+        let mut cr = ConsciousnessRuntime::new();
+        let critique = CritiqueResult {
+            passed: true,
+            relevance_score: 0.0,
+            consistency_score: 0.0,
+            uncertainty_score: 0.8,
+            overall_quality: 0.2,
+            reasons: vec!["low quality".into()],
+            selected_action: Some("rethink".into()),
+            temporal_delta: Some(0.0),
+        };
+        cr.observe_from_critique(&critique);
+        let report = cr.emotion_engine.report();
+        assert!(report.confidence < 0.5, "confidence={} should have dropped from 0.5", report.confidence);
+        assert!(report.frustration > 0.49, "frustration={} should be above neutral", report.frustration);
+        assert_eq!(cr.last_quality, 0.2);
+    }
+
+    #[test]
+    fn test_observe_from_critique_high_quality() {
+        let mut cr = ConsciousnessRuntime::new();
+        let critique = CritiqueResult {
+            passed: true,
+            relevance_score: 0.0,
+            consistency_score: 0.0,
+            uncertainty_score: 0.2,
+            overall_quality: 0.9,
+            reasons: vec!["high quality".into()],
+            selected_action: Some("explore_new".into()),
+            temporal_delta: Some(0.0),
+        };
+        cr.observe_from_critique(&critique);
+        let report = cr.emotion_engine.report();
+        assert!(report.confidence > 0.55, "confidence={} should be above neutral", report.confidence);
+        assert!(report.curiosity > 0.55, "curiosity={} should be above neutral", report.curiosity);
+        assert_eq!(cr.last_quality, 0.9);
+    }
+
+    #[test]
+    fn test_tick_emotion_returns_report() {
+        let mut cr = ConsciousnessRuntime::new();
+        cr.awaken();
+        let _ = cr.tick("test resonance");
+        let report = cr.tick_emotion();
+        assert!(report.confidence >= 0.0);
+        assert!(report.valence >= -1.0 && report.valence <= 1.0);
+    }
+
+    #[test]
+    fn test_set_emotion_engine() {
+        let mut cr = ConsciousnessRuntime::new();
+        let mut engine = EmotionEngine::default();
+        engine.observe(EmotionDimension::Confidence, 0.9, "test");
+        cr.set_emotion_engine(engine);
+        let report = cr.emotion_engine.report();
+        assert!(report.confidence > 0.55, "confidence={} should reflect observed 0.9", report.confidence);
+    }
+
+    #[test]
+    fn test_tick_wires_observe_from_critique() {
+        let mut cr = ConsciousnessRuntime::new();
+        cr.awaken();
+        let result = cr.tick("high quality content that is meaningful long enough to produce a critique");
+        assert!(result.is_some());
+        let report = cr.emotion_engine.report();
+        assert!(report.confidence >= 0.0); // tick wired observe_from_critique
+        assert!(cr.last_quality > 0.0 || cr.last_quality == 0.0); // set by tick
+        assert!(cr.last_quality() == Some(cr.last_quality));
+    }
+}

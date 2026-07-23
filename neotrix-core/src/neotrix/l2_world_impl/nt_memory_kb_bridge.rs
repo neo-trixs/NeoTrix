@@ -47,6 +47,7 @@ pub enum NodeType {
     EventRecord,
     DetectionFinding,
     GoalResult,
+    Session,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -462,6 +463,7 @@ mod conv {
             super::NodeType::EventRecord => real_types::NodeType::EventRecord,
             super::NodeType::DetectionFinding => real_types::NodeType::DetectionFinding,
             super::NodeType::GoalResult => real_types::NodeType::GoalResult,
+            super::NodeType::Session => real_types::NodeType::Session,
         }
     }
 
@@ -505,6 +507,7 @@ mod conv {
             real_types::NodeType::EventRecord => super::NodeType::EventRecord,
             real_types::NodeType::DetectionFinding => super::NodeType::DetectionFinding,
             real_types::NodeType::GoalResult => super::NodeType::GoalResult,
+            real_types::NodeType::Session => super::NodeType::Session,
         }
     }
 
