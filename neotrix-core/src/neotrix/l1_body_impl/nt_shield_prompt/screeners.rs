@@ -2,6 +2,8 @@ use regex::Regex;
 
 use super::types::{RiskLevel, ActionRule, glob_match};
 
+use crate::core::nt_core_self_test::SelfTest;
+
 pub struct PromptGuard {
     dangerous_patterns: Vec<&'static str>,
     suspicious_patterns: Vec<&'static str>,
@@ -469,6 +471,50 @@ impl ActionScreener {
     }
 }
 
+
+impl SelfTest for PromptGuard {
+    fn name(&self) -> &str { "prompt_guard" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        if self.dangerous_patterns.is_empty() {
+            return Err(vec!["PromptGuard has no dangerous patterns".into()]);
+        }
+        if self.suspicious_patterns.is_empty() {
+            return Err(vec!["PromptGuard has no suspicious patterns".into()]);
+        }
+        if !self.is_safe("hello world") {
+            return Err(vec!["'hello world' should be safe".into()]);
+        }
+        Ok(())
+    }
+}
+
+impl SelfTest for OutputScreener {
+    fn name(&self) -> &str { "output_screener" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let result = self.analyze("sk-ant-test1234567890abcdefghijklmnop");
+        if result.0 != RiskLevel::Dangerous {
+            return Err(vec!["sk- prefix should be detected as Dangerous".into()]);
+        }
+        let safe = self.analyze("hello world");
+        if safe.0 != RiskLevel::Safe {
+            return Err(vec!["plain text should be Safe".into()]);
+        }
+        Ok(())
+    }
+}
+
+impl SelfTest for ActionScreener {
+    fn name(&self) -> &str { "action_screener" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        if !self.is_file_safe("/tmp/test.txt") {
+            return Err(vec!["/tmp/test.txt should be safe".into()]);
+        }
+        if self.is_file_safe("/etc/passwd") {
+            return Err(vec!["/etc/passwd should be blocked".into()]);
+        }
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

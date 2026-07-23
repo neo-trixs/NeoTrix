@@ -12,6 +12,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 
+use crate::core::nt_core_self_test::SelfTest;
+
 /// 守卫决策
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GuardDecision {
@@ -351,6 +353,22 @@ impl AuditLog {
 impl Default for AuditLog {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl SelfTest for SecurityGuard {
+    fn name(&self) -> &str { "security_guard" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let pending = self.pending_requests();
+        if !pending.is_empty() {
+            return Err(vec![format!("expected 0 pending requests initially, got {}", pending.len())]);
+        }
+        self.set_project_root("/safe/path");
+        match self.check("file_read", "/safe/path/doc.txt") {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(vec!["project root file_read should be allowed".into()]),
+            Err(_) => Err(vec!["project root file_read should not require confirmation".into()]),
+        }
     }
 }
 

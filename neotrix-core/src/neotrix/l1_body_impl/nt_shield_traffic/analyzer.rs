@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use crate::core::nt_core_self_test::SelfTest;
+
 const RING_CAPACITY: usize = 1000;
 
 #[derive(Debug, Clone)]
@@ -467,6 +469,20 @@ impl std::fmt::Display for TrafficReport {
                     h.sensitivity_count
                 )?;
             }
+        }
+        Ok(())
+    }
+}
+
+impl SelfTest for TrafficAnalyzer {
+    fn name(&self) -> &str { "traffic_analyzer" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        if self.total_sessions() != 0 {
+            return Err(vec![format!("expected 0 sessions initially, got {}", self.total_sessions())]);
+        }
+        let report = self.generate_report();
+        if report.total_sessions != 0 {
+            return Err(vec![format!("report should show 0 sessions, got {}", report.total_sessions)]);
         }
         Ok(())
     }

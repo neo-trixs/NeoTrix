@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::core::nt_core_self_test::SelfTest;
+
 /// 策略评估结果
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicyDecision {
@@ -145,6 +147,22 @@ impl ActionPolicy {
 impl Default for ActionPolicy {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl SelfTest for ActionPolicy {
+    fn name(&self) -> &str { "action_policy" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        if self.action_count() < 5 {
+            return Err(vec![format!("expected >=5 rules, got {}", self.action_count())]);
+        }
+        if self.profile != "nt_shield" {
+            return Err(vec![format!("expected profile nt_shield, got {}", self.profile)]);
+        }
+        if self.decide("network_request") != PolicyDecision::Deny {
+            return Err(vec!["network_request should be Deny by default".into()]);
+        }
+        Ok(())
     }
 }
 

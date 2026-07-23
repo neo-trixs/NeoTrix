@@ -1384,25 +1384,21 @@ impl BackgroundLoopHandle {
 
         // ── KB health analysis (replaces Python generate-evolution-todo.py cron) ──
         if let Some(ref kb_lock) = self.kb {
-            match kb_lock.try_lock() {
-                Ok(kb) => {
-                    if let Some(conn) = kb.conn() {
-                        use crate::core::nt_core_self::evolution_analysis::{analyze_kb_health, store_report_to_kb};
-                        let defects = analyze_kb_health(conn);
-                        let p0 = defects.iter().filter(|d| d.priority == "P0").count();
-                        let p1 = defects.iter().filter(|d| d.priority == "P1").count();
-                        let p2 = defects.iter().filter(|d| d.priority == "P2").count();
-                        log::info!("[bg] kb_health: {} defects (P0={}, P1={}, P2={})", defects.len(), p0, p1, p2);
-                        let report = crate::core::nt_core_self::evolution_analysis::KbHealthReport {
-                            defects,
-                            generated_at: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
-                        };
-                        if let Err(e) = store_report_to_kb(conn, &report) {
-                            log::error!("[bg] kb_health: failed to store report: {}", e);
-                        }
-                    } else {
-                        log::warn!("[bg] kb_health: no DB connection");
+            match kb_lock.conn.try_lock() {
+                Ok(conn) => {
+                    use crate::core::nt_core_self::evolution_analysis::{analyze_kb_health, store_report_to_kb};
+                    let defects = analyze_kb_health(&conn);
+                    let p0 = defects.iter().filter(|d| d.priority == "P0").count();
+                    let p1 = defects.iter().filter(|d| d.priority == "P1").count();
+                    let p2 = defects.iter().filter(|d| d.priority == "P2").count();
+                    log::info!("[bg] kb_health: {} defects (P0={}, P1={}, P2={})", defects.len(), p0, p1, p2);
+                    let report = crate::core::nt_core_self::evolution_analysis::KbHealthReport {
+                        defects,
+                        generated_at: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                    };
+                    if let Err(e) = store_report_to_kb(&conn, &report) {
+                        log::error!("[bg] kb_health: failed to store report: {}", e);
                     }
                 }
                 Err(e) => log::warn!("[bg] kb_health: failed to lock KB: {}", e),

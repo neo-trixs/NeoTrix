@@ -8,6 +8,8 @@ use sha2::Sha256;
 
 use super::policy::{ActionPolicy, PolicyDecision};
 
+use crate::core::nt_core_self_test::SelfTest;
+
 type HmacSha256 = Hmac<Sha256>;
 
 /// Execution-Time Safety Decision
@@ -404,6 +406,22 @@ fn compute_risk_score(action_type: &ActionType, target: &str, args: &HashMap<Str
 
     let total: f64 = base + target_boost + arg_boost;
     total.max(0.0).min(1.0)
+}
+
+impl SelfTest for SafetyKernel {
+    fn name(&self) -> &str { "safety_kernel" }
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        if !self.is_active() {
+            return Err(vec!["SafetyKernel should be active by default".into()]);
+        }
+        if self.version().is_empty() {
+            return Err(vec!["SafetyKernel version should not be empty".into()]);
+        }
+        if !self.audit_log().is_empty() {
+            return Err(vec!["SafetyKernel audit log should be empty initially".into()]);
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
