@@ -184,70 +184,6 @@ impl BackgroundLoop {
             }
         }
 
-        // ── Import bandit routing data at startup ──
-        if let Some(ref kb_ref) = kb {
-            let bandit_path = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix/bandit.json");
-            if bandit_path.exists() {
-                match kb_ref.import_bandit_data(&bandit_path) {
-                    Ok(report) => {
-                        if report.imported > 0 {
-                            log::info!("[bandit] Imported {} routing profiles ({} errors)",
-                                report.imported, report.errors.len());
-                        }
-                    }
-                    Err(e) => log::warn!("[bandit] Import failed: {}", e),
-                }
-            }
-        }
-
-        // ── Import E8 engine state at startup ──
-        if let Some(ref kb_ref) = kb {
-            let e8_path = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix/e8_state.json");
-            if e8_path.exists() {
-                match kb_ref.import_e8_state(&e8_path) {
-                    Ok(report) => {
-                        if report.imported > 0 {
-                            log::info!("[e8-state] Imported E8 engine state ({} errors)",
-                                report.errors.len());
-                        }
-                    }
-                    Err(e) => log::warn!("[e8-state] Import failed: {}", e),
-                }
-            }
-        }
-
-        // ── Import avatar personality chain at startup ──
-        if let Some(ref kb_ref) = kb {
-            let avatar_path = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix/avatar_chain.json");
-            if avatar_path.exists() {
-                match kb_ref.import_avatar_chain(&avatar_path) {
-                    Ok(report) => {
-                        if report.imported > 0 {
-                            log::info!("[avatar-chain] Imported {} entries, {} edges ({} errors)",
-                                report.imported, report.edges_created, report.errors.len());
-                        }
-                    }
-                    Err(e) => log::warn!("[avatar-chain] Import failed: {}", e),
-                }
-            }
-        }
-
-        // ── Import proxy pool state at startup ──
-        if let Some(ref kb_ref) = kb {
-            let proxy_path = std::path::Path::new(&dirs::home_dir().unwrap_or_default()).join(".neotrix/proxy-pool-state.json");
-            if proxy_path.exists() {
-                match kb_ref.import_proxy_pool(&proxy_path) {
-                    Ok(report) => {
-                        if report.imported > 0 {
-                            log::info!("[proxy-pool] Imported {} proxy entries, {} edges ({} errors)",
-                                report.imported, report.edges_created, report.errors.len());
-                        }
-                    }
-                    Err(e) => log::warn!("[proxy-pool] Import failed: {}", e),
-                }
-            }
-        }
-
         let mut kb_pipeline = KnowledgeAbsorptionPipeline::new();
         if let Some(ref kb_ref) = kb {
             kb_pipeline.attach_kb(kb_ref.clone());
@@ -1380,35 +1316,6 @@ impl BackgroundLoopHandle {
             if let Ok(mut brain) = self.brain.try_write() {
                 self.goal_loop.enqueue_goal(&mut brain, &reason, None);
             }
-        }
-
-        // ── KB health analysis (replaces Python generate-evolution-todo.py cron) ──
-        if let Some(ref kb_lock) = self.kb {
-            match kb_lock.try_lock() {
-                Ok(kb) => {
-                    if let Some(conn) = kb.conn() {
-                        use crate::core::nt_core_self::evolution_analysis::{analyze_kb_health, store_report_to_kb};
-                        let defects = analyze_kb_health(conn);
-                        let p0 = defects.iter().filter(|d| d.priority == "P0").count();
-                        let p1 = defects.iter().filter(|d| d.priority == "P1").count();
-                        let p2 = defects.iter().filter(|d| d.priority == "P2").count();
-                        log::info!("[bg] kb_health: {} defects (P0={}, P1={}, P2={})", defects.len(), p0, p1, p2);
-                        let report = crate::core::nt_core_self::evolution_analysis::KbHealthReport {
-                            defects,
-                            generated_at: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
-                        };
-                        if let Err(e) = store_report_to_kb(conn, &report) {
-                            log::error!("[bg] kb_health: failed to store report: {}", e);
-                        }
-                    } else {
-                        log::warn!("[bg] kb_health: no DB connection");
-                    }
-                }
-                Err(e) => log::warn!("[bg] kb_health: failed to lock KB: {}", e),
-            }
-        } else {
-            log::debug!("[bg] kb_health: KB not attached");
         }
     }
 

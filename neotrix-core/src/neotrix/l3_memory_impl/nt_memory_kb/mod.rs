@@ -61,7 +61,10 @@ pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityN
 pub use nt_memory_auto_learn::*;
 pub use nt_memory_code_query::{
     CodeEntity, CodeEntityKind, DependencyChain, Hop, CodeGraphStats,
+    ExplosionRadius, AffectedEntity, RiskLevel,
     find_code_path, reachable_subgraph, code_graph_stats,
+    explosion_radius, find_affected_entities_by_kind,
+    find_affected_by_name_pattern, blast_radius_summary,
 };
 pub use nt_memory_tech_reserve::{
     TechReserveStore, TechReserveEntry, TechReserveDimension, TechReserveQuery,

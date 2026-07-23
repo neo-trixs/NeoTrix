@@ -2604,6 +2604,30 @@ ConsciousnessTree 是 NeoTrix 意识架构中唯一具备以下 **4 项不可替
 2. **BranchConstraints 自然恢复**: 在 11→7 合并中丢失的 BranchConstraints 恰好是 Cycle 121 中移除的 4 个辅助分支(Governance/Nexus/Meta/Repair)的职责。证明: 核心 7 域需要运行时治理约束，辅助分支抽象层可以合并但治理逻辑必须保留。
 3. **7000 测试里程碑**: 6991 passing + 11 ignored = 7002 total。这是 NeoTrix 测试覆盖率的最高水平。
 
+## Experience Tree — 2026-07-23 Cycle 82+ (NVIDIA API Gateway Debug + Model Routing Fix)
+
+### Session: 根因追踪 + Gateway Model Mismatch 修复
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **P75 Root Cause** | GatewayV2 发送 `request.model="default"` 到所有 provider; NVIDIA 校验 model name 返回 400 | Provider 注册名 `nvidia/meta/llama-3.1-8b-instruct` 的 model_id 从未被提取使用 |
+| **P75 Fix** | add `provider_model()` 从 `{provider}/{model_id}` 提取 model_id + `request_for_provider()` 覆盖 request.model | `call_provider()` 现在用真实 model_id 调用 API |
+| **P76 Log Bridge** | `log::info!` 不被 `tracing-subscriber{features=["env-filter"]}` 捕获; 缺 `log` feature | 调试信息静默消失的根因确认 |
+| **P77 is_free** | NVIDIA NIM 注册为 `is_free: true` 但实际是付费 API | select_best() 误将付费 provider 当免费调度 |
+| **P78 Merge Debt** | 跨分支合并使构建错误 3→129，回退到 cycle-151-merge 基线 | 修复合并冲突代价 > 修复原基线 3 错误 |
+
+### 方法论内化
+
+- **M-R1**: 当 tracing 不显示日志时用 `std::fs::write("/tmp/dbg.txt", msg)` 绕过所有日志基础设施
+- **M-R2**: 通用 Gateway 转发请求前必须从 provider 注册名提取 model_id 覆盖 request.model
+- **M-R3**: 修复前确认最干净基线对比错误数量; 合并状态 >50 错误应回退到原基线
+
+### Dev Rules Added (R-P56-R-P58)
+
+- **R-P56 (Model Routing)**: Gateway 转发 LLM 请求前必须根据 provider 注册名设置正确的 model_id
+- **R-P57 (Log Feature)**: `tracing-subscriber` 必须在 features 中包含 `"log"` 否则 `log::info!` 调用不会被捕获
+- **R-P58 (Catalog is_free Audit)**: 所有需要 API key 的 FreeModelCatalog 条目应为 `is_free: false`
+
 ## Experience Tree — 2026-07-22 Cycle 150-152 (Defect Methodology Internalization — 5 Patterns to 1 Meta-Pattern)
 
 ### Session: AbsorptionRegistry固化 + 三Stub修复 + P68形式化 + 构建缓存级联实证
@@ -2744,4 +2768,53 @@ MCA 5函数 vs NeoTrix 7域：
 1. **Edit-tool persistence blindspot confirmed**: The `edit` tool repeatedly failed to persist changes to `main.rs` (stale command registrations reverted 3 times) and `types.rs` (FileNode/ProjectInfo structs not deleted). Python + fsync was the only reliable write mechanism.
 2. **Build cascade**: Fixing `kb` → `self.kb` in `run.rs` exposed `blocking_kind` E0599 for custom Tauri types. Moving types to `types.rs` resolved `IpcResponse` trait bounds.
 3. **Tauri V2 type constraints**: Custom structs returned from `#[command]` must be defined in `types.rs` (not the command module) to satisfy the `IpcResponse` derive macro. Non-recursive `FlatFileNode` replaced recursive `FileNode` to avoid `Send` trait issues.
-4. **Test stability**: 13 pre-existing test failures are all pre-regression. Individual test execution of all 13 confirmed they pass in isolation — failures only occur in full-test-run (shared state interference).```
+4. **Test stability**: 13 pre-existing test failures are all pre-regression. Individual test execution of all 13 confirmed they pass in isolation — failures only occur in full-test-run (shared state interference).
+
+## Experience Tree — 2026-07-22 Cycle 155 (Full Architecture Canonicalization — 5 Phase Convergence)
+
+### Session: Deep Research → Audit → Fix → Strengthen → Verify (Full Cycle)
+
+| Phase | Duration | Outcome |
+|-------|----------|---------|
+| 1 Deep Research | 4 parallel searches | Consciousness AI 7-layer, Grounded Agency 36-cap, MAGE dual-memory, MC² metacognition, PRISM-MCTS, Crystal Tree |
+| 2 Full Audit | 6 key files | **21 gaps identified** (P0:4, P1:9, P2:8) |
+| 3 Implementation | ~20 edits across 5 files | ThinkingMode unified, MetricEntry Vec→VecDeque, maturity fields, PRISM-MCTS dual memory, Phase 5 storage, BranchConstraints LazyLock |
+| 4 Node Strengthening | ~5 edits | HeuristicsMemory decay(20), FallaciesMemory decay(20), UnconsciousConstraint gate(5), prune_fruits(100), decay_memory() |
+| 5 Build Verification | 5 build cycles | 0 new errors (35 pre-existing) |
+
+### Key Files Changed
+
+| File | Changes |
+|------|---------|
+| `consciousness_tree.rs` | +5 struct fields (heuristics_memory, fallacies_memory, unconscious_constraints, health_chain_report, evolution_path on EpiphanicCore; overall_maturity + maturity_history on ConsciousnessTree; maturity_pct on CapabilityBranch); +200L code (update_maturity/gap_to_100/next_milestones/prune_fruits/decay_memory/unconscious_constraint_gate/heuristics_fallacies_population) |
+| `state_substrate.rs` | ThinkingMode::name(), Balanced in tick(), MetricEntry Vec→VecDeque |
+| `cognitive_load.rs` | Removed duplicate ThinkingMode definition, now uses `use crate::core::nt_core_state_substrate::ThinkingMode` |
+| `nt_core_consciousness/mod.rs` + `l5_consciousness/mod.rs` | ThinkingMode re-export from state_substrate instead of cognitive_load |
+| `run.rs` | ConstitutionComplianceTest registered in SelfTestRegistry |
+
+### 核心内化规则 (Cycle 155)
+
+- **P71: Build Cache Cascade (confirmed)**: After structural changes, `cargo clean` before reliable error count. Incremental builds mask pre-existing errors in systematic cascade pattern: 0→21→9→2→35.
+- **P72: VecDeque Over Vec for Ring Buffers**: Bounded time-series data must use `VecDeque` not `Vec`. `Vec.remove(0)` = O(n), `VecDeque.pop_front()` = O(1). Applied to MetricEntry, maturity_history.
+- **P73: Canonical Enum Location**: When two modules define identical enums (ThinkingMode in state_substrate vs cognitive_load), canonicalize to the architecturally-stable location. state_substrate holds fundamental types; cognitive_load holds load-specific logic only.
+- **P74: Memory Decay as Structural Pattern**: All unbounded growth vectors need explicit decay: heuristics(20), fallacies(20), constraints(5), fruits(100), maturity_history(100). Decay is a first-class architectural concern.
+- **P75: Unconscious Constraint Gating**: Critical vulnerabilities should become behavioral gates that block fruit production in low-health branches. This creates a natural "immune system" — the tree refuses to grow when it detects existential threats.
+
+### Build Baseline (Cycle 155)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 new errors | 35 pre-existing errors (shield_prompt screeners, reflection_loop, 10× SelfTest impls missing, flush, E0061) |
+| New code | ✅ Phase 1-5 all compile | consciousness_tree: 5 struct fields + 6 methods + 4 helpers; state_substrate: 3 changes; cognitive_load: 1 delete; run.rs: 1 register |
+| 剩余待解决 | See Todo below | SelfHealingLoop wiring, DualProcessMetrics, 35 pre-existing errors, ConsciousnessReview module status |
+
+### Todo for Next Session
+
+| P0 | Fix 35 pre-existing build errors (shield_prompt screeners, 10× SelfTest impls, reflection_loop) |
+| P0 | Wire SelfHealingLoop → BackgroundLoop runtime scheduler |
+| P1 | Add DualProcessMetrics to ConsciousnessCore |
+| P1 | Wire decay_memory() + prune_fruits() into handle_consciousness_tick |
+| P1 | Add SelfTest impls for 10 modules: ActionPolicy, CleanupEngine, CodeReviewEngine, etc. |
+| P2 | Fix wiki module E0425 (ingest_source/lint_wiki missing) |
+| P2 | Resolve ConsciousnessReview module (delete or register) |
+| P3 | Re-enable #![deny(dead_code)] at crate level |```

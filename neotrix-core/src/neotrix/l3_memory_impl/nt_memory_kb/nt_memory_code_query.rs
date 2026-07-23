@@ -63,6 +63,210 @@ pub struct CodeGraphStats {
     pub isolated_nodes: Vec<String>,
 }
 
+// ── Explosion Radius Analysis (absorbed from code-review-graph) ──
+
+#[derive(Debug, Clone)]
+pub struct ExplosionRadius {
+    /// The name of the entity that changed.
+    pub changed_entity: String,
+    /// All entities affected within the radius, with depth and path info.
+    pub affected_entities: Vec<AffectedEntity>,
+    /// Total number of affected entities.
+    pub total_affected: usize,
+    /// Maximum depth reached.
+    pub max_depth: usize,
+    /// Weighted impact score (0.0–1.0).
+    pub impact_score: f64,
+    /// Categorized risk level.
+    pub risk_level: RiskLevel,
+}
+
+#[derive(Debug, Clone)]
+pub struct AffectedEntity {
+    pub name: String,
+    pub kind: CodeEntityKind,
+    pub depth: usize,
+    pub path_from_change: Vec<String>,
+    pub relation: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RiskLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl RiskLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RiskLevel::Low => "low",
+            RiskLevel::Medium => "medium",
+            RiskLevel::High => "high",
+            RiskLevel::Critical => "critical",
+        }
+    }
+}
+
+/// Compute the explosion radius for a changed entity: all entities that would be
+/// transitively affected within `max_depth` hops. Uses BFS from the change point.
+pub fn explosion_radius(
+    nodes: &[KnowledgeNode],
+    edges: &[KnowledgeEdge],
+    changed_name: &str,
+    max_depth: usize,
+) -> ExplosionRadius {
+    let start_id = match find_node_by_name(nodes, changed_name) {
+        Some(id) => id,
+        None => {
+            return ExplosionRadius {
+                changed_entity: changed_name.to_string(),
+                affected_entities: vec![],
+                total_affected: 0,
+                max_depth: 0,
+                impact_score: 0.0,
+                risk_level: RiskLevel::Low,
+            };
+        }
+    };
+
+    let id_to_node: HashMap<&str, &KnowledgeNode> = nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+    let edge_index = build_edge_index(edges);
+    let id_to_name: HashMap<&str, &str> = nodes.iter().map(|n| (n.id.as_str(), n.title.as_str())).collect();
+
+    let mut visited: HashSet<&str> = HashSet::new();
+    let mut affected = Vec::new();
+    let mut queue: VecDeque<(&str, usize, Vec<String>)> = VecDeque::new();
+    visited.insert(start_id);
+    queue.push_back((start_id, 0, vec![id_to_name.get(start_id).copied().unwrap_or("").to_string()]));
+
+    while let Some((current, depth, path)) = queue.pop_front() {
+        if depth > 0 {
+            if let Some(node) = id_to_node.get(current) {
+                let relation = if path.len() >= 2 {
+                    let parent_name = &path[path.len() - 2];
+                    edges.iter()
+                        .find(|e| {
+                            let source_is_parent = id_to_name.get(e.source_id.as_str()) == Some(&parent_name.as_str());
+                            let target_is_current = id_to_name.get(e.target_id.as_str()) == Some(&node.title.as_str());
+                            let source_is_current = id_to_name.get(e.source_id.as_str()) == Some(&node.title.as_str());
+                            let target_is_parent = id_to_name.get(e.target_id.as_str()) == Some(&parent_name.as_str());
+                            (source_is_parent && target_is_current) || (source_is_current && target_is_parent)
+                        })
+                        .map(|e| e.relation_type.as_str().to_string())
+                        .unwrap_or_else(|| "depends_on".to_string())
+                } else {
+                    "depends_on".to_string()
+                };
+
+                affected.push(AffectedEntity {
+                    name: node.title.clone(),
+                    kind: kind_from_node_type(&node.node_type),
+                    depth,
+                    path_from_change: path.clone(),
+                    relation,
+                });
+            }
+        }
+
+        if depth < max_depth {
+            let neighbors: Vec<&str> = edge_index.get(current).into_iter()
+                .flat_map(|v| v.iter())
+                .map(|e| {
+                    if e.source_id == current { e.target_id.as_str() } else { e.source_id.as_str() }
+                })
+                .collect();
+
+            for next in neighbors {
+                if visited.insert(next) {
+                    let next_name = id_to_name.get(next).copied().unwrap_or("").to_string();
+                    let mut next_path = path.clone();
+                    next_path.push(next_name);
+                    queue.push_back((next, depth + 1, next_path));
+                }
+            }
+        }
+    }
+
+    let total_affected = affected.len();
+    let max_actual_depth = affected.iter().map(|a| a.depth).max().unwrap_or(0);
+    let critical_types = affected.iter().filter(|a| {
+        matches!(a.kind, CodeEntityKind::Struct | CodeEntityKind::Trait | CodeEntityKind::Enum)
+    }).count();
+
+    let count_factor = (total_affected as f64 / 50.0).min(1.0);
+    let depth_factor = (max_actual_depth as f64 / 5.0).min(1.0);
+    let critical_factor = (critical_types as f64 / 10.0).min(1.0);
+    let score = (count_factor * 0.4 + depth_factor * 0.3 + critical_factor * 0.3).min(1.0);
+
+    let risk_level = if score >= 0.8 {
+        RiskLevel::Critical
+    } else if score >= 0.5 {
+        RiskLevel::High
+    } else if score >= 0.2 {
+        RiskLevel::Medium
+    } else {
+        RiskLevel::Low
+    };
+
+    ExplosionRadius {
+        changed_entity: changed_name.to_string(),
+        affected_entities: affected,
+        total_affected,
+        max_depth: max_actual_depth,
+        impact_score: score,
+        risk_level,
+    }
+}
+
+/// Find entities within an explosion radius that match a specific kind.
+pub fn find_affected_entities_by_kind<'a>(
+    radius: &'a ExplosionRadius,
+    kind: CodeEntityKind,
+) -> Vec<&'a AffectedEntity> {
+    radius.affected_entities.iter().filter(|a| a.kind == kind).collect()
+}
+
+/// Find affected entities whose name contains a pattern (e.g., "test").
+pub fn find_affected_by_name_pattern<'a>(
+    radius: &'a ExplosionRadius,
+    pattern: &str,
+) -> Vec<&'a AffectedEntity> {
+    let lower = pattern.to_lowercase();
+    radius.affected_entities.iter()
+        .filter(|a| a.name.to_lowercase().contains(&lower))
+        .collect()
+}
+
+/// Produce a human-readable blast radius summary.
+pub fn blast_radius_summary(radius: &ExplosionRadius) -> String {
+    let test_count = radius.affected_entities.iter()
+        .filter(|a| a.name.to_lowercase().contains("test")).count();
+    let critical_count = radius.affected_entities.iter()
+        .filter(|a| matches!(a.kind, CodeEntityKind::Struct | CodeEntityKind::Trait | CodeEntityKind::Enum))
+        .count();
+
+    format!(
+        "Blast Radius for '{}': {} affected entities across {} levels [{} risk, score={:.2}]. \
+         {} critical types (structs/traits/enums), {} test-related.",
+        radius.changed_entity, radius.total_affected, radius.max_depth,
+        radius.risk_level.as_str(), radius.impact_score,
+        critical_count, test_count,
+    )
+}
+
+fn kind_from_node_type(nt: &NodeType) -> CodeEntityKind {
+    match nt {
+        NodeType::CodeSnippet => CodeEntityKind::Function,
+        NodeType::Concept => CodeEntityKind::Module,
+        NodeType::Tool | NodeType::Framework => CodeEntityKind::Struct,
+        NodeType::Event | NodeType::EvolutionPattern => CodeEntityKind::Attribute,
+        NodeType::Book | NodeType::Article | NodeType::Textbook | NodeType::Guide => CodeEntityKind::File,
+        _ => CodeEntityKind::File,
+    }
+}
+
 /// Find the shortest dependency path between two named entities.
 pub fn find_code_path(
     nodes: &[KnowledgeNode],
@@ -279,6 +483,8 @@ mod tests {
         }
     }
 
+    // ── Existing tests ──
+
     #[test]
     fn test_find_code_path_direct() {
         let nodes = vec![
@@ -370,5 +576,134 @@ mod tests {
         let edges = vec![];
         let stats = code_graph_stats(&nodes, &edges);
         assert_eq!(stats.isolated_nodes.len(), 2);
+    }
+
+    // ── Explosion Radius tests ──
+
+    #[test]
+    fn test_explosion_radius_unknown_entity() {
+        let nodes = vec![make_node("a", "Known", NodeType::CodeSnippet)];
+        let edges = vec![];
+        let radius = explosion_radius(&nodes, &edges, "Unknown", 3);
+        assert_eq!(radius.total_affected, 0);
+        assert_eq!(radius.risk_level, RiskLevel::Low);
+    }
+
+    #[test]
+    fn test_explosion_radius_direct_dependents() {
+        let nodes = vec![
+            make_node("core", "CoreLib", NodeType::Concept),
+            make_node("p1", "PluginA", NodeType::Tool),
+            make_node("p2", "PluginB", NodeType::Tool),
+        ];
+        let edges = vec![
+            make_edge("e1", "p1", "core", RelationType::DependsOn, 1.0),
+            make_edge("e2", "p2", "core", RelationType::DependsOn, 1.0),
+        ];
+        let radius = explosion_radius(&nodes, &edges, "CoreLib", 3);
+        assert_eq!(radius.total_affected, 2);
+        assert!(radius.impact_score > 0.0);
+    }
+
+    #[test]
+    fn test_explosion_radius_chain() {
+        let nodes = vec![
+            make_node("a", "A", NodeType::CodeSnippet),
+            make_node("b", "B", NodeType::CodeSnippet),
+            make_node("c", "C", NodeType::CodeSnippet),
+            make_node("d", "D", NodeType::CodeSnippet),
+        ];
+        let edges = vec![
+            make_edge("e1", "a", "b", RelationType::DependsOn, 1.0),
+            make_edge("e2", "b", "c", RelationType::DependsOn, 1.0),
+            make_edge("e3", "c", "d", RelationType::DependsOn, 1.0),
+        ];
+        let radius = explosion_radius(&nodes, &edges, "A", 2);
+        assert_eq!(radius.total_affected, 2); // B, C at depth 2
+        assert_eq!(radius.max_depth, 2);
+    }
+
+    #[test]
+    fn test_explosion_radius_depth_limit() {
+        let nodes = vec![
+            make_node("a", "A", NodeType::CodeSnippet),
+            make_node("b", "B", NodeType::CodeSnippet),
+            make_node("c", "C", NodeType::CodeSnippet),
+        ];
+        let edges = vec![
+            make_edge("e1", "a", "b", RelationType::DependsOn, 1.0),
+            make_edge("e2", "b", "c", RelationType::DependsOn, 1.0),
+        ];
+        let radius = explosion_radius(&nodes, &edges, "A", 1);
+        assert_eq!(radius.total_affected, 1); // only B
+        assert_eq!(radius.max_depth, 1);
+    }
+
+    #[test]
+    fn test_risk_level_escalation() {
+        let mut nodes = vec![make_node("core", "CoreStruct", NodeType::CodeSnippet)];
+        let mut edges = vec![];
+        // Add many dependents to push score up
+        for i in 0..30 {
+            let nid = format!("p{}", i);
+            let ntitle = format!("Plugin{}", i);
+            nodes.push(make_node(&nid, &ntitle, NodeType::Tool));
+            edges.push(make_edge(&format!("e{}", i), &nid, "core", RelationType::DependsOn, 1.0));
+        }
+        let radius = explosion_radius(&nodes, &edges, "CoreStruct", 3);
+        assert!(radius.total_affected >= 30);
+        assert!(radius.impact_score > 0.2);
+    }
+
+    #[test]
+    fn test_find_affected_by_kind() {
+        let nodes = vec![
+            make_node("core", "CoreLib", NodeType::Concept),
+            make_node("t1", "TestHelper", NodeType::Event),
+            make_node("p1", "PluginA", NodeType::Tool),
+        ];
+        let edges = vec![
+            make_edge("e1", "t1", "core", RelationType::DependsOn, 1.0),
+            make_edge("e2", "p1", "core", RelationType::DependsOn, 1.0),
+        ];
+        let radius = explosion_radius(&nodes, &edges, "CoreLib", 3);
+        let tools = find_affected_entities_by_kind(&radius, CodeEntityKind::Struct);
+        assert!(!tools.is_empty());
+        let tests = find_affected_entities_by_kind(&radius, CodeEntityKind::Attribute);
+        assert!(!tests.is_empty());
+    }
+
+    #[test]
+    fn test_find_affected_by_name_pattern() {
+        let nodes = vec![
+            make_node("core", "CoreLib", NodeType::Concept),
+            make_node("t1", "test_core", NodeType::Event),
+            make_node("t2", "core_test", NodeType::Event),
+            make_node("p1", "PluginA", NodeType::Tool),
+        ];
+        let edges = vec![
+            make_edge("e1", "t1", "core", RelationType::DependsOn, 1.0),
+            make_edge("e2", "t2", "core", RelationType::DependsOn, 1.0),
+            make_edge("e3", "p1", "core", RelationType::DependsOn, 1.0),
+        ];
+        let radius = explosion_radius(&nodes, &edges, "CoreLib", 3);
+        let test_affected = find_affected_by_name_pattern(&radius, "test");
+        assert_eq!(test_affected.len(), 2);
+    }
+
+    #[test]
+    fn test_blast_radius_summary_format() {
+        let nodes = vec![
+            make_node("core", "CoreLib", NodeType::Concept),
+            make_node("p1", "PluginA", NodeType::Tool),
+        ];
+        let edges = vec![
+            make_edge("e1", "p1", "core", RelationType::DependsOn, 1.0),
+        ];
+        let radius = explosion_radius(&nodes, &edges, "CoreLib", 3);
+        let summary = blast_radius_summary(&radius);
+        assert!(summary.contains("CoreLib"));
+        assert!(summary.contains("affected"));
+        assert!(summary.contains("score"));
     }
 }
