@@ -874,8 +874,7 @@ impl ReasoningEngine {
 
     pub fn call_llm(&mut self, prompt: &str) -> NeoTrixResult<String> {
         if let Some(ref gateway) = self.gateway {
-            eprintln!("[DEBUG-call_llm] model={}, prompt_len={}, gateway={:p}", self.default_model, prompt.len(), gateway as *const _);
-            std::io::stderr().flush().ok();
+            std::fs::write("/tmp/neotrix-call_llm.txt", format!("model={}, prompt_len={}", self.default_model, prompt.len())).ok();
             let request = LlmRequest::new(&self.default_model, prompt);
             let gateway_ref = gateway.clone();
             let response = tokio::task::block_in_place(|| {
