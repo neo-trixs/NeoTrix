@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrent } from "@tauri-apps/plugin-deep-link";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
-import type { ProviderConfig, PermissionRequest, FileNode, DiffBlock, ProxySourceInfo, ProxyConnectivity } from "../types";
+import type { ProviderConfig, PermissionRequest, FileNode, DiffBlock, ProxySourceInfo, ProxyConnectivity, BrowserSession, ImageGenerationResult, ImageGenOptions, ScreenCapture, WindowInfo, FrontmostApp, RemoteHostConfig, RemoteExecutionResult, BackgroundTask, TaskRun, ReviewConfig, ReviewResult, ReviewIssue } from "../types";
 
 export interface BrainStats {
   iteration: number;
@@ -743,5 +743,92 @@ export async function stopGeneration(): Promise<void> {
   await invoke("stop_generation");
 }
 
+// ========== Image Generation API ==========
+export function imageGenerate(prompt: string, options: ImageGenOptions): Promise<{success: boolean; result_url?: string}> {
+  return invoke("image_generate", { prompt, options });
+}
 
+// ========== Computer Use API ==========
+export function computerCaptureScreen(): Promise<ScreenCapture> {
+  return invoke("capture_screen");
+}
+
+export function computerGetWindowList(): Promise<WindowInfo[]> {
+  return invoke("get_window_list");
+}
+
+export function computerGetFrontmostApp(): Promise<FrontmostApp> {
+  return invoke("get_frontmost_app");
+}
+
+export function computerSwitchApp(appName: string): Promise<{ok: boolean}> {
+  return invoke("switch_app", { app_name: appName });
+}
+
+export function computerExecuteRemote(appName: string, command: string): Promise<string> {
+  return invoke("execute_remote", { app_name: appName, command });
+}
+
+export function computerReadClipboard(): Promise<{text: string}> {
+  return invoke("read_clipboard");
+}
+
+export function computerWriteClipboard(text: string): Promise<{ok: boolean}> {
+  return invoke("write_clipboard", { text });
+}
+
+// ========== Remote Devbox API ==========
+export function remoteListHosts(): Promise<RemoteHostConfig[]> {
+  return invoke("list_remote_hosts");
+}
+
+export function remoteAddHost(config: RemoteHostConfig): Promise<RemoteHostConfig> {
+  return invoke("add_remote_host", { name: config.name, host: config.host, port: config.port, user: config.user, auth_method: config.auth_method, key_path: config.key_path });
+}
+
+export function remoteRemoveHost(id: string): Promise<void> {
+  return invoke("remove_remote_host", { id });
+}
+
+export function remoteTestConnection(id: string): Promise<string> {
+  return invoke("test_remote_connection", { id });
+}
+
+export function remoteExec(id: string, command: string): Promise<string> {
+  return invoke("execute_remote", { id, command });
+}
+
+// ========== Background Routines API ==========
+export function backgroundListTasks(): Promise<BackgroundTask[]> {
+  return invoke("list_background_tasks");
+}
+
+export function backgroundCreateTask(name: string, prompt: string, schedule: string): Promise<BackgroundTask> {
+  return invoke("create_background_task", { name, prompt, schedule });
+}
+
+export function backgroundPauseTask(id: string): Promise<void> {
+  return invoke("pause_background_task", { id });
+}
+
+export function backgroundResumeTask(id: string): Promise<void> {
+  return invoke("resume_background_task", { id });
+}
+
+export function backgroundDeleteTask(id: string): Promise<void> {
+  return invoke("delete_background_task", { id });
+}
+
+export function backgroundRunNow(id: string): Promise<string> {
+  return invoke("run_background_task_now", { id });
+}
+
+export function backgroundGetLog(id: string): Promise<TaskRun[]> {
+  return invoke("get_background_task_log", { id });
+}
+
+// ========== Ultra Review API ==========
+export function ultraReview(config: ReviewConfig): Promise<ReviewResult> {
+  return invoke("ultra_review", { config });
+}
 

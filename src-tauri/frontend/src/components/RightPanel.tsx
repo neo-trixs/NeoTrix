@@ -5,8 +5,13 @@ const FileTree = React.lazy(() => import("./FileTree"));
 const CodeEditor = React.lazy(() => import("./CodeEditor"));
 const DiffViewer = React.lazy(() => import("./DiffViewer"));
 const EvolutionPanel = React.lazy(() => import("./EvolutionPanel"));
+const BrowserPane = React.lazy(() => import("./BrowserPane"));
+const ImageGenPanel = React.lazy(() => import("./ImageGenPanel"));
+const ComputerUsePanel = React.lazy(() => import("./ComputerUsePanel"));
+const UltraReviewPanel = React.lazy(() => import("./UltraReviewPanel"));
+const BackgroundRoutinesPanel = React.lazy(() => import("./BackgroundRoutinesPanel"));
 
-type PanelTab = "files" | "editor" | "diff" | "evolution" | "artifact" | "tools";
+type PanelTab = "files" | "editor" | "diff" | "evolution" | "artifact" | "tools" | "browser" | "imagegen" | "computeruse" | "ultrareview" | "background";
 
 interface PanelTabConfig {
   id: PanelTab;
@@ -22,6 +27,11 @@ const TABS: PanelTabConfig[] = [
   { id: "evolution", label: "Evolution", icon: "📈", condition: () => useStore.getState().evolutionVisible },
   { id: "artifact", label: "Artifact", icon: "🖼", condition: () => true },
   { id: "tools", label: "Tools", icon: "🔧", condition: () => true },
+  { id: "browser", label: "Browser", icon: "🌐", condition: () => true },
+  { id: "imagegen", label: "Image", icon: "🖼", condition: () => true },
+  { id: "computeruse", label: "Computer", icon: "🖥", condition: () => true },
+  { id: "ultrareview", label: "Review", icon: "🔍", condition: () => true },
+  { id: "background", label: "Tasks", icon: "⏰", condition: () => true },
 ];
 
 const MIN_PANEL_WIDTH = 240;
@@ -131,6 +141,16 @@ const RightPanel: React.FC = () => {
           {activeTab === "evolution" && evolutionVisible && <EvolutionPanel />}
           {activeTab === "artifact" && <ArtifactView />}
           {activeTab === "tools" && <ToolsView />}
+          {/* @ts-ignore */}
+          {activeTab === "browser" && <BrowserPane onNavigate={(url: string) => {}} />}
+          {/* @ts-ignore */}
+          {activeTab === "imagegen" && <ImageGenPanel onGenerate={() => {}} />}
+          {/* @ts-ignore */}
+          {activeTab === "computeruse" && <ComputerUsePanel onAction={() => {}} />}
+          {/* @ts-ignore */}
+          {activeTab === "ultrareview" && <UltraReviewPanel onReviewRequest={() => {}} />}
+          {/* @ts-ignore */}
+          {activeTab === "background" && <BackgroundRoutinesPanel tasks={[]} onAddTask={() => {}} onRunTask={() => {}} onPauseTask={() => {}} onDeleteTask={() => {}} />}
         </Suspense>
       </div>
     </div>

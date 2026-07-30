@@ -415,3 +415,114 @@ export interface ProjectInstruction {
   created_at: number;
   updated_at: number;
 }
+
+// ========== Browser Pane ==========
+export interface BrowserSession {
+  id: string;
+  url: string;
+  title: string;
+  created_at: number;
+  is_active: boolean;
+}
+
+// ========== Image Generation ==========
+export interface ImageGenerationResult {
+  id: string;
+  prompt: string;
+  image_url: string;
+  width: number;
+  height: number;
+  style: string;
+  quality: string;
+  created_at: number;
+}
+
+export interface ImageGenOptions {
+  width: number;
+  height: number;
+  style: string;
+  quality: string;
+}
+
+// ========== Computer Use ==========
+export interface ScreenCapture {
+  image_base64: string;
+  width: number;
+  height: number;
+}
+
+export interface WindowInfo {
+  title: string;
+  pid: number;
+  app_name: string;
+}
+
+export interface FrontmostApp {
+  app_name: string;
+  title: string;
+}
+
+// ========== Remote Devbox ==========
+export interface RemoteHostConfig {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+  auth_method: string;
+  key_path: string | null;
+  last_connected: number | null;
+}
+
+export interface RemoteExecutionResult {
+  success: boolean;
+  output: string;
+  error: string | null;
+  exit_code: number;
+  duration_ms: number;
+}
+
+// ========== Background Routines ==========
+export interface BackgroundTask {
+  id: string;
+  name: string;
+  prompt: string;
+  schedule: string;
+  last_run: number | null;
+  next_run: number | null;
+  status: "idle" | "running" | "paused" | "error";
+  runs: TaskRun[];
+}
+
+export interface TaskRun {
+  timestamp: number;
+  summary: string;
+  result?: string;
+}
+
+// ========== Ultra Review ==========
+export interface ReviewConfig {
+  scope: "changed" | "staged" | "all";
+  depth: "standard" | "deep" | "exhaustive";
+  dimensions: string[];
+  auto_fix: boolean;
+}
+
+export interface ReviewResult {
+  run_id: string;
+  config: ReviewConfig;
+  issues_found: number;
+  issues: ReviewIssue[];
+  duration_ms: number;
+}
+
+export interface ReviewIssue {
+  id: string;
+  dimension: string;
+  severity: "info" | "warning" | "error";
+  file: string;
+  line: number;
+  message: string;
+  suggestion?: string;
+}
+

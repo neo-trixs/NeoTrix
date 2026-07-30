@@ -327,6 +327,21 @@ fn main() {
                     commands::plan_cmds::plan_steps,
                     commands::plan_cmds::plan_step,
                     commands::plan_cmds::plan_complete,
+                    commands::computer_cmds::capture_screen,
+                    commands::computer_cmds::get_window_list,
+                    commands::computer_cmds::get_frontmost_app,
+                    commands::background_cmds::list_background_tasks,
+                    commands::background_cmds::create_background_task,
+                    commands::background_cmds::pause_background_task,
+                    commands::background_cmds::resume_background_task,
+                    commands::background_cmds::delete_background_task,
+                    commands::background_cmds::run_background_task_now,
+                    commands::background_cmds::get_background_task_log,
+                    commands::remote_cmds::list_remote_hosts,
+                    commands::remote_cmds::add_remote_host,
+                    commands::remote_cmds::remove_remote_host,
+                    commands::remote_cmds::test_remote_connection,
+                    commands::remote_cmds::execute_remote,
                 ])
                 .setup(move |app| {
                     neotrix_tauri::setup_tray(app).expect("failed to setup tray");

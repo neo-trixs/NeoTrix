@@ -43,6 +43,16 @@ pub use chat_cmds::*;
 pub use kb_cmds::*;
 
 
+pub mod computer_cmds;
+pub mod background_cmds;
+pub mod remote_cmds;
+pub mod provider_cmds;
+
+// Re-exports for frontend registration
+pub use computer_cmds::*;
+pub use background_cmds::*;
+pub use remote_cmds::*;
+
 // ========== Tests ==========
 
 #[cfg(test)]
