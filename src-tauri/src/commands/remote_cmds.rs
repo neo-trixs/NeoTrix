@@ -48,12 +48,12 @@ fn save_hosts(hosts: &[RemoteHostConfig]) {
 }
 
 #[tauri::command]
-fn cmd_list_remote_hosts() -> Vec<RemoteHostConfig> {
+pub fn list_remote_hosts() -> Vec<RemoteHostConfig> {
     load_hosts()
 }
 
 #[tauri::command]
-fn cmd_add_remote_host(name: String, host: String, port: u16, user: String, auth_method: String, key_path: Option<String>) -> RemoteHostConfig {
+pub fn add_remote_host(name: String, host: String, port: u16, user: String, auth_method: String, key_path: Option<String>) -> RemoteHostConfig {
     let mut hosts = load_hosts();
     let new_host = RemoteHostConfig {
         id: format!("host-{}", hosts.len() + 1),
@@ -70,7 +70,7 @@ fn cmd_add_remote_host(name: String, host: String, port: u16, user: String, auth
 }
 
 #[tauri::command]
-fn cmd_remove_remote_host(id: String) -> Result<(), String> {
+pub fn remove_remote_host(id: String) -> Result<(), String> {
     let mut hosts = load_hosts();
     hosts.retain(|h| h.id != id);
     save_hosts(&hosts);
@@ -78,7 +78,7 @@ fn cmd_remove_remote_host(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn cmd_test_remote_connection(id: String) -> Result<String, String> {
+pub fn test_remote_connection(id: String) -> Result<String, String> {
     let hosts = load_hosts();
     let host = hosts.iter().find(|h| h.id == id)
         .ok_or_else(|| format!("Host {} not found", id))?;
@@ -102,7 +102,7 @@ fn cmd_test_remote_connection(id: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn cmd_execute_remote(id: String, command: String) -> Result<String, String> {
+pub fn execute_remote(id: String, command: String) -> Result<String, String> {
     let hosts = load_hosts();
     let host = hosts.iter().find(|h| h.id == id)
         .ok_or_else(|| format!("Host {} not found", id))?;

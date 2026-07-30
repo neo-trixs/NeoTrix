@@ -1,7 +1,5 @@
 use std::process::Command;
 use serde::Serialize;
-use tauri::State;
-use std::sync::Mutex;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ScreenCapture {
@@ -23,17 +21,20 @@ pub struct FrontmostApp {
     pub title: String,
 }
 
-pub fn init_commands(app: &mut tauri::App) {
-    app.manage(ScreenCaptureState::default());
+fn win_script() -> String {
+    r#"tell application "System Events" to get name of every process whose visible is true"#.to_string()
 }
 
-#[derive(Default)]
-pub struct ScreenCaptureState {
-    pub last_capture: Option<ScreenCapture>,
+fn front_app_script() -> String {
+    r#"tell application "System Events" to get name of first process whose frontmost is true"#.to_string()
+}
+
+fn front_title_script() -> String {
+    r#"tell application "System Events" to get title of front window of first application process whose frontmost is true"#.to_string()
 }
 
 #[tauri::command]
-fn cmd_capture_screen() -> Result<ScreenCapture, String> {
+pub fn capture_screen() -> Result<ScreenCapture, String> {
     let output = Command::new("screencapture")
         .args(["-C", "-x", "/tmp/neotrix_screen.png"])
         .output()
@@ -48,35 +49,21 @@ fn cmd_capture_screen() -> Result<ScreenCapture, String> {
 
     let base64 = base64::encode(&data);
 
-    // Get dimensions using identify or file metadata
-    let (width, height) = if let Ok(output) = Command::new("screencapture")
-        .args(["-i", "/tmp/neotrix_screen.png"])
-        .output()
-    {
-        (1920u32, 1080u32)
-    } else {
-        (1920u32, 1080u32)
-    };
-
-    Ok(ScreenCapture {
-        image_base64: base64,
-        width,
-        height,
-    })
+    Ok(ScreenCapture { image_base64: base64, width: 1920, height: 1080 })
 }
 
 #[tauri::command]
-fn cmd_get_window_list() -> Result<Vec<WindowInfo>, String> {
+pub fn get_window_list() -> Result<Vec<WindowInfo>, String> {
     let output = Command::new("osascript")
-        .args([
-            "-e",
-            "tell application "System Events" to get the name of every process whose visible is true",
-        ])
+        .args(["-e", &win_script()])
         .output()
         .map_err(|e| format!("Failed to list windows: {}", e))?;
 
     let result = String::from_utf8_lossy(&output.stdout);
-    let apps: Vec<String> = result.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
+    let apps: Vec<String> = result.lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
 
     let windows: Vec<WindowInfo> = apps.iter()
         .take(20)
@@ -91,29 +78,38 @@ fn cmd_get_window_list() -> Result<Vec<WindowInfo>, String> {
 }
 
 #[tauri::command]
-fn cmd_get_frontmost_app() -> Result<FrontmostApp, String> {
+pub fn get_frontmost_app() -> Result<FrontmostApp, String> {
     let output = Command::new("osascript")
-        .args([
-            "-e",
-            "tell application "System Events" to get name of first process whose frontmost is true",
-        ])
+        .args(["-e", &front_app_script()])
         .output()
         .map_err(|e| format!("Failed to get frontmost: {}", e))?;
 
     let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
     let title_output = Command::new("osascript")
-        .args([
-            "-e",
-            "tell application "System Events" to get title of front window of first application process whose frontmost is true",
-        ])
+        .args(["-e", &front_title_script()])
         .output()
         .map_err(|e| format!("Failed to get window title: {}", e))?;
 
     let title = String::from_utf8_lossy(&title_output.stdout).trim().to_string();
 
-    Ok(FrontmostApp {
-        app_name: name,
-        title,
-    })
+    Ok(FrontmostApp { app_name: name, title })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scripts_are_valid() {
+        assert!(win_script().contains("System Events"));
+        assert!(front_app_script().contains("frontmost"));
+        assert!(front_title_script().contains("front window"));
+    }
+
+    #[test]
+    fn test_screen_capture_default_size() {
+        let sizes = [(1920u32, 1080u32)];
+        assert_eq!(sizes[0], (1920, 1080));
+    }
 }

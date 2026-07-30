@@ -77,12 +77,12 @@ fn save_tasks(tasks: &[BackgroundTask]) {
 }
 
 #[tauri::command]
-fn cmd_list_background_tasks() -> Vec<BackgroundTask> {
+pub fn list_background_tasks() -> Vec<BackgroundTask> {
     load_tasks()
 }
 
 #[tauri::command]
-fn cmd_create_background_task(name: String, prompt: String, schedule: String) -> BackgroundTask {
+pub fn create_background_task(name: String, prompt: String, schedule: String) -> BackgroundTask {
     let tasks = load_tasks();
     let new_task = BackgroundTask {
         id: format!("task-{}", tasks.len() + 1),
@@ -101,7 +101,7 @@ fn cmd_create_background_task(name: String, prompt: String, schedule: String) ->
 }
 
 #[tauri::command]
-fn cmd_pause_background_task(id: String) -> Result<(), String> {
+pub fn pause_background_task(id: String) -> Result<(), String> {
     let mut tasks = load_tasks();
     if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
         task.status = TaskStatus::Paused;
@@ -113,7 +113,7 @@ fn cmd_pause_background_task(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn cmd_resume_background_task(id: String) -> Result<(), String> {
+pub fn resume_background_task(id: String) -> Result<(), String> {
     let mut tasks = load_tasks();
     if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
         task.status = TaskStatus::Idle;
@@ -125,7 +125,7 @@ fn cmd_resume_background_task(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn cmd_delete_background_task(id: String) -> Result<(), String> {
+pub fn delete_background_task(id: String) -> Result<(), String> {
     let mut tasks = load_tasks();
     tasks.retain(|t| t.id != id);
     save_tasks(&tasks);
@@ -133,7 +133,7 @@ fn cmd_delete_background_task(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn cmd_run_background_task_now(id: String) -> Result<String, String> {
+pub fn run_background_task_now(id: String) -> Result<String, String> {
     let mut tasks = load_tasks();
     if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
         task.status = TaskStatus::Running;
@@ -152,7 +152,7 @@ fn cmd_run_background_task_now(id: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn cmd_get_background_task_log(id: String) -> Result<Vec<TaskRun>, String> {
+pub fn get_background_task_log(id: String) -> Result<Vec<TaskRun>, String> {
     let tasks = load_tasks();
     if let Some(task) = tasks.iter().find(|t| t.id == id) {
         Ok(task.runs.clone())
