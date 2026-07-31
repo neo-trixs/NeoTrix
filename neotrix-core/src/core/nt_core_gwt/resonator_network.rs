@@ -288,6 +288,9 @@ impl ResonatorNetwork {
 
     /// Inject each dimension of `states` into the nearest resonator.
     pub fn stimulate_all(&mut self, states: &[f64]) {
+        if self.resonators.is_empty() || states.is_empty() {
+            return;
+        }
         for (i, &state) in states.iter().enumerate() {
             let idx = (i as f64 / states.len().max(1) as f64
                 * self.resonators.len() as f64)
@@ -593,6 +596,21 @@ mod tests {
         net.stimulate_all(&states);
         let freqs = net.resonant_frequencies(0.01);
         assert!(freqs.len() > 0);
+    }
+
+    #[test]
+    fn test_resonator_network_stimulate_all_empty_no_underflow() {
+        // Regression: stimulate_all computed self.resonators.len() - 1 while
+        // iterating a non-empty states slice. With zero resonators this
+        // underflowed usize in debug builds (panic) and produced a garbage
+        // index in release. Guarded: early return when either side is empty.
+        let mut net = ResonatorNetwork::new(0, 1.0, 40.0);
+        net.stimulate_all(&[0.1, 0.2, 0.3]);
+        assert!(net.compute_resonance_spectrum().is_empty());
+
+        let mut net2 = ResonatorNetwork::new(3, 1.0, 40.0);
+        net2.stimulate_all(&[]);
+        assert_eq!(net2.compute_resonance_spectrum().len(), 3);
     }
 
     #[test]
