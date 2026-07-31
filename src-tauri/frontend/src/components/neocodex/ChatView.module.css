@@ -247,6 +247,34 @@
   opacity: 0.8;
 }
 
+.copyBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--fg-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.bubble:hover .copyBtn {
+  opacity: 1;
+}
+
+.copyBtn:hover {
+  color: var(--accent-primary);
+  border-color: var(--border-primary);
+}
+
 .streaming {
   animation: fadeIn 0.1s ease-out;
 }
@@ -284,6 +312,7 @@
   max-width: 85%;
   padding: 10px 14px;
   word-wrap: break-word;
+  position: relative;
 }
 
 .content {

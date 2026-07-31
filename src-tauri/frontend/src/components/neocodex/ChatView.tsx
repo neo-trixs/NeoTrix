@@ -194,9 +194,21 @@ function MessageBubble({
           </div>
         )}
         {message.timestamp && <div className={styles.time}>{formatTimestamp(message.timestamp)}</div>}
+        <button className={styles.copyBtn} onClick={() => copyMessage(message.content)} title="复制">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="2" width="9" height="10" rx="1.5" strokeLinecap="round"/>
+            <path d="M8 2v4h-2V2h-4v4H4v8h6V6h2v4a2 2 0 002 2h4a2 2 0 002-2V4a2 2 0 00-2-2h-4z" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
       </div>
     </div>
   );
+}
+
+async function copyMessage(content: string) {
+  try {
+    await navigator.clipboard.writeText(content);
+  } catch {}
 }
 
 function ToolCard({ message, avatar, roleClass }: { message: { role: string; content: string; timestamp?: number }; avatar: string; roleClass: string }) {

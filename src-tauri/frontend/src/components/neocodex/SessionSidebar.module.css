@@ -83,6 +83,73 @@
   color: var(--fg-tertiary);
 }
 
+.itemPinned {
+  background: var(--accent-bg);
+  border-color: var(--accent-primary);
+}
+
+.pinIcon {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--accent-primary);
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--fg-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.actionBtn:hover {
+  color: var(--accent-primary);
+  border-color: var(--border-primary);
+}
+
+.empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--fg-tertiary);
+  font-size: 12px;
+}
+
+.emptyIcon {
+  margin-bottom: 12px;
+  color: var(--fg-tertiary);
+  opacity: 0.5;
+}
+
+.emptyHint {
+  display: block;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+}
+
+.emptyHint kbd {
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.dialogHint {
+  margin: 8px 0 16px;
+  font-size: 12px;
+  color: var(--fg-tertiary);
+}
+
 .empty {
   padding: 24px;
   text-align: center;
