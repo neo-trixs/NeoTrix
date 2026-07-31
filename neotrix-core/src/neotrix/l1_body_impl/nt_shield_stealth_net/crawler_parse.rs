@@ -48,7 +48,13 @@ pub(crate) fn extract_body_text(html: &str, max_len: usize) -> String {
             if text.len() >= max_len { break; }
         }
     }
-    text.truncate(max_len);
+    // Char-safe: the final push may have crossed max_len mid-UTF-8-char
+    // (e.g. a 3-byte CJK char landing at byte max_len-1). String::truncate
+    // panics off a char boundary, so pop whole chars instead (bounded: the
+    // loop breaks at the first char past max_len, so at most 4 pops).
+    while text.len() > max_len && !text.is_empty() {
+        text.pop();
+    }
     text.trim().to_string()
 }
 
@@ -126,4 +132,20 @@ pub(crate) fn extract_onion_links(html: &str, base_url: &str) -> Vec<String> {
     links.sort();
     links.dedup();
     links
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_body_text_cjk_crosses_max_len() {
+        // Regression: a 3-byte CJK char pushing byte count past max_len used to
+        // make String::truncate(max_len) panic (non-char-boundary). Must not panic
+        // and must stay within max_len bytes.
+        let html = format!("<html><body>{}</body></html>", "中文数据负载".repeat(200));
+        let text = extract_body_text(&html, 100);
+        assert!(text.len() <= 100);
+        assert!(!text.is_empty());
+    }
 }
