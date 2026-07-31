@@ -9,7 +9,7 @@ from xml.etree import ElementTree
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("process_queue")
 
-DB = "/Users/neo/.neotrix/knowledge_base.db"
+DB = "/Users/neo/.neotrix/knowledge.db"
 BATCH = 200
 MAX_WORKERS = 16
 

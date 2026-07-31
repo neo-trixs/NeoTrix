@@ -29,7 +29,7 @@ import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-KB_PATH = os.path.expanduser("~/.neotrix/knowledge_base.db")
+KB_PATH = os.path.expanduser("~/.neotrix/knowledge.db")
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 BLOCKED_DOMAINS = {
     'books.google.co.jp', 'books.google.com',

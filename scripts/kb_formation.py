@@ -46,7 +46,7 @@ import threading
 import time
 import uuid
 
-KB_PATH = os.path.expanduser("~/.neotrix/knowledge_base.db")
+KB_PATH = os.path.expanduser("~/.neotrix/knowledge.db")
 PROXY_CONF = os.path.expanduser("~/.neotrix/proxy-upstreams.conf")
 STATE_PATH = os.path.expanduser("~/.neotrix/kb_formation_state.json")
 LOG_PATH = os.path.expanduser("~/.neotrix/kb_formation_log.jsonl")

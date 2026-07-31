@@ -34,7 +34,7 @@ import sqlite3
 import sys
 import time
 
-KB_PATH = os.path.expanduser("~/.neotrix/knowledge_base.db")
+KB_PATH = os.path.expanduser("~/.neotrix/knowledge.db")
 
 # 7 域 → 主属能力 (36 原子能力 Cycle 121)
 BRANCH_CAPABILITIES = {
