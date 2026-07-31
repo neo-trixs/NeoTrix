@@ -37,6 +37,54 @@ impl ProviderCategory {
     }
 }
 
+/// Communication security profile for sub-grid composition (子母阵通信安全画像)
+/// 定义子网格的安全姿态，用于动态组合已有节点能力实现隐匿通信
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum CommunicationProfile {
+    /// 标准 HTTPS，直连，数据对提供方可见
+    Open,
+    /// 经用户定义代理路由，元数据隐匿
+    Proxied,
+    /// 经 Tor SOCKS 代理路由，身份匿名
+    Tor,
+    /// 多跳混淆 + 随机化 UA + 指纹伪装，最大隐匿
+    Anonymous,
+}
+
+impl CommunicationProfile {
+    /// 返回是否满足或超过目标安全级别
+    pub fn meets(&self, required: CommunicationProfile) -> bool {
+        // 安全级别排序: Open < Proxied < Tor < Anonymous
+        let self_level = match self {
+            CommunicationProfile::Open => 0,
+            CommunicationProfile::Proxied => 1,
+            CommunicationProfile::Tor => 2,
+            CommunicationProfile::Anonymous => 3,
+        };
+        let req_level = match required {
+            CommunicationProfile::Open => 0,
+            CommunicationProfile::Proxied => 1,
+            CommunicationProfile::Tor => 2,
+            CommunicationProfile::Anonymous => 3,
+        };
+        self_level >= req_level
+    }
+}
+
+impl ProviderCategory {
+    /// 基于分类推断的默认通信安全画像
+    pub fn default_security_profile(&self) -> CommunicationProfile {
+        match self {
+            // Local 主体：数据不出设备，天然 Anonymous
+            ProviderCategory::Local => CommunicationProfile::Anonymous,
+            // Proxy 客体：用户自定义代理，天然 Proxied
+            ProviderCategory::Proxy => CommunicationProfile::Proxied,
+            // Cloud 客体：标准 HTTPS，可升级到 Proxied/Tor
+            ProviderCategory::Cloud => CommunicationProfile::Open,
+        }
+    }
+}
+
 /// Provider 基本信息
 #[derive(Debug, Clone)]
 pub struct ProviderInfo {
@@ -56,6 +104,8 @@ pub struct ProviderInfo {
     pub is_free: bool,
     /// 支持的模型列表
     pub models: &'static [&'static str],
+    /// 通信安全画像：决定该 provider 可组合进哪些安全级别的子网格
+    pub security_profile: CommunicationProfile,
 }
 
 /// 所有主流 Provider 目录
@@ -70,6 +120,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["llama3.2", "llama3.1", "qwen2.5", "mistral", "codellama", "phi-4", "deepseek-coder"],
+        security_profile: CommunicationProfile::Anonymous,
     },
     ProviderInfo {
         name: "lm-studio",
@@ -80,6 +131,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["local-model"],
+        security_profile: CommunicationProfile::Anonymous,
     },
     ProviderInfo {
         name: "llamacpp",
@@ -90,6 +142,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["local-model"],
+        security_profile: CommunicationProfile::Anonymous,
     },
     ProviderInfo {
         name: "vllm-local",
@@ -100,6 +153,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["local-model"],
+        security_profile: CommunicationProfile::Anonymous,
     },
 
     // ── Proxy (客体): 自定义 OpenAI 兼容代理 ──
@@ -112,6 +166,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("NEOTRIX_PROXY_API_KEY"),
         is_free: false,
         models: &["gpt-4o-mini", "gpt-4o", "claude-sonnet-4", "custom"],
+        security_profile: CommunicationProfile::Proxied,
     },
 
     // ── Cloud (客体): 主流云端 API ──
@@ -124,6 +179,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("OPENAI_API_KEY"),
         is_free: false,
         models: &["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo", "o1", "o1-mini", "o3-mini"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "anthropic",
@@ -134,6 +190,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("ANTHROPIC_API_KEY"),
         is_free: false,
         models: &["claude-sonnet-4", "claude-haiku-3.5", "claude-3-opus", "claude-3.5-sonnet"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "gemini",
@@ -144,6 +201,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("GOOGLE_API_KEY"),
         is_free: true,
         models: &["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.0-pro", "gemini-1.5-pro"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "groq",
@@ -154,6 +212,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("GROQ_API_KEY"),
         is_free: true,
         models: &["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "openrouter",
@@ -164,6 +223,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("OPENROUTER_API_KEY"),
         is_free: false,
         models: &["auto"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "cerebras",
@@ -174,6 +234,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("CEREBRAS_API_KEY"),
         is_free: true,
         models: &["llama-3.3-70b", "llama-3.1-8b"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "sambanova",
@@ -184,6 +245,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("SAMBANOVA_API_KEY"),
         is_free: true,
         models: &["Meta-Llama-3.1-70B-Instruct", "Meta-Llama-3.1-8B-Instruct"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "bazaarlink",
@@ -194,6 +256,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("BAZAARLINK_API_KEY"),
         is_free: true,
         models: &["auto:free", "gpt-4o-mini", "claude-sonnet-4"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "freetheai",
@@ -204,6 +267,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["auto", "gpt-4o", "gpt-4o-mini", "claude-3.5-sonnet"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "zerolimit",
@@ -214,6 +278,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("ZEROLIMIT_API_KEY"),
         is_free: true,
         models: &["auto"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "pollinations",
@@ -224,6 +289,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["openai", "mistral", "llama"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "deepseek",
@@ -234,6 +300,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("DEEPSEEK_API_KEY"),
         is_free: false,
         models: &["deepseek-chat", "deepseek-reasoner"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "together",
@@ -244,6 +311,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("TOGETHER_API_KEY"),
         is_free: false,
         models: &["meta-llama/Llama-3.3-70B-Instruct-Turbo"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "mistral",
@@ -254,6 +322,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("MISTRAL_API_KEY"),
         is_free: false,
         models: &["mistral-large-latest", "mistral-small-latest", "codestral-latest"],
+        security_profile: CommunicationProfile::Open,
     },
 
     // ── Free Cloud (客体): 免费/免费层云端 API ──
@@ -266,6 +335,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("CLOUDFLARE_API_TOKEN"),
         is_free: true,
         models: &["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/meta/llama-3.1-8b-instruct", "@hf/deepseek-r1-distill-qwen-32b"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "nvidia",
@@ -276,6 +346,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("NVIDIA_API_KEY"),
         is_free: true,
         models: &["meta/llama-3.3-70b-instruct", "meta/llama-3.1-405b-instruct", "nvidia/llama-3.1-nemotron-70b-instruct", "deepseek-ai/deepseek-r1"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "github-models",
@@ -286,6 +357,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("GITHUB_TOKEN"),
         is_free: true,
         models: &["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "meta-llama-3.3-70b-instruct", "mistral-large-2407", "Phi-4", "cohere-command-r+"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "huggingface",
@@ -296,6 +368,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("HF_API_KEY"),
         is_free: true,
         models: &["meta-llama/Llama-3.3-70B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3", "HuggingFaceH4/zephyr-7b-beta"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "cohere",
@@ -306,6 +379,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("COHERE_API_KEY"),
         is_free: false,
         models: &["command-a", "command-r", "command-r-plus"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "together-free",
@@ -316,6 +390,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("TOGETHER_API_KEY"),
         is_free: true,
         models: &["meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", "mistralai/Mixtral-8x7B-Instruct-v0.1-Free", "Qwen/Qwen2.5-72B-Instruct-Free"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "llm7",
@@ -326,6 +401,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["gpt-oss-20b", "llama-3.1-8b", "glm-4-flash"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "kilo",
@@ -336,6 +412,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["nemotron-70b", "stepfun-32k", "deepseek-v4-flash"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "siliconflow",
@@ -346,6 +423,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("SILICONFLOW_API_KEY"),
         is_free: true,
         models: &["deepseek-ai/DeepSeek-V3", "Qwen/Qwen3-235B-A22B", "meta-llama/Llama-3.3-70B-Instruct"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "zai",
@@ -356,6 +434,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("ZAI_API_KEY"),
         is_free: true,
         models: &["glm-4-flash", "glm-4", "glm-4v"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "opencode-zen",
@@ -366,6 +445,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["deepseek-v4-flash-free", "deepseek-v4-flash"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "ovh",
@@ -376,6 +456,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["Qwen3.5-397B-A22B", "meta-llama/Llama-3.3-70B-Instruct", "gpt-oss-120b"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "deepseek-free",
@@ -386,6 +467,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: Some("DEEPSEEK_API_KEY"),
         is_free: true,
         models: &["deepseek-chat", "deepseek-reasoner"],
+        security_profile: CommunicationProfile::Open,
     },
     ProviderInfo {
         name: "modelscope",
@@ -396,6 +478,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         api_key_env: None,
         is_free: true,
         models: &["Qwen/Qwen3-235B-A22B", "iic/LLM"],
+        security_profile: CommunicationProfile::Open,
     },
 ];
 

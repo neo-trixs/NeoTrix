@@ -47,7 +47,7 @@ pub use factory::{LlmProviderType, ProviderConfig, create_provider, create_provi
 pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
 
 // Re-export 网关
-pub use gateway::{GatewayV2, CallEvent, CallObserver, AttemptPhase};
+pub use gateway::{GatewayV2, CallEvent, CallObserver, AttemptPhase, SubGrid};
 
 // Re-export 断路器 + 限流器
 pub use circuit_breaker::CircuitBreaker;
@@ -55,5 +55,5 @@ pub use rate_limiter::RateLimiter;
 pub use rate_limiter::TokenBucket;
 
 // Re-export ProviderCatalog
-pub use provider_catalog::{ProviderCategory, ProviderInfo, PROVIDER_CATALOG, lookup_provider, providers_by_category, providers_with_key, keyless_providers};
+pub use provider_catalog::{ProviderCategory, ProviderInfo, CommunicationProfile, PROVIDER_CATALOG, lookup_provider, providers_by_category, providers_with_key, keyless_providers};
 pub use provider_swap::{ProviderSwapManager, ProviderHealth, SwapRule, GLOBAL_SWAP_MANAGER, ProviderHealthSummary};

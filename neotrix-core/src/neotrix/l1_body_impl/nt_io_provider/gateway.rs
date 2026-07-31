@@ -4,9 +4,9 @@ use std::time::{Duration, Instant};
 
 use super::circuit_breaker::{BreakerState, CircuitBreaker};
 use super::free_pool::global_free_pool;
+use super::provider_catalog::{ProviderCategory, CommunicationProfile};
 use super::rate_limiter::RateLimiter;
 use super::rate_profiles::get_rate_profile;
-use super::provider_catalog::ProviderCategory;
 use super::types::*;
 use crate::core::nt_core_error_recovery::{ErrorContext, ErrorType, RecoveryAction, RecoveryConfig, RecoveryOrchestrator};
 use crate::core::nt_io_cache::{CacheConfig, SemanticCache};
@@ -112,6 +112,37 @@ pub enum AttemptPhase {
 
 pub type CallObserver = std::sync::Arc<dyn Fn(CallEvent) + Send + Sync>;
 
+/// 子网格: 由同一安全画像的 provider 组成的小循环通信单元 (子母阵基本单元)
+/// 每个子网格包含满足特定 CommunicationProfile 的 provider 组合
+#[derive(Debug, Clone)]
+pub struct SubGrid {
+    /// 子网格名称 (如 "anonymous-local", "proxied-cloud", "tor-anonymous")
+    pub name: String,
+    /// 安全画像: 该子网格满足的通信安全级别
+    pub security_profile: CommunicationProfile,
+    /// 包含的 provider 名称列表
+    pub provider_names: Vec<String>,
+    /// 创建时间
+    pub created_at: std::time::SystemTime,
+}
+
+impl SubGrid {
+    /// 创建新子网格
+    pub fn new(name: String, security_profile: CommunicationProfile, provider_names: Vec<String>) -> Self {
+        Self {
+            name,
+            security_profile,
+            provider_names,
+            created_at: std::time::SystemTime::now(),
+        }
+    }
+
+    /// 检查子网格是否满足要求的安全级别
+    pub fn meets_profile(&self, required: CommunicationProfile) -> bool {
+        self.security_profile.meets(required)
+    }
+}
+
 pub struct GatewayV2 {
     providers: HashMap<String, Box<dyn LlmProvider>>,
     states: RwLock<HashMap<String, ProviderState>>,
@@ -123,6 +154,9 @@ pub struct GatewayV2 {
     pub recovery: RwLock<RecoveryOrchestrator>,
     pub cache: Mutex<SemanticCache>,
     pub cost_budget_per_query: f64,
+    /// 组合的子网格映射: 子网格名称 -> SubGrid
+    /// 支持动态组合已有节点能力构建安全隐匿的通信小循环
+    sub_grids: RwLock<HashMap<String, SubGrid>>,
 }
 
 impl GatewayV2 {
@@ -138,6 +172,7 @@ impl GatewayV2 {
             recovery: RwLock::new(RecoveryOrchestrator::new(RecoveryConfig::default())),
             cache: Mutex::new(SemanticCache::new(CacheConfig::default())),
             cost_budget_per_query: 0.02,
+            sub_grids: RwLock::new(HashMap::new()),
         }
     }
 
@@ -155,6 +190,102 @@ impl GatewayV2 {
 
     pub fn set_cost_budget(&mut self, budget: f64) {
         self.cost_budget_per_query = budget;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // SubGrid Composition (子母阵动态组合)
+    // 通过组合已有 provider 节点，构建满足指定通信安全级别的小循环子网格
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// 动态组合一个子网格: 从已注册 providers 中选出满足安全画像的子集
+    /// `security_profile` 指定目标安全级别; `include_free_only` 限制只组合免费 provider
+    pub fn compose_sub_grid(&self, name: &str, security_profile: CommunicationProfile, include_free_only: bool) -> SubGrid {
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
+        let mut provider_names: Vec<String> = states.iter()
+            .filter(|(_, s)| {
+                let profile_ok = s.category.default_security_profile().meets(security_profile);
+                let free_ok = !include_free_only || s.is_free;
+                profile_ok && free_ok
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+        provider_names.sort();
+        let grid = SubGrid::new(name.to_string(), security_profile, provider_names);
+        if let Ok(mut grids) = self.sub_grids.write() {
+            grids.insert(name.to_string(), grid.clone());
+        }
+        grid
+    }
+
+    /// 列出所有已组合的子网格
+    pub fn list_sub_grids(&self) -> Vec<SubGrid> {
+        match self.sub_grids.read() {
+            Ok(guard) => guard.values().cloned().collect(),
+            Err(e) => {
+                log::warn!("[gateway] sub_grids RwLock poisoned: {}", e);
+                e.into_inner().values().cloned().collect()
+            }
+        }
+    }
+
+    /// 根据安全画像选择最佳 provider:
+    /// 优先从满足安全级别的子网格中选取可用 provider
+    pub async fn select_best_for_profile(&self, required: CommunicationProfile) -> Option<String> {
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
+        // Tier 1: 满足安全级别的免费 provider
+        let best_free = states.iter()
+            .filter(|(_, s)| s.is_available() && s.is_free && s.category.default_security_profile().meets(required))
+            .max_by(|(_, a), (_, b)| {
+                a.composite_score().partial_cmp(&b.composite_score())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(name, _)| name.clone());
+        if best_free.is_some() {
+            return best_free;
+        }
+        // Tier 2: 满足安全级别的任意 provider
+        states.iter()
+            .filter(|(_, s)| s.is_available() && s.category.default_security_profile().meets(required))
+            .max_by(|(_, a), (_, b)| {
+                a.composite_score().partial_cmp(&b.composite_score())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(name, _)| name.clone())
+    }
+
+    /// 完整请求路由入口 — 通过满足安全画像的子网格完成一次 LLM 调用。
+    /// 子母阵动态增幅的公共消费点 (R-P79 接线): 调用方声明所需安全级别，
+    /// 网关自动从匹配子网格中选择 provider 并执行 complete()。
+    /// 无匹配 provider 时回退到默认 select_best()，保证通信始终畅通。
+    pub async fn complete_for_profile(
+        &self,
+        required: CommunicationProfile,
+        request: &LlmRequest,
+    ) -> Result<LlmResponse, LlmError> {
+        match self.select_best_for_profile(required).await {
+            Some(name) => {
+                log::debug!("[gateway] complete_for_profile({:?}) → {}", required, name);
+                self.call_provider(&name, request).await
+            }
+            None => {
+                log::warn!("[gateway] no provider meets {:?} — falling back to default selection", required);
+                self.complete_with_selection(request).await
+            }
+        }
+    }
+
+    /// 返回当前已组成的子网格中满足给定安全级别的网格名称
+    pub fn sub_grids_meeting(&self, required: CommunicationProfile) -> Vec<String> {
+        self.list_sub_grids().into_iter()
+            .filter(|sg| sg.security_profile.meets(required))
+            .map(|sg| sg.name)
+            .collect()
     }
 
     fn fire_event(&self, provider_name: &str, success: bool, latency_ms: f64, tokens: u32, model: &str, phase: AttemptPhase) {
@@ -945,6 +1076,97 @@ mod tests {
             .expect("should receive a stream message")
             .expect("stream message should be Ok");
         assert_eq!(msg.content, "stream recovered");
+    }
+
+    #[test]
+    fn test_sub_grid_composition() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+
+        // 组合匿名子网格: 只包含 Local provider (ollama)
+        let anonymous = gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+        assert_eq!(anonymous.provider_names, vec!["ollama"]);
+        assert!(anonymous.meets_profile(CommunicationProfile::Anonymous));
+        assert!(anonymous.meets_profile(CommunicationProfile::Open));
+
+        // 组合开放子网格: 包含所有 provider
+        let open = gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+        assert_eq!(open.provider_names.len(), 2);
+
+        // 列表验证
+        let grids = gw.list_sub_grids();
+        assert_eq!(grids.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_select_best_for_profile() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+
+        // 匿名安全级别: 只能选 ollama (Local)
+        let selected = gw.select_best_for_profile(CommunicationProfile::Anonymous).await;
+        assert_eq!(selected, Some("ollama".to_string()));
+
+        // 开放安全级别: 可以选 openai 或 ollama (免费优先)
+        let selected = gw.select_best_for_profile(CommunicationProfile::Open).await;
+        assert_eq!(selected, Some("ollama".to_string()));
+    }
+
+    #[test]
+    fn test_communication_profile_meets() {
+        assert!(CommunicationProfile::Anonymous.meets(CommunicationProfile::Anonymous));
+        assert!(CommunicationProfile::Anonymous.meets(CommunicationProfile::Tor));
+        assert!(CommunicationProfile::Anonymous.meets(CommunicationProfile::Open));
+        assert!(CommunicationProfile::Open.meets(CommunicationProfile::Open));
+        assert!(!CommunicationProfile::Open.meets(CommunicationProfile::Tor));
+        assert!(CommunicationProfile::Proxied.meets(CommunicationProfile::Open));
+        assert!(!CommunicationProfile::Proxied.meets(CommunicationProfile::Tor));
+    }
+
+    #[tokio::test]
+    async fn test_complete_for_profile() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+        gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+
+        let mut req = LlmRequest::new("test-model", "hello");
+        req.model = "test-model".to_string();
+
+        // 匿名级别: 命中 ollama (Local)
+        let resp = gw.complete_for_profile(CommunicationProfile::Anonymous, &req).await;
+        assert!(resp.is_ok());
+        assert_eq!(resp.unwrap().content, "local");
+    }
+
+    #[tokio::test]
+    async fn test_complete_for_profile_fallback() {
+        // 没有任何 provider 满足 Tor 级别 → 回退默认 select_best
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+
+        let req = LlmRequest::new("test-model", "hello");
+        let resp = gw.complete_for_profile(CommunicationProfile::Tor, &req).await;
+        assert!(resp.is_ok());
+        assert_eq!(resp.unwrap().content, "ok");
+    }
+
+    #[test]
+    fn test_sub_grids_meeting() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+        gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+
+        assert_eq!(gw.sub_grids_meeting(CommunicationProfile::Anonymous), vec!["anonymous-local"]);
+        let meeting_open = gw.sub_grids_meeting(CommunicationProfile::Open);
+        assert_eq!(meeting_open.len(), 2); // anonymous 满足 open, open 也满足 open
+        // Tor 需求: 仅 anonymous (Anonymous > Tor 满足), open 不满足
+        assert_eq!(gw.sub_grids_meeting(CommunicationProfile::Tor), vec!["anonymous-local"]);
     }
 
     struct MockProvider {

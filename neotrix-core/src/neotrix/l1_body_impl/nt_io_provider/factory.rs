@@ -13,7 +13,7 @@ use super::gemini::GeminiProvider;
 use super::free_catalog::FreeModelCatalog;
 use super::free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
 use super::gateway::GatewayV2;
-use super::provider_catalog::ProviderCategory;
+use super::provider_catalog::{ProviderCategory, CommunicationProfile};
 use crate::core::nt_io_telemetry::CostTracker;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -550,6 +550,17 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // Install CostTracker for per-query budget enforcement
     let tracker = CostTracker::new();
     gateway.set_cost_tracker(tracker);
+
+    // ── 5. SubGrid Auto-Composition (子母阵自动组合) ──
+    // 基于已注册 provider 的通信安全画像，自动组合三个默认子网格:
+    //   - anonymous-local: 最高隐匿 (本地主体, 数据不出设备)
+    //   - proxied: 元数据隐匿 (自定义代理)
+    //   - open: 标准 HTTPS (云端 API)
+    // 调用方可通过 select_best_for_profile() 按需路由到对应子网格
+    gateway.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, true);
+    gateway.compose_sub_grid("proxied", CommunicationProfile::Proxied, true);
+    gateway.compose_sub_grid("open", CommunicationProfile::Open, false);
+    log::info!("[gateway] SubGrid auto-composed: anonymous-local / proxied / open");
 
     gateway
 }

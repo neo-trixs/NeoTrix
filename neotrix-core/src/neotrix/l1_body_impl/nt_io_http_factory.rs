@@ -114,3 +114,63 @@ pub fn build_blocking_client() -> reqwest::blocking::Client {
         .build()
         .unwrap_or_else(|_| global_blocking_client().clone())
 }
+
+/// 从环境变量解析代理地址 (子母阵隐匿通信支持)
+/// 优先级: NEOTRIX_PROXY_URL (通用代理) > NEOTRIX_TOR_PROXY (Tor SOCKS5)
+pub fn proxy_from_env() -> Option<String> {
+    if let Ok(url) = std::env::var("NEOTRIX_PROXY_URL") {
+        if !url.is_empty() {
+            return Some(url);
+        }
+    }
+    if let Ok(url) = std::env::var("NEOTRIX_TOR_PROXY") {
+        if !url.is_empty() {
+            return Some(url);
+        }
+    }
+    None
+}
+
+/// 构建带代理的异步客户端 (Proxied/Tor 子网格路由)
+/// 未提供 proxy 地址时回退到标准构建，保持向后兼容
+pub fn build_async_client_with_proxy(proxy_url: Option<&str>) -> reqwest::Client {
+    let mut builder = reqwest::Client::builder()
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)
+        .pool_idle_timeout(Duration::from_secs(POOL_IDLE_TIMEOUT_SECS))
+        .tcp_keepalive(Duration::from_secs(TCP_KEEPALIVE_SECS));
+    if let Some(url) = proxy_url {
+        match reqwest::Proxy::all(url) {
+            Ok(proxy) => {
+                builder = builder.proxy(proxy);
+            }
+            Err(e) => {
+                log::warn!("[http_factory] invalid proxy '{}': {} — building without proxy", url, e);
+            }
+        }
+    }
+    builder.build().unwrap_or_else(|_| global_client().clone())
+}
+
+/// 构建带代理的阻塞客户端
+pub fn build_blocking_client_with_proxy(proxy_url: Option<&str>) -> reqwest::blocking::Client {
+    let mut builder = reqwest::blocking::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)
+        .pool_idle_timeout(Duration::from_secs(POOL_IDLE_TIMEOUT_SECS))
+        .tcp_keepalive(Duration::from_secs(TCP_KEEPALIVE_SECS));
+    if let Some(url) = proxy_url {
+        match reqwest::Proxy::all(url) {
+            Ok(proxy) => {
+                builder = builder.proxy(proxy);
+            }
+            Err(e) => {
+                log::warn!("[http_factory] invalid proxy '{}': {} — building without proxy", url, e);
+            }
+        }
+    }
+    builder.build().unwrap_or_else(|_| global_blocking_client().clone())
+}
