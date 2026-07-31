@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use super::axis::DimensionAxis;
 use super::coord::HyperCoord;
 use crate::core::nt_core_knowledge::TaskType;
 
@@ -166,10 +167,19 @@ impl KnowledgeHyperCube {
         self.entries.get_mut(key)
     }
 
-    pub fn coord_density(&self, _dim: usize) -> f64 {
-        if self.entries.is_empty() { return 0.0; }
-        let total: f64 = self.entries.values().map(|e| e.value).sum();
-        (total / self.entries.len() as f64).max(0.0).min(1.0)
+    pub fn coord_density(&self, dim: usize) -> f64 {
+        if self.entries.is_empty() {
+            return 0.0;
+        }
+        let axes = DimensionAxis::all();
+        let axis = match axes.get(dim) {
+            Some(a) => a,
+            None => return 0.0,
+        };
+        let active = self.entries.values()
+            .filter(|e| e.coord.get(axis).abs() > 1e-9)
+            .count();
+        active as f64 / self.entries.len() as f64
     }
 
     pub fn prune_low_access(&mut self, min_access: u64) -> usize {
@@ -291,6 +301,30 @@ mod tests {
     fn test_coord_density_empty() {
         let cube = KnowledgeHyperCube::new();
         assert_eq!(cube.coord_density(0), 0.0);
+    }
+
+    #[test]
+    fn test_coord_density_is_per_dimension() {
+        // Regression: coord_density(_dim) ignored its parameter and returned the
+        // same aggregate value for all 8/16 dims, breaking gap analysis and
+        // sparse-dimension filtering across NT-WORLD and NT-MIND.
+        let mut cube = KnowledgeHyperCube::new();
+        let mut a = HyperCoord::new();
+        a.set(DimensionAxis::Abstraction, 1.0);
+        let mut b = HyperCoord::new();
+        b.set(DimensionAxis::Abstraction, 0.5);
+        b.set(DimensionAxis::Creativity, 0.8);
+        cube.insert(&a, "s", "a");
+        cube.insert(&b, "s", "b");
+
+        let abs_idx = DimensionAxis::Abstraction as usize;
+        let cre_idx = DimensionAxis::Creativity as usize;
+        let code_idx = DimensionAxis::CodeUnderstanding as usize;
+
+        assert_eq!(cube.coord_density(abs_idx), 1.0, "both entries set Abstraction");
+        assert_eq!(cube.coord_density(cre_idx), 0.5, "one of two entries sets Creativity");
+        assert_eq!(cube.coord_density(code_idx), 0.0, "no entry sets CodeUnderstanding");
+        assert_eq!(cube.coord_density(99), 0.0, "out-of-range dim is safe");
     }
 
     #[test]
