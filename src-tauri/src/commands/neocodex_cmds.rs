@@ -287,6 +287,11 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
                     content,
                     timestamp,
                 }),
+                WireEvent::ToolCall { name, args, result, success, .. } => items.push(NeoCodexMessageItem {
+                    role: "tool".to_string(),
+                    content: format!("**{}**{}\n```\n{}\n```", name, if success { "" } else { " (失败)" }, result.chars().take(500).collect::<String>()),
+                    timestamp: 0,
+                }),
                 WireEvent::SystemEvent { kind, detail, timestamp } => {
                     if !kind.is_empty() {
                         items.push(NeoCodexMessageItem {

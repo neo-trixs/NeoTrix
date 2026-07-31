@@ -172,6 +172,81 @@
   font-size: 12px;
 }
 
+.messageTool {
+  flex-direction: row;
+}
+
+.toolCard {
+  max-width: 85%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+.toolHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--fg-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.toolHeader:hover {
+  background: var(--bg-hover);
+}
+
+.toolName {
+  flex: 1;
+  font-weight: 600;
+  text-align: left;
+  color: var(--fg-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolTime {
+  font-size: 10px;
+  color: var(--fg-tertiary);
+  white-space: nowrap;
+}
+
+.toolChevronOpen {
+  transform: rotate(180deg);
+}
+
+.toolBody {
+  padding: 0 12px 10px;
+  border-top: 1px solid var(--border-primary);
+  color: var(--fg-primary);
+}
+
+.toolBody pre {
+  margin: 8px 0;
+  padding: 10px;
+  background: var(--bg-code);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.time {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--fg-tertiary);
+  opacity: 0.8;
+}
+
 .streaming {
   animation: fadeIn 0.1s ease-out;
 }

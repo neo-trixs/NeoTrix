@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "../stores";
-import { ChatView, CommandPalette, ModelSelector, SessionSidebar, SettingsView } from "../components/neocodex";
+import { ChatView, CommandPalette, ModelSelector, SessionSidebar, SettingsView, ShortcutHelp } from "../components/neocodex";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import styles from "./NeoCodexPage.module.css";
@@ -24,6 +24,7 @@ export default function NeoCodexPage() {
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [health, setHealth] = useState<any>(null);
 
   // Load sessions on mount
@@ -142,6 +143,9 @@ export default function NeoCodexPage() {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setPaletteOpen((v) => !v);
+      } else if (e.key === "/" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
       } else if (e.key === "n" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent("neotrix:new-session"));
@@ -244,6 +248,7 @@ export default function NeoCodexPage() {
       </main>
 
       <CommandPalette open={paletteOpen} items={paletteItems} onClose={() => setPaletteOpen(false)} />
+      <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   );
 }

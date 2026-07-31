@@ -52,6 +52,7 @@ const roleClassMap: Record<string, string> = {
   assistant: styles.messageAssistant,
   system: styles.messageSystem,
   error: styles.messageSystem,
+  tool: styles.messageTool,
 };
 
 const roleAvatarMap: Record<string, string> = {
@@ -59,7 +60,18 @@ const roleAvatarMap: Record<string, string> = {
   assistant: ASSISTANT_AVATAR,
   system: ASSISTANT_AVATAR,
   error: ASSISTANT_AVATAR,
+  tool: `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3a2 2 0 11-2.8 2.8L1.5 6.5V5.5L3 4l1-1.5h1L5 3z"/><path d="M8 5l5-3-1 5-3 1-1 3-2-2-1 1"/></svg>`,
 };
+
+function formatTimestamp(ts?: number): string {
+  if (!ts) return "";
+  const date = new Date(ts > 1e12 ? ts : ts * 1000);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  const time = date.toTimeString().slice(0, 5);
+  if (sameDay) return time;
+  return `${date.getMonth() + 1}-${date.getDate()} ${time}`;
+}
 
 interface ChatViewProps {
   messages: Array<{ role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number }>;
@@ -166,6 +178,10 @@ function MessageBubble({
   const roleClass = roleClassMap[message.role] || styles.messageAssistant;
   const avatar = roleAvatarMap[message.role] || ASSISTANT_AVATAR;
 
+  if (message.role === "tool") {
+    return <ToolCard message={message} avatar={avatar} roleClass={roleClass} />;
+  }
+
   return (
     <div className={`${styles.message} ${roleClass} ${isStreaming ? styles.streaming : ""}`}>
       <div className={styles.avatar} dangerouslySetInnerHTML={{ __html: avatar }} />
@@ -177,6 +193,39 @@ function MessageBubble({
             {codeBlocks} 代码块
           </div>
         )}
+        {message.timestamp && <div className={styles.time}>{formatTimestamp(message.timestamp)}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ToolCard({ message, avatar, roleClass }: { message: { role: string; content: string; timestamp?: number }; avatar: string; roleClass: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const m = /^\*\*([^*]+)\*\*(.*)$/s.exec(message.content);
+  const toolName = m ? m[1] : "工具调用";
+  const body = m ? m[2] : message.content;
+  const { html: bodyHtml } = renderContent(body);
+
+  return (
+    <div className={`${styles.message} ${roleClass}`}>
+      <div className={styles.avatar} dangerouslySetInnerHTML={{ __html: avatar }} />
+      <div className={styles.toolCard}>
+        <button className={styles.toolHeader} onClick={() => setExpanded((v) => !v)}>
+          <span className={styles.toolName}>{toolName}</span>
+          <span className={styles.toolTime}>{message.timestamp ? formatTimestamp(message.timestamp) : ""}</span>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className={expanded ? styles.toolChevronOpen : ""}
+          >
+            <path d="M4 5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        {expanded && <div className={styles.toolBody} dangerouslySetInnerHTML={{ __html: bodyHtml }} />}
       </div>
     </div>
   );
