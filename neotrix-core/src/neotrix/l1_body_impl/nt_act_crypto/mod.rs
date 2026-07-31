@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 pub mod wallet;
 pub mod wallet_store;
 pub mod cipher;

@@ -58,20 +58,27 @@ ALL_CAPABILITIES = sorted({c for caps in BRANCH_CAPABILITIES.values() for c in c
 # ────────────────────────────────────────────────────────────────
 SOURCE_CORES = [
     # (本源名, 主属域, 判别关键词, 本源定义)
-    ("E8",          "NT-CORE",   ["symmetr", "structur", "pattern", "mathemat", "algebra", "geometry",
-                                  "theorem", "law", "periodic", "group", "invariant", "axiom", "formal",
-                                  "order", "logic", "fractal", "topolog", "calculus", "equation", "foundation",
+    ("E8",          "NT-CORE",   ["symmetr", "mathemat", "algebra", "geometry",
+                                  "theorem", "axiom", "formal", "topolog", "calculus", "equation",
+                                  "fractal", "invariant", "funct", "statistical mechan", "proof",
                                   "quantum", "thermodynam", "entrop", "relativit", "hamiltonian", "particle",
-                                  "theory", "proof", "axiom", "theorem", "abstract", "statistical mechan"],
+                                  "differential", "topolog", "set theor", "number theor", "homolog",
+                                  "manifold", "tensor", "optimiz", "algorith", "complexity theor"],
                   "一切形式/结构/规律之源"),
     ("VSA",         "NT-MEMORY", ["memor", "semant", "represent", "vector", "embed", "symbol", "meaning",
                                   "concept", "knowledge base", "encod", "hypercub", "recall", "retrieve",
-                                  "latent", "holographic", "state space", "distributed represent", "kb"],
+                                  "latent", "holographic", "state space", "distributed represent", "kb",
+                                  "embedding", "knowledge graph", "hyperdimension", "ontolog", "semantic memory",
+                                  "associative memor", "content-addressable", "episodic memor", "working memor",
+                                  "dual-coding", "vector symbolic", "holographic represent"],
                   "一切概念/记忆/表示之源"),
-    ("GWT",         "NT-CORE",   ["conscious", "attention", "percept", "aware", "cognition", "global workspace",
-                                  "integrate info", "mind", "sentient", "binding", "focus", "thalamus",
-                                  "metacognit", "introspect", "self-aware", "consciousness", "neurosci",
-                                  "cognitiv", "mental", "emotion", "brain"],
+    ("GWT",         "NT-CORE",   ["conscious", "consciousness", "percept", "aware", "cognition", "cognitiv",
+                                  "global workspace", "integrat inform", "mind", "sentient", "binding",
+                                  "focus", "thalamus", "metacognit", "introspect", "self-aware", "neurosci",
+                                  "mental", "emotion", "brain", "neural activ", "cognitive architecture",
+                                  "phenomenolog", "qualia", "self model", "cognitive model", "working memor",
+                                  "cognitive science", "subjective experienc", "sense of self", "perception",
+                                  "attention mechanism", "gwt", "workspace theor", "conscious experienc"],
                   "一切意识/感知/认知之源"),
     ("ConsciousnessTree", "NT-MIND", ["absorb", "distill", "crystalliz", "evolve", "self-improv", "learn",
                                       "adapt", "internaliz", "feedback", "growth", "self-heal", "recursion",
@@ -85,7 +92,39 @@ SOURCE_CORES = [
                   "一切世界/感知/行动之源"),
 ]
 
-# 本源先验: node_type 决定理论载体默认溯源, 除非内容强命中他源。
+# 本源兜底启发式 (FALLBACK HINTS): 无关键词命中时按标题线索词分源
+# 本源哲学: 每节点终有所属本源; 线索词捕捉标题里的本源痕迹
+FALLBACK_HINTS = [
+    (["math", "phys", "theor", "scien", "logic", "philosoph", "quantum", "chem", "astron",
+      "relativ", "biolog", "geolog", "crystal", "equat", "axiom", "proof", "formal"], "E8"),
+    (["memor", "semantic", "represent", "concept", "knowledge", "intellig", "language", "symbol",
+      "embed", "vector", "database", "graph", "word", "text"], "VSA"),
+    (["conscious", "mind", "brain", "cogni", "percept", "psych", "emotion", "aware", "neuro",
+      "attention", "mental", "dream"], "GWT"),
+    (["learn", "evolv", "adapt", "growth", "self", "reflect", "experienc", "feedback",
+      "develop", "train", "improv"], "ConsciousnessTree"),
+    (["world", "action", "agent", "society", "polit", "econom", "hist", "culture", "art",
+      "war", "power", "soci", "commun", "technolog", "engineer", "industr", "market", "law",
+      "govern", "earth", "space", "human", "life"], "Reality"),
+]
+
+
+def fallback_source(title, node_type='article'):
+    """兜底: 标题线索词分源。repository→Reality, paper→E8, 其余按线索词。
+    无任何线索词 → Reality (世界知识大本营, 行动之源)。"""
+    if node_type == 'repository':
+        return "Reality", "NT-WORLD", ['tool']
+    if node_type == 'paper':
+        return "E8", "NT-CORE", ['theory']
+    blob = (title or '').lower()
+    for kws, core in FALLBACK_HINTS:
+        if any(k in blob for k in kws):
+            domain = next(d for c, d, _k, _z in SOURCE_CORES if c == core)
+            return core, domain, [next(k for k in kws if k in blob)]
+    return "Reality", "NT-WORLD", ['world']
+
+
+
 #   paper        → 形式之源 (E8) 载体: 论文即形式化知识, 默认 E8
 #   repository   → 行动之源 (Reality) 载体: 仓库即世界交互工具, 默认 Reality
 #   article      → 中性
@@ -130,6 +169,7 @@ KEYWORD_RULES = [
     (re.compile(r'search|retriev|index|semantic_search|rag|vector', re.I), "NT-WORLD", "search"),
     (re.compile(r'osint|recon|reconnaissance|subdomain|whois|dns_lookup|port_scan', re.I), "NT-WORLD", "observe"),
     # 理解/分析
+    (re.compile(r'explor|discover|survey|overview|invent|categoriz|taxonom|reconnaissance', re.I), "NT-CORE", "discover"),
     (re.compile(r'analyz|understand|classif|detect|cluster|topic_model|ner\b|segment', re.I), "NT-CORE", "detect"),
     (re.compile(r'metric|measure|score|benchmark|eval|quantif|statistic', re.I), "NT-CORE", "measure"),
     (re.compile(r'predict|forecast|forecast|trend|market', re.I), "NT-CORE", "predict"),
@@ -137,6 +177,10 @@ KEYWORD_RULES = [
     # 推理
     (re.compile(r'reason|logic|infer|deduc|inference|chain_of_thought|debate|critique', re.I), "NT-CORE", "critique"),
     (re.compile(r'explain|interpret|insight|attribution|xai\b', re.I), "NT-CORE", "explain"),
+    # 通用知识/百科 (Cycle 161s): wiki镜像/宗教哲学/百科条目 = 知识解释
+    (re.compile(r'wikipedia|wikip|encyclopedia|wiki\b', re.I), "NT-CORE", "explain"),
+    (re.compile(r'karma|buddha|shinto|jain|hindu|veda|sanskrit|islam|quran|religion|philosoph|ethics|theolog|sutta|dharma|zen|tao|confuci', re.I), "NT-CORE", "explain"),
+    (re.compile(r'google books|open library|archive\.org|gutenberg|libgen|ebook|textbook', re.I), "NT-MEMORY", "recall"),
     # 生成/合成
     (re.compile(r'generate|llm|gpt|model|prompt|text_gen|completion|image_gen|video_gen', re.I), "NT-MIND", "generate"),
     (re.compile(r'transform|translat|convert|summariz|rewrite|polish', re.I), "NT-MIND", "transform"),
@@ -150,7 +194,7 @@ KEYWORD_RULES = [
     (re.compile(r'\bmcp (server|client|protocol)\b|mcp-|/mcp\b', re.I), "NT-ACT", "send"),
     (re.compile(r'\bwebhook|notification|messaging|push\b|telegram|slack|discord|wechat', re.I), "NT-ACT", "send"),
     # 安全/验证
-    (re.compile(r'security|vuln|audit|scan|pen_test|pentest|exploit|firewall|shield|protect', re.I), "NT-SHIELD", "audit"),
+    (re.compile(r'security|vuln|audit|scan|pen_test|pentest|exploit|firewall|shield|protect|secur|pwn|hack|breach|malware|ransom', re.I), "NT-SHIELD", "audit"),
     (re.compile(r'verify|test|validate|check|quality|assert|lint', re.I), "NT-SHIELD", "verify"),
     # 界面/通信
     (re.compile(r'ui\b|ux\b|interface|frontend|design|dashboard|visual|component', re.I), "NT-IO", "invoke"),
@@ -217,6 +261,94 @@ KNOWN_REPOS = {
     "graphify": ("NT-MEMORY", "search"),
     "Graphify": ("NT-MEMORY", "search"),
     "khoj-ai": ("NT-MEMORY", "recall"),
+    # NT-SHIELD: 安全工具确定性映射 (Cycle 161o)
+    "nmap": ("NT-SHIELD", "audit"),
+    "sqlmap": ("NT-SHIELD", "audit"),
+    "zaproxy": ("NT-SHIELD", "audit"),
+    "grype": ("NT-SHIELD", "audit"),
+    "trivy": ("NT-SHIELD", "audit"),
+    "lynis": ("NT-SHIELD", "audit"),
+    "wpscan": ("NT-SHIELD", "audit"),
+    "impacket": ("NT-SHIELD", "audit"),
+    "BloodHound": ("NT-SHIELD", "audit"),
+    "Empire": ("NT-SHIELD", "audit"),
+    "Amass": ("NT-SHIELD", "audit"),
+    "phasar": ("NT-SHIELD", "audit"),
+    "scorecard": ("NT-SHIELD", "audit"),
+    "cosign": ("NT-SHIELD", "verify"),
+    "sigstore": ("NT-SHIELD", "verify"),
+    "opa": ("NT-SHIELD", "constrain"),
+    "secureCodeBox": ("NT-SHIELD", "verify"),
+    # NT-SHIELD constrain: 治理/对齐/约束 (Cycle 161p)
+    "constitutional-ai": ("NT-SHIELD", "constrain"),
+    "llm-guard": ("NT-SHIELD", "constrain"),
+    "guardrails": ("NT-SHIELD", "constrain"),
+    "guidance": ("NT-SHIELD", "constrain"),
+    "keycloak": ("NT-SHIELD", "constrain"),
+    "casbin": ("NT-SHIELD", "constrain"),
+    "certbot": ("NT-SHIELD", "verify"),
+    "letsencrypt": ("NT-SHIELD", "constrain"),
+    "vault": ("NT-SHIELD", "constrain"),
+    "sops": ("NT-SHIELD", "constrain"),
+    "snyk": ("NT-SHIELD", "audit"),
+    "DependencyCheck": ("NT-SHIELD", "audit"),
+    "cdxgen": ("NT-SHIELD", "audit"),
+    "spdx-sbom-generator": ("NT-SHIELD", "audit"),
+    "purl-spec": ("NT-SHIELD", "constrain"),
+    "in-toto": ("NT-SHIELD", "verify"),
+    "dependabot": ("NT-SHIELD", "audit"),
+    "flare-vm": ("NT-SHIELD", "audit"),
+    "sigma": ("NT-SHIELD", "audit"),
+    "detection-rules": ("NT-SHIELD", "audit"),
+    "attack_range": ("NT-SHIELD", "audit"),
+    "evals": ("NT-SHIELD", "verify"),
+    # NT-IO/NT-MIND 确定性映射 (Cycle 161q)
+    "kafka": ("NT-IO", "synchronize"),
+    "nats-server": ("NT-IO", "synchronize"),
+    "rabbitmq-server": ("NT-IO", "synchronize"),
+    "mosquitto": ("NT-IO", "synchronize"),
+    "emqx": ("NT-IO", "synchronize"),
+    "nsq": ("NT-IO", "synchronize"),
+    "libzmq": ("NT-IO", "synchronize"),
+    "redis": ("NT-IO", "invoke"),
+    "temporal": ("NT-IO", "synchronize"),
+    "prefect": ("NT-IO", "synchronize"),
+    "dagster": ("NT-IO", "synchronize"),
+    "airflow": ("NT-IO", "synchronize"),
+    "tree-of-thoughts": ("NT-CORE", "critique"),
+    "human-eval": ("NT-CORE", "measure"),
+    "peft": ("NT-MIND", "transform"),
+    "LoRA": ("NT-MIND", "transform"),
+    "OpenInstruct": ("NT-MIND", "generate"),
+    "FastChat": ("NT-MIND", "generate"),
+    # 优化/调参类 (Cycle 161t)
+    "optuna": ("NT-MIND", "transform"),
+    "BayesianOptimization": ("NT-MIND", "transform"),
+    "keras-tuner": ("NT-MIND", "transform"),
+    "talos": ("NT-MIND", "transform"),
+    "AutoML": ("NT-MIND", "integrate"),
+    # 元学习/自进化 (Cycle 161t)
+    "meta-dataset": ("NT-MIND", "integrate"),
+    "MAML-Pytorch": ("NT-MIND", "transform"),
+    "learn2learn": ("NT-MIND", "transform"),
+    "pytorch-meta": ("NT-MIND", "transform"),
+    "awesome-meta-learning": ("NT-MIND", "integrate"),
+    # 神经模拟 (Cycle 161t)
+    "brian2": ("NT-MEMORY", "simulate"),
+    "BrainPy": ("NT-MEMORY", "simulate"),
+    "PyNN": ("NT-MEMORY", "simulate"),
+    "BluePy": ("NT-MEMORY", "simulate"),
+    "OpenWorm": ("NT-MEMORY", "simulate"),
+    "neuropixels": ("NT-CORE", "measure"),
+    # 进化计算/自适应 (Cycle 161t)
+    "deap": ("NT-MIND", "integrate"),
+    "jenetics": ("NT-MIND", "integrate"),
+    "pagmo2": ("NT-MIND", "integrate"),
+    "Platypus": ("NT-MIND", "integrate"),
+    "cmaes": ("NT-MIND", "transform"),
+    # 认知/神经 (Cycle 161t)
+    "opencog": ("NT-MEMORY", "simulate"),
+    "bids-validator": ("NT-CORE", "verify"),
 }
 
 
@@ -255,12 +387,57 @@ def map_node(node_type, title, content, url):
             best = (br, cap)
     if best:
         return best[0], best[1], f'keyword_hits:{best_hits}'
-    # 兜底: repository → NT-WORLD.retrieve, paper → NT-CORE.critique
+    # 本源感知兜底: 无关键词命中时按 node_type + 本源给语义合理的能力 (Cycle 161n)
     if node_type == 'repository':
         return 'NT-WORLD', 'retrieve', 'fallback:repo'
     if node_type == 'paper':
         return 'NT-CORE', 'critique', 'fallback:paper'
-    return 'NT-CORE', 'discover', 'fallback:article'
+    # node_type 语义默认 (占位节点无关键词信号, node_type 是唯一判别)
+    type_default = {
+        'concept': ('NT-MEMORY', 'recall'),
+        'web': ('NT-WORLD', 'search'),
+        'external': ('NT-WORLD', 'retrieve'),
+        'skill': ('NT-ACT', 'execute'),
+        'doi': ('NT-CORE', 'critique'),
+        'arxiv': ('NT-CORE', 'critique'),
+        'wikipedia': ('NT-MEMORY', 'recall'),
+        'reference': ('NT-MEMORY', 'recall'),
+        'book': ('NT-MEMORY', 'recall'),
+        'guide': ('NT-IO', 'invoke'),
+        'method': ('NT-MIND', 'integrate'),
+        'framework': ('NT-MIND', 'integrate'),
+        'insight': ('NT-CORE', 'explain'),
+        'thinking_trace': ('NT-MIND', 'integrate'),
+        'theory': ('NT-CORE', 'critique'),
+        'person': ('NT-CORE', 'explain'),
+        'organization': ('NT-CORE', 'explain'),
+        'evolution_pattern': ('NT-MIND', 'integrate'),
+        'conversation_evolution': ('NT-MIND', 'integrate'),
+        'resource': ('NT-MEMORY', 'recall'),
+        'source': ('NT-MEMORY', 'recall'),
+        'image': ('NT-IO', 'invoke'),
+        'wiki_page': ('NT-CORE', 'explain'),
+        'algorithm': ('NT-CORE', 'measure'),
+        'note': ('NT-MEMORY', 'recall'),
+        'event_record': ('NT-CORE', 'measure'),
+        'detection_finding': ('NT-CORE', 'detect'),
+        'goal_result': ('NT-CORE', 'measure'),
+        'github': ('NT-ACT', 'execute'),
+        'arxiv': ('NT-CORE', 'critique'),
+    }
+    if node_type in type_default:
+        return *type_default[node_type], f'fallback:type:{node_type}'
+    core, _, _ = map_source_core(title, content[:1200], '', node_type)
+    if core is None:
+        core, _, _ = fallback_source(title, node_type)
+    src_cap = {
+        'E8': ('NT-CORE', 'measure'),
+        'VSA': ('NT-MEMORY', 'recall'),
+        'GWT': ('NT-CORE', 'critique'),
+        'ConsciousnessTree': ('NT-MIND', 'integrate'),
+        'Reality': ('NT-MEMORY', 'recall'),
+    }
+    return *src_cap.get(core, ('NT-CORE', 'discover')), f'fallback:core:{core}'
 
 
 def main():
@@ -270,7 +447,7 @@ def main():
     args = ap.parse_args()
 
     conn = sqlite3.connect(KB_PATH)
-    rows = conn.execute("""SELECT id, node_type, title, content, url FROM nodes
+    rows = conn.execute("""SELECT id, node_type, title, content, url, metadata FROM nodes
                            WHERE id LIKE 'batch_%'""").fetchall()
     print(f'[mapping] {len(rows)} batch nodes', flush=True)
 
@@ -279,18 +456,27 @@ def main():
     per_cap = {}
     per_source = {}
     unmapped = []
-    for nid, node_type, title, content, url in rows:
-        res = map_node(node_type, title, content, url)
+    for nid, node_type, title, content, url, meta_json in rows:
+        # GitHub topics/description 补充本源判定 (repository content 是占位模板)
+        topics = []
+        if meta_json:
+            md = json.loads(meta_json)
+            topics = md.get('topics') or []
+            if md.get('description'):
+                topics.append(md['description'])
+        topic_blob = ' '.join(topics)
+        res = map_node(node_type, title, content or '', url)
         if res is None:
             unmapped.append((nid, title))
             continue
         branch, cap, ev = res
         # 本源溯源层 (Cycle 161i): 5 道之本源 + 演化路径
-        core, core_domain, trace_kws = map_source_core(title, content, url, node_type)
+        core, core_domain, trace_kws = map_source_core(title, content or '', url, node_type)
+        if core is None and topic_blob:
+            core, core_domain, trace_kws = map_source_core(topic_blob, '', '', node_type)
         if core is None:
-            # 兜底: repository → Reality (工具/行动), paper → E8 (形式/理论)
-            core, core_domain, trace_kws = ('Reality', 'NT-WORLD', ['tool']) if node_type == 'repository' \
-                else ('E8', 'NT-CORE', ['theory'])
+            # 兜底: 标题线索词分源 (本源哲学: 每节点终有所属本源)
+            core, core_domain, trace_kws = fallback_source(title, node_type)
         mapped[nid] = {'branch': branch, 'capability': cap, 'evidence': ev,
                        'node_type': node_type, 'title': title[:60], 'url': url,
                        'source_core': core, 'source_domain': core_domain,

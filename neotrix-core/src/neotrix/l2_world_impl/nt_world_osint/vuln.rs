@@ -204,7 +204,7 @@ pub async fn investigate(target: &OsintTarget, client: &Client, _config: &OsintC
 
     // Sort by CVSS score descending
     findings.vulnerabilities.sort_by(|a, b| {
-        b.cvss_score.unwrap_or(0.0).partial_cmp(&a.cvss_score.unwrap_or(0.0)).unwrap()
+        b.cvss_score.unwrap_or(0.0).partial_cmp(&a.cvss_score.unwrap_or(0.0)).unwrap_or(std::cmp::Ordering::Equal)
     });
 
     Ok(findings)

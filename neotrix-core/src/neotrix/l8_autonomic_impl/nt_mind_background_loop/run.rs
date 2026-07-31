@@ -1245,7 +1245,7 @@ impl BackgroundLoopHandle {
             results.push(("state_substrate".to_string(), !self.state.active_mode.name().is_empty()));
             results.push(("bbrain".to_string(),
                 self.bbrain.latest_report().map(|r| r.health_score >= 0.0).unwrap_or(false)));
-            results.push(("cog_eval".to_string(), !self.cog_eval.latest_report().is_none()));
+            results.push(("cog_eval".to_string(), self.cog_eval.latest_report().is_some()));
             results.push(("gold_standard".to_string(),
                 self.gold_standard.as_ref().map(|_| true).unwrap_or(false)));
             self.convergence_pulse.gaps_from_self_tests(&results);
@@ -1304,7 +1304,7 @@ impl BackgroundLoopHandle {
             }
             // BMonitor health: if cognitive health score < 50, enqueue deep reasoning mode
             // to give the system more time/cycles for recovery.
-            if let Some(ref br) = self.bbrain.latest_report() {
+            if let Some(br) = self.bbrain.latest_report() {
                 if br.health_score < 0.5 {
                     log::warn!("[bg] auto-heal: cognitive health low ({:.0}%), adjusting mode to Deep",
                         br.health_score * 100.0);

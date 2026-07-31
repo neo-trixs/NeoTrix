@@ -58,38 +58,6 @@ export interface KnowledgeEntry {
   updated: number;
 }
 
-export interface VirtualApp {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  action: "terminal" | "files" | "settings" | "splitview" | "agentmaker" | "agentflow";
-}
-
-export interface DesktopWindow {
-  id: string;
-  title: string;
-  appId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  zIndex: number;
-  minimized: boolean;
-}
-
-export interface SplitViewSession {
-  id: string;
-  leftModel: string;
-  rightModel: string;
-  prompt: string;
-  leftResponse: string;
-  rightResponse: string;
-  timestamp: number;
-}
-
-export type ModelTier = "free" | "low" | "medium" | "high" | "custom";
-
 export interface AgentPreset {
   id: string;
   name: string;
@@ -102,66 +70,6 @@ export interface AgentPreset {
   knowledgeSources: string[];
   maxTokens: number;
   isBuiltin: boolean;
-}
-
-export interface AgentMakerPreset {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  icon: string;
-  systemPrompt: string;
-  defaultModel: string;
-  defaultTier: ModelTier;
-  defaultTemperature: number;
-  defaultMaxTokens: number;
-  suggestedTools: string[];
-  suggestedKnowledge: string[];
-}
-
-export type AgentStatus = "running" | "completed" | "failed" | "pending" | "idle";
-export type AgentNodeType = "orchestrator" | "planner" | "sub-agent" | "critic" | "aggregator" | "input" | "output";
-
-export interface AgentFlowNodeData extends Record<string, unknown> {
-  label: string;
-  agentType: AgentNodeType;
-  status: AgentStatus;
-  description: string;
-  progress?: number;
-  duration?: string;
-  steps?: { done: number; total: number };
-}
-
-export interface EvolutionState {
-  iteration: number;
-  strategy: string;
-  contextUsage: number;
-  intrinsicReward: number;
-  confidence: number;
-  errorRate: number;
-  noveltyScore: number;
-  shouldExplore: boolean;
-  stabilityScore: number;
-  flagsCount: number;
-  repairsCount: number;
-  archiveSnapshots: number;
-  selfRepairs: number;
-}
-
-export interface EditorState {
-  open: boolean;
-  filePath: string;
-  initialContent: string;
-  language: string;
-}
-
-export interface ContextMenuItem {
-  label: string;
-  icon?: string;
-  shortcut?: string;
-  action: () => void;
-  disabled?: boolean;
-  divider?: boolean;
 }
 
 export interface Attachment {
@@ -243,133 +151,6 @@ export interface ProxyConfigData {
   direct_timeout_secs: number;
 }
 
-export interface BrainHealth {
-  health_score: number;
-  degradation?: string;
-  cognitive_load?: string;
-  iteration?: number;
-  curiosity_bonus?: number;
-}
-
-export interface BrainEvent {
-  kind: "stage" | "knowledge";
-  status: string;
-  name?: string;
-  duration_ms?: number;
-  concept_count?: number;
-  domain?: string;
-  iteration?: number;
-}
-
-// ========== Consciousness: E8 Engine State ==========
-export interface E8State {
-  hexagram: number;
-  hexagramName: string;
-  confidence: number;
-  lines: E8Line[];
-  transitioning: boolean;
-}
-
-export interface E8Line {
-  value: 0 | 1;
-  changing: boolean;
-}
-
-export interface GWTResonance {
-  activeCount: number;
-  totalCount: number;
-  entropy: number;
-  experts: GWTExpert[];
-}
-
-export interface GWTExpert {
-  id: string;
-  shortName: string;
-  icon: string;
-  resonance: number;
-  hue: number;
-  weight: number;
-}
-
-export interface SEALStatus {
-  maturityLevel: 1 | 2 | 3 | 4 | 5 | 6;
-  currentEpoch: number;
-  stageName: string;
-  healthScore: number;
-}
-
-// ========== Agent Governance (Omnigent-inspired) ==========
-export interface AgentPolicy {
-  id: string;
-  name: string;
-  description: string;
-  type: "shell" | "file_write" | "network" | "budget" | "custom";
-  enabled: boolean;
-  config?: Record<string, string | number | boolean>;
-}
-
-export interface AgentRuntimeInfo {
-  id: string;
-  name: string;
-  harness: string;
-  status: "running" | "idle" | "error";
-  model: string;
-  provider: string;
-  policies: AgentPolicy[];
-}
-
-// ========== Privacy Filter (Osaurus-inspired) ==========
-export interface PrivacyFilterConfig {
-  enabled: boolean;
-  mode: "auto" | "strict" | "custom";
-  redactMode: "placeholder" | "mask" | "drop";
-  unscrubOnReply: boolean;
-  customPatterns: string[];
-}
-
-export interface PiiDetection {
-  type: string;
-  value: string;
-  placeholder: string;
-  confidence: number;
-}
-
-// ========== Sandbox (Osaurus-inspired) ==========
-export type SandboxProvider = "local-docker" | "apple-container" | "modal" | "e2b";
-export type SandboxRuntime = "python" | "node" | "rust" | "linux";
-export type SandboxStatus = "running" | "stopped" | "error";
-export type SandboxNetwork = "isolated" | "bridge" | "host";
-
-export interface SandboxInstance {
-  id: string;
-  name: string;
-  runtime: SandboxRuntime;
-  status: SandboxStatus;
-  memory: string;
-  cpu: string;
-  uptime: string;
-  network: SandboxNetwork;
-}
-
-// ========== Identity & Keys (Osaurus-inspired) ==========
-export interface AccessKey {
-  id: string;
-  label: string;
-  prefix: string;
-  scope: "full" | "agent-only" | "read-only";
-  status: "active" | "revoked" | "expired";
-  createdAt: string;
-  lastUsed: string;
-}
-
-export interface IdentityInfo {
-  name: string;
-  address: string;
-  edition: number;
-  verified: boolean;
-}
-
-// ========== Projects & Chats (Codex-style) ==========
 export interface Project {
   id: string;
   name: string;
@@ -417,26 +198,6 @@ export interface ProjectInstruction {
 }
 
 // ========== Browser Pane ==========
-export interface BrowserSession {
-  id: string;
-  url: string;
-  title: string;
-  created_at: number;
-  is_active: boolean;
-}
-
-// ========== Image Generation ==========
-export interface ImageGenerationResult {
-  id: string;
-  prompt: string;
-  image_url: string;
-  width: number;
-  height: number;
-  style: string;
-  quality: string;
-  created_at: number;
-}
-
 export interface ImageGenOptions {
   width: number;
   height: number;
@@ -463,70 +224,6 @@ export interface FrontmostApp {
 }
 
 // ========== Remote Devbox ==========
-export interface RemoteHostConfig {
-  id: string;
-  name: string;
-  host: string;
-  port: number;
-  user: string;
-  auth_method: string;
-  key_path: string | null;
-  last_connected: number | null;
-}
-
-export interface RemoteExecutionResult {
-  success: boolean;
-  output: string;
-  error: string | null;
-  exit_code: number;
-  duration_ms: number;
-}
-
-// ========== Background Routines ==========
-export interface BackgroundTask {
-  id: string;
-  name: string;
-  prompt: string;
-  schedule: string;
-  last_run: number | null;
-  next_run: number | null;
-  status: "idle" | "running" | "paused" | "error";
-  runs: TaskRun[];
-}
-
-export interface TaskRun {
-  timestamp: number;
-  summary: string;
-  result?: string;
-}
-
-// ========== Ultra Review ==========
-export interface ReviewConfig {
-  scope: "changed" | "staged" | "all";
-  depth: "standard" | "deep" | "exhaustive";
-  dimensions: string[];
-  auto_fix: boolean;
-}
-
-export interface ReviewResult {
-  run_id: string;
-  config: ReviewConfig;
-  issues_found: number;
-  issues: ReviewIssue[];
-  duration_ms: number;
-}
-
-export interface ReviewIssue {
-  id: string;
-  dimension: string;
-  severity: "info" | "warning" | "error";
-  file: string;
-  line: number;
-  message: string;
-  suggestion?: string;
-}
-
-// ========== NeoCodex Desktop ==========
 export type NeoCodexMode = "Agent" | "Shell" | "Plan";
 
 export interface NeoCodexHealthReport {
@@ -549,12 +246,6 @@ export interface NeoCodexHealthReport {
   event_bus_attached: boolean;
   evolution_iterations: number;
   tool_grounding_degraded: boolean;
-}
-
-export interface NeoCodexProviderEntry {
-  name: string;
-  model: string;
-  resolvable: boolean;
 }
 
 export interface NeoCodexProviderConfig {
@@ -580,4 +271,94 @@ export interface NeoCodexSession {
   created_at: number;
   updated_at: number;
 }
+
+// ========== API 支撑类型 (lib/api.ts) ==========
+export type ModelTier = "free" | "low" | "medium" | "high" | "custom";
+
+export interface BrowserSession {
+  id: string;
+  url: string;
+  title: string;
+  created_at: number;
+  is_active: boolean;
+}
+
+export interface ImageGenerationResult {
+  id: string;
+  prompt: string;
+  image_url: string;
+  width: number;
+  height: number;
+  style: string;
+  quality: string;
+  created_at: number;
+}
+
+export interface RemoteHostConfig {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  user: string;
+  auth_method: string;
+  key_path: string | null;
+  last_connected: number | null;
+}
+
+export interface RemoteExecutionResult {
+  success: boolean;
+  output: string;
+  error: string | null;
+  exit_code: number;
+  duration_ms: number;
+}
+
+export interface BackgroundTask {
+  id: string;
+  name: string;
+  prompt: string;
+  schedule: string;
+  last_run: number | null;
+  next_run: number | null;
+  status: "idle" | "running" | "paused" | "error";
+  runs: TaskRun[];
+}
+
+export interface TaskRun {
+  timestamp: number;
+  summary: string;
+  result?: string;
+}
+
+export interface ReviewConfig {
+  scope: "changed" | "staged" | "all";
+  depth: "standard" | "deep" | "exhaustive";
+  dimensions: string[];
+  auto_fix: boolean;
+}
+
+export interface ReviewResult {
+  run_id: string;
+  config: ReviewConfig;
+  issues_found: number;
+  issues: ReviewIssue[];
+  duration_ms: number;
+}
+
+export interface ReviewIssue {
+  id: string;
+  dimension: string;
+  severity: "info" | "warning" | "error";
+  file: string;
+  line: number;
+  message: string;
+  suggestion?: string;
+}
+
+export interface NeoCodexProviderEntry {
+  name: string;
+  model: string;
+  resolvable: boolean;
+}
+
 

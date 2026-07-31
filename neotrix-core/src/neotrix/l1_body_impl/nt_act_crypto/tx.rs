@@ -155,7 +155,7 @@ impl TxBuilder {
         let amount_bytes = u256_padded(&amount.to_be_bytes());
 
         let mut data = Vec::with_capacity(4 + 32 + 32);
-        data.extend_from_slice(&hex::decode("a9059cbb").unwrap());
+        data.extend_from_slice(&hex::decode("a9059cbb").expect("static hex selector"));
         data.extend_from_slice(&to_addr);
         data.extend_from_slice(&amount_bytes);
 
@@ -167,7 +167,7 @@ impl TxBuilder {
         let amount_bytes = u256_padded(&amount.to_be_bytes());
 
         let mut data = Vec::with_capacity(4 + 32 + 32);
-        data.extend_from_slice(&hex::decode("095ea7b3").unwrap());
+        data.extend_from_slice(&hex::decode("095ea7b3").expect("static hex selector"));
         data.extend_from_slice(&spender_bytes);
         data.extend_from_slice(&amount_bytes);
 

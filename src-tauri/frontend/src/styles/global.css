@@ -32,6 +32,18 @@ body {
 
 .panel-loading { flex:1; display:flex; align-items:center; justify-content:center; min-height:60px; }
 
+.nt-btn-primary {
+  padding: 6px 14px;
+  border-radius: var(--nt-radius-sm);
+  border: 1px solid var(--nt-primary);
+  background: var(--nt-primary);
+  color: #fff;
+  font-size: var(--nt-font-size-body);
+  font-weight: var(--nt-font-weight-medium);
+  cursor: pointer;
+}
+.nt-btn-primary:hover { background: var(--nt-primary-hover); }
+
 .glass-panel {
   background: var(--nt-chat);
   backdrop-filter: var(--nt-blur);

@@ -4,7 +4,7 @@
   "version": "0.18.0",
   "identifier": "ai.neotrix.desktop",
   "build": {
-    "beforeBuildCommand": "cd frontend && npm run build",
+    "beforeBuildCommand": "pwd",
     "frontendDist": "./frontend/dist",
     "devUrl": "http://localhost:1420"
   },

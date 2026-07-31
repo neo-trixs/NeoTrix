@@ -31,7 +31,7 @@ pub fn compute_message_key(auth_key: &[u8; AUTH_KEY_LEN], plaintext: &[u8], is_s
 }
 
 pub fn aes_ige_encrypt(key: &[u8; 32], iv: &[u8; 32], data: &[u8]) -> Vec<u8> {
-    let cipher = Aes256::new_from_slice(key).unwrap();
+    let cipher = Aes256::new_from_slice(key).expect("AES-256 key is 32 bytes");
     let blocks = data.chunks_exact(AES_BLOCK);
     let mut output = Vec::with_capacity(data.len());
     let mut prev_c = [0u8; AES_BLOCK];
@@ -40,7 +40,7 @@ pub fn aes_ige_encrypt(key: &[u8; 32], iv: &[u8; 32], data: &[u8]) -> Vec<u8> {
     prev_p.copy_from_slice(&iv[AES_BLOCK..]);
 
     for chunk in blocks {
-        let plain_block = <&[u8; AES_BLOCK]>::try_from(chunk).unwrap();
+        let plain_block = <&[u8; AES_BLOCK]>::try_from(chunk).expect("exact block chunk");
         let mut block = *plain_block;
         xor_block(&mut block, &prev_c);
         cipher.encrypt_block((&mut block).into());
@@ -53,7 +53,7 @@ pub fn aes_ige_encrypt(key: &[u8; 32], iv: &[u8; 32], data: &[u8]) -> Vec<u8> {
 }
 
 pub fn aes_ige_decrypt(key: &[u8; 32], iv: &[u8; 32], data: &[u8]) -> Vec<u8> {
-    let cipher = Aes256::new_from_slice(key).unwrap();
+    let cipher = Aes256::new_from_slice(key).expect("AES-256 key is 32 bytes");
     let blocks = data.chunks_exact(AES_BLOCK);
     let mut output = Vec::with_capacity(data.len());
     let mut prev_c = [0u8; AES_BLOCK];
@@ -62,7 +62,7 @@ pub fn aes_ige_decrypt(key: &[u8; 32], iv: &[u8; 32], data: &[u8]) -> Vec<u8> {
     prev_p.copy_from_slice(&iv[AES_BLOCK..]);
 
     for chunk in blocks {
-        let original_c = *<&[u8; AES_BLOCK]>::try_from(chunk).unwrap();
+        let original_c = *<&[u8; AES_BLOCK]>::try_from(chunk).expect("exact block chunk");
         let mut block = original_c;
         xor_block(&mut block, &prev_p);
         cipher.decrypt_block((&mut block).into());
@@ -113,7 +113,7 @@ pub fn generate_aes_key_iv(auth_key: &[u8; AUTH_KEY_LEN], msg_key: &[u8; 16], is
 }
 
 pub fn parse_biguint_hex(hex_str: &str) -> BigUint {
-    BigUint::parse_bytes(hex_str.as_bytes(), 16).unwrap()
+    BigUint::parse_bytes(hex_str.as_bytes(), 16).expect("valid hex literal")
 }
 
 pub fn dh_prime() -> BigUint {

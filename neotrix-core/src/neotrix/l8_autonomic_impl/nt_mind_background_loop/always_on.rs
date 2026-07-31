@@ -105,7 +105,7 @@ impl ScheduleExpr {
                 let today = naive.date();
                 let target = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
                     today.and_hms_opt(hour as u32, minute as u32, 0)
-                        .unwrap_or_else(|| today.and_hms_opt(0, 0, 0).unwrap()),
+                        .unwrap_or_else(|| today.and_hms_opt(0, 0, 0).expect("midnight is valid")),
                     chrono::Utc,
                 );
                 if target > from {
@@ -114,7 +114,7 @@ impl ScheduleExpr {
                     let tomorrow = today + chrono::Duration::days(1);
                     chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
                         tomorrow.and_hms_opt(hour as u32, minute as u32, 0)
-                            .unwrap_or_else(|| tomorrow.and_hms_opt(0, 0, 0).unwrap()),
+                            .unwrap_or_else(|| tomorrow.and_hms_opt(0, 0, 0).expect("midnight is valid")),
                         chrono::Utc,
                     )
                 }
@@ -136,7 +136,7 @@ impl ScheduleExpr {
                         let date = candidate.naive_utc().date();
                         let target = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(
                             date.and_hms_opt(hour as u32, minute as u32, 0)
-                                .unwrap_or_else(|| date.and_hms_opt(0, 0, 0).unwrap()),
+                                .unwrap_or_else(|| date.and_hms_opt(0, 0, 0).expect("midnight is valid")),
                             chrono::Utc,
                         );
                         if target > from {

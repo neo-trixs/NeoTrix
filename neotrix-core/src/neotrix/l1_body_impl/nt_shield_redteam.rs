@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -254,7 +256,7 @@ impl RedTeamHarness {
             findings: self.findings.clone(),
             scan_timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         }
     }

@@ -1,11 +1,13 @@
+#![deny(clippy::unwrap_used)]
+
 use std::sync::LazyLock;
 use std::time::Duration;
 
 static HTML_CLEAN_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
-    regex::Regex::new(r"(?is)<script[^>]*>.*?</script>|<style[^>]*>.*?</style>|<[^>]+>").unwrap()
+    regex::Regex::new(r"(?is)<script[^>]*>.*?</script>|<style[^>]*>.*?</style>|<[^>]+>").expect("static html-clean regex")
 });
 static WS_CLEAN_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
-    regex::Regex::new(r"\s+").unwrap()
+    regex::Regex::new(r"\s+").expect("static whitespace regex")
 });
 
 fn chrome_path() -> String {

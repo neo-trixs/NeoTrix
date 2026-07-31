@@ -173,16 +173,16 @@ impl Default for OutputScreener {
     fn default() -> Self {
         Self {
             secret_patterns: vec![
-                ("AWS Access Key", Regex::new(r"AKIA[0-9A-Z]{16}").unwrap()),
-                ("GitHub Token", Regex::new(r"gh[pousr]_[A-Za-z0-9]{36,}").unwrap()),
-                ("Private Key", Regex::new(r"-----BEGIN.*PRIVATE KEY-----").unwrap()),
-                ("JWT Token", Regex::new(r"[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}").unwrap()),
+                ("AWS Access Key", Regex::new(r"AKIA[0-9A-Z]{16}").expect("literal aws key regex")),
+                ("GitHub Token", Regex::new(r"gh[pousr]_[A-Za-z0-9]{36,}").expect("literal github token regex")),
+                ("Private Key", Regex::new(r"-----BEGIN.*PRIVATE KEY-----").expect("literal private key regex")),
+                ("JWT Token", Regex::new(r"[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}").expect("literal jwt regex")),
             ],
             secret_str_patterns: vec!["sk-", "api_key", "api-key", "apikey", "secret=", "token=", "password="],
             pii_patterns: vec![
-                ("Email address", Regex::new(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}").unwrap()),
-                ("Phone number", Regex::new(r"\b\+?1?\d{10,15}\b").unwrap()),
-                ("IPv4 address", Regex::new(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b").unwrap()),
+                ("Email address", Regex::new(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}").expect("literal email regex")),
+                ("Phone number", Regex::new(r"\b\+?1?\d{10,15}\b").expect("literal phone regex")),
+                ("IPv4 address", Regex::new(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b").expect("literal ipv4 regex")),
             ],
             pii_str_patterns: vec!["/home/", "C:\\Users"],
             max_output_length: 100_000,

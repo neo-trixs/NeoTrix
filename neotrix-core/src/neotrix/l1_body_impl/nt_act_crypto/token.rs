@@ -34,7 +34,7 @@ impl Erc20Abi {
     pub fn balance_of(owner: &str) -> Vec<u8> {
         let owner_bytes = addr_to_bytes(owner);
         let mut data = Vec::with_capacity(36);
-        data.extend_from_slice(&hex::decode("70a08231").unwrap());
+        data.extend_from_slice(&hex::decode("70a08231").expect("static hex selector"));
         data.extend_from_slice(&owner_bytes);
         data
     }
@@ -43,7 +43,7 @@ impl Erc20Abi {
         let to_bytes = addr_to_bytes(to);
         let amount_bytes = u256_padded(&amount.to_be_bytes());
         let mut data = Vec::with_capacity(68);
-        data.extend_from_slice(&hex::decode("a9059cbb").unwrap());
+        data.extend_from_slice(&hex::decode("a9059cbb").expect("static hex selector"));
         data.extend_from_slice(&to_bytes);
         data.extend_from_slice(&amount_bytes);
         data
@@ -53,7 +53,7 @@ impl Erc20Abi {
         let spender_bytes = addr_to_bytes(spender);
         let amount_bytes = u256_padded(&amount.to_be_bytes());
         let mut data = Vec::with_capacity(68);
-        data.extend_from_slice(&hex::decode("095ea7b3").unwrap());
+        data.extend_from_slice(&hex::decode("095ea7b3").expect("static hex selector"));
         data.extend_from_slice(&spender_bytes);
         data.extend_from_slice(&amount_bytes);
         data
@@ -63,7 +63,7 @@ impl Erc20Abi {
         let owner_bytes = addr_to_bytes(owner);
         let spender_bytes = addr_to_bytes(spender);
         let mut data = Vec::with_capacity(68);
-        data.extend_from_slice(&hex::decode("dd62ed3e").unwrap());
+        data.extend_from_slice(&hex::decode("dd62ed3e").expect("static hex selector"));
         data.extend_from_slice(&owner_bytes);
         data.extend_from_slice(&spender_bytes);
         data

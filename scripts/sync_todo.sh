@@ -34,7 +34,7 @@ fi
 
 # 1. 提取测试结果
 log "提取测试结果..."
-TEST_LINE=$(cargo test --lib 2>&1 | grep "test result:" | head -1)
+TEST_LINE=$(cargo test -p neotrix --lib 2>&1 | grep "test result:" | head -1)
 
 # 使用 awk 提取数字
 TEST_PASSED=$(echo "$TEST_LINE" | awk '{for(i=1;i<=NF;i++) if($i=="passed;") print $(i-1)}')
@@ -56,7 +56,7 @@ fi
 
 # 2. 提取编译状态
 log "提取编译状态..."
-CHECK_OUTPUT=$(cargo check --lib 2>&1 || true)
+CHECK_OUTPUT=$(cargo check -p neotrix --lib 2>&1 || true)
 CHECK_ERRORS=$(echo "$CHECK_OUTPUT" | grep -c "error:" || echo "0")
 CHECK_WARNINGS=$(echo "$CHECK_OUTPUT" | grep -c "warning:" || echo "0")
 

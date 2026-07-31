@@ -65,7 +65,7 @@ fn load_or_create_master_key() -> Result<[u8; 32], String> {
 }
 
 fn key_to_cipher(key: &[u8; 32]) -> Aes256Gcm {
-    Aes256Gcm::new_from_slice(key).unwrap()
+    Aes256Gcm::new_from_slice(key).expect("AES-256 key is 32 bytes")
 }
 
 /// Encrypt plaintext bytes. Returns (nonce, ciphertext_with_tag) as separate vecs.

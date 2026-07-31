@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::path::PathBuf;
 use std::fs;
 use sha2::{Sha256, Digest};

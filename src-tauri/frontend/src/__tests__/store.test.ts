@@ -7,9 +7,6 @@ beforeEach(() => {
     sessions: [{ id: "default", name: "默认会话", messages: [] }],
     activeSessionIndex: 0,
     statusText: "就绪",
-    agentBusy: false,
-    projectPath: "",
-    showFileTree: false,
     pendingPermission: null,
     providerConfig: {
       id: "anthropic",
@@ -20,9 +17,6 @@ beforeEach(() => {
     },
     knowledgeBase: [],
     settings: { ...DEFAULT_SETTINGS },
-    streamingContent: "",
-    streamingContentType: "markdown",
-    showOnboarding: false,
     updateAvailable: false,
     updateStatus: "",
     notifications: [],
@@ -58,31 +52,11 @@ describe("useStore", () => {
     expect(messages[0].contentType).toBe("markdown");
   });
 
-  it("should set agent busy state", () => {
-    useStore.getState().setAgentBusy(true);
-    expect(useStore.getState().agentBusy).toBe(true);
-  });
-
-  it("should set streaming content", () => {
-    useStore.getState().setStreamingContent("test", "text");
-    const state = useStore.getState();
-    expect(state.streamingContent).toBe("test");
-    expect(state.streamingContentType).toBe("text");
-  });
-
-  it("should append streaming content", () => {
-    useStore.getState().setStreamingContent("hello ");
-    useStore.getState().appendStreamingContent("world");
-    expect(useStore.getState().streamingContent).toBe("hello world");
-  });
-
-  it("should commit streaming content as message", () => {
-    useStore.getState().setStreamingContent("committed content");
-    useStore.getState().commitStreamingContent("assistant", "text");
-    const messages = useStore.getState().sessions[0].messages;
-    expect(messages).toHaveLength(1);
-    expect(messages[0].content).toBe("committed content");
-    expect(useStore.getState().streamingContent).toBe("");
+  it("should remove a session", () => {
+    useStore.getState().addSession();
+    useStore.getState().removeSession(1);
+    const { sessions } = useStore.getState();
+    expect(sessions).toHaveLength(1);
   });
 
   it("should update provider config", () => {

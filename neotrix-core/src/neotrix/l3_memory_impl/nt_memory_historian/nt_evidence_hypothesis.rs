@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

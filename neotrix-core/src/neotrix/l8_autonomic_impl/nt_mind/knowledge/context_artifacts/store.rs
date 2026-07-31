@@ -241,13 +241,13 @@ impl ArtifactBuilder {
 
     pub fn parse_markdown(name: &str, content: &str, source: Option<&str>) -> Artifact {
         let mut summary = String::new();
-        let heading_re = Regex::new(r"(?m)^(#{1,6})\s+(.+)$").unwrap();
+        let heading_re = Regex::new(r"(?m)^(#{1,6})\s+(.+)$").expect("literal markdown heading regex");
         let total_lines = content.lines().count();
 
         summary.push_str("# Document Structure\n\n");
         for cap in heading_re.captures_iter(content) {
-            let level = cap.get(1).unwrap().as_str().len();
-            let heading = cap.get(2).unwrap().as_str().trim();
+            let level = cap.get(1).expect("capture group 1").as_str().len();
+            let heading = cap.get(2).expect("capture group 2").as_str().trim();
             let indent = "  ".repeat(level - 1);
             summary.push_str(&format!("{}- {}\n", indent, heading));
         }
@@ -292,19 +292,19 @@ impl ArtifactBuilder {
         let format_upper = format.to_uppercase();
         summary.push_str(&format!("# {} Configuration\n\n", format_upper));
 
-        let section_re = Regex::new(r"(?m)^(\w[\w_-]*):\s*$").unwrap();
-        let kv_re = Regex::new(r"(?m)^\s*(\w[\w_-]*):\s*(.+)$").unwrap();
+        let section_re = Regex::new(r"(?m)^(\w[\w_-]*):\s*$").expect("literal section regex");
+        let kv_re = Regex::new(r"(?m)^\s*(\w[\w_-]*):\s*(.+)$").expect("literal kv regex");
 
         if format_upper == "YAML" || format_upper == "YML" {
             if let Ok(toml_section_re) = Regex::new(r"(?m)^\[(\w[\w_.-]*)\]$") {
                 let has_toml_sections = toml_section_re.is_match(content);
                 for cap in section_re.captures_iter(content) {
-                    let section = cap.get(1).unwrap().as_str();
+                    let section = cap.get(1).expect("capture group 1").as_str();
                     summary.push_str(&format!("[{}]\n", section));
                 }
                 for cap in kv_re.captures_iter(content) {
-                    let key = cap.get(1).unwrap().as_str();
-                    let value = cap.get(2).unwrap().as_str().trim();
+                    let key = cap.get(1).expect("capture group 1").as_str();
+                    let value = cap.get(2).expect("capture group 2").as_str().trim();
                     if !value.is_empty() && !value.starts_with('#') {
                         summary.push_str(&format!("  {} = {}\n", key, value));
                     }
@@ -313,10 +313,10 @@ impl ArtifactBuilder {
                     summary.clear();
                     summary.push_str(&format!("# {} Configuration\n\n", format_upper));
                     let yaml_kv =
-                        Regex::new(r"(?m)^\s*([a-zA-Z_][\w_-]*)\s*:\s*(.+)$").unwrap();
+                        Regex::new(r"(?m)^\s*([a-zA-Z_][\w_-]*)\s*:\s*(.+)$").expect("literal yaml kv regex");
                     for cap in yaml_kv.captures_iter(content) {
-                        let key = cap.get(1).unwrap().as_str();
-                        let value = cap.get(2).unwrap().as_str().trim();
+                        let key = cap.get(1).expect("capture group 1").as_str();
+                        let value = cap.get(2).expect("capture group 2").as_str().trim();
                         if !value.starts_with('#') {
                             summary.push_str(&format!("  {} = {}\n", key, value));
                         }
@@ -324,15 +324,15 @@ impl ArtifactBuilder {
                 }
             }
         } else if format_upper == "TOML" {
-            let toml_section_re = Regex::new(r"(?m)^\[(\w[\w_.-]*)\]$").unwrap();
-            let toml_kv_re = Regex::new(r"(?m)^(\w[\w_-]*)\s*=\s*(.+)$").unwrap();
+            let toml_section_re = Regex::new(r"(?m)^\[(\w[\w_.-]*)\]$").expect("literal toml section regex");
+            let toml_kv_re = Regex::new(r"(?m)^(\w[\w_-]*)\s*=\s*(.+)$").expect("literal toml kv regex");
             for cap in toml_section_re.captures_iter(content) {
-                let section = cap.get(1).unwrap().as_str();
+                let section = cap.get(1).expect("capture group 1").as_str();
                 summary.push_str(&format!("[{}]\n", section));
             }
             for cap in toml_kv_re.captures_iter(content) {
-                let key = cap.get(1).unwrap().as_str();
-                let value = cap.get(2).unwrap().as_str().trim();
+                let key = cap.get(1).expect("capture group 1").as_str();
+                let value = cap.get(2).expect("capture group 2").as_str().trim();
                 summary.push_str(&format!("  {} = {}\n", key, value));
             }
         } else {

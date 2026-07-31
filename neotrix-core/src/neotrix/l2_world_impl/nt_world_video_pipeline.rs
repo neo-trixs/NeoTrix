@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::collections::HashMap;
 use std::time::Instant;
 use std::fs;
@@ -91,7 +93,7 @@ impl VideoPipeline {
         self.key_frames.push(0);
 
         for i in 1..self.frames.len() {
-            let last_kept = &self.frames[*self.key_frames.last().unwrap()];
+            let last_kept = &self.frames[*self.key_frames.last().expect("first frame is always a key frame")];
             let diff = self.frames[i].mean_diff(last_kept);
             if diff > 5.0 {
                 self.key_frames.push(i);
@@ -105,7 +107,7 @@ impl VideoPipeline {
         let duration = if self.frames.is_empty() {
             0.0
         } else {
-            self.frames.last().unwrap().timestamp - self.frames[0].timestamp
+            self.frames.last().expect("non-empty frames").timestamp - self.frames[0].timestamp
         };
         VideoSummary {
             frame_count: self.frames.len() as u64,
@@ -119,7 +121,7 @@ impl VideoPipeline {
         let duration = if self.frames.is_empty() {
             0.0
         } else {
-            self.frames.last().unwrap().timestamp - self.frames[0].timestamp
+            self.frames.last().expect("non-empty frames").timestamp - self.frames[0].timestamp
         };
         VideoSummary {
             frame_count: self.frames.len() as u64,

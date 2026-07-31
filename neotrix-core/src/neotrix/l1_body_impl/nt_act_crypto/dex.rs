@@ -124,7 +124,7 @@ impl DexSwapper {
         let deadline_bytes = u256_padded(&deadline.to_be_bytes());
 
         let mut data = Vec::with_capacity(4 + 32 + 32 + 32 + 32 + 32);
-        data.extend_from_slice(&hex::decode("38ed1739").unwrap());
+        data.extend_from_slice(&hex::decode("38ed1739").expect("static hex selector"));
         data.extend_from_slice(&u256_padded(&amount_in.to_be_bytes()));
         data.extend_from_slice(&u256_padded(&amount_out_min.to_be_bytes()));
 
@@ -157,7 +157,7 @@ impl DexSwapper {
         let b = hex::decode(token_b.strip_prefix("0x").unwrap_or(token_b)).unwrap_or_default();
 
         let mut data = Vec::with_capacity(4 + 20 + 20 + 32 + 32 + 32 + 32 + 20 + 32);
-        data.extend_from_slice(&hex::decode("e8e33700").unwrap());
+        data.extend_from_slice(&hex::decode("e8e33700").expect("static hex selector"));
         data.extend_from_slice(&a);
         data.extend_from_slice(&b);
         data.extend_from_slice(&u256_padded(&amount_a_desired.to_be_bytes()));
@@ -204,7 +204,7 @@ impl DexSwapper {
         pair_address: &str,
         client: &EvmClient,
     ) -> Result<(u128, u128, u32), String> {
-        let data = hex::decode("0902f1ac").unwrap();
+        let data = hex::decode("0902f1ac").expect("static hex selector");
         let result = client.rpc_call("eth_call", vec![
             serde_json::json!({"to": pair_address, "data": format!("0x{}", hex::encode(&data))}),
             serde_json::json!("latest"),

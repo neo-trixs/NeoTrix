@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 pub mod bm25;
 pub mod nt_discovery_github_topics;
 pub mod nt_discovery_orchestrator;

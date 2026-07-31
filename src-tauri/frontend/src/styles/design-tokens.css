@@ -233,6 +233,28 @@
   --z-popover: 300;
   --z-toast: 400;
   --z-tooltip: 500;
+
+  /* ════════════════════════════════════════
+     NeoCodex UI Tokens (main chat surface)
+     ════════════════════════════════════════ */
+  --bg-primary: var(--nt-glass-L1-bg);
+  --bg-secondary: var(--nt-glass-L2-bg);
+  --bg-tertiary: var(--nt-glass-L3-bg);
+  --bg-hover: var(--nt-hover-strong);
+  --bg-code: var(--nt-glass-L3-bg);
+  --bg-code-header: var(--nt-glass-L4-bg);
+  --fg-primary: var(--nt-text);
+  --fg-secondary: var(--nt-text-secondary);
+  --fg-tertiary: var(--nt-text-muted);
+  --border-primary: var(--nt-border-strong);
+  --accent-primary: var(--nt-primary);
+  --accent-bg: var(--nt-primary-light-bg);
+  --accent-on: #FFFFFF;
+  --danger: var(--nt-danger);
+  --danger-on: #FFFFFF;
+  --success: var(--nt-success);
+  --warning: var(--nt-warning);
+  --font-mono: var(--nt-font-mono);
 }
 
 /* ════════════════════════════════════════
@@ -326,6 +348,26 @@
   --nt-success-bg: rgba(102, 187, 106, 0.15);
   --nt-warning-bg: rgba(255, 213, 79, 0.15);
   --nt-info-bg: rgba(90, 176, 255, 0.15);
+
+  /* ── NeoCodex UI Tokens (dark) ── */
+  --bg-primary: var(--nt-glass-L1-bg);
+  --bg-secondary: var(--nt-glass-L2-bg);
+  --bg-tertiary: var(--nt-glass-L3-bg);
+  --bg-hover: var(--nt-hover-strong);
+  --bg-code: var(--nt-glass-L3-bg);
+  --bg-code-header: var(--nt-glass-L4-bg);
+  --fg-primary: var(--nt-text);
+  --fg-secondary: var(--nt-text-secondary);
+  --fg-tertiary: var(--nt-text-muted);
+  --border-primary: var(--nt-border-strong);
+  --accent-primary: var(--nt-primary);
+  --accent-bg: var(--nt-primary-light-bg);
+  --accent-on: #FFFFFF;
+  --danger: var(--nt-danger);
+  --danger-on: #FFFFFF;
+  --success: var(--nt-success);
+  --warning: var(--nt-warning);
+  --font-mono: var(--nt-font-mono);
 }
 
 /* ════════════════════════════════════════

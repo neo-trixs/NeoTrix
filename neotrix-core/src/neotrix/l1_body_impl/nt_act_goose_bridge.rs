@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -29,7 +31,7 @@ pub struct GooseSession {
 
 impl GooseSession {
     pub fn new(id: String, name: String, agent_type: String) -> Self {
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         Self {
             id,
             name,
@@ -44,7 +46,7 @@ impl GooseSession {
 
     pub fn set_status(&mut self, status: GooseAgentStatus) {
         self.status = status;
-        self.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+        self.updated_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
     }
 
     pub fn add_tool(&mut self, tool_id: String) {
@@ -138,7 +140,7 @@ impl GooseRuntime {
 
     pub fn list_sessions(&self) -> Vec<&GooseSession> {
         self.sessions.values().filter(|s| {
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
             s.is_active() || (now - s.updated_at) < self.config.idle_timeout_secs
         }).collect()
     }

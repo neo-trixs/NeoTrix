@@ -128,11 +128,11 @@ impl GroupManager {
             return Vec::new();
         }
 
-        let fn_re = Regex::new(r"pub\s+fn\s+(\w+)").unwrap();
-        let struct_re = Regex::new(r"pub\s+struct\s+(\w+)").unwrap();
-        let trait_re = Regex::new(r"pub\s+(?:unsafe\s+)?trait\s+(\w+)").unwrap();
-        let enum_re = Regex::new(r"pub\s+enum\s+(\w+)").unwrap();
-        let sig_re = Regex::new(r"fn\s+\w+\([^)]*\)\s*(->\s*[\w:<>, \n\t]+)?").unwrap();
+        let fn_re = Regex::new(r"pub\s+fn\s+(\w+)").expect("literal fn regex");
+        let struct_re = Regex::new(r"pub\s+struct\s+(\w+)").expect("literal struct regex");
+        let trait_re = Regex::new(r"pub\s+(?:unsafe\s+)?trait\s+(\w+)").expect("literal trait regex");
+        let enum_re = Regex::new(r"pub\s+enum\s+(\w+)").expect("literal enum regex");
+        let sig_re = Regex::new(r"fn\s+\w+\([^)]*\)\s*(->\s*[\w:<>, \n\t]+)?").expect("literal signature regex");
 
         let mut contracts = Vec::new();
         let entries = Self::walk_rs_files(path);
@@ -145,7 +145,7 @@ impl GroupManager {
             // pub fn
             for cap in fn_re.captures_iter(&content) {
                 let name = cap[1].to_string();
-                let sig = sig_re.captures(&content[cap.get(0).unwrap().start()..])
+                let sig = sig_re.captures(&content[cap.get(0).expect("full match group").start()..])
                     .map(|m| m[0].trim().to_string())
                     .unwrap_or_else(|| format!("pub fn {}", name));
                 let file_path = entry.to_string_lossy().to_string();
