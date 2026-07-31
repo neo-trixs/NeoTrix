@@ -115,6 +115,9 @@ impl StealthCrawler {
     }
 
     pub fn fetch(&mut self, url: &str) -> Result<CrawlResult, String> {
+        if self.config.bypass_methods.is_empty() {
+            return Err("StealthConfig.bypass_methods is empty".into());
+        }
         let start = Instant::now();
 
         for attempt in 0..=self.config.max_retries as usize {
@@ -464,6 +467,19 @@ mod tests {
         let mut c = StealthCrawler::new(config);
         let result = c.fetch("https://example.com");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fetch_empty_bypass_methods_returns_error_not_panic() {
+        // Regression: attempt % bypass_methods.len() panicked on modulo 0 when a
+        // consumer constructed StealthConfig with an empty bypass_methods vec.
+        let config = StealthConfig {
+            bypass_methods: vec![],
+            max_retries: 1,
+            ..StealthConfig::default()
+        };
+        let mut c = StealthCrawler::new(config);
+        assert!(c.fetch("https://example.com").is_err());
     }
 
     #[test]
