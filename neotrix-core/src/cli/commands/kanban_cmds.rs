@@ -217,10 +217,10 @@ impl KanbanBoard {
         if self.would_cycle(id, dep_id) {
             return Err("Adding this dependency would create a cycle".to_string());
         }
-        let target = self.items.iter_mut().find(|i| i.id == id).unwrap();
+        let target = self.items.iter_mut().find(|i| i.id == id).ok_or_else(|| format!("Item {id} not found"))?;
         target.dependencies.push(dep_id.to_string());
         target.updated_at = Self::now();
-        let dep = self.items.iter_mut().find(|i| i.id == dep_id).unwrap();
+        let dep = self.items.iter_mut().find(|i| i.id == dep_id).ok_or_else(|| format!("Dependency {dep_id} not found"))?;
         dep.depended_by.push(id.to_string());
         dep.updated_at = Self::now();
         Ok(())
@@ -534,7 +534,12 @@ impl CliCommand for BoardCmd {
 
                 match b.move_item(task_id, &target_phase, force) {
                     Ok(()) => {
-                        let phase_str = b.get_item_by_id(task_id).unwrap().phase.to_string();
+                        let phase_str = match b.get_item_by_id(task_id) {
+                            Some(i) => i.phase.to_string(),
+                            None => {
+                                return CommandOutput::err(&format!("Task {task_id} not found after move"));
+                            }
+                        };
                         let msg = format!("Task {task_id}: → {phase_str}");
                         if want_json {
                             return CommandOutput::ok(&msg).with_json(serde_json::json!({

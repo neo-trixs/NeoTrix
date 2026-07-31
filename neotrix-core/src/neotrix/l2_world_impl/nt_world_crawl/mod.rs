@@ -8,6 +8,7 @@
 //! - WebOrganizer-inspired 二维分类 (Topic + Format)
 //! - 自愈循环: 每 N 次迭代分析错误 → 元认知 → 调整策略
 //! - 12h 周期调度 (通过 BackgroundLoop ticker)
+#![deny(clippy::unwrap_used)]
 
 pub mod config;
 pub mod frontier;

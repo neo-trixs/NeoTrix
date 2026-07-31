@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::sync::Arc;
 use std::path::PathBuf;
 use std::io::{self, Write};
@@ -36,9 +38,21 @@ fn dim(msg: impl AsRef<str>) -> String {
     msg.as_ref().dimmed().to_string()
 }
 
+/// Create a tokio runtime for the entry layer. Runtime creation failure is
+/// unrecoverable at process entry, so we log it and exit rather than unwrap.
+fn tokio_runtime() -> tokio::runtime::Runtime {
+    match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("{}: failed to create tokio runtime: {}", err("Error"), e);
+            std::process::exit(1);
+        }
+    }
+}
+
 pub fn check_provider_config() -> bool {
     let cfg = crate::config::NeoTrixConfig::load();
-    if cfg.provider.is_some() && cfg.api_key.is_some() && !cfg.api_key.as_ref().expect("api_key checked for Some above").is_empty() {
+    if cfg.provider.is_some() && cfg.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
         return true;
     }
     false
@@ -62,9 +76,12 @@ pub fn run_provider_wizard() {
 
     let provider = loop {
         print!("Select provider [1-5]: ");
-        io::stdout().flush().expect("stdout flush failed");
+        let _ = io::stdout().flush();
         let mut input = String::new();
-        io::stdin().read_line(&mut input).expect("stdin read failed");
+        if io::stdin().read_line(&mut input).is_err() {
+            eprintln!("Failed to read stdin; using default provider 'opencode'.");
+            break "opencode";
+        }
         match input.trim() {
             "1" => break "opencode",
             "2" => break "xiaohuxing",
@@ -79,9 +96,11 @@ pub fn run_provider_wizard() {
     };
 
     print!("Enter your API key (or press Enter to skip): ");
-    io::stdout().flush().expect("stdout flush failed");
+    let _ = io::stdout().flush();
     let mut api_key = String::new();
-    io::stdin().read_line(&mut api_key).expect("stdin read failed");
+    if io::stdin().read_line(&mut api_key).is_err() {
+        eprintln!("Failed to read stdin; skipping API key.");
+    }
     let api_key = api_key.trim().to_string();
 
     let default_model = match provider {
@@ -91,9 +110,12 @@ pub fn run_provider_wizard() {
         "anthropic" => "claude-3-haiku-20240307".to_string(),
         "custom" => {
             print!("Enter default model name: ");
-            io::stdout().flush().expect("stdout flush failed");
+            let _ = io::stdout().flush();
             let mut model = String::new();
-            io::stdin().read_line(&mut model).expect("stdin read failed");
+            if io::stdin().read_line(&mut model).is_err() {
+                eprintln!("Failed to read stdin; using default model.");
+                model.push_str("gpt-4o-mini");
+            }
             model.trim().to_string()
         }
         _ => "gpt-4o-mini".to_string(),
@@ -101,16 +123,20 @@ pub fn run_provider_wizard() {
 
     let config_path = crate::config::NeoTrixConfig::path();
     if let Some(parent) = config_path.parent() {
-        std::fs::create_dir_all(parent).expect("failed to create config directory");
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            eprintln!("[config] warning: failed to create config directory ({}); continuing", e);
+        }
     }
 
     let custom_endpoint = match provider {
         "xiaohuxing" => Some("https://api.xiaohuxing.eu.org/v1".to_string()),
         "custom" => {
             print!("Enter custom base URL: ");
-            io::stdout().flush().expect("stdout flush failed");
+            let _ = io::stdout().flush();
             let mut url = String::new();
-            io::stdin().read_line(&mut url).expect("stdin read failed");
+            if io::stdin().read_line(&mut url).is_err() {
+                eprintln!("Failed to read stdin; using default endpoint.");
+            }
             let url = url.trim().to_string();
             if url.is_empty() { None } else { Some(url) }
         }
@@ -141,7 +167,10 @@ pub fn run_provider_wizard() {
         content.push_str(&format!("custom_endpoint = {:?}\n", ep));
     }
 
-    std::fs::write(&config_path, content).expect("failed to write config file");
+    if let Err(e) = std::fs::write(&config_path, content) {
+        eprintln!("{}: failed to write config file ({}); configuration not saved", err("Error"), e);
+        return;
+    }
     println!();
     println!("✅ Configuration saved to: {}", config_path.display());
     println!("   Provider: {}", provider);
@@ -242,7 +271,7 @@ fn ensure_provider_env_from_config() {
 pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
     println!("{} v{}", info("NeoTrix Server"), env!("CARGO_PKG_VERSION"));
     println!("{}", info("Starting background services... Press Ctrl+C to stop."));
-    let server_rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let server_rt = tokio_runtime();
     server_rt.block_on(async {
         let (brain, bank) = init_brain(profile);
         let mut agent = SelfIteratingBrain::new();
@@ -319,7 +348,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
         eprintln!("📎 Resolved {} file mention(s)", mentions.len());
     }
     let start = std::time::Instant::now();
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
 
     if json_output {
         use neotrix::cli::jsonl_stream::JsonlWriter;
@@ -451,7 +480,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     if !mentions.is_empty() {
         eprintln!("📎 Resolved {} file mention(s)", mentions.len());
     }
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
 
     if stream {
         // Streaming mode — print tokens as they arrive, no progress bar
@@ -521,12 +550,12 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
             agent.init_reasoning_engine();
 
             let pb = indicatif::ProgressBar::new(100);
-            pb.set_style(
-                indicatif::ProgressStyle::default_bar()
-                    .template("{spinner:.blue} [{bar:40.cyan/blue}] {percent}% {msg}")
-                    .expect("invalid progress bar template")
-                    .progress_chars("█▉▊▋▌▍▎▏ "),
-            );
+            match indicatif::ProgressStyle::default_bar()
+                .template("{spinner:.blue} [{bar:40.cyan/blue}] {percent}% {msg}")
+            {
+                Ok(style) => pb.set_style(style.progress_chars("█▉▊▋▌▍▎▏ ")),
+                Err(e) => eprintln!("{}: invalid progress bar template: {}", err("Error"), e),
+            }
             pb.set_message("reasoning...");
 
             let result = if let Some(ref mut engine) = agent.reasoning_engine {
@@ -791,7 +820,7 @@ pub fn run_update(check_only: bool) {
 }
 
 pub fn run_daemon(profile: &str) {
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
     rt.block_on(async {
         let (brain, bank) = init_brain(profile);
         let mut agent = SelfIteratingBrain::new();
@@ -818,7 +847,7 @@ pub fn run_daemon(profile: &str) {
 }
 
 pub fn run_daemon_evolution(profile: &str) {
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
     rt.block_on(async {
         let (brain, bank) = init_brain(profile);
         let mut agent = SelfIteratingBrain::new();
@@ -859,7 +888,7 @@ pub fn run_daemon_evolution(profile: &str) {
 }
 
 pub fn run_standalone_mode(stage: usize) {
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
     rt.block_on(async {
         standalone::run_standalone(stage).await;
     });
@@ -877,7 +906,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
     use std::sync::{Arc, Mutex};
     use tokio::sync::RwLock;
 
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
     rt.block_on(async {
         let (brain, bank) = init_brain(profile);
 
@@ -990,11 +1019,12 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         }
 
         let sp = indicatif::ProgressBar::new_spinner();
-        sp.set_style(
-            indicatif::ProgressStyle::default_spinner()
-                .template("{spinner:.blue} {msg}")
-                .expect("invalid spinner template"),
-        );
+        match indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.blue} {msg}")
+        {
+            Ok(style) => sp.set_style(style),
+            Err(e) => eprintln!("{}: invalid spinner template: {}", err("Error"), e),
+        }
         sp.set_message("starting headless mode...");
         headless::run_headless(agent, skills_engine, hook_registry, mcp_registry).await;
         sp.finish_and_clear();
@@ -1022,7 +1052,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         std::env::set_var("RUST_LOG", format!("neotrix={}", level));
     }
 
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
     rt.block_on(async {
         let (brain, bank) = init_brain(profile);
 
@@ -1196,7 +1226,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
 pub fn run_sandbox_run(code: Option<&str>, runtime: &str, timeout: u64) {
     use neotrix::neotrix::nt_shield_sandbox::cli;
     let runtime = if runtime.is_empty() { None } else { Some(runtime) };
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
     rt.block_on(cli::handle_run(code, runtime, Some(timeout)));
 }
 
@@ -1276,7 +1306,7 @@ pub fn run_discover(port: u16, duration_ms: u64, json: bool) {
 
 pub fn run_sandbox_upload(path: &str, session_id: &str) {
     use neotrix::neotrix::nt_shield_sandbox::cli;
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    let rt = tokio_runtime();
     rt.block_on(cli::handle_upload(path, session_id));
 }
 
@@ -1505,7 +1535,10 @@ pub fn run_wallet_list(json: bool) {
                         "chain": w.chain, "created": w.created_at
                     })
                 }).collect();
-                println!("{}", serde_json::to_string_pretty(&serde_json::json!({"wallets": list})).expect("JSON serialization failed"));
+                match serde_json::to_string_pretty(&serde_json::json!({"wallets": list})) {
+                    Ok(s) => println!("{}", s),
+                    Err(e) => eprintln!("{}: JSON serialization failed: {}", err("Error"), e),
+                }
             } else if wallets.is_empty() {
                 println!("  {} No wallets found. Use {} to create one.",
                     info("ℹ"), info("neotrix wallet create <label>"));

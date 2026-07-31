@@ -583,7 +583,13 @@ pub fn create_gateway() -> GatewayV2 {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
         handle.block_on(create_gateway_async())
     } else {
-        let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime for gateway init");
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                log::error!("[gateway] failed to create tokio runtime: {e}");
+                std::process::exit(1);
+            }
+        };
         rt.block_on(create_gateway_async())
     }
 }

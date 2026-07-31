@@ -5,12 +5,13 @@ use std::time::{Duration, Instant};
 use reqwest::blocking::Client;
 
 static FETCHER_DEFAULT_HEADERS: LazyLock<reqwest::header::HeaderMap> = LazyLock::new(|| {
+    use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, CONNECTION, DNT, HeaderValue, UPGRADE_INSECURE_REQUESTS};
     let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(reqwest::header::ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8".parse().unwrap());
-    headers.insert(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9".parse().unwrap());
-    headers.insert(reqwest::header::DNT, "1".parse().unwrap());
-    headers.insert(reqwest::header::CONNECTION, "keep-alive".parse().unwrap());
-    headers.insert(reqwest::header::UPGRADE_INSECURE_REQUESTS, "1".parse().unwrap());
+    headers.insert(ACCEPT, HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"));
+    headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9"));
+    headers.insert(DNT, HeaderValue::from_static("1"));
+    headers.insert(CONNECTION, HeaderValue::from_static("keep-alive"));
+    headers.insert(UPGRADE_INSECURE_REQUESTS, HeaderValue::from_static("1"));
     headers
 });
 
@@ -205,7 +206,10 @@ impl FetcherPool {
                 .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
                 .default_headers(FETCHER_DEFAULT_HEADERS.clone())
                 .build()
-                .unwrap()
+                .unwrap_or_else(|e| {
+                    log::warn!("[fetch] nt_world_browse client build failed ({e}); using default client");
+                    Client::new()
+                })
         })
     }
 

@@ -10,6 +10,9 @@ description.workspace = true
 [lib]
 name = "neotrix"
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "neotrix"
 path = "src/main.rs"

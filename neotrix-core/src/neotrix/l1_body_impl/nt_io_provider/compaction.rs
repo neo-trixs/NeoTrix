@@ -12,17 +12,19 @@ pub fn sanitize_history(messages: &mut Vec<Message>) {
                 continue;
             }
         }
-        if messages[i].role == Role::Assistant && messages[i].tool_calls.is_some() {
-            let ids: Vec<&str> = messages[i].tool_calls.as_ref().unwrap().iter()
-                .map(|tc| tc.id.as_str()).collect();
-            let has_all = ids.iter().all(|id| {
-                messages[i + 1..].iter().any(|m| {
-                    m.role == Role::Tool && m.tool_call_id.as_deref() == Some(id)
-                })
-            });
-            if !has_all {
-                messages.remove(i);
-                continue;
+        if messages[i].role == Role::Assistant {
+            if let Some(tool_calls) = messages[i].tool_calls.as_ref() {
+                let ids: Vec<&str> = tool_calls.iter()
+                    .map(|tc| tc.id.as_str()).collect();
+                let has_all = ids.iter().all(|id| {
+                    messages[i + 1..].iter().any(|m| {
+                        m.role == Role::Tool && m.tool_call_id.as_deref() == Some(id)
+                    })
+                });
+                if !has_all {
+                    messages.remove(i);
+                    continue;
+                }
             }
         }
         i += 1;

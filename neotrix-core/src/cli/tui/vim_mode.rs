@@ -236,7 +236,7 @@ impl VimModeManager {
                 return VimAction::SwitchSession(usize::MAX);
             }
             KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
-                let n = c.to_digit(10).unwrap() as usize;
+                let n = c.to_digit(10).map(|d| d as usize).unwrap_or(0);
                 return VimAction::SwitchSession(n.wrapping_sub(1));
             }
             KeyCode::Up => {

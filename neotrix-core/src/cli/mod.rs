@@ -7,6 +7,7 @@
 //!
 //! - `tui` — ratatui 交互式终端
 //! - `commands` — 命令注册和执行
+#![deny(clippy::unwrap_used)]
 
 pub mod tui;
 pub mod commands;

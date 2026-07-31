@@ -3,6 +3,7 @@
 //! 统一架构: Provider Pool + IP Proxy Pool + Gateway
 //! 参考: One API / New API / LiteLLM / freellmpool
 //! 2026-06-30 架构升级: GatewayProvider 包装所有中间件层
+#![deny(clippy::unwrap_used)]
 
 pub mod types;
 pub mod openai;
