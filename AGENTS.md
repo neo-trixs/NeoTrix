@@ -2939,3 +2939,43 @@ MCA 5函数 vs NeoTrix 7域：
 - **R-P78 (测试 ≠ 接线)**: 模块有测试只证明可运行，不证明被使用。文档声称的"接线正例"必须通过代码引用链验证。
 - **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。
 - **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。
+
+## Experience Tree — 2026-07-31 Cycle 157 (Sub-Grid Composition — 子母阵动态组合)
+
+### Session: 对外通信畅通安全隐匿 — 节点能力动态组合实现小循环子母阵
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| 通信路径审计 | MCP Gateway 已在 Cycle 156 删除；LLM 通信为 ProviderCatalog + reqwest 直连 | 无统一安全画像 → 子网格组合补位 |
+| **CommunicationProfile** | 新枚举: Open / Proxied / Tor / Anonymous + `meets()` 级别排序 (Open<Proxied<Tor<Anonymous) | 安全级别可比较、可组合 |
+| **ProviderCatalog 元数据强化** | `ProviderInfo.security_profile` 字段 + 全部 34 条目 (Local→Anonymous, Proxy→Proxied, Cloud→Open) | 每个节点自带安全画像 (R-P42 强化已有节点) |
+| **SubGrid 动态组合** | `SubGrid{name, security_profile, provider_names}` + GatewayV2 `compose_sub_grid()`/`list_sub_grids()`/`select_best_for_profile()`/`complete_for_profile()`/`sub_grids_meeting()` | 小循环子母阵 = 满足同一画像的节点组合 |
+| **生产路径自动组合** | `create_gateway_async()` 末尾自动组合 anonymous-local / proxied / open 三个默认子网格 | 子母阵开箱即用 (R-P79 接线门) |
+| **代理/Tor 路由能力** | http_factory 新增 `build_async/blocking_client_with_proxy()` + `proxy_from_env()` (NEOTRIX_PROXY_URL / NEOTRIX_TOR_PROXY) | Proxied/Tor 画像可真实路由 (reqwest socks 已启用) |
+| **公共消费点** | `complete_for_profile(required, request)` — 声明安全级别 → 自动选匹配子网格 → 回退默认 select_best | 对外通信始终畅通，隐匿按需增幅 |
+| 测试 | 6 新测试: sub_grids_meeting / complete_for_profile / fallback / 既有 3 个 | 12 gateway tests 全绿, 全套件 6688 pass 0 fail |
+
+### 元认知发现 (Cycle 157)
+
+1. **R-P42 正确执行方式**: 没有新建独立模块平行于 GatewayV2。所有能力注入已有节点: 画像→ProviderCatalog, 组合→GatewayV2, 路由→http_factory。这三个节点正是 R-P42 正例的延伸。
+2. **安全画像必须落位到数据层**: CommunicationProfile 只有写到 ProviderInfo (每个 provider 一条) 才可被 select_best_for_profile 消费。仅枚举定义 = 元数据死代码。
+3. **子母阵语义 = 画像分组 + 动态路由**: "小循环子母阵"的工程化 = 将满足同一 CommunicationProfile 的 provider 动态组合为子网格, 调用方声明安全级别即可路由。子网格可以在网关生命周期内任意增删。
+4. **匿名是 Tor 的超集**: `Anonymous.meets(Tor) == true` — Local 设备内通信天然满足最高隐匿需求, 无需强制走 Tor。选择逻辑自动优先免费匿名节点。
+
+### Build Baseline (Cycle 157)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors | |
+| `cargo test -p neotrix --lib` | ✅ **6688 pass, 0 fail** | +6 新测试, 零回归 |
+| GatewayV2 tests | ✅ 12/12 | 子网格组合 + 画像路由 + 回退 |
+| 新提交 | `7018356` | 5 files, +380/-4 |
+
+### 缺失能力清单 (后续设计补充)
+
+| 缺失能力 | 现状 | 后续设计方向 |
+|----------|------|--------------|
+| **Provider 级代理注入** | http_factory 有 `build_*_with_proxy()` 但各 LlmProvider 使用 `global_client()` 直连 | ProviderConfig 加 `proxy: Option<String>` 字段 + 各 provider `with_proxy()` 构造器 |
+| **OSINT Tor 复用** | nt_world_osint/dark.rs 有 `build_tor_client()` (socks5h://127.0.0.1:9050) 独立实现 | 抽取到 http_factory 统一 `tor_client()` 全局, 子网格 Tor 画像共用 |
+| **子网格健康监控** | SubGrid 无运行时状态 | 复用 nt_core_telemetry, 每子网格聚合调用成功率/延迟 |
+| **画像动态协商** | 画像静态配置 | 节点间运行时协商 (如代理失效自动降级画像) |
