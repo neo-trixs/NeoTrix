@@ -153,7 +153,7 @@ pub fn format_kernel_output(v: &[f64], prompt: &str, stage: usize, energy: f64, 
     let energy = raw_energy.max(confidence * 0.5);
     let stage_info = &EVOLUTION[stage];
 
-    let above_half = v.iter().filter(|x| x.abs() > 0.3).count();
+    let above_half = v.iter().filter(|x| x.abs() > 0.5).count();
 
     match energy {
         e if e < 0.3 => {
@@ -264,8 +264,9 @@ impl StandaloneEngine {
         let history_len = self.conversation.len();
         if history_len > 0 {
             let (last_q, _) = &self.conversation[history_len - 1];
-            let ref_phrase = if last_q.len() > 50 {
-                format!("{}...", &last_q[..47])
+            let ref_phrase = if last_q.chars().count() > 50 {
+                let truncated: String = last_q.chars().take(47).collect();
+                format!("{}...", truncated)
             } else {
                 last_q.clone()
             };
@@ -277,5 +278,39 @@ impl StandaloneEngine {
             ));
         }
         response
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vector_to_text_cjk_prior_exchange_no_panic() {
+        // Regression: last_q[..47] sliced at byte 47, which panics when the
+        // boundary lands mid-UTF-8-char (CJK is 3 bytes). chars().take(47)
+        // truncates by character instead.
+        let mut engine = StandaloneEngine::new(0);
+        engine.conversation.push(("短".into(), "resp".into()));
+        let _ = engine.vector_to_text(&[0.1, 0.2], "hi");
+        engine.conversation.clear();
+
+        let long_cjk = "长".repeat(60);
+        engine.conversation.push((long_cjk, "resp".into()));
+        let out = engine.vector_to_text(&[0.1, 0.2], "hi");
+        assert!(out.contains("…") || out.contains("..."), "must truncate, got: {}", out);
+        assert!(out.contains("长"), "truncated CJK must remain valid UTF-8");
+    }
+
+    #[test]
+    fn test_format_kernel_output_threshold_matches_copy() {
+        // Regression: the "significant activation (>0.5)" copy claims a 0.5
+        // threshold but the counter used >0.3, so the reported dimension count
+        // disagreed with the wording. Both now use 0.5.
+        let v = vec![0.35, 0.45, 0.9];
+        let out = format_kernel_output(&v, "p", 0, 0.8, &[]);
+        let count = v.iter().filter(|x| x.abs() > 0.5).count();
+        assert_eq!(count, 1);
+        assert!(out.contains("1 of 3 state dimensions"), "copy must report the 0.5-count: {}", out);
     }
 }
