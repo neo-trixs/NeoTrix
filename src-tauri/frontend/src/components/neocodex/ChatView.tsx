@@ -79,6 +79,7 @@ interface ChatViewProps {
   streamingRole?: "user" | "assistant";
   agentBusy: boolean;
   onSend: (content: string) => void;
+  onDelete?: (index: number) => void;
 }
 
 export function ChatView({
@@ -87,6 +88,7 @@ export function ChatView({
   streamingRole = "assistant",
   agentBusy,
   onSend,
+  onDelete,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -156,7 +158,16 @@ export function ChatView({
       {/* Messages */}
       <main className={styles.messages}>
         {messages.map((msg, idx) => (
-          <MessageBubble key={idx} message={msg} />
+          <MessageBubble
+            key={idx}
+            message={msg}
+            index={idx}
+            allMessages={messages}
+            isLastUser={idx === messages.length - 1 && msg.role === "user"}
+            agentBusy={agentBusy}
+            onSend={onSend}
+            onDelete={onDelete}
+          />
         ))}
         {showThinking && (
           <div className={styles.thinking}>
@@ -231,11 +242,26 @@ export function ChatView({
 function MessageBubble({
   message,
   isStreaming = false,
+  index = 0,
+  allMessages,
+  isLastUser = false,
+  agentBusy = false,
+  onSend,
+  onDelete,
 }: {
   message: { role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number };
   isStreaming?: boolean;
+  index?: number;
+  allMessages?: Array<{ role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number }>;
+  isLastUser?: boolean;
+  agentBusy?: boolean;
+  onSend?: (content: string) => void;
+  onDelete?: (index: number) => void;
 }) {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editVal, setEditVal] = useState(message.content);
+  const addNotification = useStore((s) => s.addNotification);
   const { html, codeBlocks } = renderContent(message.content, message.contentType);
   const diffStats = useMemo(() => {
     let added = 0;
@@ -250,6 +276,24 @@ function MessageBubble({
   const roleClass = roleClassMap[message.role] || styles.messageAssistant;
   const avatar = roleAvatarMap[message.role] || ASSISTANT_AVATAR;
 
+  const handleCopy = async (content: string) => {
+    await copyMessage(content);
+    addNotification({ type: "success", message: "已复制", duration: 2000 });
+  };
+
+  const handleEditSubmit = () => {
+    if (editVal.trim() && onSend) {
+      onSend(editVal.trim());
+      setEditing(false);
+    }
+  };
+
+  const handleRegenerate = () => {
+    if (!onSend) return;
+    const lastUser = [...(allMessages || [])].reverse().find((m) => m.role === "user");
+    if (lastUser) onSend(lastUser.content);
+  };
+
   if (message.role === "tool") {
     return <ToolCard message={message} avatar={avatar} roleClass={roleClass} />;
   }
@@ -258,6 +302,34 @@ function MessageBubble({
     <div className={`${styles.message} ${roleClass} ${isStreaming ? styles.streaming : ""}`}>
       <div className={styles.avatar} dangerouslySetInnerHTML={{ __html: avatar }} />
       <div className={styles.bubble}>
+        {editing ? (
+          <div className={styles.editArea}>
+            <textarea
+              className={styles.editTextarea}
+              value={editVal}
+              onChange={(e) => setEditVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEditSubmit(); }
+                if (e.key === "Escape") { e.preventDefault(); setEditing(false); setEditVal(message.content); }
+              }}
+              autoFocus
+              rows={3}
+            />
+            <div className={styles.editActions}>
+              <button className={styles.actionIcon} onClick={handleEditSubmit} title="发送">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <button className={styles.actionIcon} onClick={() => { setEditing(false); setEditVal(message.content); }} title="取消">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M3 3l8 8M11 3l-8 8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className={styles.content} dangerouslySetInnerHTML={{ __html: html }} />
         {isStreaming && <span className={styles.streamCaret} aria-hidden="true" />}
         {codeBlocks > 0 && (
@@ -272,12 +344,37 @@ function MessageBubble({
           </div>
         )}
         {message.timestamp && <div className={styles.time}>{formatTimestamp(message.timestamp)}</div>}
-        <button className={styles.copyBtn} onClick={() => copyMessage(message.content)} title="复制">
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="2" width="9" height="10" rx="1.5" strokeLinecap="round"/>
-            <path d="M8 2v4h-2V2h-4v4H4v8h6V6h2v4a2 2 0 002 2h4a2 2 0 002-2V4a2 2 0 00-2-2h-4z" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        {!isStreaming && !editing && (
+          <div className={styles.messageActions}>
+            <button className={styles.actionIcon} onClick={() => handleCopy(message.content)} title="复制">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="2" width="9" height="10" rx="1.5" strokeLinecap="round"/>
+                <path d="M8 2v4h-2V2h-4v4H4v8h6V6h2v4a2 2 0 002 2h4a2 2 0 002-2V4a2 2 0 00-2-2h-4z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {message.role === "user" && (
+              <>
+                <button className={styles.actionIcon} onClick={() => { setEditVal(message.content); setEditing(true); }} title="编辑">
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M10 2l2 2-8 8H4v-2l6-6z" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <button className={styles.actionIcon} onClick={() => onDelete?.(index)} title="删除">
+                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M2 4h10M5 4V2h4v2M4 4l1 8h4l1-8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </>
+            )}
+            {message.role === "assistant" && !agentBusy && !isStreaming && onSend && (
+              <button className={styles.actionIcon} onClick={() => handleRegenerate()} title="重新生成">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M2 7a5 5 0 015-5 5 5 0 014 2M12 7a5 5 0 01-9 3M12 2v4H8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
         {!isStreaming && message.role === "assistant" && (
           <div className={styles.feedback}>
             <button className={styles.feedbackBtn} onClick={() => setFeedback("up")} title="有帮助" aria-label="有帮助">
@@ -291,6 +388,8 @@ function MessageBubble({
               </svg>
             </button>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

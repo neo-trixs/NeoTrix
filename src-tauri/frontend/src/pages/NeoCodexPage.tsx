@@ -5,8 +5,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import styles from "./NeoCodexPage.module.css";
 
+const THEME_ORDER = ["light", "dark", "system"] as const;
+
+const THEME_LABELS: Record<string, string> = {
+  light: "主题: 浅色",
+  dark: "主题: 深色",
+  system: "主题: 跟随系统",
+};
+
 export default function NeoCodexPage() {
   const {
+    settings,
+    setSettings,
     neocodexMode,
     neocodexMessages,
     neocodexStreaming,
@@ -212,6 +222,19 @@ export default function NeoCodexPage() {
           </div>
           <div className={styles.topBarRight}>
             <button
+              className={styles.settingsBtn}
+              onClick={() => {
+                const idx = THEME_ORDER.indexOf(settings.theme as (typeof THEME_ORDER)[number]);
+                setSettings({ ...settings, theme: THEME_ORDER[(idx + 1) % THEME_ORDER.length] });
+              }}
+              title={THEME_LABELS[settings.theme]}
+            >
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="7" cy="7" r="2.6" />
+                <path d="M7 1v2M7 11v2M1 7h2M11 7h2M2.9 2.9l1.4 1.4M9.7 9.7l1.4 1.4M2.9 11.1l1.4-1.4M9.7 4.3l1.4-1.4" strokeLinecap="round" />
+              </svg>
+            </button>
+            <button
               className={`${styles.settingsBtn} ${showSettings ? styles.settingsActive : ""}`}
               onClick={() => setShowSettings(!showSettings)}
               title={showSettings ? "返回对话" : "设置"}
@@ -244,6 +267,7 @@ export default function NeoCodexPage() {
               streamingRole={neocodexStreaming?.role}
               agentBusy={agentBusy}
               onSend={handleSend}
+              onDelete={(idx) => setNeoCodexMessages(neocodexMessages.filter((_, i) => i !== idx))}
             />
           )}
         </div>

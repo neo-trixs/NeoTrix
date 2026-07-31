@@ -14,6 +14,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   });
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportSession, setExportSession] = useState<NeoCodexSession | null>(null);
+  const addNotification = useStore((s) => s.addNotification);
 
   useEffect(() => {
     localStorage.setItem("neotrix:pinned-sessions", JSON.stringify(pinnedIds));
@@ -97,10 +98,13 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
     setPinnedIds((prev) => prev.filter((id) => id !== sessionId));
     onSessionDelete?.(sessionId);
+    addNotification({ type: "info", message: "会话已删除", duration: 2000 });
   };
 
   const togglePin = (sessionId: string) => {
+    const willPin = !pinnedIds.includes(sessionId);
     setPinnedIds((prev) => prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [sessionId, ...prev]);
+    addNotification({ type: willPin ? "success" : "info", message: willPin ? "会话已置顶" : "已取消置顶", duration: 2000 });
   };
 
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -112,6 +116,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     renamedNames.current[sessionId] = newName.trim();
     setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, name: newName.trim() } : s)));
     setRenamingId(null);
+    addNotification({ type: "success", message: "已重命名", duration: 2000 });
   };
 
   const handleExport = async (session: NeoCodexSession) => {
@@ -137,8 +142,10 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
       a.download = `${exportSession.name.replace(/[^a-z0-9]/gi, "_")}.${format === "markdown" ? "md" : "json"}`;
       a.click();
       URL.revokeObjectURL(url);
+      addNotification({ type: "success", message: "会话已导出", duration: 2500 });
     } catch (e) {
       console.error("Export failed:", e);
+      addNotification({ type: "error", message: "导出失败", duration: 3000 });
     }
     setShowExportDialog(false);
   };

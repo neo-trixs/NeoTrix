@@ -275,6 +275,73 @@
   border-color: var(--border-primary);
 }
 
+.message:hover .copyBtn {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.messageActions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.message:hover .messageActions {
+  opacity: 1;
+}
+
+.actionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--fg-tertiary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.actionIcon:hover {
+  color: var(--accent-primary);
+  border-color: var(--border-primary);
+}
+
+.editArea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editTextarea {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-primary);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--fg-primary);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.editActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
 .feedback {
   display: flex;
   gap: 4px;
