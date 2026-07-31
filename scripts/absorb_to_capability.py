@@ -78,9 +78,10 @@ SOURCE_CORES = [
                                       "reflect", "experience", "pattern recognit", "intuition", "pruning",
                                       "meta-learn", "self-organiz", "self-evolv", "autonom", "curriculum"],
                   "一切元认知/吸收/演化之源"),
-    ("Reality",     "NT-WORLD",  ["world", "agent", "act", "action", "interact", "environ", "observ", "sensor",
-                                  "control", "tool", "execute", "craft", "build", "system", "data", "real-time",
-                                  "robot", "network", "simulat", "perceiv", "explore", "harvest", "crawl"],
+    ("Reality",     "NT-WORLD",  ["world", "world model", "agent", "act", "action", "interact", "environ",
+                                  "sensor", "control", "tool", "execute", "robot", "simulat",
+                                  "perceiv", "explore", "harvest", "crawl", "embodied", "real world",
+                                  "physical", "device", "hardware", "deploy", "operate", "drone"],
                   "一切世界/感知/行动之源"),
 ]
 
