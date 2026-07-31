@@ -13,6 +13,7 @@ pub struct ElementRegistry {
     elements: HashMap<ElementId, Box<dyn Element>>,
     load_order: Vec<ElementId>,
     state: RegistryState,
+    bus: super::bus::ElementBus,
 }
 
 impl Default for ElementRegistry {
@@ -27,6 +28,7 @@ impl ElementRegistry {
             elements: HashMap::new(),
             load_order: Vec::new(),
             state: RegistryState::Constructed,
+            bus: super::bus::ElementBus::new(),
         }
     }
 
@@ -171,7 +173,7 @@ impl ElementRegistry {
     }
 
     pub fn bus(&self) -> super::bus::ElementBus {
-        super::bus::ElementBus::new()
+        self.bus.clone()
     }
 
     pub fn list(&self) -> Vec<&str> {
@@ -357,6 +359,31 @@ mod tests {
         let found: Option<&TestElement> = reg.get("test.get");
         assert!(found.is_some());
         assert_eq!(found.expect("found must be Some after get").name(), "Get Test");
+    }
+
+    #[test]
+    fn test_registry_bus_is_shared() -> Result<(), String> {
+        let reg = ElementRegistry::new();
+        let bus_a = reg.bus();
+        let bus_b = reg.bus();
+        let mut rx = bus_a.subscribe("listener".into(), EventKind::CapabilityUpdated);
+
+        bus_b.publish(
+            "publisher".into(),
+            EventKind::CapabilityUpdated,
+            EventPayload::Text("shared bus".into()),
+        );
+
+        let rt = tokio::runtime::Runtime::new().expect("create tokio runtime for shared-bus test");
+        let result = rt.block_on(async {
+            tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await
+        });
+
+        match result {
+            Ok(Some(EventPayload::Text(t))) => assert_eq!(t, "shared bus"),
+            other => return Err(format!("expected shared payload, got {:?}", other)),
+        }
+        Ok(())
     }
 
     #[test]
