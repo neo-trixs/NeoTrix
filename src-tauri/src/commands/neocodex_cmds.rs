@@ -188,9 +188,20 @@ pub async fn neocodex_set_provider(name: String) -> Result<String, String> {
     }
 }
 
+fn sessions_dir() -> std::path::PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from(".neocodex"))
+        .join("neocodex")
+        .join("sessions")
+}
+
+fn session_path(session_id: &str) -> std::path::PathBuf {
+    sessions_dir().join(format!("{}.jsonl", session_id))
+}
+
 #[tauri::command]
 pub async fn neocodex_list_sessions() -> Result<Vec<NeoCodexSessionInfo>, String> {
-    let dir = std::env::temp_dir().join("neotrix-sessions");
+    let dir = sessions_dir();
     if !dir.exists() {
         return Ok(Vec::new());
     }
@@ -238,8 +249,85 @@ pub async fn neocodex_list_sessions() -> Result<Vec<NeoCodexSessionInfo>, String
 }
 
 #[tauri::command]
+pub async fn neocodex_create_session(name: Option<String>) -> Result<NeoCodexSessionInfo, String> {
+    let session_id = format!("s-{}", chrono::Utc::now().timestamp_millis());
+    let path = session_path(&session_id);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, "").map_err(|e| e.to_string())?;
+    Ok(NeoCodexSessionInfo {
+        id: session_id,
+        name: name.unwrap_or_else(|| "新会话".to_string()),
+        mode: "Agent".to_string(),
+        message_count: 0,
+        wire_path: path.to_string_lossy().to_string(),
+        updated_at: chrono::Utc::now().timestamp() as u64,
+    })
+}
+
+#[tauri::command]
+pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for line in content.lines() {
+        if let Ok(event) = serde_json::from_str::<WireEvent>(line) {
+            match event {
+                WireEvent::UserMessage { content, timestamp } => items.push(NeoCodexMessageItem {
+                    role: "user".to_string(),
+                    content,
+                    timestamp,
+                }),
+                WireEvent::AgentMessage { content, timestamp } => items.push(NeoCodexMessageItem {
+                    role: "assistant".to_string(),
+                    content,
+                    timestamp,
+                }),
+                WireEvent::SystemEvent { kind, detail, timestamp } => {
+                    if !kind.is_empty() {
+                        items.push(NeoCodexMessageItem {
+                            role: "system".to_string(),
+                            content: format!("**{}**: {}", kind, detail),
+                            timestamp,
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(items)
+}
+
+#[tauri::command]
+pub async fn neocodex_set_mode(mode: String) -> Result<String, String> {
+    let parsed = match mode.as_str() {
+        "Agent" => NeoCodexMode::Agent,
+        "Shell" => NeoCodexMode::Shell,
+        "Plan" => NeoCodexMode::Plan,
+        _ => return Err(format!("unknown mode {}", mode)),
+    };
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    let agent = match guard.as_mut() {
+        Some(a) => a,
+        None => {
+            let mut a = NeoCodexAgent::new("neotrix-tauri");
+            a.provider.sync_from_real();
+            *guard = Some(a);
+            guard.as_mut().unwrap()
+        }
+    };
+    agent.set_mode(parsed);
+    Ok(format!("mode set to {}", mode))
+}
+
+#[tauri::command]
 pub async fn neocodex_switch_session(session_id: String) -> Result<String, String> {
-    let path = std::env::temp_dir().join("neotrix-sessions").join(format!("{}.jsonl", session_id));
+    let path = session_path(&session_id);
     if !path.exists() {
         return Err("Session not found".to_string());
     }
@@ -260,7 +348,7 @@ pub async fn neocodex_switch_session(session_id: String) -> Result<String, Strin
 
 #[tauri::command]
 pub async fn neocodex_delete_session(session_id: String) -> Result<String, String> {
-    let path = std::env::temp_dir().join("neotrix-sessions").join(format!("{}.jsonl", session_id));
+    let path = session_path(&session_id);
     if !path.exists() {
         return Err("Session not found".to_string());
     }
@@ -276,4 +364,11 @@ pub struct NeoCodexSessionInfo {
     pub message_count: usize,
     pub wire_path: String,
     pub updated_at: u64,
+}
+
+#[derive(serde::Serialize)]
+pub struct NeoCodexMessageItem {
+    pub role: String,
+    pub content: String,
+    pub timestamp: i64,
 }

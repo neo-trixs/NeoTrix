@@ -1,24 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useStore } from "../../stores";
 import type { NeoCodexProviderConfig } from "../../types";
 import styles from "./SettingsView.module.css";
 
 type Tab = "providers" | "theme" | "advanced" | "about";
 
 export function SettingsView() {
+  const settings = useStore((s) => s.settings);
+  const setSettings = useStore((s) => s.setSettings);
   const [activeTab, setActiveTab] = useState<Tab>("providers");
   const [providers, setProviders] = useState<Record<string, { name: string; hasKey: boolean; model: string }>>({});
-  const [config, setConfig] = useState<NeoCodexProviderConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [newKey, setNewKey] = useState("");
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
 
   useEffect(() => {
     const load = async () => {
       try {
         const configResult = await invoke<NeoCodexProviderConfig>("neocodex_provider_config");
-        setConfig(configResult);
         const map: Record<string, { name: string; hasKey: boolean; model: string }> = {};
         for (const p of configResult.providers) {
           map[p.name] = { name: p.name, hasKey: p.resolvable, model: p.model };
@@ -55,9 +55,7 @@ export function SettingsView() {
   };
 
   const handleThemeChange = (newTheme: "light" | "dark" | "system") => {
-    setTheme(newTheme);
-    document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("theme", newTheme);
+    setSettings({ ...settings, theme: newTheme });
   };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -103,7 +101,7 @@ export function SettingsView() {
             onDeleteKey={handleDeleteKey}
           />
         )}
-        {activeTab === "theme" && <ThemePanel theme={theme} onThemeChange={handleThemeChange} />}
+        {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} />}
         {activeTab === "advanced" && <AdvancedPanel />}
         {activeTab === "about" && <AboutPanel />}
       </div>

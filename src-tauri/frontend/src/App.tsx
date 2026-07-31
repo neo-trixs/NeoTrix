@@ -18,10 +18,16 @@ const App: React.FC = () => {
 
   // ── Apply theme ──
   useEffect(() => {
-    const isDark =
-      settings.theme === "dark" ||
-      (settings.theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const isDark = settings.theme === "dark" || (settings.theme === "system" && media.matches);
+      document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+    };
+    apply();
+    if (settings.theme === "system") {
+      media.addEventListener("change", apply);
+      return () => media.removeEventListener("change", apply);
+    }
   }, [settings.theme]);
 
   // ── Tauri event: task complete ──

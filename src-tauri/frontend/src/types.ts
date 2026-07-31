@@ -52,6 +52,7 @@ export interface NeoCodexSession {
   id: string;
   name: string;
   mode: NeoCodexMode;
+  message_count?: number;
   messages: Message[];
   wire_path: string;
   created_at: number;

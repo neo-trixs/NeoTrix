@@ -3,7 +3,7 @@ import { useStore } from "../../stores";
 import type { NeoCodexSession } from "../../types";
 import styles from "./SessionSidebar.module.css";
 
-export function SessionSidebar({ onSessionSelect, onSessionDelete }: { onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void }) {
+export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDelete }: { activeSessionId?: string | null; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void }) {
   const [sessions, setSessions] = useState<NeoCodexSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -17,6 +17,7 @@ export function SessionSidebar({ onSessionSelect, onSessionDelete }: { onSession
         id: s.id,
         name: s.name,
         mode: s.mode,
+        message_count: s.message_count || 0,
         messages: [],
         wire_path: s.wire_path,
         created_at: s.created_at || 0,
@@ -34,21 +35,57 @@ export function SessionSidebar({ onSessionSelect, onSessionDelete }: { onSession
     refresh();
   }, [refresh]);
 
-  const handleCreateSession = () => {
+  useEffect(() => {
+    const openNew = () => setShowNewDialog(true);
+    window.addEventListener("neotrix:new-session", openNew);
+    return () => window.removeEventListener("neotrix:new-session", openNew);
+  }, []);
+
+  const handleCreateSession = async () => {
     if (!newSessionName.trim()) return;
-    const session: NeoCodexSession = {
-      id: `session-${Date.now()}`,
-      name: newSessionName.trim(),
-      mode: "Agent",
-      messages: [],
-      wire_path: "",
-      created_at: Date.now(),
-      updated_at: Date.now(),
-    };
-    setSessions([session, ...sessions]);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const info = await invoke("neocodex_create_session", { name: newSessionName.trim() }) as any;
+      const session: NeoCodexSession = {
+        id: info.id,
+        name: info.name,
+        mode: info.mode || "Agent",
+        message_count: info.message_count || 0,
+        messages: [],
+        wire_path: info.wire_path || "",
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      setSessions((prev) => [session, ...prev]);
+      onSessionSelect?.(session);
+    } catch (e) {
+      console.error("Failed to create session:", e);
+      const session: NeoCodexSession = {
+        id: `session-${Date.now()}`,
+        name: newSessionName.trim(),
+        mode: "Agent",
+        message_count: 0,
+        messages: [],
+        wire_path: "",
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      setSessions((prev) => [session, ...prev]);
+      onSessionSelect?.(session);
+    }
     setShowNewDialog(false);
     setNewSessionName("");
-    onSessionSelect?.(session);
+  };
+
+  const handleDelete = async (sessionId: string) => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("neocodex_delete_session", { sessionId });
+    } catch (e) {
+      console.error("Failed to delete session:", e);
+    }
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    onSessionDelete?.(sessionId);
   };
 
   const formatTime = (ts: number) => {
@@ -88,8 +125,9 @@ export function SessionSidebar({ onSessionSelect, onSessionDelete }: { onSession
           <SessionItem
             key={session.id}
             session={session}
+            active={session.id === activeSessionId}
             onClick={() => onSessionSelect?.(session)}
-            onDelete={onSessionDelete ? () => onSessionDelete(session.id) : undefined}
+            onDelete={() => handleDelete(session.id)}
           />
         ))}
         {sessions.length === 0 && (
@@ -123,20 +161,19 @@ export function SessionSidebar({ onSessionSelect, onSessionDelete }: { onSession
   );
 }
 
-function SessionItem({ session, onClick, onDelete }: { session: { id: string; name: string; mode: string; updated_at: number }; onClick: () => void; onDelete?: () => void }) {
+function SessionItem({ session, active, onClick, onDelete }: { session: { id: string; name: string; mode: string; message_count?: number; updated_at: number }; active: boolean; onClick: () => void; onDelete?: () => void }) {
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete?.();
   };
   return (
-    <div className={styles.item} onClick={onClick}>
+    <div className={`${styles.item} ${active ? styles.itemActive : ""}`} onClick={onClick}>
       <div className={styles.itemRow}>
         <div className={styles.itemMain}>
           <span className={styles.itemName}>{session.name}</span>
           <span className={styles.itemMode}>{session.mode}</span>
         </div>
-        <span className={styles.itemTime}>{formatTime(session.updated_at)}</span>
-        {onDelete && (
+        <span className={styles.itemTime}>{session.message_count ? `${session.message_count}条 · ` : ""}{formatTime(session.updated_at)}</span>        {onDelete && (
           <button className={styles.deleteBtn} onClick={handleDelete} title="删除会话">
             <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M3 4h8M6 4V3h2v1M4.5 4l.5 7h4l.5-7" strokeLinecap="round" strokeLinejoin="round"/>

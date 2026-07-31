@@ -67,7 +67,6 @@ interface ChatViewProps {
   streamingRole?: "user" | "assistant";
   agentBusy: boolean;
   onSend: (content: string) => void;
-  onAddGoal: (desc: string, maxIter: number) => void;
 }
 
 export function ChatView({
@@ -76,14 +75,9 @@ export function ChatView({
   streamingRole = "assistant",
   agentBusy,
   onSend,
-  onAddGoal,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
-  const [showGoalDialog, setShowGoalDialog] = useState(false);
-  const [goalDesc, setGoalDesc] = useState("");
-  const [goalMaxIter, setGoalMaxIter] = useState(5);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,18 +105,12 @@ export function ChatView({
     }
   };
 
-  const handleGoalSubmit = () => {
-    if (!goalDesc.trim()) return;
-    onAddGoal(goalDesc.trim(), goalMaxIter);
-    setShowGoalDialog(false);
-    setGoalDesc("");
-    setGoalMaxIter(5);
-  };
+  const hasMessages = messages.length > 0 || !!streamingContent;
 
   return (
     <div className={styles.container}>
       {/* Messages */}
-      <main className={styles.messages} ref={messagesEndRef}>
+      <main className={styles.messages}>
         {messages.map((msg, idx) => (
           <MessageBubble key={idx} message={msg} />
         ))}
@@ -132,13 +120,22 @@ export function ChatView({
             isStreaming
           />
         )}
+        {!hasMessages && (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyTitle}>NeoCodex</div>
+            <div className={styles.emptyHint}>
+              选择或新建一个会话，开始与自进化 Agent 对话。
+              <br />
+              <kbd>⌘N</kbd> 新建会话 · <kbd>⌘B</kbd> 收起侧栏 · <kbd>Ctrl+Tab</kbd> 切换会话
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </main>
 
       {/* Input */}
       <form onSubmit={handleSubmit} className={styles.inputArea}>
         <textarea
-          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -154,38 +151,6 @@ export function ChatView({
           </svg>
         </button>
       </form>
-
-      {/* Goal Dialog */}
-      {showGoalDialog && (
-        <div className={styles.dialogOverlay} onClick={() => setShowGoalDialog(false)}>
-          <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
-            <h3>添加进化目标</h3>
-            <textarea
-              value={goalDesc}
-              onChange={(e) => setGoalDesc(e.target.value)}
-              placeholder="描述目标，如：优化内存分配策略..."
-              rows={3}
-              className={styles.dialogInput}
-            />
-            <div className={styles.dialogRow}>
-              <label>最大迭代数: </label>
-              <input
-                type="number"
-                value={goalMaxIter}
-                onChange={(e) => setGoalMaxIter(Number(e.target.value))}
-                min={1}
-                max={100}
-                className={styles.dialogInput}
-                style={{ width: "80px" }}
-              />
-            </div>
-            <div className={styles.dialogActions}>
-              <button className={styles.btnSecondary} onClick={() => setShowGoalDialog(false)}>取消</button>
-              <button className={styles.btnPrimary} onClick={handleGoalSubmit}>添加</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

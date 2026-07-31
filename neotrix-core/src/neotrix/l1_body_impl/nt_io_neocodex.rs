@@ -1180,6 +1180,17 @@ impl NeoCodexAgent {
         self.brain = Some(brain);
     }
 
+    /// Set an explicit mode (Agent/Shell/Plan)
+    pub fn set_mode(&mut self, mode: NeoCodexMode) {
+        if self.state.mode == mode {
+            return;
+        }
+        let from = self.state.mode;
+        self.wire.record(WireEvent::ModeChange { from, to: mode });
+        self.state.mode = mode;
+        self.state.mode_start = Instant::now();
+    }
+
     /// Toggle between Agent and Shell mode (from Kimi Code Ctrl-X)
     pub fn toggle_mode(&mut self) -> NeoCodexMode {
         let from = self.state.mode;
