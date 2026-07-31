@@ -188,6 +188,22 @@ impl AgentSdkState {
 static STATE: std::sync::LazyLock<Mutex<AgentSdkState>> =
     std::sync::LazyLock::new(|| Mutex::new(AgentSdkState::new()));
 
+#[cfg(test)]
+static TEST_SEARCH_BACKEND: Mutex<Option<fn(&str, usize) -> Vec<WebSearchResult>>> =
+    Mutex::new(None);
+
+fn run_search(query: &str, max_results: usize) -> Vec<WebSearchResult> {
+    #[cfg(test)]
+    {
+        if let Ok(guard) = TEST_SEARCH_BACKEND.lock() {
+            if let Some(backend) = *guard {
+                return backend(query, max_results);
+            }
+        }
+    }
+    search_duckduckgo(query, max_results)
+}
+
 fn now_secs() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
 }
@@ -207,7 +223,7 @@ pub fn web_search(query: String, max_results: Option<usize>) -> Result<Vec<WebSe
         return Err("query must not be empty".into());
     }
 
-    Ok(search_duckduckgo(&query, effective_limit))
+    Ok(run_search(&query, effective_limit))
 }
 
 #[command]
@@ -343,7 +359,20 @@ mod tests {
 
     #[test]
     fn test_web_search_returns_results() {
+        fn stub_backend(_query: &str, max_results: usize) -> Vec<WebSearchResult> {
+            (0..max_results)
+                .map(|i| WebSearchResult {
+                    title: format!("Result {}", i),
+                    url: format!("https://example.com/{}", i),
+                    snippet: "stub snippet".into(),
+                    relevance: 1.0 - i as f64 * 0.1,
+                })
+                .collect()
+        }
+        *TEST_SEARCH_BACKEND.lock().unwrap() = Some(stub_backend);
         let results = web_search("rust programming".into(), Some(5)).unwrap();
+        *TEST_SEARCH_BACKEND.lock().unwrap() = None;
+
         assert!(!results.is_empty());
         assert!(results.len() <= 5);
         assert!(results[0].relevance >= 0.0);

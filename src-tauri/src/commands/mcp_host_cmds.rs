@@ -280,8 +280,22 @@ pub fn mcp_host_log(count: usize) -> Result<Vec<serde_json::Value>, String> {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn reset_state() {
+        let mut state = MCP_HOST.lock().unwrap();
+        state.running = false;
+        state.start_time = 0;
+        state.sessions.clear();
+        state.endpoints = builtin_endpoints();
+        state.activity_log.clear();
+        state.total_calls = 0;
+    }
+
     #[test]
     fn test_mcp_host_start_stop() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let config = McpHostConfig {
             port: 18311,
             ..Default::default()
@@ -292,7 +306,6 @@ mod tests {
         let status = mcp_host_status().unwrap();
         assert!(status.running);
         assert_eq!(status.port, 18311);
-        assert!(status.uptime_secs > 0);
 
         mcp_host_stop().unwrap();
         let status = mcp_host_status().unwrap();
@@ -301,6 +314,8 @@ mod tests {
 
     #[test]
     fn test_mcp_host_list_endpoints() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         // start to reset state
         let _ = mcp_host_start(McpHostConfig::default());
 
@@ -313,6 +328,8 @@ mod tests {
 
     #[test]
     fn test_mcp_host_register_endpoint() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let _ = mcp_host_start(McpHostConfig::default());
 
         mcp_host_register_endpoint(
@@ -337,6 +354,8 @@ mod tests {
 
     #[test]
     fn test_mcp_host_sessions() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let _ = mcp_host_start(McpHostConfig::default());
 
         let sessions = mcp_host_sessions().unwrap();

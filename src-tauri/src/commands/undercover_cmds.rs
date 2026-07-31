@@ -276,11 +276,15 @@ pub fn undercover_verify_anonymity(path: String) -> Result<serde_json::Value, St
 mod tests {
     use super::*;
     use std::io::Write;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn write_temp_file(content: &str) -> (std::path::PathBuf, String) {
         let dir = std::env::temp_dir().join("neotrix_undercover_test");
         let _ = fs::create_dir_all(&dir);
-        let path = dir.join(format!("test_anonymity_{}.txt", now_secs()));
+        let seq = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = dir.join(format!("test_anonymity_{}_{}.txt", std::process::id(), seq));
         let mut f = fs::File::create(&path).unwrap();
         f.write_all(content.as_bytes()).unwrap();
         (path.clone(), path.to_string_lossy().to_string())

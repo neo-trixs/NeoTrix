@@ -165,6 +165,9 @@ impl MemoryManagerState {
 static MEMORY_MGR: LazyLock<Mutex<MemoryManagerState>> =
     LazyLock::new(|| Mutex::new(MemoryManagerState::default()));
 
+static NEXT_MEM_ID: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0x1000);
+
 // ===== Helpers =====
 
 fn now_ts() -> i64 {
@@ -301,7 +304,7 @@ pub fn memory_create(
         state.entries.remove(0);
     }
 
-    let id = format!("mem-{:016x}", (now_ts() as u64));
+    let id = format!("mem-{:016x}", NEXT_MEM_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed));
     let now = now_ts();
     let entry = MemoryEntry {
         id: id.clone(),
@@ -706,13 +709,11 @@ mod tests {
 
     #[test]
     fn test_memory_clear() {
-        let before = memory_stats().unwrap().total_entries;
-
         let id = memory_create("fact".into(), "Clear me".into(), None, None, None).unwrap();
-        memory_delete(id).unwrap();
+        assert!(memory_get(id.clone()).is_ok());
 
-        let after = memory_stats().unwrap().total_entries;
-        assert_eq!(after, before);
+        memory_delete(id.clone()).unwrap();
+        assert!(memory_get(id).is_err());
     }
 
     #[test]

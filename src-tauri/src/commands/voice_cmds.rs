@@ -229,7 +229,8 @@ pub fn voice_start_session(language: Option<String>) -> Result<String, String> {
         return Err("maximum 20 sessions reached".into());
     }
 
-    let id = format!("voice-{}", short_uid());
+    let entropy = short_uid();
+    let id = format!("voice-{:05x}-{}", state.next_session_num, entropy);
     let session = VoiceSession {
         id: id.clone(),
         status: VoiceStatus::Listening,

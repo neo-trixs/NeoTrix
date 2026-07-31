@@ -118,8 +118,19 @@ pub fn coordinator_set_strategy(strategy: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn reset_state() {
+        let mut state = COORDINATOR.lock().unwrap();
+        state.workers.clear();
+        state.max_workers = 8;
+        state.counter = 0;
+    }
+
     #[test]
     fn test_spawn_and_list() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let _ = coordinator_remove("test".into());
 
         let result = coordinator_spawn("refactor core".into());
@@ -132,6 +143,8 @@ mod tests {
 
     #[test]
     fn test_update_progress() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let result = coordinator_spawn("test-task".into()).unwrap();
         assert!(coordinator_update(result.worker_id.clone(), 0.5, "running".into()).is_ok());
 
@@ -142,6 +155,8 @@ mod tests {
 
     #[test]
     fn test_set_max_workers() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         assert!(coordinator_set_max_workers(5).is_ok());
         let list = coordinator_list().unwrap();
         assert_eq!(list.max_workers, 5);
@@ -149,6 +164,8 @@ mod tests {
 
     #[test]
     fn test_remove_worker() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let result = coordinator_spawn("removable".into()).unwrap();
         assert!(coordinator_remove(result.worker_id.clone()).is_ok());
         assert!(coordinator_remove("nonexistent".into()).is_err());

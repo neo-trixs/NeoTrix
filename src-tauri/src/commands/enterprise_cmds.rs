@@ -365,6 +365,8 @@ pub fn api_call(name: String, body: Option<String>) -> Result<serde_json::Value,
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
     fn cleanup() {
         if let Ok(mut state) = STATE.lock() {
             state.policies.clear();
@@ -403,6 +405,7 @@ mod tests {
 
     #[test]
     fn test_list_policies_defaults() {
+        let _guard = TEST_LOCK.lock().unwrap();
         cleanup();
         let policies = enterprise_list_policies().unwrap();
         assert_eq!(policies.len(), 3);
@@ -413,6 +416,7 @@ mod tests {
 
     #[test]
     fn test_set_policy() {
+        let _guard = TEST_LOCK.lock().unwrap();
         cleanup();
         enterprise_set_policy(
             "test_policy".into(),
@@ -427,6 +431,7 @@ mod tests {
 
     #[test]
     fn test_audit_log_entry() {
+        let _guard = TEST_LOCK.lock().unwrap();
         cleanup();
         enterprise_audit_log_action(
             "test_action".into(),
@@ -441,6 +446,7 @@ mod tests {
 
     #[test]
     fn test_register_api_endpoint() {
+        let _guard = TEST_LOCK.lock().unwrap();
         cleanup();
         let id = api_register(
             "test-api".into(),
