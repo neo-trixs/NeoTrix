@@ -1337,7 +1337,7 @@ impl NeoCodexAgent {
                 let response = format!("[confirmed] {}\n\n<thinking>Processing turn {} in Agent mode</thinking>\n\n{}",
                     msg, self.state.turn_count, input);
                 self.markdown.push(&response);
-                let clean = self.markdown.buffer.clone();
+                let clean = response.clone();
                 self.context.push("assistant", clean.clone(), clean.len() / 4);
                 self.hooks.run_post(ctx, clean.clone(), 0);
                 return clean;
@@ -1353,15 +1353,13 @@ impl NeoCodexAgent {
             None => {
                 // Fallback: provider not wired — keep the deterministic stub so the
                 // agent remains usable offline (no silent "dead agent").
-                let fallback = format!("<thinking>Processing turn {} in Agent mode (provider unavailable, stub)</thinking>\n\n{}",
-                    self.state.turn_count, input);
-                self.markdown.push(&fallback);
-                fallback
+                format!("<thinking>Processing turn {} in Agent mode (provider unavailable, stub)</thinking>\n\n{}",
+                    self.state.turn_count, input)
             }
         };
 
         self.markdown.push(&response);
-        let clean = self.markdown.buffer.clone();
+        let clean = response.clone();
         let token_estimate = clean.len() / 4;
         self.context.push("assistant", clean.clone(), token_estimate);
         let _ = self.cost.record("agent", 0.0, token_estimate as u64);
@@ -1375,8 +1373,8 @@ impl NeoCodexAgent {
 
     /// Add a goal to the queue (from Kimi Code /goal system)
     pub fn add_goal(&mut self, description: &str, max_iters: u64) {
-        let id = format!("g-{}", self.state.turn_count);
         self.goals.add(description, max_iters);
+        let id = self.goals.goals.back().map(|g| g.id.clone()).unwrap_or_default();
         self.state.goal_active = true;
         self.wire.record(WireEvent::GoalUpdate {
             id, state: "active".into(), description: description.into(),
@@ -2342,6 +2340,28 @@ mod tests {
         let mut agent = NeoCodexAgent::new("goal-test");
         agent.add_goal("Fix the bug", 5);
         assert!(agent.state.goal_active);
+    }
+
+    #[test]
+    fn test_goal_wire_id_matches_queue_id() {
+        // Regression: add_goal recorded a wire GoalUpdate id derived from
+        // turn_count, while GoalQueue::add generated a different id for the
+        // queue entry — consumers correlating wire records with queue goals
+        // would never match. The wire id now comes from the queue entry.
+        let mut agent = NeoCodexAgent::new("goal-id-test");
+        agent.add_goal("Goal one", 3);
+        agent.add_goal("Goal two", 3);
+        let queued: Vec<&String> = agent.goals.goals.iter().map(|g| &g.id).collect();
+        assert_eq!(queued.len(), 2);
+        assert_ne!(queued[0], queued[1], "distinct goals must have distinct ids");
+        for gid in queued {
+            assert!(
+                agent.wire.events.iter().any(|e| matches!(
+                    e, WireEvent::GoalUpdate { id, .. } if id == gid
+                )),
+                "wire event must use the same id as the queue entry"
+            );
+        }
     }
 
     #[test]
