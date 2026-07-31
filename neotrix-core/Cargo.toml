@@ -64,10 +64,6 @@ name = "neotrix-nihaixia-phase2"
 path = "src/bin/nihaixia_phase2.rs"
 
 [[bin]]
-name = "neotrix-kb-enrich-all"
-path = "src/bin/kb_enrich_all.rs"
-
-[[bin]]
 name = "neotrix-kb-crawl-wikipedia"
 path = "src/bin/kb_crawl_wikipedia.rs"
 
@@ -82,10 +78,6 @@ path = "src/bin/session_ingest_0703.rs"
 [[bin]]
 name = "neotrix-world-novel-ingest"
 path = "src/bin/nt_world_novel_ingest.rs"
-
-[[bin]]
-name = "neotrix-kb-import-all"
-path = "src/bin/kb_import_all.rs"
 
 [[bin]]
 name = "absorb_crawl"

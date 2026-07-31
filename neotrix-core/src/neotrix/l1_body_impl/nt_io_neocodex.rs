@@ -1429,6 +1429,107 @@ impl NeoCodexAgent {
         final_answer
     }
 
+    /// Streaming ReAct loop: emits tokens via callback as they arrive from the provider.
+    /// Returns the final accumulated response (or error).
+    pub async fn react_loop_stream<F>(&mut self, input: &str, max_steps: usize, mut on_token: F) -> Option<String>
+    where
+        F: FnMut(&str) + Send + Sync,
+    {
+        let provider = self.provider.to_llm_provider()?;
+
+        let mut messages = self.build_messages(input);
+        let mut step = 0;
+        let mut final_answer: Option<String> = None;
+        let mut accumulated = String::new();
+
+        while step < max_steps {
+            let request = self.build_request(messages.clone())?;
+
+            let mut rx = match provider.stream_complete(&request).await {
+                Ok(rx) => rx,
+                Err(e) => {
+                    self.wire.record(WireEvent::SystemEvent {
+                        kind: "provider_error".into(),
+                        detail: e.to_string(),
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                    });
+                    return Some(format!("[provider error] {}", e));
+                }
+            };
+
+            let mut response_content = String::new();
+            let mut response_usage = None;
+
+            while let Some(chunk) = rx.recv().await {
+                match chunk {
+                    Ok(resp) => {
+                        if !resp.content.is_empty() {
+                            response_content.push_str(&resp.content);
+                            accumulated.push_str(&resp.content);
+                            on_token(&resp.content);
+                        }
+                        if resp.usage.total_tokens > 0 {
+                            response_usage = Some(resp.usage);
+                        }
+                    }
+                    Err(e) => {
+                        self.wire.record(WireEvent::SystemEvent {
+                            kind: "provider_error".into(),
+                            detail: e.to_string(),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                        });
+                        return Some(format!("[provider error] {}", e));
+                    }
+                }
+            }
+
+            if let Some(usage) = response_usage {
+                self.state.tokens_used += usage.total_tokens as usize;
+                let _ = self.cost.record("agent", 0.0, usage.total_tokens as u64);
+            }
+
+            // Attempt to extract a structured tool-call from the response.
+            let tool_call = Self::extract_tool_call(&response_content);
+
+            match tool_call {
+                Some((name, args)) => {
+                    self.state.tool_call_count += 1;
+                    let result = self.execute_tool(&name, &args).await;
+                    let actual_ok = !result.starts_with('[');
+                    self.tool_grounding.record_tool_result(&name, true, actual_ok);
+                    self.wire.record(WireEvent::ToolCall {
+                        name: name.clone(),
+                        args: args.clone(),
+                        result: result.clone(),
+                        duration_ms: 0,
+                        success: actual_ok,
+                    });
+                    messages.push(Message::assistant_with_calls(
+                        &response_content,
+                        vec![crate::neotrix::nt_io_provider::types::ToolCallInfo {
+                            id: format!("call-{}", step),
+                            call_type: "function".into(),
+                            function: crate::neotrix::nt_io_provider::types::ToolCallFunction {
+                                name: name.clone(),
+                                arguments: args.clone(),
+                            },
+                        }],
+                    ));
+                    messages.push(Message::tool(&result, &format!("call-{}", step)));
+                    step += 1;
+                }
+                None => {
+                    final_answer = Some(response_content);
+                    break;
+                }
+            }
+        }
+
+        final_answer
+    }
+
     /// Build system + history + current user messages from the context pipeline.
     fn build_messages(&self, input: &str) -> Vec<Message> {
         let system = format!(
@@ -2298,6 +2399,55 @@ mod tests {
                 // to_llm_provider succeeds for ollama even without network (request only)
                 let provider = agent.provider.to_llm_provider();
                 assert!(provider.is_some());
+            }
+        });
+    }
+
+    #[test]
+    fn test_react_loop_stream_no_provider_is_noop() {
+        // D-streaming closure: without a resolvable provider the streaming
+        // loop must not panic and must return None (caller falls back).
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let mut agent = NeoCodexAgent::new("react-stream-empty");
+            agent.provider.providers.clear();
+            agent.provider.providers.push(ProviderInfo::default());
+            agent.provider.active = 0;
+            let mut seen = Vec::new();
+            let result = agent.react_loop_stream("hi", 3, |t| seen.push(t.to_string())).await;
+            assert!(result.is_none());
+            assert!(seen.is_empty());
+        });
+    }
+
+    #[test]
+    fn test_react_loop_stream_provider_supports_streaming() {
+        // All real providers implement stream_complete; verify the trait is
+        // reachable through the resolved provider (no network needed).
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let mut agent = NeoCodexAgent::new("react-stream-wired");
+            agent.provider.sync_from_real();
+            if let Some(idx) = agent.provider.providers.iter().position(|p| p.name == "ollama") {
+                agent.provider.active = idx;
+                let provider = agent.provider.to_llm_provider();
+                assert!(provider.is_some());
+                let provider = provider.unwrap();
+                // Building a stream request must not panic; a stopped local
+                // server yields Err(LlmError) which is the expected path.
+                let request = LlmRequest {
+                    model: "test".into(),
+                    messages: vec![Message::new(Role::User, "hi")],
+                    temperature: None,
+                    max_tokens: 16,
+                    tools: vec![],
+                    image_data: None,
+                    thinking_budget: None,
+                    provider_params: Default::default(),
+                    constraint_json: None,
+                    structured_output: None,
+                };
+                let _ = provider.stream_complete(&request).await;
             }
         });
     }

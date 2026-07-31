@@ -247,9 +247,9 @@ impl std::fmt::Display for OsintReport {
 pub struct DoctorReport {
     pub target: OsintTarget,
     pub dns_ok: bool,
-    pub dns_latency: u64,
+    pub _dns_latency: u64,
     pub http_ok: bool,
-    pub http_latency: u64,
+    pub _http_latency: u64,
 }
 
 impl std::fmt::Display for DoctorReport {
@@ -260,8 +260,8 @@ impl std::fmt::Display for DoctorReport {
         if let Some(ref e) = self.target.email { writeln!(f, "  Email:      {}", e)?; }
         if let Some(ref u) = self.target.url { writeln!(f, "  URL:        {}", u)?; }
         if let Some(ref i) = self.target.ip { writeln!(f, "  IP:         {}", i)?; }
-        writeln!(f, "  DNS:    {} ({}ms)", if self.dns_ok { "✓" } else { "✗" }, self.dns_latency)?;
-        writeln!(f, "  HTTP:   {} ({}ms)", if self.http_ok { "✓" } else { "✗" }, self.http_latency)?;
+        writeln!(f, "  DNS:    {} ({}ms)", if self.dns_ok { "✓" } else { "✗" }, self._dns_latency)?;
+        writeln!(f, "  HTTP:   {} ({}ms)", if self.http_ok { "✓" } else { "✗" }, self._http_latency)?;
         writeln!(f, "═══════════════════════════════════════════════════")
     }
 }
@@ -335,29 +335,29 @@ pub async fn doctor_osint(target: OsintTarget, config: OsintConfig) -> DoctorRep
     let client = default_client();
 
     let mut dns_ok = false;
-    let mut dns_latency = 0u64;
+    let mut _dns_latency = 0u64;
     let start = std::time::Instant::now();
     match dns::investigate(&target, &client, &config).await {
         Ok(_) => dns_ok = true,
         Err(_) => {}
     }
-    dns_latency = start.elapsed().as_millis() as u64;
+    _dns_latency = start.elapsed().as_millis() as u64;
 
     let mut http_ok = false;
-    let mut http_latency = 0u64;
+    let mut _http_latency = 0u64;
     let start = std::time::Instant::now();
     match http::investigate(&target, &client, &config).await {
         Ok(_) => http_ok = true,
         Err(_) => {}
     }
-    http_latency = start.elapsed().as_millis() as u64;
+    _http_latency = start.elapsed().as_millis() as u64;
 
     DoctorReport {
         target,
         dns_ok,
-        dns_latency,
+        _dns_latency,
         http_ok,
-        http_latency,
+        _http_latency,
     }
 }
 

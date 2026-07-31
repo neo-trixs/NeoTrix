@@ -1277,6 +1277,41 @@ impl BackgroundLoopHandle {
             }
             log::debug!("[bg] {}", self.convergence_pulse.status_line());
         }
+
+        // ── Phase 9: Auto-Healing — C5 self-healing loop ──
+        // 检测 degrade 信号 → 自动响应（enqueue remediation goal / log / circuit-break）
+        // 这是分形收敛循环的"修复臂"：检测→诊断→行为修复闭环。
+        {
+            let deg = self.tool_grounding.degraded_tools();
+            if !deg.is_empty() {
+                let names: Vec<&str> = deg.iter().map(|(n, _)| n.as_str()).collect();
+                log::warn!("[bg] auto-heal: degraded tools detected: {}", names.join(", "));
+                if let Ok(mut brain) = self.brain.try_write() {
+                    self.goal_loop.enqueue_goal(
+                        &mut brain,
+                        &format!("[auto-heal] Tools degraded: {}", names.join(", ")),
+                        None,
+                    );
+                }
+            }
+            // Convergence stalled detection: if same layer for >10 iterations with gaps,
+            // escalate to C0-C5 maturity downgrade notification.
+            if self.convergence_pulse.iteration > 10 && !self.convergence_pulse.gaps.is_empty() {
+                log::warn!("[bg] auto-heal: convergence stalled at {} ({} iters, {} gaps)",
+                    self.convergence_pulse.layer.name(),
+                    self.convergence_pulse.iteration,
+                    self.convergence_pulse.gaps.len());
+            }
+            // BMonitor health: if cognitive health score < 50, enqueue deep reasoning mode
+            // to give the system more time/cycles for recovery.
+            if let Some(ref br) = self.bbrain.latest_report() {
+                if br.health_score < 0.5 {
+                    log::warn!("[bg] auto-heal: cognitive health low ({:.0}%), adjusting mode to Deep",
+                        br.health_score * 100.0);
+                    self.state.set_mode(crate::core::nt_core_state_substrate::ThinkingMode::Deep);
+                }
+            }
+        }
     }
 
     /// EventBus behavioral consumer (D30) — responds to events with brain/KB actions, not just logs.

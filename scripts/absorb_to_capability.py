@@ -50,6 +50,78 @@ BRANCH_CAPABILITIES = {
 }
 ALL_CAPABILITIES = sorted({c for caps in BRANCH_CAPABILITIES.values() for c in caps})
 
+# ────────────────────────────────────────────────────────────────
+# 本源溯源层 (Source Cores) — Cycle 161i
+# 5 道之本源, 极简无细分。知识不是平行学科, 而是本源的分支脉络:
+#   每个节点溯源到一个本源 (source_core) + 演化路径 (trace_path)。
+#   交叉学科在本源深处自然交汇, 而非被文理分科割裂 (R-P42)。
+# ────────────────────────────────────────────────────────────────
+SOURCE_CORES = [
+    # (本源名, 主属域, 判别关键词, 本源定义)
+    ("E8",          "NT-CORE",   ["symmetr", "structur", "pattern", "mathemat", "algebra", "geometry",
+                                  "theorem", "law", "periodic", "group", "invariant", "axiom", "formal",
+                                  "order", "logic", "fractal", "topolog", "calculus", "equation", "foundation",
+                                  "quantum", "thermodynam", "entrop", "relativit", "hamiltonian", "particle",
+                                  "theory", "proof", "axiom", "theorem", "abstract", "statistical mechan"],
+                  "一切形式/结构/规律之源"),
+    ("VSA",         "NT-MEMORY", ["memor", "semant", "represent", "vector", "embed", "symbol", "meaning",
+                                  "concept", "knowledge base", "encod", "hypercub", "recall", "retrieve",
+                                  "latent", "holographic", "state space", "distributed represent", "kb"],
+                  "一切概念/记忆/表示之源"),
+    ("GWT",         "NT-CORE",   ["conscious", "attention", "percept", "aware", "cognition", "global workspace",
+                                  "integrate info", "mind", "sentient", "binding", "focus", "thalamus",
+                                  "metacognit", "introspect", "self-aware", "consciousness", "neurosci",
+                                  "cognitiv", "mental", "emotion", "brain"],
+                  "一切意识/感知/认知之源"),
+    ("ConsciousnessTree", "NT-MIND", ["absorb", "distill", "crystalliz", "evolve", "self-improv", "learn",
+                                      "adapt", "internaliz", "feedback", "growth", "self-heal", "recursion",
+                                      "reflect", "experience", "pattern recognit", "intuition", "pruning",
+                                      "meta-learn", "self-organiz", "self-evolv", "autonom", "curriculum"],
+                  "一切元认知/吸收/演化之源"),
+    ("Reality",     "NT-WORLD",  ["world", "agent", "act", "action", "interact", "environ", "observ", "sensor",
+                                  "control", "tool", "execute", "craft", "build", "system", "data", "real-time",
+                                  "robot", "network", "simulat", "perceiv", "explore", "harvest", "crawl"],
+                  "一切世界/感知/行动之源"),
+]
+
+# 本源先验: node_type 决定理论载体默认溯源, 除非内容强命中他源。
+#   paper        → 形式之源 (E8) 载体: 论文即形式化知识, 默认 E8
+#   repository   → 行动之源 (Reality) 载体: 仓库即世界交互工具, 默认 Reality
+#   article      → 中性
+SOURCE_PRIOR = {
+    'paper':       ('E8',      'NT-CORE',  0.35),   # 先验计入阈值
+    'repository':  ('Reality', 'NT-WORLD', 0.0),    # 已由关键词判定
+    'article':     (None,      None,       0.0),
+}
+
+
+def map_source_core(title, content, url, node_type='article'):
+    """本源溯源: 返回 (source_core, primary_domain, trace_keywords) 或 (None, None, []).
+
+    互斥判定: 取最高关键词命中数; 命中数相同取列表序靠前者 (确定性)。
+    trace_path 由 top 命中的关键词片段构成 → 本源 → 分支 → 节点 的演化路径。
+    paper 载体默认溯源 E8 (形式之源), 除非内容强命中 VSA/GWT/ConsciousnessTree。
+    """
+    blob = ' '.join([title, (content or '')[:2000]])
+    best = None
+    best_score = 0
+    best_kws = []
+    prior_core, prior_domain, prior_margin = SOURCE_PRIOR.get(node_type, (None, None, 0.0))
+    for name, domain, kws, _def in SOURCE_CORES:
+        hits = [(kw, len(re.findall(re.escape(kw), blob, re.I))) for kw in kws]
+        score = sum(h for _, h in hits)
+        if name == prior_core and score > 0:
+            score += max(1, int(score * prior_margin)) + 2  # 先验权重
+        if score > best_score:
+            best_score = score
+            best = (name, domain)
+            best_kws = [kw for kw, h in sorted(hits, key=lambda x: -x[1])[:3] if h > 0]
+    if best and best_score > 0:
+        return best[0], best[1], best_kws
+    return None, None, []
+
+# 关键词 → (域, 能力) 规则表
+
 # 关键词 → (域, 能力) 规则表
 KEYWORD_RULES = [
     # 爬虫/搜索/抓取
@@ -204,6 +276,7 @@ def main():
     mapped = {}
     per_branch = {}
     per_cap = {}
+    per_source = {}
     unmapped = []
     for nid, node_type, title, content, url in rows:
         res = map_node(node_type, title, content, url)
@@ -211,10 +284,20 @@ def main():
             unmapped.append((nid, title))
             continue
         branch, cap, ev = res
+        # 本源溯源层 (Cycle 161i): 5 道之本源 + 演化路径
+        core, core_domain, trace_kws = map_source_core(title, content, url, node_type)
+        if core is None:
+            # 兜底: repository → Reality (工具/行动), paper → E8 (形式/理论)
+            core, core_domain, trace_kws = ('Reality', 'NT-WORLD', ['tool']) if node_type == 'repository' \
+                else ('E8', 'NT-CORE', ['theory'])
         mapped[nid] = {'branch': branch, 'capability': cap, 'evidence': ev,
-                       'node_type': node_type, 'title': title[:60], 'url': url}
+                       'node_type': node_type, 'title': title[:60], 'url': url,
+                       'source_core': core, 'source_domain': core_domain,
+                       'trace_keywords': trace_kws}
         per_branch.setdefault(branch, []).append(cap)
         per_cap[cap] = per_cap.get(cap, 0) + 1
+        if core:
+            per_source[core] = per_source.get(core, 0) + 1
 
     if args.apply:
         now = int(time.time())
@@ -231,6 +314,13 @@ def main():
                                                'capability': m['capability'],
                                                'evidence': m['evidence'],
                                                'mapped_at': now}
+                if m.get('source_core'):
+                    meta['knowledge_source'] = {
+                        'source_core': m['source_core'],
+                        'primary_domain': m.get('source_domain'),
+                        'trace_path': m.get('trace_keywords', []),
+                        'mapped_at': now,
+                    }
                 conn.execute("UPDATE nodes SET metadata=? WHERE id=?",
                              (json.dumps(meta, ensure_ascii=False), nid))
             except sqlite3.Error as e:
@@ -249,6 +339,11 @@ def main():
     print(f'\n--- 36 能力分布 (top 12) ---')
     for cap, cnt in sorted(per_cap.items(), key=lambda x: -x[1])[:12]:
         print(f'  {cap:<14} {cnt:>4}')
+    print(f'\n--- 5 本源溯源分布 (道之本源脉络) ---')
+    for core, cnt in sorted(per_source.items(), key=lambda x: -x[1]):
+        print(f'  {core:<18} {cnt:>4}')
+    unknown = len(rows) - sum(per_source.values())
+    print(f'  {"(unknown)":<18} {unknown:>4}')
     print(f'\n--- 未映射节点 ---')
     for nid, t in unmapped[:15]:
         print(f'  {nid}  {t[:60]}')

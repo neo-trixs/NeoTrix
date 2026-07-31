@@ -526,3 +526,51 @@ export interface ReviewIssue {
   suggestion?: string;
 }
 
+// ========== NeoCodex Desktop ==========
+export type NeoCodexMode = "Agent" | "Shell" | "Plan";
+
+export interface NeoCodexHealthReport {
+  mode: NeoCodexMode;
+  turn_count: number;
+  tool_call_count: number;
+  tokens_used: number;
+  context_usage: number;
+  context_turns: number;
+  provider_count: number;
+  provider_resolvable: boolean;
+  provider_model: string;
+  session_writable: boolean;
+  goals_active: boolean;
+  cost_spent: number;
+  cost_budget: number;
+  subagent_results: number;
+  consciousness_attached: boolean;
+  brain_attached: boolean;
+  event_bus_attached: boolean;
+  evolution_iterations: number;
+  tool_grounding_degraded: boolean;
+}
+
+export interface NeoCodexProviderConfig {
+  provider_count: number;
+  resolvable: boolean;
+  active_model: string;
+}
+
+export interface NeoCodexEvolutionState {
+  iteration: number;
+  fixes_applied: number;
+  gaps_found: number;
+  history: string[];
+}
+
+export interface NeoCodexSession {
+  id: string;
+  name: string;
+  mode: NeoCodexMode;
+  messages: Message[];
+  wire_path: string;
+  created_at: number;
+  updated_at: number;
+}
+

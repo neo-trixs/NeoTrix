@@ -28,6 +28,7 @@ import VoiceModePanel from "./components/VoiceModePanel";
 import CoworkPanel from "./components/CoworkPanel";
 import BackgroundCUPanel from "./components/BackgroundCUPanel";
 import TerminalTabsPanel from "./components/TerminalTabsPanel";
+import NeoCodexPage from "./pages/NeoCodexPage";
 import type { Attachment } from "./types";
 export interface AppOutletContext {
   input: string;
@@ -75,6 +76,7 @@ const router = createBrowserRouter([
   { path: "/settings", element: <SettingsPage /> },
   { path: "/manage", element: <ManagePage /> },
   { path: "/plan", element: <PlanPage /> },
+  { path: "/neocodex", element: <NeoCodexPage /> },
 ]);
 
 export default router;
