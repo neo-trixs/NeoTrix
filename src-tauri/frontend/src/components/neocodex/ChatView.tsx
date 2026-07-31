@@ -89,25 +89,45 @@ export function ChatView({
   onSend,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
+  const [showSlash, setShowSlash] = useState(false);
+  const [slashQuery, setSlashQuery] = useState("");
+  const slashRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+  const SLASH_COMMANDS = [
+    { cmd: "/compact", label: "压缩会话", hint: "释放上下文 token" },
+    { cmd: "/goal <desc>", label: "设置目标", hint: "添加进化目标" },
+    { cmd: "/plan", label: "计划模式", hint: "切换到 Plan 模式" },
+    { cmd: "/status", label: "查看状态", hint: "模型·用量·会话信息" },
+    { cmd: "/feedback <text>", label: "反馈", hint: "给助手反馈" },
+    { cmd: "/export", label: "导出会话", hint: "导出为 Markdown" },
+    { cmd: "/rename <name>", label: "重命名会话", hint: "重命名当前会话" },
+    { cmd: "/fork", label: "分叉会话", hint: "从当前消息新建会话" },
+    { cmd: "/clear", label: "清除消息", hint: "清空当前会话消息" },
+  ];
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingContent, scrollToBottom]);
+  const filteredSlash = useMemo(() => {
+    const q = slashQuery.trim().toLowerCase();
+    if (!q) return SLASH_COMMANDS;
+    return SLASH_COMMANDS.filter((c) => c.cmd.toLowerCase().includes(q) || c.label.toLowerCase().includes(q));
+  }, [slashQuery]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!input.trim() || agentBusy) return;
-    const content = input.trim();
-    setInput("");
-    onSend(content);
+  const handleSlashSelect = (cmd: string) => {
+    const prefix = cmd.split(" ")[0];
+    setInput((prev) => (prev.endsWith("/") ? prev + prefix + " " : prev + prefix + " "));
+    setShowSlash(false);
+    textareaRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showSlash) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setSlashQuery((q) => q); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); }
+      else if (e.key === "Enter" && filteredSlash.length > 0) { e.preventDefault(); handleSlashSelect(filteredSlash[0].cmd); }
+      else if (e.key === "Escape") { setShowSlash(false); }
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() && !agentBusy) {
@@ -115,6 +135,15 @@ export function ChatView({
         form?.requestSubmit();
       }
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!input.trim() || agentBusy) return;
+    const content = input.trim();
+    setInput("");
+    setShowSlash(false);
+    onSend(content);
   };
 
   const hasMessages = messages.length > 0 || !!streamingContent;
@@ -154,24 +183,47 @@ export function ChatView({
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className={styles.inputArea}>
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={agentBusy ? "Waiting for response..." : "Enter 发送，Shift+Enter 换行"}
-          disabled={agentBusy}
-          rows={1}
-          className={styles.textarea}
-          style={{ height: "auto", minHeight: "44px" }}
-        />
-        <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn}>
-          <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-      </form>
+       {/* Input */}
+       <form onSubmit={handleSubmit} className={styles.inputArea}>
+         <textarea
+           ref={textareaRef}
+           value={input}
+           onChange={(e) => {
+             const val = e.target.value;
+             setInput(val);
+             const lastWord = val.split(/\s/).pop() || "";
+             if (lastWord.startsWith("/")) {
+               setSlashQuery(lastWord);
+               setShowSlash(true);
+             } else {
+               setShowSlash(false);
+             }
+           }}
+           onKeyDown={handleKeyDown}
+           placeholder={agentBusy ? "Waiting for response..." : "Enter 发送，Shift+Enter 换行，/ 显示命令"}
+           disabled={agentBusy}
+           rows={1}
+           className={styles.textarea}
+           style={{ height: "auto", minHeight: "44px" }}
+         />
+         {showSlash && (
+           <div className={styles.slashMenu}>
+             {filteredSlash.length === 0 && <div className={styles.slashEmpty}>无匹配命令</div>}
+             {filteredSlash.map((c) => (
+               <button key={c.cmd} className={styles.slashItem} onClick={() => handleSlashSelect(c.cmd)}>
+                 <span className={styles.slashCmd}>{c.cmd}</span>
+                 <span className={styles.slashLabel}>{c.label}</span>
+                 <span className={styles.slashHint}>{c.hint}</span>
+               </button>
+             ))}
+           </div>
+         )}
+         <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn}>
+           <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+             <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
+           </svg>
+         </button>
+       </form>
     </div>
   );
 }

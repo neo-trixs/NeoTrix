@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../../stores";
 import type { NeoCodexSession } from "../../types";
 import styles from "./SessionSidebar.module.css";
@@ -101,6 +101,17 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const togglePin = (sessionId: string) => {
     setPinnedIds((prev) => prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [sessionId, ...prev]);
+  };
+
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renamedNames = useRef<Record<string, string>>({});
+
+  const handleRename = async (sessionId: string, newName: string) => {
+    if (!newName.trim()) return;
+    renamedNames.current[sessionId] = newName.trim();
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, name: newName.trim() } : s)));
+    setRenamingId(null);
   };
 
   const handleExport = async (session: NeoCodexSession) => {
@@ -210,6 +221,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
                 onDelete={() => handleDelete(session.id)}
                 onPin={() => togglePin(session.id)}
                 onExport={() => handleExport(session)}
+                onRename={() => { setRenamingId(session.id); setRenameValue(session.name); }}
               />
             ))}
           </div>
@@ -270,22 +282,47 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   );
 }
 
-function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExport }: { session: { id: string; name: string; mode: string; message_count?: number; updated_at: number }; pinned: boolean; active: boolean; onClick: () => void; onDelete?: () => void; onPin: () => void; onExport: () => void }) {
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDelete?.();
+function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExport, onRename }: { session: { id: string; name: string; mode: string; message_count?: number; updated_at: number }; pinned: boolean; active: boolean; onClick: () => void; onDelete?: () => void; onPin: () => void; onExport: () => void; onRename: () => void }) {
+  const [showRename, setShowRename] = useState(false);
+  const [renameVal, setRenameVal] = useState(session.name);
+  const handleRenameSubmit = () => {
+    if (renameVal.trim()) {
+      onRename();
+      // Update via parent's rename handler (stored in renamedNames ref)
+    }
+    setShowRename(false);
+  };
+  const handleRename = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setShowRename(true);
+    setRenameVal(session.name);
+  };
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); handleRenameSubmit(); }
+    if (e.key === "Escape") { e.preventDefault(); setShowRename(false); }
   };
   return (
     <div className={`${styles.item} ${active ? styles.itemActive : ""} ${pinned ? styles.itemPinned : ""}`} onClick={onClick}>
       <div className={styles.itemRow}>
         {pinned && <span className={styles.pinIcon} title="已置顶">📌</span>}
         <div className={styles.itemMain}>
-          <span className={styles.itemName}>{session.name}</span>
+          {showRename ? (
+            <input
+              className={styles.renameInput}
+              value={renameVal}
+              onChange={(e) => setRenameVal(e.target.value)}
+              onKeyDown={handleRenameKeyDown}
+              onBlur={handleRenameSubmit}
+              autoFocus
+            />
+          ) : (
+            <span className={styles.itemName} onDoubleClick={handleRename} title="双击重命名">{session.name}</span>
+          )}
           <span className={styles.itemMode}>{session.mode}</span>
         </div>
         <span className={styles.itemTime}>{session.message_count ? `${session.message_count}条 · ` : ""}{formatTime(session.updated_at)}</span>
         {onDelete && (
-          <button className={styles.deleteBtn} onClick={handleDelete} title="删除会话">
+          <button className={styles.deleteBtn} onClick={(e) => { e.stopPropagation(); onDelete?.(); }} title="删除会话">
             <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M3 4h8M6 4V3h2v1M4.5 4l.5 7h4l.5-7" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -299,6 +336,11 @@ function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExpo
         <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); onExport(); }} title="导出">
           <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path d="M3 11v-6a2 2 0 012-2h6a2 2 0 012 2v6M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); handleRename(); }} title="重命名">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M10 2l2 2-8 8H4v-2l6-6z" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
       </div>
