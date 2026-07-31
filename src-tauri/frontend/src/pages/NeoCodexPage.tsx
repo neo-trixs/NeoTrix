@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "../stores";
-import { ChatView, ModelSelector, SessionSidebar, SettingsView } from "../components/neocodex";
+import { ChatView, CommandPalette, ModelSelector, SessionSidebar, SettingsView } from "../components/neocodex";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import styles from "./NeoCodexPage.module.css";
@@ -23,6 +23,8 @@ export default function NeoCodexPage() {
   const [agentBusy, setAgentBusy] = React.useState(false);
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [health, setHealth] = useState<any>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -36,6 +38,18 @@ export default function NeoCodexPage() {
     };
     loadSessions();
   }, []);
+
+  const loadHealth = useCallback(async () => {
+    try {
+      setHealth(await invoke("neocodex_health_report"));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    loadHealth();
+    const timer = setInterval(loadHealth, 15000);
+    return () => clearInterval(timer);
+  }, [loadHealth]);
 
   const handleSend = async (content: string) => {
     setAgentBusy(true);
@@ -53,6 +67,7 @@ export default function NeoCodexPage() {
       setNeoCodexStreaming(null);
       addNeoCodexMessage({ role: "assistant", content: response, timestamp: Date.now() });
       refreshSessions();
+      loadHealth();
     } catch (e) {
       console.error("Send failed:", e);
       setNeoCodexStreaming(null);
@@ -105,10 +120,29 @@ export default function NeoCodexPage() {
     refreshSessions();
   };
 
-  // Keyboard shortcuts: Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle
+  // Command palette items
+  const paletteItems = useMemo(() => {
+    const items: Array<{ id: string; label: string; hint?: string; onSelect: () => void }> = [
+      { id: "new", label: "新建会话", hint: "⌘N", onSelect: () => window.dispatchEvent(new CustomEvent("neotrix:new-session")) },
+      { id: "settings", label: "设置", hint: "⌘,", onSelect: () => setShowSettings(true) },
+      { id: "sidebar", label: showSidebar ? "收起侧栏" : "展开侧栏", hint: "⌘B", onSelect: () => setShowSidebar((v) => !v) },
+    ];
+    (["Agent", "Shell", "Plan"] as const).forEach((m) => {
+      items.push({ id: `mode-${m}`, label: `切换到 ${m} 模式`, hint: "Mode", onSelect: () => handleModeChange(m) });
+    });
+    neocodexSessions.forEach((s: any) => {
+      items.push({ id: `session-${s.id}`, label: s.name || "未命名会话", hint: s.mode, onSelect: () => handleSessionSelect(s) });
+    });
+    return items;
+  }, [neocodexSessions, showSidebar]);
+
+  // Keyboard shortcuts: Cmd+K palette, Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "n" && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      } else if (e.key === "n" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent("neotrix:new-session"));
       } else if (e.key === "b" && (e.metaKey || e.ctrlKey)) {
@@ -194,7 +228,22 @@ export default function NeoCodexPage() {
             />
           )}
         </div>
+
+        <footer className={styles.statusBar}>
+          <span className={styles.statusItem}>
+            <span className={styles.statusDot} style={{ background: agentBusy ? "var(--success)" : "var(--fg-tertiary)" }} />
+            {agentBusy ? "运行中…" : "就绪"}
+          </span>
+          <span className={styles.statusItem}>{neocodexMode}</span>
+          <span className={styles.statusItem} title="模型">{health?.provider_model || "—"}</span>
+          <span className={styles.statusItem} title="上下文用量">
+            Context {health ? `${Math.round((health.context_usage || 0) * 100)}%` : "—"}
+          </span>
+          <span className={styles.statusItem} title="会话数">{neocodexSessions.length} 会话</span>
+        </footer>
       </main>
+
+      <CommandPalette open={paletteOpen} items={paletteItems} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }

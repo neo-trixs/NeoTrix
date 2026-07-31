@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "../../stores";
 import type { NeoCodexSession } from "../../types";
 import styles from "./SessionSidebar.module.css";
@@ -8,6 +8,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   const [loading, setLoading] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
+  const [query, setQuery] = useState("");
 
   const refresh = useCallback(async () => {
     try {
@@ -21,7 +22,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
         messages: [],
         wire_path: s.wire_path,
         created_at: s.created_at || 0,
-        updated_at: s.updated_at || 0,
+        updated_at: (s.updated_at || 0) * 1000,
       })));
     } catch (e) {
       console.error("Failed to load sessions:", e);
@@ -88,6 +89,24 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     onSessionDelete?.(sessionId);
   };
 
+  const groups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = q ? sessions.filter((s) => s.name.toLowerCase().includes(q)) : sessions;
+    const day = 86400000;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStart = today.getTime();
+    const buckets: Array<{ label: string; sessions: NeoCodexSession[] }> = [];
+    const push = (label: string, list: NeoCodexSession[]) => {
+      if (list.length) buckets.push({ label, sessions: list });
+    };
+    push("今天", filtered.filter((s) => s.updated_at >= todayStart));
+    push("昨天", filtered.filter((s) => s.updated_at >= todayStart - day && s.updated_at < todayStart));
+    push("7天内", filtered.filter((s) => s.updated_at >= todayStart - 7 * day && s.updated_at < todayStart - day));
+    push("更早", filtered.filter((s) => s.updated_at < todayStart - 7 * day));
+    return buckets;
+  }, [sessions, query]);
+
   const formatTime = (ts: number) => {
     const date = new Date(ts);
     const now = new Date();
@@ -120,19 +139,42 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
         </button>
       </div>
 
+      <div className={styles.search}>
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="6" cy="6" r="4"/><path d="M9.5 9.5L12 12" strokeLinecap="round"/>
+        </svg>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="搜索会话…"
+          className={styles.searchInput}
+        />
+      </div>
+
       <div className={styles.list}>
-        {sessions.map((session) => (
-          <SessionItem
-            key={session.id}
-            session={session}
-            active={session.id === activeSessionId}
-            onClick={() => onSessionSelect?.(session)}
-            onDelete={() => handleDelete(session.id)}
-          />
+        {groups.map((group) => (
+          <div key={group.label}>
+            <div className={styles.groupHeader}>{group.label}</div>
+            {group.sessions.map((session) => (
+              <SessionItem
+                key={session.id}
+                session={session}
+                active={session.id === activeSessionId}
+                onClick={() => onSessionSelect?.(session)}
+                onDelete={() => handleDelete(session.id)}
+              />
+            ))}
+          </div>
         ))}
         {sessions.length === 0 && (
           <div className={styles.empty}>
             暂无会话，点击上方按钮创建
+          </div>
+        )}
+        {sessions.length > 0 && groups.length === 0 && (
+          <div className={styles.empty}>
+            无匹配会话
           </div>
         )}
       </div>

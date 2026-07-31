@@ -129,6 +129,32 @@
   flex-direction: column;
 }
 
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 16px;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  flex-shrink: 0;
+}
+
+.statusItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-tertiary);
+}
+
 /* Mobile responsive */
 @media (max-width: 1024px) {
   .sidebar {

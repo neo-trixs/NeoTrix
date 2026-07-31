@@ -171,6 +171,7 @@ function MessageBubble({
       <div className={styles.avatar} dangerouslySetInnerHTML={{ __html: avatar }} />
       <div className={styles.bubble}>
         <div className={styles.content} dangerouslySetInnerHTML={{ __html: html }} />
+        {isStreaming && <span className={styles.streamCaret} aria-hidden="true" />}
         {codeBlocks > 0 && (
           <div className={styles.codeIndicator}>
             {codeBlocks} 代码块
