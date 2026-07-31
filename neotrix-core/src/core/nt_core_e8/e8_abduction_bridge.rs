@@ -133,7 +133,12 @@ mod tests {
             "initial transition test",
         );
         assert_eq!(report.actual_next, 1);
-        assert!(report.hypothesis_count >= 0);
+        // 产生假设后, hypothesis_explained 必须与 best plausibility 判定一致
+        assert_eq!(
+            report.hypothesis_explained,
+            report.best_hypothesis_plausibility > 0.3,
+            "explained flag must match plausibility threshold"
+        );
     }
 
     #[test]
@@ -213,6 +218,9 @@ mod tests {
         );
         assert!(report.predicted_next < 64);
         assert!(report.prediction_confidence >= 0.0);
-        assert!(report.hypothesis_explained || report.hypothesis_count >= 0);
+        // 无假设时 explained 必须为 false; 有假设时由 plausibility 决定
+        if report.hypothesis_count == 0 {
+            assert!(!report.hypothesis_explained);
+        }
     }
 }

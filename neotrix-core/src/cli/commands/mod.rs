@@ -6,6 +6,7 @@ pub mod bench_cmds;
 pub mod doctor_cmds;
 pub mod core_cmds;
 pub mod brain_cmds;
+pub mod second_brain_cmds;
 pub mod goal_cmds;
 pub mod theme_cmd;
 pub mod file_cmds;

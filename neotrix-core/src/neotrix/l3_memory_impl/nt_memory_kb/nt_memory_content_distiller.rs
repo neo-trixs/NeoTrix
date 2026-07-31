@@ -544,7 +544,7 @@ mod tests {
 
         // High-confidence patterns (>0.8) should generate evolution records
         // With 5 repos of the same language, confidence = 0.7 + min(5, 5)*0.05 = 0.95
-        assert!(report.evolution_records_created >= 0, "Should handle evolution records gracefully");
+        assert!(report.evolution_records_created > 0, "Should handle evolution records gracefully");
     }
 
     #[test]

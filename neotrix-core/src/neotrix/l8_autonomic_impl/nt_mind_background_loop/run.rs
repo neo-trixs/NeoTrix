@@ -109,6 +109,8 @@ impl ConvergencePulse {
     }
 
     /// 从给定 self_test 结果生成当前层 gap。
+    /// 仅当存在 gap 时清除 verified — 无 gap 不重置外部验证结果,
+    /// 使外部 cargo check 验证 (D24/P67) 不被内部分析覆盖。
     pub fn gaps_from_self_tests(&mut self, results: &[(String, bool)]) {
         self.gaps = results.iter()
             .filter(|(_, ok)| !*ok)
@@ -118,7 +120,9 @@ impl ConvergencePulse {
                 severity: "medium".to_string(),
             })
             .collect();
-        self.verified = self.gaps.is_empty();
+        if !self.gaps.is_empty() {
+            self.verified = false;
+        }
         self.updated_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
     }
@@ -1234,8 +1238,8 @@ impl BackgroundLoopHandle {
             log::debug!("[bg] simulate: scenario={} created", sim_id);
         }
 
-        // ── Phase 8: ConvergencePulse — 分形收敛循环推进 (Cycle 115/155) ──
-        // 用本 tick 的检测状态生成 gap, 若层完成则推进迭代/晋升层级。
+        // ── Phase 8: ConvergencePulse — 分形收敛循环推进 (Cycle 115/155/160) ──
+        // 用本 tick 的检测状态生成 gap, 外部验证通过后推进迭代/晋升层级。
         {
             let mut results = Vec::new();
             results.push(("state_substrate".to_string(), !self.state.active_mode.name().is_empty()));
@@ -1245,6 +1249,19 @@ impl BackgroundLoopHandle {
             results.push(("gold_standard".to_string(),
                 self.gold_standard.as_ref().map(|_| true).unwrap_or(false)));
             self.convergence_pulse.gaps_from_self_tests(&results);
+            if self.convergence_pulse.gaps.is_empty() {
+                // 外部验证: 运行 cargo check --all-targets 确认构建完整性。
+                let build_ok = std::process::Command::new("cargo")
+                    .args(["check", "--all-targets", "-p", "neotrix"])
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false);
+                if build_ok {
+                    self.convergence_pulse.verified = true;
+                }
+            }
             let promoted = self.convergence_pulse.advance();
             if let Some(layer) = promoted {
                 log::info!("[bg] convergence: promoted to {} layer (fractal loop)",
@@ -1732,5 +1749,16 @@ mod tests {
         let p = ConvergencePulse::default();
         let result = p.self_test();
         assert!(result.is_ok(), "default pulse self-test should pass: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_convergence_gaps_do_not_clobber_external_verification() {
+        // P67 regression: 无 gap 时 gaps_from_self_tests 不得覆盖外部 cargo check 的 verified=false
+        let mut p = ConvergencePulse::default();
+        p.verified = true;
+        p.gaps_from_self_tests(&[("substrate".to_string(), true)]);
+        assert!(p.verified, "no gaps must not clear external verification");
+        let promoted = p.advance();
+        assert!(promoted.is_some(), "externally-verified complete layer should promote");
     }
 }

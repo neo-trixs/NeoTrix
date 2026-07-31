@@ -454,7 +454,10 @@ mod tests {
         let mut harness = RedTeamHarness::with_profile(AttackProfile::Light);
         let results = harness.scan_vulnerabilities("test code");
 
-        assert!(results.len() >= 0);
+        // scan_vulnerabilities 返回的每个结果都必须携带有效技术标签 (结果内容有效性, 而非仅计数)
+        for r in &results {
+            assert!(!r.technique.label().is_empty(), "each result must carry a technique");
+        }
     }
 
     #[test]

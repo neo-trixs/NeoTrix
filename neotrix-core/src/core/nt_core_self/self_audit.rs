@@ -246,50 +246,61 @@ impl ToolRecord {
 }
 
 /// 工具接地监控器 — 每次工具调用后记录 claimed/actual, 计算失败率。
+/// 阈值自适应: 0-999 次调用用 5%, 1000+ 次用 2%。
 #[derive(Debug, Clone, Default)]
 pub struct ToolGroundingMonitor {
     pub tools: std::collections::HashMap<String, ToolRecord>,
-    pub threshold: f64,
     pub total_calls: u64,
     pub grounding_failures: u64,
 }
 
 impl ToolGroundingMonitor {
     pub fn new() -> Self {
-        Self { tools: std::collections::HashMap::new(), threshold: 0.05, total_calls: 0, grounding_failures: 0 }
+        Self { tools: std::collections::HashMap::new(), total_calls: 0, grounding_failures: 0 }
     }
 
-    /// 记录一次工具调用结果。claimed=工具声称成功, actual=独立验证实际成功。
-    pub fn record_tool_result(&mut self, tool: &str, claimed_success: bool, actual_success: bool) {
-        let rec = self.tools.entry(tool.to_string()).or_default();
-        if claimed_success {
-            rec.claimed_ok += 1;
+    /// Record a tool call result: claimed_ok = tool-reported success, actual_ok = true outcome.
+    pub fn record_tool_result(&mut self, tool: &str, claimed_ok: bool, actual_ok: bool) {
+        self.total_calls += 1;
+        let record = self.tools.entry(tool.to_string()).or_insert(ToolRecord {
+            claimed_ok: 0,
+            actual_ok: 0,
+            failures: 0,
+        });
+        if claimed_ok {
+            record.claimed_ok += 1;
         }
-        if actual_success {
-            rec.actual_ok += 1;
-        }
-        if claimed_success && !actual_success {
-            rec.failures += 1;
+        if actual_ok {
+            record.actual_ok += 1;
+        } else if claimed_ok {
+            // Claimed success but actual failure = grounding failure
+            record.failures += 1;
             self.grounding_failures += 1;
         }
-        self.total_calls += 1;
+    }
+
+    /// 根据调用次数自适应收紧阈值: 0-999 次用 5%, 1000+ 用 2%。
+    fn effective_threshold(&self) -> f64 {
+        if self.total_calls > 1000 { 0.02 } else { 0.05 }
     }
 
     /// 检查某工具是否触发接地失效阈值。
     pub fn is_degraded(&self, tool: &str) -> bool {
-        self.tools.get(tool).map(|r| r.failure_rate() > self.threshold).unwrap_or(false)
+        self.tools.get(tool).map(|r| r.failure_rate() > self.effective_threshold()).unwrap_or(false)
     }
 
     /// 全工具中是否有任一达到阈值。
     pub fn any_degraded(&self) -> bool {
-        self.tools.values().any(|r| r.failure_rate() > self.threshold)
+        let t = self.effective_threshold();
+        self.tools.values().any(|r| r.failure_rate() > t)
     }
 
     /// 生成降级工具清单 (名称, 失败率)。
     pub fn degraded_tools(&self) -> Vec<(String, f64)> {
+        let t = self.effective_threshold();
         let mut out: Vec<(String, f64)> = self.tools.iter()
-            .filter(|(_, r)| r.failure_rate() > self.threshold)
-            .map(|(t, r)| (t.clone(), r.failure_rate()))
+            .filter(|(_, r)| r.failure_rate() > t)
+            .map(|(tool, r)| (tool.clone(), r.failure_rate()))
             .collect();
         out.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         out

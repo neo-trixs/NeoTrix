@@ -1,7 +1,7 @@
 # External Repository Feature Absorption Workflow
 
 ## Description
-Analyze external repositories, compare against NeoTrix, identify feature gaps, assess architecture fit, and iteratively absorb features.
+Analyze external repositories, compare against NeoTrix, identify feature gaps, assess architecture fit, and iteratively absorb features. Also covers batch URL absorption (user pastes a URL list → auto extract/dedup/categorize/capability-map/insert into KB via `scripts/kb_*`).
 
 ## Skill Type
 workflow
@@ -12,6 +12,8 @@ workflow
 - gap-analysis
 - repo-analysis
 - iterative-feature
+- batch-absorption
+- kb-pipeline
 
 ## Trigger Phrases
 - "分析这个仓库" / "analyze this repo"
@@ -21,6 +23,7 @@ workflow
 - "融合到当前架构" / "integrate into current architecture"
 - "继续后续迭代" / "continue with remaining phases" / "继续后续迭代对应的模块任务"
   → 自动加载 TODO.md，进入下一个未完成的 Phase
+- 粘贴 URL 列表 / "把这些 URL 入库" / "absorb these URLs" → 触发吸收对话方法论（六步流水线 + 启发式规则）
 
 ## Workflow
 
@@ -73,6 +76,40 @@ For each external repo:
 - **新增 (New)** = 能力树完全不存在；须给出同 session 消费者，否则 R-P79 拒绝
 - **Blocked** = 来源不可获取（认证/404），注明原因
 
+### 吸收对话方法论 (Batch URL Absorption — Cycle 160b 内化)
+
+当用户一次性粘贴大量 URL 而非单个仓库时，走以下六步流水线（`scripts/` 已实现为可复用脚本）：
+
+```
+extract → dedup → categorize → capability map → insert + 显式 FTS → rebuild fallback
+```
+
+| # | 步骤 | 脚本/入口 | 关键点 |
+|---|------|-----------|--------|
+| 1 | **extract** | `kb_batch_absorb.py` | 按域名分派: github→GitHub API(或 HTML 回退), arxiv→export API, 其他→HTML 正文 |
+| 2 | **dedup** | `kb_batch_absorb.py` | URL 规范化 + 已在库检查 → `duplicate` 跳过 |
+| 3 | **categorize** | 内置于 extract | 4 类: repo / paper / article / org |
+| 4 | **capability map** | `absorb_to_capability.py --apply` | 见下方启发式规则 |
+| 5 | **insert + 显式 FTS** | `insert_node()` | **必须显式 `INSERT INTO nodes_fts(rowid,title,summary,content,domain)`** |
+| 6 | **rebuild fallback** | `rebuild_fts()` | `INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` 仅作 fallback |
+
+#### 启发式规则 (后续吸收复用)
+
+| 规则 | 说明 | 命中率 |
+|------|------|--------|
+| **TITLE_HIT ×3** | 仓库名/论文标题命中能力关键词 → 高置信度映射 (`score = title_hits * 3 + hits`) | ~87% of Top 10 |
+| **KNOWN_REPOS 确定性** | 已知顶级仓库 → 确定性 capability (如 `openai/codex`→NT-ACT/execute, `crawl4ai`→NT-WORLD/retrieve, `langfuse`→NT-SHIELD/verify) | 100% for known |
+| **API 429 → HTML fallback** | GitHub REST API 限流时降级到 `fetch_github_html` (OG meta + raw README)，保留 stars/language/topics 关键元数据 | 100% 降级成功 |
+| **404 pre-filter** | extract 前验证 URL 有效性；600 条中发现 6 个真 404 (1%) — 预检可避免 6 轮空跑 | 防 1% 无效源 |
+| **FTS5 rebuild 陷阱** | 非 external-content FTS5 表，`INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` 只重建 shadow 表已有行，**不会**从 nodes 拉新数据 → 显式插入才是检索可用的唯一路径 | 已验证 (kb_batch_absorb.py:232) |
+
+#### absorbed_capability 数据层追踪 (R-P79 闭环)
+
+`absorb_to_capability.py --apply` 写节点 metadata 四元组：`{branch, capability, evidence, mapped_at}`。
+- **D14/D20 审计不依赖外部文档** — 节点级元数据本身就是审计证据
+- **R-P42 落地验证** — 每节点映射到现有能力树分支 (NT-IO/SHIELD/ACT/MIND/CORE/WORLD/MEMORY)，零新建平行模块
+- **数据可追溯** — 吸收来源、能力分支、证据链接全部落位 KB
+
 ### Phase 2: Gap Identification
 1. For each feature found in external repos, search NeoTrix source to confirm presence/absence:
    ```bash
@@ -121,6 +158,7 @@ Per-phase discipline:
 3. Summarize: which features absorbed, from which source, file locations
 4. Update AGENTS.md lookup chains if adding new core abstractions
 5. Update TODO.md: mark absorbed features as [[completed]]
+6. **吸收对话经验沉淀**：批量吸收后更新本文「吸收对话方法论」章节 — 新启发式/新容灾/新陷阱应回写，使经验随代码演进（R-P79 接线门延伸：经验记录同样不能滞后于实现）
 
 **子代理产出验证 (必做)**：子代理声称完成后，主 agent 必须
 1. `wc -l` + `grep "Source|"` artifact 文件 → 确认条目数 = 来源数（防幻影报告，R-P49/R-P16）

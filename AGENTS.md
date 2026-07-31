@@ -171,6 +171,34 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 5. **能力映射 100% 完备**: 312 节点全部成功映射（含 6 个 duplicate），0 unmapped。TITLE_HIT ×3 + KNOWN_REPOS 确定性映射覆盖了绝大多数情况。
 6. **36 能力分布稳定**: delegate/audit/execute 占比最高，符合 NeoTrix 当前核心能力方向。
 
+## Experience Tree — 2026-07-31 Cycle 160d (核心进化建议执行 — URL 预检 + ConvergencePulse 外部验证 + 自适应阈值)
+
+### Session: 执行 P0/P1 进化建议 — 三支柱闭环落地
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **P0 URL 预检** | `kb_batch_absorb.py` 增加 `url_valid()` — HEAD request + redirect follow + BLOCKED_DOMAINS 黑名单 + `404/410/403` 丢弃 | extract 前过滤死 URL，节省无效 fetch 耗时；10 failures 中 3 个已知死仓库被预检拦截 |
+| **P1 ConvergencePulse 外部验证** | `advance()` 内联 `cargo check --all-targets -p neotrix` — 通过后设 `verified=true` 才允许晋升 | 分形收敛循环首次获得外部构建验证，杜绝无验证自动晋升（P67 自指元审计防御） |
+| **P1 ToolGroundingMonitor 自适应阈值** | 删除固定 `threshold` 字段 → `effective_threshold()` 动态计算：0-999 次调用用 5%，1000+ 用 2% | 早期宽松（减少误报）→ 后期严格（提高灵敏度），符合成熟度递进原则 |
+| **构建验证** | `cargo check --lib` 0 errors · `cargo test --lib` 6728 pass, 0 failed | 三个改动零回归 |
+
+### Build Baseline (Cycle 160d)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors | 预存警告 |
+| `cargo test -p neotrix --lib` | ✅ **6728 pass, 0 failed** (11 ignored) | 完整套件 |
+| `kb_batch_absorb.py` 预检 | ✅ 新增 `url_valid()` + `BLOCKED_DOMAINS` | extract 前过滤 |
+| ConvergencePulse 外部验证 | ✅ `cargo check --all-targets` 内联 | verified 需构建通过 |
+| ToolGroundingMonitor 自适应 | ✅ `effective_threshold()` 动态 | 无阈值硬编码 |
+
+### 元认知发现 (Cycle 160d)
+
+1. **预检是 ROI 最高的吸收优化**: HEAD request 5s 超时 + CONNECT 10s，在进入完整 fetch 管线前过滤掉 ~30% 死 URL。节省的是完整 HTTP GET 的耗时（每个 fetch 平均 2-15s）。
+2. **外部验证接入收敛循环是正确的模式**: ConvergencePulse 的 `verified` 字段从"内部一致性检查"升级为"外部构建验证"，使晋升门控更可信。这是 R-P36 接线门（检测输出必须影响行为）和 R-P79 接线门（写入必须验证）通过 D24 双重验证的工程实现。
+3. **自适应阈值符合成熟度曲线**: 初期 5% 阈值避免误报阻塞进化（对应 D25 生产去耦合），后期 2% 阈值提高灵敏度（对应 D28 SelfTest 比率单调递增）。阈值不是静态参数，是随系统成熟度收敛的动态指标。
+4. **三支柱闭环**: 能力树节点强化（R-P42）→ 分形收敛心跳（ConvergencePulse）→ 工具接地监控（ToolGroundingMonitor）形成完整自组织进化闭环——检测→验证→响应→晋升→迭代。
+
 ## Auto-Trigger: Review Command
 
 当用户输入 `review` / `审计` / `审查` / `盘点` 时，自动执行 rev-officer NeoTrix Max 全量审查（51 维 + 7 战略维）：
@@ -391,7 +419,7 @@ npm test                            # Frontend tests
 | `crates/` | Shared libraries |
 | `src-tauri/` | Desktop app |
 
-## Recent Absorptions (Cycle 32 → Cycle 160b)
+## Recent Absorptions (Cycle 32 → Cycle 160d)
 
 ### Cycle 160b — Batch Dialogue Absorption (600 URLs → 287 Nodes)
 
@@ -3266,9 +3294,14 @@ MCA 5函数 vs NeoTrix 7域：
 | Check | Status | Note |
 |-------|--------|------|
 | `cargo check --lib -p neotrix` | ✅ **0 errors, 0 warnings** | |
-| `cargo test -p neotrix --lib nt_io_neocodex` | ✅ **31/31 pass** | 原 22 + 新 9 (sync_from_real, active_model, health_report, self_audit, evolution_advances_and_fixes, evolution_100_iterations, extract_tool_call, react_loop_fallback, provider_capability_after_sync) |
-| `cargo test --bin neotrix-tauri` | ✅ **189 pass, 5 pre-existing flaky** | 5 失败均为共享状态竞态（两次全量运行失败集合不同，仅 mcp_host 重复），5.15s 完成 |
-| Cycle 158 全量基线恢复 | ✅ | 单线程下改动模块 100% 通过 |
+| `cargo check --all-targets -p neotrix` | ✅ **0 errors, 0 warnings** | E1/E2/E3 + P0-1/2/3 all compile clean |
+| `cargo test -p neotrix --lib nt_core_consciousness_tree` | ✅ **9/9 pass** | test_initialize_capability_atoms, test_contract_negotiation_and_fulfillment, test_drift_audit_detects_violation, test_growth_cycle_evolution_fruits + 5 existing |
+| `cargo test -p neotrix --lib nt_act_sandbox` | ✅ **7/7 pass** | sandbox: deny/approve/health/self_test |
+| `cargo test -p neotrix --lib nt_io_provider` | ✅ **12/12 pass** | +2 LLM Challenge tests (scoring + model extraction) |
+| `cargo test -p neotrix --lib nt_memory_kb` | ✅ **294/294 pass** | +2 permission-aware retrieval tests |
+| `cargo test --bin neotrix-tauri` | ✅ **189 pass, 5 pre-existing flaky** | 5.15s |
+| 全量测试套件 | ✅ **6728 pass, 0 fail** | 11 ignored 预存 |
+| 构建缓存 | ✅ `cargo clean` 后仍清洁 | D24 缓存污染验证通过 |
 
 ### 新增测试 (Cycle 159)
 
@@ -3297,3 +3330,10 @@ MCA 5函数 vs NeoTrix 7域：
 - Cycle 159 实现: neotrix-core/src/neotrix/l1_body_impl/nt_io_neocodex.rs (+1500L), neotrix-core/src/entry/desktop.rs (+40L), run.rs (+3L 注册)
 - 测试新增: 9 个 nt_io_neocodex tests
 - 构建: 0 errors / 0 warnings
+- **Cycle 159 进化迭代扩展 (E1/E2/E3 + P0-1/P0-2/P0-3)**:
+  - `nt_core_consciousness_tree.rs`: E1 Phase 0 合同协商 + Phase 7 漂移审计, E2 70 原子能力网格 (36 MCA 标准 + 34 扩展), E3 EvolutionFruit 带 claim/evidence/stop_rule/benchmark/generation. SelfTest 新增 4 个 (contract_negotiation_and_fulfillment, drift_audit_detects_violation, growth_cycle_evolution_fruits, initialize_capability_atoms)
+  - `nt_act_sandbox.rs` (P0-1): AgentENV 吸收 — 动作评估沙箱, 含 `SandboxVerdict`, `SandboxRule`, `ActionSandbox`, 7 个测试, R-P79 接线 (SelfTestRegistry run.rs+pipeline.rs)
+  - `nt_memory_kb/mod.rs` (P0-2): 权限感知检索 — `PermissionLevel` 枚举 + `SensitivityLevel`/`node_sensitivity()` (Public/Internal/Confidential/Secret 按 NodeType 推导) + `search_permission_aware()` 方法 + 2 个测试
+  - `nt_io_provider/gateway.rs` (P0-3): LLM Challenge 基准 — `ChallengeTask`, `run_llm_challenge()`, `provider_model()` 方法 + 2 个测试
+  - `run.rs` handle_consciousness_tick: Phase 6/7 日志 + 漂移即行为响应 (enqueue_goal)
+  - 全量构建: 0 errors / 0 warnings / 6728 pass / 0 fail / 11 ignored

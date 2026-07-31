@@ -31,6 +31,26 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 KB_PATH = os.path.expanduser("~/.neotrix/knowledge_base.db")
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+BLOCKED_DOMAINS = {
+    'books.google.co.jp', 'books.google.com',
+    'web.archive.org', 'web.archive.org',
+}
+
+def url_valid(url):
+    """HEAD request with redirect follow; discard 404/410/403 immediately."""
+    domain = urllib.parse.urlparse(url).netloc
+    if domain in BLOCKED_DOMAINS:
+        return False
+    try:
+        r = subprocess.run(
+            ['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}',
+             '-L', '--connect-timeout', '5', '--max-time', '10',
+             '-A', UA, '-I', url],
+            capture_output=True, text=True, timeout=15)
+        code = r.stdout.strip()
+        return code in ('200', '301', '302', '307', '308')
+    except Exception:
+        return False
 
 
 def curl(url, timeout=15, headers=None):
@@ -206,6 +226,8 @@ def fetch_article(url):
 
 
 def fetch_one(url):
+    if not url_valid(url):
+        return None
     if 'github.com' in url:
         return fetch_github_repo(url)
     if 'arxiv.org' in url:
@@ -250,7 +272,16 @@ def main():
     urls = [l.strip() for l in open(args.urls) if l.strip()]
     if args.limit:
         urls = urls[:args.limit]
-    print(f'[batch] {len(urls)} URLs to absorb', flush=True)
+    # Pre-filter: discard dead URLs via HEAD request before entering fetch pipeline
+    pre_filtered = []
+    pre_failed = 0
+    for u in urls:
+        if url_valid(u):
+            pre_filtered.append(u)
+        else:
+            pre_failed += 1
+    urls = pre_filtered
+    print(f'[batch] {len(urls)} URLs after pre-filter (-{pre_failed} dead/404)', flush=True)
 
     conn = sqlite3.connect(KB_PATH)
     conn.execute('PRAGMA journal_mode=WAL')

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -178,8 +177,4 @@ mod tests {
     }
 
     // Silence unused import lint for SystemTime when not otherwise used
-    #[allow(dead_code)]
-    fn _now() -> u64 {
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()
-    }
 }
