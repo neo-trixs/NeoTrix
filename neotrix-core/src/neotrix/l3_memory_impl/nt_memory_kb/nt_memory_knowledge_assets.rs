@@ -556,7 +556,7 @@ pub fn import_bandit_data(kb: &KnowledgeBase, path: &Path) -> Result<ImportRepor
         if !entry.is_array() || entry.as_array().is_none_or(|a| a.len() < 3) {
             continue;
         }
-        let arr = entry.as_array().unwrap();
+        let arr = entry.as_array().expect("guarded array check");
         let config = &arr[0];
         let visits = arr[1].as_i64().unwrap_or(0);
         let wins = arr[2].as_i64().unwrap_or(0);

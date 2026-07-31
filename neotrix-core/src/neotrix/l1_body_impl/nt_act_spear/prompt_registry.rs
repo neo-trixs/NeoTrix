@@ -48,7 +48,7 @@ impl PromptRegistry {
         if versions.len() > self.max_versions {
             versions.remove(0);
         }
-        versions.last().unwrap()
+        versions.last().expect("entry just pushed")
     }
 
     pub fn get(&self, name: &str) -> Option<&PromptEntry> {

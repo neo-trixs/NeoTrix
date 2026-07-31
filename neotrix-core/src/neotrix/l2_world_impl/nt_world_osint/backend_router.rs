@@ -13,7 +13,10 @@ use std::future::Future;
 #[derive(Debug, Clone)]
 pub struct Backend {
     pub name: String,
-    pub probe: fn(&OsintTarget, &Client) -> Pin<Box<dyn Future<Output = Result<Box<dyn BackendResult>, BackendError>> + Send>>,
+    pub probe: for<'a> fn(
+        &'a OsintTarget,
+        &'a Client,
+    ) -> Pin<Box<dyn Future<Output = Result<Box<dyn BackendResult>, BackendError>> + Send + 'a>>,
 }
 
 pub trait BackendResult: Send + Sync {
@@ -28,6 +31,12 @@ pub enum BackendError {
     Unavailable(String),
     #[error("Backend error: {0}")]
     Error(String),
+}
+
+impl From<String> for BackendError {
+    fn from(e: String) -> Self {
+        BackendError::Error(e)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -148,7 +157,7 @@ pub fn default_dns_backends() -> Vec<Backend> {
         },
         Backend {
             name: "dns-fallback".into(),
-            probe: |target, client| Box::pin(async move {
+            probe: |_target, _client| Box::pin(async move {
                 Ok(Box::new(SimpleDnsResult) as Box<dyn BackendResult>)
             }),
         },
@@ -167,7 +176,7 @@ pub fn default_http_backends() -> Vec<Backend> {
         },
         Backend {
             name: "http-fallback".into(),
-            probe: |target, client| Box::pin(async move {
+            probe: |_target, _client| Box::pin(async move {
                 Ok(Box::new(SimpleHttpResult) as Box<dyn BackendResult>)
             }),
         },

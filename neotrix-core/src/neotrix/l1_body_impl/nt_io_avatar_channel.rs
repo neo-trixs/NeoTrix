@@ -249,7 +249,7 @@ impl AvatarChain {
         let entry = ChainEntry::new(self.entries.len() as u64, &prev, data, secret,
                                     direction, from);
         self.entries.push(entry);
-        self.entries.last().unwrap()
+        self.entries.last().expect("entry just pushed")
     }
 
     pub fn query_by_direction(&self, dir: &MessageDirection) -> Vec<&ChainEntry> {

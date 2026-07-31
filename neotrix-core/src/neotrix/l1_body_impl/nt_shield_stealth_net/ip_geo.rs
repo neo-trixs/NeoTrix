@@ -35,7 +35,7 @@ impl Default for IpGeoLocator {
 impl IpGeoLocator {
     pub fn new() -> Self {
         Self {
-            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1024).unwrap()))),
+            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1024).expect("non-zero cache capacity")))),
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(5))
                 .danger_accept_invalid_certs(true)

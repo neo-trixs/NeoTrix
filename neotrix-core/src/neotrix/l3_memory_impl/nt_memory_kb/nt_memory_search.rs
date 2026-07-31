@@ -199,7 +199,7 @@ pub fn hybrid_search(
     } else if ranklists.is_empty() {
         Vec::new()
     } else {
-        ranklists.into_iter().next().unwrap()
+        ranklists.into_iter().next().expect("non-empty ranklists")
     };
 
     // Fetch full node data for fused IDs

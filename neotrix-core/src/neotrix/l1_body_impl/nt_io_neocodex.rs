@@ -407,7 +407,7 @@ impl ContextPipeline {
 
         // Layer 4: Context collapse — summarize old turns
         while self.turns.len() > 10 {
-            let front = self.turns.pop_front().unwrap();
+            let front = self.turns.pop_front().expect("guarded by len > 10");
             if !self.turns.is_empty() && self.turns[0].role != "summary" {
                 self.turns.push_front(ContextTurn {
                     role: "summary".into(),

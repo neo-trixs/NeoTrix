@@ -62,7 +62,7 @@ impl AdaptiveRetrieval {
         Self {
             config,
             complexity_cache: RwLock::new(
-                lru::LruCache::new(std::num::NonZeroUsize::new(200).unwrap()),
+                lru::LruCache::new(std::num::NonZeroUsize::new(200).expect("non-zero cache capacity")),
             ),
         }
     }

@@ -17,6 +17,7 @@ pub mod social;
 pub mod vuln;
 pub mod network;
 pub mod dark;
+pub mod backend_router;
 
 #[derive(Debug, Clone)]
 pub struct OsintConfig {
@@ -332,20 +333,22 @@ pub async fn run_osint(target: OsintTarget, config: OsintConfig) -> OsintReport 
     report
 }
 
-/// doctor 体检: 简化版直接探测 DNS + HTTP 可用性
-pub async fn doctor_osint(target: OsintTarget, config: OsintConfig) -> DoctorReport {
+/// doctor 体检: 通过有序后端路由探测 DNS + HTTP 可用性 (R-P82)
+pub async fn doctor_osint(target: OsintTarget, _config: OsintConfig) -> DoctorReport {
     let client = default_client();
 
     let mut dns_ok = false;
     let mut _dns_latency = 0u64;
+    let mut dns_router = backend_router::BackendRouter::new(backend_router::default_dns_backends());
     let start = std::time::Instant::now();
-    if let Ok(_) = dns::investigate(&target, &client, &config).await { dns_ok = true }
+    if dns_router.probe_and_select(&target, &client).await.is_ok() { dns_ok = true }
     _dns_latency = start.elapsed().as_millis() as u64;
 
     let mut http_ok = false;
     let mut _http_latency = 0u64;
+    let mut http_router = backend_router::BackendRouter::new(backend_router::default_http_backends());
     let start = std::time::Instant::now();
-    if let Ok(_) = http::investigate(&target, &client, &config).await { http_ok = true }
+    if http_router.probe_and_select(&target, &client).await.is_ok() { http_ok = true }
     _http_latency = start.elapsed().as_millis() as u64;
 
     DoctorReport {

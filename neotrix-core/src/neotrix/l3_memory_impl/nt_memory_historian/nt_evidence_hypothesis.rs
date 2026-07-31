@@ -330,7 +330,7 @@ impl HypothesisNetwork {
         let h = Hypothesis::new(id, title, desc, prior);
         self.audit.record("hypothesis", id, "created", None, None, Some(&format!("prior={}", prior)), None, "system");
         self.hypotheses.push(h);
-        self.hypotheses.last_mut().unwrap()
+        self.hypotheses.last_mut().expect("hypothesis just pushed")
     }
 
     pub fn get_hypothesis(&self, id: &str) -> Option<&Hypothesis> {
