@@ -453,14 +453,12 @@ impl GatewayV2 {
         let mut correct = 0usize;
         let mut total_latency_ms = 0u64;
         let mut total_cost = 0.0f64;
-        let mut total_tokens = 0u32;
 
         for task in tasks {
             let request = LlmRequest::new(&self.provider_model(provider_name).unwrap_or_default(), &task.prompt);
             let start = Instant::now();
             let resp = self.call_provider(provider_name, &request).await?;
             total_latency_ms += start.elapsed().as_millis() as u64;
-            total_tokens += resp.usage.total_tokens;
             total_cost += (resp.usage.total_tokens as f64 / 1000.0) * 0.002;
             if task.check(&resp.content) {
                 correct += 1;
