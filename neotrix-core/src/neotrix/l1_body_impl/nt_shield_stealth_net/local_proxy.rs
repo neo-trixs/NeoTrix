@@ -134,6 +134,9 @@ async fn connect_via_proxy_pool(host: &str, port: u16) -> Result<TcpStream, Stri
 }
 
 async fn connect_via_socks5(proxy_addr: &str, host: &str, port: u16) -> Result<TcpStream, String> {
+    if host.len() > 255 {
+        return Err(format!("SOCKS5 hostname too long: {} bytes (max 255)", host.len()));
+    }
     let mut stream = tokio::time::timeout(
         Duration::from_secs(10),
         TcpStream::connect(proxy_addr),
@@ -513,9 +516,22 @@ pub fn tor_connect(_target: &str, _port: u16) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use super::connect_via_socks5;
 
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[tokio::test]
+    async fn test_socks5_overlong_host_rejected_before_network() {
+        // Regression: host.len() as u8 truncated SOCKS5 ATYP=0x03 domain
+        // names longer than 255 bytes, producing a malformed request. The
+        // guard must reject before any socket work (so this test never
+        // touches the network).
+        let long_host = "a".repeat(300);
+        let result = connect_via_socks5("127.0.0.1:9050", &long_host, 8080).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too long"));
     }
 }
