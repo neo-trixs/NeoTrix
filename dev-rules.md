@@ -93,3 +93,9 @@
 ## 跨 session 合并模式
 
 - **意识树合并模式**: 跨 session 发现的相似缺陷模式必须合并为单一系统性发现归入 ConsciousnessTree 意识树网络脉络。禁止重复维度。已合并: 缓存盲区+构建污染+Check-Test双验证→D24, 写入盲区+外部观察→D21, 链不忠+AI欺骗→D16g+D17, 抛扔式+生产去耦合+SelfTest接线→D43, 意识剧场+冗余实现+零消费→D44, 会话连续性+双向摘要+Session Bridge→D47, 3-Ring自愈→D26, 适配器模块+死重量+架构重量+吸收纪律→D51
+
+## 外部吸收 (R-P81 – R-P83) — 2026-07-31 吸收 ponytail/agent-reach/higress
+
+- **R-P81 (Ponytail Ladder — 最懒实现阶梯)**: 写代码前先读实际代码流，然后停在第一级能成立的梯级: ①需要存在吗? (YAGNI) → ②codebase 已有? (复用不重写) → ③stdlib 有? → ④原生平台特性? → ⑤已装依赖? → ⑥一行? 就一行 → ⑦才轮到最小可用实现。安全(信任边界验证/数据丢失处理/安全/无障碍)永不在砍伐清单。实证: -54% LOC / -20% cost / -27% time, 100% safe。Lazy about the solution, never about reading。
+- **R-P82 (有序后端路由 — 平台接入的首选+备选列表)**: 任何需要外部平台接入的能力(网页/搜索/社交/视频), 采用"首选+备选的有序后端列表"而非单一实现。真实探测各候选后端可用性(不只是命令存在), 第一个完整可用的当选; 接入方式换代时只调整列表顺序, 不重写能力层。附 `doctor` 式体检命令报告当前走哪条路。实证: agent-reach yt-dlp 被 B站风控封死 → 无感切换 bili-cli。
+- **R-P83 (单一事实源 + 派生生成物同步)**: 跨平台/多副本的内容必须单一 source-of-truth + 脚本生成派生副本, 禁止手工维护副本。实证: ponytail 20+ agent 平台共用 AGENTS.md; ai-website-cloner-template 用 sync-agent-rules.sh/sync-skills.mjs 从 AGENTS.md+SKILL.md 生成各平台副本。与写入门禁一致: 手工追加派生副本会被下次生成覆盖。
