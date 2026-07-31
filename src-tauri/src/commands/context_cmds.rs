@@ -110,7 +110,7 @@ impl Default for CompactionConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CompactionStats {
     pub total_compactions: u32,
     pub total_chars_reduced: u64,
@@ -442,8 +442,26 @@ pub fn context_check_threshold(session_id: String) -> Result<bool, String> {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn reset_state() {
+        if let Ok(mut state) = STATE.lock() {
+            state.sessions.clear();
+            state.config = CompactionConfig::default();
+            state.stats = CompactionStats {
+                total_compactions: 0,
+                total_chars_reduced: 0,
+                avg_reduction_pct: 0.0,
+                sessions_compacted: 0,
+                storage_saved_bytes: 0,
+            };
+        }
+    }
+
     #[test]
     fn test_context_analyze() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let info = context_analyze("test-session-1".into()).unwrap();
         assert_eq!(info.session_id, "test-session-1");
         assert!(info.current_chars > 0);
@@ -453,6 +471,8 @@ mod tests {
 
     #[test]
     fn test_context_compact() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let result = context_compact("compact-test".into(), Some("aggressive".into()), Some("hybrid".into())).unwrap();
         assert_eq!(result.session_id, "compact-test");
         assert!(result.reduction_pct >= 65.0 && result.reduction_pct <= 75.0);
@@ -464,6 +484,8 @@ mod tests {
 
     #[test]
     fn test_context_stats() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         // Compact a session first to generate stats
         let _ = context_compact("stats-test".into(), Some("light".into()), None);
         let stats = context_stats().unwrap();
@@ -474,6 +496,8 @@ mod tests {
 
     #[test]
     fn test_context_summarize() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let long = "This is the first sentence of a very long document. It contains important information about the system architecture. We decided to use VSA HyperCube for knowledge representation. This is another sentence that should be truncated.";
         let summary = context_summarize(long.into(), Some(60)).unwrap();
         assert!(summary.len() <= 80);
@@ -482,6 +506,8 @@ mod tests {
 
     #[test]
     fn test_context_extract_decisions() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let text = "We decided to use Rust for the core engine. We selected Python for prototyping. We will use Tauri for the desktop app. The team opted for SQLite as the database. Some unrelated text here.";
         let decisions = context_extract_decisions(text.into()).unwrap();
         assert!(decisions.len() >= 3);
@@ -491,6 +517,8 @@ mod tests {
 
     #[test]
     fn test_context_config_default() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let config = context_config().unwrap();
         assert!(config.enabled);
         assert!(config.auto_compact);
@@ -499,6 +527,8 @@ mod tests {
 
     #[test]
     fn test_context_set_config() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let mut config = CompactionConfig::default();
         config.auto_compact_threshold_chars = 100000;
         config.enabled = false;

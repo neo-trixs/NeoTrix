@@ -473,6 +473,8 @@ pub fn agent_view_tick() -> Result<AgentViewSummary, String> {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
     fn reset_state() {
         if let Ok(mut state) = STATE.lock() {
             *state = init_state();
@@ -481,6 +483,7 @@ mod tests {
 
     #[test]
     fn test_summary_has_eight_sessions() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let summary = agent_view_summary().unwrap();
         assert_eq!(summary.total_sessions, 8);
@@ -488,6 +491,7 @@ mod tests {
 
     #[test]
     fn test_list_returns_sessions() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let list = agent_view_list().unwrap();
         assert_eq!(list.len(), 8);
@@ -499,6 +503,7 @@ mod tests {
 
     #[test]
     fn test_get_finds_session() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let session = agent_view_get("s-cli-001".into()).unwrap();
         assert_eq!(session.name, "CLI Session");
@@ -508,6 +513,7 @@ mod tests {
 
     #[test]
     fn test_get_returns_error_for_missing() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let result = agent_view_get("nonexistent".into());
         assert!(result.is_err());
@@ -515,6 +521,7 @@ mod tests {
 
     #[test]
     fn test_pause_changes_status() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         agent_view_pause("s-cli-001".into()).unwrap();
         let session = agent_view_get("s-cli-001".into()).unwrap();
@@ -523,6 +530,7 @@ mod tests {
 
     #[test]
     fn test_pause_nonexistent_returns_error() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let result = agent_view_pause("nonexistent".into());
         assert!(result.is_err());
@@ -530,6 +538,7 @@ mod tests {
 
     #[test]
     fn test_resume_changes_status() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         agent_view_pause("s-cli-001".into()).unwrap();
         agent_view_resume("s-cli-001".into()).unwrap();
@@ -539,6 +548,7 @@ mod tests {
 
     #[test]
     fn test_cancel_changes_status() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         agent_view_cancel("s-cli-001".into()).unwrap();
         let session = agent_view_get("s-cli-001".into()).unwrap();
@@ -547,6 +557,7 @@ mod tests {
 
     #[test]
     fn test_events_returns_log() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let events = agent_view_events("s-cli-001".into(), Some(10)).unwrap();
         assert!(!events.is_empty());
@@ -555,6 +566,7 @@ mod tests {
 
     #[test]
     fn test_config_default() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let config = agent_view_config().unwrap();
         assert!(config.enabled);
@@ -564,6 +576,7 @@ mod tests {
 
     #[test]
     fn test_set_config() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let new_config = AgentViewConfig {
             enabled: false,
@@ -581,6 +594,7 @@ mod tests {
 
     #[test]
     fn test_tick_advances_progress() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset_state();
         let before = agent_view_get("s-desk-002".into()).unwrap();
         let progress_before = before.progress_pct;

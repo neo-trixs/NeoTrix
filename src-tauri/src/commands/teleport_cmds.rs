@@ -460,25 +460,26 @@ pub fn agent_team_result(team_id: String) -> Result<AgentTeamResult, String> {
 mod tests {
     use super::*;
 
-    fn cleanup_teleport() {
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn reset_state() {
         if let Ok(mut state) = STATE.lock() {
             state.teleport_sessions.clear();
             state.teleport_codes.clear();
             state.config = TeleportConfig::default();
-        }
-    }
-
-    fn cleanup_teams() {
-        if let Ok(mut state) = STATE.lock() {
             state.teams.clear();
             state.team_members.clear();
             state.team_messages.clear();
+            state.session_counter = 0;
+            state.team_counter = 0;
+            state.member_counter = 0;
         }
     }
 
     #[test]
     fn test_teleport_create_code() {
-        cleanup_teleport();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let code = teleport_create("cli".into(), "session-data".into()).unwrap();
         assert_eq!(code.code.len(), 6);
         assert!(!code.used);
@@ -488,7 +489,8 @@ mod tests {
 
     #[test]
     fn test_teleport_claim() {
-        cleanup_teleport();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let code = teleport_create("desktop".into(), "claim-test".into()).unwrap();
         let session = teleport_claim(code.code.clone(), "mobile".into()).unwrap();
         assert!(session.claimed);
@@ -502,7 +504,8 @@ mod tests {
 
     #[test]
     fn test_agent_team_create() {
-        cleanup_teams();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id = agent_team_create("test-team".into(), "a test team".into(), "parallel".into()).unwrap();
         assert!(id.starts_with("team-"));
 
@@ -512,7 +515,8 @@ mod tests {
 
     #[test]
     fn test_agent_team_add_member() {
-        cleanup_teams();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let team_id = agent_team_create("dev-team".into(), "dev".into(), "sequential".into()).unwrap();
         let m1 = agent_team_add_member(team_id.clone(), "lead".into(), "design".into()).unwrap();
         assert!(m1.starts_with("mbr-"));
@@ -528,7 +532,8 @@ mod tests {
 
     #[test]
     fn test_agent_team_start() {
-        cleanup_teams();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let team_id = agent_team_create("start-team".into(), "start test".into(), "parallel".into()).unwrap();
         let m1 = agent_team_add_member(team_id.clone(), "worker".into(), "task-1".into()).unwrap();
         let m2 = agent_team_add_member(team_id.clone(), "worker".into(), "task-2".into()).unwrap();

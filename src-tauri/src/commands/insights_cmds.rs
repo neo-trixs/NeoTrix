@@ -701,9 +701,23 @@ pub fn insights_reset() -> Result<(), String> {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn reset_state() {
+        if let Ok(mut state) = STATE.lock() {
+            state.events.clear();
+            state.cards.clear();
+            state.config = InsightsConfig::default();
+            state.stats = InsightsStats::default();
+            state.next_event_id = 1;
+            state.next_card_id = 1;
+        }
+    }
+
     #[test]
     fn test_record_event() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id = insights_record_event(
             "command_executed".to_string(),
             "Ran cargo build".to_string(),
@@ -718,7 +732,8 @@ mod tests {
 
     #[test]
     fn test_generate_card() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         insights_record_event(
             "command_executed".to_string(),
             "test".to_string(),
@@ -737,7 +752,8 @@ mod tests {
 
     #[test]
     fn test_card_list_and_get() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let card = insights_generate_card(None, None, None).unwrap();
         let list = insights_card_list().unwrap();
         assert!(!list.is_empty());
@@ -747,7 +763,8 @@ mod tests {
 
     #[test]
     fn test_card_share() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let card = insights_generate_card(None, None, None).unwrap();
         let url = insights_card_share(card.id.clone()).unwrap();
         assert!(url.contains("neotrix.ai/card/"));
@@ -757,7 +774,8 @@ mod tests {
 
     #[test]
     fn test_insights_generate() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let insights = insights_insights(Some("week".to_string())).unwrap();
         assert_eq!(insights.len(), 5);
         assert!(insights.iter().any(|i| i.insight_type == "streak"));
@@ -766,7 +784,8 @@ mod tests {
 
     #[test]
     fn test_config_set_and_get() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let config = InsightsConfig {
             enabled: false,
             track_activity: false,
@@ -783,14 +802,16 @@ mod tests {
 
     #[test]
     fn test_stats() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let stats = insights_stats().unwrap();
         assert_eq!(stats.total_events_tracked, 0);
     }
 
     #[test]
     fn test_trend() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let trend = insights_trend(Some(7)).unwrap();
         assert!(trend.get("dates").is_some());
         assert!(trend.get("trend_direction").is_some());
@@ -798,7 +819,8 @@ mod tests {
 
     #[test]
     fn test_daily_with_date() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let today = Utc::now().format("%Y-%m-%d").to_string();
         let daily = insights_daily(Some(today.clone())).unwrap();
         assert_eq!(daily.date, today);
@@ -806,14 +828,16 @@ mod tests {
 
     #[test]
     fn test_weekly_summary() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let weekly = insights_weekly(None).unwrap();
         assert!(weekly.overall_productivity_score <= 100);
     }
 
     #[test]
     fn test_reset_clears_everything() {
-        let _ = insights_reset();
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         insights_record_event("command_executed".to_string(), "x".to_string(), None, None, None).unwrap();
         insights_generate_card(None, None, None).unwrap();
         insights_reset().unwrap();

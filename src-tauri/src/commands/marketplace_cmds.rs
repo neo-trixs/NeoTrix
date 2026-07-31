@@ -456,6 +456,8 @@ pub fn marketplace_featured() -> Result<Vec<MarketplacePlugin>, String> {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
     fn reset() {
         let mut state = MARKETPLACE.lock().unwrap();
         state.installed.clear();
@@ -469,6 +471,7 @@ mod tests {
 
     #[test]
     fn test_marketplace_list_default() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let result = marketplace_list(None, None, None).unwrap();
         assert_eq!(result.total, 20);
@@ -479,6 +482,7 @@ mod tests {
 
     #[test]
     fn test_marketplace_list_category_filter() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let result = marketplace_list(Some("security".into()), None, None).unwrap();
         assert_eq!(result.total, 4);
@@ -487,6 +491,7 @@ mod tests {
 
     #[test]
     fn test_marketplace_search_by_name() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let result = marketplace_search("scanner".into(), None, None).unwrap();
         assert!(result.total > 0);
@@ -495,6 +500,7 @@ mod tests {
 
     #[test]
     fn test_marketplace_install_uninstall() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let msg = marketplace_install("code-scanner".into()).unwrap();
         assert!(msg.contains("Installed"));
@@ -512,6 +518,7 @@ mod tests {
 
     #[test]
     fn test_marketplace_featured() {
+        let _guard = TEST_LOCK.lock().unwrap();
         reset();
         let featured = marketplace_featured().unwrap();
         assert_eq!(featured.len(), 4);

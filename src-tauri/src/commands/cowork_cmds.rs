@@ -707,8 +707,21 @@ pub fn cowork_export_session(session_id: String, format: Option<String>) -> Resu
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn reset_state() {
+        if let Ok(mut state) = COWORK.lock() {
+            state.sessions.clear();
+            state.actions.clear();
+            state.deliverables.clear();
+            state.config = CoworkConfig::default();
+        }
+    }
+
     #[test]
     fn test_cowork_start_and_get() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id = cowork_start("/tmp".into(), "test session".into(), Some("test".into()), None).unwrap();
         assert!(id.starts_with("cw-"));
         let session = cowork_get(id.clone()).unwrap();
@@ -719,6 +732,8 @@ mod tests {
 
     #[test]
     fn test_cowork_pause_resume_stop() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id = cowork_start("/tmp".into(), "pause test".into(), None, None).unwrap();
         cowork_pause(id.clone()).unwrap();
         assert_eq!(cowork_get(id.clone()).unwrap().status, "paused");
@@ -730,6 +745,8 @@ mod tests {
 
     #[test]
     fn test_cowork_list() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let _ = cowork_start("/tmp".into(), "list test".into(), None, None).unwrap();
         let sessions = cowork_list().unwrap();
         assert!(!sessions.is_empty());
@@ -737,6 +754,8 @@ mod tests {
 
     #[test]
     fn test_cowork_config_default() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let cfg = cowork_config().unwrap();
         assert!(cfg.enabled);
         assert_eq!(cfg.max_files_per_scan, 500);
@@ -746,6 +765,8 @@ mod tests {
 
     #[test]
     fn test_cowork_templates() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let templates = cowork_templates(None).unwrap();
         assert_eq!(templates.len(), 6);
         let doc_templates = cowork_templates(Some("writing".into())).unwrap();
@@ -754,6 +775,8 @@ mod tests {
 
     #[test]
     fn test_cowork_set_config() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let cfg = CoworkConfig {
             enabled: false,
             max_files_per_scan: 100,
@@ -773,6 +796,8 @@ mod tests {
 
     #[test]
     fn test_cowork_stats() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id = cowork_start("/tmp".into(), "stats test".into(), None, None).unwrap();
         let _ = cowork_write_file(id.clone(), "/tmp/cowork_test_stats.txt".into(), "hello".into());
         let stats = cowork_stats().unwrap();

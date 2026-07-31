@@ -412,8 +412,21 @@ pub fn term_tabs_stats() -> Result<serde_json::Value, String> {
 mod tests {
     use super::*;
 
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn reset_state() {
+        if let Ok(mut state) = STATE.lock() {
+            state.sessions.clear();
+            state.groups.clear();
+            state.layouts.clear();
+            state.config = TerminalTabConfig::default();
+        }
+    }
+
     #[test]
     fn test_term_tabs_create_and_list() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id = term_tabs_create("ts-session".into(), None, None, None, None).unwrap();
         assert!(id.starts_with("tab-"));
 
@@ -425,6 +438,8 @@ mod tests {
 
     #[test]
     fn test_term_tabs_rename_and_activate() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id = term_tabs_create("ra-test".into(), None, None, None, None).unwrap();
         term_tabs_rename(id.clone(), "MyTab".into()).unwrap();
 
@@ -441,6 +456,8 @@ mod tests {
 
     #[test]
     fn test_term_tabs_close_activates_next() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id1 = term_tabs_create("ct-test".into(), Some("A".into()), None, None, None).unwrap();
         let id2 = term_tabs_create("ct-test".into(), Some("B".into()), None, None, None).unwrap();
         term_tabs_activate(id1.clone()).unwrap();
@@ -454,6 +471,8 @@ mod tests {
 
     #[test]
     fn test_term_tabs_group_create_and_delete() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
         let id1 = term_tabs_create("grp-test".into(), Some("A".into()), None, None, None).unwrap();
         let id2 = term_tabs_create("grp-test".into(), Some("B".into()), None, None, None).unwrap();
 
