@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useStore } from "../../stores";
@@ -119,6 +119,9 @@ export function ChatView({
 
   const hasMessages = messages.length > 0 || !!streamingContent;
 
+  const hasStreamed = !!streamingContent;
+  const showThinking = agentBusy && !hasStreamed && messages.length > 0;
+
   return (
     <div className={styles.container}>
       {/* Messages */}
@@ -126,6 +129,12 @@ export function ChatView({
         {messages.map((msg, idx) => (
           <MessageBubble key={idx} message={msg} />
         ))}
+        {showThinking && (
+          <div className={styles.thinking}>
+            <span className={styles.thinkingDot} />
+            思考中…
+          </div>
+        )}
         {streamingContent && (
           <MessageBubble
             message={{ role: streamingRole, content: streamingContent, contentType: "markdown" }}
@@ -174,7 +183,18 @@ function MessageBubble({
   message: { role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number };
   isStreaming?: boolean;
 }) {
+  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const { html, codeBlocks } = renderContent(message.content, message.contentType);
+  const diffStats = useMemo(() => {
+    let added = 0;
+    let removed = 0;
+    const lines = message.content.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("+")) added++;
+      else if (line.startsWith("-")) removed++;
+    }
+    return added > 0 || removed > 0 ? { added, removed } : null;
+  }, [message.content]);
   const roleClass = roleClassMap[message.role] || styles.messageAssistant;
   const avatar = roleAvatarMap[message.role] || ASSISTANT_AVATAR;
 
@@ -191,6 +211,12 @@ function MessageBubble({
         {codeBlocks > 0 && (
           <div className={styles.codeIndicator}>
             {codeBlocks} 代码块
+            {diffStats && (
+              <span className={styles.diffStat}>
+                <span className={styles.add}>+{diffStats.added}</span>
+                <span className={styles.remove}>-{diffStats.removed}</span>
+              </span>
+            )}
           </div>
         )}
         {message.timestamp && <div className={styles.time}>{formatTimestamp(message.timestamp)}</div>}
@@ -200,6 +226,20 @@ function MessageBubble({
             <path d="M8 2v4h-2V2h-4v4H4v8h6V6h2v4a2 2 0 002 2h4a2 2 0 002-2V4a2 2 0 00-2-2h-4z" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
+        {!isStreaming && message.role === "assistant" && (
+          <div className={styles.feedback}>
+            <button className={styles.feedbackBtn} onClick={() => setFeedback("up")} title="有帮助" aria-label="有帮助">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 10l3-6h4l-1 6h3l-3 6H5l1-6H3z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button className={styles.feedbackBtn} onClick={() => setFeedback("down")} title="无帮助" aria-label="无帮助">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 4l3 6h4l-1-6h3l3 6H9l1-6H5z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

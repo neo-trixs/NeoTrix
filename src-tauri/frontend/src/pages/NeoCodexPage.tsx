@@ -25,6 +25,7 @@ export default function NeoCodexPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [health, setHealth] = useState<any>(null);
 
   // Load sessions on mount
@@ -127,6 +128,7 @@ export default function NeoCodexPage() {
       { id: "new", label: "新建会话", hint: "⌘N", onSelect: () => window.dispatchEvent(new CustomEvent("neotrix:new-session")) },
       { id: "settings", label: "设置", hint: "⌘,", onSelect: () => setShowSettings(true) },
       { id: "sidebar", label: showSidebar ? "收起侧栏" : "展开侧栏", hint: "⌘B", onSelect: () => setShowSidebar((v) => !v) },
+      { id: "focus", label: focusMode ? "退出专注模式" : "专注模式", hint: "⌘Shift+F", onSelect: () => setFocusMode((v) => !v) },
     ];
     (["Agent", "Shell", "Plan"] as const).forEach((m) => {
       items.push({ id: `mode-${m}`, label: `切换到 ${m} 模式`, hint: "Mode", onSelect: () => handleModeChange(m) });
@@ -135,9 +137,9 @@ export default function NeoCodexPage() {
       items.push({ id: `session-${s.id}`, label: s.name || "未命名会话", hint: s.mode, onSelect: () => handleSessionSelect(s) });
     });
     return items;
-  }, [neocodexSessions, showSidebar]);
+  }, [neocodexSessions, showSidebar, focusMode]);
 
-  // Keyboard shortcuts: Cmd+K palette, Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle
+  // Keyboard shortcuts: Cmd+K palette, Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle, Cmd+Shift+F focus
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -152,6 +154,9 @@ export default function NeoCodexPage() {
       } else if (e.key === "b" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setShowSidebar((v) => !v);
+      } else if (e.key === "f" && e.metaKey && e.shiftKey) {
+        e.preventDefault();
+        setFocusMode((v) => !v);
       } else if (e.key === "Tab" && e.ctrlKey) {
         e.preventDefault();
         if (neocodexSessions.length === 0) return;
@@ -162,7 +167,7 @@ export default function NeoCodexPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [neocodexSessions, neocodexActiveSessionId]);
+  }, [neocodexSessions, neocodexActiveSessionId, focusMode]);
 
   return (
     <div className={styles.container}>
@@ -184,8 +189,8 @@ export default function NeoCodexPage() {
         </aside>
       )}
 
-      <main className={styles.main}>
-        <header className={styles.topBar}>
+      <main className={`${styles.main} ${focusMode ? styles.focusMode : ""}`}>
+        <header className={`${styles.topBar} ${focusMode ? styles.focusMode : ""}`}>
           <button className={styles.mobileMenuBtn} onClick={() => setShowSidebar(true)}>
             <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 4l4 3-4 3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -214,6 +219,16 @@ export default function NeoCodexPage() {
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="7" cy="7" r="2.2" />
                 <path d="M7 1.5v1.8M7 10.7v1.8M1.5 7h1.8M10.7 7h1.8M3.1 3.1l1.3 1.3M9.6 9.6l1.3 1.3M3.1 10.9l1.3-1.3M9.6 4.4l1.3-1.3" strokeLinecap="round" />
+              </svg>
+            </button>
+            <button
+              className={styles.settingsBtn}
+              onClick={() => setFocusMode((v) => !v)}
+              title={focusMode ? "退出专注" : "专注模式"}
+            >
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="7" cy="7" r="3" />
+                <path d="M7 1v2M7 11v2M1 7h2M11 7h2" strokeLinecap="round" />
               </svg>
             </button>
           </div>

@@ -275,6 +275,76 @@
   border-color: var(--border-primary);
 }
 
+.feedback {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.bubble:hover .feedback {
+  opacity: 1;
+}
+
+.feedbackBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--fg-tertiary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.feedbackBtn:hover {
+  color: var(--accent-primary);
+  border-color: var(--border-primary);
+}
+
+.feedbackBtn.active {
+  color: var(--accent-primary);
+  background: var(--accent-bg);
+}
+
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  font-style: italic;
+}
+
+.thinkingDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fg-tertiary);
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.diffStat {
+  display: inline-flex;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+}
+
+.diffStat .add { color: var(--success); }
+.diffStat .remove { color: var(--danger); }
+
 .streaming {
   animation: fadeIn 0.1s ease-out;
 }
