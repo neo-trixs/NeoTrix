@@ -1,9 +1,6 @@
-import type { Session, ProviderConfig, KnowledgeEntry, AppSettings } from "../types";
+import type { AppSettings } from "../types";
 
 const KEYS = {
-  sessions: "neotrix_sessions",
-  providerConfig: "neotrix_provider",
-  knowledgeBase: "neotrix_knowledge",
   settings: "neotrix_settings",
 } as const;
 
@@ -25,27 +22,6 @@ function safeSet(key: string, value: unknown): void {
 }
 
 export const persistence = {
-  loadSessions(): Session[] {
-    return safeGet<Session[]>(KEYS.sessions, []);
-  },
-  saveSessions(sessions: Session[]): void {
-    safeSet(KEYS.sessions, sessions);
-  },
-
-  loadProviderConfig(): ProviderConfig | null {
-    return safeGet<ProviderConfig | null>(KEYS.providerConfig, null);
-  },
-  saveProviderConfig(config: ProviderConfig): void {
-    safeSet(KEYS.providerConfig, config);
-  },
-
-  loadKnowledgeBase(): KnowledgeEntry[] {
-    return safeGet<KnowledgeEntry[]>(KEYS.knowledgeBase, []);
-  },
-  saveKnowledgeBase(entries: KnowledgeEntry[]): void {
-    safeSet(KEYS.knowledgeBase, entries);
-  },
-
   loadSettings(): AppSettings | null {
     return safeGet<AppSettings | null>(KEYS.settings, null);
   },

@@ -70,7 +70,24 @@
 .topBarCenter {
   flex: 1;
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
+}
+
+.modeSelect {
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--fg-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.modeSelect:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .topBarRight {

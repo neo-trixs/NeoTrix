@@ -4,19 +4,12 @@ import { DEFAULT_SETTINGS } from "../stores/store-utils";
 
 beforeEach(() => {
   useStore.setState({
-    sessions: [{ id: "default", name: "默认会话", messages: [] }],
-    activeSessionIndex: 0,
-    statusText: "就绪",
-    pendingPermission: null,
-    providerConfig: {
-      id: "anthropic",
-      name: "Anthropic Claude",
-      model: "claude-sonnet-4-20250514",
-      apiKey: "",
-      learningRate: 0.05,
-    },
-    knowledgeBase: [],
     settings: { ...DEFAULT_SETTINGS },
+    neocodexMode: "Agent",
+    neocodexMessages: [],
+    neocodexStreaming: null,
+    neocodexSessions: [],
+    neocodexActiveSessionId: null,
     updateAvailable: false,
     updateStatus: "",
     notifications: [],
@@ -24,56 +17,57 @@ beforeEach(() => {
 });
 
 describe("useStore", () => {
-  it("should start with default session", () => {
-    const { sessions } = useStore.getState();
-    expect(sessions).toHaveLength(1);
-    expect(sessions[0].name).toBe("默认会话");
+  it("should expose default settings", () => {
+    const { settings } = useStore.getState();
+    expect(settings.theme).toBe("light");
   });
 
-  it("should add a new session", () => {
-    useStore.getState().addSession();
-    const { sessions, activeSessionIndex } = useStore.getState();
-    expect(sessions).toHaveLength(2);
-    expect(activeSessionIndex).toBe(1);
+  it("should update settings", () => {
+    useStore.getState().setSettings({ ...DEFAULT_SETTINGS, theme: "dark" });
+    expect(useStore.getState().settings.theme).toBe("dark");
   });
 
-  it("should push a user message", () => {
-    useStore.getState().pushMessage("user", "hello");
-    const messages = useStore.getState().sessions[0].messages;
+  it("should start in Agent mode with empty messages", () => {
+    const { neocodexMode, neocodexMessages } = useStore.getState();
+    expect(neocodexMode).toBe("Agent");
+    expect(neocodexMessages).toHaveLength(0);
+  });
+
+  it("should switch neocodex mode", () => {
+    useStore.getState().setNeoCodexMode("Plan");
+    expect(useStore.getState().neocodexMode).toBe("Plan");
+  });
+
+  it("should add a neocodex message", () => {
+    useStore.getState().addNeoCodexMessage({ role: "user", content: "hello", timestamp: Date.now() });
+    const messages = useStore.getState().neocodexMessages;
     expect(messages).toHaveLength(1);
-    expect(messages[0].role).toBe("user");
     expect(messages[0].content).toBe("hello");
   });
 
-  it("should push an assistant message", () => {
-    useStore.getState().pushMessage("assistant", "hi there", "markdown");
-    const messages = useStore.getState().sessions[0].messages;
-    expect(messages).toHaveLength(1);
-    expect(messages[0].contentType).toBe("markdown");
+  it("should set streaming content", () => {
+    useStore.getState().setNeoCodexStreaming({ content: "hi", role: "assistant" });
+    expect(useStore.getState().neocodexStreaming?.content).toBe("hi");
   });
 
-  it("should remove a session", () => {
-    useStore.getState().addSession();
-    useStore.getState().removeSession(1);
-    const { sessions } = useStore.getState();
-    expect(sessions).toHaveLength(1);
+  it("should set neocodex sessions", () => {
+    useStore.getState().setNeoCodexSessions([
+      { id: "s1", name: "测试", mode: "Agent", messages: [], wire_path: "", created_at: 0, updated_at: 0 },
+    ]);
+    expect(useStore.getState().neocodexSessions).toHaveLength(1);
+    expect(useStore.getState().neocodexSessions[0].name).toBe("测试");
   });
 
-  it("should update provider config", () => {
-    useStore.getState().setProviderConfig({
-      id: "openai",
-      name: "OpenAI",
-      model: "gpt-4",
-      apiKey: "sk-test",
-      learningRate: 0.1,
-    });
-    const { providerConfig } = useStore.getState();
-    expect(providerConfig.id).toBe("openai");
-    expect(providerConfig.model).toBe("gpt-4");
+  it("should set active session", () => {
+    useStore.getState().setNeoCodexActiveSession("s1");
+    expect(useStore.getState().neocodexActiveSessionId).toBe("s1");
   });
 
-  it("should set status text", () => {
-    useStore.getState().setStatusText("思考中...");
-    expect(useStore.getState().statusText).toBe("思考中...");
+  it("should manage notifications", () => {
+    useStore.getState().addNotification({ type: "info", message: "hi", duration: 3000 });
+    expect(useStore.getState().notifications).toHaveLength(1);
+    const id = useStore.getState().notifications[0].id;
+    useStore.getState().removeNotification(id);
+    expect(useStore.getState().notifications).toHaveLength(0);
   });
 });

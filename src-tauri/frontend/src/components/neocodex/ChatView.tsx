@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useStore } from "../../stores";
-import type { Message, NeoCodexMode } from "../../types";
+import type { Message } from "../../types";
 import styles from "./ChatView.module.css";
 
 const USER_AVATAR = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="10" height="8" rx="1.5"/><circle cx="7" cy="7" r="1.5"/></svg>`;
@@ -66,11 +66,8 @@ interface ChatViewProps {
   streamingContent?: string;
   streamingRole?: "user" | "assistant";
   agentBusy: boolean;
-  mode: NeoCodexMode;
   onSend: (content: string) => void;
-  onModeToggle: () => void;
   onAddGoal: (desc: string, maxIter: number) => void;
-  onResume: () => void;
 }
 
 export function ChatView({
@@ -78,11 +75,8 @@ export function ChatView({
   streamingContent,
   streamingRole = "assistant",
   agentBusy,
-  mode,
   onSend,
-  onModeToggle,
   onAddGoal,
-  onResume,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -127,37 +121,6 @@ export function ChatView({
 
   return (
     <div className={styles.container}>
-      {/* Header / Status Bar */}
-      <header className={styles.header}>
-        <div className={styles.headerLeft}>
-          <select
-            value={mode}
-            onChange={(e) => onModeToggle()}
-            className={styles.modeSelect}
-            disabled={agentBusy}
-          >
-            <option value="Agent">Agent</option>
-            <option value="Shell">Shell</option>
-            <option value="Plan">Plan</option>
-          </select>
-          <button className={styles.iconBtn} onClick={onResume} title="Resume session" disabled={agentBusy}>
-            <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M10 7a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M7 4v3l2 2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <button className={styles.iconBtn} onClick={() => setShowGoalDialog(true)} title="Add goal" disabled={agentBusy}>
-            <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
-        <div className={styles.headerRight}>
-          <span className={styles.statusDot} style={{ background: agentBusy ? "#f59e0b" : "#10b981" }} />
-          <span className={styles.statusText}>{agentBusy ? "Thinking..." : "Ready"}</span>
-        </div>
-      </header>
-
       {/* Messages */}
       <main className={styles.messages} ref={messagesEndRef}>
         {messages.map((msg, idx) => (
@@ -179,7 +142,7 @@ export function ChatView({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={agentBusy ? "Waiting for response..." : `${mode} mode — Enter 发送，Shift+Enter 换行`}
+          placeholder={agentBusy ? "Waiting for response..." : "Enter 发送，Shift+Enter 换行"}
           disabled={agentBusy}
           rows={1}
           className={styles.textarea}

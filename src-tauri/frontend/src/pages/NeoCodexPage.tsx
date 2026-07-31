@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useStore } from "../stores";
-import { ChatView, ModelSelector, HealthPanel, SessionSidebar, SettingsView } from "../components/neocodex";
+import { ChatView, ModelSelector, SessionSidebar, SettingsView } from "../components/neocodex";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import styles from "./NeoCodexPage.module.css";
@@ -78,15 +78,6 @@ export default function NeoCodexPage() {
     }
   };
 
-  const handleResume = async () => {
-    try {
-      const count = await invoke("neocodex_resume");
-      console.log(`Resumed ${count} events`);
-    } catch (e) {
-      console.error("Resume failed:", e);
-    }
-  };
-
   const handleSessionSelect = async (session: any) => {
     try {
       const result = await invoke("neocodex_switch_session", { sessionId: session.id }) as string;
@@ -122,6 +113,17 @@ export default function NeoCodexPage() {
           </button>
           <div className={styles.topBarCenter}>
             <ModelSelector />
+            <select
+              value={neocodexMode}
+              onChange={handleModeToggle}
+              className={styles.modeSelect}
+              disabled={agentBusy}
+              title="Mode"
+            >
+              <option value="Agent">Agent</option>
+              <option value="Shell">Shell</option>
+              <option value="Plan">Plan</option>
+            </select>
           </div>
           <div className={styles.topBarRight}>
             <button
@@ -134,7 +136,6 @@ export default function NeoCodexPage() {
                 <path d="M7 1.5v1.8M7 10.7v1.8M1.5 7h1.8M10.7 7h1.8M3.1 3.1l1.3 1.3M9.6 9.6l1.3 1.3M3.1 10.9l1.3-1.3M9.6 4.4l1.3-1.3" strokeLinecap="round" />
               </svg>
             </button>
-            <HealthPanel compact />
           </div>
         </header>
 
@@ -147,11 +148,8 @@ export default function NeoCodexPage() {
               streamingContent={neocodexStreaming?.content}
               streamingRole={neocodexStreaming?.role}
               agentBusy={agentBusy}
-              mode={neocodexMode}
               onSend={handleSend}
-              onModeToggle={handleModeToggle}
               onAddGoal={handleAddGoal}
-              onResume={handleResume}
             />
           )}
         </div>

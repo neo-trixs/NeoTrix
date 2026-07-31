@@ -4,7 +4,6 @@ import { RouterProvider } from "react-router-dom";
 import router from "./router";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { captureConsoleErrors } from "./lib/error-reporter";
-import "@xterm/xterm/css/xterm.css";
 import "./styles/global.css";
 
 captureConsoleErrors();
