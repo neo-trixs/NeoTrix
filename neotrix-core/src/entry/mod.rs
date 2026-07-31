@@ -506,7 +506,9 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                     eprintln!("{}: {}", err("Reasoning error"), e);
                 }
             }
-            let _ = agent.brain.save();
+            if let Err(e) = agent.brain.save() {
+                eprintln!("{}: {}", err("Failed to save brain state"), e);
+            }
         });
     } else {
         // Non-streaming mode — original behavior with progress bar
@@ -567,7 +569,9 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                     }
                 }
             }
-            let _ = agent.brain.save();
+            if let Err(e) = agent.brain.save() {
+                eprintln!("{}: {}", err("Failed to save brain state"), e);
+            }
         });
     }
 }
