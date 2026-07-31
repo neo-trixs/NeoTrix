@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::collections::HashMap;
 use crate::core::nt_core_consciousness_tree::{
     BranchKind, CapabilityBranch, ConsciousnessTree, VulnerabilityFinding, VulnerabilitySeverity,
@@ -164,7 +166,7 @@ impl ConsciousnessReview {
         let mut low_maturity_branches: Vec<(&BranchKind, &CapabilityBranch)> = tree.branches.iter()
             .filter(|(_, b)| b.maturity_score() < 0.33)
             .collect();
-        low_maturity_branches.sort_by(|a, b| a.1.maturity_score().partial_cmp(&b.1.maturity_score()).unwrap());
+        low_maturity_branches.sort_by(|a, b| a.1.maturity_score().total_cmp(&b.1.maturity_score()));
         for (kind, branch) in low_maturity_branches.iter().take(3) {
             phase += 1;
             path.push(EvolutionStep {

@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![deny(clippy::unwrap_used)]
 
 use std::collections::HashSet;
 use std::fs;
@@ -101,10 +102,13 @@ fn walk_mod_files(src: &Path, dir: &Path, findings: &mut Vec<AuditFinding>, dept
         }
         i += 1;
     }
-    let mut entries: Vec<PathBuf> = fs::read_dir(dir).unwrap()
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.is_dir())
-        .collect();
+    let mut entries: Vec<PathBuf> = match fs::read_dir(dir) {
+        Ok(iter) => iter
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.is_dir())
+            .collect(),
+        Err(_) => Vec::new(),
+    };
     entries.sort();
     for sub in entries {
         walk_mod_files(src, &sub, findings, depth + 1);
@@ -159,7 +163,7 @@ fn collect_declared_paths(src: &Path) -> HashSet<PathBuf> {
         .collect();
 
     for mod_rs in &all_mods {
-        let dir = mod_rs.parent().unwrap();
+        let dir = mod_rs.parent().unwrap_or_else(|| Path::new("."));
         if let Ok(content) = fs::read_to_string(mod_rs) {
             for line in content.lines() {
                 let trimmed = line.trim();

@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![deny(clippy::unwrap_used)]
 
 use std::collections::{HashSet, VecDeque};
 
@@ -51,12 +52,12 @@ impl DirectedSearch {
             if path.len() > self.max_depth {
                 continue;
             }
-            if let Some(node) = graph.nodes.iter().find(|n| n.id == *path.last().unwrap()) {
+            if let Some(node) = graph.nodes.iter().find(|n| n.id == path.last().copied().unwrap_or(start)) {
                 if goal(node) {
                     results.push(path.clone());
                 }
             }
-            let last = *path.last().unwrap();
+                let last = path.last().copied().unwrap_or(start);
             if let Some(neighbors) = graph.adjacency.get(&last) {
                 for &(next, _) in neighbors {
                     if !path.contains(&next) {
@@ -108,7 +109,7 @@ impl DirectedSearch {
             }
             let mut all_extensions = Vec::new();
             for path in &candidates {
-                let last = *path.last().unwrap();
+            let last = path.last().copied().unwrap_or(start);
                 if let Some(n) = graph.nodes.iter().find(|n| n.id == last) {
                     if goal(n) {
                         results.push(path.clone());

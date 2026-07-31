@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -756,14 +758,16 @@ impl ConsciousnessTree {
         self.core.evolution_path = scan_report.evolution_path;
 
         // ═══ Phase 6: Contract Fulfillment Verification ═══
-        let fulfillment = self.verify_contract_fulfillment(self.core.last_contract.as_ref().unwrap());
-        self.core.contract_fulfillment = Some(fulfillment.clone());
-        report.phase6_fulfillment = Some(fulfillment.clone());
-
         // ═══ Phase 7: Drift Audit — post-cycle evolution fidelity check ═══
-        let drift_report = self.audit_drift(self.core.last_contract.as_ref().unwrap(), &fulfillment);
-        self.core.drift_report = Some(drift_report.clone());
-        report.phase7_drift = Some(drift_report);
+        if let Some(contract) = self.core.last_contract.as_ref() {
+            let fulfillment = self.verify_contract_fulfillment(contract);
+            self.core.contract_fulfillment = Some(fulfillment.clone());
+            report.phase6_fulfillment = Some(fulfillment.clone());
+
+            let drift_report = self.audit_drift(contract, &fulfillment);
+            self.core.drift_report = Some(drift_report.clone());
+            report.phase7_drift = Some(drift_report);
+        }
 
         report.phase4_guidance = self.core.last_cycle_guidance.len();
 

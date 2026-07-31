@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::fs;
 use std::path::Path;
 
@@ -41,11 +43,11 @@ pub fn select_centroids(vectors: &[Vec<u8>], k: usize) -> Vec<Vec<u8>> {
     let mut min_dists = vec![u64::MAX; vectors.len()];
 
     for _ in 1..k {
-        let last = centroids.last().unwrap();
+        let last = centroids.last().unwrap_or(&centroids[0]).clone();
         let mut total_dist: u64 = 0;
 
         for (i, v) in vectors.iter().enumerate() {
-            let d = hamming_distance(v, last);
+            let d = hamming_distance(v, &last);
             min_dists[i] = min_dists[i].min(d);
             total_dist += min_dists[i];
         }

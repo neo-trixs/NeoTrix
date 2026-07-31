@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use super::fhrr_vsa::{FhrrHyperCube, similarity, bundle_two};
 use rand::Rng;
 
@@ -148,9 +150,8 @@ impl ReflectionConsolidation {
             // Find top-K similar symbols (excluding self and composites)
             let mut similarities: Vec<(usize, f64)> = (0..names.len())
                 .filter(|&j| j != i && !names[j].starts_with("composite:"))
-                .map(|j| {
-                    let vec_b = hc.get_symbol(&names[j]).unwrap();
-                    (j, similarity(&vec_a, vec_b))
+                .filter_map(|j| {
+                    hc.get_symbol(&names[j]).map(|vec_b| (j, similarity(&vec_a, vec_b)))
                 })
                 .filter(|(_, sim)| *sim >= self.cross_link_threshold)
                 .collect();
@@ -160,7 +161,8 @@ impl ReflectionConsolidation {
 
             for (j, _) in similarities {
                 let name_b = &names[j];
-                let vec_b = hc.get_symbol(name_b).unwrap().to_vec();
+                let Some(vec_b) = hc.get_symbol(name_b) else { continue };
+                let vec_b = vec_b.to_vec();
                 let composite = bundle_two(&vec_a, &vec_b);
                 let link_name = if name_a < name_b {
                     format!("composite:{}:{}", name_a, name_b)

@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use super::stream_buffer::ConsciousnessStream;
 use super::specious_present::SpeciousPresent;
 use super::volition::{ActionCandidate, VolitionEngine};
@@ -34,10 +36,9 @@ impl ConsciousnessRuntime {
     }
 
     pub fn awaken(&mut self) -> &AwakeningReport {
-        let report = ConsciousnessAwakening::awaken(&mut self.stream, &mut self.specious_present);
         self.awakened = true;
-        self.last_report = Some(report.clone());
-        self.last_report.as_ref().unwrap()
+        let report = ConsciousnessAwakening::awaken(&mut self.stream, &mut self.specious_present);
+        self.last_report.insert(report)
     }
 
     pub fn tick_emotion(&mut self) -> EmotionReport {

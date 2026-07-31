@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use serde::{Deserialize, Serialize};
 use crate::core::nt_core_hex::FullReasoningState;
 use crate::core::nt_core_policy::E8Policy;
@@ -150,7 +152,7 @@ impl PlanGenerator {
         if self.policy.is_some() {
             0.5 + (mode as f64) / 128.0
         } else if !context.is_empty() {
-            let recent = context.last().unwrap();
+            let recent = context.last().unwrap_or(&context[0]);
             let similarity = 1.0 - (recent.mode.0 as f64 - mode as f64).abs() / 64.0;
             0.3 + similarity * 0.5
         } else {

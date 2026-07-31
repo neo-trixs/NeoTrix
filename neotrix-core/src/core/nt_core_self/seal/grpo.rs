@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![deny(clippy::unwrap_used)]
 
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +54,7 @@ impl GRPOLoop {
     pub fn new(config: GrpoConfig, param_size: usize) -> Self {
         let mut rng = simple_lcg(42);
         let policy: Vec<f64> = (0..param_size)
-            .map(|_| (rng.next().unwrap() % 1000) as f64 / 2000.0)
+            .map(|_| (rng.next().unwrap_or(0) % 1000) as f64 / 2000.0)
             .collect();
         let old_policy = policy.clone();
         Self {

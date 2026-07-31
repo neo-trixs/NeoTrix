@@ -7,6 +7,7 @@
 //!
 //! Also supports CoRD-style (Collaborative Reasoning Decoding) step selection
 //! via PRM-scored trajectory pruning.
+#![deny(clippy::unwrap_used)]
 
 use super::E8TransitionMatrix;
 use serde::{Deserialize, Serialize};
@@ -151,7 +152,7 @@ impl E8TraceCompressor {
                 states.push(s);
                 keep_indices.push(i);
             } else {
-                let last_block = states.last().unwrap() & 0xF8;
+                let last_block = states.last().copied().unwrap_or(s) & 0xF8;
                 if block != last_block {
                     states.push(s);
                     keep_indices.push(i);

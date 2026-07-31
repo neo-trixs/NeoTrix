@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used)]
+
 use std::collections::{HashMap, HashSet};
 
 use rusqlite::Connection;
@@ -154,13 +156,11 @@ impl crate::core::nt_core_self_test::SelfTest for SchemaWatchdog {
         let mut w = SchemaWatchdog::new();
 
         // Test 1: known-good fields must not trigger drift
-        for (type_name, fields) in &[
-            ("KnowledgeNode", w.known_schemas.get("KnowledgeNode").unwrap().clone()),
-            ("NodeType", w.known_schemas.get("NodeType").unwrap().clone()),
-            ("RelationType", w.known_schemas.get("RelationType").unwrap().clone()),
-        ] {
-            if w.detect_drift(type_name, fields).is_some() {
-                failures.push(format!("{}: false positive on exact match", type_name));
+        for type_name in ["KnowledgeNode", "NodeType", "RelationType"] {
+            if let Some(fields) = w.known_schemas.get(type_name).cloned() {
+                if w.detect_drift(type_name, &fields).is_some() {
+                    failures.push(format!("{}: false positive on exact match", type_name));
+                }
             }
         }
 
