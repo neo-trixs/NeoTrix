@@ -171,9 +171,10 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
             failures.push(format!("expected 4 promotions artifact→pr, got {}", promoted));
         }
         // gap 存在时不应晋升
-        let mut q = ConvergencePulse::default();
-        q.gaps = vec![ConvergenceGap { domain: "test".into(), description: "open gap".into(), severity: "high".into() }];
-        q.verified = false;
+        let mut q = ConvergencePulse {
+            gaps: vec![ConvergenceGap { domain: "test".into(), description: "open gap".into(), severity: "high".into() }],
+            ..Default::default()
+        };
         let before = q.layer;
         q.advance();
         if q.layer != before {
@@ -1241,13 +1242,14 @@ impl BackgroundLoopHandle {
         // ── Phase 8: ConvergencePulse — 分形收敛循环推进 (Cycle 115/155/160) ──
         // 用本 tick 的检测状态生成 gap, 外部验证通过后推进迭代/晋升层级。
         {
-            let mut results = Vec::new();
-            results.push(("state_substrate".to_string(), !self.state.active_mode.name().is_empty()));
-            results.push(("bbrain".to_string(),
-                self.bbrain.latest_report().map(|r| r.health_score >= 0.0).unwrap_or(false)));
-            results.push(("cog_eval".to_string(), self.cog_eval.latest_report().is_some()));
-            results.push(("gold_standard".to_string(),
-                self.gold_standard.as_ref().map(|_| true).unwrap_or(false)));
+            let results = vec![
+                ("state_substrate".to_string(), !self.state.active_mode.name().is_empty()),
+                ("bbrain".to_string(),
+                    self.bbrain.latest_report().map(|r| r.health_score >= 0.0).unwrap_or(false)),
+                ("cog_eval".to_string(), self.cog_eval.latest_report().is_some()),
+                ("gold_standard".to_string(),
+                    self.gold_standard.as_ref().map(|_| true).unwrap_or(false)),
+            ];
             self.convergence_pulse.gaps_from_self_tests(&results);
             if self.convergence_pulse.gaps.is_empty() {
                 // 外部验证: 运行 cargo check --all-targets 确认构建完整性。

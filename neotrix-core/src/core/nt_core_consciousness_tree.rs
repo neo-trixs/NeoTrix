@@ -23,6 +23,9 @@ pub struct ConsciousnessTree {
     pub current_contract: Option<EvolutionContract>,
     pub drift_report: Option<DriftReport>,
     pub atoms: HashMap<String, CapabilityAtom>, // All 70 atomic capabilities
+    /// Vulnerability baseline for the "vuln reduction >= 20%" contract criterion.
+    /// `None` until first measurement; set on first evaluation.
+    pub vuln_baseline: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -456,6 +459,7 @@ impl ConsciousnessTree {
             current_contract: None,
             drift_report: None,
             atoms,
+            vuln_baseline: None,
         }
     }
 
@@ -759,12 +763,12 @@ impl ConsciousnessTree {
 
         // ═══ Phase 6: Contract Fulfillment Verification ═══
         // ═══ Phase 7: Drift Audit — post-cycle evolution fidelity check ═══
-        if let Some(contract) = self.core.last_contract.as_ref() {
-            let fulfillment = self.verify_contract_fulfillment(contract);
+        if let Some(contract) = self.core.last_contract.clone() {
+            let fulfillment = self.verify_contract_fulfillment(&contract);
             self.core.contract_fulfillment = Some(fulfillment.clone());
             report.phase6_fulfillment = Some(fulfillment.clone());
 
-            let drift_report = self.audit_drift(contract, &fulfillment);
+            let drift_report = self.audit_drift(&contract, &fulfillment);
             self.core.drift_report = Some(drift_report.clone());
             report.phase7_drift = Some(drift_report);
         }
@@ -806,7 +810,7 @@ impl ConsciousnessTree {
     }
 
     /// Phase 6: Verify contract fulfillment
-    fn verify_contract_fulfillment(&self, contract: &EvolutionContract) -> ContractFulfillment {
+    fn verify_contract_fulfillment(&mut self, contract: &EvolutionContract) -> ContractFulfillment {
         let mut fulfilled = 0;
         let total = contract.evidence_plan.len();
         
@@ -818,8 +822,16 @@ impl ConsciousnessTree {
                 1 => self.branches.values().all(|b| b.health >= 0.6),
                 2 => self.fruits.iter().any(|f| f.quality >= 0.7),
                 3 => {
-                    let prev_vuln_count = self.core.vuln_scan.len();
-                    let reduction = if prev_vuln_count > 0 { 1.0 } else { 1.0 }; // Simplified
+                    // Vulnerability reduction vs first-measured baseline.
+                    // Records baseline on first evaluation; thereafter requires >= 20% drop.
+                    let current = self.core.vuln_scan.len() as f64;
+                    let baseline = self.vuln_baseline.unwrap_or(current as usize);
+                    self.vuln_baseline = Some(baseline);
+                    let reduction = if baseline as f64 > 0.0 {
+                        (baseline as f64 - current) / baseline as f64
+                    } else {
+                        0.0
+                    };
                     reduction >= 0.2
                 },
                 _ => false,
@@ -1478,6 +1490,7 @@ mod tests {
             branch.module_count = 8;
         }
         tree.fruits.push(EvolutionFruit { quality: 0.9, ..Default::default() });
+        tree.vuln_baseline = Some(2); // baseline 2, current 1 → 50% reduction
         let fulfillment = tree.verify_contract_fulfillment(&contract);
         assert!(fulfillment.evidence_total == 4);
         assert!(fulfillment.fulfilled);

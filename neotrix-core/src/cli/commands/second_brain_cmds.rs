@@ -27,7 +27,7 @@ impl CliCommand for BrainCmd {
             "save" | "note" => cmd_brain_save(args, brain),
             "emotion" | "em" => cmd_brain_emotion(),
             "dimensions" | "dims" => cmd_brain_dimensions(want_json),
-            "help" | _ => CommandOutput::ok(self.description()),
+            _ => CommandOutput::ok(self.description()),
         }
     }
 }

@@ -405,17 +405,32 @@ impl ContextPipeline {
 
         if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize { return; }
 
-        // Layer 4: Context collapse — summarize old turns
-        while self.turns.len() > 10 {
+        // Layer 4: Context collapse — distill evicted turns into a single
+        // capped summary. Real condensation (preserves role + first line per
+        // turn) instead of a no-op placeholder, and terminates deterministically
+        // (the previous pop/push-front oscillation could loop forever whenever
+        // the pipeline reached this layer with >10 turns).
+        let mut distilled = String::new();
+        while self.turns.len() > 10 && distilled.len() < 4_000 {
             let front = self.turns.pop_front().expect("guarded by len > 10");
-            if !self.turns.is_empty() && self.turns[0].role != "summary" {
-                self.turns.push_front(ContextTurn {
-                    role: "summary".into(),
-                    content: format!("[compressed: {} chars]", front.content.len()),
-                    token_count: 20,
-                    priority: 1,
-                });
+            if !distilled.is_empty() {
+                distilled.push('\n');
             }
+            let first = front.content.lines().next().unwrap_or_default();
+            distilled.push_str(&format!(
+                "[{}] {}",
+                front.role,
+                first.chars().take(120).collect::<String>()
+            ));
+        }
+        if !distilled.is_empty() {
+            let distilled_tokens = distilled.len() / 4;
+            self.turns.push_front(ContextTurn {
+                role: "summary".into(),
+                content: distilled,
+                token_count: distilled_tokens,
+                priority: 1,
+            });
         }
 
         // Layer 5: Auto-compact — hard cap
@@ -1384,6 +1399,7 @@ impl NeoCodexAgent {
         let mut final_answer: Option<String> = None;
 
         while step < max_steps {
+            Self::budget_react_messages(&mut messages, self.context.max_tokens);
             let request = self.build_request(messages.clone())?;
 
             let response = match provider.complete(&request).await {
@@ -1458,6 +1474,7 @@ impl NeoCodexAgent {
         let mut accumulated = String::new();
 
         while step < max_steps {
+            Self::budget_react_messages(&mut messages, self.context.max_tokens);
             let request = self.build_request(messages.clone())?;
 
             let mut rx = match provider.stream_complete(&request).await {
@@ -1568,7 +1585,20 @@ impl NeoCodexAgent {
         messages
     }
 
-    /// Build an LlmRequest from the current catalog's active provider.
+    /// Bottom-up token budget for the ReAct loop. The local `messages` vec grows
+    /// by one assistant + one tool-result turn per step, so a long loop can blow
+    /// the provider context window. Estimated tokens = chars / 4 (consistent with
+    /// resume_session). Evicts oldest non-system turns first; index 0 (system)
+    /// and the trailing current-user request are never evicted.
+    fn budget_react_messages(messages: &mut Vec<Message>, max_tokens: usize) {
+        let est = |m: &Message| m.content.len() / 4;
+        let mut total: usize = messages.iter().map(&est).sum();
+        let i = 1;
+        while total > max_tokens && i + 1 < messages.len() {
+            total = total.saturating_sub(est(&messages[i]));
+            messages.remove(i);
+        }
+    }    /// Build an LlmRequest from the current catalog's active provider.
     fn build_request(&self, messages: Vec<Message>) -> Option<LlmRequest> {
         self.provider.providers.get(self.provider.active)?;
         Some(LlmRequest {
@@ -1666,8 +1696,17 @@ impl NeoCodexAgent {
                         let stdout = String::from_utf8_lossy(&out.stdout).to_string();
                         let stderr = String::from_utf8_lossy(&out.stderr).to_string();
                         let code = out.status.code().unwrap_or(-1);
+                        let cap = 8_000usize;
                         if code == 0 {
-                            stdout
+                            if stdout.len() > cap {
+                                format!(
+                                    "{}... [stdout truncated {} bytes]",
+                                    stdout.chars().take(cap).collect::<String>(),
+                                    stdout.len().saturating_sub(cap)
+                                )
+                            } else {
+                                stdout
+                            }
                         } else {
                             format!("exit({}): {}", code, stderr)
                         }
@@ -2064,6 +2103,19 @@ mod tests {
     }
 
     #[test]
+    fn test_context_pipeline_collapse_terminates() {
+        // Regression: the old Layer 4 oscillated pop/push-front forever once
+        // the pipeline reached it with >10 turns. Sixty small turns force
+        // Layer 2 -> Layer 4 while staying well under the hard cap.
+        let mut ctx = ContextPipeline::new(5000);
+        for i in 0..60 {
+            ctx.push("user", format!("message {} {}", i, "x".repeat(40)), 100);
+        }
+        assert!(ctx.total_tokens() <= ctx.max_tokens);
+        assert!(ctx.turns.iter().any(|t| t.role == "summary"));
+    }
+
+    #[test]
     fn test_goal_queue() {
         let mut queue = GoalQueue::new();
         queue.add("test goal 1", 3);
@@ -2090,6 +2142,20 @@ mod tests {
         assert_eq!(agent.state.mode, NeoCodexMode::Agent);
         agent.set_plan_mode();
         assert_eq!(agent.state.mode, NeoCodexMode::Plan);
+    }
+
+    #[test]
+    fn test_budget_react_messages_evicts_oldest() {
+        let mut messages = vec![
+            Message::new(Role::System, "system prompt"),
+            Message::new(Role::User, "first request"),
+            Message::assistant_with_calls("tool call a", vec![]),
+            Message::tool("a very long tool result that blows any budget", "call-0"),
+        ];
+        NeoCodexAgent::budget_react_messages(&mut messages, 1);
+        assert_eq!(messages[0].role, Role::System);
+        assert_eq!(messages.last().unwrap().role, Role::Tool);
+        assert!(messages.len() < 4);
     }
 
     #[test]
