@@ -488,7 +488,7 @@ mod tests {
         let rust_patterns: Vec<_> = report.patterns_detected.iter()
             .filter(|p| p.description.contains("Rust"))
             .collect();
-        assert!(rust_patterns.len() >= 0, "Should have some Rust-related patterns");
+        assert!(rust_patterns.len() >= 1, "Should have some Rust-related patterns");
     }
 
     #[test]
@@ -505,7 +505,7 @@ mod tests {
         let topic_patterns: Vec<_> = report.patterns_detected.iter()
             .filter(|p| p.description.contains("Topic 'ai'"))
             .collect();
-        assert!(topic_patterns.len() >= 0, "Should have some AI topic patterns");
+        assert!(topic_patterns.len() >= 1, "Should have some AI topic patterns");
     }
 
     #[test]
@@ -527,7 +527,7 @@ mod tests {
         let report = distiller.distil_all().unwrap();
 
         // Should detect code snippet patterns
-        assert!(report.total_nodes_scanned >= 0); // at least some nodes scanned
+        assert!(report.total_nodes_scanned > 0); // at least some nodes scanned
     }
 
     #[test]

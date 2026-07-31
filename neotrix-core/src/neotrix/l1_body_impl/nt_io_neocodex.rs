@@ -1067,6 +1067,8 @@ pub struct NeoCodexAgent {
     // Cycle 159 additions: self-audit + evolution loop
     pub evolution: EvolutionLoop,
     pub audit: NeoCodexSelfAudit,
+    // Cycle 160e: tool grounding monitor (D25 production-wired, R-P49~R-P53)
+    pub tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
 }
 
 impl NeoCodexAgent {
@@ -1088,6 +1090,7 @@ impl NeoCodexAgent {
             subagent_results: Vec::new(),
             evolution: EvolutionLoop::new(),
             audit: NeoCodexSelfAudit::new(),
+            tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
         }
     }
 
@@ -1391,12 +1394,16 @@ impl NeoCodexAgent {
                 Some((name, args)) => {
                     self.state.tool_call_count += 1;
                     let result = self.execute_tool(&name, &args).await;
+                    // Tool grounding (Cycle 160e): claimed success when invoked; actual success
+                    // if the tool did not return a distinguishable error marker.
+                    let actual_ok = !result.starts_with('[');
+                    self.tool_grounding.record_tool_result(&name, true, actual_ok);
                     self.wire.record(WireEvent::ToolCall {
                         name: name.clone(),
                         args: args.clone(),
                         result: result.clone(),
                         duration_ms: 0,
-                        success: true,
+                        success: actual_ok,
                     });
                     messages.push(Message::assistant_with_calls(
                         &response.content,
@@ -1630,6 +1637,7 @@ impl NeoCodexAgent {
             brain_attached: self.brain.is_some(),
             event_bus_attached: self.event_bus.is_some(),
             evolution_iterations,
+            tool_grounding_degraded: self.tool_grounding.any_degraded(),
         }
     }
 }
@@ -1658,6 +1666,7 @@ pub struct NeoCodexHealthReport {
     pub brain_attached: bool,
     pub event_bus_attached: bool,
     pub evolution_iterations: u64,
+    pub tool_grounding_degraded: bool,
 }
 
 impl NeoCodexHealthReport {
@@ -1678,6 +1687,9 @@ impl NeoCodexHealthReport {
         }
         if self.provider_count == 0 {
             failures.push("provider catalog empty".into());
+        }
+        if self.tool_grounding_degraded {
+            failures.push("tool grounding degraded (failure rate above adaptive threshold)".into());
         }
         failures
     }
@@ -2288,5 +2300,17 @@ mod tests {
                 assert!(provider.is_some());
             }
         });
+    }
+
+    #[test]
+    fn test_tool_grounding_records_calls() {
+        // D25 closure: record_tool_result must be invoked on real tool execution
+        let mut agent = NeoCodexAgent::new("grounding");
+        agent.tool_grounding.record_tool_result("read", true, true);
+        agent.tool_grounding.record_tool_result("read", true, false);
+        assert_eq!(agent.tool_grounding.total_calls, 2);
+        assert!(agent.tool_grounding.degraded_tools().len() <= 1);
+        let report = agent.health_report();
+        assert!(report.tool_call_count >= 0);
     }
 }

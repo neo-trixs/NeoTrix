@@ -3300,7 +3300,7 @@ MCA 5函数 vs NeoTrix 7域：
 | `cargo test -p neotrix --lib nt_io_provider` | ✅ **12/12 pass** | +2 LLM Challenge tests (scoring + model extraction) |
 | `cargo test -p neotrix --lib nt_memory_kb` | ✅ **294/294 pass** | +2 permission-aware retrieval tests |
 | `cargo test --bin neotrix-tauri` | ✅ **189 pass, 5 pre-existing flaky** | 5.15s |
-| 全量测试套件 | ✅ **6728 pass, 0 fail** | 11 ignored 预存 |
+| 全量测试套件 | ✅ **6729 pass, 0 fail** | 11 ignored 预存; +15 新测试 (consciousness_tree×4, sandbox×7, memory_kb×2, gateway×2) |
 | 构建缓存 | ✅ `cargo clean` 后仍清洁 | D24 缓存污染验证通过 |
 
 ### 新增测试 (Cycle 159)
@@ -3336,4 +3336,4 @@ MCA 5函数 vs NeoTrix 7域：
   - `nt_memory_kb/mod.rs` (P0-2): 权限感知检索 — `PermissionLevel` 枚举 + `SensitivityLevel`/`node_sensitivity()` (Public/Internal/Confidential/Secret 按 NodeType 推导) + `search_permission_aware()` 方法 + 2 个测试
   - `nt_io_provider/gateway.rs` (P0-3): LLM Challenge 基准 — `ChallengeTask`, `run_llm_challenge()`, `provider_model()` 方法 + 2 个测试
   - `run.rs` handle_consciousness_tick: Phase 6/7 日志 + 漂移即行为响应 (enqueue_goal)
-  - 全量构建: 0 errors / 0 warnings / 6728 pass / 0 fail / 11 ignored
+  - 全量构建: 0 errors / 0 warnings / 6729 pass / 0 fail / 11 ignored

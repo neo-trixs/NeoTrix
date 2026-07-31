@@ -1251,13 +1251,21 @@ impl BackgroundLoopHandle {
             self.convergence_pulse.gaps_from_self_tests(&results);
             if self.convergence_pulse.gaps.is_empty() {
                 // 外部验证: 运行 cargo check --all-targets 确认构建完整性。
-                let build_ok = std::process::Command::new("cargo")
-                    .args(["check", "--all-targets", "-p", "neotrix"])
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false);
+                // 异步 + 120s 超时 (D27): 避免同步阻塞 tokio worker / 无限等待。
+                let build_ok = match tokio::time::timeout(
+                    std::time::Duration::from_secs(120),
+                    tokio::process::Command::new("cargo")
+                        .args(["check", "--all-targets", "-p", "neotrix"])
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
+                        .status(),
+                ).await {
+                    Ok(Ok(status)) => status.success(),
+                    _ => {
+                        log::warn!("[bg] convergence: external build check timed out or failed");
+                        false
+                    }
+                };
                 if build_ok {
                     self.convergence_pulse.verified = true;
                 }
