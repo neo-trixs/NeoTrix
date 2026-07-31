@@ -8,6 +8,7 @@ pub struct MemoryElement {
     pub bank: ReasoningBank,
     init_called: bool,
     started: bool,
+    projected_count: usize,
 }
 
 impl fmt::Debug for MemoryElement {
@@ -16,6 +17,7 @@ impl fmt::Debug for MemoryElement {
             .field("bank_stats", &self.bank.stats())
             .field("init_called", &self.init_called)
             .field("started", &self.started)
+            .field("projected_count", &self.projected_count)
             .finish()
     }
 }
@@ -26,6 +28,7 @@ impl MemoryElement {
             bank: ReasoningBank::new(capacity),
             init_called: false,
             started: false,
+            projected_count: 0,
         }
     }
 
@@ -38,7 +41,14 @@ impl MemoryElement {
     }
 
     pub fn recall_count(&self) -> usize {
-        self.bank.stats().total_memories
+        self.bank.stats().total_memories.max(self.projected_count)
+    }
+
+    /// Mirror the live ReasoningBank count into this element. The element does not
+    /// duplicate memory storage (R-P42): it keeps only a numeric projection so the
+    /// plugin layer can observe memory health without owning the memory itself.
+    pub fn sync_from_bank(&mut self, bank: &ReasoningBank) {
+        self.projected_count = bank.stats().total_memories;
     }
 }
 

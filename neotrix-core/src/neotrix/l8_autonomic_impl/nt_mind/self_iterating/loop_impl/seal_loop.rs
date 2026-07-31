@@ -130,6 +130,8 @@ impl SelfIteratingBrain {
             }
         }
 
+        self.sync_elements();
+
         IterationResult {
             iteration: self.iteration,
             task_type,

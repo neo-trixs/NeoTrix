@@ -37,6 +37,21 @@ impl SkillElement {
     pub fn crystal_count(&self) -> usize {
         self.registry.crystals.len()
     }
+
+    /// Project capability magnitude into the skill registry so the plugin layer
+    /// can recommend strategies without duplicating the brain's capability state.
+    pub fn sync_from_capability(&mut self, capability: &crate::core::CapabilityVector) {
+        let magnitude: f64 = capability.arr.iter().sum();
+        if magnitude > 0.0 && self.registry.crystals.is_empty() {
+            let mut trace = crate::core::nt_core_self::ThinkingTrace::new(0, "capability sync");
+            trace.grade = crate::core::nt_core_self::ReflectionGrade::Good;
+            trace.steps.push(
+                crate::core::nt_core_self::ThinkingStep::new(1, "synthesize", crate::core::nt_core_self::StrategyKind::Reflection)
+                    .with_domain(crate::core::nt_core_self::AttentionDomain::Code),
+            );
+            let _ = self.extract(&trace, 1);
+        }
+    }
 }
 
 impl Element for SkillElement {

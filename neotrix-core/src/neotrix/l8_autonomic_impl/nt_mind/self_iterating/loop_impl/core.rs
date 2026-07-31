@@ -34,6 +34,8 @@ use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_act_autonomy::knowledge_distiller::KnowledgeDistiller;
 use crate::neotrix::nt_mind_ingestion::IngestionScratchpad;
 use crate::neotrix::l8_autonomic_impl::nt_mind_memory::{MemoryOrchestrator, MemoryTier};
+use crate::neotrix::nt_mind::element::registry::ElementRegistry;
+use crate::neotrix::nt_mind::element::{capability_element::CapabilityElement, memory_element::MemoryElement, skill_element::SkillElement};
 use std::sync::{Arc, Mutex};
 
 pub struct SelfIteratingBrain {
@@ -117,6 +119,8 @@ pub struct SelfIteratingBrain {
     pub(crate) _last_consciousness_quality: f64,
     /// Total consciousness critiques received
     pub(crate) _consciousness_critique_count: u64,
+    /// Plugin Element registry (Phase 1): lifecycle-managed capability/memory/skill elements.
+    pub element_registry: ElementRegistry,
 }
 
 impl SelfIteratingBrain {
@@ -208,7 +212,51 @@ impl SelfIteratingBrain {
             )),
             _last_consciousness_quality: 0.0,
             _consciousness_critique_count: 0,
+            element_registry: Self::build_element_registry(),
         }
+    }
+
+    /// Build the plugin Element registry seeded with the brain's core elements.
+    /// Capability/memory/skill elements mirror the brain's live state via sync_elements().
+    fn build_element_registry() -> ElementRegistry {
+        let mut registry = ElementRegistry::new();
+        let elements: Vec<Box<dyn crate::neotrix::nt_mind::element::Element>> = vec![
+            Box::new(CapabilityElement::new()),
+            Box::new(MemoryElement::new(100)),
+            Box::new(SkillElement::new()),
+        ];
+        if let Err(e) = registry.bootstrap(elements) {
+            log::warn!("[element] bootstrap failed: {}", e);
+        }
+        registry
+    }
+
+    /// Project the brain's live state into the plugin Element registry and
+    /// publish lifecycle events on the ElementBus. Called after each iterate.
+    pub fn sync_elements(&mut self) {
+        use crate::neotrix::nt_mind::element::bus::{EventKind, EventPayload};
+        let bus = self.element_registry.bus();
+        let cap_sum: f64 = self.brain.capability.arr.iter().sum();
+        bus.publish(
+            "brain".to_string(),
+            EventKind::CapabilityUpdated,
+            EventPayload::Number(cap_sum),
+        );
+        if let Some(el) = self.element_registry.get_mut::<MemoryElement>("element.memory") {
+            el.sync_from_bank(&self.reasoning_bank);
+        }
+        if let Some(el) = self.element_registry.get_mut::<SkillElement>("element.skill") {
+            el.sync_from_capability(&self.brain.capability);
+        }
+        bus.publish(
+            "brain".to_string(),
+            EventKind::TraceCompleted,
+            EventPayload::Number(self.iteration as f64),
+        );
+    }
+
+    pub fn element_registry(&self) -> &ElementRegistry {
+        &self.element_registry
     }
 
     // ========== CryptoAgent integration (shared Arc<Mutex<>>) ==========
@@ -653,10 +701,30 @@ impl super::super::brain_impl::SelfIteration for SelfIteratingBrain {
 
 
 #[cfg(test)]
-mod tests {
+ mod tests {
 
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_brain_hosts_element_registry() {
+        let mut brain = super::SelfIteratingBrain::new();
+        assert_eq!(brain.element_registry.state(), crate::neotrix::nt_mind::element::registry::RegistryState::Started);
+        assert_eq!(brain.element_registry.element_count(), 3);
+        assert_eq!(brain.element_registry.list().len(), 3);
+
+        use crate::neotrix::nt_mind::element::capability_element::CapabilityElement;
+        use crate::neotrix::nt_mind::element::memory_element::MemoryElement;
+        use crate::neotrix::nt_mind::element::skill_element::SkillElement;
+        assert!(brain.element_registry.get::<CapabilityElement>("element.capability").is_some());
+        assert!(brain.element_registry.get::<MemoryElement>("element.memory").is_some());
+        assert!(brain.element_registry.get::<SkillElement>("element.skill").is_some());
+
+        let skill_count_before = brain.element_registry.get::<SkillElement>("element.skill").map(|s| s.crystal_count()).unwrap_or(0);
+        brain.sync_elements();
+        let skill_count_after = brain.element_registry.get::<SkillElement>("element.skill").map(|s| s.crystal_count()).unwrap_or(0);
+        assert!(skill_count_after >= skill_count_before);
     }
 }
