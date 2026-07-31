@@ -169,50 +169,45 @@ fn strip_html(html: &str) -> String {
         }
         let c = chars[i];
         if !in_tag && c == '<' {
-            // 检测 <script 或 <style
-            if i + 6 < chars.len() {
-                let tag_start: String = chars[i..(i + 7.min(chars.len() - i))].iter().collect();
-                if tag_start.starts_with("<script") || tag_start.starts_with("<SCRIPT") {
+            let rest: String = chars[i..].iter().collect();
+            // 开标签检测 (仅在普通内容中)
+            if !in_script && !in_style {
+                if rest.starts_with("<script") || rest.starts_with("<SCRIPT") {
                     in_script = true;
                     in_tag = true;
                     i += 1;
                     continue;
                 }
-                if tag_start.starts_with("<style") || tag_start.starts_with("<STYLE") {
+                if rest.starts_with("<style") || rest.starts_with("<STYLE") {
                     in_style = true;
                     in_tag = true;
                     i += 1;
                     continue;
                 }
+                in_tag = true;
+                i += 1;
+                continue;
             }
+            // script/style 内容中的闭合标签检测
+            if rest.starts_with("</script") || rest.starts_with("</SCRIPT") {
+                in_script = false;
+                in_tag = true;
+                i += 1;
+                continue;
+            }
+            if rest.starts_with("</style") || rest.starts_with("</STYLE") {
+                in_style = false;
+                in_tag = true;
+                i += 1;
+                continue;
+            }
+            // script/style 内容中的其他标签，直接跳过
             in_tag = true;
             i += 1;
             continue;
         }
         if in_tag && c == '>' {
             in_tag = false;
-            if in_script {
-                // 检测 </script>
-                if i + 8 < chars.len() {
-                    let end: String = chars[i..(i + 9.min(chars.len() - i))].iter().collect();
-                    if end.starts_with("</script") || end.starts_with("</SCRIPT") {
-                        in_script = false;
-                        // 跳过 </script> 剩余
-                        if let Some(close) = end.find('>') {
-                            skip_chars = close;
-                        }
-                    }
-                }
-            if in_style && i + 7 < chars.len() {
-                let end: String = chars[i..(i + 8.min(chars.len() - i))].iter().collect();
-                if end.starts_with("</style") || end.starts_with("</STYLE") {
-                        in_style = false;
-                        if let Some(close) = end.find('>') {
-                            skip_chars = close;
-                        }
-                    }
-                }
-            }
             // 添加空格代替标签
             if !out.is_empty() && !out.ends_with(' ') {
                 out.push(' ');
