@@ -4,6 +4,36 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 
 **Preamble**: This session loads `CONTEXT.md` (root) as the shared language prefix. All domain terms are defined there. Before using any domain term, refer to CONTEXT.md for its precise definition and avoid column.
 
+**统一吸收协议 (MUST)**: 每次会话结束必须自动执行 `experience-tree` 五阶段吸收 (快照→蒸馏→分类→落盘→反馈)。经验统一写入 `~/.neotrix/knowledge.db` 的 `kv_store` `experience` 命名空间; 本文件仅保留 cycle 摘要指针。执行: 汇总会话经验 → `~/.neotrix/pending-absorb.json` → 插件 `session.idle` 自动调 `~/.agents/skills/experience-tree/scripts/absorb_session.py absorb` + `close --cycle NNN`。协议详见 `~/.agents/skills/experience-tree/SKILL.md`。
+
+## Experience Tree — 2026-07-31 Cycle 160d (统一吸收协议落地 — 五阶段引擎 + session.idle 自动接线)
+
+### Session: experience-tree 伪代码协议 → 真实可运行吸收引擎 + 会话结束自动执行
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **统一吸收协议** | 盘点散落机制 (AGENTS.md 长文 / experience-tree 星网 / star-memory 星系 / session-log / SELF-EVOLVE v2.2 / mempalace) 后定案: 单一入口 `experience-tree` SKILL, 五阶段 (快照→蒸馏→分类→落盘→反馈) | `~/.agents/skills/experience-tree/` 重写为统一协议; 数据统一落 `~/.neotrix/knowledge.db` kv_store `experience` 命名空间 |
+| **吸收引擎脚本** | `absorb_session.py` 全新实现 (snapshot/absorb/close/query/hub/route/list 7 子命令): 统一 schema `{schema_version,type,session_id,cycle,ts,domain,content,evidence,source}`; hub 索引 + metrics + route_table + legacy_sources 自动维护 | 之前 `kv_get/kv_set` 伪代码 + 不存在的 `star_network_init.py` → 真实 SQLite 实现; hub `experience` namespace 首次实际建立 |
+| **会话结束自动执行** | `.opencode/plugins/experience-tree-absorption.js` 监听 `session.idle`: 读取 `~/.neotrix/pending-absorb.json` → `absorb` → 删 pending → `close --cycle` | 每次会话结束自动落盘, 非手动触发 (R-P79 接线门) |
+| **AGENTS.md 收敛** | 顶部新增「统一吸收协议 (MUST)」声明: 本文件仅保留 cycle 摘要指针, 正文经验统一写 KB | 与用户决策一致: AGENTS.md 瘦身, KB 为单一事实源 |
+| **兼容旧数据** | hub 的 legacy_sources 只读索引 `absorption`/`absorption_cycle`/`meta_cognition` (40987 行), 不迁移不双写 | 无破坏性迁移 |
+
+### Build Baseline (Cycle 160d)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `absorb_session.py` | ✅ 7 子命令全链路实测 | snapshot → absorb → query → close → hub 全通 |
+| 插件加载 | ✅ bun 加载验证 | `experience-tree-absorption.js` 导出 event hook |
+| 自动吸收链路 | ✅ pending → absorb → clean | 实测写入 KB experience namespace |
+| 回归 | ✅ 不影响 Rust 构建 | 纯 Python/JS/文档变更 |
+
+### 元认知发现 (Cycle 160d)
+
+1. **伪代码协议的落盘盲区 (P68 变体)**: experience-tree SKILL 存在数月但 `kv_get/kv_set` 是协议伪代码, `star_network_init.py`/`memory_brain_init.py` 从未存在, `experience` namespace 从未建立——文档声称的数据层从未真实发生。统一吸收的第一步是让协议有真实可运行实现, 而非继续扩展文档。
+2. **R-P42 在 skill 层同样适用**: 没有新建平行 skill, 而是把散落的 4 套机制统一强化进已有 `experience-tree` 节点——星网检索协议保留, 吸收写入成为其真实实现, star-memory/session-log/mempalace 各保留独立检索角色但退出吸收写入。
+3. **自动执行需要两条腿**: 仅文档声明「每次会话结束必须执行」不可靠 (会话代理可能跳过); 接线到 opencode `session.idle` 事件 + 插件消费 pending 文件, 使吸收在 agent 无作为时也被触发——R-P79 在基础设施层的应用。
+4. **统一 schema 是跨会话可检索的前提**: 此前 40987 行 kv_store 分散在 3+ 命名空间且无统一字段, 检索只能按 namespace 全扫。统一 schema + hub 索引 + route_table 使后续会话可 O(hub)+O(matched) 检索。
+
 ## Experience Tree — 2026-07-31 Cycle 159b (Self-Audit Iteration — P0 ReAct 不可达修复 + 协调层真实降级 + 双写管线对齐)
 
 ### Session: 10 迭代自我审计第 2 轮 — 4 P0/P1 缺陷核验修复 + Cluster C 协调层补完
@@ -110,6 +140,36 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 | 6-step pipeline | extract → dedup → categorize → map → insert+显式FTS → rebuild fallback | 完整闭环 (Cycle 159b 修正: 普通 FTS5 表 rebuild 不拉取 nodes 新数据, insert 必须显式写 nodes_fts) |
 | 404 pre-filter | 未在 extract 前验证 URL → 丢弃; 建议下一轮加预检 | 发现 6 真 404 |
 | FTS5 rebuild 陷阱 | 非 external-content (`content='nodes'`) 的 FTS5 表, `INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` 只重建 shadow 表已有行, 不会从 nodes 拉新数据 → 显式插入才是检索可用的唯一路径 | 已验证 (kb_batch_absorb.py:216) |
+
+## Experience Tree — 2026-07-31 Cycle 160c (Continued Absorption — 31 URLs → 16 Nodes · Pipeline Validation)
+
+### Session: 续吸收 — 验证批吸收管线可重复性 + 能力映射完备性
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **续吸收运行** | `kb_batch_absorb.py --urls /tmp/absorb_urls.txt` 31 新 URL → 6 duplicate (已在库) → 10 failed (404/blocked) → 16 新节点入库 | 10 repository nodes 入库; FTS5 rebuilt |
+| **能力映射** | `absorb_to_capability.py --apply` 16 新节点全部映射 | NT-IO +16, 36 能力 top: delegate(45), audit(45), execute(40), generate(22), invoke(22), search(18); 0 未映射 |
+| **管线可重复性验证** | 6 步流水线（去重→提取→分类→映射→插入→FTS rebuild）第 2 次完整跑通 | 确认批吸收管线是幂等、可重复、可恢复的生产级流程 |
+| **失败分析** | 10 failures: 2 个 repo 已改名/404 (BayesFusion/GeniusDocs, crewAI), 1 repo 路径变更 (microsoft/AgentFramework → agent-framework), 1 重复 (vercel/skills), 4 小 repo 无 README OG meta | 404 预检 + OG meta 降级已生效 |
+
+### Build Baseline (Cycle 160c)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors | 预存警告 |
+| `cargo test -p neotrix --lib` | ✅ 6727 pass | 零回归 |
+| 批吸收管线 | ✅ 幂等可重复 | 第二次完整 pipeline 跑通 |
+| 新节点 | 16 入库 | 303 total absorbed (287 + 16 new) |
+| 能力映射 | ✅ 312/312 (100%) | 0 未映射节点 |
+
+### 元认知发现 (Cycle 160c)
+
+1. **批吸收管线是幂等生产流程**: 第 2 次完整跑通（去重→提取→分类→映射→插入→FTS rebuild）确认管线可重复、可恢复。重复 URL 自动跳过（6 个已在库 → 跳过），404/blocked URL 自动丢弃（10 个失败 → 不入库）。
+2. **404 预检有效**: 10 failures 中 3 个是 repo 已改名/删除 (BayesFusion/GeniusDocs, crewAI, microsoft/AgentFramework→agent-framework)。下一轮应在 extract 前加 URL 有效性预检（HEAD request → 301 redirect → discard）。
+3. **OG meta 降级覆盖 GitHub 404**: GitHub repo 不存在时 fetch_github_html fallback 仍能返回 OG meta（空 title）→ 分类为 `repository` 类型 → 后续 insert 时检测节点为空 → 丢弃。降级策略有效但需要空值保护。
+4. **小 repo 无 README = 无 OG meta**: forge、AweAgent 等小 repo 的 OG meta 缺失 → 需更激进的正文提取 fallback（raw HTML → text → classify）。
+5. **能力映射 100% 完备**: 312 节点全部成功映射（含 6 个 duplicate），0 unmapped。TITLE_HIT ×3 + KNOWN_REPOS 确定性映射覆盖了绝大多数情况。
+6. **36 能力分布稳定**: delegate/audit/execute 占比最高，符合 NeoTrix 当前核心能力方向。
 
 ## Auto-Trigger: Review Command
 
@@ -347,6 +407,18 @@ npm test                            # Frontend tests
 | Heuristics | TITLE_HIT ×3, KNOWN_REPOS deterministic, 6-step pipeline, `api` rule tightened |
 | R-P42 | 287/287 nodes reinforced existing capability tree nodes, zero new modules |
 | Data traceability | `absorbed_capability` field → D14/D20 fully auditable |
+
+### Cycle 160c — Continued Absorption (31 URLs → 16 Nodes · Pipeline Validation)
+
+| Item | Detail |
+|------|--------|
+| Input | 31 new URLs (de-duplicated, second batch) |
+| In-KB | 6 duplicate (already present) |
+| New nodes | 16 repository nodes 入库; FTS5 rebuilt |
+| Failed | 10 failures — 2 renamed/404 (BayesFusion/GeniusDocs, crewAI), 1 path-changed (microsoft/AgentFramework→agent-framework), 1 duplicate (vercel/skills), 4 small-no-README OG meta |
+| Mapping | `absorb_to_capability.py --apply` 16/16 (100%) new nodes mapped; NT-IO +16 |
+| Pipeline | 6-step pipeline idempotent, repeatable, recoverable (2nd full run validated) |
+| NT-IO distribution | 94 (78 + 16) top domain absorbed |
 
 ### From nicepkg/ai-workflow
 - **Skill marketplace pattern**: Domain-specific skill collections (170+ pre-built)

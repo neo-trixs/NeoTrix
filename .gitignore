@@ -6,7 +6,9 @@ node_modules/
 dist/
 notes/
 sessions/
-.opencode/
+.opencode/*
+!.opencode/plugins/
+.opencode/plugins/*.lock
 .claude-plugin/
 *.rs.bak.DS_Store
 models/
