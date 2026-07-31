@@ -42,7 +42,7 @@ impl AttentionRouter {
             SpecialistType::CodeAnalyzer,
             SpecialistType::Planner,
         ] {
-            workspace.register(SpecialistModule::new(*st, format!("{:?}", st)));
+            let _ = workspace.register(SpecialistModule::new(*st, format!("{:?}", st)));
         }
         Self {
             workspace,
