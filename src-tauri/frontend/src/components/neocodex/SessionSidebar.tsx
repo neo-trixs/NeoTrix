@@ -9,6 +9,8 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "idle">("all");
+  const [groupBy, setGroupBy] = useState<"date" | "mode">("date");
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("neotrix:pinned-sessions") || "[]"); } catch { return []; }
   });
@@ -152,22 +154,41 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = q ? sessions.filter((s) => s.name.toLowerCase().includes(q)) : sessions;
+    const filtered = sessions.filter((s) => {
+      if (q && !s.name.toLowerCase().includes(q)) return false;
+      if (statusFilter === "active" && !((s.message_count ?? 0) > 0)) return false;
+      if (statusFilter === "idle" && !((s.message_count ?? 0) === 0)) return false;
+      return true;
+    });
     const pinned = filtered.filter((s) => pinnedIds.includes(s.id));
     const unpinned = filtered.filter((s) => !pinnedIds.includes(s.id));
-    const day = 86400000;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStart = today.getTime();
     const buckets: Array<{ label: string; sessions: NeoCodexSession[] }> = [];
     if (pinned.length) buckets.push({ label: "📌 置顶", sessions: pinned });
-    const push = (label: string, list: NeoCodexSession[]) => { if (list.length) buckets.push({ label, sessions: list }); };
-    push("今天", unpinned.filter((s) => s.updated_at >= todayStart));
-    push("昨天", unpinned.filter((s) => s.updated_at >= todayStart - day && s.updated_at < todayStart));
-    push("7天内", unpinned.filter((s) => s.updated_at >= todayStart - 7 * day && s.updated_at < todayStart - day));
-    push("更早", unpinned.filter((s) => s.updated_at < todayStart - 7 * day));
+    if (groupBy === "mode") {
+      const modeOrder = ["Agent", "Shell", "Plan"];
+      const byMode = new Map<string, NeoCodexSession[]>();
+      for (const s of unpinned) {
+        const key = s.mode || "未指定";
+        if (!byMode.has(key)) byMode.set(key, []);
+        byMode.get(key)!.push(s);
+      }
+      for (const m of modeOrder) {
+        if (byMode.has(m)) buckets.push({ label: `${m} 模式`, sessions: byMode.get(m)! });
+      }
+      if (byMode.has("未指定")) buckets.push({ label: "未指定", sessions: byMode.get("未指定")! });
+    } else {
+      const day = 86400000;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStart = today.getTime();
+      const push = (label: string, list: NeoCodexSession[]) => { if (list.length) buckets.push({ label, sessions: list }); };
+      push("今天", unpinned.filter((s) => s.updated_at >= todayStart));
+      push("昨天", unpinned.filter((s) => s.updated_at >= todayStart - day && s.updated_at < todayStart));
+      push("7天内", unpinned.filter((s) => s.updated_at >= todayStart - 7 * day && s.updated_at < todayStart - day));
+      push("更早", unpinned.filter((s) => s.updated_at < todayStart - 7 * day));
+    }
     return buckets;
-  }, [sessions, query, pinnedIds]);
+  }, [sessions, query, statusFilter, groupBy, pinnedIds]);
 
   const formatTime = (ts: number) => {
     const date = new Date(ts);
@@ -199,6 +220,26 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
             <path d="M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
+      </div>
+
+      <div className={styles.filterRow}>
+        <select
+          className={styles.filterSelect}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "idle")}
+        >
+          <option value="all">全部</option>
+          <option value="active">有消息</option>
+          <option value="idle">空闲</option>
+        </select>
+        <select
+          className={styles.filterSelect}
+          value={groupBy}
+          onChange={(e) => setGroupBy(e.target.value as "date" | "mode")}
+        >
+          <option value="date">按日期分组</option>
+          <option value="mode">按模式分组</option>
+        </select>
       </div>
 
       <div className={styles.search}>
@@ -245,9 +286,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
           </div>
         )}
         {sessions.length > 0 && groups.length === 0 && (
-          <div className={styles.empty}>
-            无匹配会话
-          </div>
+          <div className={styles.emptyFilter}>无匹配会话</div>
         )}
       </div>
 

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { useStore } from "../../stores";
-import type { Message } from "../../types";
+import type { Attachment, Message } from "../../types";
 import styles from "./ChatView.module.css";
 
 const USER_AVATAR = `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="10" height="8" rx="1.5"/><circle cx="7" cy="7" r="1.5"/></svg>`;
@@ -73,6 +73,23 @@ function formatTimestamp(ts?: number): string {
   return `${date.getMonth() + 1}-${date.getDate()} ${time}`;
 }
 
+function formatFileSize(size: number): string {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+async function readFileAsBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 interface ChatViewProps {
   messages: Array<{ role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number }>;
   streamingContent?: string;
@@ -80,6 +97,8 @@ interface ChatViewProps {
   agentBusy: boolean;
   onSend: (content: string) => void;
   onDelete?: (index: number) => void;
+  viewMode?: "verbose" | "normal" | "summary";
+  onStop?: () => void;
 }
 
 export function ChatView({
@@ -89,13 +108,20 @@ export function ChatView({
   agentBusy,
   onSend,
   onDelete,
+  viewMode = "normal",
+  onStop,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounter = useRef(0);
   const [input, setInput] = useState("");
   const [showSlash, setShowSlash] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const slashRef = useRef<HTMLDivElement>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const addNotification = useStore((s) => s.addNotification);
 
   const SLASH_COMMANDS = [
     { cmd: "/compact", label: "压缩会话", hint: "释放上下文 token" },
@@ -122,6 +148,45 @@ export function ChatView({
     textareaRef.current?.focus();
   };
 
+  const handleFiles = async (files: FileList | File[]) => {
+    const incoming: Attachment[] = [];
+    for (const file of Array.from(files)) {
+      incoming.push({
+        id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: file.name,
+        size: file.size,
+        mimeType: file.type || "application/octet-stream",
+        data: await readFileAsBase64(file),
+      });
+    }
+    setAttachments((prev) => [...prev, ...incoming]);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files);
+    e.target.value = "";
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (agentBusy) return;
+    dragCounter.current++;
+    setDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setDragging(false);
+    if (agentBusy) return;
+    if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (showSlash) {
       if (e.key === "ArrowDown") { e.preventDefault(); setSlashQuery((q) => q); }
@@ -145,30 +210,44 @@ export function ChatView({
     const content = input.trim();
     setInput("");
     setShowSlash(false);
+    if (attachments.length > 0) {
+      addNotification({ type: "info", message: `已附加 ${attachments.length} 个文件`, duration: 2000 });
+      setAttachments([]);
+    }
     onSend(content);
   };
 
-  const hasMessages = messages.length > 0 || !!streamingContent;
+  const visibleMessages = useMemo(() => {
+    if (viewMode === "summary") return messages.filter((m) => m.role !== "tool");
+    return messages;
+  }, [messages, viewMode]);
+
+  const hasMessages = visibleMessages.length > 0 || !!streamingContent;
 
   const hasStreamed = !!streamingContent;
   const showThinking = agentBusy && !hasStreamed && messages.length > 0;
 
   return (
     <div className={styles.container}>
-      {/* Messages */}
-      <main className={styles.messages}>
-        {messages.map((msg, idx) => (
-          <MessageBubble
-            key={idx}
-            message={msg}
-            index={idx}
-            allMessages={messages}
-            isLastUser={idx === messages.length - 1 && msg.role === "user"}
-            agentBusy={agentBusy}
-            onSend={onSend}
-            onDelete={onDelete}
-          />
-        ))}
+      <div className={styles.messagesWrap}>
+        {viewMode !== "normal" && (
+          <span className={styles.viewModeBadge}>{viewMode === "verbose" ? "详细" : "摘要"}</span>
+        )}
+        {/* Messages */}
+        <main className={styles.messages}>
+          {visibleMessages.map((msg, idx) => (
+            <MessageBubble
+              key={idx}
+              message={msg}
+              index={idx}
+              allMessages={visibleMessages}
+              isLastUser={idx === visibleMessages.length - 1 && msg.role === "user"}
+              agentBusy={agentBusy}
+              onSend={onSend}
+              onDelete={onDelete}
+              viewMode={viewMode}
+            />
+          ))}
         {showThinking && (
           <div className={styles.thinking}>
             <span className={styles.thinkingDot} />
@@ -192,31 +271,71 @@ export function ChatView({
           </div>
         )}
         <div ref={messagesEndRef} />
-      </main>
+        </main>
+      </div>
 
        {/* Input */}
-       <form onSubmit={handleSubmit} className={styles.inputArea}>
-         <textarea
-           ref={textareaRef}
-           value={input}
-           onChange={(e) => {
-             const val = e.target.value;
-             setInput(val);
-             const lastWord = val.split(/\s/).pop() || "";
-             if (lastWord.startsWith("/")) {
-               setSlashQuery(lastWord);
-               setShowSlash(true);
-             } else {
-               setShowSlash(false);
-             }
-           }}
-           onKeyDown={handleKeyDown}
-           placeholder={agentBusy ? "Waiting for response..." : "Enter 发送，Shift+Enter 换行，/ 显示命令"}
+       <form
+         onSubmit={handleSubmit}
+         className={`${styles.inputArea} ${dragging ? styles.dragging : ""}`}
+         onDragEnter={handleDragEnter}
+         onDragOver={(e) => e.preventDefault()}
+         onDragLeave={handleDragLeave}
+         onDrop={handleDrop}
+       >
+         <button
+           type="button"
+           className={styles.attachBtn}
            disabled={agentBusy}
-           rows={1}
-           className={styles.textarea}
-           style={{ height: "auto", minHeight: "44px" }}
-         />
+           onClick={() => fileInputRef.current?.click()}
+           title="添加附件"
+         >
+           <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+             <path d="M5 11l5-5.5A1.8 1.8 0 007.5 3L2.5 8A3 3 0 006.5 12l5-5.5A4.2 4.2 0 008 2L3 7" strokeLinecap="round" strokeLinejoin="round"/>
+           </svg>
+         </button>
+         <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
+         <div className={styles.composerColumn}>
+           {attachments.length > 0 && (
+             <div className={styles.attachmentsRow}>
+               {attachments.map((att) => (
+                 <span key={att.id} className={styles.attachmentChip}>
+                   <span className={styles.attachmentName}>{att.name}</span>
+                   <span className={styles.attachmentSize}>{formatFileSize(att.size)}</span>
+                   <button
+                     type="button"
+                     className={styles.attachmentRemove}
+                     title="移除"
+                     onClick={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                   >
+                     ✕
+                   </button>
+                 </span>
+               ))}
+             </div>
+           )}
+           <textarea
+             ref={textareaRef}
+             value={input}
+             onChange={(e) => {
+               const val = e.target.value;
+               setInput(val);
+               const lastWord = val.split(/\s/).pop() || "";
+               if (lastWord.startsWith("/")) {
+                 setSlashQuery(lastWord);
+                 setShowSlash(true);
+               } else {
+                 setShowSlash(false);
+               }
+             }}
+             onKeyDown={handleKeyDown}
+             placeholder={agentBusy ? "Waiting for response..." : "Enter 发送，Shift+Enter 换行，/ 显示命令"}
+             disabled={agentBusy}
+             rows={1}
+             className={styles.textarea}
+             style={{ height: "auto", minHeight: "44px" }}
+           />
+         </div>
          {showSlash && (
            <div className={styles.slashMenu}>
              {filteredSlash.length === 0 && <div className={styles.slashEmpty}>无匹配命令</div>}
@@ -229,11 +348,19 @@ export function ChatView({
              ))}
            </div>
          )}
-         <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn}>
-           <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-             <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
-           </svg>
-         </button>
+         {agentBusy && onStop ? (
+           <button type="button" className={styles.stopBtn} onClick={onStop} title="停止生成 (Esc)">
+             <svg width="16" height="16" viewBox="0 0 14 14" fill="currentColor">
+               <rect x="3" y="3" width="8" height="8" rx="1" />
+             </svg>
+           </button>
+         ) : (
+           <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn}>
+             <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+               <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
+             </svg>
+           </button>
+         )}
        </form>
     </div>
   );
@@ -248,6 +375,7 @@ function MessageBubble({
   agentBusy = false,
   onSend,
   onDelete,
+  viewMode = "normal",
 }: {
   message: { role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number };
   isStreaming?: boolean;
@@ -257,6 +385,7 @@ function MessageBubble({
   agentBusy?: boolean;
   onSend?: (content: string) => void;
   onDelete?: (index: number) => void;
+  viewMode?: "verbose" | "normal" | "summary";
 }) {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const [editing, setEditing] = useState(false);
@@ -295,7 +424,7 @@ function MessageBubble({
   };
 
   if (message.role === "tool") {
-    return <ToolCard message={message} avatar={avatar} roleClass={roleClass} />;
+    return <ToolCard message={message} avatar={avatar} roleClass={roleClass} defaultExpanded={viewMode === "verbose"} />;
   }
 
   return (
@@ -402,8 +531,8 @@ async function copyMessage(content: string) {
   } catch {}
 }
 
-function ToolCard({ message, avatar, roleClass }: { message: { role: string; content: string; timestamp?: number }; avatar: string; roleClass: string }) {
-  const [expanded, setExpanded] = useState(false);
+function ToolCard({ message, avatar, roleClass, defaultExpanded = false }: { message: { role: string; content: string; timestamp?: number }; avatar: string; roleClass: string; defaultExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const m = /^\*\*([^*]+)\*\*(.*)$/s.exec(message.content);
   const toolName = m ? m[1] : "工具调用";
   const body = m ? m[2] : message.content;

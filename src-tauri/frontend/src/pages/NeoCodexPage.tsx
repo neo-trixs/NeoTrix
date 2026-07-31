@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../stores";
 import { ChatView, CommandPalette, ModelSelector, SessionSidebar, SettingsView, ShortcutHelp } from "../components/neocodex";
 import { invoke } from "@tauri-apps/api/core";
@@ -37,6 +37,11 @@ export default function NeoCodexPage() {
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [health, setHealth] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<"verbose" | "normal" | "summary">("normal");
+  const stopRef = useRef(false);
+  const [sideChatOpen, setSideChatOpen] = useState(false);
+  const [sideChatMessages, setSideChatMessages] = useState<Array<{ role: string; content: string }>>([]);
+  const [sideChatInput, setSideChatInput] = useState("");
 
   // Load sessions on mount
   useEffect(() => {
@@ -63,7 +68,12 @@ export default function NeoCodexPage() {
     return () => clearInterval(timer);
   }, [loadHealth]);
 
+  const handleStop = () => {
+    stopRef.current = true;
+  };
+
   const handleSend = async (content: string) => {
+    stopRef.current = false;
     setAgentBusy(true);
     addNeoCodexMessage({ role: "user", content, timestamp: Date.now() });
     setNeoCodexStreaming({ content: "", role: "assistant" });
@@ -72,6 +82,7 @@ export default function NeoCodexPage() {
     const unlisten = await listen<string>("neocodex_stream_token", (event) => {
       accumulated += event.payload;
       setNeoCodexStreaming({ content: accumulated, role: "assistant" });
+      if (stopRef.current) return;
     });
 
     try {
@@ -85,6 +96,7 @@ export default function NeoCodexPage() {
       setNeoCodexStreaming(null);
       addNeoCodexMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
     } finally {
+      stopRef.current = false;
       unlisten();
       setAgentBusy(false);
     }
@@ -132,6 +144,25 @@ export default function NeoCodexPage() {
     refreshSessions();
   };
 
+  const usage = health?.context_usage || 0;
+  const usagePct = Math.round(usage * 100);
+  const usageColor = usage < 0.7 ? "var(--success)" : usage <= 0.9 ? "var(--warning)" : "var(--danger)";
+  const usageCirc = 2 * Math.PI * 7;
+
+  const viewModeLabel = viewMode === "verbose" ? "详细" : viewMode === "normal" ? "正常" : "摘要";
+
+  const cycleViewMode = () => {
+    setViewMode((v) => (v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose"));
+  };
+
+  const handleSideChatSend = () => {
+    const content = sideChatInput.trim();
+    if (!content) return;
+    setSideChatMessages((prev) => [...prev, { role: "user", content }]);
+    setSideChatInput("");
+    setSideChatMessages((prev) => [...prev, { role: "assistant", content: "侧聊仅本地记录，不影响主会话。" }]);
+  };
+
   // Command palette items
   const paletteItems = useMemo(() => {
     const items: Array<{ id: string; label: string; hint?: string; onSelect: () => void }> = [
@@ -139,6 +170,8 @@ export default function NeoCodexPage() {
       { id: "settings", label: "设置", hint: "⌘,", onSelect: () => setShowSettings(true) },
       { id: "sidebar", label: showSidebar ? "收起侧栏" : "展开侧栏", hint: "⌘B", onSelect: () => setShowSidebar((v) => !v) },
       { id: "focus", label: focusMode ? "退出专注模式" : "专注模式", hint: "⌘Shift+F", onSelect: () => setFocusMode((v) => !v) },
+      { id: "viewmode", label: "切换视图模式", hint: "Ctrl+O", onSelect: () => cycleViewMode() },
+      { id: "sidechat", label: "侧聊", hint: "⌘+;", onSelect: () => setSideChatOpen((v) => !v) },
     ];
     (["Agent", "Shell", "Plan"] as const).forEach((m) => {
       items.push({ id: `mode-${m}`, label: `切换到 ${m} 模式`, hint: "Mode", onSelect: () => handleModeChange(m) });
@@ -167,6 +200,18 @@ export default function NeoCodexPage() {
       } else if (e.key === "f" && e.metaKey && e.shiftKey) {
         e.preventDefault();
         setFocusMode((v) => !v);
+      } else if (e.key === "o" && e.ctrlKey) {
+        e.preventDefault();
+        setViewMode(v => v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose");
+      } else if (e.key === "Escape" && agentBusy) {
+        e.preventDefault();
+        handleStop();
+      } else if (e.key === "w" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (neocodexActiveSessionId) handleSessionDelete(neocodexActiveSessionId);
+      } else if (e.key === ";" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSideChatOpen((v) => !v);
       } else if (e.key === "Tab" && e.ctrlKey) {
         e.preventDefault();
         if (neocodexSessions.length === 0) return;
@@ -177,7 +222,7 @@ export default function NeoCodexPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [neocodexSessions, neocodexActiveSessionId, focusMode]);
+  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy]);
 
   return (
     <div className={styles.container}>
@@ -222,6 +267,13 @@ export default function NeoCodexPage() {
           </div>
           <div className={styles.topBarRight}>
             <button
+              className={`${styles.settingsBtn} ${styles.viewModeBtn}`}
+              onClick={cycleViewMode}
+              title={`视图模式: ${viewModeLabel}（Ctrl+O 切换）`}
+            >
+              {viewModeLabel}
+            </button>
+            <button
               className={styles.settingsBtn}
               onClick={() => {
                 const idx = THEME_ORDER.indexOf(settings.theme as (typeof THEME_ORDER)[number]);
@@ -254,6 +306,25 @@ export default function NeoCodexPage() {
                 <path d="M7 1v2M7 11v2M1 7h2M11 7h2" strokeLinecap="round" />
               </svg>
             </button>
+            <button className={styles.settingsBtn} title={`上下文用量 ${usagePct}%`}>
+              <span className={styles.usageRing}>
+                <svg width="30" height="30" viewBox="0 0 20 20">
+                  <circle cx="10" cy="10" r="7" fill="none" stroke="var(--border-primary)" strokeWidth="2" />
+                  <circle
+                    cx="10"
+                    cy="10"
+                    r="7"
+                    fill="none"
+                    stroke={usageColor}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(usageCirc * usage).toFixed(2)} ${usageCirc.toFixed(2)}`}
+                    transform="rotate(-90 10 10)"
+                  />
+                </svg>
+                <span className={styles.usageRingText}>{usagePct}%</span>
+              </span>
+            </button>
           </div>
         </header>
 
@@ -266,9 +337,40 @@ export default function NeoCodexPage() {
               streamingContent={neocodexStreaming?.content}
               streamingRole={neocodexStreaming?.role}
               agentBusy={agentBusy}
+              viewMode={viewMode}
               onSend={handleSend}
+              onStop={handleStop}
               onDelete={(idx) => setNeoCodexMessages(neocodexMessages.filter((_, i) => i !== idx))}
             />
+          )}
+          {sideChatOpen && (
+            <div className={styles.sideChat}>
+              <div className={styles.sideChatHeader}>
+                <span>侧聊</span>
+                <button className={styles.sideChatClose} onClick={() => setSideChatOpen(false)}>✕</button>
+              </div>
+              <div className={styles.sideChatMessages}>
+                {sideChatMessages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`${styles.sideChatMsg} ${m.role === "user" ? styles.sideChatMsgUser : styles.sideChatMsgAssistant}`}
+                  >
+                    {m.content}
+                  </div>
+                ))}
+              </div>
+              <div className={styles.sideChatInputRow}>
+                <input
+                  className={styles.sideChatInput}
+                  value={sideChatInput}
+                  onChange={(e) => setSideChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSideChatSend(); }}
+                  placeholder="输入内容..."
+                />
+                <button className={styles.sideChatSend} onClick={handleSideChatSend}>发送</button>
+              </div>
+              <div className={styles.sideChatHint}>侧聊不写入主会话 ⌘+; 关闭</div>
+            </div>
           )}
         </div>
 
