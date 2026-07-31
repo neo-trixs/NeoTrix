@@ -1,5 +1,43 @@
-#!/usr/bin/env bash
-# NeoTrix pre-commit hook — validate docs integrity
-set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
-python3 scripts/neotrix-doc-system.py check || { echo "⚠ Docs check failed"; exit 1; }
+#!/bin/bash
+# AGENTS.md pointer-conservation gate — rejects commits that bloat AGENTS.md.
+# Installed via .githooks/pre-commit (git config core.hooksPath .githooks).
+# Compliments .opencode/plugins/agents-guard.js (session.idle check).
+
+MAX_LINES=130
+MAX_BYTES=22000
+AGENTS="AGENTS.md"
+
+if [ ! -f "$AGENTS" ]; then
+  exit 0
+fi
+
+# Only enforce when AGENTS.md is part of this commit
+if ! git diff --cached --name-only | grep -qx "$AGENTS"; then
+  exit 0
+fi
+
+LINES=$(git show ":$AGENTS" 2>/dev/null | wc -l | tr -d ' ')
+BYTES=$(git show ":$AGENTS" 2>/dev/null | wc -c | tr -d ' ')
+
+FAIL=0
+if [ "$LINES" -gt "$MAX_LINES" ]; then
+  echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_LINES lines ($LINES). Cycle bodies belong in KB, not here."
+  FAIL=1
+fi
+if [ "$BYTES" -gt "$MAX_BYTES" ]; then
+  echo "✗ [AGENTS-GUARD] AGENTS.md would exceed $MAX_BYTES bytes ($BYTES). Violation of pointer-conservation HARD RULE."
+  FAIL=1
+fi
+
+if git show ":$AGENTS" 2>/dev/null | grep -q "^## .*Cycle.*"; then
+  echo "✗ [AGENTS-GUARD] AGENTS.md contains cycle-body sections. Must be moved to KB via experience-tree."
+  FAIL=1
+fi
+
+if [ "$FAIL" -ne 0 ]; then
+  echo "  Run: python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py gen-index --out experience-index.md"
+  echo "  Then revert AGENTS.md to HEAD and commit only pointer/rule changes."
+  exit 1
+fi
+
+exit 0
