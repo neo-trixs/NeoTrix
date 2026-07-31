@@ -8,18 +8,17 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 
 **指针守恒 (HARD RULE)**: AGENTS.md 是**纯指针文档**，永久禁止追加以下内容到本文件：cycle 完整正文、Session 明细表、Build Baseline 明细、元认知发现清单、吸收细节。所有经验正文统一经 `experience-tree` 流程落盘 KB，本文件仅允许：新增/更新 Experience Index 一行指针、修订操作规则 (Dev Rules/审查维度/共享语言) 本身。新内容超过 3 行 → 必须走 KB 吸收流程。违反即回滚。
 
-**写入门禁 (MECHANISM)**: Experience Index 是**派生生成物**，禁止手工编辑。唯一的更新路径：`python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py gen-index --out experience-index.md`（从 KB hub 自动生成，手工追加会被下一次生成覆盖）。AGENTS.md 结构受双门禁保护：opencode 插件 `.opencode/plugins/agents-guard.js` 在 `session.idle` 校验本文件行数与节结构 + git pre-commit hook 拒绝超阈提交。规则由机制执行，不依赖 agent 自律。
+**写入门禁 (MECHANISM)**: 经验指针与全文统一存 KB `experience` namespace hub，**禁止在 AGENTS.md 内联经验表或 cycle 正文**（手工追加会被门禁拒绝）。指针检索唯一路径：`python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py hub` 查看 cycle 索引 / `query --kw` 检索全文。AGENTS.md 结构受双门禁保护：opencode 插件 `.opencode/plugins/agents-guard.js` 在 `session.idle` 校验本文件行数与节结构 + git pre-commit hook 拒绝超阈提交。规则由机制执行，不依赖 agent 自律。
 
 **外部文件惰性加载 (LAZY LOAD)**: 本文件是 L1 常驻层，只含最高信号内容。以下文件**不要预加载**，遇到相关任务时用 Read 按需读取，加载后为强制规则：
 - `@dev-rules.md` — 全量 R-P1-R-P80 (编码/构建/审查/吸收纪律)。处理编码、构建、审查、吸收任务时加载
-- `@experience-index.md` — Experience Index (自动生成，KB hub 派生)。需要查看最近 session 指针时读取
 - `~/.agents/skills/rev/officer/rev-officer-agent.md` — D1-D51+S1-S7 审查维度。触发 review 时加载
 - `~/.agents/skills/experience-tree/SKILL.md` — 吸收协议。会话收尾时加载
 - KB 检索: `absorb_session.py query` — 历史经验全文，需要时按关键词查询
 
 ## Experience Index
 
-见 `@experience-index.md` (自动生成，勿手工编辑)。全文在 KB: `~/.neotrix/knowledge.db` `experience` 命名空间 hub。
+Cycle 指针与全文统一存 KB: `~/.neotrix/knowledge.db` `experience` 命名空间 hub。查看: `absorb_session.py hub`（索引） / `query --kw`（全文）。禁止内联经验表。
 
 ## Skill Routing (何时加载什么)
 

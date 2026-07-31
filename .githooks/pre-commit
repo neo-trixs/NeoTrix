@@ -35,7 +35,7 @@ if git show ":$AGENTS" 2>/dev/null | grep -q "^## .*Cycle.*"; then
 fi
 
 if [ "$FAIL" -ne 0 ]; then
-  echo "  Run: python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py gen-index --out experience-index.md"
+  echo "  Pointers live in KB: python3 ~/.agents/skills/experience-tree/scripts/absorb_session.py hub"
   echo "  Then revert AGENTS.md to HEAD and commit only pointer/rule changes."
   exit 1
 fi

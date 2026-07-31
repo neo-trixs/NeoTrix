@@ -9,7 +9,6 @@ import { join } from "node:path";
 
 const REPO_ROOT = process.cwd();
 const AGENTS_PATH = join(REPO_ROOT, "AGENTS.md");
-const INDEX_PATH = join(REPO_ROOT, "experience-index.md");
 const LOG_PATH = process.env.HOME + "/.neotrix/agents-guard-violations.log";
 
 const MAX_LINES = 130;
@@ -73,10 +72,10 @@ export const AgentsGuardPlugin = async ({ $ }) => {
           logViolation(`AGENTS.md contains forbidden cycle-body sections: ${forbidden.join(", ")}. Move to KB via experience-tree, then revert.`);
         }
 
-        // 4. Experience Index must point to the generated file, not inline a table
-        if (content.includes("| Cycle | Date |")) {
+        // 4. Experience Index must stay in KB — no inline table may appear
+        if (content.includes("| Cycle | Date |") || content.includes("| Cycle | Session |")) {
           violated = true;
-          logViolation(`AGENTS.md inlines an Experience Index table. Use @experience-index.md (auto-generated) instead.`);
+          logViolation(`AGENTS.md inlines an Experience Index table. Pointers live in KB (absorb_session.py hub/query), never in AGENTS.md.`);
         }
 
         if (violated) {
