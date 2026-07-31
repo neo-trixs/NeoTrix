@@ -358,7 +358,11 @@ impl ContextPipeline {
             role: role.to_string(),
             content,
             token_count,
-            priority: if role == "system" { 5 } else { 3 },
+            priority: match role {
+                "system" => 5,
+                "tool" => 1,
+                _ => 3,
+            },
         });
         self.compact_if_needed();
     }
@@ -1448,6 +1452,8 @@ impl NeoCodexAgent {
                         }],
                     ));
                     messages.push(Message::tool(&result, &format!("call-{}", step)));
+                    self.context.push("assistant", response.content.clone(), response.content.len() / 4);
+                    self.context.push("tool", result.clone(), result.len() / 4);
                     step += 1;
                 }
                 None => {
@@ -1550,6 +1556,8 @@ impl NeoCodexAgent {
                         }],
                     ));
                     messages.push(Message::tool(&result, &format!("call-{}", step)));
+                    self.context.push("assistant", response_content.clone(), response_content.len() / 4);
+                    self.context.push("tool", result.clone(), result.len() / 4);
                     step += 1;
                 }
                 None => {
@@ -2156,6 +2164,19 @@ mod tests {
         assert_eq!(messages[0].role, Role::System);
         assert_eq!(messages.last().unwrap().role, Role::Tool);
         assert!(messages.len() < 4);
+    }
+
+    #[test]
+    fn test_context_pipeline_tool_priority() {
+        let mut ctx = ContextPipeline::new(10_000);
+        ctx.push("system", "sys".into(), 5);
+        ctx.push("tool", "big tool result".into(), 10);
+        ctx.push("user", "hi".into(), 10);
+        ctx.push("assistant", "ok".into(), 10);
+        assert_eq!(ctx.turns[0].priority, 5);
+        assert_eq!(ctx.turns[1].priority, 1);
+        assert_eq!(ctx.turns[2].priority, 3);
+        assert_eq!(ctx.turns[3].priority, 3);
     }
 
     #[test]
