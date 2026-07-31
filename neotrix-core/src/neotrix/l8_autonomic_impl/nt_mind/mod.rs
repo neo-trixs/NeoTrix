@@ -4,24 +4,7 @@
 //! 架构: CapabilityVector + ReasoningBrain + SelfIteratingBrain
 //! 新增: SelfEvolver (S-06) - 外部信息自我进化
 //!
-//! 模块组织（6 域，中间模块提供层次化访问）:
-//!   1. core_reasoning    — 核心推理类型、引擎、自迭代
-//!   2. memory_knowledge  — 记忆、知识挖掘/引擎/持久化
-//!   3. self_improvement  — 自我进化、元认知、创造
-//!   4. connectivity      — HyperCube / GWT 桥接、监控
-//!   5. specialized_tools — 垂直引擎（审查/目标/构建/归档）
-//!   6. dev_tools         — 开发者工具（LSP 客户端）
-
-// ============================================================================
-// Domain module declarations (hierarchical organization layer)
-// ============================================================================
-pub mod core_reasoning;
-pub mod evolution_seed;
-pub mod memory_knowledge;
-pub mod self_improvement;
-pub mod connectivity;
-pub mod specialized_tools;
-pub mod dev_tools;
+//! 模块组织：各子模块以平铺结构声明（6 域 facade 层因零消费已于 Cycle 161 删除）
 
 // ============================================================================
 // Domain 1: 核心推理系统（Core Reasoning）
