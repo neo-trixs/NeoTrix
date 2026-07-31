@@ -114,13 +114,21 @@ impl JepaWorldModel {
         for _step in 0..horizon {
             let (pred, variance) = self.predictor.predict_with_uncertainty(&z, 5);
             medium_term.push(pred.clone());
-            uncertainties.push(variance.iter().sum::<f64>() / variance.len() as f64);
+            uncertainties.push(if variance.is_empty() {
+                0.0
+            } else {
+                variance.iter().sum::<f64>() / variance.len() as f64
+            });
             z = pred;
         }
 
-        let long_term_trend: Vector = (0..self.latent_dim).map(|i| {
-            medium_term.iter().map(|v| v[i]).sum::<f64>() / medium_term.len() as f64
-        }).collect();
+        let long_term_trend: Vector = if medium_term.is_empty() {
+            vec![0.0; self.latent_dim]
+        } else {
+            (0..self.latent_dim).map(|i| {
+                medium_term.iter().map(|v| v[i]).sum::<f64>() / medium_term.len() as f64
+            }).collect()
+        };
 
         let total_energy = self.energy_model.energy(&short_term, &z_current);
 

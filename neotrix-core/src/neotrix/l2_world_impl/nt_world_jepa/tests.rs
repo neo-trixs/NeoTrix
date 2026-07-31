@@ -56,6 +56,19 @@ fn test_multi_scale_prediction() {
 }
 
 #[test]
+fn test_multi_scale_prediction_zero_horizon() {
+    // Regression: horizon=0 produced an empty medium_term, then divided by
+    // medium_term.len()==0 in long_term_trend → NaN trend vector.
+    let wm = JepaWorldModel::new(64);
+    let features = sample_features();
+    let ms = wm.predict_multi_scale(&features, 0);
+    assert!(ms.medium_term.is_empty());
+    assert!(ms.uncertainties.is_empty());
+    assert!(ms.long_term_trend.iter().all(|v| v.is_finite()),
+        "zero-horizon trend must be finite, got NaN");
+}
+
+#[test]
 fn test_energy_model_basic() {
     let em = EnergyModel::new();
     let v1 = vec![1.0, 0.0, 0.0];
