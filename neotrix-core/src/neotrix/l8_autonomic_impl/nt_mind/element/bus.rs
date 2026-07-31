@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
-use super::{ElementError, ElementId};
+use super::ElementId;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EventKind {
@@ -62,15 +62,6 @@ impl ElementBus {
             .or_default()
             .push((subscriber, tx));
         rx
-    }
-
-    pub fn send_command(
-        &self,
-        _target: ElementId,
-        _command: &str,
-        _payload: EventPayload,
-    ) -> Result<EventPayload, ElementError> {
-        Err(ElementError::BusError("direct command not yet supported".into()))
     }
 
     #[cfg(test)]
