@@ -1,4 +1,4 @@
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, ConstitutionComplianceTest};
 
 pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
@@ -8,6 +8,7 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(DigitalHumanSelfTest));
     registry.register(Box::new(LeannStoreSelfTest));
     registry.register(Box::new(VideoPipelineSelfTest));
+    registry.register(Box::new(ConstitutionComplianceTest));
 }
 
 struct AnswerEngineSelfTest;
@@ -150,7 +151,7 @@ mod tests {
     fn test_register_all() {
         let mut registry = SelfTestRegistry::new();
         register_absorbed_modules(&mut registry);
-        assert_eq!(registry.count(), 7);
+        assert_eq!(registry.count(), 8);
     }
 
     #[test]
