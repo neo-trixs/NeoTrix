@@ -243,6 +243,29 @@ impl std::fmt::Display for OsintReport {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DoctorReport {
+    pub target: OsintTarget,
+    pub dns_ok: bool,
+    pub dns_latency: u64,
+    pub http_ok: bool,
+    pub http_latency: u64,
+}
+
+impl std::fmt::Display for DoctorReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "═ OSINT Doctor Report ══════════════════════════════════")?;
+        if let Some(ref d) = self.target.domain { writeln!(f, "  Domain:     {}", d)?; }
+        if let Some(ref u) = self.target.username { writeln!(f, "  Username:   {}", u)?; }
+        if let Some(ref e) = self.target.email { writeln!(f, "  Email:      {}", e)?; }
+        if let Some(ref u) = self.target.url { writeln!(f, "  URL:        {}", u)?; }
+        if let Some(ref i) = self.target.ip { writeln!(f, "  IP:         {}", i)?; }
+        writeln!(f, "  DNS:    {} ({}ms)", if self.dns_ok { "✓" } else { "✗" }, self.dns_latency)?;
+        writeln!(f, "  HTTP:   {} ({}ms)", if self.http_ok { "✓" } else { "✗" }, self.http_latency)?;
+        writeln!(f, "═══════════════════════════════════════════════════")
+    }
+}
+
 fn default_client() -> Client {
     Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -256,11 +279,13 @@ pub async fn run_osint(target: OsintTarget, config: OsintConfig) -> OsintReport 
     let mut report = OsintReport::new(target);
     let client = default_client();
 
+    // DNS: 直接使用 dns::investigate (R-P82 简化版)
     if report.target.domain.is_some() {
         match dns::investigate(&report.target, &client, &config).await {
-            Ok(f) => report.dns = Some(f),
+            Ok(dns) => report.dns = Some(dns),
             Err(e) => report.errors.push(format!("dns: {e}")),
         }
+
         match http::investigate(&report.target, &client, &config).await {
             Ok(f) => report.http = Some(f),
             Err(e) => report.errors.push(format!("http: {e}")),
@@ -303,6 +328,37 @@ pub async fn run_osint(target: OsintTarget, config: OsintConfig) -> OsintReport 
 
     report.completed_at = Some(Utc::now());
     report
+}
+
+/// doctor 体检: 简化版直接探测 DNS + HTTP 可用性
+pub async fn doctor_osint(target: OsintTarget, config: OsintConfig) -> DoctorReport {
+    let client = default_client();
+
+    let mut dns_ok = false;
+    let mut dns_latency = 0u64;
+    let start = std::time::Instant::now();
+    match dns::investigate(&target, &client, &config).await {
+        Ok(_) => dns_ok = true,
+        Err(_) => {}
+    }
+    dns_latency = start.elapsed().as_millis() as u64;
+
+    let mut http_ok = false;
+    let mut http_latency = 0u64;
+    let start = std::time::Instant::now();
+    match http::investigate(&target, &client, &config).await {
+        Ok(_) => http_ok = true,
+        Err(_) => {}
+    }
+    http_latency = start.elapsed().as_millis() as u64;
+
+    DoctorReport {
+        target,
+        dns_ok,
+        dns_latency,
+        http_ok,
+        http_latency,
+    }
 }
 
 #[cfg(test)]
