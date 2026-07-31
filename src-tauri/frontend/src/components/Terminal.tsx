@@ -102,18 +102,18 @@ const Terminal: React.FC<Props> = ({ sessionId, onClose, onStatusChange }) => {
       const ro = new ResizeObserver(() => doFit());
       if (containerRef.current) ro.observe(containerRef.current);
 
-      invoke<string>("pty_spawn")
+      const dims = fit.proposeDimensions() || { cols: 80, rows: 24 };
+      invoke<string>("pty_spawn", { cols: dims.cols, rows: dims.rows })
         .then((ptyId) => {
           entry.ptyId = ptyId;
           onStatusChange?.("终端已连接");
 
-          const dims = fit.proposeDimensions();
-          if (dims) {
-            invoke("pty_resize", { session_id: ptyId, cols: dims.cols, rows: dims.rows }).catch(() => {});
-          }
-
-          const unlisten = listen<string>(`pty-output-${ptyId}`, (event) => {
+          const unlistenOut = listen<string>(`pty-output-${ptyId}`, (event) => {
             term.write(event.payload);
+          });
+          const unlistenExit = listen<number>(`pty-exit-${ptyId}`, (code) => {
+            term.write(`\x1b[2m\r\n[进程已退出, code=${code}]\x1b[0m\r\n`);
+            onStatusChange?.("终端已关闭");
           });
 
           term.onData((data) => {
@@ -125,7 +125,8 @@ const Terminal: React.FC<Props> = ({ sessionId, onClose, onStatusChange }) => {
           });
 
           return () => {
-            unlisten.then((fn) => fn());
+            unlistenOut.then((fn) => fn());
+            unlistenExit.then((fn) => fn());
           };
         })
         .catch((e: unknown) => {

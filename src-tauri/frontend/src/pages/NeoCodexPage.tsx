@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useStore } from "../stores";
-import { ChatView, ModelSelector, HealthPanel, SessionSidebar } from "../components/neocodex";
+import { ChatView, ModelSelector, HealthPanel, SessionSidebar, SettingsView } from "../components/neocodex";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import styles from "./NeoCodexPage.module.css";
@@ -21,6 +21,7 @@ export default function NeoCodexPage() {
 
   const [agentBusy, setAgentBusy] = React.useState(false);
   const [showSidebar, setShowSidebar] = React.useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Load sessions on mount
   useEffect(() => {
@@ -122,21 +123,37 @@ export default function NeoCodexPage() {
           <div className={styles.topBarCenter}>
             <ModelSelector />
           </div>
-          <HealthPanel compact />
+          <div className={styles.topBarRight}>
+            <button
+              className={`${styles.settingsBtn} ${showSettings ? styles.settingsActive : ""}`}
+              onClick={() => setShowSettings(!showSettings)}
+              title={showSettings ? "返回对话" : "设置"}
+            >
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="7" cy="7" r="2.2" />
+                <path d="M7 1.5v1.8M7 10.7v1.8M1.5 7h1.8M10.7 7h1.8M3.1 3.1l1.3 1.3M9.6 9.6l1.3 1.3M3.1 10.9l1.3-1.3M9.6 4.4l1.3-1.3" strokeLinecap="round" />
+              </svg>
+            </button>
+            <HealthPanel compact />
+          </div>
         </header>
 
         <div className={styles.chatArea}>
-          <ChatView
-            messages={neocodexMessages}
-            streamingContent={neocodexStreaming?.content}
-            streamingRole={neocodexStreaming?.role}
-            agentBusy={agentBusy}
-            mode={neocodexMode}
-            onSend={handleSend}
-            onModeToggle={handleModeToggle}
-            onAddGoal={handleAddGoal}
-            onResume={handleResume}
-          />
+          {showSettings ? (
+            <SettingsView />
+          ) : (
+            <ChatView
+              messages={neocodexMessages}
+              streamingContent={neocodexStreaming?.content}
+              streamingRole={neocodexStreaming?.role}
+              agentBusy={agentBusy}
+              mode={neocodexMode}
+              onSend={handleSend}
+              onModeToggle={handleModeToggle}
+              onAddGoal={handleAddGoal}
+              onResume={handleResume}
+            />
+          )}
         </div>
       </main>
     </div>

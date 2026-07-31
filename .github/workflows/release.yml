@@ -62,6 +62,9 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             suffix: macos_arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            suffix: macos_x64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             suffix: linux_x64
@@ -90,6 +93,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "NeoTrix Desktop v${{ github.ref_name }}"

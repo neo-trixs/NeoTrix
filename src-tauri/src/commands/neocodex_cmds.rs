@@ -125,20 +125,66 @@ pub async fn neocodex_add_goal(desc: String, max_iter: u64) -> Result<String, St
     }
 }
 
+#[derive(serde::Serialize, Clone)]
+pub struct NeoCodexProviderEntry {
+    pub name: String,
+    pub model: String,
+    pub resolvable: bool,
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct NeoCodexProviderConfig {
+    pub provider_count: usize,
+    pub resolvable: bool,
+    pub active_model: String,
+    pub providers: Vec<NeoCodexProviderEntry>,
+}
+
 #[tauri::command]
-pub async fn neocodex_provider_config() -> Result<String, String> {
+pub async fn neocodex_provider_config() -> Result<NeoCodexProviderConfig, String> {
     let guard = NEOCODEX_AGENT.lock().await;
     match guard.as_ref() {
         Some(a) => {
-            let provider_count = a.provider.providers.len();
-            let resolvable = a.provider.is_resolvable();
-            let model = a.provider.active_model();
-            Ok(format!(
-                "provider_count={} resolvable={} active_model={}",
-                provider_count, resolvable, model
-            ))
+            let providers = a.provider.providers
+                .iter()
+                .map(|p| NeoCodexProviderEntry {
+                    name: p.name.clone(),
+                    model: p.model.clone(),
+                    resolvable: a.provider.is_resolvable_for(&p.name),
+                })
+                .collect();
+            Ok(NeoCodexProviderConfig {
+                provider_count: a.provider.providers.len(),
+                resolvable: a.provider.is_resolvable(),
+                active_model: a.provider.active_model(),
+                providers,
+            })
         }
-        None => Ok("agent not initialized".to_string()),
+        None => Ok(NeoCodexProviderConfig {
+            provider_count: 0,
+            resolvable: false,
+            active_model: "unknown".to_string(),
+            providers: Vec::new(),
+        }),
+    }
+}
+
+#[tauri::command]
+pub async fn neocodex_set_provider(name: String) -> Result<String, String> {
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    let agent = match guard.as_mut() {
+        Some(a) => a,
+        None => {
+            let mut a = NeoCodexAgent::new("neotrix-tauri");
+            a.provider.sync_from_real();
+            *guard = Some(a);
+            guard.as_mut().unwrap()
+        }
+    };
+    if agent.provider.set_active_provider(&name) {
+        Ok(format!("provider set to {}", name))
+    } else {
+        Err(format!("provider {} not found", name))
     }
 }
 

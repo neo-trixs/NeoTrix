@@ -1,34 +1,43 @@
-import React, { useEffect, useState } from "react";
-import { useStore } from "../../stores";
+import React, { useCallback, useEffect, useState } from "react";
 import type { NeoCodexProviderConfig } from "../../types";
 import styles from "./ModelSelector.module.css";
 
 export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: string) => void }) {
   const [config, setConfig] = useState<NeoCodexProviderConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [switching, setSwitching] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
+  const fetchConfig = useCallback(async () => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const result = await invoke<NeoCodexProviderConfig>("neocodex_provider_config");
+      setConfig(result);
+      onConfigChange?.(result.active_model);
+    } catch (e) {
+      console.error("Failed to fetch provider config:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [onConfigChange]);
+
   useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const result = await invoke("neocodex_provider_config") as string;
-        // Parse "provider_count=24 resolvable=true active_model=gpt-4"
-        const parts = result.split(" ");
-        const parsed: NeoCodexProviderConfig = {
-          provider_count: Number(parts[0]?.split("=")[1] || 0),
-          resolvable: parts[1]?.split("=")[1] === "true",
-          active_model: parts[2]?.split("=")[1] || "unknown",
-        };
-        setConfig(parsed);
-      } catch (e) {
-        console.error("Failed to fetch provider config:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchConfig();
-  }, []);
+  }, [fetchConfig]);
+
+  const handleSwitch = async (name: string) => {
+    if (name === config?.active_model) return;
+    setSwitching(name);
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("neocodex_set_provider", { name });
+      await fetchConfig();
+    } catch (e) {
+      console.error("Switch provider failed:", e);
+    } finally {
+      setSwitching(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -66,27 +75,33 @@ export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: st
 
       {expanded && (
         <div className={styles.dropdown}>
-          <div className={styles.dropdownItem}>
-            <span className={styles.label}>可用 Providers</span>
-            <span className={styles.value}>{config.provider_count}</span>
+          <div className={styles.dropdownHeader}>
+            <span className={styles.label}>可用 Providers ({config.provider_count})</span>
           </div>
-          <div className={styles.dropdownItem}>
-            <span className={styles.label}>当前模型</span>
-            <span className={styles.value}>{config.active_model}</span>
-          </div>
-          <div className={styles.dropdownItem}>
-            <span className={styles.label}>状态</span>
-            <span className={styles.value}>
-              <span className={styles.statusDot} style={{ background: config.resolvable ? "var(--success)" : "var(--warning)" }} />
-              {config.resolvable ? "可用" : "离线"}
-            </span>
+          <div className={styles.providerList}>
+            {config.providers.map((p) => (
+              <button
+                key={p.name}
+                className={styles.providerItem}
+                onClick={() => handleSwitch(p.name)}
+                disabled={switching !== null}
+              >
+                <span className={styles.providerName}>{p.name}</span>
+                <span className={styles.providerModel}>{p.model}</span>
+                <span className={styles.providerStatus}>
+                  {p.resolvable ? (
+                    <span className={styles.okDot} title="可解析" />
+                  ) : (
+                    <span className={styles.offDot} title="离线" />
+                  )}
+                </span>
+                {switching === p.name && <span className={styles.switching}>切换中...</span>}
+              </button>
+            ))}
           </div>
           <button
             className={styles.refreshBtn}
-            onClick={() => {
-              setLoading(true);
-              // Re-fetch would be implemented here
-            }}
+            onClick={() => { setLoading(true); fetchConfig(); }}
             disabled={loading}
           >
             {loading ? "刷新中..." : "刷新 Provider"}

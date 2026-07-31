@@ -8,6 +8,7 @@
 
 use clap::Parser;
 use tauri::{Manager, State, Emitter, Listener};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
@@ -38,8 +39,10 @@ enum Commands {
 
 /// Tauri 命令: PTY 终端管理
 #[tauri::command]
-fn pty_spawn(state: State<'_, Arc<commands::pty::PtyManager>>, session_id: String, cols: u16, rows: u16) -> Result<(), NeoTrixError> {
-    state.spawn(&session_id, cols, rows).map_err(|e| NeoTrixError::Io(e.to_string()))
+fn pty_spawn(state: State<'_, Arc<commands::pty::PtyManager>>, cols: u16, rows: u16) -> Result<String, NeoTrixError> {
+    let session_id = format!("pty-{}", uuid::Uuid::new_v4());
+    state.spawn(&session_id, cols, rows).map_err(|e| NeoTrixError::Io(e.to_string()))?;
+    Ok(session_id)
 }
 
 #[tauri::command]
@@ -153,6 +156,13 @@ fn auto_sync_cycle(sync_state: &commands::SyncState, handle: &tauri::AppHandle) 
 }
 
 fn main() {
+    // MCP stdio 子进程入口: 父进程 mcp_host_start 以 NEOTRIX_MCP_STDIO=1 拉起本进程,
+    // 必须最先拦截, 避免 clap 解析 / GUI 启动。
+    if std::env::var("NEOTRIX_MCP_STDIO").as_deref() == Ok("1") {
+        commands::mcp_host_cmds::run_mcp_stdio();
+        return;
+    }
+
     let _sentry_guard = neotrix::neotrix::nt_shield_sentry::init_sentry();
     let cli = Cli::parse();
 
@@ -166,7 +176,7 @@ fn main() {
             let reasoning_brain = Mutex::new(reasoning_brain);
 
             // PTY 管理器
-            let (pty_manager, _pty_rx) = commands::pty::PtyManager::new();
+            let (pty_manager, pty_rx) = commands::pty::PtyManager::new();
             let pty_manager = Arc::new(pty_manager);
 
             // 权限管理器
@@ -190,6 +200,20 @@ fn main() {
                 .plugin(tauri_plugin_http::init())
                 .plugin(tauri_plugin_fs::init())
                 .plugin(tauri_plugin_updater::Builder::new().build::<tauri::Wry>())
+                .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.set_focus();
+                    }
+                }))
+                .plugin(
+                    tauri_plugin_global_shortcut::Builder::new()
+                        .with_handler(|app, shortcut, event| {
+                            if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                                let _ = app.emit("neotrix-global-shortcut", shortcut.to_string());
+                            }
+                        })
+                        .build(),
+                )
                 .manage(reasoning_bank)
                 .manage(reasoning_brain)
                 .manage(pty_manager.clone())
@@ -315,6 +339,7 @@ fn main() {
                      commands::neocodex_mode_toggle,
                      commands::neocodex_add_goal,
                      commands::neocodex_provider_config,
+                     commands::neocodex_set_provider,
                      commands::neocodex_list_sessions,
                      commands::neocodex_switch_session,
                      commands::neocodex_delete_session,
@@ -351,6 +376,12 @@ fn main() {
                     commands::computer_cmds::capture_screen,
                     commands::computer_cmds::get_window_list,
                     commands::computer_cmds::get_frontmost_app,
+                    // Desktop helpers (clipboard / image / app-switch / ultra review)
+                    commands::desktop_cmds::read_clipboard,
+                    commands::desktop_cmds::write_clipboard,
+                    commands::desktop_cmds::image_generate,
+                    commands::desktop_cmds::switch_app,
+                    commands::desktop_cmds::ultra_review,
                     // Computer interactive (screen capture + mouse/keyboard)
                     commands::computer_screen_capture,
                     commands::computer_screen_list,
@@ -439,6 +470,7 @@ fn main() {
                     commands::mcp_host_start,
                     commands::mcp_host_stop,
                     commands::mcp_host_status,
+                    commands::mcp_host_ping,
                     commands::mcp_host_list_endpoints,
                     commands::mcp_host_register_endpoint,
                     commands::mcp_host_unregister_endpoint,
@@ -748,6 +780,26 @@ fn main() {
                 ])
                 .setup(move |app| {
                     neotrix_tauri::setup_tray(app).expect("failed to setup tray");
+
+                    if let Err(e) = app.global_shortcut().register("CommandOrControl+Shift+Space") {
+                        log::warn!("failed to register global shortcut: {}", e);
+                    }
+
+                    // PTY 事件转发: mpsc → Tauri 事件 (pty-output-{id} / pty-exit-{id})
+                    let pty_handle = app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        let mut rx = pty_rx;
+                        while let Some(evt) = rx.recv().await {
+                            match evt.event_type {
+                                commands::pty::PtyEventType::Output => {
+                                    let _ = pty_handle.emit(&format!("pty-output-{}", evt.session_id), &evt.data);
+                                }
+                                commands::pty::PtyEventType::Exit(code) => {
+                                    let _ = pty_handle.emit(&format!("pty-exit-{}", evt.session_id), &code);
+                                }
+                            }
+                        }
+                    });
                     let _ = commands::insights_record_event(
                         "session_start".to_string(),
                         format!("NeoTrix Desktop session started (v{})", env!("CARGO_PKG_VERSION")),

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface ScreenCapture {
-  imageBase64: string;
+  image_base64: string;
   width: number;
   height: number;
 }
@@ -9,7 +10,7 @@ interface ScreenCapture {
 interface WindowInfo {
   title: string;
   pid: number;
-  appName: string;
+  app_name: string;
 }
 
 const ComputerUsePanel: React.FC = () => {
@@ -22,7 +23,7 @@ const ComputerUsePanel: React.FC = () => {
   const captureScreen = async () => {
     setCapturing(true);
     try {
-      const result = await (window as any).__TAURI__.invoke("cmd_capture_screen") as ScreenCapture;
+      const result = await invoke<ScreenCapture>("capture_screen");
       setScreenshot(result);
       setWindows([]);
       setFrontmost("");
@@ -35,7 +36,7 @@ const ComputerUsePanel: React.FC = () => {
 
   const listWindows = async () => {
     try {
-      const result = await (window as any).__TAURI__.invoke("cmd_get_window_list") as WindowInfo[];
+      const result = await invoke<WindowInfo[]>("get_window_list");
       setWindows(result);
     } catch (e) {
       console.error("List windows failed:", e);
@@ -44,7 +45,7 @@ const ComputerUsePanel: React.FC = () => {
 
   const getFrontmost = async () => {
     try {
-      const result = await (window as any).__TAURI__.invoke("cmd_get_frontmost_app") as { app_name: string; title: string };
+      const result = await invoke<{ app_name: string; title: string }>("get_frontmost_app");
       setFrontmost(`${result.app_name}: ${result.title}`);
     } catch (e) {
       console.error("Get frontmost failed:", e);
@@ -74,7 +75,7 @@ const ComputerUsePanel: React.FC = () => {
           <div style={{ maxHeight: 100, overflowY: "auto", border: "1px solid var(--border-color, #e1e4e8)", borderRadius: 4 }}>
             {windows.map((w, i) => (
               <div key={i} style={{ padding: "3px 6px", fontSize: 10, borderBottom: "1px solid var(--border-color, #e1e4e8)", display: "flex", justifyContent: "space-between" }}>
-                <span>{w.appName}</span>
+                <span>{w.app_name}</span>
                 <span style={{ color: "var(--text-muted, #8b949e)", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.title}</span>
               </div>
             ))}
@@ -84,7 +85,7 @@ const ComputerUsePanel: React.FC = () => {
       {screenshot && (
         <div style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 10, color: "var(--text-muted, #8b949e)", marginBottom: 4 }}>Screen Capture ({screenshot.width}×{screenshot.height})</div>
-          <img src={`data:image/png;base64,${screenshot.imageBase64}`} alt="Screen capture" style={{ width: "100%", borderRadius: 4, border: "1px solid var(--border-color, #e1e4e8)" }} />
+          <img src={`data:image/png;base64,${screenshot.image_base64}`} alt="Screen capture" style={{ width: "100%", borderRadius: 4, border: "1px solid var(--border-color, #e1e4e8)" }} />
         </div>
       )}
       <div style={{ marginTop: 4 }}>

@@ -30,6 +30,7 @@ pub mod plan_cmds;
 pub mod plugin_cmds;
 pub mod marketplace_cmds;
 pub mod neocodex_cmds;
+pub mod desktop_cmds;
 
 // Re-exports for convenience (frontend/tauri registration)
 pub use types::*;
@@ -48,6 +49,7 @@ pub use kb_cmds::*;
 pub use plugin_cmds::*;
 pub use marketplace_cmds::*;
 pub use neocodex_cmds::*;
+pub use desktop_cmds::*;
 pub use websearch_cmds::*;
 
 pub mod computer_cmds;

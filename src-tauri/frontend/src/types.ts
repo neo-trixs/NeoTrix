@@ -551,10 +551,17 @@ export interface NeoCodexHealthReport {
   tool_grounding_degraded: boolean;
 }
 
+export interface NeoCodexProviderEntry {
+  name: string;
+  model: string;
+  resolvable: boolean;
+}
+
 export interface NeoCodexProviderConfig {
   provider_count: number;
   resolvable: boolean;
   active_model: string;
+  providers: NeoCodexProviderEntry[];
 }
 
 export interface NeoCodexEvolutionState {

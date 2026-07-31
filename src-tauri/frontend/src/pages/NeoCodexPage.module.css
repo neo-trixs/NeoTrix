@@ -73,6 +73,38 @@
   justify-content: center;
 }
 
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settingsBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.settingsBtn:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.settingsActive {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
 .chatArea {
   flex: 1;
   overflow: hidden;

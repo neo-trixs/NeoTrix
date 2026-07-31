@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { useStore } from "../../stores";
 import { invoke } from "@tauri-apps/api/core";
+import type { NeoCodexProviderConfig } from "../../types";
 import styles from "./SettingsView.module.css";
 
 type Tab = "providers" | "theme" | "advanced" | "about";
@@ -8,6 +8,7 @@ type Tab = "providers" | "theme" | "advanced" | "about";
 export function SettingsView() {
   const [activeTab, setActiveTab] = useState<Tab>("providers");
   const [providers, setProviders] = useState<Record<string, { name: string; hasKey: boolean; model: string }>>({});
+  const [config, setConfig] = useState<NeoCodexProviderConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [newKey, setNewKey] = useState("");
@@ -16,22 +17,13 @@ export function SettingsView() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        // Load provider configs
-        const result = await invoke("neocodex_provider_config") as string;
-        const parts = result.split(" ");
-        const parsed = {
-          provider_count: Number(parts[0]?.split("=")[1] || 0),
-          resolvable: parts[1]?.split("=")[1] === "true",
-          active_model: parts[2]?.split("=")[1] || "unknown",
-        };
-        // Mock provider list - in real impl, fetch from Tauri
-        setProviders({
-          anthropic: { name: "Anthropic (Claude)", hasKey: true, model: "claude-3-5-sonnet" },
-          openai: { name: "OpenAI", hasKey: false, model: "gpt-4o" },
-          gemini: { name: "Google Gemini", hasKey: false, model: "gemini-1.5-pro" },
-          ollama: { name: "Ollama (Local)", hasKey: true, model: "llama3.1" },
-        });
+        const configResult = await invoke<NeoCodexProviderConfig>("neocodex_provider_config");
+        setConfig(configResult);
+        const map: Record<string, { name: string; hasKey: boolean; model: string }> = {};
+        for (const p of configResult.providers) {
+          map[p.name] = { name: p.name, hasKey: p.resolvable, model: p.model };
+        }
+        setProviders(map);
       } catch (e) {
         console.error("Failed to load settings:", e);
       } finally {

@@ -157,6 +157,21 @@ impl ProviderCatalog {
             .unwrap_or(false)
     }
 
+    /// True if the given provider name maps to a real LlmProvider type.
+    pub fn is_resolvable_for(&self, name: &str) -> bool {
+        Self::provider_type_of(name).is_some()
+    }
+
+    /// Set the active provider by name. Returns true if found.
+    pub fn set_active_provider(&mut self, name: &str) -> bool {
+        if let Some(idx) = self.providers.iter().position(|p| p.name == name) {
+            self.active = idx;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Pick the active provider's concrete model id
     pub fn active_model(&self) -> String {
         self.providers
@@ -1532,12 +1547,10 @@ impl NeoCodexAgent {
 
     /// Build system + history + current user messages from the context pipeline.
     fn build_messages(&self, input: &str) -> Vec<Message> {
-        let system = format!(
-            "You are NeoCodex, an AI coding agent inside the NeoTrix architecture. \
+        let system = "You are NeoCodex, an AI coding agent inside the NeoTrix architecture. \
             Modes: Agent (autonomous coding), Shell (run commands), Plan (draft plans). \
             Use the tools when you need to read files, search the repo, or run shell commands. \
-            Always respond in markdown. Be concise and precise.",
-        );
+            Always respond in markdown. Be concise and precise.".to_string();
         let mut messages = vec![Message::new(Role::System, &system)];
         for turn in &self.context.turns {
             let role = match turn.role.as_str() {
@@ -1557,9 +1570,7 @@ impl NeoCodexAgent {
 
     /// Build an LlmRequest from the current catalog's active provider.
     fn build_request(&self, messages: Vec<Message>) -> Option<LlmRequest> {
-        if self.provider.providers.get(self.provider.active).is_none() {
-            return None;
-        }
+        self.provider.providers.get(self.provider.active)?;
         Some(LlmRequest {
             model: self.provider.active_model(),
             messages,
@@ -1913,7 +1924,7 @@ impl EvolutionLoop {
         }
 
         // Fix 4: goal queue empty but evolution wants growth → seed introspection goal
-        if agent.goals.goals.is_empty() && agent.goals.active.is_none() && agent.evolution.iteration % 25 == 0 {
+        if agent.goals.goals.is_empty() && agent.goals.active.is_none() && agent.evolution.iteration.is_multiple_of(25) {
             agent.add_goal("Self-audit: converge NeoCodex toward Codex/Claude Code desktop parity", 5);
             fixes.push("seeded introspection goal".into());
         }
