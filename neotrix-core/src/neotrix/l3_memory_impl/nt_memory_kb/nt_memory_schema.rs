@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const SCHEMA_VERSION: i32 = 5;
+pub const SCHEMA_VERSION: i32 = 7;
 
 pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
@@ -24,7 +24,12 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             access_count INTEGER DEFAULT 0,
-            metadata TEXT
+            metadata TEXT,
+            data_tier TEXT NOT NULL DEFAULT 'core',
+            temporal TEXT,
+            supersedes TEXT,
+            source_episode TEXT,
+            tier TEXT NOT NULL DEFAULT 'warm'
         );
 
         CREATE TABLE IF NOT EXISTS edges (

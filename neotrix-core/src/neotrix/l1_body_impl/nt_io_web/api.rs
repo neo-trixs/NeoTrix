@@ -53,6 +53,7 @@ fn payload_to_provider_config(payload: &ProviderConfigPayload) -> crate::neotrix
         base_url: payload.base_url.clone(),
         model: Some(payload.model.clone()),
         timeout_secs: 120,
+        proxy: None,
     }
 }
 

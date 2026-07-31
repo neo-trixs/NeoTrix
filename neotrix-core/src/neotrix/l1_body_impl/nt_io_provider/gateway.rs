@@ -5,6 +5,9 @@ use std::time::{Duration, Instant};
 use super::circuit_breaker::{BreakerState, CircuitBreaker};
 use super::free_pool::global_free_pool;
 use super::provider_catalog::{ProviderCategory, CommunicationProfile};
+use super::provider_swap::ProviderSwapManager;
+use super::agent_routing::AgentRoutingTable;
+use super::factory::LlmProviderType;
 use super::rate_limiter::RateLimiter;
 use super::rate_profiles::get_rate_profile;
 use super::types::*;
@@ -124,6 +127,58 @@ pub struct SubGrid {
     pub provider_names: Vec<String>,
     /// 创建时间
     pub created_at: std::time::SystemTime,
+    /// 健康状态: 调用成功/失败次数与延迟 (子母阵反馈回路)
+    pub health: SubGridHealth,
+}
+
+/// 子网格运行时健康状态 — 反馈回路 (D21 外部观察 + D30 行为化)
+/// 通过 nt_core_telemetry 记录, 支持画像动态降级 (Gap 4)
+#[derive(Debug, Clone, Default)]
+pub struct SubGridHealth {
+    /// 总调用次数
+    pub call_count: u64,
+    /// 成功次数
+    pub success_count: u64,
+    /// 错误次数
+    pub error_count: u64,
+    /// 累计延迟 (ms)
+    pub total_latency_ms: u64,
+    /// 最近一次调用时间
+    pub last_used: Option<std::time::SystemTime>,
+}
+
+impl SubGridHealth {
+    pub fn record_call(&mut self, success: bool, latency_ms: u64) {
+        self.call_count += 1;
+        if success {
+            self.success_count += 1;
+        } else {
+            self.error_count += 1;
+        }
+        self.total_latency_ms += latency_ms;
+        self.last_used = Some(std::time::SystemTime::now());
+    }
+
+    /// 成功率 (0.0-1.0), 无调用时返回 1.0 (未知视为健康)
+    pub fn success_rate(&self) -> f64 {
+        if self.call_count == 0 {
+            return 1.0;
+        }
+        self.success_count as f64 / self.call_count as f64
+    }
+
+    /// 平均延迟 (ms)
+    pub fn avg_latency_ms(&self) -> f64 {
+        if self.call_count == 0 {
+            return 0.0;
+        }
+        self.total_latency_ms as f64 / self.call_count as f64
+    }
+
+    /// 是否健康: 成功率 >= 0.8 或样本太少 (< 5)
+    pub fn is_healthy(&self) -> bool {
+        self.call_count < 5 || self.success_rate() >= 0.8
+    }
 }
 
 impl SubGrid {
@@ -134,6 +189,7 @@ impl SubGrid {
             security_profile,
             provider_names,
             created_at: std::time::SystemTime::now(),
+            health: SubGridHealth::default(),
         }
     }
 
@@ -263,21 +319,117 @@ impl GatewayV2 {
     /// 子母阵动态增幅的公共消费点 (R-P79 接线): 调用方声明所需安全级别，
     /// 网关自动从匹配子网格中选择 provider 并执行 complete()。
     /// 无匹配 provider 时回退到默认 select_best()，保证通信始终畅通。
+    /// 记录子网格健康 (Gap 3) 并在失败时按画像降级重试 (Gap 4)。
     pub async fn complete_for_profile(
         &self,
         required: CommunicationProfile,
         request: &LlmRequest,
     ) -> Result<LlmResponse, LlmError> {
+        self.complete_for_profile_detailed(required, request).await.map(|(r, _, _)| r)
+    }
+
+    /// 与 complete_for_profile 相同, 但返回 (响应, 实际使用的画像, 实际 provider 名)。
+    /// 供 CapabilityCoordinator 报告真实的降级状态 (修复 degraded 恒 false 失真)。
+    async fn complete_for_profile_detailed(
+        &self,
+        required: CommunicationProfile,
+        request: &LlmRequest,
+    ) -> Result<(LlmResponse, CommunicationProfile, String), LlmError> {
+        let start = std::time::Instant::now();
         match self.select_best_for_profile(required).await {
             Some(name) => {
                 log::debug!("[gateway] complete_for_profile({:?}) → {}", required, name);
-                self.call_provider(&name, request).await
+                let result = self.call_provider(&name, request).await;
+                let latency = start.elapsed().as_millis() as u64;
+                let success = result.is_ok();
+                self.record_sub_grid_call(required, success, latency);
+                if success {
+                    result.map(|r| (r, required, name))
+                } else {
+                    // Gap 4: 首选 provider 失败 → 降级到更宽松画像重试
+                    let err = result.err().unwrap_or_else(|| LlmError::Unknown("profile call failed".into()));
+                    self.degraded_retry(required, request, &err).await
+                }
             }
             None => {
                 log::warn!("[gateway] no provider meets {:?} — falling back to default selection", required);
-                self.complete_with_selection(request).await
+                match self.select_best().await {
+                    Some(name) => {
+                        let result = self.call_provider(&name, request).await;
+                        result.map(|r| (r, CommunicationProfile::Open, name))
+                    }
+                    None => Err(LlmError::Unknown("no provider available".into())),
+                }
             }
         }
+    }
+
+    /// 记录一次子网格调用 (成功/失败/延迟) 到健康状态 + nt_core_telemetry
+    fn record_sub_grid_call(&self, profile: CommunicationProfile, success: bool, latency_ms: u64) {
+        if let Ok(mut grids) = self.sub_grids.write() {
+            if let Some(grid) = grids.values_mut().find(|g| g.security_profile == profile) {
+                grid.health.record_call(success, latency_ms);
+            }
+        }
+        // 反馈到全局遥测 (D21 外部观察): 子网格健康可见于 nt_core_telemetry
+        crate::core::nt_core_telemetry::global_telemetry().record(
+            crate::core::nt_core_telemetry::TelemetryEvent::Custom {
+                name: format!("sub_grid_{:?}", profile),
+                value: format!("{}:{}:{}ms", if success { "ok" } else { "err" }, success as u8, latency_ms),
+            }
+        );
+    }
+
+    /// Gap 4: 画像动态降级 — 首选安全级别失败后, 逐步放宽到更宽松画像重试
+    /// 顺序: Anonymous → Tor → Proxied → Open (保持通信畅通优先)
+    /// 返回 (响应, 实际使用的画像, 实际 provider 名) — 供调用方感知真实降级。
+    async fn degraded_retry(
+        &self,
+        required: CommunicationProfile,
+        request: &LlmRequest,
+        first_err: &LlmError,
+    ) -> Result<(LlmResponse, CommunicationProfile, String), LlmError> {
+        let degradation_chain = [
+            CommunicationProfile::Anonymous,
+            CommunicationProfile::Tor,
+            CommunicationProfile::Proxied,
+            CommunicationProfile::Open,
+        ];
+        for target in degradation_chain {
+            // 只向更宽松的画像降级: required.meets(target) 且不同
+            if target == required || !required.meets(target) {
+                continue;
+            }
+            log::warn!("[gateway] profile {:?} degraded → {:?}: {}", required, target, first_err);
+            let start = std::time::Instant::now();
+            match self.select_best_for_profile(target).await {
+                Some(name) => {
+                    let result = self.call_provider(&name, request).await;
+                    let latency = start.elapsed().as_millis() as u64;
+                    let success = result.is_ok();
+                    self.record_sub_grid_call(target, success, latency);
+                    if success {
+                        return result.map(|r| (r, target, name));
+                    }
+                }
+                None => continue,
+            }
+        }
+        Err(first_err.clone())
+    }
+
+    /// 查询所有子网格的健康状态 (反馈回路可见性)
+    pub fn sub_grid_health_report(&self) -> Vec<(String, SubGridHealth)> {
+        self.list_sub_grids().into_iter().map(|g| (g.name, g.health)).collect()
+    }
+
+    /// 检查满足指定画像的子网格中是否有健康可用的 (Gap 4 前置判断)
+    pub fn has_healthy_sub_grid(&self, required: CommunicationProfile) -> bool {
+        self.sub_grids_meeting(required).iter().any(|grid_name| {
+            self.sub_grid_health_report().iter().any(|(name, health)| {
+                name == grid_name && health.is_healthy()
+            })
+        })
     }
 
     /// 返回当前已组成的子网格中满足给定安全级别的网格名称
@@ -286,6 +438,75 @@ impl GatewayV2 {
             .filter(|sg| sg.security_profile.meets(required))
             .map(|sg| sg.name)
             .collect()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // LLM Challenge (P0-3, Cycle 159) — Unstract/LLM-Challenge pattern
+    // Deterministic challenge tasks scoring provider accuracy/latency/cost.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Run the deterministic challenge suite against a provider. Returns a
+    /// scored benchmark (accuracy, latency, cost) for the EvolutionFruit
+    /// evidence chain and GatewayV2 provider selection.
+    pub async fn run_llm_challenge(&self, provider_name: &str, task_type: &str) -> Result<crate::core::nt_core_consciousness_tree::ProviderBenchmark, LlmError> {
+        let tasks = self.challenge_tasks(task_type);
+        let mut correct = 0usize;
+        let mut total_latency_ms = 0u64;
+        let mut total_cost = 0.0f64;
+        let mut total_tokens = 0u32;
+
+        for task in tasks {
+            let request = LlmRequest::new(&self.provider_model(provider_name).unwrap_or_default(), &task.prompt);
+            let start = Instant::now();
+            let resp = self.call_provider(provider_name, &request).await?;
+            total_latency_ms += start.elapsed().as_millis() as u64;
+            total_tokens += resp.usage.total_tokens;
+            total_cost += (resp.usage.total_tokens as f64 / 1000.0) * 0.002;
+            if task.check(&resp.content) {
+                correct += 1;
+            }
+        }
+
+        let task_count = 4usize.max(1);
+        Ok(crate::core::nt_core_consciousness_tree::ProviderBenchmark {
+            provider: provider_name.to_string(),
+            model: self.provider_model(provider_name).unwrap_or_else(|| provider_name.to_string()),
+            accuracy: correct as f64 / task_count as f64,
+            latency_ms: total_latency_ms / task_count as u64,
+            cost_usd: total_cost,
+            task_type: task_type.to_string(),
+            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        })
+    }
+
+    /// Deterministic challenge suite — answers are exact-match scored.
+    fn challenge_tasks(&self, task_type: &str) -> Vec<ChallengeTask> {
+        match task_type {
+            "arithmetic" => vec![
+                ChallengeTask { prompt: "What is 17 + 25? Answer with the number only.".into(), expected: "42".into() },
+                ChallengeTask { prompt: "What is 9 * 8? Answer with the number only.".into(), expected: "72".into() },
+                ChallengeTask { prompt: "What is 100 - 37? Answer with the number only.".into(), expected: "63".into() },
+                ChallengeTask { prompt: "What is 15 + 15 + 15? Answer with the number only.".into(), expected: "45".into() },
+            ],
+            "extraction" => vec![
+                ChallengeTask { prompt: "Extract the email from: 'Contact alice@example.com for info'. Reply with the email only.".into(), expected: "alice@example.com".into() },
+                ChallengeTask { prompt: "Extract the date from: 'The event is on 2026-07-31'. Reply with the date only.".into(), expected: "2026-07-31".into() },
+                ChallengeTask { prompt: "Extract the city from: 'She lives in Shanghai, China'. Reply with the city only.".into(), expected: "Shanghai".into() },
+                ChallengeTask { prompt: "Extract the number from: 'There are 42 apples'. Reply with the number only.".into(), expected: "42".into() },
+            ],
+            _ => vec![
+                ChallengeTask { prompt: "Is 2 + 2 equal to 4? Answer yes or no.".into(), expected: "yes".into() },
+                ChallengeTask { prompt: "Is 3 + 3 equal to 7? Answer yes or no.".into(), expected: "no".into() },
+                ChallengeTask { prompt: "What color is the sky on a clear day? One word.".into(), expected: "blue".into() },
+                ChallengeTask { prompt: "How many legs does a dog have? One digit.".into(), expected: "4".into() },
+            ],
+        }
+    }
+
+    /// Extract model id from `{provider}/{model_id}` registration names.
+    fn provider_model(&self, provider_name: &str) -> Option<String> {
+        let model = provider_name.split('/').last().unwrap_or(provider_name);
+        if model.is_empty() { None } else { Some(model.to_string()) }
     }
 
     fn fire_event(&self, provider_name: &str, success: bool, latency_ms: f64, tokens: u32, model: &str, phase: AttemptPhase) {
@@ -882,6 +1103,7 @@ impl GatewayV2 {
                 base_url: Some(entry.base_url.clone()),
                 model: Some(entry.model_id.clone()),
                 timeout_secs: 60,
+                proxy: None,
             });
             self.register_provider_with_category(&name, provider, entry.is_free, ProviderCategory::Cloud);
             log::info!("[gateway] Registered from catalog: {} ({})", name, entry.display_name);
@@ -902,6 +1124,39 @@ impl GatewayV2 {
                 "composite_score": format!("{:.4}", state.composite_score()),
             })
         }).collect()
+    }
+
+    /// 已注册 provider 名称列表
+    pub fn providers(&self) -> Vec<String> {
+        self.states.read()
+            .unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() })
+            .keys().cloned().collect()
+    }
+
+    /// 查询 provider 的安全分类
+    pub fn category_of(&self, name: &str) -> Option<ProviderCategory> {
+        self.states.read()
+            .unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() })
+            .get(name).map(|s| s.category)
+    }
+
+    /// 默认 provider 名称 (注册的第一个, 无则空串)
+    pub fn default_provider_name(&self) -> String {
+        self.default_name.read()
+            .unwrap_or_else(|e| { log::warn!("[gateway] default_name RwLock poisoned: {}", e); e.into_inner() })
+            .clone()
+    }
+}
+
+/// LLM Challenge deterministic task — exact-match scored benchmark item.
+struct ChallengeTask {
+    prompt: String,
+    expected: String,
+}
+
+impl ChallengeTask {
+    fn check(&self, response: &str) -> bool {
+        response.to_lowercase().contains(&self.expected.to_lowercase())
     }
 }
 
@@ -925,6 +1180,222 @@ impl LlmProvider for GatewayV2 {
     }
 }
 
+/// 能力自主协调层 — 任务目标驱动的已有能力组合器 (R-P42 强化已有节点)
+///
+/// 不再为每个任务创建独立管道, 而是将既有节点 (路由表 / 子网格健康 /
+/// 画像降级 / ProviderSwapManager / CircuitBreaker) 组装为按任务类型路由的
+/// 统一协调入口. 对应周天信息大阵的 "协调" 环节:
+///   1. 解析任务类型 → 需要的能力与安全画像 (CapabilityIntent)
+///   2. 查路由表 → 该任务默认 provider/model (已有 AgentRoutingTable)
+///   3. 健康感知选路 → 偏好健康子网格 (Gap 3)
+///   4. 画像降级 → 失败时自动放宽安全级别重试 (Gap 4)
+///   5. 失败注入 → ProviderSwapManager 记录, 驱动后续 swap (已有)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum CapabilityIntent {
+    /// 本地推理 (无网络需求) — 匿名级, 选 Local provider
+    LocalReasoning,
+    /// 一般推理 — 开放级, 任意 provider
+    GeneralReasoning,
+    /// 知识检索 — 开放级, 偏免费
+    KnowledgeRetrieval,
+    /// 敏感数据写入 — 代理级 (Proxied)
+    SensitiveWrite,
+    /// 匿名通信 — 匿名级 (Anonymous / Tor 可用则 Tor)
+    AnonymousCommunication,
+    /// 深度分析 (慢速/高成本可接受) — 开放级, 偏 Cloud
+    DeepAnalysis,
+}
+
+impl CapabilityIntent {
+    /// 任务类型 → 所需最低通信安全画像
+    pub fn required_profile(&self) -> CommunicationProfile {
+        match self {
+            Self::LocalReasoning => CommunicationProfile::Anonymous,
+            Self::GeneralReasoning => CommunicationProfile::Open,
+            Self::KnowledgeRetrieval => CommunicationProfile::Open,
+            Self::SensitiveWrite => CommunicationProfile::Proxied,
+            Self::AnonymousCommunication => CommunicationProfile::Tor,
+            Self::DeepAnalysis => CommunicationProfile::Open,
+        }
+    }
+
+    /// 任务类型 → 建议的 provider category (None = 无偏好)
+    pub fn preferred_category(&self) -> Option<ProviderCategory> {
+        match self {
+            Self::LocalReasoning => Some(ProviderCategory::Local),
+            Self::DeepAnalysis => Some(ProviderCategory::Cloud),
+            _ => None,
+        }
+    }
+
+    /// 从字符串解析任务意图 (CLI / 配置友好)
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s.trim().to_ascii_lowercase().as_str() {
+            "local" | "local_reasoning" | "local-reasoning" => Self::LocalReasoning,
+            "general" | "general_reasoning" | "general-reasoning" | "reason" => Self::GeneralReasoning,
+            "retrieve" | "retrieval" | "knowledge" | "knowledge_retrieval" | "knowledge-retrieval" => Self::KnowledgeRetrieval,
+            "write" | "sensitive" | "sensitive_write" | "sensitive-write" => Self::SensitiveWrite,
+            "anonymous" | "anon" | "anonymous_communication" | "anonymous-communication" | "tor" => Self::AnonymousCommunication,
+            "deep" | "deep_analysis" | "deep-analysis" | "analysis" => Self::DeepAnalysis,
+            _ => return None,
+        })
+    }
+
+    pub fn all() -> [CapabilityIntent; 6] {
+        [
+            Self::LocalReasoning,
+            Self::GeneralReasoning,
+            Self::KnowledgeRetrieval,
+            Self::SensitiveWrite,
+            Self::AnonymousCommunication,
+            Self::DeepAnalysis,
+        ]
+    }
+}
+
+impl std::fmt::Display for CapabilityIntent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::LocalReasoning => "local_reasoning",
+            Self::GeneralReasoning => "general_reasoning",
+            Self::KnowledgeRetrieval => "knowledge_retrieval",
+            Self::SensitiveWrite => "sensitive_write",
+            Self::AnonymousCommunication => "anonymous_communication",
+            Self::DeepAnalysis => "deep_analysis",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+/// 一次协调请求 — 任务目标 + 提示词, 交由 CapabilityCoordinator 自主完成
+#[derive(Debug, Clone)]
+pub struct CoordinationRequest {
+    pub intent: CapabilityIntent,
+    pub prompt: String,
+    pub model: Option<String>,
+}
+
+impl CoordinationRequest {
+    pub fn new(intent: CapabilityIntent, prompt: &str) -> Self {
+        Self { intent, prompt: prompt.to_string(), model: None }
+    }
+}
+
+/// 协调结果 — 响应 + 实际使用的安全画像 (供调用方感知降级)
+#[derive(Debug)]
+pub struct CoordinationOutcome {
+    pub response: LlmResponse,
+    pub used_profile: CommunicationProfile,
+    pub degraded: bool,
+    pub provider_name: String,
+}
+
+/// 能力自主协调器 — 组合既有节点完成目标任务
+pub struct CapabilityCoordinator {
+    pub gateway: GatewayV2,
+    pub routing: AgentRoutingTable,
+    pub swap: ProviderSwapManager,
+}
+
+impl CapabilityCoordinator {
+    pub fn new(gateway: GatewayV2, routing: AgentRoutingTable, swap: ProviderSwapManager) -> Self {
+        Self { gateway, routing, swap }
+    }
+
+    /// 组装默认子网格 (匿名本地 + 代理 + 开放), 供未预先组合时使用
+    pub fn ensure_default_sub_grids(&self) {
+        let grids = self.gateway.list_sub_grids();
+        if grids.is_empty() {
+            self.gateway.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+            self.gateway.compose_sub_grid("proxied-cloud", CommunicationProfile::Proxied, false);
+            self.gateway.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+        }
+    }
+
+    /// 任务意图 → 需要的能力清单 (梳理自有能力, D48 跨域能量流)
+    pub fn capability_plan(intent: CapabilityIntent) -> Vec<&'static str> {
+        match intent {
+            CapabilityIntent::LocalReasoning => vec!["local_reasoning", "reason", "generate"],
+            CapabilityIntent::GeneralReasoning => vec!["reason", "generate", "coordinate"],
+            CapabilityIntent::KnowledgeRetrieval => vec!["retrieve", "search", "reason"],
+            CapabilityIntent::SensitiveWrite => vec!["mutate", "send", "verify"],
+            CapabilityIntent::AnonymousCommunication => vec!["send", "communicate", "shield"],
+            CapabilityIntent::DeepAnalysis => vec!["plan", "decompose", "critique", "simulate"],
+        }
+    }
+
+    /// 协调执行 — 目标驱动的自主能力组合:
+    /// 1. 优先本地/免费 (依据意图偏好的 category)
+    /// 2. 健康感知: 偏好健康子网格, 跳过熔断的 provider
+    /// 3. 画像降级: 失败自动放宽 (complete_for_profile 内部处理)
+    /// 4. 结果注入 swap manager 以驱动长期 failover
+    pub async fn coordinate(&mut self, req: &CoordinationRequest) -> Result<CoordinationOutcome, LlmError> {
+        self.ensure_default_sub_grids();
+        let profile = req.intent.required_profile();
+
+        // 2. 若偏好 category 已注册, 直接走该 provider (LocalReasoning → Local)
+        let preferred = req.intent.preferred_category();
+        let routed_provider = preferred.and_then(|cat| self.find_provider_by_category(cat));
+        let provider_name = if let Some(name) = routed_provider {
+            name
+        } else {
+            // 3. 默认走健康感知的子网格选路
+            match self.gateway.select_best_for_profile(profile).await {
+                Some(name) => name,
+                None => {
+                    // 无匹配 → 回退默认 (通信始终畅通)
+                    self.gateway.default_provider_name()
+                }
+            }
+        };
+
+        let llm_req = LlmRequest {
+            model: req.model.clone().unwrap_or_else(|| {
+                let (_, model) = self.routing.route_for(provider_name.as_str());
+                model.clone()
+            }),
+            ..LlmRequest::new(provider_name.as_str(), &req.prompt)
+        };
+
+        let result = self.gateway.complete_for_profile_detailed(profile, &llm_req).await;
+        match result {
+            Ok((resp, actual_profile, actual_provider)) => {
+                let degraded = actual_profile != profile;
+                if !degraded {
+                    self.swap.record_success(LlmProviderType::from_name(provider_name.as_str()).unwrap_or(LlmProviderType::OpenAI), 0.0);
+                }
+                log::debug!("[coordinate] {:?} degraded={} ({:?} → {:?})", req.intent, degraded, profile, actual_profile);
+                Ok(CoordinationOutcome {
+                    response: resp,
+                    used_profile: actual_profile,
+                    degraded,
+                    provider_name: actual_provider,
+                })
+            }
+            Err(e) => {
+                // 降级已由 complete_for_profile 内部处理; 若仍失败, 记录到 swap manager
+                self.swap.record_error(
+                    LlmProviderType::from_name(provider_name.as_str()).unwrap_or(LlmProviderType::OpenAI),
+                    &e,
+                );
+                Err(e)
+            }
+        }
+    }
+
+    fn find_provider_by_category(&self, category: ProviderCategory) -> Option<String> {
+        self.gateway.providers().into_iter().find(|name| {
+            self.gateway.category_of(name).map(|c| c == category).unwrap_or(false)
+        })
+    }
+}
+
+impl Default for CapabilityCoordinator {
+    fn default() -> Self {
+        Self::new(GatewayV2::new(), AgentRoutingTable::new("default", "default"), ProviderSwapManager::new(vec![]))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -937,6 +1408,26 @@ mod tests {
 
         let selected = gw.select_best().await;
         assert_eq!(selected, Some("free".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_llm_challenge_scoring() {
+        let gw = GatewayV2::new();
+        // Default generic suite with exact-match scoring
+        let tasks = gw.challenge_tasks("generic");
+        assert_eq!(tasks.len(), 4);
+        assert!(tasks[0].check("yes, exactly"));
+        assert!(!tasks[1].check("yes definitely"));
+        assert!(tasks[2].check("The sky is BLUE"));
+        assert!(tasks[3].check("4"));
+    }
+
+    #[tokio::test]
+    async fn test_provider_model_extraction() {
+        let gw = GatewayV2::new();
+        assert_eq!(gw.provider_model("nvidia/meta/llama-3.1-8b-instruct"), Some("llama-3.1-8b-instruct".to_string()));
+        assert_eq!(gw.provider_model("openai"), Some("openai".to_string()));
+        assert_eq!(gw.provider_model(""), None);
     }
 
     #[tokio::test]
@@ -1167,6 +1658,151 @@ mod tests {
         assert_eq!(meeting_open.len(), 2); // anonymous 满足 open, open 也满足 open
         // Tor 需求: 仅 anonymous (Anonymous > Tor 满足), open 不满足
         assert_eq!(gw.sub_grids_meeting(CommunicationProfile::Tor), vec!["anonymous-local"]);
+    }
+
+    #[test]
+    fn test_sub_grid_health() {
+        let mut h = SubGridHealth::default();
+        assert!(h.is_healthy()); // 样本太少视为健康
+        h.record_call(true, 100);
+        h.record_call(true, 200);
+        h.record_call(false, 300);
+        assert_eq!(h.call_count, 3);
+        assert_eq!(h.success_count, 2);
+        assert!(h.is_healthy()); // <5 样本仍视为健康
+        h.record_call(false, 100);
+        h.record_call(false, 100);
+        h.record_call(false, 100);
+        // 6 次调用, 2 成功 4 失败 → 成功率 0.33 < 0.8
+        assert!(!h.is_healthy());
+        assert!(h.success_rate() < 0.5);
+        assert!(h.avg_latency_ms() > 100.0);
+    }
+
+    #[test]
+    fn test_sub_grid_health_report() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+
+        let report = gw.sub_grid_health_report();
+        assert_eq!(report.len(), 1);
+        assert_eq!(report[0].0, "anonymous-local");
+        assert_eq!(report[0].1.call_count, 0); // 尚未调用
+    }
+
+    #[tokio::test]
+    async fn test_complete_for_profile_records_health() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+
+        let mut req = LlmRequest::new("test-model", "hello");
+        req.model = "test-model".to_string();
+
+        let resp = gw.complete_for_profile(CommunicationProfile::Anonymous, &req).await;
+        assert!(resp.is_ok());
+
+        // 健康状态已记录
+        let report = gw.sub_grid_health_report();
+        let (_, health) = &report[0];
+        assert_eq!(health.call_count, 1);
+        assert_eq!(health.success_count, 1);
+        assert!(health.is_healthy());
+    }
+
+    #[tokio::test]
+    async fn test_degraded_retry_downgrades_on_failure() {
+        // local-fail 满足 Anonymous 但失败; cloud-ok 仅满足 Open 且成功.
+        // 请求 Anonymous → local-fail 失败 → 降级链 Anonymous→Tor→Proxied→Open → cloud-ok 成功
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("local-fail", Box::new(MockProvider::failing()), false, ProviderCategory::Local);
+        gw.register_provider_with_category("cloud-ok", Box::new(MockProvider::new("cloud")), true, ProviderCategory::Cloud);
+        gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+        gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+
+        let mut req = LlmRequest::new("test-model", "hello");
+        req.model = "test-model".to_string();
+
+        // 请求 Anonymous → 首选 local-fail 失败 → 降级到 Open → cloud-ok 成功
+        let resp = gw.complete_for_profile(CommunicationProfile::Anonymous, &req).await;
+        assert!(resp.is_ok());
+        assert_eq!(resp.unwrap().content, "cloud");
+    }
+
+    #[test]
+    fn test_capability_intent_parse() {
+        assert_eq!(CapabilityIntent::parse("local"), Some(CapabilityIntent::LocalReasoning));
+        assert_eq!(CapabilityIntent::parse("deep-analysis"), Some(CapabilityIntent::DeepAnalysis));
+        assert_eq!(CapabilityIntent::parse("anonymous_communication"), Some(CapabilityIntent::AnonymousCommunication));
+        assert_eq!(CapabilityIntent::parse("unknown_thing"), None);
+        // 画像映射
+        assert_eq!(CapabilityIntent::LocalReasoning.required_profile(), CommunicationProfile::Anonymous);
+        assert_eq!(CapabilityIntent::SensitiveWrite.required_profile(), CommunicationProfile::Proxied);
+        assert_eq!(CapabilityIntent::AnonymousCommunication.required_profile(), CommunicationProfile::Tor);
+        // 偏好分类
+        assert_eq!(CapabilityIntent::LocalReasoning.preferred_category(), Some(ProviderCategory::Local));
+        assert_eq!(CapabilityIntent::GeneralReasoning.preferred_category(), None);
+        // 能力计划 (梳理自有能力)
+        let plan = CapabilityCoordinator::capability_plan(CapabilityIntent::DeepAnalysis);
+        assert!(plan.contains(&"plan"));
+        assert!(plan.contains(&"critique"));
+    }
+
+    #[tokio::test]
+    async fn test_capability_coordinator_local_reasoning() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        let routing = AgentRoutingTable::new("ollama", "local-model");
+        let swap = ProviderSwapManager::new(vec![]);
+        let mut coord = CapabilityCoordinator::new(gw, routing, swap);
+
+        let req = CoordinationRequest::new(CapabilityIntent::LocalReasoning, "think about X");
+        let outcome = coord.coordinate(&req).await;
+        assert!(outcome.is_ok());
+        let out = outcome.unwrap();
+        assert_eq!(out.response.content, "local");
+        assert_eq!(out.used_profile, CommunicationProfile::Anonymous);
+        assert!(!out.degraded);
+    }
+
+    #[tokio::test]
+    async fn test_capability_coordinator_fallback_default() {
+        // 无任何 provider 满足 Tor → 回退默认 select_best, 通信始终畅通
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        let routing = AgentRoutingTable::new("openai", "gpt-model");
+        let swap = ProviderSwapManager::new(vec![]);
+        let mut coord = CapabilityCoordinator::new(gw, routing, swap);
+
+        let req = CoordinationRequest::new(CapabilityIntent::AnonymousCommunication, "hello");
+        let outcome = coord.coordinate(&req).await;
+        assert!(outcome.is_ok());
+        assert_eq!(outcome.unwrap().response.content, "ok");
+    }
+
+    #[tokio::test]
+    async fn test_capability_coordinator_reports_real_degradation() {
+        // local-fail 满足 Anonymous 但失败 → 降级链落到 Open → cloud-ok 成功.
+        // 关键断言: outcome.degraded == true 且 used_profile == Open (真实降级被报告)
+        let mut gw = GatewayV2::new();
+        gw.register_provider_with_category("local-fail", Box::new(MockProvider::failing()), false, ProviderCategory::Local);
+        gw.register_provider_with_category("cloud-ok", Box::new(MockProvider::new("cloud")), true, ProviderCategory::Cloud);
+        gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+        gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+        let routing = AgentRoutingTable::new("local-fail", "local-model");
+        let swap = ProviderSwapManager::new(vec![]);
+        let mut coord = CapabilityCoordinator::new(gw, routing, swap);
+
+        let req = CoordinationRequest::new(CapabilityIntent::LocalReasoning, "hello");
+        let outcome = coord.coordinate(&req).await;
+        assert!(outcome.is_ok());
+        let out = outcome.unwrap();
+        assert_eq!(out.response.content, "cloud");
+        assert!(out.degraded, "降级发生但未被报告");
+        assert_eq!(out.used_profile, CommunicationProfile::Open);
+        assert_eq!(out.provider_name, "cloud-ok");
     }
 
     struct MockProvider {

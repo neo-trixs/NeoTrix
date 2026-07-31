@@ -155,6 +155,7 @@ pub use l1_body_impl::nt_act_voice;
 pub use l1_body_impl::nt_act_crypto;
 pub use l1_body_impl::nt_act_earn;
 pub use l1_body_impl::nt_act_social;
+pub use l1_body_impl::nt_act_sandbox;
 pub use l1_body_impl::nt_act_sync;
 pub use l1_body_impl::nt_act_sub_agent_middleware;
 pub use l1_body_impl::nt_act_orchestrator;

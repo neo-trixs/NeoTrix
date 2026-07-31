@@ -1,5 +1,53 @@
 use serde::{Deserialize, Serialize};
 
+/// Permission-aware retrieval level (P0-2, Cycle 159). Maps to the caller's
+/// clearance: Public < Internal < Confidential < Secret. Each level can access
+/// all nodes at or below its sensitivity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
+pub enum PermissionLevel {
+    Public,
+    Internal,
+    #[default]
+    Confidential,
+    Secret,
+}
+
+impl PermissionLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Public => "public",
+            Self::Internal => "internal",
+            Self::Confidential => "confidential",
+            Self::Secret => "secret",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "public" => Self::Public,
+            "internal" => Self::Internal,
+            "secret" => Self::Secret,
+            _ => Self::Confidential,
+        }
+    }
+}
+
+/// Sensitivity classification derived from NodeType — no DB schema change needed.
+/// Public node types are safe to share; sensitive types carry provenance data
+/// (thinking traces, self-test failures, detection findings, goal results).
+pub fn node_sensitivity(node_type: &NodeType) -> PermissionLevel {
+    match node_type {
+        NodeType::ThinkingTrace
+        | NodeType::SelfTestFailure
+        | NodeType::DetectionFinding
+        | NodeType::GoalResult
+        | NodeType::ConversationEvolution
+        | NodeType::HarnessProfile => PermissionLevel::Secret,
+        NodeType::EventRecord | NodeType::Session | NodeType::EvolutionPattern => PermissionLevel::Internal,
+        _ => PermissionLevel::Public,
+    }
+}
+
 /// Temporal validity window for fact accuracy
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemporalValidity {

@@ -59,6 +59,7 @@ pub mod nt_act_gram;
 pub mod nt_act_orchestrator;
 pub mod nt_act_project_manager;
 pub mod nt_act_remote_control;
+pub mod nt_act_sandbox;
 pub mod nt_act_social;
 pub mod nt_act_spear;
 pub mod nt_act_sub_agent_middleware;

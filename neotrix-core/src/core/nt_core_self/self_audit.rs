@@ -225,6 +225,108 @@ pub fn converge_check<P: AsRef<Path>>(root: P) -> AuditReport {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// ToolGroundingMonitor — 工具接地失效监控 (R-P49~R-P53 系统性发现)
+// 监控 AI 工具的"声称成功 vs 实际成功", 超过阈值触发 CoreEvent。
+// 归属 NT-SHIELD/NT-REPAIR verify 能力节点 (R-P42: 强化现有节点,
+// 不建平行适配器模块)。
+// ────────────────────────────────────────────────────────────────
+#[derive(Debug, Clone, Default)]
+pub struct ToolRecord {
+    pub claimed_ok: u64,
+    pub actual_ok: u64,
+    pub failures: u64,
+}
+
+impl ToolRecord {
+    pub fn failure_rate(&self) -> f64 {
+        let total = self.claimed_ok + self.failures;
+        if total == 0 { 0.0 } else { self.failures as f64 / total as f64 }
+    }
+}
+
+/// 工具接地监控器 — 每次工具调用后记录 claimed/actual, 计算失败率。
+#[derive(Debug, Clone, Default)]
+pub struct ToolGroundingMonitor {
+    pub tools: std::collections::HashMap<String, ToolRecord>,
+    pub threshold: f64,
+    pub total_calls: u64,
+    pub grounding_failures: u64,
+}
+
+impl ToolGroundingMonitor {
+    pub fn new() -> Self {
+        Self { tools: std::collections::HashMap::new(), threshold: 0.05, total_calls: 0, grounding_failures: 0 }
+    }
+
+    /// 记录一次工具调用结果。claimed=工具声称成功, actual=独立验证实际成功。
+    pub fn record_tool_result(&mut self, tool: &str, claimed_success: bool, actual_success: bool) {
+        let rec = self.tools.entry(tool.to_string()).or_default();
+        if claimed_success {
+            rec.claimed_ok += 1;
+        }
+        if actual_success {
+            rec.actual_ok += 1;
+        }
+        if claimed_success && !actual_success {
+            rec.failures += 1;
+            self.grounding_failures += 1;
+        }
+        self.total_calls += 1;
+    }
+
+    /// 检查某工具是否触发接地失效阈值。
+    pub fn is_degraded(&self, tool: &str) -> bool {
+        self.tools.get(tool).map(|r| r.failure_rate() > self.threshold).unwrap_or(false)
+    }
+
+    /// 全工具中是否有任一达到阈值。
+    pub fn any_degraded(&self) -> bool {
+        self.tools.values().any(|r| r.failure_rate() > self.threshold)
+    }
+
+    /// 生成降级工具清单 (名称, 失败率)。
+    pub fn degraded_tools(&self) -> Vec<(String, f64)> {
+        let mut out: Vec<(String, f64)> = self.tools.iter()
+            .filter(|(_, r)| r.failure_rate() > self.threshold)
+            .map(|(t, r)| (t.clone(), r.failure_rate()))
+            .collect();
+        out.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        out
+    }
+
+    pub fn summary(&self) -> String {
+        let deg = self.degraded_tools();
+        if deg.is_empty() {
+            format!("tool_grounding: {} calls, 0 degraded", self.total_calls)
+        } else {
+            let list: Vec<String> = deg.iter().map(|(t, r)| format!("{}={:.0}%", t, r * 100.0)).collect();
+            format!("tool_grounding: {} calls, DEGRADED [{}]", self.total_calls, list.join(", "))
+        }
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for ToolGroundingMonitor {
+    fn name(&self) -> &str {
+        "tool_grounding"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        let mut m = ToolGroundingMonitor::new();
+        m.record_tool_result("edit", true, true);
+        m.record_tool_result("edit", true, false);
+        m.record_tool_result("edit", true, false);
+        if !m.is_degraded("edit") {
+            failures.push("expected edit failure_rate 0.67 > threshold to degrade".into());
+        }
+        if m.summary().is_empty() {
+            failures.push("summary() should be non-empty".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 impl crate::core::nt_core_self_test::SelfTest for ConvergeCheckFn {
     fn name(&self) -> &str {
         "self_audit"
@@ -373,6 +475,23 @@ mod tests {
         let phantom: Vec<_> = findings.iter().filter(|f| f.category == "phantom-claim").collect();
         assert_eq!(phantom.len(), 1, "Should find 1 phantom claim");
         assert!(phantom[0].message.contains("P68"));
+    }
+
+    #[test]
+    fn test_tool_grounding_monitor() {
+        let mut m = ToolGroundingMonitor::new();
+        assert!(!m.any_degraded());
+        m.record_tool_result("edit", true, true);
+        m.record_tool_result("write", true, false);
+        assert!(!m.is_degraded("edit"));
+        assert!(m.is_degraded("write"));
+        assert!(m.any_degraded());
+        assert_eq!(m.total_calls, 2);
+        assert_eq!(m.grounding_failures, 1);
+        let deg = m.degraded_tools();
+        assert_eq!(deg.len(), 1);
+        assert_eq!(deg[0].0, "write");
+        assert!(!m.summary().is_empty());
     }
 }
 

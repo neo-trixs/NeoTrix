@@ -204,41 +204,79 @@ mod tests {
 
     #[test]
     fn test_buddy_full_lifecycle() {
-        let mut lock = BUDDY.lock().unwrap();
-        lock.state = BuddyState {
-            mood: "neutral".into(), energy: 100, xp: 0, level: 1,
-            name: "NeoBuddy".into(), last_interaction: 0, active: true,
-        };
-        lock.total_pets = 0;
-        lock.total_feedings = 0;
-        lock.achievements.clear();
+        {
+            let mut lock = BUDDY.lock().unwrap();
+            lock.state = BuddyState {
+                mood: "neutral".into(), energy: 100, xp: 0, level: 1,
+                name: "NeoBuddy".into(), last_interaction: 0, active: true,
+            };
+            lock.total_pets = 0;
+            lock.total_feedings = 0;
+            lock.achievements.clear();
+        }
 
-        let initial_energy = lock.state.energy;
+        let initial_energy = {
+            let lock = BUDDY.lock().unwrap();
+            lock.state.energy
+        };
 
         let _ = buddy_pet("tester".into());
-        assert!(lock.state.energy >= initial_energy, "pet should not decrease energy");
-        assert_eq!(lock.state.mood, "happy");
+        {
+            let lock = BUDDY.lock().unwrap();
+            assert!(lock.state.energy >= initial_energy, "pet should not decrease energy");
+            assert_eq!(lock.state.mood, "happy");
+        }
 
-        lock.state.energy = 50;
-        let before_feed = lock.state.energy;
+        {
+            let mut lock = BUDDY.lock().unwrap();
+            lock.state.energy = 50;
+        }
+        let before_feed = {
+            let lock = BUDDY.lock().unwrap();
+            lock.state.energy
+        };
         buddy_feed("treat".into()).unwrap();
-        assert!(lock.state.energy > before_feed, "feed should increase energy");
+        {
+            let lock = BUDDY.lock().unwrap();
+            assert!(lock.state.energy > before_feed, "feed should increase energy");
+        }
 
-        lock.state.energy = 90;
-        let before_tick = lock.state.energy;
+        {
+            let mut lock = BUDDY.lock().unwrap();
+            lock.state.energy = 90;
+        }
+        let before_tick = {
+            let lock = BUDDY.lock().unwrap();
+            lock.state.energy
+        };
         buddy_idle_tick().unwrap();
-        assert!(lock.state.energy <= before_tick, "tick should not increase energy");
+        {
+            let lock = BUDDY.lock().unwrap();
+            assert!(lock.state.energy <= before_tick, "tick should not increase energy");
+        }
 
-        lock.state.xp = 95;
-        lock.state.level = 1;
+        {
+            let mut lock = BUDDY.lock().unwrap();
+            lock.state.xp = 95;
+            lock.state.level = 1;
+        }
         buddy_train("test".into()).unwrap();
-        assert!(lock.state.level >= 2, "should level up after 100 XP");
-        assert_eq!(lock.state.mood, "excited");
+        {
+            let lock = BUDDY.lock().unwrap();
+            assert!(lock.state.level >= 2, "should level up after 100 XP");
+            assert_eq!(lock.state.mood, "excited");
+        }
 
-        lock.total_pets = 10;
-        lock.state.level = 3;
+        {
+            let mut lock = BUDDY.lock().unwrap();
+            lock.total_pets = 10;
+            lock.state.level = 3;
+        }
         buddy_idle_tick().unwrap();
-        assert!(lock.achievements.iter().any(|x| x.id == "first_birthday"), "first_birthday should unlock after 10 pets");
-        assert!(lock.achievements.iter().any(|x| x.id == "code_master"), "code_master should unlock at level 3");
+        {
+            let lock = BUDDY.lock().unwrap();
+            assert!(lock.achievements.iter().any(|x| x.id == "first_birthday"), "first_birthday should unlock after 10 pets");
+            assert!(lock.achievements.iter().any(|x| x.id == "code_master"), "code_master should unlock at level 3");
+        }
     }
 }

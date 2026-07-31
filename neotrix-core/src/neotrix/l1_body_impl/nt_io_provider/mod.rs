@@ -47,7 +47,7 @@ pub use factory::{LlmProviderType, ProviderConfig, create_provider, create_provi
 pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
 
 // Re-export 网关
-pub use gateway::{GatewayV2, CallEvent, CallObserver, AttemptPhase, SubGrid};
+pub use gateway::{GatewayV2, CallEvent, CallObserver, AttemptPhase, SubGrid, CapabilityCoordinator, CapabilityIntent, CoordinationRequest, CoordinationOutcome, SubGridHealth};
 
 // Re-export 断路器 + 限流器
 pub use circuit_breaker::CircuitBreaker;

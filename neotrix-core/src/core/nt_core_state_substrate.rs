@@ -9,6 +9,16 @@ pub enum ThinkingMode {
     Balanced,
 }
 
+impl ThinkingMode {
+    pub fn name(&self) -> &'static str {
+        match self {
+            ThinkingMode::Deep => "deep",
+            ThinkingMode::Fast => "fast",
+            ThinkingMode::Balanced => "balanced",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct MetricEntry {
     values: Vec<f64>,

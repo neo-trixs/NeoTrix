@@ -15,6 +15,10 @@ use serde_json::Value;
 pub trait LlmProvider: Send + Sync {
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError>;
     async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError>;
+
+    /// 将 provider 的 HTTP 客户端切换为代理路由 (子母阵 Proxied/Tor 画像注入)。
+    /// 默认 no-op — 不支持代理注入的 provider 保持原客户端不变。
+    fn set_proxy(&mut self, _proxy_url: &str) {}
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -214,7 +218,7 @@ pub enum FinishReason {
     Unknown,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LlmError {
     Network(String),
     Authentication(String),

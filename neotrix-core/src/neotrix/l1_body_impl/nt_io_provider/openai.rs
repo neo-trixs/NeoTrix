@@ -71,6 +71,9 @@ impl OpenAiProvider {
 
 #[async_trait]
 impl LlmProvider for OpenAiProvider {
+    fn set_proxy(&mut self, proxy_url: &str) {
+        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let url = format!("{}/chat/completions", self.base_url);
         let body = self.build_body(request, false);

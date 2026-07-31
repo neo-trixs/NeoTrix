@@ -1,3 +1,4 @@
+use std::net::ToSocketAddrs;
 use std::sync::LazyLock;
 use std::time::Duration;
 
@@ -129,6 +130,34 @@ pub fn proxy_from_env() -> Option<String> {
         }
     }
     None
+}
+
+/// Tor SOCKS5 默认地址
+pub const TOR_PROXY_ADDR: &str = "socks5h://127.0.0.1:9050";
+
+/// 检查本地 Tor SOCKS5 代理是否可用 (TCP connect 探测)
+pub fn tor_proxy_available() -> bool {
+    let addr = match "127.0.0.1:9050".to_socket_addrs() {
+        Ok(mut addrs) => match addrs.next() {
+            Some(a) => a,
+            None => return false,
+        },
+        Err(_) => return false,
+    };
+    std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(1500)).is_ok()
+}
+
+/// 构建 Tor SOCKS5 代理客户端 (统一入口 — OSINT 与子网格共用)
+/// `https_only=false` 允许访问 .onion 服务
+pub fn tor_client(timeout_secs: u64) -> Result<reqwest::Client, String> {
+    let proxy = reqwest::Proxy::all(TOR_PROXY_ADDR)
+        .map_err(|e| format!("proxy error: {e}"))?;
+    reqwest::Client::builder()
+        .proxy(proxy)
+        .timeout(Duration::from_secs(timeout_secs))
+        .https_only(false)
+        .build()
+        .map_err(|e| format!("tor client error: {e}"))
 }
 
 /// 构建带代理的异步客户端 (Proxied/Tor 子网格路由)

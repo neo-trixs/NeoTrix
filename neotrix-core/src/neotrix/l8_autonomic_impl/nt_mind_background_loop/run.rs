@@ -22,6 +22,166 @@ impl Default for ConsciousnessThresholds {
 
 pub static CONSCIOUSNESS_THRESHOLDS: LazyLock<ConsciousnessThresholds> =
     LazyLock::new(ConsciousnessThresholds::default);
+
+// ────────────────────────────────────────────────────────────────
+// ConvergencePulse — 分形收敛循环状态机 (Cycle 115/155 模式固化)
+// 5 级分形: Artifact → Task → Session → Epic → PR
+// 每层迭代推进 gap 关闭, 全部 gap 清空 + 外部验证通过后晋升下一层。
+// ────────────────────────────────────────────────────────────────
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConvergenceLayer {
+    Artifact,
+    Task,
+    Session,
+    Epic,
+    Pr,
+}
+
+impl ConvergenceLayer {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Artifact => "artifact",
+            Self::Task => "task",
+            Self::Session => "session",
+            Self::Epic => "epic",
+            Self::Pr => "pr",
+        }
+    }
+    pub fn next(&self) -> Option<ConvergenceLayer> {
+        match self {
+            Self::Artifact => Some(Self::Task),
+            Self::Task => Some(Self::Session),
+            Self::Session => Some(Self::Epic),
+            Self::Epic => Some(Self::Pr),
+            Self::Pr => None,
+        }
+    }
+    pub fn all() -> [ConvergenceLayer; 5] {
+        [Self::Artifact, Self::Task, Self::Session, Self::Epic, Self::Pr]
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ConvergenceGap {
+    pub domain: String,
+    pub description: String,
+    pub severity: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConvergencePulse {
+    pub layer: ConvergenceLayer,
+    pub iteration: u32,
+    pub gaps: Vec<ConvergenceGap>,
+    pub verified: bool,
+    pub last_action: String,
+    pub updated_at: i64,
+}
+
+impl Default for ConvergencePulse {
+    fn default() -> Self {
+        Self {
+            layer: ConvergenceLayer::Artifact,
+            iteration: 0,
+            gaps: Vec::new(),
+            verified: false,
+            last_action: String::new(),
+            updated_at: 0,
+        }
+    }
+}
+
+impl ConvergencePulse {
+    pub fn status_line(&self) -> String {
+        if self.gaps.is_empty() {
+            return format!("convergence: layer={} iter={} gaps=none verified={}",
+                self.layer.name(), self.iteration, self.verified);
+        }
+        let g = &self.gaps[0];
+        format!("convergence: layer={} iter={} gap={}/{} [{}] {} verified={}",
+            self.layer.name(), self.iteration, g.domain, g.severity, g.description,
+            self.gaps.len(), self.verified)
+    }
+
+    /// 当前层是否已完成: 无 gap 且已通过外部验证。
+    pub fn layer_complete(&self) -> bool {
+        self.gaps.is_empty() && self.verified
+    }
+
+    /// 从给定 self_test 结果生成当前层 gap。
+    pub fn gaps_from_self_tests(&mut self, results: &[(String, bool)]) {
+        self.gaps = results.iter()
+            .filter(|(_, ok)| !*ok)
+            .map(|(name, _)| ConvergenceGap {
+                domain: self.layer.name().to_string(),
+                description: format!("self_test '{}' failing at {} layer", name, self.layer.name()),
+                severity: "medium".to_string(),
+            })
+            .collect();
+        self.verified = self.gaps.is_empty();
+        self.updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+    }
+
+    /// 推进迭代: 若层完成 → 晋升; 否则 iteration++ (自动修复动作占位)。
+    pub fn advance(&mut self) -> Option<ConvergenceLayer> {
+        if self.layer_complete() {
+            let old = self.layer;
+            if let Some(nxt) = old.next() {
+                self.layer = nxt;
+                self.iteration = 0;
+                self.verified = false;
+                self.last_action = format!("promoted {} → {}", old.name(), nxt.name());
+                return Some(nxt);
+            }
+        }
+        self.iteration += 1;
+        self.last_action = format!("iter {} at {}: {} open gap(s)",
+            self.iteration, self.layer.name(), self.gaps.len());
+        None
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
+    fn name(&self) -> &str {
+        "convergence_pulse"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        // 5 级分形层完整
+        let layers = ConvergenceLayer::all();
+        if layers.len() != 5 {
+            failures.push(format!("expected 5 convergence layers, got {}", layers.len()));
+        }
+        // 晋升链完整: 每层须先通过外部验证 (verified=true) 才能晋升。
+        let mut p = ConvergencePulse::default();
+        let mut promoted = 0;
+        loop {
+            p.gaps = Vec::new();
+            p.verified = true;
+            if p.advance().is_none() { break; }
+            promoted += 1;
+        }
+        if promoted != 4 {
+            failures.push(format!("expected 4 promotions artifact→pr, got {}", promoted));
+        }
+        // gap 存在时不应晋升
+        let mut q = ConvergencePulse::default();
+        q.gaps = vec![ConvergenceGap { domain: "test".into(), description: "open gap".into(), severity: "high".into() }];
+        q.verified = false;
+        let before = q.layer;
+        q.advance();
+        if q.layer != before {
+            failures.push("should NOT promote when gaps open".into());
+        }
+        if q.status_line().is_empty() {
+            failures.push("status_line() should be non-empty".into());
+        }
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
+}
+
 use crate::core::nt_core_self_constitution::ConstitutionLoader;
 use crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine;
@@ -244,6 +404,8 @@ cognitive_load: self.cognitive_load.take(),
             state: StateSubstrate::new(),
             delegate: DelegateEngine::new(),
             simulate: SimulateEngine::new(),
+            convergence_pulse: ConvergencePulse::default(),
+            tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
         }));
 
         macro_rules! spawn_handler {
@@ -433,6 +595,8 @@ pub struct BackgroundLoopHandle {
     state: StateSubstrate,
     delegate: DelegateEngine,
     simulate: SimulateEngine,
+    convergence_pulse: ConvergencePulse,
+    tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
 }
 
 impl BackgroundLoopHandle {
@@ -858,9 +1022,29 @@ impl BackgroundLoopHandle {
             // Branch health is now set from SelfTest results in handle_architecture_audit
             // No simulated fallback here — real data or neutral 0.5 from set_branch_health_from_self_tests
             let growth_report = tree.run_growth_cycle();
-            log::debug!("[bg] consciousness_tree cycle {}: absorbed={} phi={:.3} fruits={} guidance={}",
+            let contract_status = growth_report.phase6_fulfillment
+                .as_ref().map(|f| format!("fulfilled={} ({}/{})", f.fulfilled, f.evidence_met, f.evidence_total))
+                .unwrap_or_else(|| "n/a".into());
+            let drift_status = growth_report.phase7_drift
+                .as_ref().map(|d| if d.drift_detected { format!("DRIFT mag={:.3}", d.drift_magnitude) } else { "clean".into() })
+                .unwrap_or_else(|| "n/a".into());
+            log::info!("[bg] consciousness_tree cycle {}: absorbed={} phi={:.3} fruits={} guidance={} | contract[{}] drift[{}]",
                 tree.cycle, growth_report.phase1_absorbed, growth_report.phase2_phi,
-                growth_report.phase3_fruits, growth_report.phase4_guidance);
+                growth_report.phase3_fruits, growth_report.phase4_guidance,
+                contract_status, drift_status);
+            // Evolution contract → goal loop: enqueue a behavioral goal when drift or unmet contract detected
+            if let Some(drift) = &growth_report.phase7_drift {
+                if drift.drift_detected {
+                    if let Ok(mut brain) = self.brain.try_write() {
+                        let action = drift.corrective_actions.first().cloned().unwrap_or_else(|| "Re-evaluate evolution contract".into());
+                        self.goal_loop.enqueue_goal(
+                            &mut brain,
+                            &format!("evolution_drift_recovery: {}", action),
+                            None,
+                        );
+                    }
+                }
+            }
         }
 
         // ── Phase 2: Consciousness Runtime Tick with REAL resonance content ──
@@ -1049,6 +1233,25 @@ impl BackgroundLoopHandle {
         if self.simulate.simulate(sim_id.clone(), "stable").is_ok() {
             log::debug!("[bg] simulate: scenario={} created", sim_id);
         }
+
+        // ── Phase 8: ConvergencePulse — 分形收敛循环推进 (Cycle 115/155) ──
+        // 用本 tick 的检测状态生成 gap, 若层完成则推进迭代/晋升层级。
+        {
+            let mut results = Vec::new();
+            results.push(("state_substrate".to_string(), !self.state.active_mode.name().is_empty()));
+            results.push(("bbrain".to_string(),
+                self.bbrain.latest_report().map(|r| r.health_score >= 0.0).unwrap_or(false)));
+            results.push(("cog_eval".to_string(), !self.cog_eval.latest_report().is_none()));
+            results.push(("gold_standard".to_string(),
+                self.gold_standard.as_ref().map(|_| true).unwrap_or(false)));
+            self.convergence_pulse.gaps_from_self_tests(&results);
+            let promoted = self.convergence_pulse.advance();
+            if let Some(layer) = promoted {
+                log::info!("[bg] convergence: promoted to {} layer (fractal loop)",
+                    layer.name());
+            }
+            log::debug!("[bg] {}", self.convergence_pulse.status_line());
+        }
     }
 
     /// EventBus behavioral consumer (D30) — responds to events with brain/KB actions, not just logs.
@@ -1180,6 +1383,7 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new()));
         self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_act_autonomy::oracle_gate::OracleGate::new()));
         self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_act_code::semantic_entropy::SemanticEntropyGate::new()));
+        self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_act_sandbox::ActionSandbox::new()));
         self_tests.register(Box::new(crate::core::nt_core_consciousness_review::ConsciousnessReview::new()));
         self_tests.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::consciousness_bridge::ConsciousnessBridge::new()));
         self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::browser_security::BrowserSecurityScanner::new(
@@ -1187,6 +1391,14 @@ impl BackgroundLoopHandle {
         )));
         self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new()));
         self_tests.register(Box::new(crate::core::nt_core_telemetry::TelemetryStore::new(100)));
+
+        // NOTE (Cycle 159b): NeoCodexSelfAudit::new() is intentionally NOT
+        // registered here. Its Default snapshot reports provider-not-resolvable +
+        // catalog-empty (3 permanent failures) → failure_count > 0 on every
+        // architecture audit → spurious self-review goals enqueued. The audit is
+        // a TUI-side live snapshot (NeoCodexSelfAudit::capture via EvolutionLoop),
+        // not a BackgroundLoop detector. R-P26: SelfTest must be wired where its
+        // data source exists.
 
         // ── Absorbed module SelfTests (Cycle 113) ──
         crate::core::nt_core_self_test_integration::register_absorbed_modules(&mut self_tests);
@@ -1196,6 +1408,11 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(crate::core::nt_core_state_substrate::StateSubstrate::new()));
         self_tests.register(Box::new(crate::core::nt_core_delegate_engine::DelegateEngine::new()));
         self_tests.register(Box::new(crate::core::nt_core_simulate_engine::SimulateEngine::new()));
+        // ── ConvergencePulse SelfTest (Cycle 159c: fractal loop state machine) ──
+        self_tests.register(Box::new(ConvergencePulse::default()));
+        // ── ToolGroundingMonitor SelfTest — persistent instance (R-P49~R-P53) ──
+        self_tests.register(Box::new(self.tool_grounding.clone()));
+
         if let Some(ref sb) = self.second_brain {
             match sb.self_test() {
                 Ok(()) => log::info!("[SELF-TEST] SecondBrain ✅ pass"),
@@ -1482,5 +1699,38 @@ mod tests {
             &mut GoalLoop::new(),
             &mut WorldModelV2::new(4, 64)
         ).cycle, 1);
+    }
+
+    use super::ConvergencePulse;
+    use crate::core::nt_core_self_test::SelfTest;
+
+    #[test]
+    fn test_convergence_pulse_advance_no_gaps() {
+        let mut p = ConvergencePulse::default();
+        p.gaps = Vec::new();
+        p.verified = true;
+        let promoted = p.advance();
+        assert!(promoted.is_some(), "complete layer should promote");
+        assert_eq!(promoted.unwrap().name(), "task");
+        assert_eq!(p.iteration, 0, "iteration resets on promotion");
+    }
+
+    #[test]
+    fn test_convergence_pulse_open_gap_blocks_promotion() {
+        let mut p = ConvergencePulse::default();
+        p.gaps_from_self_tests(&[("substrate".to_string(), false)]);
+        let before = p.layer;
+        let promoted = p.advance();
+        assert!(promoted.is_none(), "open gap must block promotion");
+        assert_eq!(p.layer, before);
+        assert_eq!(p.iteration, 1);
+        assert!(!p.verified);
+    }
+
+    #[test]
+    fn test_convergence_pulse_self_test() {
+        let p = ConvergencePulse::default();
+        let result = p.self_test();
+        assert!(result.is_ok(), "default pulse self-test should pass: {:?}", result.err());
     }
 }

@@ -794,6 +794,27 @@ impl KnowledgeBase {
         Ok(results)
     }
 
+    /// Permission-aware retrieval (P0-2): runs the same hybrid search but filters
+    /// results by the caller's clearance. Nodes with sensitivity above the caller's
+    /// permission level are excluded (e.g. ThinkingTrace/Secret hidden from Public).
+    pub fn search_permission_aware(
+        &self,
+        query: &str,
+        limit: usize,
+        permission: crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel,
+    ) -> Result<Vec<SearchResult>, String> {
+        let all = self.search(query, limit * 3)?;
+        let filtered: Vec<SearchResult> = all
+            .into_iter()
+            .filter(|r| {
+                let sensitivity = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::node_sensitivity(&r.node.node_type);
+                sensitivity <= permission
+            })
+            .take(limit)
+            .collect();
+        Ok(filtered)
+    }
+
     pub fn search_by_type(&self, node_type: &NodeType, limit: usize) -> Result<Vec<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_search::search_by_type(&conn, node_type, limit)
@@ -1662,6 +1683,31 @@ mod tests {
         ).ok();
 
         println!("6 architecture fixes absorbed into KB.");
+    }
+
+    #[test]
+    fn test_node_sensitivity_classification() {
+        use super::nt_memory_types::{node_sensitivity, PermissionLevel};
+        // Secret node types
+        assert_eq!(node_sensitivity(&super::nt_memory_types::NodeType::ThinkingTrace), PermissionLevel::Secret);
+        assert_eq!(node_sensitivity(&super::nt_memory_types::NodeType::SelfTestFailure), PermissionLevel::Secret);
+        assert_eq!(node_sensitivity(&super::nt_memory_types::NodeType::DetectionFinding), PermissionLevel::Secret);
+        // Internal node types
+        assert_eq!(node_sensitivity(&super::nt_memory_types::NodeType::EventRecord), PermissionLevel::Internal);
+        // Public default
+        assert_eq!(node_sensitivity(&super::nt_memory_types::NodeType::Concept), PermissionLevel::Public);
+        // Permission ordering: Secret >= Internal >= Public
+        assert!(PermissionLevel::Secret > PermissionLevel::Internal);
+        assert!(PermissionLevel::Internal > PermissionLevel::Public);
+    }
+
+    #[test]
+    fn test_permission_ordering_and_roundtrip() {
+        use super::nt_memory_types::PermissionLevel;
+        assert_eq!(PermissionLevel::from_str("secret"), PermissionLevel::Secret);
+        assert_eq!(PermissionLevel::from_str("public"), PermissionLevel::Public);
+        assert_eq!(PermissionLevel::from_str("unknown"), PermissionLevel::Confidential);
+        assert_eq!(PermissionLevel::Confidential.as_str(), "confidential");
     }
 }
 

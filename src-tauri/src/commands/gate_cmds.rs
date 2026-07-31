@@ -446,4 +446,54 @@ mod tests {
         assert_eq!(check.status, "fail");
         assert!(check.details.contains("error"));
     }
+
+    #[test]
+    fn test_run_vuln_scan_check_finds_issues_in_test_project() {
+        let dir = std::env::temp_dir().join("neotrix_gate_vuln_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("bad.rs"), "fn main() {\n    let api_key = \"sk-secret-12345\";\n    unsafe { let x = 42; }\n    println!(\"{:?}\", api_key);\n}\n").unwrap();
+        let result = run_vuln_scan_check(dir.to_str().unwrap());
+        assert_eq!(result.name, "VulnerabilityScan");
+        assert!(!result.details.is_empty());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_run_vuln_scan_check_pass_on_clean() {
+        let dir = std::env::temp_dir().join("neotrix_gate_vuln_clean_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("clean.rs"), "fn add(a: i32, b: i32) -> i32 { a + b }\n").unwrap();
+        let result = run_vuln_scan_check(dir.to_str().unwrap());
+        assert_eq!(result.status, "pass");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_collect_rs_files_recursive() {
+        let dir = std::env::temp_dir().join("neotrix_gate_recursive_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir.join("subdir")).unwrap();
+        fs::write(dir.join("top.rs"), "mod sub;\n").unwrap();
+        fs::write(dir.join("subdir").join("nested.rs"), "fn main() {}\n").unwrap();
+        fs::write(dir.join("Cargo.toml"), "[package]\n").unwrap();
+        let files = collect_rs_files(dir.to_str().unwrap()).unwrap();
+        assert!(files.iter().any(|f| f.ends_with("top.rs")));
+        assert!(files.iter().any(|f| f.ends_with("nested.rs")));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_collect_rs_files_skips_target() {
+        let dir = std::env::temp_dir().join("neotrix_gate_skip_test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir.join("target").join("debug")).unwrap();
+        fs::write(dir.join("target").join("debug").join("lib.rs"), "// compiled\n").unwrap();
+        fs::write(dir.join("src.rs"), "// real source\n").unwrap();
+        let files = collect_rs_files(dir.to_str().unwrap()).unwrap();
+        assert!(files.iter().any(|f| f.ends_with("src.rs")));
+        assert!(!files.iter().any(|f| f.contains("target")));
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

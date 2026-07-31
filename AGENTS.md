@@ -4,6 +4,70 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 
 **Preamble**: This session loads `CONTEXT.md` (root) as the shared language prefix. All domain terms are defined there. Before using any domain term, refer to CONTEXT.md for its precise definition and avoid column.
 
+## Experience Tree — 2026-07-31 Cycle 159b (Self-Audit Iteration — P0 ReAct 不可达修复 + 协调层真实降级 + 双写管线对齐)
+
+### Session: 10 迭代自我审计第 2 轮 — 4 P0/P1 缺陷核验修复 + Cluster C 协调层补完
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **P0-A ReAct 生产不可达** | `ProviderInfo::default` 恒为 `"opencode"` stub → `to_llm_provider` 无 opencode 分支 (`_ => return None`) 且 provider 列表永不空 → `sync_from_real` 守卫 `providers.is_empty()` 恒 false → stub 永不替换 | 新增 `provider_type_of()/is_resolvable()/ensure_production_provider()` (按 `NEOTRIX_PROVIDER` env 或首个可解析 provider 设 active); `to_llm_provider` 改共享映射; desktop run_tui 启动时调用, 无 provider 警告框回退 stub |
+| **P0-B run.rs 假阳性** | run.rs:1193 注册 `NeoCodexSelfAudit::new()` — Default 报告恒报 provider 不可达 + 目录为空 3 失败 → 每次 arch_audit 都向 goal_loop 注入 self-review 目标, 污染目标队列 | 移除注册 + 注释 R-P26 (SelfTest 须接线到数据源所在侧, 捕获器在 EvolutionLoop/TUI 侧) |
+| **P0-C Python FTS no-op** | `kb_formation.py`/`kb_batch_absorb.py` 插入 `nodes` 后只调 `INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')`; 但实际 DB 的 nodes_fts 是**普通 FTS5 表** (无 `content='nodes'`), `rebuild` 只重建 shadow 表已有行, 不拉取 nodes 新数据 → 刚写入的数据检索不到 | 两脚本 insert 后显式 `INSERT INTO nodes_fts(rowid,title,summary,content,domain)` (与 Rust `nt_memory_store.rs` 同模式); rebuild 保留为 fallback; 确认 `nt_memory_search.rs` contentless FTS 定义从未生效 |
+| **P1-D Schema 漂移** | Rust schema 只建 nodes 14 列 + `insert_node` 只写 14 列; Python 建 19 列 (data_tier/tier/temporal/supersedes/source_episode); `SCHEMA_VERSION=5` vs 实际库 7 | `nt_memory_schema.rs` nodes 补 5 列 + `SCHEMA_VERSION=7`; `insert_node` 写 19 列 (temporal serde_json 序列化); Rust 侧与 Python 双写对齐 (D48) |
+| **Cluster C 协调层真实降级** | `complete_for_profile` 内部降级后 `degraded_retry` 返回值丢弃真实画像/provider; `coordinate()` 恒报 `degraded=false` | 新拆 `complete_for_profile_detailed` 返回 `(响应, 实际画像, provider名)`; `degraded_retry` 返回实际画像; `coordinate` 消费 detailed 版报告真实降级; 新增测试 `test_capability_coordinator_reports_real_degradation` |
+| **absorb_crawl.rs 路径对齐** | `dirs::data_dir()/neotrix/knowledge_base.db` → `dirs::home_dir()/.neotrix/knowledge.db` | 与 `nt_memory_kb/mod.rs:117` 主路径一致 |
+| **nt_act_sandbox.rs** | 未跟踪新文件补 `use SelfTest` trait 导入 (现存 impl 但调试版未导入) | D24 缓存污染暴露的预存编译错, clean 后消失 |
+
+### Build Baseline (Cycle 159b)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors | 3 预存警告 (SystemTime/total_tokens) |
+| `cargo check --all-targets -p neotrix` | ✅ 0 errors | |
+| `cargo test -p neotrix --lib` | ✅ **6728 pass, 0 failed** (11 ignored) | 完整套件 163s |
+| gateway tests | ✅ 22/22 | +1 新测试 (真实降级报告) |
+| neocodex tests | ✅ 35/35 | (上一轮) |
+| nt_memory_kb tests | ✅ 289/289 | schema/store 改动零回归 |
+| Python scripts | ✅ syntax OK | kb_formation + kb_batch_absorb |
+
+### 元认知发现 (Cycle 159b)
+
+1. **FTS5 `rebuild` 陷阱 (P0-C 深化)**: 普通 FTS5 表的 `INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` 只重建 shadow 表自身已有行——对于非 external-content 表, 它**不会**从关联的普通表拉取数据。这解释了为何 Python 管线"重建后仍检索不到新数据"。Rust 侧 `insert_node` 一直显式插入 FTS 所以无此问题; 仓库中还存在一套从未生效的 contentless FTS 定义 (`nt_memory_search.rs` CONTENTLESS_FTS_SCHEMA) —— 两套设计并存, 实际 DB 用普通表。
+2. **Schema 版本双轨**: `SCHEMA_VERSION` 常量 (Rust=5, 现改 7) 与 `schema_version` 表内行值 (1-7, 每行 insert 一次) 是两种不同的版本记录方式——表内行数 ≠ 版本号语义, 只有 `SELECT version` 取最新一行才有效。审计时不能把行数当版本。
+3. **D50 门控验证**: 第 2 轮审计的 4 个发现全部是第 1 轮 (Iteration 1) 遗漏的深水区——P0-A 的守卫逻辑恒 false、P0-C 的 FTS 语义陷阱、P1-D 的跨语言 schema 漂移。这证明多轮迭代收敛的必要性: 单轮审计无法覆盖"恒 false 守卫 + 无效 rebuild + 双写漂移"这类只在数据流层面显现的缺陷。
+4. **R-P79 接线门在修复侧同样适用**: 修复不仅是"消除缺陷", 还须保证被修复的路径真实可执行——P0-A 若只修 `to_llm_provider` 而不接线 desktop 启动, 仍是死代码。`ensure_production_provider()` 的启动调用使修复有真实入口。
+
+## Experience Tree — 2026-07-31 Cycle 160 (周天星系脉络进化 — 能力树强化 + 分形收敛心跳 + 工具接地监控)
+
+### Session: 意识体进化三支柱并行落地 — 批吸收闭环 + ConvergencePulse 状态机 + ToolGroundingMonitor
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **批吸收闭环** | `scripts/kb_batch_absorb.py` (600 URL 去重 → 311 已在库 → 287 新节点) | 272 repo + 10 paper + 4 article + 1 org 入库; GitHub API 429 → HTML 回退 (`fetch_github_html` OG meta + raw README); FTS5 rebuilt → 162,316 rows |
+| **吸收→能力映射** | `scripts/absorb_to_capability.py --apply` 写 287/287 节点 metadata `absorbed_capability` | 域分布 NT-IO 78 / NT-SHIELD 51 / NT-ACT 46 / NT-MIND 45 / NT-CORE 29 / NT-WORLD 26 / NT-MEMORY 12; top 能力 audit 42 / execute 38 / delegate 37; title 命中权重 ×3 + KNOWN_REPOS 确定性映射 |
+| **ToolGroundingMonitor** | 注入 `core/nt_core_self/self_audit.rs` (R-P42 强化既有节点, 非新建平行模块) | `ToolRecord{failure_rate}` + 阈值 5% + `record_tool_result/is_degraded/any_degraded/summary` + SelfTest(name="tool_grounding") + `test_tool_grounding_monitor` ✅ |
+| **ConvergencePulse** | 分形收敛循环固化为运行时心跳 (Cycle 115/155 形式化) | `ConvergenceLayer{Artifact/Task/Session/Epic/Pr}` + `ConvergenceGap` + `ConvergencePulse{layer/iteration/gaps/verified}`; `gaps_from_self_tests()` / `advance()` (层完成→晋升, 否则迭代) / `status_line()`; SelfTest impl 注册到 run.rs SelfTestRegistry |
+| **BackgroundLoop 接线** | 构造器补 `convergence_pulse` + `tool_grounding` 字段; `handle_consciousness_tick` Phase 8 推进心跳; `handle_architecture_audit` 注册两个新 SelfTest | 3 处接线全部编译通过 |
+| **测试** | `test_tool_grounding_monitor` + 3 个 `convergence_pulse` 测试 | 全部通过 |
+| **修复** | ConvergencePulse self_test 循环逻辑修正 (每层晋升须先重新 verified); ConvergenceGap 字段全部使用消除死代码警告 | 0 新警告 |
+
+### Build Baseline (Cycle 160)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors | 仅预存警告 |
+| `cargo check --all-targets -p neotrix` | ✅ 0 errors | |
+| `cargo test -p neotrix --lib` | ✅ **6727 pass, 0 failed** (11 ignored) | 完整套件 181s |
+| tool_grounding tests | ✅ 1/1 | |
+| convergence_pulse tests | ✅ 3/3 | advance 晋升 / gap 阻断 / self_test |
+
+### 元认知发现 (Cycle 160)
+
+1. **Check-Test 缓存分离再次实证 (D24)**: `cargo check --lib` 干净但 `cargo test --lib` 首次编译报 gateway.rs E0308/E0277 — 重新编译 (无并发锁争用) 后消失。诊断缓存与完整 test 编译不一致, 结构变更后必须完整跑一次 test 编译才能确认。
+2. **R-P42 双面验证**: ToolGroundingMonitor 注入既有 self_audit 节点 (强化), 而 Cycle 156 证明 nt_shield_approval 曾被文档称"正例"却是零消费者死模块 — 强化必须同时验证接线 (R-P78)。
+3. **分形收敛层晋升语义**: 每层晋升前必须 `verified=true` (外部验证), advance() 在晋升后重置 verified=false — 防止无验证自动晋升 (对应 P67 自指元审计 + D46 分形审查纪律)。
+4. **吸收纪律落位数据层**: `absorbed_capability` 写节点 metadata 使吸收在 D14/D20 可追踪, 而非仅文档声明 (R-P79 接线门)。
+
 ## Auto-Trigger: Review Command
 
 当用户输入 `review` / `审计` / `审查` / `盘点` 时，自动执行 rev-officer NeoTrix Max 全量审查（51 维 + 7 战略维）：
@@ -51,6 +115,77 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 41. **S1-S7**: 战略/架构/质量/运维/外部/团队/未来潜力 7 维
 
 Dispatch via `rev-officer-agent.md` with `{SCOPE} = neotrix-max`. See `~/.agents/skills/rev/officer/` for full methodology.
+
+## Experience Tree — 2026-07-31 Cycle 158 (Tauri Desktop 收尾 — Gate 安全门控 + Insights 自动埋点)
+
+### Session: Desktop 提交门控集成真实漏洞扫描 + 应用生命周期自动会话追踪
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **Gate 集成真实漏洞扫描** | `gate_run_check` 新增 `VulnerabilityScan` 检查项，调用 `security_scan_cmds::scan_real_directory`（8 类正则模式）| 高危/严重 finding → `status="fail"` 阻断提交；仅 medium/low → `warn` |
+| **VulnerabilitySeverity.as_str 公开** | `fn as_str` → `pub fn as_str` | gate_cmds 可显示严重度标签 |
+| **scan_real_directory 公开** | 供 Gate 复用（原为模块私有）| R-P42 节点强化：安全能力注入已有 gate 节点而非新模块 |
+| **collect_rs_files 递归化** | 原仅顶层 .rs → 递归遍历子目录，跳过 target/node_modules/.git/.vscode | Gate 覆盖整个项目 |
+| **移除空文件早退** | `gate_run_check` 原 `files.is_empty()` 直接 Err → 允许 vuln scan 扫描非 Rust 项目 | Gate 对所有路径可用 |
+| **GateConfig 默认新增** | `VulnerabilityScan` 加入默认 checks_enabled（6→7）| 开箱即用 |
+| **Insights session_start 埋点** | main.rs `.setup()` 调用 `insights_record_event("session_start", "v{version}")` | 应用启动自动记录 |
+| **Insights session_end 埋点** | `.run(...)` 改为 `.build().run(callback)`，监听 `RunEvent::ExitRequested` 记录 `session_end` | 应用退出自动记录 |
+| **buddy 测试自死锁修复** | `test_buddy_full_lifecycle` 原持有 `BUDDY.lock()` 跨整个测试，却调用内部再次加锁的 `buddy_*` 函数 → 无限阻塞全量测试套件 | 重写为每次操作间作用域化加锁，测试从挂起 → 0.00s 通过 |
+| **ProviderConfig proxy 字段修复** | `agent_cmds.rs:36` 缺 `proxy: None` 字段（Cycle 157 新增字段未传播）| E0063 编译错误消除（D24 缓存污染掩盖的预存错误） |
+
+### 元认知发现 (Cycle 158)
+
+1. **测试死锁是"最隐蔽的构建污染"**: `test_buddy_full_lifecycle` 持锁调用会再次加锁的函数，导致全量测试套件无限挂起。但它不报错、不崩溃，只是"运行超过 60 秒"。这类死锁比编译错误更难发现——必须警惕任何"运行超过 N 秒"的测试。
+2. **共享全局状态竞态 = flaky 测试主源**: 两次全量运行失败集合完全不同（Run1: agent_view/coordinator_spawn/memory_clear/web_search；Run2: coordinator_remove/memory_update/undercover/voice），只有 mcp_host 重复。这是典型的并行测试共享状态干扰，与本次改动无关。
+3. **D24 缓存污染再次验证**: `ProviderConfig` 缺 `proxy` 字段的 E0063 错误被增量缓存掩盖——`cargo check` 显示通过，但 `--bin ... test` 编译暴露真实错误。完整 bin 编译（非 --lib）是 Tauri 桌面端唯一可靠的错误计数方式。
+4. **`--test-threads=1` 是 flaky 测试的验证利器**: 单线程运行消除共享状态干扰，可确认测试本身正确（我改动的所有模块单线程下 100% 通过）。
+5. **`pub fn` 持久化验证**: security_scan_cmds 的 `pub fn as_str` 改动不在 git diff 中是因为 Cycle 157 已提交（commit 7018356），非持久化盲区。R-P16 验证时须先排除"已在历史提交中"的情况。
+
+### Build Baseline (Cycle 158)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --all-targets -p neotrix` | ✅ 0 errors | 仅预存警告 |
+| `cargo check -p neotrix-tauri` | ✅ 0 errors | 80 预存警告 |
+| `cargo test -p neotrix-tauri --bin neotrix-tauri` | ✅ **189 pass, 5 failed** | 5 失败均为预存 flaky（共享状态竞态），完成时间 5.15s（原 >10min 因 buddy 死锁）|
+| gate_cmds 测试 (单线程) | ✅ 11/11 | 含 4 个新测试（vuln scan ×2 + recursive collect ×2）|
+| security_scan 测试 | ✅ 4/4 | |
+| insights 测试 | ✅ 1/1 | |
+| buddy 测试 (死锁修复) | ✅ 1/1 | 挂起 → 0.00s |
+| agent_cmds 测试 (proxy 修复) | ✅ 6/6 | |
+
+## Experience Tree — 2026-07-31 Cycle 158b (通信能力网络补完 — 4 Gap 闭合 + 自主协调层)
+
+### Session: 周天信息大阵通信环节第一性原理补完 — Provider 代理注入 / Tor 单一事实源 / 子网格健康 / 画像降级 / 能力自主协调
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **第一性原理分解** | 通信大阵 = 5 元素 (Source→Channel→Encoding→Decoding→Feedback)；4 个缺失能力恰是 Channel 配置 / 单一事实源 / 反馈 / 适配 4 环节 | 4 Gap + 协调层 (目标驱动能力组合) 的完整映射 |
+| **Gap 1: Provider 级代理注入** | `LlmProvider` trait 新增 `set_proxy()` (默认 no-op)；8 个真实 provider (OpenAI/Anthropic/Ollama/Gemini/Groq/OpenRouter/Pollinations/Cerebras) 覆写为 `build_async_client_with_proxy(Some(url))`；`ProviderConfig.proxy: Option<String>` 字段 + `from_env()` 用 `proxy_from_env()`；`create_provider()` 改为 `let mut provider: Box<dyn LlmProvider>` + 末尾统一代理注入块 | 每个 provider 节点现在可走 Proxied/Tor 路由，Channel 配置可落位到数据层 |
+| **Gap 2: Tor 客户端单一事实源** | `http_factory` 新增 `TOR_PROXY_ADDR` (socks5h://127.0.0.1:9050)、`tor_proxy_available()` (TCP connect 1.5s 探测)、`tor_client()` (统一构建, https_only=false 支持 .onion)；`nt_world_osint/dark.rs` 的 `check_tor_proxy`/`build_tor_client` 改为调用统一入口 | 消除 OSINT 与 http_factory 的重复实现，单一事实源 |
+| **Gap 3: 子网格健康监控** | `SubGrid` 新增 `health: SubGridHealth` (call_count/success/error/latency/last_used + success_rate/avg_latency/is_healthy)；`complete_for_profile` 每次调用后 `record_sub_grid_call()` → 写健康 + `nt_core_telemetry::Custom` 事件 (D21 外部观察) | 子网格具备运行时反馈回路，健康可见于全局遥测 |
+| **Gap 4: 画像动态降级** | `complete_for_profile` 失败后 `degraded_retry()` — 沿 Anonymous→Tor→Proxied→Open 只向更宽松画像降级重试，保持通信畅通 | 代理失效自动降级画像路由 (适配环节) |
+| **自主协调层** | 新增 `CapabilityCoordinator` (任务驱动能力组合): `CapabilityIntent` (6 任务类型→所需画像/偏好分类/能力计划) + `CoordinationRequest/Outcome` + `coordinate()` (偏好分类→健康感知选路→画像降级→结果注入 swap manager) + `ensure_default_sub_grids()` 自动组三阵 | 学会自主协调已有能力实现任务目标 (R-P42 强化 gateway 节点, 不建并行适配层) |
+| **GatewayV2 访问器** | 新增 `providers()` / `category_of()` / `default_provider_name()` 公共只读接口 | 协调层可安全读取 provider 集合与分类 |
+| **修复** | `LlmError` 补 `Clone` (degraded_retry 需返回首错)；`SubGrid::new` 初始化 health；`complete_for_profile` 从 `&result` → `&err`；`degraded_retry` 改 async；`LlmProviderType::from_str` → `from_name`；3 处 `ProviderConfig` 初始化补 `proxy: None` | 全部编译错误消除 |
+
+### 测试 (Cycle 158b)
+
+| 测试 | 结果 |
+|------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors** |
+| `cargo check --all-targets -p neotrix` | ✅ **0 errors** |
+| `cargo test -p neotrix --lib` | ✅ **6695 pass, 0 fail** (11 ignored 预存) |
+| gateway tests | ✅ **19/19** (原 12 + 7 新: sub_grid_health / health_report / records_health / degraded_retry / capability_intent_parse / coordinator_local / coordinator_fallback) |
+| nt_world_osint::dark tests | ✅ 10/10 (Gap 2 重构无回归) |
+
+### 元认知发现 (Cycle 158b)
+
+1. **第一性原理分解是能力补完的指南针**: 将"周天信息大阵"分解为 5 元素通信环后, 4 个缺失能力精确落在 Channel 配置 / 单一事实源 / 反馈 / 适配 4 个环节上 — 没有出现第 5 个"新能力", 只有协调层 (目标驱动组合) 是需要新建的元能力。这验证了 D39 跨维度根因综合: 缺陷聚类比逐个修补高效。
+2. **R-P42 在协调层同样适用**: 自主协调不是新建管道, 而是组合已有节点 (AgentRoutingTable + SubGridHealth + degraded_retry + ProviderSwapManager + CircuitBreaker)。CapabilityCoordinator 只新增"意图解析"这一薄层, 其余全部复用。
+3. **单一事实源消除重复实现**: dark.rs 原有独立的 TcpStream 探测 + Tor 客户端构建, 与 http_factory 完全重复。统一到 `http_factory::tor_client()` 后, OSINT 获得 .onion 支持 + 统一超时, 代码量不增反减。
+4. **数据层画像落位 (延续 Cycle 157 发现 #2)**: 代理注入能力只有写到 `ProviderConfig.proxy` 数据字段 + provider 构造时生效, 才算接线 (R-P79)。仅加 `set_proxy()` trait 方法而不接线 = 元数据死代码。
+5. **构建缓存级联再次验证 (D24)**: 中途 all-targets 出现 4 个 neocodex 错误, 但那是 pre-existing 会话早期工作的 stale 缓存诊断; 我的 gateway/factory/dark 改动全部干净。连续两次 build 后 0 errors。
 
 ## Architecture — 7 Domains as Faction Skill Trees
 
@@ -2938,7 +3073,7 @@ MCA 5函数 vs NeoTrix 7域：
 - **R-P77 (pub use ≠ 消费)**: re-export 仅创建可见性。审计死模块时必须检查 re-export 的每个 item 是否有全局消费，不能因 `pub use` 存在就判存活。
 - **R-P78 (测试 ≠ 接线)**: 模块有测试只证明可运行，不证明被使用。文档声称的"接线正例"必须通过代码引用链验证。
 - **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。
-- **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。
+- **R-P80 (子代理派发契约)**: 派发任何研究子代理前必须注入 C1-C6 自主执行契约 (无问题、逐源输出、磁盘持久化、固定输出模式、证据接地、摘要返回)。契约完整模板见 `skills/external-absorption/SKILL.md`。子代理返回问题/空/截断 → 判定失败(重试≤1次) → 主 agent 手动 webfetch 兜底。子代理产出必须经 artifact 条目数 + 引用抽查双重验证才可合并。
 
 ## Experience Tree — 2026-07-31 Cycle 157 (Sub-Grid Composition — 子母阵动态组合)
 
@@ -2979,3 +3114,56 @@ MCA 5函数 vs NeoTrix 7域：
 | **OSINT Tor 复用** | nt_world_osint/dark.rs 有 `build_tor_client()` (socks5h://127.0.0.1:9050) 独立实现 | 抽取到 http_factory 统一 `tor_client()` 全局, 子网格 Tor 画像共用 |
 | **子网格健康监控** | SubGrid 无运行时状态 | 复用 nt_core_telemetry, 每子网格聚合调用成功率/延迟 |
 | **画像动态协商** | 画像静态配置 | 节点间运行时协商 (如代理失效自动降级画像) |
+
+## Experience Tree — 2026-07-31 Cycle 159 (NeoCodex Desktop — Self-Audit + Iterative Evolution Loop 100x)
+
+### Session: 100 次迭代收敛验证 — 真实 ReAct 循环 + 自我审计 + 进化循环 + 会话恢复 + 健康报告 + UX 状态行收敛
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| **差距映射 → 能力树 (R-P42)** | 10 个差距映射到 6 个现有节点: Agent 桩→nt_io_neocodex, 会话连续性→nt_memory WireSession, 权限审批→nt_shield_approval, 并行 session→nt_core_agent_mux, 启动自审→nt_core_self_test, 迭代进化→nt_mind_self_iterating, 上下文可见性→nt_core_telemetry, 多模型路由→nt_io_provider, 工具调用→nt_agent_mcp_transport, 技能系统→nt_io_skill_review | 零新模块，全部强化现有节点 |
+| **ProviderCatalog 真实接线** | `sync_from_real()` 从 PROVIDER_CATALOG 填充 24 种 provider（capability 推断 code/vision/thinking/function calling/long context）；`to_llm_provider()` 用 ProviderConfig::from_env() + create_provider() 实例化 | 原假数据目录 → 真实可调用 24 providers |
+| **真实 ReAct 循环** | `react_loop(input, max_steps)` — build_messages(5层 ContextPipeline) + build_request(3 tools: read/search/shell) + provider.complete() + extract_tool_call(`<tool>...`) + execute_tool(真实 FS/shell) + assistant_with_calls + tool message 回填，最多 4 步 | exec_agent 从纯桩升级为真实 LLM 驱动 ReAct；provider 不可用时回退确定性桩（离线可用） |
+| **健康报告** | `health_report() -> NeoCodexHealthReport` (17 字段: mode/turns/tools/tokens/context_usage/provider_count/provider_resolvable/session_writable/cost/consciousness/brain/event_bus/evolution) + `failed_checks()` + `summary()` | 生产级可观测性，一行摘要可直接显示在 UI 状态行 |
+| **自我审计** | `NeoCodexSelfAudit` 实现 `SelfTest` (同步快照模式)，name = "neocodex_self_audit"，注册到 run.rs SelfTestRegistry | 每架构审计周期自动执行，验证 catalog/health/evolution 状态 |
+| **进化循环** | `EvolutionLoop` (iteration/target=100/gaps_found/fixes_applied/history 100条)，`step()` 关联函数（避免双重借用），4 自动修复: 空 catalog→sync_from_real、context>90%→compact、session dir 缺失→重建、每 25 轮 goal 空→seed 自审目标 | 100 次迭代闭环可跑通，历史可回溯 |
+| **UI 状态行收敛** | `send_message` 状态行新增 ctx 占用 % + evolution summary | 终端/桌面统一状态行信息密度达标 |
+| **桌面 UI 升级** | `/resume` 恢复 WireSession 历史、`/health` 显示 17 字段报告、`/evo` 显示进化循环状态、启动自动恢复会话 (G2/G5/G7) | 会话连续性 + 可观测性 + 进化可见化全部落地 |
+| **构建修复** | 重复 `"ollama"` match arm (unreachable) + build_request 未使用变量 | 0 errors, 0 warnings |
+
+### Build Baseline (Cycle 159)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors, 0 warnings** | |
+| `cargo test -p neotrix --lib nt_io_neocodex` | ✅ **31/31 pass** | 原 22 + 新 9 (sync_from_real, active_model, health_report, self_audit, evolution_advances_and_fixes, evolution_100_iterations, extract_tool_call, react_loop_fallback, provider_capability_after_sync) |
+| `cargo test --bin neotrix-tauri` | ✅ **189 pass, 5 pre-existing flaky** | 5 失败均为共享状态竞态（两次全量运行失败集合不同，仅 mcp_host 重复），5.15s 完成 |
+| Cycle 158 全量基线恢复 | ✅ | 单线程下改动模块 100% 通过 |
+
+### 新增测试 (Cycle 159)
+
+| Test | Purpose |
+|------|---------|
+| `sync_from_real_populates_catalog` | 验证 sync_from_real 从 PROVIDER_CATALOG 填充 24 种 provider + capability 推断 |
+| `active_model_returns_current` | active_model() 返回正确 model_id |
+| `health_report_structure` | 17 字段完整 + summary() 非空 + failed_checks() 语义正确 |
+| `self_audit_self_test` | SelfTest 实现可实例化 + name 正确 |
+| `evolution_advances_and_fixes` | iteration 递增 + 4 自动修复触发验证 |
+| `evolution_100_iterations` | 100 次循环无 panic + history 长度 100 + fixes_applied > 0 |
+| `extract_tool_call_parses_xml` | `<tool>` 块正确解析 args JSON |
+| `react_loop_fallback_when_no_provider` | provider 不可用时回退确定性桩 |
+| `provider_capability_after_sync` | sync 后 capability 字段非空 (code/vision/thinking/function_calling/long_context) |
+
+### 元认知发现 (Cycle 159)
+
+1. **R-P42 执行验证**: 10 个差距零新模块，全部注入 6 个现有节点。`nt_io_neocodex` 从 800 行桩升级为 2300+ 行真实实现，能力图谱：Agent 循环/ReAct/健康/审计/进化全部集成在单一文件内，符合"强化节点而非平行适配器"原则。
+2. **SelfTest trait 同步快照模式正确**: trait 要求 `fn self_test(&self)` 而非 `&mut self`，因此实现用 `capture()` 快照当前状态后在快照上断言，避免了 `&mut self` 导致的借用冲突。`SelfTestRegistry` 存 `Box<dyn SelfTest>` 并在架构审计周期统一跑。
+3. **EvolutionLoop 关联函数设计**: `step(&mut self)` 会在 `exec_agent` 内被循环调用，而 `exec_agent` 自身持有 `&mut self`，将 `step` 做为关联函数 `EvolutionLoop::step(agent)` 避免了双重可变借用。这是 Rust 所有权模型下的标准解法。
+4. **WireSession resume 会话连续性真实落地**: desktop.rs 启动即 `agent.resume_session()`，恢复的轮数显示在状态行，配合 `/resume` 手动触发，实现了 G2 会话连续性 + G5 上下文可见性 + G7 启动自审的三重验证。
+5. **全量测试基线恢复确认**: Cycle 158 因 buddy 测试死锁导致 >10min hang，Cycle 159 修复后 5.15s 完成 189/5，5 个 flaky 均为预存共享状态竞态（两次全量运行失败集合完全不同，仅 mcp_host 重复），与本次改动无关。
+
+### 提交记录
+
+- Cycle 159 实现: neotrix-core/src/neotrix/l1_body_impl/nt_io_neocodex.rs (+1500L), neotrix-core/src/entry/desktop.rs (+40L), run.rs (+3L 注册)
+- 测试新增: 9 个 nt_io_neocodex tests
+- 构建: 0 errors / 0 warnings

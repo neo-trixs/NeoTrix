@@ -737,6 +737,13 @@ fn main() {
                 ])
                 .setup(move |app| {
                     neotrix_tauri::setup_tray(app).expect("failed to setup tray");
+                    let _ = commands::insights_record_event(
+                        "session_start".to_string(),
+                        format!("NeoTrix Desktop session started (v{})", env!("CARGO_PKG_VERSION")),
+                        None,
+                        None,
+                        None,
+                    );
                     #[cfg(debug_assertions)]
                     {
                         if let Some(window) = app.get_webview_window("main") { window.open_devtools(); }
@@ -795,8 +802,19 @@ fn main() {
  
                     Ok(())
                 })
-                .run(tauri::generate_context!())
-                .expect("error while running tauri application");
+                .build(tauri::generate_context!())
+                .expect("error while building tauri application")
+                .run(|_app, event| {
+                    if let tauri::RunEvent::ExitRequested { .. } = event {
+                        let _ = commands::insights_record_event(
+                            "session_end".to_string(),
+                            "NeoTrix Desktop session ended".to_string(),
+                            None,
+                            None,
+                            None,
+                        );
+                    }
+                });
         }
         Some(Commands::Headless) => {
             println!("NeoTrix headless mode - not yet implemented");

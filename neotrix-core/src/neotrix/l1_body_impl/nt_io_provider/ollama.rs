@@ -44,6 +44,10 @@ impl Default for OllamaProvider {
 
 #[async_trait]
 impl LlmProvider for OllamaProvider {
+    fn set_proxy(&mut self, proxy_url: &str) {
+        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let prompt = self.build_prompt(request);
         let mut body = serde_json::json!({

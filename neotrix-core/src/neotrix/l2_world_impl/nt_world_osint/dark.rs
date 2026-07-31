@@ -1,10 +1,11 @@
-use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::{OsintConfig, OsintTarget};
+
+use crate::neotrix::nt_io_http_factory as http_factory;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DarkWebResult {
@@ -177,27 +178,13 @@ fn clean_html(input: &str) -> String {
 
 /// Check if a Tor SOCKS5 proxy is available at 127.0.0.1:9050
 fn check_tor_proxy() -> bool {
-    let addr = match "127.0.0.1:9050".to_socket_addrs() {
-        Ok(mut addrs) => match addrs.next() {
-            Some(a) => a,
-            None => return false,
-        },
-        Err(_) => return false,
-    };
-    // Try TCP connect with short timeout
-    TcpStream::connect_timeout(&addr, Duration::from_millis(1500)).is_ok()
+    http_factory::tor_proxy_available()
 }
 
 /// Create a Tor-proxied reqwest client (SOCKS5h to 127.0.0.1:9050)
+/// 统一入口: http_factory::tor_client — 与 NT-IO 子网格 Tor 画像共用同一实现
 fn build_tor_client(timeout_secs: u64) -> Result<Client, String> {
-    let proxy = reqwest::Proxy::all("socks5h://127.0.0.1:9050")
-        .map_err(|e| format!("proxy error: {e}"))?;
-    Client::builder()
-        .proxy(proxy)
-        .timeout(Duration::from_secs(timeout_secs))
-        .https_only(false) // allow .onion via Tor
-        .build()
-        .map_err(|e| format!("client error: {e}"))
+    http_factory::tor_client(timeout_secs)
 }
 
 /// Search Ahmia through Tor for dark web content

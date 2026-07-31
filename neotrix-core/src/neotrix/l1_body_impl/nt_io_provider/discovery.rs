@@ -410,6 +410,7 @@ impl ModelRegistry {
             base_url: Some(model.base_url.clone()),
             model: Some(model.model_id.clone()),
             timeout_secs: 120,
+            proxy: None,
         })
     }
 

@@ -14,10 +14,14 @@ fn now() -> i64 {
 }
 
 pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
+    let temporal_json = node.temporal.as_ref().map(|t| {
+        serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
+    });
     conn.execute(
         "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language,
-            confidence, importance, created_at, updated_at, access_count, metadata)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            confidence, importance, created_at, updated_at, access_count, metadata,
+            data_tier, temporal, supersedes, source_episode, tier)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
         params![
             node.id,
             node.node_type.as_str(),
@@ -33,6 +37,11 @@ pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
             node.updated_at,
             node.access_count,
             node.metadata.as_ref().map(|m| m.to_string()),
+            "core",
+            temporal_json,
+            node.supersedes,
+            node.source_episode,
+            "warm",
         ],
     )?;
 

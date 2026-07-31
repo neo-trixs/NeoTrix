@@ -80,6 +80,10 @@ impl GroqProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for GroqProvider {
+    fn set_proxy(&mut self, proxy_url: &str) {
+        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let body = self.build_request_body(request);
         let url = format!("{}/chat/completions", self.base_url);
@@ -206,6 +210,10 @@ impl OpenRouterProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for OpenRouterProvider {
+    fn set_proxy(&mut self, proxy_url: &str) {
+        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
@@ -363,6 +371,10 @@ impl PollinationsProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for PollinationsProvider {
+    fn set_proxy(&mut self, proxy_url: &str) {
+        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,
@@ -467,6 +479,10 @@ impl CerebrasProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for CerebrasProvider {
+    fn set_proxy(&mut self, proxy_url: &str) {
+        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let mut body = serde_json::json!({
             "model": request.model,

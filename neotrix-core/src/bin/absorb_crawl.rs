@@ -17,8 +17,8 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let db_path = args.db.unwrap_or_else(|| {
-        let home = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
-        home.join("neotrix").join("knowledge_base.db")
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        home.join(".neotrix").join("knowledge.db")
     });
     let conn = rusqlite::Connection::open(&db_path).expect("open KB");
     let kb = KnowledgeBase::open(Some(db_path)).expect("open KB bridge");

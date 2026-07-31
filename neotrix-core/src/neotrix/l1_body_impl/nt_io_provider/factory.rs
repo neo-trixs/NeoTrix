@@ -125,6 +125,8 @@ pub struct ProviderConfig {
     pub base_url: Option<String>,
     pub model: Option<String>,
     pub timeout_secs: u64,
+    /// 代理注入: 设置后将 provider 的 HTTP 客户端切换到代理路由 (子母阵 Proxied/Tor 画像)
+    pub proxy: Option<String>,
 }
 
 impl Default for ProviderConfig {
@@ -135,6 +137,7 @@ impl Default for ProviderConfig {
             base_url: None,
             model: None,
             timeout_secs: 120,
+            proxy: None,
         }
     }
 }
@@ -186,6 +189,7 @@ impl ProviderConfig {
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(120),
+            proxy: super::super::nt_io_http_factory::proxy_from_env(),
         }
     }
 }
@@ -206,7 +210,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             }
         }
     }
-    match config.provider_type {
+    let mut provider: Box<dyn LlmProvider> = match config.provider_type {
         LlmProviderType::OpenAI => {
             let api_key = config.api_key.unwrap_or_else(|| {
                 std::env::var("OPENAI_API_KEY").unwrap_or_default()
@@ -434,7 +438,14 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             provider = provider.with_base_url(&base_url);
             Box::new(provider)
         }
+    };
+
+    // 代理注入: 若配置了代理 (子母阵 Proxied/Tor 画像), 将 provider 客户端切换到代理路由
+    if let Some(proxy_url) = &config.proxy {
+        provider.set_proxy(proxy_url);
+        log::info!("[factory] provider {:?} routed through proxy {}", config.provider_type, proxy_url);
     }
+    provider
 }
 
 pub fn create_provider_from_type(provider_type: LlmProviderType, api_key: Option<String>) -> Box<dyn LlmProvider> {

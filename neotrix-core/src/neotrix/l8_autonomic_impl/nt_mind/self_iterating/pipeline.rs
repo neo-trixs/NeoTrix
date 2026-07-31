@@ -1791,6 +1791,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new()));
         registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_autonomy::oracle_gate::OracleGate::new()));
         registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_code::semantic_entropy::SemanticEntropyGate::new()));
+        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_sandbox::ActionSandbox::new()));
         registry.register(Box::new(crate::core::nt_core_consciousness_review::ConsciousnessReview::new()));
         registry.register(Box::new(crate::neotrix::l5_consciousness_impl::nt_core_fep_iit::bridge::FEPIITBridge::new()));
         registry.register(Box::new(crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));

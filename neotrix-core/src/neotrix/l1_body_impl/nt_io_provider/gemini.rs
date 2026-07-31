@@ -25,6 +25,10 @@ impl GeminiProvider {
 
 #[async_trait]
 impl LlmProvider for GeminiProvider {
+    fn set_proxy(&mut self, proxy_url: &str) {
+        self.client = crate::neotrix::nt_io_http_factory::build_async_client_with_proxy(Some(proxy_url));
+    }
+
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let model = request.model.trim_start_matches("gemini-");
         let url = format!("{}/models/{}:generateContent?key={}", self.base_url, model, self.api_key);
