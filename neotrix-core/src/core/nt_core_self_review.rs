@@ -1506,14 +1506,34 @@ fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
             } else if path.extension().is_some_and(|e| e == "rs") {
                 if let Ok(content) = fs::read_to_string(&path) {
                     let mut in_test = false;
+                    let mut depth = 0usize;
                     for line in content.lines() {
-                        if line.trim().starts_with("#[cfg(test)]") {
-                            in_test = true;
-                        } else if in_test && line.trim().starts_with("}") && line.trim().len() == 1 {
-                            in_test = false;
-                            continue;
+                        if !in_test {
+                            // 进入测试上下文: #[cfg(test)] mod 块 或 独立 #[test]/#[tokio::test] fn
+                            if line.trim().starts_with("#[cfg(test)]")
+                                || line.trim().starts_with("#[test]")
+                                || line.trim().starts_with("#[tokio::test]")
+                            {
+                                // 仅当后续行出现 `{` 才进入 — 避免属性多行组合误判
+                                in_test = true;
+                                depth = 0;
+                                continue;
+                            }
                         }
-                        if in_test { continue; }
+                        if in_test {
+                            // brace 深度追踪: 遇 `{` 深度+1, 遇 `}` 深度-1, 归零退出测试上下文
+                            for ch in line.chars() {
+                                match ch {
+                                    '{' => depth += 1,
+                                    '}' => {
+                                        if depth == 0 { in_test = false; break; }
+                                        depth -= 1;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            if in_test { continue; }
+                        }
                         count += line.matches(pattern).count();
                     }
                 }
@@ -2522,6 +2542,40 @@ mod tests {
 
         let d = gate.syn_depth("fn a() { loop { break; } }");
         assert_eq!(d, 2, "fn + loop block should have depth 2");
+    }
+
+    #[test]
+    fn test_scan_for_pattern_excluding_tests_handles_all_test_forms() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("nt_self_review_scan_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let file = dir.join("sample.rs");
+
+        // 三种测试形式: cfg(test) mod / 独立 #[test] fn / #[tokio::test] fn
+        let content = r#"#[cfg(test)]
+mod tests {
+    impl Helper {
+        fn nested() { todo!("in cfg mod"); }
+    }
+}
+
+#[test]
+fn standalone() { todo!("standalone"); }
+
+#[tokio::test]
+async fn tokio_test() { todo!("tokio"); }
+
+fn prod() { let x = 1; }
+"#;
+        let mut f = std::fs::File::create(&file).unwrap();
+        f.write_all(content.as_bytes()).unwrap();
+        f.flush().unwrap();
+
+        // 生产代码无 todo! — 全部在测试上下文内
+        let count = scan_for_pattern_excluding_tests(&dir, "todo!(");
+        assert_eq!(count, 0, "all todo!() are inside test contexts; scan returned {count}");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
 
