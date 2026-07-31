@@ -87,3 +87,4 @@ pub mod nt_agent_subagent;
 pub mod mcp_bridge;
 pub mod mcp_media;
 pub mod nt_agent_mcp_registry;
+pub mod nt_agent_mcp_openapi;

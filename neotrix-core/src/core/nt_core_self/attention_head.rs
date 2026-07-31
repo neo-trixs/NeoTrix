@@ -46,6 +46,43 @@ impl AttentionDomain {
     }
 }
 
+/// 规则强度等级 (来自 ponytail 吸收: R-P81 lazy ladder)
+/// lite=探索/只读任务; full=生产修复/实现; ultra=架构重写/重构
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, Default)]
+pub enum RuleIntensity {
+    #[default]
+    Lite,
+    Full,
+    Ultra,
+}
+
+impl RuleIntensity {
+    pub fn from_task_type(task: &str) -> Self {
+        match task {
+            t if t.contains("explore") || t.contains("read") || t.contains("search") => RuleIntensity::Lite,
+            t if t.contains("implement") || t.contains("fix") || t.contains("refactor") => RuleIntensity::Full,
+            t if t.contains("architect") || t.contains("design") || t.contains("rewrite") => RuleIntensity::Ultra,
+            _ => RuleIntensity::Full,
+        }
+    }
+
+    pub fn attention_threshold(&self) -> f64 {
+        match self {
+            RuleIntensity::Lite => 0.2,
+            RuleIntensity::Full => 0.4,
+            RuleIntensity::Ultra => 0.6,
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            RuleIntensity::Lite => "lite",
+            RuleIntensity::Full => "full",
+            RuleIntensity::Ultra => "ultra",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AttentionHead {
     pub id: usize,
@@ -112,6 +149,7 @@ impl AttentionProfile {
 pub struct AttentionManager {
     pub heads: Vec<AttentionHead>,
     pub global_threshold: f64,
+    pub rule_intensity: RuleIntensity,
 }
 
 impl AttentionManager {
@@ -120,7 +158,23 @@ impl AttentionManager {
             .enumerate()
             .map(|(i, domain)| AttentionHead::new(i, domain))
             .collect();
-        Self { heads, global_threshold: threshold }
+        Self { heads, global_threshold: threshold, rule_intensity: RuleIntensity::default() }
+    }
+
+    pub fn with_intensity(threshold: f64, intensity: RuleIntensity) -> Self {
+        let mut mgr = Self::new(threshold);
+        mgr.set_intensity(intensity);
+        mgr
+    }
+
+    pub fn set_intensity(&mut self, intensity: RuleIntensity) {
+        self.rule_intensity = intensity;
+        self.global_threshold = intensity.attention_threshold();
+    }
+
+    pub fn from_task_type(threshold: f64, task: &str) -> Self {
+        let intensity = RuleIntensity::from_task_type(task);
+        Self::with_intensity(threshold, intensity)
     }
 
     pub fn stimulate_domain(&mut self, domain: AttentionDomain, amount: f64) {
@@ -263,5 +317,53 @@ mod tests {
         assert!(!h.is_activated(0.5));
         h.stimulate(0.6);
         assert!(h.is_activated(0.5));
+    }
+
+    #[test]
+    fn test_rule_intensity_from_task_type() {
+        assert_eq!(RuleIntensity::from_task_type("explore codebase"), RuleIntensity::Lite);
+        assert_eq!(RuleIntensity::from_task_type("search for pattern"), RuleIntensity::Lite);
+        assert_eq!(RuleIntensity::from_task_type("read file"), RuleIntensity::Lite);
+        assert_eq!(RuleIntensity::from_task_type("implement feature"), RuleIntensity::Full);
+        assert_eq!(RuleIntensity::from_task_type("fix bug"), RuleIntensity::Full);
+        assert_eq!(RuleIntensity::from_task_type("refactor module"), RuleIntensity::Full);
+        assert_eq!(RuleIntensity::from_task_type("architect system"), RuleIntensity::Ultra);
+        assert_eq!(RuleIntensity::from_task_type("design api"), RuleIntensity::Ultra);
+        assert_eq!(RuleIntensity::from_task_type("rewrite core"), RuleIntensity::Ultra);
+        assert_eq!(RuleIntensity::from_task_type("unknown"), RuleIntensity::Full);
+    }
+
+    #[test]
+    fn test_rule_intensity_threshold() {
+        assert_eq!(RuleIntensity::Lite.attention_threshold(), 0.2);
+        assert_eq!(RuleIntensity::Full.attention_threshold(), 0.4);
+        assert_eq!(RuleIntensity::Ultra.attention_threshold(), 0.6);
+    }
+
+    #[test]
+    fn test_attention_manager_with_intensity() {
+        let mgr = AttentionManager::with_intensity(0.3, RuleIntensity::Lite);
+        assert_eq!(mgr.global_threshold, 0.2);
+        let mgr = AttentionManager::with_intensity(0.3, RuleIntensity::Full);
+        assert_eq!(mgr.global_threshold, 0.4);
+        let mgr = AttentionManager::with_intensity(0.3, RuleIntensity::Ultra);
+        assert_eq!(mgr.global_threshold, 0.6);
+    }
+
+    #[test]
+    fn test_attention_manager_from_task_type() {
+        let mgr = AttentionManager::from_task_type(0.5, "explore");
+        assert_eq!(mgr.global_threshold, 0.2);
+        let mgr = AttentionManager::from_task_type(0.5, "implement feature");
+        assert_eq!(mgr.global_threshold, 0.4);
+        let mgr = AttentionManager::from_task_type(0.5, "architect");
+        assert_eq!(mgr.global_threshold, 0.6);
+    }
+
+    #[test]
+    fn test_attention_manager_set_intensity() {
+        let mut mgr = AttentionManager::new(0.5);
+        mgr.set_intensity(RuleIntensity::Ultra);
+        assert_eq!(mgr.global_threshold, 0.6);
     }
 }
