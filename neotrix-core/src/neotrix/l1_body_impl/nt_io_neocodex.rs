@@ -1273,6 +1273,9 @@ impl NeoCodexAgent {
         // ── Consciousness-in-the-loop (NeoTrix unique) ──
         self.inject_into_consciousness();
         self.apply_consciousness_guidance();
+        if let Some(completed_goal) = self.check_goals() {
+            log::debug!("[neocodex] goal completed, advancing: {}", completed_goal);
+        }
 
         let response = match self.state.mode {
             NeoCodexMode::Shell => self.exec_shell(input).await,
@@ -1380,15 +1383,30 @@ impl NeoCodexAgent {
         });
     }
 
-    /// Check if a goal is complete and advance the queue
+    /// Check if a goal is complete and advance the queue.
+    ///
+    /// Also increments the active goal's iteration counter each turn and
+    /// resets `goal_active` once the queue drains, so the goal loop can
+    /// actually make progress (previously `check_goals` was never called,
+    /// `iterations` never incremented, and `goal_active` never reset).
+    /// When no goal is active but the queue is non-empty, promotes the head
+    /// of the queue (add_goal queues but never promotes).
     pub fn check_goals(&mut self) -> Option<String> {
-        if let Some(ref goal) = self.goals.active {
+        if self.goals.active.is_none() && !self.goals.goals.is_empty() {
+            self.goals.next();
+        }
+        if let Some(ref mut goal) = self.goals.active {
+            goal.iterations = goal.iterations.saturating_add(1);
             if goal.iterations >= goal.max_iterations {
                 self.wire.record(WireEvent::GoalUpdate {
                     id: goal.id.clone(), state: "completed".into(),
                     description: goal.description.clone(),
                 });
-                return self.goals.next().map(|g| g.description);
+                let next = self.goals.next().map(|g| g.description);
+                if self.goals.active.is_none() && self.goals.goals.is_empty() {
+                    self.state.goal_active = false;
+                }
+                return next;
             }
         }
         None
@@ -1423,7 +1441,7 @@ impl NeoCodexAgent {
         };
         self.config.thinking_enabled = phi_avg > 0.3;
 
-        if fruit_count < 3 && tree.cycle > 5 {
+        if fruit_count < 3 && tree.cycle > 5 && !self.state.goal_active {
             self.state.mode = NeoCodexMode::Plan;
             self.add_goal("Cultivate capability branches: absorb external knowledge", 5);
         }
@@ -1639,8 +1657,9 @@ impl NeoCodexAgent {
         for turn in &self.context.turns {
             let role = match turn.role.as_str() {
                 "user" => Role::User,
-                "assistant" => Role::Assistant,
-                "system" | "summary" => Role::System,
+                "assistant" | "summary" => Role::Assistant,
+                "tool" => Role::Tool,
+                "system" => Role::System,
                 _ => Role::User,
             };
             if role == Role::System {
@@ -2239,6 +2258,32 @@ mod tests {
     }
 
     #[test]
+    fn test_build_messages_preserves_summary_and_tool_roles() {
+        // Regression 1: Layer-4 distilled "summary" turns were mapped to
+        // Role::System and skipped, silently discarding the compaction context.
+        // Regression 2: "tool" history turns were mapped to Role::User, breaking
+        // the ReAct message protocol (tool results must be Role::Tool).
+        let mut agent = NeoCodexAgent::new("role-test");
+        agent.context.push("system", "the system prompt".into(), 5);
+        agent.context.push("user", "question".into(), 10);
+        agent.context.push("assistant", "thinking".into(), 10);
+        agent.context.push("tool", "tool output".into(), 10);
+        agent.context.push("summary", "distilled earlier context".into(), 10);
+
+        let messages = NeoCodexAgent::build_messages(&agent, "current input");
+        let summary_msg = messages.iter().find(|m| m.content.contains("distilled"));
+        let tool_msg = messages.iter().find(|m| m.content.contains("tool output"));
+
+        assert!(summary_msg.is_some(), "summary turn must survive into messages");
+        assert_eq!(summary_msg.unwrap().role, Role::Assistant);
+        assert_eq!(tool_msg.unwrap().role, Role::Tool);
+        assert_eq!(messages.last().unwrap().role, Role::User);
+        assert_eq!(messages.last().unwrap().content, "current input");
+        assert!(messages.iter().filter(|m| m.role == Role::System).count() == 1,
+            "only the real system prompt is kept");
+    }
+
+    #[test]
     fn test_context_pipeline_layer3_non_ascii_no_panic() {
         // Regression: Layer 3 used String::truncate(200) which panics when byte
         // 200 falls mid-UTF-8-char. Tool turns (priority 1) now enter this path.
@@ -2297,6 +2342,45 @@ mod tests {
         let mut agent = NeoCodexAgent::new("goal-test");
         agent.add_goal("Fix the bug", 5);
         assert!(agent.state.goal_active);
+    }
+
+    #[test]
+    fn test_goal_completes_and_resets_active() {
+        // Regression: check_goals was never wired into the turn loop,
+        // iterations never incremented, and goal_active never reset — the
+        // goal queue could only grow, never progress.
+        let mut agent = NeoCodexAgent::new("goal-test");
+        agent.add_goal("Fix the bug", 2);
+        assert!(agent.state.goal_active);
+
+        // 1st call: promotes queued goal to active, iterations 0→1, not complete.
+        assert!(agent.check_goals().is_none());
+        assert_eq!(agent.goals.active.as_ref().unwrap().iterations, 1);
+
+        // 2nd call: iterations 1→2 == max, completes.
+        assert!(agent.check_goals().is_none(), "single goal: completion returns None (no next)");
+        assert!(agent.goals.active.is_none());
+        assert!(!agent.state.goal_active, "goal_active must reset once queue drains");
+        assert_eq!(agent.goals.completed.len(), 1);
+    }
+
+    #[test]
+    fn test_chained_goals_advance_to_next() {
+        let mut agent = NeoCodexAgent::new("goal-test");
+        agent.add_goal("Goal A", 1);
+        agent.add_goal("Goal B", 1);
+        assert!(agent.state.goal_active);
+
+        // Call 1: promotes A to active, increments 0→1 == max, completes A and
+        // returns the description of the next goal B.
+        assert_eq!(agent.check_goals().unwrap_or_default(), "Goal B");
+        assert_eq!(agent.goals.completed.len(), 1);
+
+        // Call 2: B is already active, increments 0→1 == max, completes B.
+        // No next goal → returns None and goal_active resets.
+        assert!(agent.check_goals().is_none());
+        assert_eq!(agent.goals.completed.len(), 2);
+        assert!(!agent.state.goal_active);
     }
 
     #[test]
