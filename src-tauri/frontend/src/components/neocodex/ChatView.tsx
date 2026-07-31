@@ -96,7 +96,7 @@ interface ChatViewProps {
   streamingContent?: string;
   streamingRole?: "user" | "assistant";
   agentBusy: boolean;
-  onSend: (content: string) => void;
+  onSend: (content: string, attachments?: Attachment[]) => void;
   onDelete?: (index: number) => void;
   viewMode?: "verbose" | "normal" | "summary";
   contextUsage?: number;
@@ -132,6 +132,9 @@ export function ChatView({
   const [mentionHighlight, setMentionHighlight] = useState(0);
   const mentionRef = useRef<HTMLDivElement>(null);
   const addNotification = useStore((s) => s.addNotification);
+  const promptHistory = useRef<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [lastInput, setLastInput] = useState("");
 
   const SLASH_COMMANDS = [
     { cmd: "/compact", label: "压缩会话", hint: "释放上下文 token" },
@@ -196,6 +199,21 @@ export function ChatView({
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
   }, [mentionOpen]);
+
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if ((ev.metaKey || ev.ctrlKey) && ev.shiftKey && (ev.key === "C" || ev.key === "c")) {
+        const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+        if (lastAssistant && lastAssistant.content) {
+          ev.preventDefault();
+          copyMessage(lastAssistant.content);
+          addNotification({ type: "success", message: "已复制最后一条回复", duration: 2000 });
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [messages, addNotification]);
 
   const handleMentionSelect = (name: string) => {
     setInput((prev) => prev.replace(/@\w*$/, "") + `@${name} `);
@@ -273,6 +291,28 @@ export function ChatView({
         const form = (e.target as HTMLTextAreaElement).closest("form");
         form?.requestSubmit();
       }
+      return;
+    }
+    if (e.key === "ArrowUp" && !input) {
+      e.preventDefault();
+      if (historyIndex === -1) setLastInput("");
+      if (promptHistory.current.length > 0) {
+        const next = historyIndex + 1 < promptHistory.current.length ? historyIndex + 1 : historyIndex;
+        if (next >= 0 && next < promptHistory.current.length) {
+          setHistoryIndex(next);
+          setInput(promptHistory.current[promptHistory.current.length - 1 - next]);
+        }
+      }
+    } else if (e.key === "ArrowDown" && historyIndex >= 0) {
+      e.preventDefault();
+      const next = historyIndex - 1;
+      if (next < 0) {
+        setHistoryIndex(-1);
+        setInput(lastInput);
+      } else {
+        setHistoryIndex(next);
+        setInput(promptHistory.current[promptHistory.current.length - 1 - next]);
+      }
     }
   };
 
@@ -286,12 +326,15 @@ export function ChatView({
     setMentionQuery("");
     if (attachments.length > 0) {
       addNotification({ type: "info", message: `已附加 ${attachments.length} 个文件`, duration: 2000 });
-      setAttachments([]);
     }
     if (mentions.length > 0) {
       addNotification({ type: "info", message: `引用 ${mentions.length} 个文件`, duration: 2000 });
     }
-    onSend(content);
+    promptHistory.current.push(content);
+    if (promptHistory.current.length > 100) promptHistory.current.shift();
+    setHistoryIndex(-1);
+    onSend(content, attachments);
+    setAttachments([]);
     if (mentions.length > 0) setMentions([]);
   };
 

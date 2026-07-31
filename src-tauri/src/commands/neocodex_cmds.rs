@@ -24,8 +24,21 @@ pub async fn neocodex_send_message(content: String) -> Result<String, String> {
     Ok(response)
 }
 
+#[derive(serde::Deserialize, Default)]
+pub struct NeoCodexAttachmentPayload {
+    pub name: String,
+    #[serde(default)]
+    pub size: u64,
+    #[serde(default)]
+    pub mime_type: String,
+}
+
 #[tauri::command]
-pub async fn neocodex_send_message_stream(app: tauri::AppHandle, content: String) -> Result<String, String> {
+pub async fn neocodex_send_message_stream(
+    app: tauri::AppHandle,
+    content: String,
+    attachments: Option<Vec<NeoCodexAttachmentPayload>>,
+) -> Result<String, String> {
     let mut agent_guard = NEOCODEX_AGENT.lock().await;
     let agent = match agent_guard.as_mut() {
         Some(a) => a,
@@ -37,6 +50,29 @@ pub async fn neocodex_send_message_stream(app: tauri::AppHandle, content: String
         }
     };
 
+    // Persist the user message (fixes streaming-not-persisted gap) with any
+    // attachments, keeping the wire + in-memory mirror in sync.
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+    let core_atts = attachments.map(|v| {
+        v.into_iter().filter(|a| !a.name.is_empty()).map(|a| {
+            neotrix::neotrix::l1_body_impl::nt_io_neocodex::NeoCodexAttachment {
+                name: a.name,
+                size: a.size,
+                mime_type: a.mime_type,
+            }
+        }).collect::<Vec<_>>()
+    });
+    agent.wire.record(WireEvent::UserMessage {
+        content: content.clone(),
+        timestamp: ts,
+        attachments: core_atts,
+    });
+    let est = content.len() / 4;
+    agent.context.push("user", content.clone(), est);
+    agent.state.tokens_used += est;
+    agent.state.turn_count += 1;
+
     // Emit start event
     let _ = app.emit("neocodex_stream_start", content.clone());
 
@@ -44,8 +80,20 @@ pub async fn neocodex_send_message_stream(app: tauri::AppHandle, content: String
         let _ = app.emit("neocodex_stream_token", token);
     }).await;
 
-    let _ = app.emit("neocodex_stream_end", result.clone().unwrap_or_default());
-    Ok(result.unwrap_or_else(|| "[no response]".to_string()))
+    let answer = result.unwrap_or_else(|| "[no response]".to_string());
+    // Persist the assistant response so streamed conversations survive reload.
+    let ats = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+    agent.wire.record(WireEvent::AgentMessage {
+        content: answer.clone(),
+        timestamp: ats,
+    });
+    let est2 = answer.len() / 4;
+    agent.context.push("assistant", answer.clone(), est2);
+    agent.state.tokens_used += est2;
+
+    let _ = app.emit("neocodex_stream_end", answer.clone());
+    Ok(answer)
 }
 
 #[tauri::command]
@@ -220,7 +268,7 @@ pub async fn neocodex_list_sessions() -> Result<Vec<NeoCodexSessionInfo>, String
             for line in &lines {
                 if let Ok(event) = serde_json::from_str::<WireEvent>(line) {
                     match event {
-                        WireEvent::UserMessage { content, timestamp } => {
+                        WireEvent::UserMessage { content, timestamp, .. } => {
                             if message_count == 0 && content.len() > 20 {
                                 name = format!("{}...", &content[..20]);
                             }
@@ -229,6 +277,12 @@ pub async fn neocodex_list_sessions() -> Result<Vec<NeoCodexSessionInfo>, String
                         }
                         WireEvent::ModeChange { to, .. } => {
                             mode = format!("{:?}", to);
+                        }
+                        WireEvent::SessionMeta { name: n, timestamp, .. } => {
+                            if !n.is_empty() {
+                                name = n;
+                            }
+                            updated_at = timestamp.max(0) as u64;
                         }
                         _ => { message_count += 1; }
                     }
@@ -277,20 +331,27 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
     for line in content.lines() {
         if let Ok(event) = serde_json::from_str::<WireEvent>(line) {
             match event {
-                WireEvent::UserMessage { content, timestamp } => items.push(NeoCodexMessageItem {
+                WireEvent::UserMessage { content, timestamp, attachments } => items.push(NeoCodexMessageItem {
                     role: "user".to_string(),
                     content,
                     timestamp,
+                    attachments: attachments.map(|v| v.into_iter().map(|a| NeoCodexAttachmentDto {
+                        name: a.name,
+                        size: a.size,
+                        mime_type: a.mime_type,
+                    }).collect()),
                 }),
                 WireEvent::AgentMessage { content, timestamp } => items.push(NeoCodexMessageItem {
                     role: "assistant".to_string(),
                     content,
                     timestamp,
+                    attachments: None,
                 }),
                 WireEvent::ToolCall { name, args, result, success, .. } => items.push(NeoCodexMessageItem {
                     role: "tool".to_string(),
                     content: format!("**{}**{}\n```\n{}\n```", name, if success { "" } else { " (失败)" }, result.chars().take(500).collect::<String>()),
                     timestamp: 0,
+                    attachments: None,
                 }),
                 WireEvent::SystemEvent { kind, detail, timestamp } => {
                     if !kind.is_empty() {
@@ -298,14 +359,126 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
                             role: "system".to_string(),
                             content: format!("**{}**: {}", kind, detail),
                             timestamp,
+                            attachments: None,
                         });
                     }
                 }
+                WireEvent::SideChatMessage { .. } => { /* side chat stays out of the main thread */ }
                 _ => {}
             }
         }
     }
     Ok(items)
+}
+
+/// Fetch persisted side-chat messages for a session (branched questions that
+/// never re-enter the main context).
+#[tauri::command]
+pub async fn neocodex_get_side_chat(session_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for line in content.lines() {
+        if let Ok(WireEvent::SideChatMessage { content, timestamp }) = serde_json::from_str::<WireEvent>(line) {
+            items.push(NeoCodexMessageItem {
+                role: "user".to_string(),
+                content,
+                timestamp,
+                attachments: None,
+            });
+        }
+    }
+    Ok(items)
+}
+
+#[tauri::command]
+pub async fn neocodex_send_side_chat(session_id: String, content: String) -> Result<Vec<NeoCodexMessageItem>, String> {
+    if content.trim().is_empty() {
+        return Err("empty side chat message".to_string());
+    }
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    let agent = match guard.as_mut() {
+        Some(a) => a,
+        None => {
+            let mut a = NeoCodexAgent::new("neotrix-tauri");
+            a.provider.sync_from_real();
+            *guard = Some(a);
+            guard.as_mut().unwrap()
+        }
+    };
+    // Route through the live agent so the wire's in-memory mirror stays in sync
+    // when this is the active session; otherwise record to the target file.
+    if agent.wire.path == path {
+        agent.record_side_chat(&content);
+    } else {
+        let mut wire = WireSession::new(&session_id);
+        wire.path = path.clone();
+        wire.record(WireEvent::SideChatMessage {
+            content: content.trim().to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+        });
+    }
+    // Return the full side-chat history for immediate re-render.
+    let content2 = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for line in content2.lines() {
+        if let Ok(WireEvent::SideChatMessage { content, timestamp }) = serde_json::from_str::<WireEvent>(line) {
+            items.push(NeoCodexMessageItem {
+                role: "user".to_string(),
+                content,
+                timestamp,
+                attachments: None,
+            });
+        }
+    }
+    Ok(items)
+}
+
+/// Persist a user-chosen session name into the session's wire stream.
+#[tauri::command]
+pub async fn neocodex_rename_session(session_id: String, name: String) -> Result<NeoCodexSessionInfo, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    let agent = match guard.as_mut() {
+        Some(a) => a,
+        None => {
+            let mut a = NeoCodexAgent::new("neotrix-tauri");
+            a.provider.sync_from_real();
+            *guard = Some(a);
+            guard.as_mut().unwrap()
+        }
+    };
+    if agent.wire.path == path {
+        agent.rename_session(&name);
+    } else {
+        let mut wire = WireSession::new(&session_id);
+        wire.path = path.clone();
+        wire.record(WireEvent::SessionMeta {
+            name: name.trim().to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+        });
+    }
+    Ok(NeoCodexSessionInfo {
+        id: session_id,
+        name: name.trim().to_string(),
+        mode: "Agent".to_string(),
+        message_count: 0,
+        wire_path: path.to_string_lossy().to_string(),
+        updated_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as u64,
+    })
 }
 
 #[tauri::command]
@@ -376,4 +549,12 @@ pub struct NeoCodexMessageItem {
     pub role: String,
     pub content: String,
     pub timestamp: i64,
+    pub attachments: Option<Vec<NeoCodexAttachmentDto>>,
+}
+
+#[derive(serde::Serialize)]
+pub struct NeoCodexAttachmentDto {
+    pub name: String,
+    pub size: u64,
+    pub mime_type: String,
 }

@@ -12,6 +12,8 @@ const SHORTCUTS: Array<{ keys: string; label: string }> = [
   { keys: "⌘W", label: "关闭会话" },
   { keys: "Esc", label: "停止生成 / 返回" },
   { keys: "⌘Shift+F", label: "专注模式" },
+  { keys: "⌘Shift+C", label: "复制最后一条回复" },
+  { keys: "↑ / ↓", label: "浏览历史提示" },
   { keys: "⌘/", label: "快捷键帮助" },
 ];
 

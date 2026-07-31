@@ -115,10 +115,17 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const handleRename = async (sessionId: string, newName: string) => {
     if (!newName.trim()) return;
-    renamedNames.current[sessionId] = newName.trim();
-    setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, name: newName.trim() } : s)));
-    setRenamingId(null);
-    addNotification({ type: "success", message: "已重命名", duration: 2000 });
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("neocodex_rename_session", { sessionId, name: newName.trim() });
+      renamedNames.current[sessionId] = newName.trim();
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, name: newName.trim() } : s)));
+      setRenamingId(null);
+      addNotification({ type: "success", message: "已重命名", duration: 2000 });
+    } catch (e) {
+      addNotification({ type: "error", message: `重命名失败: ${e}`, duration: 3000 });
+      setRenamingId(null);
+    }
   };
 
   const handleExport = async (session: NeoCodexSession) => {

@@ -460,12 +460,26 @@ impl ContextPipeline {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum WireEvent {
-    UserMessage { content: String, timestamp: i64 },
+    UserMessage {
+        content: String,
+        timestamp: i64,
+        #[serde(default)]
+        attachments: Option<Vec<NeoCodexAttachment>>,
+    },
     AgentMessage { content: String, timestamp: i64 },
     ToolCall { name: String, args: String, result: String, duration_ms: u64, success: bool },
     SystemEvent { kind: String, detail: String, timestamp: i64 },
     GoalUpdate { id: String, state: String, description: String },
     ModeChange { from: NeoCodexMode, to: NeoCodexMode },
+    SessionMeta { name: String, timestamp: i64 },
+    SideChatMessage { content: String, timestamp: i64 },
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NeoCodexAttachment {
+    pub name: String,
+    pub size: u64,
+    pub mime_type: String,
 }
 
 #[derive(Debug, Clone)]
@@ -1191,6 +1205,29 @@ impl NeoCodexAgent {
         self.state.mode_start = Instant::now();
     }
 
+    /// Persist a user-chosen session name into the wire stream (overrides
+    /// the derived first-message name on read).
+    pub fn rename_session(&mut self, name: &str) {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+        self.wire.record(WireEvent::SessionMeta {
+            name: name.trim().to_string(),
+            timestamp: ts,
+        });
+    }
+
+    /// Record a side-chat message (branched question that must NOT pollute
+    /// the main session context). Persisted to the same wire stream but
+    /// filtered out of resume_session / get_session_messages.
+    pub fn record_side_chat(&mut self, content: &str) {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+        self.wire.record(WireEvent::SideChatMessage {
+            content: content.trim().to_string(),
+            timestamp: ts,
+        });
+    }
+
     /// Toggle between Agent and Shell mode (from Kimi Code Ctrl-X)
     pub fn toggle_mode(&mut self) -> NeoCodexMode {
         let from = self.state.mode;
@@ -1226,6 +1263,7 @@ impl NeoCodexAgent {
         self.wire.record(WireEvent::UserMessage {
             content: input.to_string(),
             timestamp,
+            attachments: None,
         });
 
         let token_estimate = input.len() / 4;
@@ -2218,6 +2256,7 @@ mod tests {
         session.record(WireEvent::UserMessage {
             content: "hello".into(),
             timestamp: 1000,
+            attachments: None,
         });
         assert_eq!(session.events.len(), 1);
     }
@@ -2366,7 +2405,7 @@ mod tests {
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("replay_test.jsonl");
         let event = WireEvent::UserMessage {
-            content: "replay".into(), timestamp: 42,
+            content: "replay".into(), timestamp: 42, attachments: None,
         };
         let line = serde_json::to_string(&event).unwrap();
         let mut f = std::fs::File::create(&path).unwrap();
@@ -2483,7 +2522,7 @@ mod tests {
         let path = dir.join("resume.jsonl");
         let mut f = std::fs::File::create(&path).unwrap();
         for event in [
-            WireEvent::UserMessage { content: "hello".into(), timestamp: 1 },
+            WireEvent::UserMessage { content: "hello".into(), timestamp: 1, attachments: None },
             WireEvent::AgentMessage { content: "hi there".into(), timestamp: 2 },
             WireEvent::ModeChange { from: NeoCodexMode::Agent, to: NeoCodexMode::Plan },
         ] {

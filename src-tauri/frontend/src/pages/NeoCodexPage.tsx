@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../stores";
 import { ChatView, CommandPalette, ModelSelector, SessionSidebar, SettingsView, ShortcutHelp } from "../components/neocodex";
+import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import styles from "./NeoCodexPage.module.css";
@@ -72,10 +73,15 @@ export default function NeoCodexPage() {
     stopRef.current = true;
   };
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, attachments?: Attachment[]) => {
     stopRef.current = false;
     setAgentBusy(true);
-    addNeoCodexMessage({ role: "user", content, timestamp: Date.now() });
+    addNeoCodexMessage({
+      role: "user",
+      content,
+      timestamp: Date.now(),
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
+    });
     setNeoCodexStreaming({ content: "", role: "assistant" });
 
     let accumulated = "";
@@ -86,7 +92,10 @@ export default function NeoCodexPage() {
     });
 
     try {
-      const response = await invoke("neocodex_send_message_stream", { content }) as string;
+      const payload = (attachments && attachments.length > 0
+        ? { content, attachments: attachments.map((a) => ({ name: a.name, size: a.size, mime_type: a.mimeType })) }
+        : { content }) as any;
+      const response = await invoke("neocodex_send_message_stream", payload) as string;
       setNeoCodexStreaming(null);
       addNeoCodexMessage({ role: "assistant", content: response, timestamp: Date.now() });
       refreshSessions();
@@ -131,6 +140,8 @@ export default function NeoCodexPage() {
         contentType: "markdown",
         timestamp: m.timestamp,
       })));
+      const sideChat = await invoke("neocodex_get_side_chat", { sessionId: session.id }) as any[];
+      setSideChatMessages(sideChat.map((m) => ({ role: m.role, content: m.content })));
     } catch (e) {
       console.error("Switch session failed:", e);
     }
@@ -140,6 +151,7 @@ export default function NeoCodexPage() {
     if (neocodexActiveSessionId === sessionId) {
       setNeoCodexActiveSession(null);
       setNeoCodexMessages([]);
+      setSideChatMessages([]);
     }
     refreshSessions();
   };
@@ -155,12 +167,17 @@ export default function NeoCodexPage() {
     setViewMode((v) => (v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose"));
   };
 
-  const handleSideChatSend = () => {
+  const handleSideChatSend = async () => {
     const content = sideChatInput.trim();
-    if (!content) return;
-    setSideChatMessages((prev) => [...prev, { role: "user", content }]);
-    setSideChatInput("");
-    setSideChatMessages((prev) => [...prev, { role: "assistant", content: "侧聊仅本地记录，不影响主会话。" }]);
+    if (!content || !neocodexActiveSessionId) return;
+    try {
+      const items = await invoke("neocodex_send_side_chat", { sessionId: neocodexActiveSessionId, content }) as any[];
+      setSideChatMessages(items.map((m) => ({ role: m.role, content: m.content })));
+      setSideChatInput("");
+    } catch (e) {
+      console.error("Side chat send failed:", e);
+      setSideChatInput("");
+    }
   };
 
   // Command palette items
