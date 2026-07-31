@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::core::nt_core_self_test::SelfTest;
 
+#[allow(dead_code)]
 struct Scenario {
     name: String,
     description: String,

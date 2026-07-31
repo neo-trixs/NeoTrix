@@ -187,14 +187,11 @@ pub async fn investigate(target: &OsintTarget, client: &Client, _config: &OsintC
             let base_url = format!("{scheme}://{prefix}{domain}");
             for path in &paths {
                 let url = format!("{base_url}{path}");
-                match probe_url(&url, client).await {
-                    Ok(ep) => {
-                        let already_exists = findings.endpoints.iter().any(|e| e.url == ep.url);
-                        if !already_exists && (ep.status < 400 || ep.status == 403 || ep.status == 401) {
-                            findings.endpoints.push(ep);
-                        }
+                if let Ok(ep) = probe_url(&url, client).await {
+                    let already_exists = findings.endpoints.iter().any(|e| e.url == ep.url);
+                    if !already_exists && (ep.status < 400 || ep.status == 403 || ep.status == 401) {
+                        findings.endpoints.push(ep);
                     }
-                    Err(_) => {}
                 }
             }
         }

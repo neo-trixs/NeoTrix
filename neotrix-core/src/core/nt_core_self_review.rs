@@ -1827,6 +1827,7 @@ fn count_long_functions_in_content(content: &str, max_lines: usize) -> usize {
         let fn_start = i;
         let mut found_open = false;
         let mut closed = false;
+        #[allow(clippy::mut_range_bound)]
         for j in i..lines.len() {
             for ch in lines[j].chars() {
                 if ch == '{' { brace_depth += 1; found_open = true; }
@@ -1995,9 +1996,7 @@ fn count_long_if_chains(dir: &Path, max_chain: usize) -> usize {
                     let mut chain = 0usize;
                     for line in &lines {
                         let trimmed = line.trim();
-                        if trimmed.starts_with("} else if ") || trimmed.starts_with("else if ") {
-                            chain += 1;
-                        } else if trimmed == "} else {" || trimmed.starts_with("else {") {
+                        if trimmed.starts_with("} else if ") || trimmed.starts_with("else if ") || trimmed == "} else {" || trimmed.starts_with("else {") {
                             chain += 1;
                         } else {
                             if chain > max_chain { count += 1; }
@@ -2139,11 +2138,9 @@ fn count_state_mutation_no_result(dir: &Path) -> usize {
                         let trimmed = line.trim();
                         if (trimmed.starts_with("fn ") || trimmed.starts_with("pub fn "))
                             && trimmed.contains("&mut self")
-                        {
-                            if !trimmed.contains("Result") {
+                            && !trimmed.contains("Result") {
                                 count += 1;
                             }
-                        }
                     }
                 }
             }

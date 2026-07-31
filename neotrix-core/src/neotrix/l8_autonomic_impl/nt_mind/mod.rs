@@ -131,10 +131,6 @@ pub(crate) mod knowledge;
 pub(crate) mod consciousness;
 pub(crate) mod evolution;
 pub(crate) mod infrastructure;
-pub(crate) mod meta_agent;
-pub(crate) mod self_questioning;
-pub(crate) mod task_driver;
-
 // ============================================================================
 // Re-exports（按域分组）
 // ============================================================================

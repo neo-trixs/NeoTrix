@@ -91,9 +91,7 @@ impl PolicyEvaluator {
         for &action in policy {
             let mut next_belief = vec![0.0; current_belief.len()];
             if action < model.num_states {
-                for j in 0..model.num_states {
-                    next_belief[j] = model.transition_matrix[action][j];
-                }
+                next_belief[..model.num_states].copy_from_slice(&model.transition_matrix[action][..model.num_states]);
             }
 
             let predicted_obs = model.predict_observation(&next_belief);
@@ -113,9 +111,7 @@ impl PolicyEvaluator {
                     }
                 } else {
                     let uniform = 1.0 / model.num_states as f64;
-                    for p in &mut posterior {
-                        *p = uniform;
-                    }
+                    posterior.fill(uniform);
                 }
 
                 let posterior_entropy = calc.compute_entropy(&posterior);

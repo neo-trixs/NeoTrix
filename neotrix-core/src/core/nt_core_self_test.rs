@@ -136,6 +136,32 @@ mod tests {
     }
 }
 
+/// External verifier — runs `cargo check` to ground self-tests in build reality.
+/// Prevents self-deception (D16b): a SelfTest pass means nothing if the code doesn't compile.
+pub struct ExternalVerifier;
+
+impl SelfTest for ExternalVerifier {
+    fn name(&self) -> &str { "external_verifier" }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let output = std::process::Command::new("cargo")
+            .args(["check", "--lib", "-p", "neotrix"])
+            .output()
+            .map_err(|e| vec![format!("failed to run cargo check: {}", e)])?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let errors: Vec<String> = stderr.lines()
+                .filter(|l| l.contains("error"))
+                .take(5)
+                .map(|l| l.to_string())
+                .collect();
+            Err(vec![format!("cargo check failed ({} errors)", errors.len())])
+        }
+    }
+}
+
 /// Constitution Compliance SelfTest - verifies actions follow the constitution
 pub struct ConstitutionComplianceTest;
 

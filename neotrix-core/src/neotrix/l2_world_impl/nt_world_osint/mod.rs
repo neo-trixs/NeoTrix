@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 
+use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType;
+
 pub mod dns;
 pub mod http;
 pub mod url;
@@ -125,6 +128,93 @@ impl OsintReport {
         if let Some(ref nw) = self.network { n += nw.services.len(); }
         if let Some(ref dk) = self.dark { n += dk.results.len(); }
         n
+    }
+}
+
+impl OsintReport {
+    pub fn write_to_kb(&self, kb: &KnowledgeBase) -> Vec<(String, NodeType)> {
+        let mut written = Vec::new();
+        let domain_hint: Option<&str> = self.target.domain.as_deref()
+            .or_else(|| self.target.email.as_ref().and_then(|e| e.split('@').nth(1)));
+
+        if let Some(ref dns) = self.dns {
+            for rec in &dns.subdomains {
+                if let Ok(id) = kb.insert_or_get_node(&format!("subdomain: {} ({})", rec.name, rec.record_type), NodeType::Source, Some(&format!("DNS {} record: {}", rec.record_type, rec.value)), Some(&format!("https://{}", rec.name)), domain_hint) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
+        if let Some(ref http) = self.http {
+            for ep in &http.endpoints {
+                if let Ok(id) = kb.insert_or_get_node(&ep.url, NodeType::Source, ep.title.as_deref(), Some(&ep.url), domain_hint) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
+        if let Some(ref url) = self.url_history {
+            for snap in &url.snapshots {
+                if let Ok(id) = kb.insert_or_get_node(&format!("Wayback: {}", snap.url), NodeType::Reference, Some(&format!("Snapshot {}", snap.timestamp)), Some(&snap.url), domain_hint) {
+                    written.push((id, NodeType::Reference));
+                }
+            }
+        }
+
+        if let Some(ref cred) = self.credential {
+            for b in &cred.breaches {
+                let name = b.breach_name.as_deref().unwrap_or(&b.source);
+                if let Ok(id) = kb.insert_or_get_node(&format!("breach: {}", name), NodeType::DetectionFinding, b.description.as_deref().or(Some("Credential breach")), None, domain_hint) {
+                    written.push((id, NodeType::DetectionFinding));
+                }
+            }
+        }
+
+        if let Some(ref person) = self.person {
+            for p in &person.profiles {
+                if let Ok(id) = kb.insert_or_get_node(&format!("{} @ {}", p.username, p.platform), NodeType::Person, p.name_display.as_deref().or(Some(&p.username)), Some(&p.url), None) {
+                    written.push((id, NodeType::Person));
+                }
+            }
+        }
+
+        if let Some(ref social) = self.social {
+            for post in &social.posts {
+                if let Some(ref url) = post.url {
+                    if let Ok(id) = kb.insert_or_get_node(url, NodeType::Source, Some(&format!("Social: {} on {}", post.author, post.platform)), Some(url), None) {
+                        written.push((id, NodeType::Source));
+                    }
+                }
+            }
+        }
+
+        if let Some(ref vuln) = self.vuln {
+            for v in &vuln.vulnerabilities {
+                let summary: String = v.summary.chars().take(80).collect();
+                if let Ok(id) = kb.insert_or_get_node(&format!("{}/{}", v.id, summary), NodeType::DetectionFinding, Some(&v.summary), Some(&format!("https://nvd.nist.gov/vuln/detail/{}", v.id)), domain_hint) {
+                    written.push((id, NodeType::DetectionFinding));
+                }
+            }
+        }
+
+        if let Some(ref net) = self.network {
+            for svc in &net.services {
+                let name = svc.service.as_deref().unwrap_or("unknown");
+                if let Ok(id) = kb.insert_or_get_node(&format!("{}:{}/{}", svc.host, svc.port, name), NodeType::Source, svc.banner.as_deref(), None, domain_hint) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
+        if let Some(ref dark) = self.dark {
+            for result in &dark.results {
+                if let Ok(id) = kb.insert_or_get_node(&format!("dark: {}", result.title), NodeType::Source, Some(&result.snippet), Some(&result.url), domain_hint) {
+                    written.push((id, NodeType::Source));
+                }
+            }
+        }
+
+        written
     }
 }
 

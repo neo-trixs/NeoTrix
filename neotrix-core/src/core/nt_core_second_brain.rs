@@ -87,7 +87,7 @@ impl SecondBrain {
 
     pub fn tick(&mut self, emotion: Option<&EmotionEngine>, session_note: Option<&str>) {
         self.tick_count += 1;
-        if !self.auto_sync_enabled || self.tick_count % self.sync_interval_secs != 0 {
+        if !self.auto_sync_enabled || !self.tick_count.is_multiple_of(self.sync_interval_secs) {
             return;
         }
         let kb = match self.kb.as_ref() {

@@ -35,7 +35,7 @@ impl CliCommand for SelfAuditCmd {
             "d48" => self.d48_energy_flow(&project),
             "d49" => self.d49_dead_weight(&project),
             "d50" => self.d50_meta_audit(&project),
-            "help" | _ => {
+            _ => {
                 let mut help = String::new();
                 help.push_str("NeoTrix Internal Audit (NTIA):\n");
                 help.push_str("  /self-audit all|ntia  — run all 16 checks\n");
@@ -105,7 +105,7 @@ impl SelfAuditCmd {
             Ok(out) => {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 stdout.lines()
-                    .filter_map(|l| l.split(':').last())
+                    .filter_map(|l| l.split(':').next_back())
                     .filter_map(|c| c.trim().parse::<usize>().ok())
                     .sum()
             }
@@ -339,7 +339,7 @@ impl SelfAuditCmd {
         let modules = ["SchemaWatchdog", "SelfAudit", "KnowledgeGapDetector", "BMonitor",
                         "CognitiveEvaluator", "ConsciousnessMonitor", "ConsciousnessRuntime", "EntropyMonitor"];
         for module in &modules {
-            let consumers = self.count_total_refs(&src, &format!("\\.evaluate\\(\\.check\\(\\.audit\\(\\.scan\\("));
+            let consumers = self.count_total_refs(&src, "\\.evaluate\\(\\.check\\(\\.audit\\(\\.scan\\(");
             out.push_str(&format!("  {module}: {consumers} eval consumers\n"));
         }
 
@@ -367,7 +367,7 @@ impl SelfAuditCmd {
             .output()
             .map(|o| {
                 String::from_utf8_lossy(&o.stdout).lines()
-                    .filter_map(|l| l.split(':').last())
+                    .filter_map(|l| l.split(':').next_back())
                     .filter_map(|c| c.trim().parse::<usize>().ok())
                     .sum::<usize>()
             })
@@ -485,7 +485,7 @@ impl SelfAuditCmd {
         let mod_decls = Command::new("rg")
             .args(["^pub mod|^mod ", &src, "-g", "*.rs", "--count"])
             .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter_map(|l| l.split(':').last()).filter_map(|c| c.trim().parse::<usize>().ok()).sum::<usize>())
+            .map(|o| String::from_utf8_lossy(&o.stdout).lines().filter_map(|l| l.split(':').next_back()).filter_map(|c| c.trim().parse::<usize>().ok()).sum::<usize>())
             .unwrap_or(0);
         out.push_str(&format!("  Module declarations: {mod_decls}\n"));
 

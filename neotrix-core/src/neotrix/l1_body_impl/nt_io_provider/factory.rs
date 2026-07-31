@@ -429,7 +429,7 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             // Truly keyless — accepts any Bearer token, even empty/not-needed
             // Verified working 2026-07-22: 209+ free models with `:free` suffix
             let base_url = config.base_url.unwrap_or_else(|| "https://api.airforce/v1".to_string());
-            let api_key = config.api_key.unwrap_or_else(|| String::new());
+            let api_key = config.api_key.unwrap_or_default();
             let mut provider = OpenAiProvider::new(api_key);
             provider = provider.with_base_url(&base_url);
             Box::new(provider)

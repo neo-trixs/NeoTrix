@@ -78,6 +78,12 @@ pub struct NarrativeState {
     pub events: VecDeque<CommitEvent>,
 }
 
+impl Default for NarrativeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NarrativeState {
     pub fn new() -> Self {
         NarrativeState {
@@ -112,6 +118,12 @@ pub struct NarrativeConsistencyChecker {
     state: NarrativeState,
     entity_index: HashMap<String, usize>,
     arc_index: HashMap<String, usize>,
+}
+
+impl Default for NarrativeConsistencyChecker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NarrativeConsistencyChecker {

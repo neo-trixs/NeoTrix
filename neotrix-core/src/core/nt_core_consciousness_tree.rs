@@ -15,9 +15,11 @@ pub struct ConsciousnessTree {
     pub fruits: Vec<CapabilityFruit>,
     pub core: EpiphanicCore,
     pub cycle: u64,
+    pub config: TreeGrowthConfig,
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct DataFoundation {
     pub kb_node_count: u64,
     pub kb_edge_count: u64,
@@ -251,6 +253,68 @@ impl VulnerabilitySeverity {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// TreeGrowthConfig — centralized growth-cycle thresholds (D35)
+// ═══════════════════════════════════════════════════════════════════
+
+/// Centralized thresholds for the consciousness tree growth cycle.
+/// All magic numbers in `run_growth_cycle`/`scan_vulnerabilities` come from here.
+#[derive(Debug, Clone)]
+pub struct TreeGrowthConfig {
+    /// Minimum health for a branch to produce fruit (Phase 3 gate)
+    pub fruit_growth_health: f64,
+    /// Maximum allowed constraint violations before fruit production is blocked
+    pub max_growth_violations: usize,
+    /// Minimum fruit quality to be digested into guidance (Phase 4)
+    pub fruit_quality_threshold: f64,
+    /// Minimum vulnerability severity score to become a next action
+    pub action_severity_threshold: f64,
+    /// Neutral health assigned to branches with no SelfTest results
+    pub neutral_health: f64,
+    /// Floor for branch health computed from SelfTest pass rate
+    pub min_branch_health: f64,
+    /// Soil health below this is a Critical data-foundation vulnerability
+    pub soil_health_critical: f64,
+    /// Root health below this is a High ingestion-pipeline vulnerability
+    pub root_health_high: f64,
+    /// Branch maturity score below this is a Medium domain-maturity vulnerability
+    pub branch_maturity_low: f64,
+    /// Phi below this (after warmup cycles) indicates no integrated information
+    pub phi_minimum: f64,
+    /// Cycles before phi coherence check starts reporting
+    pub phi_warmup_cycles: u64,
+    /// Constitution rules floor (known internalized rules)
+    pub constitution_rules_floor: usize,
+    /// Constitution experiences floor (known cycles internalized)
+    pub constitution_experiences_floor: usize,
+    /// Constitution tree-growth rules count
+    pub constitution_tree_growth_rules: usize,
+    /// Constitution absorption rules count
+    pub constitution_absorption_rules: usize,
+}
+
+impl Default for TreeGrowthConfig {
+    fn default() -> Self {
+        Self {
+            fruit_growth_health: 0.5,
+            max_growth_violations: 2,
+            fruit_quality_threshold: 0.5,
+            action_severity_threshold: 0.5,
+            neutral_health: 0.5,
+            min_branch_health: 0.1,
+            soil_health_critical: 0.33,
+            root_health_high: 0.25,
+            branch_maturity_low: 0.33,
+            phi_minimum: 0.01,
+            phi_warmup_cycles: 3,
+            constitution_rules_floor: 46,
+            constitution_experiences_floor: 111,
+            constitution_tree_growth_rules: 7,
+            constitution_absorption_rules: 1,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // BranchConstraints — per-branch runtime governance
 // ═══════════════════════════════════════════════════════════════════
 
@@ -326,6 +390,12 @@ pub fn constraints_for_branch(kind: &BranchKind) -> BranchConstraints {
 
 // ═══════════════════════════════════════════════════════════════════
 
+impl Default for ConsciousnessTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConsciousnessTree {
     pub fn new() -> Self {
         Self {
@@ -337,6 +407,7 @@ impl ConsciousnessTree {
             fruits: Vec::new(),
             core: EpiphanicCore::default(),
             cycle: 0,
+            config: TreeGrowthConfig::default(),
         }
     }
 
@@ -358,10 +429,10 @@ impl ConsciousnessTree {
 
         // Phase 1: Roots absorb from soil (Data Foundation → Information Roots)
         // Constitution internalization: soil feeds roots with principles
-        self.soil.constitution_rules_count = self.soil.constitution_rules_count.max(46); // Current known rules
-        self.soil.constitution_experiences_count = self.soil.constitution_experiences_count.max(111); // Current cycles
-        self.soil.constitution_tree_growth_rules = 7; // R-P42~R-P48
-        self.soil.constitution_absorption_rules = 1; // R-P43
+        self.soil.constitution_rules_count = self.soil.constitution_rules_count.max(self.config.constitution_rules_floor); // Current known rules
+        self.soil.constitution_experiences_count = self.soil.constitution_experiences_count.max(self.config.constitution_experiences_floor); // Current cycles
+        self.soil.constitution_tree_growth_rules = self.config.constitution_tree_growth_rules; // R-P42~R-P48
+        self.soil.constitution_absorption_rules = self.config.constitution_absorption_rules; // R-P43
         
         self.roots.total_absorbed += self.soil.crawl_queue_depth;
         self.roots.total_fetched += self.soil.kb_node_count;
@@ -398,7 +469,7 @@ impl ConsciousnessTree {
             if !violations.is_empty() {
                 log::debug!("[consciousness_tree] {} constraints: {}", branch.kind.label(), violations.join("; "));
             }
-            if branch.health > 0.5 && violations.len() < 2 {
+            if branch.health > self.config.fruit_growth_health && violations.len() < self.config.max_growth_violations {
                 let fruit = CapabilityFruit {
                     name: format!("{}-fruit-{}", branch.kind.label(), self.cycle),
                     source_branch: branch.kind.clone(),
@@ -419,13 +490,13 @@ impl ConsciousnessTree {
         self.core.self_test_results = self.collect_self_test_results();
         self.core.identified_gaps = self.identify_architecture_gaps();
         self.core.last_cycle_guidance = self.fruits.iter()
-            .filter(|f| f.quality > 0.5)
+            .filter(|f| f.quality > self.config.fruit_quality_threshold)
             .map(|f| format!("Digested: {} (q={:.2})", f.name, f.quality))
             .collect();
         // Build next actions from vulnerabilities + gaps + fruit quality
         let mut next_actions = Vec::new();
         for vuln in &self.core.vuln_scan {
-            if vuln.severity.score() >= 0.5 {
+            if vuln.severity.score() >= self.config.action_severity_threshold {
                 next_actions.push(format!("[{}] {}: {}", 
                     match vuln.severity { VulnerabilitySeverity::Critical => "CRIT", VulnerabilitySeverity::High => "HIGH", _ => "FIX" },
                     vuln.module, vuln.fix_suggestion));
@@ -468,21 +539,21 @@ impl ConsciousnessTree {
             if let Some(branch) = self.branches.get_mut(kind) {
                 if branch_results.is_empty() {
                     // No SelfTest for this domain → neutral
-                    branch.health = 0.5;
+                    branch.health = self.config.neutral_health;
                 } else {
                     let passed = branch_results.iter().filter(|r| r.passed).count();
                     let total = branch_results.len();
-                    // Health = pass rate, but minimum 0.1 to avoid zero
-                    branch.health = (passed as f64 / total as f64).max(0.1);
+                    // Health = pass rate, but minimum floor to avoid zero
+                    branch.health = (passed as f64 / total as f64).max(self.config.min_branch_health);
                 }
             }
         }
         
-        // For domains with no SelfTest results at all, keep neutral 0.5
+        // For domains with no SelfTest results at all, keep neutral
         for kind in BranchKind::all() {
             if let Some(branch) = self.branches.get_mut(&kind) {
                 if !domain_results.contains_key(&kind) {
-                    branch.health = branch.health.max(0.5); // Don't override if already set
+                    branch.health = branch.health.max(self.config.neutral_health); // Don't override if already set
                 }
             }
         }
@@ -494,7 +565,7 @@ impl ConsciousnessTree {
 
         // Check 1: Soil health — data foundation viability
         let soil_health = self.soil.health();
-        if soil_health < 0.33 {
+        if soil_health < self.config.soil_health_critical {
             vulns.push(VulnerabilityFinding {
                 severity: VulnerabilitySeverity::Critical,
                 category: "data_foundation".into(),
@@ -506,7 +577,7 @@ impl ConsciousnessTree {
 
         // Check 2: Root health — data ingestion pipeline
         let root_health = self.roots.health();
-        if root_health < 0.25 {
+        if root_health < self.config.root_health_high {
             vulns.push(VulnerabilityFinding {
                 severity: VulnerabilitySeverity::High,
                 category: "ingestion_pipeline".into(),
@@ -529,7 +600,7 @@ impl ConsciousnessTree {
 
         // Check 4: Branch maturity — domain health
         for (kind, branch) in &self.branches {
-            if branch.maturity_score() < 0.33 {
+            if branch.maturity_score() < self.config.branch_maturity_low {
                 vulns.push(VulnerabilityFinding {
                     severity: VulnerabilitySeverity::Medium,
                     category: "domain_maturity".into(),
@@ -564,7 +635,7 @@ impl ConsciousnessTree {
         }
 
         // Check 6: Phi coherence
-        if self.trunk.phi < 0.01 && self.cycle > 3 {
+        if self.trunk.phi < self.config.phi_minimum && self.cycle > self.config.phi_warmup_cycles {
             vulns.push(VulnerabilityFinding {
                 severity: VulnerabilitySeverity::Medium,
                 category: "phi_coherence".into(),
@@ -591,7 +662,7 @@ impl ConsciousnessTree {
     fn identify_architecture_gaps(&self) -> Vec<String> {
         let mut gaps = Vec::new();
         for vuln in &self.core.vuln_scan {
-            if vuln.severity.score() >= 0.5 {
+            if vuln.severity.score() >= self.config.action_severity_threshold {
                 gaps.push(format!("{}: {} ({})", vuln.module, vuln.description, vuln.category));
             }
         }
@@ -639,24 +710,6 @@ impl InformationRoots {
     }
 }
 
-impl Default for DataFoundation {
-    fn default() -> Self {
-        Self {
-            kb_node_count: 0,
-            kb_edge_count: 0,
-            crawl_queue_depth: 0,
-            embedding_count: 0,
-            wiki_page_count: 0,
-            last_sync: 0,
-            constitution_rules_count: 0,
-            constitution_experiences_count: 0,
-            constitution_tree_growth_rules: 0,
-            constitution_absorption_rules: 0,
-            constitution_last_loaded: 0,
-            constitution_source_hash: String::new(),
-        }
-    }
-}
 
 impl Default for InformationRoots {
     fn default() -> Self {

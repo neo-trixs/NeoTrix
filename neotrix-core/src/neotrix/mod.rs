@@ -93,11 +93,9 @@ pub use l2_world_impl::nt_world_sense;
 pub use l2_world_impl::nt_world_crawl;
 pub use l2_world_impl::nt_world_search;
 pub use l2_world_impl::nt_world_pet;
-pub use l2_world_impl::nt_world_vision;
 pub use l2_world_impl::nt_world_parse;
 pub use l2_world_impl::nt_world_journal_index;
 pub use l2_world_impl::nt_world_code_search;
-pub use l2_world_impl::nt_world_geo;
 pub use l2_world_impl::nt_world_video_pipeline;
 pub use l2_world_impl::nt_world_osint;
 
@@ -127,12 +125,8 @@ pub use l1_body_impl::nt_io_session_recovery;
 pub use l1_body_impl::nt_io_agents_md;
 pub use l1_body_impl::nt_io_surface_bridge;
 pub use l1_body_impl::nt_io_grep;
-pub use l1_body_impl::nt_io_humanize;
-pub use l1_body_impl::nt_io_humanize_detector;
-pub use l1_body_impl::nt_io_skill_review;
-pub use l1_body_impl::nt_io_supertonic;
-pub use l1_body_impl::nt_io_hyperframes;
 pub use l1_body_impl::nt_io_digital_human;
+pub use l1_body_impl::nt_io_neocodex;
 
 pub use l1_body_impl::nt_shield;
 pub use l1_body_impl::nt_shield_audit;
@@ -146,7 +140,6 @@ pub use l1_body_impl::nt_shield_manager;
 pub use l1_body_impl::nt_shield_stealth_net;
 
 pub use l1_body_impl::nt_shield_redteam;
-pub use l1_body_impl::nt_shield_approval;
 pub use l1_body_impl::nt_shield_agentic_scan;
 
 pub use l1_body_impl::nt_act_code;
@@ -167,9 +160,7 @@ pub use l1_body_impl::nt_act_sub_agent_middleware;
 pub use l1_body_impl::nt_act_orchestrator;
 pub use l1_body_impl::nt_act_project_manager;
 pub use l1_body_impl::nt_act_remote_control;
-pub use l1_body_impl::nt_act_a2a_client;
 pub use l1_body_impl::nt_act_goose_bridge;
-pub use l1_body_impl::nt_act_persona_capture;
 pub use l1_body_impl::nt_agent_agent_team;
 
 pub use l1_body_impl::nt_agent_protocol;
@@ -180,7 +171,6 @@ pub use l1_body_impl::nt_agent_mcp_adapter;
 pub use l1_body_impl::nt_agent_mcp_auth;
 pub use l1_body_impl::nt_agent_mcp_tools;
 pub use l1_body_impl::nt_agent_mcp_transport;
-pub use l1_body_impl::nt_agent_mcp_gateway;
 pub use l1_body_impl::nt_tools;
 pub use l1_body_impl::nt_agent;
 pub use l1_body_impl::nt_agent_orchestrator;

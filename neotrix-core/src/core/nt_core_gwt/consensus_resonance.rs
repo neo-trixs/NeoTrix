@@ -47,10 +47,10 @@ impl ConsensusResonanceBridge {
                 } else {
                     0
                 };
-                let modulated = (base as u32).saturating_add(modulation).min(6);
+                let modulated = base.saturating_add(modulation).min(6);
                 strengths[i][j] = modulated;
                 total_strength += modulated as u64;
-                if modulated >= RESONANCE_THRESHOLD as u32 && i != j {
+                if modulated >= RESONANCE_THRESHOLD && i != j {
                     in_resonance += 1;
                 }
             }

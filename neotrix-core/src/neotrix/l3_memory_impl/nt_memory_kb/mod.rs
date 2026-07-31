@@ -29,11 +29,9 @@ pub mod nt_memory_unify;
 pub mod nt_memory_content_distiller;
 pub mod nt_memory_panorama;
 pub mod nt_memory_auto_learn;
-pub mod nt_memory_code_query;
 pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
 pub mod nt_memory_knowledge_assets;
-pub mod nt_memory_visual_rag;
 pub mod nt_memory_commit_tracker;
 pub mod nt_memory_graph_cache;
 pub mod privacy;
@@ -59,20 +57,9 @@ pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRec
 pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
 pub use nt_memory_auto_learn::*;
-pub use nt_memory_code_query::{
-    CodeEntity, CodeEntityKind, DependencyChain, Hop, CodeGraphStats,
-    ExplosionRadius, AffectedEntity, RiskLevel,
-    find_code_path, reachable_subgraph, code_graph_stats,
-    explosion_radius, find_affected_entities_by_kind,
-    find_affected_by_name_pattern, blast_radius_summary,
-};
 pub use nt_memory_tech_reserve::{
     TechReserveStore, TechReserveEntry, TechReserveDimension, TechReserveQuery,
     ArchitectureGap, TechProfile, extract_tech_domains,
-};
-pub use nt_memory_visual_rag::{
-    VisualRagIndex, VisualRagConfig, VisualSearchResult, VisualEmbedding,
-    cosine_similarity, l2_normalize,
 };
 
 use rusqlite::Connection;
@@ -230,7 +217,7 @@ impl KnowledgeBase {
     }
 
     pub fn embedding_available(&self) -> bool {
-        self.embedding_config.read().map_or(false, |c| c.is_some())
+        self.embedding_config.read().is_ok_and(|c| c.is_some())
     }
 
     pub fn integrity_check(&self) -> Vec<String> {
@@ -451,7 +438,7 @@ impl KnowledgeBase {
 
     /// Query the tech reserve for mature products in a domain.
     pub fn query_tech_reserve(&self, domain: &str, top_k: usize) -> Vec<TechReserveEntry> {
-        let tr = self.tech_reserve.read().unwrap();
+        let tr = self.tech_reserve.read().unwrap_or_else(|e| e.into_inner());
         tr.latest_mature_products(domain, top_k)
             .into_iter()
             .cloned()
@@ -460,7 +447,7 @@ impl KnowledgeBase {
 
     /// Get full 4D tech profile for a technology.
     pub fn tech_profile(&self, tech_name: &str) -> TechProfile {
-        let tr = self.tech_reserve.read().unwrap();
+        let tr = self.tech_reserve.read().unwrap_or_else(|e| e.into_inner());
         tr.full_tech_profile(tech_name)
     }
 

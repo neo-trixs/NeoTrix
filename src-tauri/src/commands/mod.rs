@@ -20,12 +20,15 @@ pub mod perms_cmds;
 pub mod mcp_cmds;
 pub mod sync_cmds;
 pub mod browser_cmds;
+pub mod websearch_cmds;
 pub mod pet_cmds;
 pub mod tool_cmds;
 pub mod provider_cmds;
 pub mod chat_cmds;
 pub mod kb_cmds;
 pub mod plan_cmds;
+pub mod plugin_cmds;
+pub mod marketplace_cmds;
 
 // Re-exports for convenience (frontend/tauri registration)
 pub use types::*;
@@ -41,16 +44,79 @@ pub use sync_cmds::*;
 pub use provider_cmds::*;
 pub use chat_cmds::*;
 pub use kb_cmds::*;
-
+pub use plugin_cmds::*;
+pub use marketplace_cmds::*;
+pub use websearch_cmds::*;
 
 pub mod computer_cmds;
 pub mod background_cmds;
 pub mod remote_cmds;
+pub mod coordinator_cmds;
+pub mod review_cmds;
+pub mod skill_cmds;
+pub mod daemon_cmds;
+pub mod dream_cmds;
+pub mod gate_cmds;
+pub mod undercover_cmds;
+pub mod buddy_cmds;
+pub mod summary_cmds;
+pub mod remote_bridge_cmds;
+pub mod computer_interactive_cmds;
+pub mod mcp_host_cmds;
+pub mod preview_cmds;
+pub mod teleport_cmds;
+pub mod enterprise_cmds;
+pub mod agent_view_cmds;
+pub mod channels_cmds;
+pub mod workflow_cmds;
+pub mod routines_cmds;
+pub mod loop_cmds;
+pub mod memory_mgr_cmds;
+pub mod annotation_cmds;
+pub mod security_scan_cmds;
+pub mod voice_cmds;
+pub mod profile_cmds;
+pub mod context_cmds;
+pub mod insights_cmds;
+pub mod term_tabs_cmds;
+pub mod cowork_cmds;
 
 // Re-exports for frontend registration
 pub use computer_cmds::*;
 pub use background_cmds::*;
 pub use remote_cmds::*;
+pub use coordinator_cmds::*;
+pub use review_cmds::*;
+pub use skill_cmds::*;
+pub use daemon_cmds::*;
+pub use dream_cmds::*;
+pub use gate_cmds::*;
+pub use undercover_cmds::*;
+pub use buddy_cmds::*;
+pub use summary_cmds::*;
+pub use remote_bridge_cmds::*;
+pub use computer_interactive_cmds::*;
+pub use mcp_host_cmds::*;
+pub use preview_cmds::*;
+pub use teleport_cmds::*;
+pub use enterprise_cmds::*;
+pub use agent_view_cmds::*;
+pub use channels_cmds::*;
+pub use workflow_cmds::*;
+pub use routines_cmds::*;
+pub use loop_cmds::*;
+pub use memory_mgr_cmds::*;
+pub use annotation_cmds::*;
+pub use security_scan_cmds::*;
+pub use voice_cmds::*;
+pub use profile_cmds::*;
+pub use context_cmds::*;
+pub use insights_cmds::*;
+pub use term_tabs_cmds::*;
+pub use cowork_cmds::*;
+
+pub mod unified_session_cmds;
+pub use unified_session_cmds::*;
 
 // ========== Tests ==========
 

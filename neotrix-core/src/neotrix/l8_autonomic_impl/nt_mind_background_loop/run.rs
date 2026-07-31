@@ -428,6 +428,7 @@ pub struct BackgroundLoopHandle {
     cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
     /// 0=Balanced, 1=Deep, 2=Fast — updated by consciousness tick, consumed by batch loops.
     cognitive_mode: u8,
+    #[allow(dead_code)]
     scoring: ScoringSubstrate,
     state: StateSubstrate,
     delegate: DelegateEngine,
@@ -696,6 +697,7 @@ impl BackgroundLoopHandle {
     }
     /// Log a session event to KB (obsidian-mind SessionStart/Stop pattern).
     /// Creates a node with type=Session with event type and summary.
+    #[allow(dead_code)]
     async fn log_session_event(&self, event_type: &str, summary: &str) {
         let Some(ref kb) = self.kb else { return };
         let title = format!("session-{}-{}", event_type, chrono::Utc::now().timestamp());
@@ -1006,7 +1008,7 @@ impl BackgroundLoopHandle {
         if let Some(ref mut gs) = self.gold_standard {
             let state = match self.brain.try_read() {
                 Ok(b) => {
-                    b.brain.capability.arr.iter().copied().collect::<Vec<_>>()
+                    b.brain.capability.arr.to_vec()
                 }
                 Err(_) => vec![0.0; 23],
             };
@@ -1162,6 +1164,7 @@ impl BackgroundLoopHandle {
         let meta_cog_loop = MetaCognitiveLoop::new(model);
 
         let mut self_tests = SelfTestRegistry::new();
+        self_tests.register(Box::new(crate::core::nt_core_self_test::ExternalVerifier));
         self_tests.register(Box::new(watchdog));
         self_tests.register(Box::new(ConvergeCheckFn));
         self_tests.register(Box::new(scanner));
@@ -1335,13 +1338,11 @@ impl BackgroundLoopHandle {
             return;
         }
         
-        // Batch size adjusted by cognitive mode (from consciousness tick Phase 4)
-        // 0=Balanced, 1=Deep, 2=Fast
         let base_batch_size: usize = 50;
         let batch_size = match self.cognitive_mode {
-            1 => base_batch_size * 2,    // Deep: 2x batch
-            2 => base_batch_size / 2,    // Fast: 0.5x batch
-            _ => base_batch_size,         // Balanced: default
+            1 => base_batch_size * 2,
+            2 => base_batch_size / 2,
+            _ => base_batch_size,
         };
         
         let mode_name = match self.cognitive_mode {
@@ -1358,25 +1359,33 @@ impl BackgroundLoopHandle {
                 break;
             }
             let (id, url) = {
-                let kb = self.kb_pipeline.kb.as_ref().unwrap();
-                let conn = kb.conn.lock().unwrap();
+                let kb = match self.kb_pipeline.kb.as_ref() {
+                    Some(kb) => kb, None => break,
+                };
+                let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
                 match claim_next_crawl_url(&conn) {
                     Ok(Some(item)) => (item.id, item.url),
                     _ => break,
                 }
             };
             log::info!("[bg] crawl claimed: {} (domain tracked)", url);
-            match self.kb_pipeline.absorb_url(&url) {
+            match self.kb_pipeline.absorb_url_async(&url).await {
                 Ok(report) => {
-                    log::info!("[bg] crawl absorbed: {} -> {} nodes", report.url, report.nodes_created);
-                    let kb = self.kb_pipeline.kb.as_ref().unwrap();
-                    let conn = kb.conn.lock().unwrap();
+                    log::info!("[bg] crawl absorbed: {} -> {} nodes (summary: {} chars)", 
+                        report.url, report.nodes_created,
+                        report.distil_summary.as_ref().map(|s| s.len()).unwrap_or(0));
+                    let kb = match self.kb_pipeline.kb.as_ref() {
+                        Some(kb) => kb, None => break,
+                    };
+                    let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
                     let _ = mark_crawl_complete(&conn, &id, true, None);
                 }
                 Err(e) => {
                     log::warn!("[bg] crawl failed: {}: {:?}", url, e);
-                    let kb = self.kb_pipeline.kb.as_ref().unwrap();
-                    let conn = kb.conn.lock().unwrap();
+                    let kb = match self.kb_pipeline.kb.as_ref() {
+                        Some(kb) => kb, None => break,
+                    };
+                    let conn = kb.conn.lock().unwrap_or_else(|e| e.into_inner());
                     let _ = mark_crawl_complete(&conn, &id, false, Some(&e));
                 }
             }
@@ -1417,7 +1426,10 @@ impl BackgroundLoopHandle {
             log::warn!("[bg] seed_crawl: kb not attached");
             return;
         }
-        let kb = self.kb_pipeline.kb.as_ref().unwrap();
+        let kb = match self.kb_pipeline.kb.as_ref() {
+            Some(kb) => kb,
+            None => { log::warn!("[bg] seed_crawl: kb disappeared"); return; }
+        };
         let conn = match kb.conn.lock() {
             Ok(c) => c,
             Err(e) => { log::warn!("[bg] seed_crawl lock: {}", e); return; }

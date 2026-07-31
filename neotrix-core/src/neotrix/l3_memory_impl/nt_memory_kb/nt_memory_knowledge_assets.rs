@@ -59,18 +59,16 @@ impl SkillsLibrary {
             Ok((title, summary, url, domain))
         }).map_err(|e| format!("Query: {}", e))?;
         let mut count = 0;
-        for row in rows {
-            if let Ok((name, summary, _url, domain)) = row {
-                self.skills.insert(name.clone(), SkillEntry {
-                    name,
-                    description: summary.unwrap_or_default(),
-                    source_resource: String::new(),
-                    domain: domain.unwrap_or_else(|| "unknown".into()),
-                    tool_name: None,
-                    confidence: 0.5,
-                });
-                count += 1;
-            }
+        for (name, summary, _url, domain) in rows.flatten() {
+            self.skills.insert(name.clone(), SkillEntry {
+                name,
+                description: summary.unwrap_or_default(),
+                source_resource: String::new(),
+                domain: domain.unwrap_or_else(|| "unknown".into()),
+                tool_name: None,
+                confidence: 0.5,
+            });
+            count += 1;
         }
         Ok(count)
     }
@@ -229,13 +227,13 @@ pub fn import_reasoning_memories(kb: &KnowledgeBase, path: &Path) -> Result<Impo
         let lifecycle = m["lifecycle"].as_str().unwrap_or("");
 
         let dedup_key = if tid.is_empty() {
-            format!("reasoning_memory:unnamed:{}", prefix(&task_desc, 32))
+            format!("reasoning_memory:unnamed:{}", prefix(task_desc, 32))
         } else {
             format!("reasoning_memory:{}", tid)
         };
 
-        let summary = prefix(&task_desc, 200);
-        let title = format!("[{}] {}", task_type, prefix(&task_desc, 80));
+        let summary = prefix(task_desc, 200);
+        let title = format!("[{}] {}", task_type, prefix(task_desc, 80));
 
         let node_id = match kb.insert_or_get_node(&title, NodeType::ThinkingTrace,
             Some(summary), Some(&dedup_key), Some(task_type))
@@ -303,7 +301,7 @@ pub fn import_knowledge_engine(kb: &KnowledgeBase, path: &Path) -> Result<Import
         };
 
         let sid = match kb.insert_or_get_node(title, node_type,
-            Some(prefix(&summary, 200)),
+            Some(prefix(summary, 200)),
             Some(&dedup_key), Some(first_tag))
         {
             Ok(id) => id,
@@ -555,7 +553,7 @@ pub fn import_bandit_data(kb: &KnowledgeBase, path: &Path) -> Result<ImportRepor
 
     let mut report = ImportReport::default();
     for entry in &entries {
-        if !entry.is_array() || entry.as_array().map_or(true, |a| a.len() < 3) {
+        if !entry.is_array() || entry.as_array().is_none_or(|a| a.len() < 3) {
             continue;
         }
         let arr = entry.as_array().unwrap();

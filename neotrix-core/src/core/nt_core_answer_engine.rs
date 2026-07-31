@@ -159,6 +159,12 @@ pub struct WidgetProvider {
     widgets: Vec<WidgetKind>,
 }
 
+impl Default for WidgetProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WidgetProvider {
     pub fn new() -> Self {
         Self {
@@ -172,12 +178,11 @@ impl WidgetProvider {
             self.widgets.push(WidgetKind::Weather);
             return WidgetKind::Weather;
         }
-        if lower.contains("+") || lower.contains("-") || lower.contains("*") || lower.contains("/") {
-            if lower.chars().any(|c| c.is_ascii_digit()) {
+        if (lower.contains("+") || lower.contains("-") || lower.contains("*") || lower.contains("/"))
+            && lower.chars().any(|c| c.is_ascii_digit()) {
                 self.widgets.push(WidgetKind::Calculator);
                 return WidgetKind::Calculator;
             }
-        }
         if lower.contains("stock") || lower.contains("price") || lower.contains("$") {
             self.widgets.push(WidgetKind::Stock);
             return WidgetKind::Stock;

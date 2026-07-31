@@ -175,7 +175,7 @@ impl CliCommand for ConsciousnessCmd {
                 }
             }
 
-            "help" | _ => {
+            _ => {
                 let msg = self.description();
                 let out = CommandOutput::ok(msg);
                 if want_json {

@@ -714,7 +714,7 @@ impl BrainStage for SleepStage {
     fn frequency(&self) -> usize { 100 }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let Some(ref mut engine) = brain.sleep_engine {
-            if let (Some(ref op), Some(ref mut st)) = (brain.select_operator.as_ref(), brain.selective_state.as_mut()) {
+            if let (Some(op), Some(ref mut st)) = (brain.select_operator.as_ref(), brain.selective_state.as_mut()) {
                 match engine.sleep(&mut brain.brain.capability, &mut brain.reasoning_bank, op, st) {
                     Ok(result) => {
                         let stats = result.stats.clone();
@@ -1471,7 +1471,7 @@ impl BrainStage for OracleGateStage {
             }
             if let Some(ref mut engine) = brain.reasoning_engine {
                 if let Some(ref mut gwt) = engine.gwt {
-                    gwt.broadcast(&format!("oracle_gate: needs intervention"));
+                    gwt.broadcast("oracle_gate: needs intervention");
                 }
             }
             return Ok(StageDecision::Skip(decision.suggested_action));
@@ -1684,6 +1684,12 @@ impl BrainStage for RewardCalculationStage {
 
 pub struct ConvergenceCheckStage;
 
+impl Default for ConvergenceCheckStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConvergenceCheckStage {
     pub fn new() -> Self {
         Self
@@ -1715,6 +1721,12 @@ impl BrainStage for ConvergenceCheckStage {
 // Meta-audit: every 100 iterations, verify that detection modules themselves are intact.
 
 pub struct SelfTestStage;
+
+impl Default for SelfTestStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl SelfTestStage {
     pub fn new() -> Self {

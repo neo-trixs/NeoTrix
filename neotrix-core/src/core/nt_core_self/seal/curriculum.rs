@@ -109,7 +109,7 @@ impl CalibratedCurriculumGenerator {
             return Vec::new();
         }
         let w = self.window_size.min(self.tasks_completed.len());
-        let chunk_size = (self.tasks_completed.len() + w - 1) / w;
+        let chunk_size = self.tasks_completed.len().div_ceil(w);
         let mut curve = Vec::new();
         for chunk in self.tasks_completed.iter().collect::<Vec<_>>().chunks(chunk_size) {
             let successes = chunk.iter().filter(|r| r.success).count();

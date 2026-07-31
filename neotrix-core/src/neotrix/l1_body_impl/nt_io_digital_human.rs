@@ -120,6 +120,12 @@ pub struct EmotionEngine {
     history: VecDeque<(Emotion, Instant)>,
 }
 
+impl Default for EmotionEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmotionEngine {
     pub fn new() -> Self {
         Self {
@@ -171,6 +177,12 @@ pub struct AvatarController {
     pub lip_sync: bool,
     pub blink_interval_ms: u64,
     last_blink: Instant,
+}
+
+impl Default for AvatarController {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AvatarController {

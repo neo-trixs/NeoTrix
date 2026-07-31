@@ -462,6 +462,7 @@ mod nt_memory_kb_discovery {
 
 mod nt_memory_store {
     use rusqlite::Connection;
+    #[allow(dead_code)]
     fn bridge_node(n: crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::KnowledgeNode) -> super::KnowledgeNode {
         use crate::neotrix::l2_world_impl::nt_memory_kb_bridge as bridge;
         let nt = bridge::from_real_node_type(&n.node_type);
@@ -482,6 +483,7 @@ mod nt_memory_store {
             updated_at: n.updated_at,
         }
     }
+    #[allow(dead_code)]
     pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<super::KnowledgeNode>> {
         let nodes = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::get_all_nodes(conn)?;
         Ok(nodes.into_iter().map(bridge_node).collect())

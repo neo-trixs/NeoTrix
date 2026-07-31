@@ -86,16 +86,13 @@ pub enum GraphQueryMode {
 // ─── Config ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ExtractionMode {
+    #[default]
     Heuristic,
     Llm,
 }
 
-impl Default for ExtractionMode {
-    fn default() -> Self {
-        ExtractionMode::Heuristic
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphRagConfig {

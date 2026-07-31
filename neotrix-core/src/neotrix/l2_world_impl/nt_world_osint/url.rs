@@ -55,7 +55,7 @@ async fn query_cdx(domain: &str, client: &Client, from: &str, to: &str) -> Vec<U
                     // First row is headers; skip it
                     for row in rows.iter().skip(1) {
                         if row.len() >= 6 {
-                            let raw_url = row.get(0).cloned().unwrap_or_default();
+                            let raw_url = row.first().cloned().unwrap_or_default();
                             let timestamp = row.get(1).cloned().unwrap_or_default();
                             let status = row.get(4).and_then(|s| s.parse::<u16>().ok());
                             let mimetype = row.get(3).cloned();

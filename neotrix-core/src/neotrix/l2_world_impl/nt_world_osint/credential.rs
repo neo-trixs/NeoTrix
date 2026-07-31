@@ -170,7 +170,7 @@ fn sha1_hash(input: &str) -> String {
 }
 
 async fn check_firefox_monitor(email: &str, client: &Client) -> Vec<BreachEntry> {
-    let url = format!("https://monitor.firefox.com/api/v1/scan");
+    let url = "https://monitor.firefox.com/api/v1/scan".to_string();
     match client.post(&url)
         .json(&serde_json::json!({"email": email}))
         .timeout(Duration::from_secs(10))

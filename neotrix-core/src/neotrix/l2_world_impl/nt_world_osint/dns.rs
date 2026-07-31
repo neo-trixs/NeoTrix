@@ -182,7 +182,7 @@ pub async fn investigate(target: &OsintTarget, client: &Client, config: &OsintCo
     let crt_found = crt_sh_subdomains(domain, client).await;
     let crt_count = crt_found.len();
     all_subs.extend(crt_found);
-    sub_sources.extend(std::iter::repeat("crt.sh").take(crt_count).map(String::from));
+    sub_sources.extend(std::iter::repeat_n("crt.sh", crt_count).map(String::from));
     findings.a_records.extend(resolve_a(domain));
     findings.a_records.iter_mut().for_each(|r| r.source = "system-resolver".to_string());
 

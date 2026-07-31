@@ -231,13 +231,12 @@ impl SubAgentRegistry {
             Ok(entries) => {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.extension().map_or(true, |e| e != "md") {
+                    if path.extension().is_none_or(|e| e != "md") {
                         continue;
                     }
                     match Self::register_file(&mut self.agents, &path) {
                         Ok(IsNew::New) => report.new += 1,
-                        Ok(IsNew::Updated) => report.updated += 1,
-                        Ok(IsNew::Existing) => {}
+                        Ok(IsNew::Existing) => report.updated += 1,
                         Err(e) => report.errors.push(format!("{}: {}", path.display(), e)),
                     }
                 }
@@ -358,7 +357,6 @@ impl Default for SubAgentRegistry {
 
 enum IsNew {
     New,
-    Updated,
     Existing,
 }
 

@@ -25,7 +25,7 @@ impl E8RootSystem {
         // Type II: (±1, ..., ±1) with even number of minus signs — 128 roots
         for mask in 0u8..=255 {
             let ones: u32 = mask.count_ones();
-            if ones % 2 == 0 {
+            if ones.is_multiple_of(2) {
                 let mut v = [0i8; 8];
                 for k in 0..8 {
                     v[k] = if (mask >> k) & 1 == 1 { -1 } else { 1 };

@@ -6,8 +6,7 @@
 /// 3. `competition_gate.rs` — CompetitionGate::compete() (WTA ignition)
 /// 4. `moe_router.rs` — MoERouter::forward() (learned routing matrix)
 /// 5. `workspace.rs` — e8_attention_weights (E8 bias)
-
-/// Runtime state of a single specialist available for selection.
+///    Runtime state of a single specialist available for selection.
 #[derive(Debug, Clone)]
 pub struct SpecialistState {
     pub id: usize,

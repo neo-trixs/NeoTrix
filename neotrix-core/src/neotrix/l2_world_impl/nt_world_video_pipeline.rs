@@ -283,6 +283,12 @@ pub struct VideoExtractor {
     last_extraction: Option<Instant>,
 }
 
+impl Default for VideoExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VideoExtractor {
     pub fn new() -> Self {
         Self {

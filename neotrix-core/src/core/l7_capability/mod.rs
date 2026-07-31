@@ -18,12 +18,10 @@ pub mod observer;
 pub mod skill_acquire;
 pub mod group_evolve;
 pub mod nt_act_orch_patterns;
-pub mod nt_cap_orch_graph;
 pub mod a2a;
 pub mod nt_cap_code_review;
 pub mod nt_core_antidistil;
 
-pub mod nt_cap_tree;
 pub mod nt_cap_media;
 pub mod nt_cap_geo;
 pub mod nt_core_orch_agent;

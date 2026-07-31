@@ -158,6 +158,12 @@ impl ConstitutionVectorIndex {
     }
 }
 
+impl Default for Constitution {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Constitution {
     /// Create empty constitution
     pub fn new() -> Self {
@@ -370,12 +376,13 @@ impl ConstitutionLoader {
     }
 
     /// Extract Experience Tree entries
+    #[allow(clippy::invalid_regex)]
     fn extract_experience_tree(content: &str) -> Result<Vec<ExperienceEntry>, String> {
         let mut experiences = Vec::new();
 
-        // Find Experience Tree sections
+        // Find Experience Tree sections (uses look-ahead which clippy's parser doesn't support)
         let exp_regex = regex::Regex::new(
-            r"(?ms)## Experience Tree\s*[—-]\s*(\d{4}-\d{2}-\d{2})\s*Cycle\s*(\d+)\s*\((.*?)\)\n(.*?)(?=\n## |\n## |\z)"
+            r"(?ms)## Experience Tree\s*[—-]\s*(\d{4}-\d{2}-\d{2})\s*Cycle\s*(\d+)\s*\((.*?)\)\n(.*?)(?=\n## |\z)"
         ).map_err(|e| format!("Regex error: {}", e))?;
 
         for cap in exp_regex.captures_iter(content) {
@@ -461,13 +468,12 @@ impl ConstitutionLoader {
     }
 
     fn extract_cycle_for_rule(section: &str, rule_id: &str) -> Option<u32> {
-        // Look for "Cycle XX" near the rule
+        let cycle_re = regex::Regex::new(r"Cycle\s*(\d+)").ok()?;
         let lines: Vec<&str> = section.lines().collect();
         for (i, line) in lines.iter().enumerate() {
             if line.contains(rule_id) {
-                // Search backwards for Cycle
                 for j in (0..=i).rev() {
-                    if let Some(cap) = regex::Regex::new(r"Cycle\s*(\d+)").ok()?.captures(lines[j]) {
+                    if let Some(cap) = cycle_re.captures(lines[j]) {
                         return cap[1].parse().ok();
                     }
                 }

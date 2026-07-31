@@ -2818,3 +2818,124 @@ MCA 5函数 vs NeoTrix 7域：
 | P2 | Fix wiki module E0425 (ingest_source/lint_wiki missing) |
 | P2 | Resolve ConsciousnessReview module (delete or register) |
 | P3 | Re-enable #![deny(dead_code)] at crate level |```
+
+## Experience Tree — 2026-07-31 Cycle 156 (25 Dead Module Audit + Cataclysm Pruning)
+
+### Session: 死模块大审计 — 10 迭代元认知进化循环 Iteration 3
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| 全量死模块扫描 | 4 重验证 (路径导入/字符串分发/CLI注册/外部引用) + pub item 级核对 | **25 个候选 → 23 个确认死模块，~12,000 行** |
+| 误报排除 | `nt_core_cache` (SemanticCache→gateway.rs), `nt_core_trajectory_prm` (→nt_core_observer.rs) | 2 模块实际存活，保留 |
+| 死模块删除 | 23 文件 + 45 行 mod.rs 声明 + 13 行 pub use 块 | -389,496 bytes (-11,900 行) |
+| 编译验证 | `cargo check --lib` + `--all-targets` | ✅ 0 errors |
+| 测试验证 | `cargo test -p neotrix --lib` | ✅ 6682 pass, 0 failed |
+
+### 删除的 23 个死模块
+
+| 模块 | 行数 | 说明 |
+|------|------|------|
+| nt_cap_orch_graph | 1466 | Agent graph handlers, 零消费者 |
+| nt_core_skill_manifest | 937 | Skill 错误清单 |
+| nt_memory_code_query | 709 | Graphify 吸收但从未接线 |
+| nt_core_talent | 691 | Role/talent 系统 |
+| nt_world_dom_agent | 666 | DOM agent |
+| nt_shield_approval | 604 | Cost-gated approval (R-P47 声称"正例"但从未被消费!) |
+| nt_io_humanize | 590 | humanizer 吸收 |
+| nt_io_humanize_detector | 552 | AI 检测 |
+| nt_core_cache | 保留 | SemanticCache 被 gateway.rs 使用 |
+| nt_core_trajectory_prm | 保留 | 被 nt_core_observer.rs 使用 |
+| nt_agent_mcp_gateway | 355 | MCP gateway, 从未接线 |
+| nt_shield_linter | 356 | Linter |
+| nt_io_supertonic | 336 | TTS 吸收 |
+| nt_world_geo | 321 | GEO audit |
+| nt_world_vision | 311 | Vision percept |
+| nt_io_hyperframes | 305 | Video config |
+| nt_io_skill_review | 302 | Skill review |
+| nt_memory_visual_rag | 302 | PixelRAG 吸收 (re-export 项零消费) |
+| nt_cap_tree | 300 | Capability tree |
+| nt_world_auto_absorb | 249 | Thinking-trace absorb |
+| nt_world_md_absorb | 202 | Markdown absorb |
+| nt_act_a2a_client | 377 | A2A protocol |
+| nt_act_persona_capture | 589 | Persona capture |
+| nt_act_run_history | 81 | Run records |
+| nt_act_parallel_scheduler | 9 | Stub (is_available→false) |
+
+### 元认知发现 (Cycle 156)
+
+1. **R-P47 被自身反例打脸**: AGENTS.md 将 `nt_shield_approval` 列为"正例：权限逻辑注入 nt_shield_approval"，但审计证明该模块 604 行、有 11 个测试、却 **从未被任何生产代码消费**。R-P47 的"正例"本身就是一个死模块 —— 文档声称的接线不存在。
+2. **4 重验证方法学**: 仅靠"是否被 import"不足以判定死模块。必须 4 重验证: (1) 路径限定 import (2) 字符串动态分发 (3) CLI/clap 注册 (4) mod.rs 声明链 + pub item 级核验。初扫 237 个候选，精扫后仅 25 个真阳性 (10.5%)。
+3. **测试存在 ≠ 生产接线**: 23 个死模块中 22 个有测试。测试只证明"代码能运行"，不证明"代码被使用"。R-P26/R-P30 的三维度验证 (存在性/注册/接线) 在模块级同样适用。
+4. **吸收 = 创建 ≠ 集成**: nt_memory_code_query (Graphify), nt_memory_visual_rag (PixelRAG), nt_io_humanize (humanizer), nt_io_supertonic (Supertonic), nt_io_hyperframes (HyperFrames), nt_act_a2a_client (A2A), nt_act_persona_capture (teammate-skill) 全部是"吸收了但从未接线"。R-P42/D38 吸收纪律需要"接线验证门"。
+5. **pub use 不是消费者**: nt_memory_visual_rag 被 `pub use` re-export 6 个项，但这些项在全局零消费。re-export 只创建可见性，不创建调用链。
+6. **泛词误报**: 早期扫描中 `Role`/`Error`/`Config` 等泛型名产生 900+ 假阳性。必须匹配"模块名 + item 名"组合，而非 item 名单独出现。
+
+### Build Baseline (Cycle 156)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ **0 errors** | 25.7s 全量检查 |
+| `cargo check --all-targets -p neotrix` | ✅ **0 errors** | 仅预存警告 |
+| `cargo test -p neotrix --lib` | ✅ **6682 pass, 0 failed** | 11 ignored 预存 |
+| 死代码删除 | -23 文件, -11,900 行, -389KB | 最大单次清除 |
+| 存活确认 | nt_core_cache + nt_core_trajectory_prm | 2 候选排除 |
+
+### 后续 (Iteration 4+)
+
+1. 配置硬编码 → Config struct 审计
+2. 交叉模块一致性 (ThinkingMode 类重复枚举)
+3. 测试覆盖缺口扫描
+4. 收敛总结 + AGENTS.md 更新
+
+## Experience Tree — 2026-07-31 Cycle 156b (Config Struct Audit — Iteration 4 of Meta-Cognitive Rebase)
+
+### Session: 意识树硬编码阈值集中化 → TreeGrowthConfig (D35 修复)
+
+| Area | Action | Outcome |
+|------|--------|---------|
+| 硬编码阈值审计 | 扫描 `nt_core_consciousness_tree.rs` 中 ~25 个散落阈值 | 发现 15 个独立魔法数字违反 D35 (阈值必须来自 Config struct) |
+| **TreeGrowthConfig** 创建 | 新 struct: fruit_growth_health / max_growth_violations / fruit_quality_threshold / action_severity_threshold / neutral_health / min_branch_health / soil_health_critical / root_health_high / branch_maturity_low / phi_minimum / phi_warmup_cycles / constitution_rules_floor / constitution_experiences_floor / constitution_tree_growth_rules / constitution_absorption_rules | 15 个阈值集中为 1 个配置结构 |
+| ConsciousnessTree 接入 | +`config: TreeGrowthConfig` 字段 + `new()` 中 `config: TreeGrowthConfig::default()` | 构造签名不变 (backward compatible) |
+| 硬编码替换 | 15 处硬编码 → 引用 `self.config.*` | 全部替换完成 |
+| 分类阈值豁免 | CVSS tiers / evidence credibility tiers / statistical z-scores 保留原位 | 领域分类边界非 D35 目标 |
+| 构建验证 | `cargo check --lib -p neotrix` | ✅ 0 errors (71 warnings) |
+| 测试验证 | `cargo test --lib -p neotrix` | ✅ 6682 pass, 0 failed |
+
+### D35 阈值门控 (Threshold Must Come from Config) 状态
+
+| 模块 | 硬编码阈值数 | 已集中到 Config? | 备注 |
+|------|------|------|------|
+| `nt_core_consciousness_tree.rs` | **15** | ✅ 全集中到 `TreeGrowthConfig` | 15→0 |
+| `nt_core_self_review.rs` | 22 | ✅ `SelfReviewConfig` (Cycle 105) | 已修复 |
+| `nt_core_kb/versioning.rs` | 12 | ✅ `StalenessConfig` (Cycle 105) | 已修复 |
+| `l8_autonomic_impl/nt_mind/bbrain_monitor.rs` | 15 | ✅ `BMonitorConfig` (Cycle 105) | 已修复 |
+| `core/nt_core_consciousness/cognitive_load.rs` | 7 | ✅ `CognitiveLoadConfig` (Cycle 105b) | 已修复 |
+| `l3_memory_impl/nt_memory_kb/nt_memory_confidence.rs` | 7 | ✅ `ConfidenceWeights` (Cycle 105b) | 已修复 |
+| `nt_world_absorber/mod.rs` + `kb_bridge.rs` | 3 | ✅ `AbsorptionConfig` (Cycle 109b) | 已修复 |
+| CVSS severity tiers | 4 | N/A (标准分类边界) | 非行为阈值 |
+| Evidence credibility tiers | 5 | N/A (分类边界) | 非行为阈值 |
+| Statistical z-score constants | 8 | N/A (数学常数) | 非行为阈值 |
+
+### 元认知发现 (Cycle 156b)
+
+1. **D35 是最普遍的架构缺陷**: ConsciousnessTree 中 15 个散落阈值是最大单一违规源。Config struct 模式 (Cycle 105 首创) 已被验证为修复此类缺陷的标准方案。
+2. **分类阈值 vs 行为门控**: CVSS tiers、evidence credibility tiers、统计 z-score 是领域知识边界，不可配置 —— D35 不应误触这些。仅行为决策阈值（"低于 X 触发 Y"）需要配置化。
+3. **TreeGrowthConfig 与 BranchConstraints 互补**: BranchConstraints (per-branch governance) 是 per-branch 的运行时约束；TreeGrowthConfig 是树级全局阈值。两者正交，共享 ConsciousnessTree config 字段更合理（而非分别持有）。
+4. **Backward compatible 设计**: `ConsciousnessTree::new()` 签名不变，`TreeGrowthConfig::default()` 提供合理默认值。下游调用者（BackgroundLoop、SEAL pipeline、self_test 注册）无需任何修改。
+5. **"继续" 指令揭示了新间隙**: 用户第三次"继续"关闭了配置硬编码间隙，验证分形收敛循环在第 3 次迭代闭合 L3→L4 的模式。
+
+### Build Baseline (Cycle 156b)
+
+| Check | Status | Note |
+|-------|--------|------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors | 71 warnings (pre-existing) |
+| `cargo test -p neotrix --lib` | ✅ 6682 pass, 0 failed | 11 ignored |
+| 新 struct | `TreeGrowthConfig` | 15 fields, Default impl |
+| 硬编码替换 | 15 处完成 | `consciousness_tree.rs` |
+| SelfTest | 5/5 pass (consciousness_tree) | test_tree_new, test_growth_cycle, test_branch_maturity, test_leaf_wiring, test_soil_health |
+
+- **R-P76 (4-Verification Dead Module Detection)**: 判定死模块必须 4 重验证: 路径 import / 字符串分发 / CLI 注册 / pub item 级消费。单重匹配 (泛词) 产生 89.5% 假阳性。
+- **R-P77 (pub use ≠ 消费)**: re-export 仅创建可见性。审计死模块时必须检查 re-export 的每个 item 是否有全局消费，不能因 `pub use` 存在就判存活。
+- **R-P78 (测试 ≠ 接线)**: 模块有测试只证明可运行，不证明被使用。文档声称的"接线正例"必须通过代码引用链验证。
+- **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。
+- **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。

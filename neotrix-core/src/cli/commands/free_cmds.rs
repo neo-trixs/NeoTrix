@@ -55,7 +55,7 @@ impl FreeCmd {
 
         let mut keyless: Vec<&str> = Vec::new();
         let mut key_based: Vec<&str> = Vec::new();
-        for (name, _profile) in &profiles {
+        for name in profiles.keys() {
             let typ = LlmProviderType::from_name(name);
             match typ {
                 Some(t) if !t.is_free() => {} // skip paid (openai, anthropic)

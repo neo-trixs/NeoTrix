@@ -37,7 +37,7 @@ impl LearnedGraphExecutor {
         let weight = weight.max(0.0).min(1.0);
         self.graph
             .entry(from)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((to, weight));
     }
 

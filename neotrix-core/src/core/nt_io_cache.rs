@@ -2,16 +2,13 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Default)]
 pub enum EvictionPolicy {
+    #[default]
     Lfu,
     Lru,
 }
 
-impl Default for EvictionPolicy {
-    fn default() -> Self {
-        EvictionPolicy::Lfu
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct CacheConfig {

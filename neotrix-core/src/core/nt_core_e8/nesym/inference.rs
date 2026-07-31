@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -14,21 +15,23 @@ pub enum NesyValue {
     Grounded(usize),
 }
 
-impl NesyValue {
-    pub fn to_string(&self) -> String {
+impl fmt::Display for NesyValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NesyValue::Symbol(s) => s.clone(),
-            NesyValue::Number(n) => format!("{:.4}", n),
-            NesyValue::Bool(b) => b.to_string(),
+            NesyValue::Symbol(s) => write!(f, "{}", s),
+            NesyValue::Number(n) => write!(f, "{:.4}", n),
+            NesyValue::Bool(b) => write!(f, "{}", b),
             NesyValue::List(items) => {
-                let inner: Vec<String> = items.iter().map(|v| v.to_string()).collect();
-                format!("[{}]", inner.join(", "))
+                let inner: Vec<String> = items.iter().map(|v| format!("{}", v)).collect();
+                write!(f, "[{}]", inner.join(", "))
             }
-            NesyValue::Variable(v) => format!("?{}", v),
-            NesyValue::Grounded(id) => format!("#{}", id),
+            NesyValue::Variable(v) => write!(f, "?{}", v),
+            NesyValue::Grounded(id) => write!(f, "#{}", id),
         }
     }
+}
 
+impl NesyValue {
     pub fn is_variable(&self) -> bool {
         matches!(self, NesyValue::Variable(_))
     }
@@ -103,11 +106,10 @@ impl InferenceEngine {
         }
         let mut results = Vec::new();
         for fact in &self.facts {
-            if fact.predicate == query.predicate && fact.args.len() == query.args.len() {
-                if self.unify(query, fact).is_some() {
+            if fact.predicate == query.predicate && fact.args.len() == query.args.len()
+                && self.unify(query, fact).is_some() {
                     results.push((fact.clone(), fact.confidence));
                 }
-            }
         }
         for rule in &self.rules {
             if self.unify(query, &rule.head).is_some() {
@@ -167,7 +169,7 @@ impl InferenceEngine {
             if !added {
                 break;
             }
-            derived.extend(new_facts.drain(..));
+            derived.append(&mut new_facts);
         }
         derived
     }

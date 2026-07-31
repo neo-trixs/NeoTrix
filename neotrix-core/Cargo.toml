@@ -139,7 +139,7 @@ colored = "2"
 indicatif = "0.17"
 clap_complete = "4"
 libc = "0.2"
-wasmtime = { version = "24", optional = true }
+wasmtime = { version = "42", optional = true }
 aes-gcm = "0.10"
 keyring = { version = "3", optional = true }
 rkyv = { version = "0.8", features = ["std", "bytecheck"], optional = true }

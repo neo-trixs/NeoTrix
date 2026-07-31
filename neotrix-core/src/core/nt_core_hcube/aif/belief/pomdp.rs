@@ -32,9 +32,7 @@ impl POMDPBeliefUpdater {
             }
         } else {
             let uniform = 1.0 / self.num_states as f64;
-            for s in &mut posterior {
-                *s = uniform;
-            }
+            posterior.fill(uniform);
         }
 
         posterior

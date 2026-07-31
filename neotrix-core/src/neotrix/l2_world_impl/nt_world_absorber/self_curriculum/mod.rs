@@ -126,12 +126,11 @@ impl TaskTypeBalancer {
             let actual = count as f64 / total as f64;
             let ratio_diff = target - actual;
 
-            if count < self.min_per_type || ratio_diff > 0.1 {
-                if ratio_diff > worst_deficit {
+            if (count < self.min_per_type || ratio_diff > 0.1)
+                && ratio_diff > worst_deficit {
                     worst_deficit = ratio_diff;
                     worst_type = Some(st);
                 }
-            }
         }
 
         worst_type
@@ -224,6 +223,12 @@ pub struct SelfCurriculumPipeline {
     pub source_discoverer: SourceDiscoverer,
     pub difficulty_adjuster: DifficultyAdjuster,
     max_history: usize,
+}
+
+impl Default for SelfCurriculumPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SelfCurriculumPipeline {

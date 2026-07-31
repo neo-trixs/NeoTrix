@@ -13,11 +13,11 @@ impl IntelPipeline {
     pub fn detect_intent(input: &str) -> IntelRequest {
         let lower = input.to_lowercase();
         if lower.starts_with("visit ") || lower.starts_with("fetch ") || lower.starts_with("http") {
-            let target = input.splitn(2, ' ').nth(1).unwrap_or(input);
+            let target = input.split_once(' ').map(|x| x.1).unwrap_or(input);
             return IntelRequest::FetchUrl(target.to_string());
         }
         if lower.starts_with("run ") || lower.starts_with("exec ") {
-            let cmd = input.splitn(2, ' ').nth(1).unwrap_or(input);
+            let cmd = input.split_once(' ').map(|x| x.1).unwrap_or(input);
             return IntelRequest::ExecuteCode(cmd.to_string());
         }
         if lower.starts_with("!") {

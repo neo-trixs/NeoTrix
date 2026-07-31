@@ -21,8 +21,6 @@ fn main() {
     let start = Instant::now();
     let total_duration = Duration::from_secs(3 * 3600);
     let mut round = 0u64;
-    let mut total_mined = 0usize;
-
     while start.elapsed() < total_duration {
         round += 1;
         let elapsed = start.elapsed();
@@ -30,7 +28,6 @@ fn main() {
         println!("\n── Round #{} | elapsed={:?} | remaining={:?} ──", round, elapsed, remaining);
 
         let result = pipeline.run_round(&mut brain, &mut bank);
-        total_mined += result.total_mined;
 
         if result.total_mined > 0 {
             println!("  ✅ +{} mined, +{} KE entries, reward={:.3}",

@@ -156,6 +156,7 @@ export interface KbSearchResult {
 }
 
 export async function kbSearch(query: string, limit?: number): Promise<KbSearchResult[]> {
+  recordActivity("search_performed", `kb_search: ${query.slice(0, 80)}`, undefined, 0);
   return invoke<KbSearchResult[]>("kb_search", { query, limit: limit ?? 10 });
 }
 
@@ -731,11 +732,32 @@ export async function deleteApiKey(): Promise<void> {
   await invoke("delete_api_key");
 }
 
+let activityBusy = false;
+export function recordActivity(
+  eventType: string,
+  details: string,
+  sessionId?: string,
+  durationMs?: number
+): void {
+  if (activityBusy) return;
+  activityBusy = true;
+  invoke("insights_record_event", {
+    eventType,
+    details,
+    sessionId: sessionId ?? null,
+    project: null,
+    durationMs: durationMs ?? null,
+  })
+    .catch(() => {})
+    .finally(() => { activityBusy = false; });
+}
+
 export async function sendMessage(
   conversationId: string,
   content: string,
   model?: string
 ): Promise<string> {
+  recordActivity("command_executed", `send_message (${model ?? "default"})`, conversationId, 0);
   return invoke<string>("send_message", { conversationId, content, model });
 }
 

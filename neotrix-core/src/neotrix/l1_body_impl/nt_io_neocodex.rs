@@ -61,6 +61,12 @@ pub struct ProviderCatalog {
     pub active: usize,
 }
 
+impl Default for ProviderCatalog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProviderCatalog {
     pub fn new() -> Self {
         Self {
@@ -137,6 +143,12 @@ pub enum MarkdownChunk {
     Link { text: String, url: String },
     BlockQuote(String),
     HorizontalRule,
+}
+
+impl Default for StreamingMarkdown {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StreamingMarkdown {
@@ -396,6 +408,12 @@ pub struct GoalQueue {
     pub completed: Vec<Goal>,
 }
 
+impl Default for GoalQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GoalQueue {
     pub fn new() -> Self {
         Self { goals: VecDeque::new(), active: None, completed: Vec::new() }
@@ -449,6 +467,12 @@ pub type PostToolHook = Arc<dyn Fn(ToolCallContext, String, u64) + Send + Sync>;
 pub struct LifecycleHookRegistry {
     pub pre_hooks: Vec<(String, PreToolHook)>,
     pub post_hooks: Vec<(String, PostToolHook)>,
+}
+
+impl Default for LifecycleHookRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LifecycleHookRegistry {
@@ -599,6 +623,12 @@ pub enum PermissionLevel { Allow, Deny, Ask }
 pub struct PermissionSystem {
     pub permissions: Vec<(String, PermissionLevel)>,
     pub default_level: PermissionLevel,
+}
+
+impl Default for PermissionSystem {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PermissionSystem {
@@ -911,6 +941,12 @@ pub struct AgentState {
     pub goal_active: bool,
 }
 
+impl Default for AgentState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentState {
     pub fn new() -> Self {
         Self {
@@ -1165,7 +1201,7 @@ impl NeoCodexAgent {
     /// Push agent state into ConsciousnessTree soil (outbound integration)
     fn inject_into_consciousness(&mut self) {
         if let Some(ref mut tree) = self.consciousness {
-            tree.soil.crawl_queue_depth = self.state.turn_count as u64;
+            tree.soil.crawl_queue_depth = self.state.turn_count;
             tree.run_growth_cycle();
         }
     }

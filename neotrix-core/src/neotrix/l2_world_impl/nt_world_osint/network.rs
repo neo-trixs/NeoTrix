@@ -134,7 +134,7 @@ pub async fn investigate(target: &OsintTarget, _client: &Client, config: &OsintC
     }
 
     // ASN lookup via DNS (TXT record of origin.asn.cymru.com)
-    for ip in &findings.ip_addresses {
+    if let Some(ip) = findings.ip_addresses.first() {
         let reversed: Vec<&str> = ip.split('.').rev().collect();
         let asn_query = format!("{}.origin.asn.cymru.com", reversed.join("."));
         if let Ok(addrs) = format!("{asn_query}:0").to_socket_addrs() {
@@ -142,8 +142,6 @@ pub async fn investigate(target: &OsintTarget, _client: &Client, config: &OsintC
             // Full ASN lookup would require TXT record query
             let _ = addrs;
         }
-        // Only check first IP for ASN
-        break;
     }
 
     Ok(findings)

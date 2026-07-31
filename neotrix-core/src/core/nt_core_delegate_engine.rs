@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::core::nt_core_self_test::SelfTest;
 
+#[allow(dead_code)]
 struct TaskRecord {
     id: String,
     task: String,

@@ -167,7 +167,7 @@ impl LeannGraphStore {
     }
 
     pub fn needs_recompute(&self, id: usize) -> bool {
-        self.nodes.get(&id).map_or(false, |node| {
+        self.nodes.get(&id).is_some_and(|node| {
             match self.config.default_strategy {
                 RecomputeStrategy::OnAccess => !node.stored_embedding,
                 RecomputeStrategy::OnThreshold => {

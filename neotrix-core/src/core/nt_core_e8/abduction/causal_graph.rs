@@ -75,8 +75,7 @@ impl CausalGraph {
 
     pub fn find_effects(&self, node: usize) -> Vec<(usize, f64)> {
         self.adjacency
-            .get(&node)
-            .map(|v| v.clone())
+            .get(&node).cloned()
             .unwrap_or_default()
     }
 

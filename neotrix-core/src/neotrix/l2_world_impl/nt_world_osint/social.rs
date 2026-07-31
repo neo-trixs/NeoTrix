@@ -44,7 +44,7 @@ impl std::fmt::Display for SocialFindings {
 
 async fn search_web_for_social(query: &str, client: &Client, source_name: &str) -> Vec<SocialPost> {
     // Search for "site:reddit.com username" type queries via DuckDuckGo
-    let encoded = urlencoding(&query);
+    let encoded = urlencoding(query);
     let url = format!("https://duckduckgo.com/html/?q={encoded}");
     match client.get(&url)
         .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")

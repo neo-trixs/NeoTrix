@@ -10,6 +10,7 @@ const TRAFFIC_ICONS = {
   agent: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="6" r="2.5"/><path d="M4 13.5c0-2.5 2-4.5 4-4.5s4 2 4 4.5"/><path d="M2 3L4 4M14 3L12 4M8 1v2"/></svg>`,
   explore: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>`,
   graph: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="2"/><circle cx="11" cy="5" r="2"/><circle cx="8" cy="11" r="2"/><path d="M5 7v2a2 2 0 003 1.5M11 7v2a2 2 0 01-3 1.5M5 7l3-2M11 7l-3-2"/></svg>`,
+  loop: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>`,
 };
 
 const MODE_ICONS = {
@@ -18,13 +19,23 @@ const MODE_ICONS = {
   flow: `<svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h3l1.5 6L8 4h3"/></svg>`,
 };
 
+const PROFILE_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/><path d="M7 8l1-1 1 1"/><path d="M8 7v3"/></svg>`;
+
 const NAV_ITEMS = [
   { id: "chat", label: "Chat", icon: TRAFFIC_ICONS.chat, route: "/" },
-  { id: "cowork", label: "Cowork", icon: TRAFFIC_ICONS.cowork, route: "/agent-flow" },
+  { id: "cowork", label: "Cowork", icon: TRAFFIC_ICONS.cowork, route: "/cowork" },
   { id: "code", label: "Code", icon: TRAFFIC_ICONS.code, route: "/desktop" },
   { id: "agent", label: "Agent", icon: TRAFFIC_ICONS.agent, route: "/agents" },
   { id: "explore", label: "Explore", icon: TRAFFIC_ICONS.explore, route: "/explore" },
   { id: "graph", label: "Graph", icon: TRAFFIC_ICONS.graph, route: "/knowledge-graph" },
+  { id: "sessions", label: "Sessions", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12v10H2z"/><path d="M2 4l6 4 6-4"/><circle cx="5" cy="8" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="11" cy="8" r="1"/></svg>`, route: "/sessions" },
+  { id: "insights", label: "Insights", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="10" width="3" height="4" rx="0.5"/><rect x="6.5" y="6" width="3" height="8" rx="0.5"/><rect x="11" y="2" width="3" height="12" rx="0.5"/></svg>`, route: "/insights" },
+  { id: "security", label: "Security", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5L2 4v4c0 4 2.5 6.5 6 7 3.5-.5 6-3 6-7V4L8 1.5z"/><path d="M6 8.5l1.5 1.5 3-3"/></svg>`, route: "/security" },
+  { id: "annotations", label: "Annotations", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h10a1 1 0 011 1v9a1 1 0 01-1 1H8l-2.5 2.5L3 13H3a1 1 0 01-1-1V3a1 1 0 011-1z"/><path d="M6 6h4M6 9h2"/></svg>`, route: "/annotations" },
+  { id: "voice", label: "Voice", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11a2.5 2.5 0 002.5-2.5V4a2.5 2.5 0 00-5 0v4.5A2.5 2.5 0 008 11z"/><path d="M13 8.5a5 5 0 01-10 0"/><path d="M8 14v2"/></svg>`, route: "/voice" },
+  { id: "marketplace", label: "Marketplace", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12l-1.5 8H3.5L2 4z"/><path d="M5.5 4V3a2.5 2.5 0 015 0v1"/><circle cx="5" cy="10" r="1"/><circle cx="10" cy="10" r="1"/></svg>`, route: "/marketplace" },
+  { id: "bg-computer", label: "BG Computer", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"/></svg>`, route: "/bg-computer" },
+  { id: "terminal-tabs", label: "Terminals", icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5l3 3-3 3M9 11h4"/><rect x="1" y="2" width="14" height="12" rx="1"/></svg>`, route: "/terminal-tabs" },
 ];
 
 const MODE_ITEMS = [

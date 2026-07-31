@@ -4,7 +4,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum GooseAgentStatus {
+    #[default]
     Idle,
     Running,
     WaitingForInput,
@@ -12,11 +14,6 @@ pub enum GooseAgentStatus {
     Completed,
 }
 
-impl Default for GooseAgentStatus {
-    fn default() -> Self {
-        Self::Idle
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GooseSession {

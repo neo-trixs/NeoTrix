@@ -50,9 +50,7 @@ impl FactorialPOMDP {
                 }
             } else {
                 let uniform = 1.0 / n as f64;
-                for p in &mut posterior {
-                    *p = uniform;
-                }
+                posterior.fill(uniform);
             }
 
             updated.push(posterior);

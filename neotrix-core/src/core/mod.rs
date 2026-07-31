@@ -101,8 +101,6 @@ pub mod nt_core_self_constitution;
 // L7 — 能力层 (Capability) — *** 核心新增 ***
 // ═══════════════════════════════════════════════════════════════════
 pub mod l7_capability;
-pub mod nt_core_skill_manifest;
-pub mod nt_core_talent;
 pub mod nt_core_model_skills;
 pub mod nt_core_agent_patterns;
 

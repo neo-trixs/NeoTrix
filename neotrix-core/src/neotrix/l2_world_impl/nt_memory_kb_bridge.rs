@@ -554,6 +554,7 @@ mod conv {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_real_rt(rt: &real_types::RelationType) -> super::RelationType {
         match rt {
             real_types::RelationType::References => super::RelationType::References,

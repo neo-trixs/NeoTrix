@@ -137,6 +137,12 @@ pub struct AgentBehaviorMap {
     error_patterns: Mutex<Vec<(String, String)>>,
 }
 
+impl Default for AgentBehaviorMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentBehaviorMap {
     pub fn new() -> Self {
         Self {
@@ -250,7 +256,7 @@ static GLOBAL_TELEMETRY_STORE: std::sync::LazyLock<TelemetryStore> =
     std::sync::LazyLock::new(|| TelemetryStore::new(10_000));
 
 static GLOBAL_AGENT_MAP: std::sync::LazyLock<AgentBehaviorMap> =
-    std::sync::LazyLock::new(|| AgentBehaviorMap::new());
+    std::sync::LazyLock::new(AgentBehaviorMap::new);
 
 pub fn global_telemetry() -> &'static TelemetryStore {
     &GLOBAL_TELEMETRY_STORE

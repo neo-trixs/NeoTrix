@@ -9,13 +9,25 @@ import AgentManagerPage from "./pages/AgentManagerPage";
 import KnowledgeGraphPage from "./pages/KnowledgeGraphPage";
 import ExplorePage from "./pages/ExplorePage";
 import PrivacyFilterPage from "./pages/PrivacyFilterPage";
+import SecurityScanPanel from "./components/SecurityScanPanel";
 import SandboxManagerPage from "./pages/SandboxManagerPage";
 import IdentityManagerPage from "./pages/IdentityManagerPage";
+import MemoryManager from "./components/MemoryManager";
 import ProxyPage from "./pages/ProxyPage";
 import ChatPage from "./pages/ChatPage";
 import ManagePage from "./pages/ManagePage";
 import ProjectsPage from "./pages/ProjectsPage";
 import PlanPage from "./pages/PlanPage";
+import LoopPanel from "./components/LoopPanel";
+import ProfileManager from "./components/ProfileManager";
+import InsightsDashboard from "./components/InsightsDashboard";
+import UnifiedSessionPanel from "./components/UnifiedSessionPanel";
+import AnnotationsPanel from "./components/AnnotationsPanel";
+import MarketplacePanel from "./components/MarketplacePanel";
+import VoiceModePanel from "./components/VoiceModePanel";
+import CoworkPanel from "./components/CoworkPanel";
+import BackgroundCUPanel from "./components/BackgroundCUPanel";
+import TerminalTabsPanel from "./components/TerminalTabsPanel";
 import type { Attachment } from "./types";
 export interface AppOutletContext {
   input: string;
@@ -44,8 +56,20 @@ const router = createBrowserRouter([
       { path: "sandbox", element: <SandboxManagerPage /> },
       { path: "identity", element: <IdentityManagerPage /> },
       { path: "proxy", element: <ProxyPage /> },
+      { path: "security", element: <SecurityScanPanel /> },
+      { path: "profiles", element: <ProfileManager /> },
       { path: "chat", element: <ChatPage /> },
+      { path: "memory", element: <MemoryManager /> },
       { path: "projects", element: <ProjectsPage /> },
+      { path: "loop", element: <LoopPanel /> },
+      { path: "annotations", element: <AnnotationsPanel /> },
+      { path: "marketplace", element: <MarketplacePanel /> },
+      { path: "voice", element: <VoiceModePanel /> },
+      { path: "cowork", element: <CoworkPanel /> },
+      { path: "insights", element: <InsightsDashboard /> },
+      { path: "sessions", element: <UnifiedSessionPanel /> },
+      { path: "bg-computer", element: <BackgroundCUPanel /> },
+      { path: "terminal-tabs", element: <TerminalTabsPanel /> },
     ],
   },
   { path: "/settings", element: <SettingsPage /> },

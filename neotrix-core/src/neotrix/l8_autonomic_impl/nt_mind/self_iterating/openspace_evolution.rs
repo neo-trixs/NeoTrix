@@ -78,6 +78,7 @@ impl Default for OpenSpaceEvolveStage {
     }
 }
 
+#[allow(dead_code)]
 impl OpenSpaceEvolveStage {
     pub fn new() -> Self {
         Self::default()
@@ -115,7 +116,7 @@ impl OpenSpaceEvolveStage {
         for (idx, val) in &low_caps {
             let module_name = format!("cap_dim_{}", idx);
             let issue_type = format!("low_capability_{:.3}", val);
-            let applied_patch = format!("boost_to_0.2");
+            let applied_patch = "boost_to_0.2".to_string();
             let success = *val < 0.15;
             records.push(FixTriggerRecord {
                 module_name,

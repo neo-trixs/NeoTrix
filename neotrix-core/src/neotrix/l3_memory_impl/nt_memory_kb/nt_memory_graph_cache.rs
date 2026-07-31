@@ -100,7 +100,7 @@ pub fn weighted_shortest_path(
     impl Eq for State {}
     impl PartialOrd for State {
         fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-            other.cost.partial_cmp(&self.cost)
+            Some(self.cmp(other))
         }
     }
     impl Ord for State {
