@@ -16,7 +16,6 @@ use crate::config::NeoTrixConfig;
 mod proxy_cmd;
 mod standalone;
 mod headless;
-mod server;
 mod desktop;
 
 pub use proxy_cmd::run_proxy_cmd;
