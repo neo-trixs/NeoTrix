@@ -1442,12 +1442,7 @@ impl BrainStage for OracleGateStage {
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::nt_act_autonomy::OracleGate;
 
-        let gate = if let Some(ref mut g) = brain._oracle_gate {
-            g
-        } else {
-            brain._oracle_gate = Some(OracleGate::new());
-            brain._oracle_gate.as_mut().unwrap()
-        };
+        let gate = brain._oracle_gate.get_or_insert_with(OracleGate::new);
 
         let entropy = brain.entropy_crisis_level;
         let reward = brain._reward;

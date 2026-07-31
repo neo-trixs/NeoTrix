@@ -3,6 +3,7 @@
 // Fused real module directory (Cycle 161b): flat nt_mind modules moved in,
 // replacing the earlier empty re-export shell.
 //
+#![deny(clippy::unwrap_used)]
 
 pub mod core;
 pub mod embedding;

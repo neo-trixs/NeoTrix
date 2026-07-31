@@ -318,11 +318,9 @@ impl SelfIteratingBrain {
     }
 
     pub fn init_nt_act_crypto(&mut self) -> Arc<Mutex<CryptoAgent>> {
-        if self.nt_act_crypto.is_none() {
-            self.nt_act_crypto = Some(Arc::new(Mutex::new(CryptoAgent::new())));
-        }
-        self.nt_act_crypto.clone()
-            .expect("nt_act_crypto initialized above")
+        self.nt_act_crypto
+            .get_or_insert_with(|| Arc::new(Mutex::new(CryptoAgent::new())))
+            .clone()
     }
 
     pub fn run_crypto_iteration(&mut self) -> Option<f64> {
