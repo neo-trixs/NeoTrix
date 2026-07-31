@@ -186,7 +186,7 @@ impl TokenRegistry {
         ])?;
         let hex_str = result.as_str().unwrap_or("0x0");
         let raw = Erc20Abi::decode_u256(hex_str).unwrap_or(0);
-        let divisor = 10u128.pow(token.decimals as u32);
+        let divisor = decimal_divisor(token.decimals);
         let balance = raw as f64 / divisor as f64;
 
         Ok(TokenBalance {
@@ -229,6 +229,10 @@ fn u256_padded(bytes: &[u8]) -> [u8; 32] {
     let start = 32_usize.saturating_sub(bytes.len());
     result[start..].copy_from_slice(&bytes[..bytes.len().min(32)]);
     result
+}
+
+fn decimal_divisor(decimals: u8) -> u128 {
+    10u128.checked_pow(decimals as u32).unwrap_or(1)
 }
 
 #[cfg(test)]
@@ -329,6 +333,16 @@ mod tests {
         assert_eq!(bytes.len(), 32);
         assert_eq!(bytes[12], 0x12);
         assert_eq!(bytes[31], 0x78);
+    }
+
+    #[test]
+    fn test_decimal_divisor_extreme_does_not_overflow() {
+        // Regression: 10u128.pow(decimals) panics in debug/overflow-check builds
+        // for decimals >= 39 (10^255 > u128::MAX). A malicious ERC20 could report
+        // decimals=255. checked_pow falls back to 1, keeping balance finite.
+        assert_eq!(decimal_divisor(18), 1_000_000_000_000_000_000);
+        assert_eq!(decimal_divisor(0), 1);
+        assert_eq!(decimal_divisor(255), 1, "extreme decimals must not overflow");
     }
 
     #[test]
