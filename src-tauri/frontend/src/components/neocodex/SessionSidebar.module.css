@@ -104,6 +104,17 @@
   color: var(--fg-tertiary);
 }
 
+.groupHeaderProject {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--fg-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .itemPinned {
   background: var(--accent-bg);
   border-color: var(--accent-primary);

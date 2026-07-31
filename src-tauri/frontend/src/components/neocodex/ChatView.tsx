@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import { readDir } from "@tauri-apps/plugin-fs";
 import { useStore } from "../../stores";
 import type { Attachment, Message } from "../../types";
 import styles from "./ChatView.module.css";
@@ -98,6 +99,7 @@ interface ChatViewProps {
   onSend: (content: string) => void;
   onDelete?: (index: number) => void;
   viewMode?: "verbose" | "normal" | "summary";
+  contextUsage?: number;
   onStop?: () => void;
 }
 
@@ -109,6 +111,7 @@ export function ChatView({
   onSend,
   onDelete,
   viewMode = "normal",
+  contextUsage = 0,
   onStop,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -121,6 +124,13 @@ export function ChatView({
   const slashRef = useRef<HTMLDivElement>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionFiles, setMentionFiles] = useState<string[]>([]);
+  const [mentionDirs, setMentionDirs] = useState<string[]>([]);
+  const [mentions, setMentions] = useState<string[]>([]);
+  const [mentionHighlight, setMentionHighlight] = useState(0);
+  const mentionRef = useRef<HTMLDivElement>(null);
   const addNotification = useStore((s) => s.addNotification);
 
   const SLASH_COMMANDS = [
@@ -146,6 +156,62 @@ export function ChatView({
     setInput((prev) => (prev.endsWith("/") ? prev + prefix + " " : prev + prefix + " "));
     setShowSlash(false);
     textareaRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!mentionOpen) return;
+    let cancelled = false;
+    setMentionHighlight(0);
+    (async () => {
+      try {
+        const entries = await readDir(".");
+        if (cancelled) return;
+        const q = mentionQuery.trim().toLowerCase();
+        const matched = entries.filter((e) => !q || e.name.toLowerCase().includes(q)).slice(0, 50);
+        setMentionFiles(matched.map((e) => e.name));
+        setMentionDirs(matched.filter((e) => e.isDirectory).map((e) => e.name));
+      } catch {
+        if (!cancelled) {
+          setMentionFiles([]);
+          setMentionDirs([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mentionOpen, mentionQuery]);
+
+  useEffect(() => {
+    if (!mentionOpen) return;
+    const onDown = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement;
+      const inMenu = mentionRef.current?.contains(target);
+      const inTextarea = textareaRef.current?.contains(target);
+      if (!inMenu && !inTextarea) {
+        setMentionOpen(false);
+        setMentionQuery("");
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [mentionOpen]);
+
+  const handleMentionSelect = (name: string) => {
+    setInput((prev) => prev.replace(/@\w*$/, "") + `@${name} `);
+    setMentionOpen(false);
+    setMentionQuery("");
+    setMentionHighlight(0);
+    setMentions((prev) => (prev.includes(name) ? prev : [...prev, name]));
+    textareaRef.current?.focus();
+  };
+
+  const handleCompact = () => {
+    setInput("/compact ");
+    setShowSlash(false);
+    setMentionOpen(false);
+    textareaRef.current?.focus();
+    addNotification({ type: "info", message: "已输入 /compact，回车发送", duration: 2000 });
   };
 
   const handleFiles = async (files: FileList | File[]) => {
@@ -195,6 +261,12 @@ export function ChatView({
       else if (e.key === "Escape") { setShowSlash(false); }
       return;
     }
+    if (mentionOpen) {
+      if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); setMentionQuery(""); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setMentionHighlight((h) => (h + 1) % Math.max(mentionFiles.length, 1)); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setMentionHighlight((h) => (h - 1 + Math.max(mentionFiles.length, 1)) % Math.max(mentionFiles.length, 1)); }
+      else if (e.key === "Enter" && mentionFiles.length > 0) { e.preventDefault(); handleMentionSelect(mentionFiles[Math.min(mentionHighlight, mentionFiles.length - 1)]); return; }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() && !agentBusy) {
@@ -210,11 +282,17 @@ export function ChatView({
     const content = input.trim();
     setInput("");
     setShowSlash(false);
+    setMentionOpen(false);
+    setMentionQuery("");
     if (attachments.length > 0) {
       addNotification({ type: "info", message: `已附加 ${attachments.length} 个文件`, duration: 2000 });
       setAttachments([]);
     }
+    if (mentions.length > 0) {
+      addNotification({ type: "info", message: `引用 ${mentions.length} 个文件`, duration: 2000 });
+    }
     onSend(content);
+    if (mentions.length > 0) setMentions([]);
   };
 
   const visibleMessages = useMemo(() => {
@@ -235,6 +313,14 @@ export function ChatView({
         )}
         {/* Messages */}
         <main className={styles.messages}>
+          {contextUsage > 0.8 && (
+            <div className={styles.compactBar}>
+              <span>上下文接近满（{Math.round(contextUsage * 100)}%），建议压缩以释放空间</span>
+              <button type="button" className={styles.compactBtn} onClick={handleCompact}>
+                压缩 /compact
+              </button>
+            </div>
+          )}
           {visibleMessages.map((msg, idx) => (
             <MessageBubble
               key={idx}
@@ -295,9 +381,27 @@ export function ChatView({
            </svg>
          </button>
          <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
-         <div className={styles.composerColumn}>
-           {attachments.length > 0 && (
-             <div className={styles.attachmentsRow}>
+          <div className={styles.composerColumn}>
+            {mentions.length > 0 && (
+              <div className={styles.mentionsRow}>
+                {mentions.map((m) => (
+                  <span key={m} className={styles.mentionChip}>
+                    <span className={styles.mentionGlyph}>@</span>
+                    <span className={styles.attachmentName}>{m}</span>
+                    <button
+                      type="button"
+                      className={styles.attachmentRemove}
+                      title="移除"
+                      onClick={() => setMentions((prev) => prev.filter((x) => x !== m))}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {attachments.length > 0 && (
+              <div className={styles.attachmentsRow}>
                {attachments.map((att) => (
                  <span key={att.id} className={styles.attachmentChip}>
                    <span className={styles.attachmentName}>{att.name}</span>
@@ -317,17 +421,23 @@ export function ChatView({
            <textarea
              ref={textareaRef}
              value={input}
-             onChange={(e) => {
-               const val = e.target.value;
-               setInput(val);
-               const lastWord = val.split(/\s/).pop() || "";
-               if (lastWord.startsWith("/")) {
-                 setSlashQuery(lastWord);
-                 setShowSlash(true);
-               } else {
-                 setShowSlash(false);
-               }
-             }}
+              onChange={(e) => {
+                const val = e.target.value;
+                setInput(val);
+                const lastWord = val.split(/\s/).pop() || "";
+                if (lastWord.startsWith("/")) {
+                  setSlashQuery(lastWord);
+                  setShowSlash(true);
+                } else {
+                  setShowSlash(false);
+                }
+                if (lastWord.startsWith("@")) {
+                  setMentionQuery(lastWord.slice(1));
+                  setMentionOpen(true);
+                } else {
+                  setMentionOpen(false);
+                }
+              }}
              onKeyDown={handleKeyDown}
              placeholder={agentBusy ? "Waiting for response..." : "Enter 发送，Shift+Enter 换行，/ 显示命令"}
              disabled={agentBusy}
@@ -335,9 +445,25 @@ export function ChatView({
              className={styles.textarea}
              style={{ height: "auto", minHeight: "44px" }}
            />
-         </div>
-         {showSlash && (
-           <div className={styles.slashMenu}>
+          </div>
+          {mentionOpen && (
+            <div ref={mentionRef} className={styles.mentionMenu}>
+              <div className={styles.mentionHint}>输入 @ 引用项目文件（仅本地显示）</div>
+              {mentionFiles.length === 0 && <div className={styles.mentionEmpty}>无匹配文件</div>}
+              {mentionFiles.map((f, i) => (
+                <button
+                  key={f}
+                  className={`${styles.mentionItem} ${i === mentionHighlight ? styles.mentionItemActive : ""}`}
+                  onClick={() => handleMentionSelect(f)}
+                >
+                  <span className={styles.mentionIcon}>{mentionDirs.includes(f) ? "📁" : "📄"}</span>
+                  <span className={styles.mentionName}>{f}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {showSlash && (
+            <div className={styles.slashMenu}>
              {filteredSlash.length === 0 && <div className={styles.slashEmpty}>无匹配命令</div>}
              {filteredSlash.map((c) => (
                <button key={c.cmd} className={styles.slashItem} onClick={() => handleSlashSelect(c.cmd)}>

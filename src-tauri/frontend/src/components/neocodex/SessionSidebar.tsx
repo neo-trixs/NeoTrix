@@ -10,7 +10,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   const [newSessionName, setNewSessionName] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "idle">("all");
-  const [groupBy, setGroupBy] = useState<"date" | "mode">("date");
+  const [groupBy, setGroupBy] = useState<"date" | "mode" | "project">("date");
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("neotrix:pinned-sessions") || "[]"); } catch { return []; }
   });
@@ -164,7 +164,17 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     const unpinned = filtered.filter((s) => !pinnedIds.includes(s.id));
     const buckets: Array<{ label: string; sessions: NeoCodexSession[] }> = [];
     if (pinned.length) buckets.push({ label: "📌 置顶", sessions: pinned });
-    if (groupBy === "mode") {
+    if (groupBy === "project") {
+      const byProject = new Map<string, NeoCodexSession[]>();
+      for (const s of unpinned) {
+        const key = deriveProject(s);
+        if (!byProject.has(key)) byProject.set(key, []);
+        byProject.get(key)!.push(s);
+      }
+      for (const [project, list] of byProject) {
+        buckets.push({ label: `📁 ${project} (${list.length})`, sessions: list });
+      }
+    } else if (groupBy === "mode") {
       const modeOrder = ["Agent", "Shell", "Plan"];
       const byMode = new Map<string, NeoCodexSession[]>();
       for (const s of unpinned) {
@@ -235,10 +245,11 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
         <select
           className={styles.filterSelect}
           value={groupBy}
-          onChange={(e) => setGroupBy(e.target.value as "date" | "mode")}
+          onChange={(e) => setGroupBy(e.target.value as "date" | "mode" | "project")}
         >
           <option value="date">按日期分组</option>
           <option value="mode">按模式分组</option>
+          <option value="project">按项目分组</option>
         </select>
       </div>
 
@@ -258,7 +269,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
       <div className={styles.list}>
         {groups.map((group) => (
           <div key={group.label}>
-            <div className={styles.groupHeader}>{group.label}</div>
+            <div className={groupBy === "project" ? styles.groupHeaderProject : styles.groupHeader}>{group.label}</div>
             {group.sessions.map((session) => (
               <SessionItem
                 key={session.id}
@@ -401,6 +412,17 @@ function formatTime(ts: number): string {
   if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
   return `${Math.floor(diff / 86400000)}天前`;
+}
+
+function deriveProject(session: NeoCodexSession): string {
+  const wire = session.wire_path;
+  if (wire && typeof wire === "string" && wire.trim() !== "") {
+    const parts = wire.replace(/\\/g, "/").split("/");
+    const base = parts[parts.length - 1]?.trim() || "";
+    if (base) return base;
+    return wire;
+  }
+  return "未知项目";
 }
 
 export default SessionSidebar;

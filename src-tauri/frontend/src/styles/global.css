@@ -89,3 +89,32 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  width: 100%;
+  font-size: 12px;
+}
+
+th, td {
+  border: 1px solid var(--border-primary);
+  padding: 6px 10px;
+  text-align: left;
+}
+
+th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+}
+
+tr:nth-child(even) td {
+  background: rgba(127,127,127,0.06);
+}
+
+blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--border-primary);
+  color: var(--fg-secondary);
+}

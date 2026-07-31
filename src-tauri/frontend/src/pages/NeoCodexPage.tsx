@@ -338,6 +338,7 @@ export default function NeoCodexPage() {
               streamingRole={neocodexStreaming?.role}
               agentBusy={agentBusy}
               viewMode={viewMode}
+              contextUsage={health?.context_usage || 0}
               onSend={handleSend}
               onStop={handleStop}
               onDelete={(idx) => setNeoCodexMessages(neocodexMessages.filter((_, i) => i !== idx))}

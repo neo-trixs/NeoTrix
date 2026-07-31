@@ -6,8 +6,12 @@ const SHORTCUTS: Array<{ keys: string; label: string }> = [
   { keys: "⌘K", label: "命令面板" },
   { keys: "⌘B", label: "折叠/展开侧栏" },
   { keys: "⌘,", label: "设置" },
-  { keys: "Ctrl+Tab", label: "切换会话" },
-  { keys: "Esc", label: "返回对话" },
+  { keys: "Ctrl+Tab / Ctrl+Shift+Tab", label: "下一个 / 上一个会话" },
+  { keys: "Ctrl+O", label: "循环视图模式" },
+  { keys: "⌘+;", label: "侧聊" },
+  { keys: "⌘W", label: "关闭会话" },
+  { keys: "Esc", label: "停止生成 / 返回" },
+  { keys: "⌘Shift+F", label: "专注模式" },
   { keys: "⌘/", label: "快捷键帮助" },
 ];
 
