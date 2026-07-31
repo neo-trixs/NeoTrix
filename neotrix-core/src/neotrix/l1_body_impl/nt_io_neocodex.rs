@@ -378,13 +378,20 @@ impl ContextPipeline {
             return;
         }
 
-        // Layer 1: Budget reduce — trim oversized tool outputs
+        // Layer 1: Budget reduce — trim oversized tool outputs.
+        // Token-consistent: estimator is chars/4 everywhere, so a turn budgeted
+        // at `max_turn_tokens` keeps `max_turn_tokens * 4` chars (bytes/4 ≈ tokens).
         let max_turn_tokens = self.max_tokens / 4;
         for turn in &mut self.turns {
             if turn.token_count > max_turn_tokens && turn.priority < 4 {
-                let kept = turn.content.chars().take(max_turn_tokens).collect::<String>();
-                turn.content = format!("{}... [trimmed {} bytes]", kept, turn.content.len().saturating_sub(max_turn_tokens));
-                turn.token_count = max_turn_tokens;
+                let budget_chars = max_turn_tokens * 4;
+                let kept = turn.content.chars().take(budget_chars).collect::<String>();
+                turn.content = format!(
+                    "{}... [trimmed {} bytes]",
+                    kept,
+                    turn.content.len().saturating_sub(kept.len())
+                );
+                turn.token_count = kept.len() / 4;
             }
         }
 
@@ -397,12 +404,15 @@ impl ContextPipeline {
 
         if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize { return; }
 
-        // Layer 3: Microcompact — squeeze low-priority turns
+        // Layer 3: Microcompact — squeeze low-priority turns. Char-safe: the old
+        // String::truncate(200) panicked when byte 200 landed mid-UTF-8-char
+        // (any non-ASCII tool output now hits this path via tool priority 1).
         let mut i = 0;
         while i < self.turns.len() && self.total_tokens() > (self.max_tokens as f64 * self.budget_low) as usize {
             if self.turns[i].priority < 2 {
-                self.turns[i].content.truncate(200);
-                self.turns[i].token_count = 200;
+                let kept = self.turns[i].content.chars().take(200).collect::<String>();
+                self.turns[i].content = format!("{}...", kept);
+                self.turns[i].token_count = kept.len() / 4;
             }
             i += 1;
         }
@@ -2177,6 +2187,18 @@ mod tests {
         assert_eq!(ctx.turns[1].priority, 1);
         assert_eq!(ctx.turns[2].priority, 3);
         assert_eq!(ctx.turns[3].priority, 3);
+    }
+
+    #[test]
+    fn test_context_pipeline_layer3_non_ascii_no_panic() {
+        // Regression: Layer 3 used String::truncate(200) which panics when byte
+        // 200 falls mid-UTF-8-char. Tool turns (priority 1) now enter this path.
+        let mut ctx = ContextPipeline::new(5000);
+        let big = "中文数据负载".repeat(50);
+        for i in 0..14 {
+            ctx.push("tool", format!("{} {}", i, big), 300);
+        }
+        assert!(ctx.total_tokens() <= ctx.max_tokens);
     }
 
     #[test]
