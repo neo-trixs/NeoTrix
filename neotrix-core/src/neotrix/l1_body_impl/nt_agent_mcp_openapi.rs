@@ -213,7 +213,7 @@ impl OpenApiToMcpConverter {
                 map.insert("properties".into(), Value::Object(properties));
             }
             if !required.is_empty() {
-                map.insert("required".into(), Value::Array(required.into_iter().map(|s| Value::String(s)).collect()));
+                map.insert("required".into(), Value::Array(required.into_iter().map(Value::String).collect()));
             }
             map
         });

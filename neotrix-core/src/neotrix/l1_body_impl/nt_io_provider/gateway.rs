@@ -465,7 +465,7 @@ impl GatewayV2 {
             }
         }
 
-        let task_count = 4usize.max(1);
+        let task_count = 4usize;
         Ok(crate::core::nt_core_consciousness_tree::ProviderBenchmark {
             provider: provider_name.to_string(),
             model: self.provider_model(provider_name).unwrap_or_else(|| provider_name.to_string()),
@@ -503,7 +503,7 @@ impl GatewayV2 {
 
     /// Extract model id from `{provider}/{model_id}` registration names.
     fn provider_model(&self, provider_name: &str) -> Option<String> {
-        let model = provider_name.split('/').last().unwrap_or(provider_name);
+        let model = provider_name.split('/').next_back().unwrap_or(provider_name);
         if model.is_empty() { None } else { Some(model.to_string()) }
     }
 

@@ -337,19 +337,13 @@ pub async fn doctor_osint(target: OsintTarget, config: OsintConfig) -> DoctorRep
     let mut dns_ok = false;
     let mut _dns_latency = 0u64;
     let start = std::time::Instant::now();
-    match dns::investigate(&target, &client, &config).await {
-        Ok(_) => dns_ok = true,
-        Err(_) => {}
-    }
+    if let Ok(_) = dns::investigate(&target, &client, &config).await { dns_ok = true }
     _dns_latency = start.elapsed().as_millis() as u64;
 
     let mut http_ok = false;
     let mut _http_latency = 0u64;
     let start = std::time::Instant::now();
-    match http::investigate(&target, &client, &config).await {
-        Ok(_) => http_ok = true,
-        Err(_) => {}
-    }
+    if let Ok(_) = http::investigate(&target, &client, &config).await { http_ok = true }
     _http_latency = start.elapsed().as_millis() as u64;
 
     DoctorReport {
