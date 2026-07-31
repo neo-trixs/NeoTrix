@@ -173,7 +173,8 @@ impl WsBridge {
 
     /// 计算重连退避
     pub fn backoff_duration(attempt: u32, config: &WsBridgeConfig) -> Duration {
-        let secs = config.base_backoff.as_secs() * 2u64.pow(attempt.saturating_sub(1));
+        let exp = 2u64.checked_pow(attempt.saturating_sub(1)).unwrap_or(u64::MAX);
+        let secs = config.base_backoff.as_secs().saturating_mul(exp);
         Duration::from_secs(secs.min(config.max_backoff.as_secs()))
     }
 
@@ -419,7 +420,8 @@ impl ImAdapter for SlackAdapter {
 
 /// 计算指数退避
 pub fn calculate_backoff(attempt: u32, base_ms: u64, max_ms: u64) -> Duration {
-    let ms = base_ms * 2u64.pow(attempt.saturating_sub(1));
+    let exp = 2u64.checked_pow(attempt.saturating_sub(1)).unwrap_or(u64::MAX);
+    let ms = base_ms.saturating_mul(exp);
     Duration::from_millis(ms.min(max_ms))
 }
 
@@ -480,6 +482,22 @@ mod tests {
         assert_eq!(calculate_backoff(3, 1000, 30000).as_millis(), 4000);
         let capped = calculate_backoff(10, 1000, 30000);
         assert!(capped.as_millis() <= 30000);
+    }
+
+    #[test]
+    fn test_backoff_extreme_attempt_no_panic() {
+        // Regression: 2u64.pow(attempt-1) overflowed and panicked at
+        // attempt >= 64. checked_pow + saturating_mul + min() cap instead
+        // saturate to the configured maximum, keeping the reconnection
+        // loop alive no matter how many attempts accumulate.
+        let config = WsBridgeConfig::default();
+        let b = WsBridge::backoff_duration(u32::MAX, &config);
+        assert!(b.as_secs() <= config.max_backoff.as_secs());
+
+        let c = calculate_backoff(u32::MAX, 1000, 30000);
+        assert!(c.as_millis() <= 30000);
+        let c64 = calculate_backoff(64, 1000, 30000);
+        assert!(c64.as_millis() <= 30000);
     }
 
     #[test]
