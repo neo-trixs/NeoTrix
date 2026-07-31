@@ -163,9 +163,11 @@ impl AgentTeam {
                 if deps_met && self.members.contains_key(&task.assigned_role) {
                     task.status = TaskStatus::Assigned;
                     assigned.push((task.id, task.assigned_role));
-                } else if deps_met {
-                    task.status = TaskStatus::Blocked;
                 }
+                // deps_met but role member missing: keep Pending so the task is
+                // re-evaluated on the next assign_tasks pass once add_member
+                // supplies the role. Previously this became Blocked, which
+                // assign_tasks never re-examines — permanently stuck.
             }
         }
         assigned
@@ -447,5 +449,26 @@ mod tests {
         team.assign_tasks();
         team.fail_task(t1);
         assert!(!team.get_ready_tasks().iter().any(|t| t.id == t2));
+    }
+
+    #[test]
+    fn test_task_with_missing_role_stays_pending_until_member_added() {
+        // Regression: deps-met but role-member-missing tasks were set to Blocked,
+        // which assign_tasks never re-examines — adding the member later left the
+        // task permanently stuck. Now they stay Pending and get assigned.
+        let mut team = AgentTeam::new("role-test");
+        // No Researcher member yet.
+        let t1 = team.create_task("research", AgentRole::Researcher, 1);
+        let assigned_before = team.assign_tasks();
+        assert!(!assigned_before.iter().any(|(id, _)| *id == t1),
+            "no member for role: task must not be assigned yet");
+        let t1_state = team.tasks.iter().find(|t| t.id == t1).unwrap();
+        assert_eq!(t1_state.status, TaskStatus::Pending,
+            "task must stay Pending (not Blocked) so it can be re-evaluated");
+
+        team.add_member(AgentProfile::new(AgentRole::Researcher, "eve"));
+        let assigned_after = team.assign_tasks();
+        assert!(assigned_after.iter().any(|(id, _)| *id == t1),
+            "task must become Assigned once the role member arrives");
     }
 }
