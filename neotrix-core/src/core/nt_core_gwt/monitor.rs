@@ -119,6 +119,9 @@ impl EntropyMonitor {
     pub fn inject_stimulus(&mut self, raw_salience: &mut [f64]) -> f64 {
         self.stimulus_attempts += 1;
         self.stimulus_succeeded = false;
+        if raw_salience.is_empty() {
+            return 0.0;
+        }
         let perturbation = self.stimulus_magnitude * (rand::random::<f64>() * 2.0 - 1.0);
         let target = rand::random::<usize>() % raw_salience.len();
         raw_salience[target] = (raw_salience[target] + perturbation).clamp(0.0, 1.0);

@@ -31,6 +31,9 @@ impl RouteWeights {
     }
 
     pub fn reinforce_update(&mut self, selected: &[usize], rewards: &[f64], lr: f64) {
+        if rewards.len() < MODULE_COUNT {
+            return;
+        }
         let mean_reward: f64 = rewards.iter().sum::<f64>() / rewards.len() as f64;
         for &s in selected {
             let row = &mut self.weights[s];
@@ -436,6 +439,21 @@ mod tests {
             "low-reward target weight should decrease: before={init_w}, after={}",
             rw.weights[0][1]
         );
+    }
+
+    #[test]
+    fn test_reinforce_short_or_empty_rewards_is_noop() {
+        // Regression: empty rewards -> 0/0 = NaN corrupted every weight; short
+        // rewards (< MODULE_COUNT) -> index-out-of-bounds panic on rewards[j].
+        let mut rw = RouteWeights::new();
+        let snapshot: Vec<f64> = rw.weights[0].to_vec();
+
+        rw.reinforce_update(&[0], &[], 0.1);
+        rw.reinforce_update(&[0], &[0.5, 0.5], 0.1);
+
+        for (a, b) in rw.weights[0].iter().zip(snapshot.iter()) {
+            assert_eq!(a, b, "weights must be unchanged on degenerate rewards");
+        }
     }
 
     #[test]
