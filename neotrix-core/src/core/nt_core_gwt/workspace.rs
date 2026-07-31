@@ -144,8 +144,12 @@ impl GlobalWorkspace {
         self
     }
 
-    pub fn register(&mut self, module: SpecialistModule) {
+    pub fn register(&mut self, module: SpecialistModule) -> bool {
+        if self.specialists.len() >= MODULE_COUNT {
+            return false;
+        }
         self.specialists.insert(module.name.clone(), module);
+        true
     }
 
     pub fn broadcast(&mut self, content: &str) {
@@ -510,7 +514,7 @@ mod tests {
             SpecialistType::AnomalyDetector,
             SpecialistType::KnowledgeRetriever,
         ] {
-            ws.register(SpecialistModule::new(*st, format!("{:?}", st)));
+            let _ = ws.register(SpecialistModule::new(*st, format!("{:?}", st)));
         }
         ws
     }
