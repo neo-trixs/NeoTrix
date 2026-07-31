@@ -1,11 +1,18 @@
-// Domain 4: Consciousness — Consciousness bridge, HyperCube bridges, monitoring, elements
-#![allow(unused_imports)]
-pub use super::bbrain_monitor;
-pub use super::consciousness_bridge;
-pub use super::curiosity_drive;
-pub use super::element;
-pub use super::hypercube_attention_bridge;
-pub use super::hypercube_bridge;
-pub use super::panorama_pipeline;
-pub use super::predictive_cortex;
-pub use super::wifi_sensing;
+// Consciousness & Connectivity: bridges, GWT attention, elements, prediction
+//
+// Fused real module directory (Cycle 161b): flat nt_mind modules moved in,
+// replacing the earlier empty re-export shell.
+//
+
+pub mod bbrain_monitor;
+pub mod consciousness_bridge;
+pub mod curiosity_drive;
+pub mod element;
+pub mod hypercube_attention_bridge;
+pub mod hypercube_bridge;
+pub mod panorama_pipeline;
+pub mod predictive_cortex;
+pub mod wifi_sensing;
+
+// Cross-domain surface: re-export nt_mind scope so internal super:: refs resolve at domain level
+pub use super::*;

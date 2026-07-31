@@ -1,13 +1,21 @@
-// Domain 1: Core — SEAL loop core, types, models, indexing, internal pipeline
-#![allow(unused_imports)]
-pub use super::bm25;
-pub use super::core;
-pub use super::embedding;
-pub use super::lora;
-pub use super::model_router;
-pub use super::multi_brain;
-pub use super::pipeline;
-pub use super::self_edit;
-pub use super::self_iterating;
-pub use super::stats;
-pub use super::tier_prompts;
+// SEAL loop core: brain loop, self-edit, model routing, retrieval primitives
+//
+// Fused real module directory (Cycle 161b): flat nt_mind modules moved in,
+// replacing the earlier empty re-export shell.
+//
+
+pub mod core;
+pub mod embedding;
+pub mod lora;
+pub mod model_router;
+pub mod multi_brain;
+pub mod pipeline;
+pub mod self_edit;
+pub mod self_iterating;
+pub mod stats;
+pub mod tier_prompts;
+
+pub use crate::neotrix::l3_memory_impl::nt_memory_kb::bm25;
+
+// Cross-domain surface: re-export nt_mind scope so internal super:: refs resolve at domain level
+pub use super::*;

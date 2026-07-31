@@ -1,16 +1,23 @@
-// Domain 6: Infrastructure — Code graph, reviews, benchmarks, tests
-#![allow(unused_imports)]
-pub use super::build_context;
-pub use super::case_study;
-pub use super::code_graph;
-pub use super::code_graph_executor;
-pub use super::code_review;
+// Specialized Tools & Infrastructure: reviews, code graph, benchmarks, tests
+//
+// Fused real module directory (Cycle 161b): flat nt_mind modules moved in,
+// replacing the earlier empty re-export shell.
+//
+
+pub mod build_context;
+pub mod case_study;
+pub mod code_graph;
+pub mod code_graph_executor;
+pub mod code_review;
 #[cfg(test)]
-pub use super::context_integration_test;
-pub use super::group_contracts;
-pub use super::kronecker_cleanup;
-pub use super::open_source_benchmark;
-pub use super::react_doctor;
-pub use super::stakeholder_comm;
-pub use super::tests;
-pub use super::ux_review;
+pub mod context_integration_test;
+pub mod group_contracts;
+pub mod kronecker_cleanup;
+pub mod open_source_benchmark;
+pub mod react_doctor;
+pub mod stakeholder_comm;
+pub mod tests;
+pub mod ux_review;
+
+// Cross-domain surface: re-export nt_mind scope so internal super:: refs resolve at domain level
+pub use super::*;
