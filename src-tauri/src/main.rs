@@ -355,6 +355,10 @@ fn main() {
                      commands::neocodex_delete_message,
                      commands::neocodex_regenerate,
                      commands::neocodex_search_files,
+                     commands::neocodex_stop_stream,
+                     commands::neocodex_archive_session,
+                     commands::neocodex_restore_session,
+                     commands::neocodex_list_archived,
                      commands::browser_cmds::browser_open,
                     commands::browser_cmds::browser_navigate,
                     commands::browser_cmds::browser_back,
@@ -792,6 +796,7 @@ fn main() {
                 ])
                 .setup(move |app| {
                     neotrix_tauri::setup_tray(app).expect("failed to setup tray");
+                    let _ = neotrix_tauri::setup_menu(app);
 
                     if let Err(e) = app.global_shortcut().register("CommandOrControl+Shift+Space") {
                         log::warn!("failed to register global shortcut: {}", e);

@@ -63,6 +63,33 @@ export default function NeoCodexPage() {
     loadSessions();
   }, []);
 
+  // Native menu → frontend events: Cmd+Shift+U check updates, Cmd+K palette,
+  // Cmd+, settings. Auto-check for updates once on launch (engineering gap:
+  // Claude/Codex both surface a version banner without manual action).
+  const addNotification = useStore((s) => s.addNotification);
+  useEffect(() => {
+    const unlistenPalette = listen("neocodex-open-palette", () => setPaletteOpen((v) => !v));
+    const unlistenSettings = listen("open-settings", () => setShowSettings(true));
+    const unlistenUpdates = listen("neocodex-check-updates", () => {
+      invoke("neocodex_check_update").then((r: any) => {
+        if (r?.available) {
+          addNotification({ type: "info", message: `发现新版本 v${r.latest}（当前 v${r.current}）`, duration: 8000 });
+        } else {
+          addNotification({ type: "success", message: `已是最新版本 v${r?.current ?? ""}`, duration: 3000 });
+        }
+      }).catch((e) => console.error("Check update failed:", e));
+    });
+    // Auto-check once shortly after launch (silent unless an update is found).
+    const timer = setTimeout(() => {
+      invoke("neocodex_check_update").then((r: any) => {
+        if (r?.available) {
+          addNotification({ type: "info", message: `有新版本 v${r.latest} 可用（当前 v${r.current}）`, duration: 10000 });
+        }
+      }).catch(() => {});
+    }, 3000);
+    return () => { unlistenPalette.then((f) => f()); unlistenSettings.then((f) => f()); unlistenUpdates.then((f) => f()); clearTimeout(timer); };
+  }, [addNotification]);
+
   const loadHealth = useCallback(async () => {
     try {
       setHealth(await invoke("neocodex_health_report"));
@@ -77,6 +104,7 @@ export default function NeoCodexPage() {
 
   const handleStop = () => {
     stopRef.current = true;
+    invoke("neocodex_stop_stream").catch((e) => console.error("Stop failed:", e));
   };
 
   const handleSend = async (content: string, attachments?: Attachment[], regenerate?: boolean) => {
@@ -98,6 +126,11 @@ export default function NeoCodexPage() {
       setNeoCodexStreaming({ content: accumulated, role: "assistant" });
       if (stopRef.current) return;
     });
+    const unlistenDone = await listen<any>("neocodex_stream_done", (event) => {
+      if (event.payload?.cancelled) {
+        stopRef.current = true;
+      }
+    });
 
     try {
       const payload = (attachments && attachments.length > 0
@@ -108,7 +141,12 @@ export default function NeoCodexPage() {
       }
       const response = await invoke("neocodex_send_message_stream", payload) as string;
       setNeoCodexStreaming(null);
-      addNeoCodexMessage({ role: "assistant", content: response, timestamp: Date.now() });
+      const wasCancelled = stopRef.current;
+      addNeoCodexMessage({
+        role: "assistant",
+        content: wasCancelled ? `${response}\n\n> ⏹ 已停止生成` : response,
+        timestamp: Date.now(),
+      });
       refreshSessions();
       loadHealth();
     } catch (e) {
@@ -118,6 +156,7 @@ export default function NeoCodexPage() {
     } finally {
       stopRef.current = false;
       unlisten();
+      unlistenDone();
       setAgentBusy(false);
     }
   };
@@ -375,6 +414,7 @@ export default function NeoCodexPage() {
               activeSessionId={neocodexActiveSessionId}
               onSessionSelect={handleSessionSelect}
               onSessionDelete={handleSessionDelete}
+              onSessionArchive={() => refreshSessions()}
             />
           )}
         </aside>

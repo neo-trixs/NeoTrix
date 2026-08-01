@@ -3,8 +3,10 @@ import { useStore } from "../../stores";
 import type { NeoCodexSession } from "../../types";
 import styles from "./SessionSidebar.module.css";
 
-export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDelete }: { activeSessionId?: string | null; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void }) {
+export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDelete, onSessionArchive }: { activeSessionId?: string | null; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void; onSessionArchive?: (sessionId: string) => void }) {
   const [sessions, setSessions] = useState<NeoCodexSession[]>([]);
+  const [archived, setArchived] = useState<NeoCodexSession[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
@@ -47,6 +49,30 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const refreshArchived = useCallback(async () => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const list = await invoke("neocodex_list_archived") as any[];
+      setArchived(list.map((s) => ({
+        id: s.id,
+        name: s.name,
+        mode: s.mode,
+        message_count: s.message_count || 0,
+        messages: [],
+        wire_path: s.wire_path,
+        created_at: s.created_at || 0,
+        updated_at: (s.updated_at || 0) * 1000,
+      })));
+    } catch (e) {
+      console.error("Failed to load archived sessions:", e);
+      setArchived([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshArchived();
+  }, [refreshArchived]);
 
   useEffect(() => {
     const openNew = () => setShowNewDialog(true);
@@ -101,6 +127,36 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     setPinnedIds((prev) => prev.filter((id) => id !== sessionId));
     onSessionDelete?.(sessionId);
     addNotification({ type: "info", message: "会话已删除", duration: 2000 });
+  };
+
+  const handleArchive = async (sessionId: string) => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("neocodex_archive_session", { sessionId });
+    } catch (e) {
+      console.error("Failed to archive session:", e);
+      addNotification({ type: "error", message: `归档失败: ${e}`, duration: 3000 });
+      return;
+    }
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    setPinnedIds((prev) => prev.filter((id) => id !== sessionId));
+    onSessionArchive?.(sessionId);
+    refreshArchived();
+    addNotification({ type: "info", message: "会话已归档", duration: 2000 });
+  };
+
+  const handleRestore = async (sessionId: string) => {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("neocodex_restore_session", { sessionId });
+    } catch (e) {
+      console.error("Failed to restore session:", e);
+      addNotification({ type: "error", message: `恢复失败: ${e}`, duration: 3000 });
+      return;
+    }
+    setArchived((prev) => prev.filter((s) => s.id !== sessionId));
+    refresh();
+    addNotification({ type: "info", message: "会话已恢复", duration: 2000 });
   };
 
   const togglePin = (sessionId: string) => {
@@ -287,6 +343,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
                 onDelete={() => handleDelete(session.id)}
                 onPin={() => togglePin(session.id)}
                 onExport={() => handleExport(session)}
+                onArchive={() => handleArchive(session.id)}
                 onRename={() => { setRenamingId(session.id); setRenameValue(session.name); }}
               />
             ))}
@@ -305,6 +362,45 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
         )}
         {sessions.length > 0 && groups.length === 0 && (
           <div className={styles.emptyFilter}>无匹配会话</div>
+        )}
+
+        {archived.length > 0 && (
+          <div className={styles.archivedSection}>
+            <button
+              className={styles.archivedToggle}
+              onClick={() => setShowArchived((v) => !v)}
+            >
+              <span className={styles.archivedCaret}>{showArchived ? "▾" : "▸"}</span>
+              已归档 ({archived.length})
+            </button>
+            {showArchived && (
+              <div className={styles.archivedList}>
+                {archived.map((session) => (
+                  <div key={session.id} className={styles.archivedItem}>
+                    <span className={styles.archivedName} title={session.name}>{session.name}</span>
+                    <button
+                      className={styles.actionBtn}
+                      onClick={() => handleRestore(session.id)}
+                      title="恢复会话"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M7 11V3M3 7l4-4 4 4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      className={styles.deleteBtn}
+                      onClick={() => handleDelete(session.id)}
+                      title="永久删除"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M3 4h8M6 4V3h2v1M4.5 4l.5 7h4l.5-7" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -346,7 +442,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   );
 }
 
-function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExport, onRename }: { session: { id: string; name: string; mode: string; message_count?: number; updated_at: number }; pinned: boolean; active: boolean; onClick: () => void; onDelete?: () => void; onPin: () => void; onExport: () => void; onRename: () => void }) {
+function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExport, onRename, onArchive }: { session: { id: string; name: string; mode: string; message_count?: number; updated_at: number }; pinned: boolean; active: boolean; onClick: () => void; onDelete?: () => void; onPin: () => void; onExport: () => void; onRename: () => void; onArchive?: () => void }) {
   const [showRename, setShowRename] = useState(false);
   const [renameVal, setRenameVal] = useState(session.name);
   const handleRenameSubmit = () => {
@@ -407,6 +503,13 @@ function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExpo
             <path d="M10 2l2 2-8 8H4v-2l6-6z" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
+        {onArchive && (
+          <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); onArchive(); }} title="归档会话">
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2 4h10M3.5 4l.7 7h5.6l.7-7M5.5 7.5h3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

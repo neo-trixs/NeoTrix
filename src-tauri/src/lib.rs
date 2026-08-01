@@ -5,6 +5,77 @@ pub mod browser_host;
 
 use tauri::{Emitter, Manager};
 
+/// Build a native app menu (macOS-style) so keyboard shortcuts like Cmd+C/V,
+/// Cmd+Q and standard roles behave like a first-class desktop app. Menu events
+/// that matter to NeoCodex (check updates, new session, settings) are forwarded
+/// to the frontend as window events; the rest use Tauri predefined roles.
+pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder};
+
+    let check_updates = tauri::menu::MenuItemBuilder::with_id("check_updates", "Check for Updates…")
+        .accelerator("CmdOrCtrl+Shift+U").build(app)?;
+    let new_session = tauri::menu::MenuItemBuilder::with_id("new_session", "New Session")
+        .accelerator("CmdOrCtrl+N").build(app)?;
+    let open_settings = tauri::menu::MenuItemBuilder::with_id("open_settings", "Settings…")
+        .accelerator("CmdOrCtrl+,").build(app)?;
+    let cmd_palette = tauri::menu::MenuItemBuilder::with_id("cmd_palette", "Command Palette…")
+        .accelerator("CmdOrCtrl+K").build(app)?;
+
+    let app_menu = SubmenuBuilder::new(app, "NeoTrix")
+        .item(&PredefinedMenuItem::about(app, Some("NeoTrix"), None)?)
+        .separator()
+        .item(&check_updates)
+        .separator()
+        .item(&PredefinedMenuItem::hide(app, Some("Hide NeoTrix"))?)
+        .item(&PredefinedMenuItem::hide_others(app, Some("Hide Others"))?)
+        .item(&PredefinedMenuItem::show_all(app, Some("Show All"))?)
+        .separator()
+        .item(&PredefinedMenuItem::quit(app, Some("Quit NeoTrix"))?)
+        .build()?;
+
+    let file_menu = SubmenuBuilder::new(app, "File")
+        .item(&new_session)
+        .item(&open_settings)
+        .separator()
+        .item(&PredefinedMenuItem::close_window(app, Some("Close Window"))?)
+        .build()?;
+
+    let edit_menu = SubmenuBuilder::new(app, "Edit")
+        .item(&PredefinedMenuItem::undo(app, Some("Undo"))?)
+        .item(&PredefinedMenuItem::redo(app, Some("Redo"))?)
+        .separator()
+        .item(&PredefinedMenuItem::cut(app, Some("Cut"))?)
+        .item(&PredefinedMenuItem::copy(app, Some("Copy"))?)
+        .item(&PredefinedMenuItem::paste(app, Some("Paste"))?)
+        .item(&PredefinedMenuItem::select_all(app, Some("Select All"))?)
+        .build()?;
+
+    let view_menu = SubmenuBuilder::new(app, "View")
+        .item(&cmd_palette)
+        .item(&PredefinedMenuItem::fullscreen(app, Some("Enter Full Screen"))?)
+        .build()?;
+
+    let window_menu = SubmenuBuilder::new(app, "Window")
+        .item(&PredefinedMenuItem::minimize(app, Some("Minimize"))?)
+        .build()?;
+
+    let menu = MenuBuilder::new(app)
+        .items(&[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu])
+        .build()?;
+
+    app.set_menu(menu)?;
+
+    app.on_menu_event(|app, event| match event.id().as_ref() {
+        "check_updates" => { let _ = app.emit("neocodex-check-updates", ()); }
+        "new_session" => { let _ = app.emit("neotrix:new-session", ()); }
+        "open_settings" => { let _ = app.emit("open-settings", ()); }
+        "cmd_palette" => { let _ = app.emit("neocodex-open-palette", ()); }
+        _ => {}
+    });
+
+    Ok(())
+}
+
 pub fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::menu::{MenuBuilder, MenuItemBuilder};
     #[cfg(feature = "stealth-net")]

@@ -3,10 +3,21 @@ use neotrix::neotrix::l1_body_impl::nt_io_neocodex::{
 };
 use serde::Serialize;
 use tauri::Emitter;
+use tauri::Manager;
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
 
 static NEOCODEX_AGENT: std::sync::LazyLock<tokio::sync::Mutex<Option<NeoCodexAgent>>> =
     std::sync::LazyLock::new(|| tokio::sync::Mutex::new(None));
+
+static STREAM_CANCELLED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[tauri::command]
+pub async fn neocodex_stop_stream() -> Result<(), String> {
+    STREAM_CANCELLED.store(true, std::sync::atomic::Ordering::Relaxed);
+    Ok(())
+}
 
 #[tauri::command]
 pub async fn neocodex_send_message(content: String) -> Result<String, String> {
@@ -84,8 +95,11 @@ pub async fn neocodex_send_message_stream(
     // Emit start event
     let _ = app.emit("neocodex_stream_start", content.clone());
 
+    STREAM_CANCELLED.store(false, std::sync::atomic::Ordering::Relaxed);
+    let started = std::time::Instant::now();
     let result = agent.react_loop_stream(&content, 4, |token| {
         let _ = app.emit("neocodex_stream_token", token);
+        !STREAM_CANCELLED.load(std::sync::atomic::Ordering::Relaxed)
     }).await;
 
     let answer = result.unwrap_or_else(|| "[no response]".to_string());
@@ -101,6 +115,36 @@ pub async fn neocodex_send_message_stream(
     agent.state.tokens_used += est2;
 
     let _ = app.emit("neocodex_stream_end", answer.clone());
+
+    // Engineering gap: surface completion (or cancellation) via the OS
+    // notification centre when the app window is not focused, and track the
+    // cancelled flag so the frontend can label the truncated reply.
+    let was_cancelled = STREAM_CANCELLED.load(std::sync::atomic::Ordering::Relaxed);
+    STREAM_CANCELLED.store(false, std::sync::atomic::Ordering::Relaxed);
+    let _ = app.emit("neocodex_stream_done", serde_json::json!({
+        "cancelled": was_cancelled,
+        "elapsed_ms": started.elapsed().as_millis() as u64,
+        "content": answer,
+    }));
+
+    let focused = app.get_webview_window("main")
+        .map(|w| w.is_focused().unwrap_or(false))
+        .unwrap_or(false);
+    if !focused {
+        let title = if was_cancelled { "NeoCodex 已停止" } else { "NeoCodex 任务完成" };
+        let body = if was_cancelled {
+            format!("已停止生成（已累积 {} 字符）", answer.chars().count())
+        } else {
+            let n = answer.chars().count();
+            if n > 80 { format!("{}…", answer.chars().take(80).collect::<String>()) } else { answer.clone() }
+        };
+        let _ = app.notification()
+            .builder()
+            .title(title)
+            .body(&body)
+            .show();
+    }
+
     Ok(answer)
 }
 
@@ -659,11 +703,88 @@ pub async fn neocodex_switch_session(session_id: String) -> Result<String, Strin
 #[tauri::command]
 pub async fn neocodex_delete_session(session_id: String) -> Result<String, String> {
     let path = session_path(&session_id);
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+        return Ok(format!("Deleted session {}", session_id));
+    }
+    let archived = archived_dir().join(format!("{}.jsonl", session_id));
+    if archived.exists() {
+        std::fs::remove_file(&archived).map_err(|e| e.to_string())?;
+        return Ok(format!("Deleted archived session {}", session_id));
+    }
+    Err("Session not found".to_string())
+}
+
+fn archived_dir() -> std::path::PathBuf {
+    sessions_dir().join("archived")
+}
+
+/// Move a session's wire file into the archived/ subfolder (Claude-style
+/// "Archive" — keeps history without cluttering the active list).
+#[tauri::command]
+pub async fn neocodex_archive_session(session_id: String) -> Result<String, String> {
+    let path = session_path(&session_id);
     if !path.exists() {
         return Err("Session not found".to_string());
     }
-    std::fs::remove_file(&path).map_err(|e| e.to_string())?;
-    Ok(format!("Deleted session {}", session_id))
+    let dir = archived_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let dest = dir.join(format!("{}.jsonl", session_id));
+    std::fs::rename(&path, &dest).map_err(|e| e.to_string())?;
+    Ok(format!("Archived session {}", session_id))
+}
+
+/// Move a session back from archived/ into the active list.
+#[tauri::command]
+pub async fn neocodex_restore_session(session_id: String) -> Result<String, String> {
+    let src = archived_dir().join(format!("{}.jsonl", session_id));
+    if !src.exists() {
+        return Err("Archived session not found".to_string());
+    }
+    let dest = session_path(&session_id);
+    std::fs::rename(&src, &dest).map_err(|e| e.to_string())?;
+    Ok(format!("Restored session {}", session_id))
+}
+
+/// List archived sessions (same metadata shape as active ones).
+#[tauri::command]
+pub async fn neocodex_list_archived() -> Result<Vec<NeoCodexSessionInfo>, String> {
+    let dir = archived_dir();
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut sessions = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+            let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            let mut name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
+            let mut message_count = 0;
+            let mut updated_at = entry.metadata().map_err(|e| e.to_string())?.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
+            for line in content.lines() {
+                if let Ok(WireEvent::UserMessage { content: c, timestamp, .. }) = serde_json::from_str::<WireEvent>(line) {
+                    if message_count == 0 && c.len() > 20 {
+                        name = format!("{}...", &c[..20]);
+                    }
+                    message_count += 1;
+                    updated_at = timestamp.max(0) as u64;
+                } else if let Ok(WireEvent::AgentMessage { .. }) = serde_json::from_str::<WireEvent>(line) {
+                    message_count += 1;
+                }
+            }
+            sessions.push(NeoCodexSessionInfo {
+                id: path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string(),
+                name,
+                mode: "Agent".to_string(),
+                message_count,
+                wire_path: path.to_string_lossy().to_string(),
+                updated_at,
+            });
+        }
+    }
+    sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(sessions)
 }
 
 #[derive(serde::Serialize)]

@@ -1544,10 +1544,12 @@ impl NeoCodexAgent {
     }
 
     /// Streaming ReAct loop: emits tokens via callback as they arrive from the provider.
+    /// `on_token` returns `true` to continue or `false` to cancel; a cancelled
+    /// stream returns the tokens accumulated so far (partial reply).
     /// Returns the final accumulated response (or error).
     pub async fn react_loop_stream<F>(&mut self, input: &str, max_steps: usize, mut on_token: F) -> Option<String>
     where
-        F: FnMut(&str) + Send + Sync,
+        F: FnMut(&str) -> bool + Send + Sync,
     {
         let provider = self.provider.to_llm_provider()?;
 
@@ -1555,8 +1557,9 @@ impl NeoCodexAgent {
         let mut step = 0;
         let mut final_answer: Option<String> = None;
         let mut accumulated = String::new();
+        let mut cancelled = false;
 
-        while step < max_steps {
+        while step < max_steps && !cancelled {
             Self::budget_react_messages(&mut messages, self.context.max_tokens);
             let request = self.build_request(messages.clone())?;
 
@@ -1582,7 +1585,10 @@ impl NeoCodexAgent {
                         if !resp.content.is_empty() {
                             response_content.push_str(&resp.content);
                             accumulated.push_str(&resp.content);
-                            on_token(&resp.content);
+                            if !on_token(&resp.content) {
+                                cancelled = true;
+                                break;
+                            }
                         }
                         if resp.usage.total_tokens > 0 {
                             response_usage = Some(resp.usage);
@@ -1603,6 +1609,10 @@ impl NeoCodexAgent {
             if let Some(usage) = response_usage {
                 self.state.tokens_used += usage.total_tokens as usize;
                 let _ = self.cost.record("agent", 0.0, usage.total_tokens as u64);
+            }
+
+            if cancelled {
+                break;
             }
 
             // Attempt to extract a structured tool-call from the response.
@@ -1644,7 +1654,11 @@ impl NeoCodexAgent {
             }
         }
 
-        final_answer
+        if cancelled {
+            Some(accumulated)
+        } else {
+            final_answer
+        }
     }
 
     /// Build system + history + current user messages from the context pipeline.
@@ -2700,7 +2714,7 @@ mod tests {
             agent.provider.providers.push(ProviderInfo::default());
             agent.provider.active = 0;
             let mut seen = Vec::new();
-            let result = agent.react_loop_stream("hi", 3, |t| seen.push(t.to_string())).await;
+            let result = agent.react_loop_stream("hi", 3, |t| { seen.push(t.to_string()); true }).await;
             assert!(result.is_none());
             assert!(seen.is_empty());
         });
