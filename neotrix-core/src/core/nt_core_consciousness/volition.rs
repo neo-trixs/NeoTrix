@@ -92,6 +92,9 @@ impl VolitionEngine {
     }
 
     pub fn select_by_goal_alignment(&mut self) -> Option<ActionCandidate> {
+        if self.candidates.is_empty() {
+            return None;
+        }
         let goal = match &self.current_goal_vsa {
             Some(g) => g.clone(),
             None => return self.select_best(),

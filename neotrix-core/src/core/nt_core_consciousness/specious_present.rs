@@ -41,7 +41,8 @@ impl SpeciousPresent {
         if let Some(prev) = self.window.back() {
             let coherence = QuantizedVSA::similarity(&prev.vector, &tagged.vector);
             self.coherence_trace.push_back(coherence);
-            if self.coherence_trace.len() > self.window_size {
+            // 窗口 N 项只产生 N-1 对：容量用 window_size-1，避免残留过期项污染平均 coherence
+            if self.coherence_trace.len() > self.window_size.saturating_sub(1) {
                 self.coherence_trace.pop_front();
             }
         }

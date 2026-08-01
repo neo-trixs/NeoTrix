@@ -11,6 +11,7 @@ pub struct ConsciousnessStream {
     buffer: VecDeque<VsaTagged>,
     capacity: usize,
     total_pushed: u64,
+    total_evicted: u64,
 }
 
 impl Default for ConsciousnessStream {
@@ -25,6 +26,7 @@ impl ConsciousnessStream {
             buffer: VecDeque::with_capacity(capacity),
             capacity,
             total_pushed: 0,
+            total_evicted: 0,
         }
     }
 
@@ -32,6 +34,7 @@ impl ConsciousnessStream {
         self.total_pushed += 1;
         if self.buffer.len() >= self.capacity {
             self.buffer.pop_front();
+            self.total_evicted += 1;
         }
         self.buffer.push_back(tagged);
     }
@@ -140,10 +143,12 @@ impl ConsciousnessStream {
     }
 
     pub fn retention_rate(&self) -> f64 {
+        // 真实滞留率 = 1 - 被逐出比例。旧实现 buffer.len()/min(total,cap) 恒为 1.0 (恒等式)
         if self.total_pushed == 0 {
             return 1.0;
         }
-        self.buffer.len() as f64 / self.total_pushed.min(self.capacity as u64) as f64
+        let evicted = self.total_evicted.min(self.total_pushed);
+        1.0 - evicted as f64 / self.total_pushed as f64
     }
 }
 
@@ -288,6 +293,7 @@ use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
         for _ in 0..10 {
             s.push(self_tagged(vec![1; 10]));
         }
-        assert!((s.retention_rate() - 1.0).abs() < 1e-9);
+        // 10 push，5 次逐出，滞留率 = 1 - 5/10 = 0.5
+        assert!((s.retention_rate() - 0.5).abs() < 1e-9);
     }
 }

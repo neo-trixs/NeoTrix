@@ -100,9 +100,12 @@ impl ConsciousnessRuntime {
         // Compute temporal integral and difference for richer critique
         let _temporal_integral = self.specious_present.temporal_integral();
         let _temporal_delta = self.specious_present.temporal_difference();
-        // Re-borrow for critique
+        // Re-borrow for critique: context = 前一帧 (current==current 会让 relevance 恒为 1.0)
         let mut critique = match self.specious_present.current() {
-            Some(current) => self.critic.evaluate(current, current, Some(&self.specious_present)),
+            Some(current) => {
+                let context = self.specious_present.previous(1).unwrap_or(current);
+                self.critic.evaluate(current, context, Some(&self.specious_present))
+            }
             None => return None,
         };
         // Attach selected action info to critique

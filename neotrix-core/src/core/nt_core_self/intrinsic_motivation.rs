@@ -42,6 +42,15 @@ impl IntrinsicMotivation {
         }
     }
 
+    /// 有界 reward_history：只保留最近 window_size*4 条，防止长跑无界累积
+    fn cap_reward_history(&mut self) {
+        let cap = self.window_size.saturating_mul(4).max(16);
+        if self.reward_history.len() > cap {
+            let overflow = self.reward_history.len() - cap;
+            self.reward_history.drain(..overflow);
+        }
+    }
+
     pub fn compute(&mut self, model: &SiliconSelfModel) -> MotivationState {
         let traces = model.recent_traces(self.window_size);
         let window_size = traces.len();
@@ -57,6 +66,7 @@ impl IntrinsicMotivation {
             };
             self.last_reward = 0.5;
             self.reward_history.push(0.5);
+            self.cap_reward_history();
             return state;
         }
 
@@ -114,8 +124,9 @@ impl IntrinsicMotivation {
             .map(|s| s.kind)
             .collect();
 
-        self.last_reward = r_int;
-        self.reward_history.push(r_int);
+            self.last_reward = r_int;
+            self.reward_history.push(r_int);
+            self.cap_reward_history();
 
         MotivationState {
             intrinsic_reward: r_int,

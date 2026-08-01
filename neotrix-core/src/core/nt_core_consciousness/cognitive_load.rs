@@ -52,6 +52,7 @@ pub struct CognitiveLoadMonitor {
     mode: ThinkingMode,
     total_steps: u64,
     deep_steps: u64,
+    config: CognitiveLoadConfig,
 }
 
 impl Default for CognitiveLoadMonitor {
@@ -72,13 +73,15 @@ impl CognitiveLoadMonitor {
             mode: ThinkingMode::Balanced,
             total_steps: 0,
             deep_steps: 0,
+            config,
         }
     }
 
     pub fn record_step(&mut self, load: f64) {
         self.total_steps += 1;
         let clamped = load.clamp(0.0, 1.0);
-        let cfg = &COGNITIVE_LOAD_CONFIG;
+        // 用实例 config，保证 with_config(custom) 真正生效（此前读全局 static 被静默忽略）
+        let cfg = &self.config;
         self.recent_load.push_back(clamped);
         if self.recent_load.len() > cfg.load_history_size {
             self.recent_load.pop_front();
@@ -93,7 +96,7 @@ impl CognitiveLoadMonitor {
     }
 
     fn update_mode(&mut self) {
-        let cfg = &COGNITIVE_LOAD_CONFIG;
+        let cfg = &self.config;
         if self.thinking_budget > cfg.deep_mode_budget * 0.5 && self.average_load() < cfg.deep_mode_load_threshold {
             self.mode = ThinkingMode::Deep;
         } else if self.thinking_budget < cfg.fast_mode_budget * 0.5 || self.average_load() > cfg.fast_mode_load_threshold {
@@ -123,7 +126,7 @@ impl CognitiveLoadMonitor {
     }
 
     pub fn can_do_deep_reasoning(&self) -> bool {
-        self.thinking_budget > COGNITIVE_LOAD_CONFIG.fast_mode_budget && self.mode != ThinkingMode::Fast
+        self.thinking_budget > self.config.fast_mode_budget && self.mode != ThinkingMode::Fast
     }
 
     pub fn deep_ratio(&self) -> f64 {
@@ -134,7 +137,7 @@ impl CognitiveLoadMonitor {
     }
 
     pub fn reset(&mut self) {
-        let cfg = &COGNITIVE_LOAD_CONFIG;
+        let cfg = &self.config;
         self.recent_load.clear();
         self.thinking_budget = cfg.deep_mode_budget;
         self.mode = ThinkingMode::Balanced;

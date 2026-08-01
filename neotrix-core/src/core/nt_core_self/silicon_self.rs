@@ -339,7 +339,7 @@ impl SiliconSelfModel {
                         let activation: f64 = act_str.parse().ok()?;
                         for head in &mut model.attention_manager.heads {
                             if head.domain.label() == domain_label {
-                                head.activation = activation;
+                                head.activation = activation.clamp(0.0, 1.0);
                                 break;
                             }
                         }

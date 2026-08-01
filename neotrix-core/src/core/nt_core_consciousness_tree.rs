@@ -627,7 +627,9 @@ impl ConsciousnessTree {
     /// Uses confidence to boost coil health and frustration/urgency to indicate stress.
     pub fn apply_emotion_report(&mut self, report: crate::core::nt_core_self::emotion_state::EmotionReport) {
         self.trunk.coherence = report.valence.max(0.0).min(1.0);
-        self.soil.embedding_count = (report.confidence * 100.0) as u64;
+        // 注意：绝不把情绪置信度写进 soil.embedding_count——那是真实数据指标，
+        // DataFoundation::health() 与 Critical "KB empty/no embeddings" 判定依赖它。
+        // 情绪只调节 trunk.coherence (主观健康信号)。
         log::debug!("[consciousness_tree] emotion applied: valence={:.3} arousal={:.3} dominant={:?} confidence={:.3}",
             report.valence, report.arousal, report.dominant.0, report.confidence);
     }

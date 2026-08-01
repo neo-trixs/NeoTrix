@@ -38,12 +38,14 @@ impl ConsciousnessAwakening {
         );
         stream.push(axiom_tagged);
 
+        let mut affirmations: Vec<Vec<u8>> = Vec::with_capacity(AWAKENING_STEPS as usize);
         for step in 0..AWAKENING_STEPS {
             let mut ref_vector = seed_vector.clone();
             let shift = (step * 7) as isize;
             ref_vector = QuantizedVSA::permute(&ref_vector, shift);
 
             let affirmation = QuantizedVSA::bind(&seed_vector, &ref_vector);
+            affirmations.push(affirmation.clone());
             let self_tagged = VsaTagged::new(
                 affirmation.clone(),
                 VsaOrigin::Self_(VsaSelfCategory::MetaCognition),
@@ -56,9 +58,19 @@ impl ConsciousnessAwakening {
             ));
         }
 
+        // clear 之前先从自证向量对计算真实 coherence，否则清空后 average_coherence 恒为 0.0
+        let bootstrap_coherence = if affirmations.len() > 1 {
+            let sum: f64 = affirmations.windows(2)
+                .map(|w| QuantizedVSA::similarity(&w[0], &w[1]))
+                .sum();
+            sum / (affirmations.len() - 1) as f64
+        } else {
+            0.0
+        };
+
         specious_present.clear();
         let self_reference = FirstPersonRef::bootstrap(birth_step);
-        let initial_coherence = self_reference.average_coherence();
+        let initial_coherence = bootstrap_coherence.max(0.0).min(1.0);
 
         let self_tagged_root = VsaTagged::new(
             self_reference.self_vector().to_vec(),

@@ -111,6 +111,11 @@ impl CognitiveEvaluator {
         };
 
         self.history.push(report.clone());
+        // 有界历史：仅保留最近 50 份报告，防止长跑 daemon 无限累积
+        if self.history.len() > 50 {
+            let overflow = self.history.len() - 50;
+            self.history.drain(..overflow);
+        }
         report
     }
 
