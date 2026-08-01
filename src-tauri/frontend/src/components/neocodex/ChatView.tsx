@@ -167,7 +167,7 @@ export function ChatView({
 
   const handleSlashSelect = (cmd: string) => {
     const prefix = cmd.split(" ")[0];
-    setInput((prev) => (prev.endsWith("/") ? prev + prefix + " " : prev + prefix + " "));
+    setInput((prev) => prev.replace(/\/\w*$/, "") + prefix + " ");
     setShowSlash(false);
     setSlashHighlight(0);
     textareaRef.current?.focus();

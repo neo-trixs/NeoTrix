@@ -79,6 +79,7 @@ export function SettingsView() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
+            data-testid={`settings-tab-${tab.id}`}
             className={`${styles.tab} ${activeTab === tab.id ? styles.active : ""}`}
             onClick={() => setActiveTab(tab.id)}
           >

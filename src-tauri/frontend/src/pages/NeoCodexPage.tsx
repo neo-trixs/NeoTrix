@@ -390,6 +390,7 @@ export default function NeoCodexPage() {
           <div className={styles.sidebarTabs}>
             <button
               type="button"
+              data-testid="sidebar-tab-sessions"
               className={`${styles.sidebarTab} ${!fileTreeOpen ? styles.sidebarTabActive : ""}`}
               onClick={() => setFileTreeOpen(false)}
             >
@@ -397,6 +398,7 @@ export default function NeoCodexPage() {
             </button>
             <button
               type="button"
+              data-testid="sidebar-tab-files"
               className={`${styles.sidebarTab} ${fileTreeOpen ? styles.sidebarTabActive : ""}`}
               onClick={() => setFileTreeOpen(true)}
               title="文件树"
@@ -434,6 +436,7 @@ export default function NeoCodexPage() {
               onChange={(e) => handleModeChange(e.target.value)}
               className={styles.modeSelect}
               disabled={agentBusy}
+              data-testid="mode-select"
               title="Mode"
             >
               <option value="Agent">Agent</option>
@@ -443,6 +446,7 @@ export default function NeoCodexPage() {
             <div className={styles.viewsMenuWrap}>
               <button
                 type="button"
+                data-testid="views-menu-btn"
                 className={`${styles.viewsMenuBtn} ${viewsMenuOpen ? styles.viewsMenuActive : ""}`}
                 onClick={() => setViewsMenuOpen((v) => !v)}
                 title="视图面板"
@@ -453,6 +457,7 @@ export default function NeoCodexPage() {
                 <div className={styles.viewsMenu}>
                   <button
                     type="button"
+                    data-testid="views-menu-terminal"
                     className={`${styles.viewsMenuItem} ${terminalOpen ? styles.viewsMenuItemActive : ""}`}
                     onClick={() => { setTerminalOpen((v) => !v); setViewsMenuOpen(false); }}
                   >
@@ -460,6 +465,7 @@ export default function NeoCodexPage() {
                   </button>
                   <button
                     type="button"
+                    data-testid="views-menu-diff"
                     className={`${styles.viewsMenuItem} ${diffOpen ? styles.viewsMenuItemActive : ""}`}
                     onClick={() => { setDiffOpen((v) => !v); setViewsMenuOpen(false); }}
                   >
@@ -467,6 +473,7 @@ export default function NeoCodexPage() {
                   </button>
                   <button
                     type="button"
+                    data-testid="views-menu-preview"
                     className={`${styles.viewsMenuItem} ${previewOpen ? styles.viewsMenuItemActive : ""}`}
                     onClick={() => { setPreviewOpen((v) => !v); setViewsMenuOpen(false); }}
                   >

@@ -504,7 +504,16 @@ impl WireSession {
     }
 
     pub fn record(&mut self, event: WireEvent) {
+        // Bound in-memory growth: long-running sessions otherwise accumulate
+        // every message/tool event in memory forever. The JSONL file below
+        // keeps the full history for replay/load, so only the live Vec is
+        // capped.
+        const MAX_IN_MEMORY_EVENTS: usize = 10_000;
         self.events.push(event.clone());
+        if self.events.len() > MAX_IN_MEMORY_EVENTS {
+            let drop_to = self.events.len() - MAX_IN_MEMORY_EVENTS;
+            self.events.drain(0..drop_to);
+        }
         if let Some(parent) = self.path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
@@ -554,6 +563,7 @@ pub struct GoalQueue {
     pub goals: VecDeque<Goal>,
     pub active: Option<Goal>,
     pub completed: Vec<Goal>,
+    next_id: u64,
 }
 
 impl Default for GoalQueue {
@@ -564,11 +574,16 @@ impl Default for GoalQueue {
 
 impl GoalQueue {
     pub fn new() -> Self {
-        Self { goals: VecDeque::new(), active: None, completed: Vec::new() }
+        Self { goals: VecDeque::new(), active: None, completed: Vec::new(), next_id: 0 }
     }
 
     pub fn add(&mut self, description: &str, max_iterations: u64) {
-        let id = format!("g-{}", self.completed.len() + self.goals.len() + 1);
+        // completed.len() + goals.len() + 1 omits the active goal, so two
+        // goals could share an id (e.g. add A -> g-1 active, add B -> g-1
+        // again) and corrupt WireEvent::GoalUpdate correlation. Use a
+        // monotonic counter instead.
+        self.next_id += 1;
+        let id = format!("g-{}", self.next_id);
         self.goals.push_back(Goal {
             id, description: description.to_string(),
             state: GoalState::Active,

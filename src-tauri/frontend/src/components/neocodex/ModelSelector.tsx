@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import type { NeoCodexProviderConfig } from "../../types";
 import styles from "./ModelSelector.module.css";
+import { invoke } from "@tauri-apps/api/core";
 
 export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: string) => void }) {
   const [config, setConfig] = useState<NeoCodexProviderConfig | null>(null);
@@ -10,7 +11,6 @@ export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: st
 
   const fetchConfig = useCallback(async () => {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const result = await invoke<NeoCodexProviderConfig>("neocodex_provider_config");
       setConfig(result);
       onConfigChange?.(result.active_model);
@@ -29,7 +29,6 @@ export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: st
     if (name === config?.active_model) return;
     setSwitching(name);
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("neocodex_set_provider", { name });
       await fetchConfig();
     } catch (e) {

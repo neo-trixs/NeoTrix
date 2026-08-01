@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "../../stores";
 import type { NeoCodexSession } from "../../types";
 import styles from "./SessionSidebar.module.css";
+import { invoke } from "@tauri-apps/api/core";
 
 export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDelete, onSessionArchive }: { activeSessionId?: string | null; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void; onSessionArchive?: (sessionId: string) => void }) {
   const [sessions, setSessions] = useState<NeoCodexSession[]>([]);
@@ -26,7 +27,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const refresh = useCallback(async () => {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const list = await invoke("neocodex_list_sessions") as any[];
       setSessions(list.map((s) => ({
         id: s.id,
@@ -52,7 +52,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const refreshArchived = useCallback(async () => {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const list = await invoke("neocodex_list_archived") as any[];
       setArchived(list.map((s) => ({
         id: s.id,
@@ -83,7 +82,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   const handleCreateSession = async () => {
     if (!newSessionName.trim()) return;
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const info = await invoke("neocodex_create_session", { name: newSessionName.trim() }) as any;
       const session: NeoCodexSession = {
         id: info.id,
@@ -118,7 +116,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const handleDelete = async (sessionId: string) => {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("neocodex_delete_session", { sessionId });
     } catch (e) {
       console.error("Failed to delete session:", e);
@@ -131,7 +128,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const handleArchive = async (sessionId: string) => {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("neocodex_archive_session", { sessionId });
     } catch (e) {
       console.error("Failed to archive session:", e);
@@ -147,7 +143,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
   const handleRestore = async (sessionId: string) => {
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("neocodex_restore_session", { sessionId });
     } catch (e) {
       console.error("Failed to restore session:", e);
@@ -165,22 +160,14 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     addNotification({ type: willPin ? "success" : "info", message: willPin ? "会话已置顶" : "已取消置顶", duration: 2000 });
   };
 
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const renamedNames = useRef<Record<string, string>>({});
-
   const handleRename = async (sessionId: string, newName: string) => {
     if (!newName.trim()) return;
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("neocodex_rename_session", { sessionId, name: newName.trim() });
-      renamedNames.current[sessionId] = newName.trim();
       setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, name: newName.trim() } : s)));
-      setRenamingId(null);
       addNotification({ type: "success", message: "已重命名", duration: 2000 });
     } catch (e) {
       addNotification({ type: "error", message: `重命名失败: ${e}`, duration: 3000 });
-      setRenamingId(null);
     }
   };
 
@@ -192,7 +179,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   const performExport = async (format: "markdown" | "json") => {
     if (!exportSession) return;
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       const items = await invoke("neocodex_get_session_messages", { sessionId: exportSession.id }) as any[];
       let content: string;
       if (format === "markdown") {
@@ -288,7 +274,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     <div className={styles.container}>
       <div className={styles.header}>
         <h3>会话 ({sessions.length})</h3>
-        <button className={styles.newBtn} onClick={() => setShowNewDialog(true)}>
+        <button className={styles.newBtn} onClick={() => setShowNewDialog(true)} title="新建会话">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -344,7 +330,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
                 onPin={() => togglePin(session.id)}
                 onExport={() => handleExport(session)}
                 onArchive={() => handleArchive(session.id)}
-                onRename={() => { setRenamingId(session.id); setRenameValue(session.name); }}
+                onRename={(newName) => handleRename(session.id, newName)}
               />
             ))}
           </div>
@@ -442,13 +428,12 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   );
 }
 
-function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExport, onRename, onArchive }: { session: { id: string; name: string; mode: string; message_count?: number; updated_at: number }; pinned: boolean; active: boolean; onClick: () => void; onDelete?: () => void; onPin: () => void; onExport: () => void; onRename: () => void; onArchive?: () => void }) {
+function SessionItem({ session, pinned, active, onClick, onDelete, onPin, onExport, onRename, onArchive }: { session: { id: string; name: string; mode: string; message_count?: number; updated_at: number }; pinned: boolean; active: boolean; onClick: () => void; onDelete?: () => void; onPin: () => void; onExport: () => void; onRename: (newName: string) => void; onArchive?: () => void }) {
   const [showRename, setShowRename] = useState(false);
   const [renameVal, setRenameVal] = useState(session.name);
   const handleRenameSubmit = () => {
     if (renameVal.trim()) {
-      onRename();
-      // Update via parent's rename handler (stored in renamedNames ref)
+      onRename(renameVal.trim());
     }
     setShowRename(false);
   };
