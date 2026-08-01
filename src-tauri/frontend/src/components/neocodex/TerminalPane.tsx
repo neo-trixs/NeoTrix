@@ -3,7 +3,102 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import styles from "./TerminalPane.module.css";
 
+interface TabMeta {
+  id: string;
+  name: string;
+}
+
+let tabSeq = 0;
+const nextTabId = () => `term-${Date.now()}-${tabSeq++}`;
+
 export function TerminalPane() {
+  const [tabs, setTabs] = useState<TabMeta[]>([{ id: nextTabId(), name: "终端 1" }]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // First tab becomes active once rendered.
+  useEffect(() => {
+    if (!activeId && tabs.length > 0) setActiveId(tabs[0].id);
+  }, [tabs, activeId]);
+
+  const addTab = () => {
+    const id = nextTabId();
+    setTabs((prev) => [...prev, { id, name: `终端 ${prev.length + 1}` }]);
+    setActiveId(id);
+  };
+
+  const closeTab = (id: string) => {
+    setTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === id);
+      const next = prev.filter((t) => t.id !== id);
+      if (next.length === 0) {
+        // Always keep at least one tab alive; spawn a fresh one.
+        setActiveId(null);
+        return [{ id: nextTabId(), name: "终端 1" }];
+      }
+      if (activeId === id) {
+        const neighbor = next[Math.min(idx, next.length - 1)];
+        setActiveId(neighbor.id);
+      }
+      return next;
+    });
+  };
+
+  const renameTab = (id: string, name: string) => {
+    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, name: name || t.name } : t)));
+  };
+
+  const active = tabs.find((t) => t.id === activeId) || tabs[0];
+
+  return (
+    <div className={styles.panel} data-testid="terminal-pane">
+      <div className={styles.header}>
+        <div className={styles.tabBar} role="tablist" aria-label="终端标签页">
+          {tabs.map((t) => (
+            <div
+              key={t.id}
+              role="tab"
+              aria-selected={t.id === active?.id}
+              className={`${styles.tab} ${t.id === active?.id ? styles.tabActive : ""}`}
+              data-testid={`terminal-tab-${t.id}`}
+              onClick={() => setActiveId(t.id)}
+            >
+              <input
+                className={styles.tabName}
+                value={t.name}
+                onChange={(e) => renameTab(t.id, e.target.value)}
+                onFocus={(e) => e.target.select()}
+                title="双击重命名"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                className={styles.tabClose}
+                onClick={(e) => { e.stopPropagation(); closeTab(t.id); }}
+                title="关闭标签"
+                aria-label={`关闭 ${t.name}`}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button type="button" className={styles.tabAdd} onClick={addTab} title="新建终端" data-testid="terminal-add" aria-label="新建终端">
+            +
+          </button>
+        </div>
+        <span className={styles.title}>终端</span>
+      </div>
+      <div className={styles.tabBody}>
+        {tabs.map((t) => (
+          <div key={t.id} className={styles.tabPane} hidden={t.id !== active?.id}>
+            <TerminalTab active={t.id === active?.id} onExit={() => closeTab(t.id)} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TerminalTab({ active, onExit }: { active: boolean; onExit: () => void }) {
   const [lines, setLines] = useState<string[]>(["$ "]);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);
@@ -13,10 +108,6 @@ export function TerminalPane() {
   const bufRef = useRef("");
   const sessionRef = useRef<string | null>(null);
   const cleanupRef = useRef<Array<() => void>>([]);
-
-  useEffect(() => {
-    if (outRef.current) outRef.current.scrollTop = outRef.current.scrollHeight;
-  }, [lines]);
 
   const append = useCallback((chunk: string) => {
     bufRef.current += chunk;
@@ -81,6 +172,7 @@ export function TerminalPane() {
     if (text === "exit" || text === "exit\n") {
       await invoke("pty_close", { sessionId: sid }).catch(() => {});
       sessionRef.current = null;
+      onExit();
       return;
     }
     await invoke("pty_write", { sessionId: sid, data: text + "\n" }).catch((e) => setError(String(e)));
@@ -96,12 +188,12 @@ export function TerminalPane() {
     }
   };
 
+  useEffect(() => {
+    if (active) inputRef.current?.focus();
+  }, [active]);
+
   return (
-    <div className={styles.panel} data-testid="terminal-pane">
-      <div className={styles.header}>
-        <span className={styles.title}>终端</span>
-        <span className={`${styles.dot} ${ready ? styles.dotOn : ""}`} title={ready ? "运行中" : "已退出"} />
-      </div>
+    <div className={styles.tabBody}>
       <div className={styles.output} ref={outRef}>
         {lines.map((l, i) => (
           <div key={i} className={styles.line}>{l || "\u00a0"}</div>
@@ -116,12 +208,14 @@ export function TerminalPane() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="运行命令 (Ctrl+L 清屏, exit 退出)"
-          autoFocus
-          data-testid="terminal-input"
+          placeholder="运行命令 (Ctrl+L 清屏, exit 关闭标签)"
+          autoFocus={active}
+          data-testid={active ? "terminal-input" : "terminal-input-hidden"}
         />
         <button type="button" className={styles.send} onClick={send} data-testid="terminal-send">⏎</button>
       </div>
     </div>
   );
 }
+
+export default TerminalPane;

@@ -78,4 +78,41 @@ describe("TerminalPane", () => {
     act(() => unmount());
     expect(closeSpy).toHaveBeenCalledWith({ sessionId: "s-pty-1" });
   });
+
+  it("adds a terminal tab that spawns its own pty session", async () => {
+    const spawnSpy = vi.fn(() => "s-pty-2");
+    mockInvoke("pty_spawn", spawnSpy);
+    render(<TerminalPane />);
+    await waitFor(() => expect(screen.getByTestId("terminal-input")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("terminal-add"));
+    // New tab active → second pty spawned.
+    await waitFor(() => expect(spawnSpy).toHaveBeenCalledTimes(2));
+    // Tab bar shows 2 tabs.
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+  });
+
+  it("switching tabs keeps prior tab output intact (tabs stay mounted)", async () => {
+    mockInvoke("pty_spawn", () => "s-pty-1");
+    render(<TerminalPane />);
+    await waitFor(() => expect(screen.getByTestId("terminal-input")).toBeInTheDocument());
+    emit("pty-output-s-pty-1", "first tab\n");
+    await waitFor(() => expect(screen.getByText("first tab")).toBeInTheDocument());
+    // Add a second tab and switch back to the first.
+    fireEvent.click(screen.getByTestId("terminal-add"));
+    const tabs = screen.getAllByRole("tab");
+    fireEvent.click(tabs[0]);
+    expect(screen.getByText("first tab")).toBeInTheDocument();
+  });
+
+  it("closing the last tab replaces it with a fresh one (never empty)", async () => {
+    const closeSpy = vi.fn(() => null);
+    mockInvoke("pty_close", closeSpy);
+    render(<TerminalPane />);
+    await waitFor(() => expect(screen.getByTestId("terminal-input")).toBeInTheDocument());
+    const closeBtn = screen.getByTitle("关闭标签");
+    fireEvent.click(closeBtn);
+    // A replacement tab is mounted with a new pty.
+    await waitFor(() => expect(screen.getByTestId("terminal-input")).toBeInTheDocument());
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+  });
 });

@@ -23,3 +23,7 @@ opencode.json
 # Playwright artifacts
 src-tauri/frontend/test-results/
 src-tauri/frontend/playwright-report/
+
+# Python bytecode
+__pycache__/
+*.py[cod]

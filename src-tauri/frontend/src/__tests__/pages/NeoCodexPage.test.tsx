@@ -64,4 +64,24 @@ describe("NeoCodexPage new-session handling", () => {
       expect(useStore.getState().neocodexActiveSessionId).toBe("s-event");
     });
   });
+
+  it("Cmd+1..9 switches to the session at that position (numbered switch)", async () => {
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-a", name: "会话A", mode: "Agent", message_count: 1, wire_path: "", created_at: 0, updated_at: 0 },
+      { id: "s-b", name: "会话B", mode: "Agent", message_count: 1, wire_path: "", created_at: 0, updated_at: 0 },
+      { id: "s-c", name: "会话C", mode: "Agent", message_count: 1, wire_path: "", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+    render(<NeoCodexPage />);
+
+    await waitFor(() => expect(useStore.getState().neocodexSessions.length).toBe(3));
+
+    fireEvent.keyDown(window, { key: "2", metaKey: true });
+    await waitFor(() => expect(useStore.getState().neocodexActiveSessionId).toBe("s-b"));
+
+    fireEvent.keyDown(window, { key: "3", metaKey: true });
+    await waitFor(() => expect(useStore.getState().neocodexActiveSessionId).toBe("s-c"));
+  });
 });

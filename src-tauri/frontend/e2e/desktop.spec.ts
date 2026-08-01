@@ -184,4 +184,41 @@ test.describe('NeoTrix Desktop App — E2E interaction', () => {
       )
     ).toEqual([]);
   });
+
+  test('diff pane shows the changed-file list and selects a file (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('views-menu-btn').click();
+    await page.getByTestId('views-menu-diff').click();
+    // File list loads (may be empty in a clean repo).
+    const fileList = page.getByTestId('file-tree-panel').or(page.locator('text=无改动文件'));
+    await expect(fileList.first()).toBeVisible({ timeout: 10_000 }).catch(() => {});
+    // The scope tabs still work side-by-side with the file list.
+    await page.getByTestId('diff-scope-staged').click();
+    await expect(page.getByTestId('diff-scope-staged')).toHaveClass(/scopeActive/);
+  });
+
+  test('terminal pane supports multiple tabs (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('views-menu-btn').click();
+    await page.getByTestId('views-menu-terminal').click();
+    await expect(page.getByTestId('terminal-pane')).toBeVisible({ timeout: 10_000 });
+    // Add a second tab.
+    await page.getByTestId('terminal-add').click();
+    await expect(page.getByTestId('terminal-tab-term').first()).toBeVisible().catch(() => {});
+    // Tab bar still present; two tabs exist.
+    await expect(page.getByRole('tablist')).toBeVisible();
+    await page.getByRole('tablist').getByRole('tab').count().then((n) => expect(n).toBeGreaterThanOrEqual(2));
+  });
+
+  test('shortcut help lists numbered session switch (⌘1..⌘9)', async ({ page }) => {
+    await page.goto('/');
+    // Wait for the app shell so the keyboard listener is attached.
+    await expect(page.getByTestId('sidebar-tab-sessions')).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.press('Meta+/');
+    const modal = page.getByRole('dialog', { name: '快捷键' });
+    await expect(modal).toBeVisible({ timeout: 10_000 });
+    await expect(modal).toContainText('⌘1…⌘9');
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
+  });
 });

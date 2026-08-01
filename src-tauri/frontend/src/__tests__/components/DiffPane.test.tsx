@@ -76,4 +76,50 @@ describe("DiffPane", () => {
     await waitFor(() => expect(fileSpy).toHaveBeenCalledTimes(1));
     expect(fileSpy).toHaveBeenCalledWith({ path: "src" });
   });
+
+  it("renders the changed-file list grouped by staged/unstaged/untracked", async () => {
+    mockInvoke("cmd_diff_changed_files", () => ({
+      staged: [{ status: "M", path: "src/main.rs" }],
+      unstaged: [{ status: "M", path: "README.md" }],
+      untracked: [{ status: "??", path: "notes.txt" }],
+    }));
+    render(<DiffPane />);
+    expect(await screen.findByText("已暂存 (1)")).toBeInTheDocument();
+    expect(screen.getByText("未暂存 (1)")).toBeInTheDocument();
+    expect(screen.getByText("未跟踪 (1)")).toBeInTheDocument();
+    expect(screen.getByText("src/main.rs")).toBeInTheDocument();
+    expect(screen.getByText("README.md")).toBeInTheDocument();
+    expect(screen.getByText("notes.txt")).toBeInTheDocument();
+  });
+
+  it("clicking a file in the list loads its per-file diff (cmd_diff_file)", async () => {
+    const fileSpy = vi.fn(() => [{ type: "added", content: "let x = 1;", line_start: 0 }]);
+    mockInvoke("cmd_diff_changed_files", () => ({
+      staged: [],
+      unstaged: [{ status: "M", path: "src/lib.rs" }],
+      untracked: [],
+    }));
+    mockInvoke("cmd_diff_file", fileSpy);
+    render(<DiffPane />);
+    fireEvent.click(await screen.findByText("src/lib.rs"));
+    await waitFor(() => expect(fileSpy).toHaveBeenCalledWith({ path: "src/lib.rs" }));
+    expect(await screen.findByText("let x = 1;")).toBeInTheDocument();
+  });
+
+  it("shows empty-file state when the repo has no changes", async () => {
+    mockInvoke("cmd_diff_changed_files", () => ({ staged: [], unstaged: [], untracked: [] }));
+    render(<DiffPane />);
+    expect(await screen.findByText("无改动文件")).toBeInTheDocument();
+  });
+
+  it("refreshes the file list after staging (stage → list reload)", async () => {
+    const stageSpy = vi.fn(() => ["src/lib.rs"]);
+    const filesSpy = vi.fn(() => ({ staged: [{ status: "M", path: "src/lib.rs" }], unstaged: [], untracked: [] }));
+    mockInvoke("cmd_diff_stage", stageSpy);
+    mockInvoke("cmd_diff_changed_files", filesSpy);
+    render(<DiffPane />);
+    await waitFor(() => expect(screen.getByTestId("diff-stage-all")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("diff-stage-all"));
+    await waitFor(() => expect(filesSpy).toHaveBeenCalledTimes(2));
+  });
 });

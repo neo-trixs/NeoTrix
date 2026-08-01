@@ -48,6 +48,7 @@ const defaultResponses: Record<string, (args: any) => any> = {
   neocodex_search_files: () => [],
   cmd_diff_unstaged: () => [{ type: "added", content: "fn new()", line_start: 0 }],
   cmd_diff_staged: () => [],
+  cmd_diff_changed_files: () => ({ staged: [], unstaged: [], untracked: [] }),
   cmd_diff_file: () => [],
   cmd_diff_stage: () => ["a.rs"],
   cmd_diff_unstage: () => [],

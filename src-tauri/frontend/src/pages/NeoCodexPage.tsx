@@ -474,6 +474,15 @@ export default function NeoCodexPage() {
         const delta = e.shiftKey ? -1 : 1;
         const next = neocodexSessions[(idx + delta + neocodexSessions.length) % neocodexSessions.length];
         handleSessionSelect(next);
+      } else if (/^[1-9]$/.test(e.key) && (e.metaKey || e.ctrlKey)) {
+        // Numbered session switch (Cmd+1..9) — a differentiator neither Claude
+        // Code Desktop nor Codex Desktop offers.
+        e.preventDefault();
+        const n = Number(e.key);
+        const target = neocodexSessions[n - 1];
+        if (target && target.id !== neocodexActiveSessionId) {
+          handleSessionSelect(target);
+        }
       }
     };
     window.addEventListener("keydown", handler);

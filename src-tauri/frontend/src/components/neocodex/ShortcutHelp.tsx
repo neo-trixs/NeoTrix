@@ -7,6 +7,7 @@ const SHORTCUTS: Array<{ keys: string; label: string }> = [
   { keys: "⌘B", label: "折叠/展开侧栏" },
   { keys: "⌘,", label: "设置" },
   { keys: "Ctrl+Tab / Ctrl+Shift+Tab", label: "下一个 / 上一个会话" },
+  { keys: "⌘1…⌘9", label: "按序号切换会话" },
   { keys: "Ctrl+O", label: "循环视图模式" },
   { keys: "⌘+;", label: "侧聊" },
   { keys: "⌘W", label: "关闭会话" },

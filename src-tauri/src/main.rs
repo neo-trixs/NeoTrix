@@ -245,6 +245,7 @@ fn main() {
                     commands::cmd_agent_status,
                     commands::cmd_diff_staged,
                     commands::cmd_diff_unstaged,
+                    commands::cmd_diff_changed_files,
                     commands::cmd_diff_file,
                     commands::cmd_diff_stage,
                     commands::cmd_diff_unstage,

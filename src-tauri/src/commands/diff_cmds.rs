@@ -53,6 +53,15 @@ pub fn cmd_diff_file(path: String) -> Result<Vec<DiffBlock>, NeoTrixError> {
 
 /// Stage the given paths (or all changes when `paths` is empty). Returns the
 /// updated list of changed files for the review UI.
+/// Structured changed-file list for the diff review UI (Codex #1 gap: the
+/// review file tree was hidden behind a button). Returns porcelain entries
+/// with their two-letter status + path, split into staged/unstaged buckets.
+#[command]
+pub fn cmd_diff_changed_files() -> Result<serde_json::Value, NeoTrixError> {
+    let out = run_git_cmd(&["status", "--porcelain"])?;
+    Ok(parse_porcelain_changed(&out))
+}
+
 #[command]
 pub fn cmd_diff_stage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTrixError> {
     match paths {
@@ -69,14 +78,44 @@ pub fn cmd_diff_stage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTrix
 
 fn changed_files_porcelain() -> Result<Vec<String>, NeoTrixError> {
     let out = run_git_cmd(&["status", "--porcelain"])?;
-    Ok(out
-        .lines()
+    Ok(parse_porcelain_paths(&out))
+}
+
+/// Parse `git status --porcelain` output into bare file paths.
+pub(crate) fn parse_porcelain_paths(out: &str) -> Vec<String> {
+    out.lines()
         .filter_map(|l| {
             if l.len() <= 3 { return None; }
             let p = l[3..].trim().to_string();
             if p.is_empty() { None } else { Some(p) }
         })
-        .collect())
+        .collect()
+}
+
+/// Parse `git status --porcelain` output into a structured {staged,
+/// unstaged, untracked} file list for the diff review UI.
+pub(crate) fn parse_porcelain_changed(out: &str) -> serde_json::Value {
+    let mut staged = Vec::new();
+    let mut unstaged = Vec::new();
+    let mut untracked = Vec::new();
+    for l in out.lines() {
+        // Porcelain format: exactly XY SP path — status chars must come from
+        // the raw line (do NOT trim; " M" means unstaged-modified).
+        if l.len() < 4 { continue; }
+        let status = &l[..2];
+        let path = l[3..].trim().to_string();
+        if path.is_empty() { continue; }
+        let entry = serde_json::json!({ "status": status.trim(), "path": path });
+        let is_staged = status.chars().next() == Some('M') || status.starts_with("A ") || status.starts_with("D ") || status.starts_with("R ") || status.starts_with("C ");
+        if status == "??" {
+            untracked.push(entry);
+        } else if is_staged {
+            staged.push(entry);
+        } else {
+            unstaged.push(entry);
+        }
+    }
+    serde_json::json!({ "staged": staged, "unstaged": unstaged, "untracked": untracked })
 }
 
 /// Unstage the given paths (or everything when `paths` is empty). Returns the
@@ -99,4 +138,34 @@ pub fn cmd_diff_unstage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTr
 #[command]
 pub fn cmd_diff_commit(message: String) -> Result<(), NeoTrixError> {
     run_git_cmd(&["commit", "-m", &message]).map(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn porcelain_paths_extracts_clean_paths() {
+        let out = " M src/lib.rs\n A README.md\n?? notes.txt\n";
+        assert_eq!(parse_porcelain_paths(out), vec!["src/lib.rs", "README.md", "notes.txt"]);
+    }
+
+    #[test]
+    fn porcelain_changed_buckets_by_status() {
+        let out = " M src/unstaged.rs\nM  src/staged.rs\nA  src/added.rs\n?? notes.txt\n";
+        let v = parse_porcelain_changed(out);
+        assert_eq!(v["staged"].as_array().unwrap().len(), 2);
+        assert_eq!(v["unstaged"].as_array().unwrap().len(), 1);
+        assert_eq!(v["untracked"].as_array().unwrap().len(), 1);
+        assert_eq!(v["staged"][0]["path"], "src/staged.rs");
+        assert_eq!(v["untracked"][0]["path"], "notes.txt");
+    }
+
+    #[test]
+    fn porcelain_changed_handles_untracked_dir_suffix() {
+        let out = "?? newdir/\n M src/a.rs\n";
+        let v = parse_porcelain_changed(out);
+        assert_eq!(v["untracked"][0]["path"], "newdir/");
+        assert_eq!(v["unstaged"][0]["path"], "src/a.rs");
+    }
 }
