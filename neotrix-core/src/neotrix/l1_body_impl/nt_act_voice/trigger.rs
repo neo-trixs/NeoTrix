@@ -57,7 +57,10 @@ impl VoiceTrigger {
             return Some((false, None));
         }
         let cleaned = text.to_lowercase();
-        if let Some(wake) = self.wake_words.first() {
+        // Strip whichever wake word actually fired — using wake_words[0]
+        // leaves the wake word in the command when the user said a different
+        // alias (e.g. "neotrix open settings" with ["hey neotrix","neotrix"]).
+        if let Some(wake) = self.wake_words.iter().find(|w| cleaned.contains(w.as_str())) {
             let cleaned = cleaned.replace(wake, "").trim().to_string();
             if cleaned.is_empty() {
                 return Some((true, None));

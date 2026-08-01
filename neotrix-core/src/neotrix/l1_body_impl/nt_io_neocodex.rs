@@ -303,7 +303,7 @@ impl StreamingMarkdown {
                     content[i + 2..end].trim().to_string(),
                 ));
                 i = end + 1;
-            } else if content[i..].starts_with("---") && content[i..].starts_with("---") {
+            } else if content[i..].starts_with("---") {
                 self.chunks.push(MarkdownChunk::HorizontalRule);
                 i += 3;
             } else {
@@ -880,6 +880,17 @@ impl AcpServer {
 
     pub async fn handle_request(&self, req: AcpRequest) -> AcpResponse {
         let AcpRequest { id, method, params } = req;
+        if !matches!(method.as_str(),
+            "ping" | "agent/process" | "agent/status" | "agent/mode" | "tools/list" | "shutdown")
+        {
+            // Protocol errors belong in `error`, not smuggled into `result` —
+            // clients keying on the error field otherwise see a success.
+            return AcpResponse {
+                id,
+                result: None,
+                error: Some(AcpError { code: -32601, message: format!("unknown method: {}", method) }),
+            };
+        }
         let result = self.dispatch(method, params).await;
         AcpResponse { id, result: Some(result), error: None }
     }
@@ -1766,7 +1777,7 @@ impl NeoCodexAgent {
             "read" => match std::fs::read_to_string(args.trim()) {
                 Ok(content) => {
                     if content.len() > 16_000 {
-                        content.chars().take(16_000).collect()
+                        content[..content.floor_char_boundary(16_000)].to_string()
                     } else {
                         content
                     }
@@ -1816,7 +1827,7 @@ impl NeoCodexAgent {
                             if stdout.len() > cap {
                                 format!(
                                     "{}... [stdout truncated {} bytes]",
-                                    stdout.chars().take(cap).collect::<String>(),
+                                    &stdout[..stdout.floor_char_boundary(cap)],
                                     stdout.len().saturating_sub(cap)
                                 )
                             } else {

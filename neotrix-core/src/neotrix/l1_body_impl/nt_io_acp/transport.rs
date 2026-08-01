@@ -1,4 +1,4 @@
-use std::io::{self, BufRead, Write};
+use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -29,6 +29,9 @@ impl StdioTransport {
 
     /// Read one JSON-RPC message from stdin.
     /// Returns `None` on EOF or when shutdown flag is set.
+    /// A malformed or blank line is logged and skipped (does not terminate
+    /// the server), so a stray newline or spec-legal request that fails
+    /// strict `id: u64` decoding cannot kill the whole ACP process.
     pub fn read_message(&self) -> io::Result<Option<JsonRpcMessage>> {
         if !self.running.load(Ordering::Relaxed) {
             return Ok(None);
@@ -36,19 +39,43 @@ impl StdioTransport {
         let mut line = String::new();
         let stdin = io::stdin();
         let mut reader = stdin.lock();
-        let n = reader.read_line(&mut line)?;
-        if n == 0 {
-            return Ok(None);
+        // Bound the frame size: a client streaming without a newline must
+        // not grow the buffer without limit. Lines longer than 1 MiB are
+        // drained (skipped) rather than accumulated.
+        let mut chunk = [0u8; 1024];
+        let mut total = 0usize;
+        const MAX_LINE: usize = 1024 * 1024;
+        loop {
+            let read = reader.read(&mut chunk)?;
+            if read == 0 {
+                if total == 0 { return Ok(None); }
+                break;
+            }
+            total += read;
+            if total > MAX_LINE {
+                // Drain the rest of the oversized line, then skip it.
+                let mut drain = [0u8; 4096];
+                loop {
+                    let n = reader.read(&mut drain)?;
+                    if n == 0 { return self.read_message(); }
+                    if drain[..n].contains(&b'\n') { return self.read_message(); }
+                }
+            }
+            let text = String::from_utf8_lossy(&chunk[..read]);
+            line.push_str(&text);
+            if text.contains('\n') {
+                break;
+            }
         }
         let trimmed = line.trim();
         if trimmed.is_empty() {
-            return Ok(None);
+            return self.read_message();
         }
         match serde_json::from_str::<JsonRpcMessage>(trimmed) {
             Ok(msg) => Ok(Some(msg)),
             Err(e) => {
-                log::warn!("[acp] failed to parse message: {}", e);
-                Ok(None)
+                log::warn!("[acp] failed to parse message (skipping): {}", e);
+                self.read_message()
             }
         }
     }

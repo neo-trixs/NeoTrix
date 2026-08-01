@@ -108,6 +108,7 @@ pub struct GooseRuntime {
     pub config: GooseRuntimeConfig,
     sessions: HashMap<String, GooseSession>,
     tools: HashMap<String, GooseToolDef>,
+    next_session_id: u64,
 }
 
 impl GooseRuntime {
@@ -116,6 +117,7 @@ impl GooseRuntime {
             config,
             sessions: HashMap::new(),
             tools: HashMap::new(),
+            next_session_id: 0,
         }
     }
 
@@ -124,7 +126,13 @@ impl GooseRuntime {
     }
 
     pub fn create_session(&mut self, name: &str, agent_type: &str) -> GooseSession {
-        let id = format!("goose-{}", self.sessions.len() + 1);
+        if self.sessions.len() >= self.config.max_sessions {
+            log::warn!("[goose] max_sessions ({}) reached; creating session anyway", self.config.max_sessions);
+        }
+        // Monotonic id: len()+1 collides after remove_session. Track a
+        // counter so ids never repeat within this manager instance.
+        self.next_session_id += 1;
+        let id = format!("goose-{}", self.next_session_id);
         let session = GooseSession::new(id.clone(), name.to_string(), agent_type.to_string());
         self.sessions.insert(id.clone(), session.clone());
         session
@@ -141,7 +149,7 @@ impl GooseRuntime {
     pub fn list_sessions(&self) -> Vec<&GooseSession> {
         self.sessions.values().filter(|s| {
             let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-            s.is_active() || (now - s.updated_at) < self.config.idle_timeout_secs
+            s.is_active() || now.saturating_sub(s.updated_at) < self.config.idle_timeout_secs
         }).collect()
     }
 
