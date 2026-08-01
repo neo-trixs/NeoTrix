@@ -5,7 +5,6 @@ import { useStore } from "./stores";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NotificationToast from "./components/NotificationToast";
 import { getCurrent } from "@tauri-apps/plugin-deep-link";
-import { check } from "@tauri-apps/plugin-updater";
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -13,7 +12,7 @@ const App: React.FC = () => {
 
   const settings = useStore((s) => s.settings);
   const updateProgress = useStore((s) => s.updateProgress);
-  const setUpdateStatus = useStore((s) => s.setUpdateStatus);
+  const setUpdateProgress = useStore((s) => s.setUpdateProgress);
   const addNotification = useStore((s) => s.addNotification);
 
   // ── Apply theme ──
@@ -29,7 +28,7 @@ const App: React.FC = () => {
       media.addEventListener("change", apply);
       return () => media.removeEventListener("change", apply);
     }
-  }, [settings.theme]);
+  }, [settings.theme, settings.fontSize]);
 
   // ── Tauri event: task complete ──
   useEffect(() => {
@@ -63,19 +62,25 @@ const App: React.FC = () => {
     };
   }, [navigate]);
 
-  // ── Update check ──
+  // ── Update download progress (from neocodex_download_update) ──
   useEffect(() => {
-    const checkUpdate = async () => {
-      try {
-        const update = await check();
-        if (update?.available) {
-          setUpdateStatus(true, `v${update.version}`);
-          addNotification({ type: "info", message: `Update v${update.version} available`, duration: 10000 });
-        }
-      } catch {}
+    const unlisten = listen<{ downloaded: number; total: number | null }>("neocodex_update_progress", (event) => {
+      const { downloaded, total } = event.payload;
+      if (total && total > 0) {
+        setUpdateProgress(Math.min(99, Math.round((downloaded / total) * 100)));
+      } else {
+        setUpdateProgress(0);
+      }
+    });
+    const unlistenDone = listen("neocodex_update_downloaded", () => {
+      setUpdateProgress(100);
+      setTimeout(() => setUpdateProgress(0), 2000);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+      unlistenDone.then((fn) => fn());
     };
-    checkUpdate();
-  }, [setUpdateStatus, addNotification]);
+  }, [setUpdateProgress]);
 
   // ── Window state persistence ──
   useEffect(() => {

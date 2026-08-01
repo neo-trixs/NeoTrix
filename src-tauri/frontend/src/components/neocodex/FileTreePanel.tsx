@@ -168,7 +168,8 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
       <div className={styles.tree}>
         {loading && <div className={styles.muted}>加载中…</div>}
         {error && <div className={styles.error}>{error}</div>}
-        {!loading && !error && root && renderTree(root.children || [], 0)}
+        {!loading && !error && root && root.children && root.children.length > 0 && renderTree(root.children, 0)}
+        {!loading && !error && root && (!root.children || root.children.length === 0) && <div className={styles.muted}>无文件</div>}
         {!loading && !error && !root && <div className={styles.muted}>无文件</div>}
       </div>
       {preview !== null && (
