@@ -81,7 +81,7 @@ export function TerminalPane() {
   };
 
   return (
-    <div className={styles.panel}>
+    <div className={styles.panel} data-testid="terminal-pane">
       <div className={styles.header}>
         <span className={styles.title}>终端</span>
         <span className={`${styles.dot} ${ready ? styles.dotOn : ""}`} title={ready ? "运行中" : "已退出"} />
@@ -102,8 +102,9 @@ export function TerminalPane() {
           onKeyDown={onKeyDown}
           placeholder="运行命令 (Ctrl+L 清屏, exit 退出)"
           autoFocus
+          data-testid="terminal-input"
         />
-        <button type="button" className={styles.send} onClick={send}>⏎</button>
+        <button type="button" className={styles.send} onClick={send} data-testid="terminal-send">⏎</button>
       </div>
     </div>
   );

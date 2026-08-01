@@ -131,6 +131,44 @@ test.describe('NeoTrix Desktop App — E2E interaction', () => {
     await expect(page.getByTestId('diff-scope-staged')).toHaveClass(/scopeActive/);
   });
 
+  test('files tab opens the file tree panel (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('sidebar-tab-files').click();
+    const panel = page.getByTestId('file-tree-panel');
+    await expect(panel).toBeVisible({ timeout: 10_000 });
+    await expect(panel).toContainText('文件');
+    // Switch back to sessions.
+    await page.getByTestId('sidebar-tab-sessions').click();
+    await expect(panel).not.toBeVisible();
+  });
+
+  test('terminal pane opens via views menu with input (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    const viewsBtn = page.getByTestId('views-menu-btn');
+    await expect(viewsBtn).toBeVisible({ timeout: 10_000 });
+    await viewsBtn.click();
+    await page.getByTestId('views-menu-terminal').click();
+    const pane = page.getByTestId('terminal-pane');
+    await expect(pane).toBeVisible({ timeout: 10_000 });
+    await expect(pane.getByTestId('terminal-input')).toBeVisible();
+    // Close via the same menu toggle.
+    await viewsBtn.click();
+    await page.getByTestId('views-menu-terminal').click();
+    await expect(pane).not.toBeVisible();
+  });
+
+  test('preview pane opens via views menu (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    const viewsBtn = page.getByTestId('views-menu-btn');
+    await expect(viewsBtn).toBeVisible({ timeout: 10_000 });
+    await viewsBtn.click();
+    await page.getByTestId('views-menu-preview').click();
+    const pane = page.getByTestId('preview-pane');
+    await expect(pane).toBeVisible({ timeout: 10_000 });
+    await expect(pane.getByTestId('preview-url')).toBeVisible();
+    await expect(pane.getByTestId('preview-open')).toBeVisible();
+  });
+
   test('no uncaught errors on load', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));

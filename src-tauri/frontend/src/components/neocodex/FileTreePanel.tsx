@@ -160,10 +160,10 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
   );
 
   return (
-    <div className={styles.panel}>
+    <div className={styles.panel} data-testid="file-tree-panel">
       <div className={styles.header}>
         <span className={styles.title}>文件</span>
-        <button type="button" className={styles.refresh} onClick={refresh} title="刷新">↻</button>
+        <button type="button" className={styles.refresh} onClick={refresh} title="刷新" data-testid="file-tree-refresh">↻</button>
       </div>
       <div className={styles.tree}>
         {loading && <div className={styles.muted}>加载中…</div>}

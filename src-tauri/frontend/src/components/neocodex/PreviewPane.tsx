@@ -16,7 +16,7 @@ export function PreviewPane() {
   };
 
   return (
-    <div className={styles.panel}>
+    <div className={styles.panel} data-testid="preview-pane">
       <div className={styles.header}>
         <span className={styles.title}>预览</span>
         <input
@@ -25,8 +25,9 @@ export function PreviewPane() {
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && open()}
           placeholder="http://localhost:5173"
+          data-testid="preview-url"
         />
-        <button type="button" className={styles.openBtn} onClick={open}>打开</button>
+        <button type="button" className={styles.openBtn} onClick={open} data-testid="preview-open">打开</button>
       </div>
       <div className={styles.hint}>
         {state.title ? `已打开: ${state.title}` : "输入 dev server 地址，在内置浏览器预览应用。也可直接打开 HTML/PDF/图片路径。"}
