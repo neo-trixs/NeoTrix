@@ -189,7 +189,12 @@ fn render_history_search(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
         if let Some(&entry_idx) = idx {
             let entry = &app.command_history.entries[entry_idx];
             let display = if entry.len() > area.width.saturating_sub(4) as usize {
-                format!("{}…", &entry[..area.width.saturating_sub(7) as usize])
+                let limit = area.width.saturating_sub(7) as usize;
+                let mut cut = limit.min(entry.len());
+                while !entry.is_char_boundary(cut) {
+                    cut -= 1;
+                }
+                format!("{}…", &entry[..cut])
             } else {
                 entry.clone()
             };
