@@ -116,6 +116,21 @@ test.describe('NeoTrix Desktop App — E2E interaction', () => {
     await expect(aboutTab).toHaveClass(/active/);
   });
 
+  test('diff panel opens via views menu with review actions (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    const viewsBtn = page.getByTestId('views-menu-btn');
+    await expect(viewsBtn).toBeVisible({ timeout: 10_000 });
+    await viewsBtn.click();
+    await page.getByTestId('views-menu-diff').click();
+    await expect(page.getByTestId('diff-scope-unstaged')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('diff-stage-all')).toBeVisible();
+    await expect(page.getByTestId('diff-unstage-all')).toBeVisible();
+    await expect(page.getByTestId('diff-commit')).toBeVisible();
+    // Scope tab switch is pure client-side.
+    await page.getByTestId('diff-scope-staged').click();
+    await expect(page.getByTestId('diff-scope-staged')).toHaveClass(/scopeActive/);
+  });
+
   test('no uncaught errors on load', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));

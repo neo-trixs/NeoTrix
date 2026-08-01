@@ -50,3 +50,53 @@ pub fn cmd_diff_unstaged() -> Result<Vec<DiffBlock>, NeoTrixError> {
 pub fn cmd_diff_file(path: String) -> Result<Vec<DiffBlock>, NeoTrixError> {
     run_git_cmd(&["diff", "HEAD", "--", &path]).map(|s| parse_git_diff(&s))
 }
+
+/// Stage the given paths (or all changes when `paths` is empty). Returns the
+/// updated list of changed files for the review UI.
+#[command]
+pub fn cmd_diff_stage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTrixError> {
+    match paths {
+        Some(p) if !p.is_empty() => {
+            let mut args: Vec<String> = vec!["add".into(), "--".into()];
+            args.extend(p);
+            let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+            run_git_cmd(&arg_refs)?;
+        }
+        _ => { run_git_cmd(&["add", "-A"])?; }
+    };
+    changed_files_porcelain()
+}
+
+fn changed_files_porcelain() -> Result<Vec<String>, NeoTrixError> {
+    let out = run_git_cmd(&["status", "--porcelain"])?;
+    Ok(out
+        .lines()
+        .filter_map(|l| {
+            if l.len() <= 3 { return None; }
+            let p = l[3..].trim().to_string();
+            if p.is_empty() { None } else { Some(p) }
+        })
+        .collect())
+}
+
+/// Unstage the given paths (or everything when `paths` is empty). Returns the
+/// updated porcelain file list.
+#[command]
+pub fn cmd_diff_unstage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTrixError> {
+    match paths {
+        Some(p) if !p.is_empty() => {
+            let mut args: Vec<String> = vec!["reset".into(), "HEAD".into(), "--".into()];
+            args.extend(p);
+            let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+            run_git_cmd(&arg_refs)?;
+        }
+        _ => { run_git_cmd(&["reset"])?; }
+    };
+    changed_files_porcelain()
+}
+
+/// Commit staged changes with the given message (Codex "Review changes" parity).
+#[command]
+pub fn cmd_diff_commit(message: String) -> Result<(), NeoTrixError> {
+    run_git_cmd(&["commit", "-m", &message]).map(|_| ())
+}

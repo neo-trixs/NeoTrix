@@ -45,6 +45,12 @@ const defaultResponses: Record<string, (args: any) => any> = {
   neocodex_app_version: () => "0.18.0",
   neocodex_provider_config: () => ({ provider_count: 1, resolvable: true, active_model: "test", providers: [{ name: "test", model: "test", resolvable: true }] }),
   neocodex_search_files: () => [],
+  cmd_diff_unstaged: () => [{ type: "added", content: "fn new()", line_start: 0 }],
+  cmd_diff_staged: () => [],
+  cmd_diff_file: () => [],
+  cmd_diff_stage: () => ["a.rs"],
+  cmd_diff_unstage: () => [],
+  cmd_diff_commit: () => null,
 };
 
 vi.mock("@tauri-apps/api/core", () => ({
