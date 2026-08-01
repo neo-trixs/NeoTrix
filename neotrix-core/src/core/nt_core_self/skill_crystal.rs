@@ -110,7 +110,8 @@ impl CrystalRegistry {
         }
 
         let name = if trace.task.len() > 40 {
-            format!("{}...", &trace.task[..37])
+            let truncated: String = trace.task.chars().take(37).collect();
+            format!("{}...", truncated)
         } else {
             trace.task.clone()
         };
@@ -376,6 +377,24 @@ mod tests {
         let id = reg.extract_from_trace(&trace, 1);
         assert!(id.is_none());
         assert_eq!(reg.crystals.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_long_cjk_task_no_panic() {
+        // Regression: &trace.task[..37] sliced at byte 37 which lands
+        // mid-CJK-char -> panic for any task > 40 bytes of multibyte text.
+        // chars().take(37) truncates by character.
+        let mut reg = CrystalRegistry::new();
+        let long_task = "修复编译错误与类型系统缺陷".repeat(4);
+        assert!(long_task.len() > 40);
+        let trace = make_trace(0, &long_task, ReflectionGrade::Good, StrategyKind::Reflection, AttentionDomain::Code);
+        let id = reg.extract_from_trace(&trace, 1);
+        assert!(id.is_some());
+        let crystal = &reg.crystals[0];
+        assert!(crystal.name.ends_with("..."), "long names must be ellipsized");
+        let name_chars = crystal.name.chars().count();
+        assert!(name_chars <= 40, "truncated name must fit in 40 chars, got {}", name_chars);
+        assert!(crystal.name.is_char_boundary(crystal.name.len() - 1) || crystal.name.ends_with('.'));
     }
 
     #[test]

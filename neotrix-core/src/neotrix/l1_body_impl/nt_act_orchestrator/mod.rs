@@ -185,7 +185,12 @@ impl Orchestrator {
 
             // DAG 驱动的执行循环：就绪 → 执行 → 标记完成 → 下一批
             let mut execution_log: Vec<String> = Vec::new();
-            let plan_short = if plan_result.len() > 80 { format!("{}...", &plan_result[..80]) } else { plan_result.clone() };
+            let plan_short = if plan_result.chars().count() > 80 {
+                let truncated: String = plan_result.chars().take(80).collect();
+                format!("{}...", truncated)
+            } else {
+                plan_result.clone()
+            };
             execution_log.push(format!("Plan: {}", plan_short));
 
             loop {

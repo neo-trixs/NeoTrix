@@ -55,8 +55,14 @@ impl std::fmt::Display for AutomationAction {
         match self {
             AutomationAction::RunSkill { name } => write!(f, "run_skill:{}", name),
             AutomationAction::RunSealPipeline => write!(f, "run_seal_pipeline"),
-            AutomationAction::Notify { message } => write!(f, "notify:{}", &message[..message.len().min(40)]),
-            AutomationAction::RunCommand { command } => write!(f, "run_cmd:{}", &command[..command.len().min(40)]),
+            AutomationAction::Notify { message } => {
+                let short: String = message.chars().take(40).collect();
+                write!(f, "notify:{}", short)
+            }
+            AutomationAction::RunCommand { command } => {
+                let short: String = command.chars().take(40).collect();
+                write!(f, "run_cmd:{}", short)
+            }
         }
     }
 }
@@ -385,5 +391,22 @@ mod tests {
         assert_eq!(t.to_string(), "file_change:*.rs");
         let a = AutomationAction::RunSkill { name: "test".into() };
         assert_eq!(a.to_string(), "run_skill:test");
+    }
+
+    #[test]
+    fn test_display_long_cjk_no_panic() {
+        // Regression: Notify/RunCommand sliced &message[..len.min(40)] at a
+        // byte index mid-CJK-char -> panic in Display. chars().take(40)
+        // keeps the output valid UTF-8 regardless of byte layout.
+        let long = "通知内容".repeat(30);
+        let notify = AutomationAction::Notify { message: long.clone() };
+        let out = notify.to_string();
+        assert!(out.starts_with("notify:通知内容"));
+        assert!(out.chars().count() <= "notify:".chars().count() + 40);
+
+        let cmd = AutomationAction::RunCommand { command: long };
+        let out2 = cmd.to_string();
+        assert!(out2.starts_with("run_cmd:"));
+        assert!(out2.chars().count() <= "run_cmd:".chars().count() + 40);
     }
 }

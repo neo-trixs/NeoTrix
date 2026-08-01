@@ -175,7 +175,8 @@ impl SiliconSelfModel {
 
     pub fn observe_tool_call(&mut self, tool: &str, result: &str) -> (usize, usize) {
         let call_id = self.context_window.observe(CognitiveUnitKind::ToolCall, &format!("tool:{}", tool));
-        let result_id = self.context_window.observe(CognitiveUnitKind::ActionResult, &format!("result:{}", &result[..result.len().min(200)]));
+        let result_short: String = result.chars().take(200).collect();
+        let result_id = self.context_window.observe(CognitiveUnitKind::ActionResult, &format!("result:{}", result_short));
         self.attention_manager.stimulate_domain(AttentionDomain::ToolUse, 0.3);
         (call_id, result_id)
     }
@@ -387,6 +388,19 @@ mod tests {
         ss.observe("test");
         assert_eq!(ss.iteration, 1);
         assert_eq!(ss.context_window.len(), 1);
+    }
+
+    #[test]
+    fn test_observe_tool_call_long_cjk_result_no_panic() {
+        // Regression: &result[..result.len().min(200)] sliced at byte 200
+        // which lands mid-CJK-char -> panic for any tool result > 200 bytes
+        // of multibyte text. chars().take(200) truncates by character.
+        let mut ss = SiliconSelfModel::new();
+        let long_result = "执行结果".repeat(200);
+        assert!(long_result.len() > 200);
+        let (call_id, result_id) = ss.observe_tool_call("bash", &long_result);
+        assert_ne!(call_id, result_id);
+        assert_eq!(ss.context_window.len(), 2);
     }
 
     #[test]
