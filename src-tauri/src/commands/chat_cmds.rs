@@ -46,7 +46,13 @@ pub async fn send_message(
         return Err("already generating".to_string());
     }
 
-    let api_key = anthropic::client::get_api_key()?;
+    let api_key = match anthropic::client::get_api_key() {
+        Ok(k) => k,
+        Err(e) => {
+            GENERATING.store(false, Ordering::SeqCst);
+            return Err(e);
+        }
+    };
     let model_name = model.unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
     let message_id = format!("msg-{}", uuid::Uuid::new_v4());
 

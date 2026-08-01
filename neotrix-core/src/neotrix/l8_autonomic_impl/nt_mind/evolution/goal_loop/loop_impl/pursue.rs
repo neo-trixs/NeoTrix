@@ -240,6 +240,7 @@ impl GoalLoop {
                     brain.reasoning_bank.store(memory);
                     println!("[bg-goal] goal '{}' → {}", truncate(&finished.description, 40), finished.state.label());
                     self.completed_goals.push(finished);
+                    self.completed_goals.truncate(100);
 
                     if !self.goal_queue.is_empty() {
                         if let Some(next) = self.dequeue_next() {

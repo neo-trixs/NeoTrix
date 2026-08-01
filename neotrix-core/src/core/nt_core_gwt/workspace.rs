@@ -300,7 +300,7 @@ impl GlobalWorkspace {
 
         // Step 5: update module activations with effective salience
         for (i, m) in self.specialists.values_mut().enumerate() {
-            m.activation = report.effective_saliences[i];
+            m.activation = report.effective_saliences.get(i).copied().unwrap_or(0.0);
         }
 
         // Step 5b: Competition Gate — WTA ignition override if enabled

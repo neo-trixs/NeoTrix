@@ -29,13 +29,17 @@ impl FactorialPOMDP {
             let belief = if i < beliefs.len() {
                 &beliefs[i]
             } else {
-                let n = factor.num_states();
+                let n = factor.num_states().max(1);
                 let uniform = 1.0 / n as f64;
                 default_belief = vec![uniform; n];
                 &default_belief
             };
 
             let n = factor.num_states();
+            if n == 0 {
+                updated.push(vec![]);
+                continue;
+            }
             let mut posterior = vec![0.0; n];
             let mut evidence = 0.0;
 

@@ -506,8 +506,11 @@ pub fn browser_x_auto_scroll(
         .as_ref().ok_or_else(|| NeoTrixError::Brain("No active session".into()))?
         .new_page()?;
 
-    // TODO: 后台线程持续滚动 — 需重构为 Arc<Mutex<>> 分离
-    Ok("Auto-scroll started".into())
+    // TODO: 后台线程持续滚动 — 需重构为 Arc<Mutex<>> 分离。
+    // 当前无滚动实现，若在此置 running=true 则 flag 永不复位、每次调用都报 Already running。
+    // 先回滚 flag，返回明确错误，避免 fake-success + 卡死状态。
+    x_state.running.store(false, Ordering::SeqCst);
+    Err(NeoTrixError::Brain("Auto-scroll is not implemented yet".into()))
 }
 
 /// 从 X.com 页面提取推文 (JS 注入)

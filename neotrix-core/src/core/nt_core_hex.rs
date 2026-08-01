@@ -31,7 +31,7 @@ impl ReasoningHexagram {
 
     /// Get the value of a specific reasoning axis (0=LSB, 5=MSB).
     pub fn axis(&self, i: usize) -> u8 {
-        (self.0 >> i) & 1
+        (self.0 >> (i & 7)) & 1
     }
 
     // ─── Axis accessors ───
@@ -53,7 +53,8 @@ impl ReasoningHexagram {
 
     /// Flip a single reasoning axis (爻变).
     pub fn flip_axis(&self, i: usize) -> Self {
-        Self(self.0 ^ (1 << i))
+        let mask = 1u8 << (i & 7);
+        Self(self.0 ^ (mask & 0x3F))
     }
 
     /// Flip multiple axes at once.
@@ -470,7 +471,7 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
             let end = find_next_marker(&lower[start..], &[&reason_markers[..], &boundary_markers[..], &verify_markers[..]].concat()) + start;
-            ctx.goal = task[start..end.min(task.len())].trim().to_string();
+            ctx.goal = slice_task(task, &lower, start, end);
             break;
         }
     }
@@ -482,7 +483,7 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
             let end = find_next_marker(&lower[start..], &[&goal_markers[..], &boundary_markers[..], &verify_markers[..]].concat()) + start;
-            ctx.reason = task[start..end.min(task.len())].trim().to_string();
+            ctx.reason = slice_task(task, &lower, start, end);
             break;
         }
     }
@@ -491,7 +492,7 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
             let end = find_next_marker(&lower[start..], &[&goal_markers[..], &reason_markers[..], &verify_markers[..]].concat()) + start;
-            ctx.boundaries = task[start..end.min(task.len())].trim().to_string();
+            ctx.boundaries = slice_task(task, &lower, start, end);
             break;
         }
     }
@@ -500,12 +501,22 @@ pub fn intention_from_string(task: &str) -> IntentionContext {
         if let Some(pos) = lower.find(m) {
             let start = pos + m.len();
             let end = find_next_marker(&lower[start..], &[&goal_markers[..], &reason_markers[..], &boundary_markers[..]].concat()) + start;
-            ctx.verification = task[start..end.min(task.len())].trim().to_string();
+            ctx.verification = slice_task(task, &lower, start, end);
             break;
         }
     }
 
     ctx
+}
+
+/// 从 task 提取 [start,end) 段：偏移基于小写副本计算，须先对齐原串字符边界并钳位
+/// （lowercasing 可能改变字节长度，越界/落在多字节字符中间会 panic）
+fn slice_task(task: &str, _lower: &str, start: usize, end: usize) -> String {
+    let s = start.min(task.len());
+    let e = end.min(task.len());
+    let s = task.floor_char_boundary(s);
+    let e = task.floor_char_boundary(e);
+    task[s..e].trim().to_string()
 }
 
 fn find_next_marker(text: &str, markers: &[&str]) -> usize {

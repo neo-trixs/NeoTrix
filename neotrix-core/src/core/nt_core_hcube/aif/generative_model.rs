@@ -14,16 +14,19 @@ pub struct GenerativeModel {
 
 impl GenerativeModel {
     pub fn new(num_states: usize, num_observations: usize) -> Self {
-        let uniform_state = 1.0 / num_states as f64;
-        let transition_matrix = vec![vec![uniform_state; num_states]; num_states];
-        let uniform_obs = 1.0 / num_observations as f64;
-        let likelihood_matrix = vec![vec![uniform_obs; num_observations]; num_states];
-        let prior_over_states = vec![uniform_state; num_states];
+        // 防止 num_states/num_observations 为 0 时的除零与空矩阵
+        let states = num_states.max(1);
+        let observations = num_observations.max(1);
+        let uniform_state = 1.0 / states as f64;
+        let transition_matrix = vec![vec![uniform_state; states]; states];
+        let uniform_obs = 1.0 / observations as f64;
+        let likelihood_matrix = vec![vec![uniform_obs; observations]; states];
+        let prior_over_states = vec![uniform_state; states];
         let prior_over_policies = vec![];
 
         GenerativeModel {
-            num_states,
-            num_observations,
+            num_states: states,
+            num_observations: observations,
             transition_matrix,
             likelihood_matrix,
             prior_over_states,

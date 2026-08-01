@@ -419,7 +419,7 @@ pub fn computer_bg_submit(
 
     let description = match type_.as_str() {
         "click" => format!("Mouse click at {}", target),
-        "type" => format!("Type \"{}\"", if target.len() > 40 { format!("{}...", &target[..40]) } else { target.clone() }),
+        "type" => format!("Type \"{}\"", if target.len() > 40 { let end = target.floor_char_boundary(40); format!("{}...", &target[..end]) } else { target.clone() }),
         "navigate" => format!("Open URL {}", target),
         "capture" => format!("Screen capture: {}", target),
         "script" => format!("Execute automation script {}", target),

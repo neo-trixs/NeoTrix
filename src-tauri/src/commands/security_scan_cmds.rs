@@ -203,6 +203,9 @@ fn scan_file_for_patterns(path: &std::path::Path) -> Vec<VulnerabilityFinding> {
 
             let snippet_start = mat.start().saturating_sub(40);
             let snippet_end = (mat.end() + 40).min(content.len());
+            // 切片边界可能落在多字节字符中间 → 用 floor_char_boundary 收齐
+            let snippet_start = content.floor_char_boundary(snippet_start);
+            let snippet_end = content.floor_char_boundary(snippet_end);
             let snippet = &content[snippet_start..snippet_end];
             let clean_snippet = snippet.replace('\n', " ");
 

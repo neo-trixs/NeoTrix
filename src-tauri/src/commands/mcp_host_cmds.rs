@@ -666,7 +666,19 @@ pub fn mcp_host_ping() -> Result<serde_json::Value, String> {
             serde_json::from_str::<serde_json::Value>(line.trim())
                 .map_err(|e| format!("invalid MCP response '{}': {}", line.trim(), e))
         }
-        Err(_) => Err("MCP ping timed out (child unresponsive)".into()),
+        Err(_) => {
+            // 超时：stdin 已移出 state，直接 drop 会对子进程写 EOF；读线程持有 stdout
+            // 无法回收。为防孤儿管道/子进程，此处主动杀掉子进程并复位状态。
+            drop(stdin);
+            if let Some(mut child) = state.child.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            state.child_stdin = None;
+            state.child_stdout = None;
+            state.running = false;
+            Err("MCP ping timed out (child unresponsive, killed)".into())
+        }
     }
 }
 

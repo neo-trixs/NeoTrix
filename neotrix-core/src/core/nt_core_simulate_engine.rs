@@ -30,6 +30,12 @@ impl SimulateEngine {
             description: description.to_string(),
             result: None,
         });
+        if self.scenarios.len() > 1024 {
+            let oldest = self.scenarios.keys().next().cloned();
+            if let Some(k) = oldest {
+                self.scenarios.remove(&k);
+            }
+        }
         id
     }
 

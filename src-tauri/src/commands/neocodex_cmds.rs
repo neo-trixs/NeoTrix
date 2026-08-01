@@ -296,6 +296,13 @@ fn sessions_dir() -> std::path::PathBuf {
 }
 
 fn session_path(session_id: &str) -> std::path::PathBuf {
+    // 防路径穿越: session_id 仅允许字母/数字/连字符/下划线
+    let safe: String = session_id.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    if safe.is_empty() || safe != session_id {
+        return sessions_dir().join(format!("__invalid__.jsonl"));
+    }
     sessions_dir().join(format!("{}.jsonl", session_id))
 }
 
@@ -322,7 +329,7 @@ pub async fn neocodex_list_sessions() -> Result<Vec<NeoCodexSessionInfo>, String
                     match event {
                         WireEvent::UserMessage { content, timestamp, .. } => {
                             if message_count == 0 && content.len() > 20 {
-                                name = format!("{}...", &content[..20]);
+                                name = format!("{}...", &content[..content.floor_char_boundary(20)]);
                             }
                             message_count += 1;
                             updated_at = timestamp.max(0) as u64;
@@ -765,7 +772,7 @@ pub async fn neocodex_list_archived() -> Result<Vec<NeoCodexSessionInfo>, String
             for line in content.lines() {
                 if let Ok(WireEvent::UserMessage { content: c, timestamp, .. }) = serde_json::from_str::<WireEvent>(line) {
                     if message_count == 0 && c.len() > 20 {
-                        name = format!("{}...", &c[..20]);
+                        name = format!("{}...", &c[..c.floor_char_boundary(20)]);
                     }
                     message_count += 1;
                     updated_at = timestamp.max(0) as u64;

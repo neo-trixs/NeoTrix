@@ -650,7 +650,8 @@ impl CleanupEngine {
                             match std::fs::metadata(&entry) {
                                 Ok(meta) => {
                                     if let Ok(modified) = meta.modified() {
-                                        let age = Utc::now().timestamp() - modified.elapsed()
+                                        // age = now - modified；未来 mtime (时钟偏移/解包) 视为 0，绝不删除
+                                        let age = modified.elapsed()
                                             .map(|d| d.as_secs() as i64)
                                             .unwrap_or(0);
                                         age > max_days * 86400

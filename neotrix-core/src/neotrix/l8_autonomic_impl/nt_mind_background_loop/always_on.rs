@@ -346,6 +346,7 @@ impl AlwaysOnEngine {
             paused: false,
         };
         self.tasks.push(task);
+        self.prune_tasks();
         id
     }
 
@@ -368,6 +369,7 @@ impl AlwaysOnEngine {
             paused: false,
         };
         self.tasks.push(task);
+        self.prune_tasks();
         id
     }
 
@@ -401,6 +403,7 @@ impl AlwaysOnEngine {
             paused: false,
         };
         self.tasks.push(task);
+        self.prune_tasks();
         id
     }
 
@@ -451,6 +454,20 @@ impl AlwaysOnEngine {
         let idx = self.tasks.iter().position(|t| t.id == id).ok_or_else(|| format!("Task not found: {}", id))?;
         self.tasks.remove(idx);
         Ok(())
+    }
+
+    /// 任务上限：auto_queue 发现任务会持续追加，超限时淘汰已完成的旧任务
+    fn prune_tasks(&mut self) {
+        const MAX_TASKS: usize = 512;
+        if self.tasks.len() <= MAX_TASKS {
+            return;
+        }
+        self.tasks.retain(|t| {
+            t.run_count < t.max_runs && !self.completed_task_ids.contains(&t.id)
+        });
+        if self.tasks.len() > MAX_TASKS {
+            self.tasks.truncate(MAX_TASKS);
+        }
     }
 
     pub fn status(&self) -> EngineStatus {
@@ -541,6 +558,10 @@ impl AlwaysOnEngine {
             // Check if completed
             if task.run_count >= task.max_runs {
                 self.completed_task_ids.push(task.id.clone());
+                if self.completed_task_ids.len() > 1024 {
+                    let overflow = self.completed_task_ids.len() - 1024;
+                    self.completed_task_ids.drain(0..overflow);
+                }
             }
         }
 

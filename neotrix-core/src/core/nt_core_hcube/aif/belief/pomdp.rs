@@ -18,11 +18,16 @@ impl POMDPBeliefUpdater {
         observation: usize,
         likelihood: &[Vec<f64>],
     ) -> Vec<f64> {
+        if self.num_states == 0 {
+            return vec![];
+        }
         let mut posterior = vec![0.0; self.num_states];
         let mut evidence = 0.0;
 
         for s in 0..self.num_states {
-            posterior[s] = likelihood[s][observation] * belief[s];
+            // 防 OOB: observation 越界视为无观测
+            let l = likelihood.get(s).and_then(|row| row.get(observation)).copied().unwrap_or(0.0);
+            posterior[s] = l * belief.get(s).copied().unwrap_or(0.0);
             evidence += posterior[s];
         }
 
@@ -41,8 +46,10 @@ impl POMDPBeliefUpdater {
     pub fn predict_belief(&self, belief: &[f64], transition: &[Vec<f64>]) -> Vec<f64> {
         let mut next = vec![0.0; self.num_states];
         for i in 0..self.num_states {
+            let b = belief.get(i).copied().unwrap_or(0.0);
             for j in 0..self.num_states {
-                next[j] += belief[i] * transition[i][j];
+                let t = transition.get(i).and_then(|row| row.get(j)).copied().unwrap_or(0.0);
+                next[j] += b * t;
             }
         }
         next

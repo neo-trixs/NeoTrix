@@ -381,8 +381,11 @@ pub fn context_summarize(text: String, max_chars: Option<u32>) -> Result<String,
     }
     let first_sentence: String = text.split(|c: char| c == '.' || c == '!' || c == '?')
         .next()
-        .unwrap_or(&text[..limit.min(text.len())])
-        .to_string();
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            let end = text.floor_char_boundary(limit.min(text.len()));
+            text[..end].to_string()
+        });
 
     let key_words: Vec<&str> = text.split_whitespace()
         .filter(|w| w.len() > 6)
@@ -397,7 +400,8 @@ pub fn context_summarize(text: String, max_chars: Option<u32>) -> Result<String,
     };
 
     if summary.len() > limit {
-        Ok(format!("{}...[compacted]", &summary[..limit.saturating_sub(13)]))
+        let end = summary.floor_char_boundary(limit.saturating_sub(13).min(summary.len()));
+        Ok(format!("{}...[compacted]", &summary[..end]))
     } else {
         Ok(summary)
     }
@@ -431,9 +435,14 @@ pub fn context_extract_decisions(text: String) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub fn context_check_threshold(session_id: String) -> Result<bool, String> {
-    let state = STATE.lock().map_err(|e| format!("State lock failed: {}", e))?;
+    // 注意: context_analyze 内部会获取同一把 STATE 锁，必须先释放本作用域的锁再调用，
+    // 否则 std Mutex 不可重入 → 死锁。
+    let threshold = {
+        let state = STATE.lock().map_err(|e| format!("State lock failed: {}", e))?;
+        state.config.auto_compact_threshold_chars
+    };
     let info = context_analyze(session_id)?;
-    Ok(info.current_chars > state.config.auto_compact_threshold_chars)
+    Ok(info.current_chars > threshold)
 }
 
 // ── Tests ──

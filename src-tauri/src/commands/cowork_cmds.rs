@@ -172,6 +172,41 @@ fn find_session(id: &str) -> Result<CoworkSession, String> {
     state.sessions.get(id).cloned().ok_or_else(|| format!("Session not found: {}", id))
 }
 
+/// 将用户提供的路径解析到工作区内：拒绝绝对路径、`..` 逃逸，且最终路径必须在 workspace 内。
+fn resolve_workspace_path(session: &CoworkSession, path: &str) -> Result<std::path::PathBuf, String> {
+    let workspace = std::path::Path::new(&session.workspace_path);
+    let p = std::path::Path::new(path);
+    if p.is_absolute() {
+        let has_parent = p.components().any(|c| matches!(c, std::path::Component::ParentDir));
+        if has_parent {
+            return Err("Invalid path".into());
+        }
+        if p.starts_with(workspace) {
+            return Ok(p.to_path_buf());
+        }
+        return Err("Absolute path escapes workspace".into());
+    }
+    let mut clean = std::path::PathBuf::new();
+    for comp in p.components() {
+        match comp {
+            std::path::Component::Normal(c) => clean.push(c),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir | std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err("Invalid path".into());
+            }
+        }
+    }
+    if clean.as_os_str().is_empty() {
+        return Err("Empty path".into());
+    }
+    let joined = workspace.join(clean);
+    if joined.starts_with(workspace) {
+        Ok(joined)
+    } else {
+        Err("Path escapes workspace".into())
+    }
+}
+
 fn default_templates() -> Vec<CoworkTemplate> {
     vec![
         CoworkTemplate {
@@ -405,7 +440,8 @@ pub fn cowork_scan_files(session_id: String, pattern: Option<String>) -> Result<
                         .map(|s| {
                             let trimmed = s.trim();
                             if trimmed.len() > 200 {
-                                format!("{}...", &trimmed[..200])
+                                let end = trimmed.floor_char_boundary(200);
+                                format!("{}...", &trimmed[..end])
                             } else {
                                 trimmed.to_string()
                             }
@@ -440,12 +476,7 @@ pub fn cowork_scan_files(session_id: String, pattern: Option<String>) -> Result<
 #[command]
 pub fn cowork_read_file(session_id: String, path: String) -> Result<String, String> {
     let session = find_session(&session_id)?;
-    let abs_path = if std::path::Path::new(&path).is_absolute() {
-        path.clone()
-    } else {
-        format!("{}/{}", session.workspace_path.trim_end_matches('/'), path)
-    };
-
+    let abs_path = resolve_workspace_path(&session, &path)?;
     let content = std::fs::read_to_string(&abs_path)
         .map_err(|e| format!("Failed to read file: {}", e))?;
 
@@ -461,11 +492,14 @@ pub fn cowork_read_file(session_id: String, path: String) -> Result<String, Stri
 #[command]
 pub fn cowork_write_file(session_id: String, path: String, content: String) -> Result<(), String> {
     let session = find_session(&session_id)?;
-    let abs_path = if std::path::Path::new(&path).is_absolute() {
-        path.clone()
-    } else {
-        format!("{}/{}", session.workspace_path.trim_end_matches('/'), path)
+    let allowed = {
+        let state = COWORK.lock().map_err(|e| e.to_string())?;
+        state.config.allow_file_create || state.config.allow_file_modify
     };
+    if !allowed {
+        return Err("File creation/modification is disabled by cowork config".into());
+    }
+    let abs_path = resolve_workspace_path(&session, &path)?;
 
     let parent = std::path::Path::new(&abs_path).parent().unwrap();
     std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
@@ -486,7 +520,7 @@ pub fn cowork_write_file(session_id: String, path: String, content: String) -> R
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "unnamed".into()),
-        path: abs_path,
+        path: abs_path.to_string_lossy().to_string(),
         kind: {
             let ext = std::path::Path::new(&path)
                 .extension()
@@ -520,12 +554,14 @@ pub fn cowork_write_file(session_id: String, path: String, content: String) -> R
 #[command]
 pub fn cowork_delete_file(session_id: String, path: String) -> Result<(), String> {
     let session = find_session(&session_id)?;
-    let abs_path = if std::path::Path::new(&path).is_absolute() {
-        path.clone()
-    } else {
-        format!("{}/{}", session.workspace_path.trim_end_matches('/'), path)
+    let allowed = {
+        let state = COWORK.lock().map_err(|e| e.to_string())?;
+        state.config.allow_file_delete
     };
-
+    if !allowed {
+        return Err("File deletion is disabled by cowork config".into());
+    }
+    let abs_path = resolve_workspace_path(&session, &path)?;
     std::fs::remove_file(&abs_path).map_err(|e| format!("Failed to delete file: {}", e))?;
 
     let mut state = COWORK.lock().map_err(|e| e.to_string())?;

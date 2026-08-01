@@ -209,6 +209,7 @@ impl GoalLoop {
             tracker.state = GoalState::Achieved;
             tracker.updated_at = chrono::Utc::now().to_rfc3339();
             self.completed_goals.push(tracker);
+            self.completed_goals.truncate(100);
         }
     }
 
@@ -235,6 +236,7 @@ impl GoalLoop {
             tracker.state = GoalState::Unmet;
             tracker.updated_at = chrono::Utc::now().to_rfc3339();
             self.completed_goals.push(tracker);
+            self.completed_goals.truncate(100);
         }
     }
 

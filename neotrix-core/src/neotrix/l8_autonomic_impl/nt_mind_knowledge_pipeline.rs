@@ -51,6 +51,9 @@ pub struct SourceEntry {
     pub tags: Vec<String>,
 }
 
+/// source_map 上限：长驻 daemon 每 URL 一条，无界增长 → 内存泄漏
+const SOURCE_MAP_LIMIT: usize = 2000;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbsorbState {
     pub source_map: HashMap<String, SourceEntry>,
@@ -156,7 +159,7 @@ impl KnowledgeAbsorptionPipeline {
                 Some(&summary_short), Some(url), Some(&domain)).ok()
         });
 
-        self.state.source_map.insert(url.to_string(), SourceEntry {
+        self.record_source(url.to_string(), SourceEntry {
             url: url.into(), source_type: KbSourceType::WebArticle,
             title: url.into(), kb_node_id: node_id.clone(),
             last_absorbed: Utc::now().timestamp(),
@@ -195,14 +198,27 @@ impl KnowledgeAbsorptionPipeline {
             }
         }
 
-        let (content, domain) = match reqwest::get(url).await {
-            Ok(resp) => {
+        let (content, domain) = match tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            reqwest::get(url),
+        ).await {
+            Ok(Ok(resp)) => {
                 let domain = resp.url().host_str().unwrap_or("").to_string();
-                let body = resp.text().await.unwrap_or_default();
+                let body = match tokio::time::timeout(
+                    std::time::Duration::from_secs(15),
+                    resp.text(),
+                ).await {
+                    Ok(Ok(text)) => text,
+                    Ok(Err(e)) => return Err(format!("HTTP body read failed for {}: {}", url, e)),
+                    Err(_) => return Err(format!("HTTP body read timed out for {}", url)),
+                };
                 (body, domain)
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 return Err(format!("HTTP fetch failed for {}: {}", url, e));
+            }
+            Err(_) => {
+                return Err(format!("HTTP fetch timed out for {}", url));
             }
         };
 
@@ -223,7 +239,7 @@ impl KnowledgeAbsorptionPipeline {
                 Some(&summary_short), Some(url), Some(&domain)).ok()
         });
 
-        self.state.source_map.insert(url.to_string(), SourceEntry {
+        self.record_source(url.to_string(), SourceEntry {
             url: url.into(), source_type: KbSourceType::WebArticle,
             title: url.into(), kb_node_id: node_id.clone(),
             last_absorbed: Utc::now().timestamp(),
@@ -270,7 +286,7 @@ impl KnowledgeAbsorptionPipeline {
             confidence: 0.6,
         };
 
-        self.state.source_map.insert(url_key, SourceEntry {
+        self.record_source(url_key.clone(), SourceEntry {
             url: url.into(), source_type: KbSourceType::GitHub,
             title: repo, kb_node_id: None,
             last_absorbed: Utc::now().timestamp(),
@@ -313,6 +329,22 @@ impl KnowledgeAbsorptionPipeline {
             total_sources: self.state.source_map.len(),
             total_absorbed: self.state.total_absorbed,
         }
+    }
+
+    /// 记录来源，超上限时淘汰最旧条目，防止长驻 daemon 内存无界增长
+    fn record_source(&mut self, url: String, entry: SourceEntry) {
+        if self.state.source_map.len() >= SOURCE_MAP_LIMIT {
+            let mut oldest: Option<(i64, String)> = None;
+            for (k, e) in self.state.source_map.iter() {
+                if oldest.as_ref().map_or(true, |(ts, _)| e.last_absorbed < *ts) {
+                    oldest = Some((e.last_absorbed, k.clone()));
+                }
+            }
+            if let Some((_, k)) = oldest {
+                self.state.source_map.remove(&k);
+            }
+        }
+        self.state.source_map.insert(url, entry);
     }
 }
 

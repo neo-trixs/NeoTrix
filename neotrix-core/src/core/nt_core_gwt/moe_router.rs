@@ -23,11 +23,17 @@ impl RouteWeights {
     }
 
     pub fn get(&self, from: usize, to: usize) -> f64 {
-        self.weights[from][to]
+        if from < MODULE_COUNT && to < MODULE_COUNT {
+            self.weights[from][to]
+        } else {
+            0.0
+        }
     }
 
     pub fn routing_distribution(&self, expert: usize) -> &[f64; MODULE_COUNT] {
-        &self.weights[expert]
+        // 内部调用路径已保证 expert < MODULE_COUNT；此处防直接 API 越界
+        debug_assert!(expert < MODULE_COUNT, "MoE expert index out of bounds");
+        &self.weights[expert.min(MODULE_COUNT - 1)]
     }
 
     pub fn reinforce_update(&mut self, selected: &[usize], rewards: &[f64], lr: f64) {
@@ -36,6 +42,9 @@ impl RouteWeights {
         }
         let mean_reward: f64 = rewards.iter().sum::<f64>() / rewards.len() as f64;
         for &s in selected {
+            if s >= MODULE_COUNT {
+                continue;
+            }
             let row = &mut self.weights[s];
             for j in 0..MODULE_COUNT {
                 let advantage = rewards[j] - mean_reward;
