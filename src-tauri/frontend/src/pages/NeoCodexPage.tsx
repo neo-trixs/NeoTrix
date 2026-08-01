@@ -79,15 +79,17 @@ export default function NeoCodexPage() {
     stopRef.current = true;
   };
 
-  const handleSend = async (content: string, attachments?: Attachment[]) => {
+  const handleSend = async (content: string, attachments?: Attachment[], regenerate?: boolean) => {
     stopRef.current = false;
     setAgentBusy(true);
-    addNeoCodexMessage({
-      role: "user",
-      content,
-      timestamp: Date.now(),
-      attachments: attachments && attachments.length > 0 ? attachments : undefined,
-    });
+    if (!regenerate) {
+      addNeoCodexMessage({
+        role: "user",
+        content,
+        timestamp: Date.now(),
+        attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      });
+    }
     setNeoCodexStreaming({ content: "", role: "assistant" });
 
     let accumulated = "";
@@ -99,8 +101,11 @@ export default function NeoCodexPage() {
 
     try {
       const payload = (attachments && attachments.length > 0
-        ? { content, attachments: attachments.map((a) => ({ name: a.name, size: a.size, mime_type: a.mimeType })) }
+        ? { content, attachments: attachments.map((a) => ({ name: a.name, size: a.size, mime_type: a.mimeType, data: a.data })) }
         : { content }) as any;
+      if (regenerate) {
+        payload.regenerate = true;
+      }
       const response = await invoke("neocodex_send_message_stream", payload) as string;
       setNeoCodexStreaming(null);
       addNeoCodexMessage({ role: "assistant", content: response, timestamp: Date.now() });
@@ -141,10 +146,18 @@ export default function NeoCodexPage() {
       setNeoCodexActiveSession(session.id);
       const items = await invoke("neocodex_get_session_messages", { sessionId: session.id }) as any[];
       setNeoCodexMessages(items.map((m) => ({
+        id: m.id,
         role: m.role,
         content: m.content,
         contentType: "markdown",
         timestamp: m.timestamp,
+        attachments: m.attachments?.map((a: any) => ({
+          id: `${a.name}-${a.size}`,
+          name: a.name,
+          size: a.size,
+          mimeType: a.mime_type,
+          data: a.data || "",
+        })),
       })));
       const sideChat = await invoke("neocodex_get_side_chat", { sessionId: session.id }) as any[];
       setSideChatMessages(sideChat.map((m) => ({ role: m.role, content: m.content })));
@@ -160,6 +173,69 @@ export default function NeoCodexPage() {
       setSideChatMessages([]);
     }
     refreshSessions();
+  };
+
+  const reloadMessages = async () => {
+    if (!neocodexActiveSessionId) return;
+    try {
+      const items = await invoke("neocodex_get_session_messages", { sessionId: neocodexActiveSessionId }) as any[];
+      setNeoCodexMessages(items.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        contentType: "markdown",
+        timestamp: m.timestamp,
+        attachments: m.attachments?.map((a: any) => ({
+          id: `${a.name}-${a.size}`,
+          name: a.name,
+          size: a.size,
+          mimeType: a.mime_type,
+          data: a.data || "",
+        })),
+      })));
+    } catch (e) {
+      console.error("Reload messages failed:", e);
+    }
+  };
+
+  const handleEditMessage = async (id: number, content: string) => {
+    if (!neocodexActiveSessionId) return;
+    try {
+      await invoke("neocodex_edit_message", { sessionId: neocodexActiveSessionId, index: id, content });
+      await reloadMessages();
+    } catch (e) {
+      console.error("Edit message failed:", e);
+    }
+  };
+
+  const handleDeleteMessage = async (id: number) => {
+    if (!neocodexActiveSessionId) return;
+    try {
+      await invoke("neocodex_delete_message", { sessionId: neocodexActiveSessionId, index: id });
+      await reloadMessages();
+    } catch (e) {
+      console.error("Delete message failed:", e);
+    }
+  };
+
+  const handleRegenerateMessage = async (id: number) => {
+    if (!neocodexActiveSessionId) return;
+    try {
+      const items = await invoke("neocodex_regenerate", { sessionId: neocodexActiveSessionId, index: id }) as any[];
+      const lastUser = [...items].reverse().find((m) => m.role === "user");
+      setNeoCodexMessages(items.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        contentType: "markdown",
+        timestamp: m.timestamp,
+      })));
+      if (lastUser) {
+        handleSend(lastUser.content, undefined, true);
+      }
+    } catch (e) {
+      console.error("Regenerate failed:", e);
+    }
   };
 
   const usage = health?.context_usage || 0;
@@ -251,7 +327,8 @@ export default function NeoCodexPage() {
         e.preventDefault();
         if (neocodexSessions.length === 0) return;
         const idx = neocodexSessions.findIndex((s: any) => s.id === neocodexActiveSessionId);
-        const next = neocodexSessions[(idx + 1) % neocodexSessions.length];
+        const delta = e.shiftKey ? -1 : 1;
+        const next = neocodexSessions[(idx + delta + neocodexSessions.length) % neocodexSessions.length];
         handleSessionSelect(next);
       }
     };
@@ -467,7 +544,9 @@ export default function NeoCodexPage() {
               contextUsage={health?.context_usage || 0}
               onSend={handleSend}
               onStop={handleStop}
-              onDelete={(idx) => setNeoCodexMessages(neocodexMessages.filter((_, i) => i !== idx))}
+              onEdit={handleEditMessage}
+              onDelete={handleDeleteMessage}
+              onRegenerate={handleRegenerateMessage}
             />
           )}
           {sideChatOpen && (

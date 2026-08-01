@@ -1,6 +1,6 @@
-import type { Attachment, NeoCodexMode } from "../types";
+import type { Message, NeoCodexMode } from "../types";
 
-type NeoCodexChatMessage = { role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number; attachments?: Attachment[] };
+type NeoCodexChatMessage = Message;
 
 export interface AgentSlice {
   // NeoCodex Desktop state

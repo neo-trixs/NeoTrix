@@ -16,6 +16,7 @@ const SHORTCUTS: Array<{ keys: string; label: string }> = [
   { keys: "⌘Shift+P", label: "App 预览" },
   { keys: "⌘Shift+F", label: "专注模式" },
   { keys: "⌘Shift+C", label: "复制最后一条回复" },
+  { keys: "Enter / Tab", label: "运行中排队后续输入（Steer）" },
   { keys: "↑ / ↓", label: "浏览历史提示" },
   { keys: "⌘/", label: "快捷键帮助" },
 ];

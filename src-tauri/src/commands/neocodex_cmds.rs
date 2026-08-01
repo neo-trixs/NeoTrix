@@ -32,6 +32,8 @@ pub struct NeoCodexAttachmentPayload {
     pub size: u64,
     #[serde(default)]
     pub mime_type: String,
+    #[serde(default)]
+    pub data: Option<String>,
 }
 
 #[tauri::command]
@@ -39,6 +41,7 @@ pub async fn neocodex_send_message_stream(
     app: tauri::AppHandle,
     content: String,
     attachments: Option<Vec<NeoCodexAttachmentPayload>>,
+    regenerate: Option<bool>,
 ) -> Result<String, String> {
     let mut agent_guard = NEOCODEX_AGENT.lock().await;
     let agent = match agent_guard.as_mut() {
@@ -51,28 +54,32 @@ pub async fn neocodex_send_message_stream(
         }
     };
 
-    // Persist the user message (fixes streaming-not-persisted gap) with any
-    // attachments, keeping the wire + in-memory mirror in sync.
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
-    let core_atts = attachments.map(|v| {
-        v.into_iter().filter(|a| !a.name.is_empty()).map(|a| {
-            neotrix::neotrix::l1_body_impl::nt_io_neocodex::NeoCodexAttachment {
-                name: a.name,
-                size: a.size,
-                mime_type: a.mime_type,
-            }
-        }).collect::<Vec<_>>()
-    });
-    agent.wire.record(WireEvent::UserMessage {
-        content: content.clone(),
-        timestamp: ts,
-        attachments: core_atts,
-    });
-    let est = content.len() / 4;
-    agent.context.push("user", content.clone(), est);
-    agent.state.tokens_used += est;
-    agent.state.turn_count += 1;
+    let is_regenerate = regenerate.unwrap_or(false);
+    if !is_regenerate {
+        // Persist the user message (fixes streaming-not-persisted gap) with any
+        // attachments, keeping the wire + in-memory mirror in sync.
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+        let core_atts = attachments.map(|v| {
+            v.into_iter().filter(|a| !a.name.is_empty()).map(|a| {
+                neotrix::neotrix::l1_body_impl::nt_io_neocodex::NeoCodexAttachment {
+                    name: a.name,
+                    size: a.size,
+                    mime_type: a.mime_type,
+                    data: a.data,
+                }
+            }).collect::<Vec<_>>()
+        });
+        agent.wire.record(WireEvent::UserMessage {
+            content: content.clone(),
+            timestamp: ts,
+            attachments: core_atts,
+        });
+        let est = content.len() / 4;
+        agent.context.push("user", content.clone(), est);
+        agent.state.tokens_used += est;
+        agent.state.turn_count += 1;
+    }
 
     // Emit start event
     let _ = app.emit("neocodex_stream_start", content.clone());
@@ -333,6 +340,7 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
         if let Ok(event) = serde_json::from_str::<WireEvent>(line) {
             match event {
                 WireEvent::UserMessage { content, timestamp, attachments } => items.push(NeoCodexMessageItem {
+                    id: items.len(),
                     role: "user".to_string(),
                     content,
                     timestamp,
@@ -340,15 +348,18 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
                         name: a.name,
                         size: a.size,
                         mime_type: a.mime_type,
+                        data: a.data,
                     }).collect()),
                 }),
                 WireEvent::AgentMessage { content, timestamp } => items.push(NeoCodexMessageItem {
+                    id: items.len(),
                     role: "assistant".to_string(),
                     content,
                     timestamp,
                     attachments: None,
                 }),
                 WireEvent::ToolCall { name, args, result, success, .. } => items.push(NeoCodexMessageItem {
+                    id: items.len(),
                     role: "tool".to_string(),
                     content: format!("**{}**{}\n```\n{}\n```", name, if success { "" } else { " (失败)" }, result.chars().take(500).collect::<String>()),
                     timestamp: 0,
@@ -357,6 +368,7 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
                 WireEvent::SystemEvent { kind, detail, timestamp } => {
                     if !kind.is_empty() {
                         items.push(NeoCodexMessageItem {
+                            id: items.len(),
                             role: "system".to_string(),
                             content: format!("**{}**: {}", kind, detail),
                             timestamp,
@@ -372,6 +384,123 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
     Ok(items)
 }
 
+/// Read all wire events for a session (skipping side-chat lines).
+fn read_wire_events(path: &std::path::Path) -> Result<Vec<WireEvent>, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let mut events = Vec::new();
+    for line in content.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(event) = serde_json::from_str::<WireEvent>(line) {
+            events.push(event);
+        }
+    }
+    Ok(events)
+}
+
+/// Rewrite a session's wire file from an event list (used by edit/delete/regenerate).
+fn write_wire_events(path: &std::path::Path, events: &[WireEvent]) -> Result<(), String> {
+    let mut out = String::new();
+    for event in events {
+        if let Ok(line) = serde_json::to_string(event) {
+            out.push_str(&line);
+            out.push('\n');
+        }
+    }
+    std::fs::write(path, out).map_err(|e| e.to_string())
+}
+
+/// Map a message index (as shown in the UI thread) to a user/assistant message
+/// in the wire event list. Returns (event_index, event_index_in_messages).
+fn visible_message_indices(events: &[WireEvent]) -> Vec<usize> {
+    events
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| match e {
+            WireEvent::UserMessage { .. } | WireEvent::AgentMessage { .. } => Some(i),
+            _ => None,
+        })
+        .collect()
+}
+
+fn rebuild_agent_for(path: &std::path::Path, guard: &mut tokio::sync::MutexGuard<'_, Option<NeoCodexAgent>>) {
+    if let Some(agent) = guard.as_mut() {
+        if agent.wire.path == path {
+            agent.rebuild_context_from_wire();
+        }
+    }
+}
+
+/// Edit a user/assistant message in place by its index in the visible thread.
+/// Rewrites the JSONL and reloads the agent context so the next turn reflects
+/// the correction (Claude-style in-place edit).
+#[tauri::command]
+pub async fn neocodex_edit_message(session_id: String, index: usize, content: String) -> Result<Vec<NeoCodexMessageItem>, String> {
+    if content.trim().is_empty() {
+        return Err("empty message".to_string());
+    }
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let mut events = read_wire_events(&path)?;
+    let visible = visible_message_indices(&events);
+    let target = *visible.get(index).ok_or_else(|| "message not found".to_string())?;
+    match &mut events[target] {
+        WireEvent::UserMessage { content: c, .. } | WireEvent::AgentMessage { content: c, .. } => {
+            *c = content.trim().to_string();
+        }
+        _ => return Err("target is not a message".to_string()),
+    }
+    write_wire_events(&path, &events)?;
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    rebuild_agent_for(&path, &mut guard);
+    drop(guard);
+    neocodex_get_session_messages(session_id).await
+}
+
+/// Delete a message by its index in the visible thread, persisting to the wire
+/// (no longer a frontend-only filter that resets on reload).
+#[tauri::command]
+pub async fn neocodex_delete_message(session_id: String, index: usize) -> Result<Vec<NeoCodexMessageItem>, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let mut events = read_wire_events(&path)?;
+    let visible = visible_message_indices(&events);
+    let target = *visible.get(index).ok_or_else(|| "message not found".to_string())?;
+    events.remove(target);
+    write_wire_events(&path, &events)?;
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    rebuild_agent_for(&path, &mut guard);
+    drop(guard);
+    neocodex_get_session_messages(session_id).await
+}
+
+/// Regenerate the assistant reply following the user message at `index`:
+/// removes that assistant turn (and any trailing tool/system events) from the
+/// wire so the frontend can re-send the prompt for a fresh answer.
+#[tauri::command]
+pub async fn neocodex_regenerate(session_id: String, index: usize) -> Result<Vec<NeoCodexMessageItem>, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let mut events = read_wire_events(&path)?;
+    let visible = visible_message_indices(&events);
+    let target = *visible.get(index).ok_or_else(|| "message not found".to_string())?;
+    // Remove from the target onward: an assistant reply (and any tool/system
+    // events produced while generating it) is discarded; the user message stays.
+    events.truncate(target + 1);
+    write_wire_events(&path, &events)?;
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    rebuild_agent_for(&path, &mut guard);
+    drop(guard);
+    neocodex_get_session_messages(session_id).await
+}
+
 /// Fetch persisted side-chat messages for a session (branched questions that
 /// never re-enter the main context).
 #[tauri::command]
@@ -385,6 +514,7 @@ pub async fn neocodex_get_side_chat(session_id: String) -> Result<Vec<NeoCodexMe
     for line in content.lines() {
         if let Ok(WireEvent::SideChatMessage { content, timestamp }) = serde_json::from_str::<WireEvent>(line) {
             items.push(NeoCodexMessageItem {
+                id: items.len(),
                 role: "user".to_string(),
                 content,
                 timestamp,
@@ -433,6 +563,7 @@ pub async fn neocodex_send_side_chat(session_id: String, content: String) -> Res
     for line in content2.lines() {
         if let Ok(WireEvent::SideChatMessage { content, timestamp }) = serde_json::from_str::<WireEvent>(line) {
             items.push(NeoCodexMessageItem {
+                id: items.len(),
                 role: "user".to_string(),
                 content,
                 timestamp,
@@ -547,6 +678,7 @@ pub struct NeoCodexSessionInfo {
 
 #[derive(serde::Serialize)]
 pub struct NeoCodexMessageItem {
+    pub id: usize,
     pub role: String,
     pub content: String,
     pub timestamp: i64,
@@ -558,6 +690,54 @@ pub struct NeoCodexAttachmentDto {
     pub name: String,
     pub size: u64,
     pub mime_type: String,
+    pub data: Option<String>,
+}
+
+/// Recursively search the workspace for files/dirs matching `query` (for the
+/// @-autocomplete in the composer). Skips heavy/dependency directories and
+/// caps results to keep the menu snappy.
+#[tauri::command]
+pub async fn neocodex_search_files(query: String) -> Result<Vec<String>, String> {
+    let q = query.trim().to_lowercase();
+    let root = std::env::current_dir().map_err(|e| e.to_string())?;
+    let mut results = Vec::new();
+    let mut stack = vec![root.clone()];
+    let mut visited: usize = 0;
+    const MAX_DIRS: usize = 600;
+    const MAX_RESULTS: usize = 60;
+    const SKIP: &[&str] = &["node_modules", ".git", "target", "dist", "build", ".next", ".nuxt", "__pycache__", ".venv", "vendor", ".dart_tool", "Pods"];
+
+    while let Some(dir) = stack.pop() {
+        if visited > MAX_DIRS || results.len() >= MAX_RESULTS {
+            break;
+        }
+        visited += 1;
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if SKIP.contains(&name.as_str()) {
+                continue;
+            }
+            let path = entry.path();
+            let rel = path.strip_prefix(&root).unwrap_or(&path).to_string_lossy().to_string();
+            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            let matched = q.is_empty() || name.to_lowercase().contains(&q) || rel.to_lowercase().contains(&q);
+            if matched && rel.len() <= 200 {
+                results.push(if is_dir { format!("{}/", rel) } else { rel });
+                if results.len() >= MAX_RESULTS {
+                    break;
+                }
+            }
+            if is_dir {
+                stack.push(path);
+            }
+        }
+    }
+    results.sort();
+    Ok(results)
 }
 
 #[tauri::command]

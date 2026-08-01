@@ -22,6 +22,7 @@ const App: React.FC = () => {
     const apply = () => {
       const isDark = settings.theme === "dark" || (settings.theme === "system" && media.matches);
       document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
+      document.documentElement.style.setProperty("--app-font-size", `${settings.fontSize}px`);
     };
     apply();
     if (settings.theme === "system") {

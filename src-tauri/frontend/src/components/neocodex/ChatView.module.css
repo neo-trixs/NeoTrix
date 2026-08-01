@@ -899,3 +899,78 @@
   background: rgba(255,149,0,0.15);
   border-color: var(--warning);
 }
+
+.slashItemActive {
+  background: var(--bg-tertiary);
+}
+
+.queueBar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  margin-bottom: 4px;
+  background: rgba(79, 140, 255, 0.1);
+  border: 1px solid rgba(79, 140, 255, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--fg-secondary);
+}
+
+.queueDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent, #4f8cff);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.queueCancel {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--fg-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.imageRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.attachmentImage {
+  max-width: 240px;
+  max-height: 160px;
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  cursor: zoom-in;
+  object-fit: cover;
+}
+
+.toolStatus {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.toolStatusOk {
+  background: var(--success, #3fb950);
+}
+
+.toolStatusFail {
+  background: var(--danger, #f85149);
+}
+
+.content {
+  font-size: var(--app-font-size, 13px);
+}

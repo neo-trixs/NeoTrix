@@ -9,6 +9,7 @@
      Layer 1: Base Tokens (raw values)
      ════════════════════════════════════════ */
 
+  --app-font-size: 13px;
   /* ── Brand Palette ── */
   --nt-red: #E85454;
   --nt-green: #4CAF50;

@@ -480,6 +480,8 @@ pub struct NeoCodexAttachment {
     pub name: String,
     pub size: u64,
     pub mime_type: String,
+    #[serde(default)]
+    pub data: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1805,6 +1807,16 @@ impl NeoCodexAgent {
     /// Restore prior session events from the wire file into the context
     /// pipeline (G2 session continuity, matching Claude Code `--resume`).
     /// Returns the number of events restored.
+    /// Clear in-memory context and re-restore it from the wire file. Used after
+    /// an edit/delete/regenerate rewrites the JSONL so the agent's next turn is
+    /// built from the corrected history, not stale in-memory state.
+    pub fn rebuild_context_from_wire(&mut self) -> usize {
+        self.context.turns.clear();
+        self.state.tokens_used = 0;
+        self.state.tool_call_count = 0;
+        self.resume_session()
+    }
+
     pub fn resume_session(&mut self) -> usize {
         let events = self.wire.load();
         let mut restored = 0;

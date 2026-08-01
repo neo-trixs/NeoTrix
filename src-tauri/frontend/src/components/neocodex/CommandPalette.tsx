@@ -8,6 +8,25 @@ export interface PaletteItem {
   onSelect: () => void;
 }
 
+function fuzzyScore(label: string, query: string): number {
+  if (!query) return 0;
+  const l = label.toLowerCase();
+  const q = query.toLowerCase();
+  if (l.startsWith(q)) return 100 - l.length / 100;
+  let score = 0;
+  let qi = 0;
+  let last = -2;
+  for (let i = 0; i < l.length && qi < q.length; i++) {
+    if (l[i] === q[qi]) {
+      score += i === last + 1 ? 3 : 1;
+      last = i;
+      qi++;
+    }
+  }
+  if (qi < q.length) return -1;
+  return score - l.length / 100;
+}
+
 export function CommandPalette({ open, items, onClose }: { open: boolean; items: PaletteItem[]; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -24,7 +43,11 @@ export function CommandPalette({ open, items, onClose }: { open: boolean; items:
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((i) => i.label.toLowerCase().includes(q));
+    return items
+      .map((i) => ({ item: i, score: fuzzyScore(i.label, q) }))
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.item);
   }, [items, query]);
 
   useEffect(() => {

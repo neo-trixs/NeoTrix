@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { readDir } from "@tauri-apps/plugin-fs";
+import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../../stores";
 import type { Attachment, Message } from "../../types";
 import styles from "./ChatView.module.css";
@@ -14,7 +14,7 @@ function isHtmlContent(content: string): boolean {
 }
 
 function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function renderContent(content: string, contentType?: "markdown" | "html" | "text"): { html: string; codeBlocks: number } {
@@ -34,14 +34,10 @@ function renderContent(content: string, contentType?: "markdown" | "html" | "tex
       html = `<pre>${escapeHtml(content)}</pre>`;
     }
   }
-  html = html.replace(
-    /<pre><code class="language-(\w+)">/g,
-    '<div class="code-block-header"><span class="code-lang">$1</span><button class="code-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.textContent)">复制</button></div><pre><code class="language-$1">'
-  );
   return {
     html: DOMPurify.sanitize(html, {
       ALLOWED_TAGS: ["p", "br", "strong", "em", "code", "pre", "ul", "ol", "li", "a", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "hr", "table", "thead", "tbody", "tr", "th", "td", "span", "div", "img", "svg", "path", "circle", "rect", "line", "text", "button", "input", "textarea", "span"],
-      ALLOWED_ATTR: ["href", "target", "rel", "src", "alt", "class", "style", "width", "height", "viewBox", "fill", "stroke", "strokeWidth", "d", "cx", "cy", "r", "x", "y", "rx", "ry", "xmlns", "textAnchor", "fontSize", "fontWeight", "onclick", "type", "checked", "disabled", "value", "placeholder", "rows", "class"],
+      ALLOWED_ATTR: ["href", "target", "rel", "src", "alt", "class", "style", "width", "height", "viewBox", "fill", "stroke", "strokeWidth", "d", "cx", "cy", "r", "x", "y", "rx", "ry", "xmlns", "textAnchor", "fontSize", "fontWeight", "type", "checked", "disabled", "value", "placeholder", "rows"],
       ALLOW_DATA_ATTR: false,
     }),
     codeBlocks,
@@ -92,16 +88,29 @@ async function readFileAsBase64(file: File): Promise<string> {
 }
 
 interface ChatViewProps {
-  messages: Array<{ role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number }>;
+  messages: Message[];
   streamingContent?: string;
   streamingRole?: "user" | "assistant";
   agentBusy: boolean;
   onSend: (content: string, attachments?: Attachment[]) => void;
-  onDelete?: (index: number) => void;
+  onEdit?: (id: number, content: string) => void;
+  onRegenerate?: (id: number) => void;
+  onDelete?: (id: number) => void;
   viewMode?: "verbose" | "normal" | "summary";
   contextUsage?: number;
   onStop?: () => void;
 }
+
+const SLASH_COMMANDS = [
+  { cmd: "/compact", label: "压缩会话", hint: "释放上下文 token" },
+  { cmd: "/goal <desc>", label: "设置目标", hint: "添加进化目标" },
+  { cmd: "/plan", label: "计划模式", hint: "切换到 Plan 模式" },
+  { cmd: "/status", label: "查看状态", hint: "模型·用量·会话信息" },
+  { cmd: "/feedback <text>", label: "反馈", hint: "给助手反馈" },
+  { cmd: "/export", label: "导出会话", hint: "导出为 Markdown" },
+  { cmd: "/rename <name>", label: "重命名会话", hint: "重命名当前会话" },
+  { cmd: "/clear", label: "清除消息", hint: "清空当前会话消息" },
+];
 
 export function ChatView({
   messages,
@@ -109,6 +118,8 @@ export function ChatView({
   streamingRole = "assistant",
   agentBusy,
   onSend,
+  onEdit,
+  onRegenerate,
   onDelete,
   viewMode = "normal",
   contextUsage = 0,
@@ -121,6 +132,7 @@ export function ChatView({
   const [input, setInput] = useState("");
   const [showSlash, setShowSlash] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
+  const [slashHighlight, setSlashHighlight] = useState(0);
   const slashRef = useRef<HTMLDivElement>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -135,18 +147,17 @@ export function ChatView({
   const promptHistory = useRef<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [lastInput, setLastInput] = useState("");
+  const [queuedInputs, setQueuedInputs] = useState<Array<{ content: string; attachments: Attachment[] }>>([]);
+  const queueRef = useRef<Array<{ content: string; attachments: Attachment[] }>>([]);
 
-  const SLASH_COMMANDS = [
-    { cmd: "/compact", label: "压缩会话", hint: "释放上下文 token" },
-    { cmd: "/goal <desc>", label: "设置目标", hint: "添加进化目标" },
-    { cmd: "/plan", label: "计划模式", hint: "切换到 Plan 模式" },
-    { cmd: "/status", label: "查看状态", hint: "模型·用量·会话信息" },
-    { cmd: "/feedback <text>", label: "反馈", hint: "给助手反馈" },
-    { cmd: "/export", label: "导出会话", hint: "导出为 Markdown" },
-    { cmd: "/rename <name>", label: "重命名会话", hint: "重命名当前会话" },
-    { cmd: "/fork", label: "分叉会话", hint: "从当前消息新建会话" },
-    { cmd: "/clear", label: "清除消息", hint: "清空当前会话消息" },
-  ];
+  const flushQueue = useCallback(() => {
+    if (agentBusy) return;
+    const next = queueRef.current.shift();
+    if (next) {
+      setQueuedInputs([...queueRef.current]);
+      onSend(next.content, next.attachments.length > 0 ? next.attachments : undefined);
+    }
+  }, [agentBusy, onSend]);
 
   const filteredSlash = useMemo(() => {
     const q = slashQuery.trim().toLowerCase();
@@ -158,6 +169,7 @@ export function ChatView({
     const prefix = cmd.split(" ")[0];
     setInput((prev) => (prev.endsWith("/") ? prev + prefix + " " : prev + prefix + " "));
     setShowSlash(false);
+    setSlashHighlight(0);
     textareaRef.current?.focus();
   };
 
@@ -167,12 +179,13 @@ export function ChatView({
     setMentionHighlight(0);
     (async () => {
       try {
-        const entries = await readDir(".");
-        if (cancelled) return;
         const q = mentionQuery.trim().toLowerCase();
-        const matched = entries.filter((e) => !q || e.name.toLowerCase().includes(q)).slice(0, 50);
-        setMentionFiles(matched.map((e) => e.name));
-        setMentionDirs(matched.filter((e) => e.isDirectory).map((e) => e.name));
+        const entries = await invoke<string[]>("neocodex_search_files", { query: q });
+        if (cancelled) return;
+        const files = entries.filter((e) => !e.endsWith("/"));
+        const dirs = entries.filter((e) => e.endsWith("/")).map((e) => e.slice(0, -1));
+        setMentionFiles(files.slice(0, 40));
+        setMentionDirs(dirs);
       } catch {
         if (!cancelled) {
           setMentionFiles([]);
@@ -284,26 +297,60 @@ export function ChatView({
     if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
   };
 
+  // Steer Mode (Codex v26): while the agent is busy, Enter/Tab queue the input
+  // instead of dropping it. When idle, queued inputs flush in order.
+  const queueCurrentInput = () => {
+    const content = input.trim();
+    if (!content) return;
+    queueRef.current.push({ content, attachments });
+    setQueuedInputs([...queueRef.current]);
+    setInput("");
+    setShowSlash(false);
+    setMentionOpen(false);
+    setMentionQuery("");
+    setAttachments([]);
+    textareaRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (queuedInputs.length > 0 && !agentBusy) {
+      const t = setTimeout(flushQueue, 50);
+      return () => clearTimeout(t);
+    }
+  }, [queuedInputs, agentBusy, flushQueue]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (showSlash) {
-      if (e.key === "ArrowDown") { e.preventDefault(); setSlashQuery((q) => q); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); }
-      else if (e.key === "Enter" && filteredSlash.length > 0) { e.preventDefault(); handleSlashSelect(filteredSlash[0].cmd); }
-      else if (e.key === "Escape") { setShowSlash(false); }
+      if (e.key === "ArrowDown") { e.preventDefault(); setSlashHighlight((h) => (h + 1) % Math.max(filteredSlash.length, 1)); return; }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setSlashHighlight((h) => (h - 1 + Math.max(filteredSlash.length, 1)) % Math.max(filteredSlash.length, 1)); return; }
+      else if (e.key === "Enter" && filteredSlash.length > 0) { e.preventDefault(); handleSlashSelect(filteredSlash[Math.min(slashHighlight, filteredSlash.length - 1)].cmd); return; }
+      else if (e.key === "Escape") { setShowSlash(false); setSlashHighlight(0); return; }
       return;
     }
     if (mentionOpen) {
-      if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); setMentionQuery(""); }
-      else if (e.key === "ArrowDown") { e.preventDefault(); setMentionHighlight((h) => (h + 1) % Math.max(mentionFiles.length, 1)); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); setMentionHighlight((h) => (h - 1 + Math.max(mentionFiles.length, 1)) % Math.max(mentionFiles.length, 1)); }
+      if (e.key === "Escape") { e.preventDefault(); setMentionOpen(false); setMentionQuery(""); return; }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setMentionHighlight((h) => (h + 1) % Math.max(mentionFiles.length, 1)); return; }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setMentionHighlight((h) => (h - 1 + Math.max(mentionFiles.length, 1)) % Math.max(mentionFiles.length, 1)); return; }
       else if (e.key === "Enter" && mentionFiles.length > 0) { e.preventDefault(); handleMentionSelect(mentionFiles[Math.min(mentionHighlight, mentionFiles.length - 1)]); return; }
     }
+    // Steer mode: when busy, Enter and Tab queue input instead of sending.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() && !agentBusy) {
-        const form = (e.target as HTMLTextAreaElement).closest("form");
-        form?.requestSubmit();
+      if (input.trim()) {
+        if (agentBusy) {
+          queueCurrentInput();
+          addNotification({ type: "info", message: "已排队，稍后自动发送", duration: 2000 });
+        } else {
+          const form = (e.target as HTMLTextAreaElement).closest("form");
+          form?.requestSubmit();
+        }
       }
+      return;
+    }
+    if (e.key === "Tab" && agentBusy) {
+      e.preventDefault();
+      queueCurrentInput();
+      addNotification({ type: "info", message: "已排队，稍后自动发送", duration: 2000 });
       return;
     }
     if (e.key === "ArrowUp" && !input) {
@@ -335,6 +382,7 @@ export function ChatView({
     const content = input.trim();
     setInput("");
     setShowSlash(false);
+    setSlashHighlight(0);
     setMentionOpen(false);
     setMentionQuery("");
     if (attachments.length > 0) {
@@ -379,13 +427,15 @@ export function ChatView({
           )}
           {visibleMessages.map((msg, idx) => (
             <MessageBubble
-              key={idx}
+              key={msg.id ?? idx}
               message={msg}
               index={idx}
               allMessages={visibleMessages}
               isLastUser={idx === visibleMessages.length - 1 && msg.role === "user"}
               agentBusy={agentBusy}
               onSend={onSend}
+              onEdit={onEdit}
+              onRegenerate={onRegenerate}
               onDelete={onDelete}
               viewMode={viewMode}
             />
@@ -438,6 +488,15 @@ export function ChatView({
          </button>
          <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
           <div className={styles.composerColumn}>
+            {queuedInputs.length > 0 && (
+              <div className={styles.queueBar}>
+                <span className={styles.queueDot} />
+                已排队 {queuedInputs.length} 条，完成后自动发送
+                <button type="button" className={styles.queueCancel} onClick={() => { queueRef.current = []; setQueuedInputs([]); }} title="清空队列">
+                  ✕
+                </button>
+              </div>
+            )}
             {mentions.length > 0 && (
               <div className={styles.mentionsRow}>
                 {mentions.map((m) => (
@@ -495,8 +554,7 @@ export function ChatView({
                 }
               }}
              onKeyDown={handleKeyDown}
-             placeholder={agentBusy ? "Waiting for response..." : "Enter 发送，Shift+Enter 换行，/ 显示命令"}
-             disabled={agentBusy}
+             placeholder={agentBusy ? "运行中… Enter/Tab 排队后续输入" : "Enter 发送，Shift+Enter 换行，/ 显示命令"}
              rows={1}
              className={styles.textarea}
              style={{ height: "auto", minHeight: "44px" }}
@@ -504,7 +562,7 @@ export function ChatView({
           </div>
           {mentionOpen && (
             <div ref={mentionRef} className={styles.mentionMenu}>
-              <div className={styles.mentionHint}>输入 @ 引用项目文件（仅本地显示）</div>
+              <div className={styles.mentionHint}>输入 @ 引用项目文件（递归搜索）</div>
               {mentionFiles.length === 0 && <div className={styles.mentionEmpty}>无匹配文件</div>}
               {mentionFiles.map((f, i) => (
                 <button
@@ -519,10 +577,15 @@ export function ChatView({
             </div>
           )}
           {showSlash && (
-            <div className={styles.slashMenu}>
+            <div ref={slashRef} className={styles.slashMenu}>
              {filteredSlash.length === 0 && <div className={styles.slashEmpty}>无匹配命令</div>}
-             {filteredSlash.map((c) => (
-               <button key={c.cmd} className={styles.slashItem} onClick={() => handleSlashSelect(c.cmd)}>
+             {filteredSlash.map((c, i) => (
+               <button
+                 key={c.cmd}
+                 className={`${styles.slashItem} ${i === slashHighlight ? styles.slashItemActive : ""}`}
+                 onMouseEnter={() => setSlashHighlight(i)}
+                 onClick={() => handleSlashSelect(c.cmd)}
+               >
                  <span className={styles.slashCmd}>{c.cmd}</span>
                  <span className={styles.slashLabel}>{c.label}</span>
                  <span className={styles.slashHint}>{c.hint}</span>
@@ -556,17 +619,21 @@ function MessageBubble({
   isLastUser = false,
   agentBusy = false,
   onSend,
+  onEdit,
+  onRegenerate,
   onDelete,
   viewMode = "normal",
 }: {
-  message: { role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number };
+  message: Message;
   isStreaming?: boolean;
   index?: number;
-  allMessages?: Array<{ role: string; content: string; contentType?: "markdown" | "html" | "text"; timestamp?: number }>;
+  allMessages?: Message[];
   isLastUser?: boolean;
   agentBusy?: boolean;
   onSend?: (content: string) => void;
-  onDelete?: (index: number) => void;
+  onEdit?: (id: number, content: string) => void;
+  onRegenerate?: (id: number) => void;
+  onDelete?: (id: number) => void;
   viewMode?: "verbose" | "normal" | "summary";
 }) {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
@@ -586,6 +653,7 @@ function MessageBubble({
   }, [message.content]);
   const roleClass = roleClassMap[message.role] || styles.messageAssistant;
   const avatar = roleAvatarMap[message.role] || ASSISTANT_AVATAR;
+  const imageAtts = (message.attachments || []).filter((a) => a.mimeType.startsWith("image/") && a.data);
 
   const handleCopy = async (content: string) => {
     await copyMessage(content);
@@ -593,16 +661,24 @@ function MessageBubble({
   };
 
   const handleEditSubmit = () => {
-    if (editVal.trim() && onSend) {
-      onSend(editVal.trim());
+    if (editVal.trim()) {
+      if (onEdit && message.id != null) {
+        onEdit(message.id, editVal.trim());
+      } else if (onSend) {
+        onSend(editVal.trim());
+      }
       setEditing(false);
     }
   };
 
   const handleRegenerate = () => {
-    if (!onSend) return;
-    const lastUser = [...(allMessages || [])].reverse().find((m) => m.role === "user");
-    if (lastUser) onSend(lastUser.content);
+    if (!onRegenerate) return;
+    if (message.id != null) {
+      onRegenerate(message.id);
+    } else {
+      const lastUser = [...(allMessages || [])].reverse().find((m) => m.role === "user");
+      if (lastUser && onSend) onSend(lastUser.content);
+    }
   };
 
   if (message.role === "tool") {
@@ -613,6 +689,20 @@ function MessageBubble({
     <div className={`${styles.message} ${roleClass} ${isStreaming ? styles.streaming : ""}`}>
       <div className={styles.avatar} dangerouslySetInnerHTML={{ __html: avatar }} />
       <div className={styles.bubble}>
+        {imageAtts.length > 0 && (
+          <div className={styles.imageRow}>
+            {imageAtts.map((att, i) => (
+              <img
+                key={i}
+                className={styles.attachmentImage}
+                src={`data:${att.mimeType};base64,${att.data}`}
+                alt={att.name}
+                onClick={() => window.open(`data:${att.mimeType};base64,${att.data}`, "_blank")}
+                title={`${att.name}（点击放大）`}
+              />
+            ))}
+          </div>
+        )}
         {editing ? (
           <div className={styles.editArea}>
             <textarea
@@ -670,15 +760,15 @@ function MessageBubble({
                     <path d="M10 2l2 2-8 8H4v-2l6-6z" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </button>
-                <button className={styles.actionIcon} onClick={() => onDelete?.(index)} title="删除">
+                <button className={styles.actionIcon} onClick={() => onDelete?.(message.id ?? index)} title="删除">
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M2 4h10M5 4V2h4v2M4 4l1 8h4l1-8" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </button>
               </>
             )}
-            {message.role === "assistant" && !agentBusy && !isStreaming && onSend && (
-              <button className={styles.actionIcon} onClick={() => handleRegenerate()} title="重新生成">
+            {message.role === "assistant" && !agentBusy && !isStreaming && onRegenerate && (
+              <button className={styles.actionIcon} onClick={handleRegenerate} title="重新生成">
                 <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M2 7a5 5 0 015-5 5 5 0 014 2M12 7a5 5 0 01-9 3M12 2v4H8" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -713,11 +803,12 @@ async function copyMessage(content: string) {
   } catch {}
 }
 
-function ToolCard({ message, avatar, roleClass, defaultExpanded = false }: { message: { role: string; content: string; timestamp?: number }; avatar: string; roleClass: string; defaultExpanded?: boolean }) {
+function ToolCard({ message, avatar, roleClass, defaultExpanded = false }: { message: Message; avatar: string; roleClass: string; defaultExpanded?: boolean }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const m = /^\*\*([^*]+)\*\*(.*)$/s.exec(message.content);
   const toolName = m ? m[1] : "工具调用";
   const body = m ? m[2] : message.content;
+  const failed = /\*\*.*\*\*\s*\(失败\)/.test(message.content);
   const { html: bodyHtml } = renderContent(body);
 
   return (
@@ -725,6 +816,7 @@ function ToolCard({ message, avatar, roleClass, defaultExpanded = false }: { mes
       <div className={styles.avatar} dangerouslySetInnerHTML={{ __html: avatar }} />
       <div className={styles.toolCard}>
         <button className={styles.toolHeader} onClick={() => setExpanded((v) => !v)}>
+          <span className={`${styles.toolStatus} ${failed ? styles.toolStatusFail : styles.toolStatusOk}`} title={failed ? "失败" : "成功"} />
           <span className={styles.toolName}>{toolName}</span>
           <span className={styles.toolTime}>{message.timestamp ? formatTimestamp(message.timestamp) : ""}</span>
           <svg

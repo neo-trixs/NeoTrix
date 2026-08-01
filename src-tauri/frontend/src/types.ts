@@ -1,5 +1,6 @@
 export interface Message {
-  role: "user" | "assistant" | "system" | "error";
+  id?: number;
+  role: "user" | "assistant" | "system" | "error" | "tool";
   content: string;
   contentType?: "markdown" | "html" | "text";
   timestamp?: number;

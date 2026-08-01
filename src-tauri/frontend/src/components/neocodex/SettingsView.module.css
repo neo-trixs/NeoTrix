@@ -374,3 +374,43 @@
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+.fontSizeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.fontSizeLabel {
+  font-size: 13px;
+  color: var(--fg-primary);
+}
+
+.fontSizeControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fontSizeBtn {
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--fg-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fontSizeBtn:hover {
+  border-color: var(--accent, #4f8cff);
+}
+
+.fontSizeValue {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  min-width: 40px;
+  text-align: center;
+}

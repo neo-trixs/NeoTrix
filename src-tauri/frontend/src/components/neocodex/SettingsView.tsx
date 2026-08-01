@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../../stores";
-import type { NeoCodexProviderConfig } from "../../types";
+import type { NeoCodexProviderConfig, AppSettings } from "../../types";
 import styles from "./SettingsView.module.css";
 
 type Tab = "providers" | "theme" | "advanced" | "about";
@@ -101,8 +101,8 @@ export function SettingsView() {
             onDeleteKey={handleDeleteKey}
           />
         )}
-        {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} />}
-        {activeTab === "advanced" && <AdvancedPanel />}
+        {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} fontSize={settings.fontSize} onFontSizeChange={(v) => setSettings({ ...settings, fontSize: v })} />}
+        {activeTab === "advanced" && <AdvancedPanel settings={settings} onChange={(patch) => setSettings({ ...settings, ...patch })} />}
         {activeTab === "about" && <AboutPanel />}
       </div>
     </div>
@@ -174,7 +174,7 @@ function ProvidersPanel({
   );
 }
 
-function ThemePanel({ theme, onThemeChange }: { theme: "light" | "dark" | "system"; onThemeChange: (t: "light" | "dark" | "system") => void }) {
+function ThemePanel({ theme, onThemeChange, fontSize, onFontSizeChange }: { theme: "light" | "dark" | "system"; onThemeChange: (t: "light" | "dark" | "system") => void; fontSize: number; onFontSizeChange: (v: number) => void }) {
   const options = [
     { value: "light" as const, label: "浅色", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="4"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1M4.5 4.5l.7.7M8.8 8.8l.7.7M4.5 9.5l.7-.7M8.8 5.2l.7-.7" strokeLinecap="round"/></svg> },
     { value: "dark" as const, label: "深色", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 12a5 5 0 010-10 5 5 0 000 10z"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1" strokeLinecap="round"/></svg> },
@@ -197,42 +197,53 @@ function ThemePanel({ theme, onThemeChange }: { theme: "light" | "dark" | "syste
           </button>
         ))}
       </div>
+      <div className={styles.fontSizeRow}>
+        <span className={styles.fontSizeLabel}>字体大小</span>
+        <div className={styles.fontSizeControls}>
+          <button className={styles.fontSizeBtn} onClick={() => onFontSizeChange(Math.max(11, fontSize - 1))} title="减小">A-</button>
+          <span className={styles.fontSizeValue}>{fontSize}px</span>
+          <button className={styles.fontSizeBtn} onClick={() => onFontSizeChange(Math.min(20, fontSize + 1))} title="增大">A+</button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function AdvancedPanel() {
+function AdvancedPanel({ settings, onChange }: { settings: AppSettings; onChange: (patch: Partial<AppSettings>) => void }) {
+  const bools: Array<{ key: keyof AppSettings; label: string }> = [
+    { key: "autoSave", label: "自动进化" },
+    { key: "privacyPreflightCheck", label: "自动修复" },
+    { key: "privacyLocalFirst", label: "自动压缩" },
+    { key: "privacyStoreMessages", label: "保留完整历史" },
+    { key: "privacyTelemetry", label: "调试模式" },
+  ];
+  const groups: Array<{ title: string; keys: (keyof AppSettings)[] }> = [
+    { title: "进化循环", keys: ["autoSave", "privacyPreflightCheck"] },
+    { title: "上下文管理", keys: ["privacyLocalFirst", "privacyStoreMessages"] },
+    { title: "开发者", keys: ["privacyTelemetry"] },
+  ];
   return (
     <div className={styles.panel}>
       <h3>高级设置</h3>
       <div className={styles.advancedGrid}>
-        <div className={styles.advancedCard}>
-          <h4>进化循环</h4>
-          <label className={styles.toggleLabel}>
-            <input type="checkbox" defaultChecked /> 自动进化
-          </label>
-          <label className={styles.toggleLabel}>
-            <input type="checkbox" /> 自动修复
-          </label>
-        </div>
-        <div className={styles.advancedCard}>
-          <h4>上下文管理</h4>
-          <label className={styles.toggleLabel}>
-            <input type="checkbox" defaultChecked /> 自动压缩
-          </label>
-          <label className={styles.toggleLabel}>
-            <input type="checkbox" /> 保留完整历史
-          </label>
-        </div>
-        <div className={styles.advancedCard}>
-          <h4>开发者</h4>
-          <label className={styles.toggleLabel}>
-            <input type="checkbox" /> 调试模式
-          </label>
-          <label className={styles.toggleLabel}>
-            <input type="checkbox" /> 显示原始事件
-          </label>
-        </div>
+        {groups.map((g) => (
+          <div key={g.title} className={styles.advancedCard}>
+            <h4>{g.title}</h4>
+            {g.keys.map((k) => {
+              const b = bools.find((x) => x.key === k)!;
+              return (
+                <label key={k} className={styles.toggleLabel}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settings[k])}
+                    onChange={(e) => onChange({ [k]: e.target.checked } as Partial<AppSettings>)}
+                  />{" "}
+                  {b.label}
+                </label>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
