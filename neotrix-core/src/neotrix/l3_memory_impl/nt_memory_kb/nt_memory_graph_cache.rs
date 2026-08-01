@@ -119,10 +119,19 @@ pub fn weighted_shortest_path(
     while let Some(State { cost, node, .. }) = heap.pop() {
         if node == to_id {
             let mut path_nodes = vec![to_id.to_string()];
-            let path_edges: Vec<KnowledgeEdge> = Vec::new();
+            let mut path_edges: Vec<KnowledgeEdge> = Vec::new();
             let mut cur = to_id.to_string();
             while cur != from_id {
-                if let Some((p, _eid)) = prev.get(&cur) {
+                if let Some((p, eid)) = prev.get(&cur) {
+                    // Recover the full edge that led into `cur` from `p`,
+                    // by matching its id among the neighbors of `p`.
+                    if let Some(edge) = cache
+                        .neighbors(p)
+                        .into_iter()
+                        .find(|e| &e.id == eid)
+                    {
+                        path_edges.push(edge.clone());
+                    }
                     cur = p.clone();
                     path_nodes.push(cur.clone());
                 } else {
@@ -130,6 +139,7 @@ pub fn weighted_shortest_path(
                 }
             }
             path_nodes.reverse();
+            path_edges.reverse();
             return Some((path_nodes, path_edges, cost));
         }
         if let Some(&bc) = best_cost.get(&node) {
@@ -202,5 +212,55 @@ fn dfs_all_paths(
             path.pop();
             visited.remove(&next_key);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::RelationType;
+
+    fn edge(id: &str, src: &str, dst: &str, weight: f64) -> KnowledgeEdge {
+        KnowledgeEdge {
+            id: id.into(), source_id: src.into(), target_id: dst.into(),
+            relation_type: RelationType::References, weight,
+            description: None, created_at: 0, metadata: None,
+        }
+    }
+
+    #[test]
+    fn test_weighted_shortest_path_returns_edges() {
+        // Regression: Dijkstra recorded (prev_node, edge_id) in `prev` but
+        // discarded the id during backtracking, so path_edges was always
+        // empty for any non-trivial path. Edges are now recovered by id.
+        let mut cache = GraphCache::empty();
+        cache.insert_edge(edge("e-ab", "a", "b", 1.0));
+        cache.insert_edge(edge("e-bc", "b", "c", 1.0));
+        cache.insert_edge(edge("e-ac", "a", "c", 10.0));
+
+        let (nodes, edges, cost) = weighted_shortest_path(&cache, "a", "c").unwrap();
+        assert_eq!(nodes, vec!["a", "b", "c"], "must take the cheap hop");
+        assert_eq!(cost, 2.0);
+        assert_eq!(edges.len(), 2, "both edges on the path must be returned");
+        let ids: Vec<&str> = edges.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["e-ab", "e-bc"]);
+        assert_eq!(edges[0].source_id, "a");
+        assert_eq!(edges[0].target_id, "b");
+    }
+
+    #[test]
+    fn test_weighted_shortest_path_same_node() {
+        let cache = GraphCache::empty();
+        let (nodes, edges, cost) = weighted_shortest_path(&cache, "x", "x").unwrap();
+        assert_eq!(nodes, vec!["x"]);
+        assert!(edges.is_empty());
+        assert_eq!(cost, 0.0);
+    }
+
+    #[test]
+    fn test_weighted_shortest_path_no_route() {
+        let mut cache = GraphCache::empty();
+        cache.insert_edge(edge("e-ab", "a", "b", 1.0));
+        assert!(weighted_shortest_path(&cache, "a", "z").is_none());
     }
 }
