@@ -349,6 +349,8 @@ fn main() {
                      commands::neocodex_rename_session,
                      commands::neocodex_send_side_chat,
                      commands::neocodex_get_side_chat,
+                     commands::neocodex_app_version,
+                     commands::neocodex_check_update,
                      commands::browser_cmds::browser_open,
                     commands::browser_cmds::browser_navigate,
                     commands::browser_cmds::browser_back,

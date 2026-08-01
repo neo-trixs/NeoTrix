@@ -39,6 +39,7 @@ export default function NeoCodexPage() {
   const [diffOpen, setDiffOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -225,6 +226,9 @@ export default function NeoCodexPage() {
       } else if (e.key === "o" && e.ctrlKey) {
         e.preventDefault();
         setViewMode(v => v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose");
+      } else if (e.key === "Escape" && viewsMenuOpen) {
+        e.preventDefault();
+        setViewsMenuOpen(false);
       } else if (e.key === "Escape" && agentBusy) {
         e.preventDefault();
         handleStop();
@@ -253,7 +257,7 @@ export default function NeoCodexPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy]);
+  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, viewsMenuOpen]);
 
   return (
     <div className={styles.container}>
@@ -319,6 +323,41 @@ export default function NeoCodexPage() {
               <option value="Shell">Shell</option>
               <option value="Plan">Plan</option>
             </select>
+            <div className={styles.viewsMenuWrap}>
+              <button
+                type="button"
+                className={`${styles.viewsMenuBtn} ${viewsMenuOpen ? styles.viewsMenuActive : ""}`}
+                onClick={() => setViewsMenuOpen((v) => !v)}
+                title="视图面板"
+              >
+                视图 ▾
+              </button>
+              {viewsMenuOpen && (
+                <div className={styles.viewsMenu}>
+                  <button
+                    type="button"
+                    className={`${styles.viewsMenuItem} ${terminalOpen ? styles.viewsMenuItemActive : ""}`}
+                    onClick={() => { setTerminalOpen((v) => !v); setViewsMenuOpen(false); }}
+                  >
+                    终端 {terminalOpen ? "✓" : ""}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.viewsMenuItem} ${diffOpen ? styles.viewsMenuItemActive : ""}`}
+                    onClick={() => { setDiffOpen((v) => !v); setViewsMenuOpen(false); }}
+                  >
+                    Diff 查看器 {diffOpen ? "✓" : ""}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.viewsMenuItem} ${previewOpen ? styles.viewsMenuItemActive : ""}`}
+                    onClick={() => { setPreviewOpen((v) => !v); setViewsMenuOpen(false); }}
+                  >
+                    App 预览 {previewOpen ? "✓" : ""}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <div className={styles.topBarRight}>
             <button

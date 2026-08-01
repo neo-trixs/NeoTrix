@@ -313,6 +313,38 @@
   font-size: 12px;
 }
 
+.updateRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.updateBtn {
+  padding: 6px 14px;
+  background: var(--accent, #4f8cff);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.updateBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.updateOk {
+  color: var(--success, #3fb950);
+  font-size: 12px;
+}
+
+.updateErr {
+  color: var(--danger, #f85149);
+  font-size: 12px;
+}
+
 .links {
   display: flex;
   gap: 16px;

@@ -3,6 +3,7 @@ use neotrix::neotrix::l1_body_impl::nt_io_neocodex::{
 };
 use serde::Serialize;
 use tauri::Emitter;
+use tauri_plugin_updater::UpdaterExt;
 
 static NEOCODEX_AGENT: std::sync::LazyLock<tokio::sync::Mutex<Option<NeoCodexAgent>>> =
     std::sync::LazyLock::new(|| tokio::sync::Mutex::new(None));
@@ -557,4 +558,58 @@ pub struct NeoCodexAttachmentDto {
     pub name: String,
     pub size: u64,
     pub mime_type: String,
+}
+
+#[tauri::command]
+pub fn neocodex_app_version() -> Result<String, String> {
+    Ok(env!("CARGO_PKG_VERSION").to_string())
+}
+
+#[derive(serde::Serialize)]
+pub struct UpdateCheckResult {
+    pub current: String,
+    pub available: bool,
+    pub latest: String,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn neocodex_check_update(app: tauri::AppHandle) -> Result<UpdateCheckResult, String> {
+    let current = env!("CARGO_PKG_VERSION").to_string();
+    let updater = app.updater().map_err(|e| e.to_string());
+    let updater = match updater {
+        Ok(u) => u,
+        Err(e) => {
+            return Ok(UpdateCheckResult {
+                current: current.clone(),
+                available: false,
+                latest: current.clone(),
+                error: Some(e),
+            });
+        }
+    };
+    let update = updater.check().await.map_err(|e| e.to_string());
+    match update {
+        Ok(Some(update)) => {
+            let latest = update.version.to_string();
+            Ok(UpdateCheckResult {
+                current: current.clone(),
+                available: true,
+                latest,
+                error: None,
+            })
+        }
+        Ok(None) => Ok(UpdateCheckResult {
+            current: current.clone(),
+            available: false,
+            latest: current.clone(),
+            error: None,
+        }),
+        Err(e) => Ok(UpdateCheckResult {
+            current: current.clone(),
+            available: false,
+            latest: current.clone(),
+            error: Some(e.to_string()),
+        }),
+    }
 }

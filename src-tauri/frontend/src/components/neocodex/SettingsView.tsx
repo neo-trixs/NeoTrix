@@ -239,14 +239,51 @@ function AdvancedPanel() {
 }
 
 function AboutPanel() {
+  const [version, setVersion] = useState("—");
+  const [checking, setChecking] = useState(false);
+  const [update, setUpdate] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const addNotification = useStore((s) => s.addNotification);
+
+  useEffect(() => {
+    invoke<string>("neocodex_app_version").then(setVersion).catch(() => {});
+  }, []);
+
+  const checkUpdate = async () => {
+    setChecking(true);
+    setUpdate(null);
+    setError(null);
+    try {
+      const res = await invoke<any>("neocodex_check_update");
+      if (res.error) {
+        setError(`检查失败: ${res.error}`);
+      } else if (res.available) {
+        setUpdate(`发现新版本 v${res.latest}（当前 v${res.current}）。请访问 releases 页面下载更新。`);
+      } else {
+        setUpdate("已是最新版本。");
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+
   return (
     <div className={styles.panel}>
       <h3>关于 NeoCodex</h3>
       <div className={styles.aboutInfo}>
-        <div className={styles.aboutRow}><span>版本</span><span>0.1.0-dev</span></div>
+        <div className={styles.aboutRow}><span>版本</span><span>v{version}</span></div>
         <div className={styles.aboutRow}><span>架构</span><span>Rust + Tauri 2 + React 18</span></div>
         <div className={styles.aboutRow}><span>核心</span><span>NeoTrix 自进化架构</span></div>
         <div className={styles.aboutRow}><span>协议</span><span>ReAct + EvolutionLoop + SelfAudit</span></div>
+      </div>
+      <div className={styles.updateRow}>
+        <button type="button" className={styles.updateBtn} onClick={checkUpdate} disabled={checking}>
+          {checking ? "检查中…" : "检查更新"}
+        </button>
+        {update && <span className={styles.updateOk}>{update}</span>}
+        {error && <span className={styles.updateErr}>{error}</span>}
       </div>
       <div className={styles.links}>
         <a href="https://github.com/neotrix" target="_blank" rel="noopener">GitHub</a>
