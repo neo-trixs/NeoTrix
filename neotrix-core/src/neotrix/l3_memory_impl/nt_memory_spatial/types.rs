@@ -110,12 +110,20 @@ impl SpatialEntry {
         match &self.geometry {
             SpatialGeometry::Point(p) => BoundingBox::new(p.lat, p.lng, p.lat, p.lng),
             SpatialGeometry::Line(pts) => {
+                if pts.is_empty() {
+                    return BoundingBox::world();
+                }
                 let mut bb = BoundingBox::new(pts[0].lat, pts[0].lng, pts[0].lat, pts[0].lng);
                 for p in pts { bb = bb.union(&BoundingBox::new(p.lat, p.lng, p.lat, p.lng)); }
                 bb
             }
             SpatialGeometry::Polygon(rings) => {
-                let pts = &rings[0];
+                let Some(pts) = rings.first() else {
+                    return BoundingBox::world();
+                };
+                if pts.is_empty() {
+                    return BoundingBox::world();
+                }
                 let mut bb = BoundingBox::new(pts[0].lat, pts[0].lng, pts[0].lat, pts[0].lng);
                 for p in pts { bb = bb.union(&BoundingBox::new(p.lat, p.lng, p.lat, p.lng)); }
                 bb
@@ -312,5 +320,26 @@ mod tests {
             }
             _ => panic!("expected point"),
         }
+    }
+
+    #[test]
+    fn test_spatial_entry_bbox_empty_geometry_no_panic() {
+        // Regression: Line(pts) and Polygon(rings) indexed [0] on empty
+        // input, panicking for arbitrary user/import geometry. Both now
+        // fall back to BoundingBox::world().
+        let mk = |geometry: SpatialGeometry| SpatialEntry {
+            id: "e".into(), name: "E".into(),
+            geometry, properties: HashMap::new(), source: "test".into(),
+            confidence: 1.0, created_at: 0, updated_at: 0, tags: vec![],
+        };
+        let line = mk(SpatialGeometry::Line(vec![]));
+        assert_eq!(line.bbox().min_lat, -90.0);
+        assert_eq!(line.bbox().max_lat, 90.0);
+
+        let poly_empty_rings = mk(SpatialGeometry::Polygon(vec![]));
+        assert_eq!(poly_empty_rings.bbox().min_lng, -180.0);
+
+        let poly_empty_ring = mk(SpatialGeometry::Polygon(vec![vec![]]));
+        assert_eq!(poly_empty_ring.bbox().min_lng, -180.0);
     }
 }

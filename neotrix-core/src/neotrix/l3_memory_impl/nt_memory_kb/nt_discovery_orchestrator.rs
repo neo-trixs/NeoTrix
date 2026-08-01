@@ -64,7 +64,8 @@ pub struct DiscoveryCycleReport {
 
 impl DiscoveryCycleReport {
     pub fn summary(&self) -> String {
-        let mut parts = vec![format!("Discovery Cycle {}:", &self.cycle_id[..8])];
+        let id_short: String = self.cycle_id.chars().take(8).collect();
+        let mut parts = vec![format!("Discovery Cycle {}:", id_short)];
 
         if let Some(ref g) = self.github {
             parts.push(format!("  GitHub: {} topics, {} repos ingested ({} skipped)", g.topics_found, g.repos_ingested, g.repos_skipped_existing));
@@ -299,5 +300,15 @@ mod tests {
         };
         let summary = report.summary();
         assert!(summary.contains("test"));
+    }
+
+    #[test]
+    fn test_summary_empty_cycle_id_no_panic() {
+        // Regression: &self.cycle_id[..8] panicked on an empty/short
+        // cycle_id (e.g. DiscoveryCycleReport::default()). chars().take(8)
+        // is safe for any length.
+        let report = DiscoveryCycleReport { ..Default::default() };
+        let summary = report.summary();
+        assert!(summary.contains("Discovery Cycle"));
     }
 }

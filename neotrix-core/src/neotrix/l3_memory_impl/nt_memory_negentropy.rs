@@ -146,7 +146,10 @@ impl NegentropyCalculator {
     /// 传感器 #7: N_Stream = temporal coherence of consciousness stream
     pub fn sensor_temporal_coherence(stream: &ConsciousnessStream) -> f64 {
         let n = stream.len();
-        if n == 0 {
+        if n < 2 {
+            // n == 0: empty stream; n == 1: no temporal pair to compare.
+            // Both return the neutral 0.5 — n == 1 previously divided by
+            // (n - 1) == 0 producing NaN.
             return 0.5;
         }
         let recency: Vec<f64> = (0..n).map(|i| i as f64 / (n - 1) as f64).collect();
@@ -260,5 +263,30 @@ impl NegentropyCalculator {
         );
         self.prev_total = self.metric.total;
         report
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::nt_core_consciousness::vsa_tag::{VsaOrigin, VsaSelfCategory, VsaTagged};
+
+    #[test]
+    fn test_sensor_temporal_coherence_single_element_no_nan() {
+        // Regression: n == 1 divided by (n - 1) == 0 producing NaN, which
+        // flowed into mean/variance/cv and out as a NaN sensor reading.
+        // Both n == 0 and n == 1 now return the neutral 0.5.
+        let mut stream = ConsciousnessStream::new(8);
+        assert_eq!(ConsciousnessStream::default().len(), 0);
+        let empty = stream.clone();
+        let c0 = NegentropyCalculator::sensor_temporal_coherence(&empty);
+        assert_eq!(c0, 0.5);
+        assert!(c0.is_finite());
+
+        stream.push(VsaTagged::new(vec![0u8; 16], VsaOrigin::Self_(VsaSelfCategory::Thought)));
+        assert_eq!(stream.len(), 1);
+        let c1 = NegentropyCalculator::sensor_temporal_coherence(&stream);
+        assert_eq!(c1, 0.5);
+        assert!(c1.is_finite());
     }
 }

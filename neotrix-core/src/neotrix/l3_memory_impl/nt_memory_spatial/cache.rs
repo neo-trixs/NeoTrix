@@ -142,6 +142,9 @@ impl SemanticTileCache {
     }
 
     pub fn store(&mut self, embedding: Vec<f32>, entry: TileCacheEntry) {
+        if self.max_entries == 0 {
+            return; // cache disabled
+        }
         if self.tiles.len() >= self.max_entries {
             self.tiles.remove(0);
         }
@@ -207,6 +210,20 @@ mod tests {
         sc.store(emb.clone(), entry);
         assert!(sc.find_similar(&emb).is_some());
         assert!(sc.find_similar(&[0.0, 1.0, 0.0]).is_none());
+    }
+
+    #[test]
+    fn test_semantic_tile_cache_zero_capacity_no_panic() {
+        // Regression: SemanticTileCache::new(0, _) then store() hit
+        // tiles.len() >= 0 -> remove(0) on an empty Vec -> panic. With
+        // max_entries == 0 the cache is disabled and store() is a no-op.
+        let mut sc = SemanticTileCache::new(0, 0.9);
+        let entry = TileCacheEntry {
+            data: vec![0u8; 10], format: TileFormat::Mvt,
+            cached_at: 0, ttl_ms: 60_000, size_bytes: 10,
+        };
+        sc.store(vec![1.0, 0.0], entry);
+        assert!(sc.find_similar(&[1.0, 0.0]).is_none());
     }
 
     #[test]
