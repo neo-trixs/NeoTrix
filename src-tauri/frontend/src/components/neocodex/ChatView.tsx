@@ -215,6 +215,19 @@ export function ChatView({
     return () => window.removeEventListener("keydown", onKey);
   }, [messages, addNotification]);
 
+  useEffect(() => {
+    const onPick = (ev: Event) => {
+      const path = (ev as CustomEvent<string>).detail;
+      if (!path) return;
+      setInput((prev) => prev + `@${path} `);
+      setMentions((prev) => (prev.includes(path) ? prev : [...prev, path]));
+      textareaRef.current?.focus();
+      addNotification({ type: "info", message: `已引用 ${path}`, duration: 2000 });
+    };
+    window.addEventListener("neotrix:mention-file", onPick);
+    return () => window.removeEventListener("neotrix:mention-file", onPick);
+  }, [addNotification]);
+
   const handleMentionSelect = (name: string) => {
     setInput((prev) => prev.replace(/@\w*$/, "") + `@${name} `);
     setMentionOpen(false);

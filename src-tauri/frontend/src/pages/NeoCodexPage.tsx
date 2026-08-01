@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../stores";
-import { ChatView, CommandPalette, ModelSelector, SessionSidebar, SettingsView, ShortcutHelp } from "../components/neocodex";
+import { ChatView, CommandPalette, FileTreePanel, ModelSelector, SessionSidebar, SettingsView, ShortcutHelp } from "../components/neocodex";
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -33,6 +33,8 @@ export default function NeoCodexPage() {
 
   const [agentBusy, setAgentBusy] = React.useState(false);
   const [showSidebar, setShowSidebar] = React.useState(true);
+  const [fileTreeOpen, setFileTreeOpen] = React.useState(false);
+  const [showUsage, setShowUsage] = React.useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -253,11 +255,35 @@ export default function NeoCodexPage() {
               </svg>
             </button>
           </div>
-          <SessionSidebar
-            activeSessionId={neocodexActiveSessionId}
-            onSessionSelect={handleSessionSelect}
-            onSessionDelete={handleSessionDelete}
-          />
+          <div className={styles.sidebarTabs}>
+            <button
+              type="button"
+              className={`${styles.sidebarTab} ${!fileTreeOpen ? styles.sidebarTabActive : ""}`}
+              onClick={() => setFileTreeOpen(false)}
+            >
+              会话
+            </button>
+            <button
+              type="button"
+              className={`${styles.sidebarTab} ${fileTreeOpen ? styles.sidebarTabActive : ""}`}
+              onClick={() => setFileTreeOpen(true)}
+              title="文件树"
+            >
+              文件
+            </button>
+          </div>
+          {fileTreeOpen ? (
+            <FileTreePanel onPick={(p) => {
+              setFileTreeOpen(false);
+              window.dispatchEvent(new CustomEvent("neotrix:mention-file", { detail: p }));
+            }} />
+          ) : (
+            <SessionSidebar
+              activeSessionId={neocodexActiveSessionId}
+              onSessionSelect={handleSessionSelect}
+              onSessionDelete={handleSessionDelete}
+            />
+          )}
         </aside>
       )}
 
@@ -323,7 +349,11 @@ export default function NeoCodexPage() {
                 <path d="M7 1v2M7 11v2M1 7h2M11 7h2" strokeLinecap="round" />
               </svg>
             </button>
-            <button className={styles.settingsBtn} title={`上下文用量 ${usagePct}%`}>
+            <button
+              className={`${styles.settingsBtn} ${showUsage ? styles.settingsActive : ""}`}
+              title={`上下文用量 ${usagePct}%（点击查看成本明细）`}
+              onClick={() => setShowUsage((v) => !v)}
+            >
               <span className={styles.usageRing}>
                 <svg width="30" height="30" viewBox="0 0 20 20">
                   <circle cx="10" cy="10" r="7" fill="none" stroke="var(--border-primary)" strokeWidth="2" />
@@ -344,6 +374,34 @@ export default function NeoCodexPage() {
             </button>
           </div>
         </header>
+
+        {showUsage && (
+          <div className={styles.usagePopover}>
+            <div className={styles.usagePopoverTitle}>用量 · 成本</div>
+            <div className={styles.usageRow}>
+              <span>上下文占用</span>
+              <strong>{usagePct}%</strong>
+            </div>
+            <div className={styles.usageRow}>
+              <span>Tokens 已用</span>
+              <strong>{health?.tokens_used ?? 0}</strong>
+            </div>
+            <div className={styles.usageRow}>
+              <span>本次会话成本</span>
+              <strong>{health?.cost_spent != null ? `$${Number(health.cost_spent).toFixed(4)}` : "—"}</strong>
+            </div>
+            <div className={styles.usageRow}>
+              <span>预算</span>
+              <strong>{health?.cost_budget != null ? `$${Number(health.cost_budget).toFixed(2)}` : "—"}</strong>
+            </div>
+            {health?.provider_model && (
+              <div className={styles.usageRow}>
+                <span>当前模型</span>
+                <strong>{health.provider_model}</strong>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className={styles.chatArea}>
           {showSettings ? (

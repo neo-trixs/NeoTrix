@@ -1,0 +1,137 @@
+import React, { useCallback, useEffect, useState } from "react";
+import { readDir, readTextFile } from "@tauri-apps/plugin-fs";
+import styles from "./FileTreePanel.module.css";
+
+interface TreeNode {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  children?: TreeNode[];
+  expanded?: boolean;
+}
+
+const IGNORED = new Set(["node_modules", ".git", ".next", "dist", "target", "build", ".cache", "coverage", ".turbo", ".parcel-cache"]);
+
+export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; onPick?: (path: string) => void }) {
+  const [root, setRoot] = useState<TreeNode | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState("");
+
+  const rootPath = projectRoot || ".";
+
+  const loadDir = useCallback(async (dirPath: string, depth: number): Promise<TreeNode[]> => {
+    if (depth > 4) return [];
+    try {
+      const entries = await readDir(dirPath);
+      const dirs: TreeNode[] = [];
+      const files: TreeNode[] = [];
+      for (const e of entries) {
+        if (IGNORED.has(e.name)) continue;
+        const node: TreeNode = { name: e.name, path: `${dirPath}/${e.name}`, isDirectory: e.isDirectory };
+        if (e.isDirectory) {
+          node.children = await loadDir(node.path, depth + 1);
+          dirs.push(node);
+        } else {
+          files.push(node);
+        }
+      }
+      return [...dirs, ...files];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const children = await loadDir(rootPath, 0);
+      const node: TreeNode = { name: rootPath, path: rootPath, isDirectory: true, children, expanded: true };
+      setRoot(node);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [rootPath, loadDir]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const toggle = (node: TreeNode) => {
+    setRoot((prev) => {
+      if (!prev) return prev;
+      const flip = (n: TreeNode): TreeNode => {
+        if (n.path === node.path) return { ...n, expanded: !n.expanded };
+        if (n.children) return { ...n, children: n.children.map(flip) };
+        return n;
+      };
+      return flip(prev);
+    });
+  };
+
+  const openFile = async (node: TreeNode) => {
+    setSelected(node.path);
+    setPreviewName(node.name);
+    setPreview(null);
+    if (node.isDirectory) {
+      toggle(node);
+      return;
+    }
+    try {
+      const sizeLimit = 256 * 1024;
+      const text = await readTextFile(node.path);
+      setPreview(text.length > sizeLimit ? text.slice(0, sizeLimit) + "\n\n… (已截断)" : text);
+    } catch (e) {
+      setPreview(`[无法读取 ${node.name}]\n${e}`);
+    }
+  };
+
+  const renderTree = (nodes: TreeNode[], depth: number): React.ReactNode => (
+    nodes.map((node) => (
+      <div key={node.path}>
+        <button
+          type="button"
+          className={`${styles.row} ${selected === node.path ? styles.selected : ""}`}
+          style={{ paddingLeft: 8 + depth * 14 }}
+          onClick={() => openFile(node)}
+        >
+          <span className={styles.icon}>{node.isDirectory ? (node.expanded ? "▾" : "▸") : "·"}</span>
+          <span className={styles.name} title={node.path}>{node.name}</span>
+        </button>
+        {node.isDirectory && node.expanded && node.children && renderTree(node.children, depth + 1)}
+      </div>
+    ))
+  );
+
+  return (
+    <div className={styles.panel}>
+      <div className={styles.header}>
+        <span className={styles.title}>文件</span>
+        <button type="button" className={styles.refresh} onClick={refresh} title="刷新">↻</button>
+      </div>
+      <div className={styles.tree}>
+        {loading && <div className={styles.muted}>加载中…</div>}
+        {error && <div className={styles.error}>{error}</div>}
+        {!loading && !error && root && renderTree(root.children || [], 0)}
+        {!loading && !error && !root && <div className={styles.muted}>无文件</div>}
+      </div>
+      {preview !== null && (
+        <div className={styles.preview}>
+          <div className={styles.previewHeader}>
+            <span className={styles.previewName}>{previewName}</span>
+            <button type="button" className={styles.close} onClick={() => setPreview(null)}>✕</button>
+          </div>
+          <pre className={styles.pre}>{preview}</pre>
+        </div>
+      )}
+      {onPick && selected && (
+        <button type="button" className={styles.pickBtn} onClick={() => onPick(selected)}>插入到输入</button>
+      )}
+    </div>
+  );
+}
