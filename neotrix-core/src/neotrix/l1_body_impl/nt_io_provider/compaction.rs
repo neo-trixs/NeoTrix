@@ -4,8 +4,17 @@ pub fn sanitize_history(messages: &mut Vec<Message>) {
     let mut i = 0;
     while i < messages.len() {
         if messages[i].role == Role::Tool {
+            // A Tool result is only meaningful if the immediately-preceding
+            // Assistant chain declared the exact tool_call_id this result
+            // answers. Merely seeing *some* Assistant with tool_calls is not
+            // enough: a leftover result for a call the model never declared
+            // (e.g. after a mid-turn message was dropped) would be forwarded
+            // to the provider and rejected.
+            let call_id = messages[i].tool_call_id.as_deref();
             let has_preceding_call = messages[..i].iter().rev().any(|m| {
-                m.role == Role::Assistant && m.tool_calls.is_some()
+                m.role == Role::Assistant
+                    && m.tool_calls.as_ref()
+                        .is_some_and(|calls| calls.iter().any(|tc| tc.id.as_str() == call_id.unwrap_or("")))
             });
             if !has_preceding_call {
                 messages.remove(i);
@@ -137,6 +146,24 @@ mod tests {
         ];
         sanitize_history(&mut msgs);
         assert_eq!(msgs.len(), 8);
+    }
+
+    #[test]
+    fn test_tool_result_for_undeclared_call_removed() {
+        // Regression: a Tool result whose tool_call_id matches no preceding
+        // Assistant tool_calls used to survive sanitization (the check only
+        // required *some* Assistant with calls). Providers reject results
+        // with no matching declaration. c2 is undeclared -> its result must
+        // be dropped, while the declared c1 pair is preserved.
+        let mut msgs = vec![
+            user_msg("hello"),
+            assistant_with_calls(&["c1"]),
+            tool_msg("r1", "c1"),
+            tool_msg("r2", "c2"),
+        ];
+        sanitize_history(&mut msgs);
+        assert_eq!(msgs.len(), 3);
+        assert!(!msgs.iter().any(|m| m.role == Role::Tool && m.tool_call_id.as_deref() == Some("c2")));
     }
 
     #[test]

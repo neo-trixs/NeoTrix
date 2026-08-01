@@ -639,17 +639,18 @@ impl GatewayV2 {
         };
 
         // Phase 1: Normal retry loop (up to 3 providers, best-first)
-        // Check if we've exceeded the per-query cost budget
+        // Enforce the per-query cost budget against the *current request's*
+        // own estimated tokens. The CostTracker totals are process-cumulative,
+        // so comparing them to budget_per_query permanently locked out the
+        // gateway once ~10k total tokens had ever been consumed (and free
+        // providers, whose cost is 0.0, hard-blocked too).
         {
-            if let Ok(guard) = self.cost_tracker.read() {
-                if let Some(ref ct) = *guard {
-                    let total_tokens = ct.total_prompt_tokens.load(std::sync::atomic::Ordering::Relaxed)
-                        + ct.total_completion_tokens.load(std::sync::atomic::Ordering::Relaxed);
-                    let estimated_cost = (total_tokens as f64 / 1000.0) * 0.002;
-                    if estimated_cost > self.cost_budget_per_query && self.cost_budget_per_query > 0.0 {
-                        log::warn!("[gateway] Per-query cost budget exceeded: ${:.4} > ${:.4}", estimated_cost, self.cost_budget_per_query);
-                        return Err(LlmError::Unknown(format!("Cost budget exceeded: ${:.4} > ${:.4}", estimated_cost, self.cost_budget_per_query)));
-                    }
+            if self.cost_budget_per_query > 0.0 {
+                let est_tokens = (prompt_key.len() / 4) as f64;
+                let estimated_cost = (est_tokens / 1000.0) * 0.002;
+                if estimated_cost > self.cost_budget_per_query {
+                    log::warn!("[gateway] Per-query cost budget exceeded: ${:.4} > ${:.4}", estimated_cost, self.cost_budget_per_query);
+                    return Err(LlmError::Unknown(format!("Cost budget exceeded: ${:.4} > ${:.4}", estimated_cost, self.cost_budget_per_query)));
                 }
             }
         }
@@ -855,7 +856,12 @@ impl GatewayV2 {
                         let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get_mut(name) {
                             state.record_success(elapsed, token_count);
-                            state.circuit_breaker.set_half_open_max_probes(3);
+                            // Restore the provider's configured probe threshold
+                            // instead of leaving the aggressive override in place.
+                            let saved = set_aggressive.iter()
+                                .find(|(n, _)| n == name)
+                                .map(|(_, s)| *s);
+                            state.circuit_breaker.set_half_open_max_probes(saved.unwrap_or(3));
                         }
                     }
                     self.fire_event(name, true, elapsed, token_count, &request.model, AttemptPhase::AggressiveRetry);
@@ -1037,11 +1043,15 @@ impl GatewayV2 {
 
             match self.call_provider_stream(name, request).await {
                 Ok(result) => {
-                    // Reset probes on success
+                    // Restore the provider's configured probe threshold
+                    // instead of leaving the aggressive override in place.
                     {
                         let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get_mut(name) {
-                            state.circuit_breaker.set_half_open_max_probes(3);
+                            let saved = set_aggressive.iter()
+                                .find(|(n, _)| n == name)
+                                .map(|(_, s)| *s);
+                            state.circuit_breaker.set_half_open_max_probes(saved.unwrap_or(3));
                         }
                     }
                     self.fire_event(name, true, 0.0, 0, &request.model, AttemptPhase::AggressiveRetry);
@@ -1801,6 +1811,35 @@ mod tests {
         assert!(out.degraded, "降级发生但未被报告");
         assert_eq!(out.used_profile, CommunicationProfile::Open);
         assert_eq!(out.provider_name, "cloud-ok");
+    }
+
+    #[tokio::test]
+    async fn test_per_query_budget_uses_request_not_cumulative() {
+        // Regression: the budget check compared the process-cumulative token
+        // counters against budget_per_query, so the gateway permanently
+        // rejected every request once ~10k total tokens had ever been
+        // consumed. It must now gate on the current request's own estimated
+        // tokens, and a small request must pass even after the tracker has
+        // accumulated a large cumulative balance.
+        let mut gw = GatewayV2::new();
+        gw.register_provider("free", Box::new(MockProvider::new("ok")), true);
+        gw.set_cost_budget(0.02);
+
+        // Seed a large cumulative balance in the tracker — as if the process
+        // had consumed far more than the per-query budget historically.
+        let mut tracker = CostTracker::new();
+        tracker.record("free", 5_000_000, 5_000_000); // ~$20 cumulative
+        gw.set_cost_tracker(tracker);
+
+        // A tiny request must still be allowed (per-query semantics).
+        let req = LlmRequest::new("test", "hi");
+        let result = gw.complete_with_selection(&req).await;
+        assert!(result.is_ok(), "small request must not be blocked by cumulative spend");
+
+        // A request large enough on its own to exceed the budget is rejected.
+        let big = LlmRequest::new("test", &"x".repeat(2_000_000));
+        let result = gw.complete_with_selection(&big).await;
+        assert!(result.is_err(), "oversized single request must be budget-blocked");
     }
 
     struct MockProvider {
