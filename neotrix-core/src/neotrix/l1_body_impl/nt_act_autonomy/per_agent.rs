@@ -475,6 +475,22 @@ mod tests {
     }
 
     #[test]
+    fn test_planner_many_steps_no_priority_overflow() {
+        // Regression: 10u8.saturating_sub(i as u8 * 2) overflowed u8 once a
+        // task split into >= 128 segments (i * 2 exceeds 255): debug panic,
+        // release wraps to 0 -> priority 10. saturating_mul keeps it a floor
+        // of 1 for action steps.
+        let mut planner = PlannerAgent::new("test");
+        let sentences: Vec<String> = (0..200).map(|i| format!("Action sentence {}.", i)).collect();
+        let plan = planner.plan(&sentences.join(" "));
+        assert!(plan.steps.len() >= 200);
+        for step in &plan.steps {
+            assert!(step.priority >= 1, "priority must stay >= 1, got {}", step.priority);
+            assert!(step.priority <= 10, "priority must stay <= 10, got {}", step.priority);
+        }
+    }
+
+    #[test]
     fn test_planner_gives_action_steps_higher_priority() {
         let mut planner = PlannerAgent::new("test");
         let plan = planner.plan("Implement the core. Review the docs.");

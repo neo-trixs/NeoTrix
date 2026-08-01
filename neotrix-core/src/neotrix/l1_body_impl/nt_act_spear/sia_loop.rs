@@ -295,7 +295,7 @@ impl MetaAgent {
             .map(|(i, sentence)| DecomposedInstruction {
                 id: format!("inst-{}", i + 1),
                 description: sentence.to_string(),
-                priority: (10 - i as u8).min(10),
+                priority: 10u8.saturating_sub(i as u8).min(10),
                 dependencies: if i > 0 {
                     vec![format!("inst-{}", i)]
                 } else {
@@ -433,6 +433,22 @@ mod tests {
         assert_eq!(loop_.meta_agent.decomposition_count, 0);
         assert_eq!(loop_.target_agent.execution_count, 0);
         assert_eq!(loop_.feedback_agent.review_count, 0);
+    }
+
+    #[test]
+    fn test_decompose_many_sentences_no_priority_underflow() {
+        // Regression: (10 - i as u8) underflowed u8 once a task split into
+        // 11+ sentences (i >= 11): debug panic, release wraps to 255 (then
+        // .min(10) yields 10). saturating_sub keeps the floor at 0.
+        let mut agent = MetaAgent { name: "SIA-Meta".into(), decomposition_count: 0 };
+        let task = (0..20).map(|i| format!("sentence number {}.", i)).collect::<Vec<_>>().join(" ");
+        let steps = agent.decompose_task(&task);
+        assert_eq!(steps.len(), 20);
+        for step in &steps {
+            assert!(step.priority <= 10, "priority must never exceed 10, got {}", step.priority);
+            assert!(step.id.starts_with("inst-"));
+        }
+        assert_eq!(steps[19].priority, 0, "last of 20 sentences must floor at 0");
     }
 
     #[test]
