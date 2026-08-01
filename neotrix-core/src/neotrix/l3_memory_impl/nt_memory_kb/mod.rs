@@ -704,8 +704,9 @@ impl KnowledgeBase {
         if !domain.is_empty() {
             sql.push_str(" AND domain = ?1");
         }
-        if let Some(min) = min_stars {
-            sql.push_str(&format!(" AND CAST(json_extract(metadata, '$.stars') AS INTEGER) >= {}", min));
+        if let Some(_min) = min_stars {
+            // min_stars 参数化绑定，避免字符串插值 (与 domain 的 ?1 风格一致)
+            sql.push_str(" AND CAST(json_extract(metadata, '$.stars') AS INTEGER) >= ?2");
         }
         sql.push_str(" ORDER BY rowid DESC");
         let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare: {}", e))?;
@@ -720,10 +721,11 @@ impl KnowledgeBase {
                 temporal: None, supersedes: None, source_episode: None,
             })
         };
-        let mapped_rows = if domain.is_empty() {
-            stmt.query_map([], mapper).map_err(|e| format!("query: {}", e))?
-        } else {
-            stmt.query_map([domain], mapper).map_err(|e| format!("query: {}", e))?
+        let mapped_rows = match (domain.is_empty(), min_stars) {
+            (true, None) => stmt.query_map([], mapper).map_err(|e| format!("query: {}", e))?,
+            (false, None) => stmt.query_map([domain], mapper).map_err(|e| format!("query: {}", e))?,
+            (true, Some(min)) => stmt.query_map([min], mapper).map_err(|e| format!("query: {}", e))?,
+            (false, Some(min)) => stmt.query_map(rusqlite::params![domain, min], mapper).map_err(|e| format!("query: {}", e))?,
         };
         let mut repos = Vec::new();
         for row in mapped_rows {

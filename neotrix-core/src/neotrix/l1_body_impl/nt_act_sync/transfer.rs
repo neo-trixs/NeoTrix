@@ -69,18 +69,24 @@ impl SyncServer {
                     return write_message(stream, &SyncMessage::Error { message: "invalid path".into() });
                 };
                 if rel.is_file() {
+                    // 先一次性读入内存再发 header：读取失败时不发 FileContent
+                    // （否则 header 声称 size/checksum 但 body 为空，peer read_exact 挂起）
+                    let bytes = match std::fs::read(&rel) {
+                        Ok(b) => b,
+                        Err(_) => return write_message(stream, &SyncMessage::Error { message: "read error".into() }),
+                    };
                     let metadata = match rel.metadata() {
                         Ok(m) => m,
                         Err(_) => return write_message(stream, &SyncMessage::Error { message: "metadata error".into() }),
                     };
-                    let size = metadata.len();
+                    let size = bytes.len() as u64;
                     let modified = metadata
                         .modified()
                         .ok()
                         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                         .map(|d| d.as_secs() as i64)
                         .unwrap_or(0);
-                    let checksum = match file_checksum(&rel) {
+                    let checksum = match file_checksum_bytes(&bytes) {
                         Ok(c) => c,
                         Err(_) => return write_message(stream, &SyncMessage::Error { message: "checksum error".into() }),
                     };
@@ -91,7 +97,7 @@ impl SyncServer {
                         checksum,
                     });
                     if ok {
-                        let _ = stream.write_all(&std::fs::read(&rel).unwrap_or_default());
+                        let _ = stream.write_all(&bytes);
                     }
                     ok
                 } else {
@@ -273,6 +279,12 @@ fn file_checksum(path: &Path) -> Result<String, String> {
     let mut file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
     let mut hasher = Sha256::new();
     std::io::copy(&mut file, &mut hasher).map_err(|e| format!("hash: {}", e))?;
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn file_checksum_bytes(bytes: &[u8]) -> Result<String, String> {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
     Ok(format!("{:x}", hasher.finalize()))
 }
 

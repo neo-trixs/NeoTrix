@@ -216,14 +216,15 @@ impl KnowledgeAbsorptionPipeline {
             else if url.contains("wikipedia.org") { NodeType::Reference }
             else { NodeType::Article };
 
-        let node_id = self.kb.as_ref().and_then(|kb| {
-            kb.insert_or_get_node(url, node_type.clone(),
-                Some(&summary_short), Some(url), Some(&domain)).ok()
-        });
+        // 插入失败必须传播错误：绝不把失败 URL 记成已吸收 (record_source 会使其 24h 不再重试)
+        let kb = self.kb.as_ref().ok_or("knowledge base not initialized")?;
+        let node_id = kb.insert_or_get_node(url, node_type.clone(),
+            Some(&summary_short), Some(url), Some(&domain))
+            .map_err(|e| format!("KB insert failed for {}: {}", url, e))?;
 
         self.record_source(url.to_string(), SourceEntry {
             url: url.into(), source_type: KbSourceType::WebArticle,
-            title: url.into(), kb_node_id: node_id.clone(),
+            title: url.into(), kb_node_id: Some(node_id.clone()),
             last_absorbed: Utc::now().timestamp(),
             sha_hash: None, distill_summary: None, tags: vec![],
         });
@@ -232,7 +233,7 @@ impl KnowledgeAbsorptionPipeline {
         Ok(AbsorptionReport {
             url: url.into(), source_type: KbSourceType::WebArticle,
             action: "absorbed".into(),
-            nodes_created: if node_id.is_some() { 1 } else { 0 },
+            nodes_created: 1,
             edges_created: 0,
             distil_summary: Some(summary_short),
         })
@@ -299,14 +300,15 @@ impl KnowledgeAbsorptionPipeline {
             else if url.contains("wikipedia.org") { NodeType::Reference }
             else { NodeType::Article };
 
-        let node_id = self.kb.as_ref().and_then(|kb| {
-            kb.insert_or_get_node(url, node_type.clone(),
-                Some(&summary_short), Some(url), Some(&domain)).ok()
-        });
+        // 插入失败必须传播错误：绝不把失败 URL 记成已吸收 (record_source 会使其 24h 不再重试)
+        let kb = self.kb.as_ref().ok_or("knowledge base not initialized")?;
+        let node_id = kb.insert_or_get_node(url, node_type.clone(),
+            Some(&summary_short), Some(url), Some(&domain))
+            .map_err(|e| format!("KB insert failed for {}: {}", url, e))?;
 
         self.record_source(url.to_string(), SourceEntry {
             url: url.into(), source_type: KbSourceType::WebArticle,
-            title: url.into(), kb_node_id: node_id.clone(),
+            title: url.into(), kb_node_id: Some(node_id.clone()),
             last_absorbed: Utc::now().timestamp(),
             sha_hash: None, distill_summary: None, tags: vec![],
         });
@@ -315,7 +317,7 @@ impl KnowledgeAbsorptionPipeline {
         Ok(AbsorptionReport {
             url: url.into(), source_type: KbSourceType::WebArticle,
             action: "absorbed".into(),
-            nodes_created: if node_id.is_some() { 1 } else { 0 },
+            nodes_created: 1,
             edges_created: 0,
             distil_summary: Some(summary_short),
         })

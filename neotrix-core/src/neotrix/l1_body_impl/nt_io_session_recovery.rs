@@ -70,7 +70,8 @@ impl SessionRecoveryManager {
         };
         self.snapshot_count += 1;
         self.persist_snapshot(&snapshot)?;
-        self.git_commit(&snapshot)?;
+        // git 备份是 best-effort：失败不应阻断主快照创建，但已在 git_commit 内部记录错误
+        let _ = self.git_commit(&snapshot);
         Ok(snapshot)
     }
 
@@ -119,47 +120,38 @@ impl SessionRecoveryManager {
     fn git_commit(&self, snapshot: &SessionSnapshot) -> Result<(), String> {
         let repo_dir = &self.snapshots_dir;
         if !repo_dir.join(".git").exists() {
-            if let Err(e) = std::process::Command::new("git")
-                .args(["init"])
-                .current_dir(repo_dir)
-                .output()
-                .map(|_| ())
-            {
-                log::warn!("session git init failed: {e}");
-            }
-            if let Err(e) = std::process::Command::new("git")
-                .args(["config", "user.email", "neotrix@session"])
-                .current_dir(repo_dir)
-                .output()
-                .map(|_| ())
-            {
-                log::warn!("session git config email failed: {e}");
-            }
-            if let Err(e) = std::process::Command::new("git")
-                .args(["config", "user.name", "NeoTrix Session"])
-                .current_dir(repo_dir)
-                .output()
-                .map(|_| ())
-            {
-                log::warn!("session git config name failed: {e}");
+            for (label, args) in [
+                ("init", vec!["init"]),
+                ("config email", vec!["config", "user.email", "neotrix@session"]),
+                ("config name", vec!["config", "user.name", "NeoTrix Session"]),
+            ] {
+                let out = std::process::Command::new("git")
+                    .args(&args)
+                    .current_dir(repo_dir)
+                    .output()
+                    .map_err(|e| format!("git {label} spawn failed: {e}"))?;
+                if !out.status.success() {
+                    log::warn!("session git {label} failed: {}", String::from_utf8_lossy(&out.stderr).trim());
+                }
             }
         }
-        if let Err(e) = std::process::Command::new("git")
+        // git add 后检查 exit status：非零即失败，不能静默吞掉导致 backup 缺失
+        let out = std::process::Command::new("git")
             .args(["add", "."])
             .current_dir(repo_dir)
             .output()
-            .map(|_| ())
-        {
-            log::warn!("session git add failed: {e}");
+            .map_err(|e| format!("git add spawn failed: {e}"))?;
+        if !out.status.success() {
+            log::warn!("session git add failed: {}", String::from_utf8_lossy(&out.stderr).trim());
         }
         let msg = format!("session {} snapshot {}", self.session_id, snapshot.created_at);
-        if let Err(e) = std::process::Command::new("git")
+        let out = std::process::Command::new("git")
             .args(["commit", "-m", &msg, "--allow-empty"])
             .current_dir(repo_dir)
             .output()
-            .map(|_| ())
-        {
-            log::warn!("session git commit failed: {e}");
+            .map_err(|e| format!("git commit spawn failed: {e}"))?;
+        if !out.status.success() {
+            return Err(format!("session git commit failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
         }
         Ok(())
     }
@@ -174,10 +166,14 @@ impl SessionRecoveryManager {
             .current_dir(repo_dir)
             .output().ok()?;
         if output.status.success() {
-            let _ = std::process::Command::new("git")
+            let checkout = std::process::Command::new("git")
                 .args(["checkout", "HEAD", "--", "."])
                 .current_dir(repo_dir)
                 .output().ok()?;
+            if !checkout.status.success() {
+                log::warn!("session git checkout restore failed: {}", String::from_utf8_lossy(&checkout.stderr).trim());
+                return None;
+            }
         }
         let path = self.snapshot_path("latest");
         std::fs::read_to_string(&path).ok()

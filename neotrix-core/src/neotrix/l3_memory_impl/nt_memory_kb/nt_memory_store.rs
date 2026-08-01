@@ -17,7 +17,9 @@ pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
     let temporal_json = node.temporal.as_ref().map(|t| {
         serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
     });
-    conn.execute(
+    // 事务：nodes + nodes_fts 双写保持一致性，crash 不残留孤立 FTS 行
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
         "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language,
             confidence, importance, created_at, updated_at, access_count, metadata,
             data_tier, temporal, supersedes, source_episode, tier)
@@ -48,17 +50,18 @@ pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
     let summary = node.summary.as_deref().unwrap_or("");
     let content = node.content.as_deref().unwrap_or("");
     let domain = node.domain.as_deref().unwrap_or("");
-    conn.execute(
+    tx.execute(
         "INSERT INTO nodes_fts (rowid, title, summary, content, domain)
          VALUES (last_insert_rowid(), ?1, ?2, ?3, ?4)",
         params![node.title, summary, content, domain],
     )?;
 
-    Ok(())
+    tx.commit()
 }
 
 pub fn update_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
-    conn.execute(
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
         "UPDATE nodes SET node_type=?2, title=?3, summary=?4, content=?5, url=?6,
             domain=?7, language=?8, confidence=?9, importance=?10, updated_at=?11, metadata=?12
          WHERE id=?1",
@@ -80,12 +83,12 @@ pub fn update_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
     let summary = node.summary.as_deref().unwrap_or("");
     let content = node.content.as_deref().unwrap_or("");
     let domain = node.domain.as_deref().unwrap_or("");
-    conn.execute(
+    tx.execute(
         "UPDATE nodes_fts SET title=?2, summary=?3, content=?4, domain=?5
          WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)",
         params![node.id, node.title, summary, content, domain],
     )?;
-    Ok(())
+    tx.commit()
 }
 
 pub fn update_node_metadata(conn: &Connection, id: &str, metadata: &serde_json::Value) -> rusqlite::Result<()> {
@@ -164,22 +167,24 @@ pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &N
 
 /// 合并相同标题的重复节点 (将指定节点的边迁移到保留节点)
 pub fn merge_duplicate_nodes(conn: &Connection, keep_id: &str, remove_id: &str) -> rusqlite::Result<()> {
+    // 事务：边重映射 + 节点删除必须原子，否则残留指向已删节点的边
+    let tx = conn.unchecked_transaction()?;
     // Remove edges from remove_id that already exist on keep_id (avoid UNIQUE conflict)
-    conn.execute(
+    tx.execute(
         "DELETE FROM edges WHERE source_id=?1 AND (target_id, relation_type) IN \
          (SELECT target_id, relation_type FROM edges WHERE source_id=?2)",
         params![remove_id, keep_id],
     )?;
-    conn.execute(
+    tx.execute(
         "DELETE FROM edges WHERE target_id=?1 AND (source_id, relation_type) IN \
          (SELECT source_id, relation_type FROM edges WHERE target_id=?2)",
         params![remove_id, keep_id],
     )?;
-    conn.execute("UPDATE edges SET source_id=?1 WHERE source_id=?2", params![keep_id, remove_id])?;
-    conn.execute("UPDATE edges SET target_id=?1 WHERE target_id=?2", params![keep_id, remove_id])?;
-    conn.execute("DELETE FROM nodes WHERE id=?1", params![remove_id])?;
-    conn.execute("DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)", params![remove_id])?;
-    Ok(())
+    tx.execute("UPDATE edges SET source_id=?1 WHERE source_id=?2", params![keep_id, remove_id])?;
+    tx.execute("UPDATE edges SET target_id=?1 WHERE target_id=?2", params![keep_id, remove_id])?;
+    tx.execute("DELETE FROM nodes WHERE id=?1", params![remove_id])?;
+    tx.execute("DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)", params![remove_id])?;
+    tx.commit()
 }
 
 /// 查找并合并所有重复标题的节点 (仅无 URL 节点)
@@ -237,8 +242,11 @@ pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option
 }
 
 pub fn delete_node(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
-    conn.execute("DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)", params![id])?;
-    let affected = conn.execute("DELETE FROM nodes WHERE id=?1", params![id])?;
+    // 事务：先删 FTS 行再删节点行，crash 不留孤立 FTS 行
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM nodes_fts WHERE rowid = (SELECT rowid FROM nodes WHERE id=?1)", params![id])?;
+    let affected = tx.execute("DELETE FROM nodes WHERE id=?1", params![id])?;
+    tx.commit()?;
     Ok(affected > 0)
 }
 

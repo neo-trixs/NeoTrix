@@ -668,6 +668,13 @@ pub fn mcp_host_ping() -> Result<serde_json::Value, String> {
     match rx.recv_timeout(Duration::from_secs(5)) {
         Ok((read_ok, line, reader)) => {
             let mut state = MCP_HOST.lock().map_err(|e| e.to_string())?;
+            // 并发 stop 可能已把 host 停掉：此时把手柄塞回 running=false 的 state
+            // 只会留下过期句柄。直接丢弃并如实报错。
+            if !state.running {
+                drop(reader);
+                drop(stdin);
+                return Err("MCP host stopped during ping".into());
+            }
             state.child_stdout = Some(reader.into_inner());
             state.child_stdin = Some(stdin);
             if !read_ok {

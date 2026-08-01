@@ -446,11 +446,12 @@ pub fn computer_bg_submit(
         name,
         description,
         task_type: type_.clone(),
-        status: "queued".into(),
+        // 锁内直接置 running：并发计数立即生效，杜绝双 submit 都通过上限检查 (check-then-act)
+        status: "running".into(),
         progress_pct: 0,
         target,
         created_at: now,
-        started_at: None,
+        started_at: Some(now),
         completed_at: None,
         duration_ms: None,
         result: None,
@@ -459,6 +460,7 @@ pub fn computer_bg_submit(
     };
 
     state.add_task(task);
+    state.stats.currently_running += 1;
     drop(state);
 
     // Simulate execution in background
@@ -467,16 +469,7 @@ pub fn computer_bg_submit(
     let _exec_params = params.clone();
 
     std::thread::spawn(move || {
-        // Brief delay to simulate queuing
         std::thread::sleep(std::time::Duration::from_millis(50));
-
-        if let Ok(mut s) = BG_STATE.lock() {
-            if let Some(t) = s.tasks.iter_mut().find(|t| t.id == exec_id) {
-                t.status = "running".into();
-                t.started_at = Some(timestamp_nanos());
-                s.stats.currently_running += 1;
-            }
-        }
 
         // Simulate work
         let work_ms: u64 = match exec_type.as_str() {

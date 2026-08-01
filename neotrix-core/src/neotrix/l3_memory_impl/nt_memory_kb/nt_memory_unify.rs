@@ -24,10 +24,13 @@ pub fn kv_get(conn: &Connection, namespace: &str, key: &str) -> Result<Option<St
     let mut stmt = conn
         .prepare("SELECT value FROM kv_store WHERE namespace=?1 AND key=?2")
         .map_err(|e| format!("kv_get prepare: {}", e))?;
-    let result = stmt
-        .query_row(rusqlite::params![namespace, key], |row| row.get::<_, String>(0))
-        .ok();
-    Ok(result)
+    // 区分真实 SQL 错误与"无行"：无行是正常未命中，错误必须向上传播
+    // （否则 schema 漂移/DB 损坏会被静默当成"没有保存过状态"）
+    match stmt.query_row(rusqlite::params![namespace, key], |row| row.get::<_, String>(0)) {
+        Ok(v) => Ok(Some(v)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(format!("kv_get query: {}", e)),
+    }
 }
 
 pub fn kv_set(conn: &Connection, namespace: &str, key: &str, value: &str) -> Result<(), String> {
@@ -87,10 +90,11 @@ pub fn config_get(conn: &Connection, section: &str, key: &str) -> Result<Option<
     let mut stmt = conn
         .prepare("SELECT value FROM config_entries WHERE section=?1 AND key=?2")
         .map_err(|e| format!("config_get prepare: {}", e))?;
-    let result = stmt
-        .query_row(rusqlite::params![section, key], |row| row.get::<_, String>(0))
-        .ok();
-    Ok(result)
+    match stmt.query_row(rusqlite::params![section, key], |row| row.get::<_, String>(0)) {
+        Ok(v) => Ok(Some(v)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(format!("config_get query: {}", e)),
+    }
 }
 
 pub fn config_set(conn: &Connection, section: &str, key: &str, value: &str, is_secret: bool) -> Result<(), String> {
