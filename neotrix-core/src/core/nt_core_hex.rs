@@ -874,7 +874,7 @@ pub fn evolve_strategy_entry(
     current: ReasoningHexagram,
     pattern_name: &str,
 ) -> bool {
-    let approach = (current.0 >> 3) as usize;
+    let approach = ((current.0 >> 3) & 0x07) as usize;
     let domain = (current.0 & 0x07) as usize;
     let entry = &mut matrix[approach][domain];
 

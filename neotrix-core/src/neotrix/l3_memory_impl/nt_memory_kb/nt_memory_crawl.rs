@@ -411,7 +411,10 @@ fn extract_links(html: &str, _base_url: &str) -> Vec<String> {
         let start = pos + start + 6;
         if let Some(end) = html[start..].find('"') {
             let href = &html[start..start + end];
-            if href.starts_with("http://") || href.starts_with("https://") {
+            // SSRF 防护: 仅 http/https 且目标 IP 非内网/回环/链路本地 (防自扩增内网抓取)
+            if (href.starts_with("http://") || href.starts_with("https://"))
+                && crate::neotrix::l8_autonomic_impl::nt_mind_knowledge_pipeline::is_safe_fetch_url(href)
+            {
                 links.push(href.to_string());
             }
             pos = start + end + 1;

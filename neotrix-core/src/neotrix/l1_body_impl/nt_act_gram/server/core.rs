@@ -6,11 +6,17 @@ use crate::neotrix::nt_act_gram::transport::{MtpTransport, TransportProtocol};
 
 pub struct MtpServer {
     port: u16,
+    max_connections: usize,
 }
 
 impl MtpServer {
     pub fn new(port: u16) -> Self {
-        Self { port }
+        Self { port, max_connections: 64 }
+    }
+
+    pub fn with_max_connections(mut self, max: usize) -> Self {
+        self.max_connections = max.max(1);
+        self
     }
 
     pub async fn start(&self) -> Result<(), String> {
@@ -20,13 +26,24 @@ impl MtpServer {
             .map_err(|e| format!("bind {}: {}", addr, e))?;
         log::info!("NeoTrix MTProto server listening on {}", addr);
 
+        // 并发连接上限：未认证的 0.0.0.0 服务可被批量连接打满 tokio task
+        let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(self.max_connections));
+
         loop {
             let (stream, peer) = listener
                 .accept()
                 .await
                 .map_err(|e| format!("accept: {}", e))?;
+            let permit = match semaphore.clone().try_acquire_owned() {
+                Ok(p) => p,
+                Err(_) => {
+                    log::warn!("connection from {} rejected: max connections reached", peer);
+                    continue;
+                }
+            };
             log::info!("new connection from {}", peer);
             tokio::spawn(async move {
+                let _permit = permit;
                 let mut transport = MtpTransport::new(stream, TransportProtocol::Abridged);
                 match transport.read_handshake().await {
                     Ok(_proto) => {

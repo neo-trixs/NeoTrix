@@ -196,12 +196,17 @@ pub fn daemon_start(config: DaemonConfig) -> Result<String, String> {
 
 #[tauri::command]
 pub fn daemon_stop() -> Result<(), String> {
-    let mut state = DAEMON.lock().map_err(|e| e.to_string())?;
-    if !state.running.load(Ordering::SeqCst) {
-        return Err("Daemon is not running".to_string());
-    }
-    state.running.store(false, Ordering::SeqCst);
-    if let Some(handle) = state.thread_handle.take() {
+    let handle = {
+        let mut state = DAEMON.lock().map_err(|e| e.to_string())?;
+        if !state.running.load(Ordering::SeqCst) {
+            return Err("Daemon is not running".to_string());
+        }
+        state.running.store(false, Ordering::SeqCst);
+        state.thread_handle.take()
+    };
+    // 必须先释放 DAEMON 锁再 join：守护线程醒来检查 running 时要抢同一把锁，
+    // 持锁 join 会造成互等死锁。
+    if let Some(handle) = handle {
         let _ = handle.join();
     }
     push_event("info", "", "Daemon stopped");

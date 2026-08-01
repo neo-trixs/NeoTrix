@@ -31,8 +31,8 @@ pub async fn proxy_status() -> Result<ProxyStatus, NeoTrixError> {
     Ok(ProxyStatus {
         running: true,
         mode: v["mode"].as_str().unwrap_or("off").to_string(),
-        pid: v["pid"].as_u64().unwrap_or(0) as u32,
-        port: v["port"].as_u64().unwrap_or(11080) as u16,
+        pid: v["pid"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32,
+        port: v["port"].as_u64().unwrap_or(11080).min(u16::MAX as u64) as u16,
         uptime_secs: v["uptime_secs"].as_u64().unwrap_or(0),
         active_count: v["active_count"].as_u64().unwrap_or(0),
         idle_secs: v["idle_secs"].as_u64().unwrap_or(0),

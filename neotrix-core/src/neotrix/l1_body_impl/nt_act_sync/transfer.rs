@@ -1,6 +1,6 @@
 use super::types::{FileEntry, FileIndex, SyncMessage};
 use sha2::{Digest, Sha256};
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
@@ -240,14 +240,33 @@ fn write_message(stream: &mut TcpStream, msg: &SyncMessage) -> bool {
     stream.write_all(&data).is_ok()
 }
 
+/// 单条同步消息上限 (JSON 行)：防对端持续发无换行字节导致 String 无界增长
+const MAX_MESSAGE_LEN: usize = 8 * 1024 * 1024;
+
 fn read_message(stream: &mut TcpStream) -> Option<SyncMessage> {
+    // 读超时：慢速/静默对端不再无限阻塞
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(60)));
     let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    reader.read_line(&mut line).ok()?;
+    let mut line = Vec::new();
+    loop {
+        let mut byte = [0u8; 1];
+        let n = reader.read(&mut byte).ok()?;
+        if n == 0 {
+            break; // EOF
+        }
+        if byte[0] == b'\n' {
+            break;
+        }
+        line.push(byte[0]);
+        if line.len() > MAX_MESSAGE_LEN {
+            return None; // 超长行拒绝
+        }
+    }
     if line.is_empty() {
         return None;
     }
-    serde_json::from_str(&line).ok()
+    let text = String::from_utf8(line).ok()?;
+    serde_json::from_str(&text).ok()
 }
 
 fn file_checksum(path: &Path) -> Result<String, String> {

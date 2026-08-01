@@ -1,12 +1,71 @@
 //! NeoTrix 知识吸收管道 — GitHub/外部代码 → KB 蒸馏 → 去重更新
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::Arc;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType;
+
+/// SSRF 防护：URL 必须为 http/https，且目标 IP 不得为内网/回环/链路本地/保留段。
+/// 对域名做一次性解析并校验所有解析出的地址，解析失败一律拒绝（保守）。
+pub fn is_safe_fetch_url(url: &str) -> bool {
+    let parsed = match url::Url::parse(url) {
+        Ok(u) => u,
+        Err(_) => return false,
+    };
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return false;
+    }
+    let host = match parsed.host_str() {
+        Some(h) => h,
+        None => return false,
+    };
+    let lower = host.to_ascii_lowercase();
+    if lower == "localhost" || lower.ends_with(".localhost") || lower.ends_with(".local") {
+        return false;
+    }
+    // IP 字面量直接校验
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return !is_private_ip(ip);
+    }
+    // 域名: 解析并校验全部结果 (过滤内网解析)
+    let addr = match (host, parsed.port_or_known_default().unwrap_or(80)) {
+        (h, p) => (h, p),
+    };
+    match std::net::ToSocketAddrs::to_socket_addrs(&(addr.0.to_string(), addr.1)) {
+        Ok(addrs) => {
+            let mut any_safe = false;
+            for sa in addrs {
+                let ip = sa.ip();
+                if ip.is_unspecified() {
+                    return false;
+                }
+                if is_private_ip(ip) {
+                    return false;
+                }
+                any_safe = true;
+            }
+            any_safe
+        }
+        Err(_) => false,
+    }
+}
+
+fn is_private_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_broadcast()
+                || v4.is_unspecified() || v4.is_documentation()
+        }
+        IpAddr::V6(v6) => {
+            v6.is_loopback() || v6.is_unspecified() || v6.is_unique_local()
+                || v6.is_unicast_link_local() || v6.is_multicast()
+        }
+    }
+}
 
 // ============================================================
 // 源类型 (使用唯一名避免冲突)
@@ -109,6 +168,9 @@ impl KnowledgeAbsorptionPipeline {
     }
 
     pub fn absorb_url(&mut self, url: &str) -> Result<AbsorptionReport, String> {
+        if !is_safe_fetch_url(url) {
+            return Err(format!("URL rejected (SSRF guard): {}", url));
+        }
         let url_key = url.to_string();
         if let Some(entry) = self.state.source_map.get(&url_key) {
             let age = Utc::now().timestamp() - entry.last_absorbed;
@@ -177,6 +239,9 @@ impl KnowledgeAbsorptionPipeline {
     }
 
     pub async fn absorb_url_async(&mut self, url: &str) -> Result<AbsorptionReport, String> {
+        if !is_safe_fetch_url(url) {
+            return Err(format!("URL rejected (SSRF guard): {}", url));
+        }
         let url_key = url.to_string();
         if let Some(entry) = self.state.source_map.get(&url_key) {
             let age = Utc::now().timestamp() - entry.last_absorbed;

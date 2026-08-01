@@ -166,10 +166,27 @@ impl SelfEvolver {
                     return Err(NeoTrixError::from("URL 包含非法字符"));
                 }
                 let target_str = target_dir.to_str().ok_or_else(|| NeoTrixError::from("路径不是有效 UTF-8"))?;
-                let status = Command::new("git")
+                // 无超时 git clone 会永久挂起后台 handler (持全局锁)；加入 bounded wait + kill
+                let mut child = Command::new("git")
                     .args(["clone", "--depth=1", "--", url, target_str])
-                    .status()
+                    .spawn()
                     .map_err(|e| NeoTrixError::Io(e.to_string()))?;
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+                let status = loop {
+                    match child.try_wait() {
+                        Ok(Some(st)) => break Some(st),
+                        Ok(None) => {
+                            if std::time::Instant::now() >= deadline {
+                                let _ = child.kill();
+                                let _ = child.wait();
+                                break None;
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(200));
+                        }
+                        Err(_) => break None,
+                    }
+                };
+                let status = status.ok_or_else(|| NeoTrixError::from("Git 克隆超时"))?;
                 if !status.success() {
                     return Err(NeoTrixError::from("Git 克隆失败"));
                 }

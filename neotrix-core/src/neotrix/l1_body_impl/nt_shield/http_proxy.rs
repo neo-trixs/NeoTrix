@@ -6,8 +6,17 @@
 use regex::Regex;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+
+/// RAII：离开作用域时递减并发连接计数
+struct DecrementGuard(Arc<AtomicUsize>);
+
+impl Drop for DecrementGuard {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
 
 /// 拦截动作
 #[derive(Debug, Clone)]
@@ -145,13 +154,23 @@ impl HttpInterceptor {
         let rules = self.rules.clone();
         let upstream = self.upstream.clone();
         let handle = std::thread::spawn(move || {
+            // 并发连接上限：thread-per-connection 模型下必须防止批量连接打满线程
+            let max_concurrent = 128usize;
+            let active = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
             while running.load(Ordering::SeqCst) {
                 match listener.accept() {
                     Ok((mut client, _)) => {
+                        if active.load(Ordering::SeqCst) >= max_concurrent {
+                            log::warn!("http_proxy: max concurrent connections reached, dropping");
+                            continue;
+                        }
+                        active.fetch_add(1, Ordering::SeqCst);
                         let rules = rules.clone();
                         let upstream = upstream.clone();
                         let running = running.clone();
+                        let active = active.clone();
                         std::thread::spawn(move || {
+                            let _decrement = DecrementGuard(active);
                             if running.load(Ordering::SeqCst) {
                                 if let Err(e) = handle_client(&mut client, &rules, &upstream) {
                                     log::warn!("Proxy handler error: {}", e);

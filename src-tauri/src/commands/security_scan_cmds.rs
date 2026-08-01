@@ -317,7 +317,9 @@ fn compute_score(total: usize, critical: usize, high: usize) -> u8 {
     if total == 0 {
         return 100;
     }
-    let raw = 100.0 - (critical as f64 * 15.0 + high as f64 * 7.0 + (total - critical - high) as f64 * 2.0);
+    // 防下溢: critical/high 来自外部计数，可能总和超过 total
+    let medium_low = total.saturating_sub(critical).saturating_sub(high);
+    let raw = 100.0 - (critical as f64 * 15.0 + high as f64 * 7.0 + medium_low as f64 * 2.0);
     raw.max(0.0).min(100.0) as u8
 }
 

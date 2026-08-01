@@ -631,16 +631,20 @@ pub fn mcp_host_status() -> Result<McpHostStatus, String> {
 #[allow(dead_code)]
 #[tauri::command]
 pub fn mcp_host_ping() -> Result<serde_json::Value, String> {
-    let mut state = MCP_HOST.lock().map_err(|e| e.to_string())?;
-    if !state.running {
-        return Err("MCP host is not running".into());
-    }
-    if spawn_simulated() {
-        return Ok(serde_json::json!({ "pong": true, "simulated": true }));
-    }
-
-    let stdin = state.child_stdin.take().ok_or("child stdin unavailable")?;
-    let stdout = state.child_stdout.take().ok_or("child stdout unavailable")?;
+    // 只在作用域内取所需句柄，随后立即释放锁——避免阻塞等待期间
+    // 所有 MCP 命令排队 (std Mutex 跨 recv_timeout 阻塞)。
+    let (stdin, stdout) = {
+        let mut state = MCP_HOST.lock().map_err(|e| e.to_string())?;
+        if !state.running {
+            return Err("MCP host is not running".into());
+        }
+        if spawn_simulated() {
+            return Ok(serde_json::json!({ "pong": true, "simulated": true }));
+        }
+        let stdin = state.child_stdin.take().ok_or("child stdin unavailable")?;
+        let stdout = state.child_stdout.take().ok_or("child stdout unavailable")?;
+        (stdin, stdout)
+    };
 
     let request = serde_json::json!({ "jsonrpc": "2.0", "id": 0, "method": "ping", "params": {} });
     let mut stdin = stdin;
@@ -658,6 +662,7 @@ pub fn mcp_host_ping() -> Result<serde_json::Value, String> {
 
     match rx.recv_timeout(Duration::from_secs(5)) {
         Ok((read_ok, line, reader)) => {
+            let mut state = MCP_HOST.lock().map_err(|e| e.to_string())?;
             state.child_stdout = Some(reader.into_inner());
             state.child_stdin = Some(stdin);
             if !read_ok {
@@ -670,6 +675,7 @@ pub fn mcp_host_ping() -> Result<serde_json::Value, String> {
             // 超时：stdin 已移出 state，直接 drop 会对子进程写 EOF；读线程持有 stdout
             // 无法回收。为防孤儿管道/子进程，此处主动杀掉子进程并复位状态。
             drop(stdin);
+            let mut state = MCP_HOST.lock().map_err(|e| e.to_string())?;
             if let Some(mut child) = state.child.take() {
                 let _ = child.kill();
                 let _ = child.wait();

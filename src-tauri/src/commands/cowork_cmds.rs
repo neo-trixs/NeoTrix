@@ -400,6 +400,12 @@ pub fn cowork_scan_files(session_id: String, pattern: Option<String>) -> Result<
     };
 
     let glob_pattern = pattern.unwrap_or_else(|| "**/*".into());
+    // 防 glob 逃逸: pattern 含 `/` 开头、`..` 等越界组件时拒绝
+    if glob_pattern.starts_with('/')
+        || glob_pattern.split('/').any(|c| c == "..")
+    {
+        return Err("Pattern escapes workspace".into());
+    }
     let full_pattern = format!("{}/{}", session.workspace_path.trim_end_matches('/'), glob_pattern);
 
     if let Ok(entries) = glob::glob(&full_pattern) {

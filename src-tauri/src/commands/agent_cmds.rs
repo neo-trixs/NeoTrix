@@ -57,8 +57,21 @@ pub async fn agent_reason(app: tauri::AppHandle, req: ReasonRequest) -> ReasonRe
 
     if let Ok(mut rx) = provider.stream_complete(&request).await {
         let mut full_output = String::new();
-        while let Some(chunk_result) = rx.recv().await {
-            match chunk_result {
+        loop {
+            // 无超时 recv 会在 sender 卡死时冻结前端流式输出；包一层 90s 兜底
+            let next = match tokio::time::timeout(std::time::Duration::from_secs(90), rx.recv()).await {
+                Ok(Some(chunk_result)) => chunk_result,
+                Ok(None) => break, // 正常结束
+                Err(_) => {
+                    let _ = app.emit("streaming-token", serde_json::json!({
+                        "token": "",
+                        "error": "stream timed out",
+                        "full": full_output,
+                    }));
+                    return ReasonResponse { output: format!("LLM 流超时"), success: false };
+                }
+            };
+            match next {
                 Ok(chunk) => {
                     full_output.push_str(&chunk.content);
                     let _ = app.emit("streaming-token", serde_json::json!({

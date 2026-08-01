@@ -3,6 +3,9 @@ use tokio::net::TcpStream;
 
 const ABRIDGED_HEADER: [u8; 1] = [0xef];
 
+/// 单包最大长度 (64 MiB)：未认证对端声明长度时防止超大预分配内存 DoS
+const MAX_PACKET_LEN: usize = 64 * 1024 * 1024;
+
 pub enum TransportProtocol {
     Abridged,
     Intermediate,
@@ -73,6 +76,10 @@ impl MtpTransport {
         } else {
             len_byte[0] as usize * 4
         };
+        // 未认证对端可声明任意长度 → 在读到数据前禁止超大预分配 (内存 DoS)
+        if packet_len > MAX_PACKET_LEN {
+            return Err(format!("packet len {} exceeds limit", packet_len));
+        }
         let mut data = vec![0u8; packet_len];
         self.stream.read_exact(&mut data).await.map_err(|e| format!("read data: {}", e))?;
         Ok(data)
@@ -100,6 +107,10 @@ impl MtpTransport {
         let mut len_bytes = [0u8; 4];
         self.stream.read_exact(&mut len_bytes).await.map_err(|e| format!("read len: {}", e))?;
         let packet_len = u32::from_le_bytes(len_bytes) as usize;
+        // 未认证对端可声明任意长度 → 读数据前禁止超大预分配
+        if packet_len > MAX_PACKET_LEN {
+            return Err(format!("packet len {} exceeds limit", packet_len));
+        }
         let mut data = vec![0u8; packet_len];
         self.stream.read_exact(&mut data).await.map_err(|e| format!("read data: {}", e))?;
         Ok(data)

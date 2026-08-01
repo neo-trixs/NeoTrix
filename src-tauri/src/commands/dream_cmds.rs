@@ -286,12 +286,16 @@ pub fn dream_start(config: DreamConfig) -> Result<String, String> {
 
 #[tauri::command]
 pub fn dream_stop() -> Result<(), String> {
-    let mut state = DREAM.lock().map_err(|e| e.to_string())?;
-    if !state.running.load(Ordering::SeqCst) {
-        return Err("Dream cycle is not running".to_string());
-    }
-    state.running.store(false, Ordering::SeqCst);
-    if let Some(handle) = state.thread_handle.take() {
+    let handle = {
+        let mut state = DREAM.lock().map_err(|e| e.to_string())?;
+        if !state.running.load(Ordering::SeqCst) {
+            return Err("Dream cycle is not running".to_string());
+        }
+        state.running.store(false, Ordering::SeqCst);
+        state.thread_handle.take()
+    };
+    // 必须先释放 DREAM 锁再 join：守护线程醒来检查 running 时要抢同一把锁。
+    if let Some(handle) = handle {
         let _ = handle.join();
     }
     Ok(())

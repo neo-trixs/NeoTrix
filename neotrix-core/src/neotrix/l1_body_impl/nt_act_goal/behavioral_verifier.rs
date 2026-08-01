@@ -9,8 +9,67 @@
 //!   - ReVeal (ICLR 2026): 多轮自验证 + 工具评估
 //!   - 核心差异: 验证结果作为 CapabilityVector 的 RL 奖励信号
 
-use std::time::Instant;
-use std::process::Command;
+use std::time::{Instant, Duration};
+use std::process::{Command, Output};
+
+/// 带超时的子进程执行：cargo 可能因构建锁/网络挂起，必须在限时内 kill，
+/// 否则后台 handler (持全局锁) 会被永久卡住。reader 线程捕获完整输出。
+fn run_bounded<const N: usize>(args: [&str; N], timeout_secs: u64) -> Option<Output> {
+    let child = std::sync::Arc::new(std::sync::Mutex::new(
+        Command::new("cargo")
+            .args(args)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .ok()?,
+    ));
+    let (tx, rx) = std::sync::mpsc::channel::<Output>();
+    let c2 = child.clone();
+    std::thread::spawn(move || {
+        // 轮询退出；结束后读取输出并发送
+        loop {
+            let exited = {
+                let mut g = c2.lock().unwrap();
+                g.try_wait().ok().flatten().is_some()
+            };
+            if exited {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        let out = {
+            let mut g = c2.lock().unwrap();
+            let status = g.wait();
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            if let Some(s) = g.stdout.as_mut() {
+                let _ = std::io::Read::read_to_end(s, &mut stdout);
+            }
+            if let Some(e) = g.stderr.as_mut() {
+                let _ = std::io::Read::read_to_end(e, &mut stderr);
+            }
+            status.map(|st| Output {
+                status: st,
+                stdout,
+                stderr,
+            })
+        };
+        if let Ok(output) = out {
+            let _ = tx.send(output);
+        }
+    });
+    match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
+        Ok(output) => Some(output),
+        Err(_) => {
+            // 超时: kill 子进程 (reader 线程轮询到退出后自行结束)
+            if let Ok(mut g) = child.lock() {
+                let _ = g.kill();
+                let _ = g.wait();
+            }
+            None
+        }
+    }
+}
 
 /// 验证级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,20 +149,16 @@ impl BehavioralVerifier {
 
     /// 快速编译检查
     fn check_compile() -> bool {
-        Command::new("cargo")
-            .args(["check", "--lib", "-p", "neotrix"])
-            .output()
+        run_bounded(["check", "--lib", "-p", "neotrix"], 180)
             .map(|o| o.status.success())
             .unwrap_or(false)
     }
 
     /// 捕获编译错误
     fn capture_compile_errors() -> Vec<String> {
-        let output = Command::new("cargo")
-            .args(["check", "--lib", "-p", "neotrix"])
-            .output();
+        let output = run_bounded(["check", "--lib", "-p", "neotrix"], 180);
         match output {
-            Ok(o) => {
+            Some(o) => {
                 let stderr = String::from_utf8_lossy(&o.stderr);
                 stderr.lines()
                     .filter(|l| l.contains("error["))
@@ -111,17 +166,15 @@ impl BehavioralVerifier {
                     .map(|l| l.to_string())
                     .collect()
             }
-            Err(_) => vec!["无法运行 cargo check".into()],
+            None => vec!["无法运行 cargo check".into()],
         }
     }
 
     /// 快速测试检查
     fn check_tests() -> (bool, Vec<String>) {
-        let output = Command::new("cargo")
-            .args(["test", "--lib", "-p", "neotrix", "--", "--test-threads=1"])
-            .output();
+        let output = run_bounded(["test", "--lib", "-p", "neotrix", "--", "--test-threads=1"], 300);
         match output {
-            Ok(o) => {
+            Some(o) => {
                 let stdout = String::from_utf8_lossy(&o.stdout);
                 let passed = stdout.contains("test result: ok");
                 let failures: Vec<String> = stdout.lines()
@@ -131,7 +184,7 @@ impl BehavioralVerifier {
                     .collect();
                 (passed, failures)
             }
-            Err(_) => (false, vec!["无法运行 cargo test".into()]),
+            None => (false, vec!["无法运行 cargo test".into()]),
         }
     }
 

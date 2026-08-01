@@ -210,9 +210,21 @@ pub fn computer_keyboard_type(text: String) -> Result<(), String> {
 pub fn computer_keyboard_press(key: String, modifiers: Option<Vec<String>>) -> Result<(), String> {
     let mods = modifiers.unwrap_or_default();
 
+    // 防 AppleScript 注入: key 必须是纯数字 key code，modifiers 必须来自白名单
+    if key.is_empty() || !key.bytes().all(|b| b.is_ascii_digit()) {
+        return Err("key must be a numeric key code".into());
+    }
+    const ALLOWED_MODS: [&str; 4] = ["command", "option", "control", "shift"];
+    for m in &mods {
+        let m = m.trim();
+        if !ALLOWED_MODS.contains(&m) {
+            return Err(format!("invalid modifier: {}", m));
+        }
+    }
+
     let using_modifiers = !mods.is_empty();
     let script = if using_modifiers {
-        let mod_parts: Vec<String> = mods.iter().map(|m| format!("{} down", m)).collect();
+        let mod_parts: Vec<String> = mods.iter().map(|m| format!("{} down", m.trim())).collect();
         let mod_using = mod_parts.join(" using {");
         format!(
             r#"tell application "System Events" to key code {} using {{ {} }}"#,

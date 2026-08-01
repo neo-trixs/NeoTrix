@@ -205,6 +205,10 @@ impl TileCoord {
 
     pub fn from_quadkey(qk: &str) -> Option<Self> {
         let z = qk.len() as u8;
+        // 超过 31 层时 `(z-1-i)` 移位 ≥64 或下溢
+        if z > 31 {
+            return None;
+        }
         let (mut x, mut y) = (0u64, 0u64);
         for (i, c) in qk.chars().enumerate() {
             let digit = c.to_digit(4)?;
