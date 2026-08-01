@@ -144,12 +144,13 @@ pub fn run_provider_wizard() {
     };
 
     // Encrypt the API key before persisting to disk
+    // 加密失败即拒绝保存，禁止明文回退 (fail-closed，防密钥落盘可读)
     let stored_key = if !api_key.is_empty() {
         match neotrix::neotrix::nt_shield::key_encryption::encrypt(&api_key) {
             Ok(enc) => enc,
             Err(e) => {
-                eprintln!("[config] warning: key encryption failed ({}); storing as-is", e);
-                api_key.clone()
+                eprintln!("{}: key encryption failed ({}); refusing to store plaintext key", err("Error"), e);
+                return;
             }
         }
     } else {

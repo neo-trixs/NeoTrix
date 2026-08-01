@@ -141,7 +141,13 @@ impl LocalStore {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&self.path, json)?;
+        // 原子写 + 0o600：密钥文件禁止世界可读
+        neotrix_types::fs_util::atomic_write(&self.path, json.as_bytes())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&self.path, std::fs::Permissions::from_mode(0o600));
+        }
         *self.dirty.borrow_mut() = false;
         Ok(())
     }

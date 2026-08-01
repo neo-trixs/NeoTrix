@@ -30,8 +30,8 @@ impl ReasoningBrain {
             std::fs::create_dir_all(parent)?;
         }
 
-        std::fs::write(&brain_path, &brain_data)?;
-
+        // 原子写：crash 中途不截断原文件 (R-P16 对应代码侧)
+        neotrix_types::fs_util::atomic_write(&brain_path, brain_data.as_bytes())?;
         let _ = std::fs::set_permissions(&brain_path, std::fs::Permissions::from_mode(0o600));
 
         let metadata = BrainMetadata {
@@ -45,7 +45,7 @@ impl ReasoningBrain {
 
         let metadata_json = serde_json::to_string_pretty(&metadata)
             .map_err(|e| NeoTrixError::Serde(format!("元数据序列化失败: {}", e)))?;
-        std::fs::write(&metadata_path, &metadata_json)?;
+        neotrix_types::fs_util::atomic_write(&metadata_path, metadata_json.as_bytes())?;
         let _ = std::fs::set_permissions(&metadata_path, std::fs::Permissions::from_mode(0o600));
 
         Ok(())

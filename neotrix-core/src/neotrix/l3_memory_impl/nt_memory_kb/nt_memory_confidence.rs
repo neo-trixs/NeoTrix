@@ -367,14 +367,35 @@ pub fn detect_consensus(
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 pub struct ConfidenceStore {
-    #[serde(skip)]
     inner: RwLock<HashMap<Uuid, EpistemicConfidence>>,
-    #[serde(skip)]
     contradictions: RwLock<HashMap<String, Vec<ContradictingFact>>>,
     decay_config: DecayConfig,
     lambda_overrides: HashMap<String, f64>,
+}
+
+// 自定义 Serialize：把 RwLock 内的真实数据写盘（derive 的 serde(skip) 会导致
+// round-trip 后置信度/矛盾数据全部丢失）
+impl serde::Serialize for ConfidenceStore {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let inner = self.inner.read().map_err(serde::ser::Error::custom)?;
+        let contradictions = self.contradictions.read().map_err(serde::ser::Error::custom)?;
+        #[derive(serde::Serialize)]
+        struct Repr<'a> {
+            inner: &'a HashMap<Uuid, EpistemicConfidence>,
+            contradictions: &'a HashMap<String, Vec<ContradictingFact>>,
+            decay_config: &'a DecayConfig,
+            lambda_overrides: &'a HashMap<String, f64>,
+        }
+        Repr {
+            inner: &inner,
+            contradictions: &contradictions,
+            decay_config: &self.decay_config,
+            lambda_overrides: &self.lambda_overrides,
+        }
+        .serialize(serializer)
+    }
 }
 
 impl ConfidenceStore {

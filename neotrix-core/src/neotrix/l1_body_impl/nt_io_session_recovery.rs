@@ -83,8 +83,14 @@ impl SessionRecoveryManager {
     pub fn load_latest_snapshot(&self) -> Option<SessionSnapshot> {
         let path = self.snapshot_path("latest");
         if path.exists() {
-            std::fs::read_to_string(&path).ok()
-                .and_then(|s| serde_json::from_str::<SessionSnapshot>(&s).ok())
+            // 文件存在但损坏/不可解析时，回退 git 备份（file 存在并不能保证可读）
+            let direct = std::fs::read_to_string(&path).ok()
+                .and_then(|s| serde_json::from_str::<SessionSnapshot>(&s).ok());
+            match direct {
+                Some(s) => Some(s),
+                None if self.auto_recover => self.git_restore_latest(),
+                None => None,
+            }
         } else if self.auto_recover {
             self.git_restore_latest()
         } else {
@@ -101,10 +107,11 @@ impl SessionRecoveryManager {
             .map_err(|e| format!("create snapshots dir: {}", e))?;
         let json = serde_json::to_string_pretty(snapshot)
             .map_err(|e| format!("serialize: {}", e))?;
-        std::fs::write(self.snapshot_path("latest"), &json)
+        // 原子写：快照文件不因 crash 截断损坏
+        neotrix_types::fs_util::atomic_write(&self.snapshot_path("latest"), json.as_bytes())
             .map_err(|e| format!("write snapshot: {}", e))?;
         let ts_path = self.snapshot_path(&format!("snap-{}", snapshot.created_at));
-        std::fs::write(ts_path, &json)
+        neotrix_types::fs_util::atomic_write(&ts_path, json.as_bytes())
             .map_err(|e| format!("write timestamped snapshot: {}", e))?;
         Ok(())
     }

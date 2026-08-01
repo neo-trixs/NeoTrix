@@ -69,7 +69,8 @@ impl WalletStore {
         let path = self.wallet_path(&wallet.label);
         let json = serde_json::to_string_pretty(&file)
             .map_err(|e| format!("serialize: {}", e))?;
-        std::fs::write(&path, &json)
+        // 原子写 + 0o600：钱包私钥禁止世界可读
+        neotrix_types::fs_util::atomic_write(&path, json.as_bytes())
             .map_err(|e| format!("write: {}", e))?;
         #[cfg(unix)]
         {

@@ -28,13 +28,25 @@ pub fn save_provider_config(config: ProviderConfigPayload) -> Result<String, Neo
         let _ = std::fs::create_dir_all(parent);
     }
     let json = serde_json::to_string_pretty(&config).map_err(|e| NeoTrixError::Serde(e.to_string()))?;
-    std::fs::write(&path, json).map_err(|e| NeoTrixError::Io(e.to_string()))?;
+    // 含明文 api_key，写盘须 0o600，禁止世界可读 (0o644)
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut file = opts.open(&path).map_err(|e| NeoTrixError::Io(e.to_string()))?;
+    use std::io::Write;
+    file.write_all(json.as_bytes()).map_err(|e| NeoTrixError::Io(e.to_string()))?;
+    file.flush().map_err(|e| NeoTrixError::Io(e.to_string()))?;
     Ok("saved".into())
 }
 
 #[command]
 pub fn send_notification(app: tauri::AppHandle, title: String, body: String) -> Result<(), NeoTrixError> {
-    log::info!("[notification] {}: {}", title, body);
+    // body 可能含任务输出中的敏感串，降为 debug 并截断
+    log::debug!("[notification] {}: {}", title, body.chars().take(200).collect::<String>());
     app.emit("task-complete", serde_json::json!({
         "title": &title,
         "body": &body,

@@ -342,7 +342,8 @@ impl WhiteBoxMemory {
             "last_dream_time": self.last_dream_time,
         });
         let json = serde_json::to_string_pretty(&data).map_err(|e| format!("Serialize: {}", e))?;
-        std::fs::write(&path, &json).map_err(|e| format!("Write: {}", e))?;
+        // 原子写：crash 中途不截断原文件，checkpoints/entries 不丢失
+        neotrix_types::fs_util::atomic_write(&path, json.as_bytes()).map_err(|e| format!("Write: {}", e))?;
         Ok(())
     }
 

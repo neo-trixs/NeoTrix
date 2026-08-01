@@ -126,8 +126,8 @@ mod tests {
             verification_gap: 0.1,
             references: "".into(),
             connections: vec![],
-            created_at: "2024-01-01".into(),
-            updated_at: "2024-01-01".into(),
+            created_at: "1704067200".into(),
+            updated_at: "1704067200".into(),
         }
     }
 
@@ -150,8 +150,8 @@ mod tests {
             verification_gap: 0.9,
             references: "".into(),
             connections: vec![],
-            created_at: "2024-01-01".into(),
-            updated_at: "2024-01-01".into(),
+            created_at: "1704067200".into(),
+            updated_at: "1704067200".into(),
         }
     }
 

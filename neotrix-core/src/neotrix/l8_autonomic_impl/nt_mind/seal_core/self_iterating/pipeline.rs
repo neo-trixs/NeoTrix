@@ -620,8 +620,10 @@ impl BrainStage for SecurityStage {
             log::warn!("[security_scan] iter={}: {} secret(s) detected in task context!",
                 brain.iteration, findings.findings.len());
             for secret in &findings.findings {
-                log::warn!("[security_scan]   pattern={} line={} snippet={}",
-                    secret.pattern, secret.line, secret.snippet);
+                // 只记录 pattern + line，禁止把完整秘密行 (snippet) 打进日志 (防泄密)
+                let preview: String = secret.snippet.chars().take(8).collect();
+                log::warn!("[security_scan]   pattern={} line={} snippet_prefix={}...",
+                    secret.pattern, secret.line, preview);
             }
             // Broadcast alert via GWT
             if let Some(ref mut engine) = brain.reasoning_engine {

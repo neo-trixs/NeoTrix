@@ -409,7 +409,7 @@ impl EvidenceStore {
             if (new_conf - original).abs() > 0.01 {
                 let mut updated_rec = rec.clone();
                 updated_rec.provenance_gap = (rec.provenance_gap + (1.0 - decay_factor) * 0.1).min(1.0);
-                updated_rec.updated_at = chrono::Utc::now().format("%Y-%m-%d").to_string();
+                updated_rec.updated_at = now.to_string();
                 let json = serde_json::to_string(&updated_rec).map_err(|e| format!("serialize: {}", e))?;
                 let ts = now;
                 let node = KnowledgeNode {
@@ -473,7 +473,7 @@ impl EvidenceStore {
             // Persist updated confidence back to KB
             let mut updated_rec = record.clone();
             updated_rec.provenance_gap = (record.provenance_gap + (1.0 - calibrated_score) * 0.05).min(1.0);
-            updated_rec.updated_at = chrono::Utc::now().format("%Y-%m-%d").to_string();
+            updated_rec.updated_at = ts.to_string();
             let json = serde_json::to_string(&updated_rec).map_err(|e| format!("serialize: {}", e))?;
             let node = KnowledgeNode {
                 id: format!("ewhr-{}", updated_rec.id),

@@ -5,14 +5,19 @@ use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// Atomically write data to a file: write to a temporary file first, then rename.
+/// Atomically write data to a file: write to a temporary file first, fsync, then rename.
 /// Prevents partial/corrupt writes if the process crashes mid-write.
 pub fn atomic_write(path: &Path, data: &[u8]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
     }
     let tmp_path = path.with_extension("tmp");
-    std::fs::write(&tmp_path, data).map_err(|e| format!("write tmp: {}", e))?;
+    {
+        let mut f = std::fs::File::create(&tmp_path).map_err(|e| format!("create tmp: {}", e))?;
+        use std::io::Write;
+        f.write_all(data).map_err(|e| format!("write tmp: {}", e))?;
+        f.sync_all().map_err(|e| format!("fsync tmp: {}", e))?;
+    }
     std::fs::rename(&tmp_path, path).map_err(|e| format!("rename: {}", e))?;
     Ok(())
 }

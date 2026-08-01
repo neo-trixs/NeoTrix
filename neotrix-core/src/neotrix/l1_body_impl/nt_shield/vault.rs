@@ -81,8 +81,9 @@ impl Vault {
                 .map_err(|e: std::io::Error| L1Error::Io(e.to_string()))?;
         }
 
-        std::fs::write(&self.path, encrypted)
-            .map_err(|e: std::io::Error| L1Error::Io(e.to_string()))?;
+        // 原子写 + 0o600：凭据密文禁止世界可读 (crash 不截断原文件)
+        neotrix_types::fs_util::atomic_write(&self.path, encrypted.as_slice())
+            .map_err(|e: String| L1Error::Io(e))?;
         self.dirty = false;
         Ok(())
     }
