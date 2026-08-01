@@ -327,7 +327,10 @@ impl IitPhiCalculator {
             num_partitions: (1 << (LAYER_COUNT - 1)) - 1,
             state_history: Vec::with_capacity(max_history),
             max_history,
-            num_bins: num_bins.max(2),
+            // Base-`num_bins` subset encoding (encode_subset) multiplies
+            // num_bins^j for up to LAYER_COUNT dimensions. 32^12 = 2^60 still
+            // fits u64; larger bins (e.g. 100^12 ~ 2^80) silently overflow.
+            num_bins: num_bins.clamp(2, 32),
         }
     }
 
@@ -826,6 +829,32 @@ mod tests {
         for n in &names {
             assert!(!n.is_empty());
         }
+    }
+
+    #[test]
+    fn test_encode_subset_extreme_bins_no_overflow() {
+        // Regression: base-num_bins encoding multiplied num_bins^j for up to
+        // LAYER_COUNT dims; a config of num_bins = 100 (100^12 ~ 2^80)
+        // silently overflowed u64. num_bins is now clamped to [2, 32], so
+        // 32^12 = 2^60 stays in range.
+        let calc = IitPhiCalculator::new(64, 1000);
+        assert_eq!(calc.num_bins, 32, "num_bins must be clamped to 32");
+
+        let mut state = vec![0.9; LAYER_COUNT];
+        let dims: Vec<usize> = (0..LAYER_COUNT).collect();
+        let key = calc.encode_subset(&state, &dims);
+        assert!(key > 0, "all-0.9 state must encode to a non-zero key");
+
+        let calc2 = IitPhiCalculator::new(64, 0);
+        assert_eq!(calc2.num_bins, 2, "num_bins floor must be 2");
+
+        // Exercise the full computation with clamped bins to confirm no panic.
+        let mut hist = calc.clone();
+        for _ in 0..8 {
+            hist.push_state(vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.5, 0.5, 0.5]);
+        }
+        let phi = hist.compute_phi(&vec![0.9; LAYER_COUNT]);
+        assert!(phi.is_finite());
     }
 
     #[test]

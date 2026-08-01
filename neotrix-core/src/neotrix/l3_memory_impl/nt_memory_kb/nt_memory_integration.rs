@@ -48,6 +48,23 @@ pub struct KnowledgeRelation {
     pub description: String,
 }
 
+/// Truncate a string to at most `max` bytes at a UTF-8 char boundary.
+/// Slicing at a byte index that lands mid-character panics; char_indices
+/// yields the last full char that still fits within `max` bytes.
+fn truncate_chars(s: &str, max: usize) -> &str {
+    if s.len() <= max {
+        return s;
+    }
+    match s
+        .char_indices()
+        .take_while(|(i, c)| *i + c.len_utf8() <= max)
+        .last()
+    {
+        Some((idx, c)) => &s[..idx + c.len_utf8()],
+        None => &s[..0],
+    }
+}
+
 /// 将 WebMiner 挖掘结果持久化到 KnowledgeBase
 pub fn persist_mined_knowledge(conn: &Connection, title: &str, summary: &str, url: &str, source_type: &str, _confidence: f64, _edits: &[(String, f64)], insights: &[String]) -> Result<String, String> {
     let domain = extract_domain(url);
@@ -58,7 +75,7 @@ pub fn persist_mined_knowledge(conn: &Connection, title: &str, summary: &str, ur
         _ => NodeType::Article,
     };
 
-    let summary_short = if summary.len() > 2000 { &summary[..2000] } else { summary };
+    let summary_short = truncate_chars(summary, 2000);
 
     let node_id = store::insert_or_get_node(conn, title, node_type, Some(summary_short), Some(url), Some(&domain))
         .map_err(|e| format!("KB insert node: {}", e))?;
@@ -88,7 +105,7 @@ pub fn import_from_knowledge_engine(conn: &Connection, entries: &[KnowledgeEntry
             KnowledgeSourceType::SemanticScholar => NodeType::Paper,
         };
         let summary = if entry.summary.is_empty() { &entry.body } else { &entry.summary };
-        let summary_short = if summary.len() > 2000 { &summary[..2000] } else { summary };
+    let summary_short = truncate_chars(summary, 2000);
         let domain = extract_domain(&entry.source_url);
 
         let node_id = store::insert_or_get_node(conn, &entry.title, node_type, Some(summary_short), Some(&entry.source_url), Some(&domain))
@@ -134,4 +151,37 @@ fn extract_domain(url_str: &str) -> String {
         .unwrap_or("unknown")
         .trim_start_matches("www.")
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_chars_ascii_boundary() {
+        assert_eq!(truncate_chars("hello", 100), "hello");
+        assert_eq!(truncate_chars("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_chars_cjk_no_panic() {
+        // Regression: &summary[..2000] sliced at a byte index that landed
+        // mid-CJK-char -> panic. truncate_chars must never split a char.
+        let long_cjk = "知识".repeat(2000);
+        let out = truncate_chars(&long_cjk, 2000);
+        assert!(out.is_char_boundary(0));
+        assert!(out.is_char_boundary(out.len()));
+        assert!(out.len() <= 2000);
+        // Exact 3-byte boundary: 2000 bytes / 3 = 666 chars = 1998 bytes.
+        assert_eq!(out.len(), 1998);
+    }
+
+    #[test]
+    fn test_truncate_chars_emoji_no_panic() {
+        let emoji = "🚀".repeat(1000);
+        let out = truncate_chars(&emoji, 500);
+        assert!(out.is_char_boundary(out.len()));
+        assert!(out.len() <= 500);
+        assert_eq!(out.len(), 500); // 125 * 4-byte emoji
+    }
 }
