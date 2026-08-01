@@ -22,6 +22,17 @@ const NotificationItem: React.FC<{ notif: Notification }> = ({ notif }) => {
     <div className={`${styles.toast} ${typeClassMap[notif.type]}`} role="alert">
       <span className={styles.icon}>{ICONS[notif.type]}</span>
       <span className={styles.message}>{notif.message}</span>
+      {notif.action && (
+        <button
+          className={styles.action}
+          onClick={() => {
+            notif.action!.onClick();
+            removeNotification(notif.id);
+          }}
+        >
+          {notif.action.label}
+        </button>
+      )}
       <button
         className={styles.close}
         onClick={() => removeNotification(notif.id)}

@@ -351,6 +351,8 @@ fn main() {
                      commands::neocodex_get_side_chat,
                      commands::neocodex_app_version,
                      commands::neocodex_check_update,
+                     commands::neocodex_download_update,
+                     commands::neocodex_git_status,
                      commands::neocodex_edit_message,
                      commands::neocodex_delete_message,
                      commands::neocodex_regenerate,

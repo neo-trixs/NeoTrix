@@ -449,6 +449,10 @@
   background: var(--fg-tertiary);
 }
 
+.gitDirty {
+  background: var(--warning);
+}
+
 /* Mobile responsive */
 @media (max-width: 1024px) {
   .sidebar {

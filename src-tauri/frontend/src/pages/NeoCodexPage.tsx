@@ -44,6 +44,8 @@ export default function NeoCodexPage() {
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [health, setHealth] = useState<any>(null);
+  const [gitStatus, setGitStatus] = useState<{ branch: string; dirty: boolean } | null>(null);
+  const [updating, setUpdating] = useState(false);
   const [viewMode, setViewMode] = useState<"verbose" | "normal" | "summary">("normal");
   const stopRef = useRef(false);
   const [sideChatOpen, setSideChatOpen] = useState(false);
@@ -68,27 +70,37 @@ export default function NeoCodexPage() {
   // Claude/Codex both surface a version banner without manual action).
   const addNotification = useStore((s) => s.addNotification);
   useEffect(() => {
+    const runUpdate = async () => {
+      setUpdating(true);
+      try {
+        await invoke("neocodex_download_update");
+      } catch (e) {
+        addNotification({ type: "error", message: `更新失败: ${e}`, duration: 6000 });
+      } finally {
+        setUpdating(false);
+      }
+    };
+    const notifyUpdate = (r: any) => {
+      if (r?.available) {
+        addNotification({
+          type: "info",
+          message: `发现新版本 v${r.latest}（当前 v${r.current}）`,
+          duration: 30000,
+          action: updating ? { label: "下载中…", onClick: () => {} } : { label: "立即更新", onClick: runUpdate },
+        });
+      }
+    };
     const unlistenPalette = listen("neocodex-open-palette", () => setPaletteOpen((v) => !v));
     const unlistenSettings = listen("open-settings", () => setShowSettings(true));
     const unlistenUpdates = listen("neocodex-check-updates", () => {
-      invoke("neocodex_check_update").then((r: any) => {
-        if (r?.available) {
-          addNotification({ type: "info", message: `发现新版本 v${r.latest}（当前 v${r.current}）`, duration: 8000 });
-        } else {
-          addNotification({ type: "success", message: `已是最新版本 v${r?.current ?? ""}`, duration: 3000 });
-        }
-      }).catch((e) => console.error("Check update failed:", e));
+      invoke("neocodex_check_update").then(notifyUpdate).catch((e) => console.error("Check update failed:", e));
     });
     // Auto-check once shortly after launch (silent unless an update is found).
     const timer = setTimeout(() => {
-      invoke("neocodex_check_update").then((r: any) => {
-        if (r?.available) {
-          addNotification({ type: "info", message: `有新版本 v${r.latest} 可用（当前 v${r.current}）`, duration: 10000 });
-        }
-      }).catch(() => {});
+      invoke("neocodex_check_update").then(notifyUpdate).catch(() => {});
     }, 3000);
     return () => { unlistenPalette.then((f) => f()); unlistenSettings.then((f) => f()); unlistenUpdates.then((f) => f()); clearTimeout(timer); };
-  }, [addNotification]);
+  }, [addNotification, updating]);
 
   const loadHealth = useCallback(async () => {
     try {
@@ -101,6 +113,20 @@ export default function NeoCodexPage() {
     const timer = setInterval(loadHealth, 15000);
     return () => clearInterval(timer);
   }, [loadHealth]);
+
+  const loadGitStatus = useCallback(async () => {
+    try {
+      setGitStatus(await invoke("neocodex_git_status"));
+    } catch {
+      setGitStatus(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadGitStatus();
+    const timer = setInterval(loadGitStatus, 20000);
+    return () => clearInterval(timer);
+  }, [loadGitStatus]);
 
   const handleStop = () => {
     stopRef.current = true;
@@ -653,6 +679,12 @@ export default function NeoCodexPage() {
           <span className={styles.statusItem} title="上下文用量">
             Context {health ? `${Math.round((health.context_usage || 0) * 100)}%` : "—"}
           </span>
+          {gitStatus && (
+            <span className={styles.statusItem} title={gitStatus.dirty ? "有未提交改动" : "工作区干净"}>
+              <span className={`${styles.statusDot} ${gitStatus.dirty ? styles.gitDirty : ""}`} />
+              {gitStatus.branch}
+            </span>
+          )}
           <span className={styles.statusItem} title="会话数">{neocodexSessions.length} 会话</span>
         </footer>
       </main>

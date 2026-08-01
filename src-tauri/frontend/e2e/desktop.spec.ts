@@ -68,6 +68,33 @@ test.describe('NeoTrix Desktop App — E2E interaction', () => {
     await expect(mode.locator('option')).toContainText(['Agent', 'Shell', 'Plan']);
   });
 
+  test('command palette opens via Cmd+K, filters, keyboard navigates (键盘交互)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('sidebar-tab-sessions').click();
+    await page.keyboard.press('Meta+k');
+    const palette = page.getByTestId('command-palette');
+    await expect(palette).toBeVisible({ timeout: 10_000 });
+    const input = page.getByTestId('palette-input');
+    await expect(input).toBeFocused();
+    await input.fill('会话');
+    const items = page.getByTestId('palette-list').locator('button');
+    await expect(items.first()).toContainText('新建会话');
+    // ArrowDown + Enter selects the highlighted item and closes the palette.
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(palette).not.toBeVisible();
+  });
+
+  test('command palette closes with Escape (键盘交互)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('sidebar-tab-sessions').click();
+    await page.keyboard.press('Meta+k');
+    const palette = page.getByTestId('command-palette');
+    await expect(palette).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.press('Escape');
+    await expect(palette).not.toBeVisible();
+  });
+
   test('settings dialog tab switching (标签点击)', async ({ page }) => {
     await page.goto('/');
     await page.keyboard.press('Meta+,').catch(() => {});

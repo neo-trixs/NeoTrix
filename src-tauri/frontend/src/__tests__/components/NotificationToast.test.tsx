@@ -98,4 +98,17 @@ describe("NotificationToast", () => {
     const { container } = render(<NotificationToast />);
     expect(container.querySelector("[aria-live='polite']")).toBeInTheDocument();
   });
+
+  it("renders an action button and fires onClick then dismisses", () => {
+    let clicked = false;
+    useStore.setState({
+      notifications: [
+        { id: "n1", type: "info", message: "发现新版本", action: { label: "立即更新", onClick: () => { clicked = true; } } },
+      ],
+    });
+    render(<NotificationToast />);
+    fireEvent.click(screen.getByText("立即更新"));
+    expect(clicked).toBe(true);
+    expect(useStore.getState().notifications).toHaveLength(0);
+  });
 });

@@ -79,6 +79,23 @@
   transition: opacity 0.15s ease;
 }
 
+.action {
+  flex-shrink: 0;
+  background: var(--nt-accent, #007aff);
+  color: #fff;
+  border: none;
+  border-radius: var(--nt-radius-sm);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.action:hover {
+  opacity: 0.85;
+}
+
 .close:hover {
   opacity: 1;
 }

@@ -914,3 +914,67 @@ pub async fn neocodex_check_update(app: tauri::AppHandle) -> Result<UpdateCheckR
         }),
     }
 }
+
+/// Report the current git branch + dirty state for the status bar (parity
+/// with Claude Code / Codex Desktop, both of which surface the branch inline).
+#[tauri::command]
+pub fn neocodex_git_status() -> Result<Option<GitStatus>, String> {
+    fn git(args: &[&str]) -> Option<String> {
+        let out = std::process::Command::new("git")
+            .args(args)
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    }
+    let branch = match git(&["rev-parse", "--abbrev-ref", "HEAD"]) {
+        Some(b) => b,
+        None => return Ok(None),
+    };
+    let is_dirty = git(&["status", "--porcelain"])
+        .map(|s| !s.is_empty())
+        .unwrap_or(false);
+    Ok(Some(GitStatus { branch, dirty: is_dirty }))
+}
+
+#[derive(serde::Serialize)]
+pub struct GitStatus {
+    pub branch: String,
+    pub dirty: bool,
+}
+
+/// Download and install a pending update. Emits `neocodex_update_progress`
+/// {downloaded_bytes, total_bytes?} as chunks arrive, then triggers the
+/// native relaunch once the new bundle is staged.
+#[tauri::command]
+pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater.check().await.map_err(|e| e.to_string())?;
+    let Some(update) = update else {
+        return Err("没有可用的更新".into());
+    };
+    let app_handle = app.clone();
+    let app_handle2 = app.clone();
+    update
+        .download_and_install(
+            move |downloaded, total| {
+                let _ = app_handle.emit(
+                    "neocodex_update_progress",
+                    serde_json::json!({
+                        "downloaded": downloaded,
+                        "total": total,
+                    }),
+                );
+            },
+            move || {
+                let _ = app_handle2.emit("neocodex_update_downloaded", ());
+            },
+        )
+        .await
+        .map_err(|e| format!("更新安装失败: {e}"))?;
+    // Relaunch so the new version takes effect (updater staged the bundle).
+    app.restart();
+    Ok(())
+}

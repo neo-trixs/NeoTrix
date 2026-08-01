@@ -76,16 +76,17 @@ export function CommandPalette({ open, items, onClose }: { open: boolean; items:
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.palette} onClick={(e) => e.stopPropagation()} onKeyDown={handleKey}>
+    <div className={styles.overlay} onClick={onClose} data-testid="palette-overlay">
+      <div className={styles.palette} onClick={(e) => e.stopPropagation()} onKeyDown={handleKey} data-testid="command-palette">
         <input
           ref={inputRef}
           className={styles.input}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜索会话或执行命令…"
+          data-testid="palette-input"
         />
-        <div className={styles.list}>
+        <div className={styles.list} data-testid="palette-list">
           {filtered.length === 0 && <div className={styles.empty}>无匹配项</div>}
           {filtered.map((item, i) => (
             <button
@@ -96,6 +97,7 @@ export function CommandPalette({ open, items, onClose }: { open: boolean; items:
                 item.onSelect();
                 onClose();
               }}
+              data-testid={`palette-item-${i}`}
             >
               <span className={styles.itemLabel}>{item.label}</span>
               {item.hint && <span className={styles.itemHint}>{item.hint}</span>}

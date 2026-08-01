@@ -3,6 +3,7 @@ export interface Notification {
   type: "success" | "error" | "warning" | "info";
   message: string;
   duration?: number;
+  action?: { label: string; onClick: () => void };
 }
 
 export interface NotificationSlice {
