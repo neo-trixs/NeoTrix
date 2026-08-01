@@ -609,7 +609,7 @@ impl SelfIteratingBrain {
         for (i, (trace, score)) in results.iter().enumerate() {
             println!("  [{:.2}] {} [{}]", score, trace.title, trace.source_type);
             if i == 0 {
-                println!("    📝 {}", &trace.summary[..trace.summary.len().min(150)]);
+                println!("    📝 {}", trace.summary.chars().take(150).collect::<String>());
             }
         }
     }

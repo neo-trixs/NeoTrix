@@ -141,7 +141,7 @@ impl KnowledgeAbsorptionPipeline {
 
         let summary = extract_text_content(&content);
         let summary_short = if summary.len() > 5000 {
-            format!("{}...", &summary[..5000])
+            format!("{}...", summary.chars().take(5000).collect::<String>())
         } else {
             summary.clone()
         };
@@ -208,7 +208,7 @@ impl KnowledgeAbsorptionPipeline {
 
         let summary = extract_text_content(&content);
         let summary_short = if summary.len() > 5000 {
-            format!("{}...", &summary[..5000])
+            format!("{}...", summary.chars().take(5000).collect::<String>())
         } else {
             summary.clone()
         };

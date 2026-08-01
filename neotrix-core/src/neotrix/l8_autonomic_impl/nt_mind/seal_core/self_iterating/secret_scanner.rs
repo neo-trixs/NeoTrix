@@ -44,7 +44,7 @@ impl SecretScanner {
                 };
                 if re.is_match(line) {
                     let snippet = if line.len() > 60 {
-                        format!("{}...", &line[..57])
+                        format!("{}...", line.chars().take(57).collect::<String>())
                     } else {
                         line.to_string()
                     };

@@ -106,7 +106,7 @@ impl GoalLoop {
         if tracker.iterations_completed > 0 && tracker.history.len() <= 10 {
             let last = tracker.history.last().expect("history has entries after pushing");
             let memory = ReasoningMemory::new(
-                &format!("goal_iter: {} (#{})", &tracker.description[..tracker.description.len().min(50)], last.iteration),
+                &format!("goal_iter: {} (#{})", tracker.description.chars().take(50).collect::<String>(), last.iteration),
                 TaskType::General,
                 &[],
                 last.reward,
@@ -232,7 +232,7 @@ impl GoalLoop {
                         _ => 0.5,
                     };
                     let memory = ReasoningMemory::new(
-                        &format!("goal {}: score={:.3} ({})", &finished.description[..finished.description.len().min(30)], finished.score_current, finished.state.label()),
+                        &format!("goal {}: score={:.3} ({})", finished.description.chars().take(30).collect::<String>(), finished.score_current, finished.state.label()),
                         TaskType::General,
                         &[],
                         reward,
@@ -296,7 +296,7 @@ impl GoalLoop {
                 if !suggestions.is_empty() {
                     let _suggestion_text = suggestions.join("\n");
                     let memory = ReasoningMemory::new(
-                        &format!("session_distillation: {}", &desc[..desc.len().min(40)]),
+                        &format!("session_distillation: {}", desc.chars().take(40).collect::<String>()),
                         crate::neotrix::nt_world_model::TaskType::General,
                         &[],
                         0.85,

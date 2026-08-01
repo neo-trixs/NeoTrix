@@ -26,7 +26,7 @@ pub(crate) fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max {
         format!("{:width$}", s, width = max)
     } else {
-        format!("{}...", &s[..max.saturating_sub(3)])
+        format!("{}...", s.chars().take(max.saturating_sub(3)).collect::<String>())
     }
 }
 

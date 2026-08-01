@@ -47,7 +47,7 @@ impl BookPipeline {
                 .collect::<Vec<&str>>()
                 .join(" ");
             let preview = if preview.len() > 80 {
-                format!("{}...", &preview[..80])
+                format!("{}...", preview.chars().take(80).collect::<String>())
             } else {
                 preview
             };

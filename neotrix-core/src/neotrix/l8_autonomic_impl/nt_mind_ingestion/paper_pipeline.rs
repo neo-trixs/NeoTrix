@@ -26,7 +26,7 @@ impl PaperPipeline {
             .next()
             .map(|l| {
                 let t = l.trim();
-                if t.len() > 100 { format!("{}...", &t[..100]) } else { t.to_string() }
+                if t.len() > 100 { format!("{}...", t.chars().take(100).collect::<String>()) } else { t.to_string() }
             })
             .unwrap_or_else(|| "unknown_paper".to_string())
     }

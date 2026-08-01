@@ -50,7 +50,7 @@ impl BrainStage for StructureStage {
                 .collect::<Vec<&str>>()
                 .join(" ");
             let preview = if preview.len() > 80 {
-                format!("{}...", &preview[..80])
+                format!("{}...", preview.chars().take(80).collect::<String>())
             } else {
                 preview
             };
@@ -401,7 +401,14 @@ impl BrainStage for CanonicalSortStage {
         let dummy_specs: Vec<String> = vec![];
 
         let fp = canonical_catalog_fingerprint(&hex_ids, &dummy_specs);
-        let fp_short = if fp.len() > 16 { &fp[..16] } else { &fp };
+        let fp_short = if fp.len() > 16 {
+            let cut = fp.char_indices()
+                .map(|(i, _)| i)
+                .take_while(|&i| i <= 16)
+                .last()
+                .unwrap_or(0);
+            &fp[..cut]
+        } else { &fp };
         log::trace!("[canonical_sort] catalog fingerprint: {} ({} hexagrams)", fp_short, hex_ids.len());
         Ok(StageDecision::Continue)
     }
