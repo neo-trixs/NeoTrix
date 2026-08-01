@@ -118,6 +118,7 @@ pub struct WorldModel {
 
 impl WorldModel {
     pub fn new(num_experts: usize) -> Self {
+        let num_experts = num_experts.max(1);
         Self {
             latent_dim: LATENT_DIM,
             transition_model: LatentTransition::new(num_experts),
@@ -157,7 +158,11 @@ impl WorldModel {
             let mut z = initial_state.vector.clone();
 
             for _ in 0..horizon {
-                let expert_id = (rand::random::<f64>() * self.num_experts as f64) as usize % self.num_experts;
+                let expert_id = if self.num_experts > 0 {
+                    (rand::random::<f64>() * self.num_experts as f64) as usize % self.num_experts
+                } else {
+                    0
+                };
                 sequence.push(expert_id);
 
                 let action = vec![0.0; self.num_experts];
@@ -185,6 +190,9 @@ impl WorldModel {
     }
 
     fn evaluate_sequence(&self, initial_z: &[f64], sequence: &[usize]) -> f64 {
+        if sequence.is_empty() {
+            return 0.0;
+        }
         let mut z = initial_z.to_vec();
         let mut total_score = 0.0;
 

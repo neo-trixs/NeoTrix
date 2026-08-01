@@ -187,7 +187,7 @@ impl CliCommand for MemCmd {
                 if filtered.is_empty() { return CommandOutput::ok("📭 暂无记忆"); }
                 let mut s = format!("📚 共 {} 条记忆:\n", filtered.len());
                 for (i, e) in filtered.iter().take(20).enumerate() {
-                    let content = if e.content.len() > 50 { format!("{}…", &e.content[..47]) } else { e.content.clone() };
+                    let content = if e.content.len() > 50 { format!("{}…", &e.content[..e.content.floor_char_boundary(47)]) } else { e.content.clone() };
                     let tags = if e.tags.is_empty() { String::new() } else { format!(" [{}]", e.tags.join(",")) };
                     let pin = if e.pinned { " 📌" } else { "" };
                     s.push_str(&format!("  {}. {}{}{}\n", i + 1, content, tags, pin));

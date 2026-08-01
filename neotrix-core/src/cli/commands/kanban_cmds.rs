@@ -112,6 +112,11 @@ pub struct KanbanBoard {
     pub project: String,
     pub items: Vec<WorkItem>,
     pub wip_limits: HashMap<WorkItemPhase, u8>,
+    /// Monotonic id counter. items.len()+1 reuses ids after remove_item,
+    /// which corrupts dependency/stale references, so ids are never
+    /// recycled within a board lifetime.
+    #[serde(default)]
+    next_id_counter: u64,
 }
 
 impl KanbanBoard {
@@ -119,7 +124,7 @@ impl KanbanBoard {
         let mut wip_limits = HashMap::new();
         wip_limits.insert(WorkItemPhase::Running, 3);
         wip_limits.insert(WorkItemPhase::Review, 3);
-        Self { project: project.to_string(), items: Vec::new(), wip_limits }
+        Self { project: project.to_string(), items: Vec::new(), wip_limits, next_id_counter: 0 }
     }
 
     pub fn now() -> u64 {
@@ -129,8 +134,19 @@ impl KanbanBoard {
             .as_secs()
     }
 
-    fn next_id(&self) -> String {
-        format!("task-{}", self.items.len() + 1)
+    fn next_id(&mut self) -> String {
+        // Backward compat: if a board was deserialized before the counter
+        // existed, seed it from the current max numeric id so fresh ids
+        // never collide with existing ones.
+        if self.next_id_counter == 0 {
+            let max_numeric = self.items.iter()
+                .filter_map(|i| i.id.strip_prefix("task-").and_then(|s| s.parse::<u64>().ok()))
+                .max()
+                .unwrap_or(0);
+            self.next_id_counter = max_numeric.max(self.items.len() as u64);
+        }
+        self.next_id_counter += 1;
+        format!("task-{}", self.next_id_counter)
     }
 
     pub fn add_item(&mut self, title: &str, description: &str, priority: u8) -> String {
@@ -961,5 +977,35 @@ mod tests {
 
         board.remove_dependency(&b, &a).unwrap();
         assert_eq!(board.items[1].dependencies.len(), 0);
+    }
+
+    #[test]
+    fn test_board_id_not_reused_after_remove() {
+        // Regression: next_id used items.len()+1, so removing the middle
+        // item reused its id and silently replaced a live item. Ids must be
+        // monotonic within a board lifetime.
+        let mut board = KanbanBoard::new("id-reuse");
+        let a = board.add_item("A", "", 1);
+        let b = board.add_item("B", "", 1);
+        let c = board.add_item("C", "", 1);
+        assert_eq!((a.as_str(), b.as_str(), c.as_str()), ("task-1", "task-2", "task-3"));
+
+        board.remove_item(&b).unwrap();
+        let d = board.add_item("D", "", 1);
+        assert_eq!(d, "task-4", "id must not be recycled after remove_item");
+        assert!(board.get_item_by_id("task-3").is_some(), "existing task-3 must survive");
+    }
+
+    #[test]
+    fn test_board_id_seed_from_deserialized_legacy_board() {
+        // Boards saved before the counter field existed deserialize with
+        // next_id_counter == 0; fresh ids must start above existing ones.
+        let mut board = KanbanBoard::new("legacy");
+        board.add_item("A", "", 1);
+        board.add_item("B", "", 1);
+        let json = serde_json::to_string(&board).unwrap();
+        let mut loaded: KanbanBoard = serde_json::from_str(&json).unwrap();
+        let id = loaded.add_item("C", "", 1);
+        assert_eq!(id, "task-3", "legacy board must not collide with existing ids");
     }
 }

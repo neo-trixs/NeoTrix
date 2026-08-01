@@ -28,16 +28,30 @@ impl IITPhiCalculator {
         Self { sigma: 0.5 }
     }
 
-    pub fn analyze_state(&self, _state: &[f64]) -> PhiReport {
+    /// Layer-safe phi proxy: L2 must not depend on the L5 IIT engine, so
+    /// this reports a normalized variance-based integration signal instead
+    /// of a hardcoded constant. 0 for a dead/flat state, rising with
+    /// multi-dimensional activation spread.
+    fn compute_phi(&self, state: &[f64]) -> f64 {
+        if state.len() < 2 {
+            return 0.0;
+        }
+        let mean = state.iter().sum::<f64>() / state.len() as f64;
+        let var = state.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>() / state.len() as f64;
+        // Normalize: 1.0 for unit-variance activation, saturating above.
+        (var.sqrt()).min(1.0)
+    }
+
+    pub fn analyze_state(&self, state: &[f64]) -> PhiReport {
         PhiReport {
-            phi: 0.5,
+            phi: self.compute_phi(state),
             sigma: self.sigma,
         }
     }
 
-    pub fn compute_from_state(&self, _state: &[f64]) -> PhiReport {
+    pub fn compute_from_state(&self, state: &[f64]) -> PhiReport {
         PhiReport {
-            phi: 0.5,
+            phi: self.compute_phi(state),
             sigma: self.sigma,
         }
     }

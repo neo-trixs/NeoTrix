@@ -232,7 +232,7 @@ fn cmd_search(args: &[String]) -> CommandOutput {
                 let node = &r.node;
                 let summary = node.summary.as_deref().unwrap_or("(无摘要)");
                 let preview = if summary.len() > 100 {
-                    &summary[..100]
+                    &summary[..summary.floor_char_boundary(100)]
                 } else {
                     summary
                 };
@@ -272,7 +272,7 @@ fn cmd_explore(args: &[String]) -> CommandOutput {
                 out.push_str(&format!("  摘要:     {}\n", s));
             }
             if let Some(ref c) = node.content {
-                let preview = if c.len() > 200 { &c[..200] } else { c };
+                let preview = if c.len() > 200 { &c[..c.floor_char_boundary(200)] } else { c };
                 out.push_str(&format!("  内容预览: {}\n", preview));
             }
             if let Some(ref u) = node.url {
@@ -519,7 +519,7 @@ fn cmd_cluster(args: &[String]) -> CommandOutput {
             .map(|id| {
                 let title = node_title(&conn, id);
                 if title.len() > 30 {
-                    format!("{}...", &title[..30])
+                    format!("{}...", &title[..title.floor_char_boundary(30)])
                 } else {
                     title
                 }
@@ -688,7 +688,7 @@ fn cmd_export(args: &[String]) -> CommandOutput {
                 .map(|r| {
                     let t = &r.node.title;
                     if t.len() > 20 {
-                        format!("{}...", &t[..20])
+                        format!("{}...", &t[..t.floor_char_boundary(20)])
                     } else {
                         t.clone()
                     }
@@ -723,7 +723,7 @@ fn cmd_export(args: &[String]) -> CommandOutput {
   <text x="{}" y="{}" text-anchor="middle" fill="#fff" font-family="sans-serif" font-size="11" font-weight="bold">{}"##,
                 node_title_escaped, cx, cy, cx, cy + 4.0,
                 if node.title.len() > 12 {
-                    &node.title[..12]
+                    &node.title[..node.title.floor_char_boundary(12)]
                 } else {
                     &node.title
                 }
