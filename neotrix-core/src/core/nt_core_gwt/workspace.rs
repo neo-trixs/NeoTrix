@@ -17,6 +17,11 @@ use super::geometry_sync::GeometrySync;
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_harness::HarnessAdapter;
 
+/// resonance_history 上限，防止无界增长 (每 tick push 一个)
+const RESONANCE_HISTORY_LIMIT: usize = 512;
+/// audit_chain 上限，防止无界增长 (每 tick append 一个 block)
+const AUDIT_CHAIN_LIMIT: usize = 10_000;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalWorkspace {
     pub broadcast_history: Vec<String>,
@@ -349,6 +354,9 @@ impl GlobalWorkspace {
         // Step 6: store resonance report
         self.last_resonance = Some(report.clone());
         self.resonance_history.push(report.clone());
+        if self.resonance_history.len() > RESONANCE_HISTORY_LIMIT {
+            self.resonance_history.drain(..self.resonance_history.len() - RESONANCE_HISTORY_LIMIT);
+        }
         self.tick += 1;
 
         // Return reference to the report (guaranteed safe: set on line 266)
@@ -466,12 +474,16 @@ impl GlobalWorkspace {
             compaction_triggered,
             hash,
         });
+        while self.audit_chain.len() > AUDIT_CHAIN_LIMIT {
+            self.audit_chain.pop_front();
+        }
     }
 
-    /// Verify the integrity of the entire audit chain
+    /// Verify the integrity of the retained audit chain window.
+    /// 被裁剪后链头 previous_hash 指向已移除块，故 linkage 校验从链中第二块起。
     pub fn verify_chain(&self) -> bool {
         let mut prev_hash = [0u8; 32];
-        for block in &self.audit_chain {
+        for (i, block) in self.audit_chain.iter().enumerate() {
             let mut hasher = Sha256::new();
             hasher.update(block.index.to_le_bytes());
             hasher.update(block.previous_hash);
@@ -485,7 +497,7 @@ impl GlobalWorkspace {
             if computed != block.hash {
                 return false;
             }
-            if block.index > 0 && block.previous_hash != prev_hash {
+            if i > 0 && block.previous_hash != prev_hash {
                 return false;
             }
             prev_hash = block.hash;

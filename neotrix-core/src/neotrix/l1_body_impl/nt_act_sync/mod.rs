@@ -8,7 +8,7 @@ pub use types::*;
 
 use crate::neotrix::nt_agent_protocol::discovery::{AgentDiscovery, AgentInfo};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// FileSync orchestrator — manages discovery, indexing, and transfer lifecycle.
 pub struct FileSync {
@@ -24,7 +24,7 @@ impl FileSync {
     pub fn new(discovery_port: u16, sync_port: u16, local_root: String) -> Result<Self, String> {
         let discovery = AgentDiscovery::new(discovery_port).map_err(|e| e.to_string())?;
 
-        let server = match SyncServer::bind(sync_port, {
+        let server = match SyncServer::bind(PathBuf::from(&local_root), sync_port, {
             let root = local_root.clone();
             move |_path| {
                 let p = Path::new(&root);

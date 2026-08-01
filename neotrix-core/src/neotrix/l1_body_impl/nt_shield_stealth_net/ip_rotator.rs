@@ -210,6 +210,9 @@ impl OsIpRotator {
             if let Ok(c) = self.config.try_read() { break c.clone(); }
         };
         let iface = Self::find_primary_interface().ok_or("No primary interface found")?;
+        if cfg.alias_count == 0 {
+            return Err("alias_count must be >= 1".into());
+        }
         let current_idx = self.current_alias_idx.fetch_add(1, Ordering::Relaxed);
         let ip = format!("{}.{}", cfg.alias_prefix, (current_idx % cfg.alias_count as u64) + 2);
         let prefix = "24";

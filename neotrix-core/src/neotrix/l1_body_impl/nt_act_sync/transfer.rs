@@ -2,13 +2,17 @@ use super::types::{FileEntry, FileIndex, SyncMessage};
 use sha2::{Digest, Sha256};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
+
+/// 单个同步文件的大小上限（防止远程声明超大 size 造成 OOM）。
+const MAX_SYNC_FILE_SIZE: u64 = 256 * 1024 * 1024;
 
 /// TCP server that handles incoming sync requests from peers.
 pub struct SyncServer {
     listener: TcpListener,
     port: u16,
+    root: PathBuf,
     local_index_fn: Box<dyn Fn(&str) -> Option<FileIndex> + Send>,
 }
 
@@ -17,7 +21,7 @@ pub struct SyncClient;
 
 impl SyncServer {
     /// Bind to a port for incoming sync connections.
-    pub fn bind<F>(port: u16, index_fn: F) -> Result<Self, String>
+    pub fn bind<F>(root: PathBuf, port: u16, index_fn: F) -> Result<Self, String>
     where
         F: Fn(&str) -> Option<FileIndex> + Send + 'static,
     {
@@ -29,6 +33,7 @@ impl SyncServer {
         Ok(Self {
             listener,
             port,
+            root,
             local_index_fn: Box::new(index_fn),
         })
     }
@@ -59,9 +64,12 @@ impl SyncServer {
                 write_message(stream, &SyncMessage::IndexResponse { index })
             }
             SyncMessage::GetFile { relative_path } => {
-                let root = Path::new(&relative_path);
-                if root.exists() && root.is_file() {
-                    let metadata = match root.metadata() {
+                // 路径穿越防护：拒绝绝对路径与 .. 逃逸，必须落在 root 内
+                let Some(rel) = sanitize_relative_path(&self.root, &relative_path) else {
+                    return write_message(stream, &SyncMessage::Error { message: "invalid path".into() });
+                };
+                if rel.is_file() {
+                    let metadata = match rel.metadata() {
                         Ok(m) => m,
                         Err(_) => return write_message(stream, &SyncMessage::Error { message: "metadata error".into() }),
                     };
@@ -72,7 +80,7 @@ impl SyncServer {
                         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                         .map(|d| d.as_secs() as i64)
                         .unwrap_or(0);
-                    let checksum = match file_checksum(root) {
+                    let checksum = match file_checksum(&rel) {
                         Ok(c) => c,
                         Err(_) => return write_message(stream, &SyncMessage::Error { message: "checksum error".into() }),
                     };
@@ -83,7 +91,7 @@ impl SyncServer {
                         checksum,
                     });
                     if ok {
-                        let _ = stream.write_all(&std::fs::read(root).unwrap_or_default());
+                        let _ = stream.write_all(&std::fs::read(&rel).unwrap_or_default());
                     }
                     ok
                 } else {
@@ -91,7 +99,13 @@ impl SyncServer {
                 }
             }
             SyncMessage::PutFile { relative_path, size, modified, checksum } => {
-                let target = Path::new(&relative_path);
+                // OOM 防护 + 路径穿越防护
+                if size > MAX_SYNC_FILE_SIZE {
+                    return write_message(stream, &SyncMessage::Error { message: "file too large".into() });
+                }
+                let Some(target) = sanitize_relative_path(&self.root, &relative_path) else {
+                    return write_message(stream, &SyncMessage::Error { message: "invalid path".into() });
+                };
                 if let Some(parent) = target.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
@@ -104,10 +118,10 @@ impl SyncServer {
                 if actual_hex != checksum {
                     return write_message(stream, &SyncMessage::Error { message: "checksum mismatch".into() });
                 }
-                match std::fs::write(target, &data) {
+                match std::fs::write(&target, &data) {
                     Ok(_) => {
-                        let ftime = UNIX_EPOCH + Duration::from_secs(modified as u64);
-                        let _ = filetime::set_file_mtime(target, filetime::FileTime::from_system_time(ftime));
+                        let ftime = if modified < 0 { UNIX_EPOCH } else { UNIX_EPOCH + Duration::from_secs(modified as u64) };
+                        let _ = filetime::set_file_mtime(&target, filetime::FileTime::from_system_time(ftime));
                         write_message(stream, &SyncMessage::Ack { message: format!("received: {}", relative_path) })
                     }
                     Err(e) => write_message(stream, &SyncMessage::Error { message: format!("write: {}", e) }),
@@ -137,7 +151,12 @@ impl SyncClient {
 
         match read_message(&mut stream) {
             Some(SyncMessage::FileContent { relative_path, size, modified, checksum }) => {
-                let target = dest_dir.join(&relative_path);
+                if size > MAX_SYNC_FILE_SIZE {
+                    return Err(format!("remote file too large: {}", size));
+                }
+                let Some(target) = sanitize_relative_path(dest_dir, &relative_path) else {
+                    return Err("invalid remote path".into());
+                };
                 if let Some(parent) = target.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
                 }
@@ -149,7 +168,7 @@ impl SyncClient {
                     return Err("checksum mismatch".into());
                 }
                 std::fs::write(&target, &data).map_err(|e| format!("write: {}", e))?;
-                let ftime = UNIX_EPOCH + Duration::from_secs(modified as u64);
+                let ftime = if modified < 0 { UNIX_EPOCH } else { UNIX_EPOCH + Duration::from_secs(modified as u64) };
                 let _ = filetime::set_file_mtime(&target, filetime::FileTime::from_system_time(ftime));
                 Ok(())
             }
@@ -180,6 +199,33 @@ impl SyncClient {
 }
 
 // ── Helpers ──
+
+/// 将相对路径安全拼接到 root 下：拒绝绝对路径、`..` 逃逸、根逃逸。
+/// 返回规范化后的完整路径；失败返回 None。
+fn sanitize_relative_path(root: &Path, relative_path: &str) -> Option<PathBuf> {
+    let p = Path::new(relative_path);
+    if p.is_absolute() {
+        return None;
+    }
+    let mut clean = PathBuf::new();
+    for comp in p.components() {
+        match comp {
+            Component::Normal(c) => clean.push(c),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return None,
+        }
+    }
+    if clean.as_os_str().is_empty() {
+        return None;
+    }
+    let joined = root.join(clean);
+    // 最终路径必须仍在 root 内（防符号链接 + 拼接待逃逸）
+    if joined.starts_with(root) {
+        Some(joined)
+    } else {
+        None
+    }
+}
 
 fn connect(host: &str, port: u16) -> Result<TcpStream, String> {
     let addr = format!("{}:{}", host, port);

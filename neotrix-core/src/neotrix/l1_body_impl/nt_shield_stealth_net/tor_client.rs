@@ -164,6 +164,9 @@ impl TorClient {
 
         // SOCKS5 connect request
         let addr_bytes = target.as_bytes();
+        if addr_bytes.len() > 255 {
+            return Err("SOCKS5 target hostname too long (>255 bytes)".into());
+        }
         let mut req = vec![5, 1, 0, 3, addr_bytes.len() as u8];
         req.extend_from_slice(addr_bytes);
         req.extend_from_slice(&port.to_be_bytes());
@@ -171,14 +174,45 @@ impl TorClient {
             .map_err(|e| format!("SOCKS5 connect req failed: {}", e))?;
         stream.read_exact(&mut buf).await
             .map_err(|e| format!("SOCKS5 connect resp failed: {}", e))?;
-        // Read rest of response (skip bind addr)
-        let mut rest = vec![0u8; 6];
-        stream.read_exact(&mut rest).await.ok();
-
         if buf[1] != 0 {
             return Err(format!("SOCKS5 connect rejected: code={}", buf[1]));
         }
+        // Read remainder of reply: RSV + ATYP + BND.ADDR + BND.PORT
+        // BND.ADDR length depends on ATYP (1=IPv4, 4=IPv6, 3=domain).
+        let mut typ = [0u8; 2]; // RSV, ATYP
+        stream.read_exact(&mut typ).await
+            .map_err(|e| format!("SOCKS5 connect resp (type) failed: {}", e))?;
+        let addr_len = match typ[1] {
+            1 => 4usize,  // IPv4
+            4 => 16usize, // IPv6
+            3 => {
+                let mut len = [0u8; 1];
+                stream.read_exact(&mut len).await
+                    .map_err(|e| format!("SOCKS5 connect resp (domain len) failed: {}", e))?;
+                len[0] as usize
+            }
+            atyp => return Err(format!("SOCKS5 connect resp: unexpected ATYP={}", atyp)),
+        };
+        let mut rest = vec![0u8; addr_len + 2];
+        stream.read_exact(&mut rest).await
+            .map_err(|e| format!("SOCKS5 connect resp (bind addr) failed: {}", e))?;
         Ok(stream)
+    }
+
+    /// 派生 Tor 控制密码哈希 (等价于 `tor --hash-password`)，成功返回哈希行
+    fn hash_tor_password(pw: &str) -> Option<String> {
+        let out = Command::new("tor")
+            .args(["--hash-password", pw])
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        String::from_utf8(out.stdout)
+            .ok()?
+            .lines()
+            .map(|l| l.trim().to_string())
+            .find(|l| !l.is_empty())
     }
 
     /// 启动 Tor 进程
@@ -195,12 +229,24 @@ impl TorClient {
             cmd.args(["--DataDirectory", data_dir]);
         }
         if let Some(ref pw) = self.config.control_password {
-            // 避免密码出现在 ps aux 中，写入临时文件后使用 --HashedControlPasswordFile
-            if let Ok(tmpdir) = std::env::temp_dir().canonicalize() {
-                let pw_file = tmpdir.join("neotrix_tor_pass");
-                if std::fs::write(&pw_file, pw).is_ok() {
-                    cmd.args(["--HashedControlPasswordFile", pw_file.to_str().unwrap_or("")]);
+            // Tor 不接受明文密码文件：先经 `tor --hash-password` 派生哈希，
+            // 写入 0600 权限的私有临时文件，再以 --HashedControlPasswordFile 传入。
+            // 避免密码出现在 ps aux 且避免明文落盘。
+            if let Some(hash) = Self::hash_tor_password(pw) {
+                if let Ok(tmpdir) = std::env::temp_dir().canonicalize() {
+                    let pw_file = tmpdir.join(format!("neotrix_tor_pass_{}", std::process::id()));
+                    if std::fs::write(&pw_file, hash.as_bytes()).is_ok() {
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            let _ = std::fs::set_permissions(&pw_file, std::fs::Permissions::from_mode(0o600));
+                        }
+                        cmd.args(["--HashedControlPasswordFile", pw_file.to_str().unwrap_or("")]);
+                    }
                 }
+            } else {
+                // 哈希派生失败（tor 不可用等）：退回 --ControlPortPasswd（明文出现在 ps，唯一正确传明文途径）
+                cmd.args(["--ControlPortPasswd", pw]);
             }
         }
         let child = cmd.spawn()

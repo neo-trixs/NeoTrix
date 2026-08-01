@@ -87,10 +87,12 @@ impl IITPhiCalculator {
     pub fn resonance_matrix(&self, state: &[f64]) -> Vec<Vec<f64>> {
         let n = state.len().min(64);
         let mut r = vec![vec![0.0; n]; n];
+        let sigma = if self.sigma.abs() < 1e-12 { 1.0 } else { self.sigma };
+        let sigma2 = sigma * sigma;
         for i in 0..n {
             for j in 0..n {
                 let diff = state[i] - state[j];
-                r[i][j] = (-diff * diff / (self.sigma * self.sigma)).exp();
+                r[i][j] = (-diff * diff / sigma2).exp();
             }
         }
         r

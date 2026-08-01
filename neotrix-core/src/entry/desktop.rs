@@ -146,7 +146,7 @@ pub(crate) async fn run_tui(_agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral:
         agent_ui.send_message(&input).await;
         if let Some((_, response)) = agent_ui.message_log.last() {
             if response.len() > 80 {
-                eprintln!("{}…", &response[..80]);
+                eprintln!("{}…", response.chars().take(80).collect::<String>());
             } else {
                 eprintln!("{}", response);
             }

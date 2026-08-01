@@ -683,8 +683,8 @@ pub fn run_benchmark(category: Option<&str>) {
     println!("│ Category      | Test              | Score │");
     println!("├───────────────┼───────────────────┼───────┤");
     for r in &report.results {
-        let name_display = if r.name.len() > 17 {
-            format!("{}…", &r.name[..16])
+        let name_display = if r.name.chars().count() > 17 {
+            format!("{}…", r.name.chars().take(16).collect::<String>())
         } else {
             r.name.clone()
         };

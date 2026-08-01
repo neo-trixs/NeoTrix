@@ -289,7 +289,12 @@ impl SfeExtractor {
 
     /// Score content based on extracted features
     pub fn score(&self, features: &SfeFeatures) -> SfeScore {
-        let heading_score = ((features.heading_count as f64) / (self.config.min_headings as f64 * 2.0)).min(1.0).max(0.0);
+        let denom = self.config.min_headings as f64 * 2.0;
+        let heading_score = if denom <= 0.0 {
+            if features.heading_count > 0 { 1.0 } else { 0.0 }
+        } else {
+            (features.heading_count as f64 / denom).min(1.0).max(0.0)
+        };
         let heading_bonus = if features.has_title { 0.15 } else { 0.0 };
         let heading_score = (heading_score + heading_bonus).min(1.0);
 

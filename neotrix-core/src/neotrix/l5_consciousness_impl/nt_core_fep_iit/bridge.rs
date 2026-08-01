@@ -302,6 +302,10 @@ impl FEPIITBridge {
     /// Downsample a 4096-dim VSA hypervector to 64-dim for IIT computation
     pub(crate) fn hv_to_64(&self, hv: &[f64]) -> Vec<f64> {
         let dim = hv.len();
+        if dim < 64 {
+            // 维度不足 64：返回零向量，避免 step=0 除零/空切片
+            return vec![0.0; 64];
+        }
         let step = dim / 64;
         (0..64)
             .map(|i| {

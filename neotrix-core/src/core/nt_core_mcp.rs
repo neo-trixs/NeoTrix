@@ -179,8 +179,24 @@ impl McpServer {
                 continue;
             }
 
-            let request: McpRequest = serde_json::from_str(line.trim())
-                .map_err(|e| format!("Invalid JSON-RPC request: {}", e))?;
+            let request: McpRequest = match serde_json::from_str(line.trim()) {
+                Ok(r) => r,
+                Err(_) => {
+                    // 单行解析失败不杀服务器：回 JSON-RPC 解析错误并继续
+                    let response = McpResponse {
+                        jsonrpc: "2.0".into(),
+                        id: 0,
+                        result: None,
+                        error: Some(McpError { code: -32700, message: "Parse error".into() }),
+                    };
+                    if let Ok(json) = serde_json::to_string(&response) {
+                        let mut out = self.writer.lock();
+                        let _ = writeln!(out, "{}", json);
+                        let _ = out.flush();
+                    }
+                    continue;
+                }
+            };
 
             let response = self.handle_request(&request);
 

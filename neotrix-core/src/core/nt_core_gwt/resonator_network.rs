@@ -213,7 +213,11 @@ impl BandpassResonator {
     ///
     /// `center_freq` in Hz, `q` is the quality factor. Higher Q → narrower band.
     pub fn new(center_freq: f64, q: f64) -> Self {
-        let bandwidth = center_freq / q;
+        let bandwidth = if q == 0.0 || !q.is_finite() {
+            0.0
+        } else {
+            center_freq / q
+        };
         let sample_rate = 100.0; // assume 100 Hz control loop
         Self {
             center_freq,

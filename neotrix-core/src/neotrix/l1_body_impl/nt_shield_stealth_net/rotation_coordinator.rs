@@ -89,7 +89,7 @@ impl RotationCoordinator {
             let mult = domain.mean_multiplier();
             let dmean = mean_ms * mult;
             let dstd = std_ms * mult;
-            let offset = rng.gen_range(0..max_ms);
+            let offset = if max_ms == 0 { 0 } else { rng.gen_range(0..max_ms) };
             let interval = Self::sample_interval(dmean, dstd);
             domains.push((domain, DomainState {
                 mean_ms: dmean,

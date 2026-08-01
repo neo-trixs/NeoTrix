@@ -333,39 +333,61 @@ impl NetworkResourcePool {
 
     /// 刷新所有池的有效性
     pub async fn refresh_all(&self) -> NetworkPoolSnapshot {
-        // 刷新 DNS
+        // 避免在持有写锁期间跨 await（F9）：先克隆条目，检查在锁外执行，再写回结果
         {
-            let mut servers = self.dns_servers.write().await;
-            for server in servers.iter_mut() {
+            let entries = self.dns_servers.read().await.clone();
+            let mut results = Vec::with_capacity(entries.len());
+            for server in &entries {
                 let start = Instant::now();
-                server.effective = Self::check_dns(server).await;
-                server.latency_ms = start.elapsed().as_millis() as f64;
+                let ok = Self::check_dns(server).await;
+                results.push((server.clone(), ok, start.elapsed().as_millis() as f64));
+            }
+            let mut servers = self.dns_servers.write().await;
+            for (server, ok, latency) in results {
+                if let Some(cur) = servers.iter_mut().find(|s| s.addr == server.addr && s.protocol == server.protocol) {
+                    cur.effective = ok;
+                    cur.latency_ms = latency;
+                }
             }
         }
 
         // 刷新路由
         {
-            let mut nodes = self.route_nodes.write().await;
-            for node in nodes.iter_mut() {
+            let entries = self.route_nodes.read().await.clone();
+            let mut results = Vec::with_capacity(entries.len());
+            for node in &entries {
                 let start = Instant::now();
                 let ok = Self::check_route(node).await;
-                node.effective = ok;
-                node.latency_ms = start.elapsed().as_millis() as f64;
-                node.last_check = Some(Instant::now());
-                if ok { node.success_count += 1; } else { node.fail_count += 1; }
+                results.push((node.clone(), ok, start.elapsed().as_millis() as f64));
+            }
+            let mut nodes = self.route_nodes.write().await;
+            for (node, ok, latency) in results {
+                if let Some(cur) = nodes.iter_mut().find(|n| n.id == node.id) {
+                    cur.effective = ok;
+                    cur.latency_ms = latency;
+                    cur.last_check = Some(Instant::now());
+                    if ok { cur.success_count += 1; } else { cur.fail_count += 1; }
+                }
             }
         }
 
         // 刷新 IP
         {
-            let mut resources = self.ip_resources.write().await;
-            for resource in resources.iter_mut() {
+            let entries = self.ip_resources.read().await.clone();
+            let mut results = Vec::with_capacity(entries.len());
+            for resource in &entries {
                 let start = Instant::now();
                 let ok = Self::check_ip(resource).await;
-                resource.effective = ok;
-                resource.latency_ms = start.elapsed().as_millis() as f64;
-                resource.last_verified = Some(Instant::now());
-                if ok { resource.success_count += 1; } else { resource.fail_count += 1; }
+                results.push((resource.clone(), ok, start.elapsed().as_millis() as f64));
+            }
+            let mut resources = self.ip_resources.write().await;
+            for (resource, ok, latency) in results {
+                if let Some(cur) = resources.iter_mut().find(|r| r.ip == resource.ip && r.port == resource.port) {
+                    cur.effective = ok;
+                    cur.latency_ms = latency;
+                    cur.last_verified = Some(Instant::now());
+                    if ok { cur.success_count += 1; } else { cur.fail_count += 1; }
+                }
             }
         }
 

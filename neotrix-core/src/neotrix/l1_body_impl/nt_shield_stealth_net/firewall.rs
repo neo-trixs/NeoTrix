@@ -125,14 +125,16 @@ impl FirewallManager {
 
     fn write_pf_rules(rules: &[FirewallRule]) -> Result<(), String> {
         let mut pf_text = format!("# NeoTrix pf rules\n# Divert ALL TCP -> {}\n", DIVERT_PORT);
-        pf_text.push_str(&format!("pass out quick proto tcp from any to any divert-to 127.0.0.1 port {} no-state\n", DIVERT_PORT));
-        pf_text.push_str("pass out quick proto udp from any to any port 53 divert-to 127.0.0.1 port 11053\n");
+        // Block rules must precede quick pass/divert rules: PF evaluates in order
+        // and `quick` short-circuits, so a later block could never match.
         for r in rules {
             if r.action == FirewallAction::Block {
                 pf_text.push_str(&r.to_pf_rule());
                 pf_text.push('\n');
             }
         }
+        pf_text.push_str(&format!("pass out quick proto tcp from any to any divert-to 127.0.0.1 port {} no-state\n", DIVERT_PORT));
+        pf_text.push_str("pass out quick proto udp from any to any port 53 divert-to 127.0.0.1 port 11053\n");
         let _ = std::fs::write("/tmp/neotrix_pf_anchor.conf", &pf_text);
         let output = std::process::Command::new("pfctl")
             .args(["-a", PF_ANCHOR_PATH, "-f", "/tmp/neotrix_pf_anchor.conf", "-q"]).output();
@@ -146,14 +148,16 @@ impl FirewallManager {
     fn write_nftables_rules(rules: &[FirewallRule]) -> Result<(), String> {
         let mut nft = String::from("add table inet neotrix\nflush table inet neotrix\n");
         nft.push_str("add chain inet neotrix output { type filter hook output priority 0; policy accept; }\n");
-        nft.push_str(&format!("add rule inet neotrix divert tcp dport != 11080 divert-to 127.0.0.1:{}\n", DIVERT_PORT));
-        nft.push_str("add rule inet neotrix divert udp dport 53 divert-to 127.0.0.1:11053\n");
+        // Block rules first: nftables matches in order and drop is terminal,
+        // so block rules must precede the divert rules to take effect.
         for r in rules {
             if r.action == FirewallAction::Block {
                 let dst = r.dst_addr.as_deref().unwrap_or("");
                 nft.push_str(&format!("add rule inet neotrix output {} drop comment \"{}\"\n", dst, r.label));
             }
         }
+        nft.push_str(&format!("add rule inet neotrix output tcp dport != {} divert-to 127.0.0.1:{}\n", DIVERT_PORT, DIVERT_PORT));
+        nft.push_str("add rule inet neotrix output udp dport 53 divert-to 127.0.0.1:11053\n");
         if let Err(e) = std::fs::write("/tmp/neotrix_nftables.conf", &nft) {
             log::warn!("[fw] failed to write nftables config: {}", e);
         }

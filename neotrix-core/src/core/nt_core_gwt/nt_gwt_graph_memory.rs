@@ -261,6 +261,9 @@ impl GraphMemoryStore {
             self.nodes.insert(id, node);
         }
         for edge in other.edges.drain(..) {
+            if self.max_edges == 0 {
+                break;
+            }
             if self.edges.len() >= self.max_edges {
                 self.edges.remove(0);
             }
