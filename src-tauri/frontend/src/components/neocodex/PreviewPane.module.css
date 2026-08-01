@@ -47,3 +47,7 @@
   color: var(--text-secondary, #888);
   line-height: 1.6;
 }
+
+.hintError {
+  color: var(--danger, #e5484d);
+}

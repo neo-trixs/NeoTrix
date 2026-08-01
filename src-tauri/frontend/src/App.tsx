@@ -46,12 +46,14 @@ const App: React.FC = () => {
 
   // ── Deep link ──
   useEffect(() => {
-    getCurrent().then((urls) => {
-      if (urls && urls.length > 0) {
-        const decoded = decodeURIComponent(urls.join(","));
-        useStore.getState().addNotification({ type: "info", message: `Deep link: ${decoded}`, duration: 5000 });
-      }
-    });
+    getCurrent()
+      .then((urls) => {
+        if (urls && urls.length > 0) {
+          const decoded = decodeURIComponent(urls.join(","));
+          useStore.getState().addNotification({ type: "info", message: `Deep link: ${decoded}`, duration: 5000 });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // ── Open settings event ──

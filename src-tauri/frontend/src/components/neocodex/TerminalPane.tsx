@@ -4,7 +4,6 @@ import { listen } from "@tauri-apps/api/event";
 import styles from "./TerminalPane.module.css";
 
 export function TerminalPane() {
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>(["$ "]);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);
@@ -12,6 +11,8 @@ export function TerminalPane() {
   const outRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bufRef = useRef("");
+  const sessionRef = useRef<string | null>(null);
+  const cleanupRef = useRef<Array<() => void>>([]);
 
   useEffect(() => {
     if (outRef.current) outRef.current.scrollTop = outRef.current.scrollHeight;
@@ -33,41 +34,56 @@ export function TerminalPane() {
   }, []);
 
   useEffect(() => {
-    let unlistenOutput: (() => void) | undefined;
-    let unlistenExit: (() => void) | undefined;
+    let cancelled = false;
     (async () => {
       try {
         const sid = await invoke("pty_spawn", { cols: 100, rows: 24 }) as string;
-        setSessionId(sid);
-        unlistenOutput = await listen<string>(`pty-output-${sid}`, (ev) => {
+        if (cancelled) {
+          invoke("pty_close", { sessionId: sid }).catch(() => {});
+          return;
+        }
+        sessionRef.current = sid;
+        const offOutput = await listen<string>(`pty-output-${sid}`, (ev) => {
           append(ev.payload);
           setReady(true);
         });
-        unlistenExit = await listen<number>(`pty-exit-${sid}`, () => {
+        const offExit = await listen<number>(`pty-exit-${sid}`, () => {
           setReady(false);
         });
+        if (cancelled) {
+          offOutput();
+          offExit();
+          invoke("pty_close", { sessionId: sid }).catch(() => {});
+          return;
+        }
+        cleanupRef.current = [offOutput, offExit];
         setReady(true);
       } catch (e) {
-        setError(String(e));
+        if (!cancelled) setError(String(e));
       }
     })();
     return () => {
-      unlistenOutput?.();
-      unlistenExit?.();
-      if (sessionId) invoke("pty_close", { sessionId }).catch(() => {});
+      cancelled = true;
+      cleanupRef.current.forEach((fn) => fn());
+      cleanupRef.current = [];
+      const sid = sessionRef.current;
+      if (sid) invoke("pty_close", { sessionId: sid }).catch(() => {});
+      sessionRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const send = async () => {
-    if (!sessionId) return;
+    const sid = sessionRef.current;
+    if (!sid) return;
     const text = input;
     setInput("");
     if (text === "exit" || text === "exit\n") {
-      await invoke("pty_close", { sessionId }).catch(() => {});
+      await invoke("pty_close", { sessionId: sid }).catch(() => {});
+      sessionRef.current = null;
       return;
     }
-    await invoke("pty_write", { sessionId, data: text + "\n" }).catch((e) => setError(String(e)));
+    await invoke("pty_write", { sessionId: sid, data: text + "\n" }).catch((e) => setError(String(e)));
     setLines((prev) => [...prev, `$ ${text}`]);
   };
 

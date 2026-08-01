@@ -12,25 +12,33 @@ export function SettingsView() {
   const [activeTab, setActiveTab] = useState<Tab>("providers");
   const [providers, setProviders] = useState<Record<string, { name: string; hasKey: boolean; model: string }>>({});
   const [loading, setLoading] = useState(true);
+  const [configError, setConfigError] = useState("");
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [newKey, setNewKey] = useState("");
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const configResult = await invoke<NeoCodexProviderConfig>("neocodex_provider_config");
-        const map: Record<string, { name: string; hasKey: boolean; model: string }> = {};
-        for (const p of configResult.providers) {
-          map[p.name] = { name: p.name, hasKey: p.resolvable, model: p.model };
-        }
-        setProviders(map);
-      } catch (e) {
-        console.error("Failed to load settings:", e);
-      } finally {
-        setLoading(false);
+  const loadProviders = async () => {
+    setLoading(true);
+    setConfigError("");
+    try {
+      const configResult = await invoke<NeoCodexProviderConfig | null>("neocodex_provider_config");
+      if (!configResult) {
+        setConfigError("未能读取提供商配置（后端返回空）");
+        return;
       }
-    };
-    load();
+      const map: Record<string, { name: string; hasKey: boolean; model: string }> = {};
+      for (const p of configResult.providers ?? []) {
+        map[p.name] = { name: p.name, hasKey: p.resolvable, model: p.model };
+      }
+      setProviders(map);
+    } catch (e) {
+      setConfigError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProviders();
   }, []);
 
   const handleSaveKey = async (providerId: string) => {
@@ -94,6 +102,8 @@ export function SettingsView() {
           <ProvidersPanel
             providers={providers}
             loading={loading}
+            configError={configError}
+            onRetry={loadProviders}
             editingKey={editingKey}
             newKey={newKey}
             setEditingKey={setEditingKey}
@@ -113,6 +123,8 @@ export function SettingsView() {
 function ProvidersPanel({
   providers,
   loading,
+  configError,
+  onRetry,
   editingKey,
   newKey,
   setEditingKey,
@@ -122,6 +134,8 @@ function ProvidersPanel({
 }: {
   providers: Record<string, { name: string; hasKey: boolean; model: string }>;
   loading: boolean;
+  configError?: string;
+  onRetry?: () => void;
   editingKey: string | null;
   newKey: string;
   setEditingKey: (k: string | null) => void;
@@ -130,6 +144,18 @@ function ProvidersPanel({
   onDeleteKey: (id: string) => void;
 }) {
   if (loading) return <div className={styles.skeleton} />;
+
+  if (configError) {
+    return (
+      <div className={styles.panel}>
+        <h3>API Providers</h3>
+        <div className={styles.errorBox}>
+          <span>无法加载提供商配置：{configError}</span>
+          {onRetry && <button className={styles.btnPrimary} onClick={onRetry}>重试</button>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.panel}>
@@ -267,7 +293,9 @@ function AboutPanel() {
     setError(null);
     try {
       const res = await invoke<any>("neocodex_check_update");
-      if (res.error) {
+      if (!res) {
+        setError("检查更新失败：后端无响应");
+      } else if (res.error) {
         setError(`检查失败: ${res.error}`);
       } else if (res.available) {
         setUpdate(`发现新版本 v${res.latest}（当前 v${res.current}）。请访问 releases 页面下载更新。`);

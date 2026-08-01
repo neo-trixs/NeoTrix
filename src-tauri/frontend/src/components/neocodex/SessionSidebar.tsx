@@ -50,6 +50,14 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     refresh();
   }, [refresh]);
 
+  // Refresh when the page creates/selects a session (Cmd+N / palette) so the
+  // sidebar's local list stays in sync with the store-backed page.
+  useEffect(() => {
+    const onChanged = () => refresh();
+    window.addEventListener("neotrix:sessions-changed", onChanged);
+    return () => window.removeEventListener("neotrix:sessions-changed", onChanged);
+  }, [refresh]);
+
   const refreshArchived = useCallback(async () => {
     try {
       const list = await invoke("neocodex_list_archived") as any[];

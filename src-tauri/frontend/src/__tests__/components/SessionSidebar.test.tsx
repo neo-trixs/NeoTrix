@@ -127,4 +127,22 @@ describe("SessionSidebar — session interactions", () => {
     await waitFor(() => expect(screen.getByText("调研 RAG")).toBeInTheDocument());
     expect(screen.queryByText("重构缓存层")).not.toBeInTheDocument();
   });
+
+  it("refreshes its list when neotrix:sessions-changed fires (Cmd+N sync)", async () => {
+    let sessions = [
+      { id: "s-1", name: "重构缓存层", mode: "Agent", message_count: 3, wire_path: "/sessions/s-1.jsonl", created_at: 0, updated_at: 1700000000 },
+    ];
+    mockInvoke("neocodex_list_sessions", () => sessions);
+    renderSidebar();
+    await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
+    expect(screen.queryByText("新会话CmdN")).not.toBeInTheDocument();
+
+    // Page creates a session via Cmd+N, updates its store, then dispatches the event.
+    sessions = [
+      { id: "s-2", name: "新会话CmdN", mode: "Agent", message_count: 0, wire_path: "/sessions/s-2.jsonl", created_at: 0, updated_at: 1700000001 },
+      ...sessions,
+    ];
+    fireEvent(window, new Event("neotrix:sessions-changed"));
+    await waitFor(() => expect(screen.getByText("新会话CmdN")).toBeInTheDocument());
+  });
 });

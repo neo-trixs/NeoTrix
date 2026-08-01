@@ -20,6 +20,10 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
         res = await invoke("cmd_diff_file", { path: filePath });
       } else if (scope === "staged") {
         res = await invoke("cmd_diff_staged");
+      } else if (scope === "file") {
+        setBlocks([]);
+        setLoading(false);
+        return;
       } else {
         res = await invoke("cmd_diff_unstaged");
       }
@@ -32,9 +36,15 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
     }
   }, [scope, filePath]);
 
+  // Auto-load only on scope change. The file-path input loads exclusively via
+  // the explicit "查看"/refresh buttons, avoiding an IPC request per keystroke.
+  const filePathRef = React.useRef(filePath);
+  filePathRef.current = filePath;
   useEffect(() => {
+    if (scope === "file" && !filePathRef.current) return;
     load();
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope]);
 
   const stats = useCallback(() => {
     let added = 0;
@@ -49,30 +59,22 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
   const { added, removed } = stats();
 
   const handleStage = async () => {
-    setLoading(true);
     setError("");
     try {
       await invoke("cmd_diff_stage", { paths: null });
       if (scope !== "staged") setScope("staged");
-      await load();
     } catch (e) {
       setError(String(e));
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleUnstage = async () => {
-    setLoading(true);
     setError("");
     try {
       await invoke("cmd_diff_unstage", { paths: null });
       if (scope !== "unstaged") setScope("unstaged");
-      await load();
     } catch (e) {
       setError(String(e));
-    } finally {
-      setLoading(false);
     }
   };
 

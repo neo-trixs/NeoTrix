@@ -59,4 +59,21 @@ describe("DiffPane", () => {
     expect(screen.getByPlaceholderText("文件路径（相对仓库根）")).toBeInTheDocument();
     expect(screen.getByText("查看")).toBeInTheDocument();
   });
+
+  it("does not fire cmd_diff_file per keystroke in the path input (debounce/storm fix)", async () => {
+    const fileSpy = vi.fn(() => [{ type: "added", content: "x", line_start: 0 }]);
+    mockInvoke("cmd_diff_file", fileSpy);
+    render(<DiffPane />);
+    fireEvent.click(screen.getByText("文件"));
+    const input = screen.getByPlaceholderText("文件路径（相对仓库根）");
+    // Typing several chars must NOT trigger an IPC each time.
+    fireEvent.change(input, { target: { value: "s" } });
+    fireEvent.change(input, { target: { value: "sr" } });
+    fireEvent.change(input, { target: { value: "src" } });
+    expect(fileSpy).not.toHaveBeenCalled();
+    // Only the explicit 查看 button triggers the load.
+    fireEvent.click(screen.getByText("查看"));
+    await waitFor(() => expect(fileSpy).toHaveBeenCalledTimes(1));
+    expect(fileSpy).toHaveBeenCalledWith({ path: "src" });
+  });
 });

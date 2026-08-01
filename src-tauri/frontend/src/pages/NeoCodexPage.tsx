@@ -69,14 +69,18 @@ export default function NeoCodexPage() {
   // Cmd+, settings. Auto-check for updates once on launch (engineering gap:
   // Claude/Codex both surface a version banner without manual action).
   const addNotification = useStore((s) => s.addNotification);
+  const updatingRef = useRef(false);
   useEffect(() => {
     const runUpdate = async () => {
+      if (updatingRef.current) return;
+      updatingRef.current = true;
       setUpdating(true);
       try {
         await invoke("neocodex_download_update");
       } catch (e) {
         addNotification({ type: "error", message: `更新失败: ${e}`, duration: 6000 });
       } finally {
+        updatingRef.current = false;
         setUpdating(false);
       }
     };
@@ -86,7 +90,7 @@ export default function NeoCodexPage() {
           type: "info",
           message: `发现新版本 v${r.latest}（当前 v${r.current}）`,
           duration: 30000,
-          action: updating ? { label: "下载中…", onClick: () => {} } : { label: "立即更新", onClick: runUpdate },
+          action: updatingRef.current ? { label: "下载中…", onClick: () => {} } : { label: "立即更新", onClick: runUpdate },
         });
       }
     };
@@ -100,7 +104,8 @@ export default function NeoCodexPage() {
       invoke("neocodex_check_update").then(notifyUpdate).catch(() => {});
     }, 3000);
     return () => { unlistenPalette.then((f) => f()); unlistenSettings.then((f) => f()); unlistenUpdates.then((f) => f()); clearTimeout(timer); };
-  }, [addNotification, updating]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addNotification]);
 
   const loadHealth = useCallback(async () => {
     try {
@@ -147,16 +152,26 @@ export default function NeoCodexPage() {
     setNeoCodexStreaming({ content: "", role: "assistant" });
 
     let accumulated = "";
-    const unlisten = await listen<string>("neocodex_stream_token", (event) => {
-      accumulated += event.payload;
-      setNeoCodexStreaming({ content: accumulated, role: "assistant" });
-      if (stopRef.current) return;
-    });
-    const unlistenDone = await listen<any>("neocodex_stream_done", (event) => {
-      if (event.payload?.cancelled) {
-        stopRef.current = true;
-      }
-    });
+    let unlisten: (() => void) | undefined;
+    let unlistenDone: (() => void) | undefined;
+    try {
+      unlisten = await listen<string>("neocodex_stream_token", (event) => {
+        accumulated += event.payload;
+        setNeoCodexStreaming({ content: accumulated, role: "assistant" });
+        if (stopRef.current) return;
+      });
+      unlistenDone = await listen<any>("neocodex_stream_done", (event) => {
+        if (event.payload?.cancelled) {
+          stopRef.current = true;
+        }
+      });
+    } catch (e) {
+      console.error("Stream listen failed:", e);
+      setNeoCodexStreaming(null);
+      addNeoCodexMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
+      setAgentBusy(false);
+      return;
+    }
 
     try {
       const payload = (attachments && attachments.length > 0
@@ -181,8 +196,8 @@ export default function NeoCodexPage() {
       addNeoCodexMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
     } finally {
       stopRef.current = false;
-      unlisten();
-      unlistenDone();
+      unlisten?.();
+      unlistenDone?.();
       setAgentBusy(false);
     }
   };
@@ -219,6 +234,7 @@ export default function NeoCodexPage() {
       // Ensure the sidebar surfaces the new session even if it was hidden.
       setShowSidebar(true);
       setFileTreeOpen(false);
+      window.dispatchEvent(new CustomEvent("neotrix:sessions-changed"));
     } catch (e) {
       console.error("Create session failed:", e);
     }
@@ -243,9 +259,13 @@ export default function NeoCodexPage() {
     }
   };
 
+  const sessionSwitchRef = useRef(0);
+
   const handleSessionSelect = async (session: any) => {
+    const token = ++sessionSwitchRef.current;
     try {
       await invoke("neocodex_switch_session", { sessionId: session.id });
+      if (sessionSwitchRef.current !== token) return;
       setNeoCodexActiveSession(session.id);
       // Make sure a freshly created session (via sidebar dialog) is reflected
       // in the store list used by the palette + status bar.
@@ -255,6 +275,7 @@ export default function NeoCodexPage() {
           : [session, ...(useStore.getState().neocodexSessions || [])]
       );
       const items = await invoke("neocodex_get_session_messages", { sessionId: session.id }) as any[];
+      if (sessionSwitchRef.current !== token) return;
       setNeoCodexMessages(items.map((m) => ({
         id: m.id,
         role: m.role,
@@ -270,6 +291,7 @@ export default function NeoCodexPage() {
         })),
       })));
       const sideChat = await invoke("neocodex_get_side_chat", { sessionId: session.id }) as any[];
+      if (sessionSwitchRef.current !== token) return;
       setSideChatMessages(sideChat.map((m) => ({ role: m.role, content: m.content })));
     } catch (e) {
       console.error("Switch session failed:", e);
@@ -368,7 +390,7 @@ export default function NeoCodexPage() {
       setSideChatInput("");
     } catch (e) {
       console.error("Side chat send failed:", e);
-      setSideChatInput("");
+      addNotification({ type: "error", message: "侧聊发送失败，请重试", duration: 3000 });
     }
   };
 
@@ -394,6 +416,14 @@ export default function NeoCodexPage() {
   // Keyboard shortcuts: Cmd+K palette, Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle, Cmd+Shift+F focus
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const inEditable = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable;
+      // ⌘K/⌘/ palette + help are global (harmless in inputs); everything else
+      // must not steal keystrokes the user is typing into a field.
+      const isPalette = e.key === "k" && (e.metaKey || e.ctrlKey);
+      const isHelp = e.key === "/" && (e.metaKey || e.ctrlKey);
+      if (inEditable && !isPalette && !isHelp) return;
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setPaletteOpen((v) => !v);
@@ -412,6 +442,9 @@ export default function NeoCodexPage() {
       } else if (e.key === "o" && e.ctrlKey) {
         e.preventDefault();
         setViewMode(v => v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose");
+      } else if (e.key === "Escape" && showUsage) {
+        e.preventDefault();
+        setShowUsage(false);
       } else if (e.key === "Escape" && viewsMenuOpen) {
         e.preventDefault();
         setViewsMenuOpen(false);
@@ -444,7 +477,7 @@ export default function NeoCodexPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, viewsMenuOpen]);
+  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, viewsMenuOpen, showUsage]);
 
   return (
     <div className={styles.container}>
@@ -622,8 +655,16 @@ export default function NeoCodexPage() {
         </header>
 
         {showUsage && (
-          <div className={styles.usagePopover}>
-            <div className={styles.usagePopoverTitle}>用量 · 成本</div>
+          <div
+            className={styles.usagePopover}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowUsage(false);
+            }}
+          >
+            <div className={styles.usagePopoverTitle}>
+              用量 · 成本
+              <button className={styles.usageClose} onClick={() => setShowUsage(false)} title="关闭" aria-label="关闭用量弹窗">✕</button>
+            </div>
             <div className={styles.usageRow}>
               <span>上下文占用</span>
               <strong>{usagePct}%</strong>

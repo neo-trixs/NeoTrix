@@ -217,6 +217,23 @@
   color: var(--fg-primary);
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.usageClose {
+  border: none;
+  background: none;
+  color: var(--fg-secondary, #888);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.usageClose:hover {
+  color: var(--fg-primary);
 }
 
 .usageRow {

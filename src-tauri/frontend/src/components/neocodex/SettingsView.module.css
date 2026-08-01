@@ -345,6 +345,19 @@
   font-size: 12px;
 }
 
+.errorBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px solid var(--danger, #f85149);
+  border-radius: 8px;
+  color: var(--danger, #f85149);
+  font-size: 13px;
+}
+
 .links {
   display: flex;
   gap: 16px;

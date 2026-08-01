@@ -20,6 +20,7 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
   const [selected, setSelected] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState("");
+  const [previewTruncated, setPreviewTruncated] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -92,15 +93,24 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
     try {
       const sizeLimit = 256 * 1024;
       const text = await readTextFile(node.path);
-      setPreview(text.length > sizeLimit ? text.slice(0, sizeLimit) + "\n\n… (已截断)" : text);
+      const truncated = text.length > sizeLimit;
+      setPreview(truncated ? text.slice(0, sizeLimit) + "\n\n… (已截断)" : text);
+      setPreviewTruncated(truncated);
     } catch (e) {
       setPreview(`[无法读取 ${node.name}]\n${e}`);
+      setPreviewTruncated(false);
     }
   };
 
   const startEdit = () => {
     if (preview === null) return;
-    setEditValue(preview.replace(/\n\n… \(已截断\)$/, ""));
+    // Never edit truncated previews: writing them back would silently destroy
+    // the tail of files >256 KB. Force open externally instead.
+    if (previewTruncated) {
+      if (selected) open(selected).catch(() => {});
+      return;
+    }
+    setEditValue(preview);
     setEditing(true);
   };
 
