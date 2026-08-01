@@ -73,12 +73,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     refreshArchived();
   }, [refreshArchived]);
 
-  useEffect(() => {
-    const openNew = () => setShowNewDialog(true);
-    window.addEventListener("neotrix:new-session", openNew);
-    return () => window.removeEventListener("neotrix:new-session", openNew);
-  }, []);
-
   const handleCreateSession = async () => {
     if (!newSessionName.trim()) return;
     try {

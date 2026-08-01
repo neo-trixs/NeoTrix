@@ -196,6 +196,44 @@ export default function NeoCodexPage() {
     }
   };
 
+  const handleNewSession = async () => {
+    try {
+      const info = await invoke("neocodex_create_session", { name: null }) as any;
+      const session = {
+        id: info.id,
+        name: info.name || "新会话",
+        mode: info.mode || "Agent",
+        message_count: info.message_count || 0,
+        messages: [],
+        wire_path: info.wire_path || "",
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      setNeoCodexSessions([
+        session,
+        ...(useStore.getState().neocodexSessions?.filter((s: any) => s.id !== session.id) || []),
+      ]);
+      setNeoCodexActiveSession(session.id);
+      setNeoCodexMessages([]);
+      setSideChatMessages([]);
+      // Ensure the sidebar surfaces the new session even if it was hidden.
+      setShowSidebar(true);
+      setFileTreeOpen(false);
+    } catch (e) {
+      console.error("Create session failed:", e);
+    }
+  };
+
+  // Listen for the new-session event at page level so Cmd+N and the palette
+  // work regardless of sidebar visibility / active tab (SessionSidebar is
+  // unmounted when the sidebar is collapsed or the files tab is shown).
+  useEffect(() => {
+    const onNew = () => handleNewSession();
+    window.addEventListener("neotrix:new-session", onNew);
+    return () => window.removeEventListener("neotrix:new-session", onNew);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleModeChange = async (mode: string) => {
     try {
       await invoke("neocodex_set_mode", { mode });
@@ -209,6 +247,13 @@ export default function NeoCodexPage() {
     try {
       await invoke("neocodex_switch_session", { sessionId: session.id });
       setNeoCodexActiveSession(session.id);
+      // Make sure a freshly created session (via sidebar dialog) is reflected
+      // in the store list used by the palette + status bar.
+      setNeoCodexSessions(
+        useStore.getState().neocodexSessions?.some((s: any) => s.id === session.id)
+          ? useStore.getState().neocodexSessions
+          : [session, ...(useStore.getState().neocodexSessions || [])]
+      );
       const items = await invoke("neocodex_get_session_messages", { sessionId: session.id }) as any[];
       setNeoCodexMessages(items.map((m) => ({
         id: m.id,
@@ -407,7 +452,7 @@ export default function NeoCodexPage() {
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
             <h2>NeoCodex</h2>
-            <button className={styles.sidebarToggle} onClick={() => setShowSidebar(false)}>
+            <button className={styles.sidebarToggle} onClick={() => setShowSidebar(false)} title="收起侧栏">
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M10 4l-4 3 4 3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>

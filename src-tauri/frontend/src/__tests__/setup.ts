@@ -37,6 +37,7 @@ g.__invokeHandlers = g.__invokeHandlers ?? {};
 
 const defaultResponses: Record<string, (args: any) => any> = {
   neocodex_list_sessions: () => [],
+  neocodex_create_session: () => ({ id: "s-test", name: "新会话", mode: "Agent", message_count: 0, wire_path: "", updated_at: 0 }),
   neocodex_list_archived: () => [],
   neocodex_get_session_messages: () => [],
   neocodex_get_side_chat: () => [],
