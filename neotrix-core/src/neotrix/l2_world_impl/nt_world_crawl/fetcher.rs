@@ -179,7 +179,7 @@ impl FetcherPool {
 
         while result.is_error_status() && retries < max_retries {
             retries += 1;
-            let backoff = Duration::from_secs(2u64.pow(retries));
+            let backoff = Duration::from_secs(2u64.saturating_pow(retries).min(3600));
             std::thread::sleep(backoff);
             result = self.fetch(url);
             if let Some(ref mut err) = result.error {

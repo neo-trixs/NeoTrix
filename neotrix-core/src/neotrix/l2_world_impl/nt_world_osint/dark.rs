@@ -278,7 +278,7 @@ pub async fn investigate(target: &OsintTarget, client: &Client, config: &OsintCo
                     while let Some(start) = rest.find("http") {
                         let candidate = &rest[start..];
                         let end = candidate.find(|c: char| c.is_whitespace() || c == '"' || c == '<' || c == '>')
-                            .unwrap_or(candidate.len().min(64));
+                            .unwrap_or(candidate.len().min(candidate.floor_char_boundary(64)));
                         let potential_url = &candidate[..end];
                         if potential_url.contains(".onion") {
                             findings.onion_links.push(potential_url.to_string());

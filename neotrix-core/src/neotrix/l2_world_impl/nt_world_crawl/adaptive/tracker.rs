@@ -64,7 +64,7 @@ impl AdaptiveTracker {
                     "<{}>{}",
                     dom_elem.tag,
                     if dom_elem.text.len() > 50 {
-                        &dom_elem.text[..50]
+                        &dom_elem.text[..dom_elem.text.floor_char_boundary(50)]
                     } else {
                         &dom_elem.text
                     },
@@ -102,7 +102,7 @@ impl AdaptiveTracker {
                     "<{}>{}",
                     e.tag,
                     if e.text.len() > 50 {
-                        &e.text[..50]
+                        &e.text[..e.text.floor_char_boundary(50)]
                     } else {
                         &e.text
                     },

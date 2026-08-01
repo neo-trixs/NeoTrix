@@ -155,7 +155,7 @@ async fn probe_url(url: &str, client: &Client) -> Result<HttpEndpoint, String> {
     let server = headers.get("server").cloned();
     let body_bytes = resp.bytes().await.unwrap_or_default();
     let body = String::from_utf8_lossy(&body_bytes);
-    let body_preview = if body.len() > 50000 { &body[..50000] } else { &body };
+    let body_preview = if body.len() > 50000 { &body[..body.floor_char_boundary(50000)] } else { &body };
     let title = extract_title(body_preview);
     let tech_stack = detect_tech(&headers, &title, body_preview);
 

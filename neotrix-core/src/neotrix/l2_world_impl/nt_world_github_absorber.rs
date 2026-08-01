@@ -797,9 +797,10 @@ fn parse_github_time(time_str: &str) -> Option<i64> {
 }
 
 fn day_of_year(y: i64, m: i64, d: i64) -> i64 {
+    if !(1..=12).contains(&m) { return 0; }
     let mdays = [31, if is_leap(y) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    let mut doy = d - 1;
-    for i in 0..(m as usize - 1) { doy += mdays[i]; }
+    let mut doy = d.saturating_sub(1).max(0);
+    for i in 0..(m as usize - 1) { doy = doy.saturating_add(mdays[i]); }
     doy
 }
 

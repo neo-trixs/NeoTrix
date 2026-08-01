@@ -109,7 +109,7 @@ pub async fn investigate(target: &OsintTarget, client: &Client, config: &OsintCo
         let u = username.to_string();
         let c = client.clone();
         handles.push(tokio::spawn(async move {
-            let _permit = s.acquire().await.expect("semaphore is never closed");
+            let _permit = s.acquire().await.ok(); // closed semaphore → no permit, still probe
             check_platform(&u, platform, &c).await
         }));
     }

@@ -58,6 +58,7 @@ impl VicRegLoss {
 
     fn invariance_loss(&self, pred: &[f64], target: &[f64]) -> f64 {
         let n = pred.len().min(target.len());
+        if n == 0 { return 0.0; }
         let mse: f64 = pred.iter().zip(target.iter())
             .take(n)
             .map(|(p, t)| (p - t).powi(2))
@@ -67,6 +68,7 @@ impl VicRegLoss {
 
     fn variance_loss(&self, z: &[f64]) -> f64 {
         let n = z.len() as f64;
+        if n == 0.0 { return self.variance_target.powi(2); }
         let mean = z.iter().sum::<f64>() / n;
         let std = (z.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n).sqrt();
         (self.variance_target - std).max(0.0).powi(2)
@@ -115,6 +117,7 @@ impl EnergyModel {
                 (-sim + 1.0) / self.temperature
             }
             _ => {
+                if n == 0 { return 0.0; }
                 let mse: f64 = prediction.iter().zip(target.iter())
                     .take(n)
                     .map(|(p, t)| (p - t).powi(2))
@@ -126,6 +129,7 @@ impl EnergyModel {
 
     pub fn gaussian_regularizer(z: &[f64], target_std: f64) -> f64 {
         let n = z.len() as f64;
+        if n == 0.0 { return target_std.abs(); }
         let mean = z.iter().sum::<f64>() / n;
         let variance = z.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
         let std = variance.sqrt();

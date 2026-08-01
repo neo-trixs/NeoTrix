@@ -307,7 +307,7 @@ impl UnifiedCrawler {
             return;
         }
 
-        let timeout_count = errors.iter().filter(|e| e.duration_ms > self.config.fetch_timeout_secs * 1000).count();
+        let timeout_count = errors.iter().filter(|e| e.duration_ms > self.config.fetch_timeout_secs.saturating_mul(1000)).count();
         let blocked_count = errors.iter().filter(|e| e.status_code == 403 || e.status_code == 401).count();
         let not_found_count = errors.iter().filter(|e| e.status_code == 404).count();
         let server_error_count = errors.iter().filter(|e| e.status_code >= 500).count();
@@ -330,7 +330,7 @@ impl UnifiedCrawler {
             self.fetcher.adjust_strategy(new_strategy);
             format!("high error rate → downgraded to {:?}", new_strategy)
         } else if timeout_count > errors.len() / 3 {
-            self.config.fetch_timeout_secs = (self.config.fetch_timeout_secs * 15) / 10;
+            self.config.fetch_timeout_secs = (self.config.fetch_timeout_secs.saturating_mul(15)) / 10;
             format!("too many timeouts → increased timeout to {}s", self.config.fetch_timeout_secs)
         } else if ratelimit_count > 3 {
             let new_strategy = CrawlStrategy::Polite;

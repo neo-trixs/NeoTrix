@@ -238,11 +238,15 @@ pub struct AntiDetect {
 
 impl AntiDetect {
     pub fn random_ua(&self) -> &str {
+        let n = self.user_agents.len();
+        if n == 0 {
+            return "Mozilla/5.0 (compatible; NeoTrix/1.0)";
+        }
         let i = (std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos()
-            % self.user_agents.len() as u128) as usize;
+            % n as u128) as usize;
         self.user_agents[i]
     }
 

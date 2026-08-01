@@ -246,10 +246,16 @@ impl CfbReader {
         let mut chain = Vec::new();
         let mut current = start as u32;
         let max_sector = data.len() / sector_size;
+        // A valid chain visits each sector at most once. Crafted FAT can
+        // contain cycles (fat[i]==i or a->b->a); a visited set stops the
+        // loop before it grows unbounded on untrusted files.
+        let mut visited = vec![false; max_sector];
         loop {
             if current as usize >= max_sector { break; }
-            chain.push(current);
             let idx = current as usize;
+            if visited[idx] { break; }
+            visited[idx] = true;
+            chain.push(current);
             if idx >= fat.len() { break; }
             let next = fat[idx];
             if next == u32::MAX || next == 0xFFFFFFFE { break; }
@@ -1700,6 +1706,32 @@ mod tests {
         assert_eq!(escape_xml("a&b"), "a&amp;b");
         assert_eq!(escape_xml("<tag>"), "&lt;tag&gt;");
         assert_eq!(escape_xml("hello"), "hello");
+    }
+
+    #[test]
+    fn test_read_sector_chain_breaks_on_cycle() {
+        // Crafted FAT where sector 2 points at itself (fat[2]==2): a naive
+        // loop would spin forever / grow unbounded. The guard must stop at
+        // max_sector+1 entries.
+        let data = vec![0u8; 8 * 512];
+        let sector_size = 512;
+        let mut fat = vec![u32::MAX; 8];
+        fat[2] = 2; // self-cycle
+        let chain = CfbReader::read_sector_chain(&data, sector_size, 2, &fat);
+        assert_eq!(chain.len(), 1, "self-cycle must not produce an unbounded chain");
+
+        // Two-cycle a->b->a
+        let mut fat2 = vec![u32::MAX; 8];
+        fat2[3] = 4;
+        fat2[4] = 3;
+        let chain2 = CfbReader::read_sector_chain(&data, sector_size, 3, &fat2);
+        assert_eq!(chain2.len(), 2, "two-cycle must stop after visiting each sector once");
+
+        // Valid chain still reads fully
+        let mut fat3 = vec![u32::MAX; 8];
+        fat3[5] = 6;
+        let chain3 = CfbReader::read_sector_chain(&data, sector_size, 5, &fat3);
+        assert_eq!(chain3, vec![5, 6]);
     }
 
     #[test]
