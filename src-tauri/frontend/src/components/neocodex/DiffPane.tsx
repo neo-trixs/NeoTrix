@@ -11,8 +11,9 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
   const [blocks, setBlocks] = useState<Array<{ type: string; content: string; line_start: number }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [scope, setScope] = useState<"unstaged" | "staged" | "file">("unstaged");
+  const [scope, setScope] = useState<"unstaged" | "staged" | "file" | "base">("unstaged");
   const [filePath, setFilePath] = useState("");
+  const [baseBranch, setBaseBranch] = useState("main");
   const [commitMsg, setCommitMsg] = useState("");
   const [committing, setCommitting] = useState(false);
   const [changedFiles, setChangedFiles] = useState<{ staged: ChangedFile[]; unstaged: ChangedFile[]; untracked: ChangedFile[] }>({ staged: [], unstaged: [], untracked: [] });
@@ -42,6 +43,8 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
         res = await invoke("cmd_diff_file", { path: filePath });
       } else if (scope === "staged") {
         res = await invoke("cmd_diff_staged");
+      } else if (scope === "base") {
+        res = await invoke("cmd_diff_base", { base: baseBranch });
       } else if (scope === "file") {
         setBlocks([]);
         setLoading(false);
@@ -56,7 +59,7 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
     } finally {
       setLoading(false);
     }
-  }, [scope, filePath]);
+  }, [scope, filePath, baseBranch]);
 
   // Auto-load only on scope change. The file-path input loads exclusively via
   // the explicit "查看"/refresh buttons, avoiding an IPC request per keystroke.
@@ -178,7 +181,7 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
       <div className={styles.header}>
         <span className={styles.title}>Diff</span>
         <div className={styles.scopes}>
-          {(["unstaged", "staged", "file"] as const).map((s) => (
+          {(["unstaged", "staged", "base", "file"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -186,7 +189,7 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
               onClick={() => setScope(s)}
               data-testid={`diff-scope-${s}`}
             >
-              {s === "unstaged" ? "未暂存" : s === "staged" ? "已暂存" : "文件"}
+              {s === "unstaged" ? "未暂存" : s === "staged" ? "已暂存" : s === "base" ? "基线分支" : "文件"}
             </button>
           ))}
         </div>
@@ -211,6 +214,19 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
                 placeholder="文件路径（相对仓库根）"
               />
               <button type="button" className={styles.applyBtn} onClick={() => selectFile(filePath)}>查看</button>
+            </div>
+          )}
+          {scope === "base" && (
+            <div className={styles.fileInputRow}>
+              <input
+                className={styles.fileInput}
+                value={baseBranch}
+                onChange={(e) => setBaseBranch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && load()}
+                placeholder="基线分支（如 main / origin/main）"
+                data-testid="diff-base-branch"
+              />
+              <button type="button" className={styles.applyBtn} onClick={() => load()} data-testid="diff-base-load">对比</button>
             </div>
           )}
           <div className={styles.stats}>

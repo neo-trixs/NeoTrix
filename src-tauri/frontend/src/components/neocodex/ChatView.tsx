@@ -70,6 +70,15 @@ function formatTimestamp(ts?: number): string {
   return `${date.getMonth() + 1}-${date.getDate()} ${time}`;
 }
 
+function formatRelative(ts?: number): string {
+  if (!ts) return "";
+  const t = ts > 1e12 ? ts : ts * 1000;
+  const diff = Date.now() - t;
+  if (diff < 3600000) return `${Math.max(1, Math.floor(diff / 60000))}分钟前`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+  return `${Math.floor(diff / 86400000)}天前`;
+}
+
 function formatFileSize(size: number): string {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -99,6 +108,8 @@ interface ChatViewProps {
   viewMode?: "verbose" | "normal" | "summary";
   contextUsage?: number;
   onStop?: () => void;
+  recentSessions?: Array<{ id: string; name: string; mode: string; updated_at: number }>;
+  onRecentSessionSelect?: (id: string) => void;
 }
 
 const SLASH_COMMANDS = [
@@ -124,6 +135,8 @@ export function ChatView({
   viewMode = "normal",
   contextUsage = 0,
   onStop,
+  recentSessions,
+  onRecentSessionSelect,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -460,6 +473,28 @@ export function ChatView({
               <br />
               <kbd>⌘N</kbd> 新建会话 · <kbd>⌘B</kbd> 收起侧栏 · <kbd>Ctrl+Tab</kbd> 切换会话
             </div>
+            {(recentSessions && recentSessions.length > 0) && (
+              <div className={styles.recentBlock} data-testid="recent-sessions">
+                <div className={styles.recentTitle}>最近会话</div>
+                {recentSessions.slice(0, 5).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={styles.recentItem}
+                    onClick={() => onRecentSessionSelect?.(s.id)}
+                    data-testid={`recent-session-${s.id}`}
+                  >
+                    <span className={styles.recentName}>{s.name || "未命名会话"}</span>
+                    <span className={styles.recentMeta}>{s.mode} · {formatRelative(s.updated_at)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {contextUsage > 0 && (
+              <div className={styles.emptyStats}>
+                <span>上下文占用 {Math.round(contextUsage * 100)}%</span>
+              </div>
+            )}
           </div>
         )}
         <div ref={messagesEndRef} />

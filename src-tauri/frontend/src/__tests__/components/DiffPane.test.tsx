@@ -122,4 +122,33 @@ describe("DiffPane", () => {
     fireEvent.click(screen.getByTestId("diff-stage-all"));
     await waitFor(() => expect(filesSpy).toHaveBeenCalledTimes(2));
   });
+
+  it("base scope shows branch input and loads cmd_diff_base on 对比", async () => {
+    const baseSpy = vi.fn(() => [{ type: "added", content: "base-line", line_start: 0 }]);
+    mockInvoke("cmd_diff_base", baseSpy);
+    render(<DiffPane />);
+    fireEvent.click(screen.getByText("基线分支"));
+    const input = screen.getByTestId("diff-base-branch");
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveValue("main");
+    fireEvent.change(input, { target: { value: "origin/main" } });
+    fireEvent.click(screen.getByTestId("diff-base-load"));
+    await waitFor(() => expect(baseSpy).toHaveBeenCalledWith({ base: "origin/main" }));
+    expect(await screen.findByText("base-line")).toBeInTheDocument();
+  });
+
+  it("base scope does not auto-fire per keystroke (only explicit 对比)", async () => {
+    const baseSpy = vi.fn(() => []);
+    mockInvoke("cmd_diff_base", baseSpy);
+    render(<DiffPane />);
+    fireEvent.click(screen.getByText("基线分支"));
+    const input = screen.getByTestId("diff-base-branch");
+    // Typing without pressing Enter/对比 must not fire extra IPC beyond the
+    // scope-change auto-load (which used the default "main").
+    const callsAfterScope = baseSpy.mock.calls.length;
+    fireEvent.change(input, { target: { value: "m" } });
+    fireEvent.change(input, { target: { value: "ma" } });
+    fireEvent.change(input, { target: { value: "main" } });
+    expect(baseSpy.mock.calls.length).toBe(callsAfterScope);
+  });
 });

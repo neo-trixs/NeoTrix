@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useStore } from "../stores";
-import { ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, SettingsView, ShortcutHelp, TerminalPane } from "../components/neocodex";
+import { ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, ShortcutHelp, TerminalPane } from "../components/neocodex";
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -15,6 +16,7 @@ const THEME_LABELS: Record<string, string> = {
 };
 
 export default function NeoCodexPage() {
+  const navigate = useNavigate();
   const {
     settings,
     setSettings,
@@ -38,7 +40,6 @@ export default function NeoCodexPage() {
   const [terminalOpen, setTerminalOpen] = React.useState(false);
   const [diffOpen, setDiffOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -51,6 +52,8 @@ export default function NeoCodexPage() {
   const [sideChatOpen, setSideChatOpen] = useState(false);
   const [sideChatMessages, setSideChatMessages] = useState<Array<{ role: string; content: string }>>([]);
   const [sideChatInput, setSideChatInput] = useState("");
+  const [renamingTitle, setRenamingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
 
   // Load sessions on mount
   useEffect(() => {
@@ -95,7 +98,6 @@ export default function NeoCodexPage() {
       }
     };
     const unlistenPalette = listen("neocodex-open-palette", () => setPaletteOpen((v) => !v));
-    const unlistenSettings = listen("open-settings", () => setShowSettings(true));
     const unlistenUpdates = listen("neocodex-check-updates", () => {
       invoke("neocodex_check_update").then(notifyUpdate).catch((e) => console.error("Check update failed:", e));
     });
@@ -103,7 +105,7 @@ export default function NeoCodexPage() {
     const timer = setTimeout(() => {
       invoke("neocodex_check_update").then(notifyUpdate).catch(() => {});
     }, 3000);
-    return () => { unlistenPalette.then((f) => f()); unlistenSettings.then((f) => f()); unlistenUpdates.then((f) => f()); clearTimeout(timer); };
+    return () => { unlistenPalette.then((f) => f()); unlistenUpdates.then((f) => f()); clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addNotification]);
 
@@ -191,6 +193,15 @@ export default function NeoCodexPage() {
       });
       refreshSessions();
       loadHealth();
+      // Codex/Claude parity: surface an OS notification when a task completes
+      // while the user may be looking elsewhere (opt-out in Settings).
+      if (!wasCancelled && useStore.getState().settings?.notifyOnComplete) {
+        const active = useStore.getState().neocodexSessions?.find((s: any) => s.id === useStore.getState().neocodexActiveSessionId);
+        invoke("send_notification", {
+          title: active?.name || "NeoCodex",
+          body: "任务已完成，回复已生成",
+        }).catch(() => {});
+      }
     } catch (e) {
       console.error("Send failed:", e);
       setNeoCodexStreaming(null);
@@ -257,6 +268,20 @@ export default function NeoCodexPage() {
       setNeoCodexMode(mode as "Agent" | "Shell" | "Plan");
     } catch (e) {
       console.error("Mode set failed:", e);
+    }
+  };
+
+  const activeSession = neocodexSessions.find((s: any) => s.id === neocodexActiveSessionId) ?? null;
+
+  const commitTitleRename = async () => {
+    setRenamingTitle(false);
+    const name = titleDraft.trim();
+    if (!name || !neocodexActiveSessionId) return;
+    try {
+      await invoke("neocodex_rename_session", { sessionId: neocodexActiveSessionId, name });
+      refreshSessions();
+    } catch (e) {
+      console.error("Rename failed:", e);
     }
   };
 
@@ -399,7 +424,7 @@ export default function NeoCodexPage() {
   const paletteItems = useMemo(() => {
     const items: Array<{ id: string; label: string; hint?: string; onSelect: () => void }> = [
       { id: "new", label: "新建会话", hint: "⌘N", onSelect: () => window.dispatchEvent(new CustomEvent("neotrix:new-session")) },
-      { id: "settings", label: "设置", hint: "⌘,", onSelect: () => setShowSettings(true) },
+      { id: "settings", label: "设置", hint: "⌘,", onSelect: () => navigate("/settings") },
       { id: "sidebar", label: showSidebar ? "收起侧栏" : "展开侧栏", hint: "⌘B", onSelect: () => setShowSidebar((v) => !v) },
       { id: "focus", label: focusMode ? "退出专注模式" : "专注模式", hint: "⌘Shift+F", onSelect: () => setFocusMode((v) => !v) },
       { id: "viewmode", label: "切换视图模式", hint: "Ctrl+O", onSelect: () => cycleViewMode() },
@@ -544,6 +569,41 @@ export default function NeoCodexPage() {
             </svg>
           </button>
           <div className={styles.topBarCenter}>
+            {activeSession && (
+              <div className={styles.sessionToolbar} data-testid="session-toolbar">
+                {renamingTitle ? (
+                  <input
+                    className={styles.sessionTitleInput}
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitTitleRename();
+                      if (e.key === "Escape") { setRenamingTitle(false); setTitleDraft(activeSession.name); }
+                    }}
+                    onBlur={commitTitleRename}
+                    autoFocus
+                    data-testid="session-title-input"
+                  />
+                ) : (
+                  <button
+                    className={styles.sessionTitle}
+                    onClick={() => { setTitleDraft(activeSession.name); setRenamingTitle(true); }}
+                    title="点击重命名会话"
+                    data-testid="session-title"
+                  >
+                    {activeSession.name || "未命名会话"}
+                  </button>
+                )}
+                <span className={styles.sessionProject} title={activeSession.wire_path || "未绑定项目"}>
+                  {activeSession.wire_path ? activeSession.wire_path.split(/[\\/]/).filter(Boolean).pop() : "本地"}
+                </span>
+                {gitStatus && (
+                  <span className={`${styles.branchChip} ${gitStatus.dirty ? styles.branchChipDirty : ""}`} title={gitStatus.dirty ? "有未提交改动" : "工作区干净"}>
+                    {gitStatus.branch}
+                  </span>
+                )}
+              </div>
+            )}
             <ModelSelector />
             <select
               value={neocodexMode}
@@ -619,9 +679,9 @@ export default function NeoCodexPage() {
               </svg>
             </button>
             <button
-              className={`${styles.settingsBtn} ${showSettings ? styles.settingsActive : ""}`}
-              onClick={() => setShowSettings(!showSettings)}
-              title={showSettings ? "返回对话" : "设置"}
+              className={styles.settingsBtn}
+              onClick={() => navigate("/settings")}
+              title="设置"
             >
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="7" cy="7" r="2.2" />
@@ -701,23 +761,24 @@ export default function NeoCodexPage() {
         )}
 
         <div className={styles.chatArea}>
-          {showSettings ? (
-            <SettingsView />
-          ) : (
-            <ChatView
-              messages={neocodexMessages}
-              streamingContent={neocodexStreaming?.content}
-              streamingRole={neocodexStreaming?.role}
-              agentBusy={agentBusy}
-              viewMode={viewMode}
-              contextUsage={health?.context_usage || 0}
-              onSend={handleSend}
-              onStop={handleStop}
-              onEdit={handleEditMessage}
-              onDelete={handleDeleteMessage}
-              onRegenerate={handleRegenerateMessage}
-            />
-          )}
+          <ChatView
+            messages={neocodexMessages}
+            streamingContent={neocodexStreaming?.content}
+            streamingRole={neocodexStreaming?.role}
+            agentBusy={agentBusy}
+            viewMode={viewMode}
+            contextUsage={health?.context_usage || 0}
+            recentSessions={neocodexSessions as any[]}
+            onRecentSessionSelect={(id) => {
+              const s = neocodexSessions.find((x: any) => x.id === id);
+              if (s) handleSessionSelect(s);
+            }}
+            onSend={handleSend}
+            onStop={handleStop}
+            onEdit={handleEditMessage}
+            onDelete={handleDeleteMessage}
+            onRegenerate={handleRegenerateMessage}
+          />
           {sideChatOpen && (
             <div className={styles.sideChat}>
               <div className={styles.sideChatHeader}>

@@ -32,6 +32,7 @@ export interface AppSettings {
   defaultModel: string;
   temperature: number;
   maxTokens: number;
+  notifyOnComplete: boolean;
 }
 
 export type NeoCodexMode = "Agent" | "Shell" | "Plan";

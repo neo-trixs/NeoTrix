@@ -8,7 +8,9 @@ export interface SessionSlice {
 }
 
 export const createSessionSlice = (set: any) => ({
-  settings: savedSettings ?? DEFAULT_SETTINGS,
+  // Merge saved settings over defaults so fields added after first launch
+  // (e.g. notifyOnComplete) fall back gracefully for existing users.
+  settings: savedSettings ? { ...DEFAULT_SETTINGS, ...savedSettings } : DEFAULT_SETTINGS,
 
   setSettings: (settings: AppSettings) => {
     set({ settings });

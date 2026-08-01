@@ -243,10 +243,12 @@ function AdvancedPanel({ settings, onChange }: { settings: AppSettings; onChange
     { key: "privacyLocalFirst", label: "自动压缩" },
     { key: "privacyStoreMessages", label: "保留完整历史" },
     { key: "privacyTelemetry", label: "调试模式" },
+    { key: "notifyOnComplete", label: "任务完成时发送系统通知" },
   ];
   const groups: Array<{ title: string; keys: (keyof AppSettings)[] }> = [
     { title: "进化循环", keys: ["autoSave", "privacyPreflightCheck"] },
     { title: "上下文管理", keys: ["privacyLocalFirst", "privacyStoreMessages"] },
+    { title: "通知", keys: ["notifyOnComplete"] },
     { title: "开发者", keys: ["privacyTelemetry"] },
   ];
   return (
@@ -279,8 +281,10 @@ function AdvancedPanel({ settings, onChange }: { settings: AppSettings; onChange
 function AboutPanel() {
   const [version, setVersion] = useState("—");
   const [checking, setChecking] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [update, setUpdate] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [latest, setLatest] = useState<string | null>(null);
   const addNotification = useStore((s) => s.addNotification);
 
   useEffect(() => {
@@ -291,6 +295,7 @@ function AboutPanel() {
     setChecking(true);
     setUpdate(null);
     setError(null);
+    setLatest(null);
     try {
       const res = await invoke<any>("neocodex_check_update");
       if (!res) {
@@ -298,7 +303,8 @@ function AboutPanel() {
       } else if (res.error) {
         setError(`检查失败: ${res.error}`);
       } else if (res.available) {
-        setUpdate(`发现新版本 v${res.latest}（当前 v${res.current}）。请访问 releases 页面下载更新。`);
+        setLatest(res.latest);
+        setUpdate(`发现新版本 v${res.latest}（当前 v${res.current}）。`);
       } else {
         setUpdate("已是最新版本。");
       }
@@ -306,6 +312,20 @@ function AboutPanel() {
       setError(String(e));
     } finally {
       setChecking(false);
+    }
+  };
+
+  const downloadUpdate = async () => {
+    setDownloading(true);
+    setError(null);
+    try {
+      await invoke("neocodex_download_update");
+      addNotification({ type: "success", message: "更新已下载，应用即将重启", duration: 5000 });
+    } catch (e) {
+      setError(String(e));
+      addNotification({ type: "error", message: `下载更新失败: ${e}`, duration: 6000 });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -319,9 +339,14 @@ function AboutPanel() {
         <div className={styles.aboutRow}><span>协议</span><span>ReAct + EvolutionLoop + SelfAudit</span></div>
       </div>
       <div className={styles.updateRow}>
-        <button type="button" className={styles.updateBtn} onClick={checkUpdate} disabled={checking}>
+        <button type="button" className={styles.updateBtn} onClick={checkUpdate} disabled={checking || downloading} data-testid="about-check-update">
           {checking ? "检查中…" : "检查更新"}
         </button>
+        {latest && (
+          <button type="button" className={styles.updateBtn} onClick={downloadUpdate} disabled={downloading} data-testid="about-download-update">
+            {downloading ? "下载中…" : "立即下载并重启"}
+          </button>
+        )}
         {update && <span className={styles.updateOk}>{update}</span>}
         {error && <span className={styles.updateErr}>{error}</span>}
       </div>

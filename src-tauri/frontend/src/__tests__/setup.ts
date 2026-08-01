@@ -49,10 +49,15 @@ const defaultResponses: Record<string, (args: any) => any> = {
   cmd_diff_unstaged: () => [{ type: "added", content: "fn new()", line_start: 0 }],
   cmd_diff_staged: () => [],
   cmd_diff_changed_files: () => ({ staged: [], unstaged: [], untracked: [] }),
+  cmd_diff_base: () => [],
+  cmd_diff_base_files: () => ({ staged: [], unstaged: [], untracked: [], base: "main" }),
   cmd_diff_file: () => [],
   cmd_diff_stage: () => ["a.rs"],
   cmd_diff_unstage: () => [],
   cmd_diff_commit: () => null,
+  send_notification: () => null,
+  neocodex_download_update: () => null,
+  neocodex_rename_session: (args: any) => ({ id: args?.sessionId ?? "s", name: args?.name ?? "" }),
 };
 
 vi.mock("@tauri-apps/api/core", () => ({

@@ -160,6 +160,60 @@
   font-size: 11px;
 }
 
+.recentBlock {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
+}
+
+.recentTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-tertiary);
+  margin-bottom: 6px;
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--fg-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.recentItem:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-primary);
+}
+
+.recentName {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recentMeta {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  flex-shrink: 0;
+}
+
+.emptyStats {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  margin-top: 4px;
+}
+
 .message {
   display: flex;
   gap: 8px;

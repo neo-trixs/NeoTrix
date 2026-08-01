@@ -19,6 +19,7 @@ const defaultSettings = {
   privacyTelemetry: false,
   privacyLocalFirst: true,
   privacyPreflightCheck: false,
+  notifyOnComplete: true,
   defaultModel: "",
   temperature: 0.7,
   maxTokens: 4096,
@@ -127,5 +128,32 @@ describe("SettingsView — advanced toggles (标签点击)", () => {
     expect(screen.getByText("上下文管理")).toBeInTheDocument();
     expect(screen.getByText("开发者")).toBeInTheDocument();
     expect(screen.getByText("保留完整历史")).toBeInTheDocument();
+  });
+
+  it("shows 通知 group with the completion-notification toggle checked by default", async () => {
+    render(<SettingsView />);
+    await waitFor(() => expect(screen.getByText("API Providers")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("高级"));
+    expect(screen.getByText("通知")).toBeInTheDocument();
+    const label = screen.getByText("任务完成时发送系统通知").closest("label")!;
+    const cb = label.querySelector("input") as HTMLInputElement;
+    expect(cb.checked).toBe(true);
+    await userEvent.click(cb);
+    expect(useStore.getState().settings.notifyOnComplete).toBe(false);
+  });
+});
+
+describe("SettingsView — About download", () => {
+  it("renders 立即下载并重启 when an update is available and triggers neocodex_download_update", async () => {
+    mockInvoke("neocodex_check_update", () => ({ current: "0.18.0", available: true, latest: "0.19.0", error: null }));
+    const downloadSpy = vi.fn(() => null);
+    mockInvoke("neocodex_download_update", downloadSpy);
+    render(<SettingsView />);
+    await waitFor(() => expect(screen.getByText("API Providers")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("关于"));
+    await userEvent.click(screen.getByText("检查更新"));
+    await waitFor(() => expect(screen.getByText("立即下载并重启")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("立即下载并重启"));
+    await waitFor(() => expect(downloadSpy).toHaveBeenCalled());
   });
 });

@@ -184,3 +184,31 @@ describe("ChatView — rendering details", () => {
     expect(screen.queryByText("ls")).not.toBeInTheDocument();
   });
 });
+
+describe("ChatView — welcome empty state (recent sessions)", () => {
+  const recent = [
+    { id: "s-r1", name: "上次的会话", mode: "Agent" as const, message_count: 12, updated_at: Date.now() - 60_000 },
+    { id: "s-r2", name: "修 bug 的会话", mode: "Code" as const, message_count: 3, updated_at: Date.now() - 3600_000 },
+  ];
+
+  it("renders recent sessions when no messages and shows usage stats", () => {
+    render(<ChatView messages={[]} agentBusy={false} onSend={() => {}} recentSessions={recent} />);
+    expect(screen.getByText("最近会话")).toBeInTheDocument();
+    expect(screen.getByText("上次的会话")).toBeInTheDocument();
+    expect(screen.getByText("修 bug 的会话")).toBeInTheDocument();
+    expect(screen.getByTestId("recent-sessions")).toBeInTheDocument();
+  });
+
+  it("clicking a recent session invokes onRecentSessionSelect", async () => {
+    const onSelect = vi.fn();
+    render(<ChatView messages={[]} agentBusy={false} onSend={() => {}} recentSessions={recent} onRecentSessionSelect={onSelect} />);
+    await userEvent.click(screen.getByText("上次的会话"));
+    expect(onSelect).toHaveBeenCalledWith("s-r1");
+  });
+
+  it("hides the recent block once the conversation has messages", () => {
+    render(<ChatView messages={makeMessages()} agentBusy={false} onSend={() => {}} recentSessions={recent} />);
+    expect(screen.queryByTestId("recent-sessions")).not.toBeInTheDocument();
+    expect(screen.queryByText("最近会话")).not.toBeInTheDocument();
+  });
+});

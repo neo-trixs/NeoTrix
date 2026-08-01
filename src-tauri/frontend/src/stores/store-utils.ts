@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultModel: "GatewayV2",
   temperature: 0.7,
   maxTokens: 8192,
+  notifyOnComplete: true,
 };
 
 export const savedSettings = persistence.loadSettings();

@@ -250,6 +250,8 @@ fn main() {
                     commands::cmd_diff_stage,
                     commands::cmd_diff_unstage,
                     commands::cmd_diff_commit,
+                    commands::cmd_diff_base,
+                    commands::cmd_diff_base_files,
                     commands::cmd_permission_request,
                     commands::cmd_permission_approve,
                     commands::cmd_permission_deny,

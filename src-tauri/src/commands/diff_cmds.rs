@@ -140,6 +140,50 @@ pub fn cmd_diff_commit(message: String) -> Result<(), NeoTrixError> {
     run_git_cmd(&["commit", "-m", &message]).map(|_| ())
 }
 
+/// Diff against a base branch (Codex "Review against base branch" parity).
+/// `git diff <base>...HEAD` shows commits on HEAD since diverging from base.
+/// Falls back to `git diff <base>` when no merge base exists (unrelated
+/// histories / fresh repos).
+#[command]
+pub fn cmd_diff_base(base: String) -> Result<Vec<DiffBlock>, NeoTrixError> {
+    let merge_base = run_git_cmd(&["merge-base", &base, "HEAD"]);
+    let args: Vec<&str> = if merge_base.is_ok() {
+        vec!["diff", &base, "...HEAD"]
+    } else {
+        vec!["diff", &base, "HEAD"]
+    };
+    run_git_cmd(&args).map(|s| parse_git_diff(&s))
+}
+
+/// Changed-file list for base-branch review (parity with cmd_diff_changed_files
+/// but scoped to the base branch). Returns porcelain-style {staged, unstaged,
+/// untracked} buckets by reusing the same parser on `git diff --name-status`.
+/// Parse `git diff --name-status` output into porcelain-style {staged} entries
+/// (status letter + path). Shared by `cmd_diff_base_files`; testable in isolation.
+pub(crate) fn parse_name_status(out: &str, base: &str) -> serde_json::Value {
+    let mut staged = Vec::new();
+    for line in out.lines() {
+        if line.len() < 4 { continue; }
+        let status = line[..2].trim();
+        let path = line[2..].trim().to_string();
+        if path.is_empty() { continue; }
+        staged.push(serde_json::json!({ "status": status, "path": path }));
+    }
+    serde_json::json!({ "staged": staged, "unstaged": serde_json::Value::Array(vec![]), "untracked": serde_json::Value::Array(vec![]), "base": base })
+}
+
+#[command]
+pub fn cmd_diff_base_files(base: String) -> Result<serde_json::Value, NeoTrixError> {
+    let merge_base = run_git_cmd(&["merge-base", &base, "HEAD"]);
+    let args: Vec<&str> = if merge_base.is_ok() {
+        vec!["diff", "--name-status", &base, "...HEAD"]
+    } else {
+        vec!["diff", "--name-status", &base, "HEAD"]
+    };
+    let out = run_git_cmd(&args)?;
+    Ok(parse_name_status(&out, &base))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,5 +211,28 @@ mod tests {
         let v = parse_porcelain_changed(out);
         assert_eq!(v["untracked"][0]["path"], "newdir/");
         assert_eq!(v["unstaged"][0]["path"], "src/a.rs");
+    }
+
+    #[test]
+    fn name_status_parses_base_diff_files() {
+        let out = "M\tsrc/main.rs\nA\tsrc/new.rs\nD\told.rs\nR100\told_name.rs\tnew_name.rs\n";
+        let v = parse_name_status(out, "main");
+        let staged = v["staged"].as_array().unwrap();
+        assert_eq!(staged.len(), 4);
+        assert_eq!(staged[0]["status"], "M");
+        assert_eq!(staged[0]["path"], "src/main.rs");
+        assert_eq!(staged[1]["status"], "A");
+        assert_eq!(staged[2]["status"], "D");
+        // Rename line: tab-separated "R100 old_name.rs new_name.rs" — parser
+        // takes everything after the status as the path; keep the full tail.
+        assert!(staged[3]["path"].as_str().unwrap().contains("old_name.rs"));
+        assert_eq!(v["base"], "main");
+    }
+
+    #[test]
+    fn name_status_skips_empty_lines() {
+        let out = "\nM\tsrc/a.rs\n\n";
+        let v = parse_name_status(out, "main");
+        assert_eq!(v["staged"].as_array().unwrap().len(), 1);
     }
 }

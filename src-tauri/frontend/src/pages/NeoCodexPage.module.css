@@ -114,6 +114,71 @@
   gap: 8px;
 }
 
+.sessionToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 40%;
+  min-width: 0;
+}
+
+.sessionTitle {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.sessionTitle:hover {
+  border-color: var(--border-primary);
+  background: var(--bg-tertiary);
+}
+
+.sessionTitleInput {
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent, #4f8cff);
+  border-radius: 6px;
+  color: var(--fg-primary);
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+  width: 200px;
+}
+
+.sessionProject {
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.branchChip {
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  color: var(--fg-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+}
+
+.branchChipDirty {
+  color: var(--warning, #e6a23c);
+  border-color: var(--warning, #e6a23c);
+}
+
 .modeSelect {
   padding: 6px 10px;
   background: var(--bg-tertiary);

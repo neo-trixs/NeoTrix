@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import NeoCodexPage from "../../pages/NeoCodexPage";
 import { useStore } from "../../stores";
 import { mockInvoke, resetInvokeMocks } from "../../__tests__/tauriMock";
+
+const renderPage = () =>
+  render(
+    <MemoryRouter>
+      <NeoCodexPage />
+    </MemoryRouter>
+  );
 
 describe("NeoCodexPage new-session handling", () => {
   beforeEach(() => {
@@ -19,7 +27,7 @@ describe("NeoCodexPage new-session handling", () => {
   });
 
   it("creates a session via Cmd+N even when the sidebar is collapsed", async () => {
-    render(<NeoCodexPage />);
+    renderPage();
 
     const collapseBtn = await screen.findByTitle("收起侧栏");
     fireEvent.click(collapseBtn);
@@ -43,7 +51,7 @@ describe("NeoCodexPage new-session handling", () => {
   });
 
   it("creates a session when the neotrix:new-session event fires with the sidebar collapsed", async () => {
-    render(<NeoCodexPage />);
+    renderPage();
 
     fireEvent.click(await screen.findByTitle("收起侧栏"));
     expect(screen.queryByTitle("新建会话")).toBeNull();
@@ -74,7 +82,7 @@ describe("NeoCodexPage new-session handling", () => {
     mockInvoke("neocodex_switch_session", () => null);
     mockInvoke("neocodex_get_session_messages", () => []);
     mockInvoke("neocodex_get_side_chat", () => []);
-    render(<NeoCodexPage />);
+    renderPage();
 
     await waitFor(() => expect(useStore.getState().neocodexSessions.length).toBe(3));
 
@@ -83,5 +91,52 @@ describe("NeoCodexPage new-session handling", () => {
 
     fireEvent.keyDown(window, { key: "3", metaKey: true });
     await waitFor(() => expect(useStore.getState().neocodexActiveSessionId).toBe("s-c"));
+  });
+});
+
+describe("NeoCodexPage session toolbar", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: "s-t" });
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-t", name: "初始标题", mode: "Agent", message_count: 0, wire_path: "/repo", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+  });
+
+  it("shows the active session title, project, and branch chip", async () => {
+    mockInvoke("neocodex_git_status", () => ({ branch: "feat/g1-g5", dirty: false }));
+    renderPage();
+    const title = await screen.findByTestId("session-title");
+    expect(title).toHaveTextContent("初始标题");
+    expect((await screen.findAllByTitle(/工作区干净/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("feat/g1-g5")).length).toBeGreaterThan(0);
+  });
+
+  it("renames the session via the inline title input (Enter commits)", async () => {
+    const renameSpy = vi.fn(() => null);
+    mockInvoke("neocodex_rename_session", renameSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+    fireEvent.click(screen.getByTestId("session-title"));
+    const input = screen.getByTestId("session-title-input");
+    fireEvent.change(input, { target: { value: "新标题" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(renameSpy).toHaveBeenCalledWith({ sessionId: "s-t", name: "新标题" }));
+  });
+
+  it("Escape cancels the inline rename without committing", async () => {
+    const renameSpy = vi.fn(() => null);
+    mockInvoke("neocodex_rename_session", renameSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+    fireEvent.click(screen.getByTestId("session-title"));
+    const input = screen.getByTestId("session-title-input");
+    fireEvent.change(input, { target: { value: "不该提交" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() => expect(screen.getByTestId("session-title")).toBeInTheDocument());
+    expect(renameSpy).not.toHaveBeenCalled();
   });
 });
