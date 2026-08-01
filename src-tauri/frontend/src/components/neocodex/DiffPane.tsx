@@ -18,6 +18,33 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
   const [committing, setCommitting] = useState(false);
   const [changedFiles, setChangedFiles] = useState<{ staged: ChangedFile[]; unstaged: ChangedFile[]; untracked: ChangedFile[] }>({ staged: [], unstaged: [], untracked: [] });
   const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [review, setReview] = useState<ReviewResult | null>(null);
+
+  interface ReviewIssue {
+    line: number;
+    severity: string;
+    category: string;
+    message: string;
+    suggestion?: string | null;
+  }
+  interface ReviewFileResult {
+    path: string;
+    additions: number;
+    deletions: number;
+    issues: ReviewIssue[];
+  }
+  interface ReviewResult {
+    pr_title: string;
+    total_files: number;
+    total_issues: number;
+    critical: number;
+    warning: number;
+    info: number;
+    files: ReviewFileResult[];
+    summary: string;
+    score: number;
+  }
 
   const loadFiles = useCallback(async () => {
     try {
@@ -143,6 +170,23 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
     }
   };
 
+  const runReview = async () => {
+    setReviewing(true);
+    setError("");
+    setReview(null);
+    try {
+      const res = await invoke<ReviewResult>("cmd_diff_review");
+      setReview(res);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setReviewing(false);
+    }
+  };
+
+  const severityClass = (s: string) =>
+    s === "critical" ? styles.sevCritical : s === "warning" ? styles.sevWarning : styles.sevInfo;
+
   const statusLabel = (s: string) => {
     switch (s.trim()) {
       case "M": case "MM": return "已修改";
@@ -242,7 +286,41 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
             <button type="button" className={styles.actionBtn} onClick={handleUnstage} disabled={loading} data-testid="diff-unstage-all" title="取消暂存">
               取消暂存
             </button>
+            <button type="button" className={styles.actionBtn} onClick={runReview} disabled={reviewing} data-testid="diff-review" title="对工作区变更运行静态代码审查">
+              {reviewing ? "审查中…" : "AI 审查"}
+            </button>
           </div>
+          {review && (
+            <div className={styles.reviewPanel} data-testid="diff-review-panel">
+              <div className={styles.reviewHeader}>
+                <span className={styles.reviewTitle}>审查结果</span>
+                <span className={styles.reviewScore}>得分 {review.score}/100</span>
+                <button type="button" className={styles.reviewClose} onClick={() => setReview(null)} title="关闭">✕</button>
+              </div>
+              <div className={styles.reviewSummary}>
+                {review.summary}
+                {review.total_issues === 0 && <span className={styles.reviewOk}> 未发现问题。</span>}
+              </div>
+              {review.files.map((f) => (
+                <div key={f.path} className={styles.reviewFile}>
+                  <div className={styles.reviewFilePath}>{f.path}</div>
+                  {f.issues.length === 0 ? (
+                    <div className={styles.reviewClean}>无问题</div>
+                  ) : (
+                    f.issues.map((iss, i) => (
+                      <div key={i} className={`${styles.reviewIssue} ${severityClass(iss.severity)}`}>
+                        <span className={styles.reviewSev}>{iss.severity}</span>
+                        <span className={styles.reviewLine}>L{iss.line}</span>
+                        <span className={styles.reviewCategory}>{iss.category}</span>
+                        <span className={styles.reviewMsg}>{iss.message}</span>
+                        {iss.suggestion && <div className={styles.reviewSuggest}>建议: {iss.suggestion}</div>}
+                      </div>
+                    ))
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           <div className={styles.commitRow}>
             <input
               className={styles.commitInput}

@@ -140,3 +140,43 @@ describe("NeoCodexPage session toolbar", () => {
     expect(renameSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("NeoCodexPage file palette (Cmd+P)", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: null });
+    mockInvoke("neocodex_search_files", () => ["src/main.rs", "src/lib.rs", "README.md"]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+  });
+
+  it("Cmd+P opens the palette in file-search mode with file items", async () => {
+    renderPage();
+    await screen.findByTestId("session-toolbar").catch(() => {});
+    fireEvent.keyDown(window, { key: "p", metaKey: true });
+    const input = await screen.findByTestId("palette-input");
+    expect(input).toHaveAttribute("placeholder", expect.stringContaining("搜索文件"));
+    await waitFor(() => expect(screen.getByText("src/main.rs")).toBeInTheDocument());
+    expect(screen.getByText("README.md")).toBeInTheDocument();
+  });
+
+  it("selecting a file dispatches neotrix:mention-file", async () => {
+    const dispatched: string[] = [];
+    window.addEventListener("neotrix:mention-file", (e) => dispatched.push((e as CustomEvent).detail));
+    renderPage();
+    await screen.findByTestId("session-toolbar").catch(() => {});
+    fireEvent.keyDown(window, { key: "p", metaKey: true });
+    fireEvent.click(await screen.findByText("src/lib.rs"));
+    await waitFor(() => expect(dispatched).toContain("src/lib.rs"));
+    window.removeEventListener("neotrix:mention-file", () => {});
+  });
+
+  it("Cmd+K still opens the command palette (default mode)", async () => {
+    renderPage();
+    await screen.findByTestId("session-toolbar").catch(() => {});
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const input = await screen.findByTestId("palette-input");
+    expect(input).toHaveAttribute("placeholder", expect.stringContaining("搜索会话"));
+  });
+});

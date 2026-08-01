@@ -19,7 +19,23 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   });
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportSession, setExportSession] = useState<NeoCodexSession | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const addNotification = useStore((s) => s.addNotification);
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const res = await invoke<string>("cmd_session_import_json", { json: text });
+      const imported = res ? res.split(",").filter(Boolean).length : 0;
+      addNotification({ type: "success", message: `已导入 ${imported} 个会话`, duration: 3000 });
+      window.dispatchEvent(new CustomEvent("neotrix:sessions-changed"));
+    } catch (err) {
+      addNotification({ type: "error", message: `导入失败: ${err}`, duration: 4000 });
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem("neotrix:pinned-sessions", JSON.stringify(pinnedIds));
@@ -276,11 +292,26 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     <div className={styles.container}>
       <div className={styles.header}>
         <h3>会话 ({sessions.length})</h3>
-        <button className={styles.newBtn} onClick={() => setShowNewDialog(true)} title="新建会话">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        <div className={styles.headerActions}>
+          <button className={styles.newBtn} onClick={() => fileInputRef.current?.click()} title="导入会话 JSON">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M7 10V3M4 6l3-3 3 3M3 11h8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button className={styles.newBtn} onClick={() => setShowNewDialog(true)} title="新建会话">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: "none" }}
+          onChange={handleImportFile}
+          data-testid="session-import-input"
+        />
       </div>
 
       <div className={styles.filterRow}>

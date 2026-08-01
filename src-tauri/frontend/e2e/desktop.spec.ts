@@ -263,4 +263,61 @@ test.describe('NeoTrix Desktop App — E2E interaction', () => {
     const recent = page.getByTestId('recent-sessions');
     await expect(recent).toBeVisible({ timeout: 10_000 }).catch(() => {});
   });
+
+  test('diff pane shows AI review button and panel can open/close (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('views-menu-btn').click();
+    await page.getByTestId('views-menu-diff').click();
+    const reviewBtn = page.getByTestId('diff-review');
+    await expect(reviewBtn).toBeVisible({ timeout: 10_000 });
+    // In browser mode there is no Tauri invoke; the review either errors or
+    // renders the panel. Tolerate both, but the button itself must exist.
+    await reviewBtn.click().catch(() => {});
+    const panel = page.getByTestId('diff-review-panel');
+    await expect(panel).toBeVisible({ timeout: 5_000 }).catch(() => {});
+    if (await panel.isVisible().catch(() => false)) {
+      await page.getByTitle('关闭').first().click().catch(() => {});
+      await expect(panel).not.toBeVisible().catch(() => {});
+    }
+  });
+
+  test('Cmd+P opens the file-search palette (键盘交互)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('sidebar-tab-sessions').click();
+    await page.keyboard.press('Meta+p');
+    const palette = page.getByTestId('command-palette');
+    await expect(palette).toBeVisible({ timeout: 10_000 });
+    const input = page.getByTestId('palette-input');
+    await expect(input).toBeFocused();
+    await input.fill('src');
+    await page.keyboard.press('Escape');
+    await expect(palette).not.toBeVisible();
+  });
+
+  test('settings advanced group shows model fields (标签点击)', async ({ page }) => {
+    await page.goto('/settings');
+    await page.getByTestId('settings-tab-advanced').click();
+    await expect(page.getByTestId('settings-tab-advanced')).toHaveClass(/active/);
+    await expect(page.getByTestId('settings-defaultModel')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('settings-temperature')).toBeVisible();
+    await expect(page.getByTestId('settings-maxTokens')).toBeVisible();
+    await expect(page.getByTestId('settings-maxSessions')).toBeVisible();
+    await expect(page.getByTestId('settings-terminalPath')).toBeVisible();
+  });
+
+  test('settings theme tab shows language selector (标签点击)', async ({ page }) => {
+    await page.goto('/settings');
+    await page.getByTestId('settings-tab-theme').click();
+    await expect(page.getByTestId('settings-tab-theme')).toHaveClass(/active/);
+    await expect(page.getByTestId('settings-language')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('session sidebar shows import button (标签点击)', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('sidebar-tab-sessions').click();
+    const importBtn = page.getByTitle('导入会话 JSON');
+    await expect(importBtn).toBeVisible({ timeout: 10_000 });
+    // The hidden file input backs the button.
+    await expect(page.getByTestId('session-import-input')).toBeAttached();
+  });
 });

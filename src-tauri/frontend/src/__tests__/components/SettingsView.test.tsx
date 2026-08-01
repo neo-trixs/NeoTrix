@@ -141,6 +141,33 @@ describe("SettingsView — advanced toggles (标签点击)", () => {
     await userEvent.click(cb);
     expect(useStore.getState().settings.notifyOnComplete).toBe(false);
   });
+
+  it("surfaces model/context numeric fields on 高级 and persists them", async () => {
+    render(<SettingsView />);
+    await waitFor(() => expect(screen.getByText("API Providers")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("高级"));
+    expect(screen.getByTestId("settings-defaultModel")).toBeInTheDocument();
+    const temp = screen.getByTestId("settings-temperature") as HTMLInputElement;
+    await userEvent.clear(temp);
+    await userEvent.type(temp, "0.5");
+    expect(useStore.getState().settings.temperature).toBe(0.5);
+    const tokens = screen.getByTestId("settings-maxTokens") as HTMLInputElement;
+    await userEvent.clear(tokens);
+    await userEvent.type(tokens, "16384");
+    expect(useStore.getState().settings.maxTokens).toBe(16384);
+    const sessions = screen.getByTestId("settings-maxSessions") as HTMLInputElement;
+    await userEvent.clear(sessions);
+    await userEvent.type(sessions, "30");
+    expect(useStore.getState().settings.maxSessions).toBe(30);
+  });
+
+  it("language selector on 外观 persists to store", async () => {
+    render(<SettingsView />);
+    await waitFor(() => expect(screen.getByText("API Providers")).toBeInTheDocument());
+    await userEvent.click(screen.getByText("外观"));
+    await userEvent.selectOptions(screen.getByTestId("settings-language"), "en-US");
+    expect(useStore.getState().settings.language).toBe("en-US");
+  });
 });
 
 describe("SettingsView — About download", () => {

@@ -184,6 +184,23 @@ pub fn cmd_diff_base_files(base: String) -> Result<serde_json::Value, NeoTrixErr
     Ok(parse_name_status(&out, &base))
 }
 
+/// Gather the full working-tree diff (staged + unstaged) and run the static
+/// code-review pass on it (Claude Desktop "Review code" parity). Returns the
+/// same `ReviewResult` shape as `review_diff`.
+#[command]
+pub fn cmd_diff_review(pr_title: Option<String>) -> Result<super::review_cmds::ReviewResult, NeoTrixError> {
+    let mut diff_text = String::new();
+    if let Ok(s) = run_git_cmd(&["diff"]) {
+        diff_text.push_str(&s);
+    }
+    if let Ok(s) = run_git_cmd(&["diff", "--cached"]) {
+        diff_text.push('\n');
+        diff_text.push_str(&s);
+    }
+    let title = pr_title.unwrap_or_else(|| "工作区变更".to_string());
+    super::review_cmds::review_diff(diff_text, title).map_err(|e| NeoTrixError::Memory(e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +251,17 @@ mod tests {
         let out = "\nM\tsrc/a.rs\n\n";
         let v = parse_name_status(out, "main");
         assert_eq!(v["staged"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn review_gathers_diff_and_scores() {
+        // cmd_diff_review shells out to git; verify the review pass itself by
+        // feeding a synthetic diff through the shared review_diff pipeline.
+        let diff = "+++ b/src/lib.rs\n+fn main() {\n+    let password = \"hunter2\";\n+    // TODO: fix\n+}\n";
+        let result = crate::commands::review_cmds::review_diff(diff.to_string(), "test".into()).unwrap();
+        assert_eq!(result.total_files, 1);
+        assert!(result.critical >= 1, "hardcoded credential must be critical");
+        assert!(result.score < 100);
+        assert!(result.summary.contains("Score:"));
     }
 }

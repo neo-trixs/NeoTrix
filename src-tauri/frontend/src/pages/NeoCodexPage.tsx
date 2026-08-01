@@ -42,6 +42,8 @@ export default function NeoCodexPage() {
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteMode, setPaletteMode] = useState<"command" | "file">("command");
+  const [fileItems, setFileItems] = useState<Array<{ id: string; label: string; hint?: string; onSelect: () => void }>>([]);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [health, setHealth] = useState<any>(null);
@@ -439,7 +441,26 @@ export default function NeoCodexPage() {
     return items;
   }, [neocodexSessions, showSidebar, focusMode]);
 
-  // Keyboard shortcuts: Cmd+K palette, Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle, Cmd+Shift+F focus
+  const openFilePalette = useCallback(async () => {
+    setPaletteMode("file");
+    setFileItems([]);
+    setPaletteOpen(true);
+    try {
+      const files = await invoke<string[]>("neocodex_search_files", { query: "" });
+      setFileItems(
+        (files || []).slice(0, 100).map((f) => ({
+          id: `file-${f}`,
+          label: f,
+          hint: "文件",
+          onSelect: () => window.dispatchEvent(new CustomEvent("neotrix:mention-file", { detail: f })),
+        }))
+      );
+    } catch {
+      setFileItems([]);
+    }
+  }, []);
+
+  // Keyboard shortcuts: Cmd+K palette, Cmd+P file palette, Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle, Cmd+Shift+F focus
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -452,7 +473,11 @@ export default function NeoCodexPage() {
       if (inEditable && !isPalette && !isHelp) return;
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
+        setPaletteMode("command");
         setPaletteOpen((v) => !v);
+      } else if (e.key === "p" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        openFilePalette();
       } else if (e.key === "/" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setShortcutHelpOpen((v) => !v);
@@ -512,7 +537,7 @@ export default function NeoCodexPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, viewsMenuOpen, showUsage]);
+  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, viewsMenuOpen, showUsage, openFilePalette]);
 
   return (
     <div className={styles.container}>
@@ -846,7 +871,12 @@ export default function NeoCodexPage() {
         </footer>
       </main>
 
-      <CommandPalette open={paletteOpen} items={paletteItems} onClose={() => setPaletteOpen(false)} />
+      <CommandPalette
+        open={paletteOpen}
+        items={paletteMode === "file" ? fileItems : paletteItems}
+        onClose={() => setPaletteOpen(false)}
+        placeholder={paletteMode === "file" ? "搜索文件… (⌘P)" : "搜索会话或执行命令…"}
+      />
       <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
     </div>
   );

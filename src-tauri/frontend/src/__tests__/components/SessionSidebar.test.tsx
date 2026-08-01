@@ -145,4 +145,34 @@ describe("SessionSidebar — session interactions", () => {
     fireEvent(window, new Event("neotrix:sessions-changed"));
     await waitFor(() => expect(screen.getByText("新会话CmdN")).toBeInTheDocument());
   });
+
+  it("imports a session JSON via the hidden file input and shows a toast", async () => {
+    const importSpy = vi.fn((args: { json: string }) => "imp-1");
+    mockInvoke("cmd_session_import_json", importSpy);
+    const notify = vi.fn();
+    useStore.setState({ addNotification: notify });
+    renderSidebar();
+    await waitFor(() => expect(screen.getByTitle("导入会话 JSON")).toBeInTheDocument());
+    const input = screen.getByTestId("session-import-input") as HTMLInputElement;
+    const file = new File([JSON.stringify({ format_version: 1, sessions: [{ name: "导入的会话", message_count: 1 }] })], "export.json", { type: "application/json" });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(importSpy).toHaveBeenCalled());
+    const arg = importSpy.mock.calls[0][0];
+    expect(JSON.parse(arg.json).format_version).toBe(1);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "success" }));
+  });
+
+  it("import failure shows an error toast", async () => {
+    mockInvoke("cmd_session_import_json", () => {
+      throw new Error("bad json");
+    });
+    const notify = vi.fn();
+    useStore.setState({ addNotification: notify });
+    renderSidebar();
+    await waitFor(() => expect(screen.getByTitle("导入会话 JSON")).toBeInTheDocument());
+    const input = screen.getByTestId("session-import-input") as HTMLInputElement;
+    const file = new File(["not-json"], "bad.json", { type: "application/json" });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "error" })));
+  });
 });

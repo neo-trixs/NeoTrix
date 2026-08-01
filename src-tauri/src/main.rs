@@ -252,6 +252,7 @@ fn main() {
                     commands::cmd_diff_commit,
                     commands::cmd_diff_base,
                     commands::cmd_diff_base_files,
+                    commands::cmd_diff_review,
                     commands::cmd_permission_request,
                     commands::cmd_permission_approve,
                     commands::cmd_permission_deny,

@@ -1,4 +1,15 @@
 import "@testing-library/jest-dom";
+
+if (typeof File !== "undefined" && !("text" in File.prototype)) {
+  (File.prototype as any).text = function text(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}
 import { vi } from "vitest";
 
 Element.prototype.scrollIntoView = () => {};
@@ -51,6 +62,17 @@ const defaultResponses: Record<string, (args: any) => any> = {
   cmd_diff_changed_files: () => ({ staged: [], unstaged: [], untracked: [] }),
   cmd_diff_base: () => [],
   cmd_diff_base_files: () => ({ staged: [], unstaged: [], untracked: [], base: "main" }),
+  cmd_diff_review: () => ({
+    pr_title: "工作区变更",
+    total_files: 0,
+    total_issues: 0,
+    critical: 0,
+    warning: 0,
+    info: 0,
+    files: [],
+    summary: "Found 0 issues (0 critical, 0 warning, 0 info) across 0 files. Score: 100/100",
+    score: 100,
+  }),
   cmd_diff_file: () => [],
   cmd_diff_stage: () => ["a.rs"],
   cmd_diff_unstage: () => [],
@@ -58,6 +80,7 @@ const defaultResponses: Record<string, (args: any) => any> = {
   send_notification: () => null,
   neocodex_download_update: () => null,
   neocodex_rename_session: (args: any) => ({ id: args?.sessionId ?? "s", name: args?.name ?? "" }),
+  cmd_session_import_json: () => "imp-1,imp-2",
 };
 
 vi.mock("@tauri-apps/api/core", () => ({

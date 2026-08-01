@@ -151,4 +151,57 @@ describe("DiffPane", () => {
     fireEvent.change(input, { target: { value: "main" } });
     expect(baseSpy.mock.calls.length).toBe(callsAfterScope);
   });
+
+  it("AI 审查 button calls cmd_diff_review and renders the review panel", async () => {
+    const reviewSpy = vi.fn(() => ({
+      pr_title: "工作区变更",
+      total_files: 1,
+      total_issues: 2,
+      critical: 1,
+      warning: 1,
+      info: 0,
+      score: 80,
+      summary: "Found 2 issues (1 critical, 1 warning, 0 info) across 1 files. Score: 80/100",
+      files: [
+        {
+          path: "src/main.rs",
+          additions: 3,
+          deletions: 0,
+          issues: [
+            { line: 4, severity: "critical", category: "security", message: "Possible hardcoded credential", suggestion: "Use env vars" },
+            { line: 8, severity: "warning", category: "debug", message: "Debug print statement left in code", suggestion: null },
+          ],
+        },
+      ],
+    }));
+    mockInvoke("cmd_diff_review", reviewSpy);
+    render(<DiffPane />);
+    const reviewBtn = screen.getByTestId("diff-review");
+    await waitFor(() => expect(reviewBtn).not.toBeDisabled());
+    fireEvent.click(reviewBtn);
+    await waitFor(() => expect(reviewSpy).toHaveBeenCalled());
+    expect(await screen.findByTestId("diff-review-panel")).toBeInTheDocument();
+    expect(screen.getByText("得分 80/100")).toBeInTheDocument();
+    expect(screen.getByText("src/main.rs")).toBeInTheDocument();
+    expect(screen.getByText("Possible hardcoded credential")).toBeInTheDocument();
+    expect(screen.getByText("Debug print statement left in code")).toBeInTheDocument();
+  });
+
+  it("AI 审查 shows empty-review ok state", async () => {
+    mockInvoke("cmd_diff_review", () => ({
+      pr_title: "工作区变更",
+      total_files: 0,
+      total_issues: 0,
+      critical: 0,
+      warning: 0,
+      info: 0,
+      score: 100,
+      summary: "Found 0 issues across 0 files. Score: 100/100",
+      files: [],
+    }));
+    render(<DiffPane />);
+    fireEvent.click(screen.getByTestId("diff-review"));
+    expect(await screen.findByTestId("diff-review-panel")).toBeInTheDocument();
+    expect(screen.getByText(/未发现问题/)).toBeInTheDocument();
+  });
 });

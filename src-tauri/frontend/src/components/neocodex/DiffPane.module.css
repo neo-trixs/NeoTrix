@@ -278,3 +278,107 @@
   font-size: 11px;
   text-align: center;
 }
+
+.reviewPanel {
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--bg-secondary, #fafafa);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviewTitle {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.reviewScore {
+  font-size: 11px;
+  color: var(--text-secondary, #666);
+  flex: 1;
+}
+
+.reviewClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary, #666);
+  font-size: 12px;
+}
+
+.reviewSummary {
+  font-size: 11px;
+  color: var(--text-secondary, #666);
+  margin: 4px 0;
+}
+
+.reviewOk {
+  color: #3fb950;
+}
+
+.reviewFile {
+  margin-top: 6px;
+  border-top: 1px dashed var(--border-color, #ddd);
+  padding-top: 4px;
+}
+
+.reviewFilePath {
+  font-weight: 600;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.reviewClean {
+  font-size: 11px;
+  color: #3fb950;
+}
+
+.reviewIssue {
+  font-size: 11px;
+  padding: 2px 0;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.sevCritical .reviewSev { color: #f85149; }
+.sevWarning .reviewSev { color: #d29922; }
+.sevInfo .reviewSev { color: #58a6ff; }
+
+.reviewSev {
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 10px;
+}
+
+.reviewLine {
+  font-family: monospace;
+  color: var(--text-secondary, #666);
+}
+
+.reviewCategory {
+  background: var(--border-color, #ddd);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+.reviewMsg {
+  color: var(--text-primary, #222);
+}
+
+.reviewSuggest {
+  width: 100%;
+  font-size: 10px;
+  color: var(--text-secondary, #666);
+  padding-left: 2px;
+}

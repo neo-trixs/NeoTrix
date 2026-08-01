@@ -427,3 +427,33 @@
   min-width: 40px;
   text-align: center;
 }
+
+.fieldLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg-primary);
+  margin-bottom: 8px;
+}
+
+.fieldLabel input[type="number"],
+.fieldLabel input[type="text"] {
+  width: 110px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--fg-primary);
+  font-size: 12px;
+}
+
+.selectField {
+  padding: 4px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--fg-primary);
+  font-size: 12px;
+}

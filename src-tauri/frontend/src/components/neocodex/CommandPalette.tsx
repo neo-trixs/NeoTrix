@@ -27,7 +27,7 @@ function fuzzyScore(label: string, query: string): number {
   return score - l.length / 100;
 }
 
-export function CommandPalette({ open, items, onClose }: { open: boolean; items: PaletteItem[]; onClose: () => void }) {
+export function CommandPalette({ open, items, onClose, placeholder = "搜索会话或执行命令…" }: { open: boolean; items: PaletteItem[]; onClose: () => void; placeholder?: string }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -122,7 +122,7 @@ export function CommandPalette({ open, items, onClose }: { open: boolean; items:
           className={styles.input}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜索会话或执行命令…"
+          placeholder={placeholder}
           data-testid="palette-input"
         />
         <div className={styles.list} data-testid="palette-list">

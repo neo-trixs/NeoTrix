@@ -21,6 +21,12 @@
   font-weight: 600;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .newBtn {
   display: flex;
   align-items: center;
@@ -33,6 +39,16 @@
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s;
+}
+
+.newBtn:last-child {
+  background: var(--accent-primary);
+}
+
+.headerActions .newBtn:first-child {
+  background: var(--bg-secondary);
+  color: var(--fg-primary);
+  border: 1px solid var(--border-primary);
 }
 
 .newBtn:hover {

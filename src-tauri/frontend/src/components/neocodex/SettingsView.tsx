@@ -66,6 +66,10 @@ export function SettingsView() {
     setSettings({ ...settings, theme: newTheme });
   };
 
+  const handleLanguageChange = (lang: string) => {
+    setSettings({ ...settings, language: lang as "zh-CN" | "en-US" });
+  };
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "providers", label: "Providers", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 7h8M3 4h8M3 10h8" strokeLinecap="round"/></svg> },
     { id: "theme", label: "外观", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="4"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1M4.5 4.5l.7.7M8.8 8.8l.7.7M4.5 9.5l.7-.7M8.8 5.2l.7-.7" strokeLinecap="round"/></svg> },
@@ -112,7 +116,7 @@ export function SettingsView() {
             onDeleteKey={handleDeleteKey}
           />
         )}
-        {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} fontSize={settings.fontSize} onFontSizeChange={(v) => setSettings({ ...settings, fontSize: v })} />}
+        {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} fontSize={settings.fontSize} onFontSizeChange={(v) => setSettings({ ...settings, fontSize: v })} language={settings.language} onLanguageChange={handleLanguageChange} />}
         {activeTab === "advanced" && <AdvancedPanel settings={settings} onChange={(patch) => setSettings({ ...settings, ...patch })} />}
         {activeTab === "about" && <AboutPanel />}
       </div>
@@ -201,7 +205,7 @@ function ProvidersPanel({
   );
 }
 
-function ThemePanel({ theme, onThemeChange, fontSize, onFontSizeChange }: { theme: "light" | "dark" | "system"; onThemeChange: (t: "light" | "dark" | "system") => void; fontSize: number; onFontSizeChange: (v: number) => void }) {
+function ThemePanel({ theme, onThemeChange, fontSize, onFontSizeChange, language, onLanguageChange }: { theme: "light" | "dark" | "system"; onThemeChange: (t: "light" | "dark" | "system") => void; fontSize: number; onFontSizeChange: (v: number) => void; language: string; onLanguageChange: (v: string) => void }) {
   const options = [
     { value: "light" as const, label: "浅色", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="4"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1M4.5 4.5l.7.7M8.8 8.8l.7.7M4.5 9.5l.7-.7M8.8 5.2l.7-.7" strokeLinecap="round"/></svg> },
     { value: "dark" as const, label: "深色", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 12a5 5 0 010-10 5 5 0 000 10z"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1" strokeLinecap="round"/></svg> },
@@ -232,6 +236,18 @@ function ThemePanel({ theme, onThemeChange, fontSize, onFontSizeChange }: { them
           <button className={styles.fontSizeBtn} onClick={() => onFontSizeChange(Math.min(20, fontSize + 1))} title="增大">A+</button>
         </div>
       </div>
+      <div className={styles.fontSizeRow}>
+        <span className={styles.fontSizeLabel}>语言</span>
+        <select
+          className={styles.selectField}
+          value={language}
+          onChange={(e) => onLanguageChange(e.target.value)}
+          data-testid="settings-language"
+        >
+          <option value="zh-CN">简体中文</option>
+          <option value="en-US">English</option>
+        </select>
+      </div>
     </div>
   );
 }
@@ -251,6 +267,20 @@ function AdvancedPanel({ settings, onChange }: { settings: AppSettings; onChange
     { title: "通知", keys: ["notifyOnComplete"] },
     { title: "开发者", keys: ["privacyTelemetry"] },
   ];
+  const numberField = (key: keyof AppSettings, label: string, min: number, max: number, step = 1) => (
+    <label key={key} className={styles.fieldLabel}>
+      <span>{label}</span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        value={Number(settings[key]) || 0}
+        onChange={(e) => onChange({ [key]: Number(e.target.value) } as Partial<AppSettings>)}
+        data-testid={`settings-${String(key)}`}
+      />
+    </label>
+  );
   return (
     <div className={styles.panel}>
       <h3>高级设置</h3>
@@ -273,6 +303,31 @@ function AdvancedPanel({ settings, onChange }: { settings: AppSettings; onChange
             })}
           </div>
         ))}
+        <div className={styles.advancedCard}>
+          <h4>模型与对话</h4>
+          <label className={styles.fieldLabel}>
+            <span>默认模型</span>
+            <input
+              type="text"
+              value={String(settings.defaultModel || "")}
+              onChange={(e) => onChange({ defaultModel: e.target.value })}
+              data-testid="settings-defaultModel"
+            />
+          </label>
+          {numberField("temperature", "温度 (0–2)", 0, 2, 0.1)}
+          {numberField("maxTokens", "最大 Token", 512, 200000, 256)}
+          {numberField("maxSessions", "最大会话数", 1, 100)}
+          <label className={styles.fieldLabel}>
+            <span>终端路径</span>
+            <input
+              type="text"
+              value={String(settings.terminalPath || "")}
+              onChange={(e) => onChange({ terminalPath: e.target.value })}
+              placeholder="/bin/zsh"
+              data-testid="settings-terminalPath"
+            />
+          </label>
+        </div>
       </div>
     </div>
   );
