@@ -635,7 +635,11 @@ impl BackgroundLoopHandle {
     }
     async fn handle_goal(&mut self) {
         let mut b = self.brain.write().await;
-        self.goal_loop.pursue_all(&mut b, 1);
+        // Full autonomous cycle: circuit-breaker guard, terminal-goal
+        // reward/dequeue, auto-generation of new goals when none is active,
+        // then one pursue_iteration. pursue_all(.., 1) bails early when no
+        // active goal exists and never exercises the auto-generation path.
+        self.goal_loop.pursue_auto_iteration(&mut b);
     }
     async fn handle_prediction(&mut self) {
         if let Some(ref mut pano) = self.panorama {
