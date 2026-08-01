@@ -94,7 +94,10 @@ impl CommunityDataIngester {
     pub fn fuse_into_domain(&self, dtm: &mut E8DomainTransitionModel) {
         for ds in &self.datasets {
             for &(from, to, count) in &ds.transitions {
-                let virtual_count = (ds.weight * count as f64).round() as u64;
+                // Clamp weight so a pathological deserialized config cannot
+                // expand into a billion-iteration injection loop.
+                let weight = ds.weight.clamp(0.0, 10.0);
+                let virtual_count = (weight * count as f64).round() as u64;
                 // Record into the general matrix
                 for _ in 0..virtual_count {
                     dtm.general_matrix.record_transition(from, to);

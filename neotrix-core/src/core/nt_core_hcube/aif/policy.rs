@@ -90,7 +90,7 @@ impl PolicyEvaluator {
 
         for &action in policy {
             let mut next_belief = vec![0.0; current_belief.len()];
-            if action < model.num_states {
+            if action < model.num_states && current_belief.len() >= model.num_states {
                 next_belief[..model.num_states].copy_from_slice(&model.transition_matrix[action][..model.num_states]);
             }
 

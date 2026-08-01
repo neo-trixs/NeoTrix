@@ -225,6 +225,9 @@ impl QuantizedVSA {
 
     pub fn permute(v: &[u8], shift: isize) -> Vec<u8> {
         let len = v.len().min(VSA_DIM);
+        if len == 0 {
+            return Vec::new();
+        }
         let mut result = vec![0u8; len];
         for i in 0..len {
             let src = ((i as isize - shift).rem_euclid(len as isize)) as usize;

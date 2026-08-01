@@ -34,7 +34,10 @@ impl VsaBackend for VSAEngine {
     }
 
     fn bundle(&self, vectors: &[&[f64]]) -> Vec<f64> {
-        let dim = vectors[0].len();
+        let Some(first) = vectors.first() else {
+            return Vec::new();
+        };
+        let dim = first.len();
         let mut result = vec![0.0; dim];
         for v in vectors {
             for (r, x) in result.iter_mut().zip(v.iter()) {
@@ -46,6 +49,9 @@ impl VsaBackend for VSAEngine {
 
     fn permute(&self, v: &[f64], shift: isize) -> Vec<f64> {
         let len = v.len();
+        if len == 0 {
+            return Vec::new();
+        }
         let mut result = vec![0.0; len];
         for (i, item) in result.iter_mut().enumerate() {
             let src = ((i as isize - shift).rem_euclid(len as isize)) as usize;

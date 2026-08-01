@@ -254,12 +254,17 @@ impl PhaseTransitionMatrix {
 
     /// Most likely next phase from a current phase.
     pub fn most_likely_next(&self, from: usize) -> usize {
+        let Some(row) = self.transitions.get(from) else {
+            return 0;
+        };
         let mut best = 0;
         let mut best_p = 0.0;
         for to in 0..9 {
-            if self.transitions[from][to] > best_p {
-                best_p = self.transitions[from][to];
-                best = to;
+            if let Some(&p) = row.get(to) {
+                if p > best_p {
+                    best_p = p;
+                    best = to;
+                }
             }
         }
         best

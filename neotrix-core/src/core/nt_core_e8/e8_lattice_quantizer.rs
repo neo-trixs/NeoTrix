@@ -194,6 +194,9 @@ impl E8LoraScale {
     }
 
     pub fn apply(&self, layer: usize, base_logits: &[f32]) -> Vec<f32> {
+        if self.layer_scales.is_empty() {
+            return base_logits.to_vec();
+        }
         let scale = self.layer_scales[layer % self.layer_scales.len()];
         let root_bias = self.compute_root_bias(base_logits);
         base_logits.iter().zip(root_bias.iter())
