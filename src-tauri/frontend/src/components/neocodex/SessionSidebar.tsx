@@ -133,15 +133,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   };
 
   const handleDelete = async (sessionId: string) => {
-    try {
-      await invoke("neocodex_delete_session", { sessionId });
-    } catch (e) {
-      console.error("Failed to delete session:", e);
-    }
-    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    setPinnedIds((prev) => prev.filter((id) => id !== sessionId));
     onSessionDelete?.(sessionId);
-    addNotification({ type: "info", message: "会话已删除", duration: 2000 });
   };
 
   const handleArchive = async (sessionId: string) => {
@@ -253,6 +245,9 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
         if (byMode.has(m)) buckets.push({ label: `${m} 模式`, sessions: byMode.get(m)! });
       }
       if (byMode.has("未指定")) buckets.push({ label: "未指定", sessions: byMode.get("未指定")! });
+      for (const [key, list] of byMode) {
+        if (!modeOrder.includes(key) && key !== "未指定") buckets.push({ label: `${key} 模式`, sessions: list });
+      }
     } else {
       const day = 86400000;
       const today = new Date();
@@ -266,15 +261,6 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
     }
     return buckets;
   }, [sessions, query, statusFilter, groupBy, pinnedIds]);
-
-  const formatTime = (ts: number) => {
-    const date = new Date(ts);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
-    return `${Math.floor(diff / 86400000)}天前`;
-  };
 
   if (loading) {
     return (
@@ -425,7 +411,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
       {showNewDialog && (
         <div className={styles.dialogOverlay} onClick={() => setShowNewDialog(false)}>
-          <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="新建会话" onClick={(e) => e.stopPropagation()}>
             <h3>新建会话</h3>
             <input
               type="text"
@@ -446,7 +432,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
 
       {showExportDialog && exportSession && (
         <div className={styles.dialogOverlay} onClick={() => setShowExportDialog(false)}>
-          <div className={styles.dialog} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="导出会话" onClick={(e) => e.stopPropagation()}>
             <h3>导出会话：{exportSession.name}</h3>
             <p className={styles.dialogHint}>选择格式，内容将按消息顺序导出。</p>
             <div className={styles.dialogActions}>

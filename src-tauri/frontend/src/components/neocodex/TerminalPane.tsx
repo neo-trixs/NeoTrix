@@ -31,15 +31,16 @@ export function TerminalPane() {
       const idx = prev.findIndex((t) => t.id === id);
       const next = prev.filter((t) => t.id !== id);
       if (next.length === 0) {
-        // Always keep at least one tab alive; spawn a fresh one.
-        setActiveId(null);
         return [{ id: nextTabId(), name: "终端 1" }];
       }
-      if (activeId === id) {
-        const neighbor = next[Math.min(idx, next.length - 1)];
-        setActiveId(neighbor.id);
-      }
       return next;
+    });
+    setActiveId((prevActive) => {
+      if (prevActive !== id) return prevActive;
+      const remaining = tabs.filter((t) => t.id !== id);
+      if (remaining.length === 0) return null;
+      const idx = tabs.findIndex((t) => t.id === id);
+      return remaining[Math.min(idx, remaining.length - 1)].id;
     });
   };
 

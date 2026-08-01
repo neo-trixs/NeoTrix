@@ -7,7 +7,7 @@ interface ChangedFile {
   path: string;
 }
 
-export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }) {
+export function DiffPane() {
   const [blocks, setBlocks] = useState<Array<{ type: string; content: string; line_start: number }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -88,12 +88,11 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
     }
   }, [scope, filePath, baseBranch]);
 
-  // Auto-load only on scope change. The file-path input loads exclusively via
-  // the explicit "查看"/refresh buttons, avoiding an IPC request per keystroke.
-  const filePathRef = React.useRef(filePath);
-  filePathRef.current = filePath;
+  // Auto-load on scope change for the git scopes. The file-path scope loads
+  // exclusively via the explicit "查看"/refresh buttons / list clicks, avoiding
+  // an IPC request per keystroke and double-loads from selectFile.
   useEffect(() => {
-    if (scope === "file" && !filePathRef.current) return;
+    if (scope === "file") return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope]);
@@ -107,6 +106,7 @@ export function DiffPane({ onOpenFile }: { onOpenFile?: (path: string) => void }
     setActiveFile(path);
     setFilePath(path);
     setScope("file");
+    if (!path) return;
     setLoading(true);
     setError("");
     try {

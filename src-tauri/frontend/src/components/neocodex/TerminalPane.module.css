@@ -34,7 +34,7 @@
   border-radius: 4px 4px 0 0;
   border: 1px solid transparent;
   cursor: pointer;
-  color: var(--text-secondary, #999);
+  color: var(--fg-secondary);
   font-size: 11px;
   white-space: nowrap;
   user-select: none;
@@ -43,7 +43,7 @@
   background: rgba(255, 255, 255, 0.05);
 }
 .tabActive {
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
   background: rgba(255, 255, 255, 0.07);
   border-color: var(--border-primary, rgba(255, 255, 255, 0.1));
 }
@@ -67,7 +67,7 @@
 .tabClose {
   background: none;
   border: none;
-  color: var(--text-secondary, #777);
+  color: var(--fg-secondary);
   font-size: 10px;
   cursor: pointer;
   padding: 0 2px;
@@ -81,7 +81,7 @@
 .tabAdd {
   background: none;
   border: none;
-  color: var(--text-secondary, #999);
+  color: var(--fg-secondary);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -89,7 +89,7 @@
   border-radius: 4px;
 }
 .tabAdd:hover {
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
   background: rgba(255, 255, 255, 0.07);
 }
 
@@ -112,7 +112,7 @@
 
 .title {
   font-weight: 600;
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
   font-size: 12px;
 }
 

@@ -18,7 +18,7 @@
 
 .title {
   font-weight: 600;
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
 }
 
 .urlInput {
@@ -26,7 +26,7 @@
   background: var(--bg-tertiary, #222);
   border: 1px solid var(--border-primary, rgba(255, 255, 255, 0.1));
   border-radius: 4px;
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
   font-size: 12px;
   padding: 3px 8px;
   outline: none;
@@ -44,7 +44,7 @@
 
 .hint {
   padding: 12px;
-  color: var(--text-secondary, #888);
+  color: var(--fg-secondary);
   line-height: 1.6;
 }
 

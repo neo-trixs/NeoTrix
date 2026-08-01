@@ -257,8 +257,17 @@ export default function NeoCodexPage() {
   // Listen for the new-session event at page level so Cmd+N and the palette
   // work regardless of sidebar visibility / active tab (SessionSidebar is
   // unmounted when the sidebar is collapsed or the files tab is shown).
+  // The native menu accelerator and the webview keydown handler can both fire
+  // this event; dedupe within a short window so a single Cmd+N never creates
+  // two sessions.
   useEffect(() => {
-    const onNew = () => handleNewSession();
+    let lastNew = 0;
+    const onNew = () => {
+      const now = Date.now();
+      if (now - lastNew < 300) return;
+      lastNew = now;
+      handleNewSession();
+    };
     window.addEventListener("neotrix:new-session", onNew);
     return () => window.removeEventListener("neotrix:new-session", onNew);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,13 +335,20 @@ export default function NeoCodexPage() {
     }
   };
 
-  const handleSessionDelete = (sessionId: string) => {
+  const handleSessionDelete = async (sessionId: string) => {
+    try {
+      await invoke("neocodex_delete_session", { sessionId });
+    } catch (e) {
+      console.error("Failed to delete session:", e);
+    }
     if (neocodexActiveSessionId === sessionId) {
       setNeoCodexActiveSession(null);
       setNeoCodexMessages([]);
       setSideChatMessages([]);
     }
     refreshSessions();
+    window.dispatchEvent(new CustomEvent("neotrix:sessions-changed"));
+    addNotification({ type: "info", message: "会话已删除", duration: 2000 });
   };
 
   const reloadMessages = async () => {
@@ -466,9 +482,9 @@ export default function NeoCodexPage() {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       const inEditable = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable;
-      // ⌘K/⌘/ palette + help are global (harmless in inputs); everything else
+      // ⌘K/⌘P/⌘/ palette + help are global (harmless in inputs); everything else
       // must not steal keystrokes the user is typing into a field.
-      const isPalette = e.key === "k" && (e.metaKey || e.ctrlKey);
+      const isPalette = (e.key === "k" || e.key === "p") && (e.metaKey || e.ctrlKey);
       const isHelp = e.key === "/" && (e.metaKey || e.ctrlKey);
       if (inEditable && !isPalette && !isHelp) return;
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -588,7 +604,7 @@ export default function NeoCodexPage() {
 
       <main className={`${styles.main} ${focusMode ? styles.focusMode : ""}`}>
         <header className={`${styles.topBar} ${focusMode ? styles.focusMode : ""}`}>
-          <button className={styles.mobileMenuBtn} onClick={() => setShowSidebar(true)}>
+          <button className={styles.mobileMenuBtn} onClick={() => setShowSidebar(true)} title="打开侧栏" aria-label="打开侧栏">
             <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 4l4 3-4 3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -649,14 +665,17 @@ export default function NeoCodexPage() {
                 className={`${styles.viewsMenuBtn} ${viewsMenuOpen ? styles.viewsMenuActive : ""}`}
                 onClick={() => setViewsMenuOpen((v) => !v)}
                 title="视图面板"
+                aria-expanded={viewsMenuOpen}
+                aria-haspopup="menu"
               >
                 视图 ▾
               </button>
               {viewsMenuOpen && (
-                <div className={styles.viewsMenu}>
+                <div className={styles.viewsMenu} role="menu">
                   <button
                     type="button"
                     data-testid="views-menu-terminal"
+                    role="menuitem"
                     className={`${styles.viewsMenuItem} ${terminalOpen ? styles.viewsMenuItemActive : ""}`}
                     onClick={() => { setTerminalOpen((v) => !v); setViewsMenuOpen(false); }}
                   >
@@ -665,6 +684,7 @@ export default function NeoCodexPage() {
                   <button
                     type="button"
                     data-testid="views-menu-diff"
+                    role="menuitem"
                     className={`${styles.viewsMenuItem} ${diffOpen ? styles.viewsMenuItemActive : ""}`}
                     onClick={() => { setDiffOpen((v) => !v); setViewsMenuOpen(false); }}
                   >
@@ -673,6 +693,7 @@ export default function NeoCodexPage() {
                   <button
                     type="button"
                     data-testid="views-menu-preview"
+                    role="menuitem"
                     className={`${styles.viewsMenuItem} ${previewOpen ? styles.viewsMenuItemActive : ""}`}
                     onClick={() => { setPreviewOpen((v) => !v); setViewsMenuOpen(false); }}
                   >
@@ -808,7 +829,7 @@ export default function NeoCodexPage() {
             <div className={styles.sideChat}>
               <div className={styles.sideChatHeader}>
                 <span>侧聊</span>
-                <button className={styles.sideChatClose} onClick={() => setSideChatOpen(false)}>✕</button>
+                <button className={styles.sideChatClose} onClick={() => setSideChatOpen(false)} title="关闭侧聊" aria-label="关闭侧聊">✕</button>
               </div>
               <div className={styles.sideChatMessages}>
                 {sideChatMessages.map((m, i) => (

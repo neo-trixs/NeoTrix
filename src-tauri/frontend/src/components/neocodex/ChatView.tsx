@@ -227,6 +227,21 @@ export function ChatView({
   }, [mentionOpen]);
 
   useEffect(() => {
+    if (!showSlash) return;
+    const onDown = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement;
+      const inMenu = slashRef.current?.contains(target);
+      const inTextarea = textareaRef.current?.contains(target);
+      if (!inMenu && !inTextarea) {
+        setShowSlash(false);
+        setSlashQuery("");
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [showSlash]);
+
+  useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if ((ev.metaKey || ev.ctrlKey) && ev.shiftKey && (ev.key === "C" || ev.key === "c")) {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
@@ -412,9 +427,22 @@ export function ChatView({
     if (mentions.length > 0) setMentions([]);
   };
 
-  const visibleMessages = useMemo(() => {
-    if (viewMode === "summary") return messages.filter((m) => m.role !== "tool");
-    return messages;
+  const { visibleMessages, visibleIndexToReal } = useMemo(() => {
+    if (viewMode !== "summary") {
+      return {
+        visibleMessages: messages,
+        visibleIndexToReal: messages.map((_, i) => i),
+      };
+    }
+    const visible: typeof messages = [];
+    const mapping: number[] = [];
+    messages.forEach((m, i) => {
+      if (m.role !== "tool") {
+        visible.push(m);
+        mapping.push(i);
+      }
+    });
+    return { visibleMessages: visible, visibleIndexToReal: mapping };
   }, [messages, viewMode]);
 
   const hasMessages = visibleMessages.length > 0 || !!streamingContent;
@@ -429,7 +457,7 @@ export function ChatView({
           <span className={styles.viewModeBadge}>{viewMode === "verbose" ? "详细" : "摘要"}</span>
         )}
         {/* Messages */}
-        <main className={styles.messages}>
+        <main className={styles.messages} aria-live="polite" aria-relevant="additions">
           {contextUsage > 0.8 && (
             <div className={styles.compactBar}>
               <span>上下文接近满（{Math.round(contextUsage * 100)}%），建议压缩以释放空间</span>
@@ -442,7 +470,7 @@ export function ChatView({
             <MessageBubble
               key={msg.id ?? idx}
               message={msg}
-              index={idx}
+              index={visibleIndexToReal[idx]}
               allMessages={visibleMessages}
               isLastUser={idx === visibleMessages.length - 1 && msg.role === "user"}
               agentBusy={agentBusy}
@@ -635,7 +663,7 @@ export function ChatView({
              </svg>
            </button>
          ) : (
-           <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn}>
+            <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn} title="发送" aria-label="发送">
              <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
                <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
              </svg>

@@ -60,7 +60,7 @@ export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: st
           {config.resolvable ? "可用" : "离线"}
         </span>
         <svg
-          className={styles.chevron + (expanded ? " expanded" : "")}
+          className={[styles.chevron, expanded && styles.expanded].filter(Boolean).join(" ")}
           width="14"
           height="14"
           viewBox="0 0 14 14"

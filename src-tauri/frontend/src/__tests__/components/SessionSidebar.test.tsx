@@ -46,15 +46,12 @@ describe("SessionSidebar — session interactions", () => {
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "s-new" }));
   });
 
-  it("delete session invokes backend and removes item", async () => {
+  it("delete session delegates to onDelete and removes item", async () => {
     sessionFixture();
     const { onDelete } = renderSidebar();
-    const deleted: string[] = [];
-    mockInvoke("neocodex_delete_session", (args) => { deleted.push(args.sessionId); return "ok"; });
     await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
     const rows = screen.getAllByTitle("删除会话");
     await userEvent.click(rows[0]);
-    await waitFor(() => expect(deleted).toContain("s-1"));
     expect(onDelete).toHaveBeenCalledWith("s-1");
   });
 
@@ -84,14 +81,12 @@ describe("SessionSidebar — session interactions", () => {
 
   it("deleting from archived uses delete handler", async () => {
     sessionFixture();
-    const deleted: string[] = [];
-    mockInvoke("neocodex_delete_session", (args) => { deleted.push(args.sessionId); return "ok"; });
-    renderSidebar();
+    const { onDelete } = renderSidebar();
     await waitFor(() => expect(screen.getByText(/已归档 \(1\)/)).toBeInTheDocument());
     await userEvent.click(screen.getByText(/已归档 \(1\)/));
     const delBtn = screen.getAllByTitle("永久删除");
     await userEvent.click(delBtn[0]);
-    await waitFor(() => expect(deleted).toContain("s-3"));
+    expect(onDelete).toHaveBeenCalledWith("s-3");
   });
 
   it("rename updates the session name via backend", async () => {

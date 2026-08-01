@@ -37,7 +37,11 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
       const files: TreeNode[] = [];
       for (const e of entries) {
         if (IGNORED.has(e.name)) continue;
-        const node: TreeNode = { name: e.name, path: `${dirPath}/${e.name}`, isDirectory: e.isDirectory };
+        const node: TreeNode = {
+          name: e.name,
+          path: (e as { path?: string }).path ?? (dirPath === "." ? e.name : `${dirPath.replace(/[\\/]+$/, "")}/${e.name}`),
+          isDirectory: e.isDirectory,
+        };
         if (e.isDirectory) {
           node.children = await loadDir(node.path, depth + 1);
           dirs.push(node);

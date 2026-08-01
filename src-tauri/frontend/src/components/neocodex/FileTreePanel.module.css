@@ -4,7 +4,7 @@
   height: 100%;
   min-height: 0;
   background: var(--bg-secondary, #1a1a1a);
-  border-right: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-right: 1px solid var(--border-primary);
   font-size: 12px;
 }
 
@@ -13,25 +13,25 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .title {
   font-weight: 600;
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
 }
 
 .refresh {
   background: none;
   border: none;
-  color: var(--text-secondary, #999);
+  color: var(--fg-secondary);
   cursor: pointer;
   font-size: 14px;
   padding: 2px 6px;
   border-radius: 4px;
 }
 .refresh:hover {
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -49,7 +49,7 @@
   width: 100%;
   background: none;
   border: none;
-  color: var(--text-secondary, #bbb);
+  color: var(--fg-secondary);
   cursor: pointer;
   padding: 3px 8px 3px 8px;
   text-align: left;
@@ -57,7 +57,7 @@
 }
 .row:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
 }
 .selected {
   background: var(--accent, #4f8cff);
@@ -77,7 +77,7 @@
 }
 
 .preview {
-  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-top: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   height: 45%;
@@ -89,7 +89,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .previewActions {
@@ -100,15 +100,15 @@
 
 .editBtn {
   background: none;
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
-  color: var(--text-secondary, #bbb);
+  color: var(--fg-secondary);
   cursor: pointer;
   font-size: 11px;
   padding: 2px 8px;
 }
 .editBtn:hover {
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
 }
 
 .saveBtn {
@@ -143,7 +143,7 @@
   padding: 8px 10px;
   font-family: var(--font-mono, "SF Mono", Menlo, monospace);
   font-size: 11px;
-  color: var(--text-primary, #ddd);
+  color: var(--fg-primary);
   background: var(--bg-tertiary, #111);
   border: none;
   outline: none;
@@ -162,7 +162,7 @@
   z-index: 41;
   min-width: 160px;
   background: var(--bg-tertiary, #222);
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -176,7 +176,7 @@
   text-align: left;
   padding: 6px 10px;
   border-radius: 4px;
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
   font-size: 12px;
   cursor: pointer;
 }
@@ -186,18 +186,18 @@
 
 .previewName {
   font-weight: 600;
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
 }
 
 .close {
   background: none;
   border: none;
-  color: var(--text-secondary, #999);
+  color: var(--fg-secondary);
   cursor: pointer;
   font-size: 12px;
 }
 .close:hover {
-  color: var(--text-primary, #eee);
+  color: var(--fg-primary);
 }
 
 .pre {
@@ -208,12 +208,12 @@
   padding: 8px 10px;
   font-family: var(--font-mono, "SF Mono", Menlo, monospace);
   font-size: 11px;
-  color: var(--text-primary, #ddd);
+  color: var(--fg-primary);
   white-space: pre;
 }
 
 .muted {
-  color: var(--text-secondary, #777);
+  color: var(--fg-secondary);
   padding: 12px;
 }
 
