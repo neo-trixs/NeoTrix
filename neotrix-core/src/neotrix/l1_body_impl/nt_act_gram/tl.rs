@@ -46,11 +46,12 @@ impl TlReader {
         } else {
             let mut extra = [0u8; 3];
             self.cursor.read_exact(&mut extra).map_err(|e| e.to_string())?;
-            let total = (len as u32) | ((extra[0] as u32) << 8) | ((extra[1] as u32) << 16) | ((extra[2] as u32) << 24);
-            let remainder = (total & 0x00FFFFFF) as usize;
-            let mut data = vec![0u8; remainder];
+            let len = 254 + extra[0] as usize
+                + ((extra[1] as usize) << 8)
+                + ((extra[2] as usize) << 16);
+            let mut data = vec![0u8; len];
             self.cursor.read_exact(&mut data).map_err(|e| e.to_string())?;
-            let pad = (4 - total as usize % 4) % 4;
+            let pad = (4 - len % 4) % 4;
             self.cursor.read_exact(&mut vec![0u8; pad]).ok();
             Ok(data)
         }
@@ -131,11 +132,13 @@ impl TlWriter {
             let pad = (4 - (len + 1) % 4) % 4;
             self.buffer.extend(std::iter::repeat_n(0u8, pad));
         } else {
-            let lb = (len as u32).to_le_bytes();
-            self.buffer.push(lb[0]);
-            self.buffer.push(lb[1]);
-            self.buffer.push(lb[2]);
-            self.buffer.push(lb[3]);
+            // MTProto TL long-form: 0xFE prefix + 3-byte little-endian
+            // (len - 254). Padding rounds the total (4 + len + pad) to a
+            // multiple of 4.
+            self.buffer.push(254);
+            let v = (len - 254) as u32;
+            let lb = v.to_le_bytes();
+            self.buffer.extend_from_slice(&lb[..3]);
             self.buffer.extend_from_slice(data);
             let pad = (4 - len % 4) % 4;
             self.buffer.extend(std::iter::repeat_n(0u8, pad));
@@ -223,6 +226,30 @@ mod tests {
         let buf = w.into_bytes();
         let mut r = TlReader::new(buf);
         assert_eq!(r.read_bytes().expect("read_bytes should return the written bytes"), data);
+    }
+
+    #[test]
+    fn test_write_read_long_bytes_roundtrip() {
+        // Regression: TL long-form (len >= 254) previously wrote a raw 4-byte
+        // LE length with no 0xFE prefix, while the reader decoded 254 + offset
+        // — self-round-trips broke for any payload >= 255 bytes (e.g. pq/g_a
+        // in key exchange). The writer now emits 0xFE + 3-byte LE length and
+        // the reader decodes 254 + 3-byte LE, matching the MTProto spec.
+        for len in [254usize, 255, 256, 300, 1024, 4096] {
+            let data: Vec<u8> = (0..len).map(|i| (i % 251) as u8).collect();
+            let mut w = TlWriter::new();
+            w.write_bytes(&data);
+            let buf = w.into_bytes();
+            assert_eq!(buf[0], 254, "long-form must start with 0xFE");
+            assert_eq!(
+                254 + (buf[1] as usize) + ((buf[2] as usize) << 8) + ((buf[3] as usize) << 16),
+                len,
+                "3-byte LE (len - 254) must reproduce the payload length"
+            );
+            let mut r = TlReader::new(buf);
+            assert_eq!(r.read_bytes().expect("round-trip should succeed"), data);
+            assert_eq!(r.remaining(), 0, "padding must leave no trailing bytes");
+        }
     }
 
     #[test]
