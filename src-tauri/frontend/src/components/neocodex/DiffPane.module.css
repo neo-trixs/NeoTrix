@@ -1,0 +1,122 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-secondary, #161616);
+  border-top: 1px solid var(--border-primary, rgba(255, 255, 255, 0.08));
+  font-family: var(--font-mono, "SF Mono", Menlo, monospace);
+  font-size: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-primary, rgba(255, 255, 255, 0.08));
+}
+
+.title {
+  font-weight: 600;
+  color: var(--text-primary, #eee);
+  font-size: 12px;
+}
+
+.scopes {
+  display: flex;
+  gap: 4px;
+}
+
+.scopeBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary, #999);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.scopeBtn:hover {
+  color: var(--text-primary, #eee);
+}
+.scopeActive {
+  color: var(--text-primary, #eee);
+  border-color: var(--border-primary, rgba(255, 255, 255, 0.15));
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.refresh {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  font-size: 14px;
+}
+.refresh:hover {
+  color: var(--text-primary, #eee);
+}
+
+.fileInputRow {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-primary, rgba(255, 255, 255, 0.08));
+}
+
+.fileInput {
+  flex: 1;
+  background: var(--bg-tertiary, #222);
+  border: 1px solid var(--border-primary, rgba(255, 255, 255, 0.1));
+  border-radius: 4px;
+  color: var(--text-primary, #eee);
+  font-size: 12px;
+  padding: 3px 8px;
+  outline: none;
+}
+
+.applyBtn {
+  background: var(--accent, #4f8cff);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 11px;
+}
+.added { color: #3fb950; }
+.removed { color: #f85149; }
+.muted { color: var(--text-secondary, #777); }
+.errorText { color: #f85149; }
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.block {
+  padding: 2px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+}
+.added { background: rgba(63, 185, 80, 0.12); color: #7ee787; }
+.removed { background: rgba(248, 81, 73, 0.12); color: #ffa198; }
+.unchanged { color: var(--text-secondary, #aaa); }
+
+.empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary, #666);
+}

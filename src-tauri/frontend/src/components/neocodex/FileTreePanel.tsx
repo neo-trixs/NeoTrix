@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { readDir, readTextFile } from "@tauri-apps/plugin-fs";
+import { readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { open } from "@tauri-apps/plugin-shell";
 import styles from "./FileTreePanel.module.css";
 
 interface TreeNode {
@@ -19,6 +20,11 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
   const [selected, setSelected] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; path: string; name: string } | null>(null);
+  const [savedFlash, setSavedFlash] = useState(false);
 
   const rootPath = projectRoot || ".";
 
@@ -78,6 +84,7 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
     setSelected(node.path);
     setPreviewName(node.name);
     setPreview(null);
+    setEditing(false);
     if (node.isDirectory) {
       toggle(node);
       return;
@@ -91,6 +98,49 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
     }
   };
 
+  const startEdit = () => {
+    if (preview === null) return;
+    setEditValue(preview.replace(/\n\n… \(已截断\)$/, ""));
+    setEditing(true);
+  };
+
+  const saveFile = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      await writeTextFile(selected, editValue);
+      setPreview(editValue);
+      setEditing(false);
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1600);
+    } catch (e) {
+      setPreview(`[保存失败]\n${e}`);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, node: TreeNode) => {
+    e.preventDefault();
+    if (node.isDirectory) return;
+    setMenu({ x: e.clientX, y: e.clientY, path: node.path, name: node.name });
+  };
+
+  const menuAction = async (action: "open" | "reveal" | "copy") => {
+    if (!menu) return;
+    try {
+      if (action === "copy") {
+        await navigator.clipboard.writeText(menu.path);
+      } else {
+        await open(menu.path);
+      }
+    } catch {
+      /* ignore */
+    }
+    setMenu(null);
+  };
+
   const renderTree = (nodes: TreeNode[], depth: number): React.ReactNode => (
     nodes.map((node) => (
       <div key={node.path}>
@@ -99,6 +149,7 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
           className={`${styles.row} ${selected === node.path ? styles.selected : ""}`}
           style={{ paddingLeft: 8 + depth * 14 }}
           onClick={() => openFile(node)}
+          onContextMenu={(e) => handleContextMenu(e, node)}
         >
           <span className={styles.icon}>{node.isDirectory ? (node.expanded ? "▾" : "▸") : "·"}</span>
           <span className={styles.name} title={node.path}>{node.name}</span>
@@ -124,13 +175,46 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
         <div className={styles.preview}>
           <div className={styles.previewHeader}>
             <span className={styles.previewName}>{previewName}</span>
-            <button type="button" className={styles.close} onClick={() => setPreview(null)}>✕</button>
+            <div className={styles.previewActions}>
+              {savedFlash && <span className={styles.savedFlash}>已保存</span>}
+              {!editing && previewName && (
+                <button type="button" className={styles.editBtn} onClick={startEdit}>编辑</button>
+              )}
+              {editing && (
+                <>
+                  <button type="button" className={styles.saveBtn} onClick={saveFile} disabled={saving}>
+                    {saving ? "保存中…" : "保存"}
+                  </button>
+                  <button type="button" className={styles.editBtn} onClick={() => setEditing(false)}>取消</button>
+                </>
+              )}
+              <button type="button" className={styles.close} onClick={() => setPreview(null)}>✕</button>
+            </div>
           </div>
-          <pre className={styles.pre}>{preview}</pre>
+          {editing ? (
+            <textarea
+              className={styles.editor}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              spellCheck={false}
+            />
+          ) : (
+            <pre className={styles.pre}>{preview}</pre>
+          )}
         </div>
       )}
-      {onPick && selected && (
+      {onPick && selected && !editing && (
         <button type="button" className={styles.pickBtn} onClick={() => onPick(selected)}>插入到输入</button>
+      )}
+      {menu && (
+        <>
+          <div className={styles.menuOverlay} onClick={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} />
+          <div className={styles.menu} style={{ top: menu.y, left: menu.x }}>
+            <button type="button" className={styles.menuItem} onClick={() => menuAction("open")}>在外部编辑器打开</button>
+            <button type="button" className={styles.menuItem} onClick={() => menuAction("reveal")}>在 Finder 中显示</button>
+            <button type="button" className={styles.menuItem} onClick={() => menuAction("copy")}>复制路径</button>
+          </div>
+        </>
       )}
     </div>
   );

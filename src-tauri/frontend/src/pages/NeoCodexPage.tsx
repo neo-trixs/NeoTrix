@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../stores";
-import { ChatView, CommandPalette, FileTreePanel, ModelSelector, SessionSidebar, SettingsView, ShortcutHelp } from "../components/neocodex";
+import { ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, SettingsView, ShortcutHelp, TerminalPane } from "../components/neocodex";
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -35,6 +35,9 @@ export default function NeoCodexPage() {
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [fileTreeOpen, setFileTreeOpen] = React.useState(false);
   const [showUsage, setShowUsage] = React.useState(false);
+  const [terminalOpen, setTerminalOpen] = React.useState(false);
+  const [diffOpen, setDiffOpen] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
@@ -231,6 +234,15 @@ export default function NeoCodexPage() {
       } else if (e.key === ";" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setSideChatOpen((v) => !v);
+      } else if (e.key === "`" && e.ctrlKey) {
+        e.preventDefault();
+        setTerminalOpen((v) => !v);
+      } else if (e.key === "d" && e.metaKey && e.shiftKey) {
+        e.preventDefault();
+        setDiffOpen((v) => !v);
+      } else if (e.key === "p" && e.metaKey && e.shiftKey) {
+        e.preventDefault();
+        setPreviewOpen((v) => !v);
       } else if (e.key === "Tab" && e.ctrlKey) {
         e.preventDefault();
         if (neocodexSessions.length === 0) return;
@@ -449,6 +461,22 @@ export default function NeoCodexPage() {
             </div>
           )}
         </div>
+
+        {terminalOpen && (
+          <div className={styles.pane}>
+            <TerminalPane />
+          </div>
+        )}
+        {diffOpen && (
+          <div className={styles.pane}>
+            <DiffPane />
+          </div>
+        )}
+        {previewOpen && (
+          <div className={styles.pane}>
+            <PreviewPane />
+          </div>
+        )}
 
         <footer className={styles.statusBar}>
           <span className={styles.statusItem}>

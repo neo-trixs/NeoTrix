@@ -1,7 +1,10 @@
 export { ChatView } from "./ChatView";
 export { CommandPalette } from "./CommandPalette";
+export { DiffPane } from "./DiffPane";
 export { FileTreePanel } from "./FileTreePanel";
 export { ModelSelector } from "./ModelSelector";
+export { PreviewPane } from "./PreviewPane";
 export { SessionSidebar } from "./SessionSidebar";
 export { SettingsView } from "./SettingsView";
 export { ShortcutHelp } from "./ShortcutHelp";
+export { TerminalPane } from "./TerminalPane";

@@ -172,6 +172,12 @@
   font-weight: 600;
 }
 
+.pane {
+  flex-shrink: 0;
+  height: 260px;
+  border-top: 1px solid var(--border-primary);
+}
+
 .settingsBtn {
   display: flex;
   align-items: center;
