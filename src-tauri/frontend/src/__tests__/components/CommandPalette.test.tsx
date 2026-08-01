@@ -84,4 +84,31 @@ describe("CommandPalette — fuzzy search & keyboard nav", () => {
     await userEvent.keyboard("{Enter}");
     expect(items[0].onSelect).toHaveBeenCalled();
   });
+
+  it("declares dialog semantics and traps Tab focus", async () => {
+    render(<CommandPalette open items={items} onClose={() => {}} />);
+    const palette = screen.getByTestId("command-palette");
+    expect(palette).toHaveAttribute("role", "dialog");
+    expect(palette).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByTestId("palette-input")).toHaveFocus();
+    // Tab from the last item wraps back to the input (focus trap).
+    const buttons = screen.getAllByTestId(/palette-item/);
+    buttons[buttons.length - 1].focus();
+    await userEvent.tab();
+    expect(screen.getByTestId("palette-input")).toHaveFocus();
+    // Shift+Tab from the first item wraps to the last (focus trap).
+    await userEvent.tab({ shift: true });
+    expect(buttons[buttons.length - 1]).toHaveFocus();
+  });
+
+  it("restores focus to the trigger on close", async () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "打开";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const { rerender } = render(<CommandPalette open items={items} onClose={() => {}} />);
+    rerender(<CommandPalette open={false} items={items} onClose={() => {}} />);
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

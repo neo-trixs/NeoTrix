@@ -2,11 +2,16 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { FileTreePanel } from "../../components/neocodex/FileTreePanel";
 import * as fs from "@tauri-apps/plugin-fs";
+import * as shell from "@tauri-apps/plugin-shell";
 
 vi.mock("@tauri-apps/plugin-fs", () => ({
   readDir: vi.fn(),
   readTextFile: vi.fn(),
   writeTextFile: vi.fn(),
+}));
+
+vi.mock("@tauri-apps/plugin-shell", () => ({
+  open: vi.fn().mockResolvedValue(undefined),
 }));
 
 beforeEach(() => {
@@ -68,5 +73,21 @@ describe("FileTreePanel", () => {
     fireEvent.click(await screen.findByText("b.txt"));
     fireEvent.click(screen.getByText("插入到输入"));
     expect(picked).toBe("./b.txt");
+  });
+
+  it("blocks inline edit for truncated (>256KB) previews to prevent data loss", async () => {
+    const big = "a".repeat(300 * 1024);
+    vi.mocked(fs.readDir).mockResolvedValue([
+      { name: "big.txt", isDirectory: false, path: "./big.txt" },
+    ] as any);
+    vi.mocked(fs.readTextFile).mockResolvedValue(big);
+    render(<FileTreePanel projectRoot="." />);
+    fireEvent.click(await screen.findByText("big.txt"));
+    await screen.findByText(/已截断/);
+    // Clicking 编辑 on a truncated file must not open the textarea (writing
+    // the truncated text back would silently destroy the file tail).
+    fireEvent.click(screen.getByText("编辑"));
+    expect(document.querySelector("textarea")).toBeNull();
+    expect(shell.open).toHaveBeenCalledWith("./big.txt");
   });
 });

@@ -56,6 +56,15 @@ export function FileTreePanel({ projectRoot, onPick }: { projectRoot?: string; o
     setError("");
     try {
       const children = await loadDir(rootPath, 0);
+      // loadDir swallows per-entry errors; a failed root read must surface as
+      // an error state, not a misleading "无文件" empty tree.
+      try {
+        await readDir(rootPath);
+      } catch (e) {
+        setError(`无法读取目录: ${e}`);
+        setRoot(null);
+        return;
+      }
       const node: TreeNode = { name: rootPath, path: rootPath, isDirectory: true, children, expanded: true };
       setRoot(node);
     } catch (e) {

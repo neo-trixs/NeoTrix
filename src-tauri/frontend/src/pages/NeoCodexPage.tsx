@@ -139,6 +139,7 @@ export default function NeoCodexPage() {
   };
 
   const handleSend = async (content: string, attachments?: Attachment[], regenerate?: boolean) => {
+    if (agentBusy && !regenerate) return;
     stopRef.current = false;
     setAgentBusy(true);
     if (!regenerate) {

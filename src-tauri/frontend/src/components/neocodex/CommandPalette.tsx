@@ -31,13 +31,43 @@ export function CommandPalette({ open, items, onClose }: { open: boolean; items:
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const paletteRef = useRef<HTMLDivElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setQuery("");
       setActive(0);
+      lastFocusedRef.current = document.activeElement as HTMLElement | null;
       inputRef.current?.focus();
+    } else if (lastFocusedRef.current) {
+      lastFocusedRef.current.focus?.();
+      lastFocusedRef.current = null;
     }
+  }, [open]);
+
+  // Trap Tab/Shift+Tab inside the palette so keyboard users can't walk into
+  // the page behind the overlay (parity with Codex/Claude palettes).
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const node = paletteRef.current;
+      if (!node) return;
+      const focusables = node.querySelectorAll<HTMLElement>('button, [href], input, [tabindex]:not([tabindex="-1"])');
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
   const filtered = useMemo(() => {
@@ -77,7 +107,16 @@ export function CommandPalette({ open, items, onClose }: { open: boolean; items:
 
   return (
     <div className={styles.overlay} onClick={onClose} data-testid="palette-overlay">
-      <div className={styles.palette} onClick={(e) => e.stopPropagation()} onKeyDown={handleKey} data-testid="command-palette">
+      <div
+        ref={paletteRef}
+        className={styles.palette}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKey}
+        data-testid="command-palette"
+        role="dialog"
+        aria-modal="true"
+        aria-label="命令面板"
+      >
         <input
           ref={inputRef}
           className={styles.input}
