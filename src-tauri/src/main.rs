@@ -877,14 +877,20 @@ fn main() {
                         }
                     });
  
-                    // 监听系统托盘 "Sync Now" 事件
+                    // 监听系统托盘 "Sync Now" 事件（去重：同一时刻只允许一个同步循环）
                     let sync_state_trigger = sync_state_bg.clone();
                     let handle_trigger = app.handle().clone();
+                    static SYNC_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
                     app.handle().listen("sync-trigger", move |_| {
+                        if SYNC_RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                            log::warn!("[auto-sync] trigger ignored: a sync cycle is already running");
+                            return;
+                        }
                         let state = sync_state_trigger.clone();
                         let handle = handle_trigger.clone();
                         std::thread::spawn(move || {
                             auto_sync_cycle(&state, &handle);
+                            SYNC_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
                         });
                     });
  
