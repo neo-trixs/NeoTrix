@@ -71,6 +71,7 @@ pub enum LspError {
     RequestFailed(i64, String),
     ParseError(String),
     IoError(String),
+    Timeout,
 }
 
 impl std::fmt::Display for LspError {
@@ -83,6 +84,7 @@ impl std::fmt::Display for LspError {
             LspError::RequestFailed(c, m) => write!(f, "LSP request failed ({}): {}", c, m),
             LspError::ParseError(msg) => write!(f, "LSP parse error: {}", msg),
             LspError::IoError(msg) => write!(f, "LSP IO error: {}", msg),
+            LspError::Timeout => write!(f, "LSP request timed out"),
         }
     }
 }
@@ -361,7 +363,11 @@ impl LspClient {
         .await
         .map_err(|e| LspError::IoError(e.to_string()))?;
 
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
         loop {
+            if std::time::Instant::now() > deadline {
+                return Err(LspError::Timeout);
+            }
             let msg = protocol::read_message(&mut self.reader)
                 .await
                 .map_err(LspError::IoError)?;

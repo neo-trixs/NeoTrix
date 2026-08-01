@@ -80,7 +80,10 @@ impl CliCommand for ScheduleCmd {
 
                 let mut engine = ALWAYS_ON_ENGINE.lock().unwrap_or_else(|e| e.into_inner());
                 let id = engine.add_scheduled(desc.trim(), schedule);
-                let _ = engine.save();
+                if let Err(e) = engine.save() {
+                    return CommandOutput::err(&format!(
+                        "Scheduled task added but FAILED to persist (will be lost on restart): {}", e));
+                }
                 CommandOutput::ok(&format!("Scheduled task added: {} (id={})", desc.trim(), id))
             }
             "list" => {

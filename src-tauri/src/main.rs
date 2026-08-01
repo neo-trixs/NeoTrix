@@ -801,7 +801,9 @@ fn main() {
                     commands::unified_session_refresh,
                 ])
                 .setup(move |app| {
-                    neotrix_tauri::setup_tray(app).expect("failed to setup tray");
+                    if let Err(e) = neotrix_tauri::setup_tray(app) {
+                        log::warn!("failed to setup tray: {}", e);
+                    }
                     let _ = neotrix_tauri::setup_menu(app);
 
                     if let Err(e) = app.global_shortcut().register("CommandOrControl+Shift+Space") {

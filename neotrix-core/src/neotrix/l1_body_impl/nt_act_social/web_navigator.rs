@@ -407,7 +407,11 @@ impl WebNavigator {
                 .await
                 .map_err(|e| format!("send: {}", e))?;
 
+            let deadline = Instant::now() + Duration::from_secs(30);
             loop {
+                if Instant::now() > deadline {
+                    return Err("CDP get_targets: no response within 30s".into());
+                }
                 match ws.next().await {
                     Some(Ok(Message::Text(text))) => {
                         let v: Value = serde_json::from_str(&text)
@@ -451,7 +455,11 @@ impl WebNavigator {
                 .await
                 .map_err(|e| format!("send: {}", e))?;
 
+            let deadline = Instant::now() + Duration::from_secs(30);
             loop {
+                if Instant::now() > deadline {
+                    return Err("CDP create_target: no response within 30s".into());
+                }
                 match ws.next().await {
                     Some(Ok(Message::Text(text))) => {
                         let v: Value = serde_json::from_str(&text)
@@ -478,7 +486,11 @@ impl WebNavigator {
                                 .map_err(|e| format!("send attach: {}", e))?;
 
                             // Wait for attach response with sessionId
+                            let attach_deadline = Instant::now() + Duration::from_secs(30);
                             loop {
+                                if Instant::now() > attach_deadline {
+                                    return Err("CDP attach_to_target: no response within 30s".into());
+                                }
                                 match ws.next().await {
                                     Some(Ok(Message::Text(t))) => {
                                         let v2: Value = match serde_json::from_str(&t) {

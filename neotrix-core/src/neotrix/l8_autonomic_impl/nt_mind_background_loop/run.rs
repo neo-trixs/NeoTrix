@@ -1358,6 +1358,15 @@ impl BackgroundLoopHandle {
             }
             CoreEvent::TaskSubmitted { task, task_type, priority } if *priority >= 3 => {
                 log::info!("[bg] event_bus: high-priority task {} ({})", task, task_type);
+                // R-P41: 高优先级任务入 KB，供后续 handler 消费，而非纯日志
+                if let Some(ref kb) = self.kb {
+                    let _ = kb.kv_set("event_bus", "task_submitted", &serde_json::json!({
+                        "task": task, "task_type": task_type, "priority": priority,
+                        "timestamp": std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default().as_secs(),
+                    }).to_string());
+                }
             }
             _ => {
                 log::trace!("[bg] event_bus: {:?}", event);

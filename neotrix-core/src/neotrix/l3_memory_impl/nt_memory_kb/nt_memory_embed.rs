@@ -45,21 +45,23 @@ pub fn embed_text(config: &EmbeddingConfig, text: &str) -> Result<Vec<f32>, Stri
     results.pop().ok_or_else(|| "Empty batch response".to_string())
 }
 
-fn embedding_client() -> &'static reqwest::blocking::Client {
-    static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+fn embedding_client() -> Result<&'static reqwest::blocking::Client, String> {
+    static CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = OnceLock::new();
     CLIENT.get_or_init(|| {
         reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
             .build()
-            .expect("embedding HTTP client")
+            .map_err(|e| format!("embedding HTTP client: {}", e))
     })
+    .as_ref()
+    .map_err(|e| e.clone())
 }
 
 /// Generate embeddings for multiple texts in a single API call.
 pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
     if texts.is_empty() { return Ok(Vec::new()); }
 
-    let client = embedding_client();
+    let client = embedding_client()?;
 
     let input: Vec<&str> = texts.to_vec();
     let body = serde_json::json!({

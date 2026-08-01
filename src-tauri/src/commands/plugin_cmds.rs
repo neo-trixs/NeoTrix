@@ -130,7 +130,7 @@ fn default_plugins_dir() -> String {
 
 #[tauri::command]
 pub fn plugin_list() -> Vec<PluginStatus> {
-    let mut state = PLUGIN_STATE.lock().unwrap();
+    let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     let dir = &state.config.plugins_dir;
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -162,7 +162,7 @@ pub fn plugin_install(path: String) -> Result<PluginStatus, String> {
     if manifest.name.is_empty() {
         return Err("Plugin manifest must have a non-empty 'name'".into());
     }
-    let mut state = PLUGIN_STATE.lock().unwrap();
+    let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     if state.manifests.iter().any(|m| m.id == manifest.id) {
         return Err(format!("Plugin '{}' is already installed", manifest.id));
     }
@@ -192,7 +192,7 @@ pub fn plugin_install(path: String) -> Result<PluginStatus, String> {
 
 #[tauri::command]
 pub fn plugin_uninstall(id: String) -> Result<(), String> {
-    let mut state = PLUGIN_STATE.lock().unwrap();
+    let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     let before = state.manifests.len();
     state.manifests.retain(|m| m.id != id);
     state.statuses.retain(|s| s.id != id);
@@ -205,7 +205,7 @@ pub fn plugin_uninstall(id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn plugin_enable(id: String) -> Result<(), String> {
-    let mut state = PLUGIN_STATE.lock().unwrap();
+    let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     if !state.manifests.iter().any(|m| m.id == id) {
         return Err(format!("Plugin '{}' not found", id));
     }
@@ -216,7 +216,7 @@ pub fn plugin_enable(id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn plugin_disable(id: String) -> Result<(), String> {
-    let mut state = PLUGIN_STATE.lock().unwrap();
+    let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     if !state.manifests.iter().any(|m| m.id == id) {
         return Err(format!("Plugin '{}' not found", id));
     }
@@ -227,7 +227,7 @@ pub fn plugin_disable(id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn plugin_get(id: String) -> Result<PluginStatus, String> {
-    let state = PLUGIN_STATE.lock().unwrap();
+    let state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     state
         .statuses
         .iter()
@@ -238,13 +238,13 @@ pub fn plugin_get(id: String) -> Result<PluginStatus, String> {
 
 #[tauri::command]
 pub fn plugin_config() -> Result<PluginConfig, String> {
-    let state = PLUGIN_STATE.lock().unwrap();
+    let state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     Ok(state.config.clone())
 }
 
 #[tauri::command]
 pub fn plugin_set_config(config: PluginConfig) -> Result<(), String> {
-    let mut state = PLUGIN_STATE.lock().unwrap();
+    let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     state.push_event("config_change", "system", "Plugin config updated");
     state.config = config;
     Ok(())
@@ -252,7 +252,7 @@ pub fn plugin_set_config(config: PluginConfig) -> Result<(), String> {
 
 #[tauri::command]
 pub fn plugin_event_log(count: usize) -> Vec<PluginEvent> {
-    let state = PLUGIN_STATE.lock().unwrap();
+    let state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     state.events.iter().rev().take(count).cloned().collect()
 }
 
@@ -262,7 +262,7 @@ pub fn plugin_run(
     entry_point: String,
     args: Option<Vec<String>>,
 ) -> Result<String, String> {
-    let state = PLUGIN_STATE.lock().unwrap();
+    let state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     if !state.manifests.iter().any(|m| m.id == id) {
         return Err(format!("Plugin '{}' not found", id));
     }
@@ -279,7 +279,7 @@ pub fn plugin_run(
     );
     log::info!("{}", msg);
     drop(state);
-    let mut s = PLUGIN_STATE.lock().unwrap();
+    let mut s = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
     s.push_event("loaded", &id, &msg);
     Ok(msg)
 }
@@ -289,7 +289,7 @@ mod tests {
     use super::*;
 
     fn reset_state() {
-        let mut state = PLUGIN_STATE.lock().unwrap();
+        let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
         state.manifests.clear();
         state.statuses.clear();
         state.events.clear();
@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn test_plugin_event_log_bounded() {
         reset_state();
-        let mut state = PLUGIN_STATE.lock().unwrap();
+        let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());
         for i in 0..150 {
             state.push_event("test", "p1", &format!("event {}", i));
         }

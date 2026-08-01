@@ -217,6 +217,10 @@ impl PipelineScheduler {
             return;
         }
         loop {
+            // stop() 可中断循环 (R-P38: 无退出条件的后台循环 = P0)
+            if !self.running.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
             sleep(Duration::from_secs(60)).await;
             let should_l1 = self.state.read().await.should_trigger_l1(&self.config);
             if should_l1 {

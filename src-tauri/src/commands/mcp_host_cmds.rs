@@ -573,23 +573,28 @@ pub fn mcp_host_start(config: McpHostConfig) -> Result<String, String> {
 
 #[tauri::command]
 pub fn mcp_host_stop() -> Result<(), String> {
-    let mut state = MCP_HOST.lock().map_err(|e| e.to_string())?;
-    if !state.running {
-        return Err("MCP host is not running".into());
-    }
-    if let Some(mut child) = state.child.take() {
+    let child = {
+        let mut state = MCP_HOST.lock().map_err(|e| e.to_string())?;
+        if !state.running {
+            return Err("MCP host is not running".into());
+        }
+        let child = state.child.take();
+        state.child = None;
+        state.child_stdin = None;
+        state.child_stdout = None;
+        state.pid = None;
+        state.running = false;
+        state.sessions.clear();
+        log_activity(&mut state, serde_json::json!({
+            "event": "stop", "ts": now_secs()
+        }));
+        child
+    };
+    // 锁外 wait：child 对 kill 无响应时不应阻塞其他 MCP 命令
+    if let Some(mut child) = child {
         let _ = child.kill();
         let _ = child.wait();
     }
-    state.child = None;
-    state.child_stdin = None;
-    state.child_stdout = None;
-    state.pid = None;
-    state.running = false;
-    state.sessions.clear();
-    log_activity(&mut state, serde_json::json!({
-        "event": "stop", "ts": now_secs()
-    }));
     Ok(())
 }
 

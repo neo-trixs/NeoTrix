@@ -866,7 +866,7 @@ pub fn run_daemon_evolution(profile: &str) {
             neotrix::neotrix::nt_mind_evolution_daemon::EvolutionDaemon::default()
         ));
         let daemon_clone = daemon.clone();
-        tokio::spawn(async move {
+        let evolution_task = tokio::spawn(async move {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(60)).await;
                 let mut d = daemon_clone.lock().unwrap_or_else(|e| e.into_inner());
@@ -883,6 +883,9 @@ pub fn run_daemon_evolution(profile: &str) {
         if let Ok(brain_guard) = bg.brain.try_read() {
             brain_guard.shutdown_save_e8();
         }
+        // 终止 evolution 后台任务，避免 ctrl_c 后幽灵 tick (R-P38)
+        evolution_task.abort();
+        let _ = evolution_task.await;
         bg.shutdown().await;
     });
 }

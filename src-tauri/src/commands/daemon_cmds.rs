@@ -169,7 +169,7 @@ pub fn daemon_start(config: DaemonConfig) -> Result<String, String> {
                                             for issue in issues {
                                                 push_event("issue", &path, &issue);
                                             }
-                                            let mut state = DAEMON.lock().unwrap();
+                                            let mut state = DAEMON.lock().unwrap_or_else(|e| e.into_inner());
                                             state.fixes_applied += 1;
                                             state.watched_files.insert(path.clone());
                                         }

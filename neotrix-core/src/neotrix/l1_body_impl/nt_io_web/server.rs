@@ -199,18 +199,22 @@ pub async fn start_server_with(
     }
 
     let addr = format!("0.0.0.0:{}", port);
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .expect("Failed to bind address");
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("Failed to bind address {}: {}", addr, e);
+            return;
+        }
+    };
 
     println!("╔══════════════════════════════════════════════╗");
     println!("║     NeoTrix Web UI                          ║");
     println!("║     Listening on http://{}               ║", addr);
     println!("╚══════════════════════════════════════════════╝");
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server failed");
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("Server failed: {}", e);
+    }
 }
 
 use super::{AgentStatus, SessionInfo};
