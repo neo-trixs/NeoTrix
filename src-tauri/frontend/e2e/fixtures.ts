@@ -12,6 +12,14 @@ const PRELOAD_SCRIPT = `(function() {
     neocodex_get_session_messages: () => [],
     neocodex_get_side_chat: () => [],
     neocodex_check_update: () => ({ current: "0.18.0", available: false, latest: "", error: null }),
+    neocodex_provider_config: () => ({
+      providers: [
+        { name: "test", active: true, resolvable: true, offline: false, models: ["test-model"] },
+      ],
+      active: "test",
+      active_model: "test-model",
+    }),
+    neocodex_set_provider: () => "ok",
     neocodex_search_files: () => [],
     cmd_diff_changed_files: () => ({ staged: [], unstaged: [], untracked: [] }),
     cmd_diff_unstaged: () => [],
@@ -70,6 +78,10 @@ const PRELOAD_SCRIPT = `(function() {
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.addInitScript(PRELOAD_SCRIPT);
+    // Intercept external font CDNs: the index.html links Google Fonts, and if
+    // the test runner has no network, `page.goto` blocks on the font <link>
+    // and times out. Abort them so e2e is deterministic offline.
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
     await use(page);
   },
 });

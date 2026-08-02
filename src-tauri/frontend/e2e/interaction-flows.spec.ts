@@ -33,6 +33,8 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
       created_at: 0,
       updated_at: 1700000100,
     }));
+    // P1-1: handleNewSession now points the backend at the new session too.
+    await mockCommand(page, "neocodex_switch_session", () => "switched");
     await page.goto("/");
     await page.getByTestId("sidebar-tab-sessions").click();
     await expect(page.getByTestId("sidebar-tab-sessions")).toBeVisible({ timeout: 10_000 });

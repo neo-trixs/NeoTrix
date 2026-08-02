@@ -53,6 +53,7 @@ export default function NeoCodexPage() {
   const [viewMode, setViewMode] = useState<"verbose" | "normal" | "summary">("normal");
   const stopRef = useRef(false);
   const taskSeenRef = useRef<Set<string>>(new Set());
+  const taskLastIndexRef = useRef(0);
   const [sideChatOpen, setSideChatOpen] = useState(false);
   const [sideChatMessages, setSideChatMessages] = useState<Array<{ role: string; content: string }>>([]);
   const [sideChatInput, setSideChatInput] = useState("");
@@ -165,6 +166,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     // Reset the live task tracker for this turn.
     setTaskSteps([]);
     taskSeenRef.current = new Set();
+    taskLastIndexRef.current = 0;
     setTaskStartedAt(Date.now());
     setTaskClock((c) => c + 1);
     if (!regenerate) {
@@ -217,9 +219,11 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         accumulated += event.payload;
         setNeoCodexStreaming({ content: accumulated, role: "assistant" });
         // Parse tool-call markers (`<tool name="...">args</tool>`) out of the
-        // streamed content to feed the live task pane, mirroring how the core
-        // extracts structured tool calls from the raw model output.
+        // streamed content to feed the live task pane. P2-5: incremental parse
+        // using lastIndex ref to avoid O(n²) re-scans of the full accumulated
+        // string on every token event.
         const re = /<tool\s+name="([^"]+)">([\s\S]*?)<\/tool>/g;
+        re.lastIndex = taskLastIndexRef.current;
         let m: RegExpExecArray | null;
         const seen = taskSeenRef.current;
         let dirty = false;
@@ -231,6 +235,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             dirty = true;
           }
         }
+        taskLastIndexRef.current = re.lastIndex;
         if (dirty) setTaskClock((c) => c + 1);
         if (stopRef.current) return;
       });

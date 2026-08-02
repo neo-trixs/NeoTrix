@@ -71,9 +71,7 @@ pub async fn neocodex_send_message_stream(
     // enforcement in the core loop); Manual/Accept are enforced at the UI
     // review layer (diff accept/reject), recorded here for session continuity.
     let mode = permission_mode.unwrap_or_else(|| "auto".to_string());
-    if mode == "plan" {
-        agent.set_plan_mode();
-    }
+    agent.set_permission_mode(&mode);
 
     let is_regenerate = regenerate.unwrap_or(false);
     if !is_regenerate {
@@ -1197,6 +1195,159 @@ pub fn neocodex_git_status() -> Result<Option<GitStatus>, String> {
 pub struct GitStatus {
     pub branch: String,
     pub dirty: bool,
+}
+
+/// /init — scaffold AGENTS.md with project structure + conventions.
+/// Returns the generated markdown so the frontend can insert it or save it.
+#[tauri::command]
+pub async fn neocodex_init_project(session_id: String) -> Result<String, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let mut wire = WireSession::new(&session_id);
+    wire.path = path;
+    let _ = wire.load(); // load events to verify access
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let mut structure = Vec::new();
+    fn walk(dir: &std::path::Path, cwd: &std::path::Path, out: &mut Vec<String>, depth: usize) {
+        if depth > 4 { return; }
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name == "target" || name == "node_modules" || name == ".git" || name == "dist" {
+                    continue;
+                }
+                let rel = p.strip_prefix(cwd).unwrap_or(&p).to_string_lossy().to_string();
+                if p.is_dir() {
+                    out.push(format!("{}/", rel));
+                    walk(&p, cwd, out, depth + 1);
+                } else {
+                    out.push(rel);
+                }
+            }
+        }
+    }
+    walk(&cwd, &cwd, &mut structure, 0);
+    structure.sort();
+    let structure_md = structure.join("\n");
+    let md = format!(r#"# AGENTS.md
+
+This file guides AI coding agents working in this repository.
+
+## Project Structure
+```text
+{structure_md}
+```
+
+## Conventions
+- Use the existing patterns and libraries in this codebase.
+- Run `cargo check` / `npm run lint` before committing.
+- Tests: `cargo test -p neotrix --lib` and `npm test` in frontend.
+
+## Agent Instructions
+- Prefer native file tools (read/write/edit) over shell escapes.
+- Ask before running destructive commands.
+- Summarize changes in a single commit message.
+"#);
+    Ok(md)
+}
+
+/// /export — export current session as Markdown (reuse SessionSidebar logic).
+#[tauri::command]
+pub async fn neocodex_export_session(session_id: String, format: Option<String>) -> Result<String, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut msgs = Vec::new();
+    for line in content.lines() {
+        if let Ok(ev) = serde_json::from_str::<WireEvent>(line) {
+            match ev {
+                WireEvent::UserMessage { content, timestamp, attachments: _ } => {
+                    msgs.push(format!("[User {}]: {}", timestamp, content));
+                }
+                WireEvent::AgentMessage { content, timestamp } => {
+                    msgs.push(format!("[Assistant {}]: {}", timestamp, content));
+                }
+                WireEvent::ToolCall { name, args, result, success, .. } => {
+                    msgs.push(format!("[Tool {} {}] args={} result={}", name, if success { "✓" } else { "✗" }, args, result));
+                }
+                WireEvent::SystemEvent { kind, detail, timestamp } => {
+                    msgs.push(format!("[System {}] {}: {}", timestamp, kind, detail));
+                }
+                WireEvent::SideChatMessage { content, timestamp, role } => {
+                    msgs.push(format!("[{} {}]: {}", role, timestamp, content));
+                }
+                _ => {}
+            }
+        }
+    }
+    if format.as_deref() == Some("json") {
+        return Ok(serde_json::to_string_pretty(&msgs).unwrap_or_default());
+    }
+    Ok(msgs.join("\n\n"))
+}
+
+/// /clear — wipe all messages from the current session wire (keep file for continuity).
+#[tauri::command]
+pub async fn neocodex_clear_session(session_id: String) -> Result<String, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    // Keep SessionMeta if present, drop everything else
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut keep = Vec::new();
+    for line in content.lines() {
+        if let Ok(ev) = serde_json::from_str::<WireEvent>(line) {
+            if matches!(ev, WireEvent::SessionMeta { .. }) {
+                keep.push(line.to_string());
+            }
+        }
+    }
+    let events = keep.iter().map(|l| serde_json::from_str::<WireEvent>(l).unwrap()).collect::<Vec<_>>();
+    write_wire_events(&path, &events)?;
+    // If active agent points here, rebuild
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    if let Some(agent) = guard.as_mut() {
+        if agent.wire.path == path {
+            agent.rebuild_context_from_wire();
+        }
+    }
+    Ok(format!("Cleared session {} (kept metadata)", session_id))
+}
+
+/// /feedback — record user feedback as a SystemEvent for telemetry.
+#[tauri::command]
+pub async fn neocodex_feedback(session_id: String, text: String) -> Result<String, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let mut wire = WireSession::new(&session_id);
+    wire.path = path.clone();
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+    wire.record(WireEvent::SystemEvent {
+        kind: "feedback".to_string(),
+        detail: text.trim().to_string(),
+        timestamp: ts,
+    });
+    // If active agent points here, append to its in-memory mirror
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    if let Some(agent) = guard.as_mut() {
+        if agent.wire.path == path {
+            agent.wire.events.push(WireEvent::SystemEvent {
+                kind: "feedback".to_string(),
+                detail: text.trim().to_string(),
+                timestamp: ts,
+            });
+        }
+    }
+    Ok("Feedback recorded".to_string())
 }
 
 /// Download and install a pending update. Emits `neocodex_update_progress`

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('NeoTrix Desktop App — E2E interaction', () => {
   test('app shell renders with title and status', async ({ page }) => {

@@ -806,9 +806,31 @@ impl PermissionSystem {
         let permissions = vec![
             ("read".to_string(), PermissionLevel::Allow),
             ("search".to_string(), PermissionLevel::Allow),
+            ("write".to_string(), PermissionLevel::Allow),
+            ("edit".to_string(), PermissionLevel::Allow),
             ("shell".to_string(), PermissionLevel::Ask),
         ];
         Self { permissions, default_level: PermissionLevel::Ask }
+    }
+
+    /// Non-blocking policy gate for the streaming path (P0-2). Unlike
+    /// `interactive_check` (stdin, CLI-only), this decides from the active
+    /// permission mode so the desktop app can enforce Claude-style modes
+    /// without a blocking terminal prompt.
+    pub fn policy_gate(&self, tool: &str, permission_mode: &str) -> bool {
+        match self.check(tool) {
+            // read/search/write/edit are workspace-guarded → always allowed.
+            PermissionLevel::Allow => true,
+            // Deny is absolute regardless of mode.
+            PermissionLevel::Deny => false,
+            // shell (the only Ask tool): allowed in agentic modes, denied in
+            // restrictive ones (manual/accept_edits/plan) where the UI review
+            // layer is the enforcement point instead.
+            PermissionLevel::Ask => match permission_mode {
+                "manual" | "accept_edits" | "acceptEdits" | "plan" => false,
+                _ => true,
+            },
+        }
     }
 
     pub fn check(&self, tool: &str) -> PermissionLevel {
@@ -935,7 +957,8 @@ impl AcpServer {
                     {"name": "read", "description": "Read files"},
                     {"name": "search", "description": "Search codebase"},
                     {"name": "shell", "description": "Execute shell commands"},
-                    {"name": "edit", "description": "Edit files"},
+                    {"name": "edit", "description": "Replace a unique old substring with new. Args: <path>|<old>|<new>"},
+                    {"name": "write", "description": "Write or overwrite a file. Args: <path>|<content>"},
                     {"name": "plan", "description": "Create/edit plans"},
                 ]
             }),
@@ -1120,6 +1143,10 @@ pub struct AgentState {
     pub mode: NeoCodexMode,
     pub mode_start: Instant,
     pub goal_active: bool,
+    /// Permission policy for the streaming path (P0-2). Mirrors Claude Code
+    /// Manual/AcceptEdits/Plan and Codex approval modes. Stored on the agent
+    /// because the desktop UI has no blocking stdin for `interactive_check`.
+    pub permission_mode: String,
 }
 
 impl Default for AgentState {
@@ -1137,6 +1164,7 @@ impl AgentState {
             mode: NeoCodexMode::Agent,
             mode_start: Instant::now(),
             goal_active: false,
+            permission_mode: "auto".to_string(),
         }
     }
 }
@@ -1342,6 +1370,15 @@ impl NeoCodexAgent {
         });
         self.state.mode = NeoCodexMode::Plan;
         self.state.mode_start = Instant::now();
+    }
+
+    /// Set the streaming-path permission policy (P0-2). Called by the desktop
+    /// command layer from the UI's permission_mode (auto/manual/accept_edits/plan).
+    pub fn set_permission_mode(&mut self, mode: &str) {
+        self.state.permission_mode = mode.to_string();
+        if mode == "plan" {
+            self.set_plan_mode();
+        }
     }
 
     /// Process user input through the agent loop
@@ -1592,6 +1629,24 @@ impl NeoCodexAgent {
             match tool_call {
                 Some((name, args)) => {
                     self.state.tool_call_count += 1;
+                    // P0-2: enforce the permission policy on the streaming path.
+                    // Previously only the CLI AgentStream and exec_agent honored
+                    // PermissionSystem; react_loop bypassed it entirely, so
+                    // Manual/AcceptEdits/Plan modes were advisory at best.
+                    let allowed = self.permissions.policy_gate(&name, &self.state.permission_mode);
+                    if !allowed {
+                        let denied = format!("[denied] tool `{}` blocked by permission mode `{}`", name, self.state.permission_mode);
+                        self.wire.record(WireEvent::ToolCall {
+                            name: name.clone(),
+                            args: args.clone(),
+                            result: denied.clone(),
+                            duration_ms: 0,
+                            success: false,
+                        });
+                        messages.push(Message::tool(&denied, &format!("call-{}", step)));
+                        step += 1;
+                        continue;
+                    }
                     let result = self.execute_tool(&name, &args).await;
                     // Tool grounding (Cycle 160e): claimed success when invoked; actual success
                     // if the tool did not return a distinguishable error marker.
@@ -1717,6 +1772,21 @@ impl NeoCodexAgent {
             match tool_call {
                 Some((name, args)) => {
                     self.state.tool_call_count += 1;
+                    // P0-2: enforce the permission policy on the streaming path.
+                    let allowed = self.permissions.policy_gate(&name, &self.state.permission_mode);
+                    if !allowed {
+                        let denied = format!("[denied] tool `{}` blocked by permission mode `{}`", name, self.state.permission_mode);
+                        self.wire.record(WireEvent::ToolCall {
+                            name: name.clone(),
+                            args: args.clone(),
+                            result: denied.clone(),
+                            duration_ms: 0,
+                            success: false,
+                        });
+                        messages.push(Message::tool(&denied, &format!("call-{}", step)));
+                        step += 1;
+                        continue;
+                    }
                     let result = self.execute_tool(&name, &args).await;
                     let actual_ok = !result.starts_with('[');
                     self.tool_grounding.record_tool_result(&name, true, actual_ok);
@@ -1803,6 +1873,17 @@ impl NeoCodexAgent {
     }    /// Build an LlmRequest from the current catalog's active provider.
     fn build_request(&self, messages: Vec<Message>) -> Option<LlmRequest> {
         self.provider.providers.get(self.provider.active)?;
+        // P0-3: surface the most recent user-turn image attachment to the model.
+        // The UI stores base64 in WireEvent::UserMessage.attachments; previously
+        // image_data was hardcoded None, so attached screenshots never reached
+        // the provider despite being rendered inline in the chat.
+        let image_data = self.wire.events.iter().rev().find_map(|ev| match ev {
+            WireEvent::UserMessage { attachments: Some(list), .. } => list
+                .iter()
+                .find(|a| a.mime_type.starts_with("image/"))
+                .and_then(|a| a.data.clone()),
+            _ => None,
+        });
         Some(LlmRequest {
             model: self.provider.active_model(),
             messages,
@@ -1820,12 +1901,22 @@ impl NeoCodexAgent {
                     input_schema: serde_json::json!({"type": "object", "properties": {"pattern": {"type": "string"}}}),
                 },
                 Tool {
+                    name: "write".into(),
+                    description: "Write or overwrite a file. Args format: <path>|<content> (split on the first pipe). Creates parent dirs. Guarded to the workspace.".into(),
+                    input_schema: serde_json::json!({"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}}),
+                },
+                Tool {
+                    name: "edit".into(),
+                    description: "Replace a unique old substring with new in a file. Args format: <path>|<old>|<new> (split on the first two pipes). Fails if old is missing or not unique.".into(),
+                    input_schema: serde_json::json!({"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}}),
+                },
+                Tool {
                     name: "shell".into(),
                     description: "Run a shell command and return stdout".into(),
                     input_schema: serde_json::json!({"type": "object", "properties": {"command": {"type": "string"}}}),
                 },
             ],
-            image_data: None,
+            image_data,
             thinking_budget: if self.config.thinking_enabled { Some(2048) } else { None },
             provider_params: HashMap::new(),
             constraint_json: None,
@@ -1846,45 +1937,176 @@ impl NeoCodexAgent {
         Some((name, args))
     }
 
+    /// Resolve a tool-provided path against the workspace root and refuse any
+    /// path that escapes it (`..` / absolute outside cwd). Claude/Codex both
+    /// sandbox agent file access to the project; P0-1/P2-3: without this the
+    /// read/write/edit tools could touch arbitrary files outside the repo.
+    fn guard_path(&self, raw: &str) -> Result<std::path::PathBuf, String> {
+        let cwd = std::env::current_dir().map_err(|e| format!("[cwd error] {}", e))?;
+        let p = std::path::Path::new(raw.trim());
+        let candidate = if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            cwd.join(p)
+        };
+        // Normalize: lexically resolve `.`/`..` components without touching FS.
+        let mut parts: Vec<std::ffi::OsString> = Vec::new();
+        for comp in candidate.components() {
+            match comp {
+                std::path::Component::Normal(c) => parts.push(c.to_os_string()),
+                std::path::Component::ParentDir => {
+                    if parts.pop().is_none() {
+                        return Err(format!("[path error] {} escapes the workspace", raw));
+                    }
+                }
+                std::path::Component::CurDir | std::path::Component::RootDir
+                | std::path::Component::Prefix(_) => {}
+            }
+        }
+        let normalized = parts.iter().fold(std::path::PathBuf::new(), |acc, c| acc.join(c));
+        let resolved = if candidate.is_absolute() {
+            normalized
+        } else {
+            normalized
+        };
+        if !resolved.starts_with(&cwd) {
+            return Err(format!("[path error] {} is outside the workspace", raw));
+        }
+        Ok(resolved)
+    }
+
     /// Execute a concrete tool. Wired to real FS + shell (no external binaries,
     /// consistent with R-P48 zero third-party binary dependency).
     async fn execute_tool(&mut self, name: &str, args: &str) -> String {
         match name {
-            "read" => match std::fs::read_to_string(args.trim()) {
-                Ok(content) => {
-                    if content.len() > 16_000 {
-                        content[..content.floor_char_boundary(16_000)].to_string()
-                    } else {
-                        content
+            "read" => {
+                let path = match self.guard_path(args) {
+                    Ok(p) => p,
+                    Err(e) => return e,
+                };
+                match std::fs::read_to_string(&path) {
+                    Ok(content) => {
+                        if content.len() > 16_000 {
+                            content[..content.floor_char_boundary(16_000)].to_string()
+                        } else {
+                            content
+                        }
                     }
+                    Err(e) => format!("[read error] {}", e),
                 }
-                Err(e) => format!("[read error] {}", e),
-            },
+            }
             "search" => {
                 let cwd = std::env::current_dir().unwrap_or_default();
                 let pattern = args.trim();
                 let mut hits = Vec::new();
-                if let Ok(entries) = std::fs::read_dir(&cwd) {
+                // P1-2: recursive search — the old impl only walked the top
+                // level (read_dir, no recursion) and filtered to *.rs, making it
+                // useless on real codebases. Skip heavy dirs to bound cost.
+                fn walk(
+                    dir: &std::path::Path,
+                    pattern: &str,
+                    hits: &mut Vec<String>,
+                    depth: usize,
+                ) {
+                    if depth > 8 || hits.len() >= 40 {
+                        return;
+                    }
+                    let Ok(entries) = std::fs::read_dir(dir) else { return };
                     for entry in entries.flatten() {
                         let path = entry.path();
-                        if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                        let fname = entry.file_name().to_string_lossy().to_string();
+                        if fname == "target" || fname == "node_modules" || fname == ".git"
+                            || fname == "dist" || fname == "build" || fname == ".venv"
+                            || fname == "vendor" {
+                            continue;
+                        }
+                        if path.is_dir() {
+                            walk(&path, pattern, hits, depth + 1);
                             continue;
                         }
                         if let Ok(content) = std::fs::read_to_string(&path) {
                             for (i, line) in content.lines().enumerate() {
                                 if line.contains(pattern) {
                                     hits.push(format!("{}:{}: {}", path.display(), i + 1, line.trim()));
-                                    if hits.len() >= 20 { break; }
+                                    if hits.len() >= 40 { return; }
                                 }
                             }
                         }
-                        if hits.len() >= 20 { break; }
                     }
                 }
+                walk(&cwd, pattern, &mut hits, 0);
                 if hits.is_empty() {
                     format!("No matches for {:?} in {}", pattern, cwd.display())
                 } else {
                     hits.join("\n")
+                }
+            }
+            // P0-1: native write tool (Claude Write parity). Unlike shell
+            // escape, this is a bounded, guarded single-file write.
+            "write" => {
+                // Args format: `<path>|<content>` — split on the first `|` so
+                // content may itself contain pipes. Model contract documented in
+                // build_request tool description.
+                let (path, content) = match args.split_once('|') {
+                    Some((p, c)) => (p, c),
+                    None => {
+                        return "[write error] expected format: <path>|<content>".to_string();
+                    }
+                };
+                let path = match self.guard_path(path) {
+                    Ok(p) => p,
+                    Err(e) => return e,
+                };
+                if content.len() > 64_000 {
+                    return format!("[write error] content exceeds 64 KB ({} bytes)", content.len());
+                }
+                if let Some(parent) = path.parent() {
+                    if !parent.as_os_str().is_empty() {
+                        if let Err(e) = std::fs::create_dir_all(parent) {
+                            return format!("[write error] mkdir: {}", e);
+                        }
+                    }
+                }
+                match std::fs::write(&path, content) {
+                    Ok(()) => format!("[ok] wrote {} ({} bytes)", path.display(), content.len()),
+                    Err(e) => format!("[write error] {}", e),
+                }
+            }
+            // P0-1: native edit tool (Claude Edit parity). Replaces a unique
+            // `old` substring with `new` in the target file. Args: `<path>|<old>|<new>`.
+            "edit" => {
+                let parts: Vec<&str> = args.splitn(3, '|').collect();
+                if parts.len() != 3 {
+                    return "[edit error] expected format: <path>|<old>|<new>".to_string();
+                }
+                let path = match self.guard_path(parts[0]) {
+                    Ok(p) => p,
+                    Err(e) => return e,
+                };
+                let original = match std::fs::read_to_string(&path) {
+                    Ok(c) => c,
+                    Err(e) => return format!("[edit error] read {}: {}", path.display(), e),
+                };
+                if original.len() > 64_000 {
+                    return format!("[edit error] file exceeds 64 KB ({} bytes)", original.len());
+                }
+                let old = parts[1];
+                let new = parts[2];
+                let count = original.matches(old).count();
+                if count == 0 {
+                    return format!("[edit error] old text not found in {}", path.display());
+                }
+                if count > 1 {
+                    return format!(
+                        "[edit error] old text is not unique ({} matches) in {}",
+                        count,
+                        path.display()
+                    );
+                }
+                let updated = original.replace(old, new);
+                match std::fs::write(&path, updated) {
+                    Ok(()) => format!("[ok] edited {} (replaced unique match)", path.display()),
+                    Err(e) => format!("[edit error] {}", e),
                 }
             }
             "shell" => {
