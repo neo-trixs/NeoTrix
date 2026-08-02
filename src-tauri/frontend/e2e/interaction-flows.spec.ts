@@ -14,6 +14,8 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
     await expect(page.getByText("调研 RAG").first()).toBeVisible();
 
     await page.getByTitle("删除会话").first().click();
+    await expect(page.getByRole("dialog", { name: "删除会话确认" })).toBeVisible();
+    await page.getByTestId("confirm-delete-confirm").click();
 
     const calls = await invokeCalls(page);
     expect(calls).toContainEqual(expect.objectContaining({ cmd: "neocodex_delete_session", args: { sessionId: "s-1" } }));

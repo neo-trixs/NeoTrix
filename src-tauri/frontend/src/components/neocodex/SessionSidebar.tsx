@@ -202,7 +202,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
       a.href = url;
       a.download = `${exportSession.name.replace(/[^a-z0-9]/gi, "_")}.${format === "markdown" ? "md" : "json"}`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
       addNotification({ type: "success", message: "会话已导出", duration: 2500 });
     } catch (e) {
       console.error("Export failed:", e);

@@ -143,9 +143,14 @@ export default function NeoCodexPage() {
     invoke("neocodex_stop_stream").catch((e) => console.error("Stop failed:", e));
   };
 
-  const handleSend = async (content: string, attachments?: Attachment[], regenerate?: boolean) => {
+const handleSend = async (content: string, attachments?: Attachment[], regenerate?: boolean) => {
     if (agentBusy && !regenerate) return;
     stopRef.current = false;
+    // Pin the session this send started in. If the user switches sessions while
+    // the reply is streaming, stale tokens/messages must not leak into the new
+    // session (P1: race fix). `sessionSwitchRef` is bumped by handleSessionSelect.
+    const sendSessionId = neocodexActiveSessionId;
+    const sendToken = sessionSwitchRef.current;
     setAgentBusy(true);
     if (!regenerate) {
       addNeoCodexMessage({
@@ -155,6 +160,20 @@ export default function NeoCodexPage() {
         attachments: attachments && attachments.length > 0 ? attachments : undefined,
       });
     }
+    // If a session switch already raced past our snapshot, abort the send.
+    // The token listener for this send would target another session, so bail.
+    const stillThisSession = () =>
+      sendSessionId === useStore.getState().neocodexActiveSessionId && sendToken === sessionSwitchRef.current;
+
+    const pushMessage = (message: {
+      role: "assistant" | "error";
+      content: string;
+      timestamp: number;
+    }) => {
+      if (!stillThisSession()) return;
+      addNeoCodexMessage(message);
+    };
+
     setNeoCodexStreaming({ content: "", role: "assistant" });
 
     let accumulated = "";
@@ -162,6 +181,7 @@ export default function NeoCodexPage() {
     let unlistenDone: (() => void) | undefined;
     try {
       unlisten = await listen<string>("neocodex_stream_token", (event) => {
+        if (!stillThisSession()) return;
         accumulated += event.payload;
         setNeoCodexStreaming({ content: accumulated, role: "assistant" });
         if (stopRef.current) return;
@@ -173,31 +193,37 @@ export default function NeoCodexPage() {
       });
     } catch (e) {
       console.error("Stream listen failed:", e);
+      if (!stillThisSession()) {
+        setAgentBusy(false);
+        return;
+      }
       setNeoCodexStreaming(null);
-      addNeoCodexMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
+      pushMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
       setAgentBusy(false);
       return;
     }
 
     try {
-      const payload = (attachments && attachments.length > 0
-        ? { content, attachments: attachments.map((a) => ({ name: a.name, size: a.size, mime_type: a.mimeType, data: a.data })) }
-        : { content }) as any;
+      const payload =
+        attachments && attachments.length > 0
+          ? { content, attachments: attachments.map((a) => ({ name: a.name, size: a.size, mime_type: a.mimeType, data: a.data })) }
+          : { content };
       if (regenerate) {
-        payload.regenerate = true;
+        (payload as any).regenerate = true;
       }
-      const response = await invoke("neocodex_send_message_stream", payload) as string;
+      const generated = await invoke("neocodex_send_message_stream", payload) as string;
       setNeoCodexStreaming(null);
       const wasCancelled = stopRef.current;
-      addNeoCodexMessage({
+      pushMessage({
         role: "assistant",
-        content: wasCancelled ? `${response}\n\n> ⏹ 已停止生成` : response,
+        content: wasCancelled ? `${generated}\n\n> ⏹ 已停止生成` : generated,
         timestamp: Date.now(),
       });
+      if (!stillThisSession()) return;
       refreshSessions();
       loadHealth();
-      // Codex/Claude parity: surface an OS notification when a task completes
-      // while the user may be looking elsewhere (opt-out in Settings).
+      // Codex/Claude parity: surface an opt-out notification when a turn
+      // completes while the user may be looking elsewhere.
       if (!wasCancelled && useStore.getState().settings?.notifyOnComplete) {
         const active = useStore.getState().neocodexSessions?.find((s: any) => s.id === useStore.getState().neocodexActiveSessionId);
         invoke("send_notification", {
@@ -206,9 +232,10 @@ export default function NeoCodexPage() {
         }).catch(() => {});
       }
     } catch (e) {
+      if (!stillThisSession()) return;
       console.error("Send failed:", e);
       setNeoCodexStreaming(null);
-      addNeoCodexMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
+      pushMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
     } finally {
       stopRef.current = false;
       unlisten?.();
@@ -336,6 +363,17 @@ export default function NeoCodexPage() {
     }
   };
 
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<string | null>(null);
+  const pendingDeleteName = pendingDeleteSession
+    ? neocodexSessions.find((s: any) => s.id === pendingDeleteSession)?.name || "此会话"
+    : "";
+
+  // Destructive delete is gated behind an explicit confirm. Accidental ⌘W or a
+  // stray sidebar click must never irreversibly drop a conversation (P1).
+  const requestSessionDelete = (sessionId: string) => {
+    setPendingDeleteSession(sessionId);
+  };
+
   const handleSessionDelete = async (sessionId: string) => {
     try {
       await invoke("neocodex_delete_session", { sessionId });
@@ -350,6 +388,21 @@ export default function NeoCodexPage() {
     refreshSessions();
     window.dispatchEvent(new CustomEvent("neotrix:sessions-changed"));
     addNotification({ type: "info", message: "会话已删除", duration: 2000 });
+  };
+
+  // Map a backend message `id` (a counter over the full wire thread, including
+  // tool/system events) to the zero-based "visible" thread index the backend's
+  // edit/delete/regenerate commands expect (only user/assistant messages).
+  // Prevents deleting/editing the wrong message when tool events sit between
+  // turns (P2: id-vs-index mismatch).
+  const visibleIndexFor = (id: number): number => {
+    let vis = -1;
+    for (const m of neocodexMessages) {
+      if (m.id == null) continue;
+      if (m.id > id) break;
+      if (m.role === "user" || m.role === "assistant") vis += 1;
+    }
+    return vis;
   };
 
   const reloadMessages = async () => {
@@ -378,7 +431,9 @@ export default function NeoCodexPage() {
   const handleEditMessage = async (id: number, content: string) => {
     if (!neocodexActiveSessionId) return;
     try {
-      await invoke("neocodex_edit_message", { sessionId: neocodexActiveSessionId, index: id, content });
+      const idx = visibleIndexFor(id);
+      if (idx < 0) return;
+      await invoke("neocodex_edit_message", { sessionId: neocodexActiveSessionId, index: idx, content });
       await reloadMessages();
     } catch (e) {
       console.error("Edit message failed:", e);
@@ -387,8 +442,10 @@ export default function NeoCodexPage() {
 
   const handleDeleteMessage = async (id: number) => {
     if (!neocodexActiveSessionId) return;
+    const idx = visibleIndexFor(id);
+    if (idx < 0) return;
     try {
-      await invoke("neocodex_delete_message", { sessionId: neocodexActiveSessionId, index: id });
+      await invoke("neocodex_delete_message", { sessionId: neocodexActiveSessionId, index: idx });
       await reloadMessages();
     } catch (e) {
       console.error("Delete message failed:", e);
@@ -397,8 +454,10 @@ export default function NeoCodexPage() {
 
   const handleRegenerateMessage = async (id: number) => {
     if (!neocodexActiveSessionId) return;
+    const idx = visibleIndexFor(id);
+    if (idx < 0) return;
     try {
-      const items = await invoke("neocodex_regenerate", { sessionId: neocodexActiveSessionId, index: id }) as any[];
+      const items = await invoke("neocodex_regenerate", { sessionId: neocodexActiveSessionId, index: idx }) as any[];
       const lastUser = [...items].reverse().find((m) => m.role === "user");
       setNeoCodexMessages(items.map((m) => ({
         id: m.id,
@@ -521,7 +580,7 @@ export default function NeoCodexPage() {
         handleStop();
       } else if (e.key === "w" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        if (neocodexActiveSessionId) handleSessionDelete(neocodexActiveSessionId);
+        if (neocodexActiveSessionId) requestSessionDelete(neocodexActiveSessionId);
       } else if (e.key === ";" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setSideChatOpen((v) => !v);
@@ -596,7 +655,7 @@ export default function NeoCodexPage() {
             <SessionSidebar
               activeSessionId={neocodexActiveSessionId}
               onSessionSelect={handleSessionSelect}
-              onSessionDelete={handleSessionDelete}
+              onSessionDelete={requestSessionDelete}
               onSessionArchive={() => refreshSessions()}
             />
           )}
@@ -728,6 +787,7 @@ export default function NeoCodexPage() {
                 setSettings({ ...settings, theme: THEME_ORDER[(idx + 1) % THEME_ORDER.length] });
               }}
               title={THEME_LABELS[settings.theme]}
+              aria-label="切换主题"
             >
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="7" cy="7" r="2.6" />
@@ -738,6 +798,7 @@ export default function NeoCodexPage() {
               className={styles.settingsBtn}
               onClick={() => navigate("/settings")}
               title="设置"
+              aria-label="打开设置"
             >
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="7" cy="7" r="2.2" />
@@ -748,6 +809,7 @@ export default function NeoCodexPage() {
               className={styles.settingsBtn}
               onClick={() => setFocusMode((v) => !v)}
               title={focusMode ? "退出专注" : "专注模式"}
+              aria-label={focusMode ? "退出专注" : "专注模式"}
             >
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="7" cy="7" r="3" />
@@ -914,6 +976,36 @@ export default function NeoCodexPage() {
         placeholder={paletteMode === "file" ? "搜索文件… (⌘P)" : "搜索会话或执行命令…"}
       />
       <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+      {pendingDeleteSession && (
+        <div className={styles.confirmOverlay} role="dialog" aria-modal="true" aria-label="删除会话确认">
+          <div className={styles.confirmDialog}>
+            <h3>删除会话</h3>
+            <p>
+              确定要永久删除「{pendingDeleteName}」吗？此操作不可撤销，会话及全部消息将被清除。
+            </p>
+            <div className={styles.confirmActions}>
+              <button
+                className={styles.confirmCancel}
+                data-testid="confirm-delete-cancel"
+                onClick={() => setPendingDeleteSession(null)}
+              >
+                取消
+              </button>
+              <button
+                className={styles.confirmDeleteBtn}
+                data-testid="confirm-delete-confirm"
+                onClick={() => {
+                  const id = pendingDeleteSession;
+                  setPendingDeleteSession(null);
+                  handleSessionDelete(id);
+                }}
+              >
+                永久删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

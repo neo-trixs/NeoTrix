@@ -575,3 +575,61 @@
     min-width: 0;
   }
 }
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirmDialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.confirmDialog h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--fg-primary);
+}
+
+.confirmDialog p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fg-secondary);
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.confirmCancel,
+.confirmDeleteBtn {
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--border-primary);
+}
+
+.confirmCancel {
+  background: transparent;
+  color: var(--fg-secondary);
+}
+
+.confirmDeleteBtn {
+  background: var(--danger, #d93025);
+  color: #fff;
+  border-color: var(--danger, #d93025);
+}

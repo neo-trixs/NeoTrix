@@ -180,3 +180,54 @@ describe("NeoCodexPage file palette (Cmd+P)", () => {
     expect(input).toHaveAttribute("placeholder", expect.stringContaining("搜索会话"));
   });
 });
+
+describe("NeoCodexPage destructive delete confirmation", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: "s-del" });
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-del", name: "重要会话", mode: "Agent", message_count: 3, wire_path: "/repo", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+    mockInvoke("neocodex_delete_session", () => null);
+  });
+
+  it("⌘W opens a confirmation dialog instead of deleting immediately", async () => {
+    const deleteSpy = vi.fn(() => null);
+    mockInvoke("neocodex_delete_session", deleteSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.keyDown(window, { key: "w", metaKey: true });
+    const dialog = await screen.findByRole("dialog", { name: "删除会话确认" });
+    expect(dialog).toHaveTextContent("重要会话");
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it("cancel closes the dialog without deleting", async () => {
+    const deleteSpy = vi.fn(() => null);
+    mockInvoke("neocodex_delete_session", deleteSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.keyDown(window, { key: "w", metaKey: true });
+    fireEvent.click(await screen.findByTestId("confirm-delete-cancel"));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "删除会话确认" })).toBeNull());
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it("confirm executes the delete for the targeted session", async () => {
+    const deleteSpy = vi.fn(() => null);
+    mockInvoke("neocodex_delete_session", deleteSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.keyDown(window, { key: "w", metaKey: true });
+    fireEvent.click(await screen.findByTestId("confirm-delete-confirm"));
+
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith({ sessionId: "s-del" }));
+  });
+});
