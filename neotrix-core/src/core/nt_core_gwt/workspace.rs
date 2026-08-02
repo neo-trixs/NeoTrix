@@ -102,6 +102,9 @@ pub struct GlobalWorkspace {
     pub ctm_verifier: super::ctm_verifier::CtmVerifier,
     /// Most recent CTM alignment verification result.
     pub last_ctm_report: Option<super::ctm_verifier::CtmAlignmentReport>,
+    /// Most recent cognitive type profile (Phase 8.1): softmax distribution over
+    /// Linguistic/Logical/Knowledge/Social + dominant type + Shannon entropy.
+    pub cognitive_profile: Option<super::cognitive_type::CognitiveProfile>,
 }
 
 /// Events that trigger an audit block
@@ -158,6 +161,7 @@ impl GlobalWorkspace {
             cls_buffer: super::cls_buffer::CLSBuffer::default(),
             ctm_verifier: super::ctm_verifier::CtmVerifier::new(),
             last_ctm_report: None,
+            cognitive_profile: None,
         }
     }
 
@@ -415,6 +419,34 @@ impl GlobalWorkspace {
                     aligned.total_checks,
                 ));
             }
+        }
+
+        // Step 4f: Cognitive Type profiling (Phase 8.1, MiCRo arXiv:2506.13331 §3).
+        // Aggregate post-resonance effective saliences into the 4 cognitive-type
+        // distribution, record the softmax-normalized profile (dominant type +
+        // Shannon entropy) on the workspace, and surface it in the broadcast.
+        {
+            let activations: Vec<(SpecialistType, f64)> = self
+                .specialists
+                .values()
+                .filter_map(|m| {
+                    module_index(m)
+                        .and_then(|idx| report.effective_saliences.get(idx).copied())
+                        .map(|s| (m.specialist_type, s))
+                })
+                .collect();
+            let raw = super::cognitive_type::group_activation(&activations);
+            let profile = super::cognitive_type::CognitiveProfile {
+                distribution: raw,
+                dominant: super::cognitive_type::CognitiveType::Linguistic,
+                entropy: 0.0,
+            }
+            .profile();
+            self.cognitive_profile = Some(profile.clone());
+            self.broadcast_history.push(format!(
+                "[cognitive_type] dominant = {}",
+                profile.dominant.label(),
+            ));
         }
 
         // Step 5: update module activations with effective salience
@@ -1125,5 +1157,37 @@ mod tests {
             assert_eq!(blocks[i].previous_hash, blocks[i-1].hash,
                 "block {} should link to block {}", i, i-1);
         }
+    }
+
+    #[test]
+    fn test_resonant_broadcast_generates_cognitive_profile() {
+        let mut ws = make_workspace();
+        ws.register_default_specialists();
+        let states = default_specialist_states();
+
+        // Boost a Logical specialist so the cognitive type profile is meaningful
+        ws.specialist_by_type_mut(&SpecialistType::CodeAnalyzer)
+            .expect("CodeAnalyzer should be registered").activation = 0.95;
+        ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
+            .expect("PatternMatcher should be registered").activation = 0.1;
+
+        ws.resonant_broadcast("cognitive probe", &states);
+
+        let profile = ws.cognitive_profile.expect("cognitive_profile should be set after broadcast");
+        // Distribution normalizes to 1
+        let sum: f64 = profile.distribution.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9, "distribution sum={sum}");
+        // Dominant type should be Logical (CodeAnalyzer dominates)
+        assert_eq!(
+            profile.dominant,
+            crate::core::nt_core_gwt::cognitive_type::CognitiveType::Logical
+        );
+        // Entropy is a valid Shannon entropy
+        assert!(profile.entropy >= 0.0);
+
+        // The dominant cognitive type is surfaced in the broadcast
+        assert!(ws.broadcast_history.iter().any(|b| {
+            b.contains("[cognitive_type]") && b.contains("logical")
+        }));
     }
 }

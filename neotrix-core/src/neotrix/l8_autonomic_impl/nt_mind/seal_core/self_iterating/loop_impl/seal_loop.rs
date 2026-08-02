@@ -12,6 +12,7 @@ use super::super::super::sleep::{SleepEngine};
 use super::super::super::stats::IterationResult;
 use super::super::super::stagnation::StagnationSignal;
 use super::super::pipeline::kernel_iterate_pipeline;
+use super::super::recursive_depth_reward::RecursiveDepthReward;
 use crate::neotrix::nt_world_model::{TaskType, Context};
 use crate::neotrix::nt_io_provider::create_gateway;
 use crate::core::nt_core_sae_bridge::SAEBridge;
@@ -352,6 +353,18 @@ impl SelfIteratingBrain {
                         prev, prm_avg, reward);
                 }
             }
+            // ── Phase 6.2 RecursiveDepthReward: depth factor on the blended reward ──
+            // d_rec = number of E8 state transitions (explicit depth); fall back to
+            // iteration/total_steps approximation. Applies the multiplicative depth
+            // bonus so deep-reasoning trajectories earn a larger reward signal.
+            let rdr = RecursiveDepthReward::default();
+            let depth = engine.state_trajectory.len().max(1);
+            let total_steps = self.iteration.max(1) as usize;
+            let report = rdr.evaluate(depth, total_steps, 2, reward);
+            reward = report.final_reward;
+            log::trace!("[RDR] depth={} steps={} base={:.4} bonus={:.4} final={:.4} progress={:.4}",
+                report.depth, report.total_steps, report.base_reward,
+                report.bonus, report.final_reward, report.progress);
             // Record outcome in the E8 transition learner for policy evolution.
             // Previously the E8TransitionLearner was constructed (self._transition_learner)
             // and its select_mode() / record() methods were used by DpSgdStage and

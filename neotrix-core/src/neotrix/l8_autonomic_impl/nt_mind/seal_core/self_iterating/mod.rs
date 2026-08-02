@@ -15,6 +15,7 @@ pub mod harness_adapter;
 pub mod aging_monitor;
 pub mod anti_distillation_stage;
 pub mod secret_scanner;
+pub mod recursive_depth_reward;
 
 pub use brain_impl::{ReasoningBrain, AbsorbValidator, DefaultAbsorbValidator, SelfIteration, EvaluationRecord};
 pub use loop_impl::SelfIteratingBrain;
@@ -50,6 +51,7 @@ pub use skillopt::{LrScheduler, EditBudget, ValidationGate, RejectedEditBuffer, 
     BoundedEditStage, ValidationGateStage, RejectedBufferFeedbackStage, EpochSlowUpdateStage};
 pub use harness_adapter::{HarnessAdapter, HarnessProfile};
 pub use aging_monitor::{AgingMonitor, AgingDiagnosisStage};
+pub use recursive_depth_reward::{RecursiveDepthReward, DepthRewardReport};
 
 // DPO + Constitutional + Safety stages
 pub mod dpo_stage;

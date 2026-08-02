@@ -1136,8 +1136,9 @@ fn hydrate_ewhr_hypotheses(
         if net.get_hypothesis(&id).is_some() {
             continue;
         }
-        let title = if proposal.len() > 32 {
-            format!("{}…", &proposal[..32])
+        let title = if proposal.chars().count() > 32 {
+            let truncated: String = proposal.chars().take(30).collect();
+            format!("{}…", truncated)
         } else {
             proposal.clone()
         };

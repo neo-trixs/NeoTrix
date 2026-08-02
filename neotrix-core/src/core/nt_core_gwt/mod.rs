@@ -7,6 +7,7 @@ pub mod cls_buffer;
 pub mod ctm_verifier;
 pub mod inner_speech;
 pub mod modality_router;
+pub mod cognitive_type;
 pub mod geometry_sync;
 pub mod competition_gate;
 pub mod compaction;
@@ -34,6 +35,7 @@ pub use resonator_network::{
 pub use workspace::{AuditBlock, AuditEventType};
 pub use inner_speech::InnerSpeech;
 pub use modality_router::{Modality, ModalityRouter};
+pub use cognitive_type::{CognitiveProfile, CognitiveType};
 pub use cls_buffer::{CLSBuffer, Experience};
 pub use ctm_verifier::{CtmAlignmentReport, CtmCheck, CtmVerifier, E8_STATE_COUNT};
 pub use nt_gwt_reviewer::{
