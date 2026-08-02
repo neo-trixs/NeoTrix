@@ -12,7 +12,9 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::SystemTime;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -595,7 +597,7 @@ impl SelfReviewGate {
                 if path.extension().is_none_or(|e| e != "rs") { continue; }
                 let source_layer = ArchLayer::from_path(&path);
                 if source_layer.layer_index() < 0 { continue; }
-                if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(content) = read_source_cached(&path) {
                     for line in content.lines() {
                         if line.starts_with("use crate::") {
                             let target_layer = self.detect_import_layer(line);
@@ -684,7 +686,7 @@ impl SelfReviewGate {
         let bin_dir = manifest_dir.join("src").join("bin");
 
         // Parse [[bin]] entries from Cargo.toml
-        let content = match std::fs::read_to_string(&cargo_toml) {
+        let content = match read_source_cached(&cargo_toml) {
             Ok(c) => c,
             Err(_) => return,
         };
@@ -806,7 +808,7 @@ impl SelfReviewGate {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_dir() || path.extension().is_none_or(|e| e != "rs") { continue; }
-                let content = match std::fs::read_to_string(&path) {
+                let content = match read_source_cached(&path) {
                     Ok(c) => c,
                     Err(_) => continue,
                 };
@@ -914,7 +916,7 @@ impl SelfReviewGate {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().is_some_and(|e| e == "py") {
-                    if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(content) = read_source_cached(&path) {
                         for line in content.lines() {
                             let trimmed = line.trim().to_uppercase();
                             if (trimmed.contains("KNOWLEDGE_NODES") || trimmed.contains("KNOWLEDGE_EDGES"))
@@ -952,7 +954,7 @@ impl SelfReviewGate {
                 let path = entry.path();
                 if path.extension().is_some_and(|e| e == "py") {
                     total += 1;
-                    if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(content) = read_source_cached(&path) {
                         if !content.contains("if __name__") && !content.contains("def main(") {
                             missing += 1;
                         }
@@ -1242,7 +1244,7 @@ impl SelfReviewGate {
             .join("pipeline.rs");
         let mut stub_count = 0usize;
         let mut total = 0usize;
-        if let Ok(content) = std::fs::read_to_string(&pipeline_path) {
+        if let Ok(content) = read_source_cached(&pipeline_path) {
             let lines: Vec<&str> = content.lines().collect();
             for i in 0..lines.len() {
                 if lines[i].trim().starts_with("fn process(") {
@@ -1322,7 +1324,7 @@ impl SelfReviewGate {
                     s.contains("integration_test") || s.contains("e2e_test")
                 }) {
                     integration_test_files += 1;
-                    if let Ok(content) = std::fs::read_to_string(&path) {
+                    if let Ok(content) = read_source_cached(&path) {
                         for line in content.lines() {
                             let t = line.trim();
                             if (t.starts_with("assert_eq!(") || t.starts_with("assert!("))
@@ -1367,7 +1369,7 @@ impl SelfReviewGate {
             }
             // Look for Cargo.toml files with known version-sensitive deps
             for toml in &toml_files {
-                if let Ok(content) = std::fs::read_to_string(toml) {
+                if let Ok(content) = read_source_cached(toml) {
                     for dep in &["quick-xml", "tokio", "serde", "serde_json", "uuid"] {
                         let pattern = format!("{} = \"", dep);
                         if let Some(pos) = content.find(&pattern) {
@@ -1412,19 +1414,7 @@ pub struct PatternMatch {
 // ─── Scanner helpers ───
 
 fn count_rs_files(dir: &Path) -> usize {
-    let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_rs_files(&path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                count += 1;
-            }
-        }
-    }
-    count
+    cached_rs_files(dir).len()
 }
 
 pub fn scan_for_patterns(
@@ -1441,10 +1431,9 @@ pub fn scan_for_patterns(
     }
     let mut results = Vec::new();
     if let Some(d) = dir {
-        let mut file_list = Vec::new();
-        collect_rs_files_recursive(d, &mut file_list);
-        for file_path in file_list {
-            if let Ok(content) = std::fs::read_to_string(&file_path) {
+        let file_list = cached_rs_files(d);
+        for file_path in file_list.iter() {
+            if let Ok(content) = read_source_cached(&file_path) {
                 for (pc, re) in &compiled {
                     for m in re.find_iter(&content) {
                         let line = content[..m.start()].matches('\n').count() + 1;
@@ -1492,51 +1481,123 @@ fn collect_rs_files_recursive(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
     }
 }
 
-fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
-    use std::fs;
-    let mut count = 0usize;
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("bin-archive") || path.ends_with("target") {
-                    continue;
-                }
-                count += scan_for_pattern_excluding_tests(&path, pattern);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = fs::read_to_string(&path) {
-                    let mut in_test = false;
-                    let mut depth = 0usize;
-                    for line in content.lines() {
-                        if !in_test {
-                            // 进入测试上下文: #[cfg(test)] mod 块 或 独立 #[test]/#[tokio::test] fn
-                            if line.trim().starts_with("#[cfg(test)]")
-                                || line.trim().starts_with("#[test]")
-                                || line.trim().starts_with("#[tokio::test]")
-                            {
-                                // 仅当后续行出现 `{` 才进入 — 避免属性多行组合误判
-                                in_test = true;
-                                depth = 0;
-                                continue;
-                            }
-                        }
-                        if in_test {
-                            // brace 深度追踪: 遇 `{` 深度+1, 遇 `}` 深度-1, 归零退出测试上下文
-                            for ch in line.chars() {
-                                match ch {
-                                    '{' => depth += 1,
-                                    '}' => {
-                                        if depth == 0 { in_test = false; break; }
-                                        depth -= 1;
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            if in_test { continue; }
-                        }
-                        count += line.matches(pattern).count();
+/// Cached listing of `.rs` files under `root`, invalidated by root directory mtime.
+///
+/// Nearly every check in `run_all` re-walks the whole source tree via `read_dir`
+/// (then stats each file through `read_source_cached`/`production_lines_cached`).
+/// Walking once and reusing the path list removes ~50 redundant tree traversals.
+fn cached_rs_files(root: &Path) -> Arc<Vec<PathBuf>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, (SystemTime, Arc<Vec<PathBuf>>)>>> =
+        OnceLock::new();
+    let mtime = std::fs::metadata(root)
+        .and_then(|m| m.modified())
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((cached_mtime, files)) = guard.get(root) {
+        if *cached_mtime == mtime {
+            return files.clone();
+        }
+    }
+    let mut files = Vec::new();
+    collect_rs_files_recursive(root, &mut files);
+    let files = Arc::new(files);
+    guard.insert(root.to_path_buf(), (mtime, files.clone()));
+    files
+}
+
+/// Cached source-file reader.
+///
+/// Self-review `run_all()` issues ~50 full-tree scans (PA00x pattern checks),
+/// each re-reading every `.rs` file in `src/` (1119 files / 12MB). In a debug
+/// build a single scan costs ~0.36s, so the full audit runs to tens of seconds —
+/// and in `SelfReviewStage` (frequency 1) it runs on *every* seal-loop iteration.
+/// Memoizing contents by (mtime, len) collapses the audit to one disk read per
+/// file for the whole process lifetime.
+fn read_source_cached(path: &Path) -> std::io::Result<String> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, (SystemTime, u64, Arc<str>)>>> = OnceLock::new();
+    let metadata = std::fs::metadata(path)?;
+    let mtime = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+    let len = metadata.len();
+
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((cached_mtime, cached_len, content)) = guard.get(path) {
+        if *cached_mtime == mtime && *cached_len == len {
+            return Ok(content.to_string());
+        }
+    }
+    let content = std::fs::read_to_string(path)?;
+    guard.insert(path.to_path_buf(), (mtime, len, Arc::from(content.as_str())));
+    Ok(content)
+}
+
+/// Production (non-test) source lines, computed once per file and cached by
+/// (mtime, len).
+///
+/// `scan_for_pattern_excluding_tests` is called ~25× per `run_all()`; without a
+/// cache each call re-runs the per-line test-context brace tracking over every
+/// file (344K lines in this repo). Stripping test contexts once per file turns
+/// the hot loop into a plain `line.matches(pattern)` scan over cached lines.
+fn production_lines_cached(path: &Path) -> Option<Arc<Vec<String>>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, (SystemTime, u64, Arc<Vec<String>>)>>> =
+        OnceLock::new();
+    let metadata = std::fs::metadata(path).ok()?;
+    let mtime = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+    let len = metadata.len();
+
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((cached_mtime, cached_len, lines)) = guard.get(path) {
+        if *cached_mtime == mtime && *cached_len == len {
+            return Some(lines.clone());
+        }
+    }
+    let content = std::fs::read_to_string(path).ok()?;
+    let mut prod = Vec::new();
+    let mut in_test = false;
+    let mut depth = 0usize;
+    for line in content.lines() {
+        if !in_test {
+            // 进入测试上下文: #[cfg(test)] mod 块 或 独立 #[test]/#[tokio::test] fn
+            if line.trim().starts_with("#[cfg(test)]")
+                || line.trim().starts_with("#[test]")
+                || line.trim().starts_with("#[tokio::test]")
+            {
+                // 仅当后续行出现 `{` 才进入 — 避免属性多行组合误判
+                in_test = true;
+                depth = 0;
+                continue;
+            }
+        }
+        if in_test {
+            // brace 深度追踪: 遇 `{` 深度+1, 遇 `}` 深度-1, 归零退出测试上下文
+            for ch in line.chars() {
+                match ch {
+                    '{' => depth += 1,
+                    '}' => {
+                        if depth == 0 { in_test = false; break; }
+                        depth -= 1;
                     }
+                    _ => {}
                 }
+            }
+            if in_test { continue; }
+        }
+        prod.push(line.to_string());
+    }
+    let lines = Arc::new(prod);
+    guard.insert(path.to_path_buf(), (mtime, len, lines.clone()));
+    Some(lines)
+}
+
+fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
+    let mut count = 0usize;
+    for path in cached_rs_files(dir).iter() {
+        if let Some(lines) = production_lines_cached(path) {
+            for line in lines.iter() {
+                count += line.matches(pattern).count();
             }
         }
     }
@@ -1547,26 +1608,18 @@ fn scan_for_pattern_excluding_tests(dir: &Path, pattern: &str) -> usize {
 /// Counts patterns like `use foo` when `foo` doesn't appear elsewhere.
 fn scan_for_unused_import_patterns(dir: &Path) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += scan_for_unused_import_patterns(&path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        if let Some(stripped) = line.trim().strip_prefix("use ") {
-                            let import_name: String = stripped.chars()
-                                .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':')
-                                .collect();
-                            if import_name.contains("::") { continue; }
-                            // Check if the imported name appears outside of use statements
-                            let usage_count = content.matches(&import_name).count();
-                            if import_name.len() > 3 && usage_count <= 1 {
-                                count += 1;
-                            }
-                        }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            for line in content.lines() {
+                if let Some(stripped) = line.trim().strip_prefix("use ") {
+                    let import_name: String = stripped.chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == ':')
+                        .collect();
+                    if import_name.contains("::") { continue; }
+                    // Check if the imported name appears outside of use statements
+                    let usage_count = content.matches(&import_name).count();
+                    if import_name.len() > 3 && usage_count <= 1 {
+                        count += 1;
                     }
                 }
             }
@@ -1577,17 +1630,9 @@ fn scan_for_unused_import_patterns(dir: &Path) -> usize {
 
 /// Helper: collect all .rs file stems recursively
 fn collect_rs_stems(dir: &Path, out: &mut Vec<String>) {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                collect_rs_stems(&path, out);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Some(stem) = path.file_stem() {
-                    out.push(stem.to_string_lossy().to_string());
-                }
-            }
+    for path in cached_rs_files(dir).iter() {
+        if let Some(stem) = path.file_stem() {
+            out.push(stem.to_string_lossy().to_string());
         }
     }
 }
@@ -1595,20 +1640,12 @@ fn collect_rs_stems(dir: &Path, out: &mut Vec<String>) {
 /// Scan a directory tree for .rs files without #[test].
 /// Appends uncovered file stems to `uncovered`.
 fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") || path.file_name().is_some_and(|n| n == "bin-archive") { continue; }
-                scan_file_test_coverage(&path, uncovered);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let line_count = content.lines().count();
-                    if line_count > SelfReviewConfig::default().min_test_line_count && !content.contains("#[test]") {
-                        if let Some(stem) = path.file_stem() {
-                            uncovered.push(stem.to_string_lossy().to_string());
-                        }
-                    }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            let line_count = content.lines().count();
+            if line_count > SelfReviewConfig::default().min_test_line_count && !content.contains("#[test]") {
+                if let Some(stem) = path.file_stem() {
+                    uncovered.push(stem.to_string_lossy().to_string());
                 }
             }
         }
@@ -1618,27 +1655,19 @@ fn scan_file_test_coverage(dir: &Path, uncovered: &mut Vec<String>) {
 /// Scan for .unwrap() or .expect() within LazyLock initializer closures.
 fn scan_for_pattern_in_lazy_init(dir: &Path) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += scan_for_pattern_in_lazy_init(&path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let lines: Vec<&str> = content.lines().collect();
-                    for i in 0..lines.len() {
-                        if lines[i].contains("LazyLock::new(") {
-                            // Check following lines for unwrap/expect in the closure
-                            for j in (i + 1)..lines.len().min(i + 20) {
-                                let trimmed = lines[j].trim();
-                                if trimmed.starts_with('}') || trimmed.starts_with(");") {
-                                    break;
-                                }
-                                if trimmed.contains(".unwrap(") || trimmed.contains(".expect(") {
-                                    count += 1;
-                                }
-                            }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            let lines: Vec<&str> = content.lines().collect();
+            for i in 0..lines.len() {
+                if lines[i].contains("LazyLock::new(") {
+                    // Check following lines for unwrap/expect in the closure
+                    for j in (i + 1)..lines.len().min(i + 20) {
+                        let trimmed = lines[j].trim();
+                        if trimmed.starts_with('}') || trimmed.starts_with(");") {
+                            break;
+                        }
+                        if trimmed.contains(".unwrap(") || trimmed.contains(".expect(") {
+                            count += 1;
                         }
                     }
                 }
@@ -1659,7 +1688,7 @@ fn scan_python_for_pattern(dir: &Path, pattern: &str) -> usize {
             let path = entry.path();
             if path.is_dir() { continue; }
             if path.extension().is_some_and(|e| e == "py") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(content) = read_source_cached(&path) {
                     count += content.matches(pattern).count();
                 }
             }
@@ -1676,7 +1705,7 @@ fn scan_python_for_bare_except(dir: &Path) -> usize {
             let path = entry.path();
             if path.is_dir() { continue; }
             if path.extension().is_some_and(|e| e == "py") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(content) = read_source_cached(&path) {
                     for line in content.lines() {
                         let trimmed = line.trim();
                         // Match bare `except:` with nothing after `except`
@@ -1702,7 +1731,7 @@ fn scan_python_fstring_in_sql(dir: &Path) -> usize {
             let path = entry.path();
             if path.is_dir() { continue; }
             if path.extension().is_some_and(|e| e == "py") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(content) = read_source_cached(&path) {
                     for line in content.lines() {
                         let trimmed = line.trim();
                         // Detect f-strings containing SQL keywords with curly-brace interpolation
@@ -1727,51 +1756,43 @@ fn scan_python_fstring_in_sql(dir: &Path) -> usize {
 /// suggesting they may be unused or over-abstracted.
 fn scan_for_unused_generic_params(dir: &Path) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += scan_for_unused_generic_params(&path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let lines: Vec<&str> = content.lines().collect();
-                    for i in 0..lines.len() {
-                        let trimmed = lines[i].trim();
-                        if !trimmed.starts_with("fn ") && !trimmed.starts_with("pub fn ") {
-                            continue;
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            let lines: Vec<&str> = content.lines().collect();
+            for i in 0..lines.len() {
+                let trimmed = lines[i].trim();
+                if !trimmed.starts_with("fn ") && !trimmed.starts_with("pub fn ") {
+                    continue;
+                }
+                let sig = &lines[i];
+                let open_angle = match sig.find('<') {
+                    Some(pos) => pos,
+                    None => continue,
+                };
+                let close_angle = match sig[open_angle..].find('>') {
+                    Some(pos) => open_angle + pos,
+                    None => continue,
+                };
+                let generics_section = &sig[open_angle + 1..close_angle];
+                for param in generics_section.split(',') {
+                    let p = param.trim().split(':').next().unwrap_or("").trim();
+                    if p.is_empty() || !p.chars().all(|c| c.is_uppercase() || c == '_') {
+                        continue;
+                    }
+                    let mut used = false;
+                    for j in i + 1..lines.len().min(i + 60) {
+                        if lines[j].trim().starts_with("fn ")
+                            || lines[j].trim().starts_with("pub fn ")
+                        {
+                            break;
                         }
-                        let sig = &lines[i];
-                        let open_angle = match sig.find('<') {
-                            Some(pos) => pos,
-                            None => continue,
-                        };
-                        let close_angle = match sig[open_angle..].find('>') {
-                            Some(pos) => open_angle + pos,
-                            None => continue,
-                        };
-                        let generics_section = &sig[open_angle + 1..close_angle];
-                        for param in generics_section.split(',') {
-                            let p = param.trim().split(':').next().unwrap_or("").trim();
-                            if p.is_empty() || !p.chars().all(|c| c.is_uppercase() || c == '_') {
-                                continue;
-                            }
-                            let mut used = false;
-                            for j in i + 1..lines.len().min(i + 60) {
-                                if lines[j].trim().starts_with("fn ")
-                                    || lines[j].trim().starts_with("pub fn ")
-                                {
-                                    break;
-                                }
-                                if lines[j].contains(p) {
-                                    used = true;
-                                    break;
-                                }
-                            }
-                            if !used {
-                                count += 1;
-                            }
+                        if lines[j].contains(p) {
+                            used = true;
+                            break;
                         }
+                    }
+                    if !used {
+                        count += 1;
                     }
                 }
             }
@@ -1784,20 +1805,12 @@ fn scan_for_unused_generic_params(dir: &Path) -> usize {
 fn count_deeply_nested_lines(dir: &Path, levels: usize) -> usize {
     let threshold = levels * 4;
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_deeply_nested_lines(&path, levels);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let leading_spaces = line.len() - line.trim_start().len();
-                        if leading_spaces >= threshold {
-                            count += 1;
-                        }
-                    }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            for line in content.lines() {
+                let leading_spaces = line.len() - line.trim_start().len();
+                if leading_spaces >= threshold {
+                    count += 1;
                 }
             }
         }
@@ -1809,17 +1822,9 @@ fn count_deeply_nested_lines(dir: &Path, levels: usize) -> usize {
 /// Uses simple brace-depth tracking to find matching closing braces.
 fn count_long_functions(dir: &Path, max_lines: usize) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_long_functions(&path, max_lines);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    count += count_long_functions_in_content(&content, max_lines);
-                }
-            }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            count += count_long_functions_in_content(&content, max_lines);
         }
     }
     count
@@ -1881,54 +1886,30 @@ fn count_long_functions_in_content(content: &str, max_lines: usize) -> usize {
 /// Count traits that have only one implementation (over-abstracted pattern).
 fn count_single_impl_traits(dir: &Path) -> usize {
     let mut names: Vec<(String, String)> = Vec::new(); // (trait_name, file_path)
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                names.extend(collect_single_impl_traits_from_dir(&path));
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if let Some(trait_name) = trimmed.strip_prefix("pub trait ")
-                            .or_else(|| trimmed.strip_prefix("trait "))
-                        {
-                            let name: String = trait_name.chars()
-                                .take_while(|c| c.is_alphanumeric() || *c == '_')
-                                .collect();
-                            if !name.is_empty() {
-                                names.push((name, path.to_string_lossy().to_string()));
-                            }
-                        }
+    let mut impl_counts: HashMap<String, usize> = HashMap::new();
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if let Some(trait_name) = trimmed.strip_prefix("pub trait ")
+                    .or_else(|| trimmed.strip_prefix("trait "))
+                {
+                    let name: String = trait_name.chars()
+                        .take_while(|c| c.is_alphanumeric() || *c == '_')
+                        .collect();
+                    if !name.is_empty() {
+                        names.push((name, path.to_string_lossy().to_string()));
                     }
                 }
-            }
-        }
-    }
-    // Build trait → impl count map (scan all files again for impl ... for TraitName)
-    let mut impl_counts: HashMap<String, usize> = HashMap::new();
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count_impls_for_traits(&path, &mut impl_counts);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if let Some(impl_str) = trimmed.strip_prefix("impl ")
-                            .or_else(|| trimmed.strip_prefix("pub impl "))
-                        {
-                            if let Some(for_str) = impl_str.find(" for ") {
-                                let trait_part = &impl_str[..for_str].trim();
-                                if let Some(name) = trait_part.split('<').next() {
-                                    let name = name.trim();
-                                    if !name.is_empty() && !name.contains(' ') {
-                                        *impl_counts.entry(name.to_string()).or_default() += 1;
-                                    }
-                                }
+                if let Some(impl_str) = trimmed.strip_prefix("impl ")
+                    .or_else(|| trimmed.strip_prefix("pub impl "))
+                {
+                    if let Some(for_str) = impl_str.find(" for ") {
+                        let trait_part = &impl_str[..for_str].trim();
+                        if let Some(name) = trait_part.split('<').next() {
+                            let name = name.trim();
+                            if !name.is_empty() && !name.contains(' ') {
+                                *impl_counts.entry(name.to_string()).or_default() += 1;
                             }
                         }
                     }
@@ -1942,87 +1923,20 @@ fn count_single_impl_traits(dir: &Path) -> usize {
         .count()
 }
 
-fn collect_single_impl_traits_from_dir(dir: &Path) -> Vec<(String, String)> {
-    let mut names = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                names.extend(collect_single_impl_traits_from_dir(&path));
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if let Some(trait_name) = trimmed.strip_prefix("pub trait ")
-                            .or_else(|| trimmed.strip_prefix("trait "))
-                        {
-                            let name: String = trait_name.chars()
-                                .take_while(|c| c.is_alphanumeric() || *c == '_')
-                                .collect();
-                            if !name.is_empty() {
-                                names.push((name, path.to_string_lossy().to_string()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    names
-}
-
-fn count_impls_for_traits(dir: &Path, counts: &mut HashMap<String, usize>) {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count_impls_for_traits(&path, counts);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if let Some(impl_str) = trimmed.strip_prefix("impl ")
-                            .or_else(|| trimmed.strip_prefix("pub impl "))
-                        {
-                            if let Some(for_str) = impl_str.find(" for ") {
-                                let trait_part = &impl_str[..for_str].trim();
-                                let name = trait_part.split('<').next().unwrap_or("").trim();
-                                if !name.is_empty() && !name.contains(' ') {
-                                    *counts.entry(name.to_string()).or_default() += 1;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// Count if-else chains longer than `max_chain` (consecutive `else if` / `else` lines).
 fn count_long_if_chains(dir: &Path, max_chain: usize) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_long_if_chains(&path, max_chain);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let lines: Vec<&str> = content.lines().collect();
-                    let mut chain = 0usize;
-                    for line in &lines {
-                        let trimmed = line.trim();
-                        if trimmed.starts_with("} else if ") || trimmed.starts_with("else if ") || trimmed == "} else {" || trimmed.starts_with("else {") {
-                            chain += 1;
-                        } else {
-                            if chain > max_chain { count += 1; }
-                            chain = 0;
-                        }
-                    }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            let lines: Vec<&str> = content.lines().collect();
+            let mut chain = 0usize;
+            for line in &lines {
+                let trimmed = line.trim();
+                if trimmed.starts_with("} else if ") || trimmed.starts_with("else if ") || trimmed == "} else {" || trimmed.starts_with("else {") {
+                    chain += 1;
+                } else {
+                    if chain > max_chain { count += 1; }
+                    chain = 0;
                 }
             }
         }
@@ -2033,48 +1947,40 @@ fn count_long_if_chains(dir: &Path, max_chain: usize) -> usize {
 /// Count match expressions with more than `max_arms` arms.
 fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_excessive_match_arms(&path, max_arms);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let lines: Vec<&str> = content.lines().collect();
-                    let mut i = 0;
-                    while i < lines.len() {
-                        if lines[i].contains("match ") && !lines[i].trim().starts_with("//") {
-                            let mut brace_depth = 0i32;
-                            let mut arms = 0usize;
-                            let mut in_match = false;
-                            let start = i;
-                            for j in i..lines.len() {
-                                for ch in lines[j].chars() {
-                                    if ch == '{' {
-                                        brace_depth += 1;
-                                        if !in_match { in_match = true; }
-                                    } else if ch == '}' {
-                                        brace_depth -= 1;
-                                    }
-                                }
-                                if in_match && brace_depth == 0 {
-                                    i = j;
-                                    break;
-                                }
-                                if in_match && j > start {
-                                    let tl = lines[j].trim();
-                                    if tl.starts_with('|') || tl.contains("=>") {
-                                        arms += 1;
-                                    }
-                                }
-                                if j - i > SelfReviewConfig::default().scan_safety_bound { i = j; break; }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            let lines: Vec<&str> = content.lines().collect();
+            let mut i = 0;
+            while i < lines.len() {
+                if lines[i].contains("match ") && !lines[i].trim().starts_with("//") {
+                    let mut brace_depth = 0i32;
+                    let mut arms = 0usize;
+                    let mut in_match = false;
+                    let start = i;
+                    for j in i..lines.len() {
+                        for ch in lines[j].chars() {
+                            if ch == '{' {
+                                brace_depth += 1;
+                                if !in_match { in_match = true; }
+                            } else if ch == '}' {
+                                brace_depth -= 1;
                             }
-                            if arms > max_arms { count += 1; }
                         }
-                        i += 1;
+                        if in_match && brace_depth == 0 {
+                            i = j;
+                            break;
+                        }
+                        if in_match && j > start {
+                            let tl = lines[j].trim();
+                            if tl.starts_with('|') || tl.contains("=>") {
+                                arms += 1;
+                            }
+                        }
+                        if j - i > SelfReviewConfig::default().scan_safety_bound { i = j; break; }
                     }
+                    if arms > max_arms { count += 1; }
                 }
+                i += 1;
             }
         }
     }
@@ -2084,31 +1990,23 @@ fn count_excessive_match_arms(dir: &Path, max_arms: usize) -> usize {
 /// Count function declarations with more than `max_params` parameters.
 fn count_excessive_param_count(dir: &Path, max_params: usize) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_excessive_param_count(&path, max_params);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if !trimmed.starts_with("fn ") && !trimmed.starts_with("pub fn ") {
-                            continue;
-                        }
-                        if let Some(paren_open) = trimmed.find('(') {
-                            if let Some(paren_close) = trimmed[paren_open..].find(')') {
-                                let params_str = &trimmed[paren_open + 1..paren_open + paren_close];
-                                if params_str.is_empty() { continue; }
-                                let params: Vec<&str> = params_str.split(',')
-                                    .map(|s| s.trim())
-                                    .filter(|s| !s.is_empty() && !s.contains("self"))
-                                    .collect();
-                                if params.len() > max_params {
-                                    count += 1;
-                                }
-                            }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if !trimmed.starts_with("fn ") && !trimmed.starts_with("pub fn ") {
+                    continue;
+                }
+                if let Some(paren_open) = trimmed.find('(') {
+                    if let Some(paren_close) = trimmed[paren_open..].find(')') {
+                        let params_str = &trimmed[paren_open + 1..paren_open + paren_close];
+                        if params_str.is_empty() { continue; }
+                        let params: Vec<&str> = params_str.split(',')
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty() && !s.contains("self"))
+                            .collect();
+                        if params.len() > max_params {
+                            count += 1;
                         }
                     }
                 }
@@ -2121,22 +2019,14 @@ fn count_excessive_param_count(dir: &Path, max_params: usize) -> usize {
 /// Count `// TODO` / `// FIXME` comments that aren't in files with a `#[test]`.
 fn count_todos_without_nearby_test(dir: &Path) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_todos_without_nearby_test(&path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let has_test = content.contains("#[test]");
-                    let todo_count = content.matches("// TODO").count()
-                        + content.matches("//TODO").count()
-                        + content.matches("// FIXME").count();
-                    if todo_count > 0 && !has_test {
-                        count += todo_count;
-                    }
-                }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            let has_test = content.contains("#[test]");
+            let todo_count = content.matches("// TODO").count()
+                + content.matches("//TODO").count()
+                + content.matches("// FIXME").count();
+            if todo_count > 0 && !has_test {
+                count += todo_count;
             }
         }
     }
@@ -2146,23 +2036,15 @@ fn count_todos_without_nearby_test(dir: &Path) -> usize {
 /// Count `&mut self` methods that do not return `Result` (suggesting no error handling).
 fn count_state_mutation_no_result(dir: &Path) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_state_mutation_no_result(&path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if (trimmed.starts_with("fn ") || trimmed.starts_with("pub fn "))
-                            && trimmed.contains("&mut self")
-                            && !trimmed.contains("Result") {
-                                count += 1;
-                            }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            for line in content.lines() {
+                let trimmed = line.trim();
+                if (trimmed.starts_with("fn ") || trimmed.starts_with("pub fn "))
+                    && trimmed.contains("&mut self")
+                    && !trimmed.contains("Result") {
+                        count += 1;
                     }
-                }
             }
         }
     }
@@ -2173,36 +2055,28 @@ fn count_state_mutation_no_result(dir: &Path) -> usize {
 /// (no "Returns", "Goal", "Purpose", or "Success" in the preceding doc block).
 fn count_pub_fn_without_goal_doc(dir: &Path) -> usize {
     let mut count = 0usize;
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if path.ends_with("target") || path.ends_with("bin-archive") { continue; }
-                count += count_pub_fn_without_goal_doc(&path);
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    let lines: Vec<&str> = content.lines().collect();
-                    for i in 0..lines.len() {
-                        let trimmed = lines[i].trim();
-                        if !trimmed.starts_with("pub fn ") { continue; }
-                        let mut has_goal = false;
-                        for j in (0.max(i.saturating_sub(10)))..i {
-                            let d = lines[j].trim();
-                            if d.starts_with("///") {
-                                if d.contains("Returns") || d.contains("Goal")
-                                    || d.contains("Purpose") || d.contains("Success")
-                                    || d.contains("Output")
-                                {
-                                    has_goal = true;
-                                    break;
-                                }
-                            } else if !d.starts_with("///") && !d.is_empty() {
-                                break;
-                            }
+    for path in cached_rs_files(dir).iter() {
+        if let Ok(content) = read_source_cached(path) {
+            let lines: Vec<&str> = content.lines().collect();
+            for i in 0..lines.len() {
+                let trimmed = lines[i].trim();
+                if !trimmed.starts_with("pub fn ") { continue; }
+                let mut has_goal = false;
+                for j in (0.max(i.saturating_sub(10)))..i {
+                    let d = lines[j].trim();
+                    if d.starts_with("///") {
+                        if d.contains("Returns") || d.contains("Goal")
+                            || d.contains("Purpose") || d.contains("Success")
+                            || d.contains("Output")
+                        {
+                            has_goal = true;
+                            break;
                         }
-                        if !has_goal { count += 1; }
+                    } else if !d.starts_with("///") && !d.is_empty() {
+                        break;
                     }
                 }
+                if !has_goal { count += 1; }
             }
         }
     }

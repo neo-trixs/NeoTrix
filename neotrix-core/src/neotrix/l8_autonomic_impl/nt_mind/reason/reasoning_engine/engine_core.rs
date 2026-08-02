@@ -8,8 +8,9 @@ use crate::core::nt_core_e8::ewhr_bridge::E8EwhrBridge;
 use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType, E8DomainTransitionModel};
 use crate::core::nt_core_e8::nt_core_e8_prediction::E8PredictionOracle;
 use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FablePhase};
+use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
 use crate::core::nt_core_sae_bridge::SAEBridge;
-use crate::core::nt_core_ttc::TtcEngine;
+use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
 use crate::core::nt_core_prm::ProcessRewardLearner;
 use crate::core::nt_core_aura::IntentEngine;
 use crate::core::nt_core_trajectory_compress::{CompressionLevel, TrajectoryCompressor};
@@ -124,6 +125,17 @@ pub struct ReasoningEngine {
     /// orphaned — defined in domain_transition.rs but never used in any production
     /// code path. Now wired into the prediction oracle for domain-specific blending.
     pub domain_transition_model: Option<E8DomainTransitionModel>,
+    /// Fable 5 effort tier selector: maps task difficulty + length to
+    /// Low/Medium/High/XHigh/Max tiers controlling sparse attention k,
+    /// MCTS simulations, and TTC rollout depth.
+    pub effort_tier_selector: EffortTierSelector,
+    /// Most recently selected effort tier (for telemetry).
+    pub last_effort_tier: Option<EffortTier>,
+    /// Fused consciousness-core synthesis: all mainstream model innovations
+    /// (K3 quantile balancing + sparse attention + AttnRes, DeepSeek-V4 mHC
+    /// Birkhoff projection, Gemini 3.6 step routing cache, Qwen3/Fable 5
+    /// effort tiers) fused into a single optimal prediction pipeline.
+    pub synthesis: ConsciousnessCoreSynthesis,
     /// Observer error recovery with retry + circuit breaker + fallback
     pub observer_error_recovery: ObserverErrorRecovery,
 }
@@ -176,6 +188,9 @@ impl ReasoningEngine {
             last_e8_attention_weights: None,
             last_e8_confidence: 0.5,
             domain_transition_model: None,
+            effort_tier_selector: EffortTierSelector::default(),
+            last_effort_tier: None,
+            synthesis: ConsciousnessCoreSynthesis::default(),
             observer_error_recovery: ObserverErrorRecovery::new(),
         }
     }
@@ -281,6 +296,11 @@ impl ReasoningEngine {
 
     pub fn with_domain_transition(mut self, model: E8DomainTransitionModel) -> Self {
         self.domain_transition_model = Some(model);
+        self
+    }
+
+    pub fn with_effort_tier_selector(mut self, selector: EffortTierSelector) -> Self {
+        self.effort_tier_selector = selector;
         self
     }
 
@@ -500,6 +520,7 @@ impl ReasoningEngine {
             root_span.set_attribute("gwt_winner", AttributeValue::Int(report.winner as i64));
             root_span.set_attribute("gwt_entropy", AttributeValue::Float(report.entropy));
             root_span.set_attribute("gwt_complement_activated", AttributeValue::Bool(report.complement_activated));
+            root_span.set_attribute("gwt_inner_speech", AttributeValue::Bool(gwt.inner_speech.total_generated > 0));
         }
 
         // Fable-5 pattern matcher: score trajectory alignment against Mythos reasoning phases
@@ -614,17 +635,101 @@ impl ReasoningEngine {
                     );
                 }
 
-                // Differentiable attention bridge: compute attention weights over all 64 E8 states
-                // for GWT expert selection modulation in the next resonance cycle.
-                // Uses the already-computed `dist` from predict_with_mcts() above — previously
-                // recomputed the entire ensemble from scratch via oracle.attention_weights().
-                let attn = dist.attention_weights(0.8);
-                self.last_e8_attention_weights = Some(attn.to_vec());
-                self.last_e8_confidence = mcts_confidence;
+                // Fable 5 effort tier: maps task difficulty + length to
+                // Low/Medium/High/XHigh/Max, controlling sparse attention k,
+                // MCTS simulations, and TTC rollout depth.
+                let difficulty = DifficultyEstimator::heuristic_difficulty(task, "reasoning");
+                let effort_tier = self.effort_tier_selector.select_for_task(difficulty, task.len());
+                self.last_effort_tier = Some(effort_tier);
+                root_span.set_attribute("effort_tier", AttributeValue::String(format!("{:?}", effort_tier)));
+                root_span.set_attribute("effort_rollout_depth", AttributeValue::Int(effort_tier.rollout_depth() as i64));
+                root_span.set_attribute("effort_sparse_k", AttributeValue::Int(effort_tier.sparse_k() as i64));
+                root_span.set_attribute("effort_mcts_sims", AttributeValue::Int(effort_tier.mcts_simulations() as i64));
+
+                // ── 意识体内核融合管线 (Consciousness Core Fusion) ──────────────
+                // Fuses the defining 2026 frontier-model innovations into a single
+                // optimal prediction:
+                //   1. K3 Quantile Balancing → dominance_capped_distribution (no aux loss)
+                //   2. K3 AttnRes → depth-residual skip-connection across trajectory
+                //   3. K3 sparse experts → effort-scaled sparse top-K
+                //   4. DeepSeek-V4 mHC → Birkhoff doubly-stochastic projection (column-balanced)
+                //   5. Gemini 3.6 → step-route cache reusing routing across seal-loop steps
+                //   6. Qwen3/Fable 5 → effort tier (thinking budget) scales sparsity
+                let traj_modes: Vec<u8> = self.state_trajectory.iter().map(|s| s.mode.0).collect();
+                let synth_effort = match effort_tier {
+                    crate::core::nt_core_ttc::EffortTier::Low => SynthesisEffortTier::Low,
+                    crate::core::nt_core_ttc::EffortTier::Medium => SynthesisEffortTier::Medium,
+                    crate::core::nt_core_ttc::EffortTier::High => SynthesisEffortTier::High,
+                    crate::core::nt_core_ttc::EffortTier::XHigh => SynthesisEffortTier::XHigh,
+                    crate::core::nt_core_ttc::EffortTier::Max => SynthesisEffortTier::Max,
+                };
+                // Gemini 3.6 step-route cache: reuse routing decision for repeated
+                // (task_type, phase, effort, source_bucket) contexts across the seal loop.
+                let cache_key = crate::core::nt_core_e8::nt_core_synthesis::StepRouteCache::key(
+                    task_type as u8, phase_step as u8, synth_effort.rank(), current_mode,
+                );
+                let mut route_hit = false;
+                if self.synthesis.fused_pipeline_enabled {
+                    if let Some(cached_topk) = self.synthesis.step_route_cache.get(&cache_key) {
+                        route_hit = true;
+                        root_span.set_attribute("synthesis_route_cache", AttributeValue::Bool(true));
+                        // Blend cached top-k into the attention vector
+                        let mut attn = vec![0.0f64; 64];
+                        for (state, prob) in &cached_topk {
+                            attn[(*state as usize).min(63)] = *prob;
+                        }
+                        self.last_e8_attention_weights = Some(attn);
+                        let capped_confidence = mcts_confidence.min(effort_tier.confidence_cap());
+                        self.last_e8_confidence = capped_confidence;
+                    } else {
+                        // Fused pipeline: dominance cap + AttnRes + effort sparse top-K
+                        // Fable 5 classifier-wrapped routing: high-risk contexts bypass
+                        // the aggressive frontier path through a conservative fallback.
+                        let total_routes = self.synthesis.step_route_cache.hits + self.synthesis.step_route_cache.misses;
+                        let route_hits = self.synthesis.step_route_cache.hits;
+                        let mut fused = self.synthesis.fused_distribution(tm, current_mode, &traj_modes, synth_effort);
+                        if self.synthesis.safety_router.allow_frontier(task, route_hits, total_routes) {
+                            // DeepSeek-V4 Muon: condition the fused flow so transition
+                            // columns stay well-conditioned (no rank collapse). Applied
+                            // as an 8×8 Newton-Schulz orthogonalization of the
+                            // 64-state attention distribution.
+                            fused = self.synthesis.muon.condition_vector(&fused);
+                            root_span.set_attribute("synthesis_safety", AttributeValue::Bool(true));
+                        } else {
+                            // Conservative path: damp aggressive distribution toward uniform
+                            fused = self.synthesis.safety_router.conservative_distribution(&fused);
+                            root_span.set_attribute("synthesis_safety", AttributeValue::Bool(false));
+                            root_span.set_attribute("synthesis_safety_fallback", AttributeValue::Bool(true));
+                        }
+                        let topk: Vec<(u8, f64)> = fused.iter().enumerate()
+                            .filter(|(_, &p)| p > 1e-4)
+                            .map(|(i, &p)| (i as u8, p))
+                            .collect();
+                        self.synthesis.step_route_cache.put(cache_key, topk);
+                        self.last_e8_attention_weights = Some(fused);
+                        let capped_confidence = mcts_confidence.min(effort_tier.confidence_cap());
+                        self.last_e8_confidence = capped_confidence;
+                    }
+                } else {
+                    // Fallback: plain effort-scaled sparse attention
+                    let attn = dist.attention_weights_sparse(0.8, effort_tier.sparse_k());
+                    self.last_e8_attention_weights = Some(attn.to_vec());
+                    let capped_confidence = mcts_confidence.min(effort_tier.confidence_cap());
+                    self.last_e8_confidence = capped_confidence;
+                }
+
+                root_span.set_attribute("synthesis_route_hit", AttributeValue::Bool(route_hit));
+                root_span.set_attribute("synthesis_route_hit_rate", AttributeValue::Float(self.synthesis.step_route_cache.hit_rate()));
+                root_span.set_attribute("synthesis_active", AttributeValue::Bool(self.synthesis.fused_pipeline_enabled));
+                for (k, v) in self.synthesis.telemetry() {
+                    root_span.set_attribute(&k, AttributeValue::String(v));
+                }
+
+                let attn_ref = self.last_e8_attention_weights.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
                 root_span.set_attribute(
                     "e8_attn_entropy",
                     AttributeValue::Float(
-                        attn.iter().filter(|&&p| p > 0.0).map(|&p| -p * p.log(2.0)).sum::<f64>(),
+                        attn_ref.iter().filter(|&&p| p > 0.0).map(|&p| -p * p.log(2.0)).sum::<f64>(),
                     ),
                 );
             }

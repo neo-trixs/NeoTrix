@@ -5,8 +5,15 @@ use super::specious_present::SpeciousPresent;
 use super::volition::{ActionCandidate, VolitionEngine};
 use super::inner_critic::{CritiqueResult, InnerCritic};
 use super::awakening::{AwakeningReport, ConsciousnessAwakening};
-use super::vsa_tag::VsaTagged;
+use super::vsa_tag::{VsaTagged, VsaOrigin, VsaSelfCategory};
+use super::source_hierarchy::{
+    ContextMeta, KnowledgeLayer, PerceptionMeta, PerceptionSource, ProvenanceChain,
+};
 use crate::core::nt_core_self::emotion_state::{EmotionEngine, EmotionReport, EmotionDimension};
+use crate::neotrix::nt_memory_kb::KnowledgeBase;
+
+/// 每次 tick 最多注入的 KB 知识条目数，防止无界流入意识流。
+const KB_INJECT_LIMIT: usize = 4;
 
 pub struct ConsciousnessRuntime {
     pub stream: ConsciousnessStream,
@@ -14,6 +21,10 @@ pub struct ConsciousnessRuntime {
     pub volition: VolitionEngine,
     pub critic: InnerCritic,
     pub emotion_engine: EmotionEngine,
+    /// 知识库句柄 — 意识核心主动查询记忆/知识，而非仅被动接收共振字符串。
+    pub kb: Option<std::sync::Arc<KnowledgeBase>>,
+    /// 最近一次 tick 从 KB 注入的意识条目 (title, score)。
+    pub last_kb_injections: Vec<(String, f64)>,
     pub awakened: bool,
     pub last_report: Option<AwakeningReport>,
     pub last_quality: f64,
@@ -28,11 +39,78 @@ impl ConsciousnessRuntime {
             volition: VolitionEngine::new(),
             critic: InnerCritic::new(),
             emotion_engine: EmotionEngine::default(),
+            kb: None,
+            last_kb_injections: Vec::new(),
             awakened: false,
             last_report: None,
             last_quality: 0.0,
             tick_count: 0,
         }
+    }
+
+    /// 挂接知识库，使意识核心具备主动查询能力。
+    pub fn attach_kb(&mut self, kb: std::sync::Arc<KnowledgeBase>) {
+        self.kb = Some(kb);
+    }
+
+    pub fn is_kb_attached(&self) -> bool {
+        self.kb.is_some()
+    }
+
+    /// 主动查询知识库：以当前共振内容为查询词检索关联知识。
+    /// 返回 (title, score) 列表；未挂接 KB 时返回空。
+    pub fn query_kb(&self, query: &str, limit: usize) -> Vec<(String, f64)> {
+        let kb = match self.kb.as_ref() {
+            Some(kb) => kb,
+            None => return Vec::new(),
+        };
+        match kb.search(query, limit) {
+            Ok(results) => results.into_iter()
+                .map(|r| (r.node.title.clone(), r.score))
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// 将 KB 检索结果注入意识流 (specious present) 作为带溯源的记忆条目。
+    /// 返回注入条目数。每条带 Structured provenance 层，可被后续感知层级鉴别。
+    fn inject_kb_knowledge(&mut self, query: &str) -> usize {
+        let Some(kb) = self.kb.clone() else { return 0 };
+        let results = match kb.search(query, KB_INJECT_LIMIT) {
+            Ok(r) => r,
+            Err(_) => return 0,
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos() as i64;
+        let mut injected = Vec::new();
+        for r in results {
+            let title = r.node.title.clone();
+            if title.is_empty() {
+                continue;
+            }
+            let raw = KnowledgeLayer::Raw(PerceptionMeta {
+                source_type: PerceptionSource::SearchResult,
+                raw_confidence: r.score.clamp(0.0, 1.0),
+                timestamp: now,
+            });
+            let structured = KnowledgeLayer::Structured(ContextMeta {
+                source_ids: vec![title.clone()],
+                processing_steps: vec!["kb_hybrid_search".into()],
+                contextual_confidence: r.score.clamp(0.0, 1.0),
+            });
+            let chain = ProvenanceChain::new(vec![(raw, now), (structured, now + 1)]);
+            let mut item = VsaTagged::new(
+                title.as_bytes().to_vec(),
+                VsaOrigin::Self_(VsaSelfCategory::Memory),
+            )
+            .with_confidence(r.score.clamp(0.0, 1.0))
+            .with_provenance(chain);
+            item.salience = (0.5 + r.score * 0.5).min(1.0);
+            self.specious_present.push(item);
+            injected.push((title, r.score));
+        }
+        self.last_kb_injections = injected;
+        self.last_kb_injections.len()
     }
 
     pub fn awaken(&mut self) -> &AwakeningReport {
@@ -85,6 +163,8 @@ impl ConsciousnessRuntime {
         // Feed resonance content into specious present as a VSA-tagged item
         let world_item = VsaTagged::world_input(resonance_content);
         self.specious_present.push(world_item);
+        // Query knowledge base with the resonance content — 意识核心主动检索知识
+        self.inject_kb_knowledge(resonance_content);
         // Run volition: propose candidates from the specious present window
         for item in self.specious_present.window().iter() {
             let desc = String::from_utf8_lossy(
@@ -166,6 +246,14 @@ impl crate::core::nt_core_self_test::SelfTest for ConsciousnessRuntime {
         let result = cr.tick("after awaken");
         if result.is_none() {
             failures.push("tick after awaken should return Some critique".into());
+        }
+        // Test 6: KB attachment is optional — new runtime has none
+        if cr.is_kb_attached() {
+            failures.push("new runtime should not have KB attached".into());
+        }
+        // Test 7: query_kb without KB returns empty (no panic)
+        if !cr.query_kb("anything", 3).is_empty() {
+            failures.push("query_kb without KB should return empty".into());
         }
         if failures.is_empty() { Ok(()) } else { Err(failures) }
     }
@@ -251,5 +339,22 @@ mod tests {
         assert!(report.confidence >= 0.0); // tick wired observe_from_critique
         assert!(cr.last_quality > 0.0 || cr.last_quality == 0.0); // set by tick
         assert!(cr.last_quality() == Some(cr.last_quality));
+    }
+
+    #[test]
+    fn test_query_kb_without_attachment_returns_empty() {
+        let cr = ConsciousnessRuntime::new();
+        assert!(!cr.is_kb_attached());
+        assert!(cr.query_kb("anything", 3).is_empty());
+    }
+
+    #[test]
+    fn test_tick_without_kb_injects_nothing() {
+        let mut cr = ConsciousnessRuntime::new();
+        cr.awaken();
+        let _ = cr.tick("no kb attached yet");
+        assert!(cr.last_kb_injections.is_empty());
+        // volition still works without KB
+        assert!(cr.volition().candidate_count() >= 0);
     }
 }

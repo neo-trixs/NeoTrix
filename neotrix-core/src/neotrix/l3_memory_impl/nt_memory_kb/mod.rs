@@ -773,6 +773,12 @@ impl KnowledgeBase {
         nt_memory_store::get_stats(&conn).map_err(|e| format!("stats: {}", e))
     }
 
+    /// 枚举全部知识节点 — 供超立方体/图等内存结构批量灌入。
+    pub fn all_nodes(&self) -> Result<Vec<KnowledgeNode>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_store::get_all_nodes(&conn).map_err(|e| format!("all_nodes: {}", e))
+    }
+
     // ── dedup ──
 
     pub fn dedup_nodes(&self) -> Result<usize, String> {
@@ -1552,6 +1558,53 @@ impl KnowledgeBase {
     }
 }
 
+/// 打通 core/nt_core_traits::MemoryProvider 死抽象 — KnowledgeBase 是记忆存储/检索的
+/// 事实提供者。此前 trait 定义但从未实现，任何 `dyn MemoryProvider` 都无法接线。
+impl crate::core::nt_core_traits::MemoryProvider for KnowledgeBase {
+    fn store(&mut self, key: &str, value: &str) -> Result<String, String> {
+        let node_id = self.insert_or_get_node(
+            key,
+            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType::Insight,
+            Some(value),
+            None,
+            Some("memory_provider"),
+        )?;
+        Ok(node_id)
+    }
+
+    fn search(&self, query: &str, limit: usize) -> Result<Vec<(String, String)>, String> {
+        let results = self.search(query, limit)?;
+        Ok(results.into_iter()
+            .map(|r| {
+                let content = r.node.summary.clone().unwrap_or_default();
+                (r.node.title.clone(), content)
+            })
+            .collect())
+    }
+
+    fn delete(&mut self, key: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let node = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_store::find_node_by_title_and_type(
+            &conn,
+            key,
+            &crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType::Insight,
+        ).map_err(|e| format!("find: {}", e))?;
+        drop(conn);
+        if let Some(n) = node {
+            let deleted = self.delete_node(&n.id).map_err(|e| format!("delete: {}", e))?;
+            if deleted {
+                // Invalidate fused search cache so stale results don't resurface
+                if let Ok(mut cache) = self.fused_cache.lock() {
+                    cache.clear();
+                }
+            }
+            Ok(())
+        } else {
+            Err(format!("node not found: {}", key))
+        }
+    }
+}
+
 // ── EvolutionPatternType helper ──
 
 impl EvolutionPatternType {
@@ -1581,10 +1634,46 @@ impl crate::core::l7_capability::nt_core_antidistil::AntiDistilStore for Knowled
 
 #[cfg(test)]
 mod tests {
+    use super::KnowledgeBase;
 
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_memory_provider_store_and_search() {
+        let dir = std::env::temp_dir().join(format!("nt_kb_mp_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_kb.db");
+        let mut kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        let mut provider: &mut dyn crate::core::nt_core_traits::MemoryProvider = &mut kb;
+        let id = provider.store("memory_provider_key", "memory provider value").expect("store");
+        assert!(!id.is_empty());
+
+        let results = provider.search("memory_provider_key", 3).expect("search");
+        assert!(!results.is_empty(), "search should return stored memory");
+
+        provider.delete("memory_provider_key").expect("delete");
+        let after = provider.search("memory_provider_key", 3).expect("search after delete");
+        assert!(after.is_empty(), "node should be deleted");
+    }
+
+    #[test]
+    fn test_consciousness_runtime_attaches_kb() {
+        use crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
+        let dir = std::env::temp_dir().join(format!("nt_kb_cr_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_cr_kb.db");
+        let kb = std::sync::Arc::new(KnowledgeBase::open(Some(db_path.clone())).expect("open kb"));
+
+        let mut cr = ConsciousnessRuntime::new();
+        assert!(!cr.is_kb_attached());
+        cr.attach_kb(kb.clone());
+        assert!(cr.is_kb_attached());
+        // query returns empty (fresh db) without panicking
+        assert!(cr.query_kb("anything", 3).is_empty());
     }
 
     #[test]

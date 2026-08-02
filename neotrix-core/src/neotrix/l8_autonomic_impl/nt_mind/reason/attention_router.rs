@@ -9,6 +9,7 @@ use super::hypercube_bridge::HyperCubeBridge;
 
 use crate::neotrix::nt_world_crawl::config::{CrawlTopic, SeedEntry};
 use crate::neotrix::nt_world_crawl::unified::UnifiedCrawler;
+use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 /// 路由结果 — GWT 竞争 + 知识检索的产出
 pub struct RoutedContext {
@@ -25,6 +26,8 @@ pub struct RoutedContext {
 pub struct AttentionRouter {
     pub workspace: GlobalWorkspace,
     pub bridge: HyperCubeBridge,
+    /// 真实知识库句柄 — 挂接后 KnowledgeRetriever 检索真实知识而非静态种子。
+    pub kb: Option<std::sync::Arc<KnowledgeBase>>,
 }
 
 impl AttentionRouter {
@@ -47,6 +50,7 @@ impl AttentionRouter {
         Self {
             workspace,
             bridge: HyperCubeBridge::new(),
+            kb: None,
         }
     }
 
@@ -91,6 +95,8 @@ impl AttentionRouter {
                     .push(format!("[{}] {} ({})", st.short_name(), e.label, e.source));
             }
         }
+        // 真实 KB 知识补充 — KnowledgeRetriever 的实际数据源
+        self.append_kb_knowledge_lines(context, &mut knowledge_lines);
 
         self.workspace.decay_all(0.3);
 
@@ -189,6 +195,38 @@ impl AttentionRouter {
     ) -> Vec<CubeEntry> {
         let query = specialist_query_coord(st, context);
         self.bridge.query(&query, 4)
+    }
+
+    /// 挂接真实知识库 — KnowledgeRetriever 从此检索实际记忆而非静态种子。
+    pub fn attach_kb(&mut self, kb: std::sync::Arc<KnowledgeBase>) {
+        self.kb = Some(kb);
+    }
+
+    /// 从真实 KB 检索与上下文关联的知识条目 (title)。
+    /// 未挂接 KB 或检索失败时返回空。
+    pub fn retrieve_kb(&self, context: &str, limit: usize) -> Vec<String> {
+        let kb = match self.kb.as_ref() {
+            Some(kb) => kb,
+            None => return Vec::new(),
+        };
+        match kb.search(context, limit) {
+            Ok(results) => results.into_iter()
+                .map(|r| r.node.title)
+                .filter(|t| !t.is_empty())
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// 将真实 KB 检索结果并入路由上下文的知识行。
+    /// 在 route() 中调用，使知识检索覆盖实际知识库而不仅是静态种子。
+    pub fn append_kb_knowledge_lines(&self, context: &str, lines: &mut Vec<String>) {
+        if self.kb.is_none() {
+            return;
+        }
+        for title in self.retrieve_kb(context, 4) {
+            lines.push(format!("[KB] {}", title));
+        }
     }
 
     /// Analyze hypercube gap report and return sparse CrawlTopics that need more data
@@ -595,5 +633,46 @@ mod tests {
         let pt_abstraction = pt_coord.get(&DimensionAxis::Abstraction);
         let ki_abstraction = ki_coord.get(&DimensionAxis::Abstraction);
         assert!((pt_abstraction - ki_abstraction).abs() > 0.01);
+    }
+
+    #[test]
+    fn test_new_router_has_no_kb() {
+        let router = AttentionRouter::new();
+        assert!(router.kb.is_none());
+        assert!(router.retrieve_kb("test", 4).is_empty());
+    }
+
+    #[test]
+    fn test_attach_kb_enables_kb_retrieval() {
+        let kb = std::sync::Arc::new(
+            crate::neotrix::nt_memory_kb::KnowledgeBase::open(None).expect("open kb"),
+        );
+        let _ = kb.insert_or_get_node(
+            "KB-Wire-Test-Topic",
+            crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Insight,
+            Some("kb wire test summary"),
+            None,
+            Some("test"),
+        );
+        let mut router = AttentionRouter::new();
+        router.attach_kb(kb);
+        assert!(router.kb.is_some());
+        let titles = router.retrieve_kb("wire test topic", 4);
+        assert!(
+            titles.iter().any(|t| t.contains("KB-Wire-Test-Topic")),
+            "expected KB node retrieved, got {:?}",
+            titles
+        );
+    }
+
+    #[test]
+    fn test_route_without_kb_has_no_kb_lines() {
+        let mut router = AttentionRouter::new();
+        router.seed_knowledge();
+        let mut lines: Vec<String> = Vec::new();
+        router.append_kb_knowledge_lines("test", &mut lines);
+        assert!(lines.is_empty());
+        let result = router.route("test context");
+        assert!(result.knowledge_lines.iter().all(|l| !l.starts_with("[KB]")));
     }
 }

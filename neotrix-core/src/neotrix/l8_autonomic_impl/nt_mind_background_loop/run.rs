@@ -389,7 +389,15 @@ impl BackgroundLoop {
             world_consciousness: self.world_consciousness.take(),
             #[cfg(not(feature = "stealth-net"))]
             world_consciousness: None,
-            consciousness_runtime: std::mem::take(&mut self.consciousness_runtime),
+            consciousness_runtime: {
+                let mut cr = std::mem::take(&mut self.consciousness_runtime);
+                if let Some(ref kb_ref) = self.kb {
+                    if let Some(ref mut runtime) = cr {
+                        runtime.attach_kb(kb_ref.clone());
+                    }
+                }
+                cr
+            },
             consciousness_tree: self.consciousness_tree.take(),
             fep_iit_bridge: self.fep_iit_bridge.take(),
 cognitive_load: self.cognitive_load.take(),
@@ -859,7 +867,15 @@ impl BackgroundLoopHandle {
     }
     async fn handle_curiosity(&mut self) {
         use crate::neotrix::nt_mind::hypercube_bridge::HyperCubeBridge;
-        let gaps = HyperCubeBridge::new().analyze_gaps();
+        // 用真实皮层数据构建桥接，而非空桥 — 好奇心 gap 检测必须基于实际知识分布。
+        let mut bridge = HyperCubeBridge::new();
+        let cortex_traces = self.panorama.as_ref()
+            .map(|p| p.cortex.all_traces().len())
+            .unwrap_or(0);
+        if let Some(ref pano) = self.panorama {
+            bridge.ingest_from_cortex(&pano.cortex);
+        }
+        let gaps = bridge.analyze_gaps();
         self.curiosity_drive.ingest_gap_reports(&gaps);
         for q in self.curiosity_drive.drain_queries().iter().take(2) {
             if let Some(ref mut ev) = self.self_evolver {
@@ -867,6 +883,8 @@ impl BackgroundLoopHandle {
                 let _ = ev.evolve_from_url(&url);
             }
         }
+        log::debug!("[bg] curiosity: cortex_traces={} gaps={} queries={}",
+            cortex_traces, gaps.len(), self.curiosity_drive.top_signals(3).len());
     }
     /// Log a session event to KB (obsidian-mind SessionStart/Stop pattern).
     /// Creates a node with type=Session with event type and summary.
@@ -1070,6 +1088,9 @@ impl BackgroundLoopHandle {
                 iteration, caps_mean, kb_nodes, gwt_active,
             );
             let critique = cr.tick(&resonance);
+            // Surface KB knowledge retrieved by the consciousness core into the
+            // GWT panorama broadcast — closes the loop: KB → 意识 → 全局工作空间。
+            let kb_injections = cr.last_kb_injections.clone();
             if let Some(c) = critique {
                 if c.overall_quality < CONSCIOUSNESS_THRESHOLDS.warn_quality {
                     log::warn!("[bg] consciousness: LOW QUALITY ({:.3}) — reasons: {:?}",
@@ -1102,6 +1123,19 @@ impl BackgroundLoopHandle {
                     brain._last_consciousness_quality = c.overall_quality;
                     brain._consciousness_critique_count += 1;
                 }
+            }
+            if !kb_injections.is_empty() {
+                if let Some(ref mut pano) = self.panorama {
+                    for (title, score) in &kb_injections {
+                        pano.gwt.broadcast(&format!(
+                            "[consciousness_kb] {} (score: {:.2})",
+                            title, score,
+                        ));
+                    }
+                }
+                log::debug!("[bg] consciousness retrieved {} KB entries: {:?}",
+                    kb_injections.len(),
+                    kb_injections.iter().map(|(t, _)| t.as_str()).collect::<Vec<_>>());
             }
         }
         // Record state metrics from the runtime tick

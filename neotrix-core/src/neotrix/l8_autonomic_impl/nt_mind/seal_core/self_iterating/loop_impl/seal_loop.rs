@@ -813,6 +813,15 @@ impl SelfIteratingBrain {
     pub fn init_attention_router(&mut self) {
         let mut router = AttentionRouter::new();
         router.seed_knowledge();
+        // 接通真实知识库：超立方体检索 + analyze_gaps/sparse_topics 落到实际知识
+        if let Ok(kb) = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
+            // 基础 + 前沿模型知识一次性种入 (insert_or_get 幂等, 多次启动安全)
+            if let Err(e) = kb.seed_foundational() {
+                log::warn!("[KB] foundational seed failed: {e}");
+            }
+            router.bridge.ingest_from_kb(&kb);
+            router.attach_kb(std::sync::Arc::new(kb));
+        }
         self.attention_router = Some(router);
     }
 

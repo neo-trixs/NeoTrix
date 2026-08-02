@@ -151,3 +151,20 @@ impl ReasoningBank {
         score.clamp(0.0, 1.0)
     }
 }
+
+/// 打通 core/nt_core_traits::RichMemoryProvider 死抽象 — ReasoningBank 是推理记忆的
+/// 事实提供者。此前 trait 定义但从未实现，任何 `dyn RichMemoryProvider` 都无法接线。
+impl crate::core::nt_core_traits::RichMemoryProvider for ReasoningBank {
+    fn store_memory(&mut self, memory: ReasoningMemory) -> bool {
+        self.store(memory);
+        true
+    }
+
+    fn recall_similar(&self, query: &str, limit: usize) -> Vec<ReasoningMemory> {
+        self.retrieve_relevant(query, None, limit)
+    }
+
+    fn stats(&self) -> ReasoningBankStats {
+        ReasoningBank::stats(self)
+    }
+}

@@ -223,5 +223,23 @@ pub fn seed_foundational_knowledge(conn: &Connection) -> rusqlite::Result<usize>
     upsert_edge(conn, &dynamical_systems, &mathematics, RelationType::SubclassOf, 1.0, None)?;
     upsert_edge(conn, &chaos_theory, &dynamical_systems, RelationType::SubclassOf, 1.0, None)?;
 
+    let kimi_k3 = insert_or_get_node(conn, "Kimi K3", NodeType::Framework, Some("2.8T-parameter frontier MoE (8 active) with Quantile Balancing, Attention Residual (AttnRes), SiTU-GLU activation, and LatentMoE 896-to-16 routing; $3/$15 per M tokens"), Some("https://github.com/MoonshotAI/Kimi-VL"), Some("frontier-models"))?;
+    let deepseek_v4 = insert_or_get_node(conn, "DeepSeek V4", NodeType::Framework, Some("1.6T-parameter MIT-licensed frontier MoE (V4-Pro) plus 284B V4-Flash; CSA+HCA sparse attention, mHC Sinkhorn top-p, Muon optimizer; released 2026-04-24, old aliases retired 2026-07-24"), Some("https://github.com/deepseek-ai/DeepSeek-V4"), Some("frontier-models"))?;
+    let fable5 = insert_or_get_node(conn, "Claude Fable 5", NodeType::Framework, Some("Anthropic 2026-06-09 frontier model breaking 90% on analysis benchmarks; 1M context, Mythos 9-stage reasoning, classifier-wrapped risk routing"), None, Some("frontier-models"))?;
+    let qwen3_8 = insert_or_get_node(conn, "Qwen3.8-Max", NodeType::Framework, Some("Alibaba 2.4T frontier MoE released 2026-07-19, ranked just below Fable 5 on analysis benchmarks"), Some("https://github.com/QwenLM/Qwen3"), Some("frontier-models"))?;
+    let gemini3_6 = insert_or_get_node(conn, "Gemini 3.6 Flash", NodeType::Framework, Some("Google 2026-07-21 frontier model, BenchLM 75.3 top of Google lineup, optimized for low latency inference"), None, Some("frontier-models"))?;
+    let grok4_5 = insert_or_get_node(conn, "Grok 4.5", NodeType::Framework, Some("xAI 2026-07-08 frontier model, 80 tokens/sec throughput, $2/$6 per M tokens, optimized reasoning speed"), Some("https://github.com/xai-org/grok-1"), Some("frontier-models"))?;
+    count += 6;
+
+    upsert_edge(conn, &deepseek_v4, &kimi_k3, RelationType::Related, 0.7, Some("Comparable frontier MoE routing designs"))?;
+    upsert_edge(conn, &deepseek_v4, &fable5, RelationType::Related, 0.7, Some("Direct analysis-benchmark competitors"))?;
+    upsert_edge(conn, &qwen3_8, &fable5, RelationType::Related, 0.6, Some("Second-ranked analysis capability"))?;
+    upsert_edge(conn, &gemini3_6, &fable5, RelationType::Related, 0.5, Some("Cross-vendor frontier comparison"))?;
+    upsert_edge(conn, &grok4_5, &fable5, RelationType::Related, 0.5, Some("Cross-vendor frontier comparison"))?;
+    upsert_edge(conn, &kimi_k3, &machine_learning, RelationType::SubclassOf, 1.0, None)?;
+    upsert_edge(conn, &deepseek_v4, &machine_learning, RelationType::SubclassOf, 1.0, None)?;
+    upsert_edge(conn, &deepseek_v4, &seal, RelationType::Related, 0.6, Some("Muon optimizer adopted into E8 synthesis"))?;
+    upsert_edge(conn, &fable5, &seal, RelationType::Related, 0.6, Some("Risk routing pattern adopted into E8 synthesis"))?;
+
     Ok(count)
 }
