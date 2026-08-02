@@ -170,6 +170,40 @@ impl MoERouter {
     pub fn last_selected(&self) -> &[usize] {
         &self.last_selected
     }
+
+    /// Phase 8.3 — sparse top-k gating (MiCRo arXiv:2506.13331 §4.2).
+    ///
+    /// Computes the learned gating distribution `G(x) = softmax(W_g · x)` from a
+    /// task/workspace embedding, then returns the top-`top_k` expert indices and
+    /// a sparse probability vector where only those experts retain mass (the
+    /// rest are zeroed and the surviving mass is renormalized). Only the top-k
+    /// experts "participate in broadcast", the rest are frozen.
+    pub fn sparse_gate(&mut self, task_embedding: &[f64], top_k: usize) -> (Vec<usize>, [f64; MODULE_COUNT]) {
+        let gate_probs = self.gate.forward(task_embedding);
+        self.last_gate_probs = gate_probs;
+
+        let mut order: Vec<usize> = (0..MODULE_COUNT).collect();
+        order.sort_by(|&a, &b| gate_probs[b].total_cmp(&gate_probs[a]));
+        let k = top_k.clamp(1, MODULE_COUNT);
+        let selected: Vec<usize> = order.into_iter().take(k).collect();
+
+        // Sparse mask: keep only selected, renormalize surviving mass.
+        let kept: f64 = selected.iter().map(|&i| gate_probs[i]).sum();
+        let mut sparse = [0.0f64; MODULE_COUNT];
+        if kept > 0.0 {
+            for &i in &selected {
+                sparse[i] = gate_probs[i] / kept;
+            }
+        } else {
+            let uniform = 1.0 / k as f64;
+            for &i in &selected {
+                sparse[i] = uniform;
+            }
+        }
+
+        self.last_selected = selected.clone();
+        (selected, sparse)
+    }
 }
 
 /// Dynamic expert load balancer (DeepSeek-V3 style auxiliary-loss-free balancing).
@@ -505,6 +539,52 @@ mod tests {
         assert_eq!(sel_a.len(), 3);
         assert_eq!(sel_b.len(), 3);
         let _ = same; // not asserting equality or inequality
+    }
+
+    #[test]
+    fn test_sparse_gate_selects_topk_and_freezes_rest() {
+        let mut router = MoERouter::new(64);
+        let (selected, sparse) = router.sparse_gate(&dummy_embedding(), 3);
+        assert_eq!(selected.len(), 3);
+        // Only the selected 3 retain mass; the rest are exactly zero.
+        for (i, &p) in sparse.iter().enumerate() {
+            if selected.contains(&i) {
+                assert!(p > 0.0);
+            } else {
+                assert_eq!(p, 0.0);
+            }
+        }
+        // Surviving mass renormalized to 1.
+        let sum: f64 = sparse.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_sparse_gate_selects_all_when_k_equals_count() {
+        let mut router = MoERouter::new(64);
+        let (selected, sparse) = router.sparse_gate(&dummy_embedding(), MODULE_COUNT);
+        assert_eq!(selected.len(), MODULE_COUNT);
+        let sum: f64 = sparse.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9);
+        assert!(sparse.iter().all(|&p| p > 0.0));
+    }
+
+    #[test]
+    fn test_sparse_gate_topk_matches_gate_order() {
+        let mut router = MoERouter::new(64);
+        let (selected, _) = router.sparse_gate(&dummy_embedding(), 3);
+        // The top-3 selected must be the 3 highest gate probabilities.
+        let probs = router.gate.forward(&dummy_embedding());
+        let mut order: Vec<usize> = (0..MODULE_COUNT).collect();
+        order.sort_by(|&a, &b| probs[b].total_cmp(&probs[a]));
+        assert_eq!(selected, order[..3]);
+    }
+
+    #[test]
+    fn test_sparse_gate_records_last_selected() {
+        let mut router = MoERouter::new(64);
+        let (selected, _) = router.sparse_gate(&dummy_embedding(), 2);
+        assert_eq!(router.last_selected(), &selected[..]);
     }
 
     #[test]

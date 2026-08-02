@@ -108,6 +108,9 @@ pub struct GlobalWorkspace {
     /// Cross-group routing bridge (Phase 8.2): structured cognitive topology
     /// with learnable hub-to-hub collaboration weights.
     pub cognitive_hub: super::cognitive_hub::CognitiveHub,
+    /// Most recent Phase 8.3 sparse gate result: (gated expert indices, sparse
+    /// gate probabilities). Only these experts participate in the broadcast.
+    pub last_sparse_gate: Option<(Vec<usize>, [f64; MODULE_COUNT])>,
 }
 
 /// Events that trigger an audit block
@@ -166,6 +169,7 @@ impl GlobalWorkspace {
             last_ctm_report: None,
             cognitive_profile: None,
             cognitive_hub: super::cognitive_hub::CognitiveHub::new(),
+            last_sparse_gate: None,
         }
     }
 
@@ -241,6 +245,27 @@ impl GlobalWorkspace {
     /// Initialize Kuramoto oscillator network with the given number of specialists.
     pub fn init_oscillators(&mut self, num_specialists: usize) {
         self.oscillator_network = Some(OscillatorNetwork::new(num_specialists));
+    }
+
+    /// Phase 8.3 — workspace embedding for the learnable gate `G(x)`.
+    ///
+    /// Builds a fixed-length feature vector from the broadcast content hash and
+    /// the raw specialist saliences, which the `ExpertGate` maps to a sparse
+    /// top-k expert activation distribution.
+    fn workspace_embedding_for_gate(&self, content: &str, raw: &[f64; MODULE_COUNT]) -> Vec<f64> {
+        let mut enc = vec![0.0f64; MODULE_COUNT];
+        // Content signal: coarse hash spread across the embedding slots.
+        let hash = content.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+        for (i, slot) in enc.iter_mut().enumerate() {
+            *slot = ((hash >> (i % 8) * 8) & 0xFF) as f64 / 255.0;
+        }
+        // Salience signal: blend raw activation into the second half.
+        let n = MODULE_COUNT;
+        for i in 0..n {
+            let sal = raw.get(i).copied().unwrap_or(0.0);
+            enc[i] = enc[i] * 0.5 + sal * 0.5;
+        }
+        enc
     }
 
     /// Full resonance-aware broadcast cycle with Discovery loop integration.
@@ -325,6 +350,22 @@ impl GlobalWorkspace {
                 .as_ref()
                 .map(|net| report.with_oscillation(net));
             self.last_oscillation_report = oscillation_enhanced;
+        }
+
+        // Step 3c-bis: Phase 8.3 — sparse top-k gating (MiCRo arXiv:2506.13331 §4.2).
+        // Learnable gate G(x) = softmax(W_g · x) over the current workspace/E8
+        // encoding; only the top-3 experts "participate in broadcast". Non-gated
+        // experts are frozen (their effective salience is zeroed) before the
+        // winner, cognitive profile, and activation feedback consume the report.
+        {
+            let enc = self.workspace_embedding_for_gate(content, &raw);
+            let (gated, sparse_probs) = self.moe_router.sparse_gate(&enc, 3);
+            for (i, s) in report.effective_saliences.iter_mut().enumerate() {
+                if !gated.contains(&i) {
+                    *s = 0.0;
+                }
+            }
+            self.last_sparse_gate = Some((gated, sparse_probs));
         }
 
         // Step 3c: Life-Harness adaptation — apply proven environmental boost
@@ -1197,5 +1238,32 @@ mod tests {
         assert!(ws.broadcast_history.iter().any(|b| {
             b.contains("[cognitive_type]") && b.contains("logical")
         }));
+    }
+
+    #[test]
+    fn test_resonant_broadcast_sparse_gates_top3() {
+        let mut ws = make_workspace();
+        ws.register_default_specialists();
+        let states = default_specialist_states();
+
+        ws.specialist_by_type_mut(&SpecialistType::CodeAnalyzer)
+            .expect("CodeAnalyzer").activation = 0.95;
+        ws.specialist_by_type_mut(&SpecialistType::Planner)
+            .expect("Planner").activation = 0.9;
+        ws.specialist_by_type_mut(&SpecialistType::KnowledgeRetriever)
+            .expect("KnowledgeRetriever").activation = 0.85;
+
+        ws.resonant_broadcast("sparse gate probe", &states);
+
+        // Sparse gate must have run and frozen all but top-3 experts.
+        let (gated, sparse) = ws.last_sparse_gate.expect("sparse gate should be set after broadcast");
+        assert_eq!(gated.len(), 3);
+        assert_eq!(sparse.len(), MODULE_COUNT);
+        // Exactly 3 experts retain mass.
+        let active = sparse.iter().filter(|&&p| p > 0.0).count();
+        assert_eq!(active, 3);
+        // The gate probabilities are normalized.
+        let sum: f64 = sparse.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9);
     }
 }
