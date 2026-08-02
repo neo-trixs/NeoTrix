@@ -11,6 +11,7 @@ use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FableP
 use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
 use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
 use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
+use crate::core::nt_core_e8::nt_latent_reasoning::LatentReasoningPipeline;
 use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
 use crate::core::nt_core_prm::ProcessRewardLearner;
@@ -145,6 +146,9 @@ pub struct ReasoningEngine {
     pub sparse_moe: SparseMoERouter,
     /// Phase 10.1 — unified latent space bridging E₈ / GWT / HyperCube.
     pub unified_latent: UnifiedLatentSpace,
+    /// Phase 10.2 — end-to-end latent reasoning: E8 latent → hypercube query →
+    /// GWT broadcast with no intermediate text.
+    pub latent_reasoning: LatentReasoningPipeline,
 }
 
 impl ReasoningEngine {
@@ -201,6 +205,7 @@ impl ReasoningEngine {
             observer_error_recovery: ObserverErrorRecovery::new(),
             sparse_moe: SparseMoERouter::new(),
             unified_latent: UnifiedLatentSpace::new(),
+            latent_reasoning: LatentReasoningPipeline::new(),
         }
     }
 
@@ -772,6 +777,24 @@ impl ReasoningEngine {
                     let state_proj = self.unified_latent.project_e8_state(self.current_state.mode);
                     let cross = self.unified_latent.cosine(&e8_embed, &state_proj);
                     root_span.set_attribute("unified_e8_self_sim", AttributeValue::Float(cross));
+                }
+
+                // Phase 10.2 — latent reasoning: query episodic latent memory
+                // for the current state's nearest neighbors (no text) and
+                // broadcast the resulting direct E8 attention bias to GWT.
+                let latent_retrieval = self.latent_reasoning.query_state(self.current_state.mode);
+                if !latent_retrieval.neighbor_modes.is_empty() {
+                    let (latent_weights, latent_bias) =
+                        self.latent_reasoning.to_gwt_attention(&latent_retrieval, 0.2);
+                    root_span.set_attribute(
+                        "latent_retrieval_top_sim",
+                        AttributeValue::Float(latent_retrieval.similarities.first().copied().unwrap_or(0.0)),
+                    );
+                    root_span.set_attribute(
+                        "latent_memory_fill",
+                        AttributeValue::Float(self.latent_reasoning.fill_ratio()),
+                    );
+                    self.gwt.as_mut().map(|g| g.set_e8_attention_weights(latent_weights, latent_bias));
                 }
             }
         }
