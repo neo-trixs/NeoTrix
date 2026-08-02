@@ -8,6 +8,7 @@ pub mod ctm_verifier;
 pub mod inner_speech;
 pub mod modality_router;
 pub mod cognitive_type;
+pub mod cognitive_hub;
 pub mod geometry_sync;
 pub mod competition_gate;
 pub mod compaction;
@@ -36,6 +37,7 @@ pub use workspace::{AuditBlock, AuditEventType};
 pub use inner_speech::InnerSpeech;
 pub use modality_router::{Modality, ModalityRouter};
 pub use cognitive_type::{CognitiveProfile, CognitiveType};
+pub use cognitive_hub::{CognitiveHub, HUB_COUNT, HUB_TOPK};
 pub use cls_buffer::{CLSBuffer, Experience};
 pub use ctm_verifier::{CtmAlignmentReport, CtmCheck, CtmVerifier, E8_STATE_COUNT};
 pub use nt_gwt_reviewer::{

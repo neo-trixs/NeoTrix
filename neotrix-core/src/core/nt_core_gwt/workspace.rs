@@ -105,6 +105,9 @@ pub struct GlobalWorkspace {
     /// Most recent cognitive type profile (Phase 8.1): softmax distribution over
     /// Linguistic/Logical/Knowledge/Social + dominant type + Shannon entropy.
     pub cognitive_profile: Option<super::cognitive_type::CognitiveProfile>,
+    /// Cross-group routing bridge (Phase 8.2): structured cognitive topology
+    /// with learnable hub-to-hub collaboration weights.
+    pub cognitive_hub: super::cognitive_hub::CognitiveHub,
 }
 
 /// Events that trigger an audit block
@@ -162,6 +165,7 @@ impl GlobalWorkspace {
             ctm_verifier: super::ctm_verifier::CtmVerifier::new(),
             last_ctm_report: None,
             cognitive_profile: None,
+            cognitive_hub: super::cognitive_hub::CognitiveHub::new(),
         }
     }
 
@@ -443,6 +447,10 @@ impl GlobalWorkspace {
             }
             .profile();
             self.cognitive_profile = Some(profile.clone());
+            // Phase 8.2 — CognitiveHub: record cross-group collaborations from
+            // the post-resonance winners so hub-to-hub weights learn which
+            // cognitive types actually co-activate together (structured topology).
+            self.cognitive_hub.record_broadcast_collaborations(&activations);
             self.broadcast_history.push(format!(
                 "[cognitive_type] dominant = {}",
                 profile.dominant.label(),
