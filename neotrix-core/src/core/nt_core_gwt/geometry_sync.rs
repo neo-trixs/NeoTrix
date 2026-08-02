@@ -400,18 +400,27 @@ impl IitPhiCalculator {
     /// marginals, estimated from `state_history`.
     pub fn min_info_partition(&self, current_state: &[f64]) -> f64 {
         let dim = current_state.len();
-        if dim < 2 || self.state_history.len() < 5 {
+        if dim < 2 {
             return 0.0;
         }
 
-        // Normalise current_state into [0, 1] — caller may supply raw coherences
-        let _ = current_state;
+        // 修复：旧实现 `let _ = current_state;` 完全丢弃当前状态，
+        // phi 退化为纯历史联合分布属性，与"当前整合信息"语义脱节。
+        // 现在把 current_state 并入分布 (在线增量)，反映当前时刻的整合度。
+        let mut dist = self.state_history.clone();
+        if dist.len() >= self.max_history {
+            dist.remove(0);
+        }
+        dist.push(current_state.to_vec());
+        if dist.len() < 5 {
+            return 0.0;
+        }
 
         let partitions = self.partition_system(dim);
         let mut min_phi = f64::INFINITY;
 
         for (a, b) in &partitions {
-            let phi_p = self.compute_partition_phi(a, b);
+            let phi_p = self.compute_partition_phi(&dist, a, b);
             if phi_p < min_phi {
                 min_phi = phi_p;
             }
@@ -447,8 +456,8 @@ impl IitPhiCalculator {
     }
 
     /// Compute φ for a single bipartition (A, B) using KLD.
-    fn compute_partition_phi(&self, a: &[usize], b: &[usize]) -> f64 {
-        let n = self.state_history.len() as f64;
+    fn compute_partition_phi(&self, dist: &[Vec<f64>], a: &[usize], b: &[usize]) -> f64 {
+        let n = dist.len() as f64;
         if n < 2.0 {
             return 0.0;
         }
@@ -457,7 +466,7 @@ impl IitPhiCalculator {
         let mut marg_a_counts: HashMap<u64, usize> = HashMap::new();
         let mut marg_b_counts: HashMap<u64, usize> = HashMap::new();
 
-        for state in &self.state_history {
+        for state in dist {
             let ka = self.encode_subset(state, a);
             let kb = self.encode_subset(state, b);
             *joint_counts.entry((ka, kb)).or_insert(0) += 1;

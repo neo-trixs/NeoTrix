@@ -95,7 +95,7 @@ pub fn permute(a: &[f64], n: usize) -> Vec<f64> {
         .enumerate()
         .map(|(i, theta)| {
             let shifted = theta + (i as f64) * n_f64 * PHASE_STEP;
-            shifted % std::f64::consts::TAU
+            shifted.rem_euclid(std::f64::consts::TAU)
         })
         .collect()
 }
@@ -108,7 +108,7 @@ pub fn unpermute(a: &[f64], n: usize) -> Vec<f64> {
         .enumerate()
         .map(|(i, theta)| {
             let shifted = theta - (i as f64) * n_f64 * PHASE_STEP;
-            shifted % std::f64::consts::TAU
+            shifted.rem_euclid(std::f64::consts::TAU)
         })
         .collect()
 }
@@ -907,4 +907,17 @@ mod tests {
         // More steps should not reduce the result count
         assert!(r3.len() >= r1.len(), "more steps should spread activation further");
     }
+    #[test]
+    fn test_permute_unpermute_roundtrip() {
+        // Iter45: 旧实现用 C 风格 % 使负/超 TAU 相位环绕不可逆。
+        let v: Vec<f64> = (0..16).map(|i| (i as f64) * 0.7).collect();
+        let p = permute(&v, 3);
+        let r = unpermute(&p, 3);
+        for (a, b) in v.iter().zip(r.iter()) {
+            let d = (a - b).abs();
+            let wrapped = d.min(std::f64::consts::TAU - d);
+            assert!(wrapped < 1e-9, "roundtrip failed: {a} -> {b}");
+        }
+    }
+
 }

@@ -99,17 +99,29 @@ impl IITPhiCalculator {
     }
 
     /// 计算集成信息 Φ:
-    ///   Φ = (Σ_{i≠j} R[i][j]·x_i·x_j) / (Σ_i x_i²)
+    ///   Φ = intensity × rho
+    ///     intensity = clamp( (Σ_{i≠j} R[i][j]·x̄_i·x̄_j) / (Σ_i x̄_i²), 0, 1 )
+    ///     rho       = clamp( (Σ_i x̄_i·x̄_{i-1}) / Σ_i x̄_i², 0, 1 )  相邻一致性
     ///
     /// 核心思想: 维度间共振强度 × 激活水平 (只计跨维度耦合)。
     /// 对角项 R[i][i]≡1 使 phi_raw 恒 ≥1 (自耦合不属于集成)，
     /// 旧实现让单活跃维度也 ≈1.0，"is_phi_conscious" 退化为 "状态非零" 掩码。
+    ///
+    /// Iter45 修复: ① 去均值 (centered) — 消除直流分量，均衡/全同步状态
+    /// (如能力向量 23 维值相近) 的 centered 全 ≈0 → φ→0，符合 IIT"同步可约"
+    /// 语义，不再让"技能面均衡 → φ≈1.0 → 恒判意识"。
+    /// ② 乘相邻一致性 rho — 旧公式对纯随机噪声同样给高强度，
+    /// 无法区分"结构化整合"与"随机散度"；rho 只对平滑相关的差异化
+    /// 模式高，噪声 ≈0，使 φ 语义真正对应"系统不可约的整合信息"。
     pub fn compute_phi(&self, state: &[f64]) -> PhiReport {
         // 清洗非有限值：NaN/Inf 视为 0，防止污染下游 phi/coherence/confidence/trend
         let clean: Vec<f64> = state.iter().map(|&v| if v.is_finite() { v } else { 0.0 }).collect();
         let n = clean.len().min(64);
+        // 去均值 (centered)：消除直流分量，避免均衡状态虚高
+        let mean: f64 = clean[..n].iter().sum::<f64>() / n as f64;
+        let centered: Vec<f64> = clean[..n].iter().map(|&v| v - mean).collect();
         // state_energy 与 numerator 使用同一索引空间 n，避免 >64 维时分母偏大
-        let state_energy: f64 = clean[..n].iter().map(|v| v * v).sum();
+        let state_energy: f64 = centered.iter().map(|v| v * v).sum();
         if state_energy < 1e-12 {
             return PhiReport {
                 phi: 0.0, phi_raw: 0.0, total_resonance: 0.0,
@@ -119,9 +131,9 @@ impl IITPhiCalculator {
             };
         }
 
-        let r = self.resonance_matrix(&clean);
+        let r = self.resonance_matrix(&centered);
 
-        // Σ_{i≠j} R[i][j]·x_i·x_j (排除 i==j 自耦合)
+        // Σ_{i≠j} R[i][j]·x̄_i·x̄_j (排除 i==j 自耦合)
         let mut weighted_sum = 0.0;
         let mut total_resonance = 0.0;
         let mut max_val = 0.0;
@@ -132,7 +144,7 @@ impl IITPhiCalculator {
                 if i == j {
                     continue;
                 }
-                let rv = r[i][j] * clean[i] * clean[j];
+                let rv = r[i][j] * centered[i] * centered[j];
                 weighted_sum += rv;
                 total_resonance += r[i][j];
                 if rv.abs() > max_val {
@@ -143,13 +155,28 @@ impl IITPhiCalculator {
         }
 
         // 有效集成维数: 状态中显著贡献的维度
-        let effective_dims = clean[..n].iter()
+        let effective_dims = centered.iter()
             .filter(|&&v| v.abs() > 0.05)
             .count()
             .max(1);
 
-        // Φ = 跨维度共振协方差 / 总能量 (分母与 numerator 同一索引空间 n)
-        let phi_raw = weighted_sum / state_energy;
+        // 共振整合强度 (centered 协方差 / 能量) — 均衡/同步状态 centered 全 0 → 0
+        let intensity = (weighted_sum / state_energy).clamp(0.0, 1.0);
+
+        // 相邻一致性 rho ∈ [0,1] — 结构化差异化模式 (维度平滑相关) → 高，
+        // 纯噪声 (相邻独立) → 低。区分"真正整合"与"随机散度"。
+        // 旧公式仅用 intensity 无法区分二者 (随机噪声同样高)。
+        let mut seg = 0.0;
+        for i in 1..n {
+            seg += centered[i] * centered[i - 1];
+        }
+        let rho = (seg / (n as f64) / (state_energy / n as f64)).clamp(0.0, 1.0);
+
+        // Φ = 共振整合强度 × 相邻一致性
+        //   - 均衡能力向量 (23 维值相近): var→0 → energy→0 → 0 ✓ (修复 HIGH-2 恒判意识)
+        //   - 纯随机噪声: rho≈0 → 低 ✓
+        //   - 结构化差异化模式: intensity 高 × rho 高 → 高 ✓
+        let phi_raw = intensity * rho;
 
         // Φ ∈ [0,1]；单活跃维度 weighted_sum=0 → Φ=0 (可约系统无集成信息)
         let phi = phi_raw.clamp(0.0, 1.0);
@@ -270,10 +297,11 @@ mod tests {
     fn test_uniform_state_phi() {
         let calc = IITPhiCalculator::new();
         let report = calc.compute_phi(&uniform_state());
-        // Uniform state: all dimensions equally active → moderate integration
-        assert!(report.phi >= 0.0);
-        assert!(report.phi <= 1.0);
-        assert_eq!(report.effective_dims, 64);
+        // Iter45: IIT 语义 — 全同步/均衡状态可约 → φ≈0。
+        // 旧测试断言 uniform → moderate integration 固化了错误语义
+        // (均衡能力向量 23 维相近 → φ≈1.0 → 恒判意识)。
+        assert!((report.phi - 0.0).abs() < 1e-9, "uniform state must be reducible (phi≈0), got {}", report.phi);
+        assert_eq!(report.effective_dims, 0);
     }
 
     #[test]
@@ -303,13 +331,14 @@ mod tests {
     #[test]
     fn test_phi_increases_with_coherence() {
         let calc = IITPhiCalculator::new();
-        // Coherent: all dimensions equal → resonance everywhere
-        let coherent = calc.compute_phi(&vec![1.0; 64]);
-        // Incoherent: dimensions randomly distributed
-        let incoherent = calc.compute_phi(&random_state());
-        // Coherent state should have higher Φ
-        assert!(coherent.phi >= incoherent.phi - 0.1,
-            "Coherent state should have comparable or higher Φ");
+        // Iter45: 结构化差异化模式 (周期振荡) 有高集成信息；
+        // 全等状态可约 → φ=0 (同步=低集成)。用差异化+相干的模式对比随机噪声。
+        let coherent: Vec<f64> = (0..64).map(|i| ((i as f64) * 0.3).sin()).collect();
+        let incoherent = random_state();
+        let phi_c = calc.compute_phi(&coherent).phi;
+        let phi_r = calc.compute_phi(&incoherent).phi;
+        assert!(phi_c > phi_r,
+            "Structured differentiated pattern should have higher Φ than noise (got {:.3} vs {:.3})", phi_c, phi_r);
     }
 
     #[test]

@@ -2,7 +2,7 @@ use crate::core::nt_core_negentropy::{
     NegentropyComponents, NegentropyFlux, NegentropyMetric, NegentropyReport,
 };
 use crate::core::nt_core_hcube::vsa_quantized::QuantizedVSA;
-use crate::core::nt_core_gwt::resonance::{compute_semantic_entropy, MODULE_COUNT};
+use crate::core::nt_core_gwt::resonance::compute_semantic_entropy;
 use crate::core::nt_core_consciousness::ConsciousnessStream;
 use crate::core::ReasoningHexagram;
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
@@ -108,11 +108,18 @@ impl NegentropyCalculator {
     }
 
     /// 传感器 #5: N_Attn = GWT attention focus
-    /// Focused attention = low entropy of specialist distribution
-    pub fn sensor_attention_focus() -> f64 {
-        let entropy = compute_semantic_entropy(&[0.0_f64; MODULE_COUNT]);
-        let max_entropy: f64 = (64.0_f64).ln();
-        1.0 - (entropy / max_entropy).clamp(0.0, 1.0)
+    /// Focused attention = low entropy of specialist distribution.
+    ///
+    /// Iter45 修复: 旧实现硬编码  假数据 → 熵恒 0
+    /// → 恒返回 1.0 (最大聚焦)，信号无信息量 (审计 M-9)。
+    /// 现在接收真实 specialist 分布；无数据/全零分布 (无法区分聚焦与否)
+    /// 返回中性 0.5，而非误导性的完全聚焦。
+    pub fn sensor_attention_focus(distribution: &[f64]) -> f64 {
+        if distribution.is_empty() || distribution.iter().all(|&v| v <= 0.0) {
+            return 0.5;
+        }
+        let entropy = compute_semantic_entropy(distribution);
+        1.0 - entropy.clamp(0.0, 1.0)
     }
 
     /// 传感器 #6: N_E8 = strategy differentiation
@@ -218,7 +225,7 @@ impl NegentropyCalculator {
             vsa_coherence: Self::sensor_vsa_coherence(vsa_pool),
             kb_order: Self::sensor_kb_order(kb),
             prediction_acc: Self::sensor_prediction_acc(jepa, jepa_error),
-            attention_focus: Self::sensor_attention_focus(),
+            attention_focus: Self::sensor_attention_focus(state),
             strategy_diff: Self::sensor_strategy_diff(matrix),
             temporal_coherence: Self::sensor_temporal_coherence(stream),
         };

@@ -254,10 +254,11 @@ impl GraphMemoryStore {
 
     pub fn merge_other(&mut self, other: &mut GraphMemoryStore) {
         for (id, node) in other.nodes.drain() {
-            if self.nodes.len() >= self.max_nodes {
+            let is_new = !self.nodes.contains_key(&id);
+            if is_new && self.nodes.len() >= self.max_nodes {
                 self.evict_lru_inner(1);
             }
-            if !self.nodes.contains_key(&id) {
+            if is_new {
                 self.access_order.push(id.clone());
             }
             self.nodes.insert(id, node);
