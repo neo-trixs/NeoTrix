@@ -34,6 +34,7 @@ Cycle 指针与全文统一存 KB: `~/.neotrix/knowledge.db` `experience` 命名
 | 191 | NT-CORE | Phase 7.5+7.3+7.4: ModalityRouter (5-modal softmax q·k router + REINFORCE, Step 4c) / CLS_Buffer (ring100 episodic + hybrid 检索, Step 4d) / CTM_Verifier (5 公理 finite-state/finite-action/globality/δ/bounded-tape, Step 4e) 接线 GlobalWorkspace; GWT 337 通过, 全 lib 6810 (仅 2 预存 DNS 失败); 教训: REINFORCE 勿 unit-normalize, verify 用 in-flight report 非 last_resonance, ReasoningHexagram pub 构造测 invalid state |
 | 192 | NT-CORE | Phase 8.1 CognitiveType (MiCRo): 4 认知类型 (Linguistic/Logical/Knowledge/Social) classify + group_activation 聚合 + CognitiveProfile softmax/dominant/entropy, 接线 resonant_broadcast Step 4f |
 | 193 | NT-CORE | C5-P0-05 McpRegistry::call_tool stub→真转发 (transport 映射 + mcp_call_tool, 5 测试); 并发审计法: grep/Read 矛盾=并发实时改写, ground truth=git status; TODO.yml 多数已落地 |
+| 193 | NT-CORE | Phase 10 统一潜在推理 (iter193): 10.1 UnifiedLatentSpace (JL 式 SeededProjection 跨域 cosine, E8/GWT/VSA→256-d) / 10.2 LatentReasoningPipeline (E8→latent→NN→GWT 直发无文本, episodic 256 + outcome 加权注意力) / 10.3 MultimodalEncoder (text n-gram hash kernel + image/audio → unified, ModalityRouter 融合→E8 mode); 全接线 engine_core + telemetry; 23 新测试, GWT 370 |
 | 194 | NT-CORE | EA3-P0-01 MCP 吸收管线闭环 (ToolOrchestrator 真实现 + as_native_tools + entry 双接线 + /mcp list absorbed) + rev-officer 审计 15 项修 3 (/review 路由真引擎删 stub, Span gen_ai setter 真记录, 删 3 假模块); 6888 测试过 (2 预存 DNS); 遗留: evolution_daemon 硬编码 stub, HookRegistry 空操作, DelegateEngine 假成功 |
 
 ## Skill Routing (何时加载什么)
