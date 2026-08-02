@@ -52,6 +52,7 @@ export default function NeoCodexPage() {
   const [updating, setUpdating] = useState(false);
   const [viewMode, setViewMode] = useState<"verbose" | "normal" | "summary">("normal");
   const stopRef = useRef(false);
+  const taskSeenRef = useRef<Set<string>>(new Set());
   const [sideChatOpen, setSideChatOpen] = useState(false);
   const [sideChatMessages, setSideChatMessages] = useState<Array<{ role: string; content: string }>>([]);
   const [sideChatInput, setSideChatInput] = useState("");
@@ -163,6 +164,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     setAgentBusy(true);
     // Reset the live task tracker for this turn.
     setTaskSteps([]);
+    taskSeenRef.current = new Set();
     setTaskStartedAt(Date.now());
     setTaskClock((c) => c + 1);
     if (!regenerate) {
@@ -219,7 +221,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         // extracts structured tool calls from the raw model output.
         const re = /<tool\s+name="([^"]+)">([\s\S]*?)<\/tool>/g;
         let m: RegExpExecArray | null;
-        const seen = new Set(taskSteps.map((s) => s.id));
+        const seen = taskSeenRef.current;
         let dirty = false;
         while ((m = re.exec(accumulated)) !== null) {
           const id = `tool-${m.index}`;
@@ -332,6 +334,14 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         created_at: Date.now(),
         updated_at: Date.now(),
       };
+      // P1-1: point the backend agent at the new session BEFORE sending. The
+      // backend send path has no session_id arg and writes to the agent's
+      // current wire path; without a switch here the first message after
+      // Cmd+N lands in the previous session's file (data miswrite) while the
+      // new session stays empty. Bump the switch token to drop any in-flight
+      // stream from the old session.
+      ++sessionSwitchRef.current;
+      await invoke("neocodex_switch_session", { sessionId: session.id });
       setNeoCodexSessions([
         session,
         ...(useStore.getState().neocodexSessions?.filter((s: any) => s.id !== session.id) || []),
@@ -362,8 +372,16 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       lastNew = now;
       handleNewSession();
     };
+    // P2-1: the native File→New Session menu emits a Tauri IPC event
+    // (app.emit "neotrix:new-session", lib.rs:70) which only `listen()`
+    // handlers receive — a DOM CustomEvent listener alone is dead in the
+    // packaged app. Bridge both channels into the same deduped handler.
     window.addEventListener("neotrix:new-session", onNew);
-    return () => window.removeEventListener("neotrix:new-session", onNew);
+    const unlistenTauri = listen<void>("neotrix:new-session", onNew).catch(() => () => {});
+    return () => {
+      window.removeEventListener("neotrix:new-session", onNew);
+      unlistenTauri.then((un) => un?.()).catch(() => {});
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

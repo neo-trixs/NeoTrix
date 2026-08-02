@@ -81,8 +81,12 @@ pub async fn neocodex_send_message_stream(
         // attachments, keeping the wire + in-memory mirror in sync.
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+        // P2-7: server-side cap on attachment payloads (defense-in-depth over
+        // the frontend limit). A malicious/oversized IPC payload must not land
+        // in the wire file or context.
+        const MAX_ATTACHMENT_BYTES: u64 = 10 * 1024 * 1024;
         let core_atts = attachments.map(|v| {
-            v.into_iter().filter(|a| !a.name.is_empty()).map(|a| {
+            v.into_iter().filter(|a| !a.name.is_empty() && a.size <= MAX_ATTACHMENT_BYTES).map(|a| {
                 neotrix::neotrix::l1_body_impl::nt_io_neocodex::NeoCodexAttachment {
                     name: a.name,
                     size: a.size,
@@ -472,6 +476,9 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
 }
 
 /// Read all wire events for a session (skipping side-chat lines).
+/// P2-4: corrupt lines are surfaced as a SystemEvent instead of being silently
+/// dropped — a partial write or bad JSON used to vanish with no trace, leaving
+/// the user wondering why earlier messages were gone.
 fn read_wire_events(path: &std::path::Path) -> Result<Vec<WireEvent>, String> {
     let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
     let mut events = Vec::new();
@@ -479,8 +486,17 @@ fn read_wire_events(path: &std::path::Path) -> Result<Vec<WireEvent>, String> {
         if line.trim().is_empty() {
             continue;
         }
-        if let Ok(event) = serde_json::from_str::<WireEvent>(line) {
-            events.push(event);
+        match serde_json::from_str::<WireEvent>(line) {
+            Ok(event) => events.push(event),
+            Err(e) => {
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+                events.push(WireEvent::SystemEvent {
+                    kind: "wire_corrupt".to_string(),
+                    detail: format!("unreadable line dropped: {}", e),
+                    timestamp: ts,
+                });
+            }
         }
     }
     Ok(events)
@@ -640,25 +656,36 @@ pub async fn neocodex_compact_session(session_id: String, keep_messages: Option<
 /// Fetch persisted side-chat messages for a session (branched questions that
 /// never re-enter the main context).
 #[tauri::command]
+/// Read side-chat history from a session wire file, honoring each message's
+/// role (P1-2: assistant answers are persisted with role="assistant").
+fn read_side_chat(path: &std::path::Path) -> Vec<NeoCodexMessageItem> {
+    let mut items = Vec::new();
+    if let Ok(content) = std::fs::read_to_string(path) {
+        for line in content.lines() {
+            if let Ok(WireEvent::SideChatMessage { content, timestamp, role }) =
+                serde_json::from_str::<WireEvent>(line)
+            {
+                let role = if role.is_empty() { "user" } else { &role };
+                items.push(NeoCodexMessageItem {
+                    id: items.len(),
+                    role: role.to_string(),
+                    content,
+                    timestamp,
+                    attachments: None,
+                });
+            }
+        }
+    }
+    items
+}
+
+#[tauri::command]
 pub async fn neocodex_get_side_chat(session_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
     let path = session_path(&session_id);
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut items = Vec::new();
-    for line in content.lines() {
-        if let Ok(WireEvent::SideChatMessage { content, timestamp }) = serde_json::from_str::<WireEvent>(line) {
-            items.push(NeoCodexMessageItem {
-                id: items.len(),
-                role: "user".to_string(),
-                content,
-                timestamp,
-                attachments: None,
-            });
-        }
-    }
-    Ok(items)
+    Ok(read_side_chat(&path))
 }
 
 #[tauri::command]
@@ -683,31 +710,31 @@ pub async fn neocodex_send_side_chat(session_id: String, content: String) -> Res
     // Route through the live agent so the wire's in-memory mirror stays in sync
     // when this is the active session; otherwise record to the target file.
     if agent.wire.path == path {
-        agent.record_side_chat(&content);
+        agent.record_side_chat(&content, "user");
+        // P1-2: generate a real answer (isolated from main context) and
+        // persist it as an assistant side-chat event so the UI can show it.
+        let answer = agent.side_chat_ask(&content).await;
+        agent.record_side_chat(&answer, "assistant");
     } else {
         let mut wire = WireSession::new(&session_id);
         wire.path = path.clone();
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
         wire.record(WireEvent::SideChatMessage {
             content: content.trim().to_string(),
+            timestamp: ts,
+            role: "user".to_string(),
+        });
+        // Non-active session: generate a one-shot answer too.
+        wire.record(WireEvent::SideChatMessage {
+            content: agent.side_chat_ask(&content).await,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+            role: "assistant".to_string(),
         });
     }
     // Return the full side-chat history for immediate re-render.
-    let content2 = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut items = Vec::new();
-    for line in content2.lines() {
-        if let Ok(WireEvent::SideChatMessage { content, timestamp }) = serde_json::from_str::<WireEvent>(line) {
-            items.push(NeoCodexMessageItem {
-                id: items.len(),
-                role: "user".to_string(),
-                content,
-                timestamp,
-                attachments: None,
-            });
-        }
-    }
-    Ok(items)
+    Ok(read_side_chat(&path))
 }
 
 /// Persist a user-chosen session name into the session's wire stream.
@@ -799,16 +826,29 @@ pub async fn neocodex_switch_session(session_id: String) -> Result<String, Strin
 #[tauri::command]
 pub async fn neocodex_delete_session(session_id: String) -> Result<String, String> {
     let path = session_path(&session_id);
+    let mut deleted = false;
     if path.exists() {
         std::fs::remove_file(&path).map_err(|e| e.to_string())?;
-        return Ok(format!("Deleted session {}", session_id));
+        deleted = true;
     }
     let archived = archived_session_path(&session_id);
     if archived.exists() {
         std::fs::remove_file(&archived).map_err(|e| e.to_string())?;
-        return Ok(format!("Deleted archived session {}", session_id));
+        deleted = true;
     }
-    Err("Session not found".to_string())
+    if !deleted {
+        return Err("Session not found".to_string());
+    }
+    // P2-3: same detach as archive — stale wire.path must not resurrect the
+    // deleted file on the next record().
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    if let Some(agent) = guard.as_mut() {
+        if agent.wire.path == path || agent.wire.path == archived {
+            agent.detach_wire();
+        }
+    }
+    drop(guard);
+    Ok(format!("Deleted session {}", session_id))
 }
 
 fn archived_dir() -> std::path::PathBuf {
@@ -889,7 +929,9 @@ fn list_checkpoints_inner(session_id: &str) -> Vec<serde_json::Value> {
             }));
         }
     }
-    list.sort_by_key(|v| v["created_at"].as_u64().unwrap_or(0));
+    // P2-6: newest-first. The frontend labels index 0 as "最新" — with an
+    // ascending sort that mislabeled the OLDEST checkpoint instead.
+    list.sort_by_key(|v| std::cmp::Reverse(v["created_at"].as_u64().unwrap_or(0)));
     list
 }
 
@@ -934,6 +976,15 @@ pub async fn neocodex_archive_session(session_id: String) -> Result<String, Stri
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let dest = archived_session_path(&session_id);
     std::fs::rename(&path, &dest).map_err(|e| e.to_string())?;
+    // P2-3: if the active agent pointed at this wire, detach so the next
+    // `record()` cannot resurrect the moved/deleted file (create+append split).
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    if let Some(agent) = guard.as_mut() {
+        if agent.wire.path == path {
+            agent.detach_wire();
+        }
+    }
+    drop(guard);
     Ok(format!("Archived session {}", session_id))
 }
 

@@ -318,7 +318,12 @@ export function ChatView({
 
   const handleFiles = async (files: FileList | File[]) => {
     const incoming: Attachment[] = [];
+    const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
     for (const file of Array.from(files)) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        addNotification({ type: "error", message: `「${file.name}」超过 10 MB 上限，未附加`, duration: 3000 });
+        continue;
+      }
       incoming.push({
         id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         name: file.name,

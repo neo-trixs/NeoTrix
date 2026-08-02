@@ -472,7 +472,14 @@ pub enum WireEvent {
     GoalUpdate { id: String, state: String, description: String },
     ModeChange { from: NeoCodexMode, to: NeoCodexMode },
     SessionMeta { name: String, timestamp: i64 },
-    SideChatMessage { content: String, timestamp: i64 },
+    // P1-2: side chat now carries a role so the UI can render a real answer
+    // bubble; `role` defaults to "user" so pre-fix wire lines stay compatible.
+    SideChatMessage {
+        content: String,
+        timestamp: i64,
+        #[serde(default)]
+        role: String,
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -1247,13 +1254,67 @@ impl NeoCodexAgent {
     /// Record a side-chat message (branched question that must NOT pollute
     /// the main session context). Persisted to the same wire stream but
     /// filtered out of resume_session / get_session_messages.
-    pub fn record_side_chat(&mut self, content: &str) {
+    pub fn record_side_chat(&mut self, content: &str, role: &str) {
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
         self.wire.record(WireEvent::SideChatMessage {
             content: content.trim().to_string(),
             timestamp: ts,
+            role: role.to_string(),
         });
+    }
+
+    /// Detach the agent from its current wire file (P2-3). After a session is
+    /// archived/deleted while active, the stale `wire.path` would otherwise
+    /// recreate the file on the next `record()` (`create+append`) and split
+    /// the conversation into a divergent duplicate. Resets to a fresh empty
+    /// session so the next turn starts clean.
+    pub fn detach_wire(&mut self) {
+        self.wire = WireSession::new(&format!(
+            "s-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()
+        ));
+        self.context.turns.clear();
+        self.state.tokens_used = 0;
+        self.state.turn_count = 0;
+        self.state.tool_call_count = 0;
+    }
+
+    /// One-shot side-chat answer (P1-2). Unlike the main loop, this must NOT
+    /// push into `self.context` / `self.state` — the branch question is
+    /// isolated from the session's real conversation. We generate the reply
+    /// on a throwaway message list and record both turns as side-chat events.
+    pub async fn side_chat_ask(&mut self, content: &str) -> String {
+        let provider = match self.provider.to_llm_provider() {
+            Some(p) => p,
+            None => return "[side chat] no provider configured".to_string(),
+        };
+        let system = "You are NeoCodex, an AI coding assistant. Answer the user's question concisely and precisely. Respond in markdown.";
+        let messages = vec![
+            Message::new(Role::System, system),
+            Message::new(Role::User, content.trim()),
+        ];
+        let request = match self.build_request(messages) {
+            Some(r) => r,
+            None => return "[side chat] provider unavailable".to_string(),
+        };
+        let mut rx = match provider.stream_complete(&request).await {
+            Ok(rx) => rx,
+            Err(e) => return format!("[side chat] {}", e),
+        };
+        let mut answer = String::new();
+        while let Some(chunk) = rx.recv().await {
+            match chunk {
+                Ok(resp) => answer.push_str(&resp.content),
+                Err(e) => return format!("[side chat] {}", e),
+            }
+        }
+        if answer.trim().is_empty() {
+            "[side chat] empty response".to_string()
+        } else {
+            answer
+        }
     }
 
     /// Toggle between Agent and Shell mode (from Kimi Code Ctrl-X)

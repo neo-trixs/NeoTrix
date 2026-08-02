@@ -36,8 +36,9 @@ pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let file_menu = SubmenuBuilder::new(app, "File")
         .item(&new_session)
         .item(&open_settings)
-        .separator()
-        .item(&PredefinedMenuItem::close_window(app, Some("Close Window"))?)
+        // P2-2: no close_window item here — its default CmdOrCtrl+W accelerator
+        // would be captured by the native menu and prevent the webview's
+        // "⌘W 删除会话" handler (delete-session confirm) from ever firing.
         .build()?;
 
     let edit_menu = SubmenuBuilder::new(app, "Edit")
