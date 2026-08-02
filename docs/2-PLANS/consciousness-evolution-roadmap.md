@@ -267,8 +267,8 @@
 - **参考**: GWA §3.3; EG-MRSI
 
 ### 实现检查清单
-- [ ] `MetaWorkspace` — 二阶观察器
-- [ ] `SelfModel` — 动态自评估
+- [x] `MetaWorkspace` — 二阶观察器 (meta_workspace.rs, 9 tests, overactivation/entropy-anomaly/gate-fixation, 接线 InnerSpeech) ✅ iter193
+- [x] `SelfModel` — 动态自评估 (self_model.rs, 8 tests, capability+uncertainty+fatigue, self-error 内在奖励接线 SEAL) ✅ iter193
 - [x] `CuriosityModule` — 预测误差驱动的好奇心奖励 (LatentPredictor.curiosity_reward + seal_loop 集成, 16 passes)
 - [x] `GaussianThoughtSampler` — GTS 替代 epsilon-greedy 均匀探索 (Box-Muller, E8Policy.select_mode)
 - [x] `PhysicsAttention` — Transolver 自适应切片聚类 (AdaptiveSlicer + resonate_cycle_with_physics, 9 passes)
@@ -364,8 +364,8 @@ Phase 10 ── 统一潜在推理
 | **P1** | 6.3 | SparseMoERouter | E8 分组重构 | 5d | ✅ iter193 |
 | **P2** | 8.2 | CognitiveHub | Phase 8.1 | 4d | ✅ iter193 |
 | **P2** | 8.3 | GatingNetwork | Phase 8.2 | 5d | ✅ iter193 |
-| **P2** | 9.1 | MetaWorkspace | Phase 7 | 5d |
-| **P2** | 9.2 | SelfModel | Phase 9.1 | 4d |
+| **P2** | 9.1 | MetaWorkspace | Phase 7 | 5d | ✅ iter193 |
+| **P2** | 9.2 | SelfModel | Phase 9.1 | 4d | ✅ iter193 |
 | **P3** | 10.1 | E8Embedding | Phase 6 | 5d |
 | **P3** | 10.2 | LatentHyperCube | Phase 10.1 | 5d |
 | **P3** | 10.3 | LatentOmni 多模态 | Phase 10.2 | 8d |
@@ -388,6 +388,8 @@ Phase 10 ── 统一潜在推理
 | SparseMoERouter (top-2 专家组路由) | `core/nt_core_e8/sparse_moe.rs` | 10 ✅ | Thinking Pixel §3.1 | 6.3 |
 | CognitiveHub (跨组路由桥梁) | `core/nt_core_gwt/cognitive_hub.rs` | 8 ✅ | MiCRo §4.1 | 8.2 |
 | SparseGate (top-3 广播门控) | `core/nt_core_gwt/moe_router.rs` | 4 ✅ | MiCRo §4.2 | 8.3 |
+| MetaWorkspace (二阶观察器) | `core/nt_core_gwt/meta_workspace.rs` | 9 ✅ | CTM-AI §5 / GWA §4.1 | 9.1 |
+| SelfModel (动态自评估) | `core/nt_core_self/self_model.rs` | 8 ✅ | MIRROR §5 | 9.2 |
 
 ---
 
