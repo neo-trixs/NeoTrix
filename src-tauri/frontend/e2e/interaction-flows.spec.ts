@@ -233,6 +233,22 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
     await expect(pane.getByText(/自我进化 3 次/)).toBeVisible();
   });
 
+  test("task pane toggles from the topbar and renders the empty state", async ({ page }) => {
+    await mockCommand(page, "neocodex_list_sessions", () => []);
+    await mockCommand(page, "neocodex_list_archived", () => []);
+    await page.goto("/");
+    await page.getByTestId("sidebar-tab-sessions").click();
+    await expect(page.getByTestId("sidebar-tab-sessions")).toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId("task-pane-toggle").click();
+    const pane = page.getByTestId("task-pane");
+    await expect(pane).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("task-pane-empty")).toBeVisible();
+
+    await page.getByTestId("task-pane-toggle").click();
+    await expect(pane).not.toBeVisible();
+  });
+
   test("accent color picker persists the accent setting", async ({ page }) => {
     await page.goto("/settings");
     await page.getByTestId("settings-tab-theme").click();

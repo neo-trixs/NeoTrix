@@ -20,6 +20,18 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 
 Cycle 指针与全文统一存 KB: `~/.neotrix/knowledge.db` `experience` 命名空间 hub。查看: `absorb_session.py hub`（索引） / `query --kw`（全文）。禁止内联经验表。
 
+| Cycle | Domain | Summary |
+|-------|--------|---------|
+| 163 | NT-CORE | Frontier model research: Kimi K3, Fable 5, DeepSeek V4-Pro, Qwen3.7/3.8, Gemini 3.6 Flash, Grok 4.5 + HuggingFace datasets/models mapped to NeoTrix consciousness core evolution plan |
+| 185 | NT-CORE | Iter44 audit: VSA bundle encoding-agnostic x!=0 voting + Kanerva count*2>=n (all-zero collapse), FHRR FPE scalar + seed split from GHRR, GWT workspace index-space, IIT phi off-diagonal, gold-standard coherence bounds, entropy normalization, per-tick activation reset |
+| 186 | NT-CORE | 周天星系大阵断链修复: ConsciousnessRuntime 接入 KB (attach_kb/query_kb/tick 注入, 带 provenance) + 背景循环 surface 到 GWT + 好奇心 HyperCubeBridge 空桥改真实皮层数据 + MemoryProvider/RichMemoryProvider 死抽象实现到 KnowledgeBase/ReasoningBank |
+| 186 | NT-IO | 竞品差距批: 空状态 quick-action chips + 单代码块复制 (decorateCodeBlocks) + 滚动吸底按钮 + slash 命令集 8→12 (/btw /new /model /init); Playwright workers=2+retries=1 治 dev-server 竞争超时; CSS module 块截断陷阱; 真实环境测试栈 (tauri-driver 不支持 Playwright/WKWebView) |
+| 187 | NT-IO | Evolve 批: 能力网健康面板 (7域意识树健康网格, 消费 health_report) + 主题 accent 系统 (6色 swatch) + 竞品12产品 TOP-10 差距研究 + Evolve B1-B7 阻塞项 (独立验证器/受限自治/激活预算/中途持久化/域熔断/自愈复核/公证); 修 absorb_session query 排序崩溃 + /tmp 碰撞 + spec 花括号陷阱 |
+| 187 | NT-CORE | Frontier model fusion wired to E8: nt_core_synthesis.rs (AttnRes/compressed_attention, V4 fused_distribution, Gemini 3.6 StepRouteCache, effort tiers) → engine_core.reason() + telemetry; defects fixed: attention tail-mass, birkhoff Sinkhorn double-count, matrix_distribution cap 0.5→0.8, engine_core tm_vec u64→f64, negentropy sensor_attention_focus caller; gold_standard 8-test regression reconciled to Iter45 phi semantics (±1 cluster fixture, >0.4); KB test order-pollution confirmed |
+| 188 | NT-CORE | Muon/Safety 修复 (Newton-Schulz Frobenius 归一化防 NaN, risk 归一化 /1.2) + 前沿模型知识落库 (Kimi K3/DeepSeek V4/Fable 5/Qwen3.8/Gemini 3.6/Grok 4.5 → KB seed → hypercube SystemDesign 轴); seal_loop.init_attention_router 触发 seed_foundational; frontier seed 全链路测试通过 |
+| 189 | NT-CORE | Iter45 周天星系大阵运转链路审计轮 (13 HIGH/12 MEDIUM/10 LOW): H3 hypercube_bridge 多标签坐标塌缩聚合; M-8 geometry_sync min_info_partition 丢 current_state; HIGH-2 iit_phi 均衡饱和 → centered + intensity×rho (23维均衡0/差异化0.58); FHRR permute % → rem_euclid(TAU); M-9 negentropy 硬编码假传感器 → 真实 state+0.5降级; L-4 graph_memory 重复 id 误驱逐 LRU; 提交 89d58dd (6 文件); H3 文件因并发 ingest_from_kb WIP 留待并发合并; HIGH-1 Track2 死代码删除: cognitive_tick+cognitive_orchestrator 1124行平行孤儿 (R-P42/R-P79) → 5c24375; 共享 mod.rs 用 staged 纯删除+working 保留并发行隔离 |
+| 190 | NT-CORE | Phase 7.2 InnerSpeech (MIRROR §3.3): inner_speech.rs 自我对话 (广播→独白→context 写回, 有界 ring=32, 自我问答 cadence); GlobalWorkspace 接线 + engine_core GWT tick telemetry; 11 测试 + GWT 全量 316 通过 |
+
 ## Skill Routing (何时加载什么)
 
 | 任务 | 加载 |

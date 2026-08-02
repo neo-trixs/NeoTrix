@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../stores";
-import { CapabilityHealthPane, ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, ShortcutHelp, TerminalPane } from "../components/neocodex";
+import { CapabilityHealthPane, ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, ShortcutHelp, TaskPane, TerminalPane } from "../components/neocodex";
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -61,6 +61,11 @@ export default function NeoCodexPage() {
   const [checkpoints, setCheckpoints] = useState<Array<{ id: string; created_at: string; message_count: number }>>([]);
   const [checkpointsLoading, setCheckpointsLoading] = useState(false);
   const [pendingCheckpointRestore, setPendingCheckpointRestore] = useState<string | null>(null);
+  const [compacting, setCompacting] = useState(false);
+  const [taskPaneOpen, setTaskPaneOpen] = useState(false);
+  const [taskSteps, setTaskSteps] = useState<Array<{ id: string; name: string; args: string; startedAt: number; status: "running" | "done"; success?: boolean }>>([]);
+  const [taskStartedAt, setTaskStartedAt] = useState<number | null>(null);
+  const [, setTaskClock] = useState(0);
 
   // Load sessions on mount
   useEffect(() => {
@@ -156,6 +161,10 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     const sendSessionId = neocodexActiveSessionId;
     const sendToken = sessionSwitchRef.current;
     setAgentBusy(true);
+    // Reset the live task tracker for this turn.
+    setTaskSteps([]);
+    setTaskStartedAt(Date.now());
+    setTaskClock((c) => c + 1);
     if (!regenerate) {
       addNeoCodexMessage({
         role: "user",
@@ -188,6 +197,22 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         if (!stillThisSession()) return;
         accumulated += event.payload;
         setNeoCodexStreaming({ content: accumulated, role: "assistant" });
+        // Parse tool-call markers (`<tool name="...">args</tool>`) out of the
+        // streamed content to feed the live task pane, mirroring how the core
+        // extracts structured tool calls from the raw model output.
+        const re = /<tool\s+name="([^"]+)">([\s\S]*?)<\/tool>/g;
+        let m: RegExpExecArray | null;
+        const seen = new Set(taskSteps.map((s) => s.id));
+        let dirty = false;
+        while ((m = re.exec(accumulated)) !== null) {
+          const id = `tool-${m.index}`;
+          if (!seen.has(id)) {
+            seen.add(id);
+            setTaskSteps((prev) => [...prev, { id, name: m![1], args: m![2].trim(), startedAt: Date.now(), status: "running" }]);
+            dirty = true;
+          }
+        }
+        if (dirty) setTaskClock((c) => c + 1);
         if (stopRef.current) return;
       });
       unlistenDone = await listen<any>("neocodex_stream_done", (event) => {
@@ -225,6 +250,9 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         timestamp: Date.now(),
       });
       if (!stillThisSession()) return;
+      // All parsed tool steps from this turn are complete once the reply lands.
+      setTaskSteps((prev) => prev.map((s) => (s.status === "running" ? { ...s, status: "done" as const, success: true } : s)));
+      setTaskStartedAt(null);
       refreshSessions();
       loadHealth();
       // Permission-mode review gate (Claude Code Manual / AcceptEdits parity):
@@ -470,6 +498,20 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     } catch (e) {
       console.error("Reload messages failed:", e);
     }
+  };
+
+  const handleCompact = async () => {
+    if (!neocodexActiveSessionId) return;
+    setCompacting(true);
+    try {
+      await invoke("neocodex_compact_session", { sessionId: neocodexActiveSessionId });
+      await reloadMessages();
+      addNotification({ type: "success", message: "上下文已压缩，早期消息已截断", duration: 3000 });
+    } catch (e) {
+      console.error("Compact failed:", e);
+      addNotification({ type: "error", message: `压缩失败: ${e}`, duration: 4000 });
+    }
+    setCompacting(false);
   };
 
   const handleEditMessage = async (id: number, content: string) => {
@@ -788,6 +830,18 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               </svg>
               时间线
             </button>
+            <button
+              className={`${styles.topBarBtn} ${taskPaneOpen ? styles.topBarBtnActive : ""}`}
+              onClick={() => setTaskPaneOpen((v) => !v)}
+              data-testid="task-pane-toggle"
+              title="任务面板：实时查看工具调用步骤与耗时"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="2" y="3" width="12" height="10" rx="1.5"/>
+                <path d="M5 8h6M5 11h3" strokeLinecap="round"/>
+              </svg>
+              任务
+            </button>
             <div className={styles.viewsMenuWrap}>
               <button
                 type="button"
@@ -889,7 +943,9 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             <button
               className={`${styles.settingsBtn} ${showUsage ? styles.settingsActive : ""}`}
               title={`上下文用量 ${usagePct}%（点击查看成本明细）`}
+              aria-label={`上下文用量 ${usagePct}%`}
               onClick={() => setShowUsage((v) => !v)}
+              data-testid="usage-toggle"
             >
               <span className={styles.usageRing}>
                 <svg width="30" height="30" viewBox="0 0 20 20">
@@ -943,6 +999,19 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               <div className={styles.usageRow}>
                 <span>当前模型</span>
                 <strong>{health.provider_model}</strong>
+              </div>
+            )}
+            {usage >= 0.85 && (
+              <div className={styles.compactBanner}>
+                <span>上下文接近上限{usage >= 0.95 ? "，继续对话可能被截断" : ""}。建议压缩后继续。</span>
+                <button
+                  className={styles.compactBtn}
+                  data-testid="usage-compact"
+                  disabled={agentBusy || compacting}
+                  onClick={handleCompact}
+                >
+                  {compacting ? "压缩中…" : "压缩上下文"}
+                </button>
               </div>
             )}
           </div>
@@ -1006,6 +1075,11 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         {diffOpen && (
           <div className={styles.pane}>
             <DiffPane />
+          </div>
+        )}
+        {taskPaneOpen && (
+          <div className={styles.pane}>
+            <TaskPane steps={taskSteps} startedAt={taskStartedAt} />
           </div>
         )}
         {previewOpen && (

@@ -187,7 +187,7 @@
 - [x] `EntropyMonitor` — 激活熵计算 + 死锁检测 + 刺激注入 (22 passes)
 - [x] `StagnationSignal` — 连续低熵 → 危机等级 → 回滚 (与 EntropyMonitor 集成)
 - [x] `DeadlockAwareRollback` — 最大刺激后回滚 (seal_loop.rs 集成)
-- [ ] `InnerSpeech` — 自我对话生成器
+- [x] `InnerSpeech` — 自我对话生成器 (inner_speech.rs, 11 tests, GWT 广播→独白→context 写回)
 - [ ] `CLS_Buffer` — 快速体验缓冲区 (经验回放)
 - [ ] `CTM_Verifier` — 形式化对齐检查
 - [ ] `ModalityRouter` — 模态级注意力权重
@@ -358,7 +358,7 @@ Phase 10 ── 统一潜在推理
 | **P0** | 7.3 | CLS_Buffer 互补学习 | HyperCube 现有 | 4d |
 | **P0** | 6.2 | RecursiveDepthReward | SEAL reward_calc | 2d |
 | **P0** | 7.4 | CTM formality 对齐 | Phase 6/7 基础 | 3d |
-| **P1** | 7.2 | InnerSpeech | GWT broadcast | 4d |
+| **P1** | 7.2 | InnerSpeech | GWT broadcast | 4d | ✅ iter190 |
 | **P1** | 7.5 | ModalityRouter | GWT attention | 3d |
 | **P1** | 8.1 | CognitiveType | GWT 专家枚举 | 2d |
 | **P1** | 6.3 | SparseMoERouter | E8 分组重构 | 5d |
@@ -384,6 +384,7 @@ Phase 10 ── 统一潜在推理
 | GaussianThoughtSampler | `core/e8_experiment.rs` | 9 ✅ | GTS (arXiv:2602.14077) | 9.3 |
 | PhysicsAttention (AdaptiveSlicer) | `core/consciousness/physics_attention.rs` | 9 ✅ | Transolver (arXiv:2402.02366) | 7.x |
 | DeadlockAwareRollback (最大刺激回滚) | `monitor.rs` + `seal_loop.rs` | — | GWA | 7.1 |
+| InnerSpeech (内心独白 + 上下文写回) | `core/nt_core_gwt/inner_speech.rs` | 11 ✅ | MIRROR (AAAI 2026) §3.3 | 7.2 |
 
 ---
 

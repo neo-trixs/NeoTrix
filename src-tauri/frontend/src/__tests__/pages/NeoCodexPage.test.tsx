@@ -249,10 +249,6 @@ describe("NeoCodexPage checkpoint timeline", () => {
   });
 
   it("timeline button lists checkpoints for the active session", async () => {
-    mockInvoke("neocodex_checkpoint_list", () => [
-      { id: "s-tl-1000.jsonl", created_at: 1000, message_count: 2 },
-      { id: "s-tl-2000.jsonl", created_at: 2000, message_count: 4 },
-    ]);
     renderPage();
     await screen.findByTestId("session-title");
 
@@ -289,5 +285,58 @@ describe("NeoCodexPage checkpoint timeline", () => {
 
     await waitFor(() => expect(screen.queryByTestId("timeline-restore-confirm")).toBeNull());
     expect(restoreSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("NeoCodexPage context compaction", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: "s-cmp" });
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-cmp", name: "压缩会话", mode: "Agent", message_count: 10, wire_path: "/repo", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+    mockInvoke("neocodex_health_report", () => ({ context_usage: 0.93, turn_count: 9, tool_call_count: 12, tokens_used: 48000, context_turns: 9, provider_count: 0, provider_resolvable: false, provider_model: "mock", session_writable: true, goals_active: false, cost_spent: 0, cost_budget: 0 }));
+  });
+
+  it("shows the compact action when context usage is near the limit", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("usage-toggle"));
+    expect(await screen.findByTestId("usage-compact")).toBeInTheDocument();
+  });
+
+  it("compact button calls neocodex_compact_session for the active session", async () => {
+    const compactSpy = vi.fn(() => []);
+    mockInvoke("neocodex_compact_session", compactSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.click(screen.getByTestId("usage-toggle"));
+    fireEvent.click(await screen.findByTestId("usage-compact"));
+    await waitFor(() => expect(compactSpy).toHaveBeenCalledWith({ sessionId: "s-cmp" }));
+  });
+});
+
+describe("NeoCodexPage task pane", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: "s-task" });
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-task", name: "任务会话", mode: "Agent", message_count: 0, wire_path: "/repo", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+  });
+
+  it("task pane toggle opens the live task panel", async () => {
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.click(screen.getByTestId("task-pane-toggle"));
+    expect(await screen.findByTestId("task-pane")).toBeInTheDocument();
+    expect(screen.getByTestId("task-pane-empty")).toBeInTheDocument();
   });
 });

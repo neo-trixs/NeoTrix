@@ -364,6 +364,7 @@ fn main() {
                      commands::neocodex_edit_message,
                      commands::neocodex_delete_message,
                      commands::neocodex_regenerate,
+                     commands::neocodex_compact_session,
                      commands::neocodex_search_files,
                      commands::neocodex_stop_stream,
                      commands::neocodex_archive_session,

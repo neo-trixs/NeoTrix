@@ -562,6 +562,42 @@ pub async fn neocodex_regenerate(session_id: String, index: usize) -> Result<Vec
     neocodex_get_session_messages(session_id).await
 }
 
+/// Compact a session: keep the most recent `keep_messages` user/assistant
+/// turns and drop everything older (Claude /compact parity). Early tool/system
+/// context is trimmed; the newest conversation remains fully intact. Returns
+/// the refreshed visible thread.
+#[tauri::command]
+pub async fn neocodex_compact_session(session_id: String, keep_messages: Option<usize>) -> Result<Vec<NeoCodexMessageItem>, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let events = read_wire_events(&path)?;
+    let keep = keep_messages.unwrap_or(8).max(2).min(50);
+    let visible = visible_message_indices(&events);
+    if visible.len() <= keep {
+        return neocodex_get_session_messages(session_id).await;
+    }
+    let first_keep = visible[visible.len() - keep];
+    // Drop everything strictly before the oldest kept visible message.
+    let mut kept: Vec<WireEvent> = events[first_keep..].to_vec();
+    // Preserve the session metadata/name so the sidebar title survives.
+    let meta = events.iter().find(|e| matches!(e, WireEvent::SessionMeta { .. })).cloned();
+    if let Some(m) = meta {
+        kept.insert(0, m);
+    }
+    kept.insert(0, WireEvent::SystemEvent {
+        kind: "compact".to_string(),
+        detail: format!("上下文已压缩：保留了最近 {} 轮对话，更早的消息被截断。", keep),
+        timestamp: chrono::Utc::now().timestamp_millis(),
+    });
+    write_wire_events(&path, &kept)?;
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    rebuild_agent_for(&path, &mut guard);
+    drop(guard);
+    neocodex_get_session_messages(session_id).await
+}
+
 /// Fetch persisted side-chat messages for a session (branched questions that
 /// never re-enter the main context).
 #[tauri::command]
