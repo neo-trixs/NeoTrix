@@ -1644,6 +1644,15 @@ impl NeoCodexAgent {
             // Attempt to extract a structured tool-call from the response.
             let tool_call = Self::extract_tool_call(&response_content);
 
+            // P1-1 Plan gate: in non-Agent modes (Plan) tools must NOT be
+            // executed. Plan is a read-only promise (Codex plan / Claude
+            // plan-mode parity); executing shell there lets the model run
+            // arbitrary commands despite the read-only contract. Skip tool
+            // execution and return the drafted plan/response as the answer.
+            if self.state.mode != NeoCodexMode::Agent {
+                return Some(response_content);
+            }
+
             match tool_call {
                 Some((name, args)) => {
                     self.state.tool_call_count += 1;
@@ -1707,8 +1716,14 @@ impl NeoCodexAgent {
             }
             messages.push(Message::new(role, &turn.content));
         }
-        messages.push(Message::new(Role::User, input));
-        messages
+        // P1-2 dedup: the current user input is already pushed into
+        // `context.turns` by the caller before invoking the loop (send
+        // command / process). Appending it again yields two consecutive
+        // identical user turns in every request. Only append when the last
+        // history turn is NOT the same message.
+        if self.context.turns.back().map(|t| t.content.as_str()) != Some(input) {
+            messages.push(Message::new(Role::User, input));
+        }        messages
     }
 
     /// Bottom-up token budget for the ReAct loop. The local `messages` vec grows

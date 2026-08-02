@@ -251,17 +251,17 @@ export function DiffPane() {
             <span className={styles.fileStatus} data-status={f.status.trim()}>{statusLabel(f.status)}</span>
             <span className={styles.filePath}>{f.path}</span>
             <span className={styles.fileActions}>
-              {bucket === "unstaged" && (
+              {bucket === "unstaged" || bucket === "untracked" ? (
                 <button
                   type="button"
                   className={styles.fileAccept}
                   onClick={(e) => handleStageFile(f.path, e)}
-                  title="接受此文件改动 (stage)"
+                  title={bucket === "untracked" ? "接受此新文件 (stage add)" : "接受此文件改动 (stage)"}
                   data-testid={`diff-accept-${f.path}`}
                 >
                   ✓
                 </button>
-              )}
+              ) : null}
               {bucket !== "untracked" && bucket === "staged" && (
                 <button
                   type="button"

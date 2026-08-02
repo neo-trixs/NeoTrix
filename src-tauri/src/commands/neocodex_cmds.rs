@@ -320,15 +320,26 @@ fn sessions_dir() -> std::path::PathBuf {
         .join("sessions")
 }
 
-fn session_path(session_id: &str) -> std::path::PathBuf {
-    // 防路径穿越: session_id 仅允许字母/数字/连字符/下划线
+/// Sanitize a session_id for use in a filename. `session_path` sanitizes for
+/// the active-list path, but several archived-branch callers joined the RAW id
+/// directly (P1-3 path-transversal: "../../x" escaped the sessions dir and
+/// could remove/move arbitrary .jsonl). Centralize the allowlist here so both
+/// active and archived paths sanitize identically.
+fn sanitize_session_id(session_id: &str) -> Option<String> {
     let safe: String = session_id.chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .collect();
     if safe.is_empty() || safe != session_id {
-        return sessions_dir().join(format!("__invalid__.jsonl"));
+        None
+    } else {
+        Some(safe)
     }
-    sessions_dir().join(format!("{}.jsonl", session_id))
+}
+
+fn session_path(session_id: &str) -> std::path::PathBuf {
+    sanitize_session_id(session_id)
+        .map(|s| sessions_dir().join(format!("{}.jsonl", s)))
+        .unwrap_or_else(|| sessions_dir().join("__invalid__.jsonl"))
 }
 
 #[tauri::command]
@@ -476,15 +487,25 @@ fn read_wire_events(path: &std::path::Path) -> Result<Vec<WireEvent>, String> {
 }
 
 /// Rewrite a session's wire file from an event list (used by edit/delete/regenerate).
+/// P2-6: write atomically (tmp + fsync + rename) so a crash mid-rewrite can't
+/// truncate the session file into a lost-history state. `std::fs::write` was a
+/// non-atomic truncate. Serialization failures are surfaced, not silently dropped.
 fn write_wire_events(path: &std::path::Path, events: &[WireEvent]) -> Result<(), String> {
     let mut out = String::new();
     for event in events {
-        if let Ok(line) = serde_json::to_string(event) {
-            out.push_str(&line);
-            out.push('\n');
-        }
+        let line = serde_json::to_string(event).map_err(|e| e.to_string())?;
+        out.push_str(&line);
+        out.push('\n');
     }
-    std::fs::write(path, out).map_err(|e| e.to_string())
+    let tmp = path.with_extension("jsonl.tmp");
+    {
+        let mut f = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        use std::io::Write as _;
+        f.write_all(out.as_bytes()).map_err(|e| e.to_string())?;
+        f.flush().map_err(|e| e.to_string())?;
+        f.sync_all().map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&tmp, path).map_err(|e| e.to_string())
 }
 
 /// Map a message index (as shown in the UI thread) to a user/assistant message
@@ -782,7 +803,7 @@ pub async fn neocodex_delete_session(session_id: String) -> Result<String, Strin
         std::fs::remove_file(&path).map_err(|e| e.to_string())?;
         return Ok(format!("Deleted session {}", session_id));
     }
-    let archived = archived_dir().join(format!("{}.jsonl", session_id));
+    let archived = archived_session_path(&session_id);
     if archived.exists() {
         std::fs::remove_file(&archived).map_err(|e| e.to_string())?;
         return Ok(format!("Deleted archived session {}", session_id));
@@ -792,6 +813,15 @@ pub async fn neocodex_delete_session(session_id: String) -> Result<String, Strin
 
 fn archived_dir() -> std::path::PathBuf {
     sessions_dir().join("archived")
+}
+
+/// P1-3: archived paths must sanitize the id exactly like `session_path`;
+/// joining the raw id previously allowed LFI path traversal out of the
+/// sessions archive (delete/archive/restore could escape to arbitrary files).
+fn archived_session_path(session_id: &str) -> std::path::PathBuf {
+    sanitize_session_id(session_id)
+        .map(|s| archived_dir().join(format!("{}.jsonl", s)))
+        .unwrap_or_else(|| archived_dir().join("__invalid__.jsonl"))
 }
 
 fn checkpoints_dir() -> std::path::PathBuf {
@@ -902,7 +932,7 @@ pub async fn neocodex_archive_session(session_id: String) -> Result<String, Stri
     }
     let dir = archived_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let dest = dir.join(format!("{}.jsonl", session_id));
+    let dest = archived_session_path(&session_id);
     std::fs::rename(&path, &dest).map_err(|e| e.to_string())?;
     Ok(format!("Archived session {}", session_id))
 }
@@ -910,7 +940,7 @@ pub async fn neocodex_archive_session(session_id: String) -> Result<String, Stri
 /// Move a session back from archived/ into the active list.
 #[tauri::command]
 pub async fn neocodex_restore_session(session_id: String) -> Result<String, String> {
-    let src = archived_dir().join(format!("{}.jsonl", session_id));
+    let src = archived_session_path(&session_id);
     if !src.exists() {
         return Err("Archived session not found".to_string());
     }

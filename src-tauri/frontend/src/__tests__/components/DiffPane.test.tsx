@@ -230,7 +230,7 @@ describe("DiffPane", () => {
     await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith({ paths: ["src/a.rs"] }));
   });
 
-  it("untracked files only show reject (no accept/stage button)", async () => {
+  it("untracked files show accept (stage add) and reject", async () => {
     mockInvoke("cmd_diff_changed_files", () => ({
       staged: [],
       unstaged: [],
@@ -238,6 +238,8 @@ describe("DiffPane", () => {
     }));
     render(<DiffPane />);
     expect(await screen.findByTestId("diff-reject-notes.txt")).toBeInTheDocument();
-    expect(screen.queryByTestId("diff-accept-notes.txt")).toBeNull();
+    // P2-4: untracked new files must be stageable (git add) — parity with
+    // Claude/Codex review, which can accept new files into the review set.
+    expect(screen.getByTestId("diff-accept-notes.txt")).toBeInTheDocument();
   });
 });

@@ -192,9 +192,26 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     let accumulated = "";
     let unlisten: (() => void) | undefined;
     let unlistenDone: (() => void) | undefined;
+    // P2-1 watchdog: if the provider stalls (no token, done, or invoke resolve
+    // for a long window) the busy state would wedge permanently — textarea
+    // disabled, Stop ineffective, only an app restart recovers. Track last
+    // activity and fire once. Idle threshold is generous so legit long
+    // multi-tool generations (which emit tokens) never trip it.
+    let lastActivity = Date.now();
+    const watchdogDelayMs = 180_000; // 3 min without ANY activity
+    const watchdog = window.setTimeout(() => {
+      const idleMs = Date.now() - lastActivity;
+      if (!stopRef.current && idleMs >= watchdogDelayMs && stillThisSession()) {
+        stopRef.current = true;
+        setNeoCodexStreaming({ content: `${accumulated}\n\n> ⏸ 连接无响应，已超时停止（可点击重试）`, role: "assistant" });
+        setTaskStartedAt(null);
+      }
+    }, watchdogDelayMs + 5_000);
+    const touch = () => { lastActivity = Date.now(); };
     try {
       unlisten = await listen<string>("neocodex_stream_token", (event) => {
         if (!stillThisSession()) return;
+        touch();
         accumulated += event.payload;
         setNeoCodexStreaming({ content: accumulated, role: "assistant" });
         // Parse tool-call markers (`<tool name="...">args</tool>`) out of the
@@ -222,12 +239,15 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       });
     } catch (e) {
       console.error("Stream listen failed:", e);
+      window.clearTimeout(watchdog);
       if (!stillThisSession()) {
+        unlisten?.();
         setAgentBusy(false);
         return;
       }
       setNeoCodexStreaming(null);
       pushMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
+      unlisten?.();
       setAgentBusy(false);
       return;
     }
@@ -255,6 +275,10 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       setTaskStartedAt(null);
       refreshSessions();
       loadHealth();
+      // P2-3: reload messages after the turn so the just-sent user message
+      // gains a backend id (otherwise edit/delete remain gated on id==null
+      // until the user switches away and back).
+      reloadMessages();
       // Permission-mode review gate (Claude Code Manual / AcceptEdits parity):
       // in review modes, surface the working-tree diff for per-file accept /
       // reject after every turn instead of silently applying agent edits.
@@ -278,6 +302,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       setNeoCodexStreaming(null);
       pushMessage({ role: "error", content: `Error: ${e}`, timestamp: Date.now() });
     } finally {
+      window.clearTimeout(watchdog);
       stopRef.current = false;
       unlisten?.();
       unlistenDone?.();
@@ -369,6 +394,11 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
 
   const handleSessionSelect = async (session: any) => {
     const token = ++sessionSwitchRef.current;
+    // P2-2: clear per-session runtime state so a stream in the previous
+    // session doesn't bleed its partial tokens / task steps into the new one.
+    setNeoCodexStreaming(null);
+    setTaskSteps([]);
+    setTaskStartedAt(null);
     try {
       await invoke("neocodex_switch_session", { sessionId: session.id });
       if (sessionSwitchRef.current !== token) return;
@@ -661,7 +691,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       } else if (e.key === "Escape" && viewsMenuOpen) {
         e.preventDefault();
         setViewsMenuOpen(false);
-      } else if (e.key === "Escape" && agentBusy) {
+      } else if (e.key === "Escape" && agentBusy && !(paletteOpen || shortcutHelpOpen || timelineOpen || pendingDeleteSession)) {
         e.preventDefault();
         handleStop();
       } else if (e.key === "w" && (e.metaKey || e.ctrlKey)) {
