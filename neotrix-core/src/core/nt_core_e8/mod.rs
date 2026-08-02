@@ -19,6 +19,7 @@ pub mod nt_core_synthesis;
 pub mod nt_latent_thought;
 pub mod nt_core_trajectory_prm;
 pub mod sparse_moe;
+pub mod unified_latent;
 pub mod state_machine;
 pub mod thinking_budget;
 pub mod trace_compression;
@@ -27,6 +28,7 @@ pub mod nesym;
 
 pub use nt_latent_thought::LatentThoughtVector;
 pub use sparse_moe::{SparseMoERouter, SparseRouting};
+pub use unified_latent::{UnifiedLatentSpace, UNIFIED_LATENT_DIM, SeededProjection};
 
 #[cfg(test)]
 use std::collections::HashSet;

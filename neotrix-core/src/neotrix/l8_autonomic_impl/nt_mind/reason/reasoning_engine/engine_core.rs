@@ -10,6 +10,7 @@ use crate::core::nt_core_e8::nt_core_e8_prediction::E8PredictionOracle;
 use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FablePhase};
 use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
 use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
+use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
 use crate::core::nt_core_prm::ProcessRewardLearner;
@@ -142,6 +143,8 @@ pub struct ReasoningEngine {
     /// Phase 6.3 — sparse MoE router: groups the 64 E₈ states into 8 expert
     /// groups and routes attention to the top-2 each step, freezing the rest.
     pub sparse_moe: SparseMoERouter,
+    /// Phase 10.1 — unified latent space bridging E₈ / GWT / HyperCube.
+    pub unified_latent: UnifiedLatentSpace,
 }
 
 impl ReasoningEngine {
@@ -197,6 +200,7 @@ impl ReasoningEngine {
             synthesis: ConsciousnessCoreSynthesis::default(),
             observer_error_recovery: ObserverErrorRecovery::new(),
             sparse_moe: SparseMoERouter::new(),
+            unified_latent: UnifiedLatentSpace::new(),
         }
     }
 
@@ -759,6 +763,16 @@ impl ReasoningEngine {
                         attn_ref.iter().filter(|&&p| p > 0.0).map(|&p| -p * p.log(2.0)).sum::<f64>(),
                     ),
                 );
+
+                // Phase 10.1 — unified latent space: project the current E8 state
+                // and the aggregated workspace into the shared space and surface
+                // their cross-domain similarity for telemetry.
+                if attn_ref.len() == 64 {
+                    let e8_embed = self.unified_latent.project_e8(attn_ref);
+                    let state_proj = self.unified_latent.project_e8_state(self.current_state.mode);
+                    let cross = self.unified_latent.cosine(&e8_embed, &state_proj);
+                    root_span.set_attribute("unified_e8_self_sim", AttributeValue::Float(cross));
+                }
             }
         }
 
