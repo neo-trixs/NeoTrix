@@ -111,6 +111,9 @@ pub struct GlobalWorkspace {
     /// Most recent Phase 8.3 sparse gate result: (gated expert indices, sparse
     /// gate probabilities). Only these experts participate in the broadcast.
     pub last_sparse_gate: Option<(Vec<usize>, [f64; MODULE_COUNT])>,
+    /// Phase 9.1 — second-order observer workspace: watches the primary
+    /// workspace and registers meta-observations for self-aware inner speech.
+    pub meta_workspace: super::meta_workspace::MetaWorkspace,
 }
 
 /// Events that trigger an audit block
@@ -170,6 +173,7 @@ impl GlobalWorkspace {
             cognitive_profile: None,
             cognitive_hub: super::cognitive_hub::CognitiveHub::new(),
             last_sparse_gate: None,
+            meta_workspace: super::meta_workspace::MetaWorkspace::new(),
         }
     }
 
@@ -400,13 +404,33 @@ impl GlobalWorkspace {
             let winner_name = self.specialist_at_index(report.winner)
                 .map(|m| m.name.clone())
                 .unwrap_or_else(|| format!("specialist_{}", report.winner));
+            // Phase 9.1 — Meta-Workspace: second-order observation of the primary
+            // workspace (winner, entropy, sparse-gate choices), registered before
+            // inner speech so the self-talk can reference its own behavior.
+            let gated = self.last_sparse_gate.as_ref().map(|(g, _)| g.clone()).unwrap_or_default();
+            let obs = super::meta_workspace::PrimaryObservation {
+                winner: report.winner,
+                winner_name: winner_name.clone(),
+                entropy: report.entropy,
+                gated_experts: gated,
+                specialist_count: self.specialists.len(),
+            };
+            let meta_fresh = self.meta_workspace.observe(obs);
+            for mo in &meta_fresh {
+                self.broadcast_history.push(mo.message.clone());
+            }
+            let meta_context = self.meta_workspace.context_block(4);
             let speech_input = super::inner_speech::SpeechInput {
                 winner: report.winner,
                 winner_name,
                 entropy: report.entropy,
                 focused: report.is_focused(),
                 complement_activated: report.complement_activated,
-                content: content.to_string(),
+                content: if meta_context.is_empty() {
+                    content.to_string()
+                } else {
+                    format!("{content}\n{meta_context}")
+                },
             };
             let utterance = self.inner_speech.speak(&speech_input);
             if self.inner_speech.feed_back_enabled {
