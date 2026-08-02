@@ -8,6 +8,8 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
+use crate::neotrix::l1_body_impl::nt_agent_mcp_transport::TransportMode;
+
 // ---------------------------------------------------------------------------
 // Legacy types — API-identical to the original inline module in agent.rs
 // ---------------------------------------------------------------------------
@@ -257,10 +259,23 @@ impl McpRegistry {
     }
 
     /// Stub — returns Err with a descriptive message
-    pub fn call_tool(&self, name: &str, _args: &Value) -> Result<String, String> {
-        Err(format!(
-            "McpRegistry::call_tool is a stub; use nt_agent_mcp_transport::mcp_call_tool instead. (tool={name})"
-        ))
+    pub fn call_tool(&self, name: &str, args: &Value) -> Result<String, String> {
+        let (server, tool) = self
+            .servers
+            .iter()
+            .filter_map(|s| {
+                s.tools
+                    .iter()
+                    .find(|t| t.name == name)
+                    .map(|t| (s, t))
+            })
+            .next()
+            .ok_or_else(|| format!("MCP tool '{}' not registered", name))?;
+
+        let mode = to_transport_mode(&server.transport, server.url.as_deref());
+        let (content, _cache) = crate::neotrix::l1_body_impl::nt_agent_mcp_transport::mcp_call_tool(&mode, &tool.name, args)
+            .map_err(|e| format!("MCP tool '{}' failed: {}", name, e))?;
+        Ok(content)
     }
 
     /// Stub
@@ -271,5 +286,91 @@ impl McpRegistry {
     /// Stub
     pub fn prune_cache(&self) -> usize {
         0
+    }
+}
+
+/// Convert legacy `McpTransport` into the v3 `TransportMode` used by
+/// `nt_agent_mcp_transport::mcp_call_tool`. Falls back to Stdio for unknown
+/// variants so a missing URL never panics.
+fn to_transport_mode(t: &McpTransport, url: Option<&str>) -> TransportMode {
+    match t {
+        McpTransport::Local { command, args } => TransportMode::Local {
+            command: command.clone(),
+            args: args.clone(),
+        },
+        McpTransport::Http | McpTransport::WebSocket | McpTransport::Sse => {
+            if let Some(url) = url {
+                TransportMode::Remote {
+                    http_url: url.to_string(),
+                    headers: std::collections::HashMap::new(),
+                    sse_url: None,
+                    auth: None,
+                }
+            } else {
+                TransportMode::Local {
+                    command: "mcp".to_string(),
+                    args: vec![],
+                }
+            }
+        }
+        McpTransport::Stdio => TransportMode::Local {
+            command: "mcp".to_string(),
+            args: vec![],
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_transport_mode_local() {
+        let mode = to_transport_mode(
+            &McpTransport::Local { command: "server".into(), args: vec!["--flag".into()] },
+            None,
+        );
+        match mode {
+            TransportMode::Local { command, args } => {
+                assert_eq!(command, "server");
+                assert_eq!(args, vec!["--flag".to_string()]);
+            }
+            _ => panic!("expected Local"),
+        }
+    }
+
+    #[test]
+    fn test_to_transport_mode_remote_with_url() {
+        let mode = to_transport_mode(&McpTransport::Http, Some("https://mcp.example.com"));
+        match mode {
+            TransportMode::Remote { http_url, sse_url, .. } => {
+                assert_eq!(http_url, "https://mcp.example.com");
+                assert!(sse_url.is_none());
+            }
+            _ => panic!("expected Remote"),
+        }
+    }
+
+    #[test]
+    fn test_to_transport_mode_remote_without_url_falls_back() {
+        let mode = to_transport_mode(&McpTransport::Sse, None);
+        assert!(matches!(mode, TransportMode::Local { .. }));
+    }
+
+    #[test]
+    fn test_call_tool_unregistered() {
+        let reg = McpRegistry::new();
+        let err = reg.call_tool("ghost", &serde_json::json!({})).unwrap_err();
+        assert!(err.contains("not registered"));
+    }
+
+    #[test]
+    fn test_call_tool_registered_no_command() {
+        let mut reg = McpRegistry::new();
+        reg.publish("echo", "nonexistent-cmd-xyz", &[], "echo tool");
+        // Tool resolves but spawn of a nonexistent binary fails → returns Err,
+        // proving we left the stub (which also returned Err but with "stub").
+        let err = reg.call_tool("echo_tool", &serde_json::json!({})).unwrap_err();
+        assert!(!err.contains("stub"), "call_tool must not be a stub anymore");
     }
 }
