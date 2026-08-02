@@ -228,9 +228,9 @@
 
 ### 实现检查清单
 - [x] CognitiveType enum (Linguistic, Logical, Knowledge, Social) — cognitive_type.rs, 10 tests, Step 4f 接线 ✅ iter192
-- [ ] `CognitiveHub` — 跨组路由桥梁
-- [ ] `GatingNetwork` — 可学习 router
-- [ ] `CognitiveTopology` — 结构化连接矩阵
+- [x] `CognitiveHub` — 跨组路由桥梁 (cognitive_hub.rs, 8 tests, 4×4 可学习 hub 权重 + top-2 稀疏路由, broadcast 协作记录) ✅ iter193
+- [x] `GatingNetwork` — 可学习 router (MoERouter::sparse_gate, 4 tests, G(x)=softmax(W_g·x) top-3 广播门控) ✅ iter193
+- [ ] `CognitiveTopology` — 结构化连接矩阵 (组内全连接 + 组间仅经 hub, 由 CognitiveHub 覆盖)
 - [ ] 测试: 路由精度 / 组内协作增益 / 稀疏性约束
 
 ---
@@ -361,9 +361,9 @@ Phase 10 ── 统一潜在推理
 | **P1** | 7.2 | InnerSpeech | GWT broadcast | 4d | ✅ iter190 |
 | **P1** | 7.5 | ModalityRouter | GWT attention | 3d | ✅ iter191 |
 | **P1** | 8.1 | CognitiveType | GWT 专家枚举 | 2d | ✅ iter192 |
-| **P1** | 6.3 | SparseMoERouter | E8 分组重构 | 5d |
-| **P2** | 8.2 | CognitiveHub | Phase 8.1 | 4d |
-| **P2** | 8.3 | GatingNetwork | Phase 8.2 | 5d |
+| **P1** | 6.3 | SparseMoERouter | E8 分组重构 | 5d | ✅ iter193 |
+| **P2** | 8.2 | CognitiveHub | Phase 8.1 | 4d | ✅ iter193 |
+| **P2** | 8.3 | GatingNetwork | Phase 8.2 | 5d | ✅ iter193 |
 | **P2** | 9.1 | MetaWorkspace | Phase 7 | 5d |
 | **P2** | 9.2 | SelfModel | Phase 9.1 | 4d |
 | **P3** | 10.1 | E8Embedding | Phase 6 | 5d |
@@ -385,6 +385,9 @@ Phase 10 ── 统一潜在推理
 | PhysicsAttention (AdaptiveSlicer) | `core/consciousness/physics_attention.rs` | 9 ✅ | Transolver (arXiv:2402.02366) | 7.x |
 | DeadlockAwareRollback (最大刺激回滚) | `monitor.rs` + `seal_loop.rs` | — | GWA | 7.1 |
 | InnerSpeech (内心独白 + 上下文写回) | `core/nt_core_gwt/inner_speech.rs` | 11 ✅ | MIRROR (AAAI 2026) §3.3 | 7.2 |
+| SparseMoERouter (top-2 专家组路由) | `core/nt_core_e8/sparse_moe.rs` | 10 ✅ | Thinking Pixel §3.1 | 6.3 |
+| CognitiveHub (跨组路由桥梁) | `core/nt_core_gwt/cognitive_hub.rs` | 8 ✅ | MiCRo §4.1 | 8.2 |
+| SparseGate (top-3 广播门控) | `core/nt_core_gwt/moe_router.rs` | 4 ✅ | MiCRo §4.2 | 8.3 |
 
 ---
 
