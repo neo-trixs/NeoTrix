@@ -19,7 +19,6 @@ pub mod skill_acquire;
 pub mod group_evolve;
 pub mod nt_act_orch_patterns;
 pub mod a2a;
-pub mod nt_cap_code_review;
 pub mod nt_core_antidistil;
 
 pub mod nt_cap_media;

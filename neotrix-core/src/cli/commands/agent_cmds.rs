@@ -11,15 +11,27 @@ use crate::neotrix::nt_mind::SelfIteratingBrain;
 static AGENT_MANAGER: LazyLock<Arc<RwLock<SubagentManager>>> =
     LazyLock::new(|| Arc::new(RwLock::new(SubagentManager::new())));
 static MCP_REGISTRY: OnceLock<Arc<RwLock<McpRegistry>>> = OnceLock::new();
+static TOOL_ORCHESTRATOR: OnceLock<Arc<RwLock<crate::agent::tool::ToolOrchestrator>>> = OnceLock::new();
 
 pub fn set_mcp_registry(registry: McpRegistry) {
     MCP_REGISTRY.set(Arc::new(RwLock::new(registry))).ok();
 }
 
-fn get_mcp_registry() -> Arc<RwLock<McpRegistry>> {
+pub fn get_mcp_registry() -> Arc<RwLock<McpRegistry>> {
     MCP_REGISTRY.get()
         .cloned()
         .unwrap_or_else(|| Arc::new(RwLock::new(McpRegistry::new())))
+}
+
+/// 注入生产初始化时构建的 ToolOrchestrator（吸收管线终点）。
+pub fn set_tool_orchestrator(orch: crate::agent::tool::ToolOrchestrator) {
+    TOOL_ORCHESTRATOR.set(Arc::new(RwLock::new(orch))).ok();
+}
+
+pub fn get_tool_orchestrator() -> Arc<RwLock<crate::agent::tool::ToolOrchestrator>> {
+    TOOL_ORCHESTRATOR.get()
+        .cloned()
+        .unwrap_or_else(|| Arc::new(RwLock::new(crate::agent::tool::ToolOrchestrator::default())))
 }
 
 // ====== /agent ======
@@ -273,10 +285,19 @@ impl CliCommand for McpCmd {
                 if tools.is_empty() {
                     s.push_str("  (none — use /mcp status for bridge status)\n");
                 }
+                let orch = get_tool_orchestrator();
+                let orch = orch.blocking_read();
+                let absorbed = orch.list_defs();
+                s.push_str(&format!("🧩 Absorbed NativeTools: {}\n", absorbed.len()));
+                for (i, def) in absorbed.iter().enumerate() {
+                    s.push_str(&format!("  {}. {} — {}\n", i + 1, def.name, def.description));
+                }
                 if want_json {
                     let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+                    let absorbed_names: Vec<&str> = absorbed.iter().map(|t| t.name.as_str()).collect();
                     return CommandOutput::ok(&s).with_json(serde_json::json!({
-                        "tools": tool_names, "count": tool_names.len()
+                        "tools": tool_names, "count": tool_names.len(),
+                        "absorbed": absorbed_names, "absorbed_count": absorbed_names.len()
                     }));
                 }
                 CommandOutput::ok(&s)

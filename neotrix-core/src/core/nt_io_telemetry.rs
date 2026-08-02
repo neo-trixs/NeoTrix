@@ -11,7 +11,7 @@ pub enum SpanKind {
     Llm,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AttributeValue {
     String(String),
     Int(i64),
@@ -47,9 +47,23 @@ impl Span {
         }
     }
 
-    pub fn set_gen_ai_request_model(&self, _model: &str) {}
+    /// Record the requested GenAI model as a span attribute (GenAI semconv `gen_ai.request.model`).
+    pub fn set_gen_ai_request_model(&self, model: &str) {
+        self.set_attribute("gen_ai.request.model", AttributeValue::String(model.to_string()));
+    }
 
-    pub fn set_gen_ai_system(&self, _system: &str) {}
+    /// Record the GenAI system name as a span attribute (`gen_ai.system`).
+    pub fn set_gen_ai_system(&self, system: &str) {
+        self.set_attribute("gen_ai.system", AttributeValue::String(system.to_string()));
+    }
+
+    /// Look up a recorded attribute (clones the value; used for observability/tests).
+    pub fn attribute(&self, key: &str) -> Option<AttributeValue> {
+        self.attributes
+            .lock()
+            .ok()
+            .and_then(|attrs| attrs.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone()))
+    }
 }
 
 pub trait Tracer: Send + Sync {
@@ -159,5 +173,23 @@ mod tests {
             ct.total_completion_tokens.load(Ordering::Relaxed),
             150
         );
+    }
+
+    #[test]
+    fn test_gen_ai_setters_record_attributes() {
+        let tracer = ConsoleTracer;
+        let span = tracer.start_span("llm_call", SpanKind::Llm);
+        span.set_gen_ai_request_model("gpt-4o");
+        span.set_gen_ai_system("neotrix");
+        assert_eq!(
+            span.attribute("gen_ai.request.model"),
+            Some(AttributeValue::String("gpt-4o".into()))
+        );
+        assert_eq!(
+            span.attribute("gen_ai.system"),
+            Some(AttributeValue::String("neotrix".into()))
+        );
+        assert_eq!(span.attribute("missing"), None);
+        tracer.end_span(span);
     }
 }

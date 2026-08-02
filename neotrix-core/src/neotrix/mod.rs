@@ -123,8 +123,6 @@ pub use l1_body_impl::nt_io_map_tile;
 pub use l1_body_impl::nt_io_acp;
 pub use l1_body_impl::nt_io_session_recovery;
 pub use l1_body_impl::nt_io_agents_md;
-pub use l1_body_impl::nt_io_surface_bridge;
-pub use l1_body_impl::nt_io_grep;
 pub use l1_body_impl::nt_io_digital_human;
 pub use l1_body_impl::nt_io_neocodex;
 

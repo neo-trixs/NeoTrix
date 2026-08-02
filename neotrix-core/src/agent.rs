@@ -313,17 +313,56 @@ pub mod tool {
 
     use std::sync::{Arc, RwLock};
 
-    #[derive(Debug, Clone)]
-    pub struct ToolOrchestrator;
-
-    impl ToolOrchestrator {
-        pub fn new(_cap: Arc<RwLock<crate::core::nt_core_cap::CapabilityVector>>) -> Self { Self }
-        pub fn register_native_all(&mut self, _tools: Vec<Box<dyn crate::core::nt_core_traits::NativeTool>>) {}
-        pub fn native_count(&self) -> usize { 0 }
+    /// ToolOrchestrator — 统一原生工具编排器
+    ///
+    /// 吸收管线终点：外部 MCP 服务器 → McpToolAdapter → ToolOrchestrator。
+    /// 上层（GWT、SEAL、nt_cap）把每个 NativeTool 视为普通工具。
+    #[derive(Default)]
+    pub struct ToolOrchestrator {
+        tools: Vec<Box<dyn crate::core::nt_core_traits::NativeTool>>,
     }
 
+    impl ToolOrchestrator {
+        pub fn new(_cap: Arc<RwLock<crate::core::nt_core_cap::CapabilityVector>>) -> Self {
+            Self::default()
+        }
+
+        /// 批量注册 NativeTool（吸收的 MCP 服务器走此路径）。
+        pub fn register_native_all(
+            &mut self,
+            tools: Vec<Box<dyn crate::core::nt_core_traits::NativeTool>>,
+        ) {
+            self.tools.extend(tools);
+        }
+
+        pub fn native_count(&self) -> usize {
+            self.tools.len()
+        }
+
+        /// 列出所有已注册工具的 ToolDef（供 /mcp native 与上层消费）。
+        pub fn list_defs(&self) -> Vec<crate::core::nt_core_traits::ToolDef> {
+            self.tools.iter().map(|t| t.to_def()).collect()
+        }
+
+        /// 按 id 派发调用。
+        pub fn call(
+            &self,
+            name: &str,
+            args: &serde_json::Value,
+        ) -> Result<crate::core::nt_core_traits::ToolOutput, String> {
+            self.tools
+                .iter()
+                .find(|t| t.id() == name)
+                .ok_or_else(|| format!("Native tool '{}' not registered", name))
+                .and_then(|t| t.execute(args))
+        }
+    }
+
+    /// 从全局 McpRegistry 重建吸收的原生工具列表（真实路径，非空壳）。
     pub fn all_native_tools() -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> {
-        Vec::new()
+        crate::cli::commands::agent_cmds::get_mcp_registry()
+            .blocking_read()
+            .as_native_tools()
     }
 }
 
@@ -336,5 +375,63 @@ mod tests {
     #[test]
     fn test_placeholder() {
         assert!(true);
+    }
+
+    use crate::core::nt_core_traits::{NativeTool, ToolOutput};
+    use serde_json::json;
+
+    struct DummyTool(&'static str);
+
+    impl NativeTool for DummyTool {
+        fn id(&self) -> &str {
+            self.0
+        }
+        fn description(&self) -> &str {
+            "dummy"
+        }
+        fn input_schema(&self) -> serde_json::Value {
+            json!({"type": "object", "properties": {}})
+        }
+        fn capability_tags(&self) -> Vec<&'static str> {
+            vec![]
+        }
+        fn execute(&self, _args: &serde_json::Value) -> Result<ToolOutput, String> {
+            Ok(ToolOutput { success: true, content: format!("ran {}", self.0) })
+        }
+    }
+
+    #[test]
+    fn test_tool_orchestrator_register_and_count() {
+        let mut orch = super::tool::ToolOrchestrator::default();
+        assert_eq!(orch.native_count(), 0);
+        orch.register_native_all(vec![
+            Box::new(DummyTool("alpha")) as Box<dyn NativeTool>,
+            Box::new(DummyTool("beta")) as Box<dyn NativeTool>,
+        ]);
+        assert_eq!(orch.native_count(), 2);
+        assert_eq!(orch.list_defs().len(), 2);
+    }
+
+    #[test]
+    fn test_tool_orchestrator_dispatch() {
+        let mut orch = super::tool::ToolOrchestrator::default();
+        orch.register_native_all(vec![Box::new(DummyTool("calc")) as Box<dyn NativeTool>]);
+        let out = orch.call("calc", &json!({"a": 1})).expect("dispatch");
+        assert!(out.success);
+        assert!(out.content.contains("ran calc"));
+        let err = orch.call("ghost", &json!({}));
+        assert!(err.is_err(), "unregistered tool must error");
+        let msg = match err {
+            Ok(_) => String::new(),
+            Err(e) => e,
+        };
+        assert!(msg.contains("not registered"));
+    }
+
+    #[test]
+    fn test_all_native_tools_from_global_registry() {
+        // Before any registry is set, must return empty (never panic).
+        let tools = super::tool::all_native_tools();
+        assert!(tools.is_empty());
     }
 }

@@ -6,7 +6,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::core::l7_capability::nt_cap_code_review::{AuditDimension, AuditMode, CodeReviewEngine};
+use crate::neotrix::nt_mind::code_review::CodeReviewEngine;
+use crate::neotrix::nt_shield_audit::{AuditDimension, AuditMode};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 pub struct ReviewCmd;

@@ -30,7 +30,6 @@ pub mod nt_memory_types;
 pub mod nt_memory_unify;
 pub mod nt_memory_content_distiller;
 pub mod nt_memory_panorama;
-pub mod nt_memory_auto_learn;
 pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
 pub mod nt_memory_knowledge_assets;
@@ -58,7 +57,6 @@ pub use nt_memory_svaf_gate::{SvafGate, SvafDecision, SvafEvaluation};
 pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRecord, MemoryProficiencyReport};
 pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
-pub use nt_memory_auto_learn::*;
 pub use nt_memory_tech_reserve::{
     TechReserveStore, TechReserveEntry, TechReserveDimension, TechReserveQuery,
     ArchitectureGap, TechProfile, extract_tech_domains,

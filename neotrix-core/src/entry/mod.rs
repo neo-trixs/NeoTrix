@@ -955,6 +955,10 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
         neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
+        let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
+        orchestrator.register_native_all(mcp_registry.as_native_tools());
+        neotrix::cli::commands::agent_cmds::set_tool_orchestrator(orchestrator);
+        println!("{}: {} native MCP tools absorbed via McpToolAdapter", info("ToolOrchestrator"), success(mcp_registry.tool_count().to_string()));
         neotrix::cli::commands::agent_cmds::set_mcp_registry(mcp_registry.clone());
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let mcp_registry = Arc::new(RwLock::new(mcp_registry));
@@ -1101,6 +1105,10 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
         neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
+        let mut orchestrator = neotrix::agent::tool::ToolOrchestrator::default();
+        orchestrator.register_native_all(mcp_registry.as_native_tools());
+        neotrix::cli::commands::agent_cmds::set_tool_orchestrator(orchestrator);
+        neotrix::cli::commands::agent_cmds::set_mcp_registry(mcp_registry.clone());
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let _mcp_registry = Arc::new(RwLock::new(mcp_registry));
 

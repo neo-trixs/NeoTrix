@@ -8,6 +8,7 @@
 use serde_json::Value;
 use std::collections::HashMap;
 
+use crate::neotrix::l1_body_impl::nt_agent_mcp_adapter::McpToolAdapter;
 use crate::neotrix::l1_body_impl::nt_agent_mcp_transport::TransportMode;
 
 // ---------------------------------------------------------------------------
@@ -251,6 +252,24 @@ impl McpRegistry {
         &self.servers
     }
 
+    // -- Absorption into NativeTool -------------------------------------------------
+
+    /// 把每个已注册且含工具的服务器包装为 `McpToolAdapter`，供 ToolOrchestrator
+    /// 以普通 NativeTool 身份消费（吸收管线：MCP → adapter → orchestrator）。
+    pub fn as_native_tools(
+        &self,
+    ) -> Vec<Box<dyn crate::core::nt_core_traits::NativeTool>> {
+        self.servers
+            .iter()
+            .filter(|s| !s.tools.is_empty())
+            .map(|s| {
+                let mode = to_transport_mode(&s.transport, s.url.as_deref());
+                Box::new(McpToolAdapter::new(&s.name, mode, s.tools.clone()))
+                    as Box<dyn crate::core::nt_core_traits::NativeTool>
+            })
+            .collect()
+    }
+
     // -- Stubs (for forward compat) -----------------------------------------
 
     /// Always returns `true` (stub)
@@ -372,5 +391,35 @@ mod tests {
         // proving we left the stub (which also returned Err but with "stub").
         let err = reg.call_tool("echo_tool", &serde_json::json!({})).unwrap_err();
         assert!(!err.contains("stub"), "call_tool must not be a stub anymore");
+    }
+
+    #[test]
+    fn test_as_native_tools_maps_servers() {
+        let mut reg = McpRegistry::new();
+        reg.publish("alpha", "cmd-a", &[], "alpha tool");
+        reg.register_stdio("beta", "cmd-b", &[], vec![McpToolDef {
+            name: "beta_t1".into(),
+            description: "beta tool".into(),
+            input_schema: serde_json::json!({"type": "object", "properties": {}}),
+            server_name: "beta".into(),
+            transport: McpTransport::Stdio,
+            schema_version: None,
+        }]);
+        // Empty server (no tools) must be skipped.
+        reg.register_stdio("empty", "cmd-e", &[], vec![]);
+
+        let native = reg.as_native_tools();
+        // alpha (1 published tool) + beta (1 tool) = 2 adapters; "empty" filtered out.
+        assert_eq!(native.len(), 2, "empty server should be excluded");
+        let ids: Vec<String> = native.iter().map(|t| t.id().to_string()).collect();
+        assert!(ids.contains(&"alpha_tool".to_string()));
+        assert!(ids.contains(&"beta_t1".to_string()));
+        assert_eq!(native[0].capability_tags(), vec!["mcp_absorbed"]);
+    }
+
+    #[test]
+    fn test_as_native_tools_empty_registry() {
+        let reg = McpRegistry::new();
+        assert!(reg.as_native_tools().is_empty());
     }
 }

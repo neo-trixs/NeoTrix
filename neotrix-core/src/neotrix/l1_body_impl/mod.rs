@@ -29,8 +29,6 @@ pub mod nt_io_web;
 pub mod nt_io_map_tile;
 pub mod nt_io_session_recovery;
 pub mod nt_io_agents_md;
-pub mod nt_io_surface_bridge;
-pub mod nt_io_grep;
 pub mod nt_io_digital_human;
 pub mod nt_io_neocodex;
 
