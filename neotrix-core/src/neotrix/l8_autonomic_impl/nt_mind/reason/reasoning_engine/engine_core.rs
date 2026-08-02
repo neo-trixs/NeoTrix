@@ -9,6 +9,7 @@ use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType, E8Domain
 use crate::core::nt_core_e8::nt_core_e8_prediction::E8PredictionOracle;
 use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FablePhase};
 use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
+use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
 use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
 use crate::core::nt_core_prm::ProcessRewardLearner;
@@ -138,6 +139,9 @@ pub struct ReasoningEngine {
     pub synthesis: ConsciousnessCoreSynthesis,
     /// Observer error recovery with retry + circuit breaker + fallback
     pub observer_error_recovery: ObserverErrorRecovery,
+    /// Phase 6.3 — sparse MoE router: groups the 64 E₈ states into 8 expert
+    /// groups and routes attention to the top-2 each step, freezing the rest.
+    pub sparse_moe: SparseMoERouter,
 }
 
 impl ReasoningEngine {
@@ -192,6 +196,7 @@ impl ReasoningEngine {
             last_effort_tier: None,
             synthesis: ConsciousnessCoreSynthesis::default(),
             observer_error_recovery: ObserverErrorRecovery::new(),
+            sparse_moe: SparseMoERouter::new(),
         }
     }
 
@@ -502,19 +507,41 @@ impl ReasoningEngine {
             }
         }
         let gwt_content = format!("E8 state: {} | task: {}", self.current_state.mode.mode_name(), task);
+        // Phase 6.3 — sparse MoE routing: score the 8 expert groups (proximity +
+        // task affinity + transition mass), pick top-2, freeze the other 6 before
+        // the GWT bridge consumes them. Computed before the `gwt` borrow so the
+        // router can be mutated while `gwt` is borrowed mutably.
+        let sparse_moe_state = if self.last_e8_attention_weights.as_ref().is_some_and(|v| v.len() >= 64) {
+            let task_ty = E8TaskType::detect(task);
+            let next_block_mass = self.sparse_moe_next_block_mass();
+            let routing = self.sparse_moe.route(self.current_state.mode.0, task_ty, next_block_mass.as_ref());
+            let attn_arr = {
+                let attn_vec = self.last_e8_attention_weights.as_ref().unwrap();
+                let mut arr = [0.0_f64; 64];
+                arr.copy_from_slice(&attn_vec[..64]);
+                self.sparse_moe.apply_mask(&routing, &arr)
+            };
+            Some((routing, attn_arr))
+        } else {
+            None
+        };
         if let Some(ref mut gwt) = self.gwt {
             // Inject E8 prediction attention weights from previous cycle (one-cycle lag).
             // This creates a differentiable bridge: the oracle's predicted distribution over all
             // 64 E8 modes biases the GWT resonance cycle, favoring experts whose current E8 mode
             // has high predicted probability. The bias is consumed (set to None) inside
             // resonant_broadcast after one use.
-            if let Some(ref attn_vec) = self.last_e8_attention_weights {
-                if attn_vec.len() >= 64 {
-                    let mut attn_arr = [0.0_f64; 64];
-                    attn_arr.copy_from_slice(&attn_vec[..64]);
-                    let adaptive_bias = 0.1 + self.last_e8_confidence * 0.4;
-                    gwt.set_e8_attention_weights(attn_arr, adaptive_bias);
-                }
+            if let Some((routing, attn_arr)) = sparse_moe_state {
+                let adaptive_bias = 0.1 + self.last_e8_confidence * 0.4;
+                gwt.set_e8_attention_weights(attn_arr, adaptive_bias);
+                root_span.set_attribute(
+                    "sparse_moe_active",
+                    AttributeValue::String(format!("{:?}", routing.active_groups).into()),
+                );
+                root_span.set_attribute(
+                    "sparse_moe_sparsity",
+                    AttributeValue::Float(routing.sparsity() as f64),
+                );
             }
             let report = gwt.resonant_broadcast(&gwt_content, &hex_states);
             root_span.set_attribute("gwt_winner", AttributeValue::Int(report.winner as i64));
@@ -843,6 +870,25 @@ impl ReasoningEngine {
             };
             let _ = kb.store_conversation_record(&record);
         }
+    }
+
+    /// Compute next-block probability mass for the 8 MoE expert groups from the
+    /// domain-aware transition model's general matrix, used as the transition
+    /// signal in sparse MoE routing. Returns `None` when no transition data exists.
+    fn sparse_moe_next_block_mass(&self) -> Option<[f64; 8]> {
+        let current = self.current_state.mode.0;
+        let mut mass = [0.0f64; 8];
+        if let Some(ref model) = self.domain_transition_model {
+            let dist = model.general_matrix.dominance_capped_distribution(current, 0.5);
+            let total: f64 = dist.iter().sum();
+            if total > 0.0 {
+                for (t, p) in dist.iter().enumerate() {
+                    mass[t / 8] += p / total;
+                }
+                return Some(mass);
+            }
+        }
+        None
     }
 
     pub fn reason_multi_agent(&mut self, task: &str) -> NeoTrixResult<String> {

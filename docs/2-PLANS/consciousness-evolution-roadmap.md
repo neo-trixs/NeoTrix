@@ -353,7 +353,7 @@ Phase 10 ── 统一潜在推理
 
 | 优先级 | 阶段 | 项目 | 依赖 | 预估 |
 |--------|------|------|------|------|
-| **P0** | 7.1 | EntropyMonitor 死锁打破 | GWT 现有 | 3d |
+| **P0** | 7.1 | EntropyMonitor 死锁打破 | GWT 现有 | 3d | ✅ iter191 |
 | **P0** | 6.1 | LatentThoughtVector | E8 现有 | 5d | ✅ iter192 |
 | **P0** | 7.3 | CLS_Buffer 互补学习 | HyperCube 现有 | 4d | ✅ iter191 |
 | **P0** | 6.2 | RecursiveDepthReward | SEAL reward_calc | 2d | ✅ iter192 |
