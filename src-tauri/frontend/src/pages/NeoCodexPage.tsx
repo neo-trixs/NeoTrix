@@ -57,6 +57,10 @@ export default function NeoCodexPage() {
   const [sideChatInput, setSideChatInput] = useState("");
   const [renamingTitle, setRenamingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<Array<{ id: string; created_at: string; message_count: number }>>([]);
+  const [checkpointsLoading, setCheckpointsLoading] = useState(false);
+  const [pendingCheckpointRestore, setPendingCheckpointRestore] = useState<string | null>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -211,6 +215,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       if (regenerate) {
         (payload as any).regenerate = true;
       }
+      (payload as any).permission_mode = useStore.getState().settings?.permissionMode || "auto";
       const generated = await invoke("neocodex_send_message_stream", payload) as string;
       setNeoCodexStreaming(null);
       const wasCancelled = stopRef.current;
@@ -222,6 +227,14 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       if (!stillThisSession()) return;
       refreshSessions();
       loadHealth();
+      // Permission-mode review gate (Claude Code Manual / AcceptEdits parity):
+      // in review modes, surface the working-tree diff for per-file accept /
+      // reject after every turn instead of silently applying agent edits.
+      const permMode = useStore.getState().settings?.permissionMode || "auto";
+      if (!wasCancelled && (permMode === "manual" || permMode === "accept")) {
+        setDiffOpen(true);
+        addNotification({ type: "info", message: permMode === "manual" ? "本轮改动待审阅，请在 Diff 面板逐文件接受/拒绝" : "改动已应用，可在 Diff 面板复核", duration: 3000 });
+      }
       // Codex/Claude parity: surface an opt-out notification when a turn
       // completes while the user may be looking elsewhere.
       if (!wasCancelled && useStore.getState().settings?.notifyOnComplete) {
@@ -405,11 +418,42 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     return vis;
   };
 
+  const loadCheckpoints = async () => {
+    if (!neocodexActiveSessionId) return;
+    setCheckpointsLoading(true);
+    try {
+      const list = await invoke("neocodex_checkpoint_list", { sessionId: neocodexActiveSessionId }) as Array<{ id: string; created_at: string; message_count: number }>;
+      setCheckpoints(list);
+    } catch (e) {
+      console.error("Failed to list checkpoints:", e);
+      setCheckpoints([]);
+    }
+    setCheckpointsLoading(false);
+  };
+
+  const openTimeline = () => {
+    setTimelineOpen(true);
+    loadCheckpoints();
+  };
+
+  const handleCheckpointRestore = async (checkpointId: string) => {
+    if (!neocodexActiveSessionId) return;
+    try {
+      await invoke("neocodex_checkpoint_restore", { sessionId: neocodexActiveSessionId, checkpointId });
+      await reloadMessages();
+      setPendingCheckpointRestore(null);
+      addNotification({ type: "success", message: "已回退到检查点", duration: 3000 });
+    } catch (e) {
+      console.error("Failed to restore checkpoint:", e);
+      addNotification({ type: "error", message: `回退失败: ${e}`, duration: 4000 });
+      setPendingCheckpointRestore(null);
+    }
+  };
+
   const reloadMessages = async () => {
     if (!neocodexActiveSessionId) return;
     try {
-      const items = await invoke("neocodex_get_session_messages", { sessionId: neocodexActiveSessionId }) as any[];
-      setNeoCodexMessages(items.map((m) => ({
+      const items = await invoke("neocodex_get_session_messages", { sessionId: neocodexActiveSessionId }) as any[];      setNeoCodexMessages(items.map((m) => ({
         id: m.id,
         role: m.role,
         content: m.content,
@@ -718,6 +762,32 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               <option value="Shell">Shell</option>
               <option value="Plan">Plan</option>
             </select>
+            <select
+              value={settings?.permissionMode || "auto"}
+              onChange={(e) => setSettings({ ...settings, permissionMode: e.target.value as any })}
+              className={styles.modeSelect}
+              disabled={agentBusy}
+              data-testid="permission-mode-select"
+              title="权限模式: 控制每轮编辑的审批方式"
+            >
+              <option value="auto">Auto</option>
+              <option value="accept">AcceptEdits</option>
+              <option value="manual">Manual</option>
+              <option value="plan">Plan</option>
+            </select>
+            <button
+              className={styles.topBarBtn}
+              onClick={openTimeline}
+              disabled={!activeSession}
+              data-testid="timeline-open"
+              title="检查点时间线 (回退到历史状态)"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="8" cy="8" r="5.5"/>
+                <path d="M8 5v3l2 1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              时间线
+            </button>
             <div className={styles.viewsMenuWrap}>
               <button
                 type="button"
@@ -1001,6 +1071,78 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
                 }}
               >
                 永久删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {timelineOpen && (
+        <div className={styles.confirmOverlay} role="dialog" aria-modal="true" aria-label="检查点时间线" data-testid="timeline-panel" onClick={() => setTimelineOpen(false)}>
+          <div className={styles.timelineDialog} onClick={(e) => e.stopPropagation()}>
+            <h3>检查点时间线</h3>
+            <p className={styles.timelineSub}>
+              {activeSession?.name || "此会话"} 的历史状态，可回退到任意检查点。回退会用该点消息重建会话。
+            </p>
+            {checkpointsLoading ? (
+              <div className={styles.timelineEmpty}>加载中…</div>
+            ) : checkpoints.length === 0 ? (
+              <div className={styles.timelineEmpty}>暂无检查点。每次发送消息会自动创建。</div>
+            ) : (
+              <ul className={styles.timelineList}>
+                {checkpoints.map((cp, i) => (
+                  <li key={cp.id} className={styles.timelineItem}>
+                    <div className={styles.timelineInfo}>
+                      <span className={styles.timelineTime}>
+                        {i === 0 ? "最新" : ""} {new Date(cp.created_at).toLocaleString()}
+                      </span>
+                      <span className={styles.timelineCount}>{cp.message_count} 条消息</span>
+                    </div>
+                    <button
+                      className={styles.confirmDeleteBtn}
+                      data-testid={`timeline-restore-${cp.id}`}
+                      onClick={() => setPendingCheckpointRestore(cp.id)}
+                    >
+                      回退到此
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className={styles.confirmActions}>
+              <button
+                className={styles.confirmCancel}
+                data-testid="timeline-close"
+                onClick={() => setTimelineOpen(false)}
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {pendingCheckpointRestore && (
+        <div className={styles.confirmOverlay} role="dialog" aria-modal="true" aria-label="回退检查点确认" data-testid="timeline-restore-confirm">
+          <div className={styles.confirmDialog}>
+            <h3>回退到检查点</h3>
+            <p>确定要回退吗？当前会话内容将被该检查点的消息替换。建议先确认已暂存需要保留的改动。</p>
+            <div className={styles.confirmActions}>
+              <button
+                className={styles.confirmCancel}
+                data-testid="timeline-restore-cancel"
+                onClick={() => setPendingCheckpointRestore(null)}
+              >
+                取消
+              </button>
+              <button
+                className={styles.confirmDeleteBtn}
+                data-testid="timeline-restore-confirm-btn"
+                onClick={() => {
+                  const id = pendingCheckpointRestore;
+                  setPendingCheckpointRestore(null);
+                  handleCheckpointRestore(id);
+                }}
+              >
+                确认回退
               </button>
             </div>
           </div>

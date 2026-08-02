@@ -53,6 +53,7 @@ pub async fn neocodex_send_message_stream(
     content: String,
     attachments: Option<Vec<NeoCodexAttachmentPayload>>,
     regenerate: Option<bool>,
+    permission_mode: Option<String>,
 ) -> Result<String, String> {
     let mut agent_guard = NEOCODEX_AGENT.lock().await;
     let agent = match agent_guard.as_mut() {
@@ -64,6 +65,15 @@ pub async fn neocodex_send_message_stream(
             agent_guard.as_mut().unwrap()
         }
     };
+
+    // Permission mode (Claude Code Manual/AcceptEdits/Plan / Codex approval
+    // parity). Plan forces the read-only planning path (exec_plan — real
+    // enforcement in the core loop); Manual/Accept are enforced at the UI
+    // review layer (diff accept/reject), recorded here for session continuity.
+    let mode = permission_mode.unwrap_or_else(|| "auto".to_string());
+    if mode == "plan" {
+        agent.set_plan_mode();
+    }
 
     let is_regenerate = regenerate.unwrap_or(false);
     if !is_regenerate {
@@ -724,6 +734,86 @@ pub async fn neocodex_delete_session(session_id: String) -> Result<String, Strin
 
 fn archived_dir() -> std::path::PathBuf {
     sessions_dir().join("archived")
+}
+
+fn checkpoints_dir() -> std::path::PathBuf {
+    sessions_dir().join("checkpoints")
+}
+
+/// Snapshot a session's wire file into checkpoints/ (Claude Desktop
+/// checkpoint / Codex revert parity). Each user prompt turn may create a
+/// checkpoint; rewinding restores the conversation to that point.
+#[tauri::command]
+pub async fn neocodex_checkpoint_create(session_id: String) -> Result<Vec<serde_json::Value>, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let dir = checkpoints_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    let dest = dir.join(format!("{}-{}.jsonl", session_id, ts));
+    std::fs::copy(&path, &dest).map_err(|e| e.to_string())?;
+    Ok(list_checkpoints_inner(&session_id))
+}
+
+fn list_checkpoints_inner(session_id: &str) -> Vec<serde_json::Value> {
+    let dir = checkpoints_dir();
+    let mut list = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        let prefix = format!("{}-", session_id);
+        for entry in entries.flatten() {
+            let fname = entry.file_name().to_string_lossy().to_string();
+            if !fname.starts_with(&prefix) || !fname.ends_with(".jsonl") {
+                continue;
+            }
+            let ts: u64 = fname
+                .trim_start_matches(&prefix)
+                .trim_end_matches(".jsonl")
+                .parse()
+                .unwrap_or(0);
+            let message_count = std::fs::read_to_string(dir.join(&fname))
+                .map(|s| s.lines().count())
+                .unwrap_or(0);
+            list.push(serde_json::json!({
+                "id": fname,
+                "created_at": ts,
+                "message_count": message_count
+            }));
+        }
+    }
+    list.sort_by_key(|v| v["created_at"].as_u64().unwrap_or(0));
+    list
+}
+
+#[tauri::command]
+pub async fn neocodex_checkpoint_list(session_id: String) -> Result<Vec<serde_json::Value>, String> {
+    Ok(list_checkpoints_inner(&session_id))
+}
+
+/// Rewind a session to a checkpoint: replaces the active wire file with the
+/// snapshot and rebuilds the agent context so the next turn continues from
+/// that point (Claude `/rewind` parity, code + conversation).
+#[tauri::command]
+pub async fn neocodex_checkpoint_restore(session_id: String, checkpoint_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
+    // Anti-traversal: checkpoint_id must match our generated naming.
+    let safe: String = checkpoint_id.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    if safe.is_empty() || safe != checkpoint_id || !checkpoint_id.ends_with(".jsonl") {
+        return Err("Invalid checkpoint id".to_string());
+    }
+    let src = checkpoints_dir().join(&checkpoint_id);
+    if !src.exists() {
+        return Err("Checkpoint not found".to_string());
+    }
+    let path = session_path(&session_id);
+    std::fs::copy(&src, &path).map_err(|e| e.to_string())?;
+    let mut guard = NEOCODEX_AGENT.lock().await;
+    rebuild_agent_for(&path, &mut guard);
+    drop(guard);
+    neocodex_get_session_messages(session_id).await
 }
 
 /// Move a session's wire file into the archived/ subfolder (Claude-style

@@ -194,6 +194,28 @@
   cursor: default;
 }
 
+.topBarBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--fg-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.topBarBtn:hover:not(:disabled) {
+  color: var(--fg-primary);
+  border-color: var(--accent, #4f8cff);
+}
+.topBarBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .viewsMenuWrap {
   position: relative;
 }
@@ -632,4 +654,84 @@
   background: var(--danger, #d93025);
   color: #fff;
   border-color: var(--danger, #d93025);
+}
+
+.timelineDialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 420px;
+  width: 92%;
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.timelineDialog h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--fg-primary);
+}
+
+.timelineSub {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg-secondary);
+}
+
+.timelineEmpty {
+  padding: 16px 4px;
+  font-size: 13px;
+  color: var(--fg-secondary);
+  text-align: center;
+}
+
+.timelineList {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.timelineItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+}
+
+.timelineInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.timelineTime {
+  font-size: 13px;
+  color: var(--fg-primary);
+}
+
+.timelineCount {
+  font-size: 11px;
+  color: var(--fg-secondary);
+}
+
+.timelineItem .confirmDeleteBtn {
+  background: transparent;
+  color: var(--accent, #4f8cff);
+  border-color: var(--accent, #4f8cff);
+}
+.timelineItem .confirmDeleteBtn:hover {
+  background: rgba(79, 140, 255, 0.15);
 }

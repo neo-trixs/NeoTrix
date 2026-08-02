@@ -231,3 +231,63 @@ describe("NeoCodexPage destructive delete confirmation", () => {
     await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith({ sessionId: "s-del" }));
   });
 });
+
+describe("NeoCodexPage checkpoint timeline", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: "s-tl" });
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-tl", name: "时间线会话", mode: "Agent", message_count: 4, wire_path: "/repo", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+    mockInvoke("neocodex_checkpoint_list", () => [
+      { id: "s-tl-1000.jsonl", created_at: 1000, message_count: 2 },
+      { id: "s-tl-2000.jsonl", created_at: 2000, message_count: 4 },
+    ]);
+  });
+
+  it("timeline button lists checkpoints for the active session", async () => {
+    mockInvoke("neocodex_checkpoint_list", () => [
+      { id: "s-tl-1000.jsonl", created_at: 1000, message_count: 2 },
+      { id: "s-tl-2000.jsonl", created_at: 2000, message_count: 4 },
+    ]);
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.click(screen.getByTestId("timeline-open"));
+    expect(await screen.findByTestId("timeline-panel")).toBeInTheDocument();
+    expect(screen.getByText("2 条消息")).toBeInTheDocument();
+    expect(screen.getByText("4 条消息")).toBeInTheDocument();
+  });
+
+  it("restore requires a confirm step before calling the backend", async () => {
+    const restoreSpy = vi.fn(() => []);
+    mockInvoke("neocodex_checkpoint_restore", restoreSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.click(screen.getByTestId("timeline-open"));
+    fireEvent.click(await screen.findByTestId("timeline-restore-s-tl-1000.jsonl"));
+    expect(await screen.findByTestId("timeline-restore-confirm")).toBeInTheDocument();
+    expect(restoreSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("timeline-restore-confirm-btn"));
+    await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith({ sessionId: "s-tl", checkpointId: "s-tl-1000.jsonl" }));
+  });
+
+  it("cancel in restore confirm aborts without calling backend", async () => {
+    const restoreSpy = vi.fn(() => []);
+    mockInvoke("neocodex_checkpoint_restore", restoreSpy);
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.click(screen.getByTestId("timeline-open"));
+    fireEvent.click(await screen.findByTestId("timeline-restore-s-tl-1000.jsonl"));
+    fireEvent.click(await screen.findByTestId("timeline-restore-cancel"));
+
+    await waitFor(() => expect(screen.queryByTestId("timeline-restore-confirm")).toBeNull());
+    expect(restoreSpy).not.toHaveBeenCalled();
+  });
+});

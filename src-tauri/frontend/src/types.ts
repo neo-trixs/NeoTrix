@@ -34,9 +34,15 @@ export interface AppSettings {
   maxTokens: number;
   notifyOnComplete: boolean;
   accent: string;
+  permissionMode: PermissionMode;
 }
 
 export type NeoCodexMode = "Agent" | "Shell" | "Plan";
+
+/** Claude Code Manual/AcceptEdits/Plan / Codex approval parity.
+ *  auto: 自主执行（默认）；accept: 自动应用编辑但在 Diff 面板可审阅；
+ *  manual: 每轮编辑后等待人工 per-file 确认；plan: 只读规划。 */
+export type PermissionMode = "auto" | "accept" | "manual" | "plan";
 
 export interface NeoCodexProviderConfig {
   provider_count: number;

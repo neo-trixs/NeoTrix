@@ -66,7 +66,7 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
 
     const calls = await invokeCalls(page);
     expect(calls).toContainEqual(
-      expect.objectContaining({ cmd: "neocodex_send_message_stream", args: { content: "帮我分析 RAG 检索" } })
+      expect.objectContaining({ cmd: "neocodex_send_message_stream", args: { content: "帮我分析 RAG 检索", permission_mode: "auto" } })
     );
   });
 

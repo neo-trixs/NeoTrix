@@ -65,8 +65,7 @@ describe("DiffPane", () => {
     mockInvoke("cmd_diff_file", fileSpy);
     render(<DiffPane />);
     fireEvent.click(screen.getByText("文件"));
-    const input = screen.getByPlaceholderText("文件路径（相对仓库根）");
-    // Typing several chars must NOT trigger an IPC each time.
+    const input = screen.getByPlaceholderText("文件路径（相对仓库根）");    // Typing several chars must NOT trigger an IPC each time.
     fireEvent.change(input, { target: { value: "s" } });
     fireEvent.change(input, { target: { value: "sr" } });
     fireEvent.change(input, { target: { value: "src" } });
@@ -203,5 +202,42 @@ describe("DiffPane", () => {
     fireEvent.click(screen.getByTestId("diff-review"));
     expect(await screen.findByTestId("diff-review-panel")).toBeInTheDocument();
     expect(screen.getByText(/未发现问题/)).toBeInTheDocument();
+  });
+
+  it("per-file accept stages only that file (cmd_diff_stage with path)", async () => {
+    const stageSpy = vi.fn(() => []);
+    mockInvoke("cmd_diff_changed_files", () => ({
+      staged: [],
+      unstaged: [{ status: "M", path: "src/a.rs" }],
+      untracked: [],
+    }));
+    mockInvoke("cmd_diff_stage", stageSpy);
+    render(<DiffPane />);
+    fireEvent.click(await screen.findByTestId("diff-accept-src/a.rs"));
+    await waitFor(() => expect(stageSpy).toHaveBeenCalledWith({ paths: ["src/a.rs"] }));
+  });
+
+  it("per-file reject restores that file (cmd_diff_restore with path)", async () => {
+    const restoreSpy = vi.fn(() => []);
+    mockInvoke("cmd_diff_changed_files", () => ({
+      staged: [],
+      unstaged: [{ status: "M", path: "src/a.rs" }],
+      untracked: [],
+    }));
+    mockInvoke("cmd_diff_restore", restoreSpy);
+    render(<DiffPane />);
+    fireEvent.click(await screen.findByTestId("diff-reject-src/a.rs"));
+    await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith({ paths: ["src/a.rs"] }));
+  });
+
+  it("untracked files only show reject (no accept/stage button)", async () => {
+    mockInvoke("cmd_diff_changed_files", () => ({
+      staged: [],
+      unstaged: [],
+      untracked: [{ status: "??", path: "notes.txt" }],
+    }));
+    render(<DiffPane />);
+    expect(await screen.findByTestId("diff-reject-notes.txt")).toBeInTheDocument();
+    expect(screen.queryByTestId("diff-accept-notes.txt")).toBeNull();
   });
 });

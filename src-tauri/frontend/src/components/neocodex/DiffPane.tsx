@@ -154,6 +154,30 @@ export function DiffPane() {
     }
   };
 
+  // Per-file review (Claude Code Manual / Codex review parity): accept = stage
+  // just this file, reject = discard just this file's working-tree changes.
+  const handleStageFile = async (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setError("");
+    try {
+      await invoke("cmd_diff_stage", { paths: [path] });
+      await loadFiles();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleRejectFile = async (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setError("");
+    try {
+      await invoke("cmd_diff_restore", { paths: [path] });
+      await loadFiles();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
   const handleCommit = async () => {
     if (!commitMsg.trim()) return;
     setCommitting(true);
@@ -198,15 +222,14 @@ export function DiffPane() {
     }
   };
 
-  const renderFileGroup = (title: string, files: ChangedFile[]) => {
+  const renderFileGroup = (title: string, files: ChangedFile[], bucket: "staged" | "unstaged" | "untracked") => {
     if (files.length === 0) return null;
     return (
       <div className={styles.fileGroup}>
         <div className={styles.fileGroupTitle}>{title} ({files.length})</div>
         {files.map((f) => (
-          <button
+          <div
             key={f.path}
-            type="button"
             className={`${styles.fileItem} ${activeFile === f.path ? styles.fileItemActive : ""}`}
             onClick={() => selectFile(f.path)}
             title={f.path}
@@ -214,7 +237,42 @@ export function DiffPane() {
           >
             <span className={styles.fileStatus} data-status={f.status.trim()}>{statusLabel(f.status)}</span>
             <span className={styles.filePath}>{f.path}</span>
-          </button>
+            <span className={styles.fileActions}>
+              {bucket === "unstaged" && (
+                <button
+                  type="button"
+                  className={styles.fileAccept}
+                  onClick={(e) => handleStageFile(f.path, e)}
+                  title="接受此文件改动 (stage)"
+                  data-testid={`diff-accept-${f.path}`}
+                >
+                  ✓
+                </button>
+              )}
+              {bucket !== "untracked" && bucket === "staged" && (
+                <button
+                  type="button"
+                  className={styles.fileReject}
+                  onClick={(e) => { e.stopPropagation(); handleUnstage(); }}
+                  title="取消暂存此文件"
+                  data-testid={`diff-unstage-${f.path}`}
+                >
+                  ↩
+                </button>
+              )}
+              {(bucket === "unstaged" || bucket === "untracked") && (
+                <button
+                  type="button"
+                  className={styles.fileReject}
+                  onClick={(e) => handleRejectFile(f.path, e)}
+                  title="拒绝此文件改动 (restore)"
+                  data-testid={`diff-reject-${f.path}`}
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          </div>
         ))}
       </div>
     );
@@ -241,9 +299,9 @@ export function DiffPane() {
       </div>
       <div className={styles.split}>
         <div className={styles.fileList}>
-          {renderFileGroup("已暂存", changedFiles.staged)}
-          {renderFileGroup("未暂存", changedFiles.unstaged)}
-          {renderFileGroup("未跟踪", changedFiles.untracked)}
+          {renderFileGroup("已暂存", changedFiles.staged, "staged")}
+          {renderFileGroup("未暂存", changedFiles.unstaged, "unstaged")}
+          {renderFileGroup("未跟踪", changedFiles.untracked, "untracked")}
           {changedFiles.staged.length === 0 && changedFiles.unstaged.length === 0 && changedFiles.untracked.length === 0 && (
             <div className={styles.fileEmpty}>无改动文件</div>
           )}

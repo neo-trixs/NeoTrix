@@ -134,6 +134,30 @@ pub fn cmd_diff_unstage(paths: Option<Vec<String>>) -> Result<Vec<String>, NeoTr
     changed_files_porcelain()
 }
 
+/// Discard working-tree changes for the given paths (per-file "reject" in the
+/// diff review UI, Claude Code Manual / Codex review parity). Untracked files
+/// are removed; tracked files are restored to HEAD. Returns the updated
+/// porcelain changed-file list.
+#[command]
+pub fn cmd_diff_restore(paths: Vec<String>) -> Result<Vec<String>, NeoTrixError> {
+    if paths.is_empty() {
+        return Err(NeoTrixError::Memory("no paths to restore".into()));
+    }
+    for p in &paths {
+        // Untracked (??) files have no HEAD entry; remove them outright.
+        let porcelain = run_git_cmd(&["status", "--porcelain", "--", p])?;
+        let untracked = porcelain.lines().any(|l| l.starts_with("??"));
+        if untracked {
+            let _ = std::fs::remove_file(p);
+            continue;
+        }
+        let mut args: Vec<&str> = vec!["restore", "--worktree", "--"];
+        args.extend(vec![p.as_str()]);
+        run_git_cmd(&args)?;
+    }
+    changed_files_porcelain()
+}
+
 /// Commit staged changes with the given message (Codex "Review changes" parity).
 #[command]
 pub fn cmd_diff_commit(message: String) -> Result<(), NeoTrixError> {

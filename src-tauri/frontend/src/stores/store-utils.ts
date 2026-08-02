@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxTokens: 8192,
   notifyOnComplete: true,
   accent: "default",
+  permissionMode: "auto",
 };
 
 export const savedSettings = persistence.loadSettings();
