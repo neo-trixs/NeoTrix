@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::collections::BTreeMap;
 
 use crate::core::l7_capability::nt_core_antidistil::AntiDistillationSystem;
 use crate::core::nt_core_bank::ReasoningBank;
@@ -12,6 +13,7 @@ use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, Syn
 use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
 use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::core::nt_core_e8::nt_latent_reasoning::LatentReasoningPipeline;
+use crate::core::nt_core_e8::nt_multimodal::{MultimodalEncoder, MultimodalInput};
 use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
 use crate::core::nt_core_prm::ProcessRewardLearner;
@@ -149,6 +151,9 @@ pub struct ReasoningEngine {
     /// Phase 10.2 — end-to-end latent reasoning: E8 latent → hypercube query →
     /// GWT broadcast with no intermediate text.
     pub latent_reasoning: LatentReasoningPipeline,
+    /// Phase 10.3 — multimodal unified reasoning: text+image+audio encoders →
+    /// unified latent space → cross-modal fusion driving the E8 loop.
+    pub multimodal: MultimodalEncoder,
 }
 
 impl ReasoningEngine {
@@ -206,6 +211,7 @@ impl ReasoningEngine {
             sparse_moe: SparseMoERouter::new(),
             unified_latent: UnifiedLatentSpace::new(),
             latent_reasoning: LatentReasoningPipeline::new(),
+            multimodal: MultimodalEncoder::new(),
         }
     }
 
@@ -795,6 +801,40 @@ impl ReasoningEngine {
                         AttributeValue::Float(self.latent_reasoning.fill_ratio()),
                     );
                     self.gwt.as_mut().map(|g| g.set_e8_attention_weights(latent_weights, latent_bias));
+                }
+
+                // Phase 10.3 — multimodal fusion: encode the task as text (the
+                // available modality in the reasoning loop) into the unified
+                // latent space, route via GWT modal attention, and fuse.
+                let multi_input = MultimodalInput::text(task);
+                let multi_embeds = self.multimodal.encode_all(&multi_input);
+                if !multi_embeds.is_empty() {
+                    let router_weights: BTreeMap<crate::core::nt_core_gwt::modality_router::Modality, f64> = {
+                        let mut m = BTreeMap::new();
+                        if let Some(g) = &self.gwt {
+                            for mod_i in crate::core::nt_core_gwt::modality_router::Modality::ALL {
+                                m.insert(mod_i, g.modality_router.weight_of(mod_i));
+                            }
+                        } else {
+                            m.insert(crate::core::nt_core_gwt::modality_router::Modality::Text, 1.0);
+                        }
+                        m
+                    };
+                    let (fused, weights) = self.multimodal.fuse(&router_weights, &multi_embeds);
+                    let fused_mode = self.multimodal.to_e8_mode(&fused);
+                    root_span.set_attribute(
+                        "multimodal_fused_mode",
+                        AttributeValue::Int(fused_mode as i64),
+                    );
+                    root_span.set_attribute(
+                        "multimodal_active_modalities",
+                        AttributeValue::Int(weights.len() as i64),
+                    );
+                    self.latent_reasoning.record(
+                        crate::core::nt_core_hex::ReasoningHexagram::new(fused_mode),
+                        self.last_e8_confidence,
+                        "multimodal",
+                    );
                 }
             }
         }

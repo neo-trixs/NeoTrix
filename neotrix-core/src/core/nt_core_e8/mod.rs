@@ -21,6 +21,7 @@ pub mod nt_core_trajectory_prm;
 pub mod sparse_moe;
 pub mod unified_latent;
 pub mod nt_latent_reasoning;
+pub mod nt_multimodal;
 pub mod state_machine;
 pub mod thinking_budget;
 pub mod trace_compression;
@@ -34,6 +35,7 @@ pub use nt_latent_reasoning::{
     LatentReasoningPipeline, LatentRetrieval, LatentEpisodicEntry,
     LATENT_MEMORY_SIZE, TOP_K_NEIGHBORS,
 };
+pub use nt_multimodal::{MultimodalEncoder, MultimodalInput, TEXT_EMBED_DIM};
 
 #[cfg(test)]
 use std::collections::HashSet;
