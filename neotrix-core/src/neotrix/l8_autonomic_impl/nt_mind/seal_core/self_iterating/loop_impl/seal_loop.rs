@@ -365,6 +365,24 @@ impl SelfIteratingBrain {
             log::trace!("[RDR] depth={} steps={} base={:.4} bonus={:.4} final={:.4} progress={:.4}",
                 report.depth, report.total_steps, report.base_reward,
                 report.bonus, report.final_reward, report.progress);
+            // ── Phase 9.2 SelfModel: dynamic self-estimate + intrinsic reward ──
+            // Workspace signal = normalized current reward (0..1), load = how many
+            // steps this iteration consumed, meta alarms = consciousness quality.
+            // The self-model error (estimate vs observed) blends an intrinsic
+            // correction into the transition-learning reward.
+            {
+                let ws_signal = reward.clamp(0.0, 1.0);
+                let load_delta = (total_steps as f64 / 64.0).clamp(0.0, 1.0);
+                let meta_alarm = if self._last_consciousness_quality < 0.5 { 1 } else { 0 };
+                let st = self.self_model.tick(ws_signal, load_delta, meta_alarm);
+                let intrinsic = self.self_model.self_reward();
+                // Self-error penalty: scale relative to the reward magnitude.
+                reward = reward + 0.1 * intrinsic;
+                log::trace!(
+                    "[SelfModel] capability={:.3} uncertainty={:.3} fatigue={:.3} error={:.3} intrinsic={:+.3}",
+                    st.capability, st.uncertainty, st.fatigue, st.self_error, intrinsic
+                );
+            }
             // Record outcome in the E8 transition learner for policy evolution.
             // Previously the E8TransitionLearner was constructed (self._transition_learner)
             // and its select_mode() / record() methods were used by DpSgdStage and

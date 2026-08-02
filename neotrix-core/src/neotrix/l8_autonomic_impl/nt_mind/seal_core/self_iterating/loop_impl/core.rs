@@ -119,6 +119,10 @@ pub struct SelfIteratingBrain {
     pub(crate) _last_consciousness_quality: f64,
     /// Total consciousness critiques received
     pub(crate) _consciousness_critique_count: u64,
+    /// Phase 9.2 — dynamic self-model: continuous estimate of capability,
+    /// uncertainty, and fatigue; its prediction error is the intrinsic
+    /// self-reward blended into transition learning.
+    pub self_model: crate::core::nt_core_self::SelfModel,
     /// Plugin Element registry (Phase 1): lifecycle-managed capability/memory/skill elements.
     pub element_registry: ElementRegistry,
 }
@@ -212,6 +216,7 @@ impl SelfIteratingBrain {
             )),
             _last_consciousness_quality: 0.0,
             _consciousness_critique_count: 0,
+            self_model: crate::core::nt_core_self::SelfModel::new(),
             element_registry: Self::build_element_registry(),
         }
     }
