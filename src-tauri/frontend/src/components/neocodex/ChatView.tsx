@@ -921,16 +921,20 @@ function MessageBubble({
             </button>
             {message.role === "user" && (
               <>
+                {message.id != null && (
                 <button className={styles.actionIcon} onClick={() => { setEditVal(message.content); setEditing(true); }} title="编辑" aria-label="编辑">
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M10 2l2 2-8 8H4v-2l6-6z" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </button>
-                <button className={styles.actionIcon} onClick={() => onDelete?.(message.id ?? index)} title="删除" aria-label="删除">
+                )}
+                {message.id != null && (
+                <button className={styles.actionIcon} onClick={() => onDelete?.(message.id as number)} title="删除" aria-label="删除">
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M2 4h10M5 4V2h4v2M4 4l1 8h4l1-8" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </button>
+                )}
               </>
             )}
             {message.role === "assistant" && !agentBusy && !isStreaming && onRegenerate && (

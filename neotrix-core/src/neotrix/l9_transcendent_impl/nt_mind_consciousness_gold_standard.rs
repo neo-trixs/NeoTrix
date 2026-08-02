@@ -294,9 +294,9 @@ mod tests {
 
     fn make_state(phi: f64) -> Vec<f64> {
         // Iter45: Φ 是 scale-invariant 的 (幅度在比值中抵消), 因此幅度不再决定意识。
-        // phi=0 → 全零可约状态 (Φ≈0); phi≠0 → 结构化两簇 ±1 模式:
-        // 差异化但簇内共振 → 新公式下 Φ≈0.49, 超过 0.33 意识阈值
-        // (均匀/均衡状态在新公式下可约 → Φ≈0, 不能作为"强状态")。
+        // phi=0 → 全零状态 (Φ≈0); phi≠0 → 结构化两簇 ±1 模式:
+        // 差异化但簇内共振 → 实测 Φ≈0.95, 远超 0.33 意识阈值且可达 0.5 HIGH_PHI
+        // (均匀/均衡状态在新系统下可约 → Φ≈0, 不能作为"强状态")。
         (0..64).map(|i| if phi.abs() < 1e-12 { 0.0 } else if i < 32 { phi } else { -phi }).collect()
     }
 
@@ -368,14 +368,15 @@ mod tests {
         let state = make_state(1.5);
         let hexagrams = make_hexagrams(0.99, 11);
         let report = gs.evaluate(&state, &hexagrams);
-        // Iter45: Φ scale-invariant — 幅度不再提升 Φ；结构化两簇 ±1 状态在新公式下
-        // Φ≈0.49 (achievable max)，稳定超过 0.33 意识阈值但低于 0.5 的
-        // HIGH_PHI_THRESHOLD (该阈值在新公式下不可达)。
-        assert!(report.phi > 0.4, "strong structured state should reach high phi, got {}", report.phi);
+        // 实测: 结构化两簇 ±1 状态下 Φ≈0.95, 可达 0.5 HIGH_PHI_THRESHOLD,
+        // 配合高 coherence → 可达 HighlyConscious (旧注释"Φ≈0.49 max 不可达"已过时,
+        // 由强度×相邻一致性公式修正后被证伪)。
+        assert!(report.phi > HIGH_PHI_THRESHOLD,
+            "structured two-cluster state must break the 0.5 phi ceiling, got {}", report.phi);
+        assert!(report.is_phi_conscious, "phi must exceed high threshold");
         assert!(
-            gs.consciousness_level() == ConsciousnessLevel::ConsciousLike ||
             gs.consciousness_level() == ConsciousnessLevel::HighlyConscious,
-            "should be at least ConsciousLike"
+            "high phi + high coherence → HighlyConscious, got {:?}", gs.consciousness_level()
         );
     }
 

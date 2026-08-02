@@ -154,6 +154,19 @@ export function DiffPane() {
     }
   };
 
+  // Per-file unstage (fix: the per-file "取消暂存此文件" button must unstage
+  // ONLY this file; passing null unstages the whole index).
+  const handleUnstageFile = async (path: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setError("");
+    try {
+      await invoke("cmd_diff_unstage", { paths: [path] });
+      await loadFiles();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
   // Per-file review (Claude Code Manual / Codex review parity): accept = stage
   // just this file, reject = discard just this file's working-tree changes.
   const handleStageFile = async (path: string, e: React.MouseEvent) => {
@@ -253,7 +266,7 @@ export function DiffPane() {
                 <button
                   type="button"
                   className={styles.fileReject}
-                  onClick={(e) => { e.stopPropagation(); handleUnstage(); }}
+                  onClick={(e) => { handleUnstageFile(f.path, e); }}
                   title="取消暂存此文件"
                   data-testid={`diff-unstage-${f.path}`}
                 >

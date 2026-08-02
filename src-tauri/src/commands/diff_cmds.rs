@@ -151,9 +151,11 @@ pub fn cmd_diff_restore(paths: Vec<String>) -> Result<Vec<String>, NeoTrixError>
             let _ = std::fs::remove_file(p);
             continue;
         }
-        let mut args: Vec<&str> = vec!["restore", "--worktree", "--"];
-        args.extend(vec![p.as_str()]);
-        run_git_cmd(&args)?;
+        // Restore to HEAD (not `--worktree` alone, which restores from the
+        // INDEX and leaves staged changes behind — an accept/reject reject
+        // must fully discard the change). `--staged --worktree --source=HEAD`
+        // resets both the index and the working tree to HEAD semantics.
+        run_git_cmd(&["restore", "--staged", "--worktree", "--source=HEAD", "--", p])?;
     }
     changed_files_porcelain()
 }

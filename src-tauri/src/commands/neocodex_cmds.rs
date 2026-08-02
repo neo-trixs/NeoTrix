@@ -124,6 +124,20 @@ pub async fn neocodex_send_message_stream(
     agent.context.push("assistant", answer.clone(), est2);
     agent.state.tokens_used += est2;
 
+    // Auto-checkpoint after each complete turn (Claude Desktop checkpoint /
+    // Codex revert parity). Skip regenerate turns — those truncate the wire
+    // and re-snapshot the same state; snapshot only fresh user turns.
+    if !is_regenerate {
+        let sess = agent.wire.path
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default();
+        if !sess.is_empty() {
+            snapshot_checkpoint(&agent.wire.path, &sess);
+        }
+    }
+
     let _ = app.emit("neocodex_stream_end", answer.clone());
 
     // Engineering gap: surface completion (or cancellation) via the OS
@@ -183,6 +197,7 @@ pub async fn neocodex_health_report() -> Result<NeoCodexHealthReport, String> {
             event_bus_attached: false,
             evolution_iterations: 0,
             tool_grounding_degraded: false,
+            node_snapshots: Vec::new(),
         }),
     }
 }
@@ -554,7 +569,10 @@ pub async fn neocodex_regenerate(session_id: String, index: usize) -> Result<Vec
     let target = *visible.get(index).ok_or_else(|| "message not found".to_string())?;
     // Remove from the target onward: an assistant reply (and any tool/system
     // events produced while generating it) is discarded; the user message stays.
-    events.truncate(target + 1);
+    // `truncate(target)` (not target+1) — truncate keeps [0..target), so the
+    // assistant message at `target` and everything after it are discarded,
+    // otherwise the stale reply persists in the wire and a re-send duplicates it.
+    events.truncate(target);
     write_wire_events(&path, &events)?;
     let mut guard = NEOCODEX_AGENT.lock().await;
     rebuild_agent_for(&path, &mut guard);
@@ -749,7 +767,11 @@ pub async fn neocodex_switch_session(session_id: String) -> Result<String, Strin
         }
     };
     agent.wire.path = path.clone();
-    let count = agent.resume_session();
+    // Fix cross-session context bleed: switching must clear the prior
+    // session's in-memory context/tokens (rebuild clears) else A's turns leak
+    // into B. `resume_session` only appends; `rebuild_context_from_wire`
+    // clears then restores.
+    let count = agent.rebuild_context_from_wire();
     Ok(format!("Switched to session {} (restored {} events)", session_id, count))
 }
 
@@ -792,6 +814,24 @@ pub async fn neocodex_checkpoint_create(session_id: String) -> Result<Vec<serde_
     let dest = dir.join(format!("{}-{}.jsonl", session_id, ts));
     std::fs::copy(&path, &dest).map_err(|e| e.to_string())?;
     Ok(list_checkpoints_inner(&session_id))
+}
+
+/// Non-locking snapshot of an in-memory-only wire path. Used by
+/// `neocodex_send_message_stream` (which already holds the agent lock) to
+/// auto-create a checkpoint after each non-regenerate turn — this is what
+/// makes the timeline's "每次发送消息会自动创建" claim true.
+fn snapshot_checkpoint(path: &std::path::Path, session_id: &str) {
+    if !path.exists() {
+        return;
+    }
+    let dir = checkpoints_dir();
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+    let dest = dir.join(format!("{}-{}.jsonl", session_id, ts));
+    let _ = std::fs::copy(path, &dest);
 }
 
 fn list_checkpoints_inner(session_id: &str) -> Vec<serde_json::Value> {
