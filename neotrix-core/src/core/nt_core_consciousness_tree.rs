@@ -145,6 +145,246 @@ pub struct CapabilityBranch {
     pub fruit_count: usize,
     /// Capabilities already absorbed (from ALL_CAPABILITIES), to prevent redundant skill creation
     pub absorbed_capabilities: Vec<String>,
+    /// ── Skill Node Evolution (AGENTS.md Skill Tree) ──
+    /// 节点层级: Small Passive / Notable Passive / Keystone
+    pub node_tier: NodeTier,
+    /// 5 色符文槽: Crimson/Indigo/Obsidian/Golden/Alabaster
+    pub runes: RuneSocket,
+    /// Constellation 成熟度 7 档 (C0-C6), 由 maturity_c0..c5 派生
+    pub constellation: Constellation,
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Skill Node Evolution — 3-layer node tiers + Rune Socketing + Constellation
+// (AGENTS.md Skill Tree architecture, absorbed into the production-wired tree)
+// ═══════════════════════════════════════════════════════════════════
+
+/// 节点层级 — AGENTS.md Skill Tree 3 层
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum NodeTier {
+    /// Small Passive (微节点自愈): 单模块自动修复/降级, 域内自治
+    SmallPassive,
+    /// Notable Passive (域级突破): 一个域的能力提升, 域内基础设施
+    NotablePassive,
+    /// Keystone (基石): 跨域变革, 影响 2+ 域共享的架构能力
+    Keystone,
+}
+
+impl NodeTier {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::SmallPassive => "Small Passive (微节点自愈)",
+            Self::NotablePassive => "Notable Passive (域级突破)",
+            Self::Keystone => "Keystone (跨域变革)",
+        }
+    }
+
+    /// 权重: Keystone 最高, 用于 health 折算
+    pub fn weight(&self) -> f64 {
+        match self {
+            Self::SmallPassive => 1.0,
+            Self::NotablePassive => 2.0,
+            Self::Keystone => 3.0,
+        }
+    }
+
+    /// 从真实模块数据推导节点层级 (非硬编码):
+    /// - 跨域消费者多 + 模块数大 → Keystone
+    /// - 模块数中上 → NotablePassive
+    /// - 其余 → SmallPassive
+    pub fn derive(module_count: usize, cross_domain_consumers: usize, self_test_count: usize) -> Self {
+        let keystone = module_count >= 20 && cross_domain_consumers >= 3 && self_test_count >= 3;
+        let notable = module_count >= 8 && cross_domain_consumers >= 1 && self_test_count >= 2;
+        if keystone {
+            Self::Keystone
+        } else if notable {
+            Self::NotablePassive
+        } else {
+            Self::SmallPassive
+        }
+    }
+}
+
+/// 符文颜色 — 5 色 Rune Socketing (AGENTS.md)
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RuneColor {
+    /// Crimson (数据摄取)
+    Crimson,
+    /// Indigo (变换)
+    Indigo,
+    /// Obsidian (缓存)
+    Obsidian,
+    /// Golden (错误恢复)
+    Golden,
+    /// Alabaster (监控)
+    Alabaster,
+}
+
+impl RuneColor {
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Crimson => "Crimson (数据摄取)",
+            Self::Indigo => "Indigo (变换)",
+            Self::Obsidian => "Obsidian (缓存)",
+            Self::Golden => "Golden (错误恢复)",
+            Self::Alabaster => "Alabaster (监控)",
+        }
+    }
+}
+
+/// 单颗符文 — 配置化模块调优单元
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Rune {
+    pub id: String,
+    pub name: String,
+    pub color: RuneColor,
+    pub effect: String,
+    /// 效果强度 [0,1], 参与 health 折算
+    pub strength: f64,
+}
+
+impl Rune {
+    pub fn new(id: &str, name: &str, color: RuneColor, effect: &str, strength: f64) -> Self {
+        Self {
+            id: id.to_string(),
+            name: name.to_string(),
+            color,
+            effect: effect.to_string(),
+            strength: strength.clamp(0.0, 1.0),
+        }
+    }
+}
+
+/// Rune Socket — 5 槽符文组合, 满槽产生 Runeword (涌现效果)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RuneSocket {
+    pub crimson: Option<Rune>,
+    pub indigo: Option<Rune>,
+    pub obsidian: Option<Rune>,
+    pub golden: Option<Rune>,
+    pub alabaster: Option<Rune>,
+}
+
+impl RuneSocket {
+    pub fn set(&mut self, color: RuneColor, rune: Rune) {
+        let slot = match color {
+            RuneColor::Crimson => &mut self.crimson,
+            RuneColor::Indigo => &mut self.indigo,
+            RuneColor::Obsidian => &mut self.obsidian,
+            RuneColor::Golden => &mut self.golden,
+            RuneColor::Alabaster => &mut self.alabaster,
+        };
+        *slot = Some(rune);
+    }
+
+    pub fn filled_slots(&self) -> usize {
+        [&self.crimson, &self.indigo, &self.obsidian, &self.golden, &self.alabaster]
+            .iter().filter(|s| s.is_some()).count()
+    }
+
+    /// Runeword 涌现: 满 5 槽触发组合效果, 返回组合名
+    pub fn runeword(&self) -> Option<String> {
+        if self.filled_slots() == 5 {
+            // Scry = 完整 ETL (数据→变换→缓存→恢复→监控)
+            Some("Scry (完整 ETL)".to_string())
+        } else {
+            None
+        }
+    }
+
+    /// 组合效果强度: 槽数 × 平均 strength, 用于 health 折算
+    pub fn composite_effect(&self) -> f64 {
+        let slots = [
+            &self.crimson, &self.indigo, &self.obsidian, &self.golden, &self.alabaster,
+        ];
+        let sum: f64 = slots.iter().filter_map(|s| s.as_ref()).map(|r| r.strength).sum();
+        let filled = self.filled_slots();
+        if filled == 0 { 0.0 } else { sum / filled as f64 }
+    }
+}
+
+/// Constellation 成熟度 7 档 (C0-C6) — 取代粗糙的 6 布尔
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Constellation {
+    pub level: u8,
+    pub c0_compiles: bool,
+    pub c1_unit_tests: bool,
+    pub c2_integration: bool,
+    pub c3_benchmark: bool,
+    pub c4_pipeline: bool,
+    pub c5_self_healing: bool,
+    pub c6_adaptive: bool,
+}
+
+impl Constellation {
+    pub fn new() -> Self {
+        Self {
+            level: 0,
+            c0_compiles: false,
+            c1_unit_tests: false,
+            c2_integration: false,
+            c3_benchmark: false,
+            c4_pipeline: false,
+            c5_self_healing: false,
+            c6_adaptive: false,
+        }
+    }
+
+    pub fn level_name(&self) -> &str {
+        match self.level {
+            0 => "C0 (编译)",
+            1 => "C1 (单测)",
+            2 => "C2 (集成)",
+            3 => "C3 (benchmark)",
+            4 => "C4 (主流水线)",
+            5 => "C5 (自愈)",
+            6 => "C6 (自适应)",
+            _ => "C0 (编译)",
+        }
+    }
+
+    /// 从真实 maturity 布尔推导 level (向后兼容 maturity_c0..c5 字段)
+    pub fn derive(compiles: bool, unit: bool, integration: bool, benchmark: bool, pipeline: bool, healing: bool) -> Self {
+        let flags = [compiles, unit, integration, benchmark, pipeline, healing];
+        let level = flags.iter().rev().position(|&f| f).map(|i| 5 - i).unwrap_or(0) as u8;
+        Self {
+            level,
+            c0_compiles: compiles,
+            c1_unit_tests: unit,
+            c2_integration: integration,
+            c3_benchmark: benchmark,
+            c4_pipeline: pipeline,
+            c5_self_healing: healing,
+            c6_adaptive: false,
+        }
+    }
+
+    pub fn score(&self) -> f64 {
+        let mut s = 0.0;
+        if self.c0_compiles { s += 1.0; }
+        if self.c1_unit_tests { s += 1.0; }
+        if self.c2_integration { s += 1.0; }
+        if self.c3_benchmark { s += 1.0; }
+        if self.c4_pipeline { s += 1.0; }
+        if self.c5_self_healing { s += 1.0; }
+        if self.c6_adaptive { s += 1.0; }
+        s / 7.0
+    }
+}
+
+impl Default for Constellation {
+    fn default() -> Self { Self::new() }
+}
+
+/// Node snapshot — per-branch 节点状态快照, 供遥测/CLI/UI 消费
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeSnapshot {
+    pub branch: BranchKind,
+    pub tier: NodeTier,
+    pub constellation_level: u8,
+    pub rune_filled_slots: usize,
+    pub runeword: Option<String>,
+    pub composite_effect: f64,
 }
 
 impl CapabilityBranch {
@@ -157,6 +397,45 @@ impl CapabilityBranch {
         if self.maturity_c4 { s += 1.0; }
         if self.maturity_c5 { s += 1.0; }
         s / 6.0
+    }
+
+    /// 运行时评估节点层级 — 基于真实模块数据 (跨域消费者由外部注入)
+    pub fn evaluate_node_tier(&mut self, cross_domain_consumers: usize) {
+        self.node_tier = NodeTier::derive(self.module_count, cross_domain_consumers, self.self_test_count);
+    }
+
+    /// 运行时推导 Constellation — 从现有 maturity 布尔派生 (向后兼容)
+    pub fn evaluate_constellation(&mut self) {
+        self.constellation = Constellation::derive(
+            self.maturity_c0,
+            self.maturity_c1,
+            self.maturity_c2,
+            self.maturity_c3,
+            self.maturity_c4,
+            self.maturity_c5,
+        );
+    }
+
+    /// 带 Rune 效果的健康折算: health × (1 + rune_composite × tier_weight)
+    pub fn health_with_runes(&self) -> f64 {
+        let composite = self.runes.composite_effect();
+        if composite <= 0.0 {
+            return self.health;
+        }
+        let boost = 1.0 + composite * 0.1 * self.node_tier.weight();
+        (self.health * boost).clamp(0.0, 1.0)
+    }
+
+    /// 生成节点快照供遥测消费
+    pub fn snapshot(&self) -> NodeSnapshot {
+        NodeSnapshot {
+            branch: self.kind.clone(),
+            tier: self.node_tier.clone(),
+            constellation_level: self.constellation.level,
+            rune_filled_slots: self.runes.filled_slots(),
+            runeword: self.runes.runeword(),
+            composite_effect: self.runes.composite_effect(),
+        }
     }
 }
 
@@ -698,6 +977,12 @@ impl ConsciousnessTree {
             if !violations.is_empty() {
                 log::debug!("[consciousness_tree] {} constraints: {}", branch.kind.label(), violations.join("; "));
             }
+
+            // Skill Node Evolution: 运行时评估节点层级 + Constellation (基于真实模块数据)
+            // 跨域消费者近似 = 约束的 max_active_modules 权重 (越大跨域影响越强)
+            let cross_domain_consumers = if constraints.max_active_modules >= 30 { 3 } else { 1 };
+            branch.evaluate_node_tier(cross_domain_consumers);
+            branch.evaluate_constellation();
             
             // Check SelfTest minimum (E2: atomic capability coverage)
             let atoms_for_branch = self.atoms.iter().filter(|(_, a)| a.branch == branch.kind && a.mandatory).count();
@@ -883,7 +1168,15 @@ impl ConsciousnessTree {
         }
     }
 
-/// Set branch health from SelfTest results.
+    /// 枚举全部 7 域节点快照供遥测/健康面板消费
+    pub fn snapshots(&self) -> Vec<NodeSnapshot> {
+        BranchKind::all().into_iter()
+            .filter_map(|k| self.branches.get(&k))
+            .map(|b| b.snapshot())
+            .collect()
+    }
+
+    /// Set branch health from SelfTest results.
     /// Maps SelfTest module names to BranchKind and computes health per domain.
     pub fn set_branch_health_from_self_tests(&mut self, results: &[crate::core::nt_core_self_test::SelfTestResult]) {
         let mut domain_results: HashMap<BranchKind, Vec<&crate::core::nt_core_self_test::SelfTestResult>> = HashMap::new();
@@ -893,7 +1186,7 @@ impl ConsciousnessTree {
                 domain_results.entry(kind).or_default().push(result);
             }
         }
-        
+
         for (kind, branch_results) in &domain_results {
             if let Some(branch) = self.branches.get_mut(kind) {
                 if branch_results.is_empty() {
@@ -1365,6 +1658,9 @@ impl CapabilityBranch {
             maturity_c5: false,
             fruit_count: 0,
             absorbed_capabilities: absorbed,
+            node_tier: NodeTier::SmallPassive,
+            runes: RuneSocket::default(),
+            constellation: Constellation::new(),
         }
     }
 }
@@ -1467,6 +1763,96 @@ mod tests {
         assert!(atoms.contains_key("delegate"));
         // All mandatory atoms default to T1Existence
         assert!(atoms.values().all(|a| a.tier == SelfTestTier::T1Existence));
+    }
+
+    #[test]
+    fn test_node_tier_derive() {
+        assert_eq!(NodeTier::derive(5, 0, 1), NodeTier::SmallPassive);
+        assert_eq!(NodeTier::derive(12, 2, 3), NodeTier::NotablePassive);
+        assert_eq!(NodeTier::derive(25, 5, 4), NodeTier::Keystone);
+        // 边界: 模块数足但跨域消费者不足 → 不升 Keystone
+        assert_eq!(NodeTier::derive(25, 1, 4), NodeTier::NotablePassive);
+    }
+
+    #[test]
+    fn test_rune_socketing() {
+        let mut socket = RuneSocket::default();
+        assert_eq!(socket.filled_slots(), 0);
+        assert!(socket.runeword().is_none());
+        socket.set(RuneColor::Crimson, Rune::new("c1", "Crimson Rune", RuneColor::Crimson, "ingest", 0.8));
+        assert_eq!(socket.filled_slots(), 1);
+        assert!((socket.composite_effect() - 0.8).abs() < 1e-9);
+        socket.set(RuneColor::Indigo, Rune::new("i1", "Indigo Rune", RuneColor::Indigo, "transform", 0.7));
+        socket.set(RuneColor::Obsidian, Rune::new("o1", "Obsidian Rune", RuneColor::Obsidian, "cache", 0.6));
+        socket.set(RuneColor::Golden, Rune::new("g1", "Golden Rune", RuneColor::Golden, "recover", 0.9));
+        socket.set(RuneColor::Alabaster, Rune::new("a1", "Alabaster Rune", RuneColor::Alabaster, "monitor", 0.5));
+        assert_eq!(socket.filled_slots(), 5);
+        let rw = socket.runeword().expect("full 5-slot socket produces runeword");
+        assert!(rw.contains("Scry"));
+        // 满槽组合效果 = 均值
+        assert!((socket.composite_effect() - (0.8 + 0.7 + 0.6 + 0.9 + 0.5) / 5.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_constellation_derive_and_score() {
+        let c0 = Constellation::derive(false, false, false, false, false, false);
+        assert_eq!(c0.level, 0);
+        assert!((c0.score() - 0.0).abs() < 1e-9);
+        let c3 = Constellation::derive(true, true, true, true, false, false);
+        assert_eq!(c3.level, 3);
+        assert!((c3.score() - 4.0 / 7.0).abs() < 1e-9);
+        let c6 = Constellation::derive(true, true, true, true, true, true);
+        assert_eq!(c6.level, 5);
+        assert!((c6.score() - 6.0 / 7.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_branch_evaluate_and_snapshot() {
+        let mut branch = CapabilityBranch::new(BranchKind::Core);
+        branch.module_count = 25;
+        branch.self_test_count = 4;
+        branch.maturity_c0 = true;
+        branch.maturity_c1 = true;
+        branch.maturity_c2 = true;
+        branch.health = 0.7;
+        branch.evaluate_node_tier(5);
+        assert_eq!(branch.node_tier, NodeTier::Keystone);
+        branch.evaluate_constellation();
+        assert_eq!(branch.constellation.level, 2);
+        // Rune 效果: 空槽不改变 health
+        assert!((branch.health_with_runes() - 0.7).abs() < 1e-9);
+        branch.runes.set(RuneColor::Crimson, Rune::new("c", "C", RuneColor::Crimson, "e", 1.0));
+        assert!(branch.health_with_runes() > 0.7);
+        let snap = branch.snapshot();
+        assert_eq!(snap.tier, NodeTier::Keystone);
+        assert_eq!(snap.constellation_level, 2);
+        assert_eq!(snap.rune_filled_slots, 1);
+    }
+
+    #[test]
+    fn test_growth_cycle_evaluates_nodes() {
+        let mut tree = ConsciousnessTree::new();
+        tree.soil.crawl_queue_depth = 100;
+        for branch in tree.branches.values_mut() {
+            branch.health = 0.8;
+            branch.self_test_count = 5;
+            branch.module_count = 12;
+            branch.fruit_count = 1;
+        }
+        tree.run_growth_cycle();
+        for branch in tree.branches.values() {
+            assert!(!branch.constellation.c0_compiles || branch.node_tier == NodeTier::SmallPassive
+                || branch.node_tier == NodeTier::NotablePassive
+                || branch.node_tier == NodeTier::Keystone);
+        }
+    }
+
+    #[test]
+    fn test_snapshots_enumerate_all_branches() {
+        let tree = ConsciousnessTree::new();
+        let snaps = tree.snapshots();
+        assert_eq!(snaps.len(), BranchKind::all().len());
+        assert!(snaps.iter().all(|s| !s.branch.label().is_empty()));
     }
 
     #[test]

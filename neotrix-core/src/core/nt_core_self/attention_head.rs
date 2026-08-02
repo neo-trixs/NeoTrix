@@ -146,10 +146,63 @@ impl AttentionProfile {
     }
 }
 
+/// Ascendancy Weapon Set — 双专精 (AGENTS.md):
+/// 每 session 两个 Weapon Set, 经 AttentionManager 按任务类型路由。
+/// Weapon Set I = 获取 (acquisition): CORE+WORLD 域优先
+/// Weapon Set II = 进化 (evolution): CORE+MIND 域优先
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum WeaponSet {
+    /// 获取模式: PatternMatch/Code/Temporal/ToolUse 优先 (采集+执行)
+    Acquisition,
+    /// 进化模式: Semantic/SelfReflection/Creativity/GoalAlignment 优先 (蒸馏+进化)
+    Evolution,
+}
+
+impl WeaponSet {
+    /// 双专精域映射 — 该专精下获得激活加成的 attention 域
+    pub fn priority_domains(&self) -> Vec<AttentionDomain> {
+        match self {
+            Self::Acquisition => vec![
+                AttentionDomain::PatternMatch,
+                AttentionDomain::Code,
+                AttentionDomain::Temporal,
+                AttentionDomain::ToolUse,
+            ],
+            Self::Evolution => vec![
+                AttentionDomain::Semantic,
+                AttentionDomain::SelfReflection,
+                AttentionDomain::Creativity,
+                AttentionDomain::GoalAlignment,
+            ],
+        }
+    }
+
+    /// 从任务类型路由专精 (与 RuleIntensity::from_task_type 协同)
+    pub fn from_task_type(task: &str) -> Self {
+        let t = task.to_lowercase();
+        if t.contains("evolve") || t.contains("distill") || t.contains("absorb")
+            || t.contains("reflect") || t.contains("crystallize") || t.contains("learn")
+        {
+            Self::Evolution
+        } else {
+            Self::Acquisition
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Acquisition => "Weapon Set I (获取: CORE+WORLD)",
+            Self::Evolution => "Weapon Set II (进化: CORE+MIND)",
+        }
+    }
+}
+
 pub struct AttentionManager {
     pub heads: Vec<AttentionHead>,
     pub global_threshold: f64,
     pub rule_intensity: RuleIntensity,
+    /// Ascendancy 当前专精 (Weapon Set)
+    pub weapon_set: WeaponSet,
 }
 
 impl AttentionManager {
@@ -158,7 +211,7 @@ impl AttentionManager {
             .enumerate()
             .map(|(i, domain)| AttentionHead::new(i, domain))
             .collect();
-        Self { heads, global_threshold: threshold, rule_intensity: RuleIntensity::default() }
+        Self { heads, global_threshold: threshold, rule_intensity: RuleIntensity::default(), weapon_set: WeaponSet::Acquisition }
     }
 
     pub fn with_intensity(threshold: f64, intensity: RuleIntensity) -> Self {
@@ -174,7 +227,22 @@ impl AttentionManager {
 
     pub fn from_task_type(threshold: f64, task: &str) -> Self {
         let intensity = RuleIntensity::from_task_type(task);
-        Self::with_intensity(threshold, intensity)
+        let mut mgr = Self::with_intensity(threshold, intensity);
+        mgr.weapon_set = WeaponSet::from_task_type(task);
+        mgr
+    }
+
+    /// Ascendancy: 切换 Weapon Set 并给予优先级域启动激活加成
+    pub fn activate_weapon_set(&mut self, set: WeaponSet, boost: f64) {
+        self.weapon_set = set;
+        for domain in set.priority_domains() {
+            self.stimulate_domain(domain, boost);
+        }
+    }
+
+    /// 当前专精的优先级域列表
+    pub fn active_priority_domains(&self) -> Vec<AttentionDomain> {
+        self.weapon_set.priority_domains()
     }
 
     pub fn stimulate_domain(&mut self, domain: AttentionDomain, amount: f64) {
@@ -309,6 +377,48 @@ mod tests {
     fn test_all_domains_count() {
         let domains = AttentionDomain::all();
         assert_eq!(domains.len(), 10);
+    }
+
+    #[test]
+    fn test_weapon_set_from_task_type() {
+        assert_eq!(WeaponSet::from_task_type("absorb knowledge"), WeaponSet::Evolution);
+        assert_eq!(WeaponSet::from_task_type("distill session"), WeaponSet::Evolution);
+        assert_eq!(WeaponSet::from_task_type("crawler fix"), WeaponSet::Acquisition);
+        assert_eq!(WeaponSet::from_task_type("implement feature"), WeaponSet::Acquisition);
+    }
+
+    #[test]
+    fn test_weapon_set_priority_domains() {
+        let acq = WeaponSet::Acquisition.priority_domains();
+        assert!(acq.contains(&AttentionDomain::Code));
+        assert!(acq.contains(&AttentionDomain::ToolUse));
+        assert!(!acq.contains(&AttentionDomain::SelfReflection));
+        let evo = WeaponSet::Evolution.priority_domains();
+        assert!(evo.contains(&AttentionDomain::SelfReflection));
+        assert!(evo.contains(&AttentionDomain::Creativity));
+        assert!(!evo.contains(&AttentionDomain::Code));
+    }
+
+    #[test]
+    fn test_activate_weapon_set_boosts_priority_domains() {
+        let mut mgr = AttentionManager::new(0.5);
+        mgr.activate_weapon_set(WeaponSet::Evolution, 0.6);
+        assert_eq!(mgr.weapon_set, WeaponSet::Evolution);
+        for domain in mgr.active_priority_domains() {
+            let head = mgr.heads.iter().find(|h| h.domain == domain).expect("head exists");
+            assert!(head.activation >= 0.6, "priority domain {} should be boosted", domain.label());
+        }
+        // 非优先级域不应被提升
+        let code_head = mgr.heads.iter().find(|h| h.domain == AttentionDomain::Code).unwrap();
+        assert!(code_head.activation < 0.6);
+    }
+
+    #[test]
+    fn test_from_task_type_sets_weapon_set() {
+        let mgr = AttentionManager::from_task_type(0.4, "distill knowledge");
+        assert_eq!(mgr.weapon_set, WeaponSet::Evolution);
+        let mgr2 = AttentionManager::from_task_type(0.4, "write code");
+        assert_eq!(mgr2.weapon_set, WeaponSet::Acquisition);
     }
 
     #[test]

@@ -1925,6 +1925,9 @@ impl NeoCodexAgent {
             event_bus_attached: self.event_bus.is_some(),
             evolution_iterations,
             tool_grounding_degraded: self.tool_grounding.any_degraded(),
+            node_snapshots: self.consciousness.as_ref()
+                .map(|tree| tree.snapshots())
+                .unwrap_or_default(),
         }
     }
 }
@@ -1954,6 +1957,9 @@ pub struct NeoCodexHealthReport {
     pub event_bus_attached: bool,
     pub evolution_iterations: u64,
     pub tool_grounding_degraded: bool,
+    /// Skill Node Evolution — per-domain 节点状态 (NodeTier/Constellation/Rune)
+    /// 使 7 域健康网格反映真实 per-domain 遥测, 而非布尔投影。
+    pub node_snapshots: Vec<crate::core::nt_core_consciousness_tree::NodeSnapshot>,
 }
 
 impl NeoCodexHealthReport {
