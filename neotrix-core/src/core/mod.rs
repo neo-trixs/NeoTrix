@@ -260,13 +260,6 @@ pub use nt_core_consensus::{
     AbductiveExplanation, AbductiveSolver, ConsensusConfig, ConsensusReport, ReflectionHead,
     ReflectionPipeline, ReflectionResult,
 };
-pub use nt_core_gwt::cognitive_tick::{
-    CognitiveEngine, CognitiveTickConfig, CognitiveTickReport, EntropyDrive,
-    CognitiveAgent, AgentType, ContentItem, create_default_agents,
-};
-pub use nt_core_gwt::cognitive_orchestrator::{
-    CognitiveOrchestrator, CognitiveOrchestratorReport,
-};
 pub use nt_core_gwt::consensus_resonance::{
     ConsensusResonanceBridge, ConsensusResonanceReport,
 };
