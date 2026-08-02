@@ -188,9 +188,9 @@
 - [x] `StagnationSignal` — 连续低熵 → 危机等级 → 回滚 (与 EntropyMonitor 集成)
 - [x] `DeadlockAwareRollback` — 最大刺激后回滚 (seal_loop.rs 集成)
 - [x] `InnerSpeech` — 自我对话生成器 (inner_speech.rs, 11 tests, GWT 广播→独白→context 写回)
+- [x] `ModalityRouter` — 模态级注意力权重 (modality_router.rs, 21 tests, $a_m=\text{softmax}(q^T k_m)$ + REINFORCE, resonant_broadcast Step 4c 接线)
 - [ ] `CLS_Buffer` — 快速体验缓冲区 (经验回放)
 - [ ] `CTM_Verifier` — 形式化对齐检查
-- [ ] `ModalityRouter` — 模态级注意力权重
 - [ ] 测试: entropy 行为 / inner speech 一致性 / CLS 检索 / CTM 约束
 
 ---

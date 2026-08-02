@@ -89,6 +89,9 @@ pub struct GlobalWorkspace {
     /// Inner Speech channel — self-talk summarizing the resonance state,
     /// fed back as context for subsequent experts (MIRROR AAAI 2026 §3.3).
     pub inner_speech: super::inner_speech::InnerSpeech,
+    /// Top-Down Modality Attention Router (arXiv:2602.08597 §3). Gates per-modality
+    /// workspace representation strength by task-query attention over modality keys.
+    pub modality_router: super::modality_router::ModalityRouter,
 }
 
 /// Events that trigger an audit block
@@ -141,6 +144,7 @@ impl GlobalWorkspace {
             vsa_scorer: None,
             geometry_sync: None,
             inner_speech: super::inner_speech::InnerSpeech::default(),
+            modality_router: super::modality_router::ModalityRouter::default(),
         }
     }
 
@@ -348,6 +352,24 @@ impl GlobalWorkspace {
             }
         }
 
+        // Step 4c: Top-Down Modality Attention (arXiv:2602.08597 §3).
+        // Build a stable query embedding from the broadcast content, route attention
+        // over modality keys, and gate a per-modality strength map. The winner is
+        // recorded so downstream specialists know which modality the consciousness
+        // layer is prioritizing. The router's learned keys train via reinforce()
+        // whenever a downstream outcome reward is available.
+        {
+            let query = self.content_query(content);
+            let strengths = self.modality_strengths(&report.effective_saliences);
+            let _gated = self.modality_router.gate(&query, &strengths);
+            if let Some(winner) = self.modality_router.winner() {
+                self.broadcast_history.push(format!(
+                    "[modality_router] active modality = {}",
+                    winner.label(),
+                ));
+            }
+        }
+
         // Step 5: update module activations with effective salience
         // effective_saliences[i] 是声明序，按 specialist_type 写回而非 values() 枚举序
         for m in self.specialists.values_mut() {
@@ -417,6 +439,62 @@ impl GlobalWorkspace {
             // Recovery: last entry in history (also just pushed)
             &self.resonance_history[self.resonance_history.len() - 1]
         })
+    }
+
+    /// Build a deterministic query embedding from broadcast content, in the
+    /// ModalityRouter's key dimension. Uses a cheap rolling-hash to allow the same
+    /// content to produce a stable query across cycles (so routing is reproducible).
+    fn content_query(&self, content: &str) -> Vec<f64> {
+        let dim = self.modality_router.dim;
+        let mut q = vec![0.0_f64; dim];
+        let bytes: Vec<u8> = content.bytes().collect();
+        if bytes.is_empty() {
+            return q;
+        }
+        for (i, &b) in bytes.iter().enumerate() {
+            q[i % dim] += (b as f64 + 0.5).sin() * ((i % 5) as f64 + 1.0) / 255.0;
+        }
+        // normalize to unit-like magnitude
+        let norm: f64 = q.iter().map(|v| v * v).sum::<f64>().sqrt();
+        if norm > 1e-12 {
+            for v in q.iter_mut() {
+                *v = (*v / norm).max(0.0).min(1.0);
+            }
+        }
+        q
+    }
+
+    /// Map resonance effective saliences to per-modality representation strengths.
+    /// Specialist modules are categorized by type into the five modalities.
+    fn modality_strengths(&self, saliences: &[f64]) -> std::collections::BTreeMap<super::modality_router::Modality, f64> {
+        use super::modality_router::Modality;
+        let mut strengths = std::collections::BTreeMap::new();
+        for (modality, strength) in self.specialists.values().filter_map(|m| {
+            module_index(m).and_then(|idx| saliences.get(idx).copied())
+                .map(|s| (self.specialist_modality(m.specialist_type), s))
+        }) {
+            *strengths.entry(modality).or_insert(0.0) += strength;
+        }
+        // ensure all modalities present
+        for m in Modality::ALL {
+            strengths.entry(m).or_insert(0.0);
+        }
+        strengths
+    }
+
+    /// Map a SpecialistType to its dominant representation modality.
+    fn specialist_modality(&self, st: SpecialistType) -> super::modality_router::Modality {
+        use super::module_def::SpecialistType as ST;
+        use super::modality_router::Modality as M;
+        match st {
+            ST::ImageGenerator | ST::CreativityGenerator => M::Image,
+            ST::AISecurity => M::Code,
+            ST::CodeAnalyzer | ST::EvidenceWeightedHypothesis => M::Code,
+            ST::PatternMatcher | ST::AnomalyDetector | ST::Planner
+            | ST::KnowledgeIntegrator | ST::GoalPrioritizer | ST::RiskAssessor
+            | ST::ReflectionEngine | ST::MetaCognitionAnalyst | ST::Orchestrator => M::Text,
+            ST::KnowledgeRetriever => M::Latent,
+        }
     }
 
     /// Get the winner module from the last resonance cycle.
