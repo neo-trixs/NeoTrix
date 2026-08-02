@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   temperature: 0.7,
   maxTokens: 8192,
   notifyOnComplete: true,
+  accent: "default",
 };
 
 export const savedSettings = persistence.loadSettings();

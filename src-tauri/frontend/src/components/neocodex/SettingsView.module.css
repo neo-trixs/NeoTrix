@@ -428,6 +428,35 @@
   text-align: center;
 }
 
+.accentOptions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accentSwatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+  color: var(--fg-secondary);
+  font-size: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.accentSwatch:hover {
+  transform: scale(1.1);
+}
+
+.accentSwatchActive {
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 3px var(--accent-primary);
+}
+
 .fieldLabel {
   display: flex;
   align-items: center;

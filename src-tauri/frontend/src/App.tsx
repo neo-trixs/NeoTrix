@@ -6,6 +6,16 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import NotificationToast from "./components/NotificationToast";
 import { getCurrent } from "@tauri-apps/plugin-deep-link";
 
+const ACCENTS: Record<string, string> = {
+  default: "",
+  red: "#FF6B6B",
+  amber: "#FFB74D",
+  emerald: "#66BB6A",
+  cyan: "#4DD0E1",
+  violet: "#B388FF",
+  blue: "#64B5F6",
+};
+
 const App: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,13 +32,16 @@ const App: React.FC = () => {
       const isDark = settings.theme === "dark" || (settings.theme === "system" && media.matches);
       document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
       document.documentElement.style.setProperty("--app-font-size", `${settings.fontSize}px`);
+      const accent = ACCENTS[settings.accent] || "";
+      document.documentElement.style.setProperty("--accent-primary", accent || "var(--nt-primary)");
+      document.documentElement.style.setProperty("--accent-on", accent ? "#FFFFFF" : "#FFFFFF");
     };
     apply();
     if (settings.theme === "system") {
       media.addEventListener("change", apply);
       return () => media.removeEventListener("change", apply);
     }
-  }, [settings.theme, settings.fontSize]);
+  }, [settings.theme, settings.fontSize, settings.accent]);
 
   // ── Tauri event: task complete ──
   useEffect(() => {

@@ -33,6 +33,7 @@ export interface AppSettings {
   temperature: number;
   maxTokens: number;
   notifyOnComplete: boolean;
+  accent: string;
 }
 
 export type NeoCodexMode = "Agent" | "Shell" | "Plan";

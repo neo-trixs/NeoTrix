@@ -116,7 +116,7 @@ export function SettingsView() {
             onDeleteKey={handleDeleteKey}
           />
         )}
-        {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} fontSize={settings.fontSize} onFontSizeChange={(v) => setSettings({ ...settings, fontSize: v })} language={settings.language} onLanguageChange={handleLanguageChange} />}
+        {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} fontSize={settings.fontSize} onFontSizeChange={(v) => setSettings({ ...settings, fontSize: v })} language={settings.language} onLanguageChange={handleLanguageChange} accent={settings.accent} onAccentChange={(v) => setSettings({ ...settings, accent: v })} />}
         {activeTab === "advanced" && <AdvancedPanel settings={settings} onChange={(patch) => setSettings({ ...settings, ...patch })} />}
         {activeTab === "about" && <AboutPanel />}
       </div>
@@ -205,11 +205,21 @@ function ProvidersPanel({
   );
 }
 
-function ThemePanel({ theme, onThemeChange, fontSize, onFontSizeChange, language, onLanguageChange }: { theme: "light" | "dark" | "system"; onThemeChange: (t: "light" | "dark" | "system") => void; fontSize: number; onFontSizeChange: (v: number) => void; language: string; onLanguageChange: (v: string) => void }) {
+function ThemePanel({ theme, onThemeChange, fontSize, onFontSizeChange, language, onLanguageChange, accent, onAccentChange }: { theme: "light" | "dark" | "system"; onThemeChange: (t: "light" | "dark" | "system") => void; fontSize: number; onFontSizeChange: (v: number) => void; language: string; onLanguageChange: (v: string) => void; accent: string; onAccentChange: (v: string) => void }) {
   const options = [
     { value: "light" as const, label: "浅色", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="4"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1M4.5 4.5l.7.7M8.8 8.8l.7.7M4.5 9.5l.7-.7M8.8 5.2l.7-.7" strokeLinecap="round"/></svg> },
     { value: "dark" as const, label: "深色", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 12a5 5 0 010-10 5 5 0 000 10z"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1" strokeLinecap="round"/></svg> },
     { value: "system" as const, label: "跟随系统", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="8" height="8" rx="1"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1" strokeLinecap="round"/></svg> },
+  ];
+
+  const accents = [
+    { value: "default", label: "默认" },
+    { value: "red", label: "绯红" },
+    { value: "amber", label: "琥珀" },
+    { value: "emerald", label: "翡翠" },
+    { value: "cyan", label: "青碧" },
+    { value: "violet", label: "紫罗兰" },
+    { value: "blue", label: "蔚蓝" },
   ];
 
   return (
@@ -227,6 +237,24 @@ function ThemePanel({ theme, onThemeChange, fontSize, onFontSizeChange, language
             {theme === opt.value && <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--accent-primary)" strokeWidth="2"><path d="M3 7l3 3 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           </button>
         ))}
+      </div>
+      <div className={styles.fontSizeRow}>
+        <span className={styles.fontSizeLabel}>强调色</span>
+        <div className={styles.accentOptions}>
+          {accents.map((a) => (
+            <button
+              key={a.value}
+              type="button"
+              data-testid={`settings-accent-${a.value}`}
+              className={`${styles.accentSwatch} ${accent === a.value ? styles.accentSwatchActive : ""}`}
+              title={a.label}
+              onClick={() => onAccentChange(a.value)}
+              style={a.value !== "default" ? { background: { red: "#FF6B6B", amber: "#FFB74D", emerald: "#66BB6A", cyan: "#4DD0E1", violet: "#B388FF", blue: "#64B5F6" }[a.value] } : undefined}
+            >
+              {a.value === "default" ? "默认" : ""}
+            </button>
+          ))}
+        </div>
       </div>
       <div className={styles.fontSizeRow}>
         <span className={styles.fontSizeLabel}>字体大小</span>

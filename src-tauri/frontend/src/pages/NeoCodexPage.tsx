@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../stores";
-import { ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, ShortcutHelp, TerminalPane } from "../components/neocodex";
+import { CapabilityHealthPane, ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, ShortcutHelp, TerminalPane } from "../components/neocodex";
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -40,6 +40,7 @@ export default function NeoCodexPage() {
   const [terminalOpen, setTerminalOpen] = React.useState(false);
   const [diffOpen, setDiffOpen] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [capabilityOpen, setCapabilityOpen] = React.useState(false);
   const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteMode, setPaletteMode] = useState<"command" | "file">("command");
@@ -699,6 +700,15 @@ export default function NeoCodexPage() {
                   >
                     App 预览 {previewOpen ? "✓" : ""}
                   </button>
+                  <button
+                    type="button"
+                    data-testid="views-menu-capability"
+                    role="menuitem"
+                    className={`${styles.viewsMenuItem} ${capabilityOpen ? styles.viewsMenuItemActive : ""}`}
+                    onClick={() => { setCapabilityOpen((v) => !v); setViewsMenuOpen(false); }}
+                  >
+                    能力网健康 {capabilityOpen ? "✓" : ""}
+                  </button>
                 </div>
               )}
             </div>
@@ -869,6 +879,11 @@ export default function NeoCodexPage() {
         {previewOpen && (
           <div className={styles.pane}>
             <PreviewPane />
+          </div>
+        )}
+        {capabilityOpen && (
+          <div className={styles.pane}>
+            <CapabilityHealthPane data={health} />
           </div>
         )}
 

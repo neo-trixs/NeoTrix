@@ -190,4 +190,62 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
     await textarea.press("Enter");
     await expect(textarea).toHaveValue("/init ");
   });
+
+  test("capability health pane opens from the views menu and shows the 7-domain network", async ({ page }) => {
+    await mockCommand(page, "neocodex_list_sessions", () => []);
+    await mockCommand(page, "neocodex_list_archived", () => []);
+    await mockCommand(page, "neocodex_health_report", () => ({
+      mode: "Agent",
+      turn_count: 8,
+      tool_call_count: 12,
+      tokens_used: 1000,
+      context_usage: 0.42,
+      context_turns: 5,
+      provider_count: 1,
+      provider_resolvable: true,
+      provider_model: "gateway",
+      session_writable: true,
+      goals_active: true,
+      cost_spent: 0.01,
+      cost_budget: 1.0,
+      subagent_results: 5,
+      consciousness_attached: true,
+      brain_attached: true,
+      event_bus_attached: true,
+      evolution_iterations: 3,
+      tool_grounding_degraded: false,
+    }));
+    await page.goto("/");
+    await page.getByTestId("sidebar-tab-sessions").click();
+    await expect(page.getByTestId("sidebar-tab-sessions")).toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId("views-menu-btn").click();
+    await page.getByTestId("views-menu-capability").click();
+
+    const pane = page.getByTestId("capability-health");
+    await expect(pane).toBeVisible({ timeout: 10_000 });
+    await expect(pane.getByText("能力网健康")).toBeVisible();
+    await expect(pane.getByText("核心链路通畅")).toBeVisible();
+    await expect(pane.locator("[data-domain='NT-CORE']")).toBeVisible();
+    await expect(pane.locator("[data-domain='NT-IO']")).toBeVisible();
+    await expect(pane.getByText(/自我进化 3 次/)).toBeVisible();
+  });
+
+  test("accent color picker persists the accent setting", async ({ page }) => {
+    await page.goto("/settings");
+    await page.getByTestId("settings-tab-theme").click();
+    await expect(page.getByTestId("settings-accent-emerald")).toBeVisible({ timeout: 10_000 });
+
+    await page.getByTestId("settings-accent-emerald").click();
+
+    const saved = await page.evaluate(() => {
+      try {
+        const raw = localStorage.getItem("neotrix_settings");
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    });
+    expect(saved).toEqual(expect.objectContaining({ accent: "emerald" }));
+  });
 });
