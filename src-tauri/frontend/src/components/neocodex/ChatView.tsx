@@ -37,11 +37,27 @@ function renderContent(content: string, contentType?: "markdown" | "html" | "tex
   return {
     html: DOMPurify.sanitize(html, {
       ALLOWED_TAGS: ["p", "br", "strong", "em", "code", "pre", "ul", "ol", "li", "a", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "hr", "table", "thead", "tbody", "tr", "th", "td", "span", "div", "img", "svg", "path", "circle", "rect", "line", "text", "button", "input", "textarea", "span"],
-      ALLOWED_ATTR: ["href", "target", "rel", "src", "alt", "class", "style", "width", "height", "viewBox", "fill", "stroke", "strokeWidth", "d", "cx", "cy", "r", "x", "y", "rx", "ry", "xmlns", "textAnchor", "fontSize", "fontWeight", "type", "checked", "disabled", "value", "placeholder", "rows"],
-      ALLOW_DATA_ATTR: false,
+      ALLOWED_ATTR: ["href", "target", "rel", "src", "alt", "class", "style", "width", "height", "viewBox", "fill", "stroke", "strokeWidth", "d", "cx", "cy", "r", "x", "y", "rx", "ry", "xmlns", "textAnchor", "fontSize", "fontWeight", "type", "checked", "disabled", "value", "placeholder", "rows", "data-copy-id"],
+      ALLOW_DATA_ATTR: true,
     }),
     codeBlocks,
   };
+}
+
+// Injects a copy button into each <pre> block so users can copy a single
+// code block (Claude Code / Codex parity) without copying the whole reply.
+function decorateCodeBlocks(html: string, id: string): string {
+  if (!html.includes("<pre")) return html;
+  let idx = 0;
+  return html.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/g, (match, inner) => {
+    const copyId = `${id}-cb-${idx++}`;
+    return (
+      `<div class="codeblock-wrap" style="position:relative">
+         <button type="button" class="codeblock-copy" data-copy-id="${copyId}" title="复制代码" aria-label="复制代码" style="position:absolute;top:6px;right:6px;z-index:2;padding:3px 8px;font-size:11px;border-radius:4px;border:1px solid var(--border-primary);background:var(--bg-tertiary);color:var(--fg-secondary);cursor:pointer;opacity:0.6">复制</button>
+         <pre data-copy-id="${copyId}" style="position:relative">${inner}</pre>
+       </div>`
+    );
+  });
 }
 
 const roleClassMap: Record<string, string> = {
@@ -117,10 +133,21 @@ const SLASH_COMMANDS = [
   { cmd: "/goal <desc>", label: "设置目标", hint: "添加进化目标" },
   { cmd: "/plan", label: "计划模式", hint: "切换到 Plan 模式" },
   { cmd: "/status", label: "查看状态", hint: "模型·用量·会话信息" },
+  { cmd: "/btw", label: "侧聊", hint: "打开侧边聊天" },
+  { cmd: "/new", label: "新会话", hint: "创建新会话" },
+  { cmd: "/model <name>", label: "切换模型", hint: "切换当前模型" },
+  { cmd: "/init", label: "初始化项目", hint: "生成 AGENTS.md 与项目配置" },
   { cmd: "/feedback <text>", label: "反馈", hint: "给助手反馈" },
   { cmd: "/export", label: "导出会话", hint: "导出为 Markdown" },
   { cmd: "/rename <name>", label: "重命名会话", hint: "重命名当前会话" },
   { cmd: "/clear", label: "清除消息", hint: "清空当前会话消息" },
+];
+
+const QUICK_ACTIONS = [
+  { icon: "🔍", label: "分析项目结构", desc: "梳理代码库模块与依赖", prompt: "请分析当前项目的整体结构，包括主要模块、入口点、依赖关系和数据流，给出架构概述。" },
+  { icon: "🐛", label: "排查 Bug", desc: "定位并解释代码问题", prompt: "请帮我排查代码中的潜在 Bug。重点关注未处理的错误、竞态条件、边界情况和资源泄漏，指出问题位置并给出修复建议。" },
+  { icon: "🧪", label: "生成单元测试", desc: "为关键逻辑补测试", prompt: "请为当前项目中的关键模块生成单元测试，遵循现有测试约定，覆盖正常路径与边界情况，并给出运行命令。" },
+  { icon: "📐", label: "制定实施计划", desc: "拆解功能为可执行步骤", prompt: "请为当前任务制定一份实施计划，将其拆解为可执行步骤，包含前置检查、实现要点、测试与验证方式。" },
 ];
 
 export function ChatView({
@@ -139,6 +166,9 @@ export function ChatView({
   onRecentSessionSelect,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLElement>(null);
+  const [showScrollDown, setShowScrollDown] = useState(false);
+  const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
@@ -347,6 +377,34 @@ export function ChatView({
     }
   }, [queuedInputs, agentBusy, flushQueue]);
 
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    stickToBottomRef.current = true;
+    setShowScrollDown(false);
+  }, []);
+
+  useEffect(() => {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      stickToBottomRef.current = nearBottom;
+      setShowScrollDown(!nearBottom);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auto-stick to the newest content while streaming / on new messages,
+  // unless the user has scrolled up to read earlier output.
+  useEffect(() => {
+    if (stickToBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [messages, streamingContent, viewMode]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (showSlash) {
       if (e.key === "ArrowDown") { e.preventDefault(); setSlashHighlight((h) => (h + 1) % Math.max(filteredSlash.length, 1)); return; }
@@ -457,7 +515,7 @@ export function ChatView({
           <span className={styles.viewModeBadge}>{viewMode === "verbose" ? "详细" : "摘要"}</span>
         )}
         {/* Messages */}
-        <main className={styles.messages} aria-live="polite" aria-relevant="additions">
+        <main className={styles.messages} aria-live="polite" aria-relevant="additions" ref={messagesScrollRef}>
           {contextUsage > 0.8 && (
             <div className={styles.compactBar}>
               <span>上下文接近满（{Math.round(contextUsage * 100)}%），建议压缩以释放空间</span>
@@ -501,6 +559,21 @@ export function ChatView({
               <br />
               <kbd>⌘N</kbd> 新建会话 · <kbd>⌘B</kbd> 收起侧栏 · <kbd>Ctrl+Tab</kbd> 切换会话
             </div>
+            <div className={styles.quickActions} data-testid="quick-actions">
+              {QUICK_ACTIONS.map((qa) => (
+                <button
+                  key={qa.label}
+                  type="button"
+                  className={styles.quickAction}
+                  onClick={() => { setInput(qa.prompt); textareaRef.current?.focus(); }}
+                  data-testid={`quick-action-${qa.label}`}
+                >
+                  <span className={styles.quickActionIcon}>{qa.icon}</span>
+                  <span className={styles.quickActionLabel}>{qa.label}</span>
+                  <span className={styles.quickActionDesc}>{qa.desc}</span>
+                </button>
+              ))}
+            </div>
             {(recentSessions && recentSessions.length > 0) && (
               <div className={styles.recentBlock} data-testid="recent-sessions">
                 <div className={styles.recentTitle}>最近会话</div>
@@ -527,6 +600,20 @@ export function ChatView({
         )}
         <div ref={messagesEndRef} />
         </main>
+        {showScrollDown && (
+          <button
+            type="button"
+            className={styles.scrollDownBtn}
+            onClick={() => scrollToBottom(true)}
+            title="滚动到底部"
+            aria-label="滚动到底部"
+            data-testid="scroll-to-bottom"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <path d="M7 2v10M3 8l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
       </div>
 
        {/* Input */}
@@ -703,7 +790,8 @@ function MessageBubble({
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(message.content);
   const addNotification = useStore((s) => s.addNotification);
-  const { html, codeBlocks } = renderContent(message.content, message.contentType);
+  const { html: rawHtml, codeBlocks } = renderContent(message.content, message.contentType);
+  const html = useMemo(() => decorateCodeBlocks(rawHtml, `m${message.id ?? Math.random().toString(36).slice(2, 8)}`), [rawHtml, message.id]);
   const diffStats = useMemo(() => {
     let added = 0;
     let removed = 0;
@@ -794,7 +882,21 @@ function MessageBubble({
           </div>
         ) : (
         <>
-        <div className={styles.content} dangerouslySetInnerHTML={{ __html: html }} />
+        <div
+          className={styles.content}
+          dangerouslySetInnerHTML={{ __html: html }}
+          onClick={async (e) => {
+            const btn = (e.target as HTMLElement).closest?.("[data-copy-id]");
+            const pre = (e.target as HTMLElement).closest?.("pre[data-copy-id]");
+            const copyId = btn?.getAttribute("data-copy-id") || pre?.getAttribute("data-copy-id");
+            if (!copyId) return;
+            if (btn) e.stopPropagation();
+            const codeEl = document.querySelector(`pre[data-copy-id="${copyId}"]`);
+            if (!codeEl) return;
+            await copyMessage((codeEl.textContent || "").trim());
+            addNotification({ type: "success", message: "已复制代码块", duration: 2000 });
+          }}
+        />
         {isStreaming && <span className={styles.streamCaret} aria-hidden="true" />}
         {codeBlocks > 0 && (
           <div className={styles.codeIndicator}>

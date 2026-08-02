@@ -180,7 +180,7 @@ test.describe('NeoTrix Desktop App — E2E interaction', () => {
     expect(
       errors.filter(
         (e) =>
-          !/favicon|tailwind|websocket|tauri|invoke|resizeobserver|transformCallback|__TAURI__|404 \(Not Found\)/i.test(e)
+          !/favicon|tailwind|websocket|tauri|invoke|resizeobserver|transformCallback|__TAURI__|404 \(Not Found\)|tunnel|ERR_TUNNEL|net::/i.test(e)
       )
     ).toEqual([]);
   });

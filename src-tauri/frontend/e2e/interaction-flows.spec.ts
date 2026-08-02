@@ -139,4 +139,55 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
     const calls = await invokeCalls(page);
     expect(calls).toContainEqual(expect.objectContaining({ cmd: "cmd_diff_review" }));
   });
+
+  test("welcome empty state shows quick action chips that prefill the composer", async ({ page }) => {
+    await mockCommand(page, "neocodex_list_sessions", () => []);
+    await mockCommand(page, "neocodex_list_archived", () => []);
+    await page.goto("/");
+    await page.getByTestId("sidebar-tab-sessions").click();
+    await expect(page.getByTestId("quick-actions")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("分析项目结构")).toBeVisible();
+
+    await page.getByTestId("quick-action-排查 Bug").click();
+    const textarea = page.locator("textarea").first();
+    await expect(textarea).toBeFocused();
+    await expect(textarea).toHaveValue(/排查/);
+  });
+
+  test("streamed code block renders a per-code-block copy button", async ({ page }) => {
+    await mockCommand(page, "neocodex_list_sessions", () => []);
+    await mockCommand(page, "neocodex_list_archived", () => []);
+    await mockCommand(page, "neocodex_send_message_stream", () => "```ts\nconst x = 1;\n```");
+    await page.goto("/");
+    await page.getByTestId("sidebar-tab-sessions").click();
+    await expect(page.getByTestId("sidebar-tab-sessions")).toBeVisible({ timeout: 10_000 });
+
+    const textarea = page.locator("textarea").first();
+    await textarea.fill("给个代码示例");
+    await textarea.press("Enter");
+    await expect(page.locator("main").last()).toContainText("const x = 1;", { timeout: 10_000 });
+
+    const copyBtn = page.locator(".codeblock-copy").first();
+    await expect(copyBtn).toBeVisible();
+    await expect(copyBtn).toHaveAttribute("title", "复制代码");
+  });
+
+  test("slash menu exposes parity commands and inserts into the composer", async ({ page }) => {
+    await mockCommand(page, "neocodex_list_sessions", () => []);
+    await mockCommand(page, "neocodex_list_archived", () => []);
+    await page.goto("/");
+    await page.getByTestId("sidebar-tab-sessions").click();
+    await expect(page.getByTestId("sidebar-tab-sessions")).toBeVisible({ timeout: 10_000 });
+
+    const textarea = page.locator("textarea").first();
+    await textarea.fill("/mod");
+    await expect(page.getByText("切换模型")).toBeVisible({ timeout: 10_000 });
+    await textarea.press("Enter");
+    await expect(textarea).toHaveValue("/model ");
+
+    await textarea.fill("/init");
+    await expect(page.getByText("初始化项目")).toBeVisible({ timeout: 10_000 });
+    await textarea.press("Enter");
+    await expect(textarea).toHaveValue("/init ");
+  });
 });

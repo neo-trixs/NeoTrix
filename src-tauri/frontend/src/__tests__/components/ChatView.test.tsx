@@ -212,3 +212,71 @@ describe("ChatView — welcome empty state (recent sessions)", () => {
     expect(screen.queryByText("最近会话")).not.toBeInTheDocument();
   });
 });
+
+describe("ChatView — quick action chips (welcome empty state)", () => {
+  it("renders quick action chips in the empty state", () => {
+    render(<ChatView messages={[]} agentBusy={false} onSend={() => {}} />);
+    expect(screen.getByTestId("quick-actions")).toBeInTheDocument();
+    expect(screen.getByText("分析项目结构")).toBeInTheDocument();
+    expect(screen.getByText("排查 Bug")).toBeInTheDocument();
+  });
+
+  it("clicking a chip fills the composer and focuses it", async () => {
+    render(<ChatView messages={[]} agentBusy={false} onSend={() => {}} />);
+    const chip = screen.getByTestId("quick-action-排查 Bug");
+    await userEvent.click(chip);
+    const textarea = screen.getByPlaceholderText(/Enter 发送/) as HTMLTextAreaElement;
+    expect(textarea.value).toContain("排查");
+    expect(document.activeElement).toBe(textarea);
+  });
+
+  it("hides quick actions once messages exist", () => {
+    render(<ChatView messages={makeMessages()} agentBusy={false} onSend={() => {}} />);
+    expect(screen.queryByTestId("quick-actions")).not.toBeInTheDocument();
+  });
+});
+
+describe("ChatView — per-code-block copy button", () => {
+  it("renders a copy button for each code block", () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    render(<ChatView messages={makeMessages()} agentBusy={false} onSend={() => {}} />);
+    const btns = document.querySelectorAll(".codeblock-copy");
+    expect(btns.length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("复制代码").length).toBeGreaterThan(0);
+  });
+
+  it("clicking the code-block copy button copies the code text", async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    render(<ChatView messages={makeMessages()} agentBusy={false} onSend={() => {}} />);
+    const btn = document.querySelector(".codeblock-copy") as HTMLButtonElement;
+    expect(btn).not.toBeNull();
+    await userEvent.click(btn);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("function add(a: number, b: number) { return a + b; }");
+  });
+});
+
+describe("ChatView — scroll-to-bottom button", () => {
+  it("does not show by default and appears when scrolled away from the bottom", () => {
+    render(<ChatView messages={makeMessages()} agentBusy={false} onSend={() => {}} />);
+    expect(screen.queryByTestId("scroll-to-bottom")).not.toBeInTheDocument();
+    const main = document.querySelector("main") as HTMLElement;
+    expect(main).not.toBeNull();
+    // Simulate scroll position far from bottom.
+    Object.defineProperty(main, "scrollHeight", { value: 1000, configurable: true });
+    Object.defineProperty(main, "clientHeight", { value: 500, configurable: true });
+    fireEvent.scroll(main, { target: { scrollTop: 0 } });
+    expect(screen.getByTestId("scroll-to-bottom")).toBeInTheDocument();
+  });
+
+  it("clicking scroll-to-bottom scrolls the messages container to the end", async () => {
+    render(<ChatView messages={makeMessages()} agentBusy={false} onSend={() => {}} />);
+    const main = document.querySelector("main") as HTMLElement;
+    Object.defineProperty(main, "scrollHeight", { value: 1000, configurable: true });
+    Object.defineProperty(main, "clientHeight", { value: 500, configurable: true });
+    const scrollSpy = vi.fn();
+    main.scrollTo = scrollSpy as typeof main.scrollTo;
+    fireEvent.scroll(main, { target: { scrollTop: 0 } });
+    await userEvent.click(screen.getByTestId("scroll-to-bottom"));
+    expect(scrollSpy).toHaveBeenCalledWith({ top: 1000, behavior: "smooth" });
+  });
+});
