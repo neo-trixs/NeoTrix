@@ -34,12 +34,15 @@ impl CrossModalAligner {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         words[0].hash(&mut h);
         let seed = h.finish();
-        let mut accum = self.seeded_random(seed, self.dim);
+        // 基底必须与 bundle 输出同编码：seeded_random 返回均匀 u8 (0..=255)，
+        // 与 bundle 的 {0,1} 输出混算会因编码不兼容 (见 QuantizedVSA::bundle) 退化为全零。
+        // 这里显式 binarize 到 {0,1}，后续 bundle 的编码无关化逻辑可正确处理。
+        let mut accum = QuantizedVSA::binarize(&self.seeded_random(seed, self.dim));
         for (i, word) in words.iter().enumerate().skip(1) {
             let mut h = std::collections::hash_map::DefaultHasher::new();
             word.hash(&mut h);
             let seed = h.finish();
-            let mut v = self.seeded_random(seed, self.dim);
+            let mut v = QuantizedVSA::binarize(&self.seeded_random(seed, self.dim));
             v = QuantizedVSA::permute(&v, i as isize);
             accum = QuantizedVSA::bundle(&[&accum, &v]);
         }

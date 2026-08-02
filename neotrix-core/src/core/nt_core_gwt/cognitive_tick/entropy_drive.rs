@@ -28,7 +28,7 @@ impl EntropyDrive {
 
     pub fn compute_entropy(items: &[ContentItem]) -> f64 {
         let total: f64 = items.iter().map(|i| i.salience).sum();
-        if total == 0.0 {
+        if total == 0.0 || items.len() < 2 {
             return 0.0;
         }
         let entropy: f64 = items
@@ -36,7 +36,9 @@ impl EntropyDrive {
             .map(|i| i.salience / total)
             .map(|p| -p * (p + 1e-10).ln())
             .sum();
-        entropy
+        // 归一化到 [0,1]：除以 ln(len)。旧实现返回 nat 熵 (max≈ln N)，
+        // 与 target_entropy(0.3 量级) 比较恒超阈值，drive_signal 恒 0 → 探索机制永为 no-op。
+        entropy / (items.len() as f64).ln()
     }
 
     pub fn drive_signal(&self) -> f64 {
@@ -113,7 +115,7 @@ mod tests {
     fn test_compute_entropy_uniform() {
         let items = vec![make_item(1.0), make_item(1.0), make_item(1.0)];
         let e = EntropyDrive::compute_entropy(&items);
-        assert!((e - 1.0986122886681096).abs() < 1e-6);
+        assert!((e - 1.0).abs() < 1e-6, "uniform normalized entropy should be 1.0, got {e}");
     }
 
     #[test]
@@ -193,7 +195,7 @@ mod tests {
         let mut ed = EntropyDrive::new(0.8);
         let items = vec![make_item(0.5), make_item(0.5)];
         ed.update(&items);
-        assert!((ed.current_entropy - 0.6931471805599453).abs() < 1e-6);
+        assert!((ed.current_entropy - 1.0).abs() < 1e-6, "uniform 2-item normalized entropy = 1.0, got {}", ed.current_entropy);
         assert_eq!(ed.entropy_history.len(), 1);
     }
 

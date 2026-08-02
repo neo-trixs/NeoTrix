@@ -119,7 +119,7 @@ impl ConsciousnessGoldStandard {
 
         let phi_confidence = phi.min(1.0).max(0.0);
         let coherence_confidence = coherence.min(1.0).max(0.0);
-        let combined_confidence = self_consistency_weight(phi, coherence, phi_confidence, coherence_confidence);
+        let combined_confidence = self_consistency_weight(phi, coherence, phi_confidence, coherence_confidence, self.phi_threshold, self.coherence_threshold);
 
         let report = GoldStandardReport {
             timestamp,
@@ -249,9 +249,9 @@ fn coherence_from_hexagrams(states: &[E8HexagramState]) -> f64 {
     phase_coherence * activation_scale
 }
 
-fn self_consistency_weight(phi: f64, coherence: f64, phi_conf: f64, coh_conf: f64) -> f64 {
+fn self_consistency_weight(phi: f64, coherence: f64, phi_conf: f64, coh_conf: f64, phi_threshold: f64, coherence_threshold: f64) -> f64 {
     let base = 0.5 * phi_conf + 0.5 * coh_conf;
-    let consistency_bonus = if (phi > 0.33) == (coherence > 0.7) { 0.15 } else { -0.1 };
+    let consistency_bonus = if (phi > phi_threshold) == (coherence > coherence_threshold) { 0.15 } else { -0.1 };
     (base + consistency_bonus).clamp(0.0, 1.0)
 }
 

@@ -161,6 +161,11 @@ impl CognitiveEngine {
     fn phase1_gather(&mut self) {
         let entropy = self.entropy_drive.current_entropy;
         let drive = self.entropy_drive.drive_signal();
+        // activation_count 是 per-tick 预算计数器，每 tick 重置；
+        // 否则它变成 lifetime 累计计数，agent 触发 max_agents_per_tick 次后永久静默。
+        for handle in self.agents.iter_mut() {
+            handle.activation_count = 0;
+        }
         for handle in self.agents.iter_mut() {
             if !handle.active {
                 continue;

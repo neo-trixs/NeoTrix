@@ -17,6 +17,17 @@ use super::geometry_sync::GeometrySync;
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_harness::HarnessAdapter;
 
+/// 按 SpecialistType 声明序取 module 索引（与 default_specialist_states / hexagram_states 同序）。
+/// BTreeMap<String, _> 的 values() 是 name-sort 序，与声明序不一致，绝不能按位置互用。
+/// 自由函数而非方法：可在 values_mut() 迭代中调用而不触发 &self 借用冲突。
+fn module_index(m: &SpecialistModule) -> Option<usize> {
+    if (m.specialist_type as usize) < MODULE_COUNT {
+        Some(m.specialist_type as usize)
+    } else {
+        None
+    }
+}
+
 /// resonance_history 上限，防止无界增长 (每 tick push 一个)
 const RESONANCE_HISTORY_LIMIT: usize = 512;
 /// audit_chain 上限，防止无界增长 (每 tick append 一个 block)
@@ -165,6 +176,13 @@ impl GlobalWorkspace {
         self.specialists.values_mut().find(|m| m.specialist_type == *st)
     }
 
+    /// 按 SpecialistType 声明序定位 specialist (与 default_specialist_states / hexagram_states 同序)。
+    /// BTreeMap<String, _> 的 values() 是 name-sort 序，与声明序不一致，绝不能按位置互用。
+    fn specialist_at_index(&self, idx: usize) -> Option<&SpecialistModule> {
+        self.specialists.values()
+            .find(|m| m.specialist_type as usize == idx)
+    }
+
     /// Pre-resonance: returns specialists with raw activation above threshold.
     pub fn active_specialists(&self) -> Vec<&SpecialistModule> {
         self.specialists.values().filter(|m| m.activation >= self.threshold).collect()
@@ -177,9 +195,11 @@ impl GlobalWorkspace {
             None => return self.active_specialists(),
         };
         self.specialists.values()
-            .enumerate()
-            .filter(|(i, _)| report.effective_saliences.get(*i).copied().unwrap_or(0.0) >= self.threshold)
-            .map(|(_, m)| m)
+            .filter(|m| {
+                module_index(m)
+                    .and_then(|idx| report.effective_saliences.get(idx).copied())
+                    .unwrap_or(0.0) >= self.threshold
+            })
             .collect()
     }
 
@@ -208,9 +228,13 @@ impl GlobalWorkspace {
         hexagram_states: &[ReasoningHexagram; MODULE_COUNT],
     ) -> &ResonanceReport {
         // Step 1: collect raw activations
+        // 索引空间必须与 hexagram_states 一致：按 SpecialistType 声明序 (specialist_type as usize)
+        // 而非 BTreeMap values() 的 name-sort 序，否则 E8 boost / winner / 回写全部错位。
         let mut raw = [0.0; MODULE_COUNT];
-        for (i, m) in self.specialists.values().enumerate() {
-            raw[i] = m.activation;
+        for m in self.specialists.values() {
+            if let Some(idx) = module_index(m) {
+                raw[idx] = m.activation;
+            }
         }
 
         // Step 1a: E8 attention bias — modulate raw salience with prediction attention weights
@@ -299,8 +323,11 @@ impl GlobalWorkspace {
         self.broadcast_history.push(content.to_string());
 
         // Step 5: update module activations with effective salience
-        for (i, m) in self.specialists.values_mut().enumerate() {
-            m.activation = report.effective_saliences.get(i).copied().unwrap_or(0.0);
+        // effective_saliences[i] 是声明序，按 specialist_type 写回而非 values() 枚举序
+        for m in self.specialists.values_mut() {
+            if let Some(idx) = module_index(m) {
+                m.activation = report.effective_saliences.get(idx).copied().unwrap_or(0.0);
+            }
         }
 
         // Step 5b: Competition Gate — WTA ignition override if enabled
@@ -369,7 +396,7 @@ impl GlobalWorkspace {
     /// Get the winner module from the last resonance cycle.
     pub fn resonance_winner(&self) -> Option<&SpecialistModule> {
         let report = self.last_resonance.as_ref()?;
-        self.specialists.values().nth(report.winner)
+        self.specialist_at_index(report.winner)
     }
 
     /// Get resonance cluster members as module references.
@@ -381,7 +408,7 @@ impl GlobalWorkspace {
         report.resonator_clusters.iter()
             .map(|cluster| {
                 cluster.iter()
-                    .filter_map(|&i| self.specialists.values().nth(i))
+                    .filter_map(|&i| self.specialist_at_index(i))
                     .collect()
             })
             .collect()

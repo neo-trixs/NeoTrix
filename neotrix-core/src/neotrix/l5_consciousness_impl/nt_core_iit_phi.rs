@@ -99,13 +99,17 @@ impl IITPhiCalculator {
     }
 
     /// 计算集成信息 Φ:
-    ///   Φ = (Σ_i,j R[i][j]·x_i·x_j) / (Σ_i x_i²) - 1/N
+    ///   Φ = (Σ_{i≠j} R[i][j]·x_i·x_j) / (Σ_i x_i²)
     ///
-    /// 核心思想: 维度间共振强度 × 激活水平,
-    /// 减去独立基线的 1/N 修正项
+    /// 核心思想: 维度间共振强度 × 激活水平 (只计跨维度耦合)。
+    /// 对角项 R[i][i]≡1 使 phi_raw 恒 ≥1 (自耦合不属于集成)，
+    /// 旧实现让单活跃维度也 ≈1.0，"is_phi_conscious" 退化为 "状态非零" 掩码。
     pub fn compute_phi(&self, state: &[f64]) -> PhiReport {
-        let n = state.len().min(64);
-        let state_energy: f64 = state.iter().map(|v| v * v).sum();
+        // 清洗非有限值：NaN/Inf 视为 0，防止污染下游 phi/coherence/confidence/trend
+        let clean: Vec<f64> = state.iter().map(|&v| if v.is_finite() { v } else { 0.0 }).collect();
+        let n = clean.len().min(64);
+        // state_energy 与 numerator 使用同一索引空间 n，避免 >64 维时分母偏大
+        let state_energy: f64 = clean[..n].iter().map(|v| v * v).sum();
         if state_energy < 1e-12 {
             return PhiReport {
                 phi: 0.0, phi_raw: 0.0, total_resonance: 0.0,
@@ -115,9 +119,9 @@ impl IITPhiCalculator {
             };
         }
 
-        let r = self.resonance_matrix(state);
+        let r = self.resonance_matrix(&clean);
 
-        // Σ R[i][j]·x_i·x_j
+        // Σ_{i≠j} R[i][j]·x_i·x_j (排除 i==j 自耦合)
         let mut weighted_sum = 0.0;
         let mut total_resonance = 0.0;
         let mut max_val = 0.0;
@@ -125,10 +129,13 @@ impl IITPhiCalculator {
 
         for i in 0..n {
             for j in 0..n {
-                let rv = r[i][j] * state[i] * state[j];
+                if i == j {
+                    continue;
+                }
+                let rv = r[i][j] * clean[i] * clean[j];
                 weighted_sum += rv;
                 total_resonance += r[i][j];
-                if i != j && rv.abs() > max_val {
+                if rv.abs() > max_val {
                     max_val = rv.abs();
                     max_pair = (i, j);
                 }
@@ -136,16 +143,16 @@ impl IITPhiCalculator {
         }
 
         // 有效集成维数: 状态中显著贡献的维度
-        let effective_dims = state.iter()
+        let effective_dims = clean[..n].iter()
             .filter(|&&v| v.abs() > 0.05)
             .count()
             .max(1);
 
-        // Φ_raw = 共振加权协方差 / 总能量
+        // Φ = 跨维度共振协方差 / 总能量 (分母与 numerator 同一索引空间 n)
         let phi_raw = weighted_sum / state_energy;
 
-        // Φ = Φ_raw - 1/N (独立基线修正)
-        let phi = (phi_raw - 1.0 / n as f64).clamp(0.0, 1.0);
+        // Φ ∈ [0,1]；单活跃维度 weighted_sum=0 → Φ=0 (可约系统无集成信息)
+        let phi = phi_raw.clamp(0.0, 1.0);
 
         // Φ 趋势
         let phi_trend = self.compute_trend(phi);

@@ -73,10 +73,12 @@ impl GraphMemoryStore {
         if id.is_empty() {
             return Err("Node id cannot be empty".into());
         }
-        if self.nodes.len() >= self.max_nodes {
+        let is_new = !self.nodes.contains_key(&id);
+        // 仅当插入全新节点且已达上限时才驱逐 LRU；
+        // 更新已有节点绝不驱逐（否则在容量满时一次 update 就静默丢失一条无关数据）。
+        if is_new && self.nodes.len() >= self.max_nodes {
             self.evict_lru_inner(1);
         }
-        let is_new = !self.nodes.contains_key(&id);
         self.nodes.insert(id.clone(), node);
         if is_new {
             self.access_order.push(id.clone());

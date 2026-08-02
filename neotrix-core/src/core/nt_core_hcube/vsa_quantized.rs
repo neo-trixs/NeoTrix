@@ -211,16 +211,20 @@ impl QuantizedVSA {
         }
         let n = vectors.len();
         let dim = vectors[0].len().min(VSA_DIM);
+        // 编码无关化：按 x != 0 计票，兼容 {0,1} 与 {0,255} 两种编码。
+        // 陷阱：binarize(x>=128) 会把 {0,1} 向量 (1<128) 全部映射成 0 → 全零 bundle。
         let mut counts = vec![0i32; dim];
         for v in vectors {
             for (c, &x) in counts.iter_mut().zip(v.iter()) {
-                if x >= BINARY_THRESHOLD {
+                if x != 0 {
                     *c += 1;
                 }
             }
         }
-        let threshold = (n as i32 + 1) / 2;
-        counts.iter().map(|&c| if c > threshold { 1 } else { 0 }).collect()
+        // 多数投票标准 (Kanerva)：count*2 >= n，平局判 1。
+        // 旧实现 count > n/2 在偶数 n 时要求全票 → 密度逐层衰减坍缩到全零。
+        // n=1 → 返回原向量；n=3 → 需 2 票；n=2 → 任 1 票即通过。
+        counts.iter().map(|&c| if c * 2 >= n as i32 { 1 } else { 0 }).collect()
     }
 
     pub fn permute(v: &[u8], shift: isize) -> Vec<u8> {
@@ -301,16 +305,17 @@ impl QuantizedVSA {
         }
         let n = vectors.len();
         let dim = vectors[0].len().min(VSA_DIM);
+        // 编码无关化（同 bundle）：按 x != 0 计票，兼容 {0,1} 与 {0,255} 编码
         let mut counts = vec![0i32; dim];
         for v in vectors {
             for (c, &x) in counts.iter_mut().zip(v.iter()) {
-                if x >= BINARY_THRESHOLD {
+                if x != 0 {
                     *c += 1;
                 }
             }
         }
-        let threshold = (n as i32) / 2;
-        counts.iter().map(|&c| if c > threshold { 255 } else { 0 }).collect()
+        // 同 bundle：count*2 >= n，平局判 1（输出 {0,255} 编码）
+        counts.iter().map(|&c| if c * 2 >= n as i32 { 255 } else { 0 }).collect()
     }
 
     pub fn xor_bind(a: &[u8], b: &[u8]) -> Vec<u8> {

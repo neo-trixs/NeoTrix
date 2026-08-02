@@ -100,6 +100,19 @@ pub fn permute(a: &[f64], n: usize) -> Vec<f64> {
         .collect()
 }
 
+/// Inverse of `permute`: subtract the same phase ramp to recover the original.
+/// θ_i = (θ'_i - i * n * PHASE_STEP) mod 2π
+pub fn unpermute(a: &[f64], n: usize) -> Vec<f64> {
+    let n_f64 = n as f64;
+    a.iter()
+        .enumerate()
+        .map(|(i, theta)| {
+            let shifted = theta - (i as f64) * n_f64 * PHASE_STEP;
+            shifted % std::f64::consts::TAU
+        })
+        .collect()
+}
+
 /// Cosine similarity in complex space: mean of cos(θ_a - θ_b).
 ///
 /// Returns a value in [-1, 1] where 1.0 = identical phase vectors.
@@ -142,15 +155,22 @@ pub fn cleanup_always(noisy: &[f64], candidates: &[&[f64]]) -> usize {
 
 /// Encode a scalar value into an FHRR phase vector.
 ///
-/// Maps value → deterministic phase vector via a seeded per-dimension
-/// phase offset modulated by the scalar.
+/// 采用 Fractional Power Encoding (FPE, Frady/Kleyko/Sommer 2018)：
+/// θ_i = α_i · value mod 2π，α_i 是固定随机基相位。
+/// 旧实现用固定 golden-ratio ramp (i·1.618) 对所有 value 相同，
+/// 使 encode(v1)/encode(v2) 只差一个全局相位 → similarity 恒为单一 cos，
+/// 且 2/137.5≈0.01455 间距的 value 产生完全相同的向量（碰撞）。
 pub fn encode_scalar(value: f64) -> Vec<f64> {
-    let base_angle = (value * 137.5).fract() * std::f64::consts::TAU;
+    // 固定种子生成基相位 α_i ∈ [0, 2π)
+    static BASE_PHASES: std::sync::OnceLock<Vec<f64>> = std::sync::OnceLock::new();
+    let base = BASE_PHASES.get_or_init(|| {
+        let mut rng = StdRng::seed_from_u64(0x5EED_AC7E_5C41_A0A0);
+        (0..FHRR_DIM)
+            .map(|_| rng.gen_range(0.0..std::f64::consts::TAU))
+            .collect()
+    });
     (0..FHRR_DIM)
-        .map(|i| {
-            let offset = (i as f64) * 1.618033988749895; // golden ratio
-            (base_angle + offset) % std::f64::consts::TAU
-        })
+        .map(|i| (base[i] * value) % std::f64::consts::TAU)
         .collect()
 }
 

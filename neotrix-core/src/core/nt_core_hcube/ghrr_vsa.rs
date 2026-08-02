@@ -304,7 +304,7 @@ impl GhrrHyperCube {
             dim,
             codebook: HashMap::new(),
             eta,
-            next_seed: 0xF1_4A_1F_1A,
+            next_seed: 0xDEAD_BEEF_CAFE_0001,
         }
     }
 

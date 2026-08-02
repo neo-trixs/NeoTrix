@@ -17,9 +17,12 @@ use super::vsa_scorer::VsaContentScorer;
 /// Compute Shannon entropy of a probability distribution.
 /// Returns normalized entropy (0..1) where 0 = certain, 1 = uniform.
 pub fn compute_semantic_entropy(data: &[f64]) -> f64 {
+    if data.is_empty() {
+        return 0.0;
+    }
     let sum: f64 = data.iter().sum();
     if sum <= 0.0 {
-        return 1.0;
+        return 0.0;
     }
     let normalized: Vec<f64> = data.iter().map(|v| v / sum).collect();
     let entropy: f64 = normalized.iter()
