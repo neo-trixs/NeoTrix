@@ -781,8 +781,11 @@ impl ReasoningEngine {
                 root_span.set_attribute("ewhr_hypotheses_proposed", AttributeValue::Int(proposed.len() as i64));
                 // Hydrate into HypothesisNetwork if available
                 if let Some(ref net_lock) = self.hypothesis_network {
-                    if let Ok(_net) = net_lock.lock() {
-                        // TODO: convert proposed strings to HypothesisNetwork nodes
+                    if let Ok(mut net) = net_lock.lock() {
+                        let added = hydrate_ewhr_hypotheses(&mut net, &proposed, self.state_trajectory.len());
+                        if added > 0 {
+                            root_span.set_attribute("ewhr_hypotheses_hydrated", AttributeValue::Int(added as i64));
+                        }
                     }
                 }
             }
@@ -1117,6 +1120,33 @@ impl ReasoningEngine {
     }
 }
 
+/// EWHR 提议 → HypothesisNetwork 落点。
+///
+/// 将 `analyze_trajectory` 返回的候选假说字符串 (Vec<String>) 转化为
+/// HypothesisNetwork 节点。幂等: 同一 (trajectory_len, index) 的 id 已存在则跳过,
+/// 避免每轮重复落点。返回实际新增数量。
+fn hydrate_ewhr_hypotheses(
+    net: &mut crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork,
+    proposed: &[String],
+    tick: usize,
+) -> usize {
+    let mut added = 0usize;
+    for (i, proposal) in proposed.iter().enumerate() {
+        let id = format!("ewhr_{}_{}", tick, i);
+        if net.get_hypothesis(&id).is_some() {
+            continue;
+        }
+        let title = if proposal.len() > 32 {
+            format!("{}…", &proposal[..32])
+        } else {
+            proposal.clone()
+        };
+        net.propose_hypothesis(&id, &title, proposal, 0.5);
+        added += 1;
+    }
+    added
+}
+
 /// Detect if an LLM response is a refusal (empty, apology, or explicit refusal patterns).
 pub fn detect_refusal_response(response: &str) -> bool {
     let trimmed = response.trim();
@@ -1181,5 +1211,48 @@ mod tests {
         assert!(!detect_refusal_response("The answer to your question is..."));
         assert!(!detect_refusal_response("Let me help you with that."));
         assert!(!detect_refusal_response("Here is the implementation:"));
+    }
+
+    #[test]
+    fn test_hydrate_ewhr_hypotheses_adds_nodes() {
+        use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        let mut net = HypothesisNetwork::new();
+        let proposed = vec![
+            "agent should adopt Direct strategy when context is high".to_string(),
+            "error recovery benefits from rollback-first policy".to_string(),
+        ];
+        let added = hydrate_ewhr_hypotheses(&mut net, &proposed, 42);
+        assert_eq!(added, 2);
+        assert_eq!(net.hypotheses.len(), 2);
+        assert!(net.get_hypothesis("ewhr_42_0").is_some());
+        assert!(net.get_hypothesis("ewhr_42_1").is_some());
+    }
+
+    #[test]
+    fn test_hydrate_ewhr_hypotheses_idempotent() {
+        use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        let mut net = HypothesisNetwork::new();
+        let proposed = vec!["same proposal repeated".to_string()];
+        // 同一 tick 两次调用 → 第二次不重复落点
+        let added1 = hydrate_ewhr_hypotheses(&mut net, &proposed, 7);
+        let added2 = hydrate_ewhr_hypotheses(&mut net, &proposed, 7);
+        assert_eq!(added1, 1);
+        assert_eq!(added2, 0, "same tick must not duplicate hypotheses");
+        assert_eq!(net.hypotheses.len(), 1);
+        // 不同 tick → 允许新增 (新一轮轨迹)
+        let added3 = hydrate_ewhr_hypotheses(&mut net, &proposed, 8);
+        assert_eq!(added3, 1);
+        assert_eq!(net.hypotheses.len(), 2);
+    }
+
+    #[test]
+    fn test_hydrate_ewhr_hypotheses_long_title_truncated() {
+        use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisNetwork;
+        let mut net = HypothesisNetwork::new();
+        let long = "a very long hypothesis description that definitely exceeds the thirty two character title limit for display purposes".to_string();
+        let added = hydrate_ewhr_hypotheses(&mut net, &[long.clone()], 1);
+        assert_eq!(added, 1);
+        let h = net.get_hypothesis("ewhr_1_0").expect("node exists");
+        assert!(h.title.len() <= 33, "title must be truncated to 32+ellipsis, got len {}", h.title.len());
     }
 }
