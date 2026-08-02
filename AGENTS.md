@@ -31,6 +31,7 @@ Cycle 指针与全文统一存 KB: `~/.neotrix/knowledge.db` `experience` 命名
 | 188 | NT-CORE | Muon/Safety 修复 (Newton-Schulz Frobenius 归一化防 NaN, risk 归一化 /1.2) + 前沿模型知识落库 (Kimi K3/DeepSeek V4/Fable 5/Qwen3.8/Gemini 3.6/Grok 4.5 → KB seed → hypercube SystemDesign 轴); seal_loop.init_attention_router 触发 seed_foundational; frontier seed 全链路测试通过 |
 | 189 | NT-CORE | Iter45 周天星系大阵运转链路审计轮 (13 HIGH/12 MEDIUM/10 LOW): H3 hypercube_bridge 多标签坐标塌缩聚合; M-8 geometry_sync min_info_partition 丢 current_state; HIGH-2 iit_phi 均衡饱和 → centered + intensity×rho (23维均衡0/差异化0.58); FHRR permute % → rem_euclid(TAU); M-9 negentropy 硬编码假传感器 → 真实 state+0.5降级; L-4 graph_memory 重复 id 误驱逐 LRU; 提交 89d58dd (6 文件); H3 文件因并发 ingest_from_kb WIP 留待并发合并; HIGH-1 Track2 死代码删除: cognitive_tick+cognitive_orchestrator 1124行平行孤儿 (R-P42/R-P79) → 5c24375; 共享 mod.rs 用 staged 纯删除+working 保留并发行隔离 |
 | 190 | NT-CORE | Phase 7.2 InnerSpeech (MIRROR §3.3): inner_speech.rs 自我对话 (广播→独白→context 写回, 有界 ring=32, 自我问答 cadence); GlobalWorkspace 接线 + engine_core GWT tick telemetry; 11 测试 + GWT 全量 316 通过 |
+| 191 | NT-CORE | Phase 7.5+7.3+7.4: ModalityRouter (5-modal softmax q·k router + REINFORCE, Step 4c) / CLS_Buffer (ring100 episodic + hybrid 检索, Step 4d) / CTM_Verifier (5 公理 finite-state/finite-action/globality/δ/bounded-tape, Step 4e) 接线 GlobalWorkspace; GWT 337 通过, 全 lib 6810 (仅 2 预存 DNS 失败); 教训: REINFORCE 勿 unit-normalize, verify 用 in-flight report 非 last_resonance, ReasoningHexagram pub 构造测 invalid state |
 
 ## Skill Routing (何时加载什么)
 
