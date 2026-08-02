@@ -121,8 +121,8 @@
 - **参考**: Thinking Pixel (arXiv:2604.25299), §3.1
 
 ### 实现检查清单
-- [ ] `E8State` → `latent_thought: Vec<f32>` 字段
-- [ ] `RecursiveDepthReward` in SEAL reward_calc
+- [x] `E8State` → `latent_thought` 嵌入 (nt_latent_thought.rs, 10 tests, Gauss-kernel 可微 embed/interpolate/nearest_state) ✅ iter192
+- [x] `RecursiveDepthReward` in SEAL reward_calc (recursive_depth_reward.rs, 6 tests, seal_loop 融合点接线) ✅ iter192
 - [ ] `SparseMoERouter` 模块 (top-k routing)
 - [ ] `LatentReasoningTransformer` (lightweight, 循环深度)
 - [x] `LatentPredictor` — E8 状态转换预测器 (最近邻, Hamming 距离, curiosity_reward, 16 passes)
@@ -227,7 +227,7 @@
 - **参考**: MiCRo (arXiv:2506.13331), §4.2
 
 ### 实现检查清单
-- [ ] CognitiveType enum (Linguistic, Logical, Knowledge, Social)
+- [x] CognitiveType enum (Linguistic, Logical, Knowledge, Social) — cognitive_type.rs, 10 tests, Step 4f 接线 ✅ iter192
 - [ ] `CognitiveHub` — 跨组路由桥梁
 - [ ] `GatingNetwork` — 可学习 router
 - [ ] `CognitiveTopology` — 结构化连接矩阵
@@ -354,13 +354,13 @@ Phase 10 ── 统一潜在推理
 | 优先级 | 阶段 | 项目 | 依赖 | 预估 |
 |--------|------|------|------|------|
 | **P0** | 7.1 | EntropyMonitor 死锁打破 | GWT 现有 | 3d |
-| **P0** | 6.1 | LatentThoughtVector | E8 现有 | 5d |
+| **P0** | 6.1 | LatentThoughtVector | E8 现有 | 5d | ✅ iter192 |
 | **P0** | 7.3 | CLS_Buffer 互补学习 | HyperCube 现有 | 4d | ✅ iter191 |
-| **P0** | 6.2 | RecursiveDepthReward | SEAL reward_calc | 2d |
+| **P0** | 6.2 | RecursiveDepthReward | SEAL reward_calc | 2d | ✅ iter192 |
 | **P0** | 7.4 | CTM formality 对齐 | Phase 6/7 基础 | 3d | ✅ iter191 |
 | **P1** | 7.2 | InnerSpeech | GWT broadcast | 4d | ✅ iter190 |
 | **P1** | 7.5 | ModalityRouter | GWT attention | 3d | ✅ iter191 |
-| **P1** | 8.1 | CognitiveType | GWT 专家枚举 | 2d |
+| **P1** | 8.1 | CognitiveType | GWT 专家枚举 | 2d | ✅ iter192 |
 | **P1** | 6.3 | SparseMoERouter | E8 分组重构 | 5d |
 | **P2** | 8.2 | CognitiveHub | Phase 8.1 | 4d |
 | **P2** | 8.3 | GatingNetwork | Phase 8.2 | 5d |
