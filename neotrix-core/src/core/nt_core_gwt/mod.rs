@@ -4,6 +4,7 @@ pub mod resonance;
 pub mod monitor;
 pub mod physics_attention;
 pub mod cls_buffer;
+pub mod ctm_verifier;
 pub mod inner_speech;
 pub mod modality_router;
 pub mod geometry_sync;
@@ -33,6 +34,8 @@ pub use resonator_network::{
 pub use workspace::{AuditBlock, AuditEventType};
 pub use inner_speech::InnerSpeech;
 pub use modality_router::{Modality, ModalityRouter};
+pub use cls_buffer::{CLSBuffer, Experience};
+pub use ctm_verifier::{CtmAlignmentReport, CtmCheck, CtmVerifier, E8_STATE_COUNT};
 pub use nt_gwt_reviewer::{
     ReviewSeverity, ReviewFinding, ReviewReport, ReviewerRole, ReviewerAgent, ReviewerCoordinator,
 };

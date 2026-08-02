@@ -189,9 +189,9 @@
 - [x] `DeadlockAwareRollback` — 最大刺激后回滚 (seal_loop.rs 集成)
 - [x] `InnerSpeech` — 自我对话生成器 (inner_speech.rs, 11 tests, GWT 广播→独白→context 写回)
 - [x] `ModalityRouter` — 模态级注意力权重 (modality_router.rs, 21 tests, $a_m=\text{softmax}(q^T k_m)$ + REINFORCE, resonant_broadcast Step 4c 接线)
-- [ ] `CLS_Buffer` — 快速体验缓冲区 (经验回放)
-- [ ] `CTM_Verifier` — 形式化对齐检查
-- [ ] 测试: entropy 行为 / inner speech 一致性 / CLS 检索 / CTM 约束
+- [x] `CLS_Buffer` — 快速体验缓冲区 (cls_buffer.rs, 10+2 tests, ring buffer + hybrid 检索, resonant_broadcast Step 4d 写入)
+- [x] `CTM_Verifier` — 形式化对齐检查 (ctm_verifier.rs, 7 tests, 5 公理: finite-state/finite-action/globality/deterministic-delta/bounded-tape, Step 4e 接线)
+- [x] 测试: entropy 行为 / inner speech 一致性 / CLS 检索 / CTM 约束
 
 ---
 
@@ -355,11 +355,11 @@ Phase 10 ── 统一潜在推理
 |--------|------|------|------|------|
 | **P0** | 7.1 | EntropyMonitor 死锁打破 | GWT 现有 | 3d |
 | **P0** | 6.1 | LatentThoughtVector | E8 现有 | 5d |
-| **P0** | 7.3 | CLS_Buffer 互补学习 | HyperCube 现有 | 4d |
+| **P0** | 7.3 | CLS_Buffer 互补学习 | HyperCube 现有 | 4d | ✅ iter191 |
 | **P0** | 6.2 | RecursiveDepthReward | SEAL reward_calc | 2d |
-| **P0** | 7.4 | CTM formality 对齐 | Phase 6/7 基础 | 3d |
+| **P0** | 7.4 | CTM formality 对齐 | Phase 6/7 基础 | 3d | ✅ iter191 |
 | **P1** | 7.2 | InnerSpeech | GWT broadcast | 4d | ✅ iter190 |
-| **P1** | 7.5 | ModalityRouter | GWT attention | 3d |
+| **P1** | 7.5 | ModalityRouter | GWT attention | 3d | ✅ iter191 |
 | **P1** | 8.1 | CognitiveType | GWT 专家枚举 | 2d |
 | **P1** | 6.3 | SparseMoERouter | E8 分组重构 | 5d |
 | **P2** | 8.2 | CognitiveHub | Phase 8.1 | 4d |

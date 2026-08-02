@@ -92,6 +92,16 @@ pub struct GlobalWorkspace {
     /// Top-Down Modality Attention Router (arXiv:2602.08597 §3). Gates per-modality
     /// workspace representation strength by task-query attention over modality keys.
     pub modality_router: super::modality_router::ModalityRouter,
+    /// Complementary Learning Systems fast buffer (MIRROR AAAI 2026 §3.4).
+    /// Hippocampus-style ring buffer of recent episodic experiences recorded from
+    /// each resonance cycle; hybrid retrieval reranks fast candidates by salience.
+    pub cls_buffer: super::cls_buffer::CLSBuffer,
+    /// CTM-AI formal alignment verifier (arXiv:2605.04097 §2-4). Confirms the
+    /// GWT is a Conscious Turing Machine instance: finite E8 states, bounded
+    /// specialist actions, global broadcast, deterministic transition.
+    pub ctm_verifier: super::ctm_verifier::CtmVerifier,
+    /// Most recent CTM alignment verification result.
+    pub last_ctm_report: Option<super::ctm_verifier::CtmAlignmentReport>,
 }
 
 /// Events that trigger an audit block
@@ -145,6 +155,9 @@ impl GlobalWorkspace {
             geometry_sync: None,
             inner_speech: super::inner_speech::InnerSpeech::default(),
             modality_router: super::modality_router::ModalityRouter::default(),
+            cls_buffer: super::cls_buffer::CLSBuffer::default(),
+            ctm_verifier: super::ctm_verifier::CtmVerifier::new(),
+            last_ctm_report: None,
         }
     }
 
@@ -370,6 +383,40 @@ impl GlobalWorkspace {
             }
         }
 
+        // Step 4d: Complementary Learning Systems — record this resonance cycle as
+        // an episodic experience in the fast (hippocampus) buffer. The winner's E8
+        // mode + effective salience snapshot form the episode signature; the content
+        // is the broadcast payload. High-reward episodes become consolidation
+        // candidates for the slow (neocortex) HyperCube store (MIRROR AAAI 2026 §3.4).
+        {
+            let e8_state = hexagram_states
+                .get(report.winner)
+                .map(|h| h.0)
+                .unwrap_or(0);
+            let reward = report.effective_saliences.get(report.winner).copied().unwrap_or(0.0);
+            self.cls_buffer.record(
+                e8_state,
+                report.effective_saliences.to_vec(),
+                content.to_string(),
+                reward,
+            );
+        }
+
+        // Step 4e: CTM-AI formal alignment — verify the GWT is a Conscious Turing
+        // Machine instance over the just-produced resonance report (finite states,
+        // bounded actions, global broadcast, deterministic δ, bounded tape).
+        {
+            let active = self.specialists.len();
+            let aligned = self.verify_ctm_report(hexagram_states, active, &report);
+            if !aligned.aligned {
+                self.broadcast_history.push(format!(
+                    "[ctm_verifier] MISALIGNED: {}/{} axioms held",
+                    aligned.passed_checks,
+                    aligned.total_checks,
+                ));
+            }
+        }
+
         // Step 5: update module activations with effective salience
         // effective_saliences[i] 是声明序，按 specialist_type 写回而非 values() 枚举序
         for m in self.specialists.values_mut() {
@@ -501,6 +548,60 @@ impl GlobalWorkspace {
     pub fn resonance_winner(&self) -> Option<&SpecialistModule> {
         let report = self.last_resonance.as_ref()?;
         self.specialist_at_index(report.winner)
+    }
+
+    /// Hybrid CLS retrieval: query the fast episodic buffer by E8 mode and by
+    /// activation similarity, then merge by description. This is the query side of
+    /// the dual-memory architecture — fast candidates are surfaced before the slow
+    /// HyperCube semantic store reranks (roadmap Phase 7.3).
+    pub fn recall_experiences(&self, e8_state: u8, activation: &[f64], top_k: usize) -> Vec<&super::cls_buffer::Experience> {
+        let mut seen: Vec<&super::cls_buffer::Experience> = Vec::new();
+        let mut dedup: std::collections::HashSet<u64> = std::collections::HashSet::new();
+        for exp in self.cls_buffer.query_fast(e8_state, top_k).into_iter()
+            .chain(self.cls_buffer.query_fast_by_activation(activation, top_k))
+        {
+            if dedup.insert(exp.id) {
+                seen.push(exp);
+            }
+        }
+        seen.truncate(top_k);
+        seen
+    }
+
+    /// Run the CTM-AI formal alignment verification over a resonance snapshot.
+    /// Returns the alignment report and stores it in `last_ctm_report`.
+    /// `specialists_active` is the count of registered specialists (|A| witness).
+    pub fn verify_ctm(&mut self, hexagram_states: &[ReasoningHexagram], specialists_active: usize) -> super::ctm_verifier::CtmAlignmentReport {
+        let report = match self.last_resonance.clone() {
+            Some(r) => r,
+            None => {
+                // Degenerate placeholder when no resonance has run yet — only used to
+                // keep the verifier total; alignment will fail the globality check.
+                ResonanceReport {
+                    winner: usize::MAX,
+                    effective_saliences: [0.0; MODULE_COUNT],
+                    raw_saliences: [0.0; MODULE_COUNT],
+                    entropy: f64::NAN,
+                    resonator_clusters: Vec::new(),
+                    complement_activated: false,
+                }
+            }
+        };
+        let tape_len = self.broadcast_history.len();
+        let aligned = self.ctm_verifier.verify(hexagram_states, specialists_active, &report, tape_len);
+        let ret = aligned.clone();
+        self.last_ctm_report = Some(aligned);
+        ret
+    }
+
+    /// Verify an in-flight resonance report (used mid-cycle in resonant_broadcast,
+    /// before `last_resonance` is stored at Step 6).
+    fn verify_ctm_report(&mut self, hexagram_states: &[ReasoningHexagram], specialists_active: usize, report: &ResonanceReport) -> super::ctm_verifier::CtmAlignmentReport {
+        let tape_len = self.broadcast_history.len();
+        let aligned = self.ctm_verifier.verify(hexagram_states, specialists_active, report, tape_len);
+        let ret = aligned.clone();
+        self.last_ctm_report = Some(aligned);
+        ret
     }
 
     /// Get resonance cluster members as module references.
@@ -690,6 +791,80 @@ mod tests {
         // Activations should be updated with effective salience
         let pm = ws.specialist_by_type_mut(&SpecialistType::PatternMatcher).expect("PatternMatcher should be registered for activation check");
         assert!(pm.activation > 0.0);
+    }
+
+    #[test]
+    fn test_resonant_broadcast_records_cls_experience() {
+        let mut ws = make_workspace();
+        let states = default_specialist_states();
+
+        ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
+            .expect("PatternMatcher should be registered").activation = 0.9;
+
+        ws.resonant_broadcast("episodic payload", &states);
+
+        // Every resonance cycle records one episodic experience into the fast buffer
+        assert_eq!(ws.cls_buffer.len(), 1);
+        let winners = ws.cls_buffer.consolidation_candidates();
+        // The winner's effective salience is used as reward proxy, so high-winner
+        // episodes should surface as consolidation candidates
+        let _ = winners;
+
+        // Hybrid recall surfaces the recorded experience
+        let winner_idx = ws.last_resonance.as_ref().map(|r| r.winner).unwrap_or(0);
+        let e8_state = states.get(winner_idx).map(|h| h.0).unwrap_or(0);
+        let recall = ws.recall_experiences(e8_state, &[0.9, 0.5, 0.1], 3);
+        assert!(!recall.is_empty());
+        assert_eq!(recall[0].description, "episodic payload");
+    }
+
+    #[test]
+    fn test_cls_ring_eviction_in_broadcast() {
+        let mut ws = make_workspace();
+        let states = default_specialist_states();
+        ws.cls_buffer.max_fast = 2;
+
+        ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
+            .expect("PatternMatcher should be registered").activation = 0.9;
+        ws.resonant_broadcast("first", &states);
+        ws.resonant_broadcast("second", &states);
+        ws.resonant_broadcast("third", &states);
+
+        // Ring buffer evicts oldest: only 2 most recent retained
+        assert_eq!(ws.cls_buffer.len(), 2);
+        assert!(ws.cls_buffer.query_fast(0, 10).iter().all(|e| e.description != "first"));
+    }
+
+    #[test]
+    fn test_resonant_broadcast_runs_ctm_verification() {
+        let mut ws = make_workspace();
+        let states = default_specialist_states();
+
+        ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
+            .expect("PatternMatcher should be registered").activation = 0.9;
+        ws.resonant_broadcast("ctm probe", &states);
+
+        // Every resonance cycle runs CTM-AI formal alignment verification
+        assert!(ws.last_ctm_report.is_some());
+        let rep = ws.last_ctm_report.as_ref().unwrap();
+        assert!(rep.aligned, "GWT should satisfy CTM axioms: {:#?}", rep.checks);
+        assert_eq!(rep.total_checks, 5);
+        assert_eq!(rep.passed_checks, 5);
+    }
+
+    #[test]
+    fn test_ctm_verifier_manual_run() {
+        let mut ws = make_workspace();
+        let states = default_specialist_states();
+        ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
+            .expect("PatternMatcher should be registered").activation = 0.8;
+        ws.resonant_broadcast("manual", &states);
+
+        // Re-run verification directly with the current snapshot's action space
+        let active = ws.specialists.len();
+        let rep = ws.verify_ctm(&states, active);
+        assert!(rep.is_aligned());
+        assert!(ws.last_ctm_report.is_some());
     }
 
     #[test]
