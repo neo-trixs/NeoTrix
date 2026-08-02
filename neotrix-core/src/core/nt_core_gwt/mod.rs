@@ -4,6 +4,7 @@ pub mod resonance;
 pub mod monitor;
 pub mod physics_attention;
 pub mod cls_buffer;
+pub mod inner_speech;
 pub mod geometry_sync;
 pub mod competition_gate;
 pub mod compaction;
@@ -29,6 +30,7 @@ pub use resonator_network::{
     ResonanceReport as ResonatorReport, ResonatorNetwork,
 };
 pub use workspace::{AuditBlock, AuditEventType};
+pub use inner_speech::InnerSpeech;
 pub use nt_gwt_reviewer::{
     ReviewSeverity, ReviewFinding, ReviewReport, ReviewerRole, ReviewerAgent, ReviewerCoordinator,
 };

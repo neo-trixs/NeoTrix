@@ -86,6 +86,9 @@ pub struct GlobalWorkspace {
     /// Cross-dimensional consciousness geometry sync (12-layer Φ integration).
     /// Ticked every resonant_broadcast cycle to compute integrated information.
     pub geometry_sync: Option<GeometrySync>,
+    /// Inner Speech channel — self-talk summarizing the resonance state,
+    /// fed back as context for subsequent experts (MIRROR AAAI 2026 §3.3).
+    pub inner_speech: super::inner_speech::InnerSpeech,
 }
 
 /// Events that trigger an audit block
@@ -137,6 +140,7 @@ impl GlobalWorkspace {
             e8_attention_bias: 0.3,
             vsa_scorer: None,
             geometry_sync: None,
+            inner_speech: super::inner_speech::InnerSpeech::default(),
         }
     }
 
@@ -321,6 +325,28 @@ impl GlobalWorkspace {
             report.resonator_clusters.len(),
         ));
         self.broadcast_history.push(content.to_string());
+
+        // Step 4b: Inner Speech — self-talk over the observed resonance state.
+        // Generates a natural-language utterance (what the consciousness layer is
+        // attending to, how focused, entropy health) and feeds it back into the
+        // workspace so subsequent specialists reason over their own broadcast.
+        {
+            let winner_name = self.specialist_at_index(report.winner)
+                .map(|m| m.name.clone())
+                .unwrap_or_else(|| format!("specialist_{}", report.winner));
+            let speech_input = super::inner_speech::SpeechInput {
+                winner: report.winner,
+                winner_name,
+                entropy: report.entropy,
+                focused: report.is_focused(),
+                complement_activated: report.complement_activated,
+                content: content.to_string(),
+            };
+            let utterance = self.inner_speech.speak(&speech_input);
+            if self.inner_speech.feed_back_enabled {
+                self.broadcast_history.push(utterance.clone());
+            }
+        }
 
         // Step 5: update module activations with effective salience
         // effective_saliences[i] 是声明序，按 specialist_type 写回而非 values() 枚举序

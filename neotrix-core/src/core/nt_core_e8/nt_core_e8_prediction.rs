@@ -51,15 +51,44 @@ fn top_k(probs: &[f64], k: usize) -> Vec<(u8, f64)> {
 }
 
 /// Predictive distribution from the empirical transition matrix row.
+///
+/// Uses `dominance_capped_distribution` (Kimi K3 Quantile Balancing) so a single
+/// over-visited destination cannot monopolize the row and flatten attention.
 fn matrix_distribution(tm: &E8TransitionMatrix, from: u8) -> Vec<f64> {
     let fi = from.min(63) as usize;
     let total = tm.row_totals.0[fi];
-    let mut probs = vec![1.0 / 64.0; 64];
-    if total == 0 { return probs; }
-    for t in 0..64 {
-        probs[t] = tm.counts.get(fi, t) as f64 / total as f64;
+    if total == 0 {
+        return vec![1.0 / 64.0; 64];
     }
-    probs
+    // Cap 0.8: prevents a single destination from fully monopolizing a row
+    // (K3 quantile-balancing intent) while still leaving headroom for
+    // temperature to concentrate attention on the true mode.
+    tm.dominance_capped_distribution(from, 0.8)
+}
+
+/// Top-K sparse attention: keep only the largest `k` probability entries and
+/// renormalize the rest to zero. Mirrors the sparsity of Mixture-of-Experts
+/// routers (Kimi K3 activates 16 of 896 experts; Qwen3 allocates a thinking
+/// budget). With `k` scaling down as confidence rises, attention progressively
+/// condenses onto the predicted modes instead of staying flat across all 64.
+fn sparse_top_k(probs: &[f64], k: usize) -> Vec<f64> {
+    if probs.len() != 64 || k >= 64 {
+        return probs.to_vec();
+    }
+    let mut idx: Vec<(usize, f64)> = probs.iter().enumerate().map(|(i, &p)| (i, p)).collect();
+    idx.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    let mut out = vec![0.0; 64];
+    let mut sum = 0.0;
+    for (i, p) in idx.iter().take(k) {
+        out[*i] = *p;
+        sum += p;
+    }
+    if sum > 0.0 {
+        for o in out.iter_mut() {
+            *o /= sum;
+        }
+    }
+    out
 }
 
 /// Canonical task-type chain as a probability bump around predicted position.
@@ -162,6 +191,13 @@ impl E8PredictiveDistribution {
     /// If `temperature` is low (0.1), approximates one-hot; high (1.0) = soft.
     pub fn attention_weights(&self, temperature: f64) -> Vec<f64> {
         softmax_with_temp(&self.probabilities, temperature)
+    }
+
+    /// Sparse attention: softmax then zero-out all but the top-`k` states.
+    /// The `k` controls the "thinking budget" — fewer states means sharper focus.
+    pub fn attention_weights_sparse(&self, temperature: f64, k: usize) -> Vec<f64> {
+        let soft = softmax_with_temp(&self.probabilities, temperature);
+        sparse_top_k(&soft, k)
     }
 
     /// Returns the number of states that account for 90% of probability mass.

@@ -15,6 +15,7 @@ pub mod ewhr_bridge;
 pub mod nt_core_community_ingester;
 pub mod nt_core_e8_prediction;
 pub mod nt_core_fable_pattern;
+pub mod nt_core_synthesis;
 pub mod nt_core_trajectory_prm;
 pub mod state_machine;
 pub mod thinking_budget;
@@ -907,6 +908,24 @@ impl FlatCounts {
     }
 }
 
+/// Semantic edge weight for a ReasoningFlow-style typed transition.
+///
+/// Maps the typed edge families from `jinulee-v/reasoningflow`
+/// (arXiv:2606.05402) onto the E8 transition matrix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EdgeSemantics {
+    /// `reason:infer` — logical premise→conclusion, strongest signal.
+    Infer,
+    /// `plan:decompose` / `plan:proceed` — structured forward progress.
+    Progress,
+    /// `plan:verify` / `reflect:*` — verification or reflection; moderate.
+    Verify,
+    /// `plan:backtrack` / `validate:attack` — reversal or contradiction.
+    /// Recording backtrack edges at full weight entrenches the self-loop
+    /// dynamics that cause route collapse; damped to keep forward signal.
+    Backtrack,
+}
+
 /// 64×64 transition probability matrix for E8 hexagram states.
 /// cell[i][j] = empirical probability of transitioning from hexagram i to j.
 /// Seeded from discovered Mythos trace patterns and updated continuously.
@@ -984,6 +1003,95 @@ impl E8TransitionMatrix {
         let ti = (to.min(63)) as usize;
         self.counts.add(fi, ti, 1);
         self.row_totals.0[fi] = self.row_totals.0[fi].saturating_add(1);
+        self.visit_counts.0[fi] = self.visit_counts.0[fi].saturating_add(1);
+        self.recent_transitions.push((from, to));
+        if self.recent_transitions.len() > self.max_recent {
+            self.recent_transitions.remove(0);
+        }
+    }
+
+    /// Dominance-capped empirical distribution for a source state.
+    ///
+    /// Mirrors Kimi K3 "Quantile Balancing" routing: no single destination may
+    /// claim more than `cap` of the row's probability mass. A row whose count
+    /// distribution is monopolized by one cell (e.g. mode 0 accumulating tens of
+    /// thousands of transitions while all others stay near zero) is rebalanced by
+    /// clamping each cell at `cap`, then redistributing the freed mass to the
+    /// under-represented cells in proportion to their raw counts. This ensures a
+    /// dominant cell stays at the cap while the rest of the row still gets real
+    /// predictive signal. Without this, a single over-visited mode dominates the
+    /// prediction, attention stays flat (the source row becomes near-uniform),
+    /// and the confidence metric decays — the exact "route collapse" seen in
+    /// long-run SEAL tests.
+    pub fn dominance_capped_distribution(&self, from: u8, cap: f64) -> Vec<f64> {
+        let fi = from.min(63) as usize;
+        let total = self.row_totals.0[fi];
+        let probs = vec![1.0 / 64.0; 64];
+        if total == 0 {
+            return probs;
+        }
+        let cap = cap.clamp(0.05, 1.0);
+        let raw: Vec<f64> = (0..64)
+            .map(|t| self.counts.get(fi, t) as f64 / total as f64)
+            .collect();
+        let mut clamped = vec![0.0f64; 64];
+        let mut freed = 0.0f64;
+        for t in 0..64 {
+            clamped[t] = raw[t].min(cap);
+            if raw[t] > cap {
+                freed += raw[t] - cap;
+            }
+        }
+        let uncapped_raw_sum: f64 = raw.iter().zip(clamped.iter())
+            .filter(|(r, c)| r <= c)
+            .map(|(r, _)| r)
+            .sum();
+        if freed > 0.0 && uncapped_raw_sum > 0.0 {
+            for t in 0..64 {
+                if raw[t] > clamped[t] {
+                    continue;
+                }
+                clamped[t] += freed * (raw[t] / uncapped_raw_sum);
+            }
+        }
+        let sum: f64 = clamped.iter().sum();
+        if sum > 0.0 {
+            for p in clamped.iter_mut() {
+                *p /= sum;
+            }
+        }
+        clamped
+    }
+
+    /// Record a transition with explicit reasoning edge semantics.
+    ///
+    /// Maps the typed edge families from `jinulee-v/reasoningflow`
+    /// (arXiv:2606.05402) onto the E8 transition matrix. Forward edges
+    /// (`Infer`, `Progress`) strengthen the empirical signal; `Backtrack`
+    /// edges are damped so a reversal-heavy trace cannot monopolize a row
+    /// and flatten attention the way mode 0 did in long-run SEAL tests.
+    pub fn record_semantic_transition(&mut self, from: u8, to: u8, edge: EdgeSemantics) {
+        let weight: f64 = match edge {
+            EdgeSemantics::Infer => 3.0,
+            EdgeSemantics::Progress => 2.0,
+            EdgeSemantics::Verify => 1.0,
+            EdgeSemantics::Backtrack => {
+                if from == to {
+                    return;
+                }
+                0.5
+            }
+        };
+        let fi = (from.min(63)) as usize;
+        let ti = (to.min(63)) as usize;
+        if weight == weight.round() {
+            let w = weight as u64;
+            self.counts.add(fi, ti, w);
+            self.row_totals.0[fi] = self.row_totals.0[fi].saturating_add(w);
+        } else {
+            self.counts.add(fi, ti, 1);
+            self.row_totals.0[fi] = self.row_totals.0[fi].saturating_add(1);
+        }
         self.visit_counts.0[fi] = self.visit_counts.0[fi].saturating_add(1);
         self.recent_transitions.push((from, to));
         if self.recent_transitions.len() > self.max_recent {
@@ -1093,6 +1201,124 @@ impl E8TransitionMatrix {
             self.row_totals.0[i] = self.row_totals.0[i].saturating_add(other.row_totals.0[i]);
             self.visit_counts.0[i] = self.visit_counts.0[i].saturating_add(other.visit_counts.0[i]);
         }
+    }
+
+    /// mHC doubly stochastic projection (Sinkhorn-Knopp).
+    ///
+    /// DeepSeek-V4's mHC architecture enforces that the transition matrix
+    /// is doubly stochastic: every row AND every column sums to 1.0.
+    /// This prevents any single destination state from monopolizing
+    /// transitions across the entire matrix — not just within one row.
+    ///
+    /// The Sinkhorn-Knopp algorithm alternates row-normalization and
+    /// column-normalization until convergence. The result is the unique
+    /// doubly stochastic matrix closest to the original in KL divergence.
+    ///
+    /// This directly counters route collapse: when mode 0 accumulates
+    /// tens of thousands of transitions while all others stay near zero,
+    /// a row-only normalization (dominance_capped_distribution) caps the
+    /// dominant cell but leaves column imbalance intact. The Birkhoff
+    /// projection ensures that mode 0 cannot dominate its column either,
+    /// so other source states still have a path *to* diverse destinations.
+    ///
+    /// `max_iter` — maximum Sinkhorn iterations (default 100).
+    /// `tol` — convergence tolerance on row/column sum deviation (default 1e-6).
+    /// Project the transition matrix onto the Birkhoff polytope (doubly
+    /// stochastic matrices) via Sinkhorn-Knopp iteration (DeepSeek-V4 mHC).
+    /// Returns the projected matrix as a float probability matrix: every row
+    /// and every column sums to 1, so no single destination can monopolize a
+    /// source's routing mass (anti-monopolization).
+    pub fn birkhoff_projected_matrix(&self, max_iter: usize, tol: f64) -> [[f64; 64]; 64] {
+        let total: u64 = self.row_totals.0.iter().sum();
+        if total == 0 {
+            let mut uniform = [[0.0f64; 64]; 64];
+            for i in 0..64 {
+                for j in 0..64 {
+                    uniform[i][j] = 1.0 / 64.0;
+                }
+            }
+            return uniform;
+        }
+
+        // Build raw probability matrix from counts
+        let mut mat = [[0.0f64; 64]; 64];
+        for i in 0..64 {
+            let ri = self.row_totals.0[i];
+            if ri == 0 {
+                for j in 0..64 { mat[i][j] = 1.0 / 64.0; }
+            } else {
+                for j in 0..64 {
+                    mat[i][j] = self.counts.get(i, j) as f64 / ri as f64;
+                }
+            }
+        }
+
+        // Sinkhorn-Knopp: alternate row and column normalization.
+        // NOTE: `mat` is the only working matrix — row/column scales are applied
+        // directly to it (never kept in separate scale vectors that then get
+        // re-applied, which double-counts and breaks convergence).
+        for _iter in 0..max_iter {
+            // Row normalize: scale each row to sum to 1
+            for i in 0..64 {
+                let row_sum: f64 = (0..64).map(|j| mat[i][j]).sum();
+                if row_sum > 0.0 {
+                    let inv = 1.0 / row_sum;
+                    for j in 0..64 {
+                        mat[i][j] *= inv;
+                    }
+                }
+            }
+
+            // Column normalize: scale each column to sum to 1
+            let mut max_dev = 0.0f64;
+            for j in 0..64 {
+                let col_sum: f64 = (0..64).map(|i| mat[i][j]).sum();
+                if col_sum > 0.0 {
+                    let inv = 1.0 / col_sum;
+                    max_dev = max_dev.max((inv - 1.0).abs());
+                    for i in 0..64 {
+                        mat[i][j] *= inv;
+                    }
+                }
+            }
+
+            if max_dev < tol {
+                break;
+            }
+        }
+
+        mat
+    }
+
+    /// Project the transition matrix onto the Birkhoff polytope and reconstruct
+    /// integer counts from the doubly-stochastic probability matrix. Each row is
+    /// scaled by its own original mass so the total transition mass is preserved
+    /// (rows with no data stay zero); the per-row normalized distribution is the
+    /// doubly-stochastic row, so anti-monopolization survives in probability space.
+    pub fn birkhoff_projection(&self, max_iter: usize, tol: f64) -> E8TransitionMatrix {
+        let mat = self.birkhoff_projected_matrix(max_iter, tol);
+
+        // Reconstruct counts, scaling each row by its own original mass so the
+        // total transition mass is preserved. Row i's normalized distribution
+        // remains the doubly-stochastic row mat[i][:], so the anti-monopolization
+        // property survives in probability space (rows with no data stay zero).
+        let mut result = E8TransitionMatrix::new();
+        for i in 0..64 {
+            let ri = self.row_totals.0[i];
+            if ri == 0 {
+                result.visit_counts.0[i] = self.visit_counts.0[i];
+                continue;
+            }
+            for j in 0..64 {
+                let count = (mat[i][j] * ri as f64).round() as u64;
+                if count > 0 {
+                    result.counts.add(i, j, count);
+                    result.row_totals.0[i] += count;
+                }
+            }
+            result.visit_counts.0[i] = self.visit_counts.0[i];
+        }
+        result
     }
 }
 
@@ -1280,5 +1506,101 @@ mod tests {
     fn test_total_lines_identity() {
         assert_eq!(TOTAL_LINES, 384);
         assert_eq!(HEXAGRAM_COUNT * LINES_PER_HEXAGRAM, TOTAL_LINES);
+    }
+
+    #[test]
+    fn test_birkhoff_projection_doubly_stochastic() {
+        let mut tm = E8TransitionMatrix::new();
+        // Create a monopolized row: mode 0 dominates all transitions
+        for _ in 0..100 {
+            tm.record_transition(0, 0);
+        }
+        for _ in 0..5 {
+            tm.record_transition(0, 1);
+        }
+        for _ in 0..3 {
+            tm.record_transition(0, 2);
+        }
+        // Add some other rows with varied transitions
+        for i in 1..64 {
+            for j in 0..8 {
+                tm.record_transition(i as u8, ((i + j) % 64) as u8);
+            }
+        }
+
+        let projected = tm.birkhoff_projection(100, 1e-6);
+        let proj_mat = tm.birkhoff_projected_matrix(100, 1e-6);
+
+        // Verify rows sum to 1.0 (within tolerance)
+        for i in 0..64 {
+            let total = projected.row_totals.0[i];
+            if total > 0 {
+                let normalized_sum: f64 = (0..64)
+                    .map(|j| projected.counts.get(i, j) as f64 / total as f64)
+                    .sum();
+                assert!(
+                    (normalized_sum - 1.0).abs() < 1e-4,
+                    "Row {i} sum = {normalized_sum} (should be 1.0)"
+                );
+            }
+        }
+
+        // Verify the float projection is doubly stochastic: every row AND column
+        // sums to 1 — the mHC property that no destination monopolizes the
+        // routing mass (columns must be balanced, not just rows).
+        for i in 0..64 {
+            let row_sum: f64 = proj_mat[i].iter().sum();
+            assert!((row_sum - 1.0).abs() < 1e-3, "Proj row {i} sum = {row_sum:.4}");
+        }
+        for j in 0..64 {
+            let col_sum: f64 = (0..64).map(|i| proj_mat[i][j]).sum();
+            assert!((col_sum - 1.0).abs() < 1e-3, "Proj column {j} sum = {col_sum:.4}");
+        }
+
+        // Anti-monopolization: the projection must REDUCE the peak column
+        // concentration relative to the raw matrix. Row 0 originally dumps
+        // ~93% of its mass into column 0; after projection that peak must fall.
+        let raw_max_col = (0..64)
+            .map(|j| {
+                let total_col: u64 = (0..64).map(|i| tm.counts.get(i, j)).sum();
+                if total_col == 0 {
+                    0.0
+                } else {
+                    (0..64).map(|i| tm.counts.get(i, j) as f64 / total_col as f64).fold(0.0, f64::max)
+                }
+            })
+            .fold(0.0, f64::max);
+        let proj_max_col = (0..64)
+            .map(|j| (0..64).map(|i| proj_mat[i][j]).fold(0.0, f64::max))
+            .fold(0.0, f64::max);
+        assert!(
+            proj_max_col < raw_max_col,
+            "Projection must reduce peak column concentration: proj {proj_max_col:.3} vs raw {raw_max_col:.3}"
+        );
+    }
+
+    #[test]
+    fn test_birkhoff_projection_preserves_total_mass() {
+        let mut tm = E8TransitionMatrix::new();
+        tm.init_from_trace_patterns();
+        for _ in 0..50 {
+            tm.record_transition(10, 20);
+        }
+        for _ in 0..30 {
+            tm.record_transition(10, 30);
+        }
+        for _ in 0..20 {
+            tm.record_transition(20, 40);
+        }
+
+        let original_total: u64 = tm.row_totals.0.iter().sum();
+        let projected = tm.birkhoff_projection(100, 1e-6);
+        let projected_total: u64 = projected.row_totals.0.iter().sum();
+
+        // Projected matrix should preserve total transition mass
+        assert!(
+            (projected_total as i64 - original_total as i64).abs() < original_total as i64 / 4,
+            "Projected total {projected_total} should be close to original {original_total}"
+        );
     }
 }

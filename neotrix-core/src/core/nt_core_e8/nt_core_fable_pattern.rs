@@ -269,6 +269,58 @@ impl PhaseTransitionMatrix {
         }
         best
     }
+
+    /// Record one observed (from → to) phase transition.
+    pub fn record(&mut self, from: usize, to: usize) {
+        if from < 9 && to < 9 {
+            self.transitions[from][to] += 1.0;
+        }
+    }
+
+    /// Re-normalize each row to sum to 1.0 after bulk `record` calls.
+    pub fn normalize(&mut self) {
+        for row in self.transitions.iter_mut() {
+            let sum: f64 = row.iter().sum();
+            if sum > 0.0 {
+                for p in row.iter_mut() {
+                    *p /= sum;
+                }
+            }
+        }
+    }
+
+    /// Calibrate transition probabilities from a sequence of cognitive modes.
+    ///
+    /// Maps the `cognitive_mode` labels from `sxiong/MLR_structured_trajectory`
+    /// (ICLR 2026) — ProblemUnderstanding, Decomposition, Calculation,
+    /// Verification, Synthesis, Finalization — onto the Fable 9-phase chain and
+    /// accumulates empirical transition counts. This grounds the synthetic phase
+    /// priors in real reasoning traces instead of relying only on hand-authored
+    /// probabilities, directly countering the route-collapse tendency where a
+    /// stale self-loop-heavy row traps the E8 trajectory at one mode.
+    pub fn calibrate_from_cognitive_modes(&mut self, modes: &[&str]) {
+        for pair in modes.windows(2) {
+            if let (Some(f), Some(t)) = (self.phase_from_cognitive(pair[0]), self.phase_from_cognitive(pair[1])) {
+                self.record(f, t);
+            }
+        }
+        self.normalize();
+    }
+
+    /// Map a `cognitive_mode` string to a Fable phase index.
+    fn phase_from_cognitive(&self, mode: &str) -> Option<usize> {
+        let m = mode.to_ascii_lowercase();
+        if m.contains("understand") || m.contains("problem") || m.contains("parse") { Some(1) }
+        else if m.contains("decompos") || m.contains("plan") || m.contains("link") { Some(2) }
+        else if m.contains("first") || m.contains("principle") || m.contains("strategy") { Some(3) }
+        else if m.contains("calcul") || m.contains("execut") || m.contains("derive") { Some(6) }
+        else if m.contains("verif") || m.contains("check") || m.contains("reflect") { Some(4) }
+        else if m.contains("synthes") || m.contains("conclud") || m.contains("final") { Some(7) }
+        else if m.contains("alternat") || m.contains("consider") { Some(5) }
+        else if m.contains("acknowledg") { Some(0) }
+        else if m.contains("context") { Some(0) }
+        else { None }
+    }
 }
 
 /// Non-linear reasoning pattern types observed in community distillation data.
@@ -733,20 +785,47 @@ pub struct CommunityDatasetWeights {
     pub glint_2m: f64,
     /// Base linear assumption
     pub base: f64,
+
+    /// === Real HF dataset sources (2026) — extend the consciousness galaxy array ===
+    /// sxiong/MLR_structured_trajectory (ICLR 2026): step-level cognitive_mode annotations
+    /// (ProblemUnderstanding, Decomposition, Calculation, Verification, Synthesis, Finalization)
+    /// Directly maps to Fable 9-phase chain — critical for phase transition calibration.
+    pub mlr_structured: f64,
+    /// jinulee-v/reasoningflow: DAG-structured reasoning with 9 node types and typed edges
+    /// (reason:infer, plan:backtrack, plan:verify, plan:decompose). Maps directly to E8 transitions.
+    pub reasoningflow: f64,
+    /// DJLougen/harmonic-reasoning-v1: 4-phase Understand→Explore→Execute→Verify with
+    /// quality metrics (self_corrections, verifications, explorations). Perfect for PRM calibration.
+    pub harmonic_reasoning: f64,
+    /// Qyrou/reasoning-corpus-4K-5M-v1: 3.67M rows from DeepSeek-v4, Qwen3, Gemma4, etc.
+    /// repo_id field enables source-weighted blending.
+    pub qyrou_5m: f64,
+    /// saberai/ccf-reasoning-dataset: 6-stage Cognitive Cascade Framework
+    /// (Parse→Link→Strategy→Execute→Verify→Synthesize) — maps to Fable phases.
+    pub ccf_reasoning: f64,
+    /// sxiong/SWAP: Structure-aware Planning with process supervision from GPT-4o/DeepSeek-V2/Llama3.
+    pub swap: f64,
 }
 
 impl Default for CommunityDatasetWeights {
     fn default() -> Self {
         Self {
-            fable5_25k: 0.20,
-            complete_2m: 0.15,
-            uka_balanced: 0.12,
-            deep_reason: 0.10,
-            glm52_traces: 0.08,
-            qwable_sdft: 0.06,
-            agentic_distillation: 0.05,
-            glint_2m: 0.18,
-            base: 0.06,
+            fable5_25k: 0.11,
+            complete_2m: 0.09,
+            uka_balanced: 0.06,
+            deep_reason: 0.05,
+            glm52_traces: 0.04,
+            qwable_sdft: 0.04,
+            agentic_distillation: 0.03,
+            glint_2m: 0.11,
+            base: 0.04,
+            // Real HF sources (2026) — calibrated to complement synthetic sources
+            mlr_structured: 0.12,      // ICLR 2026, high-quality cognitive_mode labels
+            reasoningflow: 0.09,       // DAG-structured, rich transition semantics
+            harmonic_reasoning: 0.06,  // Quality metrics for PRM
+            qyrou_5m: 0.08,            // 3.67M rows, diverse model coverage
+            ccf_reasoning: 0.05,       // 6-stage CCF, Fable phase alignment
+            swap: 0.03,                // Process supervision, smaller but high-signal
         }
     }
 }
@@ -957,7 +1036,9 @@ mod tests {
     fn test_community_dataset_weights() {
         let w = CommunityDatasetWeights::default();
         let sum: f64 = w.fable5_25k + w.complete_2m + w.uka_balanced + w.deep_reason
-            + w.glm52_traces + w.qwable_sdft + w.agentic_distillation + w.glint_2m + w.base;
+            + w.glm52_traces + w.qwable_sdft + w.agentic_distillation + w.glint_2m + w.base
+            + w.mlr_structured + w.reasoningflow + w.harmonic_reasoning + w.qyrou_5m
+            + w.ccf_reasoning + w.swap;
         assert!((sum - 1.0).abs() < 0.01);
         assert!(w.glm52_traces > 0.0, "GLM-5.2 cross-model traces should have non-zero weight");
         assert!(w.qwable_sdft > 0.0, "Qwable SDFT should have non-zero weight");

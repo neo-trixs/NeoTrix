@@ -531,6 +531,200 @@ impl PrmAdapter {
     pub fn clear(&mut self) { self.prm_scores.clear(); self.step_scores.clear(); }
 }
 
+/// Fable 5 effort tiers mapped to TTC rollout depths.
+///
+/// Qwen3 allocates a thinking budget proportional to task difficulty;
+/// Fable 5 uses five explicit effort levels (low/medium/high/xhigh/max).
+/// Each tier controls how deep the TTC rollout explores before committing
+/// to a prediction — directly mapping the model's compute allocation to
+/// the NeoTrix consciousness core's trajectory depth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum EffortTier {
+    /// Low effort: minimal rollout, direct answer (Qwen3 thinking_budget ≈ 0.1)
+    Low,
+    /// Medium effort: standard rollout depth (Qwen3 thinking_budget ≈ 0.3)
+    Medium,
+    /// High effort: deeper iterative loops (Qwen3 thinking_budget ≈ 0.5)
+    High,
+    /// Extra-high effort: deep verification + backtrack (Qwen3 thinking_budget ≈ 0.7)
+    XHigh,
+    /// Max effort: full MCTS + parallel trajectories (Qwen3 thinking_budget ≈ 0.9)
+    Max,
+}
+
+impl EffortTier {
+    /// Detect effort tier from task difficulty and length.
+    /// Mirrors Qwen3's thinking budget allocation heuristic.
+    pub fn from_difficulty(difficulty: f64, task_length: usize) -> Self {
+        let length_factor = (task_length as f64 / 500.0).min(1.0);
+        let combined = difficulty * 0.7 + length_factor * 0.3;
+        if combined < 0.2 { EffortTier::Low }
+        else if combined < 0.4 { EffortTier::Medium }
+        else if combined < 0.6 { EffortTier::High }
+        else if combined < 0.8 { EffortTier::XHigh }
+        else { EffortTier::Max }
+    }
+
+    /// TTC rollout depth for this effort tier.
+    pub fn rollout_depth(&self) -> usize {
+        match self {
+            EffortTier::Low => 2,
+            EffortTier::Medium => 4,
+            EffortTier::High => 8,
+            EffortTier::XHigh => 16,
+            EffortTier::Max => 32,
+        }
+    }
+
+    /// MCTS simulations for this effort tier.
+    pub fn mcts_simulations(&self) -> usize {
+        match self {
+            EffortTier::Low => 0,
+            EffortTier::Medium => 8,
+            EffortTier::High => 16,
+            EffortTier::XHigh => 32,
+            EffortTier::Max => 64,
+        }
+    }
+
+    /// Beam width for this effort tier.
+    pub fn beam_width(&self) -> usize {
+        match self {
+            EffortTier::Low => 1,
+            EffortTier::Medium => 2,
+            EffortTier::High => 4,
+            EffortTier::XHigh => 8,
+            EffortTier::Max => 16,
+        }
+    }
+
+    /// Confidence cap: maximum confidence allowed at this tier.
+    /// Lower tiers stay uncertain (exploration); higher tiers commit (exploitation).
+    pub fn confidence_cap(&self) -> f64 {
+        match self {
+            EffortTier::Low => 0.5,
+            EffortTier::Medium => 0.65,
+            EffortTier::High => 0.8,
+            EffortTier::XHigh => 0.9,
+            EffortTier::Max => 0.95,
+        }
+    }
+
+    /// Sparse attention k: top-K states to attend to at this tier.
+    /// Mirrors K3's sparse expert activation (16 of 896).
+    pub fn sparse_k(&self) -> usize {
+        match self {
+            EffortTier::Low => 8,
+            EffortTier::Medium => 16,
+            EffortTier::High => 24,
+            EffortTier::XHigh => 32,
+            EffortTier::Max => 40,
+        }
+    }
+}
+
+/// Adaptive effort tier selector using Fable 5 five-tier effort model.
+///
+/// Maps the Fable-5 effort allocation (low/medium/high/xhigh/max) to
+/// TTC compute parameters. This is the bridge between the reasoning
+/// pattern's effort signal and the test-time compute scaling engine.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EffortTierSelector {
+    /// Base difficulty threshold for each tier boundary.
+    pub tier_thresholds: [f64; 4],
+}
+
+impl Default for EffortTierSelector {
+    fn default() -> Self {
+        Self {
+            // Boundaries between Low/Medium/High/XHigh/Max
+            tier_thresholds: [0.2, 0.4, 0.6, 0.8],
+        }
+    }
+}
+
+impl EffortTierSelector {
+    /// Select effort tier from difficulty score.
+    pub fn select(&self, difficulty: f64) -> EffortTier {
+        let d = difficulty.clamp(0.0, 1.0);
+        if d < self.tier_thresholds[0] { EffortTier::Low }
+        else if d < self.tier_thresholds[1] { EffortTier::Medium }
+        else if d < self.tier_thresholds[2] { EffortTier::High }
+        else if d < self.tier_thresholds[3] { EffortTier::XHigh }
+        else { EffortTier::Max }
+    }
+
+    /// Select effort tier from difficulty and task length.
+    pub fn select_for_task(&self, difficulty: f64, task_length: usize) -> EffortTier {
+        let length_factor = (task_length as f64 / 500.0).min(1.0);
+        let adjusted = difficulty * 0.7 + length_factor * 0.3;
+        self.select(adjusted)
+    }
+}
+
+#[cfg(test)]
+mod effort_tier_tests {
+    use super::*;
+
+    #[test]
+    fn test_effort_tier_from_difficulty() {
+        assert_eq!(EffortTier::from_difficulty(0.1, 100), EffortTier::Low);
+        assert_eq!(EffortTier::from_difficulty(0.3, 200), EffortTier::Medium);
+        assert_eq!(EffortTier::from_difficulty(0.5, 300), EffortTier::High);
+        assert_eq!(EffortTier::from_difficulty(0.7, 400), EffortTier::XHigh);
+        assert_eq!(EffortTier::from_difficulty(0.9, 500), EffortTier::Max);
+    }
+
+    #[test]
+    fn test_rollout_depth_increases_with_tier() {
+        assert!(EffortTier::Max.rollout_depth() > EffortTier::High.rollout_depth());
+        assert!(EffortTier::High.rollout_depth() > EffortTier::Medium.rollout_depth());
+        assert!(EffortTier::Medium.rollout_depth() > EffortTier::Low.rollout_depth());
+    }
+
+    #[test]
+    fn test_mcts_simulations_increases_with_tier() {
+        assert_eq!(EffortTier::Low.mcts_simulations(), 0);
+        assert_eq!(EffortTier::Medium.mcts_simulations(), 8);
+        assert_eq!(EffortTier::High.mcts_simulations(), 16);
+        assert_eq!(EffortTier::XHigh.mcts_simulations(), 32);
+        assert_eq!(EffortTier::Max.mcts_simulations(), 64);
+    }
+
+    #[test]
+    fn test_sparse_k_increases_with_tier() {
+        assert_eq!(EffortTier::Low.sparse_k(), 8);
+        assert_eq!(EffortTier::Medium.sparse_k(), 16);
+        assert_eq!(EffortTier::High.sparse_k(), 24);
+        assert_eq!(EffortTier::XHigh.sparse_k(), 32);
+        assert_eq!(EffortTier::Max.sparse_k(), 40);
+    }
+
+    #[test]
+    fn test_confidence_cap_increases_with_tier() {
+        assert!(EffortTier::Max.confidence_cap() > EffortTier::High.confidence_cap());
+        assert!(EffortTier::High.confidence_cap() > EffortTier::Medium.confidence_cap());
+        assert!(EffortTier::Medium.confidence_cap() > EffortTier::Low.confidence_cap());
+    }
+
+    #[test]
+    fn test_effort_tier_selector() {
+        let selector = EffortTierSelector::default();
+        assert_eq!(selector.select(0.1), EffortTier::Low);
+        assert_eq!(selector.select(0.3), EffortTier::Medium);
+        assert_eq!(selector.select(0.5), EffortTier::High);
+        assert_eq!(selector.select(0.7), EffortTier::XHigh);
+        assert_eq!(selector.select(0.9), EffortTier::Max);
+    }
+
+    #[test]
+    fn test_effort_tier_selector_clamping() {
+        let selector = EffortTierSelector::default();
+        assert_eq!(selector.select(-0.5), EffortTier::Low);
+        assert_eq!(selector.select(1.5), EffortTier::Max);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
