@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import styles from "./DiffPane.module.css";
 
@@ -7,11 +7,18 @@ interface ChangedFile {
   path: string;
 }
 
+interface FileDiff {
+  path: string;
+  blocks: Array<{ type: string; content: string; line_start: number }>;
+  additions: number;
+  deletions: number;
+}
+
 export function DiffPane() {
   const [blocks, setBlocks] = useState<Array<{ type: string; content: string; line_start: number }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [scope, setScope] = useState<"unstaged" | "staged" | "file" | "base">("unstaged");
+  const [scope, setScope] = useState<"unstaged" | "staged" | "file" | "base" | "neocodex">("unstaged");
   const [filePath, setFilePath] = useState("");
   const [baseBranch, setBaseBranch] = useState("main");
   const [commitMsg, setCommitMsg] = useState("");
@@ -20,6 +27,11 @@ export function DiffPane() {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [review, setReview] = useState<ReviewResult | null>(null);
+  const [fileDiffs, setFileDiffs] = useState<Map<string, FileDiff>>(new Map());
+  const [neocodexLoading, setNeocodexLoading] = useState(false);
+
+  const loadRef = useRef<() => Promise<void>>();
+  const loadNeocodexDiffsRef = useRef<() => Promise<void>>();
 
   interface ReviewIssue {
     line: number;
@@ -61,6 +73,42 @@ export function DiffPane() {
     }
   }, []);
 
+  const loadNeocodexDiffs = useCallback(async () => {
+    setNeocodexLoading(true);
+    setError("");
+    try {
+      const res = await invoke<any>("neocodex_get_diff");
+      if (res) {
+        const diffsMap = new Map<string, FileDiff>();
+        for (const [path, blocks] of Object.entries(res)) {
+          const blockArray = blocks as Array<{ type: string; content: string; line_start: number }>;
+          let additions = 0;
+          let deletions = 0;
+          for (const b of blockArray) {
+            if (b.type === "added") additions++;
+            if (b.type === "removed") deletions++;
+          }
+          diffsMap.set(path, { path, blocks: blockArray, additions, deletions });
+        }
+        setFileDiffs(diffsMap);
+        // Also update changedFiles for the file list UI
+        const changed: { staged: ChangedFile[]; unstaged: ChangedFile[]; untracked: ChangedFile[] } = { staged: [], unstaged: [], untracked: [] };
+        for (const [path, diff] of diffsMap) {
+          if (diff.blocks.some(b => b.type === "added" && diff.blocks[0] === b)) {
+            changed.untracked.push({ status: "??", path });
+          } else {
+            changed.unstaged.push({ status: "M", path });
+          }
+        }
+        setChangedFiles(changed);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setNeocodexLoading(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -76,6 +124,10 @@ export function DiffPane() {
         setBlocks([]);
         setLoading(false);
         return;
+      } else if (scope === "neocodex") {
+        await loadNeocodexDiffs();
+        setLoading(false);
+        return;
       } else {
         res = await invoke("cmd_diff_unstaged");
       }
@@ -88,16 +140,25 @@ export function DiffPane() {
     }
   }, [scope, filePath, baseBranch]);
 
-  // Auto-load on scope change for the git scopes. The file-path scope loads
-  // exclusively via the explicit "查看"/refresh buttons / list clicks, avoiding
-  // an IPC request per keystroke and double-loads from selectFile.
+  // Keep refs in sync with latest callbacks
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
+
+  useEffect(() => {
+    loadNeocodexDiffsRef.current = loadNeocodexDiffs;
+  }, [loadNeocodexDiffs]);
+
+  // Auto-load on scope change only (not on baseBranch/filePath changes)
   useEffect(() => {
     if (scope === "file") return;
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (scope === "neocodex") {
+      loadNeocodexDiffsRef.current?.();
+    } else {
+      loadRef.current?.();
+    }
   }, [scope]);
 
-  // Keep the changed-file list fresh (initial + after stage/unstage/commit).
   useEffect(() => {
     loadFiles();
   }, [loadFiles]);
@@ -117,6 +178,16 @@ export function DiffPane() {
       setBlocks([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const selectNeocodexFile = (path: string) => {
+    setActiveFile(path);
+    const diff = fileDiffs.get(path);
+    if (diff) {
+      setBlocks(diff.blocks);
+    } else {
+      setBlocks([]);
     }
   };
 
@@ -154,8 +225,6 @@ export function DiffPane() {
     }
   };
 
-  // Per-file unstage (fix: the per-file "取消暂存此文件" button must unstage
-  // ONLY this file; passing null unstages the whole index).
   const handleUnstageFile = async (path: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setError("");
@@ -167,14 +236,17 @@ export function DiffPane() {
     }
   };
 
-  // Per-file review (Claude Code Manual / Codex review parity): accept = stage
-  // just this file, reject = discard just this file's working-tree changes.
   const handleStageFile = async (path: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setError("");
     try {
-      await invoke("cmd_diff_stage", { paths: [path] });
-      await loadFiles();
+      if (scope === "neocodex") {
+        await invoke("neocodex_apply_diff", { path, action: "accept" });
+        await loadNeocodexDiffs();
+      } else {
+        await invoke("cmd_diff_stage", { paths: [path] });
+        await loadFiles();
+      }
     } catch (err) {
       setError(String(err));
     }
@@ -184,8 +256,13 @@ export function DiffPane() {
     e.stopPropagation();
     setError("");
     try {
-      await invoke("cmd_diff_restore", { paths: [path] });
-      await loadFiles();
+      if (scope === "neocodex") {
+        await invoke("neocodex_apply_diff", { path, action: "reject" });
+        await loadNeocodexDiffs();
+      } else {
+        await invoke("cmd_diff_restore", { paths: [path] });
+        await loadFiles();
+      }
     } catch (err) {
       setError(String(err));
     }
@@ -240,53 +317,64 @@ export function DiffPane() {
     return (
       <div className={styles.fileGroup}>
         <div className={styles.fileGroupTitle}>{title} ({files.length})</div>
-        {files.map((f) => (
-          <div
-            key={f.path}
-            className={`${styles.fileItem} ${activeFile === f.path ? styles.fileItemActive : ""}`}
-            onClick={() => selectFile(f.path)}
-            title={f.path}
-            data-testid={`diff-file-${f.path}`}
-          >
-            <span className={styles.fileStatus} data-status={f.status.trim()}>{statusLabel(f.status)}</span>
-            <span className={styles.filePath}>{f.path}</span>
-            <span className={styles.fileActions}>
-              {bucket === "unstaged" || bucket === "untracked" ? (
-                <button
-                  type="button"
-                  className={styles.fileAccept}
-                  onClick={(e) => handleStageFile(f.path, e)}
-                  title={bucket === "untracked" ? "接受此新文件 (stage add)" : "接受此文件改动 (stage)"}
-                  data-testid={`diff-accept-${f.path}`}
-                >
-                  ✓
-                </button>
-              ) : null}
-              {bucket !== "untracked" && bucket === "staged" && (
-                <button
-                  type="button"
-                  className={styles.fileReject}
-                  onClick={(e) => { handleUnstageFile(f.path, e); }}
-                  title="取消暂存此文件"
-                  data-testid={`diff-unstage-${f.path}`}
-                >
-                  ↩
-                </button>
+        {files.map((f) => {
+          const diff = fileDiffs.get(f.path);
+          const fileAdditions = diff?.additions ?? 0;
+          const fileDeletions = diff?.deletions ?? 0;
+          return (
+            <div
+              key={f.path}
+              className={`${styles.fileItem} ${activeFile === f.path ? styles.fileItemActive : ""}`}
+              onClick={() => scope === "neocodex" ? selectNeocodexFile(f.path) : selectFile(f.path)}
+              title={f.path}
+              data-testid={`diff-file-${f.path}`}
+            >
+              <span className={styles.fileStatus} data-status={f.status.trim()}>{statusLabel(f.status)}</span>
+              <span className={styles.filePath}>{f.path}</span>
+              {(fileAdditions > 0 || fileDeletions > 0) && (
+                <span className={styles.fileStats}>
+                  <span className={styles.added}>+{fileAdditions}</span>
+                  <span className={styles.removed}>-{fileDeletions}</span>
+                </span>
               )}
-              {(bucket === "unstaged" || bucket === "untracked") && (
-                <button
-                  type="button"
-                  className={styles.fileReject}
-                  onClick={(e) => handleRejectFile(f.path, e)}
-                  title="拒绝此文件改动 (restore)"
-                  data-testid={`diff-reject-${f.path}`}
-                >
-                  ✕
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
+              <span className={styles.fileActions}>
+                {bucket === "unstaged" || bucket === "untracked" ? (
+                  <button
+                    type="button"
+                    className={styles.fileAccept}
+                    onClick={(e) => handleStageFile(f.path, e)}
+                    title={bucket === "untracked" ? "接受此新文件 (stage add)" : "接受此文件改动 (stage)"}
+                    data-testid={`diff-accept-${f.path}`}
+                  >
+                    ✓
+                  </button>
+                ) : null}
+                {bucket !== "untracked" && bucket === "staged" && (
+                  <button
+                    type="button"
+                    className={styles.fileReject}
+                    onClick={(e) => { handleUnstageFile(f.path, e); }}
+                    title="取消暂存此文件"
+                    data-testid={`diff-unstage-${f.path}`}
+                  >
+                    ↩
+                  </button>
+                )}
+                {(bucket === "unstaged" || bucket === "untracked") && (
+                  <button
+                    type="button"
+                    className={styles.fileReject}
+                    onClick={(e) => handleRejectFile(f.path, e)}
+                    title="拒绝此文件改动 (restore)"
+                    data-testid={`diff-reject-${f.path}`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -296,7 +384,7 @@ export function DiffPane() {
       <div className={styles.header}>
         <span className={styles.title}>Diff</span>
         <div className={styles.scopes}>
-          {(["unstaged", "staged", "base", "file"] as const).map((s) => (
+          {(["unstaged", "staged", "base", "file", "neocodex"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -304,7 +392,7 @@ export function DiffPane() {
               onClick={() => setScope(s)}
               data-testid={`diff-scope-${s}`}
             >
-              {s === "unstaged" ? "未暂存" : s === "staged" ? "已暂存" : s === "base" ? "基线分支" : "文件"}
+              {s === "unstaged" ? "未暂存" : s === "staged" ? "已暂存" : s === "base" ? "基线分支" : s === "file" ? "文件" : "会话"}
             </button>
           ))}
         </div>
@@ -320,15 +408,16 @@ export function DiffPane() {
           )}
         </div>
         <div className={styles.diffCol}>
-          {scope === "file" && (
+          {(scope === "file" || scope === "neocodex") && (
             <div className={styles.fileInputRow}>
               <input
                 className={styles.fileInput}
                 value={filePath}
                 onChange={(e) => setFilePath(e.target.value)}
-                placeholder="文件路径（相对仓库根）"
+                placeholder={scope === "neocodex" ? "当前会话文件（点击列表选择）" : "文件路径（相对仓库根）"}
+                disabled={scope === "neocodex"}
               />
-              <button type="button" className={styles.applyBtn} onClick={() => selectFile(filePath)}>查看</button>
+              {scope === "file" && <button type="button" className={styles.applyBtn} onClick={() => selectFile(filePath)}>查看</button>}
             </div>
           )}
           {scope === "base" && (
@@ -347,14 +436,14 @@ export function DiffPane() {
           <div className={styles.stats}>
             <span className={styles.added}>+{added}</span>
             <span className={styles.removed}>-{removed}</span>
-            {loading && <span className={styles.muted}>加载中…</span>}
+            {(loading || neocodexLoading) && <span className={styles.muted}>加载中…</span>}
             {error && <span className={styles.errorText}>{error}</span>}
           </div>
           <div className={styles.actions}>
-            <button type="button" className={styles.actionBtn} onClick={handleStage} disabled={loading} data-testid="diff-stage-all" title="暂存全部改动">
+            <button type="button" className={styles.actionBtn} onClick={handleStage} disabled={loading || neocodexLoading} data-testid="diff-stage-all" title="暂存全部改动">
               暂存
             </button>
-            <button type="button" className={styles.actionBtn} onClick={handleUnstage} disabled={loading} data-testid="diff-unstage-all" title="取消暂存">
+            <button type="button" className={styles.actionBtn} onClick={handleUnstage} disabled={loading || neocodexLoading} data-testid="diff-unstage-all" title="取消暂存">
               取消暂存
             </button>
             <button type="button" className={styles.actionBtn} onClick={runReview} disabled={reviewing} data-testid="diff-review" title="对工作区变更运行静态代码审查">
@@ -411,7 +500,7 @@ export function DiffPane() {
             </button>
           </div>
           <div className={styles.body}>
-            {!loading && blocks.length === 0 && !error && (
+            {!loading && !neocodexLoading && blocks.length === 0 && !error && (
               <div className={styles.empty}>无改动</div>
             )}
             {blocks.map((b, i) => (

@@ -313,7 +313,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
 }
+
+.fileStats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--fg-secondary);
+  margin-left: 6px;
+}
+.fileStats .added { color: #3fb950; }
+.fileStats .removed { color: #f85149; }
 
 .fileEmpty {
   padding: 12px 10px;
