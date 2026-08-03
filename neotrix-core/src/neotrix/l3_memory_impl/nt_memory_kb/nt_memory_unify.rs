@@ -14,11 +14,22 @@ use uuid::Uuid;
 
 pub const NONCE_LEN: usize = 12;
 
+/// kv_store value 透明压缩魔数 (Python 侧 absorb_session.py 的 _VALUE_MAGIC)。
+/// 魔数前缀 + zlib 表示 value 已压缩 (仅 Python 侧写入)。Rust 侧读到该前缀时
+/// 视为压缩数据: 不尝试解码为明文 (避免乱码), 按无数据跳过, 配合 Python 侧完整解压读取。
+pub const VALUE_COMPRESSED_MAGIC: &[u8] = b"NTZ1";
+
 fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
 }
 
 // ─── KV Store ───────────────────────────────────────────────────────────────
+
+/// 判断 value 是否为 Python 侧压缩存储 (魔数前缀)。压缩值 Rust 侧不解码 (无 zlib),
+/// 上层按"无明文数据"处理 — 避免把二进制当 UTF-8 解析产生乱码。
+fn is_compressed_value(raw: &str) -> bool {
+    raw.as_bytes().starts_with(VALUE_COMPRESSED_MAGIC)
+}
 
 pub fn kv_get(conn: &Connection, namespace: &str, key: &str) -> Result<Option<String>, String> {
     let mut stmt = conn
@@ -27,7 +38,13 @@ pub fn kv_get(conn: &Connection, namespace: &str, key: &str) -> Result<Option<St
     // 区分真实 SQL 错误与"无行"：无行是正常未命中，错误必须向上传播
     // （否则 schema 漂移/DB 损坏会被静默当成"没有保存过状态"）
     match stmt.query_row(rusqlite::params![namespace, key], |row| row.get::<_, String>(0)) {
-        Ok(v) => Ok(Some(v)),
+        Ok(v) => {
+            if is_compressed_value(&v) {
+                Ok(None) // 压缩值: Rust 侧不解码, 视为无明文
+            } else {
+                Ok(Some(v))
+            }
+        }
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(e) => Err(format!("kv_get query: {}", e)),
     }
@@ -65,7 +82,11 @@ pub fn kv_list(conn: &Connection, namespace: &str) -> Result<Vec<(String, String
         .map_err(|e| format!("kv_list query: {}", e))?;
     let mut results = Vec::new();
     for row in rows {
-        results.push(row.map_err(|e| format!("kv_list row: {}", e))?);
+        let (k, v) = row.map_err(|e| format!("kv_list row: {}", e))?;
+        if is_compressed_value(&v) {
+            continue; // 压缩值: Rust 侧不解码, 跳过 (Python 侧负责解压读取)
+        }
+        results.push((k, v));
     }
     Ok(results)
 }

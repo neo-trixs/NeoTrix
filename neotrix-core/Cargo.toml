@@ -86,6 +86,10 @@ path = "src/bin/nt_world_novel_ingest.rs"
 name = "absorb_crawl"
 path = "src/bin/absorb_crawl.rs"
 
+[[bin]]
+name = "neotrix-experience"
+path = "src/bin/experience.rs"
+
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
 thiserror = "1"
@@ -115,6 +119,7 @@ k256 = { version = "0.13", features = ["ecdsa"] }
 sha3 = "0.10"
 glob = "0.3"
 regex = "1"
+flate2 = "1"
 syn = { version = "2", features = ["full", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 walkdir = "2"
