@@ -158,7 +158,6 @@ pub mod nt_core_self_test_integration;
 pub mod nt_core_intel_pipeline;
 pub mod nt_core_io_capability;
 pub mod nt_core_second_brain;
-pub mod nt_core_delegate_engine;
 pub mod nt_core_scoring_substrate;
 pub mod nt_core_state_substrate;
 pub mod nt_core_subagent;

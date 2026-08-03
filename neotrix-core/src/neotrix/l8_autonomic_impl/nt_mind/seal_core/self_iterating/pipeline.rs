@@ -1810,7 +1810,6 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
         registry.register(Box::new(crate::core::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5)));
         registry.register(Box::new(crate::core::nt_core_state_substrate::StateSubstrate::new()));
-        registry.register(Box::new(crate::core::nt_core_delegate_engine::DelegateEngine::new()));
         registry.register(Box::new(crate::core::nt_core_simulate_engine::SimulateEngine::new()));
         registry.register(Box::new(crate::core::nt_core_second_brain::SecondBrain::new()));
         let results = registry.run_all();

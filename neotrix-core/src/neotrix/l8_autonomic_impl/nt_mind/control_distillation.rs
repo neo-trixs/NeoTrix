@@ -7,10 +7,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_prm::{LambdaGrpoResult, StepAdvantage, compute_step_advantages, StepGrpoConfig, ProcessScore};
+use crate::core::nt_core_prm::{LambdaGrpoResult, StepAdvantage, compute_step_advantages, StepGrpoConfig, ProcessScore, AgentTrajectory, TrajectoryStep};
 use crate::core::nt_core_policy::{E8Policy, NUM_E8_FACTORS};
 use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector};
 use crate::core::nt_core_e8::domain_transition::E8TaskType;
+use crate::core::nt_core_hex::ReasoningHexagram;
+use crate::core::nt_core_traits::SpecialistType;
 use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 
 /// 控制类型 (MERA 同款)
@@ -375,7 +377,7 @@ impl ControlTrainer {
             for seg in &seq.segments {
                 if let AlternatingSegment::Control { signal } = seg {
                     // 将 control_type 映射为 E8 因子更新
-                    self.apply_control_to_policy(signal)?;
+                    self.apply_control_to_policy(seq, signal)?;
                     control_updates += 1;
                 }
             }
@@ -409,7 +411,7 @@ impl ControlTrainer {
                 
                 // 3. Control Masking: 只对 control tokens 更新策略
                 // 这里通过 ProcessScore 的 attribution_tags="control" 实现 masking
-                self.apply_masked_policy_update(signal, reward.total)?;
+                self.apply_masked_policy_update(seq, signal, reward.total)?;
                 masked_steps += 1;
             }
 
@@ -420,7 +422,7 @@ impl ControlTrainer {
         Ok(CsppoReport { total_control_reward, masked_steps })
     }
 
-    fn apply_control_to_policy(&mut self, signal: &ControlSignal) -> Result<(), DistillError> {
+    fn apply_control_to_policy(&mut self, seq: &AlternatingSequence, signal: &ControlSignal) -> Result<(), DistillError> {
         // 将 control_type 映射为 E8 因子 delta (复用 E8Policy::learn_from_scores)
         let (tag, delta) = match signal.takeover_point.control_type {
             ControlType::Backtrack => ("backtrack", 0.15),
@@ -431,12 +433,12 @@ impl ControlTrainer {
         let process_score = ProcessScore {
             step_idx: signal.takeover_point.step_idx,
             score: delta,
-            confidence: 1.0,
+            confidence: signal.takeover_point.confidence,
             criteria: vec![],
             attribution_tags: vec!["control".to_string(), tag.to_string()],
         };
-        // 需要 trajectory 上下文，简化：记录到 policy 内部缓冲
-        // 实际应调用 policy.learn_from_scores(&trajectory, &[process_score])
+        let trajectory = Self::build_trajectory(seq);
+        self.policy.learn_from_scores(&trajectory, &[process_score]);
         Ok(())
     }
 
@@ -448,18 +450,71 @@ impl ControlTrainer {
         Ok(ControlReward { semantic_score: semantic, format_score: format, total: semantic + format })
     }
 
-    fn apply_masked_policy_update(&mut self, signal: &ControlSignal, advantage: f64) -> Result<(), DistillError> {
+    fn apply_masked_policy_update(&mut self, seq: &AlternatingSequence, signal: &ControlSignal, advantage: f64) -> Result<(), DistillError> {
         // Control Masking: 只更新 control 相关的因子
         // 通过 attribution_tags="control" 实现 (E8Policy 已支持 factorized learning)
         let process_score = ProcessScore {
             step_idx: signal.takeover_point.step_idx,
             score: advantage,
-            confidence: 1.0,
+            confidence: signal.takeover_point.confidence,
             criteria: vec![],
             attribution_tags: vec!["control".to_string(), format!("{:?}", signal.takeover_point.control_type).to_lowercase()],
         };
-        // 实际应: policy.learn_from_scores(&trajectory, &[process_score])
+        let trajectory = Self::build_trajectory(seq);
+        self.policy.learn_from_scores(&trajectory, &[process_score]);
         Ok(())
+    }
+
+    /// 从交替序列重建 AgentTrajectory，供 E8Policy::learn_from_scores 消费。
+    /// 步骤按 step_idx 稠密排列（vector 索引 == step_idx），保证 ProcessScore
+    /// 的 `steps.get(score.step_idx)` 按位置对齐。Control 段与 Reason 段同索引时
+    /// 以 control 动作覆盖该位置 (Control Masking)。
+    fn build_trajectory(seq: &AlternatingSequence) -> AgentTrajectory {
+        let mut max_idx = 0usize;
+        for seg in &seq.segments {
+            let idx = match seg {
+                AlternatingSegment::Reason { step_idx, .. } => *step_idx,
+                AlternatingSegment::Control { signal } => signal.takeover_point.step_idx,
+            };
+            max_idx = max_idx.max(idx);
+        }
+        let mut slots: Vec<Option<TrajectoryStep>> = vec![None; max_idx + 1];
+        for seg in &seq.segments {
+            match seg {
+                AlternatingSegment::Reason { text, step_idx } => {
+                    slots[*step_idx] = Some(TrajectoryStep {
+                        step_idx: *step_idx,
+                        specialist: SpecialistType::ReflectionEngine,
+                        e8_mode: ReasoningHexagram::new((*step_idx % 64) as u8),
+                        action: "reason".into(),
+                        input: seq.task.clone(),
+                        output: text.clone(),
+                        duration_ms: None,
+                        success: true,
+                        external_reward: Some(seq.outcome_quality),
+                    });
+                }
+                AlternatingSegment::Control { signal } => {
+                    let idx = signal.takeover_point.step_idx;
+                    slots[idx] = Some(TrajectoryStep {
+                        step_idx: idx,
+                        specialist: SpecialistType::ReflectionEngine,
+                        e8_mode: ReasoningHexagram::new((idx % 64) as u8),
+                        action: format!("control:{:?}", signal.takeover_point.control_type),
+                        input: seq.task.clone(),
+                        output: signal.instruction.clone(),
+                        duration_ms: None,
+                        success: true,
+                        external_reward: Some(seq.outcome_quality),
+                    });
+                }
+            }
+        }
+        let mut trajectory = AgentTrajectory::new(0, seq.task.clone());
+        trajectory.steps = slots.into_iter().flatten().collect();
+        trajectory.completed = true;
+        trajectory.outcome_reward = Some(seq.outcome_quality);
+        trajectory
     }
 }
 

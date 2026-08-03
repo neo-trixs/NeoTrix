@@ -40,7 +40,6 @@ pub use l8_autonomic_impl::nt_mind_cleanup;
 pub use l8_autonomic_impl::nt_mind_distiller;
 pub use l8_autonomic_impl::nt_mind_scheduler;
 pub use l8_autonomic_impl::nt_mind_topic_aggregator;
-pub use l8_autonomic_impl::nt_mind_evolve;
 pub use l8_autonomic_impl::nt_mind_knowledge_pipeline;
 pub use l8_autonomic_impl::nt_mind_hook;
 pub use l8_autonomic_impl::nt_mind_skill_engine;

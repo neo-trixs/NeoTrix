@@ -191,6 +191,7 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
 use crate::core::nt_core_self_constitution::ConstitutionLoader;
 use crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine;
+use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, HookRegistry, LogHook};
 use crate::neotrix::l8_autonomic_impl::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
 use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager;
 use crate::neotrix::nt_core_event_bus::{EventBus, subscribe_all_layers_sync};
@@ -198,7 +199,6 @@ use crate::neotrix::nt_mind::distillation::MetaCognitionBridge;
 use crate::core::nt_core_event::CoreEvent;
 use crate::core::nt_core_scoring_substrate::ScoringSubstrate;
 use crate::core::nt_core_state_substrate::StateSubstrate;
-use crate::core::nt_core_delegate_engine::{DelegateEngine, EvidenceStrength};
 use crate::core::nt_core_simulate_engine::SimulateEngine;
 
 impl BackgroundLoop {
@@ -379,9 +379,14 @@ impl BackgroundLoop {
             nt_world_model: self.nt_world_model.take(),
             scheduler: self.scheduler.take(),
             daemon: self.daemon.take(),
-            skill_engine: SkillEngine::new(PathBuf::from(
-                &dirs::home_dir().unwrap_or_default().join(".claude").join("skills"),
-            )),
+            skill_engine: {
+                let mut hooks = HookRegistry::default();
+                hooks.register(HookEvent::SkillLoaded, Box::new(LogHook::new("bg-loop")));
+                hooks.register(HookEvent::SkillUnloaded, Box::new(LogHook::new("bg-loop")));
+                SkillEngine::new(PathBuf::from(
+                    &dirs::home_dir().unwrap_or_default().join(".claude").join("skills"),
+                )).with_hooks(hooks)
+            },
             kb_pipeline,
             session_recovery: self.session_recovery.take(),
             event_bus: Some(event_bus.as_ref().clone()),
@@ -416,11 +421,6 @@ cognitive_load: self.cognitive_load.take(),
             cognitive_mode: 0,
             scoring: ScoringSubstrate::new().with_threshold(0.5),
             state: StateSubstrate::new(),
-            delegate: DelegateEngine::new()
-                .with_domain_gate("consciousness")
-                .with_domain_gate("memory")
-                .with_domain_gate("action")
-                .with_domain_gate("learning"),
             simulate: SimulateEngine::new(),
             convergence_pulse: ConvergencePulse::default(),
             tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
@@ -613,7 +613,6 @@ pub struct BackgroundLoopHandle {
     #[allow(dead_code)]
     scoring: ScoringSubstrate,
     state: StateSubstrate,
-    delegate: DelegateEngine,
     simulate: SimulateEngine,
     convergence_pulse: ConvergencePulse,
     tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
@@ -1292,59 +1291,6 @@ impl BackgroundLoopHandle {
                 gs_report.is_conscious_like, gs_report.phi, gs_report.coherence, gs_report.detection_streak);
         }
 
-        // ── Phase 6: DelegateEngine — evidence-gated cross-domain delegation ──
-        // 反哺自 crm (evidence-priced ledger) + loopx (quota/gate) + PentAGI (域熔断):
-        // 每个域都有独立熔断 gate; 只有 Observed 证据才驱动熔断统计。
-        self.delegate.tick_forward();
-        let mut delegated: Vec<(String, String)> = Vec::new(); // (id, domain)
-        for (domain, task, prio) in [
-            ("consciousness", "consciousness_tick", 0u8),
-            ("memory", "kb_absorb", 3u8),
-            ("learning", "consolidate", 2u8),
-            ("action", "goal_recovery", 1u8),
-        ] {
-            match self.delegate.delegate_to(task, "nt_mind_background_loop", domain, prio) {
-                Some(id) => {
-                    delegated.push((id, domain.to_string()));
-                    log::debug!("[bg] delegate: {} → domain={} accepted", task, domain);
-                }
-                None => {
-                    log::warn!("[bg] delegate: {} rejected — max concurrent OR domain {} circuit-broken",
-                        task, domain);
-                }
-            }
-        }
-
-        // 结算并记录真实观测结果 (Observed 证据 → 驱动域熔断统计)
-        // 每个域的成败由真实相位观测构造:
-        //   - consciousness: 有最后一次共振广播 (last_resonance) 即成功
-        //   - memory:       KB 有节点即成功 (kb_nodes > 0)
-        //   - learning:     convergence 已 verified 即成功 (否则先留 Inferred)
-        //   - action:       当前 mode 非空即成功
-        let consciousness_ok = self.panorama.as_ref()
-            .map(|p| p.gwt.last_resonance.is_some()).unwrap_or(false);
-        let memory_ok = kb_nodes > 0;
-        let learning_ok = self.convergence_pulse.verified;
-        let action_ok = !self.state.active_mode.name().is_empty();
-        for (id, domain) in &delegated {
-            let ok = match domain.as_str() {
-                "consciousness" => consciousness_ok,
-                "memory" => memory_ok,
-                "learning" => learning_ok,
-                "action" => action_ok,
-                _ => true,
-            };
-            if ok {
-                self.delegate.record_evidence(id, true, EvidenceStrength::Observed);
-            }
-        }
-        let pending = self.delegate.synchronize();
-        let delegated_total = self.delegate.total_tasks();
-        if delegated_total > 0 {
-            log::debug!("[bg] delegate: {} pending of {} total tasks, success_rate={:.2}",
-                pending, delegated_total, self.delegate.success_rate());
-        }
-
         // ── Phase 7: SimulateEngine — run grounding scenario ──
         let ctx = format!("Predict consciousness quality from phi={:.3} coherence={:.3}",
             self.state.metric("phi").and_then(|m| m.latest()).unwrap_or(0.0),
@@ -1592,7 +1538,6 @@ impl BackgroundLoopHandle {
         // ── Substrate + Engine SelfTests (Cycle 119 architecture refactor) ──
         self_tests.register(Box::new(crate::core::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5)));
         self_tests.register(Box::new(crate::core::nt_core_state_substrate::StateSubstrate::new()));
-        self_tests.register(Box::new(crate::core::nt_core_delegate_engine::DelegateEngine::new()));
         self_tests.register(Box::new(crate::core::nt_core_simulate_engine::SimulateEngine::new()));
         // ── ConvergencePulse SelfTest (Cycle 159c: fractal loop state machine) ──
         self_tests.register(Box::new(ConvergencePulse::default()));

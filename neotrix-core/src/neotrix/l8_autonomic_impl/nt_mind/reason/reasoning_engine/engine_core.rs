@@ -32,7 +32,7 @@ use crate::neotrix::nt_mind::core::BrainMutView;
 use crate::neotrix::nt_mind::distillation::{AntiPattern, StrategicPrinciple};
 use crate::neotrix::nt_mind::model_router::ModelRouter;
 use crate::neotrix::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
-use crate::neotrix::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep};
+use crate::neotrix::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep, ControlTrainer, SftReport, CsppoReport};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_mind::context_artifacts::indexer::ArtifactIndexer;
 use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest};
@@ -42,6 +42,8 @@ use super::CognitiveEye;
 
 pub const MAX_COST_LOG: usize = 1000;
 pub const MAX_TRACES: usize = 1000;
+/// F6 训练节流: 累积多少条交替序列后触发一次 SFT + CSPO 训练。
+pub const CONTROL_TRAIN_BATCH: usize = 8;
 
 pub struct CostRecord {
     pub tier: String,
@@ -108,6 +110,8 @@ pub struct ReasoningEngine {
     pub control_distiller: Option<ControlDistiller>,
     /// Distilled alternating sequences (control segments) for training feedback
     pub distilled_sequences: Vec<AlternatingSequence>,
+    /// Batches of distilled sequences consumed by the trainer since last SFT/CSPO run
+    pub train_batch: usize,
     /// E8→EWHR bridge: auto-proposes hypotheses from reasoning trajectory
     pub ewhr_bridge: Option<E8EwhrBridge>,
     /// SAE bridge: extracts interpretable features from E8 reasoning states
@@ -202,6 +206,7 @@ impl ReasoningEngine {
             _last_watermarked: None,
             control_distiller: Some(ControlDistiller::new(Arc::new(ConsciousnessGoldStandard::new()))),
             distilled_sequences: Vec::new(),
+            train_batch: 0,
             ewhr_bridge: None,
             sae_bridge: None,
             prm: None,
@@ -986,6 +991,14 @@ impl ReasoningEngine {
 
         if let Some(ref t) = self.tracer { t.end_span(root_span); } else { NoopTracer.end_span(root_span); }
 
+        // F6 closed loop (周天大阵运转): distill the successful trace into
+        // alternating sequences and periodically run SFT + CSPO to update the
+        // E8 policy, so reasoning controls learned from real runs feed back
+        // into subsequent reason() calls via PRM (R-P79 production wiring).
+        if let Ok(response) = &result {
+            self.learn_from_trace(task, response);
+        }
+
         self.core_review(task, &result);
 
         // Return watermarked response if anti-distillation was active, else raw response
@@ -1290,6 +1303,21 @@ impl ReasoningEngine {
         if let Some(seq) = self.distill_trace(task, response) {
             log::debug!("[control-distill] distilled {} segments (quality={:.3})", seq.segments.len(), seq.outcome_quality);
         }
+        // F6 closed loop: once a batch of alternating sequences has accumulated,
+        // consume them via SFT + CSPO and write the updated policy back into PRM.
+        // Throttled here (in addition to reason()) so training also runs on the
+        // offline learn_from_trace path.
+        if self.train_batch >= CONTROL_TRAIN_BATCH {
+            if let Some((sft, csppo)) = self.train_from_distilled() {
+                log::debug!(
+                    "[control-train] SFT(c={},r={}) CSPO(reward={:.3},masked={})",
+                    sft.control_updates,
+                    sft.reason_updates,
+                    csppo.total_control_reward,
+                    csppo.masked_steps,
+                );
+            }
+        }
     }
 
     /// 把单条推理 response 蒸馏为交替序列 (Reason ↔ Control)，供 CSPO/SFT 训练消费。
@@ -1306,7 +1334,39 @@ impl ReasoningEngine {
             self.distilled_sequences.remove(0);
         }
         self.distilled_sequences.push(seq.clone());
+        self.train_batch += 1;
         Some(seq)
+    }
+
+    /// F6 训练闭环：消费蒸馏序列，SFT + CSPO 更新 E8 policy。
+    ///
+    /// 从当前 `prm.policy` 克隆构造临时训练器（单策略权威，避免平行状态，
+    /// R-P42），运行 SFT（阶段 1）+ CSPO（阶段 2）后写回 `prm.policy`。
+    /// 节流由 `reason()` 主流程按 `train_batch` 阈值触发。
+    pub fn train_from_distilled(&mut self) -> Option<(SftReport, CsppoReport)> {
+        if self.distilled_sequences.is_empty() || self.prm.is_none() {
+            return None;
+        }
+        let seqs = std::mem::take(&mut self.distilled_sequences);
+        let policy = self.prm.as_ref().map(|p| p.policy.clone())?;
+        let gold = Arc::new(ConsciousnessGoldStandard::new());
+        let mut trainer = ControlTrainer::new(policy, gold);
+        let sft = trainer.sft(&seqs).ok()?;
+        let csppo = trainer.csppo(&seqs).ok()?;
+        if let Some(ref mut prm) = self.prm {
+            prm.policy = trainer.policy.clone();
+            prm.learning_count += 1;
+        }
+        self.train_batch = 0;
+        log::info!(
+            "[control-train] batch={} sft(control={},reason={}) csppo(reward={:.3},masked={})",
+            seqs.len(),
+            sft.control_updates,
+            sft.reason_updates,
+            csppo.total_control_reward,
+            csppo.masked_steps,
+        );
+        Some((sft, csppo))
     }
 
     pub fn observer_analyze(&mut self, task: &str) {
@@ -1571,5 +1631,38 @@ mod tests {
         assert_eq!(engine.distilled_sequences.len(), 1, "distillation must run via learn_from_trace (R-P36 grounding)");
         let seq = &engine.distilled_sequences[0];
         assert!(!seq.segments.is_empty(), "alternating sequence must contain segments");
+    }
+
+    #[test]
+    fn test_train_from_distilled_closes_loop() {
+        use crate::core::nt_core_prm::ProcessRewardLearner;
+        use crate::core::nt_core_policy::E8Policy;
+        let mut engine = ReasoningEngine::from_env();
+        let prm = ProcessRewardLearner::new(E8Policy::default(), Box::new(crate::core::nt_core_prm::HeuristicCoach::new("test")));
+        engine = engine.with_prm(prm);
+
+        // Accumulate CONTROL_TRAIN_BATCH distilled sequences with takeover markers
+        let responses = [
+            "Compute the integral.\nWait, reconsider the bounds.\nThen verify the result.",
+            "Solve the equation.\nActually, switch to substitution.\nCheck the algebra.",
+            "Derive the formula.\nHmm, backtrack to the derivative.\nValidate step by step.",
+            "Factor the polynomial.\nAlternatively use grouping.\nConfirm each factor.",
+            "Simplify the fraction.\nOn second thought, use common denominator.\nVerify the simplification.",
+            "Evaluate the limit.\nWait, apply L'Hopital.\nThen check continuity.",
+            "Prove the theorem.\nLet me rethink the induction base.\nValidate the inductive step.",
+            "Compute the determinant.\nActually, expand along the first row.\nVerify the arithmetic.",
+        ];
+        for r in responses {
+            engine.learn_from_trace("math", r);
+        }
+
+        // Batch threshold reached → training must have run and drained sequences
+        assert_eq!(engine.train_batch, 0, "train_batch must reset after training");
+        assert!(engine.distilled_sequences.len() < responses.len(), "training must consume distilled sequences");
+        if let Some(ref prm) = engine.prm {
+            assert!(prm.learning_count >= 1, "PRM learning_count must advance after training");
+        } else {
+            panic!("PRM must be configured");
+        }
     }
 }
