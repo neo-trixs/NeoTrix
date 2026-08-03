@@ -120,6 +120,55 @@
   color: var(--fg-tertiary);
 }
 
+.runningStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  border-radius: 10px;
+}
+
+.runningDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 50%, transparent);
+  animation: runningPulse 1.6s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes runningPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.runningMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.runningLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-primary);
+  white-space: nowrap;
+}
+
+.runningSub {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .groupHeaderProject {
   padding: 8px 12px 4px;
   font-size: 11px;

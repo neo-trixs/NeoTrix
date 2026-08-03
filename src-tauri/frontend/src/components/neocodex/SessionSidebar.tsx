@@ -4,7 +4,7 @@ import type { NeoCodexSession } from "../../types";
 import styles from "./SessionSidebar.module.css";
 import { invoke } from "@tauri-apps/api/core";
 
-export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDelete, onSessionArchive }: { activeSessionId?: string | null; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void; onSessionArchive?: (sessionId: string) => void }) {
+export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessionDelete, onSessionArchive }: { activeSessionId?: string | null; busy?: boolean; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void; onSessionArchive?: (sessionId: string) => void }) {
   const [sessions, setSessions] = useState<NeoCodexSession[]>([]);
   const [archived, setArchived] = useState<NeoCodexSession[]>([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -388,6 +388,15 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
       </div>
 
       <div className={styles.list}>
+        {busy && (
+          <div className={styles.runningStrip} data-testid="sidebar-running-agent">
+            <span className={styles.runningDot} />
+            <div className={styles.runningMeta}>
+              <span className={styles.runningLabel}>运行中 Agent</span>
+              <span className={styles.runningSub}>正在执行任务…</span>
+            </div>
+          </div>
+        )}
         {query.trim().length >= 2 && (
           <div className={styles.searchResults} data-testid="session-search-results">
             <div className={styles.searchResultsHeader}>

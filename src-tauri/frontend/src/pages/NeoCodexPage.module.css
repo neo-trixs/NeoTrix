@@ -819,6 +819,28 @@
   background: var(--warning);
 }
 
+.syncItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--success);
+  white-space: nowrap;
+}
+
+.syncSpinner {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid color-mix(in srgb, var(--success) 35%, transparent);
+  border-top-color: var(--success);
+  border-radius: 50%;
+  animation: syncSpin 0.9s linear infinite;
+}
+
+@keyframes syncSpin {
+  to { transform: rotate(360deg); }
+}
+
 /* Mobile responsive */
 @media (max-width: 1024px) {
   .sidebar {

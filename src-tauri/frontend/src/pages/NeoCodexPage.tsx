@@ -918,6 +918,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
           ) : (
             <SessionSidebar
               activeSessionId={neocodexActiveSessionId}
+              busy={agentBusy}
               onSessionSelect={handleSessionSelect}
               onSessionDelete={requestSessionDelete}
               onSessionArchive={() => refreshSessions()}
@@ -1146,6 +1147,8 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             pendingPlanExecute={pendingPlanExecute}
             onPlanApprove={handlePlanApprove}
             onSlashAction={handleSlashAction}
+            mode={neocodexMode}
+            onModeChange={handleModeChange}
           />
           {sideChatOpen && (
             <div className={styles.sideChat}>
@@ -1178,7 +1181,13 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
           )}
         </div>
 
-        <footer className={styles.statusBar}>
+        <footer className={styles.statusBar} data-testid="status-bar">
+          <span className={styles.statusItem} title="审批模式">
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 1.5L12 3v3.5c0 2.8-2 4.8-5 6-3-1.2-5-3.2-5-6V3L7 1.5z"/>
+            </svg>
+            {settings?.permissionMode === "auto" ? "自动" : settings?.permissionMode === "manual" ? "手动" : "接受"}
+          </span>
           <span className={styles.statusItem}>
             <span className={styles.statusDot} style={{ background: agentBusy ? "var(--success)" : "var(--fg-tertiary)" }} />
             {agentBusy ? "运行中…" : "就绪"}
@@ -1195,6 +1204,12 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             </span>
           )}
           <span className={styles.statusItem} title="会话数">{neocodexSessions.length} 会话</span>
+          {agentBusy && (
+            <span className={styles.syncItem} title="Agent 运行中" data-testid="status-sync">
+              <span className={styles.syncSpinner} />
+              同步
+            </span>
+          )}
         </footer>
       </main>
 
@@ -1205,7 +1220,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             aria-selected={rightPanelTab === "task"}
             className={`${styles.railBtn} ${rightPanelTab === "task" ? styles.railBtnActive : ""}`}
             onClick={() => setRightPanelTab(rightPanelTab === "task" ? null : "task")}
-            title="任务面板"
+            title="Tasks"
             data-testid="rail-btn-task"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1217,7 +1232,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             aria-selected={rightPanelTab === "diff"}
             className={`${styles.railBtn} ${rightPanelTab === "diff" ? styles.railBtnActive : ""}`}
             onClick={() => setRightPanelTab(rightPanelTab === "diff" ? null : "diff")}
-            title="Diff 查看器"
+            title="Review changes"
             data-testid="rail-btn-diff"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1229,7 +1244,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             aria-selected={rightPanelTab === "preview"}
             className={`${styles.railBtn} ${rightPanelTab === "preview" ? styles.railBtnActive : ""}`}
             onClick={() => setRightPanelTab(rightPanelTab === "preview" ? null : "preview")}
-            title="App 预览"
+            title="Browser"
             data-testid="rail-btn-preview"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1242,7 +1257,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             aria-selected={rightPanelTab === "terminal"}
             className={`${styles.railBtn} ${rightPanelTab === "terminal" ? styles.railBtnActive : ""}`}
             onClick={() => setRightPanelTab(rightPanelTab === "terminal" ? null : "terminal")}
-            title="终端"
+            title="Terminal"
             data-testid="rail-btn-terminal"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

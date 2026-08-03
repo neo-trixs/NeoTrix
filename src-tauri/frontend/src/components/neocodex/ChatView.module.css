@@ -806,6 +806,57 @@
   margin-top: 2px;
 }
 
+.composerLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.modelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  user-select: none;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.planToggle:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+}
+
+.planToggleActive {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+}
+
 .contextCapsule {
   display: inline-flex;
   align-items: center;
