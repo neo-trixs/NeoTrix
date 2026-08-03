@@ -1014,6 +1014,15 @@ impl BackgroundLoopHandle {
             if fixes.0 > 0 {
                 log::info!("[bg] evolve: {} fixes, reward={:.4}", fixes.0, fixes.1);
             }
+            // B3: 开启 mutation 时驱动完整四相进化循环 (扫描→修复→蒸馏→自我进化)
+            if d.config.mutation_enabled {
+                let cycle_result = d.run_cycle_goal();
+                if cycle_result.fixes_applied > 0 {
+                    log::info!("[bg] evolve: cycle_goal applied {} fixes (cycle {})",
+                        cycle_result.fixes_applied, cycle_result.cycle);
+                }
+                d.run_loop_goal();
+            }
         }
     }
     async fn handle_skill_scan(&mut self) {
@@ -1130,18 +1139,27 @@ impl BackgroundLoopHandle {
                     log::warn!("[bg] consciousness: LOW QUALITY ({:.3}) — reasons: {:?}",
                         c.overall_quality, c.reasons);
                     if c.overall_quality < CONSCIOUSNESS_THRESHOLDS.critical_quality {
-                        // BEHAVIORAL RESPONSE: enqueue self-review goal on critical quality
+                        // BEHAVIORAL RESPONSE: enqueue self-review goal on critical quality,
+                        // using volition's selected_action if available.
                         if let Ok(mut brain) = self.brain.try_write() {
-                            self.goal_loop.enqueue_goal(
-                                &mut brain,
-                                "consciousness_recovery: quality critically low — initiating self-review",
-                                None,
-                            );
+                            let action_desc = c.selected_action.clone()
+                                .unwrap_or_else(|| "consciousness_recovery: quality critically low — initiating self-review".into());
+                            self.goal_loop.enqueue_goal(&mut brain, &action_desc, None);
                         }
                     }
                 } else if c.overall_quality > 0.7 {
                     log::info!("[bg] consciousness: good quality ({:.3}) selected_action={:?}",
                         c.overall_quality, c.selected_action);
+                    // B2: execute volition's selected action by enqueueing it as a goal
+                    if let Some(ref action_desc) = c.selected_action {
+                        if let Ok(mut brain) = self.brain.try_write() {
+                            self.goal_loop.enqueue_goal(
+                                &mut brain,
+                                &format!("volition_execute: {}", action_desc),
+                                None,
+                            );
+                        }
+                    }
                 } else {
                     log::debug!("[bg] consciousness: quality={:.3} relevance={:.3} consistency={:.3}",
                         c.overall_quality, c.relevance_score, c.consistency_score);

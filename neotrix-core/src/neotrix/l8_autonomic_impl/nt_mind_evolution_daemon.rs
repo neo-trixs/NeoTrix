@@ -96,7 +96,8 @@ impl Default for EvolutionConfig {
             verbose: false,
             max_fix_attempts: 3,
             cycle_interval: 300,
-            mutation_enabled: std::env::var("NEOTRIX_EVOLVE_MUTATE").as_deref() == Ok("1"),
+            // B3: 默认开启持续自修复, 可用 NEOTRIX_EVOLVE_MUTATE=0 关闭。
+            mutation_enabled: std::env::var("NEOTRIX_EVOLVE_MUTATE").as_deref() != Ok("0"),
         }
     }
 }

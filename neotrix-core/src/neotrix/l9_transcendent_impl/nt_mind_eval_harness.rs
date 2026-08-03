@@ -9,11 +9,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
-use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest, LlmResponse, LlmError, LlmProviderType, create_provider_from_type};
-use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector};
-use crate::core::nt_core_e8::domain_transition::E8TaskType;
-use crate::core::nt_core_prm::ProcessScore;
-use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::{ConsciousnessGoldStandard, ConsciousnessLevel, GoldStandardReport, E8HexagramState, derive_level};
+use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest, LlmError, LlmProviderType, create_provider_from_type};
+use crate::core::nt_core_ttc::EffortTier;
+use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::{ConsciousnessGoldStandard, ConsciousnessLevel, GoldStandardReport, derive_level};
 
 /// 评测预算网格 (R2-Bench 16 点 + 我们努力分层对齐)
 pub const DEFAULT_BUDGET_GRID: &[u32] = &[
@@ -251,7 +249,7 @@ impl EvalHarness {
     async fn eval_single_point(
         provider: Arc<dyn LlmProvider>,
         judge: JudgeSpec,
-        gold_standard: Arc<ConsciousnessGoldStandard>,
+        _gold_standard: Arc<ConsciousnessGoldStandard>,
         model_name: String,
         query: EvalQuery,
         budget: u32,

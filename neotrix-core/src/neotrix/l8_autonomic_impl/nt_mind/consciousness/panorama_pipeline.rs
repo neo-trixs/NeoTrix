@@ -63,6 +63,12 @@ impl PanoramaPipeline {
         }
     }
 
+    /// 注入共享的 GlobalWorkspace 单例, 替代内部新建的独立实例。
+    pub fn with_gwt(mut self, gwt: GlobalWorkspace) -> Self {
+        self.gwt = gwt;
+        self
+    }
+
     pub fn attach_kb(&mut self, kb: std::sync::Arc<KnowledgeBase>) {
         self.consciousness.attach_kb(kb);
     }

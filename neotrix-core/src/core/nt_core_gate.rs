@@ -1193,8 +1193,8 @@ impl GateDecision {
     pub fn check_tool_call(
         tool_name: &str,
         registry: &ToolRegistry,
-        input: &JudgeInput,
-        panel: &JudgePanel,
+        _input: &JudgeInput,
+        _panel: &JudgePanel,
     ) -> (bool, String) {
         let Some(spec) = registry.get(tool_name) else {
             return (false, format!("工具 '{}' 未在注册表中, 默认拒绝", tool_name));

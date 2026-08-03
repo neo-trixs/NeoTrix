@@ -263,6 +263,26 @@ fn sessions_dir() -> std::path::PathBuf {
         .join("sessions")
 }
 
+static CURRENT_PROJECT: std::sync::LazyLock<tokio::sync::RwLock<Option<std::path::PathBuf>>> =
+    std::sync::LazyLock::new(|| tokio::sync::RwLock::new(None));
+
+#[tauri::command]
+pub async fn neocodex_set_project(path: String) -> Result<String, String> {
+    let path_buf = std::path::PathBuf::from(&path);
+    if !path_buf.exists() {
+        return Err("Project path does not exist".to_string());
+    }
+    let mut guard = CURRENT_PROJECT.write().await;
+    *guard = Some(path_buf.clone());
+    Ok(format!("Project set to {}", path_buf.display()))
+}
+
+#[tauri::command]
+pub async fn neocodex_get_project() -> Result<Option<String>, String> {
+    let guard = CURRENT_PROJECT.read().await;
+    Ok(guard.as_ref().map(|p| p.to_string_lossy().to_string()))
+}
+
 /// Sanitize a session_id for use in a filename. `session_path` sanitizes for
 /// the active-list path, but several archived-branch callers joined the RAW id
 /// directly (P1-3 path-transversal: "../../x" escaped the sessions dir and
@@ -286,16 +306,34 @@ fn session_path(session_id: &str) -> std::path::PathBuf {
 }
 
 #[tauri::command]
-pub async fn neocodex_list_sessions() -> Result<Vec<NeoCodexSessionInfo>, String> {
+pub async fn neocodex_list_sessions(project_path: Option<String>) -> Result<Vec<NeoCodexSessionInfo>, String> {
     let dir = sessions_dir();
     if !dir.exists() {
         return Ok(Vec::new());
     }
+    
+    // If project_path is provided, use it; otherwise check global current project
+    let filter_path = if let Some(p) = project_path {
+        Some(std::path::PathBuf::from(p))
+    } else {
+        let guard = CURRENT_PROJECT.read().await;
+        guard.clone()
+    };
+    
     let mut sessions = Vec::new();
     for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
         if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+            // If filtering by project, check if session is under the project path
+            if let Some(ref project) = filter_path {
+                let session_path_str = path.to_string_lossy();
+                let project_str = project.to_string_lossy();
+                if !session_path_str.starts_with(project_str.as_ref()) {
+                    continue;
+                }
+            }
+            
             let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
             let lines: Vec<&str> = content.lines().collect();
             let mut name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
@@ -1490,5 +1528,226 @@ pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), Strin
         .map_err(|e| format!("更新安装失败: {e}"))?;
     // Relaunch so the new version takes effect (updater staged the bundle).
     app.restart();
+    Ok(())
+}
+
+/// Get per-file diffs for the active neocodex session's working tree.
+/// Returns a map of file path -> diff blocks for all changed files.
+#[tauri::command]
+pub fn neocodex_get_diff() -> Result<serde_json::Value, String> {
+    use std::process::Command;
+    let out = Command::new("git")
+        .args(["diff", "--name-only"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err("git diff failed".into());
+    }
+    let files: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+
+    let mut result = serde_json::Map::new();
+    for file in &files {
+        let diff_out = Command::new("git")
+            .args(["diff", "HEAD", "--", file])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let diff_text = String::from_utf8_lossy(&diff_out.stdout).to_string();
+        let blocks = parse_neocodex_diff(&diff_text);
+        result.insert(file.clone(), serde_json::to_value(blocks).unwrap());
+    }
+
+    // Also include untracked files
+    let untracked_out = Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    let untracked: Vec<String> = String::from_utf8_lossy(&untracked_out.stdout)
+        .lines()
+        .filter(|l| l.starts_with("??"))
+        .map(|l| l[3..].trim().to_string())
+        .collect();
+
+    for file in &untracked {
+        if let Ok(content) = std::fs::read_to_string(file) {
+            let blocks = vec![crate::commands::DiffBlock {
+                r#type: "added".into(),
+                content,
+                line_start: 0,
+            }];
+            result.insert(file.clone(), serde_json::to_value(blocks).unwrap());
+        }
+    }
+
+    Ok(serde_json::Value::Object(result))
+}
+
+/// Apply (accept) or reject a file's diff in the neocodex session.
+/// action: "accept" stages the file (git add), "reject" restores it (git restore).
+#[tauri::command]
+pub fn neocodex_apply_diff(path: String, action: String) -> Result<(), String> {
+    use std::process::Command;
+    match action.as_str() {
+        "accept" => {
+            let out = Command::new("git")
+                .args(["add", "--", &path])
+                .output()
+                .map_err(|e| e.to_string())?;
+            if !out.status.success() {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                return Err(stderr.trim().to_string());
+            }
+        }
+        "reject" => {
+            // Check if untracked
+            let porcelain = Command::new("git")
+                .args(["status", "--porcelain", "--", &path])
+                .output()
+                .map_err(|e| e.to_string())?;
+            let is_untracked = String::from_utf8_lossy(&porcelain.stdout)
+                .lines()
+                .any(|l| l.starts_with("??"));
+
+            if is_untracked {
+                let _ = std::fs::remove_file(&path);
+            } else {
+                let out = Command::new("git")
+                    .args(["restore", "--staged", "--worktree", "--source=HEAD", "--", &path])
+                    .output()
+                    .map_err(|e| e.to_string())?;
+                if !out.status.success() {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    return Err(stderr.trim().to_string());
+                }
+            }
+        }
+        _ => return Err(format!("Invalid action: {}", action)),
+    }
+    Ok(())
+}
+
+fn parse_neocodex_diff(diff_str: &str) -> Vec<crate::commands::DiffBlock> {
+    let mut blocks = Vec::new();
+    for line in diff_str.lines() {
+        if let Some(stripped) = line.strip_prefix('+') {
+            if !stripped.starts_with('+') {
+                blocks.push(crate::commands::DiffBlock {
+                    r#type: "added".into(),
+                    content: stripped.to_string(),
+                    line_start: 0,
+                });
+                continue;
+            }
+        }
+        if let Some(stripped) = line.strip_prefix('-') {
+            if !stripped.starts_with('-') {
+                blocks.push(crate::commands::DiffBlock {
+                    r#type: "removed".into(),
+                    content: stripped.to_string(),
+                    line_start: 0,
+                });
+                continue;
+            }
+        }
+        if !line.starts_with("diff")
+            && !line.starts_with("index")
+            && !line.starts_with("---")
+            && !line.starts_with("+++")
+            && !line.starts_with("@@")
+            && !line.starts_with("\\ ")
+        {
+            blocks.push(crate::commands::DiffBlock {
+                r#type: "unchanged".into(),
+                content: line.to_string(),
+                line_start: 0,
+            });
+        }
+    }
+    blocks
+}
+
+/// Open a file in the internal editor by dispatching a frontend event.
+#[tauri::command]
+pub fn neocodex_open_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    app.emit("neocodex:open-file", path).map_err(|e| e.to_string())
+}
+
+/// Open a file in the external editor (OS default).
+#[tauri::command]
+pub async fn neocodex_open_external(path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let app = tauri::AppHandle::current();
+    app.opener().open_path(path, None::<String>).map_err(|e| e.to_string())
+}
+
+/// Get git status for all files in the repo (porcelain format).
+#[tauri::command]
+pub fn neocodex_git_file_status(cwd: Option<String>) -> Result<Vec<GitFileStatus>, String> {
+    use std::process::Command;
+    let cwd = cwd.unwrap_or_else(|| std::env::current_dir().unwrap_or_default().to_string_lossy().to_string());
+    let out = Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(&cwd)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err(stderr.trim().to_string());
+    }
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let mut statuses = Vec::new();
+    for line in stdout.lines() {
+        if line.len() < 3 {
+            continue;
+        }
+        let status = &line[0..2];
+        let path = line[3..].trim().to_string();
+        statuses.push(GitFileStatus {
+            path,
+            status: status.to_string(),
+        });
+    }
+    Ok(statuses)
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct GitFileStatus {
+    pub path: String,
+    pub status: String,
+}
+
+/// File operations: create file, create folder, delete, rename.
+#[tauri::command]
+pub async fn neocodex_file_operation(op: String, path: String, new_name: Option<String>) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+    let p = Path::new(&path);
+    match op.as_str() {
+        "new_file" => {
+            if let Some(parent) = p.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            fs::File::create(p).map_err(|e| e.to_string())?;
+        }
+        "new_folder" => {
+            fs::create_dir_all(p).map_err(|e| e.to_string())?;
+        }
+        "delete" => {
+            if p.is_dir() {
+                fs::remove_dir_all(p).map_err(|e| e.to_string())?;
+            } else {
+                fs::remove_file(p).map_err(|e| e.to_string())?;
+            }
+        }
+        "rename" => {
+            let new_name = new_name.ok_or("new_name required for rename")?;
+            let new_path = p.with_file_name(new_name);
+            fs::rename(p, new_path).map_err(|e| e.to_string())?;
+        }
+        _ => return Err(format!("Invalid operation: {}", op)),
+    }
     Ok(())
 }

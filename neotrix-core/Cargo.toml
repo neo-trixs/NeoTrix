@@ -119,6 +119,8 @@ k256 = { version = "0.13", features = ["ecdsa"] }
 sha3 = "0.10"
 glob = "0.3"
 regex = "1"
+html-escape = "0.2"
+unicode-normalization = "0.1"
 flate2 = "1"
 syn = { version = "2", features = ["full", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
@@ -190,6 +192,7 @@ office = ["dep:zip", "dep:quick-xml"]
 stealth-net = ["dep:chromiumoxide"]
 sandbox = ["dep:wasmtime", "dep:agent-sandbox"]
 telemetry = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:tracing-opentelemetry"]
+research = []
 rkyv-storage = ["dep:rkyv", "dep:memmap2"]
 keyring = ["dep:keyring"]
 anyhow = ["dep:anyhow"]

@@ -7,10 +7,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use crate::core::nt_core_prm::{LambdaGrpoResult, StepAdvantage, compute_step_advantages, StepGrpoConfig, ProcessScore, AgentTrajectory, TrajectoryStep};
-use crate::core::nt_core_policy::{E8Policy, NUM_E8_FACTORS};
-use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector};
-use crate::core::nt_core_e8::domain_transition::E8TaskType;
+use crate::core::nt_core_prm::{StepGrpoConfig, ProcessScore, AgentTrajectory, TrajectoryStep};
+use crate::core::nt_core_policy::E8Policy;
+use crate::core::nt_core_ttc::EffortTier;
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_traits::SpecialistType;
 use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;

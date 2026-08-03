@@ -23,8 +23,9 @@
 // L0 — 基底层 (Substrate)
 // ═══════════════════════════════════════════════════════════════════
 pub mod l0_substrate;
+#[cfg(feature = "research")]
 pub mod nt_core_deploy;
-pub mod nt_core_graph_orch;
+#[cfg(feature = "research")]
 pub mod nt_core_deploy_cache;
 pub mod nt_core_harness;
 
@@ -155,7 +156,9 @@ pub mod nt_core_telemetry;
 pub mod nt_core_answer_engine;
 pub mod nt_core_answer_bridge;
 pub mod nt_core_self_test_integration;
+#[cfg(feature = "research")]
 pub mod nt_core_intel_pipeline;
+#[cfg(feature = "research")]
 pub mod nt_core_io_capability;
 pub mod nt_core_second_brain;
 pub mod nt_core_scoring_substrate;
@@ -204,6 +207,7 @@ pub use l7_capability::nt_core_orch_agent::{
 };
 
 // --- L0: Substrate ---
+#[cfg(feature = "research")]
 pub use nt_core_deploy::{
     EdgeDeployPipeline, Quantizer, HardwareDetector, AotCompiler,
     Quantization, OsType, AotTarget, HardwareProfile, LoraAdapter,

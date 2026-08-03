@@ -7,18 +7,15 @@ use tokio::task::JoinHandle;
 use crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 use crate::neotrix::nt_mind::knowledge_chain::KnowledgeChain;
 use crate::neotrix::nt_mind::goal_loop::GoalLoop;
-use crate::neotrix::nt_mind::thinking_bridge::ThinkingBridge;
 use crate::neotrix::nt_mind::distillation::MetaCognitionBridge;
 use crate::neotrix::nt_mind::bbrain_monitor::BMonitor;
 use self::always_on::AlwaysOnEngine;
 use crate::neotrix::nt_mind_cleanup::CleanupEngine;
 use crate::neotrix::nt_io_plugin::registry::PluginRegistry;
 use crate::neotrix::nt_world_model::WorldModelV2;
-use crate::neotrix::nt_mind_evolution_loop::EvolutionLoop;
 use crate::neotrix::nt_mind_evolution_daemon::{EvolutionDaemon, EvolutionConfig};
 use crate::neotrix::nt_mind::panorama_pipeline::PanoramaPipeline;
 use crate::neotrix::nt_mind::exploration_pipeline::ExplorationPipeline;
-use crate::neotrix::nt_world_crawl::{UnifiedCrawler, CrawlerConfig};
 use crate::neotrix::nt_act_voice::VoiceInput;
 use crate::neotrix::l1_body_impl::nt_io_user_avatar::DistillationEngine;
 use crate::neotrix::nt_mind::self_evolver::SelfEvolver;
@@ -29,9 +26,7 @@ use crate::neotrix::nt_mind::auto_crystallizer::AutoCrystallizer;
 use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
-use crate::neotrix::nt_mind::web_miner::WebKnowledgeMiner;
 use crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery;
-use crate::neotrix::nt_agent_protocol::capabilities::CapabilityRouter;
 
 use crate::core::nt_core_second_brain::SecondBrain;
 use crate::core::nt_core_self::intra_reflection::PreActionIntrospector;
@@ -39,6 +34,7 @@ use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
 use crate::neotrix::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use crate::neotrix::nt_mind_consciousness_monitor::ConsciousnessMonitor;
 use crate::core::nt_core_consciousness::CognitiveLoadMonitor;
+use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 
 pub use crate::neotrix::nt_mind_background_config::{BackgroundConfig, TelemetryCollector, TelemetrySnapshot};
 
@@ -71,21 +67,16 @@ pub struct BackgroundLoop {
     pub telemetry: Arc<TelemetryCollector>,
     pub goal_loop: GoalLoop,
     pub metacognition: Option<MetaCognitionBridge>,
-    pub thinking: ThinkingBridge,
     pub bbrain: BMonitor,
-    pub evolution: EvolutionLoop,
     pub daemon: Option<EvolutionDaemon>,
-    pub nt_world_crawl: Option<UnifiedCrawler>,
     pub exploration_pipeline: Option<ExplorationPipeline>,
     pub nt_world_model: Option<WorldModelV2>,
     pub panorama: Option<PanoramaPipeline>,
     pub agent_discovery: Option<AgentDiscovery>,
-    pub capability_router: Option<CapabilityRouter>,
     pub self_evolver: Option<SelfEvolver>,
     pub curiosity_drive: CuriosityDrive,
     pub knowledge_aging: KnowledgeAging,
     pub auto_crystallizer: AutoCrystallizer,
-    pub web_miner: Option<WebKnowledgeMiner>,
     pub introspector: Option<PreActionIntrospector>,
     pub gap_detector: Option<KnowledgeGapDetector>,
     pub awareness: Option<ConsciousnessMonitor>,
@@ -120,6 +111,9 @@ pub struct BackgroundLoop {
     pub cognitive_load: Option<CognitiveLoadMonitor>,
     pub second_brain: Option<SecondBrain>,
     pub kb: Option<Arc<KnowledgeBase>>,
+    /// 统一的 GlobalWorkspace 单例 —— 被 engine、panorama、consciousness_bridge 共享。
+    /// 消除 panorama 独立 new(13.0) 与 engine new(0.5) 的双实例分裂。
+    pub gwt: Option<GlobalWorkspace>,
 }
 
 impl BackgroundLoop {
@@ -130,21 +124,16 @@ impl BackgroundLoop {
             telemetry: Arc::new(TelemetryCollector::new()),
             goal_loop: GoalLoop::new(),
             metacognition: Some(MetaCognitionBridge::new(".")),
-            thinking: ThinkingBridge::new("."),
             bbrain: BMonitor::new(),
-            evolution: EvolutionLoop::new(),
             daemon: Some(EvolutionDaemon::new(EvolutionConfig::default())),
-            nt_world_crawl: None,
             exploration_pipeline: None,
             nt_world_model: None,
             panorama: None,
             agent_discovery: None,
-            capability_router: None,
             self_evolver: None,
             curiosity_drive: CuriosityDrive::new(),
             knowledge_aging: KnowledgeAging::new(),
             auto_crystallizer: AutoCrystallizer::new(),
-            web_miner: None,
             introspector: Some(PreActionIntrospector::new()),
             gap_detector: Some(KnowledgeGapDetector::new()),
             awareness: Some(ConsciousnessMonitor::new()),
@@ -178,6 +167,7 @@ impl BackgroundLoop {
             cognitive_load: Some(CognitiveLoadMonitor::new()),
             second_brain: Some(SecondBrain::new()),
             kb: None,
+            gwt: Some(GlobalWorkspace::new(13.0)),
         }
     }
 }

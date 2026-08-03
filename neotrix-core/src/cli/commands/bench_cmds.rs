@@ -4,7 +4,7 @@ use tokio::sync::RwLock;
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::neotrix::nt_mind::benchmark::{bench_plan_reasoning, print_benchmark_table};
-use crate::neotrix::nt_io_provider::{LlmProvider, LlmProviderType, create_provider_from_type};
+use crate::neotrix::nt_io_provider::{LlmProviderType, create_provider_from_type};
 use crate::neotrix::l9_transcendent_impl::nt_mind_eval_harness::{
     EvalHarness, ModelSpec, DatasetSpec, EvalQuery, DEFAULT_BUDGET_GRID,
 };

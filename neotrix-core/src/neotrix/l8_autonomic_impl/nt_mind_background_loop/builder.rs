@@ -13,13 +13,13 @@ impl BackgroundLoop {
         self
     }
 
-    pub fn with_panorama(mut self, _pano: PanoramaPipeline) -> Self {
-        self.panorama = Some(_pano);
-        self
-    }
-
-    pub fn with_nt_world_crawl(mut self, _work_dir: std::path::PathBuf) -> Self {
-        self.nt_world_crawl = Some(UnifiedCrawler::new(CrawlerConfig::default()));
+    pub fn with_panorama(mut self, pano: PanoramaPipeline) -> Self {
+        // B1: 注入共享 GWT 单例, 消除 panorama 独立 new(13.0) 与 mod 级 gwt 的双实例分裂
+        let pano = match self.gwt.take() {
+            Some(shared) => pano.with_gwt(shared),
+            None => pano,
+        };
+        self.panorama = Some(pano);
         self
     }
 
@@ -37,11 +37,6 @@ impl BackgroundLoop {
 
     pub fn with_knowledge_chain(mut self, work_dir: std::path::PathBuf) -> Self {
         self.knowledge_chain = Some(KnowledgeChain::new(work_dir));
-        self
-    }
-
-    pub fn with_web_miner(mut self, work_dir: std::path::PathBuf) -> Self {
-        self.web_miner = Some(WebKnowledgeMiner::new(work_dir));
         self
     }
 
