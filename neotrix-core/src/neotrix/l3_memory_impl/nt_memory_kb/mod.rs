@@ -39,6 +39,7 @@ pub mod privacy;
 pub mod user_memory;
 pub mod vector_adapter;
 pub mod nt_normalizer;
+pub mod knowledge_storage;
 
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
@@ -62,7 +63,8 @@ pub use nt_memory_tech_reserve::{
     TechReserveStore, TechReserveEntry, TechReserveDimension, TechReserveQuery,
     ArchitectureGap, TechProfile, extract_tech_domains,
 };
-pub use nt_normalizer::{normalize_text, strip_markdown, normalize_lang, content_fingerprint, extract_key_sections, detect_language, STOP_WORDS};
+pub use nt_normalizer::{normalize_text, strip_markdown, normalize_lang, content_fingerprint, extract_key_sections, detect_language, compute_quality_score, validate_node_type, validate_relation_type};
+pub use knowledge_storage::{KnowledgeStorage, migrate_from_json};
 
 use rusqlite::Connection;
 use std::collections::HashMap;
