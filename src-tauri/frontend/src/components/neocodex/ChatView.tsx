@@ -129,6 +129,8 @@ interface ChatViewProps {
   recentSessions?: Array<{ id: string; name: string; mode: string; updated_at: number }>;
   onRecentSessionSelect?: (id: string) => void;
   onSlashAction?: (cmd: string, arg: string) => void;
+  mode?: "Agent" | "Shell" | "Plan";
+  onModeChange?: (mode: string) => void;
 }
 
 const SLASH_COMMANDS = [
@@ -170,6 +172,8 @@ export function ChatView({
   pendingPlanExecute = false,
   onPlanApprove,
   onSlashAction,
+  mode,
+  onModeChange,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLElement>(null);
@@ -195,6 +199,8 @@ export function ChatView({
   const addNotification = useStore((s) => s.addNotification);
   const permMode = useStore((s) => s.settings?.permissionMode) || "auto";
   const defaultModel = useStore((s) => s.settings?.defaultModel) || "GatewayV2";
+  const storeMode = useStore((s) => s.neocodexMode);
+  const activeMode = mode || storeMode;
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [lastInput, setLastInput] = useState("");
   const [queuedInputs, setQueuedInputs] = useState<Array<{ content: string; attachments: Attachment[] }>>([]);
@@ -826,12 +832,40 @@ export function ChatView({
              </button>
           )}
           <div className={styles.composerFooter}>
-            <span className={styles.contextCapsule} title="当前工作区上下文" data-testid="composer-context">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1.5 4.5h11M1.5 7h11M1.5 9.5h7"/>
-              </svg>
-              项目
-              <span className={styles.contextCapsuleArrow}>▾</span>
+            <span className={styles.composerLeft}>
+              <span className={styles.modelChip} title="当前模型" data-testid="composer-model">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="5" width="10" height="7" rx="1.5"/>
+                  <path d="M4.5 5V3.5a1.5 1.5 0 013 0V5M9.5 5V3.5a1.5 1.5 0 01-3 0V5"/>
+                </svg>
+                {defaultModel}
+              </span>
+              <button
+                type="button"
+                className={`${styles.planToggle} ${activeMode === "Plan" ? styles.planToggleActive : ""}`}
+                title={activeMode === "Plan" ? "Plan 模式（只读规划）已开启" : "切换到 Plan 模式"}
+                data-testid="composer-plan-toggle"
+                onClick={() => {
+                  if (activeMode === "Plan") {
+                    onModeChange?.("Agent");
+                  } else {
+                    onModeChange?.("Plan");
+                  }
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1.5" y="3.5" width="11" height="8" rx="1.5"/>
+                  <path d="M4 6.5h6M4 8.5h3"/>
+                </svg>
+                Plan
+              </button>
+              <span className={styles.contextCapsule} title="当前工作区上下文" data-testid="composer-context">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1.5 4.5h11M1.5 7h11M1.5 9.5h7"/>
+                </svg>
+                项目
+                <span className={styles.contextCapsuleArrow}>▾</span>
+              </span>
             </span>
             <button
               type="button"

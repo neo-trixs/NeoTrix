@@ -13,6 +13,20 @@ function renderSidebar() {
   return { onSelect, onDelete, onArchive };
 }
 
+describe("SessionSidebar — running agent strip", () => {
+  it("shows running-agent indicator when busy", async () => {
+    render(<SessionSidebar activeSessionId={null} busy />);
+    expect(await screen.findByTestId("sidebar-running-agent")).toBeInTheDocument();
+    expect(screen.getByText(/运行中 Agent/)).toBeInTheDocument();
+  });
+
+  it("hides running-agent strip when idle", async () => {
+    render(<SessionSidebar activeSessionId={null} busy={false} />);
+    await screen.findByText(/会话 \(/).catch(() => {});
+    expect(screen.queryByTestId("sidebar-running-agent")).not.toBeInTheDocument();
+  });
+});
+
 beforeEach(() => {
   resetInvokeMocks();
   useStore.setState({ notifications: [] });

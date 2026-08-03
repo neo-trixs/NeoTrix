@@ -134,6 +134,10 @@
 
 - **R-P92 (并发 recompile 瞬错忽略)**: 并发 session 正在重编译时，`Cargo.toml`/`Cargo.lock` 解析可能瞬时失败或状态漂移。遇到" manifest 解析错误 / lock 文件冲突"等**非代码错误**，等 5-10 秒重试一次再判失败；不要据瞬错断言代码有缺陷。差异见 R-P19（架构修复声明必须过 cargo check 才可信）。
 
+## 并发 worktree 隔离 (R-P93)
+
+- **R-P93 (前端工作必须在独立 worktree)**: 主工作树 `main` 由自治循环 (openhands 并发 session) 持有，会执行 `git stash push`/`git reset`/`git add -A` 提交，周期性清扫未提交改动。**前端 (src-tauri/frontend) 工作一律在 `.worktrees/neocodex-ui` (branch `feat/neocodex-ui`) 中进行**，物理隔离后循环的 git 操作永远碰不到前端文件。worktree 内 `node_modules` 用符号链接指向主树，dev server 跑 `:1421`。完成一批后 commit 到该 branch，再 `git checkout main && git merge feat/neocodex-ui` 或 PR 合并回主树。
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：
