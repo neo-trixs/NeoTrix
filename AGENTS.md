@@ -43,6 +43,7 @@ Cycle 指针与全文统一存 KB: `~/.neotrix/knowledge.db` `experience` 命名
 | 199 | NT-CORE | (本期 hub 已有并发会话 cycle=199 条目: 证据门控自治 DelegateEngine DomainGate/证据强度反哺 crm-loopx-PentAGI; 增量构建缓存幻影错误) |
 | 200 | NT-CORE | KB 全域审查 (rev-officer): 修 D52-1 hub 幽灵索引 (absorb 增量漂移→_refresh_hub_metrics 从实际分支全量重建, 幂等自愈) + D52-2 cycle int/str 混用 (统一 str) + D53-1 中文长短语神经元不可达 (_neural_associative 模糊联想 + 滑窗切词); 验证 0 幽灵突触/0 孤儿; 神经记忆层落地 (概念神经元去重 + 突触 + 联想检索, backfill 幂等回填) |
 | 201 | NT-CORE | 神经记忆层 v2 — Hebb 共现网络 (星型→立体): 概念 co 字段 (同分支两两累计 fire together), query 一阶+二阶扩散 ([关联] 排后); cmd_prune 清理 16 停用词噪声神经元 (幂等); 全库 155 万概念对内存批量+单事务 2s (原逐对 commit >120s); 3 并发 opencode 写 KB 下 hub 仍自洽 (分支=唯一事实源); 停用词收敛纪律 (勿误杀 code/test 等有效词) |
+| 202 | NT-CORE | rev-officer Phase 3 并行批: theater gate 8 模块 (research feature, 挖出 memory_budget 函数级 global() 真用回退) + evolution_daemon 挂起修复 (mutation_enabled 默认 true → 测试只读不触发嵌套 cargo 死锁) + Phase 3a hub 拆分 (engine_core reason() 663→14行+4 helper; run.rs 1896→700 拆 handlers_core/consciousness/maintenance 3 worker 经 #[path] mod) + Phase 3b unwrap 审计 (6 热点全在测试块, 生产区已 unwrap_or*) |
 
 ## Skill Routing (何时加载什么)
 
