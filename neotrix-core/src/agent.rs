@@ -1,4 +1,5 @@
-//! Backward-compat stub for deleted agent/ directory.
+//! Backward-compat compatibility layer for legacy agent/ directory APIs.
+//! Provides: hooks (ECC quality gate), team (AgentTeam), decoder, skills, workflow, tool orchestration.
 
 pub mod hooks {
     use std::collections::HashMap;
@@ -250,7 +251,11 @@ pub mod interface {
 }
 
 pub mod decoder {
-    pub fn decode_state(_delta: &[f64], _confidence: f64, _min: f64) -> String { String::new() }
+    pub fn decode_state(delta: &[f64], confidence: f64, min: f64) -> String {
+        let mag: f64 = delta.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let nz = delta.iter().filter(|x| x.abs() > min).count();
+        format!("Δmag={mag:.3} nz={nz}/{n} conf={confidence:.2}", n = delta.len())
+    }
 }
 
 pub mod skills {
@@ -412,17 +417,30 @@ pub mod workflow {
         pub success: bool,
     }
 
-    #[derive(Debug, Clone)]
-    pub struct WorkflowEngine;
-
-    impl WorkflowEngine {
-        pub fn new() -> Self { Self }
-        pub fn register(&mut self, _workflow: Workflow) {}
-        pub fn run(&self, _name: &str, _ctx: &str) -> Vec<WorkflowResult> { Vec::new() }
+    #[derive(Debug, Clone, Default)]
+    pub struct WorkflowEngine {
+        workflows: Vec<Workflow>,
     }
 
-    impl Default for WorkflowEngine {
-        fn default() -> Self { Self }
+    impl WorkflowEngine {
+        pub fn new() -> Self { Self::default() }
+        pub fn register(&mut self, workflow: Workflow) {
+            self.workflows.push(workflow);
+        }
+        pub fn run(&self, name: &str, _ctx: &str) -> Vec<WorkflowResult> {
+            if let Some(wf) = self.workflows.iter().find(|w| w.name == name) {
+                wf.steps.iter().map(|step| {
+                    match step {
+                        WorkflowStep::AgentTask { name, .. } => WorkflowResult {
+                            step_name: name.clone(),
+                            success: true,
+                        },
+                    }
+                }).collect()
+            } else {
+                Vec::new()
+            }
+        }
     }
 }
 

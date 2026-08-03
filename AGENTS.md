@@ -41,6 +41,8 @@ Cycle 指针与全文统一存 KB: `~/.neotrix/knowledge.db` `experience` 命名
 | 198 | NT-CORE | 第一性原理评测 CLI 冗余: 自主动循环(周天大阵)需观测面不需指挥面, 干预cmd=伪需求冗余; 删除 brain_cmds.rs 未注册 EvolveCmd 死壳 (R-P42/R-P79) + registry 5测试过; 立规则: 命令三分类(指挥→daemon自驱冗余 / 观测→CLI必要 / 配置→CLI交互), 能力网单一主权原则(daemon调度/CLI观测/KB存态, 无主权方特性不应存在); holon 可选git依赖是预存环境问题非代码缺陷 |
 | 199 | NT-CORE | F6 蒸馏训练闭环接地: successor closed-loop (分布蒸馏→SFT+CSPO→E8策略更新→影响后续reason), sing strategy authority R-P42(temp trainer from prm.policy→write-back), 修复 ControlTrainer apply_* 空壳真调 learn_from_scores(步骤按 step_idx 稠密对齐供 steps.get 位置索引) + reason() 主流程接线 learn_from_trace(R-P79死链修复); 清理孤儿 nt_core_delegate_engine.rs + xueshu_login.js(从未运行/仓库走Rust CDP), install.sh Homebrew 公式路径断裂修复 git mv → deploy/homebrew; 语言评测: 41万行Rust主核+平台强约束脚本层(.rb DSL/.js, Playwright/.py 数理)无需迁移, 真正遗留是路径断裂非语言; 并行 HookRegistry(agent.hooks vs nt_mind_hook) 真技术债留独立 rev-officer session |
 | 199 | NT-CORE | (本期 hub 已有并发会话 cycle=199 条目: 证据门控自治 DelegateEngine DomainGate/证据强度反哺 crm-loopx-PentAGI; 增量构建缓存幻影错误) |
+| 200 | NT-CORE | KB 全域审查 (rev-officer): 修 D52-1 hub 幽灵索引 (absorb 增量漂移→_refresh_hub_metrics 从实际分支全量重建, 幂等自愈) + D52-2 cycle int/str 混用 (统一 str) + D53-1 中文长短语神经元不可达 (_neural_associative 模糊联想 + 滑窗切词); 验证 0 幽灵突触/0 孤儿; 神经记忆层落地 (概念神经元去重 + 突触 + 联想检索, backfill 幂等回填) |
+| 201 | NT-CORE | 神经记忆层 v2 — Hebb 共现网络 (星型→立体): 概念 co 字段 (同分支两两累计 fire together), query 一阶+二阶扩散 ([关联] 排后); cmd_prune 清理 16 停用词噪声神经元 (幂等); 全库 155 万概念对内存批量+单事务 2s (原逐对 commit >120s); 3 并发 opencode 写 KB 下 hub 仍自洽 (分支=唯一事实源); 停用词收敛纪律 (勿误杀 code/test 等有效词) |
 
 ## Skill Routing (何时加载什么)
 

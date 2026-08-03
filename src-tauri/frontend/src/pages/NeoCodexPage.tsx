@@ -37,7 +37,7 @@ export default function NeoCodexPage() {
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [fileTreeOpen, setFileTreeOpen] = React.useState(false);
   const [showUsage, setShowUsage] = React.useState(false);
-  const [rightPanelTab, setRightPanelTab] = React.useState<"task" | "diff" | "preview" | "terminal" | "capability" | null>(null);
+  const [rightPanelTab, setRightPanelTab] = React.useState<"browser" | "terminal" | "review" | "file" | "tasks" | null>("review");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteMode, setPaletteMode] = useState<"command" | "file">("command");
   const [fileItems, setFileItems] = useState<Array<{ id: string; label: string; hint?: string; onSelect: () => void }>>([]);
@@ -47,6 +47,8 @@ export default function NeoCodexPage() {
   const [gitStatus, setGitStatus] = useState<{ branch: string; dirty: boolean } | null>(null);
   const [updating, setUpdating] = useState(false);
   const [viewMode, setViewMode] = useState<"verbose" | "normal" | "summary">("normal");
+  const [sidebarFilter, setSidebarFilter] = useState<"all" | "active" | "archived">("all");
+  const [sidebarGroupBy, setSidebarGroupBy] = useState<"project" | "none">("project");
   const stopRef = useRef(false);
   const taskSeenRef = useRef<Set<string>>(new Set());
   const taskLastIndexRef = useRef(0);

@@ -70,7 +70,6 @@ pub mod nt_agent_agent_team;
 pub mod nt_tools;
 
 // Agent
-pub mod nt_agent;
 pub mod nt_agent_mcp_adapter;
 pub mod nt_agent_mcp_auth;
 pub mod nt_agent_mcp_discovery;
