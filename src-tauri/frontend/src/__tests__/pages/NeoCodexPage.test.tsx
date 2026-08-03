@@ -363,6 +363,20 @@ describe("NeoCodexPage — status bar parity", () => {
     await screen.findByTestId("status-bar");
     expect(screen.queryByTestId("status-sync")).not.toBeInTheDocument();
   });
+
+  it("shows active model in the status bar from health report", async () => {
+    renderPage();
+    await screen.findByTestId("status-bar");
+    await waitFor(() => expect(screen.getByTestId("status-model")).toBeInTheDocument());
+    expect(screen.getByTestId("status-model")).toHaveTextContent("mock-lgm");
+  });
+
+  it("hides the model status item when health lacks provider_model", async () => {
+    mockInvoke("neocodex_health_report", () => ({ context_usage: 0.1, tokens_used: 0, cost_spent: 0, cost_budget: 0 }));
+    renderPage();
+    await screen.findByTestId("status-bar");
+    expect(screen.queryByTestId("status-model")).not.toBeInTheDocument();
+  });
 });
 
 describe("NeoCodexPage — resizable right panel", () => {

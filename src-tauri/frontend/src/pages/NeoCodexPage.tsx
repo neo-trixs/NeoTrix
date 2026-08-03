@@ -1212,6 +1212,16 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               {gitStatus.branch}
             </span>
           )}
+          {health?.provider_model && (
+            <span
+              className={styles.statusItem}
+              title={`当前模型: ${health.provider_model}（点击在输入框切换模型）`}
+              data-testid="status-model"
+            >
+              <span className={styles.statusModelDot} />
+              {health.provider_model}
+            </span>
+          )}
           {health?.diff_stats && (
             <span className={styles.diffStats}>
               <span className={styles.diffAdd}>+{health.diff_stats.added || 0}</span>

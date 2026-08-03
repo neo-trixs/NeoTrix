@@ -515,6 +515,15 @@
   background: var(--warning);
 }
 
+.statusModelDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  opacity: 0.8;
+  box-shadow: 0 0 4px var(--accent-primary);
+}
+
 .diffStats {
   display: inline-flex;
   gap: 4px;
