@@ -4,28 +4,26 @@ import type { NeoCodexSession } from "../../types";
 import styles from "./SessionSidebar.module.css";
 import { invoke } from "@tauri-apps/api/core";
 
-export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessionDelete, onSessionArchive }: { activeSessionId?: string | null; busy?: boolean; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void; onSessionArchive?: (sessionId: string) => void }) {
+export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessionDelete, onSessionArchive, filter, groupBy, searchQuery }: { activeSessionId?: string | null; busy?: boolean; onSessionSelect?: (session: NeoCodexSession) => void; onSessionDelete?: (sessionId: string) => void; onSessionArchive?: (sessionId: string) => void; filter?: "all" | "active" | "archived"; groupBy?: "project" | "none"; searchQuery?: string }) {
   const [sessions, setSessions] = useState<NeoCodexSession[]>([]);
   const [archived, setArchived] = useState<NeoCodexSession[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showNewDialog, setShowNewDialog] = useState(false);
-  const [newSessionName, setNewSessionName] = useState("");
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "idle">("all");
-  const [groupBy, setGroupBy] = useState<"date" | "mode" | "project">("date");
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("neotrix:pinned-sessions") || "[]"); } catch { return []; }
   });
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportSession, setExportSession] = useState<NeoCodexSession | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const addNotification = useStore((s) => s.addNotification);
+  const query = searchQuery ?? "";
   // P2-2: full-text message search (Codex ⌘G / Claude find parity). Local name
   // filter stays for <2 chars; longer queries hit the backend search command.
   const [searchHits, setSearchHits] = useState<Array<{ session_id: string; session_name: string; role: string; snippet: string; match_count: number }>>([]);
   const [searching, setSearching] = useState(false);
   const searchTimerRef = useRef<number | null>(null);
+
+  const effectiveFilter = filter ?? "all";
+  const effectiveGroupBy = groupBy === "project" ? "project" : "date";
 
   useEffect(() => {
     const q = query.trim();
@@ -72,21 +70,6 @@ export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessi
         created_at: 0,
         updated_at: 0,
       } as NeoCodexSession);
-    }
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const res = await invoke<string>("cmd_session_import_json", { json: text });
-      const imported = res ? res.split(",").filter(Boolean).length : 0;
-      addNotification({ type: "success", message: `已导入 ${imported} 个会话`, duration: 3000 });
-      window.dispatchEvent(new CustomEvent("neotrix:sessions-changed"));
-    } catch (err) {
-      addNotification({ type: "error", message: `导入失败: ${err}`, duration: 4000 });
     }
   };
 
@@ -149,41 +132,6 @@ export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessi
   useEffect(() => {
     refreshArchived();
   }, [refreshArchived]);
-
-  const handleCreateSession = async () => {
-    if (!newSessionName.trim()) return;
-    try {
-      const info = await invoke("neocodex_create_session", { name: newSessionName.trim() }) as any;
-      const session: NeoCodexSession = {
-        id: info.id,
-        name: info.name,
-        mode: info.mode || "Agent",
-        message_count: info.message_count || 0,
-        messages: [],
-        wire_path: info.wire_path || "",
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      };
-      setSessions((prev) => [session, ...prev]);
-      onSessionSelect?.(session);
-    } catch (e) {
-      console.error("Failed to create session:", e);
-      const session: NeoCodexSession = {
-        id: `session-${Date.now()}`,
-        name: newSessionName.trim(),
-        mode: "Agent",
-        message_count: 0,
-        messages: [],
-        wire_path: "",
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      };
-      setSessions((prev) => [session, ...prev]);
-      onSessionSelect?.(session);
-    }
-    setShowNewDialog(false);
-    setNewSessionName("");
-  };
 
   const handleDelete = async (sessionId: string) => {
     onSessionDelete?.(sessionId);
@@ -268,15 +216,15 @@ export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessi
     const q = query.trim().toLowerCase();
     const filtered = sessions.filter((s) => {
       if (q && !s.name.toLowerCase().includes(q)) return false;
-      if (statusFilter === "active" && !((s.message_count ?? 0) > 0)) return false;
-      if (statusFilter === "idle" && !((s.message_count ?? 0) === 0)) return false;
+      if (effectiveFilter === "active" && !((s.message_count ?? 0) > 0)) return false;
+      if (effectiveFilter === "archived") return false;
       return true;
     });
     const pinned = filtered.filter((s) => pinnedIds.includes(s.id));
     const unpinned = filtered.filter((s) => !pinnedIds.includes(s.id));
     const buckets: Array<{ label: string; sessions: NeoCodexSession[] }> = [];
     if (pinned.length) buckets.push({ label: "📌 置顶", sessions: pinned });
-    if (groupBy === "project") {
+    if (effectiveGroupBy === "project") {
       const byProject = new Map<string, NeoCodexSession[]>();
       for (const s of unpinned) {
         const key = deriveProject(s);
@@ -285,21 +233,6 @@ export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessi
       }
       for (const [project, list] of byProject) {
         buckets.push({ label: `📁 ${project} (${list.length})`, sessions: list });
-      }
-    } else if (groupBy === "mode") {
-      const modeOrder = ["Agent", "Shell", "Plan"];
-      const byMode = new Map<string, NeoCodexSession[]>();
-      for (const s of unpinned) {
-        const key = s.mode || "未指定";
-        if (!byMode.has(key)) byMode.set(key, []);
-        byMode.get(key)!.push(s);
-      }
-      for (const m of modeOrder) {
-        if (byMode.has(m)) buckets.push({ label: `${m} 模式`, sessions: byMode.get(m)! });
-      }
-      if (byMode.has("未指定")) buckets.push({ label: "未指定", sessions: byMode.get("未指定")! });
-      for (const [key, list] of byMode) {
-        if (!modeOrder.includes(key) && key !== "未指定") buckets.push({ label: `${key} 模式`, sessions: list });
       }
     } else {
       const day = 86400000;
@@ -313,15 +246,11 @@ export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessi
       push("更早", unpinned.filter((s) => s.updated_at < todayStart - 7 * day));
     }
     return buckets;
-  }, [sessions, query, statusFilter, groupBy, pinnedIds]);
+  }, [sessions, query, effectiveFilter, effectiveGroupBy, pinnedIds]);
 
   if (loading) {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <h3>会话</h3>
-          <button className={styles.newBtn} disabled>新建会话</button>
-        </div>
         <div className={styles.skeleton} />
       </div>
     );
@@ -329,64 +258,6 @@ export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessi
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h3>会话 ({sessions.length})</h3>
-        <div className={styles.headerActions}>
-          <button className={styles.newBtn} onClick={() => fileInputRef.current?.click()} title="导入会话 JSON">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M7 10V3M4 6l3-3 3 3M3 11h8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <button className={styles.newBtn} onClick={() => setShowNewDialog(true)} title="新建会话">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="application/json,.json"
-          style={{ display: "none" }}
-          onChange={handleImportFile}
-          data-testid="session-import-input"
-        />
-      </div>
-
-      <div className={styles.filterRow}>
-        <select
-          className={styles.filterSelect}
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "idle")}
-        >
-          <option value="all">全部</option>
-          <option value="active">有消息</option>
-          <option value="idle">空闲</option>
-        </select>
-        <select
-          className={styles.filterSelect}
-          value={groupBy}
-          onChange={(e) => setGroupBy(e.target.value as "date" | "mode" | "project")}
-        >
-          <option value="date">按日期分组</option>
-          <option value="mode">按模式分组</option>
-          <option value="project">按项目分组</option>
-        </select>
-      </div>
-
-      <div className={styles.search}>
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="6" cy="6" r="4"/><path d="M9.5 9.5L12 12" strokeLinecap="round"/>
-        </svg>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜索会话…"
-          className={styles.searchInput}
-        />
-      </div>
-
       <div className={styles.list}>
         {busy && (
           <div className={styles.runningStrip} data-testid="sidebar-running-agent">
@@ -496,27 +367,6 @@ export function SessionSidebar({ activeSessionId, busy, onSessionSelect, onSessi
           </div>
         )}
       </div>
-
-      {showNewDialog && (
-        <div className={styles.dialogOverlay} onClick={() => setShowNewDialog(false)}>
-          <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="新建会话" onClick={(e) => e.stopPropagation()}>
-            <h3>新建会话</h3>
-            <input
-              type="text"
-              value={newSessionName}
-              onChange={(e) => setNewSessionName(e.target.value)}
-              placeholder="会话名称"
-              className={styles.dialogInput}
-              autoFocus
-              onKeyDown={(e) => e.key === "Enter" && handleCreateSession()}
-            />
-            <div className={styles.dialogActions}>
-              <button className={styles.btnSecondary} onClick={() => setShowNewDialog(false)}>取消</button>
-              <button className={styles.btnPrimary} onClick={handleCreateSession}>创建</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showExportDialog && exportSession && (
         <div className={styles.dialogOverlay} onClick={() => setShowExportDialog(false)}>

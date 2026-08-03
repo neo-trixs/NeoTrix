@@ -29,9 +29,8 @@ describe("NeoCodexPage new-session handling", () => {
   it("creates a session via Cmd+N even when the sidebar is collapsed", async () => {
     renderPage();
 
-    const collapseBtn = await screen.findByTitle("收起侧栏");
-    fireEvent.click(collapseBtn);
-    expect(screen.queryByTitle("新建会话")).toBeNull();
+    fireEvent.keyDown(window, { key: "b", metaKey: true });
+    expect(screen.queryByTestId("nav-new")).toBeNull();
 
     const createSpy = vi.fn(() => ({
       id: "s-cmdn",
@@ -53,8 +52,8 @@ describe("NeoCodexPage new-session handling", () => {
   it("creates a session when the neotrix:new-session event fires with the sidebar collapsed", async () => {
     renderPage();
 
-    fireEvent.click(await screen.findByTitle("收起侧栏"));
-    expect(screen.queryByTitle("新建会话")).toBeNull();
+    fireEvent.keyDown(window, { key: "b", metaKey: true });
+    expect(screen.queryByTestId("nav-new")).toBeNull();
 
     const createSpy = vi.fn(() => ({
       id: "s-event",
@@ -335,7 +334,7 @@ describe("NeoCodexPage task pane", () => {
     renderPage();
     await screen.findByTestId("session-title");
 
-    fireEvent.click(screen.getByTestId("rail-btn-task"));
+    fireEvent.click(screen.getByTestId("rail-btn-tasks"));
     expect(await screen.findByTestId("task-pane")).toBeInTheDocument();
     expect(screen.getByTestId("task-pane-empty")).toBeInTheDocument();
   });
@@ -352,11 +351,11 @@ describe("NeoCodexPage — status bar parity", () => {
     mockInvoke("neocodex_get_side_chat", () => []);
   });
 
-  it("renders harness permission chip reflecting settings.permissionMode", async () => {
+  it("renders composer permission pill reflecting settings.permissionMode", async () => {
     useStore.setState({ settings: { ...(useStore.getState().settings || {}), permissionMode: "accept" } });
     renderPage();
-    await screen.findByTestId("status-bar");
-    expect(screen.getByTestId("status-bar")).toHaveTextContent("接受");
+    await screen.findByTestId("composer-permission");
+    expect(screen.getByTestId("composer-permission")).toHaveTextContent("接受");
   });
 
   it("does not show sync indicator at idle; no crash", async () => {

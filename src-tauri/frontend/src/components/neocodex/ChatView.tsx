@@ -197,8 +197,6 @@ export function ChatView({
   const [mentionHighlight, setMentionHighlight] = useState(0);
   const mentionRef = useRef<HTMLDivElement>(null);
   const addNotification = useStore((s) => s.addNotification);
-  const permMode = useStore((s) => s.settings?.permissionMode) || "auto";
-  const defaultModel = useStore((s) => s.settings?.defaultModel) || "GatewayV2";
   const storeMode = useStore((s) => s.neocodexMode);
   const activeMode = mode || storeMode;
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -833,13 +831,6 @@ export function ChatView({
           )}
           <div className={styles.composerFooter}>
             <span className={styles.composerLeft}>
-              <span className={styles.modelChip} title="当前模型" data-testid="composer-model">
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="5" width="10" height="7" rx="1.5"/>
-                  <path d="M4.5 5V3.5a1.5 1.5 0 013 0V5M9.5 5V3.5a1.5 1.5 0 01-3 0V5"/>
-                </svg>
-                {defaultModel}
-              </span>
               <button
                 type="button"
                 className={`${styles.planToggle} ${activeMode === "Plan" ? styles.planToggleActive : ""}`}
@@ -859,25 +850,7 @@ export function ChatView({
                 </svg>
                 Plan
               </button>
-              <span className={styles.contextCapsule} title="当前工作区上下文" data-testid="composer-context">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M1.5 4.5h11M1.5 7h11M1.5 9.5h7"/>
-                </svg>
-                项目
-                <span className={styles.contextCapsuleArrow}>▾</span>
-              </span>
             </span>
-            <button
-              type="button"
-              className={styles.permissionPill}
-              title="审批模式"
-              data-testid="composer-permission"
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 1.5L12 3v3.5c0 2.8-2 4.8-5 6-3-1.2-5-3.2-5-6V3L7 1.5z"/>
-              </svg>
-              {permMode === "auto" ? "自动" : permMode === "manual" ? "手动" : "接受"}
-            </button>
           </div>
         </div>
        </form>

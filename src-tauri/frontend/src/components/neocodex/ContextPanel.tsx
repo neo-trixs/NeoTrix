@@ -1,9 +1,9 @@
 import React from "react";
-import { TaskPane, DiffPane, PreviewPane, TerminalPane, CapabilityHealthPane } from "./index";
+import { TaskPane, DiffPane, PreviewPane, TerminalPane, CapabilityHealthPane, FileTreePanel } from "./index";
 import styles from "./ContextPanel.module.css";
 
 export interface ContextPanelProps {
-  activeTab: "task" | "diff" | "preview" | "terminal" | "capability";
+  activeTab: "review" | "terminal" | "browser" | "file" | "tasks";
   taskSteps: Array<{ id: string; name: string; args: string; startedAt: number; status: "running" | "done"; success?: boolean }>;
   taskStartedAt: number | null;
   health: any;
@@ -18,11 +18,11 @@ export function ContextPanel({
   return (
     <div className={styles.panel}>
       <div className={styles.content}>
-        {activeTab === "task" && <TaskPane steps={taskSteps} startedAt={taskStartedAt} />}
-        {activeTab === "diff" && <DiffPane />}
-        {activeTab === "preview" && <PreviewPane />}
+        {activeTab === "tasks" && <TaskPane steps={taskSteps} startedAt={taskStartedAt} />}
+        {activeTab === "review" && <DiffPane />}
+        {activeTab === "browser" && <PreviewPane />}
         {activeTab === "terminal" && <TerminalPane />}
-        {activeTab === "capability" && <CapabilityHealthPane data={health} />}
+        {activeTab === "file" && <FileTreePanel onPick={() => {}} />}
       </div>
     </div>
   );

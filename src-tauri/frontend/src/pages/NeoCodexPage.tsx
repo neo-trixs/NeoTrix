@@ -49,6 +49,8 @@ export default function NeoCodexPage() {
   const [viewMode, setViewMode] = useState<"verbose" | "normal" | "summary">("normal");
   const [sidebarFilter, setSidebarFilter] = useState<"all" | "active" | "archived">("all");
   const [sidebarGroupBy, setSidebarGroupBy] = useState<"project" | "none">("project");
+  const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const stopRef = useRef(false);
   const taskSeenRef = useRef<Set<string>>(new Set());
   const taskLastIndexRef = useRef(0);
@@ -306,7 +308,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       // reject after every turn instead of silently applying agent edits.
       const permMode = useStore.getState().settings?.permissionMode || "auto";
       if (!wasCancelled && (permMode === "manual" || permMode === "accept")) {
-        setRightPanelTab("diff");
+        setRightPanelTab("review");
         addNotification({ type: "info", message: permMode === "manual" ? "本轮改动待审阅，请在 Diff 面板逐文件接受/拒绝" : "改动已应用，可在 Diff 面板复核", duration: 3000 });
       }
       // P2-3: Plan-mode parity with Codex /plan — surface an approve-to-execute
@@ -386,6 +388,22 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       window.dispatchEvent(new CustomEvent("neotrix:sessions-changed"));
     } catch (e) {
       console.error("Create session failed:", e);
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const res = await invoke<string>("cmd_session_import_json", { json: text });
+      const imported = res ? res.split(",").filter(Boolean).length : 0;
+      addNotification({ type: "success", message: `已导入 ${imported} 个会话`, duration: 3000 });
+      window.dispatchEvent(new CustomEvent("neotrix:sessions-changed"));
+      refreshSessions();
+    } catch (err) {
+      addNotification({ type: "error", message: `导入失败: ${err}`, duration: 4000 });
     }
   };
 
@@ -817,10 +835,10 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         setRightPanelTab(rightPanelTab === "terminal" ? null : "terminal");
       } else if (e.key === "d" && e.metaKey && e.shiftKey) {
         e.preventDefault();
-        setRightPanelTab(rightPanelTab === "diff" ? null : "diff");
+        setRightPanelTab(rightPanelTab === "review" ? null : "review");
       } else if (e.key === "p" && e.metaKey && e.shiftKey) {
         e.preventDefault();
-        setRightPanelTab(rightPanelTab === "preview" ? null : "preview");
+        setRightPanelTab(rightPanelTab === "browser" ? null : "browser");
       } else if (e.key === "Tab" && e.ctrlKey) {
         e.preventDefault();
         if (neocodexSessions.length === 0) return;
@@ -848,93 +866,83 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       {showSidebar && (
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <div className={styles.trafficLights} aria-hidden="true">
-              <span className={`${styles.trafficDot} ${styles.trafficRed}`} />
-              <span className={`${styles.trafficDot} ${styles.trafficYellow}`} />
-              <span className={`${styles.trafficDot} ${styles.trafficGreen}`} />
-            </div>
-            <div className={styles.workspaceSwitcher}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M2 4l5 2.5L12 4M2 4l5 7 5-7" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className={styles.workspaceName}>工作区</span>
-              <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M3 5l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <button className={styles.sidebarToggle} onClick={() => setShowSidebar(false)} title="收起侧栏">
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10 4l-4 3 4 3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-          <div className={styles.sidebarNav}>
             <button
               type="button"
-              className={`${styles.sidebarNavItem} ${styles.sidebarNavItemActive}`}
+              className={styles.newSessionBtn}
               onClick={() => window.dispatchEvent(new CustomEvent("neotrix:new-session"))}
               data-testid="nav-new"
+              title="新建会话 (⌘N)"
             >
-              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
                 <path d="M7 2v10M2 7h10" strokeLinecap="round"/>
               </svg>
               <span>新对话</span>
             </button>
-            <button
-              type="button"
-              className={styles.sidebarNavItem}
-              onClick={() => { setPaletteMode("file"); setPaletteOpen(true); }}
-              data-testid="nav-search"
-            >
-              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <circle cx="6" cy="6" r="3.5"/>
-                <path d="M9 9l3 3" strokeLinecap="round"/>
-              </svg>
-              <span>搜索</span>
-            </button>
           </div>
-          <div className={styles.sidebarTabs}>
-            <button
-              type="button"
-              data-testid="sidebar-tab-sessions"
-              className={`${styles.sidebarTab} ${!fileTreeOpen ? styles.sidebarTabActive : ""}`}
-              onClick={() => setFileTreeOpen(false)}
+          <div className={styles.sidebarFilters}>
+            <select
+              className={styles.filterSelect}
+              value={sidebarFilter}
+              onChange={(e) => setSidebarFilter(e.target.value as "all" | "active" | "archived")}
+              aria-label="按状态筛选"
             >
-              会话
-            </button>
-            <button
-              type="button"
-              data-testid="sidebar-tab-files"
-              className={`${styles.sidebarTab} ${fileTreeOpen ? styles.sidebarTabActive : ""}`}
-              onClick={() => setFileTreeOpen(true)}
-              title="协作空间"
+              <option value="all">全部</option>
+              <option value="active">进行中</option>
+              <option value="archived">已归档</option>
+            </select>
+            <select
+              className={styles.filterSelect}
+              value={sidebarGroupBy}
+              onChange={(e) => setSidebarGroupBy(e.target.value as "project" | "none")}
+              aria-label="分组方式"
             >
-              协作
-            </button>
+              <option value="project">按项目分组</option>
+              <option value="none">不分组</option>
+            </select>
           </div>
-          {fileTreeOpen ? (
-            <FileTreePanel onPick={(p) => {
-              setFileTreeOpen(false);
-              window.dispatchEvent(new CustomEvent("neotrix:mention-file", { detail: p }));
-            }} />
-          ) : (
-            <SessionSidebar
-              activeSessionId={neocodexActiveSessionId}
-              busy={agentBusy}
-              onSessionSelect={handleSessionSelect}
-              onSessionDelete={requestSessionDelete}
-              onSessionArchive={() => refreshSessions()}
+          <div className={styles.sidebarSearch}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="6" cy="6" r="3.5"/>
+              <path d="M9 9l3 3" strokeLinecap="round"/>
+            </svg>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="搜索会话…"
+              value={sidebarSearchQuery}
+              onChange={(e) => setSidebarSearchQuery(e.target.value)}
             />
-          )}
+          </div>
+          <SessionSidebar
+            activeSessionId={neocodexActiveSessionId}
+            busy={agentBusy}
+            onSessionSelect={handleSessionSelect}
+            onSessionDelete={requestSessionDelete}
+            onSessionArchive={() => refreshSessions()}
+            filter={sidebarFilter}
+            groupBy={sidebarGroupBy}
+            searchQuery={sidebarSearchQuery}
+          />
           <div className={styles.sidebarFooter}>
-            <div className={styles.userArea}>
-              <span className={styles.userAvatar}>N</span>
-              <div className={styles.userMeta}>
-                <span className={styles.userName}>neotrix</span>
-                <span className={styles.userPlan}>本地 · {neocodexMode}</span>
-              </div>
-              <span className={`${styles.statusDot} ${agentBusy ? styles.statusDotBusy : ""}`} title={agentBusy ? "运行中" : "就绪"} />
-            </div>
+            <button
+              className={styles.sidebarFooterBtn}
+              onClick={() => fileInputRef.current?.click()}
+              title="导入会话 JSON"
+              aria-label="导入会话 JSON"
+            >
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M7 3v8M3 7h8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 11h8" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className={styles.hiddenFileInput}
+              data-testid="session-import-input"
+              onChange={handleImportFile}
+            />
             <button
               className={styles.sidebarFooterBtn}
               onClick={() => navigate("/settings")}
@@ -993,28 +1001,8 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
                 )}
               </div>
             )}
-            <ModelSelector />
-            <select
-              value={neocodexMode}
-              onChange={(e) => handleModeChange(e.target.value)}
-              className={styles.modeSelect}
-              disabled={agentBusy}
-              data-testid="mode-select"
-              title="Mode"
-            >
-              <option value="Agent">Agent</option>
-              <option value="Shell">Shell</option>
-              <option value="Plan">Plan</option>
-            </select>
           </div>
           <div className={styles.topBarRight}>
-            <button
-              className={`${styles.settingsBtn} ${styles.viewModeBtn}`}
-              onClick={cycleViewMode}
-              title={`视图模式: ${viewModeLabel}（Ctrl+O 切换）`}
-            >
-              {viewModeLabel}
-            </button>
             <button
               className={styles.settingsBtn}
               onClick={() => {
@@ -1051,82 +1039,46 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
                 <path d="M7 1v2M7 11v2M1 7h2M11 7h2" strokeLinecap="round" />
               </svg>
             </button>
-            <button
-              className={`${styles.settingsBtn} ${showUsage ? styles.settingsActive : ""}`}
-              title={`上下文用量 ${usagePct}%（点击查看成本明细）`}
-              aria-label={`上下文用量 ${usagePct}%`}
-              onClick={() => setShowUsage((v) => !v)}
-              data-testid="usage-toggle"
-            >
-              <span className={styles.usageRing}>
-                <svg width="30" height="30" viewBox="0 0 20 20">
-                  <circle cx="10" cy="10" r="7" fill="none" stroke="var(--border-primary)" strokeWidth="2" />
-                  <circle
-                    cx="10"
-                    cy="10"
-                    r="7"
-                    fill="none"
-                    stroke={usageColor}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(usageCirc * usage).toFixed(2)} ${usageCirc.toFixed(2)}`}
-                    transform="rotate(-90 10 10)"
-                  />
-                </svg>
-                <span className={styles.usageRingText}>{usagePct}%</span>
-              </span>
-            </button>
           </div>
         </header>
 
-        {showUsage && (
-          <div
-            className={styles.usagePopover}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setShowUsage(false);
-            }}
-          >
-            <div className={styles.usagePopoverTitle}>
-              用量 · 成本
-              <button className={styles.usageClose} onClick={() => setShowUsage(false)} title="关闭" aria-label="关闭用量弹窗">✕</button>
+        <div className={styles.composerToolbar}>
+          <div className={styles.composerLeft}>
+            <div className={styles.composerModelWrap} data-testid="composer-model">
+              <ModelSelector />
             </div>
-            <div className={styles.usageRow}>
-              <span>上下文占用</span>
-              <strong>{usagePct}%</strong>
-            </div>
-            <div className={styles.usageRow}>
-              <span>Tokens 已用</span>
-              <strong>{health?.tokens_used ?? 0}</strong>
-            </div>
-            <div className={styles.usageRow}>
-              <span>本次会话成本</span>
-              <strong>{health?.cost_spent != null ? `$${Number(health.cost_spent).toFixed(4)}` : "—"}</strong>
-            </div>
-            <div className={styles.usageRow}>
-              <span>预算</span>
-              <strong>{health?.cost_budget != null ? `$${Number(health.cost_budget).toFixed(2)}` : "—"}</strong>
-            </div>
-            {health?.provider_model && (
-              <div className={styles.usageRow}>
-                <span>当前模型</span>
-                <strong>{health.provider_model}</strong>
-              </div>
-            )}
-            {usage >= 0.85 && (
-              <div className={styles.compactBanner}>
-                <span>上下文接近上限{usage >= 0.95 ? "，继续对话可能被截断" : ""}。建议压缩后继续。</span>
-                <button
-                  className={styles.compactBtn}
-                  data-testid="usage-compact"
-                  disabled={agentBusy || compacting}
-                  onClick={handleCompact}
-                >
-                  {compacting ? "压缩中…" : "压缩上下文"}
-                </button>
-              </div>
-            )}
+            <select
+              value={neocodexMode}
+              onChange={(e) => handleModeChange(e.target.value)}
+              className={styles.modeSelect}
+              disabled={agentBusy}
+              data-testid="mode-select"
+              title="Mode"
+            >
+              <option value="Agent">Agent</option>
+              <option value="Shell">Shell</option>
+              <option value="Plan">Plan</option>
+            </select>
+            <span className={styles.contextCapsule} title="当前工作区上下文" data-testid="composer-context">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1.5 4.5h11M1.5 7h11M1.5 9.5h7"/>
+              </svg>
+              项目
+              <span className={styles.contextCapsuleArrow}>▾</span>
+            </span>
           </div>
-        )}
+          <button
+            type="button"
+            className={styles.permissionPill}
+            title="审批模式"
+            data-testid="composer-permission"
+          >
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 1.5L12 3v3.5c0 2.8-2 4.8-5 6-3-1.2-5-3.2-5-6V3L7 1.5z"/>
+            </svg>
+            {settings?.permissionMode === "auto" ? "自动" : settings?.permissionMode === "manual" ? "手动" : "接受"}
+          </button>
+        </div>
 
         <div className={styles.chatArea}>
           <ChatView
@@ -1184,20 +1136,22 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         </div>
 
         <footer className={styles.statusBar} data-testid="status-bar">
-          <span className={styles.statusItem} title="审批模式">
-            <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 1.5L12 3v3.5c0 2.8-2 4.8-5 6-3-1.2-5-3.2-5-6V3L7 1.5z"/>
+          <button className={styles.statusBtn} onClick={openTimeline} title="检查点时间线" data-testid="timeline-open" aria-label="检查点时间线">
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="7" cy="7" r="5"/>
+              <path d="M7 4v3l2 2" strokeLinecap="round"/>
             </svg>
-            {settings?.permissionMode === "auto" ? "自动" : settings?.permissionMode === "manual" ? "手动" : "接受"}
+          </button>
+          <span className={styles.statusItem} title="上下文用量" data-testid="usage-toggle" role="button" tabIndex={0} onClick={() => setShowUsage((v) => !v)} onKeyDown={(e) => { if (e.key === "Enter") setShowUsage((v) => !v); }}>
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="7" cy="7" r="5"/>
+              <path d="M7 3v4l3 3" strokeLinecap="round"/>
+            </svg>
+            {health ? `${Math.round((health.context_usage || 0) * 100)}%` : "—"}
           </span>
           <span className={styles.statusItem}>
             <span className={styles.statusDot} style={{ background: agentBusy ? "var(--success)" : "var(--fg-tertiary)" }} />
             {agentBusy ? "运行中…" : "就绪"}
-          </span>
-          <span className={styles.statusItem}>{neocodexMode}</span>
-          <span className={styles.statusItem} title="模型">{health?.provider_model || "—"}</span>
-          <span className={styles.statusItem} title="上下文用量">
-            Context {health ? `${Math.round((health.context_usage || 0) * 100)}%` : "—"}
           </span>
           {gitStatus && (
             <span className={styles.statusItem} title={gitStatus.dirty ? "有未提交改动" : "工作区干净"}>
@@ -1205,7 +1159,12 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               {gitStatus.branch}
             </span>
           )}
-          <span className={styles.statusItem} title="会话数">{neocodexSessions.length} 会话</span>
+          {health?.diff_stats && (
+            <span className={styles.diffStats}>
+              <span className={styles.diffAdd}>+{health.diff_stats.added || 0}</span>
+              <span className={styles.diffRemove}>-{health.diff_stats.removed || 0}</span>
+            </span>
+          )}
           {agentBusy && (
             <span className={styles.syncItem} title="Agent 运行中" data-testid="status-sync">
               <span className={styles.syncSpinner} />
@@ -1213,45 +1172,31 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             </span>
           )}
         </footer>
+        {showUsage && (
+          <div className={styles.usagePopover} data-testid="usage-popover">
+            <div className={styles.usageRow}>
+              <span>上下文</span>
+              <span>{health ? `${Math.round((health.context_usage || 0) * 100)}%` : "—"}</span>
+            </div>
+            <button className={styles.usageCompact} data-testid="usage-compact" onClick={handleCompact} disabled={!neocodexActiveSessionId || compacting}>
+              {compacting ? "压缩中…" : "压缩上下文"}
+            </button>
+          </div>
+        )}
       </main>
 
       <aside className={styles.rightSidebar} data-testid="right-sidebar">
         <div className={styles.rightRail} role="tablist" aria-label="右侧面板">
           <button
             role="tab"
-            aria-selected={rightPanelTab === "task"}
-            className={`${styles.railBtn} ${rightPanelTab === "task" ? styles.railBtnActive : ""}`}
-            onClick={() => setRightPanelTab(rightPanelTab === "task" ? null : "task")}
-            title="Tasks"
-            data-testid="rail-btn-task"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 5h12M3 9h12M3 13h8"/>
-            </svg>
-          </button>
-          <button
-            role="tab"
-            aria-selected={rightPanelTab === "diff"}
-            className={`${styles.railBtn} ${rightPanelTab === "diff" ? styles.railBtnActive : ""}`}
-            onClick={() => setRightPanelTab(rightPanelTab === "diff" ? null : "diff")}
+            aria-selected={rightPanelTab === "review"}
+            className={`${styles.railBtn} ${rightPanelTab === "review" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "review" ? null : "review")}
             title="Review changes"
-            data-testid="rail-btn-diff"
+            data-testid="rail-btn-review"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 5h12M3 9h8M3 13h5"/>
-            </svg>
-          </button>
-          <button
-            role="tab"
-            aria-selected={rightPanelTab === "preview"}
-            className={`${styles.railBtn} ${rightPanelTab === "preview" ? styles.railBtnActive : ""}`}
-            onClick={() => setRightPanelTab(rightPanelTab === "preview" ? null : "preview")}
-            title="Browser"
-            data-testid="rail-btn-preview"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="14" height="12" rx="2"/>
-              <path d="M6 9l4 4 6-6"/>
             </svg>
           </button>
           <button
@@ -1268,27 +1213,39 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
           </button>
           <button
             role="tab"
-            aria-selected={rightPanelTab === "capability"}
-            className={`${styles.railBtn} ${rightPanelTab === "capability" ? styles.railBtnActive : ""}`}
-            onClick={() => setRightPanelTab(rightPanelTab === "capability" ? null : "capability")}
-            title="能力网健康"
-            data-testid="rail-btn-capability"
+            aria-selected={rightPanelTab === "browser"}
+            className={`${styles.railBtn} ${rightPanelTab === "browser" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "browser" ? null : "browser")}
+            title="Browser"
+            data-testid="rail-btn-browser"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="9" r="7"/>
-              <path d="M9 5v8M5 9h8"/>
+              <rect x="2" y="3" width="14" height="12" rx="2"/>
+              <path d="M6 9l4 4 6-6"/>
             </svg>
           </button>
           <button
-            className={styles.railBtn}
-            onClick={openTimeline}
-            disabled={!activeSession}
-            title="检查点时间线"
-            data-testid="timeline-open"
+            role="tab"
+            aria-selected={rightPanelTab === "file"}
+            className={`${styles.railBtn} ${rightPanelTab === "file" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "file" ? null : "file")}
+            title="Files"
+            data-testid="rail-btn-file"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="9" r="7"/>
-              <path d="M9 6v4l2 2"/>
+              <path d="M4 4h10l-1 12H5L4 4zM8 8v8M12 8v8"/>
+            </svg>
+          </button>
+          <button
+            role="tab"
+            aria-selected={rightPanelTab === "tasks"}
+            className={`${styles.railBtn} ${rightPanelTab === "tasks" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "tasks" ? null : "tasks")}
+            title="Tasks"
+            data-testid="rail-btn-tasks"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 5h12M3 9h12M3 13h8"/>
             </svg>
           </button>
         </div>

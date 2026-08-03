@@ -5,11 +5,11 @@ import { SessionSidebar } from "../../components/neocodex/SessionSidebar";
 import { useStore } from "../../stores";
 import { mockInvoke, resetInvokeMocks, sessionFixture } from "../tauriMock";
 
-function renderSidebar() {
+function renderSidebar(props: { searchQuery?: string } = {}) {
   const onSelect = vi.fn();
   const onDelete = vi.fn();
   const onArchive = vi.fn();
-  render(<SessionSidebar activeSessionId={null} onSessionSelect={onSelect} onSessionDelete={onDelete} onSessionArchive={onArchive} />);
+  render(<SessionSidebar activeSessionId={null} onSessionSelect={onSelect} onSessionDelete={onDelete} onSessionArchive={onArchive} {...props} />);
   return { onSelect, onDelete, onArchive };
 }
 
@@ -44,20 +44,24 @@ describe("SessionSidebar — session interactions", () => {
     expect(screen.getByText("调研 RAG")).toBeInTheDocument();
   });
 
-  it("new session dialog creates via invoke and calls onSessionSelect", async () => {
+  it("search filters sessions by name for short queries", async () => {
     sessionFixture();
-    const { onSelect } = renderSidebar();
-    let created: any = null;
-    mockInvoke("neocodex_create_session", (args) => {
-      created = args;
-      return { id: "s-new", name: args.name, mode: "Agent", message_count: 0, wire_path: "/sessions/s-new.jsonl", created_at: 0, updated_at: 0 };
+    renderSidebar({ searchQuery: "重" });
+    await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
+    expect(screen.queryByText("调研 RAG")).not.toBeInTheDocument();
+  });
+
+  it("full-text search hits backend and shows message snippets", async () => {
+    sessionFixture();
+    mockInvoke("neocodex_search_sessions", (args) => {
+      return [
+        { session_id: "s-2", session_name: "调研 RAG", role: "assistant", snippet: `…found ${args.query} in message…`, match_count: 1 },
+      ];
     });
-    await waitFor(() => expect(screen.getByTitle("新建会话")).toBeInTheDocument());
-    await userEvent.click(screen.getByTitle("新建会话"));
-    await userEvent.type(screen.getByPlaceholderText("会话名称"), "新会话测试");
-    await userEvent.keyboard("{Enter}");
-    await waitFor(() => expect(created).toEqual({ name: "新会话测试" }));
-    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "s-new" }));
+    renderSidebar({ searchQuery: "RAG" });
+    await waitFor(() => expect(screen.getByTestId("session-search-results")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/found RAG in message/)).toBeInTheDocument());
+    expect(screen.getByText("调研 RAG")).toBeInTheDocument();
   });
 
   it("delete session delegates to onDelete and removes item", async () => {
@@ -130,9 +134,7 @@ describe("SessionSidebar — session interactions", () => {
 
   it("search filters sessions by name for short queries", async () => {
     sessionFixture();
-    renderSidebar();
-    await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
-    await userEvent.type(screen.getByPlaceholderText("搜索会话…"), "重");
+    renderSidebar({ searchQuery: "重" });
     await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
     expect(screen.queryByText("调研 RAG")).not.toBeInTheDocument();
   });
@@ -144,9 +146,7 @@ describe("SessionSidebar — session interactions", () => {
         { session_id: "s-2", session_name: "调研 RAG", role: "assistant", snippet: `…found ${args.query} in message…`, match_count: 1 },
       ];
     });
-    renderSidebar();
-    await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
-    await userEvent.type(screen.getByPlaceholderText("搜索会话…"), "RAG");
+    renderSidebar({ searchQuery: "RAG" });
     await waitFor(() => expect(screen.getByTestId("session-search-results")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText(/found RAG in message/)).toBeInTheDocument());
     expect(screen.getByText("调研 RAG")).toBeInTheDocument();
@@ -168,35 +168,5 @@ describe("SessionSidebar — session interactions", () => {
     ];
     fireEvent(window, new Event("neotrix:sessions-changed"));
     await waitFor(() => expect(screen.getByText("新会话CmdN")).toBeInTheDocument());
-  });
-
-  it("imports a session JSON via the hidden file input and shows a toast", async () => {
-    const importSpy = vi.fn((args: { json: string }) => "imp-1");
-    mockInvoke("cmd_session_import_json", importSpy);
-    const notify = vi.fn();
-    useStore.setState({ addNotification: notify });
-    renderSidebar();
-    await waitFor(() => expect(screen.getByTitle("导入会话 JSON")).toBeInTheDocument());
-    const input = screen.getByTestId("session-import-input") as HTMLInputElement;
-    const file = new File([JSON.stringify({ format_version: 1, sessions: [{ name: "导入的会话", message_count: 1 }] })], "export.json", { type: "application/json" });
-    fireEvent.change(input, { target: { files: [file] } });
-    await waitFor(() => expect(importSpy).toHaveBeenCalled());
-    const arg = importSpy.mock.calls[0][0];
-    expect(JSON.parse(arg.json).format_version).toBe(1);
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "success" }));
-  });
-
-  it("import failure shows an error toast", async () => {
-    mockInvoke("cmd_session_import_json", () => {
-      throw new Error("bad json");
-    });
-    const notify = vi.fn();
-    useStore.setState({ addNotification: notify });
-    renderSidebar();
-    await waitFor(() => expect(screen.getByTitle("导入会话 JSON")).toBeInTheDocument());
-    const input = screen.getByTestId("session-import-input") as HTMLInputElement;
-    const file = new File(["not-json"], "bad.json", { type: "application/json" });
-    fireEvent.change(input, { target: { files: [file] } });
-    await waitFor(() => expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "error" })));
   });
 });
