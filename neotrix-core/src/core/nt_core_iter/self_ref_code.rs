@@ -74,6 +74,7 @@ pub struct SelfRefStats {
 }
 
 /// 自我代码监控器
+#[derive(Debug, Clone)]
 pub struct SelfCodeMonitor {
     active_mutations: HashMap<String, MutationResult>,
     rollback_plans: HashMap<String, RollbackPlan>,

@@ -650,14 +650,14 @@ impl E8PredictionOracle {
         current_phase: FablePhase,
         pattern_matcher: &FablePatternMatcher,
         cot_length: CoTLength,
-    ) -> (E8PredictiveDistribution, f64, f64) {
+    ) -> (E8PredictiveDistribution, u8, f64, f64) {
         let dist = self.predict_distribution(tm, from, task_type, current_phase, pattern_matcher, cot_length);
-        let (_, mcts_value, mcts_confidence) = self.mcts.predict(from, tm, pattern_matcher, task_type, current_phase);
+        let (mcts_state, mcts_value, mcts_confidence) = self.mcts.predict(from, tm, pattern_matcher, task_type, current_phase);
         // Blend ensemble top-1 with MCTS top-1
         let (_, ens_prob) = dist.best();
         let blended_value = 0.6 * ens_prob + 0.4 * mcts_value;
         let blended_confidence = 0.5 * dist.confidence + 0.5 * mcts_confidence;
-        (dist, blended_value, blended_confidence)
+        (dist, mcts_state, mcts_value, mcts_confidence)
     }
 
     /// Get attention weights for GWT bridge (differentiable).
@@ -867,7 +867,7 @@ use crate::core::nt_core_e8::E8TransitionMatrix;
         assert!(dist.best().1 > 0.0);
 
         // MCTS-enhanced
-        let (_dist, value, confidence) = oracle.predict_with_mcts(
+        let (_dist, _mcts_state, value, confidence) = oracle.predict_with_mcts(
             &tm, 56, E8TaskType::Math,
             FablePhase::DeepDive, &pm, CoTLength::Long,
         );

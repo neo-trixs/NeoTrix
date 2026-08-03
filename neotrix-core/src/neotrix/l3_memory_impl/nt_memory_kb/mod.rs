@@ -786,12 +786,46 @@ impl KnowledgeBase {
 
     // ── Search ──
 
+    /// Unified search entry: auto-selects the best available method.
+    /// Priority: PQ (if codebook exists + embedding configured) → semantic (if embedding configured) → hybrid (BM25+FTS fallback).
+    /// This single-entry design eliminates parallel redundant paths and converges to the optimal call chain per first principles.
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
         let cache_key = format!("search:{}:{}", query, limit);
         let cached_hit = self.fused_cache.lock().ok().and_then(|mut c| c.get(&cache_key).cloned());
         if let Some(cached) = cached_hit {
             return Ok(cached);
         }
+
+        // Try PQ if codebook exists + embedding configured (fast + exact-reranked)
+        let has_codebook = {
+            let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+            conn.query_row(
+                "SELECT 1 FROM pq_codebook LIMIT 1",
+                [],
+                |_| Ok(())
+            ).is_ok()
+        };
+        let config = self.embedding_config.read().map_err(|e| format!("embedding_config read: {}", e))?.clone();
+        if has_codebook && config.is_some() {
+            if let Ok(results) = self.pq_search(query, limit) {
+                if let Ok(mut cache) = self.fused_cache.lock() {
+                    cache.put(cache_key, results.clone());
+                }
+                return Ok(results);
+            }
+        }
+
+        // Try semantic if embedding configured (full cosine)
+        if config.is_some() {
+            if let Ok(results) = self.semantic_search(query, limit) {
+                if let Ok(mut cache) = self.fused_cache.lock() {
+                    cache.put(cache_key, results.clone());
+                }
+                return Ok(results);
+            }
+        }
+
+        // Fallback: hybrid BM25+FTS
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
         let results = nt_memory_search::hybrid_search(&conn, query, limit, bm25.as_ref())
@@ -833,6 +867,93 @@ impl KnowledgeBase {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_search::get_related(&conn, node_id, relation_type, limit)
             .map_err(|e| format!("get_related: {}", e))
+    }
+
+    /// Semantic search: encodes the real query via the configured embedding
+    /// endpoint, then recalls top-K by cosine similarity over ALL stored
+    /// embeddings (pure vector recall — finds results FTS misses, e.g. queries
+    /// in a different language). Falls back to hybrid_search (FTS+BM25) when no
+    /// embedding endpoint is configured or reachable.
+    pub fn semantic_search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let config = self.embedding_config.read().map_err(|e| format!("embedding_config read: {}", e))?.clone();
+        let config = match config {
+            Some(c) => c,
+            None => {
+                // No endpoint configured: fall back to hybrid_search's proxy-vector rerank.
+                let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
+                return nt_memory_search::hybrid_search(&conn, query, limit, bm25.as_ref())
+                    .map_err(|e| format!("semantic_search: {}", e));
+            }
+        };
+        let query_vec = match nt_memory_embed::embed_text(&config, query) {
+            Ok(v) => v,
+            Err(_) => {
+                let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
+                return nt_memory_search::hybrid_search(&conn, query, limit, bm25.as_ref())
+                    .map_err(|e| format!("semantic_search: {}", e));
+            }
+        };
+        // Pure vector recall over ALL embeddings.
+        let embeddings = nt_memory_embed::load_all_embeddings(&conn).unwrap_or_default();
+        if embeddings.is_empty() {
+            let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
+            return nt_memory_search::hybrid_search(&conn, query, limit, bm25.as_ref())
+                .map_err(|e| format!("semantic_search: {}", e));
+        }
+        let mut scored: Vec<(String, f64)> = embeddings
+            .iter()
+            .map(|(id, v)| (id.clone(), nt_memory_embed::cosine_similarity(&query_vec, v)))
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let mut results = Vec::with_capacity(limit);
+        for (id, sim) in scored.into_iter().take(limit) {
+            if let Ok(Some(node)) = nt_memory_store::get_node(&conn, &id) {
+                results.push(SearchResult {
+                    node,
+                    score: sim,
+                    matched_on: vec![crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::SearchMatchType::VectorSimilarity],
+                    signals: None,
+                });
+            }
+        }
+        Ok(results)
+    }
+
+    /// PQ (product quantization) ANN search: encodes the query via the configured
+    /// embedding endpoint, then scores against the compressed `embeddings_pq`
+    /// index. Fast path when a codebook has been trained (scripts/kb-embed-pq.py).
+    /// Falls back to `semantic_search` when no codebook is available.
+    pub fn pq_search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
+        let config = self.embedding_config.read()
+            .map_err(|e| format!("embedding_config read: {}", e))?
+            .clone();
+        let config = match config {
+            Some(c) => c,
+            None => return self.semantic_search(query, limit),
+        };
+        let query_vec = match nt_memory_embed::embed_text(&config, query) {
+            Ok(v) => v,
+            Err(_) => return self.semantic_search(query, limit),
+        };
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let hits = nt_memory_embed::pq_ann_search(&conn, &query_vec, limit, None)
+            .map_err(|e| format!("pq_ann_search: {}", e))?;
+        if hits.is_empty() {
+            return self.semantic_search(query, limit);
+        }
+        let mut results = Vec::with_capacity(hits.len());
+        for (node_id, score) in hits {
+            if let Ok(Some(node)) = nt_memory_store::get_node(&conn, &node_id) {
+                results.push(SearchResult {
+                    node,
+                    score: score.max(-1e6),
+                    matched_on: vec![crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::SearchMatchType::VectorSimilarity],
+                    signals: None,
+                });
+            }
+        }
+        Ok(results)
     }
 
     pub fn hybrid_rerank_search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
@@ -1290,6 +1411,11 @@ impl KnowledgeBase {
     pub fn kv_list(&self, namespace: &str) -> Result<Vec<(String, String)>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_unify::kv_list(&conn, namespace)
+    }
+
+    /// 读取 experience-tree 吸收的经验条目, 供门控校准 (CalibrationSet::from_kb_experience)。
+    pub fn experience_entries(&self) -> Result<Vec<(String, String)>, String> {
+        self.kv_list("experience")
     }
 
     pub fn config_get(&self, section: &str, key: &str) -> Result<Option<String>, String> {

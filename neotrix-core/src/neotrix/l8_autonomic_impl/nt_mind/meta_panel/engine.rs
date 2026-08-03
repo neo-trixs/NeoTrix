@@ -4,6 +4,9 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
+use crate::core::nt_core_gate::{
+    Claim, GuardrailReport, JudgeFamily, JudgeInput, JudgePanel, ToolSpec, GateDecision,
+};
 use crate::core::nt_core_self_review::{SelfReviewGate, Severity};
 use crate::neotrix::l8_autonomic_impl::nt_mind::reasoning_types::{PerspectiveLens, ReasoningMethod};
 
@@ -14,6 +17,8 @@ pub struct MetaPanelEngine {
     pub depth: AnalysisDepth,
     pub strict_review: bool,
     pub viewpoint_registry: HashMap<(PerspectiveLens, ReasoningMethod), String>,
+    /// 动作路径工具清单 — 爆炸半径分级的输入 (构建期注册, 非运行期猜测)
+    pub tools: Vec<ToolSpec>,
 }
 
 impl Default for MetaPanelEngine {
@@ -30,11 +35,16 @@ impl MetaPanelEngine {
                 registry.insert((p, m), format!("{:?}_{:?}", p, m));
             }
         }
-        Self { depth, strict_review, viewpoint_registry: registry }
+        Self { depth, strict_review, viewpoint_registry: registry, tools: Vec::new() }
     }
 
     pub fn set_depth(&mut self, depth: AnalysisDepth) {
         self.depth = depth;
+    }
+
+    /// 注册动作路径工具 (不可逆/扩权工具会升级门控到人工)。
+    pub fn set_tools(&mut self, tools: Vec<ToolSpec>) {
+        self.tools = tools;
     }
 
     pub fn analyze(&self, question: &str) -> MetaPanelResult {
@@ -70,14 +80,42 @@ impl MetaPanelEngine {
 
         let review_report = gate.report();
 
+        // ── 门控接线 (nt_core_gate): 多家族评审组 + eval 护栏 + 爆炸半径分级 ──
+        let evidence_ids: Vec<String> = viewpoints.iter().flat_map(|v| v.evidence.iter().cloned()).collect();
+        let claims: Vec<Claim> = viewpoints.iter().map(|v| Claim {
+            text: v.analysis.clone(),
+            evidence_refs: v.evidence.clone(),
+        }).collect();
+        let input = JudgeInput {
+            candidate: conclusion.clone(),
+            claims,
+            evidence_ids,
+            trajectory: None,
+            grounding_failures: 0,
+            schema_failures: Vec::new(),
+            producer_family: JudgeFamily::None,
+        };
+        let panel = JudgePanel::default_panel();
+        let panel_verdict = panel.run(&input);
+        let guardrail = GuardrailReport::evaluate(&input, &panel.debias);
+        let gate_decision = GateDecision::decide(&self.tools, &input, &panel);
+
+        let review_passed = review_report.is_pass()
+            && panel_verdict.is_pass()
+            && guardrail.action == crate::core::nt_core_gate::GuardAction::Allow
+            && gate_decision.allows_autonomous();
+
         MetaPanelResult {
             question: question.to_string(),
             depth: self.depth,
             viewpoints,
             fusion,
             conclusion,
-            review_passed: review_report.is_pass(),
+            review_passed,
             review_report,
+            panel_verdict: Some(panel_verdict),
+            guardrail: Some(guardrail),
+            gate_decision: Some(gate_decision),
         }
     }
 

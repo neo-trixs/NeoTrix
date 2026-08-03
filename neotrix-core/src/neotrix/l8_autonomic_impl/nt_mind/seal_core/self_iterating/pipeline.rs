@@ -975,10 +975,19 @@ impl BrainStage for GwtAbsorbStage {
             let summary = format!("gwt:iter={} reward={:.4} avg_cap={:.4} aut={:?}",
                 iteration, reward, avg_cap, brain.autonomy);
             let _ = kb.kv_set("gwt_absorb", &format!("snapshot_{}", iteration), &summary);
+            // is_conscious derived from the real InnerCritic quality score
+            // (0.0–1.0), not hardcoded true. Falls back to a phi-like threshold
+            // on avg_cap when no critique has been produced yet.
+            let conscious_signal = if brain._consciousness_critique_count > 0 {
+                brain._last_consciousness_quality
+            } else {
+                avg_cap
+            };
+            let is_conscious = conscious_signal >= 0.5;
             let _ = kb.record_consciousness_snapshot(
                 avg_cap,
                 reward,
-                true,
+                is_conscious,
                 "pipeline",
                 &summary,
             );

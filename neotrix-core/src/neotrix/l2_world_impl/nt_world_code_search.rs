@@ -8,7 +8,7 @@ pub struct CodeSearchResult {
     pub content: String,
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct CodeSearchEngine;
 
 impl CodeSearchEngine {

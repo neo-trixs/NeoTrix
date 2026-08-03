@@ -193,11 +193,13 @@ export function ChatView({
   const [mentionHighlight, setMentionHighlight] = useState(0);
   const mentionRef = useRef<HTMLDivElement>(null);
   const addNotification = useStore((s) => s.addNotification);
-  const promptHistory = useRef<string[]>([]);
+  const permMode = useStore((s) => s.settings?.permissionMode) || "auto";
+  const defaultModel = useStore((s) => s.settings?.defaultModel) || "GatewayV2";
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [lastInput, setLastInput] = useState("");
   const [queuedInputs, setQueuedInputs] = useState<Array<{ content: string; attachments: Attachment[] }>>([]);
   const queueRef = useRef<Array<{ content: string; attachments: Attachment[] }>>([]);
+  const promptHistory = useRef<string[]>([]);
 
   const flushQueue = useCallback(() => {
     if (agentBusy) return;
@@ -620,12 +622,10 @@ export function ChatView({
         )}
         {!hasMessages && (
           <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>NeoCodex</div>
             <div className={styles.emptyHint}>
-              选择或新建一个会话，开始与自进化 Agent 对话。
-              <br />
               <kbd>⌘N</kbd> 新建会话 · <kbd>⌘B</kbd> 收起侧栏 · <kbd>Ctrl+Tab</kbd> 切换会话
             </div>
+            <div className={styles.emptyTitle}>我们该做什么？</div>
             <div className={styles.quickActions} data-testid="quick-actions">
               {QUICK_ACTIONS.map((qa) => (
                 <button
@@ -692,6 +692,7 @@ export function ChatView({
          onDragLeave={handleDragLeave}
          onDrop={handleDrop}
        >
+         <div className={styles.composerCard}>
          <button
            type="button"
            className={styles.attachBtn}
@@ -702,10 +703,10 @@ export function ChatView({
           >
            <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
              <path d="M5 11l5-5.5A1.8 1.8 0 007.5 3L2.5 8A3 3 0 006.5 12l5-5.5A4.2 4.2 0 008 2L3 7" strokeLinecap="round" strokeLinejoin="round"/>
-           </svg>
+            </svg>
          </button>
-         <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
-          <div className={styles.composerColumn}>
+          <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
+           <div className={styles.composerColumn}>
             {queuedInputs.length > 0 && (
               <div className={styles.queueBar}>
                 <span className={styles.queueDot} />
@@ -811,19 +812,40 @@ export function ChatView({
              ))}
            </div>
          )}
-         {agentBusy && onStop ? (
-           <button type="button" className={styles.stopBtn} onClick={onStop} title="停止生成 (Esc)" aria-label="停止生成">
-             <svg width="16" height="16" viewBox="0 0 14 14" fill="currentColor">
-               <rect x="3" y="3" width="8" height="8" rx="1" />
-             </svg>
-           </button>
-         ) : (
-            <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn} title="发送" aria-label="发送">
-             <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-               <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
-             </svg>
-           </button>
-         )}
+{agentBusy && onStop ? (
+            <button type="button" className={styles.stopBtn} onClick={onStop} title="停止生成 (Esc)" aria-label="停止生成">
+              <svg width="16" height="16" viewBox="0 0 14 14" fill="currentColor">
+                <rect x="3" y="3" width="8" height="8" rx="1" />
+              </svg>
+            </button>
+          ) : (
+             <button type="submit" disabled={agentBusy || !input.trim()} className={styles.sendBtn} title="发送" aria-label="发送">
+              <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 7l5-5 5 5M8 2v10" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+             </button>
+          )}
+          <div className={styles.composerFooter}>
+            <span className={styles.contextCapsule} title="当前工作区上下文" data-testid="composer-context">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1.5 4.5h11M1.5 7h11M1.5 9.5h7"/>
+              </svg>
+              项目
+              <span className={styles.contextCapsuleArrow}>▾</span>
+            </span>
+            <button
+              type="button"
+              className={styles.permissionPill}
+              title="审批模式"
+              data-testid="composer-permission"
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 1.5L12 3v3.5c0 2.8-2 4.8-5 6-3-1.2-5-3.2-5-6V3L7 1.5z"/>
+              </svg>
+              {permMode === "auto" ? "自动" : permMode === "manual" ? "手动" : "接受"}
+            </button>
+          </div>
+        </div>
        </form>
     </div>
   );

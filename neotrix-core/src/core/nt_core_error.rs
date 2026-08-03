@@ -22,6 +22,7 @@ pub enum NeoTrixError {
     Wasm(String),
     Crypto(String),
     Keyring(String),
+    Shield(String),
 }
 
 impl fmt::Display for NeoTrixError {
@@ -44,7 +45,8 @@ impl fmt::Display for NeoTrixError {
             NeoTrixError::Wasm(msg) => write!(f, "WASM 错误: {}", msg),
             NeoTrixError::Crypto(msg) => write!(f, "加密错误: {}", msg),
             NeoTrixError::Keyring(msg) => write!(f, "密钥环错误: {}", msg),
-        }
+            NeoTrixError::Shield(msg) => write!(f, "护盾拦截: {}", msg),
+}
     }
 }
 

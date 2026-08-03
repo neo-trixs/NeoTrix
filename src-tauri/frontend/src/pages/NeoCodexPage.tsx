@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../stores";
-import { CapabilityHealthPane, ChatView, CommandPalette, DiffPane, FileTreePanel, ModelSelector, PreviewPane, SessionSidebar, ShortcutHelp, TaskPane, TerminalPane } from "../components/neocodex";
+import { ChatView, CommandPalette, ContextPanel, FileTreePanel, ModelSelector, SessionSidebar, ShortcutHelp } from "../components/neocodex";
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -37,11 +37,7 @@ export default function NeoCodexPage() {
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [fileTreeOpen, setFileTreeOpen] = React.useState(false);
   const [showUsage, setShowUsage] = React.useState(false);
-  const [terminalOpen, setTerminalOpen] = React.useState(false);
-  const [diffOpen, setDiffOpen] = React.useState(false);
-  const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [capabilityOpen, setCapabilityOpen] = React.useState(false);
-  const [viewsMenuOpen, setViewsMenuOpen] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = React.useState<"task" | "diff" | "preview" | "terminal" | "capability" | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteMode, setPaletteMode] = useState<"command" | "file">("command");
   const [fileItems, setFileItems] = useState<Array<{ id: string; label: string; hint?: string; onSelect: () => void }>>([]);
@@ -64,7 +60,6 @@ export default function NeoCodexPage() {
   const [checkpointsLoading, setCheckpointsLoading] = useState(false);
   const [pendingCheckpointRestore, setPendingCheckpointRestore] = useState<string | null>(null);
   const [compacting, setCompacting] = useState(false);
-  const [taskPaneOpen, setTaskPaneOpen] = useState(false);
   const [taskSteps, setTaskSteps] = useState<Array<{ id: string; name: string; args: string; startedAt: number; status: "running" | "done"; success?: boolean }>>([]);
   const [taskStartedAt, setTaskStartedAt] = useState<number | null>(null);
   const [, setTaskClock] = useState(0);
@@ -309,7 +304,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       // reject after every turn instead of silently applying agent edits.
       const permMode = useStore.getState().settings?.permissionMode || "auto";
       if (!wasCancelled && (permMode === "manual" || permMode === "accept")) {
-        setDiffOpen(true);
+        setRightPanelTab("diff");
         addNotification({ type: "info", message: permMode === "manual" ? "本轮改动待审阅，请在 Diff 面板逐文件接受/拒绝" : "改动已应用，可在 Diff 面板复核", duration: 3000 });
       }
       // P2-3: Plan-mode parity with Codex /plan — surface an approve-to-execute
@@ -806,9 +801,6 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       } else if (e.key === "Escape" && showUsage) {
         e.preventDefault();
         setShowUsage(false);
-      } else if (e.key === "Escape" && viewsMenuOpen) {
-        e.preventDefault();
-        setViewsMenuOpen(false);
       } else if (e.key === "Escape" && agentBusy && !(paletteOpen || shortcutHelpOpen || timelineOpen || pendingDeleteSession)) {
         e.preventDefault();
         handleStop();
@@ -820,13 +812,13 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         setSideChatOpen((v) => !v);
       } else if (e.key === "`" && e.ctrlKey) {
         e.preventDefault();
-        setTerminalOpen((v) => !v);
+        setRightPanelTab(rightPanelTab === "terminal" ? null : "terminal");
       } else if (e.key === "d" && e.metaKey && e.shiftKey) {
         e.preventDefault();
-        setDiffOpen((v) => !v);
+        setRightPanelTab(rightPanelTab === "diff" ? null : "diff");
       } else if (e.key === "p" && e.metaKey && e.shiftKey) {
         e.preventDefault();
-        setPreviewOpen((v) => !v);
+        setRightPanelTab(rightPanelTab === "preview" ? null : "preview");
       } else if (e.key === "Tab" && e.ctrlKey) {
         e.preventDefault();
         if (neocodexSessions.length === 0) return;
@@ -847,18 +839,56 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, viewsMenuOpen, showUsage, openFilePalette]);
+  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, showUsage, openFilePalette]);
 
   return (
     <div className={styles.container}>
       {showSidebar && (
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <h2>NeoCodex</h2>
+            <div className={styles.trafficLights} aria-hidden="true">
+              <span className={`${styles.trafficDot} ${styles.trafficRed}`} />
+              <span className={`${styles.trafficDot} ${styles.trafficYellow}`} />
+              <span className={`${styles.trafficDot} ${styles.trafficGreen}`} />
+            </div>
+            <div className={styles.workspaceSwitcher}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 4l5 2.5L12 4M2 4l5 7 5-7" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className={styles.workspaceName}>工作区</span>
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 5l4 4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
             <button className={styles.sidebarToggle} onClick={() => setShowSidebar(false)} title="收起侧栏">
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M10 4l-4 3 4 3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+            </button>
+          </div>
+          <div className={styles.sidebarNav}>
+            <button
+              type="button"
+              className={`${styles.sidebarNavItem} ${styles.sidebarNavItemActive}`}
+              onClick={() => window.dispatchEvent(new CustomEvent("neotrix:new-session"))}
+              data-testid="nav-new"
+            >
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <path d="M7 2v10M2 7h10" strokeLinecap="round"/>
+              </svg>
+              <span>新对话</span>
+            </button>
+            <button
+              type="button"
+              className={styles.sidebarNavItem}
+              onClick={() => { setPaletteMode("file"); setPaletteOpen(true); }}
+              data-testid="nav-search"
+            >
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <circle cx="6" cy="6" r="3.5"/>
+                <path d="M9 9l3 3" strokeLinecap="round"/>
+              </svg>
+              <span>搜索</span>
             </button>
           </div>
           <div className={styles.sidebarTabs}>
@@ -875,9 +905,9 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               data-testid="sidebar-tab-files"
               className={`${styles.sidebarTab} ${fileTreeOpen ? styles.sidebarTabActive : ""}`}
               onClick={() => setFileTreeOpen(true)}
-              title="文件树"
+              title="协作空间"
             >
-              文件
+              协作
             </button>
           </div>
           {fileTreeOpen ? (
@@ -893,6 +923,27 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               onSessionArchive={() => refreshSessions()}
             />
           )}
+          <div className={styles.sidebarFooter}>
+            <div className={styles.userArea}>
+              <span className={styles.userAvatar}>N</span>
+              <div className={styles.userMeta}>
+                <span className={styles.userName}>neotrix</span>
+                <span className={styles.userPlan}>本地 · {neocodexMode}</span>
+              </div>
+              <span className={`${styles.statusDot} ${agentBusy ? styles.statusDotBusy : ""}`} title={agentBusy ? "运行中" : "就绪"} />
+            </div>
+            <button
+              className={styles.sidebarFooterBtn}
+              onClick={() => navigate("/settings")}
+              title="设置"
+              aria-label="打开设置"
+            >
+              <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="7" cy="7" r="2.2" />
+                <path d="M7 1.5v1.8M7 10.7v1.8M1.5 7h1.8M10.7 7h1.8M3.1 3.1l1.3 1.3M9.6 9.6l1.3 1.3M3.1 10.9l1.3-1.3M9.6 4.4l1.3-1.3" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </aside>
       )}
 
@@ -952,97 +1003,6 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               <option value="Shell">Shell</option>
               <option value="Plan">Plan</option>
             </select>
-            <select
-              value={settings?.permissionMode || "auto"}
-              onChange={(e) => setSettings({ ...settings, permissionMode: e.target.value as any })}
-              className={styles.modeSelect}
-              disabled={agentBusy}
-              data-testid="permission-mode-select"
-              title="权限模式: 控制每轮编辑的审批方式"
-            >
-              <option value="auto">Auto</option>
-              <option value="accept">AcceptEdits</option>
-              <option value="manual">Manual</option>
-              <option value="plan">Plan</option>
-            </select>
-            <button
-              className={styles.topBarBtn}
-              onClick={openTimeline}
-              disabled={!activeSession}
-              data-testid="timeline-open"
-              title="检查点时间线 (回退到历史状态)"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="8" cy="8" r="5.5"/>
-                <path d="M8 5v3l2 1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              时间线
-            </button>
-            <button
-              className={`${styles.topBarBtn} ${taskPaneOpen ? styles.topBarBtnActive : ""}`}
-              onClick={() => setTaskPaneOpen((v) => !v)}
-              data-testid="task-pane-toggle"
-              title="任务面板：实时查看工具调用步骤与耗时"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="2" y="3" width="12" height="10" rx="1.5"/>
-                <path d="M5 8h6M5 11h3" strokeLinecap="round"/>
-              </svg>
-              任务
-            </button>
-            <div className={styles.viewsMenuWrap}>
-              <button
-                type="button"
-                data-testid="views-menu-btn"
-                className={`${styles.viewsMenuBtn} ${viewsMenuOpen ? styles.viewsMenuActive : ""}`}
-                onClick={() => setViewsMenuOpen((v) => !v)}
-                title="视图面板"
-                aria-expanded={viewsMenuOpen}
-                aria-haspopup="menu"
-              >
-                视图 ▾
-              </button>
-              {viewsMenuOpen && (
-                <div className={styles.viewsMenu} role="menu">
-                  <button
-                    type="button"
-                    data-testid="views-menu-terminal"
-                    role="menuitem"
-                    className={`${styles.viewsMenuItem} ${terminalOpen ? styles.viewsMenuItemActive : ""}`}
-                    onClick={() => { setTerminalOpen((v) => !v); setViewsMenuOpen(false); }}
-                  >
-                    终端 {terminalOpen ? "✓" : ""}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="views-menu-diff"
-                    role="menuitem"
-                    className={`${styles.viewsMenuItem} ${diffOpen ? styles.viewsMenuItemActive : ""}`}
-                    onClick={() => { setDiffOpen((v) => !v); setViewsMenuOpen(false); }}
-                  >
-                    Diff 查看器 {diffOpen ? "✓" : ""}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="views-menu-preview"
-                    role="menuitem"
-                    className={`${styles.viewsMenuItem} ${previewOpen ? styles.viewsMenuItemActive : ""}`}
-                    onClick={() => { setPreviewOpen((v) => !v); setViewsMenuOpen(false); }}
-                  >
-                    App 预览 {previewOpen ? "✓" : ""}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="views-menu-capability"
-                    role="menuitem"
-                    className={`${styles.viewsMenuItem} ${capabilityOpen ? styles.viewsMenuItemActive : ""}`}
-                    onClick={() => { setCapabilityOpen((v) => !v); setViewsMenuOpen(false); }}
-                  >
-                    能力网健康 {capabilityOpen ? "✓" : ""}
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
           <div className={styles.topBarRight}>
             <button
@@ -1218,32 +1178,6 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
           )}
         </div>
 
-        {terminalOpen && (
-          <div className={styles.pane}>
-            <TerminalPane />
-          </div>
-        )}
-        {diffOpen && (
-          <div className={styles.pane}>
-            <DiffPane />
-          </div>
-        )}
-        {taskPaneOpen && (
-          <div className={styles.pane}>
-            <TaskPane steps={taskSteps} startedAt={taskStartedAt} />
-          </div>
-        )}
-        {previewOpen && (
-          <div className={styles.pane}>
-            <PreviewPane />
-          </div>
-        )}
-        {capabilityOpen && (
-          <div className={styles.pane}>
-            <CapabilityHealthPane data={health} />
-          </div>
-        )}
-
         <footer className={styles.statusBar}>
           <span className={styles.statusItem}>
             <span className={styles.statusDot} style={{ background: agentBusy ? "var(--success)" : "var(--fg-tertiary)" }} />
@@ -1263,6 +1197,95 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
           <span className={styles.statusItem} title="会话数">{neocodexSessions.length} 会话</span>
         </footer>
       </main>
+
+      <aside className={styles.rightSidebar} data-testid="right-sidebar">
+        <div className={styles.rightRail} role="tablist" aria-label="右侧面板">
+          <button
+            role="tab"
+            aria-selected={rightPanelTab === "task"}
+            className={`${styles.railBtn} ${rightPanelTab === "task" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "task" ? null : "task")}
+            title="任务面板"
+            data-testid="rail-btn-task"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 5h12M3 9h12M3 13h8"/>
+            </svg>
+          </button>
+          <button
+            role="tab"
+            aria-selected={rightPanelTab === "diff"}
+            className={`${styles.railBtn} ${rightPanelTab === "diff" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "diff" ? null : "diff")}
+            title="Diff 查看器"
+            data-testid="rail-btn-diff"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 5h12M3 9h8M3 13h5"/>
+            </svg>
+          </button>
+          <button
+            role="tab"
+            aria-selected={rightPanelTab === "preview"}
+            className={`${styles.railBtn} ${rightPanelTab === "preview" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "preview" ? null : "preview")}
+            title="App 预览"
+            data-testid="rail-btn-preview"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="14" height="12" rx="2"/>
+              <path d="M6 9l4 4 6-6"/>
+            </svg>
+          </button>
+          <button
+            role="tab"
+            aria-selected={rightPanelTab === "terminal"}
+            className={`${styles.railBtn} ${rightPanelTab === "terminal" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "terminal" ? null : "terminal")}
+            title="终端"
+            data-testid="rail-btn-terminal"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 9h10M9 4v10"/>
+            </svg>
+          </button>
+          <button
+            role="tab"
+            aria-selected={rightPanelTab === "capability"}
+            className={`${styles.railBtn} ${rightPanelTab === "capability" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "capability" ? null : "capability")}
+            title="能力网健康"
+            data-testid="rail-btn-capability"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="9" r="7"/>
+              <path d="M9 5v8M5 9h8"/>
+            </svg>
+          </button>
+          <button
+            className={styles.railBtn}
+            onClick={openTimeline}
+            disabled={!activeSession}
+            title="检查点时间线"
+            data-testid="timeline-open"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="9" r="7"/>
+              <path d="M9 6v4l2 2"/>
+            </svg>
+          </button>
+        </div>
+        {rightPanelTab && (
+          <div className={styles.rightPanelExpanded}>
+            <ContextPanel
+              activeTab={rightPanelTab}
+              taskSteps={taskSteps}
+              taskStartedAt={taskStartedAt}
+              health={health}
+            />
+          </div>
+        )}
+      </aside>
 
       <CommandPalette
         open={paletteOpen}

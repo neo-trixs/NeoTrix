@@ -22,6 +22,11 @@ pub struct EmbeddingCommitment {
     pub dimension: u32,
     pub timestamp: u64,
     pub domain_separator: String,
+    /// 作者/来源标识 (吸收 cyberstrike authenticity + teamlore provenance):
+    /// 将作者身份折叠进 Merkle 分块, 使承诺既证"未被篡改"又证"出自何人"。
+    /// 空字符串 = 未绑定作者 (向后兼容旧数据)。
+    #[serde(default)]
+    pub author: String,
 }
 
 /// A Merkle proof for a single chunk within an embedding commitment.
@@ -113,10 +118,66 @@ impl EmbeddingCommitmentStore {
             dimension: vector.len() as u32,
             timestamp,
             domain_separator,
+            author: String::new(),
         };
 
         self.commitments.insert(node_id, commitment.clone());
         Ok(commitment)
+    }
+
+    /// 作者绑定版 `commit_vector`: 把 `author` 折叠进分块 domain_separator,
+    /// 使 Merkle root 与作者身份耦合。同一向量被另一作者认领时会得到不同的
+    /// root → 伪造作者失败 (吸收 CyberStrike 真实性 / teamlore 来源绑定)。
+    pub fn commit_vector_authored(
+        &mut self,
+        node_id: String,
+        vector: &[f32],
+        model_name: String,
+        domain_separator: String,
+        author: &str,
+    ) -> Result<EmbeddingCommitment, String> {
+        let sep = Self::separator_with_author(&domain_separator, author);
+        let mut c = self.commit_vector(node_id, vector, model_name, sep)?;
+        c.author = author.to_string();
+        self.commitments.insert(c.node_id.clone(), c.clone());
+        Ok(c)
+    }
+
+    /// 校验某节点承诺的作者是否 `expected`。未绑定作者 (author=="") 视为不参与
+    /// 来源校验 (兼容旧数据), 返回 true 以免破坏历史承诺。
+    pub fn verify_author(&self, node_id: &str, expected: &str) -> bool {
+        match self.commitments.get(node_id) {
+            None => false,
+            Some(c) => c.author.is_empty() || c.author == expected,
+        }
+    }
+
+    /// 完整性 + 来源双门校验: root 必须匹配 (未被篡改) 且作者身份匹配 (防伪造)。
+    /// 只有两者同时成立才返回 verified=true。
+    pub fn verify_commitment_origin(
+        &self,
+        node_id: &str,
+        vector: &[f32],
+        expected_author: &str,
+    ) -> Result<CommitmentProof, String> {
+        let mut proof = self.verify_commitment(node_id, vector)?;
+        proof.verified = proof.verified && self.verify_author(node_id, expected_author);
+        Ok(proof)
+    }
+
+    /// 将作者身份与所在域分离器绑定, 生成作者专属的分块上下文。
+    /// 空作者不改变原 separator (向后兼容)。
+    fn separator_with_author(domain_separator: &str, author: &str) -> String {
+        if author.is_empty() {
+            return domain_separator.to_string();
+        }
+        let mut h = Sha256::new();
+        h.update(b"nt.author.v1");
+        h.update(domain_separator.as_bytes());
+        h.update(b"\x00");
+        h.update(author.as_bytes());
+        let binding = h.finalize();
+        format!("{}:{}", domain_separator, hex::encode(&binding))
     }
 
     /// Re-quantize the supplied vector, re-build the Merkle tree, and compare
@@ -854,5 +915,88 @@ mod tests {
         let c = store.commitments.get("n1").unwrap();
         assert_eq!(c.original_vector, v);
         assert_eq!(c.dimension, 128);
+    }
+
+    #[test]
+    fn test_commit_authored_binds_author_and_verifies() {
+        let mut store = make_store();
+        let v = test_vector(64);
+        store
+            .commit_vector_authored(
+                "a1".to_string(),
+                &v,
+                "m".to_string(),
+                "d".to_string(),
+                "alice",
+            )
+            .expect("authored commit");
+
+        assert_eq!(store.commitments.get("a1").unwrap().author, "alice");
+        // 真实作者 + 完好向量 → 完整性+来源双过
+        let proof = store
+            .verify_commitment_origin("a1", &v, "alice")
+            .expect("origin verify");
+        assert!(proof.verified, "author-bound commitment must verify");
+    }
+
+    #[test]
+    fn test_forged_author_fails_origin_verification() {
+        let mut store = make_store();
+        let v = test_vector(64);
+        store
+            .commit_vector_authored(
+                "a2".to_string(),
+                &v,
+                "m".to_string(),
+                "d".to_string(),
+                "alice",
+            )
+            .expect("authored commit");
+
+        // 伪造作者 (mal 冒充 alice) → 来源门拒绝
+        let proof = store
+            .verify_commitment_origin("a2", &v, "mal")
+            .expect("origin verify");
+        assert!(!proof.verified, "forged author must fail origin verification");
+
+        // 作者不同 → root 不同 (不能借 alice 的内容改名真 own)
+        let mut other = store.clone();
+        other
+            .commit_vector_authored(
+                "a3".to_string(),
+                &v,
+                "m".to_string(),
+                "d".to_string(),
+                "bob",
+            )
+            .expect("bob authored commit");
+        let root_alice = store.commitments.get("a2").unwrap().merkle_root;
+        let root_bob = other.commitments.get("a3").unwrap().merkle_root;
+        assert_ne!(root_alice, root_bob, "author must bind into the Merkle root");
+    }
+
+    #[test]
+    fn test_tampered_vector_under_correct_author_fails() {
+        let mut store = make_store();
+        let v = test_vector(64);
+        store
+            .commit_vector_authored(
+                "a4".to_string(),
+                &v,
+                "m".to_string(),
+                "d".to_string(),
+                "alice",
+            )
+            .expect("authored commit");
+
+        let mut tampered = v.clone();
+        tampered[0] = -tampered[0];
+        let proof = store
+            .verify_commitment_origin("a4", &tampered, "alice")
+            .expect("origin verify");
+        assert!(
+            !proof.verified,
+            "tampered content must fail even under correct author"
+        );
     }
 }

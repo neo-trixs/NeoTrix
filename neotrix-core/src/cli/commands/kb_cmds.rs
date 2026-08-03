@@ -112,11 +112,29 @@ impl CliCommand for KbCmd {
             "export" => cmd_export(rest),
             "import-assets" => cmd_import_assets(rest),
             "import-review" => cmd_import_review(rest),
+            "embed" => cmd_embed(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review",
+                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review, embed",
                 sub
             )),
         }
+    }
+}
+
+fn cmd_embed(_args: &[String]) -> CommandOutput {
+    let kb = match KnowledgeBase::open(None) {
+        Ok(kb) => kb,
+        Err(e) => return CommandOutput::err(&format!("无法打开知识库: {}", e)),
+    };
+    let cfg = crate::neotrix::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
+    let bundled = kb.with_embedding(cfg);
+    match bundled.ensure_embeddings() {
+        Ok(n) => CommandOutput::ok(&format!(
+            "Embedding 补跑完成: 本轮生成 {} 条向量 (model all-MiniLM-L6-v2, 384-dim)\n\
+             提示: 需先启动本地服务 scripts/kb-embed-server.py",
+            n
+        )),
+        Err(e) => CommandOutput::err(&format!("Embedding 补跑失败: {}", e)),
     }
 }
 

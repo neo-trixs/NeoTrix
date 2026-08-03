@@ -199,8 +199,12 @@ pub struct E8DomainTransitionModel {
     pub blend_weight: f64,
     /// Confidence threshold for domain-specific prediction
     pub confidence_threshold: f64,
-    /// Cached blended matrix — only recomputed when dirty.
-    pub blended_cache: Option<E8TransitionMatrix>,
+    /// Cached blended matrices — one per task type, so switching task types
+    /// never reuses another domain's blend. Previously a single
+    /// `blended_cache: Option<...>` returned the cached matrix regardless of
+    /// `task_type`, so after a Coding blend the next Math blend() returned the
+    /// wrong matrix until a transition marked it dirty.
+    pub blended_cache: [Option<E8TransitionMatrix>; E8TaskType::COUNT],
     /// Whether the cache is stale (set true by record_transition).
     pub dirty: bool,
 }
@@ -233,7 +237,7 @@ impl E8DomainTransitionModel {
             general_matrix,
             blend_weight,
             confidence_threshold: 0.15,
-            blended_cache: None,
+            blended_cache: Default::default(),
             dirty: true,
         }
     }
@@ -250,15 +254,16 @@ impl E8DomainTransitionModel {
 
     /// Blend domain-specific and general matrices for a task type.
     /// Returns blended transition probabilities for each (from, to) pair.
-    /// Uses cached result when not dirty.
+    /// Uses cached result when not dirty, keyed by task type.
     pub fn blend(&mut self, task_type: E8TaskType) -> E8TransitionMatrix {
+        let ti = task_type as usize;
         if !self.dirty {
-            if let Some(ref cached) = self.blended_cache {
+            if let Some(ref cached) = self.blended_cache[ti] {
                 return cached.clone();
             }
         }
         let blended = self.blend_inner(task_type);
-        self.blended_cache = Some(blended.clone());
+        self.blended_cache[ti] = Some(blended.clone());
         self.dirty = false;
         blended
     }

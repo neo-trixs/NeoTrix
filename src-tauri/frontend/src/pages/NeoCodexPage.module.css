@@ -1,6 +1,6 @@
 .container {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100vh;
   background: var(--bg-primary);
   overflow: hidden;
@@ -18,9 +18,168 @@
 .sidebarHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border-primary);
+}
+
+.trafficLights {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.trafficDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.trafficRed { background: #ff5f57; }
+.trafficYellow { background: #febc2e; }
+.trafficGreen { background: #28c840; }
+
+.workspaceSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 7px;
+  color: var(--fg-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  border: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.workspaceSwitcher:hover {
+  border-color: var(--border-primary);
+}
+
+.workspaceName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.sidebarNavItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--fg-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebarNavItem:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.sidebarNavItemActive {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+  font-weight: 600;
+}
+
+.sidebarFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-primary);
+  margin-top: auto;
+}
+
+.userArea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.userAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: var(--accent-on);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.userMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.userName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userPlan {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebarFooterBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sidebarFooterBtn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.statusDotBusy {
+  background: var(--success) !important;
 }
 
 .sidebarTabs {
@@ -73,10 +232,75 @@
   min-width: 0;
 }
 
+.rightSidebar {
+  width: 48px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-primary);
+  overflow: hidden;
+  position: relative;
+}
+
+.rightRail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 4px;
+}
+
+.railBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.railBtn:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+}
+
+.railBtnActive {
+  background: var(--accent, #4f8cff);
+  color: #fff;
+}
+
+.railBtn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.rightPanelExpanded {
+  position: absolute;
+  right: 48px;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-primary);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .main.focusMode {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   width: 100%;
+  flex: 1 1 auto;
 }
 
 .topBar {
@@ -610,6 +834,10 @@
 
   .sidebar.open {
     transform: translateX(0);
+  }
+
+  .rightSidebar {
+    display: none;
   }
 
   .sidebarToggle {

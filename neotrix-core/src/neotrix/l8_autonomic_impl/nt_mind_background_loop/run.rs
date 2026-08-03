@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::nt_core_gate::{GateDecision, ToolRegistry};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -197,7 +198,7 @@ use crate::neotrix::nt_mind::distillation::MetaCognitionBridge;
 use crate::core::nt_core_event::CoreEvent;
 use crate::core::nt_core_scoring_substrate::ScoringSubstrate;
 use crate::core::nt_core_state_substrate::StateSubstrate;
-use crate::core::nt_core_delegate_engine::DelegateEngine;
+use crate::core::nt_core_delegate_engine::{DelegateEngine, EvidenceStrength};
 use crate::core::nt_core_simulate_engine::SimulateEngine;
 
 impl BackgroundLoop {
@@ -415,10 +416,16 @@ cognitive_load: self.cognitive_load.take(),
             cognitive_mode: 0,
             scoring: ScoringSubstrate::new().with_threshold(0.5),
             state: StateSubstrate::new(),
-            delegate: DelegateEngine::new(),
+            delegate: DelegateEngine::new()
+                .with_domain_gate("consciousness")
+                .with_domain_gate("memory")
+                .with_domain_gate("action")
+                .with_domain_gate("learning"),
             simulate: SimulateEngine::new(),
             convergence_pulse: ConvergencePulse::default(),
             tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
+            /// 门控注册表 — 默认只读工具, 运行时可扩展。
+            gate_registry: Some(ToolRegistry::from_read_only(&["get", "query", "read", "search"])),
         }));
 
         macro_rules! spawn_handler {
@@ -610,6 +617,8 @@ pub struct BackgroundLoopHandle {
     simulate: SimulateEngine,
     convergence_pulse: ConvergencePulse,
     tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
+    /// 门控注册表 — 背景循环工具执行前置检查用。
+    gate_registry: Option<ToolRegistry>,
 }
 
 impl BackgroundLoopHandle {
@@ -642,6 +651,26 @@ impl BackgroundLoopHandle {
         }
     }
     async fn handle_goal(&mut self) {
+        // ── 门控前置检查: 爆炸半径分级 × 护栏 × 评审组 ──
+        if let Some(ref registry) = self.gate_registry {
+            let input = crate::core::nt_core_gate::JudgeInput {
+                candidate: "autonomous goal pursuit".to_string(),
+                claims: vec![crate::core::nt_core_gate::Claim::new("pursue next goal", &["internal:goal_loop"])],
+                evidence_ids: vec!["internal:goal_loop".to_string()],
+                trajectory: None,
+                grounding_failures: self.tool_grounding.grounding_failures,
+                schema_failures: vec![],
+                producer_family: crate::core::nt_core_gate::JudgeFamily::None,
+            };
+            let panel = crate::core::nt_core_gate::JudgePanel::default_panel();
+            let decision = GateDecision::check_path(&registry.cloned_specs(), &input, &panel);
+            if !decision.allows_autonomous() {
+                eprintln!("[bg] gate blocked goal pursuit: level={:?} action={:?} verdict={:?} reason={}",
+                    decision.level, decision.action, decision.verdict, decision.reason);
+                return; // 阻断本轮 goal pursuit
+            }
+        }
+
         let mut b = self.brain.write().await;
         // Full autonomous cycle: circuit-breaker guard, terminal-goal
         // reward/dequeue, auto-generation of new goals when none is active,
@@ -1044,7 +1073,13 @@ impl BackgroundLoopHandle {
                 tree.trunk.phi = report.phi;
                 tree.trunk.coherence = report.coherence;
             }
-            tree.trunk.gwt_resonance_active = self.panorama.is_some();
+            // Real GWT resonance signal: active only when the GWT has actually
+            // run a resonance broadcast (last_resonance set) and specialists
+            // are above threshold. Previously a fake `panorama.is_some()` that
+            // reported resonance as active even when no broadcast had fired.
+            tree.trunk.gwt_resonance_active = self.panorama.as_ref()
+                .map(|p| p.gwt.last_resonance.is_some() && !p.gwt.resonant_specialists().is_empty())
+                .unwrap_or(false);
             tree.trunk.workspace_size = 23;
             // Branch health is now set from SelfTest results in handle_architecture_audit
             // No simulated fallback here — real data or neutral 0.5 from set_branch_health_from_self_tests
@@ -1257,9 +1292,51 @@ impl BackgroundLoopHandle {
                 gs_report.is_conscious_like, gs_report.phi, gs_report.coherence, gs_report.detection_streak);
         }
 
-        // ── Phase 6: DelegateEngine — delegate cross-domain tasks ──
-        if self.delegate.delegate("consciousness_tick", "nt_mind_background_loop", 0).is_none() {
-            log::warn!("[bg] delegate: consciousness_tick delegation rejected — max concurrent reached");
+        // ── Phase 6: DelegateEngine — evidence-gated cross-domain delegation ──
+        // 反哺自 crm (evidence-priced ledger) + loopx (quota/gate) + PentAGI (域熔断):
+        // 每个域都有独立熔断 gate; 只有 Observed 证据才驱动熔断统计。
+        self.delegate.tick_forward();
+        let mut delegated: Vec<(String, String)> = Vec::new(); // (id, domain)
+        for (domain, task, prio) in [
+            ("consciousness", "consciousness_tick", 0u8),
+            ("memory", "kb_absorb", 3u8),
+            ("learning", "consolidate", 2u8),
+            ("action", "goal_recovery", 1u8),
+        ] {
+            match self.delegate.delegate_to(task, "nt_mind_background_loop", domain, prio) {
+                Some(id) => {
+                    delegated.push((id, domain.to_string()));
+                    log::debug!("[bg] delegate: {} → domain={} accepted", task, domain);
+                }
+                None => {
+                    log::warn!("[bg] delegate: {} rejected — max concurrent OR domain {} circuit-broken",
+                        task, domain);
+                }
+            }
+        }
+
+        // 结算并记录真实观测结果 (Observed 证据 → 驱动域熔断统计)
+        // 每个域的成败由真实相位观测构造:
+        //   - consciousness: 有最后一次共振广播 (last_resonance) 即成功
+        //   - memory:       KB 有节点即成功 (kb_nodes > 0)
+        //   - learning:     convergence 已 verified 即成功 (否则先留 Inferred)
+        //   - action:       当前 mode 非空即成功
+        let consciousness_ok = self.panorama.as_ref()
+            .map(|p| p.gwt.last_resonance.is_some()).unwrap_or(false);
+        let memory_ok = kb_nodes > 0;
+        let learning_ok = self.convergence_pulse.verified;
+        let action_ok = !self.state.active_mode.name().is_empty();
+        for (id, domain) in &delegated {
+            let ok = match domain.as_str() {
+                "consciousness" => consciousness_ok,
+                "memory" => memory_ok,
+                "learning" => learning_ok,
+                "action" => action_ok,
+                _ => true,
+            };
+            if ok {
+                self.delegate.record_evidence(id, true, EvidenceStrength::Observed);
+            }
         }
         let pending = self.delegate.synchronize();
         let delegated_total = self.delegate.total_tasks();

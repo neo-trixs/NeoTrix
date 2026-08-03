@@ -1,4 +1,5 @@
-//! Brain 交互命令 — Absorb / Evolve / Mem / Save / Trace / Avatar
+//! Brain 交互命令 — Absorb / Mem / Save / Trace / Avatar
+//! 注: /evolve 为 auto-backend 自驱, 不注册 CLI (见 test_auto_commands_not_in_registry)
 
 use std::sync::{Arc, LazyLock, Mutex};
 use tokio::sync::RwLock;
@@ -49,65 +50,6 @@ impl CliCommand for AbsorbCmd {
             }
         } else {
             CommandOutput::err("Brain 不可用")
-        }
-    }
-}
-
-// ====== /evolve ======
-
-pub struct EvolveCmd;
-impl CliCommand for EvolveCmd {
-    fn name(&self) -> &str { "/evolve" }
-    fn aliases(&self) -> Vec<&str> { vec!["/e"] }
-    fn description(&self) -> &str { "SEAL 进化: /evolve <url> | /evolve (internal SEAL loop)" }
-    fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
-        let want_json = args.iter().any(|a| a == "--json");
-        let url = args.iter().find(|a| *a != "--json").map(|s| s.as_str()).unwrap_or("");
-        if url.is_empty() {
-            return CommandOutput::err("用法: /evolve <url> | /evolve self\n示例: /evolve https://github.com/user/repo");
-        }
-        if url == "self" {
-            if let Some(b) = brain {
-                let mut a = b.blocking_write();
-                let result = a.iterate(crate::neotrix::nt_world_model::TaskType::General);
-                let msg = format!("🧬 SEAL self-evolve: {:.3} → {:.3} (improved={})",
-                    result.score_before, result.score_after, result.improved);
-                if want_json {
-                    return CommandOutput::ok(&msg).with_json(serde_json::json!({
-                        "evolved": true, "score_before": result.score_before,
-                        "score_after": result.score_after, "improved": result.improved
-                    }));
-                }
-                CommandOutput::ok(&msg)
-            } else {
-                CommandOutput::err("Brain 不可用")
-            }
-        } else if crate::neotrix::nt_mind::self_evolver::SelfEvolver::is_url(url) {
-            if let Some(b) = brain {
-                use std::path::PathBuf;
-                let work_dir = PathBuf::from(
-                    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-                ).join(".neotrix").join("work");
-                let _ = std::fs::create_dir_all(&work_dir);
-                let mut a = b.blocking_write();
-                match a.run_seal_loop(url, None, None) {
-                    Ok(reward) => {
-                        let _ = a.brain.save();
-                        let msg = format!("🌐 进化完成: reward={:.3}", reward);
-                        if want_json {
-                            return CommandOutput::ok(&msg).with_json(serde_json::json!({
-                                "evolved": true, "url": url, "reward": reward
-                            }));
-                        }
-                        CommandOutput::ok(&msg)
-                    }
-                    Err(e) => CommandOutput::err(&format!("进化失败: {}", e)),
-                }
-            } else {
-                CommandOutput::err("Brain 不可用")
-            }
-        } else {
-            CommandOutput::err("无效 URL 或命令. 用法: /evolve <url> | /evolve self")
         }
     }
 }

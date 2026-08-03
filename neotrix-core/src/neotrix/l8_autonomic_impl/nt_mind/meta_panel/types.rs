@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::core::nt_core_gate::{GateDecision, GuardrailReport, PanelVerdict};
 use crate::core::nt_core_self_review::SelfReviewReport;
 use crate::neotrix::l8_autonomic_impl::nt_mind::reasoning_types::{PerspectiveLens, ReasoningMethod};
 
@@ -110,6 +111,12 @@ pub struct MetaPanelResult {
     pub conclusion: String,
     pub review_passed: bool,
     pub review_report: SelfReviewReport,
+    /// 多家族评审组裁决 (nt_core_gate) — 高分歧/低分不自动放行
+    pub panel_verdict: Option<PanelVerdict>,
+    /// eval 护栏 (grounding/schema/幻觉隔离)
+    pub guardrail: Option<GuardrailReport>,
+    /// 爆炸半径分级组合裁决 (确定性检查优先于 LLM 分数)
+    pub gate_decision: Option<GateDecision>,
 }
 
 impl MetaPanelResult {

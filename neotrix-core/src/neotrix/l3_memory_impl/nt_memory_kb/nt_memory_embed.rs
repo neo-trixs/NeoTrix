@@ -2,7 +2,7 @@ use serde::Deserialize;
 use rusqlite::{params, Connection};
 use std::sync::OnceLock;
 
-/// Configuration for the embedding API (OpenAI-compatible, incl. Gemini Embedding 2).
+/// Configuration for the embedding API (OpenAI-compatible, incl. MiniLM local server).
 #[derive(Debug, Clone)]
 pub struct EmbeddingConfig {
     pub api_key: String,
@@ -13,17 +13,21 @@ pub struct EmbeddingConfig {
 
 impl Default for EmbeddingConfig {
     fn default() -> Self {
+        // Default to the local all-MiniLM-L6-v2 server (384-dim), matching the
+        // existing embeddings written by scripts/kb-embed-local.py. This keeps
+        // dimension consistent across the whole corpus and avoids silent
+        // cosine-similarity degradation from mixed 384/768 vectors.
         Self {
             api_key: std::env::var("NEOTRIX_EMBEDDING_API_KEY")
                 .or_else(|_| std::env::var("NEOTRIX_API_KEY"))
-                .unwrap_or_default(),
+                .unwrap_or_else(|_| "local".to_string()),
             base_url: std::env::var("NEOTRIX_EMBEDDING_BASE_URL")
-                .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
+                .unwrap_or_else(|_| "http://127.0.0.1:8237/v1".to_string()),
             model: std::env::var("NEOTRIX_EMBEDDING_MODEL")
-                .unwrap_or_else(|_| "text-embedding-3-small".to_string()),
+                .unwrap_or_else(|_| "all-MiniLM-L6-v2".to_string()),
             dimension: std::env::var("NEOTRIX_EMBEDDING_DIMENSION")
                 .ok().and_then(|s| s.parse().ok())
-                .unwrap_or(768),
+                .unwrap_or(384),
         }
     }
 }
@@ -202,4 +206,239 @@ pub fn build_node_text(title: &str, summary: Option<&str>, content: Option<&str>
         text.push_str(&c[..c.len().min(500)]);
     }
     text
+}
+
+/// Product Quantization (PQ) approximate nearest neighbor support.
+///
+/// Reads the trained codebook (`pq_codebook`) + compressed codes (`embeddings_pq`)
+/// written by `scripts/kb-embed-pq.py`. Scores a query vector against all
+/// quantized vectors using asymmetric distance computation (ADC): each
+/// sub-vector of the query is compared to the K centroids of its sub-space once,
+/// then the per-code distances are summed — O(M×K) per query instead of O(D×N).
+pub fn pq_ann_search(
+    conn: &Connection,
+    query_vec: &[f32],
+    k: usize,
+    codebook_id: Option<i64>,
+) -> rusqlite::Result<Vec<(String, f64)>> {
+    let cb = match load_latest_codebook(conn, codebook_id)? {
+        Some(cb) => cb,
+        None => return Ok(Vec::new()),
+    };
+    let m = cb.m as usize;
+    let sub_dim = cb.sub_dim as usize;
+    let ks = cb.ks as usize;
+    let d = m * sub_dim;
+    if query_vec.len() != d {
+        log::warn!("pq_ann_search: query dim {} != codebook dim {}", query_vec.len(), d);
+        return Ok(Vec::new());
+    }
+
+    // Per-subspace distance tables: for each subspace s and each centroid c,
+    // store squared distance between query sub-vector and centroid.
+    let mut tables: Vec<Vec<f64>> = Vec::with_capacity(m);
+    for s in 0..m {
+        let q_sub = &query_vec[s * sub_dim..(s + 1) * sub_dim];
+        let mut row = Vec::with_capacity(ks);
+        for c in 0..ks {
+            let centroid = &cb.codewords[s][c];
+            let dist: f64 = q_sub.iter().zip(centroid.iter())
+                .map(|(a, b)| {
+                    let diff = (a - b) as f64;
+                    diff * diff
+                })
+                .sum();
+            row.push(dist);
+        }
+        tables.push(row);
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT node_id, pq_codes FROM embeddings_pq WHERE (?1 IS NULL OR codebook_id = ?1)"
+    )?;
+    let rows = stmt.query_map([codebook_id], |row| {
+        let node_id: String = row.get(0)?;
+        let codes: Vec<u8> = row.get(1)?;
+        Ok((node_id, codes))
+    })?;
+
+    let mut scored: Vec<(String, f64)> = Vec::new();
+    for row in rows.flatten() {
+        let (node_id, codes) = row;
+        if codes.len() != m {
+            continue;
+        }
+        let dist: f64 = codes.iter().enumerate()
+            .map(|(s, &c)| tables[s][c as usize])
+            .sum();
+        scored.push((node_id, -dist));
+    }
+    // Coarse candidate ranking: score = -dist, so nearest (smallest dist) has the
+    // HIGHEST score. Sort descending to pull the closest candidates first.
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    // Re-rank the top coarse candidates by exact cosine on the stored vectors.
+    // PQ centroid quantization loses fine-grained precision, so a handful of
+    // unrelated candidates can rank above the true nearest neighbours (they sit
+    // in a near-identical coarse ADC band). Re-scoring the promising subset with
+    // the exact embedding recovers the correct order while keeping PQ as the
+    // fast filter (no full-corpus scan).
+    let coarse_count = (k * 16).min(scored.len());
+    if coarse_count > 0 {
+        let coarse: Vec<(String, f64)> = scored.into_iter().take(coarse_count).collect();
+        let mut exact = Vec::with_capacity(coarse.len());
+        for (node_id, _) in coarse {
+            let sim = match exact_vector_cosine(conn, &node_id, query_vec) {
+                Some(s) => s,
+                None => continue,
+            };
+            exact.push((node_id, sim));
+        }
+        exact.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        exact.truncate(k);
+        return Ok(exact);
+    }
+    Ok(Vec::new())
+}
+
+/// Load one vector blob from the `embeddings` table and compute exact cosine
+/// against `query_vec`. Returns `None` if the node has no usable vector.
+fn exact_vector_cosine(conn: &Connection, node_id: &str, query_vec: &[f32]) -> Option<f64> {
+    let blob: Vec<u8> = conn.query_row(
+        "SELECT vector FROM embeddings WHERE node_id = ?1",
+        params![node_id],
+        |row| row.get(0),
+    ).ok()?;
+    let dim_bytes = blob.len() / 4;
+    let mut v = Vec::with_capacity(dim_bytes);
+    for i in 0..dim_bytes {
+        let off = i * 4;
+        v.push(f32::from_le_bytes([blob[off], blob[off + 1], blob[off + 2], blob[off + 3]]));
+    }
+    Some(cosine_similarity(query_vec, &v))
+}
+
+struct PqCodebook {
+    m: usize,
+    ks: usize,
+    sub_dim: usize,
+    codewords: Vec<Vec<Vec<f32>>>,
+}
+
+fn load_latest_codebook(conn: &Connection, codebook_id: Option<i64>) -> rusqlite::Result<Option<PqCodebook>> {
+    let row = if let Some(id) = codebook_id {
+        conn.query_row(
+            "SELECT m, ks, sub_dim, codewords FROM pq_codebook WHERE id = ?1",
+            params![id],
+            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?, row.get::<_, Vec<u8>>(3)?)),
+        ).ok()
+    } else {
+        conn.query_row(
+            "SELECT m, ks, sub_dim, codewords FROM pq_codebook ORDER BY id DESC LIMIT 1",
+            [],
+            |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i32>(1)?, row.get::<_, i32>(2)?, row.get::<_, Vec<u8>>(3)?)),
+        ).ok()
+    };
+    let Some((m, ks, sub_dim, blob)) = row else {
+        return Ok(None);
+    };
+    let m = m as usize;
+    let ks = ks as usize;
+    let sub_dim = sub_dim as usize;
+    let expect = m * ks * sub_dim * 4;
+    if blob.len() != expect {
+        log::warn!("pq_codebook blob size {} != expected {}", blob.len(), expect);
+        return Ok(None);
+    }
+    let mut codewords: Vec<Vec<Vec<f32>>> = Vec::with_capacity(m);
+    for s in 0..m {
+        let mut sub = Vec::with_capacity(ks);
+        for c in 0..ks {
+            let base = (s * ks + c) * sub_dim * 4;
+            let mut v = Vec::with_capacity(sub_dim);
+            for i in 0..sub_dim {
+                let off = base + i * 4;
+                let b = [blob[off], blob[off + 1], blob[off + 2], blob[off + 3]];
+                v.push(f32::from_le_bytes(b));
+            }
+            sub.push(v);
+        }
+        codewords.push(sub);
+    }
+    Ok(Some(PqCodebook { m, ks, sub_dim, codewords }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cosine_dimension_mismatch_safe() {
+        // Mismatched dims must not panic and should yield 0.0 (silent-safe).
+        let a: Vec<f32> = vec![1.0, 0.0];
+        let b: Vec<f32> = vec![0.0, 1.0, 0.0];
+        assert_eq!(cosine_similarity(&a, &b), 0.0);
+    }
+
+    #[test]
+    fn test_cosine_identical() {
+        let a: Vec<f32> = vec![0.5, 0.5, 0.0];
+        let b: Vec<f32> = vec![0.5, 0.5, 0.0];
+        assert!((cosine_similarity(&a, &b) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_vector_blob_roundtrip() {
+        let v: Vec<f32> = vec![1.5, -2.0, 3.25, 100.5];
+        let blob = vector_to_blob(&v);
+        let back = blob_to_vector(&blob);
+        assert_eq!(v, back);
+    }
+
+    #[test]
+    fn test_pq_codebook_parse_in_memory() {
+        // Build a synthetic codebook blob: m=2 subspaces, ks=2 centroids, sub_dim=2
+        let m = 2;
+        let ks = 2;
+        let sub_dim = 2;
+        let mut blob = Vec::new();
+        // subspace 0: centroids [1,1],[9,9]; subspace 1: [2,2],[8,8]
+        for cw in [1.0f32, 1.0, 9.0, 9.0, 2.0, 2.0, 8.0, 8.0] {
+            blob.extend_from_slice(&cw.to_le_bytes());
+        }
+        // Build a temp DB with pq_codebook row and embeddings_pq entry
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE pq_codebook(id INTEGER PRIMARY KEY, m INTEGER, ks INTEGER, sub_dim INTEGER, codewords BLOB, dimension INTEGER, model TEXT, trained_at INTEGER, num_vectors INTEGER);
+             CREATE TABLE embeddings_pq(node_id TEXT PRIMARY KEY, pq_codes BLOB, codebook_id INTEGER);
+             CREATE TABLE embeddings(node_id TEXT PRIMARY KEY, vector BLOB, dimension INTEGER, model TEXT, created_at INTEGER);",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO pq_codebook (id, m, ks, sub_dim, codewords, dimension, model, trained_at, num_vectors) VALUES (1, 2, 2, 2, ?1, 4, 'mini', 0, 1)",
+            params![blob],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO embeddings_pq VALUES ('n1', ?1, 1)",
+            params![vec![0u8, 1u8]],
+        )
+        .unwrap();
+        // Exact vector for n1 == query, so rerank lifts it to the top.
+        let mut exact_blob = Vec::new();
+        for f in [1.0f32, 1.0, 8.0, 8.0] {
+            exact_blob.extend_from_slice(&f.to_le_bytes());
+        }
+        conn.execute(
+            "INSERT INTO embeddings (node_id, vector, dimension, model, created_at) VALUES ('n1', ?1, 4, 'mini', 0)",
+            params![exact_blob],
+        )
+        .unwrap();
+        // query vector very close to sub0 centroid0 [1,1] and sub1 centroid1 [8,8]
+        let q: Vec<f32> = vec![1.0, 1.0, 8.0, 8.0];
+        let hits = pq_ann_search(&conn, &q, 1, Some(1)).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].0, "n1");
+        // After exact re-ranking the score is cosine similarity (positive for a match).
+        assert!(hits[0].1 > 0.0, "re-ranked score should be cosine similarity");
+    }
 }

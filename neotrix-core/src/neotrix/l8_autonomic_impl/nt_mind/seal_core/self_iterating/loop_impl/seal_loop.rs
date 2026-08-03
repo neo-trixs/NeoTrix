@@ -30,14 +30,18 @@ type BatchTask<'a> = &'a [(String, Option<Vec<f64>>, Option<f64>)];
 impl SelfIteratingBrain {
     pub fn run_seal_loop_pipeline(&mut self, task: &str, task_embedding: Option<Vec<f64>>, external_reward: Option<f64>) -> NeoTrixResult<f64> {
         // ShieldEnforcer governance check: is SEAL self-iteration allowed?
+        // Block / Violation abort the pipeline; RequireApproval is surfaced as
+        // an error so the caller can route it to the approval flow. Previously
+        // this only logged a warning and continued iterating — a no-op shield.
         if let Ok(shield) = global_shield().lock() {
             if let Err(decision) = shield.check_all("seal_iterate", "internal", None, None) {
                 let msg = match decision {
                     crate::cli::ShieldDecision::Block(m) => format!("Shield blocked SEAL iteration: {}", m),
+                    crate::cli::ShieldDecision::Violation(v) => format!("Shield blocked SEAL iteration: {} law violation(s)", v.len()),
                     crate::cli::ShieldDecision::RequireApproval(m) => format!("Shield requires approval for SEAL iteration: {}", m),
-                    _ => "Shield blocked SEAL iteration".to_string(),
+                    crate::cli::ShieldDecision::Allow => String::new(),
                 };
-                log::warn!("{}", msg);
+                return Err(NeoTrixError::Shield(format!("{}", msg)));
             }
         }
 
@@ -266,8 +270,14 @@ impl SelfIteratingBrain {
                         gwt.entropy_monitor.stimulus_attempts,
                         gwt.entropy_monitor.stuck_ratio(),
                     );
-                    println!("[seal] ⏸ 熵死锁触发暂停: {} (cycle {})", reason, self.iteration);
-                    return Ok(self._reward);
+                    let reward = self._reward;
+                    // Actually restore the pre-iteration brain snapshot instead of
+                    // dropping the rollback. Previous code returned Ok(reward) without
+                    // restoring state — a silent Rollback drop that permanently kept the
+                    // degraded reasoning state.
+                    self._snapshot_restore();
+                    println!("[seal] ⏸ 熵死锁触发暂停+回滚: {} (cycle {})", reason, self.iteration);
+                    return Ok(reward);
                 }
             }
         }

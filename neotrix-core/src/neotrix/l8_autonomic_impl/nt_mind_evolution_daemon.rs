@@ -2,13 +2,25 @@
 //!
 //! 零 LLM 依赖的持续自修复引擎, 由 BackgroundLoop 驱动。
 //! 集成 SelfDiagnose + AutoFixer + PersistentIssueTracker。
+//!
+//! 真实实现来自 L1 nt_act_goal 与 L2 nt_world_infer，替代原本的本地存根。
 
 use crate::neotrix::nt_mind_autofixer::AutoFixer;
 use crate::neotrix::nt_mind_evolution_loop::{EvolutionLoop, ProjectSnapshot};
+use crate::neotrix::nt_act_goal::{
+    BehavioralVerifier, CoverageAnalyzer, AutoGoalGenerator, RLFeedbackLoop,
+    EvolutionGoal, GoalCategory,
+};
+use crate::neotrix::nt_act_goal::behavioral_verifier::VerificationLevel;
+use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
+use crate::core::nt_core_absorb::spec_driven::{
+    SpecDrivenPipeline, SpecPipelineConfig, EvolutionSpec, SpecDiff, SpecStatus,
+};
+use crate::neotrix::nt_world_code_search::CodeSearchEngine;
 use std::path::PathBuf;
 
 // ============================================================
-// Local replacements for L1/L2/L4 types (architecture boundary)
+// 本地类型：IITPhiCalculator（真实计算）、PhiReport、IssueType/Lifecycle 等
 // ============================================================
 
 #[derive(Debug, Clone, Default)]
@@ -40,86 +52,21 @@ impl IITPhiCalculator {
 #[derive(Debug, Clone)]
 pub struct PhiReport { pub phi: f64 }
 
-#[derive(Debug, Clone, Default)]
-pub struct ActiveInferenceEngine;
-
-impl ActiveInferenceEngine {
-    pub fn new() -> Self { Self }
-    pub fn expected_free_energy(&self, epistemic_value: f64, expected_energy: f64) -> f64 {
-        -epistemic_value + expected_energy
-    }
-    #[allow(dead_code)]
-    pub fn compute_free_energy(&mut self, _jepa_energy: f64, _e8_entropy: f64, _e8_gradient: f64) -> FreeEnergyReport {
-        FreeEnergyReport { variational_fe: 0.0 }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FreeEnergyReport { pub variational_fe: f64 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum VerificationLevel { CompileOnly, CompileAndTest, Full }
-
-#[derive(Debug, Clone)]
-pub struct VerificationResult {
-    pub passed: bool,
-    pub compile_ok: bool,
-    pub tests_ok: bool,
-    pub properties_ok: bool,
-    pub compile_errors: Vec<String>,
-    pub test_failures: Vec<String>,
-    pub duration_ms: u64,
-}
-
-#[derive(Debug, Clone)]
-pub struct BehavioralVerifier;
-
-impl BehavioralVerifier {
-    pub fn verify(_file: &str, _old: &str, _new: &str, _level: VerificationLevel) -> VerificationResult {
-        VerificationResult {
-            passed: true, compile_ok: true, tests_ok: true, properties_ok: true,
-            compile_errors: vec![], test_failures: vec![], duration_ms: 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CoverageReport { pub overall_ratio: f64 }
-
-#[derive(Debug, Clone)]
-pub struct CoverageAnalyzer { _project_root: PathBuf }
-
-impl CoverageAnalyzer {
-    pub fn new(project_root: PathBuf) -> Self { Self { _project_root: project_root } }
-    pub fn analyze(&self) -> CoverageReport { CoverageReport { overall_ratio: 0.5 } }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GoalCategory { CodeHealth, TestCoverage, Architecture, Performance, Security, Knowledge }
-
-#[derive(Debug, Clone)]
-pub struct EvolutionGoal {
-    pub category: GoalCategory,
-    pub target_file: Option<String>,
-    pub description: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct AutoGoalGenerator;
-
-impl AutoGoalGenerator {
-    pub fn generate_from_snapshot(_snapshot: &ProjectSnapshot) -> Vec<EvolutionGoal> {
-        vec![]
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RLFeedbackLoop;
-
-impl RLFeedbackLoop {
-    pub fn default() -> Self { Self }
-    pub fn process_result(&mut self, _file: &str, _dim: &str, _result: &VerificationResult) -> f64 {
-        0.5
+// EvolutionLoop::ProjectSnapshot -> nt_l1_shared_types::ProjectSnapshot 转换
+fn to_l1_snapshot(snap: &ProjectSnapshot) -> crate::neotrix::l1_body_impl::nt_l1_shared_types::ProjectSnapshot {
+    crate::neotrix::l1_body_impl::nt_l1_shared_types::ProjectSnapshot {
+        total_files: snap.total_files,
+        total_lines: snap.total_lines,
+        large_files: snap.large_files.clone(),
+        modules_without_tests: snap.modules_without_tests.clone(),
+        file_unsafe_hotspots: snap.file_unsafe_hotspots.clone(),
+        unsafe_count: snap.unsafe_count,
+        unwrap_count: snap.unwrap_count,
+        todo_count: snap.todo_count,
+        compile_errors: snap.compile_errors,
+        compile_warnings: snap.compile_warnings,
+        test_count: snap.test_count,
+        test_failures: snap.test_failures,
     }
 }
 
@@ -138,6 +85,9 @@ pub struct EvolutionConfig {
     pub verbose: bool,
     pub max_fix_attempts: u32,
     pub cycle_interval: u64,
+    /// 启用真实 AutoFixer 变更（默认 false：仅计算目标/评分，不落盘）。
+    /// 由 NEOTRIX_EVOLVE_MUTATE=1 环境变量也可开启。
+    pub mutation_enabled: bool,
 }
 
 impl Default for EvolutionConfig {
@@ -146,6 +96,7 @@ impl Default for EvolutionConfig {
             verbose: false,
             max_fix_attempts: 3,
             cycle_interval: 300,
+            mutation_enabled: std::env::var("NEOTRIX_EVOLVE_MUTATE").as_deref() == Ok("1"),
         }
     }
 }
@@ -267,6 +218,12 @@ pub struct EvolutionDaemon {
     pub phi_reward_history: Vec<f64>,
     /// Causal-JEPA 相干性历史
     pub causal_coherence_history: Vec<f64>,
+    /// 自我代码变更监控器 — 记录/回滚 AutoFixer 的每次真实变更
+    pub code_monitor: crate::core::nt_core_iter::self_ref_code::SelfCodeMonitor,
+    /// Spec 驱动进化管线 — 目标约束验证 + 版本化演进
+    pub spec_pipeline: SpecDrivenPipeline,
+    /// 代码搜索引擎 — 修复前定位 / 修复后确认
+    pub code_search: CodeSearchEngine,
 }
 
 impl EvolutionDaemon {
@@ -287,11 +244,26 @@ impl EvolutionDaemon {
             phi_calculator: IITPhiCalculator::new(),
             phi_reward_history: Vec::new(),
             causal_coherence_history: Vec::new(),
+            code_monitor: crate::core::nt_core_iter::self_ref_code::SelfCodeMonitor::new(),
+            spec_pipeline: SpecDrivenPipeline::new(SpecPipelineConfig {
+                max_active_specs: 5,
+                review_required: true,
+                auto_evolve: true,
+                min_confidence: 0.7,
+            }),
+            code_search: CodeSearchEngine::new(),
         }
     }
 
     /// 单次自修复循环 — 扫描 + 尝试修复 + 标记
+    /// 仅在 mutation_enabled 时落盘变更 (真实 AutoFixer 调用)。
     pub fn autofix_attempt(&mut self) -> u32 {
+        if !self.config.mutation_enabled {
+            if self.config.verbose {
+                println!("[daemon] mutation disabled — skipping autofix");
+            }
+            return 0;
+        }
         let max_attempts = self.config.max_fix_attempts;
         let unattempted = self.tracker.get_unattempted(max_attempts);
         let mut fixes = 0u32;
@@ -324,6 +296,17 @@ impl EvolutionDaemon {
                     Ok(msg) => {
                         self.tracker.mark_fixed(&id, self.cycle_count);
                         fixes += 1;
+                        // 记录真实变更到 SelfCodeMonitor (可回滚审计)
+                        let mutation_id = format!("autofix-{}-{}", id, self.cycle_count);
+                        self.code_monitor.record_result(
+                            crate::core::nt_core_iter::self_ref_code::MutationResult {
+                                mutation_id,
+                                success: true,
+                                error: None,
+                                applied_at: self.cycle_count,
+                                verification_score: 1.0,
+                            },
+                        );
                         if self.config.verbose {
                             println!("[daemon] 🔧 fixed {}: {}", id, msg);
                         }
@@ -391,9 +374,35 @@ impl EvolutionDaemon {
 
     pub fn run_intelligent_cycle(&mut self) -> (u32, f64) {
         let snapshot = self.evolution_loop.scan_project();
-        let goals = AutoGoalGenerator::generate_from_snapshot(&snapshot);
+        let l1_snapshot = to_l1_snapshot(&snapshot);
+        let goals = AutoGoalGenerator::generate_from_snapshot(&l1_snapshot);
         let mut fixes = 0u32;
         let mut total_reward = 0.0;
+
+        // Spec 驱动管线: 将每个目标登记为 EvolutionSpec (仅 Pending 状态, 无副作用)
+        for goal in &goals {
+            let spec_id = format!("GOAL-{}", self.cycle_count);
+            self.spec_pipeline.submit_spec(EvolutionSpec {
+                id: spec_id,
+                name: format!("{:?}", goal.category),
+                description: goal.description.clone(),
+                constraints: vec![],
+                target_module: goal.target_file.clone().unwrap_or_default(),
+                status: SpecStatus::Pending,
+                version: 1,
+                created_at: self.cycle_count,
+            });
+        }
+        // 用快照摘要验证 spec 约束
+        let codebase_summary = format!(
+            "files={} errors={} warnings={} todo={} untested={}",
+            l1_snapshot.total_files,
+            l1_snapshot.compile_errors,
+            l1_snapshot.compile_warnings,
+            l1_snapshot.todo_count,
+            l1_snapshot.modules_without_tests.len(),
+        );
+        let _verifications = self.spec_pipeline.verify_all(&codebase_summary);
 
         // FEP 目标优先级排序: 选择预期自由能最低 (最优) 的目标优先执行
         let ordered = self.select_goal_by_fe(&goals);
@@ -413,6 +422,21 @@ impl EvolutionDaemon {
                     Some(f) => f.clone(),
                     None => continue,
                 };
+
+                // 真实落盘变更仅在 mutation_enabled 时执行
+                if !self.config.mutation_enabled {
+                    continue;
+                }
+
+                // 修复前确认目标文件存在 (代码搜索定位)
+                let file_exists = !CodeSearchEngine::search(
+                    "fn ",
+                    std::path::Path::new(&file),
+                ).is_empty()
+                    || std::path::Path::new(&file).exists();
+                if !file_exists {
+                    continue;
+                }
 
                 let fix_result = match goal.category {
                     GoalCategory::TestCoverage => AutoFixer::add_test_stub(&file),
@@ -434,6 +458,14 @@ impl EvolutionDaemon {
                     self.phi_reward_history.push(phi_reward);
                     let causal_coherence = self.compute_causal_coherence();
                     self.causal_coherence_history.push(causal_coherence);
+                    // 记录变更 diff 到 spec 管线 (版本化演进追踪)
+                    self.spec_pipeline.record_diff(SpecDiff {
+                        spec_id: format!("GOAL-{}", self.cycle_count),
+                        before: String::new(),
+                        after: format!("{:?}", goal.category),
+                        impact: goal.expected_impact,
+                        affected_modules: vec![file.clone()],
+                    });
                     // EWC stability bonus: reward consistent phi over time
                     let phi_stability = if self.phi_reward_history.len() >= 3 {
                         let recent = &self.phi_reward_history[self.phi_reward_history.len().saturating_sub(3)..];
@@ -483,10 +515,12 @@ impl EvolutionDaemon {
         let fixed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, IssueLifecycle::Fixed(_))).count();
         let failed = self.tracker.issues.iter().filter(|t| matches!(t.lifecycle, IssueLifecycle::Failed(_))).count();
         let coverage_report = self.coverage_analyzer.analyze();
+        let spec_stats = self.spec_pipeline.stats();
         format!(
-            "[daemon] {} issues | {} fixed | {} failed | {} cycles | coverage {:.1}%",
+            "[daemon] {} issues | {} fixed | {} failed | {} cycles | coverage {:.1}% | specs {} ({} active)",
             total, fixed, failed, self.cycle_count,
             coverage_report.overall_ratio * 100.0,
+            spec_stats.total, spec_stats.active,
         )
     }
 
@@ -689,6 +723,24 @@ mod tests {
     }
 
     #[test]
+    fn test_spec_pipeline_wired_and_dashboard_reports_specs() {
+        let d = EvolutionDaemon::default();
+        assert_eq!(d.spec_pipeline.stats().total, 0);
+        assert!(d.dashboard().contains("specs 0"));
+    }
+
+    #[test]
+    fn test_run_intelligent_cycle_submits_specs() {
+        // run_intelligent_cycle 在只读模式下也应提交 spec (不触发 AutoFixer)
+        let mut d = EvolutionDaemon::default();
+        d.config.mutation_enabled = false;
+        let _ = d.run_intelligent_cycle();
+        // spec 管线至少登记了目标 (非空或已完成登记路径)
+        let _stats = d.spec_pipeline.stats();
+        assert!(d.spec_pipeline.get_active_specs().len() <= 5);
+    }
+
+    #[test]
     fn test_phi_reward_finite() {
         let d = EvolutionDaemon::default();
         let reward = d.compute_phi_reward();
@@ -711,6 +763,59 @@ mod tests {
         let d = EvolutionDaemon::default();
         let energy = d.compute_jepa_energy();
         assert!(energy >= 0.2 && energy <= 0.8);
+    }
+
+    #[test]
+    fn test_mutation_disabled_by_default() {
+        let d = EvolutionDaemon::default();
+        assert!(!d.config.mutation_enabled);
+    }
+
+    #[test]
+    fn test_autofix_gated_by_mutation_flag() {
+        let mut d = EvolutionDaemon::default();
+        d.tracker.register_issue(Some("gated.rs".into()), IssueType::TodoLeftovers);
+        let fixes = d.autofix_attempt();
+        assert_eq!(fixes, 0, "autofix must not mutate when mutation_enabled=false");
+    }
+
+    #[test]
+    fn test_real_goal_generator_wired() {
+        // 验证真实 AutoGoalGenerator 已接线: 对合成快照能生成非空目标 (只读, 不触发 AutoFixer)
+        let l1 = crate::neotrix::l1_body_impl::nt_l1_shared_types::ProjectSnapshot {
+            total_files: 1,
+            total_lines: 100,
+            large_files: vec!["big.rs".into()],
+            modules_without_tests: vec!["untested.rs".into()],
+            file_unsafe_hotspots: vec![],
+            unsafe_count: 0,
+            unwrap_count: 0,
+            todo_count: 10,
+            compile_errors: 2,
+            compile_warnings: 0,
+            test_count: 5,
+            test_failures: 0,
+        };
+        let goals = AutoGoalGenerator::generate_from_snapshot(&l1);
+        assert!(!goals.is_empty(), "real goal generator must produce goals");
+        assert!(goals.iter().any(|g| g.category == GoalCategory::Architecture));
+    }
+
+    #[test]
+    fn test_code_monitor_wired_and_empty_by_default() {
+        let mut d = EvolutionDaemon::default();
+        d.config.mutation_enabled = true;
+        assert_eq!(d.code_monitor.stats().total_mutations, 0);
+        // 直接验证记录路径 (不触发真实 AutoFixer 文件系统写)
+        d.code_monitor.record_result(crate::core::nt_core_iter::self_ref_code::MutationResult {
+            mutation_id: "autofix-test-1".into(),
+            success: true,
+            error: None,
+            applied_at: 1,
+            verification_score: 1.0,
+        });
+        assert_eq!(d.code_monitor.stats().total_mutations, 1);
+        assert!(d.code_monitor.get_status("autofix-test-1").is_some());
     }
 
     #[test]

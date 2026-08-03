@@ -101,10 +101,6 @@ impl AttentionResiduals {
 /// scenarios. Mapped to E8 factor-energy updates: the gate value scales
 /// how strongly a factor's raw delta is applied, preventing a single
 /// dominating mode from exploding the energy update.
-pub fn situ_gate(x: f64) -> f64 {
-    let sigmoid = 1.0 / (1.0 + (-x).exp());
-    sigmoid * x.tanh()
-}
 
 /// Muon optimizer — DeepSeek V4.
 ///
@@ -362,13 +358,24 @@ impl SafetyRouter {
 
     /// Decide which prediction path a context should take.
     /// Returns `true` if the frontier-fused pipeline is allowed.
+    ///
+    /// The frontier path (aggressive fused pipeline) runs on step-route cache
+    /// misses; cache hits reuse an already-routed decision. So the budget tracks
+    /// the *frontier fraction* = miss rate, not the hit rate. The previous code
+    /// compared `route_hits / total` (hit rate) against the budget: as the cache
+    /// warmed past the budget the frontier was blocked on the *rare miss*,
+    /// pushing normal low-risk tasks onto the conservative path — inverted.
     pub fn allow_frontier(&self, context: &str, route_hits: u64, total_routes: u64) -> bool {
         let risk = self.classify_risk(context);
         if risk >= self.risk_threshold {
             return false;
         }
-        // Budget: keep frontier fraction below frontier_budget
-        let used = if total_routes > 0 { route_hits as f64 / total_routes as f64 } else { 0.0 };
+        // Budget: keep the frontier (miss) fraction below frontier_budget
+        let used = if total_routes > 0 {
+            (total_routes.saturating_sub(route_hits)) as f64 / total_routes as f64
+        } else {
+            0.0
+        };
         used <= self.frontier_budget
     }
 
@@ -643,8 +650,10 @@ impl ConsciousnessCoreSynthesis {
     /// single transition matrix row.
     ///
     /// 1. K3 dominance cap — row cannot be monopolized by one destination
-    /// 2. AttnRes — cross-depth residual from trajectory history
-    /// 3. Effort-scaled sparse top-K — attention condenses with effort
+    /// 2. DeepSeek-V4 mHC — Birkhoff doubly-stochastic projection (column-balanced)
+    /// 3. AttnRes — cross-depth residual from trajectory history
+    /// 4. CSA/HCA — compressed attention reweights recent trajectory states
+    /// 5. Effort-scaled sparse top-K — attention condenses with effort
     ///
     /// Returns the fused distribution over 64 states.
     pub fn fused_distribution(
@@ -655,12 +664,55 @@ impl ConsciousnessCoreSynthesis {
         effort: SynthesisEffortTier,
     ) -> Vec<f64> {
         // 1. K3 Quantile Balancing: dominance-capped row distribution
-        let base = tm.dominance_capped_distribution(from, self.dominance_cap);
+        let mut base = tm.dominance_capped_distribution(from, self.dominance_cap);
 
-        // 2. AttnRes: cross-depth residual blend
-        let residual_blend = self.attention_residuals.blend(&base, trajectory);
+        // 2. DeepSeek-V4 mHC: Sinkhorn-Knopp doubly-stochastic projection.
+        // The dominance cap above bounds each cell of a single row; the
+        // Birkhoff projection additionally column-normalizes across all
+        // sources so no single destination can monopolize routing mass from
+        // every state (anti-monopolization in the column space).
+        let birkhoff = tm.birkhoff_projected_matrix(self.sinkhorn_iters, self.sinkhorn_tol);
+        let birk_row = birkhoff[from.min(63) as usize];
+        let mhc_w = 0.35;
+        for (b, &bj) in base.iter_mut().zip(birk_row.iter()) {
+            *b = *b * (1.0 - mhc_w) + bj * mhc_w;
+        }
+        let mhc_sum: f64 = base.iter().sum();
+        if mhc_sum > 0.0 {
+            for b in base.iter_mut() {
+                *b /= mhc_sum;
+            }
+        }
 
-        // 3. Effort-scaled sparse top-K (K3 sparse experts / Qwen3 budget)
+        // 3. AttnRes: cross-depth residual blend
+        let mut residual_blend = self.attention_residuals.blend(&base, trajectory);
+
+        // 4. CSA/HCA hybrid compressed attention: reweight the trajectory
+        // states by their compressed-attention weights (recent window holds
+        // most mass, distant tail compresses into a decaying summary). This
+        // makes the fused distribution attend to *where the reasoning has
+        // actually been* within the context window, not just transition stats.
+        if residual_blend.len() == 64 && !trajectory.is_empty() {
+            let csa = compressed_attention_weights(trajectory.len(), self.context_window, self.context_compression);
+            let mut csa_boost = vec![0.0f64; 64];
+            for (i, &s) in trajectory.iter().enumerate() {
+                if let Some(&w) = csa.get(i) {
+                    csa_boost[s as usize] += w;
+                }
+            }
+            let csa_w = 0.2;
+            for (r, &c) in residual_blend.iter_mut().zip(csa_boost.iter()) {
+                *r = *r * (1.0 - csa_w) + c * csa_w;
+            }
+            let csa_sum: f64 = residual_blend.iter().sum();
+            if csa_sum > 0.0 {
+                for r in residual_blend.iter_mut() {
+                    *r /= csa_sum;
+                }
+            }
+        }
+
+        // 5. Effort-scaled sparse top-K (K3 sparse experts / Qwen3 budget)
         let mut sorted: Vec<(usize, f64)> = residual_blend.iter().enumerate().map(|(i, p)| (i, *p)).collect();
         sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let k = effort.sparse_k();
@@ -702,15 +754,6 @@ impl ConsciousnessCoreSynthesis {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_situ_gate_bounded() {
-        assert!(situ_gate(0.0).abs() < 1e-9);
-        assert!(situ_gate(100.0) <= 1.0);
-        assert!(situ_gate(-100.0) >= -1.0);
-        // Gate should be non-decreasing
-        assert!(situ_gate(1.0) >= situ_gate(0.5));
-    }
 
     #[test]
     fn test_attention_residuals_blend_shapes() {
@@ -953,9 +996,10 @@ mod tests {
     #[test]
     fn test_safety_router_budget_caps_frontier() {
         let router = SafetyRouter { frontier_budget: 0.5, ..Default::default() };
-        // 7 of 10 routes used → above 0.5 budget → block frontier
-        assert!(!router.allow_frontier("normal task", 7, 10));
-        // 3 of 10 → within budget
-        assert!(router.allow_frontier("normal task", 3, 10));
+        // Frontier fraction = miss rate = (total - hits)/total.
+        // 3 of 10 misses → 0.3 miss rate → within 0.5 budget → allow frontier
+        assert!(router.allow_frontier("normal task", 7, 10));
+        // 7 of 10 misses → 0.7 miss rate → above 0.5 budget → block frontier
+        assert!(!router.allow_frontier("normal task", 3, 10));
     }
 }

@@ -335,7 +335,7 @@ describe("NeoCodexPage task pane", () => {
     renderPage();
     await screen.findByTestId("session-title");
 
-    fireEvent.click(screen.getByTestId("task-pane-toggle"));
+    fireEvent.click(screen.getByTestId("rail-btn-task"));
     expect(await screen.findByTestId("task-pane")).toBeInTheDocument();
     expect(screen.getByTestId("task-pane-empty")).toBeInTheDocument();
   });

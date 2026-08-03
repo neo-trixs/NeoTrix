@@ -1,6 +1,7 @@
 export { CapabilityHealthPane } from "./CapabilityHealthPane";
 export { ChatView } from "./ChatView";
 export { CommandPalette } from "./CommandPalette";
+export { ContextPanel } from "./ContextPanel";
 export { DiffPane } from "./DiffPane";
 export { FileTreePanel } from "./FileTreePanel";
 export { ModelSelector } from "./ModelSelector";

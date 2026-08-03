@@ -66,6 +66,7 @@ pub mod nt_core_hex;
 pub mod nt_core_e8_vsa;
 pub mod nt_core_policy;
 pub mod nt_core_prm;
+pub mod nt_core_gate;
 pub mod nt_core_sae;
 pub mod nt_core_sae_bridge;
 pub mod nt_core_td;

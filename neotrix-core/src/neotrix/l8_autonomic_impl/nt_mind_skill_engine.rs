@@ -211,6 +211,10 @@ impl SkillEngine {
     /// When `e8_mode` is `None`, the E8 mode filter is skipped.
     /// Matching is case-insensitive keyword match against triggers.
     /// Results are sorted by priority descending, then by trigger relevance.
+    /// 反哺自 spec-kit/autoroute 吸收: 确定性优先级栈 (exact > substring) + 硬结果上限
+    /// (open-code-review 预算纪律) — 防止路由返回无界候选淹没下游消费方。
+    pub const MAX_ROUTE_RESULTS: usize = 8;
+
     pub fn find_matching(&self, query: &str, e8_mode: Option<u8>) -> Vec<&SkillEntry> {
         let query_lower = query.to_lowercase();
         let query_words: Vec<String> = query_lower.split_whitespace()
@@ -218,6 +222,9 @@ impl SkillEngine {
             .chain(std::iter::once(query_lower.clone()))
             .collect();
 
+        // tier 0 = exact trigger equality (最高优先级, 确定性命中)
+        // tier 1 = substring 命中
+        let mut exact: Vec<(usize, usize, &SkillEntry)> = Vec::new();
         let mut scored: Vec<(usize, usize, &SkillEntry)> = Vec::new();
 
         for skill in self.skills.iter() {
@@ -226,23 +233,34 @@ impl SkillEngine {
                     continue;
                 }
             }
+            let mut exact_count = 0;
             let mut match_count = 0;
             for word in &query_words {
                 for trigger in &skill.triggers {
                     let t_lower = trigger.to_lowercase();
-                    if t_lower.contains(word.as_str()) || word.contains(t_lower.as_str()) {
+                    if t_lower == *word {
+                        exact_count += 1;
+                    } else if t_lower.contains(word.as_str()) || word.contains(t_lower.as_str()) {
                         match_count += 1;
                     }
                 }
             }
-            if match_count > 0 {
+            if exact_count > 0 {
+                exact.push((exact_count, skill.priority as usize, skill));
+            } else if match_count > 0 {
                 scored.push((match_count, skill.priority as usize, skill));
             }
         }
 
+        // Sort: desc by exact_count, then desc by priority (确定性优先层)
+        exact.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
         // Sort: desc by match_count, then desc by priority
         scored.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
-        scored.into_iter().map(|(_, _, s)| s).collect()
+
+        exact.into_iter().map(|(_, _, s)| s)
+            .chain(scored.into_iter().map(|(_, _, s)| s))
+            .take(Self::MAX_ROUTE_RESULTS)
+            .collect()
     }
 
     pub fn get_skill(&self, name: &str) -> Option<&SkillEntry> {
@@ -754,6 +772,65 @@ body"#;
         assert_eq!(matches.len(), 1);
         let matches = engine.find_matching("help", None);
         assert_eq!(matches.len(), 1);
+    }
+
+    #[test]
+    fn test_find_matching_exact_trigger_outranks_substring() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let exact_skill = r#"---
+name: auth
+description: Authentication handler
+triggers: ["auth", "login", "session"]
+---
+body"#;
+        let substring_skill = r#"---
+name: auth-analyzer
+description: A skill that also matches auth as substring
+triggers: ["auth-flow", "oauth"]
+---
+body"#;
+        for (name, content) in [("auth", exact_skill), ("auth-analyzer", substring_skill)] {
+            let dir2 = skills_dir.join(name);
+            std::fs::create_dir_all(&dir2).unwrap();
+            std::fs::write(dir2.join("SKILL.md"), content).unwrap();
+        }
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+
+        // Exact trigger "auth" must outrank substring "auth-flow" match
+        let matches = engine.find_matching("auth", None);
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].name, "auth", "exact trigger must be ranked first");
+    }
+
+    #[test]
+    fn test_find_matching_caps_results() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        for i in 0..(SkillEngine::MAX_ROUTE_RESULTS + 5) {
+            let name = format!("matching-skill-{}", i);
+            let dir2 = skills_dir.join(&name);
+            std::fs::create_dir_all(&dir2).unwrap();
+            let content = format!(
+                "---\nname: {}\ndescription: test\ntriggers: [\"matching-skill\"]\n---\nbody",
+                name
+            );
+            std::fs::write(dir2.join("SKILL.md"), content).unwrap();
+        }
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+
+        // All skills match query "matching-skill" (substring); results must be capped
+        let matches = engine.find_matching("matching-skill", None);
+        assert!(matches.len() <= SkillEngine::MAX_ROUTE_RESULTS);
+        assert_eq!(matches.len(), SkillEngine::MAX_ROUTE_RESULTS);
     }
 
     #[test]

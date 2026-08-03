@@ -260,6 +260,9 @@ impl ReviewCmd {
         }
 
         // --- Build output ---
+        // 反哺自 open-code-review: 确定性规则保证覆盖, 但输出受预算上限约束
+        // (token 1/9 精神) — 每类最多列出 top FINDING_CAP 条, 其余折叠为计数。
+        const FINDING_CAP: usize = 20;
         let mut output = String::new();
         output.push_str(&format!("## 🔍 Code Review: {}\n\n", label));
 
@@ -268,9 +271,13 @@ impl ReviewCmd {
         if nt_shield_issues.is_empty() {
             output.push_str("  No nt_shield issues detected.\n");
         } else {
-            for issue in &nt_shield_issues {
+            for issue in nt_shield_issues.iter().take(FINDING_CAP) {
                 output.push_str(issue);
                 output.push('\n');
+            }
+            if nt_shield_issues.len() > FINDING_CAP {
+                output.push_str(&format!("  …and {} more security findings (capped at {})\n",
+                    nt_shield_issues.len() - FINDING_CAP, FINDING_CAP));
             }
         }
         output.push('\n');
@@ -280,9 +287,13 @@ impl ReviewCmd {
         if quality_issues.is_empty() {
             output.push_str("  No quality issues detected.\n");
         } else {
-            for issue in &quality_issues {
+            for issue in quality_issues.iter().take(FINDING_CAP) {
                 output.push_str(issue);
                 output.push('\n');
+            }
+            if quality_issues.len() > FINDING_CAP {
+                output.push_str(&format!("  …and {} more quality findings (capped at {})\n",
+                    quality_issues.len() - FINDING_CAP, FINDING_CAP));
             }
         }
         output.push('\n');
@@ -292,9 +303,13 @@ impl ReviewCmd {
         if style_issues.is_empty() {
             output.push_str("  No style issues detected.\n");
         } else {
-            for issue in &style_issues {
+            for issue in style_issues.iter().take(FINDING_CAP) {
                 output.push_str(issue);
                 output.push('\n');
+            }
+            if style_issues.len() > FINDING_CAP {
+                output.push_str(&format!("  …and {} more style findings (capped at {})\n",
+                    style_issues.len() - FINDING_CAP, FINDING_CAP));
             }
         }
         output.push('\n');
@@ -456,5 +471,19 @@ mod tests {
         let cmd = ReviewCmd;
         let result = cmd.execute(&["invalid".to_string()], None);
         assert!(!result.success);
+    }
+
+    #[test]
+    fn test_analyze_content_caps_findings() {
+        // 超过 FINDING_CAP 的 findings 应被折叠为计数而非全量输出
+        let cmd = ReviewCmd;
+        let mut content = String::new();
+        for i in 0..30 {
+            content.push_str(&format!("// {}\nlet _x_{} = foo().unwrap();\n", i, i));
+        }
+        let result = cmd.analyze_content(&content, "capped");
+        // 每类最多 20 条 + 1 条折叠计数
+        assert!(result.contains("more quality findings"));
+        assert!(result.contains("capped at 20"));
     }
 }

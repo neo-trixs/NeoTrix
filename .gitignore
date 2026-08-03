@@ -27,3 +27,11 @@ src-tauri/frontend/playwright-report/
 # Python bytecode
 __pycache__/
 *.py[cod]
+
+# SQLite runtime artifacts (knowledge.db WAL/SHM)
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Ad-hoc test scratch dirs
+*_test_tmp/

@@ -1,36 +1,157 @@
 //! Backward-compat stub for deleted agent/ directory.
 
 pub mod hooks {
+    use std::collections::HashMap;
     use std::time::Instant;
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum HookProfile { Standard, Strict, Permissive }
 
-    #[derive(Debug, Clone)]
+    /// ECC 风格钩子 — 对事件执行检查并产出可阻断动作。
+    /// 输出前缀约定：`BLOCK:` 开头的字符串表示阻断（check_blocked 识别）。
+    pub trait Hook: Send + Sync {
+        fn name(&self) -> &'static str;
+        fn description(&self) -> &'static str;
+        fn events(&self) -> Vec<HookEvent>;
+        fn execute(&self, ctx: &HookContext) -> String;
+    }
+
+    /// 质量门控：PreToolUse 阻止超 800 行的输入（对齐 LARGE_FILE_THRESHOLD）。
+    pub struct QualityGateHook;
+    impl Hook for QualityGateHook {
+        fn name(&self) -> &'static str { "quality-gate" }
+        fn description(&self) -> &'static str { "阻止创建超 800 行的文件" }
+        fn events(&self) -> Vec<HookEvent> { vec![HookEvent::PreToolUse] }
+        fn execute(&self, ctx: &HookContext) -> String {
+            if let Some(ref input) = ctx.tool_input {
+                let lines = input.lines().count();
+                if lines > 800 {
+                    return format!("BLOCK: File exceeds 800 lines ({} lines). Split into smaller modules.", lines);
+                }
+            }
+            format!("CONTINUE: quality-gate passed")
+        }
+    }
+
+    /// TODO 警告：PostToolUse 提醒新增 TODO/FIXME/HACK。
+    pub struct TodoWarningHook;
+    impl Hook for TodoWarningHook {
+        fn name(&self) -> &'static str { "todo-warning" }
+        fn description(&self) -> &'static str { "警告新增 TODO/FIXME/HACK 注释" }
+        fn events(&self) -> Vec<HookEvent> { vec![HookEvent::PostToolUse] }
+        fn execute(&self, ctx: &HookContext) -> String {
+            if let Some(ref output) = ctx.tool_output {
+                if output.contains("TODO") || output.contains("FIXME") || output.contains("HACK") {
+                    return format!("WARN: New TODO/FIXME/HACK found");
+                }
+            }
+            format!("CONTINUE: todo-warning passed")
+        }
+    }
+
+    /// 会话边界钩子：SessionStart/SessionEnd 记录。
+    pub struct SessionPersistenceHook;
+    impl Hook for SessionPersistenceHook {
+        fn name(&self) -> &'static str { "session-persistence" }
+        fn description(&self) -> &'static str { "保存/恢复会话上下文" }
+        fn events(&self) -> Vec<HookEvent> {
+            vec![HookEvent::SessionStart, HookEvent::SessionEnd, HookEvent::PostToolUse]
+        }
+        fn execute(&self, ctx: &HookContext) -> String {
+            format!("CONTINUE: {} handled", ctx.event.as_str())
+        }
+    }
+
     pub struct HookRegistry {
+        hooks: Vec<Box<dyn Hook>>,
+        event_index: HashMap<HookEvent, Vec<usize>>,
         profile: HookProfile,
+        disabled_hooks: Vec<String>,
     }
 
     impl Default for HookRegistry {
         fn default() -> Self {
-            Self { profile: HookProfile::Standard }
+            let mut reg = Self::new();
+            reg.register_defaults();
+            reg
         }
     }
 
     impl HookRegistry {
-        pub fn check_blocked(_actions: &[String]) -> Option<String> { None }
+        pub fn new() -> Self {
+            Self {
+                hooks: Vec::new(),
+                event_index: HashMap::new(),
+                profile: HookProfile::Standard,
+                disabled_hooks: Vec::new(),
+            }
+        }
 
-        pub fn execute_event(&self, _ctx: &HookContext) -> Vec<String> { Vec::new() }
+        pub fn register(&mut self, hook: Box<dyn Hook>) {
+            let idx = self.hooks.len();
+            for event in hook.events() {
+                self.event_index.entry(event).or_default().push(idx);
+            }
+            self.hooks.push(hook);
+        }
+
+        pub fn register_defaults(&mut self) {
+            self.register(Box::new(QualityGateHook));
+            self.register(Box::new(TodoWarningHook));
+            self.register(Box::new(SessionPersistenceHook));
+        }
 
         pub fn set_profile(&mut self, profile: HookProfile) { self.profile = profile; }
 
-        pub fn hook_count(&self) -> usize { 0 }
+        pub fn disable_hook(&mut self, name: &str) {
+            if !self.disabled_hooks.contains(&name.to_string()) {
+                self.disabled_hooks.push(name.to_string());
+            }
+        }
 
-        pub fn list_hooks(&self) -> Vec<(String, String)> { Vec::new() }
+        pub fn check_blocked(actions: &[String]) -> Option<String> {
+            actions.iter().find(|a| a.starts_with("BLOCK:")).map(|a| a.clone())
+        }
+
+        pub fn execute_event(&self, ctx: &HookContext) -> Vec<String> {
+            let mut results = Vec::new();
+            if let Some(indices) = self.event_index.get(&ctx.event) {
+                for &idx in indices {
+                    let hook = &self.hooks[idx];
+                    if self.disabled_hooks.contains(&hook.name().to_string()) { continue; }
+                    // Permissive 仅保留会话钩子，跳过阻断类检查
+                    if self.profile == HookProfile::Permissive
+                        && !matches!(hook.name(), "session-persistence")
+                    {
+                        continue;
+                    }
+                    let result = hook.execute(ctx);
+                    results.push(result);
+                }
+            }
+            results
+        }
+
+        pub fn hook_count(&self) -> usize { self.hooks.len() }
+
+        pub fn list_hooks(&self) -> Vec<(String, String)> {
+            self.hooks.iter().map(|h| (h.name().to_string(), h.description().to_string())).collect()
+        }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum HookEvent { SessionStart, SessionEnd, PreToolUse, PostToolUse }
+
+    impl HookEvent {
+        pub fn as_str(&self) -> &'static str {
+            match self {
+                HookEvent::SessionStart => "SessionStart",
+                HookEvent::SessionEnd => "SessionEnd",
+                HookEvent::PreToolUse => "PreToolUse",
+                HookEvent::PostToolUse => "PostToolUse",
+            }
+        }
+    }
 
     #[derive(Debug, Clone)]
     pub struct HookContext {
@@ -433,5 +554,73 @@ mod tests {
         // Before any registry is set, must return empty (never panic).
         let tools = super::tool::all_native_tools();
         assert!(tools.is_empty());
+    }
+
+    use super::hooks::{HookContext, HookEvent, HookProfile, HookRegistry};
+
+    #[test]
+    fn test_hook_registry_default_count() {
+        let reg = HookRegistry::default();
+        assert_eq!(reg.hook_count(), 3);
+        assert_eq!(reg.list_hooks().len(), 3);
+    }
+
+    #[test]
+    fn test_quality_gate_blocks_large_input() {
+        let reg = HookRegistry::default();
+        let mut ctx = HookContext::new(HookEvent::PreToolUse);
+        ctx.tool_name = Some("write".into());
+        ctx.tool_input = Some("line\n".repeat(900));
+        let actions = reg.execute_event(&ctx);
+        let blocked = HookRegistry::check_blocked(&actions);
+        assert!(blocked.is_some(), "quality gate must block >800 lines");
+        assert!(blocked.unwrap().contains("800"));
+    }
+
+    #[test]
+    fn test_quality_gate_allows_small_input() {
+        let reg = HookRegistry::default();
+        let mut ctx = HookContext::new(HookEvent::PreToolUse);
+        ctx.tool_name = Some("write".into());
+        ctx.tool_input = Some("small content".to_string());
+        let actions = reg.execute_event(&ctx);
+        assert!(HookRegistry::check_blocked(&actions).is_none());
+    }
+
+    #[test]
+    fn test_todo_warning_hook() {
+        let reg = HookRegistry::default();
+        let mut ctx = HookContext::new(HookEvent::PostToolUse);
+        ctx.tool_name = Some("edit".into());
+        ctx.tool_output = Some("added // TODO later".to_string());
+        let actions = reg.execute_event(&ctx);
+        assert!(actions.iter().any(|a| a.contains("WARN")));
+    }
+
+    #[test]
+    fn test_permissive_profile_skips_blocking_hooks() {
+        let mut reg = HookRegistry::default();
+        reg.set_profile(HookProfile::Permissive);
+        let mut ctx = HookContext::new(HookEvent::PreToolUse);
+        ctx.tool_input = Some("line\n".repeat(900));
+        let actions = reg.execute_event(&ctx);
+        assert!(HookRegistry::check_blocked(&actions).is_none());
+    }
+
+    #[test]
+    fn test_disable_hook() {
+        let mut reg = HookRegistry::default();
+        reg.disable_hook("quality-gate");
+        let mut ctx = HookContext::new(HookEvent::PreToolUse);
+        ctx.tool_input = Some("line\n".repeat(900));
+        let actions = reg.execute_event(&ctx);
+        assert!(HookRegistry::check_blocked(&actions).is_none());
+    }
+
+    #[test]
+    fn test_session_hook_handles_boundary() {
+        let reg = HookRegistry::default();
+        let actions = reg.execute_event(&HookContext::new(HookEvent::SessionStart));
+        assert!(actions.iter().any(|a| a.contains("CONTINUE")));
     }
 }

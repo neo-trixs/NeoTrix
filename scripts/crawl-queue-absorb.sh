@@ -77,7 +77,7 @@ absorb_wikipedia() {
 
     # Check if already exists
     local existing
-    existing=$(sql "SELECT id FROM knowledge_nodes WHERE url = '$url' LIMIT 1" 2>/dev/null || echo "")
+    existing=$(sql "SELECT id FROM nodes WHERE url = '$url' LIMIT 1" 2>/dev/null || echo "")
     if [ -n "$existing" ]; then
         log_info "Already exists: $title ($url)"
         return 0
@@ -122,15 +122,15 @@ except:
     if [ -z "$extract" ]; then
         log_info "No extract for $page_title, storing as stub"
         local id; id=$(generate_uuid)
-        sql "INSERT OR IGNORE INTO knowledge_nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at)
-             VALUES ('$id', 'Concept', '$page_title', 'Wikipedia: $page_title', '$url', '$domain', 'en', 0.7, 0.5, $NOW, $NOW);"
+        sql "INSERT OR IGNORE INTO nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at)
+             VALUES ('$id', 'concept', '$page_title', 'Wikipedia: $page_title', '$url', '$domain', 'en', 0.7, 0.5, $NOW, $NOW);"
         log_info "Stored stub: $page_title"
     else
         local id; id=$(generate_uuid)
         local summary_esc
         summary_esc=$(echo "$extract" | sed "s/'/''/g" | head -c 1000)
-        sql "INSERT OR IGNORE INTO knowledge_nodes (id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at)
-             VALUES ('$id', 'Concept', '$page_title', '$summary_esc', '$extract', '$url', '$domain', 'en', 0.8, 0.6, $NOW, $NOW);"
+        sql "INSERT OR IGNORE INTO nodes (id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at)
+             VALUES ('$id', 'concept', '$page_title', '$summary_esc', '$extract', '$url', '$domain', 'en', 0.8, 0.6, $NOW, $NOW);"
         log_info "Stored Wikipedia: $page_title (${#extract} chars)"
     fi
 
@@ -148,7 +148,7 @@ absorb_arxiv() {
 
     # Check if already exists
     local existing
-    existing=$(sql "SELECT id FROM knowledge_nodes WHERE url LIKE '%arxiv.org/abs/$paper_id%' LIMIT 1" 2>/dev/null || echo "")
+    existing=$(sql "SELECT id FROM nodes WHERE url LIKE '%arxiv.org/abs/$paper_id%' LIMIT 1" 2>/dev/null || echo "")
     if [ -n "$existing" ]; then
         log_info "ArXiv $paper_id already exists"
         sql "UPDATE crawl_queue SET status='completed', last_attempt=$NOW WHERE url='$url';"
@@ -162,8 +162,8 @@ absorb_arxiv() {
 
     if echo "$data" | grep -qi "error\|not found\|<entry>" >/dev/null 2>&1; then
         local id; id=$(generate_uuid)
-        sql "INSERT OR IGNORE INTO knowledge_nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at)
-             VALUES ('$id', 'Concept', 'ArXiv $paper_id', 'Paper from arxiv: $paper_id', 'https://arxiv.org/abs/$paper_id', 'arxiv.org', 'en', 0.7, 0.5, $NOW, $NOW);"
+        sql "INSERT OR IGNORE INTO nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at)
+             VALUES ('$id', 'concept', 'ArXiv $paper_id', 'Paper from arxiv: $paper_id', 'https://arxiv.org/abs/$paper_id', 'arxiv.org', 'en', 0.7, 0.5, $NOW, $NOW);"
         log_info "Stored arXiv stub: $paper_id"
     else
         local title
@@ -172,8 +172,8 @@ absorb_arxiv() {
         local summary
         summary=$(echo "$data" | grep -o '<summary>[^<]*</summary>' | head -1 | sed 's/<[^>]*>//g' | sed "s/'/''/g" | head -c 1000)
         local id; id=$(generate_uuid)
-        sql "INSERT OR IGNORE INTO knowledge_nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at)
-             VALUES ('$id', 'Concept', '$title', '$summary', 'https://arxiv.org/abs/$paper_id', 'arxiv.org', 'en', 0.8, 0.6, $NOW, $NOW);"
+        sql "INSERT OR IGNORE INTO nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at)
+             VALUES ('$id', 'concept', '$title', '$summary', 'https://arxiv.org/abs/$paper_id', 'arxiv.org', 'en', 0.8, 0.6, $NOW, $NOW);"
         log_info "Stored ArXiv: $title"
     fi
 
@@ -190,7 +190,7 @@ absorb_github_repo() {
 
     # Check if already exists
     local existing
-    existing=$(sql "SELECT id FROM knowledge_nodes WHERE url = 'https://github.com/$full_name' LIMIT 1" 2>/dev/null || echo "")
+    existing=$(sql "SELECT id FROM nodes WHERE url = 'https://github.com/$full_name' LIMIT 1" 2>/dev/null || echo "")
     if [ -n "$existing" ]; then
         log_info "Repo $full_name already exists"
         sql "UPDATE crawl_queue SET status='completed', last_attempt=$NOW WHERE url='https://github.com/$full_name';"
@@ -227,8 +227,8 @@ import sys,json; d=json.load(sys.stdin); t=d.get('topics',[]); print(json.dumps(
     local meta="{\"stars\":$stars,\"language\":\"$language\",\"topics\":$topics}"
     local meta_esc; meta_esc=$(echo "$meta" | sed "s/'/''/g")
 
-    sql "INSERT OR IGNORE INTO knowledge_nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at, metadata)
-         VALUES ('$id', 'Repository', '$full_name', '$description', 'https://github.com/$full_name', 'github.com', 'en', 1.0, 0.5, $NOW, $NOW, '$meta_esc');"
+    sql "INSERT OR IGNORE INTO nodes (id, node_type, title, summary, url, domain, language, confidence, importance, created_at, updated_at, metadata)
+         VALUES ('$id', 'repository', '$full_name', '$description', 'https://github.com/$full_name', 'github.com', 'en', 1.0, 0.5, $NOW, $NOW, '$meta_esc');"
 
     log_info "Stored $full_name ($stars★, $language)"
     sql "UPDATE crawl_queue SET status='completed', last_attempt=$NOW WHERE url='$url';"
@@ -306,7 +306,7 @@ process_queue() {
         echo "  [$((OK+FAIL+1))] $domain: $(echo $url | head -c 80)"
         # Try to fetch and store as generic Concept
         local existing
-        existing=$(sql "SELECT id FROM knowledge_nodes WHERE url = '$url' LIMIT 1" 2>/dev/null || echo "")
+        existing=$(sql "SELECT id FROM nodes WHERE url = '$url' LIMIT 1" 2>/dev/null || echo "")
         if [ -n "$existing" ]; then
             log_info "Already exists"
             sql "UPDATE crawl_queue SET status='completed', last_attempt=$NOW WHERE url='$url';"
@@ -335,8 +335,8 @@ except:
             local id; id=$(generate_uuid)
             local domain_clean=$(echo "$domain" | sed "s/'/''/g")
             local extract_esc=$(echo "$extract" | sed "s/'/''/g" | head -c 500)
-            sql "INSERT OR IGNORE INTO knowledge_nodes (id, node_type, title, summary, url, domain, confidence, importance, created_at, updated_at)
-                 VALUES ('$id', 'Concept', '$url', '$extract_esc', '$url', '$domain_clean', 0.5, 0.3, $NOW, $NOW);"
+            sql "INSERT OR IGNORE INTO nodes (id, node_type, title, summary, url, domain, confidence, importance, created_at, updated_at)
+                 VALUES ('$id', 'concept', '$url', '$extract_esc', '$url', '$domain_clean', 0.5, 0.3, $NOW, $NOW);"
             log_info "Stored: $url"
             sql "UPDATE crawl_queue SET status='completed', last_attempt=$NOW WHERE url='$url';"
             OK=$((OK+1))
@@ -353,9 +353,9 @@ except:
 generate_meta_report() {
     local duration=$(( $(date +%s) - CYCLE_START ))
     local node_count
-    node_count=$(sql "SELECT COUNT(*) FROM knowledge_nodes;" 2>/dev/null || echo "?")
+    node_count=$(sql "SELECT COUNT(*) FROM nodes;" 2>/dev/null || echo "?")
     local edge_count
-    edge_count=$(sql "SELECT COUNT(*) FROM knowledge_edges;" 2>/dev/null || echo "?")
+    edge_count=$(sql "SELECT COUNT(*) FROM edges;" 2>/dev/null || echo "?")
     local pending
     pending=$(sql "SELECT COUNT(*) FROM crawl_queue WHERE status='pending';" 2>/dev/null || echo "?")
     local failed
@@ -407,7 +407,7 @@ generate_meta_report() {
 
     # Record KB growth rate
     local yesterday_count
-    yesterday_count=$(sql "SELECT COUNT(*) FROM knowledge_nodes WHERE created_at < $((NOW - 3600))" 2>/dev/null || echo "0")
+    yesterday_count=$(sql "SELECT COUNT(*) FROM nodes WHERE created_at < $((NOW - 3600))" 2>/dev/null || echo "0")
     local growth=$((node_count - yesterday_count))
     record_cycle_meta "kb_growth" "ok" "KB grew by $growth nodes in last hour"
 

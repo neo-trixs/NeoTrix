@@ -164,15 +164,21 @@
 }
 
 .emptyTitle {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 38px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
   color: var(--fg-primary);
+  background: linear-gradient(120deg, var(--fg-primary), var(--accent-primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .emptyHint {
   font-size: 12px;
   line-height: 1.8;
   color: var(--fg-tertiary);
+  margin-bottom: 8px;
 }
 
 .emptyHint kbd {
@@ -671,31 +677,49 @@
 
 .inputArea {
   display: flex;
-  gap: 8px;
-  padding: 12px;
-  border-top: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
+  justify-content: center;
+  padding: 12px 16px 16px;
   flex-shrink: 0;
   position: relative;
 }
 
+.composerCard {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 760px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.composerCard:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.12), 0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+}
+
 .textarea {
   flex: 1;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  padding: 10px 4px;
   color: var(--fg-primary);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   resize: none;
   outline: none;
-  transition: border-color 0.15s;
 }
 
 .textarea:focus {
-  border-color: var(--accent-primary);
+  border-color: transparent;
+}
+
+.textarea::placeholder {
+  color: var(--fg-tertiary);
 }
 
 .textarea:disabled {
@@ -711,7 +735,7 @@
   height: 40px;
   background: var(--accent-primary);
   border: none;
-  border-radius: 8px;
+  border-radius: 50%;
   color: var(--accent-on);
   cursor: pointer;
   transition: all 0.15s;
@@ -735,17 +759,17 @@
   width: 40px;
   height: 40px;
   background: transparent;
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
+  border: none;
+  border-radius: 50%;
   color: var(--fg-secondary);
   cursor: pointer;
   transition: all 0.15s;
   flex-shrink: 0;
+  align-self: flex-end;
 }
 
 .attachBtn:hover:not(:disabled) {
   background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
   color: var(--accent-primary);
 }
 
@@ -762,7 +786,7 @@
   height: 40px;
   background: var(--danger);
   border: none;
-  border-radius: 8px;
+  border-radius: 50%;
   color: #fff;
   cursor: pointer;
   transition: all 0.15s;
@@ -772,6 +796,58 @@
 .stopBtn:hover {
   filter: brightness(1.1);
   transform: scale(1.02);
+}
+
+.composerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.contextCapsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.contextCapsule:hover {
+  background: var(--bg-primary);
+  border-color: var(--accent-primary);
+}
+
+.contextCapsuleArrow {
+  font-size: 10px;
+  color: var(--fg-tertiary);
+}
+
+.permissionPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.permissionPill:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
 }
 
 .composerColumn {
@@ -843,8 +919,9 @@
 .slashMenu {
   position: absolute;
   bottom: 100%;
-  left: 0;
-  right: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, 90%);
   max-height: 200px;
   overflow-y: auto;
   background: var(--bg-secondary);
