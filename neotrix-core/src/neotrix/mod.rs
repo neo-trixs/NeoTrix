@@ -39,6 +39,7 @@ pub use l8_autonomic_impl::nt_mind_background_config;
 pub use l8_autonomic_impl::nt_mind_cleanup;
 pub use l8_autonomic_impl::nt_mind_distiller;
 pub use l8_autonomic_impl::nt_mind_scheduler;
+#[cfg(feature = "research")]
 pub use l8_autonomic_impl::nt_mind_topic_aggregator;
 pub use l8_autonomic_impl::nt_mind_knowledge_pipeline;
 pub use l8_autonomic_impl::nt_mind_hook;

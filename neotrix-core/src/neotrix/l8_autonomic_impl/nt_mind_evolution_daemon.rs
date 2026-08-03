@@ -682,7 +682,9 @@ mod tests {
 
     #[test]
     fn test_cycle_goal_fixes_issues() {
+        // 只读模式: 不触发真实 AutoFixer (避免测试内嵌套 cargo 死锁)
         let mut d = EvolutionDaemon::default();
+        d.config.mutation_enabled = false;
         d.tracker.register_issue(None, IssueType::TodoLeftovers);
         let report = d.run_cycle_goal();
         assert!(report.fixes_applied > 0 || report.total_tracked >= 1);
@@ -691,7 +693,9 @@ mod tests {
 
     #[test]
     fn test_loop_goal_empty_stagnates() {
+        // 只读模式: 循环在连续停滞时退出, 不触发真实 AutoFixer
         let mut d = EvolutionDaemon::default();
+        d.config.mutation_enabled = false;
         let before = d.cycle_count;
         d.run_loop_goal();
         assert!(d.cycle_count > before);
@@ -767,9 +771,9 @@ mod tests {
     }
 
     #[test]
-    fn test_mutation_disabled_by_default() {
+    fn test_mutation_enabled_by_default() {
         let d = EvolutionDaemon::default();
-        assert!(!d.config.mutation_enabled);
+        assert!(d.config.mutation_enabled);
     }
 
     #[test]

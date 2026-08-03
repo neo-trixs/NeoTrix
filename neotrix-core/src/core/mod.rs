@@ -50,6 +50,7 @@ pub mod nt_core_sense;
 pub mod l3_memory;
 pub mod nt_core_hcube;
 pub mod nt_core_bank;
+#[cfg(feature = "research")]
 pub mod nt_core_fhrr;
 pub mod nt_core_consensus;
 pub mod nt_core_graph;
@@ -104,6 +105,7 @@ pub mod nt_core_self_constitution;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l7_capability;
 pub mod nt_core_model_skills;
+#[cfg(feature = "research")]
 pub mod nt_core_agent_patterns;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -144,6 +146,7 @@ pub mod nt_core_mcp;
 pub mod nt_core_accessor;
 pub mod nt_core_cache;
 
+#[cfg(feature = "research")]
 pub mod nt_core_source_edit;
 pub mod nt_core_vector_store;
 pub mod nt_core_resource_pool;
@@ -151,6 +154,7 @@ pub mod nt_core_data_pipeline;
 pub mod nt_core_schema_watchdog;
 pub mod nt_core_self_test;
 pub mod nt_core_memory_budget;
+#[cfg(feature = "research")]
 pub mod nt_core_bounded_collections;
 pub mod nt_core_telemetry;
 pub mod nt_core_answer_engine;
@@ -163,6 +167,7 @@ pub mod nt_core_io_capability;
 pub mod nt_core_second_brain;
 pub mod nt_core_scoring_substrate;
 pub mod nt_core_state_substrate;
+#[cfg(feature = "research")]
 pub mod nt_core_subagent;
 pub mod nt_core_simulate_engine;
 // Formal verification proof harnesses
