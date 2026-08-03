@@ -411,3 +411,31 @@ describe("NeoCodexPage — resizable right panel", () => {
     expect(panel).toHaveStyle({ width: "640px" });
   });
 });
+
+describe("NeoCodexPage — settings drawer open flow", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    localStorage.clear();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: null });
+    mockInvoke("neocodex_health_report", () => ({ context_usage: 0.1, provider_model: "mock-lgm", tokens_used: 0, cost_spent: 0, cost_budget: 0 }));
+    mockInvoke("neocodex_list_sessions", () => []);
+  });
+
+  it("opens settings drawer from sidebar footer button and shows tabs", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("settingsBtn"));
+    expect(await screen.findByTestId("settings-tab-providers")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-theme")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-advanced")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-about")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-tab-mcp")).toBeInTheDocument();
+  });
+
+  it("switches to appearance/theme panel inside settings drawer", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("settingsBtn"));
+    fireEvent.click(await screen.findByTestId("settings-tab-theme"));
+    expect(await screen.findByTestId("settings-accent-default")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-language")).toBeInTheDocument();
+  });
+});

@@ -1022,6 +1022,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               onClick={() => setSettingsOpen(true)}
               title="设置"
               aria-label="打开设置"
+              data-testid="settingsBtn"
             >
               <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="7" cy="7" r="2.2" />
