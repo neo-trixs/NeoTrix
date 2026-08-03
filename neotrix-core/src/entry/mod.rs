@@ -1164,7 +1164,6 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
                 .with_nt_world_model(WorldModelV2::new(8, 64))
                 .with_panorama(panorama)
                 .with_kb(bg_kb)
-                .with_nt_world_crawl(std::path::PathBuf::from("."))
                 .with_exploration_pipeline(std::path::PathBuf::from("."))
                 .with_knowledge_chain(std::path::PathBuf::from("."))
                 .with_agent_discovery(42069);
