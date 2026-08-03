@@ -29,8 +29,8 @@ if [[ -n "$prev_snapshot" && -f "$prev_snapshot" ]]; then
     fi
 
     # 检测: 原本有 modified 文件现在回到 clean (可能被 checkout)
-    prev_modified=$(grep -c '^ M' "$prev_snapshot" 2>/dev/null || echo 0)
-    curr_modified=$(grep -c '^ M' "$snapshot_file" 2>/dev/null || echo 0)
+    prev_modified=$(grep -c '^ M' "$prev_snapshot" 2>/dev/null || true)
+    curr_modified=$(grep -c '^ M' "$snapshot_file" 2>/dev/null || true)
     if [[ $prev_modified -gt 0 && $curr_modified -eq 0 ]]; then
         echo "[$(date -Is)] ⚠️ MODIFIED FILES REVERTED (was $prev_modified, now 0) — possible git checkout/reset" | tee -a "$LOG_FILE"
     fi
