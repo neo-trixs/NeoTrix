@@ -8,6 +8,7 @@ export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: st
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState("");
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -77,9 +78,19 @@ export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: st
           <div className={styles.dropdownHeader}>
             <span className={styles.label}>可用 Providers ({config.provider_count})</span>
           </div>
+          <input
+            className={styles.searchInput}
+            type="text"
+            placeholder="搜索模型..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          />
           <div className={styles.providerList}>
-            {config.providers.map((p) => (
-              <button
+            {config.providers
+              .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.model.toLowerCase().includes(search.toLowerCase()))
+              .map((p) => (
+                <button
                 key={p.name}
                 className={styles.providerItem}
                 onClick={() => handleSwitch(p.name)}
