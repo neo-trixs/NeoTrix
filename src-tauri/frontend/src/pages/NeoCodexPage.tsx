@@ -503,6 +503,20 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         } else {
           addNotification({ type: "info", message: "用法: /model <模型名>", duration: 3000 });
         }
+      } else if (cmd === "/compact") {
+        await handleCompact();
+      } else if (cmd === "/goal") {
+        const desc = arg.trim();
+        if (desc) {
+          await invoke("neocodex_add_goal", { sessionId: sid, description: desc });
+          addNotification({ type: "success", message: `已添加目标: ${desc}`, duration: 3000 });
+        } else {
+          addNotification({ type: "info", message: "用法: /goal <目标描述>", duration: 3000 });
+        }
+      } else if (cmd === "/status") {
+        setShowUsage(true);
+      } else if (cmd === "/btw") {
+        setSideChatOpen((v) => !v);
       }
     } catch (e) {
       console.error("Slash action failed:", e);
