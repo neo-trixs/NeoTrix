@@ -116,16 +116,6 @@
   font-size: 12px;
 }
 
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #666;
-}
-.dotOn {
-  background: #3fb950;
-}
-
 .output {
   flex: 1;
   min-height: 0;

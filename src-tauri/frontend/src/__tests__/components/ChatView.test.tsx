@@ -69,6 +69,28 @@ describe("ChatView — composer & steer mode", () => {
     await userEvent.click(stop);
     expect(onStop).toHaveBeenCalled();
   });
+
+  it("renders Codex-parity composer controls: model chip, plan toggle, permission", async () => {
+    useStore.setState({ settings: { ...(useStore.getState().settings || {}), permissionMode: "manual" } });
+    const onModeChange = vi.fn();
+    render(<ChatView messages={[]} agentBusy={false} onSend={() => {}} mode="Agent" onModeChange={onModeChange} />);
+    expect(screen.getByTestId("composer-model")).toBeInTheDocument();
+    expect(screen.getByTestId("composer-plan-toggle")).toBeInTheDocument();
+    expect(screen.getByTestId("composer-context")).toBeInTheDocument();
+    expect(screen.getByTestId("composer-permission")).toHaveTextContent("手动");
+  });
+
+  it("plan toggle calls onModeChange('Plan') and reflects active Plan state", async () => {
+    const onModeChange = vi.fn();
+    const { unmount } = render(<ChatView messages={[]} agentBusy={false} onSend={() => {}} mode="Agent" onModeChange={onModeChange} />);
+    const toggle = screen.getByTestId("composer-plan-toggle");
+    await userEvent.click(toggle);
+    expect(onModeChange).toHaveBeenCalledWith("Plan");
+    unmount();
+    render(<ChatView messages={[]} agentBusy={false} onSend={() => {}} mode="Plan" onModeChange={onModeChange} />);
+    await userEvent.click(screen.getByTestId("composer-plan-toggle"));
+    expect(onModeChange).toHaveBeenLastCalledWith("Agent");
+  });
 });
 
 describe("ChatView — slash commands", () => {

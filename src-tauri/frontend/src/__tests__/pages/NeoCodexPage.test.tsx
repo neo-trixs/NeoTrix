@@ -340,3 +340,28 @@ describe("NeoCodexPage task pane", () => {
     expect(screen.getByTestId("task-pane-empty")).toBeInTheDocument();
   });
 });
+
+describe("NeoCodexPage — status bar parity", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: null });
+    mockInvoke("neocodex_health_report", () => ({ context_usage: 0.1, provider_model: "mock-lgm", tokens_used: 0, cost_spent: 0, cost_budget: 0 }));
+    mockInvoke("neocodex_create_session", () => ({ id: "s-sb", name: "会话", mode: "Agent", message_count: 0, wire_path: "", updated_at: 0 }));
+    mockInvoke("neocodex_switch_session", () => {});
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+  });
+
+  it("renders harness permission chip reflecting settings.permissionMode", async () => {
+    useStore.setState({ settings: { ...(useStore.getState().settings || {}), permissionMode: "accept" } });
+    renderPage();
+    await screen.findByTestId("status-bar");
+    expect(screen.getByTestId("status-bar")).toHaveTextContent("接受");
+  });
+
+  it("does not show sync indicator at idle; no crash", async () => {
+    renderPage();
+    await screen.findByTestId("status-bar");
+    expect(screen.queryByTestId("status-sync")).not.toBeInTheDocument();
+  });
+});
