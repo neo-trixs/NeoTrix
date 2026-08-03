@@ -35,3 +35,6 @@ __pycache__/
 
 # Ad-hoc test scratch dirs
 *_test_tmp/
+
+# Isolated worktrees for concurrent-agent conflict isolation
+.worktrees/
