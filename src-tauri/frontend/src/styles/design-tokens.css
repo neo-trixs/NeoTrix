@@ -403,6 +403,7 @@
   --border-primary: rgba(237, 233, 225, 0.10);
   --accent-bg: rgba(217, 118, 78, 0.14);
   --accent-primary: var(--nt-clay);
+  --accent: var(--nt-clay);
   --accent-on: #FFFFFF;
   --nt-primary: var(--nt-clay);
   --nt-primary-hover: var(--nt-clay-hover);
@@ -426,6 +427,7 @@
   --border-primary: rgba(34, 31, 27, 0.10);
   --accent-bg: rgba(217, 118, 78, 0.10);
   --accent-primary: var(--nt-clay);
+  --accent: var(--nt-clay);
   --accent-on: #FFFFFF;
   --nt-primary: var(--nt-clay);
   --nt-primary-hover: var(--nt-clay-hover);
