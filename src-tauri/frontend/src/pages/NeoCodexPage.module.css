@@ -199,6 +199,20 @@
   overflow: hidden;
 }
 
+.panelResizeHandle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 21;
+}
+
+.panelResizeHandle:hover {
+  background: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
 .main.focusMode {
   max-width: 900px;
   margin: 0 auto;

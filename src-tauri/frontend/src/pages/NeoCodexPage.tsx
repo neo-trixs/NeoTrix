@@ -38,6 +38,17 @@ export default function NeoCodexPage() {
   const [fileTreeOpen, setFileTreeOpen] = React.useState(false);
   const [showUsage, setShowUsage] = React.useState(false);
   const [rightPanelTab, setRightPanelTab] = React.useState<"browser" | "terminal" | "review" | "file" | "tasks" | null>("review");
+  const [rightPanelWidth, setRightPanelWidth] = React.useState<number>(() => {
+    const raw = localStorage.getItem("neotrix.rightPanelWidth");
+    const saved = Number(raw);
+    if (!raw || !Number.isFinite(saved) || saved <= 0) return 320;
+    return Math.min(640, Math.max(260, saved));
+  });
+  const rightPanelResizingRef = useRef(false);
+  const rightPanelWidthRef = useRef(rightPanelWidth);
+  useEffect(() => {
+    rightPanelWidthRef.current = rightPanelWidth;
+  }, [rightPanelWidth]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteMode, setPaletteMode] = useState<"command" | "file">("command");
   const [fileItems, setFileItems] = useState<Array<{ id: string; label: string; hint?: string; onSelect: () => void }>>([]);
@@ -71,6 +82,28 @@ export default function NeoCodexPage() {
   const [, setTaskClock] = useState(0);
   const [pendingPlanExecute, setPendingPlanExecute] = useState(false);
   const lastPlanMsgRef = useRef<{ content: string; attachments?: any[] } | null>(null);
+
+  const startPanelResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    rightPanelResizingRef.current = true;
+    const startX = e.clientX;
+    const startW = rightPanelWidthRef.current;
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(640, Math.max(260, startW + (startX - ev.clientX)));
+      rightPanelWidthRef.current = next;
+      setRightPanelWidth(next);
+    };
+    const onUp = () => {
+      rightPanelResizingRef.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      localStorage.setItem("neotrix.rightPanelWidth", String(rightPanelWidthRef.current));
+    };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   // Load sessions on mount
   useEffect(() => {
@@ -1319,7 +1352,13 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
           </button>
         </div>
         {rightPanelTab && (
-          <div className={styles.rightPanelExpanded}>
+          <div className={styles.rightPanelExpanded} style={{ width: rightPanelWidth }} data-testid="right-panel">
+            <div
+              className={styles.panelResizeHandle}
+              onMouseDown={startPanelResize}
+              data-testid="right-panel-resize"
+              title="拖动调整宽度"
+            />
             <ContextPanel
               activeTab={rightPanelTab}
               taskSteps={taskSteps}

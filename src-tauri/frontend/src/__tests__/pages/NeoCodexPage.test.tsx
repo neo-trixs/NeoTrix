@@ -364,3 +364,50 @@ describe("NeoCodexPage — status bar parity", () => {
     expect(screen.queryByTestId("status-sync")).not.toBeInTheDocument();
   });
 });
+
+describe("NeoCodexPage — resizable right panel", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    localStorage.clear();
+    useStore.setState({ neocodexSessions: [], neocodexActiveSessionId: null });
+    mockInvoke("neocodex_health_report", () => ({ context_usage: 0.1, provider_model: "mock-lgm", tokens_used: 0, cost_spent: 0, cost_budget: 0 }));
+    mockInvoke("neocodex_create_session", () => ({ id: "s-rp", name: "会话", mode: "Agent", message_count: 0, wire_path: "", updated_at: 0 }));
+    mockInvoke("neocodex_switch_session", () => {});
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+  });
+
+  it("opens right panel with default width 320px", async () => {
+    renderPage();
+    const panel = await screen.findByTestId("right-panel");
+    expect(panel).toHaveStyle({ width: "320px" });
+  });
+
+  it("resizes on drag and persists to localStorage on release", async () => {
+    renderPage();
+    await screen.findByTestId("right-panel");
+    fireEvent.click(screen.getByTestId("rail-btn-tasks"));
+    await screen.findByTestId("right-panel");
+    const handle = screen.getByTestId("right-panel-resize");
+    fireEvent.mouseDown(handle, { clientX: 900 });
+    fireEvent.mouseMove(window, { clientX: 850 });
+    const panel = screen.getByTestId("right-panel");
+    expect(panel).toHaveStyle({ width: "370px" });
+    fireEvent.mouseUp(window, { clientX: 850 });
+    expect(localStorage.getItem("neotrix.rightPanelWidth")).toBe("370");
+  });
+
+  it("restores persisted width on mount", async () => {
+    localStorage.setItem("neotrix.rightPanelWidth", "480");
+    renderPage();
+    const panel = await screen.findByTestId("right-panel");
+    expect(panel).toHaveStyle({ width: "480px" });
+  });
+
+  it("clamps persisted width to [260, 640]", async () => {
+    localStorage.setItem("neotrix.rightPanelWidth", "99999");
+    renderPage();
+    const panel = await screen.findByTestId("right-panel");
+    expect(panel).toHaveStyle({ width: "640px" });
+  });
+});
