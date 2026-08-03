@@ -20,7 +20,7 @@ use crate::core::nt_core_prm::ProcessRewardLearner;
 use crate::core::nt_core_aura::IntentEngine;
 use crate::core::nt_core_trajectory_compress::{CompressionLevel, TrajectoryCompressor};
 
-use crate::core::nt_io_telemetry::{AttributeValue, ConsoleTracer, CostTracker, NoopTracer, SpanKind, Tracer};
+use crate::core::nt_io_telemetry::{AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer};
 use crate::core::nt_core_gwt::resonance::MODULE_COUNT;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_hex::{FullReasoningState, ReasoningHexagram};
@@ -351,6 +351,13 @@ impl ReasoningEngine {
         root_span.set_attribute("agent", AttributeValue::String("ReasoningEngine".to_string()));
         root_span.set_gen_ai_system("neotrix");
 
+        let (mut e8_machine, prompt) = self.prepare_reasoning(task, &root_span);
+        let result = self.call_llm_and_analyze(task, &prompt, &root_span, &mut e8_machine);
+        self.run_prediction_fusion(task, &root_span, &mut e8_machine);
+        self.broadcast_and_finalize(task, root_span, result)
+    }
+
+    fn prepare_reasoning(&mut self, task: &str, root_span: &Span) -> (E8StateMachine, String) {
         let mut e8_machine = E8StateMachine::from(self.current_state);
         if let Some(ref ttc) = self.ttc_engine {
             e8_machine.set_ttc_engine(ttc.clone());
@@ -416,13 +423,16 @@ impl ReasoningEngine {
               {kb_context}{artifact_ctx}{date_line}\
              Query: {query}"
         );
+        (e8_machine, prompt)
+    }
 
+    fn call_llm_and_analyze(&mut self, task: &str, prompt: &str, root_span: &Span, e8_machine: &mut E8StateMachine) -> NeoTrixResult<String> {
         let llm_span = self.tracer.as_ref()
-            .map(|t| t.start_child_span(&root_span, "call_llm", SpanKind::Llm))
-            .unwrap_or_else(|| NoopTracer.start_child_span(&root_span, "call_llm", SpanKind::Llm));
+            .map(|t| t.start_child_span(root_span, "call_llm", SpanKind::Llm))
+            .unwrap_or_else(|| NoopTracer.start_child_span(root_span, "call_llm", SpanKind::Llm));
         llm_span.set_gen_ai_request_model(&self.default_model);
 
-        let result = self.call_llm(&prompt);
+        let result = self.call_llm(prompt);
 
         match &result {
             Ok(response) => {
@@ -559,7 +569,10 @@ impl ReasoningEngine {
                 }
             }
         }
+        result
+    }
 
+    fn run_prediction_fusion(&mut self, task: &str, root_span: &Span, e8_machine: &mut E8StateMachine) {
         // E8 Prediction Oracle: compute prediction distribution for next E8 state
         // This provides a differentiable attention bridge to GWT via attention_weights()
         //
@@ -881,7 +894,9 @@ impl ReasoningEngine {
                 }
             }
         }
+    }
 
+    fn broadcast_and_finalize(&mut self, task: &str, root_span: Span, result: NeoTrixResult<String>) -> NeoTrixResult<String> {
         // GWT resonant broadcast: consciousness layer processes the reasoning state.
         // Runs AFTER the fusion pipeline so it consumes the *current* cycle's E8
         // prediction attention weights (previously it consumed the previous cycle's
