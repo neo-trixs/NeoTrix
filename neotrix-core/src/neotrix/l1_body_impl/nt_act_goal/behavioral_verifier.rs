@@ -29,7 +29,7 @@ fn run_bounded<const N: usize>(args: [&str; N], timeout_secs: u64) -> Option<Out
         // 轮询退出；结束后读取输出并发送
         loop {
             let exited = {
-                let mut g = c2.lock().unwrap();
+                let mut g = c2.lock().unwrap_or_else(|e| e.into_inner());
                 g.try_wait().ok().flatten().is_some()
             };
             if exited {
@@ -38,7 +38,7 @@ fn run_bounded<const N: usize>(args: [&str; N], timeout_secs: u64) -> Option<Out
             std::thread::sleep(Duration::from_millis(200));
         }
         let out = {
-            let mut g = c2.lock().unwrap();
+            let mut g = c2.lock().unwrap_or_else(|e| e.into_inner());
             let status = g.wait();
             let mut stdout = Vec::new();
             let mut stderr = Vec::new();

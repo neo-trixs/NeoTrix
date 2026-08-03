@@ -122,7 +122,7 @@ impl HookResult {
 }
 
 /// 钩子注册表 — 管理所有已注册的 hook
-pub struct HookRegistry {
+pub struct MindHookRegistry {
     hooks: HashMap<HookEvent, Vec<Box<dyn HookAction>>>,
     execution_log: Vec<HookLogEntry>,
     max_log: usize,
@@ -137,7 +137,7 @@ struct HookLogEntry {
     timestamp: u64,
 }
 
-impl HookRegistry {
+impl MindHookRegistry {
     pub fn new() -> Self {
         Self {
             hooks: HashMap::new(),
@@ -198,7 +198,7 @@ impl HookRegistry {
     }
 }
 
-impl Default for HookRegistry {
+impl Default for MindHookRegistry {
     fn default() -> Self {
         Self::new()
     }
@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn test_register_and_trigger() {
-        let mut reg = HookRegistry::new();
+        let mut reg = MindHookRegistry::new();
         reg.register(HookEvent::SealBeforePipeline, Box::new(TestHook));
         let ctx = HookContext::new(HookEvent::SealBeforePipeline, "checkpoint");
         let results = reg.trigger(&ctx);
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_unregister() {
-        let mut reg = HookRegistry::new();
+        let mut reg = MindHookRegistry::new();
         reg.register(HookEvent::E8ReasoningStart, Box::new(TestHook));
         assert_eq!(reg.hook_count(), 1);
         reg.unregister(&HookEvent::E8ReasoningStart, "test_hook");
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_no_hooks_for_event() {
-        let mut reg = HookRegistry::new();
+        let mut reg = MindHookRegistry::new();
         let ctx = HookContext::new(HookEvent::SealAfterPipeline, "nobody listening");
         let results = reg.trigger(&ctx);
         assert!(results.is_empty());
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_log_hook() {
-        let mut reg = HookRegistry::new();
+        let mut reg = MindHookRegistry::new();
         reg.register(HookEvent::GwtBroadcast, Box::new(LogHook::new("test")));
         let ctx = HookContext::new(HookEvent::GwtBroadcast, "broadcast message");
         let results = reg.trigger(&ctx);
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_recent_log() {
-        let mut reg = HookRegistry::new();
+        let mut reg = MindHookRegistry::new();
         reg.register(HookEvent::SessionStart, Box::new(TestHook));
         let ctx = HookContext::new(HookEvent::SessionStart, "started");
         reg.trigger(&ctx);

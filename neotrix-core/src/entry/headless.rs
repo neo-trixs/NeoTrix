@@ -7,7 +7,7 @@ use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 use neotrix::neotrix::nt_mind::KnowledgeSource as V1KnowledgeSource;
 use neotrix::neotrix::nt_mind::goal_loop::{GoalLoop, GoalState};
 use neotrix::agent::skills::SkillsEngine;
-use neotrix::agent::hooks::{HookRegistry, HookEvent, HookContext};
+use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
 use neotrix::agent::workflow::{Workflow, WorkflowStep, WorkflowEngine};
 use neotrix::agent::tool::mcp::McpRegistry;
 use neotrix::core::nt_core_cap::FIELD_NAMES;
@@ -18,7 +18,7 @@ use super::print_brain_stats;
 pub(crate) async fn run_headless(
     agent: Arc<RwLock<SelfIteratingBrain>>,
     skills_engine: Arc<RwLock<SkillsEngine>>,
-    hook_registry: Arc<RwLock<HookRegistry>>,
+    hook_registry: Arc<RwLock<EccHookRegistry>>,
     mcp_registry: Arc<RwLock<McpRegistry>>,
 ) {
     let mut goal_loop = GoalLoop::new();
@@ -56,7 +56,7 @@ pub(crate) async fn run_headless(
                 pre_ctx.tool_name = Some("headless_command".to_string());
                 pre_ctx.tool_input = Some(input.clone());
                 let pre_actions = hr.execute_event(&pre_ctx);
-                if let Some(block_reason) = HookRegistry::check_blocked(&pre_actions) {
+                if let Some(block_reason) = EccHookRegistry::check_blocked(&pre_actions) {
                     eprintln!("Hook blocked: {}", block_reason);
                     continue;
                 }
@@ -94,7 +94,7 @@ pub(crate) async fn run_headless(
     }
 }
 
-async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _skills: &mut SkillsEngine, hooks: &HookRegistry, mcp: &mut McpRegistry, goal_loop: &mut GoalLoop) -> bool {
+async fn handle_command_headless(input: &str, brain: &mut SelfIteratingBrain, _skills: &mut SkillsEngine, hooks: &EccHookRegistry, mcp: &mut McpRegistry, goal_loop: &mut GoalLoop) -> bool {
     let cmd = input.trim().to_lowercase();
 
     match cmd.as_str() {

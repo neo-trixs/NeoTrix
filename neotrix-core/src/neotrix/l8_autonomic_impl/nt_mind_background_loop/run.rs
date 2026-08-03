@@ -191,7 +191,7 @@ impl crate::core::nt_core_self_test::SelfTest for ConvergencePulse {
 use crate::core::nt_core_self_constitution::ConstitutionLoader;
 use crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::{CleanupEngine, CleanupKind, BackupEngine};
 use crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine;
-use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, HookRegistry, LogHook};
+use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
 use crate::neotrix::l8_autonomic_impl::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
 use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager;
 use crate::neotrix::nt_core_event_bus::{EventBus, subscribe_all_layers_sync};
@@ -380,7 +380,7 @@ impl BackgroundLoop {
             scheduler: self.scheduler.take(),
             daemon: self.daemon.take(),
             skill_engine: {
-                let mut hooks = HookRegistry::default();
+                let mut hooks = MindHookRegistry::default();
                 hooks.register(HookEvent::SkillLoaded, Box::new(LogHook::new("bg-loop")));
                 hooks.register(HookEvent::SkillUnloaded, Box::new(LogHook::new("bg-loop")));
                 SkillEngine::new(PathBuf::from(

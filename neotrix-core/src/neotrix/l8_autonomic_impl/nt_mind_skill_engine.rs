@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::ProceduralMemoryRecord;
-use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, HookRegistry, HookContext, HookResult};
+use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, MindHookRegistry, HookContext, HookResult};
 
 /// A single skill entry parsed from a markdown file with YAML frontmatter.
 #[derive(Debug, Clone)]
@@ -126,7 +126,7 @@ pub struct SkillEngine {
     /// Index: E8 mode → skill indices
     e8_index: HashMap<u8, Vec<usize>>,
     /// Optional hook registry for firing lifecycle events
-    hooks: Option<HookRegistry>,
+    hooks: Option<MindHookRegistry>,
     /// Optional GWT for broadcasting activation events
     gwt: Option<Arc<RwLock<GlobalWorkspace>>>,
 }
@@ -143,7 +143,7 @@ impl SkillEngine {
         }
     }
 
-    pub fn with_hooks(mut self, hooks: HookRegistry) -> Self {
+    pub fn with_hooks(mut self, hooks: MindHookRegistry) -> Self {
         self.hooks = Some(hooks);
         self
     }

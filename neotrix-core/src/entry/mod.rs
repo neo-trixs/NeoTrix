@@ -904,7 +904,7 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
     use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
     
     use neotrix::agent::skills::SkillsEngine;
-    use neotrix::agent::hooks::{HookRegistry, HookEvent, HookContext};
+    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
     use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
     use neotrix::agent::{AgentTeam, ProcessType};
     use std::sync::{Arc, Mutex};
@@ -963,16 +963,16 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
-        let mut hook_registry = HookRegistry::default();
+        let mut hook_registry = EccHookRegistry::default();
         hook_registry.set_profile(neotrix::agent::hooks::HookProfile::Standard);
         println!("{}: {} {}",
-            info("HookRegistry"),
+            info("EccHookRegistry"),
             success(format!("{} hooks registered", hook_registry.hook_count())),
             info("(profile: standard)"));
 
         let session_ctx = HookContext::new(HookEvent::SessionStart);
         let hook_actions = hook_registry.execute_event(&session_ctx);
-        if let Some(block) = HookRegistry::check_blocked(&hook_actions) {
+        if let Some(block) = EccHookRegistry::check_blocked(&hook_actions) {
             eprintln!("{}: {}", warn("Hook blocked startup"), block);
         }
 
@@ -1050,7 +1050,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
     use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
     
     use neotrix::agent::skills::SkillsEngine;
-    use neotrix::agent::hooks::{HookRegistry, HookEvent, HookContext};
+    use neotrix::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
     use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
     use neotrix::agent::{AgentTeam, AgentRole, ProcessType};
     use std::sync::{Arc, Mutex};
@@ -1112,23 +1112,23 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
         println!("{}: {} ({})", info("McpRegistry"), success("ready"), info("use /mcp list"));
         let _mcp_registry = Arc::new(RwLock::new(mcp_registry));
 
-        let mut hook_registry = HookRegistry::default();
+        let mut hook_registry = EccHookRegistry::default();
         hook_registry.set_profile(neotrix::agent::hooks::HookProfile::Standard);
         println!("{}: {} {}",
-            info("HookRegistry"),
+            info("EccHookRegistry"),
             success(format!("{} hooks registered", hook_registry.hook_count())),
             info("(profile: standard)"));
 
         let session_ctx = HookContext::new(HookEvent::SessionStart);
         let hook_actions = hook_registry.execute_event(&session_ctx);
-        if let Some(block) = HookRegistry::check_blocked(&hook_actions) {
+        if let Some(block) = EccHookRegistry::check_blocked(&hook_actions) {
             eprintln!("{}: {}", warn("Hook blocked startup"), block);
         }
 
         let agent = Arc::new(RwLock::new(agent));
         let bg_agent = agent.clone();
         let _skills_engine = Arc::new(RwLock::new(skills_engine));
-        let hook_registry: Arc<RwLock<HookRegistry>> = Arc::new(RwLock::new(hook_registry));
+        let hook_registry: Arc<RwLock<EccHookRegistry>> = Arc::new(RwLock::new(hook_registry));
 
         let mut bg_goal_loop = neotrix::neotrix::nt_mind::goal_loop::GoalLoop::new();
         bg_goal_loop.load();
@@ -1182,7 +1182,7 @@ pub fn run_interactive_with_ephemeral(cfg: &NeoTrixConfig, profile: &str, epheme
             pre_ctx.tool_name = Some("tui_session".to_string());
             pre_ctx.tool_input = Some("interactive_mode".to_string());
             let pre_actions = hr.execute_event(&pre_ctx);
-            if let Some(block_reason) = HookRegistry::check_blocked(&pre_actions) {
+            if let Some(block_reason) = EccHookRegistry::check_blocked(&pre_actions) {
                 eprintln!("Hook blocked TUI session: {}", block_reason);
             }
         }

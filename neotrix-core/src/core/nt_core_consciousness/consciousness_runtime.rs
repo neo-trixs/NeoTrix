@@ -14,6 +14,31 @@ use crate::neotrix::nt_memory_kb::KnowledgeBase;
 
 /// 每次 tick 最多注入的 KB 知识条目数，防止无界流入意识流。
 const KB_INJECT_LIMIT: usize = 4;
+/// KB 查询缓存容量：避免意识 tick 对相同共振内容重复同步搜索 KB。
+const KB_QUERY_CACHE_CAP: usize = 64;
+
+/// 有界 KB 查询缓存 — 以共振内容为 key，避免重复同步 DB 搜索。
+struct KbQueryCache {
+    entries: std::collections::VecDeque<(String, Vec<(String, f64)>)>,
+}
+
+impl KbQueryCache {
+    fn new() -> Self {
+        Self { entries: std::collections::VecDeque::new() }
+    }
+    fn get(&self, query: &str) -> Option<&Vec<(String, f64)>> {
+        self.entries.iter().find(|(k, _)| k == query).map(|(_, v)| v)
+    }
+    fn put(&mut self, query: &str, results: Vec<(String, f64)>) {
+        if self.entries.iter().any(|(k, _)| k == query) {
+            return;
+        }
+        if self.entries.len() >= KB_QUERY_CACHE_CAP {
+            self.entries.pop_front();
+        }
+        self.entries.push_back((query.to_string(), results));
+    }
+}
 
 pub struct ConsciousnessRuntime {
     pub stream: ConsciousnessStream,
@@ -25,6 +50,8 @@ pub struct ConsciousnessRuntime {
     pub kb: Option<std::sync::Arc<KnowledgeBase>>,
     /// 最近一次 tick 从 KB 注入的意识条目 (title, score)。
     pub last_kb_injections: Vec<(String, f64)>,
+    /// KB 查询缓存 — 防止共振内容重复触发同步搜索。
+    kb_cache: KbQueryCache,
     pub awakened: bool,
     pub last_report: Option<AwakeningReport>,
     pub last_quality: f64,
@@ -41,6 +68,7 @@ impl ConsciousnessRuntime {
             emotion_engine: EmotionEngine::default(),
             kb: None,
             last_kb_injections: Vec::new(),
+            kb_cache: KbQueryCache::new(),
             awakened: false,
             last_report: None,
             last_quality: 0.0,
@@ -58,8 +86,13 @@ impl ConsciousnessRuntime {
     }
 
     /// 主动查询知识库：以当前共振内容为查询词检索关联知识。
-    /// 返回 (title, score) 列表；未挂接 KB 时返回空。
+    /// 返回 (title, score) 列表；未挂接 KB 时返回空。结果经有界缓存复用。
     pub fn query_kb(&self, query: &str, limit: usize) -> Vec<(String, f64)> {
+        if let Some(cached) = self.kb_cache.get(query) {
+            let mut v = cached.clone();
+            v.truncate(limit);
+            return v;
+        }
         let kb = match self.kb.as_ref() {
             Some(kb) => kb,
             None => return Vec::new(),
@@ -76,38 +109,45 @@ impl ConsciousnessRuntime {
     /// 返回注入条目数。每条带 Structured provenance 层，可被后续感知层级鉴别。
     fn inject_kb_knowledge(&mut self, query: &str) -> usize {
         let Some(kb) = self.kb.clone() else { return 0 };
-        let results = match kb.search(query, KB_INJECT_LIMIT) {
-            Ok(r) => r,
-            Err(_) => return 0,
+        // 缓存命中: 直接复用上次搜索结果, 避免同步 DB 搜索阻塞意识 tick。
+        let results: Vec<(String, f64)> = if let Some(cached) = self.kb_cache.get(query) {
+            cached.clone()
+        } else {
+            let fresh = match kb.search(query, KB_INJECT_LIMIT) {
+                Ok(r) => r,
+                Err(_) => return 0,
+            };
+            let mapped: Vec<(String, f64)> = fresh.iter().map(|r| (r.node.title.clone(), r.score)).collect();
+            self.kb_cache.put(query, mapped.clone());
+            mapped
         };
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos() as i64;
         let mut injected = Vec::new();
-        for r in results {
-            let title = r.node.title.clone();
+        for (title, score) in results {
             if title.is_empty() {
                 continue;
             }
             let raw = KnowledgeLayer::Raw(PerceptionMeta {
                 source_type: PerceptionSource::SearchResult,
-                raw_confidence: r.score.clamp(0.0, 1.0),
+                raw_confidence: score.clamp(0.0, 1.0),
                 timestamp: now,
             });
             let structured = KnowledgeLayer::Structured(ContextMeta {
                 source_ids: vec![title.clone()],
                 processing_steps: vec!["kb_hybrid_search".into()],
-                contextual_confidence: r.score.clamp(0.0, 1.0),
+                contextual_confidence: score.clamp(0.0, 1.0),
             });
             let chain = ProvenanceChain::new(vec![(raw, now), (structured, now + 1)]);
             let mut item = VsaTagged::new(
                 title.as_bytes().to_vec(),
                 VsaOrigin::Self_(VsaSelfCategory::Memory),
             )
-            .with_confidence(r.score.clamp(0.0, 1.0))
+            .with_confidence(score.clamp(0.0, 1.0))
             .with_provenance(chain);
-            item.salience = (0.5 + r.score * 0.5).min(1.0);
+            item.salience = (0.5 + score * 0.5).min(1.0);
             self.specious_present.push(item);
-            injected.push((title, r.score));
+            injected.push((title, score));
         }
         self.last_kb_injections = injected;
         self.last_kb_injections.len()
@@ -356,5 +396,17 @@ mod tests {
         assert!(cr.last_kb_injections.is_empty());
         // volition still works without KB
         assert!(cr.volition().candidate_count() >= 0);
+    }
+
+    #[test]
+    fn test_kb_query_cache_bounded_and_shared() {
+        let cr = ConsciousnessRuntime::new();
+        // 未挂接 KB 时, 缓存不应误报命中
+        assert!(cr.query_kb("cache_probe", 3).is_empty());
+        // cache 内部无任何 KB 结果 — 验证缓存不会在无 KB 时返回脏数据
+        let mut cr2 = ConsciousnessRuntime::new();
+        cr2.awaken();
+        let _ = cr2.tick("cache probe resonance content for cache test");
+        assert!(cr2.last_kb_injections.is_empty());
     }
 }

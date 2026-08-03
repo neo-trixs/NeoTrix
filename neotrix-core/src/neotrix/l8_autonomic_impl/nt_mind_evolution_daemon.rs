@@ -273,7 +273,7 @@ impl EvolutionDaemon {
                 let file = ti.file.as_deref().unwrap_or("");
                 let result = match ti.issue_type {
                     IssueType::MissingTests if !file.is_empty() => {
-                        AutoFixer::add_test_stub(file)
+                        AutoFixer::record_test_gap(file)
                     }
                     IssueType::CompileWarning => {
                         AutoFixer::cargo_fix()
@@ -439,7 +439,7 @@ impl EvolutionDaemon {
                 }
 
                 let fix_result = match goal.category {
-                    GoalCategory::TestCoverage => AutoFixer::add_test_stub(&file),
+                    GoalCategory::TestCoverage => AutoFixer::record_test_gap(&file),
                     GoalCategory::CodeHealth if goal.description.contains("compile") => AutoFixer::cargo_fix(),
                     GoalCategory::CodeHealth => {
                         AutoFixer::cleanup_todos(&file).map(|n| format!("移除 {} 个 TODO", n))

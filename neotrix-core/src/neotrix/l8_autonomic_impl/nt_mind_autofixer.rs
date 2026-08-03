@@ -190,6 +190,13 @@ impl AutoFixer {
         }
         Ok(removed)
     }
+
+    /// 生产安全: 记录测试缺口而不写入存根
+    /// EvolutionDaemon 等生产路径应调用此方法而非 add_test_stub
+    pub fn record_test_gap(file_path: &str) -> Result<String, String> {
+        log::info!("[AutoFixer] Test gap recorded for: {}", file_path);
+        Ok(format!("Test gap recorded (no stub written): {}", file_path))
+    }
 }
 
 #[cfg(test)]

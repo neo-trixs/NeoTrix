@@ -63,14 +63,14 @@ pub mod hooks {
         }
     }
 
-    pub struct HookRegistry {
+    pub struct EccHookRegistry {
         hooks: Vec<Box<dyn Hook>>,
         event_index: HashMap<HookEvent, Vec<usize>>,
         profile: HookProfile,
         disabled_hooks: Vec<String>,
     }
 
-    impl Default for HookRegistry {
+    impl Default for EccHookRegistry {
         fn default() -> Self {
             let mut reg = Self::new();
             reg.register_defaults();
@@ -78,7 +78,7 @@ pub mod hooks {
         }
     }
 
-    impl HookRegistry {
+    impl EccHookRegistry {
         pub fn new() -> Self {
             Self {
                 hooks: Vec::new(),
@@ -574,40 +574,40 @@ mod tests {
         assert!(tools.is_empty());
     }
 
-    use super::hooks::{HookContext, HookEvent, HookProfile, HookRegistry};
+    use super::hooks::{HookContext, HookEvent, HookProfile, EccHookRegistry};
 
     #[test]
     fn test_hook_registry_default_count() {
-        let reg = HookRegistry::default();
+        let reg = EccHookRegistry::default();
         assert_eq!(reg.hook_count(), 3);
         assert_eq!(reg.list_hooks().len(), 3);
     }
 
     #[test]
     fn test_quality_gate_blocks_large_input() {
-        let reg = HookRegistry::default();
+        let reg = EccHookRegistry::default();
         let mut ctx = HookContext::new(HookEvent::PreToolUse);
         ctx.tool_name = Some("write".into());
         ctx.tool_input = Some("line\n".repeat(900));
         let actions = reg.execute_event(&ctx);
-        let blocked = HookRegistry::check_blocked(&actions);
+        let blocked = EccHookRegistry::check_blocked(&actions);
         assert!(blocked.is_some(), "quality gate must block >800 lines");
         assert!(blocked.unwrap().contains("800"));
     }
 
     #[test]
     fn test_quality_gate_allows_small_input() {
-        let reg = HookRegistry::default();
+        let reg = EccHookRegistry::default();
         let mut ctx = HookContext::new(HookEvent::PreToolUse);
         ctx.tool_name = Some("write".into());
         ctx.tool_input = Some("small content".to_string());
         let actions = reg.execute_event(&ctx);
-        assert!(HookRegistry::check_blocked(&actions).is_none());
+        assert!(EccHookRegistry::check_blocked(&actions).is_none());
     }
 
     #[test]
     fn test_todo_warning_hook() {
-        let reg = HookRegistry::default();
+        let reg = EccHookRegistry::default();
         let mut ctx = HookContext::new(HookEvent::PostToolUse);
         ctx.tool_name = Some("edit".into());
         ctx.tool_output = Some("added // TODO later".to_string());
@@ -617,27 +617,27 @@ mod tests {
 
     #[test]
     fn test_permissive_profile_skips_blocking_hooks() {
-        let mut reg = HookRegistry::default();
+        let mut reg = EccHookRegistry::default();
         reg.set_profile(HookProfile::Permissive);
         let mut ctx = HookContext::new(HookEvent::PreToolUse);
         ctx.tool_input = Some("line\n".repeat(900));
         let actions = reg.execute_event(&ctx);
-        assert!(HookRegistry::check_blocked(&actions).is_none());
+        assert!(EccHookRegistry::check_blocked(&actions).is_none());
     }
 
     #[test]
     fn test_disable_hook() {
-        let mut reg = HookRegistry::default();
+        let mut reg = EccHookRegistry::default();
         reg.disable_hook("quality-gate");
         let mut ctx = HookContext::new(HookEvent::PreToolUse);
         ctx.tool_input = Some("line\n".repeat(900));
         let actions = reg.execute_event(&ctx);
-        assert!(HookRegistry::check_blocked(&actions).is_none());
+        assert!(EccHookRegistry::check_blocked(&actions).is_none());
     }
 
     #[test]
     fn test_session_hook_handles_boundary() {
-        let reg = HookRegistry::default();
+        let reg = EccHookRegistry::default();
         let actions = reg.execute_event(&HookContext::new(HookEvent::SessionStart));
         assert!(actions.iter().any(|a| a.contains("CONTINUE")));
     }

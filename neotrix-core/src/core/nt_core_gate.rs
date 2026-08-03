@@ -1196,11 +1196,9 @@ impl GateDecision {
         input: &JudgeInput,
         panel: &JudgePanel,
     ) -> (bool, String) {
-        let spec = registry.get(tool_name);
-        if spec.is_none() {
+        let Some(spec) = registry.get(tool_name) else {
             return (false, format!("工具 '{}' 未在注册表中, 默认拒绝", tool_name));
-        }
-        let spec = spec.unwrap();
+        };
         // 单工具快速判定: 只读/可逆 → 允许 (后续完整路径再查); 不可逆/扩权 → 拒绝需人工
         match spec.reversibility {
             ToolReversibility::ReadOnly => (true, "只读工具, 自治放行".to_string()),

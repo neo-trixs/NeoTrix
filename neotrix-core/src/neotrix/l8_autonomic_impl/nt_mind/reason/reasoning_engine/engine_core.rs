@@ -695,10 +695,10 @@ impl ReasoningEngine {
                     );
                 }
 
-                // Fable 5 effort tier: computed above (before the oracle call) and
-                // applied to the MCTS budget — reused here for the fusion pipeline's
-                // sparse-k + thinking-budget scaling.
-                let effort_tier = self.last_effort_tier.unwrap();
+                 // Fable 5 effort tier: computed above (before the oracle call) and
+                 // applied to the MCTS budget — reused here for the fusion pipeline's
+                 // sparse-k + thinking-budget scaling.
+                 let effort_tier = self.last_effort_tier.unwrap_or(crate::core::nt_core_ttc::EffortTier::Medium);
 
                 // ── 意识体内核融合管线 (Consciousness Core Fusion) ──────────────
                 // Fuses the defining 2026 frontier-model innovations into a single
@@ -899,16 +899,13 @@ impl ReasoningEngine {
         // task affinity + transition mass), pick top-2, freeze the other 6 before
         // the GWT bridge consumes them. Computed before the `gwt` borrow so the
         // router can be mutated while `gwt` is borrowed mutably.
-        let sparse_moe_state = if self.last_e8_attention_weights.as_ref().is_some_and(|v| v.len() >= 64) {
+        let sparse_moe_state = if let Some(attn_vec) = self.last_e8_attention_weights.as_ref().filter(|v| v.len() >= 64) {
             let task_ty = E8TaskType::detect(task);
             let next_block_mass = self.sparse_moe_next_block_mass();
             let routing = self.sparse_moe.route(self.current_state.mode.0, task_ty, next_block_mass.as_ref());
-            let attn_arr = {
-                let attn_vec = self.last_e8_attention_weights.as_ref().unwrap();
-                let mut arr = [0.0_f64; 64];
-                arr.copy_from_slice(&attn_vec[..64]);
-                self.sparse_moe.apply_mask(&routing, &arr)
-            };
+            let mut arr = [0.0_f64; 64];
+            arr.copy_from_slice(&attn_vec[..64]);
+            let attn_arr = self.sparse_moe.apply_mask(&routing, &arr);
             Some((routing, attn_arr))
         } else {
             None

@@ -214,7 +214,10 @@ impl EvalHarness {
 
         for query in &dataset.queries {
             for &budget in &self.budget_grid {
-                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let permit = match semaphore.clone().acquire_owned().await {
+                    Ok(p) => p,
+                    Err(_) => return Err(EvalError::ConcurrencyClosed),
+                };
                 let provider = provider.clone();
                 let judge = self.judge.clone();
                 let query = query.clone();
@@ -431,12 +434,12 @@ Provide your score and brief justification in JSON:
             let min_cost_for_best = all_points.iter()
                 .filter(|p| p.model_name == curve.model_name && (p.quality - best_peak).abs() < 0.01)
                 .map(|p| p.cost_usd)
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .min_by(|a, b| a.total_cmp(b))
                 .unwrap_or(f64::INFINITY);
             let best_single_cost = all_points.iter()
                 .filter(|p| (p.quality - best_peak).abs() < 0.01)
                 .map(|p| p.cost_usd)
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .min_by(|a, b| a.total_cmp(b))
                 .unwrap_or(1.0);
             qnc_scores.insert(curve.model_name.clone(), if best_single_cost > 0.0 { min_cost_for_best / best_single_cost } else { 1.0 });
         }
@@ -452,7 +455,7 @@ Provide your score and brief justification in JSON:
                 pareto.push(p.clone());
             }
         }
-        pareto.sort_by(|a, b| a.cost_usd.partial_cmp(&b.cost_usd).unwrap());
+        pareto.sort_by(|a, b| a.cost_usd.total_cmp(&b.cost_usd));
 
         (audc_scores, qnc_scores, peak_quality, pareto)
     }
@@ -502,6 +505,8 @@ pub enum EvalError {
     JoinError(String),
     #[error("Config error: {0}")]
     ConfigError(String),
+    #[error("Concurrency semaphore closed")]
+    ConcurrencyClosed,
 }
 
 #[cfg(test)]

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub(crate) use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::agent::hooks::{HookRegistry, HookEvent, HookContext};
+use crate::agent::hooks::{EccHookRegistry, HookEvent, HookContext};
 use crate::cli::sandbox::check_sandbox;
 use crate::cli::shield_enforcer::global_shield;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
@@ -147,7 +147,7 @@ pub fn category_for(name: &str) -> CommandCategory {
 
 pub struct CommandRegistry {
     commands: Vec<Box<dyn CliCommand>>,
-    hooks: Option<HookRegistry>,
+    hooks: Option<EccHookRegistry>,
     kb: Option<KnowledgeBase>,
 }
 
@@ -162,13 +162,13 @@ impl CommandRegistry {
         Self { commands: Vec::new(), hooks: None, kb: None }
     }
 
-    /// Attach a HookRegistry for PreToolUse/PostToolUse hook calls
-    pub fn with_hooks(mut self, hooks: HookRegistry) -> Self {
+    /// Attach a EccHookRegistry for PreToolUse/PostToolUse hook calls
+    pub fn with_hooks(mut self, hooks: EccHookRegistry) -> Self {
         self.hooks = Some(hooks);
         self
     }
 
-    pub fn set_hooks(&mut self, hooks: HookRegistry) {
+    pub fn set_hooks(&mut self, hooks: EccHookRegistry) {
         self.hooks = Some(hooks);
     }
 
@@ -268,7 +268,7 @@ impl CommandRegistry {
                     timestamp: std::time::Instant::now(),
                 };
                 let actions = hooks.execute_event(&pre_ctx);
-                if let Some(block_reason) = HookRegistry::check_blocked(&actions) {
+                if let Some(block_reason) = EccHookRegistry::check_blocked(&actions) {
                     return CommandOutput::err(&format!("Hook blocked: {}", block_reason));
                 }
             }
