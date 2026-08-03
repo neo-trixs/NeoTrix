@@ -1,12 +1,11 @@
 import React from "react";
-import { TaskPane, DiffPane, PreviewPane, TerminalPane, CapabilityHealthPane, FileTreePanel } from "./index";
+import { TaskPane, DiffPane, PreviewPane, TerminalPane, FileTreePanel } from "./index";
 import styles from "./ContextPanel.module.css";
 
 export interface ContextPanelProps {
   activeTab: "review" | "terminal" | "browser" | "file" | "tasks";
   taskSteps: Array<{ id: string; name: string; args: string; startedAt: number; status: "running" | "done"; success?: boolean }>;
   taskStartedAt: number | null;
-  health: any;
   onFilePick?: (path: string) => void;
 }
 
@@ -14,7 +13,6 @@ export function ContextPanel({
   activeTab,
   taskSteps,
   taskStartedAt,
-  health,
   onFilePick,
 }: ContextPanelProps) {
   return (

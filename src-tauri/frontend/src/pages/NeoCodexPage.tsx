@@ -5,6 +5,7 @@ import { ChatView, CommandPalette, ContextPanel, FileTreePanel, ModelSelector, S
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { SettingsDrawer } from "./SettingsDrawer";
 import styles from "./NeoCodexPage.module.css";
 
 const THEME_ORDER = ["light", "dark", "system"] as const;
@@ -38,6 +39,7 @@ export default function NeoCodexPage() {
   const [fileTreeOpen, setFileTreeOpen] = React.useState(false);
   const [showUsage, setShowUsage] = React.useState(false);
   const [rightPanelTab, setRightPanelTab] = React.useState<"browser" | "terminal" | "review" | "file" | "tasks" | null>("review");
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [rightPanelWidth, setRightPanelWidth] = React.useState<number>(() => {
     const raw = localStorage.getItem("neotrix.rightPanelWidth");
     const saved = Number(raw);
@@ -167,6 +169,7 @@ export default function NeoCodexPage() {
       }
     };
     const unlistenPalette = listen("neocodex-open-palette", () => setPaletteOpen((v) => !v));
+    const unlistenSettings = listen("open-settings", () => setSettingsOpen((v) => !v));
     const unlistenUpdates = listen("neocodex-check-updates", () => {
       invoke("neocodex_check_update").then(notifyUpdate).catch((e) => console.error("Check update failed:", e));
     });
@@ -174,7 +177,7 @@ export default function NeoCodexPage() {
     const timer = setTimeout(() => {
       invoke("neocodex_check_update").then(notifyUpdate).catch(() => {});
     }, 3000);
-    return () => { unlistenPalette.then((f) => f()); unlistenUpdates.then((f) => f()); clearTimeout(timer); };
+    return () => { unlistenPalette.then((f) => f()); unlistenSettings.then((f) => f()); unlistenUpdates.then((f) => f()); clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addNotification]);
 
@@ -819,7 +822,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
   const paletteItems = useMemo(() => {
     const items: Array<{ id: string; label: string; hint?: string; onSelect: () => void }> = [
       { id: "new", label: "新建会话", hint: "⌘N", onSelect: () => window.dispatchEvent(new CustomEvent("neotrix:new-session")) },
-      { id: "settings", label: "设置", hint: "⌘,", onSelect: () => navigate("/settings") },
+      { id: "settings", label: "设置", hint: "⌘,", onSelect: () => setSettingsOpen(true) },
       { id: "sidebar", label: showSidebar ? "收起侧栏" : "展开侧栏", hint: "⌘B", onSelect: () => setShowSidebar((v) => !v) },
       { id: "focus", label: focusMode ? "退出专注模式" : "专注模式", hint: "⌘Shift+F", onSelect: () => setFocusMode((v) => !v) },
       { id: "viewmode", label: "切换视图模式", hint: "Ctrl+O", onSelect: () => cycleViewMode() },
@@ -886,6 +889,9 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       } else if (e.key === "o" && e.ctrlKey) {
         e.preventDefault();
         setViewMode(v => v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose");
+      } else if (e.key === "," && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSettingsOpen((v) => !v);
       } else if (e.key === "Escape" && showUsage) {
         e.preventDefault();
         setShowUsage(false);
@@ -1013,7 +1019,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             />
             <button
               className={styles.sidebarFooterBtn}
-              onClick={() => navigate("/settings")}
+              onClick={() => setSettingsOpen(true)}
               title="设置"
               aria-label="打开设置"
             >
@@ -1087,7 +1093,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             </button>
             <button
               className={styles.settingsBtn}
-              onClick={() => navigate("/settings")}
+              onClick={() => setSettingsOpen(true)}
               title="设置"
               aria-label="打开设置"
             >
@@ -1156,7 +1162,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
                   <div className={styles.contextMenuDivider} />
                   <div className={styles.contextMenuItem} onClick={() => {
                     setContextMenuOpen(false);
-                    navigate("/settings");
+                    setSettingsOpen(true);
                   }}>
                     打开设置
                   </div>
@@ -1363,7 +1369,6 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               activeTab={rightPanelTab}
               taskSteps={taskSteps}
               taskStartedAt={taskStartedAt}
-              health={health}
               onFilePick={(path) => {
                 window.dispatchEvent(new CustomEvent("neotrix:mention-file", { detail: path }));
               }}
@@ -1379,6 +1384,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         placeholder={paletteMode === "file" ? "搜索文件… (⌘P)" : "搜索会话或执行命令…"}
       />
       <ShortcutHelp open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
+      <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {pendingDeleteSession && (
         <div className={styles.confirmOverlay} role="dialog" aria-modal="true" aria-label="删除会话确认">
           <div className={styles.confirmDialog}>

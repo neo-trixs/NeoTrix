@@ -11,7 +11,6 @@ vi.mock("../../components/neocodex/index", () => {
     DiffPane: mk("diff"),
     PreviewPane: mk("preview"),
     TerminalPane: mk("terminal"),
-    CapabilityHealthPane: mk("health"),
     FileTreePanel: mk("file"),
   };
 });
@@ -26,7 +25,6 @@ const base = {
     success?: boolean;
   }>,
   taskStartedAt: null,
-  health: null,
 };
 
 describe("ContextPanel route-by-rail-tab", () => {

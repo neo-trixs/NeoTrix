@@ -5,7 +5,6 @@ import { useStore } from "./stores";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NotificationToast from "./components/NotificationToast";
 import { getCurrent } from "@tauri-apps/plugin-deep-link";
-
 const ACCENTS: Record<string, string> = {
   default: "",
   red: "#FF6B6B",
@@ -69,13 +68,7 @@ const App: React.FC = () => {
       .catch(() => {});
   }, []);
 
-  // ── Open settings event ──
-  useEffect(() => {
-    const unlisten = listen("open-settings", () => navigate("/settings"));
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [navigate]);
+  // ── Open settings event (handled by SettingsDrawer in NeoCodexPage) ──
 
   // ── Update download progress (from neocodex_download_update) ──
   useEffect(() => {
@@ -142,11 +135,7 @@ const App: React.FC = () => {
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === ",") {
-        e.preventDefault();
-        navigate("/settings");
-      } else if (e.key === "Escape" && location.pathname !== "/") {
+      if (e.key === "Escape" && location.pathname !== "/") {
         navigate("/");
       }
     };
