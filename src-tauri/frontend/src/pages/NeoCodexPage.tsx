@@ -51,6 +51,7 @@ export default function NeoCodexPage() {
   const [sidebarGroupBy, setSidebarGroupBy] = useState<"project" | "none">("project");
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [currentProject, setCurrentProject] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stopRef = useRef(false);
   const taskSeenRef = useRef<Set<string>>(new Set());
@@ -75,14 +76,33 @@ export default function NeoCodexPage() {
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const sessions = await invoke("neocodex_list_sessions") as any[];
+        const sessions = await invoke("neocodex_list_sessions", { projectPath: currentProject }) as any[];
         setNeoCodexSessions(sessions);
       } catch (e) {
         console.error("Failed to load sessions:", e);
       }
     };
     loadSessions();
-  }, []);
+  }, [currentProject]);
+
+  const handleProjectSwitch = async (projectPath: string) => {
+    try {
+      await invoke("neocodex_set_project", { path: projectPath });
+      setCurrentProject(projectPath);
+      // Refresh sessions for the new project
+      const sessions = await invoke("neocodex_list_sessions", { projectPath }) as any[];
+      setNeoCodexSessions(sessions);
+      // Clear chat and active session
+      setNeoCodexActiveSession(null);
+      setNeoCodexMessages([]);
+      setSideChatMessages([]);
+      setContextMenuOpen(false);
+      addNotification({ type: "success", message: `已切换到项目: ${projectPath.split(/[\\/]/).filter(Boolean).pop() || projectPath}`, duration: 3000 });
+    } catch (e) {
+      console.error("Failed to switch project:", e);
+      addNotification({ type: "error", message: `切换项目失败: ${e}`, duration: 4000 });
+    }
+  };
 
   // Native menu → frontend events: Cmd+Shift+U check updates, Cmd+K palette,
   // Cmd+, settings. Auto-check for updates once on launch (engineering gap:

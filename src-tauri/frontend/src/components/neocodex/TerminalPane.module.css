@@ -173,3 +173,21 @@
 .send:hover {
   opacity: 0.9;
 }
+
+.hasBell {
+  position: relative;
+}
+.hasBell::after {
+  content: "🔔";
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 14px;
+  opacity: 0.8;
+  pointer-events: none;
+  animation: bellPulse 1s ease-in-out infinite;
+}
+@keyframes bellPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}

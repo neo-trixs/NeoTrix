@@ -11,11 +11,13 @@ interface TabMeta {
 let tabSeq = 0;
 const nextTabId = () => `term-${Date.now()}-${tabSeq++}`;
 
+const DEFAULT_SCROLLBACK = 2000;
+
 export function TerminalPane() {
   const [tabs, setTabs] = useState<TabMeta[]>([{ id: nextTabId(), name: "终端 1" }]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const scrollbackRef = useRef(DEFAULT_SCROLLBACK);
 
-  // First tab becomes active once rendered.
   useEffect(() => {
     if (!activeId && tabs.length > 0) setActiveId(tabs[0].id);
   }, [tabs, activeId]);
@@ -28,7 +30,6 @@ export function TerminalPane() {
 
   const closeTab = (id: string) => {
     setTabs((prev) => {
-      const idx = prev.findIndex((t) => t.id === id);
       const next = prev.filter((t) => t.id !== id);
       if (next.length === 0) {
         return [{ id: nextTabId(), name: "终端 1" }];
@@ -46,6 +47,10 @@ export function TerminalPane() {
 
   const renameTab = (id: string, name: string) => {
     setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, name: name || t.name } : t)));
+  };
+
+  const setScrollback = (lines: number) => {
+    scrollbackRef.current = Math.max(100, lines);
   };
 
   const active = tabs.find((t) => t.id === activeId) || tabs[0];
@@ -91,7 +96,11 @@ export function TerminalPane() {
       <div className={styles.tabBody}>
         {tabs.map((t) => (
           <div key={t.id} className={styles.tabPane} hidden={t.id !== active?.id}>
-            <TerminalTab active={t.id === active?.id} onExit={() => closeTab(t.id)} />
+            <TerminalTab
+              active={t.id === active?.id}
+              onExit={() => closeTab(t.id)}
+              scrollback={scrollbackRef.current}
+            />
           </div>
         ))}
       </div>
@@ -99,16 +108,24 @@ export function TerminalPane() {
   );
 }
 
-function TerminalTab({ active, onExit }: { active: boolean; onExit: () => void }) {
+function TerminalTab({ active, onExit, scrollback }: { active: boolean; onExit: () => void; scrollback: number }) {
   const [lines, setLines] = useState<string[]>(["$ "]);
   const [input, setInput] = useState("");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const [hasBell, setHasBell] = useState(false);
   const outRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const bufRef = useRef("");
   const sessionRef = useRef<string | null>(null);
   const cleanupRef = useRef<Array<() => void>>([]);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const dimensionsRef = useRef({ cols: 100, rows: 24 });
+  const activeRef = useRef(active);
+  const scrollbackRef = useRef(scrollback);
+
+  activeRef.current = active;
+  scrollbackRef.current = scrollback;
 
   const append = useCallback((chunk: string) => {
     bufRef.current += chunk;
@@ -121,15 +138,60 @@ function TerminalTab({ active, onExit }: { active: boolean; onExit: () => void }
         const trimmed = p.replace(/\r/g, "");
         next.push(trimmed);
       }
-      return next.slice(-500);
+      if (!activeRef.current) setHasBell(true);
+      return next.slice(-scrollbackRef.current);
     });
   }, []);
+
+  const clearBell = useCallback(() => {
+    setHasBell(false);
+  }, []);
+
+  useEffect(() => {
+    if (active) {
+      inputRef.current?.focus();
+      clearBell();
+    }
+  }, [active, clearBell]);
+
+  const handleResize = useCallback(async () => {
+    const sid = sessionRef.current;
+    if (!sid) return;
+    const outEl = outRef.current;
+    if (!outEl) return;
+    const fontSize = 12;
+    const lineHeight = 1.45;
+    const charWidth = fontSize * 0.6;
+    const cols = Math.max(10, Math.floor(outEl.clientWidth / charWidth));
+    const rows = Math.max(5, Math.floor(outEl.clientHeight / (fontSize * lineHeight)));
+    if (cols !== dimensionsRef.current.cols || rows !== dimensionsRef.current.rows) {
+      dimensionsRef.current = { cols, rows };
+      try {
+        await invoke("pty_resize", { sessionId: sid, cols, rows });
+      } catch (e) {
+        console.warn("pty_resize failed:", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const outEl = outRef.current;
+    if (outEl) {
+      resizeObserverRef.current = new ResizeObserver(handleResize);
+      resizeObserverRef.current.observe(outEl);
+      handleResize();
+    }
+    return () => {
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+    };
+  }, [handleResize]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const sid = await invoke("pty_spawn", { cols: 100, rows: 24 }) as string;
+        const sid = await invoke("pty_spawn", { cols: dimensionsRef.current.cols, rows: dimensionsRef.current.rows }) as string;
         if (cancelled) {
           invoke("pty_close", { sessionId: sid }).catch(() => {});
           return;
@@ -162,8 +224,7 @@ function TerminalTab({ active, onExit }: { active: boolean; onExit: () => void }
       if (sid) invoke("pty_close", { sessionId: sid }).catch(() => {});
       sessionRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [append]);
 
   const send = async () => {
     const sid = sessionRef.current;
@@ -181,21 +242,43 @@ function TerminalTab({ active, onExit }: { active: boolean; onExit: () => void }
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") send();
+    if (e.key === "Enter") {
+      send();
+    }
     if (e.key === "l" && e.ctrlKey) {
       e.preventDefault();
       setLines(["$ "]);
       bufRef.current = "";
     }
+    if (e.key === "c" && e.ctrlKey && e.shiftKey) {
+      e.preventDefault();
+      copySelection();
+    }
   };
 
-  useEffect(() => {
-    if (active) inputRef.current?.focus();
-  }, [active]);
+  const copySelection = useCallback(() => {
+    const selection = window.getSelection();
+    if (selection && selection.toString()) {
+      navigator.clipboard.writeText(selection.toString()).catch(() => {});
+    }
+  }, []);
+
+  const onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const selection = window.getSelection();
+    if (selection && selection.toString()) {
+      navigator.clipboard.writeText(selection.toString()).catch(() => {});
+    }
+  };
 
   return (
     <div className={styles.tabBody}>
-      <div className={styles.output} ref={outRef}>
+      <div
+        className={`${styles.output} ${hasBell && !active ? styles.hasBell : ""}`}
+        ref={outRef}
+        onContextMenu={onContextMenu}
+        data-testid="terminal-output"
+      >
         {lines.map((l, i) => (
           <div key={i} className={styles.line}>{l || "\u00a0"}</div>
         ))}
@@ -209,7 +292,7 @@ function TerminalTab({ active, onExit }: { active: boolean; onExit: () => void }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="运行命令 (Ctrl+L 清屏, exit 关闭标签)"
+          placeholder="运行命令 (Ctrl+L 清屏, Ctrl+Shift+C 复制, exit 关闭标签)"
           autoFocus={active}
           data-testid={active ? "terminal-input" : "terminal-input-hidden"}
         />
