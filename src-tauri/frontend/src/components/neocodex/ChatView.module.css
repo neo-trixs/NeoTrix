@@ -576,18 +576,22 @@
   display: flex;
   gap: 8px;
   width: 100%;
-  max-width: 760px;
-  padding: 12px;
+  max-width: 800px;
+  padding: 14px 16px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.10);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.composerCard:hover {
+  background: var(--bg-tertiary, var(--bg-secondary));
 }
 
 .composerCard:focus-within {
   border-color: var(--accent-primary);
-  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.12), 0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  box-shadow: 0 4px 36px rgba(0, 0, 0, 0.14), 0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 .textarea {
@@ -692,7 +696,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 2px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-primary);
 }
 
 .composerLeft {

@@ -10,14 +10,17 @@
      ════════════════════════════════════════ */
 
   --app-font-size: 13px;
-  /* ── Brand Palette ── */
+  /* ── Brand Palette (Claude Code Desktop clay) ── */
   --nt-red: #E85454;
   --nt-green: #4CAF50;
   --nt-yellow: #FFC107;
   --nt-orange: #FF9800;
-  --nt-primary: var(--nt-red);
-  --nt-primary-hover: #D04040;
-  --nt-primary-light: #F26B6B;
+  --nt-clay: #D9764E;
+  --nt-clay-hover: #E28358;
+  --nt-clay-light: #E8A07E;
+  --nt-primary: var(--nt-clay);
+  --nt-primary-hover: var(--nt-clay-hover);
+  --nt-primary-light: #E8A07E;
 
   /* ── Neutral Scale (light) ── */
   --nt-white: #FFFFFF;
@@ -378,4 +381,57 @@
 [data-theme="light"] {
   --nt-bg: #F5F2EC;
   --nt-bg-base: #F5F2EC;
+}
+
+/* ════════════════════════════════════════
+   Claude Code Desktop — warm surface layer
+   Maps the NeoCodex semantic tokens to Claude's
+   warm-clay canvas (light + dark) for 1:1 feel.
+   Later in cascade → wins against base tokens.
+   ════════════════════════════════════════ */
+
+[data-theme="dark"] {
+  --bg-primary: #161412;
+  --bg-secondary: #1C1A17;
+  --bg-tertiary: #232019;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-code: #1E1B17;
+  --bg-code-header: #26221C;
+  --fg-primary: #EDE9E1;
+  --fg-secondary: #A69C8E;
+  --fg-tertiary: #6E665A;
+  --border-primary: rgba(237, 233, 225, 0.10);
+  --accent-bg: rgba(217, 118, 78, 0.14);
+  --accent-primary: var(--nt-clay);
+  --accent-on: #FFFFFF;
+  --nt-primary: var(--nt-clay);
+  --nt-primary-hover: var(--nt-clay-hover);
+  --nt-primary-light: #E8A07E;
+  --nt-active: rgba(217, 118, 78, 0.16);
+  --nt-active-bg: rgba(217, 118, 78, 0.14);
+  --nt-primary-glow: rgba(217, 118, 78, 0.12);
+  --nt-primary-light-bg: rgba(217, 118, 78, 0.14);
+}
+
+[data-theme="light"] {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F6F4F0;
+  --bg-tertiary: #EDEBE5;
+  --bg-hover: rgba(20, 18, 16, 0.05);
+  --bg-code: #F8F6F2;
+  --bg-code-header: #FBF9F5;
+  --fg-primary: #221F1B;
+  --fg-secondary: #6B645C;
+  --fg-tertiary: #9A9287;
+  --border-primary: rgba(34, 31, 27, 0.10);
+  --accent-bg: rgba(217, 118, 78, 0.10);
+  --accent-primary: var(--nt-clay);
+  --accent-on: #FFFFFF;
+  --nt-primary: var(--nt-clay);
+  --nt-primary-hover: var(--nt-clay-hover);
+  --nt-primary-light: var(--nt-clay-light, #E8A07E);
+  --nt-active: rgba(217, 118, 78, 0.14);
+  --nt-active-bg: rgba(217, 118, 78, 0.10);
+  --nt-primary-glow: rgba(217, 118, 78, 0.10);
+  --nt-primary-light-bg: rgba(217, 118, 78, 0.10);
 }
