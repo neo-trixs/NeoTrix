@@ -7,6 +7,7 @@ export interface ContextPanelProps {
   taskSteps: Array<{ id: string; name: string; args: string; startedAt: number; status: "running" | "done"; success?: boolean }>;
   taskStartedAt: number | null;
   health: any;
+  onFilePick?: (path: string) => void;
 }
 
 export function ContextPanel({
@@ -14,6 +15,7 @@ export function ContextPanel({
   taskSteps,
   taskStartedAt,
   health,
+  onFilePick,
 }: ContextPanelProps) {
   return (
     <div className={styles.panel}>
@@ -22,7 +24,7 @@ export function ContextPanel({
         {activeTab === "review" && <DiffPane />}
         {activeTab === "browser" && <PreviewPane />}
         {activeTab === "terminal" && <TerminalPane />}
-        {activeTab === "file" && <FileTreePanel onPick={() => {}} />}
+        {activeTab === "file" && <FileTreePanel onPick={onFilePick} />}
       </div>
     </div>
   );

@@ -50,6 +50,7 @@ export default function NeoCodexPage() {
   const [sidebarFilter, setSidebarFilter] = useState<"all" | "active" | "archived">("all");
   const [sidebarGroupBy, setSidebarGroupBy] = useState<"project" | "none">("project");
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState("");
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stopRef = useRef(false);
   const taskSeenRef = useRef<Set<string>>(new Set());
@@ -1043,42 +1044,76 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         </header>
 
         <div className={styles.composerToolbar}>
-          <div className={styles.composerLeft}>
-            <div className={styles.composerModelWrap} data-testid="composer-model">
-              <ModelSelector />
+            <div className={styles.composerLeft}>
+              <div className={styles.composerModelWrap} data-testid="composer-model">
+                <ModelSelector />
+              </div>
+              <select
+                value={neocodexMode}
+                onChange={(e) => handleModeChange(e.target.value)}
+                className={styles.modeSelect}
+                disabled={agentBusy}
+                data-testid="mode-select"
+                title="Mode"
+              >
+                <option value="Agent">Agent</option>
+                <option value="Shell">Shell</option>
+                <option value="Plan">Plan</option>
+              </select>
+              <span className={styles.contextCapsule} title="当前工作区上下文" data-testid="composer-context" onClick={() => setContextMenuOpen(!contextMenuOpen)}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1.5 4.5h11M1.5 7h11M1.5 9.5h7"/>
+                </svg>
+                项目
+                <span className={styles.contextCapsuleArrow}>▾</span>
+              </span>
+              {contextMenuOpen && (
+                <div className={styles.contextMenu} data-testid="context-menu">
+                  {activeSession && (
+                    <div className={styles.contextMenuItem} onClick={() => {
+                      setContextMenuOpen(false);
+                      navigate(`/project/${encodeURIComponent(activeSession.wire_path)}`);
+                    }}>
+                      <span>当前: </span>
+                      <span className={styles.contextMenuPath}>{activeSession.wire_path.split(/[\\/]/).filter(Boolean).pop() || "本地"}</span>
+                    </div>
+                  )}
+                  {Array.from(new Set(neocodexSessions.map((s: any) => s.wire_path).filter(Boolean))).map((path) => (
+                    <div key={path} className={styles.contextMenuItem} onClick={() => {
+                      setContextMenuOpen(false);
+                      navigate(`/project/${encodeURIComponent(path)}`);
+                    }}>
+                      <span className={styles.contextMenuPath}>{path.split(/[\\/]/).filter(Boolean).pop() || path}</span>
+                    </div>
+                  ))}
+                  <div className={styles.contextMenuDivider} />
+                  <div className={styles.contextMenuItem} onClick={() => {
+                    setContextMenuOpen(false);
+                    navigate("/settings");
+                  }}>
+                    打开设置
+                  </div>
+                </div>
+              )}
             </div>
-            <select
-              value={neocodexMode}
-              onChange={(e) => handleModeChange(e.target.value)}
-              className={styles.modeSelect}
-              disabled={agentBusy}
-              data-testid="mode-select"
-              title="Mode"
+            <button
+              type="button"
+              className={styles.permissionPill}
+              title="审批模式: 点击切换"
+              data-testid="composer-permission"
+              onClick={() => {
+                const current = settings?.permissionMode || "auto";
+                const next = current === "auto" ? "manual" : current === "manual" ? "accept" : "auto";
+                setSettings({ ...settings, permissionMode: next });
+                invoke("neocodex_set_permission_mode", { mode: next }).catch((e) => console.error("Set permission mode failed:", e));
+              }}
             >
-              <option value="Agent">Agent</option>
-              <option value="Shell">Shell</option>
-              <option value="Plan">Plan</option>
-            </select>
-            <span className={styles.contextCapsule} title="当前工作区上下文" data-testid="composer-context">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M1.5 4.5h11M1.5 7h11M1.5 9.5h7"/>
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 1.5L12 3v3.5c0 2.8-2 4.8-5 6-3-1.2-5-3.2-5-6V3L7 1.5z"/>
               </svg>
-              项目
-              <span className={styles.contextCapsuleArrow}>▾</span>
-            </span>
+              {settings?.permissionMode === "auto" ? "自动" : settings?.permissionMode === "manual" ? "手动" : "接受"}
+            </button>
           </div>
-          <button
-            type="button"
-            className={styles.permissionPill}
-            title="审批模式"
-            data-testid="composer-permission"
-          >
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 1.5L12 3v3.5c0 2.8-2 4.8-5 6-3-1.2-5-3.2-5-6V3L7 1.5z"/>
-            </svg>
-            {settings?.permissionMode === "auto" ? "自动" : settings?.permissionMode === "manual" ? "手动" : "接受"}
-          </button>
-        </div>
 
         <div className={styles.chatArea}>
           <ChatView
@@ -1256,6 +1291,9 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               taskSteps={taskSteps}
               taskStartedAt={taskStartedAt}
               health={health}
+              onFilePick={(path) => {
+                window.dispatchEvent(new CustomEvent("neotrix:mention-file", { detail: path }));
+              }}
             />
           </div>
         )}
