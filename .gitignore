@@ -35,7 +35,9 @@ __pycache__/
 
 # Ad-hoc test scratch dirs
 *_test_tmp/
-src-tauri/frontend/node_modules
 
 # Isolated worktrees for concurrent-agent conflict isolation
 .worktrees/
+
+# Worktree node_modules symlink (isolated frontend builds)
+src-tauri/frontend/node_modules
