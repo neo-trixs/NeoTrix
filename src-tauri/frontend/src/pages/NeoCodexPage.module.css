@@ -220,132 +220,6 @@
   flex: 1 1 auto;
 }
 
-.topBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
-  flex-shrink: 0;
-  position: relative;
-}
-
-.topBar.focusMode {
-  max-width: 800px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.mobileMenuBtn {
-  display: none;
-  padding: 8px;
-  background: transparent;
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  color: var(--fg-secondary);
-  cursor: pointer;
-}
-
-.topBarCenter {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.sessionToolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 40%;
-  min-width: 0;
-}
-
-.sessionTitle {
-  padding: 4px 8px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: var(--fg-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: text;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 220px;
-}
-
-.sessionTitle:hover {
-  border-color: var(--border-primary);
-  background: var(--bg-tertiary);
-}
-
-.sessionTitleInput {
-  padding: 4px 8px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--accent-primary);
-  border-radius: 6px;
-  color: var(--fg-primary);
-  font-size: 13px;
-  font-weight: 600;
-  outline: none;
-  width: 200px;
-}
-
-.sessionProject {
-  color: var(--fg-tertiary);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
-
-.branchChip {
-  padding: 2px 8px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: 10px;
-  color: var(--fg-secondary);
-  font-size: 11px;
-  font-family: var(--font-mono, monospace);
-  white-space: nowrap;
-}
-
-.branchChipDirty {
-  color: var(--warning, #e6a23c);
-  border-color: var(--warning, #e6a23c);
-}
-
-.topBarRight {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.settingsBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  color: var(--fg-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.settingsBtn:hover {
-  border-color: var(--accent-primary);
-  background: var(--bg-hover);
-}
-
 .composerToolbar {
   display: flex;
   align-items: center;
@@ -701,29 +575,12 @@
     display: none;
   }
 
-  .mobileMenuBtn {
-    display: flex;
-  }
-
-  .topBar {
-    padding: 8px 12px;
-  }
-
   .composerToolbar {
     padding: 6px 12px;
   }
 }
 
 @media (max-width: 640px) {
-  .topBar {
-    padding: 6px 8px;
-  }
-
-  .topBarCenter {
-    flex: 1;
-    min-width: 0;
-  }
-
   .composerToolbar {
     flex-wrap: wrap;
   }

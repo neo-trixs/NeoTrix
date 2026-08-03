@@ -1,4 +1,5 @@
 export { ChatView } from "./ChatView";
+export { TitleBar } from "./TitleBar";
 export { CommandPalette } from "./CommandPalette";
 export { ContextPanel } from "./ContextPanel";
 export { DiffPane } from "./DiffPane";

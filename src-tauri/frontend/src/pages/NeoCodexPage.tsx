@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../stores";
-import { ChatView, CommandPalette, ContextPanel, FileTreePanel, ModelSelector, SessionSidebar, ShortcutHelp } from "../components/neocodex";
+import { ChatView, CommandPalette, ContextPanel, FileTreePanel, ModelSelector, SessionSidebar, ShortcutHelp, TitleBar } from "../components/neocodex";
 import type { Attachment } from "../types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -1033,88 +1033,32 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       )}
 
       <main className={`${styles.main} ${focusMode ? styles.focusMode : ""}`}>
-        <header className={`${styles.topBar} ${focusMode ? styles.focusMode : ""}`}>
-          <button className={styles.mobileMenuBtn} onClick={() => setShowSidebar(true)} title="打开侧栏" aria-label="打开侧栏">
-            <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4l4 3-4 3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <div className={styles.topBarCenter}>
-            {activeSession && (
-              <div className={styles.sessionToolbar} data-testid="session-toolbar">
-                {renamingTitle ? (
-                  <input
-                    className={styles.sessionTitleInput}
-                    value={titleDraft}
-                    onChange={(e) => setTitleDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitTitleRename();
-                      if (e.key === "Escape") { setRenamingTitle(false); setTitleDraft(activeSession.name); }
-                    }}
-                    onBlur={commitTitleRename}
-                    autoFocus
-                    data-testid="session-title-input"
-                  />
-                ) : (
-                  <button
-                    className={styles.sessionTitle}
-                    onClick={() => { setTitleDraft(activeSession.name); setRenamingTitle(true); }}
-                    title="点击重命名会话"
-                    data-testid="session-title"
-                  >
-                    {activeSession.name || "未命名会话"}
-                  </button>
-                )}
-                <span className={styles.sessionProject} title={activeSession.wire_path || "未绑定项目"}>
-                  {activeSession.wire_path ? activeSession.wire_path.split(/[\\/]/).filter(Boolean).pop() : "本地"}
-                </span>
-                {gitStatus && (
-                  <span className={`${styles.branchChip} ${gitStatus.dirty ? styles.branchChipDirty : ""}`} title={gitStatus.dirty ? "有未提交改动" : "工作区干净"}>
-                    {gitStatus.branch}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          <div className={styles.topBarRight}>
-            <button
-              className={styles.settingsBtn}
-              onClick={() => {
-                const idx = THEME_ORDER.indexOf(settings.theme as (typeof THEME_ORDER)[number]);
-                setSettings({ ...settings, theme: THEME_ORDER[(idx + 1) % THEME_ORDER.length] });
-              }}
-              title={THEME_LABELS[settings.theme]}
-              aria-label="切换主题"
-            >
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="7" cy="7" r="2.6" />
-                <path d="M7 1v2M7 11v2M1 7h2M11 7h2M2.9 2.9l1.4 1.4M9.7 9.7l1.4 1.4M2.9 11.1l1.4-1.4M9.7 4.3l1.4-1.4" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              className={styles.settingsBtn}
-              onClick={() => setSettingsOpen(true)}
-              title="设置"
-              aria-label="打开设置"
-            >
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="7" cy="7" r="2.2" />
-                <path d="M7 1.5v1.8M7 10.7v1.8M1.5 7h1.8M10.7 7h1.8M3.1 3.1l1.3 1.3M9.6 9.6l1.3 1.3M3.1 10.9l1.3-1.3M9.6 4.4l1.3-1.3" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              className={styles.settingsBtn}
-              onClick={() => setFocusMode((v) => !v)}
-              title={focusMode ? "退出专注" : "专注模式"}
-              aria-label={focusMode ? "退出专注" : "专注模式"}
-            >
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="7" cy="7" r="3" />
-                <path d="M7 1v2M7 11v2M1 7h2M11 7h2" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-        </header>
+        <TitleBar
+          currentProject={currentProject}
+          activeSessionName={activeSession?.name}
+          sessionProject={activeSession?.wire_path}
+          renaming={renamingTitle}
+          titleDraft={titleDraft}
+          onTitleDraftChange={setTitleDraft}
+          onTitleCommit={commitTitleRename}
+          onTitleCancel={() => { setRenamingTitle(false); setTitleDraft(activeSession?.name ?? ""); }}
+          onTitleStartRename={() => { if (activeSession) { setTitleDraft(activeSession.name); setRenamingTitle(true); } }}
+          gitStatus={gitStatus}
+          usagePct={health?.context_usage ?? null}
+          themeLabel={THEME_LABELS[settings.theme] ?? ""}
+          focusMode={focusMode}
+          onToggleTheme={() => {
+            const idx = THEME_ORDER.indexOf(settings.theme as (typeof THEME_ORDER)[number]);
+            setSettings({ ...settings, theme: THEME_ORDER[(idx + 1) % THEME_ORDER.length] });
+          }}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleFocus={() => setFocusMode((v) => !v)}
+          onOpenUsage={() => setShowUsage((v) => !v)}
+          onToggleSidebar={() => setShowSidebar((v) => !v)}
+          onWorkspaceClick={() => setContextMenuOpen((v) => !v)}
+          onSearchClick={() => openFilePalette()}
+          onNewSession={() => window.dispatchEvent(new CustomEvent("neotrix:new-session"))}
+        />
 
         <div className={styles.composerToolbar}>
             <div className={styles.composerLeft}>
