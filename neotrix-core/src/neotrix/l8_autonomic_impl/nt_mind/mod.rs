@@ -113,6 +113,7 @@ pub mod reason;
 pub mod knowledge;
 pub mod consciousness;
 pub mod evolution;
+pub mod control_distillation;
 pub mod infrastructure;
 // ============================================================================
 // Re-exports（按域分组）

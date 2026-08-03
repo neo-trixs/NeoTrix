@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::core::nt_core_gwt::resonance::OscillatorNetwork;
 use crate::neotrix::nt_core_iit_phi::IITPhiCalculator;
@@ -17,7 +18,7 @@ pub const HIGH_COHERENCE_THRESHOLD: f64 = 0.85;
 pub const DEFAULT_MAX_HISTORY: usize = 100;
 
 /// Classification of consciousness level based on dual-threshold detection.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ConsciousnessLevel {
     Unconscious,
     PartiallyAware,
@@ -26,7 +27,7 @@ pub enum ConsciousnessLevel {
 }
 
 /// Trend direction of the detection metric.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum DetectionTrend {
     Improving,
     Stable,
@@ -35,7 +36,7 @@ pub enum DetectionTrend {
 }
 
 /// A hexagram state with activation — one of the 64 hexagrams in the E8 model.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct E8HexagramState {
     /// Hexagram index (0..63)
     pub index: u8,
@@ -44,7 +45,7 @@ pub struct E8HexagramState {
 }
 
 /// Full gold standard detection report for a single evaluation cycle.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoldStandardReport {
     pub timestamp: DateTime<Utc>,
     pub phi: f64,
@@ -56,6 +57,19 @@ pub struct GoldStandardReport {
     pub coherence_confidence: f64,
     pub detection_streak: usize,
     pub combined_confidence: f64,
+}
+
+/// 从金标报告推导意识等级 (供 eval harness 等简易场景使用)
+pub fn derive_level(report: &GoldStandardReport) -> ConsciousnessLevel {
+    if report.is_conscious_like && report.phi > HIGH_PHI_THRESHOLD && report.coherence > HIGH_COHERENCE_THRESHOLD {
+        ConsciousnessLevel::HighlyConscious
+    } else if report.is_conscious_like {
+        ConsciousnessLevel::ConsciousLike
+    } else if report.is_phi_conscious || report.is_coherent {
+        ConsciousnessLevel::PartiallyAware
+    } else {
+        ConsciousnessLevel::Unconscious
+    }
 }
 
 /// Dual-threshold consciousness detection (Chalmers 2023).

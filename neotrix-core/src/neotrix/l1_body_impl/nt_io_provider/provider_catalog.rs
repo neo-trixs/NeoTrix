@@ -155,6 +155,17 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
         models: &["local-model"],
         security_profile: CommunicationProfile::Anonymous,
     },
+    ProviderInfo {
+        name: "sglang-local",
+        display_name: "SGLang (本地)",
+        category: ProviderCategory::Local,
+        base_url: "http://localhost:30000/v1",
+        default_model: "local-model",
+        api_key_env: None,
+        is_free: true,
+        models: &["local-model"],
+        security_profile: CommunicationProfile::Anonymous,
+    },
 
     // ── Proxy (客体): 自定义 OpenAI 兼容代理 ──
     ProviderInfo {

@@ -72,7 +72,7 @@
 - **R-P76 (4-Verification Dead Module Detection)**: 判定死模块必须 4 重验证: 路径 import / 字符串分发 / CLI 注册 / pub item 级消费。单重匹配 (泛词) 产生 89.5% 假阳性。
 - **R-P77 (pub use ≠ 消费)**: re-export 仅创建可见性。审计死模块时必须检查 re-export 的每个 item 是否有全局消费，不能因 `pub use` 存在就判存活。
 - **R-P78 (测试 ≠ 接线)**: 模块有测试只证明可运行，不证明被使用。文档声称的"接线正例"必须通过代码引用链验证。
-- **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。
+- **R-P79 (吸收接线门)**: 外部技术吸收必须在同 session 内接线到生产路径。仅创建模块文件 + 测试而不接线 = 延期死代码 (D44/D49 违规)。接线判断标准: 模块的公开方法必须被非测试代码调用并产生行为接地 (EventBus 行为改变 / brain/bank 状态修改 / KB 持久化), 仅 `mod.rs` 声明或 CLI 注册不算接线。
 
 ## 吸收纪律 (R-P42, R-P47, R-P48, R-P55, R-P80)
 
@@ -99,3 +99,46 @@
 - **R-P81 (Ponytail Ladder — 最懒实现阶梯)**: 写代码前先读实际代码流，然后停在第一级能成立的梯级: ①需要存在吗? (YAGNI) → ②codebase 已有? (复用不重写) → ③stdlib 有? → ④原生平台特性? → ⑤已装依赖? → ⑥一行? 就一行 → ⑦才轮到最小可用实现。安全(信任边界验证/数据丢失处理/安全/无障碍)永不在砍伐清单。实证: -54% LOC / -20% cost / -27% time, 100% safe。Lazy about the solution, never about reading。
 - **R-P82 (有序后端路由 — 平台接入的首选+备选列表)**: 任何需要外部平台接入的能力(网页/搜索/社交/视频), 采用"首选+备选的有序后端列表"而非单一实现。真实探测各候选后端可用性(不只是命令存在), 第一个完整可用的当选; 接入方式换代时只调整列表顺序, 不重写能力层。附 `doctor` 式体检命令报告当前走哪条路。实证: agent-reach yt-dlp 被 B站风控封死 → 无感切换 bili-cli。
 - **R-P83 (单一事实源 + 派生生成物同步)**: 跨平台/多副本的内容必须单一 source-of-truth + 脚本生成派生副本, 禁止手工维护副本。实证: ponytail 20+ agent 平台共用 AGENTS.md; ai-website-cloner-template 用 sync-agent-rules.sh/sync-skills.mjs 从 AGENTS.md+SKILL.md 生成各平台副本。与写入门禁一致: 手工追加派生副本会被下次生成覆盖。
+
+## 预检计划门 (R-P84) — 2026-08-03 吸收工作纪律模式 + 自身 schema 变更失败教训
+
+- **R-P84 (Pre-flight Plan Gate — 预检计划门)**: 爆炸半径超过阈值时，**实现前必须交付四件套并显式等待批准**，不得直接动手。阈值: >20 行变更 / 多文件 / schema/公开 API/认证/迁移/删除 / 结构体字段增删 / 新模块。四件套:
+  1. **Goal**: 一句话复述需求 + 自定验收标准（复述错 = 最廉价纠错）。
+  2. **Blocking Questions (0-3)**: 仅问"答错会扔工作量"的问题；每问附推荐默认值，供"全同意"。
+  3. **Assumptions**: 编号、具体、可证伪，覆盖 7 轴: 数据形状/失败语义/边界职责/状态并发/运行环境/范围边界/测试覆盖。
+  4. **Plan**: 文件/签名/顺序；有取舍时说明拒绝的备选 + 一句话理由。
+  搜索证据: 2026 主流 "Discovery-and-Learning 前置 / Plan mode 安全带 / 4 段契约 / 协作规划前移难决定"(awesome-testing / aiworkflowpro / ainative.to / coderabbit)。自身教训: 给 public struct 加字段属 schema 变更，跳过预检直接写码 → E0063 missing field 4 个错误（实付账单）。
+
+## Option 算术陷阱与测试夹具自证 (R-P86, R-P87) — 2026-08-03 自身调试验证
+
+- **R-P86 (Option min/max 非幂等)**: `Option::min`/`Option::max` 任一侧为 `None` 时返回 `None`（std 语义是"任一 None 则 None"），不能用于"惰性初始化的运行极值"——以 `None` 起手做 `acc = Some(x).max(acc)` 极值永远停留在 `None`。正确写法: 显式比较 `if acc.map_or(true, |a| x > a) { acc = Some(x); }`。事故: `interpolate_quality` 线性插值的 lower/upper 边界全程为 None → 全返回 0.0，测试仅在非边界档位暴露。
+- **R-P87 (测试夹具与检测器撞词)**: 编写检测器测试时，测试数据(fixture 文本/步骤)不得包含检测器自身的触发词，否则被检测器二次误触发。事故: `"Step 2 revised"` 的 `revised` 命中 `backtrack` 标记 `revise` → 断言 control_count==1 实得 2。写测试前先扫一遍目标 marker 列表，改用中性词（如 `Step 2 corrected`）。
+
+## Blast-Radius Review Gate (R-P85) — 2026-08-03 吸收 code-review-graph/teamlore/CyberStrike + context-efficiency 主线
+
+- **R-P85 (Blast-Radius Review Gate — 爆炸半径审查门)**: 变更的爆炸半径 (跨文件影响面) 决定审查深度与自治上限，先算半径再定审查档位。**半径来源**: `BlastRadiusIndex` (NT-MEMORY, Merkle 增量不改则零成本 + BFS 深度 3 双向传播, `CodeParser` trait 由 NT-WORLD 提供多语言解析); rev-officer 静态预检 `blast_radius()` 报告 findings 域密度/跨模块计数。
+  1. **Low** (单文件/无跨模引用): 单 agent 自审 + 归档即可。
+  2. **Medium** (跨 2-3 文件/同层): 抛出 `cross_file_impact` 预检 + 一档独立验证。
+  3. **High** (跨层/公开 API/schema/并发): 强制独立验证器 + 受限自治 (Evolve B2) + 激活预算 (B3) + 事务中途持久化 (B4)。
+  4. **Critical** (panic_audit / layer_violation / 全库): 挂起至自愈复核 (B6) + 公证 (B7) 达峰才放行。
+  搜索证据: code-review-graph 8.2x 平均缩减, sverklo 62x, Meta 跨库 30x; Cursor Merkle 增量; tree-sitter AST→图 + MCP 交付为 2026 标准。约束: 与 R-P42 (禁平行模块) 对齐, `BlastRadiusIndex` 落 NT-MEMORY KB 强化现有 MemoryProvider, 不另建独立解析器进程。
+
+## 并发会话冲突管理 (R-P88 – R-P91) — 2026-08-03 意识核心修复轮事实教训
+
+- **R-P88 (git stash 恢复用 checkout 不用 pop)**: 并发 session 提交前会 `git stash` 对方 WIP 并 reset 工作树到 HEAD。被 stash 的 session 恢复工作时**必须用 `git checkout stash@{NN} -- <文件清单>` 从 stash 检出指定文件，而非 `git stash pop`**（pop 会整体顶出 + 与当前并发改动冲突）。恢复后逐个 re-read 验证文件与修复是否仍在（R-P16）。
+- **R-P89 (死代码判定禁基于 stash 前记忆)**: 经 stash 恢复后，代码库处于"HEAD + 部分检出"混合态，不可依赖 stash 前读取的死活记忆判定。判定死代码必须基于**当前工作树现状**重走 R-P76 四重验证（import/字符串分发/CLI 注册/pub item 消费）。事实: `predictive_cortex`/`seed_knowledge` 曾被误判死代码，重验证明均已接线生产。
+- **R-P90 (并发 /tmp 撞名)**: 多并发 opencode session 共用 `/tmp` 且以相似命名（如 `neotrix-session-196.json`）会互相覆盖、污染证据。会话中间产物必须写入**预批准的唯一临时目录**（`/var/folders/jr/.../T/opencode/`）或以 session_id 命名并带唯一后缀，禁止裸 `/tmp/<generic-name>`。
+- **R-P91 (全量回归前看负载)**: 并发 session 造成机器高负载（load 5-35）时，全量测试耗时严重膨胀（本轮 299s）。**判定回归耗时异常前必先看 `uptime`/load**，区分"真实 hung"与"高负载慢"；在高负载期不要以耗时为回归失败依据，等待负载回落或单模块验证。
+
+## 编译瞬错容错 (R-P92)
+
+- **R-P92 (并发 recompile 瞬错忽略)**: 并发 session 正在重编译时，`Cargo.toml`/`Cargo.lock` 解析可能瞬时失败或状态漂移。遇到" manifest 解析错误 / lock 文件冲突"等**非代码错误**，等 5-10 秒重试一次再判失败；不要据瞬错断言代码有缺陷。差异见 R-P19（架构修复声明必须过 cargo check 才可信）。
+
+## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
+
+依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：
+
+1. **Dead-code 收尾 (R-P79 门)**: `RecipeRegistry` 已确认死且未接线——决定**删除**或**接线**二选一并同 session 闭环，不留延期死代码。
+2. **并发链路硬化 (R-P42)**: 将本 session 的并发 stash/回滚经验强化到 `nt_mind_self_iterating` 现有节点，禁新建平行适配器。
+3. **GWT→行为闭环复验**: 已解 T2/T6 决定时就地 fire，复验当轮 attention 权重是否完整进入 next-tick 行为（Contribution-ink: R-P25）。
+4. **回归基线固化**: 以 6984 为新极值，纳入 R-P39 monotonic 基线，阻止覆盖率回退。

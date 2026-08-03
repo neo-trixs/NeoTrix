@@ -215,18 +215,25 @@ impl ModelDiscovery {
             ("lm-studio", "http://localhost:1234/v1", "LM Studio"),
             ("llama-cpp", "http://localhost:8080/v1", "llama.cpp"),
             ("vllm", "http://localhost:8000/v1", "vLLM"),
+            ("sglang", "http://localhost:30000/v1", "SGLang"),
         ];
 
         for (id, url, name) in &local_endpoints {
             if !force && !Self::probe_endpoint(url) {
                 continue;
             }
+            let provider_type = match *id {
+                "ollama" => LlmProviderType::Ollama,
+                "vllm" => LlmProviderType::Vllm,
+                "sglang" => LlmProviderType::Sglang,
+                _ => LlmProviderType::OpenAI,
+            };
             let models_for_endpoint = match *id {
                 "ollama" => vec![
                     Self::make_model(id, "llama3.2", &format!("Llama 3.2 ({name})"), LlmProviderType::Ollama, url, false, None, ModelSource::LocalEndpoint, "t1-standard"),
                     Self::make_model(id, "qwen2.5", &format!("Qwen 2.5 ({name})"), LlmProviderType::Ollama, url, false, None, ModelSource::LocalEndpoint, "t1-standard"),
                 ],
-                _ => vec![Self::make_model(id, "default", &format!("{name} (Local)"), LlmProviderType::OpenAI, url, false, None, ModelSource::LocalEndpoint, "t1-standard")],
+                _ => vec![Self::make_model(id, "default", &format!("{name} (Local)"), provider_type, url, false, None, ModelSource::LocalEndpoint, "t1-standard")],
             };
             models.extend(models_for_endpoint);
         }

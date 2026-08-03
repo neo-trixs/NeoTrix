@@ -621,6 +621,30 @@ impl EffortTier {
             EffortTier::Max => 40,
         }
     }
+
+    /// Extended-thinking budget in tokens. Mirrors Qwen3 thinking-budget
+    /// fraction (Low≈0.1 … Max≈0.9) scaled to a 16k reasoning window.
+    /// Low = 0 disables extended thinking (direct answer).
+    pub fn thinking_budget_tokens(&self) -> u32 {
+        match self {
+            EffortTier::Low => 0,
+            EffortTier::Medium => 1024,
+            EffortTier::High => 2048,
+            EffortTier::XHigh => 4096,
+            EffortTier::Max => 8192,
+        }
+    }
+
+    /// Total output token budget (thinking + answer) for this tier.
+    pub fn max_tokens_budget(&self) -> u32 {
+        match self {
+            EffortTier::Low => 2048,
+            EffortTier::Medium => 4096,
+            EffortTier::High => 8192,
+            EffortTier::XHigh => 16384,
+            EffortTier::Max => 32768,
+        }
+    }
 }
 
 /// Adaptive effort tier selector using Fable 5 five-tier effort model.

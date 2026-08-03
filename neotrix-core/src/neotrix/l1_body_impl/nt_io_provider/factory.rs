@@ -49,6 +49,8 @@ pub enum LlmProviderType {
     DeepSeekFree,
     ModelScope,
     ApiAirforce,
+    Vllm,
+    Sglang,
 }
 
 impl LlmProviderType {
@@ -82,6 +84,8 @@ impl LlmProviderType {
             "deepseek-free" | "deepseek_free" => Some(Self::DeepSeekFree),
             "modelscope" => Some(Self::ModelScope),
             "api-airforce" | "api_airforce" => Some(Self::ApiAirforce),
+            "vllm" => Some(Self::Vllm),
+            "sglang" => Some(Self::Sglang),
             _ => None,
         }
     }
@@ -111,7 +115,7 @@ impl LlmProviderType {
 
     pub fn category(self) -> ProviderCategory {
         match self {
-            Self::Ollama => ProviderCategory::Local,
+            Self::Ollama | Self::Vllm | Self::Sglang => ProviderCategory::Local,
             Self::CustomProxy => ProviderCategory::Proxy,
             _ => ProviderCategory::Cloud,
         }
@@ -177,6 +181,8 @@ impl ProviderConfig {
             "deepseek-free" | "deepseek_free" => LlmProviderType::DeepSeekFree,
             "modelscope" => LlmProviderType::ModelScope,
             "api-airforce" | "api_airforce" => LlmProviderType::ApiAirforce,
+            "vllm" => LlmProviderType::Vllm,
+            "sglang" => LlmProviderType::Sglang,
             _ => LlmProviderType::Anthropic,
         };
 
@@ -232,6 +238,32 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             if let Some(url) = config.base_url {
                 provider = provider.with_base_url(&url);
             }
+            Box::new(provider)
+        }
+        LlmProviderType::Vllm => {
+            // vLLM serves an OpenAI-compatible API. Self-hosted: base URL defaults
+            // to the standard vLLM endpoint (override with NEOTRIX_VLLM_BASE_URL).
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_VLLM_API_KEY").unwrap_or_else(|_| "local".to_string())
+            });
+            let base_url = config.base_url.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_VLLM_BASE_URL").unwrap_or_else(|_| "http://localhost:8000/v1".to_string())
+            });
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
+            Box::new(provider)
+        }
+        LlmProviderType::Sglang => {
+            // SGLang serves an OpenAI-compatible API. Self-hosted: base URL defaults
+            // to the standard SGLang endpoint (override with NEOTRIX_SGLANG_BASE_URL).
+            let api_key = config.api_key.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_SGLANG_API_KEY").unwrap_or_else(|_| "local".to_string())
+            });
+            let base_url = config.base_url.unwrap_or_else(|| {
+                std::env::var("NEOTRIX_SGLANG_BASE_URL").unwrap_or_else(|_| "http://localhost:30000/v1".to_string())
+            });
+            let mut provider = OpenAiProvider::new(api_key);
+            provider = provider.with_base_url(&base_url);
             Box::new(provider)
         }
         LlmProviderType::Gemini => {

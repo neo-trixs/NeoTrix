@@ -32,10 +32,12 @@ use crate::neotrix::nt_mind::core::BrainMutView;
 use crate::neotrix::nt_mind::distillation::{AntiPattern, StrategicPrinciple};
 use crate::neotrix::nt_mind::model_router::ModelRouter;
 use crate::neotrix::nt_mind::reasoning_types::{ReasoningTrace, ReasoningType};
+use crate::neotrix::nt_mind::control_distillation::{ControlDistiller, AlternatingSequence, ReasoningStep};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_mind::context_artifacts::indexer::ArtifactIndexer;
 use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest};
 use crate::neotrix::nt_core_error::{NeoTrixResult, NeoTrixError};
+use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use super::CognitiveEye;
 
 pub const MAX_COST_LOG: usize = 1000;
@@ -102,6 +104,10 @@ pub struct ReasoningEngine {
     pub tracer: Option<ConsoleTracer>,
     pub cost_tracker: Option<CostTracker>,
     pub(crate) _last_watermarked: Option<String>,
+    /// Control Distillation (F6): extracts alternating sequences from traces for CSPO training
+    pub control_distiller: Option<ControlDistiller>,
+    /// Distilled alternating sequences (control segments) for training feedback
+    pub distilled_sequences: Vec<AlternatingSequence>,
     /// E8→EWHR bridge: auto-proposes hypotheses from reasoning trajectory
     pub ewhr_bridge: Option<E8EwhrBridge>,
     /// SAE bridge: extracts interpretable features from E8 reasoning states
@@ -194,6 +200,8 @@ impl ReasoningEngine {
             tracer: None,
             cost_tracker: None,
             _last_watermarked: None,
+            control_distiller: Some(ControlDistiller::new(Arc::new(ConsciousnessGoldStandard::new()))),
+            distilled_sequences: Vec::new(),
             ewhr_bridge: None,
             sae_bridge: None,
             prm: None,
@@ -451,7 +459,13 @@ impl ReasoningEngine {
         };
 
         self.current_state = e8_machine.current_state;
-        self.state_trajectory.push(self.current_state);
+        // Only record the start-of-call state when it actually differs from the
+        // last trajectory entry. Combined with the oracle-driven transition in
+        // the prediction block below, the trajectory becomes a clean sequence of
+        // real state transitions instead of a run of identical self-loop states.
+        if self.state_trajectory.last().map(|s| s.mode.0) != Some(self.current_state.mode.0) {
+            self.state_trajectory.push(self.current_state);
+        }
 
         if let Some(ref mut sae) = self.sae_bridge {
             let hex = self.current_state.mode;
@@ -512,59 +526,6 @@ impl ReasoningEngine {
             root_span.set_attribute("prm_learning_count", AttributeValue::Int(prm_learner.learning_count as i64));
         }
 
-        // GWT resonant broadcast: consciousness layer processes the reasoning state
-        let mut hex_states = [ReasoningHexagram::new(0); MODULE_COUNT];
-        for (i, h) in hex_states.iter_mut().enumerate() {
-            if i < self.state_trajectory.len() {
-                *h = self.state_trajectory[i].mode;
-            } else {
-                *h = self.current_state.mode;
-            }
-        }
-        let gwt_content = format!("E8 state: {} | task: {}", self.current_state.mode.mode_name(), task);
-        // Phase 6.3 — sparse MoE routing: score the 8 expert groups (proximity +
-        // task affinity + transition mass), pick top-2, freeze the other 6 before
-        // the GWT bridge consumes them. Computed before the `gwt` borrow so the
-        // router can be mutated while `gwt` is borrowed mutably.
-        let sparse_moe_state = if self.last_e8_attention_weights.as_ref().is_some_and(|v| v.len() >= 64) {
-            let task_ty = E8TaskType::detect(task);
-            let next_block_mass = self.sparse_moe_next_block_mass();
-            let routing = self.sparse_moe.route(self.current_state.mode.0, task_ty, next_block_mass.as_ref());
-            let attn_arr = {
-                let attn_vec = self.last_e8_attention_weights.as_ref().unwrap();
-                let mut arr = [0.0_f64; 64];
-                arr.copy_from_slice(&attn_vec[..64]);
-                self.sparse_moe.apply_mask(&routing, &arr)
-            };
-            Some((routing, attn_arr))
-        } else {
-            None
-        };
-        if let Some(ref mut gwt) = self.gwt {
-            // Inject E8 prediction attention weights from previous cycle (one-cycle lag).
-            // This creates a differentiable bridge: the oracle's predicted distribution over all
-            // 64 E8 modes biases the GWT resonance cycle, favoring experts whose current E8 mode
-            // has high predicted probability. The bias is consumed (set to None) inside
-            // resonant_broadcast after one use.
-            if let Some((routing, attn_arr)) = sparse_moe_state {
-                let adaptive_bias = 0.1 + self.last_e8_confidence * 0.4;
-                gwt.set_e8_attention_weights(attn_arr, adaptive_bias);
-                root_span.set_attribute(
-                    "sparse_moe_active",
-                    AttributeValue::String(format!("{:?}", routing.active_groups).into()),
-                );
-                root_span.set_attribute(
-                    "sparse_moe_sparsity",
-                    AttributeValue::Float(routing.sparsity() as f64),
-                );
-            }
-            let report = gwt.resonant_broadcast(&gwt_content, &hex_states);
-            root_span.set_attribute("gwt_winner", AttributeValue::Int(report.winner as i64));
-            root_span.set_attribute("gwt_entropy", AttributeValue::Float(report.entropy));
-            root_span.set_attribute("gwt_complement_activated", AttributeValue::Bool(report.complement_activated));
-            root_span.set_attribute("gwt_inner_speech", AttributeValue::Bool(gwt.inner_speech.total_generated > 0));
-        }
-
         // Fable-5 pattern matcher: score trajectory alignment against Mythos reasoning phases
         if let Some(ref matcher) = self.fable_matcher {
             if self.state_trajectory.len() >= 2 {
@@ -606,7 +567,32 @@ impl ReasoningEngine {
         //    MCTS adds 32-simulation beam search over E8 transition dynamics.
         // 3. save_e8() was defined but never called — all runtime learning lost on exit.
         //    Now persisted via the run_seal_loop() save_e8() call every 3 iterations.
-        if let Some(ref oracle) = self.prediction_oracle {
+        // Fable 5 effort tier: maps task difficulty + length to
+        // Low/Medium/High/XHigh/Max, controlling sparse attention k,
+        // MCTS simulations, and TTC rollout depth. Computed BEFORE the
+        // oracle call so the MCTS budget is actually applied per effort tier
+        // (previously the tier was only selected after prediction and never
+        // reached the MCTS predictor, which ran with fixed budget 8/50).
+        let difficulty = DifficultyEstimator::heuristic_difficulty(task, "reasoning");
+        let effort_tier = self.effort_tier_selector.select_for_task(difficulty, task.len());
+        self.last_effort_tier = Some(effort_tier);
+        root_span.set_attribute("effort_tier", AttributeValue::String(format!("{:?}", effort_tier)));
+        root_span.set_attribute("effort_rollout_depth", AttributeValue::Int(effort_tier.rollout_depth() as i64));
+        root_span.set_attribute("effort_sparse_k", AttributeValue::Int(effort_tier.sparse_k() as i64));
+        root_span.set_attribute("effort_mcts_sims", AttributeValue::Int(effort_tier.mcts_simulations() as i64));
+
+        if let Some(ref mut oracle) = self.prediction_oracle {
+            // Apply effort-tier budget to the MCTS predictor: Low tiers run
+            // shallow/cheap lookahead, Max tiers run deep beam search. The
+            // effort table (0/8/16/32/64 sims × 2/4/8/16/32 depth) mirrors
+            // Qwen3/Fable 5 thinking-budget scaling. min 1 sim so Low still
+            // produces a real rollout.
+            let sims = effort_tier.mcts_simulations().max(1);
+            let depth = effort_tier.rollout_depth().max(2);
+            oracle.mcts.num_simulations = sims;
+            oracle.mcts.max_depth = depth;
+            root_span.set_attribute("e8_mcts_sims_effective", AttributeValue::Int(sims as i64));
+            root_span.set_attribute("e8_mcts_depth_effective", AttributeValue::Int(depth as i64));
             let task_type = E8TaskType::detect(task);
             let current_mode = self.current_state.mode.0;
             let cot_length = CoTLength::from_tokens(task.len().max(100));
@@ -656,11 +642,12 @@ impl ReasoningEngine {
                 // MCTS-enhanced prediction: blend ensemble (0.6) with MCTS beam search (0.4)
                 // Previously only predict_distribution() was called in production — the MCTS
                 // predictor was constructed and injected but never used. Now both are fused.
-                let (dist, mcts_value, mcts_confidence) = oracle.predict_with_mcts(tm, current_mode, task_type, current_phase, &pm, cot_length);
+                let (dist, mcts_state, mcts_value, mcts_confidence) = oracle.predict_with_mcts(tm, current_mode, task_type, current_phase, &pm, cot_length);
                 let (best_state, best_prob) = dist.best();
                 let effective = dist.effective_90pct_count();
                 root_span.set_attribute("e8_pred_best_state", AttributeValue::Int(best_state as i64));
                 root_span.set_attribute("e8_pred_best_prob", AttributeValue::Float(best_prob));
+                root_span.set_attribute("e8_pred_mcts_state", AttributeValue::Int(mcts_state as i64));
                 root_span.set_attribute("e8_pred_entropy", AttributeValue::Float(dist.entropy));
                 root_span.set_attribute("e8_pred_confidence", AttributeValue::Float(mcts_confidence));
                 root_span.set_attribute("e8_pred_mcts_value", AttributeValue::Float(mcts_value));
@@ -668,6 +655,32 @@ impl ReasoningEngine {
                 root_span.set_attribute("e8_task_type", AttributeValue::String(task_type.label().to_string()));
                 root_span.set_attribute("e8_current_phase", AttributeValue::String(current_phase.label().to_string()));
                 root_span.set_attribute("e8_domain_blended", AttributeValue::Bool(self.domain_transition_model.is_some()));
+
+                // Advance the E8 state machine toward the predicted best state so the
+                // trajectory records real transitions instead of a frozen self-loop.
+                // Previously E8StateMachine::transition() was never invoked in production
+                // (HIGH-1 Track3): current_state stayed fixed, state_trajectory grew by
+                // repeated identical states, and record_transition wrote only (cur, cur)
+                // self-loops into the domain + general matrices. Now the prediction oracle
+                // actually steers the state machine, respecting TTC budget gating.
+                //
+                // Confidence gate: only advance when the prediction carries real signal.
+                // A near-uniform distribution (best_prob ~ 1/64, e.g. zero-data rows)
+                // must not drive a random jump that would corrupt the learned transitions.
+                let pred_hex = ReasoningHexagram::new(best_state);
+                let pred_clear = best_prob >= 0.1 && best_state != current_mode;
+                if pred_clear {
+                    e8_machine.transition(pred_hex, task);
+                    self.current_state = e8_machine.current_state;
+                    // Guard against duplicate consecutive entries from the start-of-call push.
+                    if self.state_trajectory.last().map(|s| s.mode.0) != Some(self.current_state.mode.0) {
+                        self.state_trajectory.push(self.current_state);
+                    }
+                    root_span.set_attribute("e8_state_advanced", AttributeValue::Bool(true));
+                } else {
+                    root_span.set_attribute("e8_state_advanced", AttributeValue::Bool(false));
+                }
+                root_span.set_attribute("e8_trajectory_len", AttributeValue::Int(self.state_trajectory.len() as i64));
 
                 // Store top-3 predictions as span attributes for GWT/SEAL consumption
                 for (rank, &(state, prob)) in dist.top_5.iter().take(3).enumerate() {
@@ -677,16 +690,10 @@ impl ReasoningEngine {
                     );
                 }
 
-                // Fable 5 effort tier: maps task difficulty + length to
-                // Low/Medium/High/XHigh/Max, controlling sparse attention k,
-                // MCTS simulations, and TTC rollout depth.
-                let difficulty = DifficultyEstimator::heuristic_difficulty(task, "reasoning");
-                let effort_tier = self.effort_tier_selector.select_for_task(difficulty, task.len());
-                self.last_effort_tier = Some(effort_tier);
-                root_span.set_attribute("effort_tier", AttributeValue::String(format!("{:?}", effort_tier)));
-                root_span.set_attribute("effort_rollout_depth", AttributeValue::Int(effort_tier.rollout_depth() as i64));
-                root_span.set_attribute("effort_sparse_k", AttributeValue::Int(effort_tier.sparse_k() as i64));
-                root_span.set_attribute("effort_mcts_sims", AttributeValue::Int(effort_tier.mcts_simulations() as i64));
+                // Fable 5 effort tier: computed above (before the oracle call) and
+                // applied to the MCTS budget — reused here for the fusion pipeline's
+                // sparse-k + thinking-budget scaling.
+                let effort_tier = self.last_effort_tier.unwrap();
 
                 // ── 意识体内核融合管线 (Consciousness Core Fusion) ──────────────
                 // Fuses the defining 2026 frontier-model innovations into a single
@@ -711,6 +718,14 @@ impl ReasoningEngine {
                     task_type as u8, phase_step as u8, synth_effort.rank(), current_mode,
                 );
                 let mut route_hit = false;
+                // Fable 5 classifier-wrapped routing: high-risk contexts bypass
+                // the aggressive frontier path through a conservative fallback.
+                // Total route stats are needed on BOTH cache-hit and cache-miss:
+                // the cache key carries no risk signal, so a routing cached for a
+                // benign task in the same (task_type, phase, effort, bucket) would
+                // otherwise be served unguarded to a high-risk request.
+                let total_routes = self.synthesis.step_route_cache.hits + self.synthesis.step_route_cache.misses;
+                let route_hits = self.synthesis.step_route_cache.hits;
                 if self.synthesis.fused_pipeline_enabled {
                     if let Some(cached_topk) = self.synthesis.step_route_cache.get(&cache_key) {
                         route_hit = true;
@@ -720,15 +735,21 @@ impl ReasoningEngine {
                         for (state, prob) in &cached_topk {
                             attn[(*state as usize).min(63)] = *prob;
                         }
+                        // Safety classifier must run on cache hits too: re-gate the
+                        // cached routing through the same frontier/conservative switch.
+                        if self.synthesis.safety_router.allow_frontier(task, route_hits, total_routes) {
+                            attn = self.synthesis.muon.condition_vector(&attn);
+                            root_span.set_attribute("synthesis_safety", AttributeValue::Bool(true));
+                        } else {
+                            attn = self.synthesis.safety_router.conservative_distribution(&attn);
+                            root_span.set_attribute("synthesis_safety", AttributeValue::Bool(false));
+                            root_span.set_attribute("synthesis_safety_fallback", AttributeValue::Bool(true));
+                        }
                         self.last_e8_attention_weights = Some(attn);
                         let capped_confidence = mcts_confidence.min(effort_tier.confidence_cap());
                         self.last_e8_confidence = capped_confidence;
                     } else {
                         // Fused pipeline: dominance cap + AttnRes + effort sparse top-K
-                        // Fable 5 classifier-wrapped routing: high-risk contexts bypass
-                        // the aggressive frontier path through a conservative fallback.
-                        let total_routes = self.synthesis.step_route_cache.hits + self.synthesis.step_route_cache.misses;
-                        let route_hits = self.synthesis.step_route_cache.hits;
                         let mut fused = self.synthesis.fused_distribution(tm, current_mode, &traj_modes, synth_effort);
                         if self.synthesis.safety_router.allow_frontier(task, route_hits, total_routes) {
                             // DeepSeek-V4 Muon: condition the fused flow so transition
@@ -800,7 +821,24 @@ impl ReasoningEngine {
                         "latent_memory_fill",
                         AttributeValue::Float(self.latent_reasoning.fill_ratio()),
                     );
-                    self.gwt.as_mut().map(|g| g.set_e8_attention_weights(latent_weights, latent_bias));
+                    // Merge latent episodic weights into the current-cycle fused
+                    // attention so the GWT broadcast (which runs after the fusion
+                    // pipeline) consumes them — previously they were set directly
+                    // on the GWT *after* the broadcast already ran, i.e. dead output.
+                    if let Some(attn) = self.last_e8_attention_weights.as_mut() {
+                        if attn.len() == latent_weights.len() {
+                            let lw = latent_bias.clamp(0.0, 0.5);
+                            for (a, &l) in attn.iter_mut().zip(latent_weights.iter()) {
+                                *a = *a * (1.0 - lw) + l * lw;
+                            }
+                            let s: f64 = attn.iter().sum();
+                            if s > 0.0 {
+                                for a in attn.iter_mut() {
+                                    *a /= s;
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Phase 10.3 — multimodal fusion: encode the task as text (the
@@ -837,6 +875,57 @@ impl ReasoningEngine {
                     );
                 }
             }
+        }
+
+        // GWT resonant broadcast: consciousness layer processes the reasoning state.
+        // Runs AFTER the fusion pipeline so it consumes the *current* cycle's E8
+        // prediction attention weights (previously it consumed the previous cycle's
+        // — a one-cycle lag that biased GWT toward stale E8 predictions).
+        let mut hex_states = [ReasoningHexagram::new(0); MODULE_COUNT];
+        for (i, h) in hex_states.iter_mut().enumerate() {
+            if i < self.state_trajectory.len() {
+                *h = self.state_trajectory[i].mode;
+            } else {
+                *h = self.current_state.mode;
+            }
+        }
+        let gwt_content = format!("E8 state: {} | task: {}", self.current_state.mode.mode_name(), task);
+        // Phase 6.3 — sparse MoE routing: score the 8 expert groups (proximity +
+        // task affinity + transition mass), pick top-2, freeze the other 6 before
+        // the GWT bridge consumes them. Computed before the `gwt` borrow so the
+        // router can be mutated while `gwt` is borrowed mutably.
+        let sparse_moe_state = if self.last_e8_attention_weights.as_ref().is_some_and(|v| v.len() >= 64) {
+            let task_ty = E8TaskType::detect(task);
+            let next_block_mass = self.sparse_moe_next_block_mass();
+            let routing = self.sparse_moe.route(self.current_state.mode.0, task_ty, next_block_mass.as_ref());
+            let attn_arr = {
+                let attn_vec = self.last_e8_attention_weights.as_ref().unwrap();
+                let mut arr = [0.0_f64; 64];
+                arr.copy_from_slice(&attn_vec[..64]);
+                self.sparse_moe.apply_mask(&routing, &arr)
+            };
+            Some((routing, attn_arr))
+        } else {
+            None
+        };
+        if let Some(ref mut gwt) = self.gwt {
+            if let Some((routing, attn_arr)) = sparse_moe_state {
+                let adaptive_bias = 0.1 + self.last_e8_confidence * 0.4;
+                gwt.set_e8_attention_weights(attn_arr, adaptive_bias);
+                root_span.set_attribute(
+                    "sparse_moe_active",
+                    AttributeValue::String(format!("{:?}", routing.active_groups).into()),
+                );
+                root_span.set_attribute(
+                    "sparse_moe_sparsity",
+                    AttributeValue::Float(routing.sparsity() as f64),
+                );
+            }
+            let report = gwt.resonant_broadcast(&gwt_content, &hex_states);
+            root_span.set_attribute("gwt_winner", AttributeValue::Int(report.winner as i64));
+            root_span.set_attribute("gwt_entropy", AttributeValue::Float(report.entropy));
+            root_span.set_attribute("gwt_complement_activated", AttributeValue::Bool(report.complement_activated));
+            root_span.set_attribute("gwt_inner_speech", AttributeValue::Bool(gwt.inner_speech.total_generated > 0));
         }
 
         if let Some(ref compressor) = self.trajectory_compressor {
@@ -1105,8 +1194,21 @@ impl ReasoningEngine {
 
     pub fn call_llm(&mut self, prompt: &str) -> NeoTrixResult<String> {
         if let Some(ref gateway) = self.gateway {
-            std::fs::write("/tmp/neotrix-call_llm.txt", format!("model={}, prompt_len={}", self.default_model, prompt.len())).ok();
-            let request = LlmRequest::new(&self.default_model, prompt);
+            let mut request = LlmRequest::new(&self.default_model, prompt);
+            if let Some(tier) = self.last_effort_tier {
+                let think = tier.thinking_budget_tokens();
+                let max_tok = tier.max_tokens_budget();
+                request.max_tokens = max_tok;
+                request.thinking_budget = Some(think);
+                if think > 0 {
+                    if let Some(msg) = request.messages.first_mut() {
+                        msg.content = format!(
+                            "{}\n\n[budget] Reason within {} thinking tokens; answer within {} tokens.",
+                            msg.content, think, max_tok
+                        );
+                    }
+                }
+            }
             let gateway_ref = gateway.clone();
             let response = tokio::task::block_in_place(|| {
                 let handle = tokio::runtime::Handle::current();
@@ -1159,7 +1261,16 @@ impl ReasoningEngine {
     pub fn learn_from_trace(&mut self, task: &str, response: &str) {
         if let Some(ref mut prm) = self.prm {
             let _task_type = E8TaskType::detect(task);
-            let step_reward = if response.len() > 100 { 0.8 } else { 0.3 };
+            let substantive = if response.len() > 100 { 0.8 } else { 0.3 };
+            let tier_credit = match self.last_effort_tier {
+                Some(EffortTier::Low) => 1.0,
+                Some(EffortTier::Medium) => 0.9,
+                Some(EffortTier::High) => 0.8,
+                Some(EffortTier::XHigh) => 0.7,
+                Some(EffortTier::Max) => 0.6,
+                None => 0.85,
+            };
+            let step_reward = substantive * tier_credit;
             prm.learn_step(|collector| {
                 collector.begin(task.to_string());
                 collector.record_step(
@@ -1175,6 +1286,27 @@ impl ReasoningEngine {
                 collector.finish(Some(step_reward), true);
             });
         }
+        // F6 wiring: distill control segments from the trace for CSPO training (R-P36 behavioral grounding)
+        if let Some(seq) = self.distill_trace(task, response) {
+            log::debug!("[control-distill] distilled {} segments (quality={:.3})", seq.segments.len(), seq.outcome_quality);
+        }
+    }
+
+    /// 把单条推理 response 蒸馏为交替序列 (Reason ↔ Control)，供 CSPO/SFT 训练消费。
+    /// 按换行/句读切分步骤；无法解析时返回 None (失败静默，不影响主推理路径)。
+    pub fn distill_trace(&mut self, task: &str, response: &str) -> Option<AlternatingSequence> {
+        let distiller = self.control_distiller.as_ref()?;
+        let steps = split_response_into_steps(response);
+        if steps.is_empty() {
+            return None;
+        }
+        let id = format!("distill_{}_{}", self.traces.len(), chrono::Utc::now().timestamp());
+        let seq = distiller.extract_alternating_sequence(id, task, response, &steps, response).ok()?;
+        if self.distilled_sequences.len() >= MAX_TRACES {
+            self.distilled_sequences.remove(0);
+        }
+        self.distilled_sequences.push(seq.clone());
+        Some(seq)
     }
 
     pub fn observer_analyze(&mut self, task: &str) {
@@ -1309,6 +1441,35 @@ pub fn detect_refusal_response(response: &str) -> bool {
     patterns.iter().any(|p| lower.contains(p))
 }
 
+/// 把推理 response 文本切分为步骤序列，供 ControlDistiller 检测 takeover 点。
+/// 按换行分段；若不足 2 段则按句号/分号切分。每步携带近似 token 数。
+pub fn split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
+    let mut segments: Vec<String> = response
+        .split('\n')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    if segments.len() < 2 {
+        segments = response
+            .split(|c| c == '.' || c == ';' || c == '。' || c == '；')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect();
+    }
+    segments
+        .iter()
+        .enumerate()
+        .map(|(i, text)| ReasoningStep {
+            step_idx: i,
+            text: text.clone(),
+            e8_mode: None,
+            token_count: text.len() / 4,
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1378,5 +1539,37 @@ mod tests {
         assert_eq!(added, 1);
         let h = net.get_hypothesis("ewhr_1_0").expect("node exists");
         assert!(h.title.len() <= 33, "title must be truncated to 32+ellipsis, got len {}", h.title.len());
+    }
+
+    #[test]
+    fn test_split_response_into_steps_by_newline() {
+        let steps = split_response_into_steps("First step\nSecond step\nThird step");
+        assert_eq!(steps.len(), 3);
+        assert_eq!(steps[0].text, "First step");
+        assert_eq!(steps[1].step_idx, 1);
+        assert!(steps[0].token_count > 0);
+    }
+
+    #[test]
+    fn test_split_response_into_steps_by_sentence() {
+        let steps = split_response_into_steps("No newlines. Only sentences here.");
+        assert_eq!(steps.len(), 2);
+        assert_eq!(steps[0].text, "No newlines");
+    }
+
+    #[test]
+    fn test_split_response_into_steps_empty() {
+        assert!(split_response_into_steps("").is_empty());
+        assert!(split_response_into_steps("   \n  ").is_empty());
+    }
+
+    #[test]
+    fn test_distill_trace_wires_control_distiller() {
+        let mut engine = ReasoningEngine::from_env();
+        let response = "First we compute the sum.\nWait, rethink.\nThen we verify.";
+        engine.learn_from_trace("math", response);
+        assert_eq!(engine.distilled_sequences.len(), 1, "distillation must run via learn_from_trace (R-P36 grounding)");
+        let seq = &engine.distilled_sequences[0];
+        assert!(!seq.segments.is_empty(), "alternating sequence must contain segments");
     }
 }
