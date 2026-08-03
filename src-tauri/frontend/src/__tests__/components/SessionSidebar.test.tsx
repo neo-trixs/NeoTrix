@@ -114,13 +114,28 @@ describe("SessionSidebar — session interactions", () => {
     await waitFor(() => expect(screen.getByText("📌 置顶")).toBeInTheDocument());
   });
 
-  it("search filters sessions", async () => {
+  it("search filters sessions by name for short queries", async () => {
     sessionFixture();
     renderSidebar();
     await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
+    await userEvent.type(screen.getByPlaceholderText("搜索会话…"), "重");
+    await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
+    expect(screen.queryByText("调研 RAG")).not.toBeInTheDocument();
+  });
+
+  it("full-text search hits backend and shows message snippets", async () => {
+    sessionFixture();
+    mockInvoke("neocodex_search_sessions", (args) => {
+      return [
+        { session_id: "s-2", session_name: "调研 RAG", role: "assistant", snippet: `…found ${args.query} in message…`, match_count: 1 },
+      ];
+    });
+    renderSidebar();
+    await waitFor(() => expect(screen.getByText("重构缓存层")).toBeInTheDocument());
     await userEvent.type(screen.getByPlaceholderText("搜索会话…"), "RAG");
-    await waitFor(() => expect(screen.getByText("调研 RAG")).toBeInTheDocument());
-    expect(screen.queryByText("重构缓存层")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("session-search-results")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/found RAG in message/)).toBeInTheDocument());
+    expect(screen.getByText("调研 RAG")).toBeInTheDocument();
   });
 
   it("refreshes its list when neotrix:sessions-changed fires (Cmd+N sync)", async () => {

@@ -1,6 +1,7 @@
 use neotrix::neotrix::l1_body_impl::nt_io_neocodex::{
-    NeoCodexAgent, NeoCodexHealthReport, NeoCodexMode, EvolutionLoop, WireSession, WireEvent,
+    NeoCodexAgent, NeoCodexHealthReport, NeoCodexMode, WireSession, WireEvent,
 };
+use neotrix::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry;
 use serde::Serialize;
 use tauri::Emitter;
 use tauri::Manager;
@@ -17,23 +18,6 @@ static STREAM_CANCELLED: std::sync::atomic::AtomicBool =
 pub async fn neocodex_stop_stream() -> Result<(), String> {
     STREAM_CANCELLED.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(())
-}
-
-#[tauri::command]
-pub async fn neocodex_send_message(content: String) -> Result<String, String> {
-    let mut agent_guard = NEOCODEX_AGENT.lock().await;
-    let agent = match agent_guard.as_mut() {
-        Some(a) => a,
-        None => {
-            let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
-            *agent_guard = Some(a);
-            agent_guard.as_mut().unwrap()
-        }
-    };
-
-    let response = agent.process(&content).await;
-    Ok(response)
 }
 
 #[derive(serde::Deserialize, Default)]
@@ -54,6 +38,8 @@ pub async fn neocodex_send_message_stream(
     attachments: Option<Vec<NeoCodexAttachmentPayload>>,
     regenerate: Option<bool>,
     permission_mode: Option<String>,
+    temperature: Option<f64>,
+    max_tokens: Option<u32>,
 ) -> Result<String, String> {
     let mut agent_guard = NEOCODEX_AGENT.lock().await;
     let agent = match agent_guard.as_mut() {
@@ -65,6 +51,9 @@ pub async fn neocodex_send_message_stream(
             agent_guard.as_mut().unwrap()
         }
     };
+
+    // P2-1: apply settings-panel generation params to the next request.
+    agent.set_generation_params(temperature, max_tokens);
 
     // Permission mode (Claude Code Manual/AcceptEdits/Plan / Codex approval
     // parity). Plan forces the read-only planning path (exec_plan — real
@@ -201,54 +190,6 @@ pub async fn neocodex_health_report() -> Result<NeoCodexHealthReport, String> {
             tool_grounding_degraded: false,
             node_snapshots: Vec::new(),
         }),
-    }
-}
-
-#[tauri::command]
-pub async fn neocodex_evolution_step() -> Result<String, String> {
-    let mut guard = NEOCODEX_AGENT.lock().await;
-    match guard.as_mut() {
-        Some(a) => {
-            EvolutionLoop::step(a);
-            Ok(format!(
-                "iteration {} ({} fixes applied total)",
-                a.evolution.iteration, a.evolution.fixes_applied
-            ))
-        }
-        None => Err("agent not initialized".to_string()),
-    }
-}
-
-#[tauri::command]
-pub async fn neocodex_resume() -> Result<usize, String> {
-    let mut guard = NEOCODEX_AGENT.lock().await;
-    match guard.as_mut() {
-        Some(a) => Ok(a.resume_session()),
-        None => Err("agent not initialized".to_string()),
-    }
-}
-
-#[tauri::command]
-pub async fn neocodex_mode_toggle() -> Result<String, String> {
-    let mut guard = NEOCODEX_AGENT.lock().await;
-    match guard.as_mut() {
-        Some(a) => {
-            let mode = a.toggle_mode();
-            Ok(format!("{:?}", mode))
-        }
-        None => Err("agent not initialized".to_string()),
-    }
-}
-
-#[tauri::command]
-pub async fn neocodex_add_goal(desc: String, max_iter: u64) -> Result<String, String> {
-    let mut guard = NEOCODEX_AGENT.lock().await;
-    match guard.as_mut() {
-        Some(a) => {
-            a.add_goal(&desc, max_iter);
-            Ok(format!("goal added: {} (max {} iters)", desc, max_iter))
-        }
-        None => Err("agent not initialized".to_string()),
     }
 }
 
@@ -397,6 +338,192 @@ pub async fn neocodex_list_sessions() -> Result<Vec<NeoCodexSessionInfo>, String
     }
     sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     Ok(sessions)
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct NeoCodexSearchHit {
+    pub session_id: String,
+    pub session_name: String,
+    pub role: String,
+    pub snippet: String,
+    pub timestamp: i64,
+    pub match_count: usize,
+}
+
+/// P2-2: full-text search across session message content (Codex ⌘G /
+/// Claude find parity). The session sidebar previously filtered only by
+/// session name; this command lets the UI search the actual message bodies.
+#[tauri::command]
+pub async fn neocodex_search_sessions(query: String) -> Result<Vec<NeoCodexSearchHit>, String> {
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() || needle.len() < 2 {
+        return Ok(Vec::new());
+    }
+    let dir = sessions_dir();
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut hits = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
+            continue;
+        }
+        let session_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
+        let mut session_name = session_id.clone();
+        let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        for line in content.lines() {
+            if let Ok(event) = serde_json::from_str::<WireEvent>(line) {
+                match event {
+                    WireEvent::SessionMeta { name, .. } => {
+                        if !name.is_empty() {
+                            session_name = name;
+                        }
+                    }
+                    WireEvent::UserMessage { content: msg, timestamp, .. } => {
+                        push_search_hit(&msg, "user", timestamp, &needle, &session_id, &session_name, &mut hits);
+                    }
+                    WireEvent::AgentMessage { content: msg, timestamp } => {
+                        push_search_hit(&msg, "assistant", timestamp, &needle, &session_id, &session_name, &mut hits);
+                    }
+                    WireEvent::SessionMeta { name, .. } => {
+                        if !name.is_empty() {
+                            session_name = name;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    hits.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    hits.truncate(50);
+    Ok(hits)
+}
+
+fn snippet_around(haystack: &str, needle: &str, radius: usize) -> String {
+    let lower = haystack.to_lowercase();
+    if let Some(pos) = lower.find(needle) {
+        let start = pos.saturating_sub(radius);
+        let end = (pos + needle.len() + radius).min(haystack.len());
+        let mut s = haystack[start..end].to_string();
+        if start > 0 {
+            s.insert_str(0, "…");
+        }
+        if end < haystack.len() {
+            s.push('…');
+        }
+        s.replace('\n', " ")
+    } else {
+        haystack.chars().take(radius * 2).collect()
+    }
+}
+
+fn push_search_hit(
+    msg: &str,
+    role: &str,
+    timestamp: i64,
+    needle: &str,
+    session_id: &str,
+    session_name: &str,
+    hits: &mut Vec<NeoCodexSearchHit>,
+) {
+    let lower = msg.to_lowercase();
+    if !lower.contains(needle) {
+        return;
+    }
+    let snippet = snippet_around(msg, needle, 120);
+    let match_count = lower.matches(needle).count();
+    hits.push(NeoCodexSearchHit {
+        session_id: session_id.to_string(),
+        session_name: session_name.to_string(),
+        role: role.to_string(),
+        snippet,
+        timestamp,
+        match_count,
+    });
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct NeoCodexMcpServerInfo {
+    pub name: String,
+    pub transport: String,
+    pub tool_count: usize,
+    pub healthy: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct NeoCodexMcpToolInfo {
+    pub name: String,
+    pub description: String,
+    pub server: String,
+}
+
+/// P2-5: register an MCP stdio server and attach it to the NeoCodex agent so
+/// its tools become callable via the `mcp_call` agent tool (Codex/Claude MCP
+/// parity). Previously the MCP host existed only for CLI/headless.
+#[tauri::command]
+pub async fn neocodex_mcp_register(
+    name: String,
+    command: String,
+    args: Option<Vec<String>>,
+) -> Result<Vec<NeoCodexMcpServerInfo>, String> {
+    let mut agent_guard = NEOCODEX_AGENT.lock().await;
+    let agent = match agent_guard.as_mut() {
+        Some(a) => a,
+        None => {
+            let mut a = NeoCodexAgent::new("neotrix-tauri");
+            a.provider.sync_from_real();
+            *agent_guard = Some(a);
+            agent_guard.as_mut().unwrap()
+        }
+    };
+    let registry = agent.mcp.get_or_insert_with(McpRegistry::new);
+    let arg_owned: Vec<String> = args.unwrap_or_default();
+    let arg_refs: Vec<&str> = arg_owned.iter().map(|s| s.as_str()).collect();
+    registry.register_stdio(&name, &command, &arg_refs, vec![]);
+    Ok(registry.list_servers().iter().map(|s| NeoCodexMcpServerInfo {
+        name: s.name.clone(),
+        transport: s.transport.transport_type().to_string(),
+        tool_count: s.tools.len(),
+        healthy: s.healthy,
+    }).collect())
+}
+
+/// P2-5: list MCP servers and tools currently attached to the NeoCodex agent.
+#[tauri::command]
+pub async fn neocodex_mcp_list() -> Result<Vec<NeoCodexMcpServerInfo>, String> {
+    let agent_guard = NEOCODEX_AGENT.lock().await;
+    let Some(agent) = agent_guard.as_ref() else {
+        return Ok(Vec::new());
+    };
+    let Some(registry) = agent.mcp.as_ref() else {
+        return Ok(Vec::new());
+    };
+    Ok(registry.list_servers().iter().map(|s| NeoCodexMcpServerInfo {
+        name: s.name.clone(),
+        transport: s.transport.transport_type().to_string(),
+        tool_count: s.tools.len(),
+        healthy: s.healthy,
+    }).collect())
+}
+
+/// P2-5: list all MCP tools (name + description) exposed by the attached registry.
+#[tauri::command]
+pub async fn neocodex_mcp_tools() -> Result<Vec<NeoCodexMcpToolInfo>, String> {
+    let agent_guard = NEOCODEX_AGENT.lock().await;
+    let Some(agent) = agent_guard.as_ref() else {
+        return Ok(Vec::new());
+    };
+    let Some(registry) = agent.mcp.as_ref() else {
+        return Ok(Vec::new());
+    };
+    Ok(registry.list_tools().iter().map(|t| NeoCodexMcpToolInfo {
+        name: t.name.clone(),
+        description: t.description.clone(),
+        server: t.server_name.clone(),
+    }).collect())
 }
 
 #[tauri::command]
@@ -864,24 +991,6 @@ fn archived_session_path(session_id: &str) -> std::path::PathBuf {
 
 fn checkpoints_dir() -> std::path::PathBuf {
     sessions_dir().join("checkpoints")
-}
-
-/// Snapshot a session's wire file into checkpoints/ (Claude Desktop
-/// checkpoint / Codex revert parity). Each user prompt turn may create a
-/// checkpoint; rewinding restores the conversation to that point.
-#[tauri::command]
-pub async fn neocodex_checkpoint_create(session_id: String) -> Result<Vec<serde_json::Value>, String> {
-    let path = session_path(&session_id);
-    if !path.exists() {
-        return Err("Session not found".to_string());
-    }
-    let dir = checkpoints_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
-    let dest = dir.join(format!("{}-{}.jsonl", session_id, ts));
-    std::fs::copy(&path, &dest).map_err(|e| e.to_string())?;
-    Ok(list_checkpoints_inner(&session_id))
 }
 
 /// Non-locking snapshot of an in-memory-only wire path. Used by

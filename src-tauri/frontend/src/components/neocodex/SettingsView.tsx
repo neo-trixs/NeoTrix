@@ -4,7 +4,7 @@ import { useStore } from "../../stores";
 import type { NeoCodexProviderConfig, AppSettings } from "../../types";
 import styles from "./SettingsView.module.css";
 
-type Tab = "providers" | "theme" | "advanced" | "about";
+type Tab = "providers" | "theme" | "advanced" | "about" | "mcp";
 
 export function SettingsView() {
   const settings = useStore((s) => s.settings);
@@ -75,6 +75,7 @@ export function SettingsView() {
     { id: "theme", label: "外观", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="4"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1M4.5 4.5l.7.7M8.8 8.8l.7.7M4.5 9.5l.7-.7M8.8 5.2l.7-.7" strokeLinecap="round"/></svg> },
     { id: "advanced", label: "高级", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="5"/><path d="M7 3v1M7 10v1M3 7h1M10 7h1" strokeLinecap="round"/></svg> },
     { id: "about", label: "关于", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="7" cy="7" r="5"/><path d="M7 5v2M7 9v.01" strokeLinecap="round"/></svg> },
+    { id: "mcp", label: "MCP", icon: <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 2v10M2 7h10M4.5 2.5l2.5 2.5 2.5-2.5M4.5 11.5L7 9l2.5 2.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   ];
 
   if (loading) {
@@ -119,6 +120,7 @@ export function SettingsView() {
         {activeTab === "theme" && <ThemePanel theme={settings.theme} onThemeChange={handleThemeChange} fontSize={settings.fontSize} onFontSizeChange={(v) => setSettings({ ...settings, fontSize: v })} language={settings.language} onLanguageChange={handleLanguageChange} accent={settings.accent} onAccentChange={(v) => setSettings({ ...settings, accent: v })} />}
         {activeTab === "advanced" && <AdvancedPanel settings={settings} onChange={(patch) => setSettings({ ...settings, ...patch })} />}
         {activeTab === "about" && <AboutPanel />}
+        {activeTab === "mcp" && <McpPanel />}
       </div>
     </div>
   );
@@ -443,3 +445,94 @@ function AboutPanel() {
 }
 
 export default SettingsView;
+
+interface McpServerInfo { name: string; transport: string; tool_count: number; healthy: boolean }
+interface McpToolInfo { name: string; description: string; server: string }
+
+function McpPanel() {
+  const [servers, setServers] = useState<McpServerInfo[]>([]);
+  const [tools, setTools] = useState<McpToolInfo[]>([]);
+  const [name, setName] = useState("");
+  const [command, setCommand] = useState("");
+  const [args, setArgs] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const addNotification = useStore((s) => s.addNotification);
+
+  const load = async () => {
+    try {
+      const [s, t] = await Promise.all([
+        invoke<McpServerInfo[]>("neocodex_mcp_list"),
+        invoke<McpToolInfo[]>("neocodex_mcp_tools"),
+      ]);
+      setServers(s || []);
+      setTools(t || []);
+      setError("");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleRegister = async () => {
+    if (!name.trim() || !command.trim()) {
+      setError("服务名与命令不能为空");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const argList = args.split(/\s+/).filter(Boolean);
+      const list = await invoke<McpServerInfo[]>("neocodex_mcp_register", { name, command, args: argList });
+      setServers(list || []);
+      setName(""); setCommand(""); setArgs("");
+      addNotification({ type: "success", message: `MCP 服务 ${name} 已注册`, duration: 3000 });
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={styles.panel}>
+      <div className={styles.mcpTitle}>MCP 服务器</div>
+      <p className={styles.hint}>注册 MCP 服务器后，其工具可通过 mcp_call 供 Agent 调用（Codex/Claude MCP 对标）。</p>
+      <div className={styles.mcpRow}>
+        <input type="text" placeholder="服务名 (如 filesystem)" value={name} onChange={(e) => setName(e.target.value)} className={styles.mcpInput} data-testid="mcp-name" />
+      </div>
+      <div className={styles.mcpRow}>
+        <input type="text" placeholder="命令 (如 npx)" value={command} onChange={(e) => setCommand(e.target.value)} className={styles.mcpInput} data-testid="mcp-command" />
+      </div>
+      <div className={styles.mcpRow}>
+        <input type="text" placeholder="参数 (空格分隔，可选)" value={args} onChange={(e) => setArgs(e.target.value)} className={styles.mcpInput} data-testid="mcp-args" />
+      </div>
+      <button type="button" className={styles.updateBtn} onClick={handleRegister} disabled={busy} data-testid="mcp-register">
+        {busy ? "注册中…" : "注册 Stdio 服务器"}
+      </button>
+
+      {error && <div className={styles.updateErr}>{error}</div>}
+
+      <div className={styles.mcpSectionSub}>已注册 ({servers.length})</div>
+      {servers.length === 0 && <div className={styles.mcpEmpty}>尚未注册 MCP 服务器</div>}
+      {servers.map((s) => (
+        <div key={s.name} className={styles.mcpServer} data-testid={`mcp-server-${s.name}`}>
+          <span className={styles.mcpServerName}>{s.name}</span>
+          <span className={styles.mcpServerMeta}>{s.transport} · {s.tool_count} 工具{s.healthy ? "" : " · 未健康检查"}</span>
+        </div>
+      ))}
+
+      <div className={styles.mcpSectionSub}>可用工具 ({tools.length})</div>
+      {tools.length === 0 && <div className={styles.mcpEmpty}>无可用 MCP 工具</div>}
+      {tools.map((t) => (
+        <div key={`${t.server}:${t.name}`} className={styles.mcpTool} data-testid={`mcp-tool-${t.name}`}>
+          <span className={styles.mcpToolName}>{t.name}</span>
+          <span className={styles.mcpToolServer}>{t.server}</span>
+          <span className={styles.mcpToolDesc}>{t.description}</span>
+        </div>
+      ))}
+    </div>
+  );
+}

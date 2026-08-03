@@ -391,6 +391,70 @@
   font-size: 12px;
 }
 
+.searchResults {
+  padding: 6px 8px;
+}
+
+.searchResultsHeader {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-tertiary);
+  padding: 4px 6px 8px;
+}
+
+.searchHit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.searchHit:hover {
+  background: var(--bg-hover);
+}
+
+.searchHitHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.searchHitName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchHitRole {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--accent-primary, #388bfd);
+}
+
+.searchHitRoleAsst {
+  color: var(--success, #3fb950);
+}
+
+.searchHitSnippet {
+  font-size: 11px;
+  color: var(--fg-secondary);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .skeleton {
   height: 60px;
   background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-hover) 50%, var(--bg-tertiary) 75%);

@@ -1124,7 +1124,7 @@ impl AgentStream {
 
 // ── NeoCodex Agent Loop (from Claude Code: ReAct pattern + NeoTrix Consciousness) ──
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct NeoCodexConfig {
     pub mode: NeoCodexMode,
     pub max_turn_tokens: usize,
@@ -1133,6 +1133,27 @@ pub struct NeoCodexConfig {
     pub shell_available: bool,
     pub thinking_enabled: bool,
     pub goal_mode: bool,
+    /// P2-1: generation parameters surfaced from the desktop settings panel.
+    /// Previously hardcoded (temperature 0.3 / max_tokens 4096) so the
+    /// editable Settings temperature/maxTokens fields never reached the LLM.
+    pub temperature: f64,
+    pub max_tokens: u32,
+}
+
+impl Default for NeoCodexConfig {
+    fn default() -> Self {
+        Self {
+            mode: NeoCodexMode::default(),
+            max_turn_tokens: 0,
+            provider_name: "neotrix".to_string(),
+            auto_compact: true,
+            shell_available: true,
+            thinking_enabled: false,
+            goal_mode: false,
+            temperature: 0.3,
+            max_tokens: 4096,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1190,6 +1211,11 @@ pub struct NeoCodexAgent {
     pub audit: NeoCodexSelfAudit,
     // Cycle 160e: tool grounding monitor (D25 production-wired, R-P49~R-P53)
     pub tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
+    // P2-5: MCP tool registry (Codex/Claude MCP parity). When registered, the
+    // agent gains a `mcp_call` tool proxying to the registry; previously the
+    // MCP host existed only for CLI/headless and the NeoCodex agent could not
+    // call MCP tools despite the desktop UI having zero MCP surface.
+    pub mcp: Option<crate::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry>,
 }
 
 impl NeoCodexAgent {
@@ -1212,13 +1238,35 @@ impl NeoCodexAgent {
             evolution: EvolutionLoop::new(),
             audit: NeoCodexSelfAudit::new(),
             tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
+            mcp: None,
         }
+    }
+
+    /// P2-5: attach the shared MCP registry so the agent can call MCP tools.
+    pub fn with_mcp(mut self, mcp: crate::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry) -> Self {
+        self.mcp = Some(mcp);
+        self
+    }
+
+    pub fn set_mcp(&mut self, mcp: Option<crate::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry>) {
+        self.mcp = mcp;
     }
 
     /// Set budget limit (from Claude Code max_budget_usd)
     pub fn with_budget(mut self, max_budget: f64) -> Self {
         self.cost.max_budget = max_budget;
         self
+    }
+
+    /// P2-1: set generation params from the desktop settings panel. Applies on
+    /// the next request built by build_request (was previously hardcoded).
+    pub fn set_generation_params(&mut self, temperature: Option<f64>, max_tokens: Option<u32>) {
+        if let Some(t) = temperature {
+            self.config.temperature = t.clamp(0.0, 2.0);
+        }
+        if let Some(m) = max_tokens {
+            self.config.max_tokens = m.max(1);
+        }
     }
 
     /// Register a pre-tool lifecycle hook (from Kimi Code lifecycle hooks)
@@ -1887,8 +1935,10 @@ impl NeoCodexAgent {
         Some(LlmRequest {
             model: self.provider.active_model(),
             messages,
-            temperature: Some(0.3),
-            max_tokens: 4096,
+            // P2-1: honor the settings-panel generation params instead of the
+            // old hardcoded values.
+            temperature: Some(self.config.temperature.clamp(0.0, 2.0) as f32),
+            max_tokens: self.config.max_tokens.max(1),
             tools: vec![
                 Tool {
                     name: "read".into(),
@@ -1914,6 +1964,16 @@ impl NeoCodexAgent {
                     name: "shell".into(),
                     description: "Run a shell command and return stdout".into(),
                     input_schema: serde_json::json!({"type": "object", "properties": {"command": {"type": "string"}}}),
+                },
+                Tool {
+                    name: "mcp_call".into(),
+                    description: "Call a registered MCP tool. Args format: <tool_name>|<json_args> (split on the first pipe). List available tools with mcp_list.".into(),
+                    input_schema: serde_json::json!({"type": "object", "properties": {"name": {"type": "string"}, "args": {"type": "string"}}}),
+                },
+                Tool {
+                    name: "mcp_list".into(),
+                    description: "List registered MCP servers and their available tools".into(),
+                    input_schema: serde_json::json!({"type": "object", "properties": {}}),
                 },
             ],
             image_data,
@@ -2137,6 +2197,43 @@ impl NeoCodexAgent {
                     }
                     Err(e) => format!("[shell error] {}", e),
                 }
+            }
+            // P2-5: MCP tool call (Codex/Claude MCP parity). Args format:
+            // `<tool_name>|<json_args>` — split on the first `|`. Delegates to
+            // the attached McpRegistry; without a registry it returns a clear
+            // error instead of silently pretending to succeed.
+            "mcp_call" => {
+                let Some(registry) = &self.mcp else {
+                    return "[mcp_call error] no MCP registry attached; register MCP servers first".to_string();
+                };
+                let (name, json) = match args.split_once('|') {
+                    Some((n, j)) => (n.trim(), j),
+                    None => (args.trim(), "{}"),
+                };
+                let parsed: serde_json::Value = match serde_json::from_str(json) {
+                    Ok(v) => v,
+                    Err(e) => return format!("[mcp_call error] invalid JSON args: {}", e),
+                };
+                match registry.call_tool(name, &parsed) {
+                    Ok(result) => result,
+                    Err(e) => format!("[mcp_call error] {}", e),
+                }
+            }
+            "mcp_list" => {
+                let Some(registry) = &self.mcp else {
+                    return "[mcp_list] no MCP registry attached".to_string();
+                };
+                if registry.server_count() == 0 {
+                    return "[mcp_list] no MCP servers registered".to_string();
+                }
+                let mut out = String::new();
+                for server in registry.list_servers() {
+                    out.push_str(&format!("# {} ({})\n", server.name, server.tools.len()));
+                    for tool in &server.tools {
+                        out.push_str(&format!("  - {}: {}\n", tool.name, tool.description));
+                    }
+                }
+                out
             }
             _ => format!("Unknown tool: {}", name),
         }

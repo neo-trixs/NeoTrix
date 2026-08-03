@@ -486,3 +486,99 @@
   color: var(--fg-primary);
   font-size: 12px;
 }
+
+.mcpTitle {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--fg-primary);
+}
+
+.mcpRow {
+  margin-bottom: 8px;
+}
+
+.mcpInput {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--fg-primary);
+  font-size: 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.mcpSectionSub {
+  margin-top: 16px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-tertiary);
+}
+
+.mcpEmpty {
+  padding: 10px;
+  text-align: center;
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.mcpServer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.mcpServerName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+
+.mcpServerMeta {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+}
+
+.mcpTool {
+  padding: 7px 10px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.mcpToolName {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-primary);
+  margin-right: 6px;
+}
+
+.mcpToolServer {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--accent-primary, #388bfd);
+  background: rgba(56, 139, 253, 0.1);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-right: 6px;
+}
+
+.mcpToolDesc {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--fg-secondary);
+}

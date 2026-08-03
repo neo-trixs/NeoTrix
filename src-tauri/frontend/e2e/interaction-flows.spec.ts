@@ -68,7 +68,10 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
 
     const calls = await invokeCalls(page);
     expect(calls).toContainEqual(
-      expect.objectContaining({ cmd: "neocodex_send_message_stream", args: { content: "帮我分析 RAG 检索", permission_mode: "auto" } })
+      expect.objectContaining({
+        cmd: "neocodex_send_message_stream",
+        args: expect.objectContaining({ content: "帮我分析 RAG 检索", permissionMode: "auto" }),
+      })
     );
   });
 
@@ -179,6 +182,7 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
   test("slash menu exposes parity commands and inserts into the composer", async ({ page }) => {
     await mockCommand(page, "neocodex_list_sessions", () => []);
     await mockCommand(page, "neocodex_list_archived", () => []);
+    await mockCommand(page, "neocodex_init_project", () => "已初始化项目");
     await page.goto("/");
     await page.getByTestId("sidebar-tab-sessions").click();
     await expect(page.getByTestId("sidebar-tab-sessions")).toBeVisible({ timeout: 10_000 });
@@ -189,10 +193,13 @@ test.describe("NeoCodex interaction flows (mocked IPC)", () => {
     await textarea.press("Enter");
     await expect(textarea).toHaveValue("/model ");
 
+    // `/init` is a real backend operation (P2-4): picking it dispatches the
+    // command immediately instead of inserting text, so the textarea clears
+    // rather than showing "/init ".
     await textarea.fill("/init");
     await expect(page.getByText("初始化项目")).toBeVisible({ timeout: 10_000 });
     await textarea.press("Enter");
-    await expect(textarea).toHaveValue("/init ");
+    await expect(textarea).toHaveValue("");
   });
 
   test("capability health pane opens from the views menu and shows the 7-domain network", async ({ page }) => {

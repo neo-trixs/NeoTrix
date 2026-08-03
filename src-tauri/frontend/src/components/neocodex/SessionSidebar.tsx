@@ -21,6 +21,59 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
   const [exportSession, setExportSession] = useState<NeoCodexSession | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addNotification = useStore((s) => s.addNotification);
+  // P2-2: full-text message search (Codex ⌘G / Claude find parity). Local name
+  // filter stays for <2 chars; longer queries hit the backend search command.
+  const [searchHits, setSearchHits] = useState<Array<{ session_id: string; session_name: string; role: string; snippet: string; match_count: number }>>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setSearchHits([]);
+      setSearching(false);
+      if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
+      return;
+    }
+    if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current);
+    setSearching(true);
+    searchTimerRef.current = window.setTimeout(async () => {
+      try {
+        const hits = await invoke("neocodex_search_sessions", { query: q }) as any[];
+        setSearchHits(hits.map((h) => ({
+          session_id: h.session_id,
+          session_name: h.session_name,
+          role: h.role,
+          snippet: h.snippet,
+          match_count: h.match_count || 0,
+        })));
+      } catch (e) {
+        console.error("Search failed:", e);
+        setSearchHits([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => { if (searchTimerRef.current) window.clearTimeout(searchTimerRef.current); };
+  }, [query]);
+
+  const handleSearchHitSelect = (hit: { session_id: string; session_name: string }) => {
+    const s = sessions.find((x) => x.id === hit.session_id);
+    if (s) {
+      onSessionSelect?.(s);
+    } else {
+      onSessionSelect?.({
+        id: hit.session_id,
+        name: hit.session_name,
+        mode: "Agent",
+        message_count: 0,
+        messages: [],
+        wire_path: "",
+        created_at: 0,
+        updated_at: 0,
+      } as NeoCodexSession);
+    }
+  };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -335,7 +388,33 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
       </div>
 
       <div className={styles.list}>
-        {groups.map((group) => (
+        {query.trim().length >= 2 && (
+          <div className={styles.searchResults} data-testid="session-search-results">
+            <div className={styles.searchResultsHeader}>
+              {searching ? "搜索中…" : `消息搜索结果 (${searchHits.length})`}
+            </div>
+            {searchHits.length === 0 && !searching && (
+              <div className={styles.emptyFilter}>未找到包含“{query.trim()}”的会话消息</div>
+            )}
+            {searchHits.map((hit, i) => (
+              <button
+                key={`${hit.session_id}-${i}`}
+                type="button"
+                className={styles.searchHit}
+                onClick={() => handleSearchHitSelect(hit)}
+              >
+                <div className={styles.searchHitHead}>
+                  <span className={styles.searchHitName}>{hit.session_name || hit.session_id}</span>
+                  <span className={`${styles.searchHitRole} ${hit.role === "assistant" ? styles.searchHitRoleAsst : ""}`}>
+                    {hit.role === "user" ? "你" : "Agent"} · {hit.match_count} 处
+                  </span>
+                </div>
+                <div className={styles.searchHitSnippet}>{hit.snippet}</div>
+              </button>
+            ))}
+          </div>
+        )}
+        {query.trim().length < 2 && groups.map((group) => (
           <div key={group.label}>
             <div className={groupBy === "project" ? styles.groupHeaderProject : styles.groupHeader}>{group.label}</div>
             {group.sessions.map((session) => (
@@ -365,7 +444,7 @@ export function SessionSidebar({ activeSessionId, onSessionSelect, onSessionDele
             <span className={styles.emptyHint}>点击上方 + 号创建第一个会话，或按 <kbd>⌘N</kbd></span>
           </div>
         )}
-        {sessions.length > 0 && groups.length === 0 && (
+        {query.trim().length < 2 && sessions.length > 0 && groups.length === 0 && (
           <div className={styles.emptyFilter}>无匹配会话</div>
         )}
 

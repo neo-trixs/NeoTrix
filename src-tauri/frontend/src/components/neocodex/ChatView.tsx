@@ -123,9 +123,12 @@ interface ChatViewProps {
   onDelete?: (id: number) => void;
   viewMode?: "verbose" | "normal" | "summary";
   contextUsage?: number;
+  pendingPlanExecute?: boolean;
+  onPlanApprove?: () => void;
   onStop?: () => void;
   recentSessions?: Array<{ id: string; name: string; mode: string; updated_at: number }>;
   onRecentSessionSelect?: (id: string) => void;
+  onSlashAction?: (cmd: string, arg: string) => void;
 }
 
 const SLASH_COMMANDS = [
@@ -164,6 +167,9 @@ export function ChatView({
   onStop,
   recentSessions,
   onRecentSessionSelect,
+  pendingPlanExecute = false,
+  onPlanApprove,
+  onSlashAction,
 }: ChatViewProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLElement>(null);
@@ -210,6 +216,32 @@ export function ChatView({
 
   const handleSlashSelect = (cmd: string) => {
     const prefix = cmd.split(" ")[0];
+    // P2-4: slash commands that map to real backend operations are dispatched
+    // immediately instead of merely being inserted as text. `/init`, `/export`,
+    // `/clear`, `/feedback` previously did nothing when sent (they reached the
+    // model as plain text or were no-ops), while the matching backend commands
+    // existed but were never invoked by the UI.
+    if (prefix === "/init" || prefix === "/export" || prefix === "/clear") {
+      onSlashAction?.(prefix, "");
+      setInput("");
+      setShowSlash(false);
+      setSlashHighlight(0);
+      textareaRef.current?.focus();
+      return;
+    }
+    if (prefix === "/feedback") {
+      const rest = cmd.slice("/feedback".length).trim();
+      if (rest) {
+        onSlashAction?.("/feedback", rest);
+        setInput("");
+      } else {
+        setInput("/feedback ");
+      }
+      setShowSlash(false);
+      setSlashHighlight(0);
+      textareaRef.current?.focus();
+      return;
+    }
     setInput((prev) => prev.replace(/\/\w*$/, "") + prefix + " ");
     setShowSlash(false);
     setSlashHighlight(0);
@@ -485,6 +517,18 @@ export function ChatView({
     promptHistory.current.push(content);
     if (promptHistory.current.length > 100) promptHistory.current.shift();
     setHistoryIndex(-1);
+    // P2-4: intercept first-tier slash commands at submit time instead of
+    // shipping them to the model as plain text. `/plan /model /new /rename`
+    // are real actions with backend/UI support; sending them as text makes the
+    // model guess at intent. Insert-only hints like `/compact /status /btw
+    // /goal` still pass through so the model can interpret them.
+    const slashPrefix = content.split(/\s+/)[0];
+    if (slashPrefix === "/plan" || slashPrefix === "/model" || slashPrefix === "/new" || slashPrefix === "/rename" || slashPrefix === "/export" || slashPrefix === "/clear") {
+      onSlashAction?.(slashPrefix, content.slice(slashPrefix.length).trim());
+      setAttachments([]);
+      if (mentions.length > 0) setMentions([]);
+      return;
+    }
     onSend(content, attachments);
     setAttachments([]);
     if (mentions.length > 0) setMentions([]);
@@ -555,6 +599,24 @@ export function ChatView({
             message={{ role: streamingRole, content: streamingContent, contentType: "markdown" }}
             isStreaming
           />
+        )}
+        {pendingPlanExecute && !agentBusy && (
+          <div className={styles.planApprove} data-testid="plan-approve-banner" role="dialog" aria-label="计划审批">
+            <div className={styles.planApproveTitle}>📋 计划已生成</div>
+            <div className={styles.planApproveHint}>
+              当前为 Plan 模式（只读）。批准后切换到 Agent 模式执行该计划。
+            </div>
+            <div className={styles.planApproveActions}>
+              <button
+                type="button"
+                className={styles.planApproveBtn}
+                data-testid="plan-approve-btn"
+                onClick={onPlanApprove}
+              >
+                批准并执行
+              </button>
+            </div>
+          </div>
         )}
         {!hasMessages && (
           <div className={styles.emptyState}>

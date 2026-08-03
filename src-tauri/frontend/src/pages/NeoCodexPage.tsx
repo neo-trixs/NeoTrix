@@ -68,6 +68,8 @@ export default function NeoCodexPage() {
   const [taskSteps, setTaskSteps] = useState<Array<{ id: string; name: string; args: string; startedAt: number; status: "running" | "done"; success?: boolean }>>([]);
   const [taskStartedAt, setTaskStartedAt] = useState<number | null>(null);
   const [, setTaskClock] = useState(0);
+  const [pendingPlanExecute, setPendingPlanExecute] = useState(false);
+  const lastPlanMsgRef = useRef<{ content: string; attachments?: any[] } | null>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -157,6 +159,9 @@ export default function NeoCodexPage() {
 const handleSend = async (content: string, attachments?: Attachment[], regenerate?: boolean) => {
     if (agentBusy && !regenerate) return;
     stopRef.current = false;
+    // P2-3: a fresh send dismisses any pending plan-approval action.
+    setPendingPlanExecute(false);
+    lastPlanMsgRef.current = null;
     // Pin the session this send started in. If the user switches sessions while
     // the reply is streaming, stale tokens/messages must not leak into the new
     // session (P1: race fix). `sessionSwitchRef` is bumped by handleSessionSelect.
@@ -267,7 +272,20 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       if (regenerate) {
         (payload as any).regenerate = true;
       }
-      (payload as any).permission_mode = useStore.getState().settings?.permissionMode || "auto";
+      // Tauri v2 converts command args camelCase→snake_case by default
+      // (tauri-macros ArgumentCase::Camel). Snake_case keys like
+      // `permission_mode` are silently ignored → the backend falls back to
+      // "auto", so the Manual/AcceptEdits review gate never activates and
+      // maxTokens never reaches the request. Use camelCase keys.
+      (payload as any).permissionMode = useStore.getState().settings?.permissionMode || "auto";
+      // P2-1: pass settings-panel generation params to the backend so the LLM
+      // request honors them (temperature/maxTokens were previously hardcoded
+      // server-side and the editable fields never took effect).
+      const s = useStore.getState().settings;
+      const temp = s?.temperature;
+      const maxT = s?.maxTokens;
+      (payload as any).temperature = typeof temp === "number" ? temp : undefined;
+      (payload as any).maxTokens = typeof maxT === "number" ? maxT : undefined;
       const generated = await invoke("neocodex_send_message_stream", payload) as string;
       setNeoCodexStreaming(null);
       const wasCancelled = stopRef.current;
@@ -293,6 +311,17 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       if (!wasCancelled && (permMode === "manual" || permMode === "accept")) {
         setDiffOpen(true);
         addNotification({ type: "info", message: permMode === "manual" ? "本轮改动待审阅，请在 Diff 面板逐文件接受/拒绝" : "改动已应用，可在 Diff 面板复核", duration: 3000 });
+      }
+      // P2-3: Plan-mode parity with Codex /plan — surface an approve-to-execute
+      // action after a plan turn completes instead of leaving the user in a
+      // dead end. The user can approve to switch to Agent mode and re-run the
+      // same prompt, or discard by sending something new.
+      if (!wasCancelled && neocodexMode === "Plan") {
+        lastPlanMsgRef.current = { content };
+        setPendingPlanExecute(true);
+      } else {
+        lastPlanMsgRef.current = null;
+        setPendingPlanExecute(false);
       }
       // Codex/Claude parity: surface an opt-out notification when a turn
       // completes while the user may be looking elsewhere.
@@ -396,6 +425,72 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       setNeoCodexMode(mode as "Agent" | "Shell" | "Plan");
     } catch (e) {
       console.error("Mode set failed:", e);
+    }
+  };
+
+  // P2-3: approve a generated plan — switch to Agent mode and re-run the same
+  // prompt so the plan is executed instead of being a dead end.
+  const handlePlanApprove = async () => {
+    const last = lastPlanMsgRef.current;
+    if (!last || agentBusy) return;
+    setPendingPlanExecute(false);
+    lastPlanMsgRef.current = null;
+    await handleModeChange("Agent");
+    handleSend(last.content, last.attachments);
+  };
+
+  // P2-4: wire slash commands to the real backend operations. Previously
+  // `/init /export /clear /feedback` only inserted text (no-op when sent),
+  // while the backend commands existed but were never invoked by the UI.
+  const handleSlashAction = async (cmd: string, arg: string) => {
+    const sid = useStore.getState().neocodexActiveSessionId;
+    if (!sid) {
+      addNotification({ type: "error", message: "请先选择或创建会话", duration: 3000 });
+      return;
+    }
+    try {
+      if (cmd === "/init") {
+        const res = await invoke("neocodex_init_project", { sessionId: sid }) as string;
+        addNotification({ type: "success", message: res.slice(0, 120), duration: 4000 });
+      } else if (cmd === "/export") {
+        const md = await invoke("neocodex_export_session", { sessionId: sid, format: null }) as string;
+        const blob = new Blob([md], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `neocodex-session-${sid}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+        addNotification({ type: "success", message: "已导出会话为 Markdown", duration: 3000 });
+      } else if (cmd === "/clear") {
+        await invoke("neocodex_clear_session", { sessionId: sid });
+        useStore.getState().setNeoCodexMessages([]);
+        setNeoCodexStreaming(null);
+        addNotification({ type: "success", message: "已清空当前会话消息", duration: 3000 });
+      } else if (cmd === "/feedback") {
+        await invoke("neocodex_feedback", { sessionId: sid, text: arg });
+        addNotification({ type: "success", message: "已记录反馈，感谢！", duration: 3000 });
+      } else if (cmd === "/plan") {
+        await handleModeChange("Plan");
+        addNotification({ type: "info", message: "已切换到 Plan 模式（只读规划）", duration: 2500 });
+      } else if (cmd === "/new") {
+        await handleNewSession();
+      } else if (cmd === "/rename") {
+        setRenamingTitle(true);
+      } else if (cmd === "/model") {
+        const m = arg.trim();
+        if (m) {
+          await invoke("neocodex_set_provider", { name: m }).catch((e) => {
+            addNotification({ type: "error", message: `切换模型失败: ${e}`, duration: 3000 });
+          });
+          addNotification({ type: "success", message: `已切换模型: ${m}`, duration: 2500 });
+        } else {
+          addNotification({ type: "info", message: "用法: /model <模型名>", duration: 3000 });
+        }
+      }
+    } catch (e) {
+      console.error("Slash action failed:", e);
+      addNotification({ type: "error", message: `命令执行失败: ${e}`, duration: 4000 });
     }
   };
 
@@ -1088,6 +1183,9 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             onEdit={handleEditMessage}
             onDelete={handleDeleteMessage}
             onRegenerate={handleRegenerateMessage}
+            pendingPlanExecute={pendingPlanExecute}
+            onPlanApprove={handlePlanApprove}
+            onSlashAction={handleSlashAction}
           />
           {sideChatOpen && (
             <div className={styles.sideChat}>
