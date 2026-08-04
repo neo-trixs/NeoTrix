@@ -50,8 +50,6 @@ pub mod nt_core_sense;
 pub mod l3_memory;
 pub mod nt_core_hcube;
 pub mod nt_core_bank;
-#[cfg(feature = "research")]
-pub mod nt_core_fhrr;
 pub mod nt_core_consensus;
 pub mod nt_core_graph;
 pub mod nt_core_walsh;
@@ -157,12 +155,7 @@ pub mod nt_core_memory_budget;
 pub mod nt_core_bounded_collections;
 pub mod nt_core_telemetry;
 pub mod nt_core_answer_engine;
-pub mod nt_core_answer_bridge;
 pub mod nt_core_self_test_integration;
-#[cfg(feature = "research")]
-pub mod nt_core_intel_pipeline;
-#[cfg(feature = "research")]
-pub mod nt_core_io_capability;
 pub mod nt_core_second_brain;
 pub mod nt_core_scoring_substrate;
 pub mod nt_core_state_substrate;
@@ -267,9 +260,6 @@ pub use nt_core_e8::abduction::{
 pub use nt_core_consensus::{
     AbductiveExplanation, AbductiveSolver, ConsensusConfig, ConsensusReport, ReflectionHead,
     ReflectionPipeline, ReflectionResult,
-};
-pub use nt_core_gwt::consensus_resonance::{
-    ConsensusResonanceBridge, ConsensusResonanceReport,
 };
 pub use nt_core_e8::e8_abduction_bridge::{
     E8AbductionBridge, AbductiveTransitionReport,

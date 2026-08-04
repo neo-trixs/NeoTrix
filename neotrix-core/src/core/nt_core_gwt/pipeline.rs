@@ -341,7 +341,7 @@ mod tests {
             ("code output", true),
             ("verification ok", true),
         ]);
-        let gwt = GlobalWorkspace::new(13.0);
+        let gwt = GlobalWorkspace::new(0.3);
         let result = executor.execute("test task", &gwt, &handler);
         assert!(result.all_success);
         assert_eq!(result.step_results.len(), 3);
@@ -356,7 +356,7 @@ mod tests {
             ("code failed", false),
             ("should not run", true),
         ]);
-        let gwt = GlobalWorkspace::new(13.0);
+        let gwt = GlobalWorkspace::new(0.3);
         let result = executor.execute("failing task", &gwt, &handler);
         assert!(!result.all_success);
         assert_eq!(result.step_results[1].success, false);
@@ -370,7 +370,7 @@ mod tests {
             ("step2", true),
             ("step3", true),
         ]);
-        let gwt = GlobalWorkspace::new(13.0);
+        let gwt = GlobalWorkspace::new(0.3);
         let result = executor.execute("traj test", &gwt, &handler);
         let traj = executor.trajectory_collector.latest();
         assert!(traj.is_some());

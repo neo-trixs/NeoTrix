@@ -1678,9 +1678,15 @@ pub fn neocodex_open_file(app: tauri::AppHandle, path: String) -> Result<(), Str
 /// Open a file in the external editor (OS default).
 #[tauri::command]
 pub async fn neocodex_open_external(path: String) -> Result<(), String> {
-    use tauri_plugin_opener::OpenerExt;
-    let app = tauri::AppHandle::current();
-    app.opener().open_path(path, None::<String>).map_err(|e| e.to_string())
+    let status = if cfg!(target_os = "windows") {
+        std::process::Command::new("cmd").args(["/C", "start", ""]).arg(&path).status()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(&path).status()
+    } else {
+        std::process::Command::new("xdg-open").arg(&path).status()
+    };
+    status.map_err(|e| format!("failed to launch external opener: {e}"))?;
+    Ok(())
 }
 
 /// Get git status for all files in the repo (porcelain format).

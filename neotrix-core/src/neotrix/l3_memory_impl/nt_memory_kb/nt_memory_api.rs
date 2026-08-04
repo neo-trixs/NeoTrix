@@ -348,6 +348,7 @@ mod tests {
                 base_url: "http://127.0.0.1:8237/v1".into(),
                 model: "all-MiniLM-L6-v2".into(),
                 dimension: 384,
+                mode: nt_memory_embed::EmbedMode::Http,
             });
         }
         let body = futures_block_on(embeddings_status_handler(State(state))).expect("status ok");

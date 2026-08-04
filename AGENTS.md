@@ -15,7 +15,7 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 - `~/.agents/skills/rev/officer/rev-officer-agent.md` — D1-D51+S1-S7 审查维度。触发 review 时加载
 - `~/.agents/skills/experience-tree/SKILL.md` — 吸收协议。会话收尾时加载
 - KB 检索: `absorb_session.py query` — 历史经验全文，需要时按关键词查询
-## Skill Routing (何时加载什么)
+## Skill Routing
 
 | 任务 | 加载 |
 |------|------|
@@ -26,7 +26,7 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 | 实现功能/修复 | `dev-rules.md` (编码/构建/持久化纪律) + `skills/dev/implementer` |
 | 架构设计 | `skills/des/architect` |
 
-## Architecture — 7 Domains as Faction Skill Trees
+## Architecture
 
 ```
 NT-CORE  (E8引导者)  | NT-MIND  (进化工匠)  | NT-MEMORY (知识守护者)
@@ -39,7 +39,7 @@ NT-IO    (界面使徒)
 - **Rune Socketing 5 槽**: Crimson(数据摄取) / Indigo(变换) / Obsidian(缓存) / Golden(错误恢复) / Alabaster(监控)；组合产生 Runeword (如 Scry = 完整 ETL)
 - **Constellation 成熟度**: C0 编译 → C1 单测 → C2 集成测试 → C3 benchmark → C4 主流水线 → C5 自愈/自适应
 
-## Always-On Core Rules (常驻纪律)
+## Always-On Core Rules
 
 - **R-P1**: `#![forbid(unsafe_code)]` — zero unsafe in core
 - **构建缓存不可信**: 结构变更后强制 `cargo clean` 或连续 build 两次获取真实错误计数 (R-P9/R-P17/R-P29/R-P35/R-P51/R-P54)

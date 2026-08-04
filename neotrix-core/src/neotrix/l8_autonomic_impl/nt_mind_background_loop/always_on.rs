@@ -649,8 +649,7 @@ impl AlwaysOnEngine {
     }
 }
 
-/// Global always-on engine singleton
-// TODO: inject via DI — pass &AlwaysOnEngine through background loop context
+/// Global always-on engine singleton — 供 CLI (/ui, /source) 经句柄消费 (cycle 204 LOW-1 复核)。
 pub static ALWAYS_ON_ENGINE: LazyLock<Mutex<AlwaysOnEngine>> = LazyLock::new(|| {
     Mutex::new(AlwaysOnEngine::load())
 });

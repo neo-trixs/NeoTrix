@@ -19,7 +19,6 @@ pub mod nt_io_proxy;
 pub mod nt_io_proxy_server;
 pub mod nt_io_push_channel;
 pub mod nt_io_remote;
-pub mod nt_io_acp;
 pub mod nt_io_server;
 pub mod nt_io_standalone;
 #[cfg(feature = "telemetry")]

@@ -1340,6 +1340,8 @@ impl KnowledgeBase {
         let missing = nt_memory_embed::find_nodes_missing_embeddings(&conn)
             .map_err(|e| format!("find_missing: {}", e))?;
         let count = missing.len();
+        let mut local_fallback = 0usize;
+        let mut http_err: Option<String> = None;
         for node_id in &missing {
             if let Ok(Some(node)) = nt_memory_store::get_node(&conn, node_id) {
                 let text = nt_memory_embed::build_node_text(
@@ -1347,12 +1349,44 @@ impl KnowledgeBase {
                     node.summary.as_deref(),
                     node.content.as_deref(),
                 );
-                if let Ok(vec) = nt_memory_embed::embed_text(&config, &text) {
+                // Http 模式失败 → 自动降级本地 hash-kernel (Cycle 207 R-P79:
+                // embedding 链路不依赖外部 server, 保证零依赖可跑)。
+                if config.mode == nt_memory_embed::EmbedMode::Http {
+                    match nt_memory_embed::embed_text(&config, &text) {
+                        Ok(vec) => {
+                            if let Err(e) = nt_memory_embed::store_embedding(&conn, node_id, &vec, &config.model) {
+                                log::warn!("[KB] store embedding for {}: {}", node_id, e);
+                            }
+                            continue;
+                        }
+                        Err(e) => {
+                            if http_err.is_none() {
+                                http_err = Some(e);
+                            }
+                            let local_cfg = nt_memory_embed::EmbeddingConfig {
+                                mode: nt_memory_embed::EmbedMode::Local,
+                                ..config.clone()
+                            };
+                            if let Ok(vec) = nt_memory_embed::embed_text(&local_cfg, &text) {
+                                if nt_memory_embed::store_embedding(&conn, node_id, &vec, "hash-kernel-384").is_ok() {
+                                    local_fallback += 1;
+                                }
+                            }
+                        }
+                    }
+                } else if let Ok(vec) = nt_memory_embed::embed_text(&config, &text) {
                     if let Err(e) = nt_memory_embed::store_embedding(&conn, node_id, &vec, &config.model) {
                         log::warn!("[KB] store embedding for {}: {}", node_id, e);
                     }
                 }
             }
+        }
+        if let Some(e) = http_err {
+            log::warn!(
+                "[KB] ensure_embeddings: embedding API unavailable ({}); fell back to local hash-kernel for {} nodes",
+                e,
+                local_fallback
+            );
         }
         Ok(count)
     }

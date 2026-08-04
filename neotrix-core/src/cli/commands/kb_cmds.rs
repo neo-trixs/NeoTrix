@@ -124,17 +124,24 @@ impl CliCommand for KbCmd {
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
+    use crate::neotrix::nt_memory_kb::nt_memory_embed::EmbedMode;
     let kb = match KnowledgeBase::open(None) {
         Ok(kb) => kb,
         Err(e) => return CommandOutput::err(&format!("无法打开知识库: {}", e)),
     };
     let cfg = crate::neotrix::nt_memory_kb::nt_memory_embed::EmbeddingConfig::default();
     let bundled = kb.with_embedding(cfg);
+    let mode_label = match bundled.embedding_config.read().ok().and_then(|c| c.clone()).map(|c| c.mode) {
+        Some(EmbedMode::Local) => "本地 hash-kernel (384-dim, 零依赖)",
+        _ => "HTTP MiniLM (可选脚本 scripts/kb-embed-server.py)",
+    };
     match bundled.ensure_embeddings() {
         Ok(n) => CommandOutput::ok(&format!(
-            "Embedding 补跑完成: 本轮生成 {} 条向量 (model all-MiniLM-L6-v2, 384-dim)\n\
-             提示: 需先启动本地服务 scripts/kb-embed-server.py",
-            n
+            "Embedding 补跑完成: 本轮处理 {} 个待嵌节点\n\
+             模式: {}\n\
+             Http 服务不可用时自动降级本地 hash-kernel, 全链路零依赖可跑。\n\
+             强制本地: NEOTRIX_EMBEDDING_MODE=local",
+            n, mode_label
         )),
         Err(e) => CommandOutput::err(&format!("Embedding 补跑失败: {}", e)),
     }

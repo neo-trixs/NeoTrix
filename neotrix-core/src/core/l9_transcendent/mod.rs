@@ -40,12 +40,6 @@ pub use crate::core::nt_core_observer_error::{
     FallbackHandler, ErrorRecoveryError,
 };
 
-// 评估基准
-pub use crate::core::nt_core_meta::eval_bench::{
-    Benchmark, BenchmarkMetric, BenchmarkRunner, BenchmarkSuite,
-    EvalResult, RunnerStats,
-};
-
 // 知识缺口检测
 pub use crate::core::nt_core_meta::knowledge_gap_detector::{
     KnowledgeGapDetector, KnowledgeGap, GapReport, GapCluster, GapCategory,

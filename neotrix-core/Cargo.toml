@@ -160,7 +160,7 @@ agent-sandbox = { version = "0.4", optional = true }
 holon = { git = "https://github.com/watmin/holon-rs", optional = true }
 notify = "7"
 sentry = { version = "0.34", default-features = false, features = ["anyhow", "backtrace", "contexts", "panic"] }
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.31", features = ["bundled", "backup"] }
 lopdf = "0.42"
 serde_yaml = "0.9"
 zip = { version = "2", optional = true }

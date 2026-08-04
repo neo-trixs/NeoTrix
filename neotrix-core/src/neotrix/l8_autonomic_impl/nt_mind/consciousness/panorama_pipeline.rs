@@ -49,12 +49,17 @@ pub struct PanoramaPipeline {
 
 impl PanoramaPipeline {
     pub fn new() -> Self {
+        // 全景 GWT — 低阈值(0.3)匹配 activation∈[0,1] 值域, 保证共振过滤有效。
+        // 注释曾误填 13.0 (将高熵温度概念填入 threshold 槽位), 会令 active/resonant
+        // specialists 恒空, 共振引擎零输出 (cycle 205 伪收敛溯源)。
+        // 注册 14 个默认基线专家 (activation=0.3) + 初始化振荡器, 使 resonant_broadcast
+        // 有真实竞争池 (cycle 206 观测: 此前仅 wm_pred_N 单专家, 无竞争无熵)。
+        let mut gwt = GlobalWorkspace::new(0.3);
+        gwt.register_default_specialists();
         Self {
             cycle: 0,
             hypercube: KnowledgeHyperCube::new(),
-            // 全景 GWT — 高温度(13.0)高熵广度, 与 attention_router(0.4 低熵聚焦)
-            // / reasoner seal_loop(0.5) 分属不同子系统, 非单例矛盾 (cycle 204 HIGH-3)。
-            gwt: GlobalWorkspace::new(13.0),
+            gwt,
             cortex: CortexMemory::new(100, 1000),
             predictive_cortex: PredictiveCortex::new(32, 64),
             last_features: Vec::new(),
@@ -154,7 +159,19 @@ impl PanoramaPipeline {
         self.last_forecast = Some(new_forecast);
 
         self.consciousness.maybe_poll(brain, &mut self.gwt);
-        let _gwt_count = self.gwt.active_specialists().len();
+
+        // 触发完整共振竞争周期: 收集 specialists → 共振竞争 → 广播 winner → 回写激活。
+        // cycle 205 收敛"共振至后台环"后 background_loop 从未调用 resonant_broadcast,
+        // 导致 GWT 共振引擎(competition/oscillator/entropy 全景)零执行, 恒为伪收敛。
+        // 此处以预测特征为内容驱动一轮全景共振。
+        let hexagram_states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+        self.gwt.resonant_broadcast(
+            &format!(
+                "[panorama] cycle={} prediction_energy={:.3} phi={:.3} fe={:.3}",
+                self.cycle, fe_report.prediction_energy, phi_value, fe_report.variational_fe,
+            ),
+            &hexagram_states,
+        );
 
         if anomaly {
             self.create_anomaly_goal(goal_loop, brain, &fe_report);
@@ -260,5 +277,46 @@ impl DimensionAxis {
 impl Default for PanoramaPipeline {
     fn default() -> Self {
         Self::new()
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
+    use crate::neotrix::nt_mind::goal_loop::GoalLoop;
+    use crate::neotrix::nt_world_model::WorldModelV2;
+
+    #[test]
+    fn test_resonance_activation() {
+        let mut pano = PanoramaPipeline::new();
+        let mut brain = SelfIteratingBrain::new();
+        let mut goal_loop = GoalLoop::new();
+        let mut world_model = WorldModelV2::new(4, 64);
+
+        let report = pano.run_cycle(&mut brain, &mut goal_loop, &mut world_model);
+        assert_eq!(report.cycle, 1);
+
+        assert!(pano.gwt.last_resonance.is_some(), "resonant_broadcast should produce resonance report");
+        
+        if let Some(res) = &pano.gwt.last_resonance {
+            // Use public methods to get winner and clusters
+            let winner = pano.gwt.resonance_winner();
+            let clusters = pano.gwt.resonance_clusters();
+            println!("Resonance Report - winner: {:?}, entropy: {:.3}, clusters: {}", 
+                winner.map(|w| w.name.as_str()),
+                res.entropy,
+                clusters.len());
+            for (i, cluster) in clusters.iter().enumerate() {
+                let names: Vec<_> = cluster.iter().map(|m| m.name.as_str()).collect();
+                println!("  Cluster {}: {:?}", i, names);
+            }
+            assert!(winner.is_some(), "resonance should have a winner");
+            assert!(res.entropy.is_finite(), "entropy should be finite");
+        }
+
+        let active = pano.gwt.active_specialists();
+        let resonant = pano.gwt.resonant_specialists();
+        println!("Active specialists: {}", active.len());
+        println!("Resonant specialists: {}", resonant.len());
     }
 }

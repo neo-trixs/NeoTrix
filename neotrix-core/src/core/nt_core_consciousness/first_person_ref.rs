@@ -77,20 +77,6 @@ impl FirstPersonRef {
         }
         self.coherence_history.iter().sum::<f64>() / self.coherence_history.len() as f64
     }
-
-    pub fn evolve_self(&mut self, new_experience: &[u8], __step: u64) {
-        let sim = self.coherence_with(new_experience);
-        if sim > self.self_similarity_threshold {
-            let blend = sim * 0.1;
-            for (s, &n) in self.self_vector.iter_mut().zip(new_experience.iter()) {
-                if rand::random::<f64>() < blend {
-                    *s = n;
-                }
-            }
-            self.self_tagged.vector = self.self_vector.clone();
-        }
-        self.record_coherence(sim);
-    }
 }
 
 #[cfg(test)]
@@ -120,14 +106,6 @@ mod tests {
             VsaOrigin::World(crate::core::nt_core_consciousness::vsa_tag::VsaWorldCategory::UserInput),
         );
         assert!(!fpr.is_self_coherent(&world_tagged));
-    }
-
-    #[test]
-    fn test_evolve_self_updates_threshold() {
-        let mut fpr = FirstPersonRef::bootstrap(0);
-        let other = QuantizedVSA::random_binary();
-        fpr.evolve_self(&other, 1);
-        assert!(fpr.coherence_history.len() >= 1);
     }
 
     #[test]

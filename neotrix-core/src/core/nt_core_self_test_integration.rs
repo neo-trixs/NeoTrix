@@ -2,7 +2,6 @@ use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, ConstitutionCom
 
 pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
-    registry.register(Box::new(AnswerBridgeSelfTest));
     registry.register(Box::new(AgentTeamSelfTest));
     registry.register(Box::new(AgenticScanSelfTest));
     registry.register(Box::new(DigitalHumanSelfTest));
@@ -27,22 +26,6 @@ impl SelfTest for AnswerEngineSelfTest {
             return Err(vec!["config not initialized".into()]);
         }
         Ok(())
-    }
-}
-
-struct AnswerBridgeSelfTest;
-
-impl SelfTest for AnswerBridgeSelfTest {
-    fn name(&self) -> &str {
-        "nt_core_answer_bridge"
-    }
-
-    fn self_test(&self) -> Result<(), Vec<String>> {
-        let mode = crate::core::nt_core_answer_engine::AnswerMode::Speed;
-        match crate::core::nt_core_answer_bridge::AnswerGwtBridge::route_for_mode(mode) {
-            crate::core::nt_core_answer_bridge::RoutingMode::Direct(_) => Ok(()),
-            _ => Err(vec!["Speed should route Direct".into()]),
-        }
     }
 }
 
@@ -151,7 +134,7 @@ mod tests {
     fn test_register_all() {
         let mut registry = SelfTestRegistry::new();
         register_absorbed_modules(&mut registry);
-        assert_eq!(registry.count(), 8);
+        assert_eq!(registry.count(), 7);
     }
 
     #[test]
@@ -160,14 +143,9 @@ mod tests {
     }
 
     #[test]
-    fn test_answer_bridge_st() {
-        assert!(AnswerBridgeSelfTest.self_test().is_ok());
-    }
-
-    #[test]
     fn test_all_have_names() {
-        let tests: [&dyn SelfTest; 7] = [
-            &AnswerEngineSelfTest, &AnswerBridgeSelfTest, &AgentTeamSelfTest,
+        let tests: [&dyn SelfTest; 6] = [
+            &AnswerEngineSelfTest, &AgentTeamSelfTest,
             &AgenticScanSelfTest, &DigitalHumanSelfTest, &LeannStoreSelfTest,
             &VideoPipelineSelfTest,
         ];

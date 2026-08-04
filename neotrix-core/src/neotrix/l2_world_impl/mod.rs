@@ -14,8 +14,6 @@ pub mod nt_world_map;
 pub mod nt_world_model;
 pub mod nt_world_model_v2;
 pub mod nt_world_pet;
-pub mod nt_world_pred;
-pub mod nt_world_pred_hcube;
 pub mod nt_world_scrape;
 pub mod nt_world_search;
 pub mod nt_world_sense;

@@ -2,6 +2,30 @@ use serde::Deserialize;
 use rusqlite::{params, Connection};
 use std::sync::OnceLock;
 
+/// Embedding backend mode.
+///
+/// - `Http`: 调用 OpenAI 兼容远程服务 (MiniLM local server / 云端 API)。
+/// - `Local`: 内嵌确定性 hash-kernel (384-dim), 无需外部进程即可生成向量,
+///   保证 `/kb embed` 与 `ensure_embeddings` 零依赖可跑 (Cycle 207 R-P79 闭环)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmbedMode {
+    Http,
+    Local,
+}
+
+impl EmbedMode {
+    pub fn from_env() -> Self {
+        match std::env::var("NEOTRIX_EMBEDDING_MODE")
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "local" | "builtin" | "hash" => EmbedMode::Local,
+            _ => EmbedMode::Http,
+        }
+    }
+}
+
 /// Configuration for the embedding API (OpenAI-compatible, incl. MiniLM local server).
 #[derive(Debug, Clone)]
 pub struct EmbeddingConfig {
@@ -9,6 +33,7 @@ pub struct EmbeddingConfig {
     pub base_url: String,
     pub model: String,
     pub dimension: usize,
+    pub mode: EmbedMode,
 }
 
 impl Default for EmbeddingConfig {
@@ -28,6 +53,7 @@ impl Default for EmbeddingConfig {
             dimension: std::env::var("NEOTRIX_EMBEDDING_DIMENSION")
                 .ok().and_then(|s| s.parse().ok())
                 .unwrap_or(384),
+            mode: EmbedMode::from_env(),
         }
     }
 }
@@ -49,6 +75,58 @@ pub fn embed_text(config: &EmbeddingConfig, text: &str) -> Result<Vec<f32>, Stri
     results.pop().ok_or_else(|| "Empty batch response".to_string())
 }
 
+/// 内嵌 hash-kernel 文本嵌入 (Cycle 207): 确定性、零依赖、任意维度。
+///
+/// 特性分解 (对应 scripts/kb-embed-server.py 的 MiniLM 输出能力):
+///   - 字符 n-gram (2/3/4) 特征哈希 → 累加到 `dim` 桶
+///   - 双哈希 → (bucket, sign) 以消偏
+///   - 长度归一化 → 与 MiniLM 向量同一 embeddings 表可比 (cosine)
+///
+/// 语义质量低于真 MiniLM, 但保证无外部 server 时 embedding 链路完整可用,
+/// 供 `ensure_embeddings` / `/kb embed` 兜底 (R-P79 接线而非死代码)。
+pub fn local_embed_texts(texts: &[&str], dim: usize) -> Vec<Vec<f32>> {
+    let dim = dim.max(16);
+    texts.iter().map(|&t| hash_kernel_embed(t, dim)).collect()
+}
+
+fn hash_kernel_embed(text: &str, dim: usize) -> Vec<f32> {
+    let lower = text.to_lowercase();
+    let chars: Vec<char> = lower.chars().collect();
+    let mut acc = vec![0.0f32; dim];
+
+    let mut add_ngram = |lo: usize, hi: usize, salt: u64| {
+        for start in 0..=chars.len().saturating_sub(hi - lo) {
+            let gram: String = chars[start..start + (hi - lo)].iter().collect();
+            let h1 = fnv1a(&gram, salt);
+            let h2 = fnv1a(&gram, salt ^ 0x9E37_79B9_7F4A_7C15);
+            let bucket = ((h1 % dim as u64) as usize) % dim;
+            let sign = if (h2 & 1) == 0 { 1.0f32 } else { -1.0f32 };
+            // 简单 IDF 近似: 频次饱和 (sqrt 计数) 降噪
+            let weight = 1.0 + (h2 % 4) as f32 * 0.25;
+            acc[bucket] += sign * weight;
+        }
+    };
+    add_ngram(2, 3, 0x8D5B); // bigram
+    add_ngram(3, 4, 0x5A9E); // trigram
+    if chars.len() >= 4 { add_ngram(4, 5, 0xC3A1); } // 4-gram (仅长文本)
+
+    // L2 归一化
+    let norm: f32 = acc.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 1e-8 {
+        for x in acc.iter_mut() { *x /= norm; }
+    }
+    acc
+}
+
+fn fnv1a(s: &str, salt: u64) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ salt;
+    for b in s.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x1000_0000_01b3);
+    }
+    h
+}
+
 fn embedding_client() -> Result<&'static reqwest::blocking::Client, String> {
     static CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = OnceLock::new();
     CLIENT.get_or_init(|| {
@@ -64,6 +142,10 @@ fn embedding_client() -> Result<&'static reqwest::blocking::Client, String> {
 /// Generate embeddings for multiple texts in a single API call.
 pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<Vec<f32>>, String> {
     if texts.is_empty() { return Ok(Vec::new()); }
+
+    if config.mode == EmbedMode::Local {
+        return Ok(local_embed_texts(texts, config.dimension));
+    }
 
     let client = embedding_client()?;
 
@@ -564,6 +646,45 @@ mod tests {
         let a: Vec<f32> = vec![0.5, 0.5, 0.0];
         let b: Vec<f32> = vec![0.5, 0.5, 0.0];
         assert!((cosine_similarity(&a, &b) - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_local_hash_kernel_dim_and_norm() {
+        let v = local_embed_texts(&["hello world", "hello world again"], 384);
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].len(), 384);
+        let norm: f32 = v[0].iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 1e-4, "L2 norm should be 1.0, got {}", norm);
+    }
+
+    #[test]
+    fn test_local_hash_kernel_deterministic_and_similar() {
+        let a = local_embed_texts(&["neotrix consciousness core", "neotrix consciousness core"], 384);
+        // 同文本 → 同向量
+        assert_eq!(a[0], a[1]);
+        // 相似文本 → 高 cosine
+        let b = local_embed_texts(&["neotrix consciousness tree", "random unrelated text about quantum"], 384);
+        let sim_same = cosine_similarity(&a[0], &b[0]);
+        let sim_diff = cosine_similarity(&a[0], &b[1]);
+        assert!(sim_same > sim_diff, "similar should rank above dissimilar: {} vs {}", sim_same, sim_diff);
+    }
+
+    #[test]
+    fn test_embed_mode_from_env() {
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "local");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Local);
+        std::env::set_var("NEOTRIX_EMBEDDING_MODE", "");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Http);
+        std::env::remove_var("NEOTRIX_EMBEDDING_MODE");
+        assert_eq!(EmbedMode::from_env(), EmbedMode::Http);
+    }
+
+    #[test]
+    fn test_embed_text_batch_local_mode_no_network() {
+        let cfg = EmbeddingConfig { api_key: "local".into(), base_url: "http://127.0.0.1:1/v1".into(), model: "hash-kernel".into(), dimension: 384, mode: EmbedMode::Local };
+        let v = embed_text_batch(&cfg, &["t1", "t2"]).unwrap();
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].len(), 384);
     }
 
     #[test]

@@ -109,35 +109,6 @@ fn benchmark_capability_vector_ops(c: &mut Criterion) {
     }
 
     group.finish();
-
-    // 测试 signal::ops 函数
-    let mut group = c.benchmark_group("signal_ops");
-
-    let vec_22 = random_vector(22);
-    let vec_100 = random_vector(100);
-    let vec_1000 = random_vector(1000);
-
-    for (name, vec) in [("22d", vec_22), ("100d", vec_100), ("1000d", vec_1000)] {
-        let v = vec.clone();
-
-        group.bench_function(&format!("softmax_{}", name), |b| {
-            b.iter(|| black_box(ops::softmax(&v)))
-        });
-
-        group.bench_function(&format!("relu_{}", name), |b| {
-            b.iter(|| black_box(ops::relu(&v)))
-        });
-
-        group.bench_function(&format!("sigmoid_{}", name), |b| {
-            b.iter(|| black_box(ops::sigmoid(&v)))
-        });
-
-        group.bench_function(&format!("normalize_{}", name), |b| {
-            b.iter(|| black_box(ops::normalize(&v)))
-        });
-    }
-
-    group.finish();
 }
 
 criterion_group!(benches, benchmark_capability_vector_ops);

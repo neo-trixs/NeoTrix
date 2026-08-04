@@ -18,7 +18,6 @@ pub mod nt_mind_cleanup;
 pub mod nt_mind_distiller;
 pub mod nt_mind_evolution_daemon;
 pub mod nt_mind_evolution_loop;
-pub mod nt_mind_scheduler;
 pub mod nt_mind_self_diagnose;
 #[cfg(feature = "research")]
 pub mod nt_mind_topic_aggregator;

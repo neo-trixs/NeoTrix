@@ -600,4 +600,35 @@ mod tests {
         assert_eq!(control_count, 1);
         assert!(seq.outcome_quality >= 0.0);
     }
+
+    fn build_training_sequence(gold: Arc<ConsciousnessGoldStandard>) -> AlternatingSequence {
+        let distiller = ControlDistiller::new(gold);
+        let steps = vec![
+            ReasoningStep { step_idx: 0, text: "Step 1".into(), e8_mode: None, token_count: 10 },
+            ReasoningStep { step_idx: 1, text: "Wait, rethink".into(), e8_mode: None, token_count: 15 },
+            ReasoningStep { step_idx: 2, text: "Step 2 corrected".into(), e8_mode: None, token_count: 12 },
+        ];
+        let trace = "Step 1 Wait, rethink Step 2 corrected";
+        distiller.extract_alternating_sequence("t1".into(), "task", trace, &steps, "answer").unwrap()
+    }
+
+    #[test]
+    fn test_sft_training_loop_executes() {
+        let gold = Arc::new(ConsciousnessGoldStandard::new());
+        let mut trainer = ControlTrainer::new(E8Policy::default(), gold.clone());
+        let seq = build_training_sequence(gold);
+        let report = trainer.sft(&[seq]).expect("SFT 训练应成功执行 (非空壳)");
+        assert!(report.control_updates >= 1, "SFT 应至少执行 1 次 control 策略更新");
+        assert!(report.reason_updates >= 1, "SFT 应至少识别 1 个 reason segment");
+    }
+
+    #[test]
+    fn test_csppo_training_loop_executes() {
+        let gold = Arc::new(ConsciousnessGoldStandard::new());
+        let mut trainer = ControlTrainer::new(E8Policy::default(), gold.clone());
+        let seq = build_training_sequence(gold);
+        let report = trainer.csppo(&[seq]).expect("CSPO 训练应成功执行 (非空壳)");
+        assert!(report.masked_steps >= 1, "CSPO 应至少执行 1 步 masked 策略更新");
+        assert!(report.total_control_reward.is_finite(), "CSPO control reward 应有限");
+    }
 }

@@ -82,10 +82,7 @@ pub use goal_contract::{
 };
 
 // Recipe re-exports
-pub use recipe::{
-    RecipeConfig, RecipeStage, Recipe, RecipeRegistry,
-    preset_standard, preset_kernel, preset_debug, preset_design,
-};
+pub use recipe::RecipeStage;
 
 // Internal helper shared across hyperagent sub-modules
 pub(crate) use hyperarchive::cosine_distance;

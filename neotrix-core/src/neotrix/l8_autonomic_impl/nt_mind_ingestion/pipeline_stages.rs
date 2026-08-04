@@ -433,16 +433,6 @@ impl BrainStage for StormBreakerStage {
     }
 }
 
-make_stage!(InnerCriticStage);
-impl BrainStage for InnerCriticStage {
-    fn name(&self) -> &str { "inner_critic" }
-    fn frequency(&self) -> usize { 5 }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let _ = brain._current_task();
-        Ok(StageDecision::Continue)
-    }
-}
-
 use super::document_parser::DocumentParsingEngine;
 use std::path::Path;
 

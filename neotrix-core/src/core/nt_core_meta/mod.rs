@@ -5,8 +5,6 @@ pub mod weakness;
 pub mod planner;
 pub mod metacognition_loop;
 pub mod knowledge_gap_detector;
-pub mod scaling_law;
-pub mod eval_bench;
 pub mod nt_core_meta_auditor;
 pub mod nt_core_arch_lint;
 
@@ -17,17 +15,10 @@ pub use self_model::{
     ComponentMap, ComponentNode,
 };
 pub use scanner::CodeScanner;
-pub use scaling_law::{
-    ScalingLawPredictor, ScaleReport, PowerLaw, KaplanLaw, ChinchillaLaw,
-};
 pub use monitor::{MetaMonitor, MetaAlert, AlertSeverity, HealthCheck, HealthTrend};
 pub use weakness::{WeaknessAnalyzer, Weakness, WeaknessReport, WeaknessSummary};
 pub use planner::{EvolutionPlanner, PlannedEvolution, ImpactEstimate, RiskLevel, EvolutionAction, ActionStatus, MetaGoal, MetaGoalBridge, weakness_to_goals};
 pub use metacognition_loop::{MetaCognitiveLoop, MetaCycleResult};
 pub use knowledge_gap_detector::{KnowledgeGapDetector, KnowledgeGap, GapReport, GapCluster, GapCategory};
-pub use eval_bench::{
-    Benchmark, BenchmarkMetric, BenchmarkRunner, BenchmarkSuite,
-    EvalResult, RunnerStats,
-};
 pub use nt_core_meta_auditor::MetaAuditor;
 pub use nt_core_arch_lint::ArchLint;

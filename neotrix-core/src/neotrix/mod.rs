@@ -37,7 +37,6 @@ pub use l8_autonomic_impl::nt_mind_benchmark;
 pub use l8_autonomic_impl::nt_mind_background_config;
 pub use l8_autonomic_impl::nt_mind_cleanup;
 pub use l8_autonomic_impl::nt_mind_distiller;
-pub use l8_autonomic_impl::nt_mind_scheduler;
 #[cfg(feature = "research")]
 pub use l8_autonomic_impl::nt_mind_topic_aggregator;
 pub use l8_autonomic_impl::nt_mind_knowledge_pipeline;
@@ -66,7 +65,6 @@ pub use l5_consciousness_impl::nt_core_signal;
 
 // L4 — Cognition (认知层) — 推理
 pub use l4_cognition_impl::nt_core_kernel;
-pub use l4_cognition_impl::nt_core_code_query;
 pub use l4_cognition_impl::nt_core_parallel;
 
 // L3 — Memory (记忆层) — 记忆
@@ -82,12 +80,10 @@ pub use l2_world_impl::nt_world_model;
 pub use l2_world_impl::nt_world_model_v2;
 pub use l2_world_impl::nt_world_jepa;
 pub use l2_world_impl::nt_world_e8;
-pub use l2_world_impl::nt_world_pred_hcube;
 pub use l2_world_impl::nt_world_infer;
 pub use l2_world_impl::nt_world_browse;
 pub use l2_world_impl::nt_world_browse_auto;
 pub use l2_world_impl::nt_world_scrape;
-pub use l2_world_impl::nt_world_pred;
 pub use l2_world_impl::nt_world_sense;
 pub use l2_world_impl::nt_world_crawl;
 pub use l2_world_impl::nt_world_search;
@@ -120,7 +116,6 @@ pub use l1_body_impl::nt_io_proxy_server;
 pub use l1_body_impl::nt_io_plugin;
 pub use l1_body_impl::nt_io_provider;
 pub use l1_body_impl::nt_io_map_tile;
-pub use l1_body_impl::nt_io_acp;
 pub use l1_body_impl::nt_io_session_recovery;
 pub use l1_body_impl::nt_io_agents_md;
 pub use l1_body_impl::nt_io_digital_human;
@@ -193,8 +188,6 @@ pub use l1_body_impl::nt_io_mention::{resolve_mentions, MentionResult};
 pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{ConsciousnessGoldStandard, GoldStandardReport, ConsciousnessLevel, DetectionTrend, E8HexagramState};
 pub use l8_autonomic_impl::nt_mind::export_import::ReasoningBankExporter;
 pub use l1_body_impl::nt_io_server::{NeoTrixACPServer, ServerInfo};
-pub use l1_body_impl::nt_io_acp::AcpAgent;
-pub use crate::neotrix::nt_core_code_query::CodeQueryEngine;
 pub use crate::core::nt_core_answer_engine::{AnswerEngine, AnswerEngineConfig, AnswerMode, AnswerResult, AnswerSegment, SearchResult, SourceType, WidgetKind, WidgetProvider, ContextBuilder, ContextSource, PreparedQuery};
 pub use l2_world_impl::nt_world_scrape::{ScraperConfig, ScrapeResult, BrowserScraper, RequestScraper, AntiDetect};
 pub use l1_body_impl::nt_shield_audit::{

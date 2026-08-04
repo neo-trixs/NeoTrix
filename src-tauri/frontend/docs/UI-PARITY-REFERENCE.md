@@ -114,3 +114,12 @@
 2. **P1 状态栏补 branch/worktree**（呼应 R-P47/状态感知; branch 已有, worktree 待补）
 3. **P2 empty-state 三态统一**（each pane）
 4. **P2 file pane 磁盘变更警告/Save**（依赖 file 读写的 Rust IPC, 深度三 blocked 时不动）
+
+## Claude Desktop 前端重构 (2026-08-04)
+按 Claude Code Desktop 前端结构重构 (commit dca03c3 之后的 Phase A-G 工作):
+- **Phase A — 顶层三 tab**: `TopTabBar` (Chat/Cowork/Code), Code 激活其余占位 (`TabPlaceholder`), App.tsx 条件渲染, 5 tests。
+- **Phase B — Composer 行对齐**: 权限三态 → 5 模式菜单 (manual/accept/plan/auto/bypassPermissions, `permission-option-*`); ⌘Shift+M 打开菜单; Transcript 视图下拉 (正常/详细/摘要); `UsageRing` 圆环 (绿/黄/红, 点击开 usage popover); ChatView `+` 按钮菜单 (附加文件 / Slash 命令 / 引用文件)。
+- **Phase B2 — 控件收敛到 composer footer**: model/usage ring/模式/项目 pill/权限/视图下拉从聊天区顶部工具栏移入 ChatView 底部 `composerFooter` (`composerControls` 插槽), 顶部工具栏删除 — 对齐 Claude "控件都在底部 composer 行" 布局。
+- **Phase C — 视觉对齐**: 消息气泡 → Claude 式扁平消息 (无背景/无边框, 全宽) + 角色标签 (你 / NeoCodex); composerFooter flex-wrap 防溢出。
+- 验证: TSC clean, 214 tests, vite build ok。
+- 遗留: 深度三 (Rust IPC) 仍被并发会话阻塞; 视觉 token 对齐近黑/ivory 待用户目检确认。

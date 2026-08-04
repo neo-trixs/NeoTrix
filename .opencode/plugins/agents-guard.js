@@ -26,18 +26,18 @@ const MAX_BYTES = 22000;
 
 // Sections allowed in AGENTS.md (L1 pointer doc). Anything else = structural violation.
 const ALLOWED_SECTIONS = [
-  "## Skill Routing",
-  "## Architecture",
-  "## Always-On Core Rules",
-  "## Shared Language",
-  "## Build",
-  "## Test",
-  "## Key Locations",
+  "Skill Routing",
+  "Architecture",
+  "Always-On Core Rules",
+  "Shared Language",
+  "Build",
+  "Test",
+  "Key Locations",
 ];
 
 // Sections that are structurally forbidden — any per-cycle growth area or body dump.
 const FORBIDDEN_SECTIONS = [
-  "## Experience Index",
+  "Experience Index",
 ];
 
 function logViolation(msg) {
