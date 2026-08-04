@@ -303,8 +303,8 @@
   }
   .sb-header-actions { display:flex; align-items:center; gap:6px; }
 
-  /* Traffic lights — always visible, no blur */
-  .traffic { position:fixed; left:12px; top:14px; display:flex; gap:6px; z-index:var(--z-traffic); }
+  /* Traffic lights — inside sidebar header chrome */
+  .traffic { display:flex; gap:6px; margin-right:8px; }
   .t-dot { width:10px; height:10px; border-radius:50%; }
   .t-c { background:#ff5f57; } .t-m { background:#febc2e; } .t-x { background:#28c840; }
 
@@ -327,8 +327,8 @@
   .sb.collapsed { width:0; min-width:0; overflow:hidden; border-right:none; }
   .sb.collapsed .sb-top,
   .sb.collapsed .sf { display:none; }
-  .sb.collapsed + .traffic + .sb-float { opacity:1; pointer-events:auto; }
-  .sb.collapsed + .traffic + .sb-float + .ma { border-radius:12px 0 0 12px; }
+  .sb.collapsed + .sb-float { opacity:1; pointer-events:auto; }
+  .sb.collapsed + .sb-float + .ma { border-radius:12px 0 0 12px; }
   .sb-float {
     position:absolute; left:58px; top:14px; z-index:var(--z-sidebar-float);
     width:28px; height:28px; border-radius:8px; border:1px solid var(--bd2);

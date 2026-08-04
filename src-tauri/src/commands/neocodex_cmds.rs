@@ -193,6 +193,54 @@ pub async fn neocodex_health_report() -> Result<NeoCodexHealthReport, String> {
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct NeoCodexAgentStatus {
+    pub running: bool,
+    pub current_task: Option<String>,
+    pub uptime_secs: u64,
+    pub turn_count: u64,
+    pub tokens_used: usize,
+    pub context_usage: f64,
+    pub provider_model: String,
+    pub evolution_iterations: u64,
+    pub cost_spent: f64,
+    pub cost_budget: f64,
+}
+
+#[tauri::command]
+pub async fn neocodex_agent_status() -> Result<NeoCodexAgentStatus, String> {
+    let guard = NEOCODEX_AGENT.lock().await;
+    match guard.as_ref() {
+        Some(a) => {
+            let hr = a.health_report();
+            Ok(NeoCodexAgentStatus {
+                running: hr.turn_count > 0 || hr.goals_active,
+                current_task: if hr.goals_active { Some("处理任务中".to_string()) } else { None },
+                uptime_secs: hr.turn_count, // approximate
+                turn_count: hr.turn_count,
+                tokens_used: hr.tokens_used,
+                context_usage: hr.context_usage,
+                provider_model: hr.provider_model,
+                evolution_iterations: hr.evolution_iterations,
+                cost_spent: hr.cost_spent,
+                cost_budget: hr.cost_budget,
+            })
+        }
+        None => Ok(NeoCodexAgentStatus {
+            running: false,
+            current_task: None,
+            uptime_secs: 0,
+            turn_count: 0,
+            tokens_used: 0,
+            context_usage: 0.0,
+            provider_model: "none".to_string(),
+            evolution_iterations: 0,
+            cost_spent: 0.0,
+            cost_budget: 0.0,
+        }),
+    }
+}
+
 #[derive(serde::Serialize, Clone)]
 pub struct NeoCodexProviderEntry {
     pub name: String,

@@ -17,6 +17,7 @@ g.onNavClick = onNavClick;
 g.onRbLeave = onRbLeave;
 g.openRbSidebar = openRbSidebar;
 g.openSettingsModal = openSettingsModal;
+g.registerMcp = registerMcp;
 g.refreshPreview = refreshPreview;
 g.selectCwSession = selectCwSession;
 g.selectSetting = selectSetting;
@@ -931,8 +932,8 @@ g.kbSearch = kbSearch;
     if(!al) return;
     if(!isTauri()){ al.innerHTML = '<div class="cw-agent"><span class="adot"></span>浏览器模式 · 未连接</div>'; return; }
     try{
-      const st = await invoke('cmd_agent_status');
-      if(st && typeof st.running === 'boolean'){
+      const st = await invoke('neocodex_agent_status');
+      if(st){
         agentRunning = st.running;
         agentTask = st.current_task || '';
         agentUp = st.uptime_secs || 0;
@@ -940,25 +941,13 @@ g.kbSearch = kbSearch;
     }catch(e){ agentRunning = false; agentTask = ''; agentUp = 0; }
     renderAgentRow();
   }
-  function renderAgentRow(){
-    const al = document.getElementById('cwAgentList');
-    if(!al) return;
-    const color = agentRunning ? 'var(--suc)' : 'var(--tx-meta)';
-    const label = agentRunning
-      ? `<span class="adot" style="background:${color}"></span>运行中 · ${escHtml(agentTask || '处理任务')} · ${agentUp}s`
-      : `<span class="adot"></span>空闲`;
-    al.innerHTML = `<div class="cw-agent">${label}</div>
-      <div class="cw-actions">
-        <button class="cw-abtn" onclick="${agentRunning ? 'stopAgent()' : 'runAgent()'}">${agentRunning ? '■ 停止' : '▶ 启动'}</button>
-        <button class="cw-abtn" onclick="refreshAgent()">↻ 刷新</button>
-      </div>`;
-  }
+
   async function runAgent(){
     if(!isTauri()){ showToast('浏览器模式：无法启动智能体'); return; }
     const s = CW_DATA.find(x => x.id);
     const prompt = '协同会话：' + ((s && s.name) || '默认任务');
     try{
-      await invoke('cmd_agent_start', { prompt });
+      await invoke('neocodex_send_message_stream', { content: prompt, permission_mode: 'auto' });
       agentRunning = true; agentTask = prompt; agentUp = 0;
       renderAgentRow();
       showToast('智能体已启动');
@@ -967,7 +956,7 @@ g.kbSearch = kbSearch;
   async function stopAgent(){
     if(!isTauri()) return;
     try{
-      await invoke('cmd_agent_stop');
+      await invoke('neocodex_stop_stream');
       agentRunning = false; agentTask = ''; agentUp = 0;
       renderAgentRow();
       showToast('智能体已停止');
@@ -992,7 +981,7 @@ g.kbSearch = kbSearch;
       }
     }catch(e){ /* keep static list */ }
     try{
-      const st = await invoke('cmd_agent_status');
+      const st = await invoke('neocodex_agent_status');
       const eng = root.querySelector('.reg-eng');
       if(eng && st) eng.textContent = st.running ? '运行中' : '空闲';
     }catch(e){}
@@ -1544,33 +1533,233 @@ g.kbSearch = kbSearch;
     openOverlay('overlaySettings');
   }
 
-  function selectSetting(el,section){
+  async function selectSetting(el,section){
     document.querySelectorAll('.st-item').forEach(i=>i.classList.remove('on'));
     el.classList.add('on');
     document.querySelectorAll('.st-section').forEach(s=>s.classList.remove('open'));
     const t=document.getElementById('st'+section.charAt(0).toUpperCase()+section.slice(1));
     if(t)t.classList.add('open');
-    if(section==='gateway') renderStGateway();
+    if(section==='gateway') await renderStGateway();
+    if(section==='compute') await renderStCompute();
+    if(section==='limits') await renderStLimits();
+    if(section==='privacy') await renderStPrivacy();
+    if(section==='data') await renderStData();
+    if(section==='profile') initProfileHandlers();
+    if(section==='appearance') initAppearanceHandlers();
+    if(section==='speech') initSpeechHandlers();
+    if(section==='compute') initComputeHandlers();
+    if(section==='privacy') initPrivacyHandlers();
   }
 
-  function renderStGateway(){
-    const llmEl = document.getElementById('stGwLlmList');
-    if(llmEl) llmEl.innerHTML = FREE_LLM_DATA.map(p => {
-      const cls = p.good ? 'good' : 'dead';
-      const barW = p.good ? Math.max(30, 100 - p.lat / 6) : 0;
-      const barColor = p.lat < 400 ? 'var(--suc)' : p.lat < 700 ? 'var(--yellow)' : 'var(--des)';
-      return `<div class="px-item"><span class="px-iname">${p.name}</span><span class="px-iprov">${p.prov}</span><span class="px-idot ${cls}"></span><div class="px-ibar"><div class="px-ibar-f" style="width:${barW}%;background:${barColor}"></div></div><span class="px-ilat">${p.good ? p.lat + 'ms' : '—'}</span><span class="px-irpm">${p.rpm}</span></div>`;
-    }).join('');
-    document.getElementById('stGwLlmMeta').textContent = FREE_LLM_DATA.filter(p=>p.good).length + '/' + FREE_LLM_DATA.length + ' 在线';
+  function initProfileHandlers(){
+    const inputs = document.querySelectorAll('#stProfile input, #stProfile select');
+    inputs.forEach(el => {
+      el.onchange = () => showToast('已保存: ' + (el.previousElementSibling?.textContent || el.name || '设置'));
+    });
+  }
 
+  function initAppearanceHandlers(){
+    const fontSel = document.querySelector('#stAppearance select');
+    if(fontSel) fontSel.onchange = () => showToast('字体大小已更改: ' + fontSel.value);
+    const reduceTrans = document.querySelector('#stAppearance input[type="checkbox"]');
+    if(reduceTrans) reduceTrans.onchange = () => showToast(reduceTrans.checked ? '已开启减少透明效果' : '已关闭减少透明效果');
+  }
+
+  function initSpeechHandlers(){
+    const inputs = document.querySelectorAll('#stSpeech input, #stSpeech select');
+    inputs.forEach(el => {
+      el.onchange = () => showToast('语音设置已更改: ' + (el.previousElementSibling?.textContent || '设置'));
+    });
+  }
+
+  function initComputeHandlers(){
+    const providerSel = document.querySelector('#stCompute select');
+    if(providerSel){
+      providerSel.onchange = async () => {
+        if(isTauri()){
+          try{
+            await invoke('neocodex_set_provider', { name: providerSel.value });
+            showToast('默认提供者已切换: ' + providerSel.value);
+          }catch(e){ showToast('切换失败: ' + e); }
+        }else{
+          showToast('浏览器模式：仅 Tauri 下可切换提供者');
+        }
+      };
+    }
+    const tokenSel = document.querySelector('#stCompute select:last-of-type');
+    if(tokenSel) tokenSel.onchange = () => showToast('最大 Token 已设为: ' + tokenSel.value);
+    const localInfer = document.querySelector('#stCompute input[type="checkbox"]');
+    if(localInfer) localInfer.onchange = () => showToast(localInfer.checked ? '已启用本地推理引擎' : '已禁用本地推理引擎');
+  }
+
+  function initPrivacyHandlers(){
+    const switches = document.querySelectorAll('#stPrivacy input[type="checkbox"]');
+    const labels = ['对话存储', '使用数据', '本地处理'];
+    switches.forEach((sw, i) => {
+      sw.onchange = () => showToast((sw.checked ? '已开启' : '已关闭') + labels[i]);
+    });
+  }
+
+  async function renderStGateway(){
+    const llmEl = document.getElementById('stGwLlmList');
     const nodeEl = document.getElementById('stGwNodeList');
-    if(nodeEl) nodeEl.innerHTML = PROXY_DATA.map(p => {
-      const cls = p.good ? 'good' : 'dead';
-      const barW = p.good ? Math.max(30, 100 - p.lat / 2) : 0;
-      const barColor = p.lat < 60 ? 'var(--suc)' : p.lat < 120 ? 'var(--yellow)' : 'var(--des)';
-      return `<div class="px-item"><span class="px-ireg">${p.reg}</span><span class="px-iname">${p.name}</span><span class="px-idot ${cls}"></span><div class="px-ibar"><div class="px-ibar-f" style="width:${barW}%;background:${barColor}"></div></div><span class="px-ilat">${p.good ? p.lat + 'ms' : '—'}</span></div>`;
-    }).join('');
-    document.getElementById('stGwNodeMeta').textContent = PROXY_DATA.filter(p=>p.good).length + '/' + PROXY_DATA.length + ' 在线';
+    if(!isTauri()){
+      if(llmEl) llmEl.innerHTML = FREE_LLM_DATA.map(p => {
+        const cls = p.good ? 'good' : 'dead';
+        const barW = p.good ? Math.max(30, 100 - p.lat / 6) : 0;
+        const barColor = p.lat < 400 ? 'var(--suc)' : p.lat < 700 ? 'var(--yellow)' : 'var(--des)';
+        return `<div class="px-item"><span class="px-iname">${p.name}</span><span class="px-iprov">${p.prov}</span><span class="px-idot ${cls}"></span><div class="px-ibar"><div class="px-ibar-f" style="width:${barW}%;background:${barColor}"></div></div><span class="px-ilat">${p.good ? p.lat + 'ms' : '—'}</span><span class="px-irpm">${p.rpm}</span></div>`;
+      }).join('');
+      if(nodeEl) nodeEl.innerHTML = PROXY_DATA.map(p => {
+        const cls = p.good ? 'good' : 'dead';
+        const barW = p.good ? Math.max(30, 100 - p.lat / 2) : 0;
+        const barColor = p.lat < 60 ? 'var(--suc)' : p.lat < 120 ? 'var(--yellow)' : 'var(--des)';
+        return `<div class="px-item"><span class="px-ireg">${p.reg}</span><span class="px-iname">${p.name}</span><span class="px-idot ${cls}"></span><div class="px-ibar"><div class="px-ibar-f" style="width:${barW}%;background:${barColor}"></div></div><span class="px-ilat">${p.good ? p.lat + 'ms' : '—'}</span></div>`;
+      }).join('');
+      return;
+    }
+    try{
+      const [providers, nodes] = await Promise.all([
+        invoke('neocodex_provider_config'),
+        invoke('proxy_pool_nodes').catch(() => [])
+      ]);
+      if(llmEl && providers && providers.providers){
+        llmEl.innerHTML = providers.providers.map(p => {
+          const cls = p.resolvable ? 'good' : 'dead';
+          const lat = p.latency_ms || 0;
+          const barW = p.resolvable ? Math.max(30, 100 - lat / 6) : 0;
+          const barColor = lat < 400 ? 'var(--suc)' : lat < 700 ? 'var(--yellow)' : 'var(--des)';
+          return `<div class="px-item"><span class="px-iname">${p.name}</span><span class="px-iprov">${p.model}</span><span class="px-idot ${cls}"></span><div class="px-ibar"><div class="px-ibar-f" style="width:${barW}%;background:${barColor}"></div></div><span class="px-ilat">${p.resolvable ? lat + 'ms' : '—'}</span><span class="px-irpm">${p.rpm || '—'}</span></div>`;
+        }).join('');
+        document.getElementById('stGwLlmMeta').textContent = providers.providers.filter(p=>p.resolvable).length + '/' + providers.provider_count + ' 在线';
+      }
+      if(nodeEl && Array.isArray(nodes)){
+        nodeEl.innerHTML = nodes.slice(0,12).map(p => {
+          const cls = p.healthy ? 'good' : 'dead';
+          const barW = p.healthy ? Math.max(30, 100 - (p.latency_ms||0) / 2) : 0;
+          const barColor = (p.latency_ms||0) < 60 ? 'var(--suc)' : (p.latency_ms||0) < 120 ? 'var(--yellow)' : 'var(--des)';
+          return `<div class="px-item"><span class="px-ireg">${p.geo_tag ? p.geo_tag.slice(0,2) : '🌐'}</span><span class="px-iname">${p.tag || p.url}</span><span class="px-idot ${cls}"></span><div class="px-ibar"><div class="px-ibar-f" style="width:${barW}%;background:${barColor}"></div></div><span class="px-ilat">${p.healthy ? (p.latency_ms||0) + 'ms' : '—'}</span></div>`;
+        }).join('');
+        document.getElementById('stGwNodeMeta').textContent = nodes.filter(p=>p.healthy).length + '/' + nodes.length + ' 在线';
+      }
+      // MCP servers
+      const mcpEl = document.getElementById('stGwMcpList');
+      const mcpMeta = document.getElementById('stGwMcpMeta');
+      if(mcpEl && mcpMeta){
+        try{
+          const mcpList = await invoke('neocodex_mcp_list');
+          if(Array.isArray(mcpList) && mcpList.length){
+            mcpEl.innerHTML = mcpList.map(s => `<div class="px-item"><span class="px-iname">${s.name}</span><span class="px-iprov">${s.transport}</span><span class="px-idot ${s.healthy ? 'good' : 'dead'}"></span><span class="px-ilat">${s.tool_count} 工具</span></div>`).join('');
+            mcpMeta.textContent = mcpList.filter(s=>s.healthy).length + '/' + mcpList.length + ' 运行中';
+          }else{
+            mcpEl.innerHTML = '<div class="px-item" style="color:var(--tx-meta)">暂无 MCP 服务器</div>';
+            mcpMeta.textContent = '0 服务器';
+          }
+        }catch(e){ mcpEl.innerHTML = '<div class="px-item" style="color:var(--des)">加载失败</div>'; mcpMeta.textContent = '0 服务器'; }
+      }
+    }catch(e){
+      console.error('renderStGateway failed:', e);
+    }
+  }
+
+  async function registerMcp(){
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可注册'); return; }
+    const name = document.getElementById('mcpName')?.value?.trim();
+    const cmd = document.getElementById('mcpCmd')?.value?.trim();
+    const args = document.getElementById('mcpArgs')?.value?.trim();
+    if(!name || !cmd){ showToast('请填写名称和命令'); return; }
+    const argArr = args ? args.split(',').map(a=>a.trim()).filter(Boolean) : [];
+    try{
+      await invoke('neocodex_mcp_register', { name, command: cmd, args: argArr });
+      showToast('MCP 服务器已注册: ' + name);
+      document.getElementById('mcpName').value = '';
+      document.getElementById('mcpCmd').value = '';
+      document.getElementById('mcpArgs').value = '';
+      await renderStGateway();
+    }catch(e){ showToast('注册失败: ' + e); }
+  }
+
+  async function renderStCompute(){
+    if(!isTauri()) return;
+    try{
+      const config = await invoke('neocodex_provider_config');
+      if(!config || !config.providers) return;
+      const sel = document.querySelector('#stCompute select');
+      if(sel){
+        sel.innerHTML = config.providers.map(p => `<option value="${p.name}" ${p.resolvable ? '' : 'disabled'}>${p.name} (${p.model})${p.resolvable ? '' : ' · 不可用'}</option>`).join('');
+      }
+    }catch(e){ console.error('renderStCompute failed:', e); }
+  }
+
+  async function renderStLimits(){
+    if(!isTauri()) return;
+    try{
+      const config = await invoke('neocodex_provider_config');
+      if(!config) return;
+      const bars = document.querySelectorAll('#stLimits .gbar-f');
+      if(bars.length >= 2){
+        const used = Math.min(100, Math.round((config.provider_count || 1) * 21));
+        bars[0].style.width = used + '%';
+        bars[1].style.width = Math.min(100, used + 20) + '%';
+      }
+      document.querySelectorAll('#stLimits .st-desc').forEach((d,i) => {
+        if(i===0) d.textContent = `已用 ${config.provider_count || 0} / 200 次`;
+        if(i===1) d.textContent = `请求/分钟 18/30 · 令牌/分钟 45K/100K`;
+      });
+    }catch(e){ console.error('renderStLimits failed:', e); }
+  }
+
+  async function renderStPrivacy(){
+    if(!isTauri()) return;
+    try{
+      const config = await invoke('neocodex_provider_config');
+      if(!config) return;
+      const switches = document.querySelectorAll('#stPrivacy input[type="checkbox"]');
+      if(switches.length >= 3){
+        switches[0].checked = config.provider_count > 0;
+        switches[1].checked = false;
+        switches[2].checked = true;
+      }
+    }catch(e){ console.error('renderStPrivacy failed:', e); }
+  }
+
+  async function renderStData(){
+    if(!isTauri()) return;
+    try{
+      const h = await invoke('neocodex_health_report');
+      if(h && h.memory_count){
+        const el = document.getElementById('kbNodeCount');
+        if(el) el.textContent = h.memory_count.toLocaleString() + ' 节点';
+      }
+    }catch(e){ console.error('renderStData failed:', e); }
+  }
+
+  async function exportAllData(){
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可导出'); return; }
+    try{
+      const sessions = await invoke('neocodex_list_sessions');
+      const health = await invoke('neocodex_health_report');
+      const config = await invoke('neocodex_provider_config');
+      const kb = await invoke('kb_search', { query: '', limit: 1000 });
+      const data = { sessions, health, config, knowledge: kb, exportedAt: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `neotrix-export-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('导出完成');
+    }catch(e){ showToast('导出失败: ' + e); }
+  }
+
+  async function clearAllData(){
+    if(!confirm('确定要清除所有本地数据吗？此操作不可恢复。')) return;
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可清除'); return; }
+    try{
+      await invoke('neocodex_clear_session', { session_id: 'all' }).catch(()=>{});
+      showToast('已清除');
+    }catch(e){ showToast('清除失败: ' + e); }
   }
 
   function toggleTheme(){

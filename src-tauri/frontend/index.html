@@ -1,14 +1,645 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NeoTrix Desktop</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NeoTrix · 液态玻璃</title>
+  <script type="module" src="/src/ui-v2.js"></script>
+  <link rel="stylesheet" href="/src/styles/ui-v2.css">
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+<div class="app">
+  <div class="ab">
+
+    <!-- ═══ SIDEBAR ═══ -->
+    <aside class="sb" id="sidebar">
+      <div class="sb-top">
+        <!-- Window Header — unified traffic lights in chrome -->
+        <div class="sb-header">
+          <div class="sb-header-actions">
+            <!-- Traffic lights — integrated in sidebar chrome -->
+            <div class="traffic">
+              <span class="t-dot t-c"></span>
+              <span class="t-dot t-m"></span>
+              <span class="t-dot t-x"></span>
+            </div>
+            <button class="sbn" id="sidebarToggle" onclick="toggleSidebar()">
+              <svg viewBox="0 0 14 14"><line x1="10" y1="3" x2="10" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><polyline points="7,5 5,7 7,9" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class="sbn" onclick="showToast('搜索 (开发中)')">
+              <svg viewBox="0 0 14 14"><circle cx="6" cy="6" r="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="9" y1="9" x2="12.5" y2="12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Segmented Control — icon-only consciousness modes -->
+        <div class="seg">
+          <button class="segb on" data-view="chat" onclick="switchView(this,'chat')">
+            <svg viewBox="0 0 16 16"><path d="M3 4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H8L5.5 12.5V10H4a1 1 0 0 1-1-1V4z" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
+            对话
+          </button>
+          <button class="segb" data-view="cowork" onclick="switchView(this,'cowork')">
+            <svg viewBox="0 0 16 16"><circle cx="5.5" cy="5.5" r="2.1" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M2 12.5a3.5 3.5 0 0 1 7 0" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/><circle cx="11.2" cy="6" r="1.7" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M9.7 12.5a3.4 3.4 0 0 1 4.3-3.3" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg>
+            团队
+          </button>
+        </div>
+
+        <!-- Dynamic Nav List -->
+        <div class="nav-list" id="navList"></div>
+
+        <!-- Dynamic Recents -->
+        <div class="re" id="recentList"></div>
+      </div>
+
+      <!-- User Bar — click avatar for popover menu -->
+      <div class="sf" id="userBar" onclick="toggleUserPopover(event)" style="cursor:pointer">
+        <div class="sa" style="pointer-events:none">N</div>
+        <div class="su-info" style="pointer-events:none">
+          <div class="su-name">neotrix</div>
+          <div class="su-plan">dolpinsy@gmail.com</div>
+        </div>
+        <div class="sf-actions" style="pointer-events:none"></div>
+
+        <!-- User Popover Menu -->
+        <div class="popover" id="userPopover">
+          <div class="popover-card">
+            <div class="pop-hd">
+              <div class="pop-av">N</div>
+              <div class="pop-info">
+                <div class="pop-name">neotrix</div>
+              </div>
+            </div>
+            <div class="pop-sep"></div>
+            <button class="pop-item" onclick="openSettingsModal();closePopover()"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="1.5" x2="7" y2="3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="10.5" x2="7" y2="12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="1.5" y1="7" x2="3.5" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10.5" y1="7" x2="12.5" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>设置<span class="pop-shortcut">⌘,</span></button>
+            <button class="pop-item" onclick="closePopover();showToast('升级计划 — Pro 版本即将推出')"><svg viewBox="0 0 14 14"><line x1="7" y1="1.5" x2="7" y2="12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>升级<span class="pop-shortcut">Pro</span></button>
+            <button class="pop-item" id="popThemeToggle" onclick="toggleTheme();closePopover()"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="2" x2="7" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="10" x2="7" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="2" y1="7" x2="4" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>主题切换<span class="pop-shortcut" id="popThemeLabel">亮色</span></button>
+            <button class="pop-item" onclick="closePopover();showToast('帮助与反馈 · NeoTrix v0.19.0')"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="7" x2="7" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="10" r=".5" stroke="currentColor" stroke-width="1" fill="none"/></svg>帮助</button>
+            <div class="pop-sep"></div>
+            <button class="pop-item pop-logout" onclick="closePopover();showToast('已退出登录');clearChat()"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><polyline points="4,5 7,8 10,5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="2.5" y1="10" x2="11.5" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>退出登录</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Floating toggle for collapsed sidebar -->
+    <button class="sb-float" id="sidebarFloat" onclick="toggleSidebar()">
+      <svg viewBox="0 0 14 14"><line x1="10" y1="3" x2="10" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><polyline points="7,5 5,7 7,9" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <!-- ═══ MAIN ═══ -->
+    <main class="ma">
+
+
+
+      <!-- ═══ VIEW: Chat (对话) — Claude 式: hero 问候 + 底部常驻输入框 ═══ -->
+      <div class="vw-chat" id="viewChat">
+        <div class="wc-inner" id="heroSection">
+          <div class="hero">
+            <div class="hero-svg">
+              <svg viewBox="0 0 32 32" fill="none">
+                <path d="M16 2l4 8 8 4-8 4-4 8-4-8-8-4 8-4 4-8z" fill="var(--pri)" opacity="0.25"/>
+                <path d="M16 6l2.5 5 5.5 2.5-5.5 2.5-2.5 5-2.5-5L8 13.5l5.5-2.5 2.5-5z" fill="var(--pri)"/>
+                <circle cx="16" cy="13.5" r="2.5" fill="var(--pri)" stroke="none"/>
+                <circle cx="16" cy="13.5" r="1" fill="#fff" stroke="none"/>
+                <path d="M4 20q4-4 8 0t8-8 8 4" stroke="var(--pri2)" stroke-width="0.8" stroke-linecap="round" opacity="0.4" fill="none"/>
+              </svg>
+            </div>
+            <h1>下午好</h1>
+          </div>
+        </div>
+        <div class="cs" id="chatScroll" style="display:none"></div>
+        <div class="cic-wrap">
+          <div class="cic">
+            <textarea id="chatInput" rows="1" placeholder="发消息…（Shift + Enter 换行）" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+            <div class="cic-actions">
+              <div class="cic-left">
+              </div>
+              <div class="cic-right">
+                <button class="vc-btn vc-send" id="sendBtn" disabled onclick="sendMsg()" title="发送 (Enter)">
+                  <svg viewBox="0 0 16 16"><path d="M3 8l10-5-3.2 9.5-1.8-4.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="cic-hint">NeoTrix 可能出错，请核查重要信息。</div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: Cowork (协同) — 会话列表 + 任务看板 + 智能体监控 ═══ -->
+      <div class="vw-cowork" id="viewCowork">
+        <div class="cw-layout">
+          <!-- 左侧：会话列表 -->
+          <div class="cw-sidebar">
+            <div class="cw-shead">
+              <span>会话</span>
+              <button class="cw-add" onclick="createSession()"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+            </div>
+            <div class="cw-slist" id="cwSessionList"></div>
+          </div>
+          <!-- 右侧：任务详情 + 智能体 -->
+          <div class="cw-main" id="cwDetail">
+            <div class="cw-empty" id="cwEmpty">
+              <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="12" stroke="var(--tx-meta)" stroke-width="1.2"/><path d="M16 10v6l4 4" stroke="var(--tx-meta)" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <p>选择或创建一个协同会话</p>
+              <span>任务将在这里展示</span>
+            </div>
+            <div class="cw-content" id="cwContent" style="display:none">
+              <div class="cw-header">
+                <div>
+                  <div class="cw-title" id="cwDetailTitle">—</div>
+                  <div class="cw-sub" id="cwDetailStatus">0 个任务</div>
+                </div>
+                <div class="cw-hbadge" id="cwHBadge">进行中</div>
+              </div>
+              <div class="cw-section-title"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="6" r="1.5" fill="none" stroke="currentColor" stroke-width="1"/></svg>任务</div>
+              <div class="cw-tlist" id="cwTaskList"></div>
+              <div class="cw-section-title"><svg viewBox="0 0 12 12"><circle cx="6" cy="4" r="2.5" stroke="currentColor" stroke-width="1" fill="none"/><path d="M2 11a4 4 0 018 0" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/></svg>智能体</div>
+              <div class="cw-agents" id="cwAgentList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ VIEW: 代理 (Agent) 已移至设置 → 代理 · 网关 ═══ -->
+
+      <!-- ═══ OVERLAY: 能力注册表 ═══ -->
+<div class="overlay-panel" id="overlayRegistry">
+  <div class="overlay-box">
+    <div class="overlay-h">
+      <h2>能力注册表</h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayRegistry')" title="关闭"></span>
+        <span class="tlg-dot tlg-y" onclick="showToast('需求分析中')" title="最小化"></span>
+        <span class="tlg-dot tlg-g" onclick="showToast('需求分析中')" title="最大化"></span>
+      </div>
+    </div>
+    <div class="overlay-bd">
+      <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:8px">L7 Capability Registry · <span class="reg-dim">— 维</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div class="evo-card" style="flex:1"><div class="lbl">迭代</div><div class="val reg-iter">—</div></div>
+        <div class="evo-card" style="flex:1"><div class="lbl">能力总值</div><div class="val reg-cap">—</div></div>
+        <div class="evo-card" style="flex:1"><div class="lbl">引擎</div><div class="val reg-eng">—</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <div class="pipeline-item"><span class="s">代码生成</span><span class="st ok">Mature 6</span></div>
+        <div class="pipeline-item"><span class="s">知识吸收</span><span class="st ok">Mature 5</span></div>
+        <div class="pipeline-item"><span class="s">E8 推理</span><span class="st run">Mature 4</span></div>
+        <div class="pipeline-item"><span class="s">SEAL 循环</span><span class="st run">Mature 3</span></div>
+        <div class="pipeline-item"><span class="s">工具调用</span><span class="st ok">Mature 5</span></div>
+        <div class="pipeline-item"><span class="s">记忆检索</span><span class="st ok">Mature 6</span></div>
+        <div class="pipeline-item"><span class="s">元认知监控</span><span class="st run">Mature 2</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: 超立方体 ═══ -->
+<div class="overlay-panel" id="overlayHypercube">
+  <div class="overlay-box">
+    <div class="overlay-h">
+      <h2>知识超立方体</h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayHypercube')" title="关闭"></span>
+        <span class="tlg-dot tlg-y" onclick="showToast('需求分析中')" title="最小化"></span>
+        <span class="tlg-dot tlg-g" onclick="showToast('需求分析中')" title="最大化"></span>
+      </div>
+    </div>
+    <div class="overlay-bd">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="evo-card"><div class="lbl">总节点</div><div class="val" id="hcNodes">1,247</div></div>
+        <div class="evo-card"><div class="lbl">能力总值</div><div class="val" id="hcCap">6.0</div></div>
+        <div class="evo-card"><div class="lbl">关系边</div><div class="val" id="hcEdges">4,382</div></div>
+        <div class="evo-card"><div class="lbl">VSA 维度</div><div class="val" id="hcVsa">D=2048</div></div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:6px">最近写入</div>
+        <div class="pipeline-item"><span class="s">E8 Grounding 状态记录</span><span class="st ok">2m ago</span></div>
+        <div class="pipeline-item"><span class="s">CapabilityVector 更新</span><span class="st ok">5m ago</span></div>
+        <div class="pipeline-item"><span class="s">SEAL Epoch 7 摘要</span><span class="st ok">12m ago</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: 项目/成果/历史 通用面板 ═══ -->
+<div class="overlay-panel" id="overlayProjects">
+  <div class="overlay-box" style="max-width:420px">
+    <div class="overlay-h">
+      <h2 id="opTitle"></h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayProjects')" title="关闭"></span>
+      </div>
+    </div>
+    <div class="overlay-bd" id="opBody"></div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: Diff 行内评论 ═══ -->
+<div class="overlay-panel" id="overlayDiff">
+  <div class="overlay-box" style="max-width:900px;width:92vw;max-height:82vh">
+    <div class="overlay-h">
+      <h2 id="diffTitle">代码变更</h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayDiff')" title="关闭"></span>
+      </div>
+    </div>
+    <div class="diff-body" id="diffBody"></div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: 设置面板 ═══ -->
+<div class="overlay-panel" id="overlaySettings">
+  <div class="st-modal">
+    <div class="st-sidebar">
+      <div class="st-search">
+        <svg viewBox="0 0 14 14"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="搜索设置" />
+        <span class="st-kbd">⌘K</span>
+      </div>
+      <div class="st-nav">
+        <div class="st-grp">通用</div>
+        <div class="st-item on" onclick="selectSetting(this,'profile')">
+          <svg viewBox="0 0 14 14"><circle cx="7" cy="4.5" r="3" stroke="currentColor" stroke-width="1" fill="none"/><path d="M2 13a5 5 0 0110 0" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/></svg>个人资料
+        </div>
+        <div class="st-item" onclick="selectSetting(this,'appearance')">
+          <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="2" x2="7" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="10" x2="7" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="2" y1="7" x2="4" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>外观
+        </div>
+        <div class="st-item" onclick="selectSetting(this,'speech')">
+          <svg viewBox="0 0 14 14"><line x1="4" y1="3" x2="4" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="4" x2="10" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>语音
+        </div>
+        <div class="st-item" onclick="selectSetting(this,'compute')">
+          <svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1" fill="none"/><circle cx="7" cy="7" r="1.5" stroke="currentColor" stroke-width="1" fill="none"/></svg>计算资源
+        </div>
+        <div class="st-grp">系统</div>
+        <div class="st-item" onclick="selectSetting(this,'gateway')">
+          <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1" fill="none"/><ellipse cx="7" cy="7" rx="3" ry="6" stroke="currentColor" stroke-width="0.8" fill="none"/><line x1="1" y1="5.5" x2="13" y2="5.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/><line x1="1" y1="10.5" x2="13" y2="10.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round"/></svg>代理 · 网关
+        </div>
+        <div class="st-grp">账户</div>
+        <div class="st-item" onclick="selectSetting(this,'limits')">
+          <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="4" x2="7" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="10" r=".4" fill="currentColor"/></svg>账户限制
+        </div>
+        <div class="st-item" onclick="selectSetting(this,'billing')">
+          <svg viewBox="0 0 14 14"><rect x="1.5" y="4.5" width="11" height="7" rx="1.5" stroke="currentColor" stroke-width="1" fill="none"/><circle cx="7" cy="8" r="1.5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="4" y1="4.5" x2="4" y2="3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="4.5" x2="10" y2="3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>账单
+        </div>
+        <div class="st-item" onclick="selectSetting(this,'privacy')">
+          <svg viewBox="0 0 14 14"><rect x="2.5" y="6" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1" fill="none"/><path d="M4.5 6V4a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>隐私
+        </div>
+        <div class="st-item" onclick="selectSetting(this,'data')">
+          <svg viewBox="0 0 14 14"><ellipse cx="7" cy="4" rx="4.5" ry="2" stroke="currentColor" stroke-width="1" fill="none"/><path d="M2.5 4v2.5c0 1.1 2 2 4.5 2s4.5-.9 4.5-2V4" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M2.5 6.5V9c0 1.1 2 2 4.5 2s4.5-.9 4.5-2V6.5" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/></svg>数据控制
+        </div>
+      </div>
+    </div>
+    <div class="st-content">
+      <div class="st-top">
+        <span class="st-title">设置</span>
+        <div class="tlg-close">
+          <span class="tlg-dot tlg-r" onclick="closeOverlay('overlaySettings')" title="关闭"></span>
+          <span class="tlg-dot tlg-y" onclick="showToast('需求分析中')" title="最小化"></span>
+          <span class="tlg-dot tlg-g" onclick="showToast('需求分析中')" title="最大化"></span>
+        </div>
+      </div>
+      <div class="st-body">
+
+        <!-- 个人资料 -->
+        <div class="st-section open" id="stProfile">
+          <h2 class="st-h2">个人资料</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">头像</div>
+                <div class="st-desc">代表你的账户头像</div>
+              </div>
+              <div class="st-av">N</div>
+            </div>
+          </div>
+          <div class="st-field">
+            <label class="st-lbl">全名</label>
+            <input type="text" class="st-input" value="neotrix" />
+          </div>
+          <div class="st-field">
+            <label class="st-lbl">显示名称</label>
+            <input type="text" class="st-input" value="neotrix" />
+          </div>
+          <div class="st-field">
+            <label class="st-lbl">工作角色</label>
+            <select class="st-input"><option>其他</option><option>开发者</option><option>设计师</option><option>研究员</option></select>
+          </div>
+        </div>
+
+        <!-- 外观 -->
+        <div class="st-section" id="stAppearance" style="display:none">
+          <h2 class="st-h2">外观</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">主题模式</div>
+                <div class="st-desc">切换亮色 / 暗色界面</div>
+              </div>
+              <button class="st-toggle" onclick="toggleTheme()" style="padding:4px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);cursor:pointer;font-family:var(--ff);transition:var(--tr)">切换主题</button>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">字体大小</div>
+                <div class="st-desc">调整界面文字尺寸</div>
+              </div>
+              <select class="st-input" style="width:100px"><option>小</option><option selected>中</option><option>大</option></select>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">减少透明效果</div>
+                <div class="st-desc">降低毛玻璃透明度以提升可读性</div>
+              </div>
+              <label class="st-switch"><input type="checkbox" /></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 语音 -->
+        <div class="st-section" id="stSpeech" style="display:none">
+          <h2 class="st-h2">语音</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">语音输入</div>
+                <div class="st-desc">启用麦克风进行语音对话</div>
+              </div>
+              <label class="st-switch"><input type="checkbox" checked /></label>
+            </div>
+          </div>
+          <div class="st-field">
+            <label class="st-lbl">输入语言</label>
+            <select class="st-input"><option>中文（简体）</option><option>English</option><option>日本語</option></select>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">自动发送</div>
+                <div class="st-desc">语音识别完成后自动发送消息</div>
+              </div>
+              <label class="st-switch"><input type="checkbox" /></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 计算资源 -->
+        <div class="st-section" id="stCompute" style="display:none">
+          <h2 class="st-h2">计算资源</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">本地推理引擎</div>
+                <div class="st-desc">使用 ANE / GPU 加速本地模型推理</div>
+              </div>
+              <label class="st-switch"><input type="checkbox" /></label>
+            </div>
+          </div>
+          <div class="st-field">
+            <label class="st-lbl">默认提供者</label>
+            <select class="st-input"><option>GatewayV2（自动）</option><option>OpenAI</option><option>Anthropic</option><option>Groq（免费）</option></select>
+          </div>
+          <div class="st-field">
+            <label class="st-lbl">最大 Token</label>
+            <select class="st-input"><option>4096</option><option selected>8192</option><option>16384</option><option>32768</option></select>
+          </div>
+        </div>
+
+        <!-- 代理 · 网关 -->
+        <div class="st-section" id="stGateway" style="display:none">
+          <h2 class="st-h2">代理 · 网关</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">聚合网关</div>
+                <div class="st-desc">GatewayV2 · 断路器 · 速率限制</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="px-pulse on" style="display:inline-block;width:6px;height:6px"></span>
+                <span style="font-size:var(--fs-small);font-weight:var(--fw-medium);color:var(--suc)" id="stGwStatus">运行中</span>
+              </div>
+            </div>
+          </div>
+          <div class="px-section" style="margin-bottom:12px">
+            <div class="px-shead">
+              <span>LLM 提供者</span>
+              <span class="px-smeta" id="stGwLlmMeta">6 提供者</span>
+            </div>
+            <div class="px-clist" id="stGwLlmList" style="max-height:160px;overflow-y:auto"></div>
+          </div>
+          <div class="px-section">
+            <div class="px-shead">
+              <span>代理节点</span>
+              <span class="px-smeta" id="stGwNodeMeta">12 代理</span>
+            </div>
+            <div class="px-clist" id="stGwNodeList" style="max-height:160px;overflow-y:auto"></div>
+          </div>
+          <div class="px-section">
+            <div class="px-shead">
+              <span>MCP 服务器</span>
+              <span class="px-smeta" id="stGwMcpMeta">0 服务器</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:8px">
+              <input id="mcpName" type="text" placeholder="名称" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);font-family:var(--ff);outline:none">
+              <input id="mcpCmd" type="text" placeholder="命令 (如 npx -y @modelcontextprotocol/server-filesystem)" style="flex:2;padding:7px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);font-family:var(--ff);outline:none">
+              <input id="mcpArgs" type="text" placeholder="参数 (可选，逗号分隔)" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);font-family:var(--ff);outline:none">
+              <button onclick="registerMcp()" style="padding:5px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);cursor:pointer;font-family:var(--ff);transition:var(--tr)">注册</button>
+            </div>
+            <div class="px-clist" id="stGwMcpList" style="max-height:120px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- 账户限制 -->
+        <div class="st-section" id="stLimits" style="display:none">
+          <h2 class="st-h2">账户限制</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">计划类型</div>
+                <div class="st-desc">当前使用的服务计划</div>
+              </div>
+              <span style="font-size:var(--fs-small);font-weight:var(--fw-semibold);color:var(--suc);padding:3px 10px;border-radius:20px;background:rgba(76,175,80,0.1)">免费</span>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">每日请求</div>
+                <div class="st-desc">已用 42 / 200 次</div>
+              </div>
+              <div class="gbar" style="width:80px"><div class="gbar-f" style="width:21%;background:var(--suc)"></div></div>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">速率限制</div>
+                <div class="st-desc">请求/分钟 18/30 · 令牌/分钟 45K/100K</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 账单 -->
+        <div class="st-section" id="stBilling" style="display:none">
+          <h2 class="st-h2">账单</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">本月用量</div>
+                <div class="st-desc">免费计划 · 无需付费</div>
+              </div>
+              <span style="font-size:var(--fs-body);font-weight:var(--fw-semibold);color:var(--suc)">¥0.00</span>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">升级至 Pro</div>
+                <div class="st-desc">解锁无限请求、优先队列、高级模型</div>
+              </div>
+              <button style="padding:5px 16px;border-radius:8px;border:none;background:var(--tx);color:var(--bg-base);font-size:var(--fs-small);cursor:pointer;font-family:var(--ff);font-weight:var(--fw-medium)">了解详情</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 隐私 -->
+        <div class="st-section" id="stPrivacy" style="display:none">
+          <h2 class="st-h2">隐私</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">对话存储</div>
+                <div class="st-desc">在本地保存对话历史用于检索</div>
+              </div>
+              <label class="st-switch"><input type="checkbox" checked /></label>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">使用数据</div>
+                <div class="st-desc">匿名化使用数据帮助改进产品</div>
+              </div>
+              <label class="st-switch"><input type="checkbox" /></label>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">本地处理</div>
+                <div class="st-desc">优先使用本地推理引擎保护隐私</div>
+              </div>
+              <label class="st-switch"><input type="checkbox" checked /></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据控制 -->
+        <div class="st-section" id="stData" style="display:none">
+          <h2 class="st-h2">数据控制</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">知识库</div>
+                <div class="st-desc">SQLite · ~/.neotrix/knowledge.db · <span id="kbNodeCount">1,247 节点</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-info">
+              <div class="st-lbl">知识库检索</div>
+              <div class="st-desc" style="margin-bottom:8px">检索已吸收的经验、论文与技能</div>
+              <div style="display:flex;gap:8px">
+                <input id="kbSearchInput" type="text" placeholder="输入关键词…" onkeydown="if(event.key==='Enter')kbSearch()" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);font-family:var(--ff);outline:none"/>
+                <button onclick="kbSearch()" style="padding:5px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);cursor:pointer;font-family:var(--ff);transition:var(--tr)">检索</button>
+              </div>
+              <div id="kbResults" style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+                <div class="kb-empty" style="color:var(--tx-meta);font-size:var(--fs-caption)">输入关键词检索知识库</div>
+              </div>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">导出数据</div>
+                <div class="st-desc">下载所有对话、知识库和配置</div>
+              </div>
+              <button onclick="exportAllData()" style="padding:5px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--ghost);color:var(--tx2);font-size:var(--fs-small);cursor:pointer;font-family:var(--ff);transition:var(--tr)">导出</button>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">清除数据</div>
+                <div class="st-desc">删除所有本地数据（不可恢复）</div>
+              </div>
+              <button onclick="clearAllData()" style="padding:5px 14px;border-radius:8px;border:1px solid var(--des);background:rgba(232,84,84,0.08);color:var(--des);font-size:var(--fs-small);cursor:pointer;font-family:var(--ff);transition:var(--tr)">清除</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+    </main>
+
+    <!-- ═══ RIGHT SIDEBAR — File Tree + Agent Trace ═══ -->
+    <aside class="rb" id="rightbar" onmouseenter="openRbSidebar()" onmouseleave="onRbLeave()">
+      <button class="rb-float" id="rbFloat" onclick="toggleRbSidebar()" title="切换侧栏">
+        <svg id="rbFloatIcon" viewBox="0 0 8 8"><line x1="5" y1="2" x2="3" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="5" y1="6" x2="3" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="rb-content">
+        <!-- Artifact Pane (top) -->
+        <div class="ap mini" id="filePreview" onclick="expandPreview(event)">
+          <div class="ap-bar">
+            <div class="ap-bar-left">
+              <button class="ap-view-btn on" data-view="preview" onclick="switchArtifactView(this,'preview')" title="Preview">
+                <svg viewBox="0 0 14 14"><path d="M1.5 7s2.5-4.5 5.5-4.5S12.5 7 12.5 7s-2.5 4.5-5.5 4.5S1.5 7 1.5 7z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+              </button>
+              <button class="ap-view-btn" data-view="code" onclick="switchArtifactView(this,'code')" title="Code">
+                <svg viewBox="0 0 14 14"><polyline points="4,4 1.5,7 4,10" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="10,4 12.5,7 10,10" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="8.5" y1="3.5" x2="5.5" y2="10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+            <span class="ap-title" id="fpName">未选择文件</span>
+          </div>
+          <div class="ap-tabs" id="fpFmt"></div>
+          <div class="ap-body" id="fpBody">
+            <div class="ap-content" id="fpContent">
+              <span class="cm">// 点击文件预览</span>
+            </div>
+          </div>
+          <div class="ap-footer">
+            <button class="ap-action" onclick="copyPreview(event)" title="Copy">
+              <svg viewBox="0 0 12 12"><rect x="3" y="1.5" width="7.5" height="9" rx="1" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M1.5 4v6.5a1 1 0 001 1H9" stroke="currentColor" stroke-width="1.1" fill="none"/></svg>
+              <span>复制</span>
+            </button>
+            <button class="ap-action" onclick="refreshPreview(event)" title="Refresh">
+              <svg viewBox="0 0 12 12"><path d="M1.5 6A4.5 4.5 0 016 1.5 4.5 4.5 0 0110.5 6" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/><polyline points="9,4.5 10.5,6 9,7.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>刷新</span>
+            </button>
+            <button class="ap-action" onclick="expandPreview(event)" title="Expand">
+              <svg viewBox="0 0 12 12"><polyline points="2,4.5 2,10 7.5,10" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="10,7.5 10,2 4.5,2" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>展开</span>
+            </button>
+            <button class="ap-action" onclick="closePreview(event)" title="Close">
+              <svg viewBox="0 0 12 12"><line x1="3" y1="3" x2="9" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="9" y1="3" x2="3" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <span>关闭</span>
+            </button>
+          </div>
+        </div>
+        <!-- File Tree (below artifact pane) -->
+        <div class="ft" id="fileTree"></div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+
 </body>
 </html>
