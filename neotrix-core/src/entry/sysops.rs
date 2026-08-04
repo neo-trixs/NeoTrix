@@ -281,12 +281,59 @@ fn cmd_daemons(sub: &str) {
             }
             println!("{} kb daemons uninstalled", success("✓"));
         }
+        "rewire" => {
+            let exe = current_exe();
+            let exe_str = exe.to_string_lossy().into_owned();
+            let fs = launch_agents_dir();
+            if let Err(e) = fs::create_dir_all(&fs) {
+                eprintln!("{} {}", err("Error:"), e);
+                return;
+            }
+            let log_dir = home_dir().join(".neotrix/logs");
+            let _ = fs::create_dir_all(&log_dir);
+
+            // 先卸载现有
+            bootout("com.neotrix.kb-guard");
+            bootout("com.neotrix.kb-backup");
+
+            let guard_plist = plist(
+                "com.neotrix.kb-guard",
+                &[exe_str.as_str(), "sysops", "guard"],
+                600,
+                &log_dir.join("kb-guard.log"),
+            );
+            let backup_plist = plist(
+                "com.neotrix.kb-backup",
+                &[exe_str.as_str(), "sysops", "backup"],
+                21600,
+                &log_dir.join("kb-backup.log"),
+            );
+            fs::write(kb_guard_plist_path(), &guard_plist)
+                .map_err(|e| eprintln!("{} write plist: {}", err("Error:"), e))
+                .ok();
+            fs::write(kb_backup_plist_path(), &backup_plist)
+                .map_err(|e| eprintln!("{} write plist: {}", err("Error:"), e))
+                .ok();
+            match bootstrap(&kb_guard_plist_path()) {
+                Ok(()) => println!("{} kb-guard daemon rewired (600s)", success("✓")),
+                Err(e) => eprintln!("{} {}", err("Error:"), e),
+            }
+            match bootstrap(&kb_backup_plist_path()) {
+                Ok(()) => println!("{} kb-backup daemon rewired (6h)", success("✓")),
+                Err(e) => eprintln!("{} {}", err("Error:"), e),
+            }
+            println!(
+                "{} ProgramArguments 指向 {} (release)",
+                info("→"),
+                exe.display()
+            );
+        }
         "status" => {
             cmd_status();
         }
         other => {
             eprintln!(
-                "{} unknown daemons subcommand: {} (expected: install|uninstall|status)",
+                "{} unknown daemons subcommand: {} (expected: install|uninstall|status|rewire)",
                 err("Error:"),
                 other
             );
@@ -362,6 +409,7 @@ pub fn run_sysops(args: &[String]) {
                  \x20   status               显示 KB 健康/备份/daemon 状态\n\
                  \x20   daemons install     安装 kb-guard + kb-backup launchd 任务 (幂等)\n\
                  \x20   daemons uninstall   卸载 launchd 任务\n\
+                 \x20   daemons rewire      重指向二进制 (release build 后重装, 幂等)\n\
                  \x20   uninstall [--force] 安全卸载 (先备份 KB 防数据丢失)",
                 info("╭─")
             );
