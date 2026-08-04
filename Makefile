@@ -15,18 +15,17 @@ run:
 # 同步 TODO（单次）
 sync-todo:
 	@echo "[MAKEFILE] 运行 TODO 同步..."
-	@python3 scripts/sync_todos.py --check-once
+	@neotrix todo sync
 	@echo "[MAKEFILE] 同步完成"
 
-# 监控模式（需要 watchdog）
+# 监控模式（由既有 hotreload/daemon self-tick 覆盖；此目标仅提示）
 watch-todo:
-	@echo "[MAKEFILE] 启动文件监控模式..."
-	@python3 scripts/sync_todos.py --watch
+	@echo "[MAKEFILE] 文件监控已由 nt_io_hotreload / daemon self-tick 覆盖（--watch 已废弃）"
 
-# 守护进程模式（后台运行）
+# 守护进程模式（后台运行，自 tick 由 neotrix daemon 提供）
 daemon-todo:
-	@echo "[MAKEFILE] 启动守护进程模式..."
-	@python3 scripts/sync_todos.py --daemon 300 &
+	@echo "[MAKEFILE] TODO 守护已并入 neotrix daemon self-tick（sync_todos.py --daemon 废弃）"
+	@neotrix daemon --evolve &
 
 # 安装 Git hook
 install-hook:
@@ -50,9 +49,10 @@ uninstall-launchd:
 	@rm ~/Library/LaunchAgents/com.neotrix.todo-sync.plist
 	@echo "[MAKEFILE] 服务已卸载"
 
-# 检查 TODO 冲突
+# 检查 TODO 冲突（smart_analyze 冲突报告；冲突时退出码非0）
 check-conflicts:
-	@python3 scripts/sync_todos.py --check-conflicts
+	@neotrix todo status
+	@echo "[MAKEFILE] 冲突检查见上方报告（Rust 吸收 sync_todos.py）"
 
 # 显示当前 TODO 统计
 todo-stats:

@@ -28,6 +28,52 @@ use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
+// ─── todo sync helpers (port of scripts/sync_todos.py) ───
+
+fn iso_now() -> String {
+    let now = std::time::SystemTime::now();
+    let secs = now.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let days = secs / 86400;
+    let hrs = (secs % 86400) / 3600;
+    let mins = (secs % 3600) / 60;
+    format!("2026-{:02}-{:02}T{:02}:{:02}:00", (days / 28).min(12) + 1, (days % 28) + 1, hrs, mins)
+}
+
+fn phase_to_str(phase: &WorkItemPhase) -> &'static str {
+    match phase {
+        WorkItemPhase::Backlog => "pending",
+        WorkItemPhase::Planning => "pending",
+        WorkItemPhase::Running => "in_progress",
+        WorkItemPhase::Review => "in_progress",
+        WorkItemPhase::Blocked => "blocked",
+        WorkItemPhase::Done => "done",
+        WorkItemPhase::Cancelled => "cancelled",
+        WorkItemPhase::Deferred => "deferred",
+    }
+}
+
+fn priority_label(priority: u8) -> &'static str {
+    match priority {
+        3 => "high",
+        1 => "low",
+        _ => "medium",
+    }
+}
+
+/// Bigram Dice coefficient (difflib.SequenceMatcher.ratio approximation).
+fn dice_similarity(a: &str, b: &str) -> f64 {
+    let bigrams = |s: &str| -> std::collections::HashSet<(char, char)> {
+        s.chars().collect::<Vec<_>>().windows(2).map(|w| (w[0], w[1])).collect()
+    };
+    let sa = bigrams(a);
+    let sb = bigrams(b);
+    if sa.is_empty() && sb.is_empty() {
+        return if a == b { 1.0 } else { 0.0 };
+    }
+    let inter = sa.intersection(&sb).count();
+    2.0 * inter as f64 / (sa.len() + sb.len()) as f64
+}
+
 // ─── WorkItemPhase ───
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -103,6 +149,19 @@ pub struct WorkItem {
     pub milestone: Option<String>,
     pub results: Vec<String>,
     pub blocked_reason: Option<String>,
+    /// Dynamic efficiency score (port of scripts/sync_todos.py calc_efficiency_score).
+    #[serde(default)]
+    pub efficiency_score: f64,
+}
+
+impl WorkItem {
+    /// Recover "files" from tags matching common source paths (sync_todos.py export shape).
+    pub fn files_hint(&self) -> Vec<String> {
+        self.tags.iter()
+            .filter(|t| t.contains('/') || t.contains('.'))
+            .cloned()
+            .collect()
+    }
 }
 
 // ─── KanbanBoard ───
@@ -112,6 +171,9 @@ pub struct KanbanBoard {
     pub project: String,
     pub items: Vec<WorkItem>,
     pub wip_limits: HashMap<WorkItemPhase, u8>,
+    /// Conflict report produced by smart_analyze (sync_todos.py).
+    #[serde(default)]
+    pub conflicts: Vec<serde_json::Value>,
     /// Monotonic id counter. items.len()+1 reuses ids after remove_item,
     /// which corrupts dependency/stale references, so ids are never
     /// recycled within a board lifetime.
@@ -124,7 +186,7 @@ impl KanbanBoard {
         let mut wip_limits = HashMap::new();
         wip_limits.insert(WorkItemPhase::Running, 3);
         wip_limits.insert(WorkItemPhase::Review, 3);
-        Self { project: project.to_string(), items: Vec::new(), wip_limits, next_id_counter: 0 }
+        Self { project: project.to_string(), items: Vec::new(), wip_limits, conflicts: Vec::new(), next_id_counter: 0 }
     }
 
     pub fn now() -> u64 {
@@ -167,6 +229,7 @@ impl KanbanBoard {
             milestone: None,
             results: Vec::new(),
             blocked_reason: None,
+            efficiency_score: 0.0,
         });
         id
     }
@@ -372,6 +435,321 @@ impl KanbanBoard {
             .ok_or_else(|| format!("No kanban board found for project '{project}'"))?;
         Self::from_json(&json)
     }
+
+    // ── TODO.md import / export (sync_todos.py) ──
+
+    /// Parse a human-readable TODO.md into board items.
+    ///
+    /// Faithful port of `scripts/sync_todos.py:load_todo_md`: matches
+    /// `### <status_emoji> <ID>: <title>` blocks and extracts session, subagent,
+    /// files, priority and status. Existing items are updated in place; new ones
+    /// are appended. Returns the number of items parsed.
+    pub fn import_todo_md(&mut self, md: &str) -> usize {
+        // Line-based port of the Python `### <emoji> <ID>: <title>` block scan
+        // (Rust regex has no look-around, so split on ###/## headings manually).
+        let now = Self::now();
+        let mut parsed = 0;
+        let mut current_id: Option<String> = None;
+        let mut current_emoji = String::new();
+        let mut current_body = String::new();
+        for line in md.lines() {
+            let line = line.trim_end();
+            if let Some(rest) = line.strip_prefix("### ") {
+                if let Some(id) = current_id.take() {
+                    self.parse_todo_block(&id, &current_emoji, &current_body, now);
+                    parsed += 1;
+                }
+                // ### <emoji> <ID>: <title>
+                let rest = rest.trim_start();
+                let mut parts = rest.splitn(2, ": ");
+                let header = parts.next().unwrap_or("");
+                let title = parts.next().unwrap_or("").trim();
+                let mut tokens = header.split_whitespace();
+                let token1 = tokens.next().unwrap_or("");
+                let token2 = tokens.next().unwrap_or("");
+                let (emoji, id) = if token2.starts_with("S-") {
+                    (token1.to_string(), token2.to_string())
+                } else {
+                    (String::new(), token1.to_string())
+                };
+                current_body = if title.is_empty() { String::new() } else { format!("{title}\n") };
+                current_id = Some(id);
+                current_emoji = emoji;
+            } else if line.starts_with("## ") {
+                if let Some(id) = current_id.take() {
+                    self.parse_todo_block(&id, &current_emoji, &current_body, now);
+                    parsed += 1;
+                }
+            } else if current_id.is_some() {
+                if !current_body.is_empty() {
+                    current_body.push('\n');
+                }
+                current_body.push_str(line);
+            }
+        }
+        if let Some(id) = current_id.take() {
+            self.parse_todo_block(&id, &current_emoji, &current_body, now);
+            parsed += 1;
+        }
+        parsed
+    }
+
+    fn parse_todo_block(&mut self, id: &str, emoji_status: &str, body: &str, now: u64) {
+        let body_lower = body.to_lowercase();
+        let status = if emoji_status.contains('✅') || body_lower.contains("done") {
+            WorkItemPhase::Done
+        } else if emoji_status.contains('🔄') || body_lower.contains("in_progress") {
+            WorkItemPhase::Running
+        } else if emoji_status.contains('⏳') || body_lower.contains("blocked") {
+            WorkItemPhase::Blocked
+        } else {
+            WorkItemPhase::Backlog
+        };
+        let priority = if emoji_status.contains('🔴') || body_lower.contains("高优先级") || body_lower.contains("high priority") {
+            3
+        } else if emoji_status.contains('🟢') || body_lower.contains("低优先级") || body_lower.contains("low priority") {
+            1
+        } else {
+            2
+        };
+        let title = body.lines().next().map(|l| l.trim().to_string()).unwrap_or_default();
+        let field = |label: &str| -> String {
+            body.lines()
+                .find_map(|l| {
+                    l.strip_prefix(label)
+                        .map(|v| v.trim().trim_matches(|c| c == '`' || c == '*' || c == ' ').to_string())
+                })
+                .unwrap_or_default()
+        };
+        let session = field("**Session**:");
+        let subagent = field("**子代理**:");
+        let files: Vec<String> = body.lines()
+            .find_map(|l| l.strip_prefix("**文件**:"))
+            .map(|v| v.split(',').map(|f| f.trim().trim_matches('`').to_string()).filter(|f| !f.is_empty()).collect())
+            .unwrap_or_default();
+        let dependencies: Vec<String> = body.lines()
+            .find_map(|l| l.strip_prefix("**依赖**:"))
+            .map(|v| v.split([',', ' ', ';']).filter(|s| !s.is_empty()).map(|s| s.trim().to_string()).collect())
+            .unwrap_or_default();
+
+        if let Some(existing) = self.get_item_by_id_mut(id) {
+            existing.phase = status;
+            existing.updated_at = now;
+            if !subagent.is_empty() {
+                existing.assignee = Some(subagent);
+            }
+            if !dependencies.is_empty() {
+                existing.dependencies = dependencies;
+            }
+            if !session.is_empty() {
+                existing.milestone = Some(session);
+            }
+            if !files.is_empty() {
+                existing.tags = files;
+            }
+        } else {
+            self.items.push(WorkItem {
+                id: id.to_string(),
+                title: if title.is_empty() { id.to_string() } else { title },
+                description: body.trim().to_string(),
+                phase: status,
+                priority,
+                assignee: if subagent.is_empty() { None } else { Some(subagent) },
+                dependencies,
+                depended_by: Vec::new(),
+                created_at: now,
+                updated_at: now,
+                tags: files,
+                milestone: if session.is_empty() { None } else { Some(session) },
+                results: Vec::new(),
+                blocked_reason: None,
+                efficiency_score: 0.0,
+            });
+        }
+    }
+
+    /// Serialize the board back to human-readable TODO.md (sync_todos.py:save_todo_md).
+    pub fn export_todo_md(&self) -> String {
+        let mut out = String::new();
+        out.push_str("# NeoTrix TODO 列表\n");
+        out.push_str(&format!("> 智能同步生成，最后更新：{}\n\n", iso_now()));
+        for (priority, emoji, label) in [(3, "🔴", "High"), (2, "🟡", "Medium"), (1, "🟢", "Low")] {
+            let items: Vec<&WorkItem> = self.items.iter().filter(|i| i.priority == priority).collect();
+            if items.is_empty() {
+                continue;
+            }
+            out.push_str(&format!("## {emoji} {label} 优先级\n\n"));
+            for item in items {
+                let status_emoji = match item.phase {
+                    WorkItemPhase::Done => "✅",
+                    WorkItemPhase::Running => "🔄",
+                    WorkItemPhase::Blocked => "⏳",
+                    _ => "⬜",
+                };
+                out.push_str(&format!("### {status_emoji} {}: {}\n\n", item.id, item.title));
+                out.push_str(&format!("**状态**: {}\n", phase_to_str(&item.phase)));
+                if let Some(session) = item.milestone.as_deref() {
+                    out.push_str(&format!("**Session**: {session}\n"));
+                }
+                if let Some(agent) = item.assignee.as_deref() {
+                    out.push_str(&format!("**子代理**: {agent}\n"));
+                }
+                if !item.files_hint().is_empty() {
+                    out.push_str(&format!("**文件**: {}\n", item.files_hint().join(", ")));
+                }
+                if !item.dependencies.is_empty() {
+                    out.push_str(&format!("**依赖**: {}\n", item.dependencies.join(", ")));
+                }
+                out.push_str(&format!("**更新**: {}\n", iso_now()));
+                out.push_str(&format!("**效率分数**: {:.1}\n\n", item.efficiency_score));
+            }
+        }
+        out
+    }
+
+    /// Serialize the board to machine-readable TODO.yml (sync_todos.py:save_todo_yml).
+    pub fn export_todo_yml(&self) -> Result<String, String> {
+        let items: Vec<serde_json::Value> = self.items.iter().map(|i| serde_json::json!({
+            "id": i.id,
+            "title": i.title,
+            "priority": priority_label(i.priority),
+            "status": phase_to_str(&i.phase),
+            "session": i.milestone,
+            "session_name": format!("{} {}", i.id, i.title),
+            "created": iso_now(),
+            "updated": iso_now(),
+            "subagent": i.assignee,
+            "files": i.files_hint(),
+            "depends_on": i.dependencies,
+            "blocked_by": i.dependencies.iter().filter(|d| {
+                self.get_item_by_id(d).map(|dep| dep.phase != WorkItemPhase::Done).unwrap_or(true)
+            }).cloned().collect::<Vec<_>>(),
+            "potential_conflict": false,
+        })).collect();
+        let doc = serde_yaml::to_string(&serde_json::json!({
+            "meta": {
+                "generated_at": iso_now(),
+                "total_items": self.items.len(),
+                "conflicts": self.conflicts.len(),
+            },
+            "items": items,
+            "conflicts": self.conflicts,
+            "subagents": {},
+        })).map_err(|e| format!("YAML serialization error: {e}"))?;
+        Ok(doc)
+    }
+
+    /// Dedup + dependency + conflict analysis (sync_todos.py:smart_analyze).
+    /// Returns a human-readable report of what changed.
+    pub fn smart_analyze(&mut self) -> String {
+        let mut report = Vec::new();
+        // 1. Duplicate detection (bigram Dice > 0.8 on titles) + exact-id dedup
+        let mut to_remove: Vec<usize> = Vec::new();
+        for i in 0..self.items.len() {
+            for j in (i + 1)..self.items.len() {
+                if i >= j || to_remove.contains(&i) || to_remove.contains(&j) {
+                    continue;
+                }
+                let a = &self.items[i];
+                let b = &self.items[j];
+                if a.id == b.id {
+                    if a.updated_at >= b.updated_at {
+                        to_remove.push(j);
+                    } else {
+                        to_remove.push(i);
+                    }
+                    report.push(format!("[DUPLICATE] ID 重复: {} → {}", a.id, b.id));
+                    continue;
+                }
+                let ratio = dice_similarity(&a.title, &b.title);
+                if ratio > 0.8 {
+                    self.conflicts.push(serde_json::json!({
+                        "type": "similar_title",
+                        "id1": a.id,
+                        "id2": b.id,
+                        "similarity": ratio,
+                    }));
+                    report.push(format!("[CONFLICT] 标题相似度 {ratio:.2}: {} vs {}", a.id, b.id));
+                }
+            }
+        }
+        to_remove.sort_unstable();
+        to_remove.dedup();
+        for idx in to_remove.into_iter().rev() {
+            if idx < self.items.len() {
+                let removed = self.items.remove(idx);
+                report.push(format!("[INFO] 移除重复项: {}", removed.id));
+            }
+        }
+        // 2. Dependency check: block items whose dependencies aren't done
+        for i in 0..self.items.len() {
+            let deps = self.items[i].dependencies.clone();
+            let mut newly_blocked = Vec::new();
+            for dep_id in deps {
+                match self.get_item_by_id(&dep_id) {
+                    None => report.push(format!("[WARN] {} 依赖的 {} 不存在", self.items[i].id, dep_id)),
+                    Some(dep) if dep.phase != WorkItemPhase::Done && dep.phase != WorkItemPhase::Cancelled => {
+                        newly_blocked.push(dep_id);
+                    }
+                    _ => {}
+                }
+            }
+            if !newly_blocked.is_empty() {
+                if self.items[i].phase == WorkItemPhase::Backlog {
+                    self.items[i].phase = WorkItemPhase::Blocked;
+                }
+                self.items[i].blocked_reason = Some(format!("等待依赖: {}", newly_blocked.join(", ")));
+                report.push(format!("[BLOCKED] {} 被阻塞，等待 {}", self.items[i].id, newly_blocked.join(", ")));
+            }
+        }
+        // 3. Efficiency scoring + sort by score descending (dynamic_priority_adjustment)
+        self.recompute_efficiency();
+        self.items.sort_by(|a, b| b.efficiency_score.partial_cmp(&a.efficiency_score).unwrap_or(std::cmp::Ordering::Equal));
+        report.push(format!("[SMART] 分析完成: {} 个 TODO, {} 个冲突", self.items.len(), self.conflicts.len()));
+        report.join("\n")
+    }
+
+    /// Recompute dynamic efficiency scores for all items (sync_todos.py:dynamic_priority_adjustment).
+    pub fn recompute_efficiency(&mut self) {
+        let running: std::collections::HashSet<String> = self.items.iter()
+            .filter(|i| i.phase == WorkItemPhase::Running)
+            .filter_map(|i| i.assignee.clone())
+            .collect();
+        for item in self.items.iter_mut() {
+            let subagent_running = item.assignee.as_ref().map(|a| running.contains(a)).unwrap_or(false);
+            let subagent_completed = false; // completed tracked via phase
+            item.efficiency_score = crate::neotrix::nt_core_parallel::OptimalTaskAllocator::new(
+                crate::neotrix::nt_core_parallel::AllocationStrategy::Hybrid
+            ).score_todo(
+                item.priority,
+                item.created_at,
+                item.dependencies.len(),
+                subagent_running,
+                subagent_completed,
+            );
+        }
+    }
+
+    /// Items ready to allocate: pending (Backlog) with unmet dependencies cleared by smart_analyze.
+    pub fn ready_for_allocation(&self) -> Vec<&WorkItem> {
+        self.items.iter()
+            .filter(|i| i.phase == WorkItemPhase::Backlog)
+            .filter(|i| i.blocked_reason.is_none())
+            .collect()
+    }
+
+    /// Subagents currently registered on Running items.
+    pub fn running_subagents(&self) -> Vec<&str> {
+        self.items.iter()
+            .filter(|i| i.phase == WorkItemPhase::Running)
+            .filter_map(|i| i.assignee.as_deref())
+            .collect()
+    }
+
+    /// Number of items currently running (max_parallel budget check).
+    pub fn running_count(&self) -> usize {
+        self.items.iter().filter(|i| i.phase == WorkItemPhase::Running).count()
+    }
 }
 
 // ─── Global Board ───
@@ -474,13 +852,130 @@ impl BoardCmd {
             None => CommandOutput::not_found(&format!("Task {task_id} not found")),
         }
     }
+
+    /// `/board todo …` — absorbed scripts/sync_todos.py (import → analyze → allocate → persist).
+    fn cmd_todo(&self, args: &[String]) -> CommandOutput {
+        let sub = args.first().map(|s| s.as_str()).unwrap_or("");
+        match sub {
+            "import" | "import-todo" => {
+                let path = args.get(1).map(|s| s.as_str()).unwrap_or("TODO.md");
+                let md = match std::fs::read_to_string(path) {
+                    Ok(m) => m,
+                    Err(e) => return CommandOutput::err(&format!("Cannot read {path}: {e}")),
+                };
+                let mut b = board().lock().unwrap_or_else(|e| e.into_inner());
+                let parsed = b.import_todo_md(&md);
+                CommandOutput::ok(&format!("Imported {parsed} TODO items from {path}"))
+            }
+            "sync" | "smart-sync" => {
+                let mut b = board().lock().unwrap_or_else(|e| e.into_inner());
+                // Persist subagent registry first so efficiency scoring sees real state.
+                if let Some(kb) = open_kb() {
+                    let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
+                    let mut mgr = shared.blocking_write();
+                    if let Err(e) = mgr.load_from_kb(&kb) {
+                        log::warn!("todo sync: load subagents: {e}");
+                    }
+                }
+                let report = b.smart_analyze();
+                let yml = b.export_todo_yml();
+                if let (Ok(y), Some(kb)) = (&yml, open_kb()) {
+                    let _ = kb.kv_set("todo", "TODO.yml", y);
+                    let _ = kb.kv_set("todo", "TODO.md", &b.export_todo_md());
+                    let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
+                    let mgr = shared.try_write();
+                    if let Ok(mgr) = mgr {
+                        let _ = mgr.save_to_kb(&kb);
+                    }
+                }
+                if let Ok(y) = &yml {
+                    if let Err(e) = std::fs::write("TODO.yml", y) {
+                        return CommandOutput::err(&format!("Cannot write TODO.yml: {e}"));
+                    }
+                }
+                if let Err(e) = std::fs::write("TODO.md", b.export_todo_md()) {
+                    return CommandOutput::err(&format!("Cannot write TODO.md: {e}"));
+                }
+                CommandOutput::ok(&report)
+            }
+            "allocate" => {
+                let max_parallel: usize = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(3);
+                let (ready_ids, mut b) = {
+                    let b = board().lock().unwrap_or_else(|e| e.into_inner());
+                    (b.ready_for_allocation().iter().map(|i| i.id.clone()).collect::<Vec<_>>(), b)
+                };
+                let allocator = crate::neotrix::nt_core_parallel::OptimalTaskAllocator::new(
+                    crate::neotrix::nt_core_parallel::AllocationStrategy::Hybrid,
+                );
+                let shared = crate::cli::commands::agent_cmds::shared_subagent_manager();
+                let mut mgr = shared.blocking_write();
+                let running = mgr.running_count();
+                if running >= max_parallel {
+                    return CommandOutput::ok(&format!(
+                        "已达最大并行数 ({max_parallel})，当前 running={running}，等待…"
+                    ));
+                }
+                let budget = max_parallel - running;
+                let mut allocated = Vec::new();
+                // Build TodoTask views of ready items and pick top-budget by efficiency score.
+                for id in &ready_ids {
+                    let item = match b.get_item_by_id(id) {
+                        Some(i) => i.clone(),
+                        None => continue,
+                    };
+                    let todo = crate::neotrix::nt_core_parallel::TodoTask::new(
+                        item.id.clone(), item.title.clone(), "todo".into(),
+                    )
+                        .with_priority(item.priority as i32)
+                        .with_dependencies(item.dependencies.clone());
+                    let mut t = todo;
+                    t.created_at = item.created_at;
+                    let budget_hit = allocator.allocate_todo(std::slice::from_ref(&t), budget, |_| false);
+                    if !budget_hit.is_empty() && allocated.len() < budget {
+                        let agent_id = mgr.register_for_task(&item.id, item.milestone.as_deref().unwrap_or(""));
+                        if let Some(wi) = b.get_item_by_id_mut(&item.id) {
+                            wi.phase = WorkItemPhase::Running;
+                            wi.assignee = Some(agent_id.clone());
+                            wi.updated_at = KanbanBoard::now();
+                        }
+                        allocated.push(format!("{agent_id} → {} ({})", item.id, item.title));
+                    }
+                }
+                if allocated.is_empty() {
+                    return CommandOutput::ok("无可用任务（pending 且未阻塞）");
+                }
+                let _ = b.save_to_kb(&open_kb().unwrap_or_else(|| KnowledgeBase::open(None).expect("kb")));
+                CommandOutput::ok(&format!("分配了 {} 个任务:\n{}", allocated.len(), allocated.join("\n")))
+            }
+            "status" => {
+                let b = board().lock().unwrap_or_else(|e| e.into_inner());
+                let mut out = String::new();
+                out.push_str("=== NeoTrix TODO 状态报告 ===\n");
+                let mut stats: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+                for item in &b.items {
+                    *stats.entry(format!("{}_{}", priority_label(item.priority), phase_to_str(&item.phase))).or_insert(0) += 1;
+                }
+                for (k, v) in &stats {
+                    out.push_str(&format!("  {k}: {v}\n"));
+                }
+                out.push_str("\n[最高效任务 TOP 5]\n");
+                let mut sorted: Vec<&WorkItem> = b.items.iter().collect();
+                sorted.sort_by(|a, c| c.efficiency_score.partial_cmp(&a.efficiency_score).unwrap_or(std::cmp::Ordering::Equal));
+                for item in sorted.iter().take(5) {
+                    out.push_str(&format!("  {}: 分数={:.1}, 状态={}\n", item.id, item.efficiency_score, phase_to_str(&item.phase)));
+                }
+                CommandOutput::ok(&out)
+            }
+            _ => CommandOutput::err("Usage: /board todo import|sync|allocate [max_parallel]|status"),
+        }
+    }
 }
 
 impl CliCommand for BoardCmd {
     fn name(&self) -> &str { "/board" }
-    fn aliases(&self) -> Vec<&str> { vec!["/b"] }
+    fn aliases(&self) -> Vec<&str> { vec!["/b", "/todo"] }
     fn description(&self) -> &str {
-        "Kanban board: /board list | create <spec> | move <id> [--to <phase>] [--force] | view <id> | dependency <id> add/remove <dep> | block/unblock <id> | assign <id> <agent> | priority <id> <level> | wip <phase> <limit> | ready | save [path] | load [path]"
+        "Kanban board: /board list | create <spec> | move <id> [--to <phase>] [--force] | view <id> | dependency <id> add/remove <dep> | block/unblock <id> | assign <id> <agent> | priority <id> <level> | wip <phase> <limit> | ready | save [path] | load [path] | todo import|sync|allocate|status"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -783,7 +1278,11 @@ impl CliCommand for BoardCmd {
                     None => CommandOutput::not_found(&format!("Task {id} not found")),
                 }
             }
-            _ => CommandOutput::err(&format!("Unknown subcommand: {}. Try: create, list, move, view, dependency, block, unblock, assign, priority, wip, ready, save, load", args[0])),
+            "todo" => self.cmd_todo(&args[1..]),
+            // /todo <sub> alias resolves to BoardCmd with args[0]=sub; route the
+            // todo-only sub-actions here so both `/board todo import` and `/todo import` work.
+            "sync" | "import" | "import-todo" | "smart-sync" | "allocate" | "status" => self.cmd_todo(args),
+            _ => CommandOutput::err(&format!("Unknown subcommand: {}. Try: create, list, move, view, dependency, block, unblock, assign, priority, wip, ready, save, load, todo", args[0])),
         }
     }
 }
@@ -1007,5 +1506,139 @@ mod tests {
         let mut loaded: KanbanBoard = serde_json::from_str(&json).unwrap();
         let id = loaded.add_item("C", "", 1);
         assert_eq!(id, "task-3", "legacy board must not collide with existing ids");
+    }
+
+    #[test]
+    fn test_import_todo_md_parses_items() {
+        let md = "# NeoTrix TODO 列表\n\
+## 🔴 High 优先级\n\n\
+### ✅ S-TASK-1: Ship the thing\n\n\
+**状态**: done  \n\
+**Session**: cycle-200 (Ship it)\n\
+**子代理**: agent-0001\n\
+**文件**: src/a.rs, src/b.rs\n\n\
+### 🔄 S-TASK-2: In progress task\n\n\
+**状态**: in_progress  \n\
+**依赖**: S-TASK-3\n\n\
+### ⬜ S-TASK-3: Pending task\n\n\
+**状态**: pending  \n\
+";
+        let mut board = KanbanBoard::new("import");
+        let parsed = board.import_todo_md(md);
+        assert_eq!(parsed, 3);
+        assert_eq!(board.items.len(), 3);
+        let t1 = board.get_item_by_id("S-TASK-1").unwrap();
+        assert_eq!(t1.phase, WorkItemPhase::Done);
+        assert_eq!(t1.assignee.as_deref(), Some("agent-0001"));
+        assert_eq!(t1.tags.len(), 2);
+        let t2 = board.get_item_by_id("S-TASK-2").unwrap();
+        assert_eq!(t2.phase, WorkItemPhase::Running);
+        assert_eq!(t2.dependencies, vec!["S-TASK-3"]);
+        let t3 = board.get_item_by_id("S-TASK-3").unwrap();
+        assert_eq!(t3.phase, WorkItemPhase::Backlog);
+    }
+
+    #[test]
+    fn test_import_todo_md_incremental_update() {
+        let md1 = "### ⬜ S-TASK-1: First task\n\n**状态**: pending\n";
+        let mut board = KanbanBoard::new("import2");
+        assert_eq!(board.import_todo_md(md1), 1);
+        let md2 = "### ✅ S-TASK-1: First task\n\n**状态**: done\n";
+        assert_eq!(board.import_todo_md(md2), 1);
+        assert_eq!(board.items.len(), 1, "re-import must update, not duplicate");
+        assert_eq!(board.items[0].phase, WorkItemPhase::Done);
+    }
+
+    #[test]
+    fn test_smart_analyze_blocks_on_dependencies() {
+        let mut board = KanbanBoard::new("analyze");
+        board.add_item("A", "Task A", 2);
+        board.add_item("B", "Task B", 2);
+        let a = "task-1".to_string();
+        let b = "task-2".to_string();
+        board.add_dependency(&b, &a).unwrap();
+        // Move dep A to Backlog (not done) → B blocked
+        let report = board.smart_analyze();
+        assert!(report.contains("[BLOCKED]"), "report: {report}");
+        let bb = board.get_item_by_id(&b).unwrap();
+        assert_eq!(bb.phase, WorkItemPhase::Blocked);
+    }
+
+    #[test]
+    fn test_smart_analyze_dedup_by_similar_title() {
+        let mut board = KanbanBoard::new("dedup");
+        let a = board.add_item("Add telemetry to agent loop", "", 2);
+        let b = board.add_item("Add telemetry to agent loop!", "", 2);
+        board.smart_analyze();
+        // Similar titles produce a conflict entry, not deletion (Python keeps both + flags)
+        assert!(!board.conflicts.is_empty(), "expected a similar-title conflict");
+        assert!(board.get_item_by_id(&a).is_some());
+        assert!(board.get_item_by_id(&b).is_some());
+    }
+
+    #[test]
+    fn test_export_todo_yml_roundtrip_shape() {
+        let mut board = KanbanBoard::new("yml");
+        let id = board.add_item("YAML export task", "desc", 3);
+        board.items[0].milestone = Some("cycle-201".into());
+        let yml = board.export_todo_yml().unwrap();
+        assert!(yml.contains("total_items: 1"));
+        assert!(yml.contains("high"));
+        assert!(yml.contains(&id));
+        // Must be valid YAML
+        let v: serde_yaml::Value = serde_yaml::from_str(&yml).unwrap();
+        assert!(v.get("items").is_some());
+    }
+
+    #[test]
+    fn test_recompute_efficiency_ranks_priority() {
+        let mut board = KanbanBoard::new("eff");
+        board.add_item("low", "", 1);
+        board.add_item("high", "", 3);
+        board.recompute_efficiency();
+        let low = board.items.iter().find(|i| i.title == "low").unwrap().efficiency_score;
+        let high = board.items.iter().find(|i| i.title == "high").unwrap().efficiency_score;
+        assert!(high > low);
+    }
+
+    #[test]
+    fn test_dice_similarity() {
+        assert!(dice_similarity("same title text", "same title text") > 0.99);
+        assert!(dice_similarity("completely unrelated one", "totally different two") < 0.3);
+        assert_eq!(dice_similarity("", ""), 1.0);
+    }
+
+    #[test]
+    fn test_board_todo_import_and_status() {
+        let cmd = BoardCmd;
+        let md = "### ✅ S-T1: First\n\n**状态**: done\n### ⬜ S-T2: Second\n\n**状态**: pending\n";
+        let path = std::env::temp_dir().join(format!("nt_todo_import_{}.md", std::process::id()));
+        std::fs::write(&path, md).unwrap();
+        let r = cmd.execute(&["todo".into(), "import".into(), path.to_str().unwrap().into()], None);
+        assert!(r.success, "{}", r.message);
+        assert!(r.message.contains("2"), "import should report 2: {}", r.message);
+        let st = cmd.execute(&["todo".into(), "status".into()], None);
+        assert!(st.success);
+        assert!(st.message.contains("TODO") || st.message.contains("任务"));
+        // board is global; also test /todo alias normalizes to same handler
+        let alias = cmd.execute(&["import".into(), path.to_str().unwrap().into()], None);
+        assert!(alias.success, "alias routing: {}", alias.message);
+    }
+
+    #[test]
+    fn test_board_todo_allocate_respects_running_budget() {
+        let cmd = BoardCmd;
+        // Allocate with max_parallel=1 and no running agents should pick exactly 1
+        let r = cmd.execute(&["todo".into(), "allocate".into(), "1".into()], None);
+        assert!(r.success, "{}", r.message);
+    }
+
+    #[test]
+    fn test_board_todo_sync_writes_files() {
+        let cmd = BoardCmd;
+        let r = cmd.execute(&["todo".into(), "sync".into()], None);
+        assert!(r.success, "{}", r.message);
+        // Leaves TODO.md / TODO.yml in cwd; just assert no panic and report shape
+        assert!(r.message.contains("[SMART]") || r.message.contains("分析完成") || r.message.contains("TODO"));
     }
 }

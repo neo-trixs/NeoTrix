@@ -14,7 +14,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 
-use super::{KnowledgeBase, SearchResult, SearchMatchType};
+use super::{nt_memory_embed, KnowledgeBase, SearchResult, SearchMatchType};
 
 /// Shared state for KB API handlers
 #[derive(Clone)]
@@ -42,6 +42,8 @@ pub fn build_kb_router(state: KbApiState) -> Router {
         .route("/api/kb/specialist/{name}", get(specialist_query_handler))
         .route("/api/kb/node", post(create_node_handler))
         .route("/api/kb/edge", post(create_edge_handler))
+        .route("/api/kb/embeddings/status", get(embeddings_status_handler))
+        .route("/api/kb/embeddings/backfill", post(embeddings_backfill_handler))
         .with_state(state)
 }
 
@@ -253,4 +255,132 @@ pub async fn create_edge_handler(
         body.description.as_deref(),
     ).map_err(|e| internal_err(&e))?;
     Ok(json_ok(serde_json::json!({"created": true})))
+}
+
+/// GET /api/kb/embeddings/status — report embedding provider config + corpus state
+///
+/// Convenience/introspection endpoint mirroring the "provider=lite" responsibilities of
+/// `scripts/kb-embed-server.py`. Real inference stays external (MiniLM server); this just
+/// surfaces reachability, dimension, and how far backfill has to go.
+pub async fn embeddings_status_handler(
+    State(state): State<KbApiState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let (model, dimension, base_url, vector_count, missing) = {
+        let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+        let config = kb.embedding_config.read()
+            .map_err(|e| internal_err(&format!("embedding_config read: {}", e)))?
+            .clone();
+        let vectorized = {
+            let conn = kb.conn.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            nt_memory_embed::embedding_count(&conn).unwrap_or(0)
+        };
+        let missing = {
+            let conn = kb.conn.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
+            nt_memory_embed::find_nodes_missing_embeddings(&conn).unwrap_or_default().len()
+        };
+        match config {
+            Some(c) => (c.model, c.dimension, c.base_url, vectorized, missing),
+            None => ("(none)".to_string(), 0, "(not configured)".to_string(), vectorized, missing),
+        }
+    };
+
+    // Cheap reachability probe on the configured provider, off the async runtime.
+    let reachable = tokio::task::spawn_blocking({
+        let base_url = base_url.clone();
+        move || {
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(3))
+                .build()
+                .ok();
+            let Some(client) = client else { return false };
+            client.get(format!("{base_url}/models")).send().map(|r| r.status().is_success()).unwrap_or(false)
+        }
+    }).await.unwrap_or(false);
+
+    Ok(json_ok(serde_json::json!({
+        "model": model,
+        "dimension": dimension,
+        "base_url": base_url,
+        "provider_reachable": reachable,
+        "vectors_stored": vector_count,
+        "nodes_missing_vectors": missing,
+    })))
+}
+
+/// POST /api/kb/embeddings/backfill — materialize missing node embeddings via the provider
+///
+/// Rust-side equivalent of `scripts/kb-embed-server.py`'s backfill loop. Requires an
+/// embedding provider on `base_url` (see `EmbeddingConfig::default`). Runs the (blocking)
+/// `ensure_embeddings` off the async runtime via `spawn_blocking`.
+pub async fn embeddings_backfill_handler(
+    State(state): State<KbApiState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let kb = state.kb.clone();
+    let processed = tokio::task::spawn_blocking(move || {
+        kb.lock().map_err(|e| format!("Lock: {}", e))?.ensure_embeddings()
+    })
+        .await
+        .map_err(|e| internal_err(&format!("Backfill task: {e}")))?
+        .map_err(|e| internal_err(&e))?;
+    Ok(json_ok(serde_json::json!({"processed": processed})))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_kb() -> (KbApiState, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("nt_kb_api_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join(format!("test_api_kb_{}.db", std::thread::current().name().unwrap_or("t")));
+        let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+        (KbApiState { kb: Arc::new(Mutex::new(kb)) }, db_path)
+    }
+
+    #[test]
+    fn test_embeddings_status_reports_config() {
+        let (state, _) = temp_kb();
+        // Config present → status reports model/dim without panicking even if no provider up.
+        {
+            let kb = state.kb.lock().expect("lock");
+            *kb.embedding_config.write().expect("rwlock") = Some(nt_memory_embed::EmbeddingConfig {
+                api_key: "local".into(),
+                base_url: "http://127.0.0.1:8237/v1".into(),
+                model: "all-MiniLM-L6-v2".into(),
+                dimension: 384,
+            });
+        }
+        let body = futures_block_on(embeddings_status_handler(State(state))).expect("status ok");
+        let v = body.0;
+        assert_eq!(v["model"], "all-MiniLM-L6-v2");
+        assert_eq!(v["dimension"], 384);
+        assert_eq!(v["base_url"], "http://127.0.0.1:8237/v1");
+        // No nodes, no vectors — reachability just reports false (no provider).
+        assert_eq!(v["vectors_stored"], 0);
+        assert_eq!(v["nodes_missing_vectors"], 0);
+    }
+
+    #[test]
+    fn test_embeddings_status_without_config() {
+        let (state, _) = temp_kb();
+        let body = futures_block_on(embeddings_status_handler(State(state))).expect("status ok");
+        assert_eq!(body.0["model"], "(none)");
+        assert_eq!(body.0["provider_reachable"], false);
+    }
+
+    #[test]
+    fn test_embeddings_backfill_without_provider_is_noop() {
+        let (state, _) = temp_kb();
+        // No provider configured → ensure_embeddings returns Ok(0); handler must not error.
+        let body = futures_block_on(embeddings_backfill_handler(State(state))).expect("backfill ok");
+        assert_eq!(body.0["processed"], 0);
+    }
+
+    fn futures_block_on<F: std::future::Future>(fut: F) -> F::Output {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime")
+            .block_on(fut)
+    }
 }

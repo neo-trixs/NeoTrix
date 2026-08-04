@@ -158,6 +158,11 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    #[command(name = "todo", about = "TODO smart-sync (sync_todos.py replacement): sync|status|allocate [max]|import <path>")]
+    Todo {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -398,6 +403,17 @@ fn main() {
         Some(Commands::Wiki { args }) => {
             use neotrix::cli::commands::types::CliCommand;
             let cmd = neotrix::cli::commands::wiki_cmds::WikiCmd;
+            let out = cmd.execute(&args, None);
+            if out.success {
+                println!("{}", out.message);
+            } else {
+                eprintln!("{}", out.message);
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::Todo { args }) => {
+            use neotrix::cli::commands::types::CliCommand;
+            let cmd = neotrix::cli::commands::kanban_cmds::BoardCmd;
             let out = cmd.execute(&args, None);
             if out.success {
                 println!("{}", out.message);

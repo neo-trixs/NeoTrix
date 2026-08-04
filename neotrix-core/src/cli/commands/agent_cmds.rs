@@ -13,6 +13,11 @@ static AGENT_MANAGER: LazyLock<Arc<RwLock<SubagentManager>>> =
 static MCP_REGISTRY: OnceLock<Arc<RwLock<McpRegistry>>> = OnceLock::new();
 static TOOL_ORCHESTRATOR: OnceLock<Arc<RwLock<crate::agent::tool::ToolOrchestrator>>> = OnceLock::new();
 
+/// Shared subagent registry — single owner across /agent and /board todo.
+pub fn shared_subagent_manager() -> Arc<RwLock<SubagentManager>> {
+    AGENT_MANAGER.clone()
+}
+
 pub fn set_mcp_registry(registry: McpRegistry) {
     MCP_REGISTRY.set(Arc::new(RwLock::new(registry))).ok();
 }
@@ -86,6 +91,7 @@ impl CliCommand for AgentCmd {
                         crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Completed { .. } => "completed",
                         crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Failed { .. } => "failed",
                         crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Paused => "paused",
+                        crate::core::l7_capability::nt_core_orch_agent::SubagentStatus::Stale => "stale",
                     };
                     out.push_str(&format!("  {} | {} | E8:{} | {} | msgs:{}\n",
                         a.id, a.config.name, a.config.e8_mode, status_str, a.messages.len()));

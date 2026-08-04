@@ -41,3 +41,7 @@ __pycache__/
 
 # Worktree node_modules symlink (isolated frontend builds)
 src-tauri/frontend/node_modules
+
+# test artifacts from cargo test cwd
+/neotrix-core/TODO.md
+/neotrix-core/TODO.yml

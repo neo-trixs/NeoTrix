@@ -56,6 +56,8 @@ pub enum SubagentStatus {
     Completed { result: String },
     Failed { error: String },
     Paused,
+    /// Heartbeat expired (port of sync_todos.py SubagentTracker::check_stale).
+    Stale,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,6 +250,104 @@ impl SubagentManager {
         }
         pending
     }
+
+    /// Register a new subagent bound to a TODO task (port of sync_todos.py register).
+    pub fn register_for_task(&mut self, task_id: &str, session: &str) -> String {
+        // Timestamp alone can collide when several tasks register within the same
+        // second (two ids would overwrite each other in the map), so append a
+        // monotonic counter.
+        let id = format!("ses_{}_{}", unix_secs(), self.next_id);
+        self.next_id += 1;
+        let now = unix_secs();
+        let mut config = SubagentConfig {
+            name: format!("subagent for {task_id}"),
+            e8_mode: 1,
+            description: String::new(),
+            goal: task_id.to_string(),
+            capabilities: vec![],
+            max_context: 8192,
+            autostart: false,
+        };
+        if !session.is_empty() {
+            config.description = format!("session: {session}");
+        }
+        let agent = SubagentInstance {
+            id: id.clone(),
+            config,
+            status: SubagentStatus::Running { task: task_id.to_string(), started_at: now },
+            messages: Vec::new(),
+            current_plan: None,
+            context_window: Vec::new(),
+            created_at: now,
+            last_active: now,
+            execution_count: 0,
+            total_duration_ms: 0,
+        };
+        self.agents.insert(id.clone(), agent);
+        id
+    }
+
+    /// Touch a subagent's heartbeat (port of sync_todos.py heartbeat).
+    pub fn heartbeat(&mut self, id: &str, result: Option<String>) -> bool {
+        let Some(agent) = self.agents.get_mut(id) else { return false };
+        agent.last_active = unix_secs();
+        if let Some(r) = result {
+            agent.status = SubagentStatus::Completed { result: r };
+        }
+        true
+    }
+
+    /// Mark subagents whose heartbeat is older than `timeout_secs` as Stale.
+    /// Returns the stale ids (port of sync_todos.py check_stale).
+    pub fn check_stale(&mut self, timeout_secs: u64) -> Vec<String> {
+        let now = unix_secs();
+        let mut stale = Vec::new();
+        for agent in self.agents.values_mut() {
+            if matches!(agent.status, SubagentStatus::Completed { .. } | SubagentStatus::Failed { .. } | SubagentStatus::Stale) {
+                continue;
+            }
+            if now.saturating_sub(agent.last_active) > timeout_secs {
+                agent.status = SubagentStatus::Stale;
+                stale.push(agent.id.clone());
+            }
+        }
+        stale
+    }
+
+    /// Release a subagent (task finished) — port of sync_todos.py release.
+    pub fn release(&mut self, id: &str, result: &str) -> bool {
+        let Some(agent) = self.agents.get_mut(id) else { return false };
+        agent.status = SubagentStatus::Completed { result: result.to_string() };
+        agent.last_active = unix_secs();
+        true
+    }
+
+    // ── KB persistence (sync_todos.py sessions/subagents.yml) ──
+
+    /// Persist subagent states to the KB `subagents` namespace.
+    pub fn save_to_kb(&self, kb: &crate::neotrix::nt_memory_kb::KnowledgeBase) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(&self.agents)
+            .map_err(|e| format!("SubagentManager serialize: {e}"))?;
+        kb.kv_set("subagents", "registry", &json)
+    }
+
+    /// Load subagent states from the KB `subagents` namespace, merging into current state.
+    pub fn load_from_kb(&mut self, kb: &crate::neotrix::nt_memory_kb::KnowledgeBase) -> Result<usize, String> {
+        let json = kb.kv_get("subagents", "registry")?;
+        let Some(json) = json else { return Ok(0) };
+        let loaded: HashMap<String, SubagentInstance> = serde_json::from_str(&json)
+            .map_err(|e| format!("SubagentManager deserialize: {e}"))?;
+        let count = loaded.len();
+        self.agents.extend(loaded);
+        Ok(count)
+    }
+}
+
+fn unix_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 impl Default for SubagentManager {
@@ -388,5 +488,51 @@ mod tests {
                 assert_eq!(agent.messages.len(), 1);
             }
         }
+    }
+
+    #[test]
+    fn test_register_for_task_heartbeat_release() {
+        let mut mgr = SubagentManager::new();
+        let id = mgr.register_for_task("S-TASK-9", "cycle-201");
+        assert!(id.starts_with("ses_"));
+        assert!(mgr.get(&id).is_some());
+        assert!(mgr.running_count() >= 1);
+        assert!(mgr.heartbeat(&id, None));
+        assert!(mgr.release(&id, "done well"));
+        match mgr.get(&id).unwrap().status {
+            SubagentStatus::Completed { ref result } => assert_eq!(result, "done well"),
+            _ => panic!("expected Completed after release"),
+        }
+    }
+
+    #[test]
+    fn test_check_stale_flags_expired() {
+        let mut mgr = SubagentManager::new();
+        let fresh = mgr.register_for_task("S-TASK-1", "");
+        let stale = mgr.register_for_task("S-TASK-2", "");
+        {
+            let agent = mgr.get_mut(&stale).unwrap();
+            agent.last_active = unix_secs().saturating_sub(3600 * 3); // 3h old
+        }
+        let marked = mgr.check_stale(3600);
+        assert!(!marked.contains(&fresh));
+        assert!(marked.contains(&stale));
+        assert!(matches!(mgr.get(&stale).unwrap().status, SubagentStatus::Stale));
+    }
+
+    #[test]
+    fn test_kb_subagents_roundtrip() {
+        let dir = std::env::temp_dir().join(format!("nt_orch_agent_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(dir.join("orch.db")))
+            .expect("open kb");
+        let mut mgr = SubagentManager::new();
+        mgr.register_for_task("S-TASK-5", "cycle-202");
+        mgr.save_to_kb(&kb).expect("save");
+
+        let mut reloaded = SubagentManager::new();
+        let count = reloaded.load_from_kb(&kb).expect("load");
+        assert_eq!(count, 1);
+        assert!(reloaded.list().iter().any(|a| a.config.goal == "S-TASK-5"));
     }
 }

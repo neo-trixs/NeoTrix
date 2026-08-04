@@ -136,6 +136,7 @@ pub struct TodoTask {
     pub priority: i32,
     pub dependencies: Vec<String>,  // 依赖的任务ID
     pub estimated_complexity: f64,  // 预估复杂度 (0.0-1.0)
+    pub created_at: u64,            // 创建时间戳 (unix epoch secs)
 }
 
 impl TodoTask {
@@ -147,6 +148,10 @@ impl TodoTask {
             priority: 0,
             dependencies: Vec::new(),
             estimated_complexity: 0.5,
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
         }
     }
 

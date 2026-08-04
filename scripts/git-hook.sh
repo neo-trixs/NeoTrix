@@ -16,16 +16,15 @@ if git diff --cached --name-only | grep -q "TODO.md\|TODO.yml"; then
         pending_count=$(grep -c 'status: pending' "$TODO_YML" 2>/dev/null || echo 0)
         if [ "$todo_count" -gt 0 ] && [ "$pending_count" -eq 0 ]; then
             echo "[GIT-HOOK] 警告：TODO.md 有 $todo_count 项待办，但 TODO.yml 无 pending 项"
-            echo "[GIT-HOOK] 请先运行 scripts/sync_todos.py 同步后再提交"
+            echo "[GIT-HOOK] 请先运行 `neotrix todo sync` 同步后再提交"
             exit 1
         fi
     fi
 fi
 
-# 运行同步脚本（如果存在）
-SYNC_SCRIPT="$PROJECT_ROOT/scripts/sync_todos.py"
-if [ -f "$SYNC_SCRIPT" ]; then
-    python3 "$SYNC_SCRIPT" --git-hook 2>/dev/null
+# 运行同步（Rust CLI 吸收 sync_todos.py；无二进制或失败时静默跳过）
+if command -v neotrix >/dev/null 2>&1; then
+    neotrix todo sync >/dev/null 2>&1 || true
 fi
 
 exit 0

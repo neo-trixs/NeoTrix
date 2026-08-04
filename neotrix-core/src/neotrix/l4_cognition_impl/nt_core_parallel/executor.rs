@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use crate::neotrix::nt_core_parallel::types::{Task, Agent, AgentId, AllocationStrategy};
+use crate::neotrix::nt_core_parallel::types::{Task, Agent, AgentId, AllocationStrategy, TodoTask};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ExecMode {
@@ -181,6 +181,71 @@ impl OptimalTaskAllocator {
         }
         combined
     }
+
+    /// Dynamic efficiency score for a TODO item — faithful port of
+    /// `scripts/sync_todos.py:TodoItem.calc_efficiency_score`.
+    ///
+    /// * priority ×10 (priority weight dominates)
+    /// * +5 if the assigned subagent is running (keep going), −10 if completed (deprioritize)
+    /// * wait-time bonus: up to +5, scaled 0.5/hr since `created_ts`
+    /// * −3 per unresolved dependency
+    pub fn score_todo(
+        &self,
+        priority: u8,
+        created_ts: u64,
+        dependency_count: usize,
+        subagent_running: bool,
+        subagent_completed: bool,
+    ) -> f64 {
+        let mut score = (priority as f64) * 10.0;
+        if subagent_running {
+            score += 5.0;
+        } else if subagent_completed {
+            score -= 10.0;
+        }
+        let wait_hours = unix_now().saturating_sub(created_ts) as f64 / 3600.0;
+        score += (wait_hours * 0.5).min(5.0);
+        score -= (dependency_count as f64) * 3.0;
+        score
+    }
+
+    /// Sort `todos` by dynamic efficiency score and return the top `budget` that
+    /// are currently allocatable (dependencies met + not already running).
+    ///
+    /// Faithful port of `scripts/sync_todos.py:allocate_tasks` ordering logic, minus
+    /// the subagent-registration side effects (those live in SubagentManager).
+    pub fn allocate_todo<'a>(
+        &self,
+        todos: &'a [TodoTask],
+        budget: usize,
+        is_running: impl Fn(&TodoTask) -> bool,
+    ) -> Vec<&'a TodoTask> {
+        if budget == 0 {
+            return Vec::new();
+        }
+        let mut scored: Vec<(&'a TodoTask, f64)> = todos.iter()
+            .filter(|t| !is_running(t))
+            .map(|t| {
+                let score = self.score_todo(
+                    t.priority.max(0) as u8,
+                    t.created_at,
+                    t.dependencies.len(),
+                    false,
+                    false,
+                );
+                (t, score)
+            })
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        scored.into_iter().take(budget).map(|(t, _)| t).collect()
+    }
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -210,5 +275,51 @@ mod tests {
         let cmd: Vec<f64> = "ls -la".bytes().map(|b| b as f64).collect();
         let decoded = ParallelExecutor::decode_command(&cmd);
         assert_eq!(decoded, "ls -la");
+    }
+
+    #[test]
+    fn test_score_todo_priorities() {
+        let a = OptimalTaskAllocator::new(AllocationStrategy::Hybrid);
+        // High priority, no deps, no subagent → higher than low priority
+        let high = a.score_todo(3, unix_now(), 0, false, false);
+        let low = a.score_todo(1, unix_now(), 0, false, false);
+        assert!(high > low);
+        // Running subagent boosts; completed deprioritizes
+        let running = a.score_todo(2, unix_now(), 0, true, false);
+        let completed = a.score_todo(2, unix_now(), 0, false, true);
+        assert!(running > completed);
+        // Dependencies penalize
+        let with_deps = a.score_todo(3, unix_now(), 2, false, false);
+        assert!(with_deps < a.score_todo(3, unix_now(), 0, false, false));
+    }
+
+    #[test]
+    fn test_allocate_todo_respects_budget_and_order() {
+        let a = OptimalTaskAllocator::new(AllocationStrategy::Hybrid);
+        let old = unix_now().saturating_sub(3600); // waited 1h → wait bonus
+        let t1 = TodoTask::new("t1".into(), "low priority, old".into(), "x".into())
+            .with_priority(1).with_complexity(0.5);
+        let t2 = TodoTask::new("t2".into(), "high priority, fresh".into(), "x".into())
+            .with_priority(5);
+        // bump t1.created_at to simulate age
+        let mut t1 = t1;
+        t1.created_at = old;
+        let todos = [t1, t2];
+        let alloc = a.allocate_todo(&todos, 1, |_| false);
+        assert_eq!(alloc.len(), 1);
+        assert_eq!(alloc[0].id, "t2", "higher priority should win the single budget slot");
+        let alloc_all = a.allocate_todo(&todos, 2, |_| false);
+        assert_eq!(alloc_all.len(), 2);
+    }
+
+    #[test]
+    fn test_allocate_todo_skips_running() {
+        let a = OptimalTaskAllocator::new(AllocationStrategy::Hybrid);
+        let t1 = TodoTask::new("t1".into(), "running task".into(), "x".into()).with_priority(5);
+        let t2 = TodoTask::new("t2".into(), "pending task".into(), "x".into()).with_priority(1);
+        let todos = [t1, t2];
+        let alloc = a.allocate_todo(&todos, 2, |t| t.id == "t1");
+        assert_eq!(alloc.len(), 1);
+        assert_eq!(alloc[0].id, "t2");
     }
 }
