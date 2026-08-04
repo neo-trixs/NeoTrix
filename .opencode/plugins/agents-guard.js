@@ -1,15 +1,17 @@
 // AGENTS.md structure guard — enforces the pointer-conservation HARD RULE mechanically.
-// Fires on session.idle: validates that AGENTS.md has not grown beyond the L1 ceiling
-// and that its section structure matches the whitelist. Violations are logged to
+// Fires on session.idle: validates that AGENTS.md has not grown beyond the L1 ceiling,
+// that its section structure matches the whitelist, and that NO per-cycle growth area
+// (Experience Index table / cycle bodies) has been appended. Violations are logged to
 // ~/.neotrix/agents-guard-violations.log AND echoed loudly so no session can silently
 // pollute the pointer file. Complemented by the git pre-commit hook.
 //
-// Budget model (fixed in cycle 209):
-//   The "## Experience Index" section is a SANCTIONED growing section — the HARD RULE
-//   explicitly allows one pointer row per cycle. It therefore gets its own budget and is
-//   EXCLUDED from the constant-content line/byte ceilings. Without this split, legitimate
-//   one-row-per-cycle growth kept tripping a false "131 lines" violation (the file sat at
-//   exactly the global ceiling), so every cycle the guard spam-logged noise.
+// Budget model (finalized in cycle 209 refactor):
+//   AGENTS.md is a PURE GUIDANCE doc. The Experience Index section (previously sanctioned
+//   to grow one row per cycle) was the root cause of chronic false "131 lines" violations:
+//   pointer growth collided with the global ceiling and byte headroom. It is now FORBIDDEN
+//   entirely — cycle pointers live only in the KB `experience` hub (absorb_session.py
+//   hub/query). The guard therefore enforces simple total ceilings on the constant content
+//   plus an explicit "no Experience Index section" check.
 
 import { readFileSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -18,17 +20,12 @@ const REPO_ROOT = process.cwd();
 const AGENTS_PATH = join(REPO_ROOT, "AGENTS.md");
 const LOG_PATH = process.env.HOME + "/.neotrix/agents-guard-violations.log";
 
-// Ceilings for CONSTANT L1 content (preamble + rules + sections, index excluded).
-const MAX_CONTENT_LINES = 130;
-const MAX_CONTENT_BYTES = 16000;
-// Own budget for the sanctioned growing Experience Index pointer table.
-const MAX_INDEX_ROWS = 80;
-// Overall file bound (index row bytes dominate as cycles accumulate).
-const MAX_BYTES = 35000;
+// Total ceilings for the whole L1 pointer doc (now index-free, so a single budget).
+const MAX_LINES = 130;
+const MAX_BYTES = 22000;
 
 // Sections allowed in AGENTS.md (L1 pointer doc). Anything else = structural violation.
 const ALLOWED_SECTIONS = [
-  "## Experience Index",
   "## Skill Routing",
   "## Architecture",
   "## Always-On Core Rules",
@@ -38,32 +35,17 @@ const ALLOWED_SECTIONS = [
   "## Key Locations",
 ];
 
+// Sections that are structurally forbidden — any per-cycle growth area or body dump.
+const FORBIDDEN_SECTIONS = [
+  "## Experience Index",
+];
+
 function logViolation(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   try {
     appendFileSync(LOG_PATH, line);
   } catch (_) {}
   console.error("\n[AGENTS-GUARD] " + msg);
-}
-
-// Split the file into the Experience Index section vs. the constant-content rest.
-// Returns { indexStart, indexEnd, indexRows, contentLines, content }.
-function splitSections(lines) {
-  const headerIdx = lines.findIndex((l) => l === "## Experience Index");
-  if (headerIdx === -1) {
-    return { indexStart: -1, indexEnd: -1, indexRows: 0, contentLines: lines.length, content: lines };
-  }
-  let end = lines.length;
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    if (lines[i].startsWith("## ")) {
-      end = i;
-      break;
-    }
-  }
-  // Pointer rows = data rows of the table (exclude the blank line and header row).
-  const indexRows = lines.slice(headerIdx + 1, end).filter((l) => /^\|\s*\d+\s*\|/.test(l)).length;
-  const content = [...lines.slice(0, headerIdx), ...lines.slice(end)];
-  return { indexStart: headerIdx, indexEnd: end, indexRows, contentLines: content.length, content };
 }
 
 export const AgentsGuardPlugin = async ({ $ }) => {
@@ -78,51 +60,42 @@ export const AgentsGuardPlugin = async ({ $ }) => {
 
         let violated = false;
 
-        // 1. Constant-content line ceiling (index excluded — it is a sanctioned growth area)
-        const { indexRows, contentLines, content: rest } = splitSections(lines);
-        if (contentLines > MAX_CONTENT_LINES) {
+        // 1. Total line ceiling
+        if (lines.length > MAX_LINES) {
           violated = true;
-          logViolation(`AGENTS.md constant content exceeded ${MAX_CONTENT_LINES} lines (now ${contentLines}, index excluded). Cycle bodies must go to KB, not here.`);
+          logViolation(`AGENTS.md exceeded ${MAX_LINES} lines (now ${lines.length}). AGENTS.md is guidance-only; cycle content must go to KB, never here.`);
         }
 
-        // 2. Experience Index own budget
-        if (indexRows > MAX_INDEX_ROWS) {
-          violated = true;
-          logViolation(`AGENTS.md Experience Index exceeded ${MAX_INDEX_ROWS} pointer rows (now ${indexRows}). Archive old cycles to KB summaries, then trim the table.`);
-        }
-
-        // 3. Constant-content byte ceiling (index excluded)
-        const contentBytes = Buffer.byteLength(rest.join("\n"), "utf8");
-        if (contentBytes > MAX_CONTENT_BYTES) {
-          violated = true;
-          logViolation(`AGENTS.md constant content exceeded ${MAX_CONTENT_BYTES} bytes (now ${contentBytes}, index excluded).`);
-        }
-
-        // 4. Overall byte ceiling
+        // 2. Total byte ceiling
         if (Buffer.byteLength(content, "utf8") > MAX_BYTES) {
           violated = true;
-          logViolation(`AGENTS.md exceeded ${MAX_BYTES} bytes total. Violation of pointer-conservation HARD RULE.`);
+          logViolation(`AGENTS.md exceeded ${MAX_BYTES} bytes. Violation of pointer-conservation HARD RULE.`);
         }
 
-        // 5. Section whitelist — no cycle-body sections may appear
+        // 3. Section whitelist — allowed sections only; no cycle-body sections may appear
         const h2Sections = lines
           .filter((l) => l.startsWith("## "))
           .map((l) => l.replace(/^##\s+/, "").trim());
-        const forbidden = h2Sections.filter(
-          (s) => !ALLOWED_SECTIONS.includes(s) &&
-                 (s.includes("Cycle") || s.includes("Session") ||
-                  s.includes("Build Baseline") || s.includes("元认知") ||
-                  s.includes("吸收"))
-        );
-        if (forbidden.length > 0) {
+        const unknown = h2Sections.filter((s) => !ALLOWED_SECTIONS.includes(s));
+        if (unknown.length > 0) {
           violated = true;
-          logViolation(`AGENTS.md contains forbidden cycle-body sections: ${forbidden.join(", ")}. Move to KB via experience-tree, then revert.`);
+          logViolation(`AGENTS.md contains non-whitelisted sections: ${unknown.join(", ")}. Allowed: ${ALLOWED_SECTIONS.join(", ")}.`);
         }
 
-        // 6. Experience Index must stay a pointer table — no inline cycle body tables may appear
-        if (content.includes("| Cycle | Date |") || content.includes("| Cycle | Session |")) {
+        // 4. Explicitly forbidden growth areas
+        const growth = h2Sections.filter((s) => FORBIDDEN_SECTIONS.includes(s));
+        if (growth.length > 0) {
           violated = true;
-          logViolation(`AGENTS.md inlines a non-pointer Experience Index table. Pointers live in the | Cycle | Domain | Summary | table; bodies live in KB (absorb_session.py hub/query), never in AGENTS.md.`);
+          logViolation(`AGENTS.md contains forbidden per-cycle growth area: ${growth.join(", ")}. Cycle pointers live in KB (absorb_session.py hub/query), never in AGENTS.md.`);
+        }
+
+        // 5. No inline Experience Index table (header or data rows)
+        if (content.includes("## Experience Index") ||
+            content.includes("| Cycle | Domain | Summary |") ||
+            content.includes("| Cycle | Date |") ||
+            content.includes("| Cycle | Session |")) {
+          violated = true;
+          logViolation(`AGENTS.md inlines an Experience Index table. Cycle pointers live in the KB experience hub, never in AGENTS.md.`);
         }
 
         if (violated) {
