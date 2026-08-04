@@ -1513,7 +1513,23 @@ fn default_datasets() -> Vec<CommunityDataset> {
 /// so locally-observed transitions take priority (community patterns are priors,
 /// not ground truth).
 pub fn seed_transition_matrix_with_community(tm: &mut E8TransitionMatrix) {
-    let ingester = CommunityDataIngester::default();
+    // 优先加载运行时 ETL 产出 (scripts/absorb-fable-2m.py → data/community_transitions.json),
+    // 文件缺失时回退硬编码 default 数据集。R-P79: 确保 Python ETL 输出有生产消费者。
+    let runtime_path = std::path::Path::new("data/community_transitions.json");
+    let ingester = match CommunityDataIngester::from_runtime_jsonl(
+        runtime_path,
+        "https://huggingface.co/datasets/Glint-Research/Complete-FABLE.5-traces-2M",
+        0.15,
+    ) {
+        Some(ing) => {
+            log::info!("[E8-COMMUNITY] loaded runtime transitions from {}", runtime_path.display());
+            ing
+        }
+        None => {
+            log::info!("[E8-COMMUNITY] runtime transitions file missing, using hardcoded defaults");
+            CommunityDataIngester::default()
+        }
+    };
     let community = ingester.fuse_all();
     tm.merge(&community);
     log::info!(
