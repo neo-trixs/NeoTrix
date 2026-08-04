@@ -138,6 +138,14 @@
 
 - **R-P93 (前端工作必须在独立 worktree)**: 主工作树 `main` 由自治循环 (openhands 并发 session) 持有，会执行 `git stash push`/`git reset`/`git add -A` 提交，周期性清扫未提交改动。**前端 (src-tauri/frontend) 工作一律在 `.worktrees/neocodex-ui` (branch `feat/neocodex-ui`) 中进行**，物理隔离后循环的 git 操作永远碰不到前端文件。worktree 内 `node_modules` 用符号链接指向主树，dev server 跑 `:1421`。完成一批后 commit 到该 branch，再 `git checkout main && git merge feat/neocodex-ui` 或 PR 合并回主树。
 
+## 并发提交覆盖 (R-P94) — 2026-08-04 cycle 204 意识核心修复轮
+
+- **R-P94 (并发 session 提交覆盖)**: 主树工作会被并行 openhands session 周期性 `git add -A` + commit 抢先打包 (cycle 204 我的 nt_core_ssm/l5_consciousness/signal/engine_core/panorama 修复被并发提交 `1520876` 覆盖)。工作策略:
+  1. 编辑后先 `git status --short` 隔离自己的文件集。
+  2. 若文件不再显示 diff 但 `git log --oneline` 见并发提交 → 用 `git show --stat` + `git grep <symbol> HEAD` 验证修复确在 HEAD，勿重复提交或回滚。
+  3. 剩余本地 diff 若非本人改动 → 不 stage 不 commit，留给对方。
+  4. 高危删除判定 (R-P76 四重验证) 必须在当前工作树重走，禁用 stash 前记忆 (R-P89)。
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：

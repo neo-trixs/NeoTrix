@@ -45,6 +45,7 @@ Cycle 指针与全文统一存 KB: `~/.neotrix/knowledge.db` `experience` 命名
 | 201 | NT-CORE | 神经记忆层 v2 — Hebb 共现网络 (星型→立体): 概念 co 字段 (同分支两两累计 fire together), query 一阶+二阶扩散 ([关联] 排后); cmd_prune 清理 16 停用词噪声神经元 (幂等); 全库 155 万概念对内存批量+单事务 2s (原逐对 commit >120s); 3 并发 opencode 写 KB 下 hub 仍自洽 (分支=唯一事实源); 停用词收敛纪律 (勿误杀 code/test 等有效词) |
 | 202 | NT-CORE | rev-officer Phase 3 并行批: theater gate 8 模块 (research feature, 挖出 memory_budget 函数级 global() 真用回退) + evolution_daemon 挂起修复 (mutation_enabled 默认 true → 测试只读不触发嵌套 cargo 死锁) + Phase 3a hub 拆分 (engine_core reason() 663→14行+4 helper; run.rs 1896→700 拆 handlers_core/consciousness/maintenance 3 worker 经 #[path] mod) + Phase 3b unwrap 审计 (6 热点全在测试块, 生产区已 unwrap_or*) |
 | 203 | NT-CORE | 大阵全量审计+修复批: 定性 GWT 共振环为"彩排剧场"(真闭环在背景环 ConsciousnessRuntime+daemon); F1 entry:291 with_panorama 接线 GWT 单例(注释宣称统一实为双实例); F2+F3 删 GeometrySync+ResonatorNetwork 1928 行恒 None 死件(34+16 测试假绿灯); F6 删 L8 Awakening 孪生死影; F7 FEPIIT score→record_metric 真落库+删死方法; F8 CLS 写多读零收敛; F4/F5 seal_loop+background_loop 补真测试; 389 测试过; 第一性原理 3 问审计法(生产什么/谁消费/删了变吗) |
+| 204 | NT-CORE | 大阵复检+修复批: 复检确认 cycle203 F1-F8 全部落地 (GWT 318 测试); 深挖发现 resonant_broadcast 热路径彩排剧场未根治 → 移除 engine_core 共振+sparse_moe, 统一后台环; 删双 SelectiveState 平行实现 (nt_core_ssm 467行 R-P42); 收敛 nt_core_signal 死子模块 (attribution/history/ops→仅 cosine_similarity); 删 l5_consciousness 冗余 re-export 桶; 删 introspector/scoring 死字段; GWT 三温度注释消歧; 拓扑 squad 3 处误报 (R-P10 印证); 6774 测试全绿; 新规则 R-P94 并发 session 提交覆盖 |
 
 ## Skill Routing (何时加载什么)
 
