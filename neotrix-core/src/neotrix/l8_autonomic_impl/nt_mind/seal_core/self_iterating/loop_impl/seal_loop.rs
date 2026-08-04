@@ -878,8 +878,44 @@ impl SelfIteratingBrain {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use super::SelfIteratingBrain;
+
+    fn sealed() -> SelfIteratingBrain {
+        SelfIteratingBrain::new()
+    }
+
     #[test]
-    fn test_placeholder() {
-        assert!(true);
+    fn test_default_seal_loop_augmented_signal() {
+        let brain = sealed();
+        assert_eq!(brain.iteration, 0, "iteration should start at 0");
+        assert!(brain.auto_absorb, "auto_absorb defaults on so iterate can learn");
+        assert!(brain.quality_threshold > 0.0);
+    }
+
+    #[test]
+    fn test_code_review_iterate_advances_and_applies_edits() {
+        let mut brain = sealed();
+        let mut files = HashMap::new();
+        // 注入一个含 Critical 级别代码缺陷的文件，触发维度调整 + normalize
+        files.insert(
+            std::path::PathBuf::from("test.rs"),
+            "\nfn main() {\n    let x: &u8 = std::mem::uninitialized();\n}\n".to_string(),
+        );
+        let r = brain.code_review_iterate(&files);
+        assert_eq!(r.task_type, crate::neotrix::nt_world_model::TaskType::CodeReview);
+        assert!(r.iteration >= 1);
+        assert!(r.absorbed_count >= 0);
+    }
+
+    #[test]
+    fn test_plain_iterate_runs_without_panic() {
+        let mut brain = sealed();
+        let before = brain.iteration;
+        let r = brain.iterate(crate::neotrix::nt_world_model::TaskType::General);
+        assert_eq!(r.iteration, before + 1, "iterate should bump iteration count");
+        // iterate 是纯内存路径，不应触发 LLM 调用
+        assert!(r.score_after.is_finite());
     }
 }

@@ -171,3 +171,39 @@ impl BackgroundLoop {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    use super::BackgroundLoop;
+    use crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
+
+    #[test]
+    fn test_background_loop_wires_consciousness_core() {
+        let bg = BackgroundLoop::new(Arc::new(RwLock::new(SelfIteratingBrain::new())));
+        assert!(bg.gwt.is_some(), "GWT 单例必须存在 (F1 接线)");
+        assert!(bg.consciousness_runtime.is_some(), "ConsciousnessRuntime 阵眼必须接线");
+        assert!(bg.consciousness_tree.is_some(), "ConsciousnessTree 必须接线");
+        assert!(bg.fep_iit_bridge.is_some(), "FEPIIT bridge 必须接线");
+        assert!(bg.daemon.is_some(), "evolution daemon 必须接线");
+        assert!(!bg.started, "new() 不得自动 start");
+    }
+
+    #[test]
+    fn test_background_loop_gwt_singleton_shared_by_panorama() {
+        let brain = Arc::new(RwLock::new(SelfIteratingBrain::new()));
+        let bg = BackgroundLoop::new(brain.clone());
+        let pre_pano_gwt = bg.gwt.is_some();
+        assert!(pre_pano_gwt, "new() 必须预置 GWT 单例");
+        let pano = crate::neotrix::nt_mind::panorama_pipeline::PanoramaPipeline::new();
+        let bg = bg.with_panorama(pano);
+        // B1: with_panorama 会把共享 gwt 注入 pano (self.gwt.take), 故 bg.gwt 转 None、pano 持有它
+        assert!(bg.panorama.is_some(), "panorama 已注入");
+        assert!(bg.gwt.is_none(), "gwt 已被注入 pano (B1 单例转移)");
+        // 注入路径被证明执行过: bg.gwt 的 Some→None 转移即 B1 生效
+        assert!(bg.panorama.as_ref().map_or(false, |p| p.cycle == 0),
+            "panorama 实例保留");
+    }
+}
