@@ -19,7 +19,6 @@ pub use crate::core::nt_core_gwt::resonance::{
 pub use crate::core::nt_core_gwt::workspace as workspace;
 pub use crate::core::nt_core_gwt::competition_gate as competition_gate;
 pub use crate::core::nt_core_gwt::moe_router as moe_router;
-pub use crate::core::nt_core_gwt::resonator_network as resonator_network;
 
 // 现象学组件从 consciousness 移入 L5（体验的结构）
 pub use crate::core::nt_core_consciousness::stream_buffer::{

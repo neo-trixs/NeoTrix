@@ -12,7 +12,6 @@ use super::resonance::{
 use super::competition_gate::{CompetitionGate, CompetitionResult};
 use super::compaction::CompactionPipeline;
 use super::moe_router::MoERouter;
-use super::geometry_sync::GeometrySync;
 
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_harness::HarnessAdapter;
@@ -83,19 +82,12 @@ pub struct GlobalWorkspace {
     /// instead of discrete Hamming distance — producing differentiable [0,1]
     /// strength scores mapped to u32 [0,6]. Wired from seal_loop init.
     pub vsa_scorer: Option<super::vsa_scorer::VsaContentScorer>,
-    /// Cross-dimensional consciousness geometry sync (12-layer Φ integration).
-    /// Ticked every resonant_broadcast cycle to compute integrated information.
-    pub geometry_sync: Option<GeometrySync>,
     /// Inner Speech channel — self-talk summarizing the resonance state,
     /// fed back as context for subsequent experts (MIRROR AAAI 2026 §3.3).
     pub inner_speech: super::inner_speech::InnerSpeech,
     /// Top-Down Modality Attention Router (arXiv:2602.08597 §3). Gates per-modality
     /// workspace representation strength by task-query attention over modality keys.
     pub modality_router: super::modality_router::ModalityRouter,
-    /// Complementary Learning Systems fast buffer (MIRROR AAAI 2026 §3.4).
-    /// Hippocampus-style ring buffer of recent episodic experiences recorded from
-    /// each resonance cycle; hybrid retrieval reranks fast candidates by salience.
-    pub cls_buffer: super::cls_buffer::CLSBuffer,
     /// CTM-AI formal alignment verifier (arXiv:2605.04097 §2-4). Confirms the
     /// GWT is a Conscious Turing Machine instance: finite E8 states, bounded
     /// specialist actions, global broadcast, deterministic transition.
@@ -164,10 +156,8 @@ impl GlobalWorkspace {
             e8_attention_weights: None,
             e8_attention_bias: 0.3,
             vsa_scorer: None,
-            geometry_sync: None,
             inner_speech: super::inner_speech::InnerSpeech::default(),
             modality_router: super::modality_router::ModalityRouter::default(),
-            cls_buffer: super::cls_buffer::CLSBuffer::default(),
             ctm_verifier: super::ctm_verifier::CtmVerifier::new(),
             last_ctm_report: None,
             cognitive_profile: None,
@@ -456,25 +446,6 @@ impl GlobalWorkspace {
             }
         }
 
-        // Step 4d: Complementary Learning Systems — record this resonance cycle as
-        // an episodic experience in the fast (hippocampus) buffer. The winner's E8
-        // mode + effective salience snapshot form the episode signature; the content
-        // is the broadcast payload. High-reward episodes become consolidation
-        // candidates for the slow (neocortex) HyperCube store (MIRROR AAAI 2026 §3.4).
-        {
-            let e8_state = hexagram_states
-                .get(report.winner)
-                .map(|h| h.0)
-                .unwrap_or(0);
-            let reward = report.effective_saliences.get(report.winner).copied().unwrap_or(0.0);
-            self.cls_buffer.record(
-                e8_state,
-                report.effective_saliences.to_vec(),
-                content.to_string(),
-                reward,
-            );
-        }
-
         // Step 4e: CTM-AI formal alignment — verify the GWT is a Conscious Turing
         // Machine instance over the just-produced resonance report (finite states,
         // bounded actions, global broadcast, deterministic δ, bounded tape).
@@ -551,17 +522,6 @@ impl GlobalWorkspace {
 
         // Step 5c: MoE Router — REINFORCE update using effective salience as reward
         self.moe_router.routing_update(&report.effective_saliences);
-
-        // Step 5d': Geometry Sync — cross-dimensional consciousness Φ integration
-        if let Some(ref mut gs) = self.geometry_sync {
-            let phi = gs.tick();
-            if phi.total > super::geometry_sync::CONSCIOUS_PHI_THRESHOLD {
-                self.broadcast_history.push(format!(
-                    "[geometry_sync] Φ={:.4} above threshold — consciousness binding active",
-                    phi.total,
-                ));
-            }
-        }
 
         // Step 5e: Compaction — run compaction pipeline on broadcast_history
         {
@@ -655,24 +615,6 @@ impl GlobalWorkspace {
         self.specialist_at_index(report.winner)
     }
 
-    /// Hybrid CLS retrieval: query the fast episodic buffer by E8 mode and by
-    /// activation similarity, then merge by description. This is the query side of
-    /// the dual-memory architecture — fast candidates are surfaced before the slow
-    /// HyperCube semantic store reranks (roadmap Phase 7.3).
-    pub fn recall_experiences(&self, e8_state: u8, activation: &[f64], top_k: usize) -> Vec<&super::cls_buffer::Experience> {
-        let mut seen: Vec<&super::cls_buffer::Experience> = Vec::new();
-        let mut dedup: std::collections::HashSet<u64> = std::collections::HashSet::new();
-        for exp in self.cls_buffer.query_fast(e8_state, top_k).into_iter()
-            .chain(self.cls_buffer.query_fast_by_activation(activation, top_k))
-        {
-            if dedup.insert(exp.id) {
-                seen.push(exp);
-            }
-        }
-        seen.truncate(top_k);
-        seen
-    }
-
     /// Run the CTM-AI formal alignment verification over a resonance snapshot.
     /// Returns the alignment report and stores it in `last_ctm_report`.
     /// `specialists_active` is the count of registered specialists (|A| witness).
@@ -686,7 +628,7 @@ impl GlobalWorkspace {
                     winner: usize::MAX,
                     effective_saliences: [0.0; MODULE_COUNT],
                     raw_saliences: [0.0; MODULE_COUNT],
-                    entropy: f64::NAN,
+                    entropy: 0.0,
                     resonator_clusters: Vec::new(),
                     complement_activated: false,
                 }
@@ -896,48 +838,6 @@ mod tests {
         // Activations should be updated with effective salience
         let pm = ws.specialist_by_type_mut(&SpecialistType::PatternMatcher).expect("PatternMatcher should be registered for activation check");
         assert!(pm.activation > 0.0);
-    }
-
-    #[test]
-    fn test_resonant_broadcast_records_cls_experience() {
-        let mut ws = make_workspace();
-        let states = default_specialist_states();
-
-        ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
-
-        ws.resonant_broadcast("episodic payload", &states);
-
-        // Every resonance cycle records one episodic experience into the fast buffer
-        assert_eq!(ws.cls_buffer.len(), 1);
-        let winners = ws.cls_buffer.consolidation_candidates();
-        // The winner's effective salience is used as reward proxy, so high-winner
-        // episodes should surface as consolidation candidates
-        let _ = winners;
-
-        // Hybrid recall surfaces the recorded experience
-        let winner_idx = ws.last_resonance.as_ref().map(|r| r.winner).unwrap_or(0);
-        let e8_state = states.get(winner_idx).map(|h| h.0).unwrap_or(0);
-        let recall = ws.recall_experiences(e8_state, &[0.9, 0.5, 0.1], 3);
-        assert!(!recall.is_empty());
-        assert_eq!(recall[0].description, "episodic payload");
-    }
-
-    #[test]
-    fn test_cls_ring_eviction_in_broadcast() {
-        let mut ws = make_workspace();
-        let states = default_specialist_states();
-        ws.cls_buffer.max_fast = 2;
-
-        ws.specialist_by_type_mut(&SpecialistType::PatternMatcher)
-            .expect("PatternMatcher should be registered").activation = 0.9;
-        ws.resonant_broadcast("first", &states);
-        ws.resonant_broadcast("second", &states);
-        ws.resonant_broadcast("third", &states);
-
-        // Ring buffer evicts oldest: only 2 most recent retained
-        assert_eq!(ws.cls_buffer.len(), 2);
-        assert!(ws.cls_buffer.query_fast(0, 10).iter().all(|e| e.description != "first"));
     }
 
     #[test]

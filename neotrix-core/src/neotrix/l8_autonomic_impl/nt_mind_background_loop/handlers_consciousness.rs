@@ -301,6 +301,7 @@ impl BackgroundLoopHandle {
                 // Free Energy from StateSubstrate (unified: 1 - phi*coherence + load*0.5)
                 let fe_val = self.state.free_energy.max(0.0).min(1.0) * 10.0;
                 let score = fep_iit.compute_consciousness_score(fe_val, report.phi, report.coherence);
+                self.state.record_metric("fep_iit", score);
                 log::debug!("[bg] fep_iit: unified_score={:.3} phi={:.3} coherence={:.3} fe={:.3}",
                     score, report.phi, report.coherence, fe_val);
             }

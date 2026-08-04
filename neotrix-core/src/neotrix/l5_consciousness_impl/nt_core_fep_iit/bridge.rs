@@ -438,8 +438,12 @@ mod tests {
 
     #[test]
     fn test_placeholder() {
-        let _instance = FEPIITBridge::new();
-        assert!(true);
+        let bridge = FEPIITBridge::new();
+        let low = bridge.compute_score(10.0, 0.0);
+        let high = bridge.compute_score(0.0, 1.0);
+        assert!((0.0..=1.0).contains(&low), "low={low}");
+        assert!((0.0..=1.0).contains(&high), "high={high}");
+        assert!(high >= low, "high={high} should not drop below low={low}");
     }
 
     #[test]

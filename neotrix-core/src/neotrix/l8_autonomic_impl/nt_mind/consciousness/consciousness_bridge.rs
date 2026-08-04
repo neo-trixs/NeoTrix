@@ -169,14 +169,10 @@ impl ConsciousnessBridge {
             let content = gwt.active_content.as_deref().unwrap_or("");
             let specialists: Vec<String> = gwt.active_specialists()
                 .iter().map(|m| m.name.clone()).collect();
-            // Compute phi from geometry_sync if available, else resonance entropy
-            let phi = gwt.geometry_sync.as_ref()
-                .map(|gs| gs.current_phi().iit_phi)
-                .unwrap_or_else(|| {
-                    gwt.last_resonance.as_ref().map(|r| {
-                        (1.0 - r.entropy / 11.0_f64.max(1.0)).max(0.0).min(1.0)
-                    }).unwrap_or(0.0)
-                });
+            // Compute phi from resonance entropy
+            let phi = gwt.last_resonance.as_ref().map(|r| {
+                (1.0 - r.entropy / 11.0_f64.max(1.0)).max(0.0).min(1.0)
+            }).unwrap_or(0.0);
             let coherence = active_count as f64 / gwt.specialists.len().max(1) as f64
                 * gwt.active_specialists().iter()
                     .map(|m| m.activation)

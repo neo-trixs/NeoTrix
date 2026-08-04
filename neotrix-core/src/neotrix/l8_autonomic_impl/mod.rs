@@ -4,7 +4,6 @@
 //! Runs below consciousness — no GWT (L5) required.
 
 pub mod nt_mind;
-pub mod nt_mind_awakening;
 pub mod nt_mind_background_loop;
 pub mod nt_mind_ingestion;
 

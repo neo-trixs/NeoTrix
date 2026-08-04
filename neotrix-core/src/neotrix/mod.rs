@@ -28,7 +28,6 @@ pub use l9_transcendent_impl::nt_mind_consciousness_monitor;
 // L8 — Autonomic (自主神经层) — 自我进化
 pub use l8_autonomic_impl::nt_mind;
 pub use l8_autonomic_impl::nt_mind_background_loop;
-pub use l8_autonomic_impl::nt_mind_awakening;
 pub use l8_autonomic_impl::nt_mind_autofixer;
 pub use l8_autonomic_impl::nt_mind_evolution_loop;
 pub use l8_autonomic_impl::nt_mind_evolution_daemon;

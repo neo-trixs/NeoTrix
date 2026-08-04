@@ -11,7 +11,6 @@
 //! 融合 AGENTS.md 元认知自检 + MetaCognitive Self-Check 协议
 
 use crate::neotrix::nt_mind_autofixer::AutoFixer;
-use crate::neotrix::nt_core_fep_iit::FEPIITBridge;
 use crate::neotrix::nt_act_code::PipelineAutoFixer;
 use crate::neotrix::nt_mind_self_diagnose::{
     ActionExecutor, CodeUnderlyingIssue, DiagnosticItem, EvolutionLoopProvider,
@@ -533,20 +532,6 @@ impl EvolutionLoop {
         score -= snap.compile_warnings.min(20) as f64 * 1.0;
 
         score.clamp(0.0, 100.0)
-    }
-
-    /// FEP-IIT alternative evolution score [0,1]
-    /// Uses Kearney (2026) VSA bridge: α·(1 - FEₙ) + β·Φ
-    pub fn compute_fep_iit_score(&self, free_energy: f64, phi: f64) -> f64 {
-        FEPIITBridge::new().compute_score(free_energy, phi)
-    }
-
-    /// Combined project + FEP-IIT evolution score [0,1]
-    /// 70% project metrics + 30% FEP-IIT consciousness metrics
-    pub fn compute_combined_score(&self, snap: &ProjectSnapshot, free_energy: f64, phi: f64) -> f64 {
-        let project_score = self.compute_evolution_score(snap, &[]) / 100.0;
-        let bridge = FEPIITBridge::new();
-        bridge.project_to_fep_iit(project_score * 100.0, free_energy, phi)
     }
 
     /// 判断是否需要人工介入

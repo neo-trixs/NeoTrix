@@ -288,7 +288,7 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
             panorama.attach_kb(kb.clone());
             bg.kb = Some(kb);
         }
-        bg.panorama = Some(panorama);
+        bg = bg.with_panorama(panorama);
         #[cfg(feature = "stealth-net")]
         {
             bg = bg.with_world_consciousness();

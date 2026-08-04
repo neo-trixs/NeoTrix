@@ -10,12 +10,10 @@ pub mod modality_router;
 pub mod cognitive_type;
 pub mod cognitive_hub;
 pub mod meta_workspace;
-pub mod geometry_sync;
 pub mod competition_gate;
 pub mod compaction;
 pub mod compression;
 pub mod moe_router;
-pub mod resonator_network;
 pub mod vsa_scorer;
 pub mod context_engine;
 pub mod nt_gwt_geo;
@@ -25,15 +23,6 @@ pub mod consensus_resonance;
 pub mod pipeline;
 pub mod selection_strategy;
 
-pub use geometry_sync::{
-    CycleReport, CrossDimensionalResonator, DimensionLayer, GeometrySync, IitPhiCalculator,
-    IntegratedPhi, LayerSnapshot, CONSCIOUS_PHI_THRESHOLD, DEFAULT_COUPLING,
-    DEFAULT_SYNC_THRESHOLD, LAYER_COUNT,
-};
-pub use resonator_network::{
-    AdaptiveCouplingKuramoto, AdaptiveResonatorConfig, BandpassResonator, ResonanceOptimizer,
-    ResonanceReport as ResonatorReport, ResonatorNetwork,
-};
 pub use workspace::{AuditBlock, AuditEventType};
 pub use inner_speech::InnerSpeech;
 pub use modality_router::{Modality, ModalityRouter};
