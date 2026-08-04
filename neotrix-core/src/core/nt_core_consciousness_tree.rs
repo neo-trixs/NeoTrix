@@ -1065,6 +1065,22 @@ impl ConsciousnessTree {
         report
     }
 
+    /// 从 KB `absorbed_capability` 元数据同步到能力网 (Cycle 206 R-P79 闭环)。
+    /// 每个 `(branch_str, capability)` 对会合并进对应 CapabilityBranch.absorbed_capabilities,
+    /// 避免重复条目。branch_str 形如 "NT-CORE"/"NT-SHIELD"。
+    pub fn sync_absorbed_capabilities_from_kb(&mut self, pairs: &[(&str, &str)]) -> usize {
+        let mut synced = 0usize;
+        for (branch_str, capability) in pairs {
+            let Some(kind) = BranchKind::from_branch_str(branch_str) else { continue };
+            let Some(branch) = self.branches.get_mut(&kind) else { continue };
+            if !branch.absorbed_capabilities.iter().any(|c| c == capability) {
+                branch.absorbed_capabilities.push((*capability).to_string());
+                synced += 1;
+            }
+        }
+        synced
+    }
+
     /// Phase 0: Negotiate evolution contract before cycle begins
     fn negotiate_contract(&self) -> EvolutionContract {
         // Derive claim from top vulnerabilities and gaps
@@ -1627,6 +1643,20 @@ impl BranchKind {
             None
         }
     }
+
+    /// "NT-CORE"/"NT-SHIELD" → BranchKind (KB absorbed_capability.branch 字符串)
+    pub fn from_branch_str(s: &str) -> Option<BranchKind> {
+        match s.to_uppercase().as_str() {
+            "NT-CORE" => Some(BranchKind::Core),
+            "NT-MIND" => Some(BranchKind::Mind),
+            "NT-MEMORY" => Some(BranchKind::Memory),
+            "NT-WORLD" => Some(BranchKind::World),
+            "NT-ACT" => Some(BranchKind::Act),
+            "NT-IO" => Some(BranchKind::Io),
+            "NT-SHIELD" => Some(BranchKind::Shield),
+            _ => None,
+        }
+    }
 }
 
 impl CapabilityBranch {
@@ -1692,6 +1722,51 @@ mod tests {
         let tree = ConsciousnessTree::new();
         assert_eq!(tree.branches.len(), 7);
         assert_eq!(tree.cycle, 0);
+    }
+
+    #[test]
+    fn test_from_branch_str() {
+        assert_eq!(BranchKind::from_branch_str("NT-CORE"), Some(BranchKind::Core));
+        assert_eq!(BranchKind::from_branch_str("NT-SHIELD"), Some(BranchKind::Shield));
+        assert_eq!(BranchKind::from_branch_str("nt-io"), Some(BranchKind::Io));
+        assert_eq!(BranchKind::from_branch_str("NOPE"), None);
+    }
+
+    #[test]
+    fn test_sync_absorbed_capabilities_dedup() {
+        let mut tree = ConsciousnessTree::new();
+        let base_act = tree.branches[&BranchKind::Act].absorbed_capabilities.len();
+        let base_shield = tree.branches[&BranchKind::Shield].absorbed_capabilities.len();
+        let pairs: Vec<(&str, &str)> = vec![
+            ("NT-ACT", "execute"),
+            ("NT-ACT", "execute"),
+            ("NT-ACT", "cyberstrike-skill"),
+            ("NT-SHIELD", "verify"),
+            ("NT-SHIELD", "evidence-gated-autonomy"),
+            ("NOPE", "nope"),
+        ];
+        let synced = tree.sync_absorbed_capabilities_from_kb(&pairs);
+        // execute/verify 已在 36 基础能力集 → 仅 2 条新增
+        assert_eq!(synced, 2);
+        let act = &tree.branches[&BranchKind::Act];
+        assert_eq!(act.absorbed_capabilities.len(), base_act + 1);
+        assert!(
+            act.absorbed_capabilities
+                .iter()
+                .filter(|c| *c == "cyberstrike-skill")
+                .count()
+                == 1
+        );
+        let shield = &tree.branches[&BranchKind::Shield];
+        assert_eq!(shield.absorbed_capabilities.len(), base_shield + 1);
+        assert!(
+            shield
+                .absorbed_capabilities
+                .iter()
+                .filter(|c| *c == "evidence-gated-autonomy")
+                .count()
+                == 1
+        );
     }
 
     #[test]

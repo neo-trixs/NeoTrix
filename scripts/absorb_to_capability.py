@@ -279,6 +279,49 @@ KNOWN_REPOS = {
     "sigstore": ("NT-SHIELD", "verify"),
     "opa": ("NT-SHIELD", "constrain"),
     "secureCodeBox": ("NT-SHIELD", "verify"),
+    # Cycle 206 批 (2026-08-04 吸收 47 源) — 专家判定 (sub-agent 四字段表)
+    "kostja94/marketing-skills": ("NT-IO", "invoke"),
+    "CyberStrike": ("NT-SHIELD", "constrain"),
+    "zhaoxuya520/reverse-skill": ("NT-SHIELD", "audit"),
+    "uditgoenka/autoresearch": ("NT-MIND", "integrate"),
+    "averygan/reclip": ("NT-WORLD", "retrieve"),
+    "github/spec-kit": ("NT-CORE", "plan"),
+    "Kritt-ai/open-kritt": ("NT-SHIELD", "audit"),
+    "yc-software/qm": ("NT-ACT", "execute"),
+    "alibaba/open-code-review": ("NT-CORE", "critique"),
+    "affaan-m/ECC": ("NT-MIND", "integrate"),
+    "AgentSwarms-fyi/agentswarms": ("NT-ACT", "delegate"),
+    "trycompai/crm": ("NT-ACT", "execute"),
+    "xai-org/grok-build": ("NT-ACT", "execute"),
+    "jakubkrehel/skills": ("NT-IO", "invoke"),
+    "jakubkrehel/oklch-skill": ("NT-IO", "invoke"),
+    "jakubkrehel/make-interfaces-feel-better": ("NT-IO", "invoke"),
+    "robert-mcdermott/ai-knowledge-graph": ("NT-MEMORY", "search"),
+    "vxcontrol/pentagi": ("NT-SHIELD", "audit"),
+    "toeverything/AFFiNE": ("NT-MEMORY", "persist"),
+    "huangruiteng/loopx": ("NT-ACT", "execute"),
+    "google/magika": ("NT-SHIELD", "verify"),
+    "phibrowser": ("NT-WORLD", "observe"),
+    "lightpanda-io/browser": ("NT-WORLD", "retrieve"),
+    "firecrawl/pdf-inspector": ("NT-MEMORY", "recall"),
+    "aigclink/geolook": ("NT-MIND", "integrate"),
+    "diegosouzapw/OmniRoute": ("NT-IO", "inquire"),
+    "stablyai/orca": ("NT-ACT", "delegate"),
+    "citrolabs/ego-lite": ("NT-WORLD", "retrieve"),
+    "CoreBunch/Instatic": ("NT-SHIELD", "constrain"),
+    "Lordog/dive-into-llms": ("NT-MEMORY", "recall"),
+    "anthropics/claude-cookbooks": ("NT-CORE", "plan"),
+    "NanoNets/Graft": ("NT-MEMORY", "search"),
+    "ever-co/ever-gauzy": ("NT-ACT", "execute"),
+    "superdesigndev/superdesign": ("NT-IO", "invoke"),
+    "skalesapp/skales": ("NT-ACT", "execute"),
+    "claraverse-space/ClaraVerse": ("NT-MEMORY", "recall"),
+    "FareedKhan-dev/kimi-k3-in-c": ("NT-MIND", "generate"),
+    "LasCC/HackTools": ("NT-SHIELD", "audit"),
+    "taranis-ai/taranis-ai": ("NT-WORLD", "observe"),
+    "ruvnet/ruflo": ("NT-SHIELD", "constrain"),
+    "projectdiscovery/nuclei": ("NT-SHIELD", "audit"),
+    "whiteguo233/OpenBiliClaw": ("NT-WORLD", "observe"),
     # NT-SHIELD constrain: 治理/对齐/约束 (Cycle 161p)
     "constitutional-ai": ("NT-SHIELD", "constrain"),
     "llm-guard": ("NT-SHIELD", "constrain"),
@@ -362,12 +405,25 @@ def normalize_repo_title(title):
 def map_node(node_type, title, content, url):
     """返回 (branch, capability, evidence) 或 None"""
     owner_repo = None
+    if url and 'github.com' in url:
+        url_low = url.lower()
+        last = url_low.rstrip('/').rsplit('/', 1)[-1] if url_low.rstrip('/') else ''
+        # Pass 1: 完整 owner/repo key 用 URL 判真 (ground truth, 任意 node_type)
+        for k, (br, cap) in KNOWN_REPOS.items():
+            kl = k.lower()
+            if '/' in k and kl in url_low:
+                return br, cap, f'known_repo:{k}'
+        # Pass 2: 裸 key 须等于 URL 末段 (精确判别, 防 "skills" 误吞 "marketing-skills")
+        for k, (br, cap) in KNOWN_REPOS.items():
+            kl = k.lower()
+            if '/' not in k and kl == last:
+                return br, cap, f'known_repo:{k}'
     if node_type == 'repository':
         owner_repo = normalize_repo_title(title)
         low = owner_repo.lower()
-        # 先查 KNOWN_REPOS (确定性)
         for k, (br, cap) in KNOWN_REPOS.items():
-            if k.lower() in low or low.endswith(k.lower()):
+            kl = k.lower()
+            if kl in low or low.endswith(kl) or low == kl.split('/')[-1]:
                 return br, cap, f'known_repo:{k}'
     elif node_type == 'paper':
         low = title.lower()

@@ -317,6 +317,49 @@ pub fn known_repos() -> &'static [(&'static str, &'static str, &'static str)] {
         ("cmaes", "NT-MIND", "transform"),
         ("opencog", "NT-MEMORY", "simulate"),
         ("bids-validator", "NT-CORE", "verify"),
+        // Cycle 206 批 (2026-08-04 吸收 47 源) — 专家判定 (sub-agent 四字段表)
+        ("kostja94/marketing-skills", "NT-IO", "invoke"),
+        ("CyberStrike", "NT-SHIELD", "constrain"),
+        ("zhaoxuya520/reverse-skill", "NT-SHIELD", "audit"),
+        ("uditgoenka/autoresearch", "NT-MIND", "integrate"),
+        ("averygan/reclip", "NT-WORLD", "retrieve"),
+        ("github/spec-kit", "NT-CORE", "plan"),
+        ("Kritt-ai/open-kritt", "NT-SHIELD", "audit"),
+        ("yc-software/qm", "NT-ACT", "execute"),
+        ("alibaba/open-code-review", "NT-CORE", "critique"),
+        ("affaan-m/ECC", "NT-MIND", "integrate"),
+        ("AgentSwarms-fyi/agentswarms", "NT-ACT", "delegate"),
+        ("trycompai/crm", "NT-ACT", "execute"),
+        ("xai-org/grok-build", "NT-ACT", "execute"),
+        ("jakubkrehel/skills", "NT-IO", "invoke"),
+        ("jakubkrehel/oklch-skill", "NT-IO", "invoke"),
+        ("jakubkrehel/make-interfaces-feel-better", "NT-IO", "invoke"),
+        ("robert-mcdermott/ai-knowledge-graph", "NT-MEMORY", "search"),
+        ("vxcontrol/pentagi", "NT-SHIELD", "audit"),
+        ("toeverything/AFFiNE", "NT-MEMORY", "persist"),
+        ("huangruiteng/loopx", "NT-ACT", "execute"),
+        ("google/magika", "NT-SHIELD", "verify"),
+        ("phibrowser", "NT-WORLD", "observe"),
+        ("lightpanda-io/browser", "NT-WORLD", "retrieve"),
+        ("firecrawl/pdf-inspector", "NT-MEMORY", "recall"),
+        ("aigclink/geolook", "NT-MIND", "integrate"),
+        ("diegosouzapw/OmniRoute", "NT-IO", "inquire"),
+        ("stablyai/orca", "NT-ACT", "delegate"),
+        ("citrolabs/ego-lite", "NT-WORLD", "retrieve"),
+        ("CoreBunch/Instatic", "NT-SHIELD", "constrain"),
+        ("Lordog/dive-into-llms", "NT-MEMORY", "recall"),
+        ("anthropics/claude-cookbooks", "NT-CORE", "plan"),
+        ("NanoNets/Graft", "NT-MEMORY", "search"),
+        ("ever-co/ever-gauzy", "NT-ACT", "execute"),
+        ("superdesigndev/superdesign", "NT-IO", "invoke"),
+        ("skalesapp/skales", "NT-ACT", "execute"),
+        ("claraverse-space/ClaraVerse", "NT-MEMORY", "recall"),
+        ("FareedKhan-dev/kimi-k3-in-c", "NT-MIND", "generate"),
+        ("LasCC/HackTools", "NT-SHIELD", "audit"),
+        ("taranis-ai/taranis-ai", "NT-WORLD", "observe"),
+        ("ruvnet/ruflo", "NT-SHIELD", "constrain"),
+        ("projectdiscovery/nuclei", "NT-SHIELD", "audit"),
+        ("whiteguo233/OpenBiliClaw", "NT-WORLD", "observe"),
     ]
 }
 
@@ -368,12 +411,32 @@ fn normalize_repo_title(title: &str) -> String {
 }
 
 /// 映射单节点 → (branch, capability, evidence)。
-pub fn map_node(node_type: &str, title: &str, content: &str) -> Option<(&'static str, &'static str, String)> {
-    // 1. KNOWN_REPOS 确定性映射 (仅 repository)
+pub fn map_node(node_type: &str, title: &str, content: &str, url: &str) -> Option<(&'static str, &'static str, String)> {
+    // 1. KNOWN_REPOS 确定性映射 (URL 判真优先, 任意 node_type)
+    if !url.is_empty() && url.contains("github.com") {
+        let url_low = url.to_ascii_lowercase();
+        let last = url_low.trim_end_matches('/').rsplit('/').next().unwrap_or("").to_string();
+        // Pass 1: 完整 owner/repo key
+        for (k, br, cap) in known_repos() {
+            let kl = k.to_ascii_lowercase();
+            if k.contains('/') && url_low.contains(&kl) {
+                return Some((br, cap, format!("known_repo:{k}")));
+            }
+        }
+        // Pass 2: 裸 key 须等于 URL 末段
+        for (k, br, cap) in known_repos() {
+            let kl = k.to_ascii_lowercase();
+            if !k.contains('/') && kl == last {
+                return Some((br, cap, format!("known_repo:{k}")));
+            }
+        }
+    }
     if node_type == "repository" {
         let owner_repo = normalize_repo_title(title).to_ascii_lowercase();
         for (k, br, cap) in known_repos() {
-            if owner_repo.contains(&k.to_ascii_lowercase()) || owner_repo.ends_with(&k.to_ascii_lowercase()) {
+            let kl = k.to_ascii_lowercase();
+            let bare = kl.split('/').next_back().unwrap_or(&kl).to_string();
+            if owner_repo.contains(&kl) || owner_repo.ends_with(&kl) || owner_repo == bare {
                 return Some((br, cap, format!("known_repo:{k}")));
             }
         }
@@ -540,7 +603,7 @@ pub fn map_batch_nodes(conn: &Connection) -> rusqlite::Result<(Vec<(String, Capa
         }
         let topic_blob = topics.join(" ");
 
-        let res = map_node(&node_type, &title, &content);
+        let res = map_node(&node_type, &title, &content, &url);
         let Some((branch, cap, ev)) = res else {
             report.unmapped.push((nid.clone(), title.clone()));
             continue;
@@ -611,6 +674,27 @@ pub fn apply_mappings(conn: &Connection, mappings: &[(String, CapabilityMapping)
     Ok(mappings.len())
 }
 
+/// 从 KB nodes 的 `absorbed_capability` 元数据加载 `(branch_str, capability)` 对,
+/// 供 ConsciousnessTree 能力网同步 (R-P79 闭环, Cycle 206)。
+pub fn load_absorbed_capabilities(conn: &Connection) -> rusqlite::Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare("SELECT metadata FROM nodes WHERE metadata IS NOT NULL")?;
+    let rows = stmt.query_map([], |row| row.get::<_, Option<String>>(0))?;
+    let mut out: Vec<(String, String)> = Vec::new();
+    for row in rows {
+        let Some(mj) = row? else { continue };
+        let Ok(md) = serde_json::from_str::<Value>(&mj) else { continue };
+        let Some(ac) = md.get("absorbed_capability") else { continue };
+        let (Some(branch), Some(cap)) = (
+            ac.get("branch").and_then(Value::as_str),
+            ac.get("capability").and_then(Value::as_str),
+        ) else {
+            continue;
+        };
+        out.push((branch.to_string(), cap.to_string()));
+    }
+    Ok(out)
+}
+
 fn unix_now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -645,7 +729,7 @@ mod tests {
 
     #[test]
     fn test_map_repository_known_repo() {
-        let (br, cap, ev) = map_node("repository", "GitHub - openai/codex: coding agent", "src").unwrap();
+        let (br, cap, ev) = map_node("repository", "GitHub - openai/codex: coding agent", "src", "").unwrap();
         assert_eq!(br, "NT-ACT");
         assert_eq!(cap, "execute");
         assert!(ev.starts_with("known_repo:"));
@@ -653,14 +737,14 @@ mod tests {
 
     #[test]
     fn test_map_paper_default() {
-        let (br, cap, _) = map_node("paper", "Attention Is All You Need", "neutral prose").unwrap();
+        let (br, cap, _) = map_node("paper", "Attention Is All You Need", "neutral prose", "").unwrap();
         assert_eq!(br, "NT-CORE");
         assert_eq!(cap, "critique");
     }
 
     #[test]
     fn test_map_repository_fallback() {
-        let (br, cap, ev) = map_node("repository", "Some Random Repo No Keywords", "no content").unwrap();
+        let (br, cap, ev) = map_node("repository", "Some Random Repo No Keywords", "no content", "").unwrap();
         assert_eq!(br, "NT-WORLD");
         assert_eq!(cap, "retrieve");
         assert_eq!(ev, "fallback:repo");
@@ -668,7 +752,7 @@ mod tests {
 
     #[test]
     fn test_map_web_type_default() {
-        let (br, cap, ev) = map_node("web", "title", "content").unwrap();
+        let (br, cap, ev) = map_node("web", "title", "content", "").unwrap();
         assert_eq!(br, "NT-WORLD");
         assert_eq!(cap, "search");
         assert!(ev.starts_with("fallback:type:"));
@@ -718,6 +802,28 @@ mod tests {
         let v: Value = serde_json::from_str(&meta.unwrap()).unwrap();
         assert_eq!(v["absorbed_capability"]["capability"], "execute");
         assert_eq!(v["knowledge_source"]["source_core"], "Reality");
+    }
+
+    #[test]
+    fn test_load_absorbed_capabilities_roundtrip() {
+        let conn = test_db();
+        assert!(load_absorbed_capabilities(&conn).unwrap().is_empty());
+
+        let now = unix_now();
+        conn.execute(
+            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier) VALUES(?1,'repository','GitHub - openai/codex: desc','s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?2,?3,0,'{}','cache',NULL,NULL,NULL,'warm')",
+            params![format!("u_{now}"), now, now],
+        ).unwrap();
+        let (mapped, _) = map_batch_nodes(&conn).unwrap();
+        assert!(mapped.is_empty());
+        let meta = serde_json::json!({
+            "absorbed_capability": {"branch": "NT-ACT", "capability": "execute", "evidence": "known_repo:openai/codex", "mapped_at": now},
+            "knowledge_source": {"source_core": "Reality", "primary_domain": "NT-ACT", "mapped_at": now},
+        });
+        conn.execute("UPDATE nodes SET metadata = ?1", params![meta.to_string()]).unwrap();
+
+        let pairs = load_absorbed_capabilities(&conn).unwrap();
+        assert_eq!(pairs, vec![("NT-ACT".to_string(), "execute".to_string())]);
     }
 
     #[test]

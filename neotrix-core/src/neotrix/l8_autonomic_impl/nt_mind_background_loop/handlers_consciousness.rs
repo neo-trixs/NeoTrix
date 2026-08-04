@@ -775,6 +775,28 @@ impl BackgroundLoopHandle {
             tree.set_branch_health_from_self_tests(&results);
             log::debug!("[bg] consciousness_tree: branch health updated from {} SelfTest results", results.len());
         }
+
+        // Cycle 206 R-P79 闭环: 从 KB absorbed_capability 元数据同步到能力网分支
+        if let Some(kb) = self.kb.clone() {
+            if let Some(ref mut tree) = self.consciousness_tree {
+                match kb.absorbed_capabilities() {
+                    Ok(pairs) if !pairs.is_empty() => {
+                        let refs: Vec<(&str, &str)> = pairs
+                            .iter()
+                            .map(|(b, c)| (b.as_str(), c.as_str()))
+                            .collect();
+                        let synced = tree.sync_absorbed_capabilities_from_kb(&refs);
+                        log::debug!(
+                            "[bg] consciousness_tree: synced {} absorbed capabilities from KB ({} total)",
+                            synced,
+                            pairs.len()
+                        );
+                    }
+                    Ok(_) => log::debug!("[bg] no absorbed_capability metadata in KB"),
+                    Err(e) => log::warn!("[bg] absorbed_capabilities failed: {}", e),
+                }
+            }
+        }
         
         if !report.findings.is_empty() || failure_count > 0 {
             let reason = format!(

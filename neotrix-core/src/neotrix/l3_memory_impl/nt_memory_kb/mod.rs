@@ -457,6 +457,12 @@ impl KnowledgeBase {
         tr.full_tech_profile(tech_name)
     }
 
+    /// 读取全部已吸收能力 `(branch_str, capability)` 对 (Cycle 206 R-P79 闭环)。
+    pub fn absorbed_capabilities(&self) -> Result<Vec<(String, String)>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_absorb_mapper::load_absorbed_capabilities(&conn).map_err(|e| e.to_string())
+    }
+
     // ── close ──
 
     pub fn close(self) -> Result<(), String> {
