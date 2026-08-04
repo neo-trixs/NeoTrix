@@ -108,7 +108,7 @@ impl InnerSpeech {
         }
 
         // Self-questioning cadence: every N ticks, ask what the next move should be.
-        if self.tick % self.question_cadence == 0 {
+        if self.tick.is_multiple_of(self.question_cadence) {
             line.push_str(" What should I do next?");
         }
 

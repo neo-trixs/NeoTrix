@@ -32,9 +32,7 @@ pub fn is_safe_fetch_url(url: &str) -> bool {
         return !is_private_ip(ip);
     }
     // 域名: 解析并校验全部结果 (过滤内网解析)
-    let addr = match (host, parsed.port_or_known_default().unwrap_or(80)) {
-        (h, p) => (h, p),
-    };
+    let addr = (host, parsed.port_or_known_default().unwrap_or(80));
     match std::net::ToSocketAddrs::to_socket_addrs(&(addr.0.to_string(), addr.1)) {
         Ok(addrs) => {
             let mut any_safe = false;
@@ -403,7 +401,7 @@ impl KnowledgeAbsorptionPipeline {
         if self.state.source_map.len() >= SOURCE_MAP_LIMIT {
             let mut oldest: Option<(i64, String)> = None;
             for (k, e) in self.state.source_map.iter() {
-                if oldest.as_ref().map_or(true, |(ts, _)| e.last_absorbed < *ts) {
+                if oldest.as_ref().is_none_or(|(ts, _)| e.last_absorbed < *ts) {
                     oldest = Some((e.last_absorbed, k.clone()));
                 }
             }

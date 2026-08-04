@@ -265,7 +265,7 @@ impl ConsciousnessMonitor {
     /// 插值成**平滑且差异化**的连续谱：
     ///   - 平滑 → 相邻一致性 rho 高 (produit 平滑相关)
     ///   - 差异化 → 去均值后仍有强度，intensity 高
-    /// 这正是 compute_phi 需要的高集成形态，不再受零填充拖累。
+    ///     这正是 compute_phi 需要的高集成形态，不再受零填充拖累。
     fn current_phi_state(&self) -> Vec<f64> {
         // 真实输入锚点 (排除 phi_current：它是自身输出，回环喂入会自激/失真)。
         // 保持固定顺序以便相邻语义相邻。

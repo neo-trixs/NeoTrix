@@ -30,7 +30,7 @@ pub mod hooks {
                     return format!("BLOCK: File exceeds 800 lines ({} lines). Split into smaller modules.", lines);
                 }
             }
-            format!("CONTINUE: quality-gate passed")
+            "CONTINUE: quality-gate passed".to_string()
         }
     }
 
@@ -43,10 +43,10 @@ pub mod hooks {
         fn execute(&self, ctx: &HookContext) -> String {
             if let Some(ref output) = ctx.tool_output {
                 if output.contains("TODO") || output.contains("FIXME") || output.contains("HACK") {
-                    return format!("WARN: New TODO/FIXME/HACK found");
+                    return "WARN: New TODO/FIXME/HACK found".to_string();
                 }
             }
-            format!("CONTINUE: todo-warning passed")
+            "CONTINUE: todo-warning passed".to_string()
         }
     }
 
@@ -111,7 +111,7 @@ pub mod hooks {
         }
 
         pub fn check_blocked(actions: &[String]) -> Option<String> {
-            actions.iter().find(|a| a.starts_with("BLOCK:")).map(|a| a.clone())
+            actions.iter().find(|a| a.starts_with("BLOCK:")).cloned()
         }
 
         pub fn execute_event(&self, ctx: &HookContext) -> Vec<String> {

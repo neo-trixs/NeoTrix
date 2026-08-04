@@ -251,7 +251,7 @@ impl GlobalWorkspace {
         // Content signal: coarse hash spread across the embedding slots.
         let hash = content.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
         for (i, slot) in enc.iter_mut().enumerate() {
-            *slot = ((hash >> (i % 8) * 8) & 0xFF) as f64 / 255.0;
+            *slot = ((hash >> ((i % 8) * 8)) & 0xFF) as f64 / 255.0;
         }
         // Salience signal: blend raw activation into the second half.
         let n = MODULE_COUNT;

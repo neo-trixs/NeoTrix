@@ -428,7 +428,7 @@ cognitive_load: self.cognitive_load.take(),
             simulate: SimulateEngine::new(),
             convergence_pulse: ConvergencePulse::default(),
             tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
-            /// 门控注册表 — 默认只读工具, 运行时可扩展。
+            // 门控注册表 — 默认只读工具, 运行时可扩展。
             gate_registry: Some(ToolRegistry::from_read_only(&["get", "query", "read", "search"])),
         }));
 
@@ -586,6 +586,7 @@ pub struct BackgroundLoopHandle {
     knowledge_aging: KnowledgeAging,
     auto_crystallizer: AutoCrystallizer,
     knowledge_chain: Option<KnowledgeChain>,
+    #[allow(dead_code)]
     exploration_pipeline: Option<ExplorationPipeline>,
     always_on: AlwaysOnEngine,
     plugin_registry: PluginRegistry,

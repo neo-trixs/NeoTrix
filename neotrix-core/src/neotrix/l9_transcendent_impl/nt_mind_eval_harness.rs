@@ -219,7 +219,6 @@ impl EvalHarness {
                 let provider = provider.clone();
                 let judge = self.judge.clone();
                 let query = query.clone();
-                let budget = budget;
                 let gold_standard = self.gold_standard.clone();
                 let model_name = model.name.clone();
 
@@ -364,10 +363,10 @@ Provide your score and brief justification in JSON:
             let mut lower = None;
             let mut upper = None;
             for &b in avg_quality.keys() {
-                if b <= target_budget && lower.map_or(true, |l| b > l) {
+                if b <= target_budget && lower.is_none_or(|l| b > l) {
                     lower = Some(b);
                 }
-                if b >= target_budget && upper.map_or(true, |u| b < u) {
+                if b >= target_budget && upper.is_none_or(|u| b < u) {
                     upper = Some(b);
                 }
             }

@@ -1433,7 +1433,7 @@ pub fn scan_for_patterns(
     if let Some(d) = dir {
         let file_list = cached_rs_files(d);
         for file_path in file_list.iter() {
-            if let Ok(content) = read_source_cached(&file_path) {
+            if let Ok(content) = read_source_cached(file_path) {
                 for (pc, re) in &compiled {
                     for m in re.find_iter(&content) {
                         let line = content[..m.start()].matches('\n').count() + 1;

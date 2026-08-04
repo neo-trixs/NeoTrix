@@ -77,7 +77,7 @@ impl SimulateEngine {
 
     /// 读取场景描述 — 供日志与监控消费
     pub fn scenario_description(&self, id: &str) -> Option<String> {
-        self.scenarios.get(id).and_then(|s| Some(s.description.clone()))
+        self.scenarios.get(id).map(|s| s.description.clone())
     }
 
     pub fn simulation_count(&self) -> u64 {

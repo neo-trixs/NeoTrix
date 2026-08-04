@@ -111,8 +111,8 @@ impl MetaWorkspace {
         let count = self.specialist_count();
         self.activation_counts = vec![0; count.max(1)];
         for h in &self.history {
-            if (h.winner as usize) < self.activation_counts.len() {
-                self.activation_counts[h.winner as usize] += 1;
+            if h.winner < self.activation_counts.len() {
+                self.activation_counts[h.winner] += 1;
             }
         }
         let mut overactivation: Vec<MetaObservation> = Vec::new();
@@ -123,7 +123,7 @@ impl MetaWorkspace {
                     let name = self
                         .history
                         .iter()
-                        .find(|h| h.winner as usize == expert)
+                        .find(|h| h.winner == expert)
                         .map(|h| h.winner_name.clone())
                         .unwrap_or_else(|| format!("specialist_{expert}"));
                     overactivation.push(MetaObservation {
@@ -150,7 +150,7 @@ impl MetaWorkspace {
             .map(|h| h.entropy)
             .sum::<f64>()
             / n;
-        if mean_entropy < 0.5 || mean_entropy > 2.5 {
+        if !(0.5..=2.5).contains(&mean_entropy) {
             let mo = MetaObservation {
                 tag: "entropy_anomaly".to_string(),
                 message: format!(

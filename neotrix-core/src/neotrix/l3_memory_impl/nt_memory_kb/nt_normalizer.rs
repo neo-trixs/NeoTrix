@@ -266,6 +266,7 @@ pub fn content_fingerprint(content: &str) -> String {
 /// 1. 代码块围栏标签 (```python → Python, 权重 0.9)
 /// 2. 描述关键词 ('built with Rust' → 权重 0.6)
 /// 3. 标题命中
+///
 /// 返回规范语言名；未检测到→ `"en"` (默认 KB 语言)。
 pub fn detect_language(text: &str, title: &str) -> String {
     let mut scores: HashMap<&'static str, f64> = HashMap::new();
@@ -351,7 +352,7 @@ pub fn validate_node_type(t: &str) -> &'static str {
     NODE_TYPES
         .iter()
         .find(|valid| **valid == t)
-        .map(|s| *s)
+        .copied()
         .unwrap_or("Concept")
 }
 
@@ -360,7 +361,7 @@ pub fn validate_relation_type(r: &str) -> &'static str {
     RELATION_TYPES
         .iter()
         .find(|valid| **valid == r)
-        .map(|s| *s)
+        .copied()
         .unwrap_or("references")
 }
 #[cfg(test)]

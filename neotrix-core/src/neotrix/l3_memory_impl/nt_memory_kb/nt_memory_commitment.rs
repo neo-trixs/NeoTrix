@@ -177,7 +177,7 @@ impl EmbeddingCommitmentStore {
         h.update(b"\x00");
         h.update(author.as_bytes());
         let binding = h.finalize();
-        format!("{}:{}", domain_separator, hex::encode(&binding))
+        format!("{}:{}", domain_separator, hex::encode(binding))
     }
 
     /// Re-quantize the supplied vector, re-build the Merkle tree, and compare

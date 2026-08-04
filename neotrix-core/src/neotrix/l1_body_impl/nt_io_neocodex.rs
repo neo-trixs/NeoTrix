@@ -826,10 +826,10 @@ impl PermissionSystem {
             // shell (the only Ask tool): allowed in agentic modes, denied in
             // restrictive ones (manual/accept_edits/plan) where the UI review
             // layer is the enforcement point instead.
-            PermissionLevel::Ask => match permission_mode {
-                "manual" | "accept_edits" | "acceptEdits" | "plan" => false,
-                _ => true,
-            },
+            PermissionLevel::Ask => !matches!(
+                permission_mode,
+                "manual" | "accept_edits" | "acceptEdits" | "plan"
+            ),
         }
     }
 
@@ -2024,11 +2024,7 @@ impl NeoCodexAgent {
             }
         }
         let normalized = parts.iter().fold(std::path::PathBuf::new(), |acc, c| acc.join(c));
-        let resolved = if candidate.is_absolute() {
-            normalized
-        } else {
-            normalized
-        };
+        let resolved = normalized;
         if !resolved.starts_with(&cwd) {
             return Err(format!("[path error] {} is outside the workspace", raw));
         }

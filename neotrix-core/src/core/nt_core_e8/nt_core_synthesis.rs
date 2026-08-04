@@ -101,7 +101,6 @@ impl AttentionResiduals {
 /// scenarios. Mapped to E8 factor-energy updates: the gate value scales
 /// how strongly a factor's raw delta is applied, preventing a single
 /// dominating mode from exploding the energy update.
-
 /// Muon optimizer — DeepSeek V4.
 ///
 /// DeepSeek V4 uses Muon, a momentum optimizer that replaces the dense

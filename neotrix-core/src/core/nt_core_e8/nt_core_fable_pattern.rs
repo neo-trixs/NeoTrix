@@ -317,8 +317,7 @@ impl PhaseTransitionMatrix {
         else if m.contains("verif") || m.contains("check") || m.contains("reflect") { Some(4) }
         else if m.contains("synthes") || m.contains("conclud") || m.contains("final") { Some(7) }
         else if m.contains("alternat") || m.contains("consider") { Some(5) }
-        else if m.contains("acknowledg") { Some(0) }
-        else if m.contains("context") { Some(0) }
+        else if m.contains("acknowledg") || m.contains("context") { Some(0) }
         else { None }
     }
 }

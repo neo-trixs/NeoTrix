@@ -26,8 +26,6 @@ fn unix_ts() -> i64 {
 
 /// 增量存储引擎 — append-only journal + 全量快照 (类 LevelDB compaction)。
 pub struct KnowledgeStorage {
-    /// 全量快照主路径 (Python `self.path`)。
-    compact_path: PathBuf,
     journal_path: PathBuf,
     max_memory: usize,
     entries: HashMap<String, Value>,
@@ -46,7 +44,6 @@ impl KnowledgeStorage {
         let journal_path = compact_path.with_extension("jsonl");
         let snap_path = PathBuf::from(format!("{}.snap", compact_path.display()));
         let mut store = Self {
-            compact_path,
             journal_path,
             max_memory: max_memory_entries,
             entries: HashMap::new(),
@@ -120,11 +117,10 @@ impl KnowledgeStorage {
         self.append_journal(&entry)?;
 
         // 触发 compact
-        if self.last_compact_size > 0
-            && self.entries.len() > self.last_compact_size + self.max_memory / 2
+        if (self.last_compact_size > 0
+            && self.entries.len() > self.last_compact_size + self.max_memory / 2)
+            || self.fragmentation_ratio() > 0.3
         {
-            self.compact()?;
-        } else if self.fragmentation_ratio() > 0.3 {
             self.compact()?;
         }
 

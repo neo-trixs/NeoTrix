@@ -190,6 +190,7 @@ pub struct ReasoningStep {
 pub struct ControlDistiller {
     detector: TakeoverDetector,
     signal_generator: ControlSignalGenerator,
+    #[allow(dead_code)]
     gold_standard: Arc<ConsciousnessGoldStandard>,
 }
 
@@ -250,7 +251,6 @@ impl ControlDistiller {
         signals: &[ControlSignal],
     ) -> Vec<AlternatingSegment> {
         let mut segments = Vec::new();
-        let mut _signal_idx = 0;
         let mut last_reason_end = 0;
 
         for (tp, signal) in takeovers.iter().zip(signals.iter()) {
@@ -264,7 +264,6 @@ impl ControlDistiller {
             // control: 插入控制指令
             segments.push(AlternatingSegment::Control { signal: signal.clone() });
             last_reason_end = tp.step_idx + 1;
-            _signal_idx += 1;
         }
 
         // 剩余 reason
@@ -280,8 +279,7 @@ impl ControlDistiller {
 
     fn assess_outcome_quality(&self, answer: &str, _task: &str) -> f64 {
         // 简化：跳过金标 evaluate (需 E8 state & hexagram)，用启发式
-        let len_score = (answer.len() as f64 / 500.0).min(1.0);
-        len_score
+        (answer.len() as f64 / 500.0).min(1.0)
     }
 }
 
@@ -289,6 +287,7 @@ impl ControlDistiller {
 #[derive(Default)]
 pub struct ControlSignalGenerator {
     // 模板: control_type -> (system_prompt, few_shot_examples)
+    #[allow(dead_code)]
     templates: HashMap<ControlType, (&'static str, Vec<(&'static str, &'static str)>)>,
 }
 
@@ -329,7 +328,7 @@ impl ControlSignalGenerator {
             takeover_point: takeover.clone(),
             instruction,
             target_effort_tier: target_effort,
-            target_strategy: target_strategy,
+            target_strategy,
         })
     }
 

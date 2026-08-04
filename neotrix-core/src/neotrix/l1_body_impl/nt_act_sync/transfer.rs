@@ -275,13 +275,6 @@ fn read_message(stream: &mut TcpStream) -> Option<SyncMessage> {
     serde_json::from_str(&text).ok()
 }
 
-fn file_checksum(path: &Path) -> Result<String, String> {
-    let mut file = std::fs::File::open(path).map_err(|e| format!("open: {}", e))?;
-    let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher).map_err(|e| format!("hash: {}", e))?;
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
 fn file_checksum_bytes(bytes: &[u8]) -> Result<String, String> {
     let mut hasher = Sha256::new();
     hasher.update(bytes);

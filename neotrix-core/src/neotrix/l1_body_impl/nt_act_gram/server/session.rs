@@ -30,9 +30,9 @@ impl Session {
         // Seconds in the high 32 bits, per-turn counter in the low 32 bits
         // (MTProto msg_id layout). Shift in u64 so (now >= 2^31, i.e. after
         // 2038) cannot overflow i64 in debug builds.
-        let base = (now as u64) << 32;
+        let base = now << 32;
         let prev = self.msg_id.fetch_add(1, Ordering::SeqCst);
-        (base | (prev as u64 & 0xFFFFFFFF)) as i64
+        (base | (prev & 0xFFFFFFFF)) as i64
     }
 
     pub fn is_authenticated(&self) -> bool {

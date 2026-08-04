@@ -800,7 +800,7 @@ impl ReasoningEngine {
                     root_span.set_attribute(&k, AttributeValue::String(v));
                 }
 
-                let attn_ref = self.last_e8_attention_weights.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
+                let attn_ref = self.last_e8_attention_weights.as_deref().unwrap_or(&[]);
                 root_span.set_attribute(
                     "e8_attn_entropy",
                     AttributeValue::Float(
@@ -1456,7 +1456,7 @@ pub fn split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
         .collect();
     if segments.len() < 2 {
         segments = response
-            .split(|c| c == '.' || c == ';' || c == '。' || c == '；')
+            .split(['.', ';', '。', '；'])
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .map(str::to_string)

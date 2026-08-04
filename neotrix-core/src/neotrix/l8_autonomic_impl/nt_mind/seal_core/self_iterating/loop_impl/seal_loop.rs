@@ -41,7 +41,7 @@ impl SelfIteratingBrain {
                     crate::cli::ShieldDecision::RequireApproval(m) => format!("Shield requires approval for SEAL iteration: {}", m),
                     crate::cli::ShieldDecision::Allow => String::new(),
                 };
-                return Err(NeoTrixError::Shield(format!("{}", msg)));
+                return Err(NeoTrixError::Shield(msg));
             }
         }
 
@@ -387,7 +387,7 @@ impl SelfIteratingBrain {
                 let st = self.self_model.tick(ws_signal, load_delta, meta_alarm);
                 let intrinsic = self.self_model.self_reward();
                 // Self-error penalty: scale relative to the reward magnitude.
-                reward = reward + 0.1 * intrinsic;
+                reward += 0.1 * intrinsic;
                 log::trace!(
                     "[SelfModel] capability={:.3} uncertainty={:.3} fatigue={:.3} error={:.3} intrinsic={:+.3}",
                     st.capability, st.uncertainty, st.fatigue, st.self_error, intrinsic
