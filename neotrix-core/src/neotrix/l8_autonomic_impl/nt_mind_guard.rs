@@ -16,6 +16,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use rusqlite::Connection;
 
 /// 备份根目录 (独立于 ~/.neotrix, 防整目录被删)
 fn backup_root() -> PathBuf {
@@ -31,12 +32,13 @@ fn kb_path() -> PathBuf {
 }
 
 /// 判定 sqlite 库是否健康: 文件存在 + integrity_check == ok + 关键表存在
-pub fn db_healthy(path: &Path) -> bool {
-    use rusqlite::Connection;
+/// 快速健康检查: 文件存在 + 非空 + 可打开 + 关键表存在 (跳过 PRAGMA integrity_check)
+/// 用于常规守卫检查 (每 10min), 避免 2GB 库跑完整性校验太慢
+pub fn db_healthy_fast(path: &Path) -> bool {
     if !path.is_file() {
         return false;
     }
-    // 空文件 (<1KB) 不是有效库 — 拒绝 (防 snapshot 失败残留的 0 字节文件被误判健康)
+    // 空文件 (<1KB) 不是有效库
     if fs::metadata(path)
         .map(|m| m.len() < 1024)
         .unwrap_or(true)
@@ -45,13 +47,6 @@ pub fn db_healthy(path: &Path) -> bool {
     }
     match Connection::open(path) {
         Ok(conn) => {
-            let integrity_ok = conn
-                .query_row("PRAGMA integrity_check", [], |r| r.get::<_, String>(0))
-                .map(|s| s == "ok")
-                .unwrap_or(false);
-            if !integrity_ok {
-                return false;
-            }
             // 校验关键表存在 (空库 integrity_check 也返回 ok, 需要 schema 校验兜底)
             conn.query_row(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='kv_store'",
@@ -60,6 +55,22 @@ pub fn db_healthy(path: &Path) -> bool {
             )
             .is_ok()
         }
+        Err(_) => false,
+    }
+}
+
+/// 完整健康检查: 快速检查 + PRAGMA integrity_check
+/// 用于备份验证、恢复前确认等关键路径
+pub fn db_healthy(path: &Path) -> bool {
+    if !db_healthy_fast(path) {
+        return false;
+    }
+    // 完整性校验 (慢, 仅用于关键路径)
+    match Connection::open(path) {
+        Ok(conn) => conn
+            .query_row("PRAGMA integrity_check", [], |r| r.get::<_, String>(0))
+            .map(|s| s == "ok")
+            .unwrap_or(false),
         Err(_) => false,
     }
 }
@@ -97,7 +108,7 @@ fn find_latest_backup(dir: &Path) -> Option<PathBuf> {
         .map(|e| e.path())
         .filter(|p| {
             // 只接受健康备份 — 坏文件 (0字节/无 kv_store 表) 不能用于恢复
-            db_healthy(p)
+            db_healthy_fast(p)
         })
         .collect();
     backups.sort_by_key(|p| {
@@ -156,7 +167,7 @@ impl KbGuard {
         fs::create_dir_all(&dir).map_err(|e| format!("create backup dir: {e}"))?;
 
         let src = kb_path();
-        if !db_healthy(&src) {
+        if !db_healthy_fast(&src) {
             return Err("source KB not healthy, refusing to backup".into());
         }
 
@@ -164,7 +175,7 @@ impl KbGuard {
         let dst = dir.join(format!("knowledge-{stamp}.db"));
         snapshot_to(&src, &dst)?;
 
-        // 校验快照本身自洽
+        // 校验快照本身自洽 (完整校验, 防止残留损坏文件被接受)
         if !db_healthy(&dst) {
             let _ = fs::remove_file(&dst);
             return Err("backup snapshot integrity failed, discarded".into());
@@ -235,7 +246,7 @@ impl KbGuard {
     pub fn guard(&self) -> KbGuardReport {
         let src = kb_path();
         let mut report = KbGuardReport::default();
-        if db_healthy(&src) {
+        if db_healthy_fast(&src) {
             report.healthy = true;
             return report;
         }
