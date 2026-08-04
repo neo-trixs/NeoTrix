@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import hljs from "highlight.js";
 import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../../stores";
 import type { Attachment, Message } from "../../types";
@@ -887,7 +888,20 @@ function MessageBubble({
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(message.content);
   const addNotification = useStore((s) => s.addNotification);
+  const contentRef = useRef<HTMLDivElement>(null);
   const { html: rawHtml, codeBlocks } = renderContent(message.content, message.contentType);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.querySelectorAll("pre code").forEach((block) => {
+      try {
+        hljs.highlightElement(block as HTMLElement);
+      } catch {
+        /* ignore unhighlightable block */
+      }
+    });
+  }, [rawHtml]);
   const html = useMemo(() => decorateCodeBlocks(rawHtml, `m${message.id ?? Math.random().toString(36).slice(2, 8)}`), [rawHtml, message.id]);
   const diffStats = useMemo(() => {
     let added = 0;
@@ -981,6 +995,7 @@ function MessageBubble({
         <>
         <div
           className={styles.content}
+          ref={contentRef}
           dangerouslySetInnerHTML={{ __html: html }}
           onClick={async (e) => {
             const btn = (e.target as HTMLElement).closest?.("[data-copy-id]");

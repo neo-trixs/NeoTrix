@@ -170,6 +170,14 @@ describe("ChatView — rendering details", () => {
     expect(document.querySelector("pre code")).not.toBeNull();
   });
 
+  it("syntax-highlights code blocks via highlight.js", () => {
+    render(<ChatView messages={makeMessages()} agentBusy={false} onSend={() => {}} />);
+    const code = document.querySelector("pre code") as HTMLElement;
+    expect(code).not.toBeNull();
+    expect(code.querySelector(".hljs-keyword")).not.toBeNull();
+    expect(code.className).toContain("hljs");
+  });
+
   it("shows thinking indicator while busy before any streamed content", () => {
     render(<ChatView messages={makeMessages()} agentBusy onSend={() => {}} />);
     expect(screen.getByText("思考中…")).toBeInTheDocument();

@@ -118,3 +118,21 @@ blockquote {
   border-left: 3px solid var(--border-primary);
   color: var(--fg-secondary);
 }
+
+/* Light-mode syntax highlighting override (github-dark theme is the default).
+   Adapts token colors so code stays readable on the light canvas. */
+[data-theme="light"] .hljs {
+  color: #24292e;
+  background: transparent;
+}
+[data-theme="light"] .hljs-keyword, [data-theme="light"] .hljs-selector-tag,
+[data-theme="light"] .hljs-deletion { color: #d73a49; }
+[data-theme="light"] .hljs-string, [data-theme="light"] .hljs-attr,
+[data-theme="light"] .hljs-template-tag, [data-theme="light"] .hljs-addition { color: #032f62; }
+[data-theme="light"] .hljs-comment, [data-theme="light"] .hljs-quote { color: #6a737d; font-style: italic; }
+[data-theme="light"] .hljs-title, [data-theme="light"] .hljs-title.function_,
+[data-theme="light"] .hljs-section, [data-theme="light"] .hljs-name { color: #005cc5; }
+[data-theme="light"] .hljs-number, [data-theme="light"] .hljs-literal { color: #005cc5; }
+[data-theme="light"] .hljs-type, [data-theme="light"] .hljs-class .hljs-title { color: #e36209; }
+[data-theme="light"] .hljs-variable, [data-theme="light"] .hljs-template-variable { color: #e36209; }
+[data-theme="light"] .hljs-meta { color: #24292e; font-weight: 600; }

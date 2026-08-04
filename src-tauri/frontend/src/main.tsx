@@ -5,6 +5,7 @@ import router from "./router";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { captureConsoleErrors } from "./lib/error-reporter";
 import "./styles/global.css";
+import "highlight.js/styles/github-dark.min.css";
 
 captureConsoleErrors();
 
