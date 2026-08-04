@@ -14,7 +14,6 @@ pub use core::nt_core_bank as memory;
 pub use core::nt_core_knowledge;
 pub use core::nt_core_edit;
 pub use core::nt_core_event as event;
-pub use core::nt_core_ssm as signal;
 pub use core::context;
 pub use core::nt_core_gwt as consciousness;
 pub use core::nt_core_hcube as hypercube;
@@ -44,7 +43,6 @@ pub use core::{
     SelfEdit, MicroEdit, ToolCall,
     KnowledgeSource, KnowledgeProvider, TaskType, RewardSource, SourceAccessTracker, SourceAccessRecord,
     ReasoningBank, ReasoningMemory, TemporalContext, MemoryTier, MemoryLifecycle, ReasoningBankStats,
-    SelectiveState, SelectableOperator, SparseMatrix, ConsciousnessTier, SemanticType, SemanticBlock,
     SelfIteration,
     MemoryProvider, RichMemoryProvider, AgentExecutor, ToolProvider, ToolDef, ToolOutput, SessionProvider, BrainProvider, EngineProvider, SealResult,
     HyperGraph, HyperNode, HyperEdge, HyperNodeType, EdgeRelation,

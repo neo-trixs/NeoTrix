@@ -204,7 +204,6 @@ use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager
 use crate::neotrix::nt_core_event_bus::{EventBus, subscribe_all_layers_sync};
 use crate::neotrix::nt_mind::distillation::MetaCognitionBridge;
 use crate::core::nt_core_event::CoreEvent;
-use crate::core::nt_core_scoring_substrate::ScoringSubstrate;
 use crate::core::nt_core_state_substrate::StateSubstrate;
 use crate::core::nt_core_simulate_engine::SimulateEngine;
 
@@ -368,7 +367,6 @@ impl BackgroundLoop {
             goal_loop: std::mem::take(&mut self.goal_loop),
             awareness: self.awareness.take(),
             gold_standard: self.gold_standard.take(),
-            introspector: self.introspector.take(),
             gap_detector: self.gap_detector.take(),
             nt_act_voice_input: self.nt_act_voice_input.take(),
             avatar_engine: self.avatar_engine.take(),
@@ -426,7 +424,6 @@ cognitive_load: self.cognitive_load.take(),
             kb,
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
             cognitive_mode: 0,
-            scoring: ScoringSubstrate::new().with_threshold(0.5),
             state: StateSubstrate::new(),
             simulate: SimulateEngine::new(),
             convergence_pulse: ConvergencePulse::default(),
@@ -581,8 +578,6 @@ pub struct BackgroundLoopHandle {
     goal_loop: GoalLoop,
     awareness: Option<ConsciousnessMonitor>,
     gold_standard: Option<ConsciousnessGoldStandard>,
-    #[allow(dead_code)] // kept for future pre-action introspection feature
-    introspector: Option<PreActionIntrospector>,
     gap_detector: Option<KnowledgeGapDetector>,
     nt_act_voice_input: Option<VoiceInput>,
     avatar_engine: Option<std::sync::Mutex<crate::neotrix::l1_body_impl::nt_io_user_avatar::DistillationEngine>>,
@@ -591,7 +586,6 @@ pub struct BackgroundLoopHandle {
     knowledge_aging: KnowledgeAging,
     auto_crystallizer: AutoCrystallizer,
     knowledge_chain: Option<KnowledgeChain>,
-    #[allow(dead_code)] // kept for future autonomous exploration feature
     exploration_pipeline: Option<ExplorationPipeline>,
     always_on: AlwaysOnEngine,
     plugin_registry: PluginRegistry,
@@ -617,8 +611,6 @@ pub struct BackgroundLoopHandle {
     cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
     /// 0=Balanced, 1=Deep, 2=Fast — updated by consciousness tick, consumed by batch loops.
     cognitive_mode: u8,
-    #[allow(dead_code)]
-    scoring: ScoringSubstrate,
     state: StateSubstrate,
     simulate: SimulateEngine,
     convergence_pulse: ConvergencePulse,

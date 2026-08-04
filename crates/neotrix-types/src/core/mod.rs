@@ -7,7 +7,6 @@ pub mod nt_core_knowledge;
 pub mod nt_core_edit;
 pub mod nt_core_bank;
 pub mod nt_core_event;
-pub mod nt_core_ssm;
 pub mod nt_core_iter_agent;
 pub mod nt_core_absorb;
 pub mod nt_core_iter;
@@ -48,7 +47,6 @@ pub use nt_core_knowledge::{KnowledgeSource, KnowledgeProvider, TaskType, Reward
 pub use nt_core_accessor::{Accessor, AccessionReport, SourceType, UrlAccessor};
 pub use nt_core_edit::{SelfEdit, MicroEdit, ToolCall};
 pub use nt_core_bank::{ReasoningBank, ReasoningMemory, TemporalContext, MemoryTier, MemoryLifecycle, ReasoningBankStats};
-pub use nt_core_ssm::{SelectiveState, SelectableOperator, SparseMatrix, ConsciousnessTier, SemanticType, SemanticBlock};
 pub use nt_core_absorb::AbsorbValidator;
 pub use nt_core_iter::SelfIteration;
 pub use nt_core_traits::{MemoryProvider, RichMemoryProvider, AgentExecutor, ToolProvider, ToolDef, ToolOutput, SessionProvider, BrainProvider, EngineProvider, SealResult};

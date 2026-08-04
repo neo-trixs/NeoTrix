@@ -10,7 +10,6 @@ use crate::core::nt_core_e8::domain_transition::{CoTLength, E8TaskType, E8Domain
 use crate::core::nt_core_e8::nt_core_e8_prediction::E8PredictionOracle;
 use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FablePhase};
 use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
-use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
 use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::core::nt_core_e8::nt_latent_reasoning::LatentReasoningPipeline;
 use crate::core::nt_core_e8::nt_multimodal::{MultimodalEncoder, MultimodalInput};
@@ -21,7 +20,6 @@ use crate::core::nt_core_aura::IntentEngine;
 use crate::core::nt_core_trajectory_compress::{CompressionLevel, TrajectoryCompressor};
 
 use crate::core::nt_io_telemetry::{AttributeValue, ConsoleTracer, CostTracker, NoopTracer, Span, SpanKind, Tracer};
-use crate::core::nt_core_gwt::resonance::MODULE_COUNT;
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::core::nt_core_hex::{FullReasoningState, ReasoningHexagram};
 use crate::core::nt_core_observer::OneObserver;
@@ -153,9 +151,6 @@ pub struct ReasoningEngine {
     pub synthesis: ConsciousnessCoreSynthesis,
     /// Observer error recovery with retry + circuit breaker + fallback
     pub observer_error_recovery: ObserverErrorRecovery,
-    /// Phase 6.3 — sparse MoE router: groups the 64 E₈ states into 8 expert
-    /// groups and routes attention to the top-2 each step, freezing the rest.
-    pub sparse_moe: SparseMoERouter,
     /// Phase 10.1 — unified latent space bridging E₈ / GWT / HyperCube.
     pub unified_latent: UnifiedLatentSpace,
     /// Phase 10.2 — end-to-end latent reasoning: E8 latent → hypercube query →
@@ -221,7 +216,6 @@ impl ReasoningEngine {
             last_effort_tier: None,
             synthesis: ConsciousnessCoreSynthesis::default(),
             observer_error_recovery: ObserverErrorRecovery::new(),
-            sparse_moe: SparseMoERouter::new(),
             unified_latent: UnifiedLatentSpace::new(),
             latent_reasoning: LatentReasoningPipeline::new(),
             multimodal: MultimodalEncoder::new(),
@@ -897,53 +891,10 @@ impl ReasoningEngine {
     }
 
     fn broadcast_and_finalize(&mut self, task: &str, root_span: Span, result: NeoTrixResult<String>) -> NeoTrixResult<String> {
-        // GWT resonant broadcast: consciousness layer processes the reasoning state.
-        // Runs AFTER the fusion pipeline so it consumes the *current* cycle's E8
-        // prediction attention weights (previously it consumed the previous cycle's
-        // — a one-cycle lag that biased GWT toward stale E8 predictions).
-        let mut hex_states = [ReasoningHexagram::new(0); MODULE_COUNT];
-        for (i, h) in hex_states.iter_mut().enumerate() {
-            if i < self.state_trajectory.len() {
-                *h = self.state_trajectory[i].mode;
-            } else {
-                *h = self.current_state.mode;
-            }
-        }
-        let gwt_content = format!("E8 state: {} | task: {}", self.current_state.mode.mode_name(), task);
-        // Phase 6.3 — sparse MoE routing: score the 8 expert groups (proximity +
-        // task affinity + transition mass), pick top-2, freeze the other 6 before
-        // the GWT bridge consumes them. Computed before the `gwt` borrow so the
-        // router can be mutated while `gwt` is borrowed mutably.
-        let sparse_moe_state = if let Some(attn_vec) = self.last_e8_attention_weights.as_ref().filter(|v| v.len() >= 64) {
-            let task_ty = E8TaskType::detect(task);
-            let next_block_mass = self.sparse_moe_next_block_mass();
-            let routing = self.sparse_moe.route(self.current_state.mode.0, task_ty, next_block_mass.as_ref());
-            let mut arr = [0.0_f64; 64];
-            arr.copy_from_slice(&attn_vec[..64]);
-            let attn_arr = self.sparse_moe.apply_mask(&routing, &arr);
-            Some((routing, attn_arr))
-        } else {
-            None
-        };
-        if let Some(ref mut gwt) = self.gwt {
-            if let Some((routing, attn_arr)) = sparse_moe_state {
-                let adaptive_bias = 0.1 + self.last_e8_confidence * 0.4;
-                gwt.set_e8_attention_weights(attn_arr, adaptive_bias);
-                root_span.set_attribute(
-                    "sparse_moe_active",
-                    AttributeValue::String(format!("{:?}", routing.active_groups).into()),
-                );
-                root_span.set_attribute(
-                    "sparse_moe_sparsity",
-                    AttributeValue::Float(routing.sparsity() as f64),
-                );
-            }
-            let report = gwt.resonant_broadcast(&gwt_content, &hex_states);
-            root_span.set_attribute("gwt_winner", AttributeValue::Int(report.winner as i64));
-            root_span.set_attribute("gwt_entropy", AttributeValue::Float(report.entropy));
-            root_span.set_attribute("gwt_complement_activated", AttributeValue::Bool(report.complement_activated));
-            root_span.set_attribute("gwt_inner_speech", AttributeValue::Bool(gwt.inner_speech.total_generated > 0));
-        }
+        // GWT 共振职责已收敛至后台环 (background_loop handlers_consciousness.rs):
+        // reasoner 热路径不再承担 GWT resonant_broadcast —— 产物 (winner/entropy) 仅
+        // 进 telemetry, 无决策/学习消费, 属 cycle 204 HIGH-2 冗余共振。reasoner 侧
+        // gwt 实例保留供未来注入, 但共振计算统一由后台环闭环执行。
 
         if let Some(ref compressor) = self.trajectory_compressor {
             let orig_len = self.state_trajectory.len();
@@ -1061,25 +1012,6 @@ impl ReasoningEngine {
             };
             let _ = kb.store_conversation_record(&record);
         }
-    }
-
-    /// Compute next-block probability mass for the 8 MoE expert groups from the
-    /// domain-aware transition model's general matrix, used as the transition
-    /// signal in sparse MoE routing. Returns `None` when no transition data exists.
-    fn sparse_moe_next_block_mass(&self) -> Option<[f64; 8]> {
-        let current = self.current_state.mode.0;
-        let mut mass = [0.0f64; 8];
-        if let Some(ref model) = self.domain_transition_model {
-            let dist = model.general_matrix.dominance_capped_distribution(current, 0.5);
-            let total: f64 = dist.iter().sum();
-            if total > 0.0 {
-                for (t, p) in dist.iter().enumerate() {
-                    mass[t / 8] += p / total;
-                }
-                return Some(mass);
-            }
-        }
-        None
     }
 
     pub fn reason_multi_agent(&mut self, task: &str) -> NeoTrixResult<String> {

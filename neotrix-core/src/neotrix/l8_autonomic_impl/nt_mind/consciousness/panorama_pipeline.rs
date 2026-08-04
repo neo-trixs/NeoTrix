@@ -52,6 +52,8 @@ impl PanoramaPipeline {
         Self {
             cycle: 0,
             hypercube: KnowledgeHyperCube::new(),
+            // 全景 GWT — 高温度(13.0)高熵广度, 与 attention_router(0.4 低熵聚焦)
+            // / reasoner seal_loop(0.5) 分属不同子系统, 非单例矛盾 (cycle 204 HIGH-3)。
             gwt: GlobalWorkspace::new(13.0),
             cortex: CortexMemory::new(100, 1000),
             predictive_cortex: PredictiveCortex::new(32, 64),

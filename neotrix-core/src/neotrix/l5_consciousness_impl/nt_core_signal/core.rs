@@ -85,11 +85,6 @@ impl SelectiveState {
         (energy / max_energy).min(1.0)
     }
 
-    /// 获取当前意识层级
-    pub fn tier(&self) -> super::history::ConsciousnessTier {
-        super::history::ConsciousnessTier::from_score(self.awareness_score())
-    }
-
     /// 状态积分
     pub fn integrate(&mut self, new_input: &Vector, learning_rate: f64) {
         let dim = self.data.len().min(new_input.len());

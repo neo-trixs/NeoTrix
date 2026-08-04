@@ -5,18 +5,9 @@
 // 子模块声明
 pub mod core;          // MatrixError, SelectiveState, Vector, Matrix, 基础实现
 pub mod select;        // SelectableOperator, SemanticBlock, SemanticType
-pub mod history;       // StateHistory, ConsciousnessTier
-pub mod attribution;   // SIGReg, AttributionSource, AttributionSummary
-pub mod ops;           // 向量/矩阵运算函数
+pub mod ops;           // 向量/矩阵运算函数 (生产仅 cosine_similarity 被消费)
 
 // Re-export 主要类型
 pub use core::{Vector, Matrix, MatrixError, SelectiveState, SsdState, SSM_STATE_SIZE};
 pub use select::{SelectableOperator, SemanticBlock, SemanticType, SsdOperator};
-pub use history::{StateHistory, ConsciousnessTier};
-pub use attribution::{SIGReg, AttributionSource, AttributionSummary};
-pub use ops::{
-    l2_norm, softmax, relu, sigmoid, gelu,
-    matrix_vector_mul, matrix_vector_mul_safe,
-    dot_product, cosine_similarity, euclidean_distance,
-    normalize, clamp,
-};
+pub use ops::cosine_similarity;

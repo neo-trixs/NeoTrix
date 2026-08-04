@@ -29,7 +29,6 @@ use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_agent_protocol::discovery::AgentDiscovery;
 
 use crate::core::nt_core_second_brain::SecondBrain;
-use crate::core::nt_core_self::intra_reflection::PreActionIntrospector;
 use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
 use crate::neotrix::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard;
 use crate::neotrix::nt_mind_consciousness_monitor::ConsciousnessMonitor;
@@ -77,7 +76,6 @@ pub struct BackgroundLoop {
     pub curiosity_drive: CuriosityDrive,
     pub knowledge_aging: KnowledgeAging,
     pub auto_crystallizer: AutoCrystallizer,
-    pub introspector: Option<PreActionIntrospector>,
     pub gap_detector: Option<KnowledgeGapDetector>,
     pub awareness: Option<ConsciousnessMonitor>,
     pub gold_standard: Option<ConsciousnessGoldStandard>,
@@ -134,7 +132,6 @@ impl BackgroundLoop {
             curiosity_drive: CuriosityDrive::new(),
             knowledge_aging: KnowledgeAging::new(),
             auto_crystallizer: AutoCrystallizer::new(),
-            introspector: Some(PreActionIntrospector::new()),
             gap_detector: Some(KnowledgeGapDetector::new()),
             awareness: Some(ConsciousnessMonitor::new()),
             gold_standard: Some(ConsciousnessGoldStandard::new()),

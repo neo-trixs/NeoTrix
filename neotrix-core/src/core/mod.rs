@@ -83,7 +83,6 @@ pub mod nt_core_credit;
 // ═══════════════════════════════════════════════════════════════════
 // L5 — 意识层 (Consciousness)
 // ═══════════════════════════════════════════════════════════════════
-pub mod l5_consciousness;
 pub mod nt_core_gwt;
 pub mod nt_core_context;
 

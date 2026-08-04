@@ -32,6 +32,8 @@ pub struct AttentionRouter {
 
 impl AttentionRouter {
     pub fn new() -> Self {
+        // 推理 GWT — 低温度(0.4)低熵聚焦, 与 panorama(13.0 高熵全景)分属不同子系统
+        // (cycle 204 HIGH-3: 非单例矛盾, 各温度对应其用途)。
         let mut workspace = GlobalWorkspace::new(0.4);
         for st in &[
             SpecialistType::PatternMatcher,
