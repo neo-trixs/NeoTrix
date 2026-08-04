@@ -576,10 +576,6 @@
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
   }
 
-  .sidebar.open {
-    transform: translateX(0);
-  }
-
   .rightSidebar {
     display: none;
   }

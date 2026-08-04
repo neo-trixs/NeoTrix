@@ -17,12 +17,6 @@
   border-bottom: 1px solid var(--border-primary);
 }
 
-.headerTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .headerActions {
   display: flex;
   align-items: center;
@@ -313,17 +307,4 @@
 }
 .pickBtn:hover {
   opacity: 0.9;
-}
-
-.hoverInfo {
-  position: fixed;
-  z-index: 50;
-  background: var(--bg-tertiary, #222);
-  border: 1px solid var(--border-primary);
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 11px;
-  color: var(--fg-secondary);
-  pointer-events: none;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }

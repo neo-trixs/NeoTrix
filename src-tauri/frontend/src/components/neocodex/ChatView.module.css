@@ -9,16 +9,6 @@
   color: var(--fg-primary);
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
-  flex-shrink: 0;
-}
-
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -418,11 +408,6 @@
   border-color: var(--border-primary);
 }
 
-.feedbackBtn.active {
-  color: var(--accent-primary);
-  background: var(--accent-bg);
-}
-
 .thinking {
   display: flex;
   align-items: center;
@@ -520,38 +505,6 @@
   background: transparent;
   padding: 0;
   font-size: inherit;
-}
-
-.content .code-block-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 12px;
-  background: var(--bg-code-header);
-  border-bottom: 1px solid var(--border-primary);
-  font-size: 11px;
-  color: var(--fg-tertiary);
-}
-
-.content .code-lang {
-  text-transform: uppercase;
-  font-weight: 500;
-}
-
-.content .code-copy-btn {
-  background: transparent;
-  border: none;
-  color: var(--fg-tertiary);
-  cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 11px;
-  transition: all 0.15s;
-}
-
-.content .code-copy-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--accent-primary);
 }
 
 .codeIndicator {
@@ -750,50 +703,6 @@
   color: var(--accent-primary);
   border-color: var(--accent-primary);
   background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
-}
-
-.contextCapsule {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--fg-secondary);
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.contextCapsule:hover {
-  background: var(--bg-primary);
-  border-color: var(--accent-primary);
-}
-
-.contextCapsuleArrow {
-  font-size: 10px;
-  color: var(--fg-tertiary);
-}
-
-.permissionPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: transparent;
-  border: 1px solid var(--border-primary);
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--fg-secondary);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.permissionPill:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
 }
 
 .composerColumn {
