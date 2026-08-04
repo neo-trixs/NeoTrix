@@ -163,6 +163,11 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    #[command(about = "NeoTrix 系统运维 (统一安装/守护/卸载, 替代分散 sh 脚本): daemons|uninstall|status")]
+    Sysops {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -252,8 +257,12 @@ fn main() {
     let _sentry_guard = neotrix::neotrix::nt_shield_sentry::init_sentry();
     let cli = Cli::parse();
 
-    // First-run provider config wizard
-    if !entry::check_provider_config() {
+    // First-run provider config wizard (skip for pure ops commands)
+    let is_ops_cmd = matches!(
+        cli.command,
+        Some(Commands::Sysops { .. }) | Some(Commands::Status)
+    );
+    if !is_ops_cmd && !entry::check_provider_config() {
         entry::run_provider_wizard();
     }
 
@@ -421,6 +430,9 @@ fn main() {
                 eprintln!("{}", out.message);
                 std::process::exit(1);
             }
+        }
+        Some(Commands::Sysops { args }) => {
+            entry::run_sysops(args);
         }
         None => {
             if cli.standalone { run_standalone_mode(cli.stage); }

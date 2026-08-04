@@ -19,8 +19,10 @@ mod proxy_cmd;
 mod standalone;
 mod headless;
 mod desktop;
+mod sysops;
 
 pub use proxy_cmd::run_proxy_cmd;
+pub use sysops::run_sysops;
 
 fn info(msg: impl AsRef<str>) -> String {
     msg.as_ref().blue().to_string()
