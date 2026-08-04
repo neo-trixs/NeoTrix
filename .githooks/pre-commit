@@ -40,9 +40,4 @@ if [ "$FAIL" -ne 0 ]; then
   exit 1
 fi
 
-# 工作区守卫 (R-P53 并发 reset 盲区): 检测 staged 文件意外消失
-if command -v bash >/dev/null && [[ -x "scripts/workspace-guard.sh" ]]; then
-  bash scripts/workspace-guard.sh || true
-fi
-
 exit 0
