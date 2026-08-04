@@ -171,10 +171,110 @@
 }
 
 .block {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   padding: 2px 12px;
   white-space: pre-wrap;
   word-break: break-all;
   line-height: 1.5;
+  cursor: pointer;
+}
+.block:hover {
+  outline: 1px solid var(--border-strong, rgba(255, 255, 255, 0.2));
+}
+.lineNo {
+  flex: 0 0 auto;
+  width: 28px;
+  text-align: right;
+  color: rgba(127, 127, 127, 0.6);
+  font-size: 11px;
+  line-height: 1.6;
+  user-select: none;
+}
+.lineContent {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.commented {
+  box-shadow: inset 2px 0 0 var(--accent, #5b9dff);
+}
+.commentBadge {
+  flex: 0 0 auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.commentBox {
+  margin: 0 12px 6px 50px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-primary, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.03));
+}
+.commentInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--fg-primary, #e6e6e6);
+  font-size: 12px;
+  padding: 2px 0;
+  outline: none;
+}
+.commentInput::placeholder {
+  color: var(--fg-secondary, #8a8a8a);
+}
+.commentActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.commentSaveBtn,
+.commentCancelBtn {
+  border: none;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.commentSaveBtn {
+  background: var(--accent, #ff5d3b);
+  color: #fff;
+}
+.commentSaveBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.commentCancelBtn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--fg-secondary, #ccc);
+}
+.commentCancelBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.commentBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-primary, rgba(255, 255, 255, 0.08));
+}
+.commentCount {
+  color: var(--fg-secondary, #aaa);
+  font-size: 12px;
+}
+.commentSubmitBtn {
+  border: none;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--accent, #ff5d3b);
+  color: #fff;
+  cursor: pointer;
+}
+.commentSubmitBtn:hover {
+  opacity: 0.9;
 }
 .added { background: rgba(63, 185, 80, 0.12); color: #7ee787; }
 .removed { background: rgba(248, 81, 73, 0.12); color: #ffa198; }

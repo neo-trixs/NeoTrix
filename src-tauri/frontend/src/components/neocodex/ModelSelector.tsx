@@ -26,6 +26,12 @@ export function ModelSelector({ onConfigChange }: { onConfigChange?: (config: st
     fetchConfig();
   }, [fetchConfig]);
 
+  useEffect(() => {
+    const onToggle = () => setExpanded((v) => !v);
+    window.addEventListener("neotrix:toggle-model-menu", onToggle);
+    return () => window.removeEventListener("neotrix:toggle-model-menu", onToggle);
+  }, []);
+
   const handleSwitch = async (name: string) => {
     if (name === config?.active_model) return;
     setSwitching(name);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import NeoCodexPage from "../../pages/NeoCodexPage";
 import { useStore } from "../../stores";
@@ -466,5 +466,140 @@ describe("NeoCodexPage — settings drawer open flow", () => {
     fireEvent.click(await screen.findByTestId("settings-tab-theme"));
     expect(await screen.findByTestId("settings-accent-default")).toBeInTheDocument();
     expect(screen.getByTestId("settings-language")).toBeInTheDocument();
+  });
+});
+
+describe("NeoCodexPage — context menu project switch (dead-navigation fix)", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    localStorage.clear();
+    useStore.setState({
+      neocodexSessions: [{ id: "s-ctx", name: "会话", mode: "Agent", messages: [], wire_path: "/repo/alpha", created_at: 0, updated_at: 0 }],
+      neocodexActiveSessionId: "s-ctx",
+    });
+    mockInvoke("neocodex_health_report", () => ({ context_usage: 0.1, provider_model: "mock-lgm", tokens_used: 0, cost_spent: 0, cost_budget: 0 }));
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-ctx", name: "会话", mode: "Agent", message_count: 1, wire_path: "/repo/alpha", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_set_project", (args: any) => null);
+    mockInvoke("neocodex_switch_session", () => {});
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+  });
+
+  it("project switch calls neocodex_set_project in place instead of navigating to a dead route", async () => {
+    renderPage();
+    await screen.findByTestId("session-title");
+    const setSpy = vi.fn();
+    mockInvoke("neocodex_set_project", setSpy);
+    fireEvent.click(screen.getByTestId("composer-context"));
+    const menu = screen.getByTestId("context-menu");
+    const items = within(menu).getAllByText("alpha");
+    fireEvent.click(items[items.length - 1]);
+    await waitFor(() => expect(setSpy).toHaveBeenCalled());
+  });
+});
+
+describe("NeoCodexPage — Claude Code Desktop keyboard parity", () => {
+  beforeEach(() => {
+    resetInvokeMocks();
+    localStorage.clear();
+    useStore.setState({
+      neocodexSessions: [
+        { id: "s-a", name: "会话A", mode: "Agent", messages: [], wire_path: "", created_at: 0, updated_at: 0 },
+        { id: "s-b", name: "会话B", mode: "Agent", messages: [], wire_path: "", created_at: 0, updated_at: 0 },
+        { id: "s-c", name: "会话C", mode: "Agent", messages: [], wire_path: "", created_at: 0, updated_at: 0 },
+      ],
+      neocodexActiveSessionId: "s-a",
+    });
+    mockInvoke("neocodex_list_sessions", () => [
+      { id: "s-a", name: "会话A", mode: "Agent", message_count: 1, wire_path: "", created_at: 0, updated_at: 0 },
+      { id: "s-b", name: "会话B", mode: "Agent", message_count: 1, wire_path: "", created_at: 0, updated_at: 0 },
+      { id: "s-c", name: "会话C", mode: "Agent", message_count: 1, wire_path: "", created_at: 0, updated_at: 0 },
+    ]);
+    mockInvoke("neocodex_switch_session", () => null);
+    mockInvoke("neocodex_get_session_messages", () => []);
+    mockInvoke("neocodex_get_side_chat", () => []);
+    mockInvoke("neocodex_health_report", () => ({ context_usage: 0.1, provider_model: "mock-lgm", tokens_used: 0, cost_spent: 0, cost_budget: 0, diff_stats: { added: 3, removed: 1 } }));
+    mockInvoke("neocodex_provider_config", () => ({ active_model: "mock-lgm", provider_count: 1, providers: [{ name: "mock", model: "mock-lgm", resolvable: true }], resolvable: true }));
+  });
+
+  it("Cmd+Shift+] (Shift+]) cycles to the next session", async () => {
+    renderPage();
+    await waitFor(() => expect(useStore.getState().neocodexSessions.length).toBe(3));
+    fireEvent.keyDown(window, { key: "}", metaKey: true, shiftKey: true });
+    await waitFor(() => expect(useStore.getState().neocodexActiveSessionId).toBe("s-b"));
+  });
+
+  it("Cmd+Shift+[ (Shift+[) cycles to the previous session", async () => {
+    renderPage();
+    await waitFor(() => expect(useStore.getState().neocodexSessions.length).toBe(3));
+    fireEvent.keyDown(window, { key: "{", metaKey: true, shiftKey: true });
+    await waitFor(() => expect(useStore.getState().neocodexActiveSessionId).toBe("s-c"));
+  });
+
+  it("Cmd+\\ closes the focused right pane", async () => {
+    renderPage();
+    await screen.findByTestId("right-panel");
+    fireEvent.keyDown(window, { key: "\\", metaKey: true });
+    expect(screen.queryByTestId("right-panel")).toBeNull();
+  });
+
+  it("Cmd+Shift+B toggles the Browser pane", async () => {
+    renderPage();
+    expect(screen.queryByTestId("preview-pane")).toBeNull();
+    fireEvent.keyDown(window, { key: "B", metaKey: true, shiftKey: true });
+    expect(await screen.findByTestId("preview-pane")).toBeInTheDocument();
+  });
+
+  it("Cmd+Shift+M cycles the permission mode and notifies the backend", async () => {
+    const permSpy = vi.fn(() => null);
+    mockInvoke("neocodex_set_permission_mode", permSpy);
+    useStore.setState({ settings: { ...useStore.getState().settings, permissionMode: "auto" } });
+    renderPage();
+    await screen.findByTestId("composer-permission");
+    fireEvent.keyDown(window, { key: "M", metaKey: true, shiftKey: true });
+    await waitFor(() => expect(permSpy).toHaveBeenCalledWith({ mode: "manual" }));
+    expect(useStore.getState().settings.permissionMode).toBe("manual");
+  });
+
+  it("Cmd+Shift+I dispatches the model-menu toggle event", async () => {
+    const spy = vi.fn();
+    window.addEventListener("neotrix:toggle-model-menu", spy);
+    renderPage();
+    await screen.findByTestId("composer-permission");
+    fireEvent.keyDown(window, { key: "I", metaKey: true, shiftKey: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+    window.removeEventListener("neotrix:toggle-model-menu", spy);
+  });
+
+  it("uppercase Shift+letter keydown still triggers Cmd+Shift+D (latent case bug)", async () => {
+    renderPage();
+    await screen.findByTestId("right-panel");
+    // Real keydown for ⌘Shift+D yields e.key === "D"; must still toggle the diff pane.
+    fireEvent.keyDown(window, { key: "D", metaKey: true, shiftKey: true });
+    expect(screen.queryByTestId("right-panel")).toBeNull();
+    fireEvent.keyDown(window, { key: "D", metaKey: true, shiftKey: true });
+    expect(screen.queryByTestId("right-panel")).toBeInTheDocument();
+  });
+
+  it("diff-stats indicator (+N −M) reopens the Diff pane on click", async () => {
+    renderPage();
+    await screen.findByTestId("right-panel");
+    fireEvent.keyDown(window, { key: "\\", metaKey: true });
+    expect(screen.queryByTestId("right-panel")).toBeNull();
+    fireEvent.click(screen.getByTestId("diff-stats-toggle"));
+    expect(await screen.findByTestId("right-panel")).toBeInTheDocument();
+    expect(screen.getByText("Diff")).toBeInTheDocument();
+  });
+
+  it("neotrix:diff-submit-comments event delivers the comment text through the chat send path", async () => {
+    const sendSpy = vi.fn(() => "");
+    mockInvoke("neocodex_send_message_stream", sendSpy);
+    useStore.setState({ neocodexActiveSessionId: "s-a" });
+    renderPage();
+    await screen.findByTestId("composer-permission");
+    window.dispatchEvent(new CustomEvent("neotrix:diff-submit-comments", { detail: { content: "src/a.rs:12 — 边界条件有误" } }));
+    await waitFor(() => expect(sendSpy).toHaveBeenCalled());
   });
 });

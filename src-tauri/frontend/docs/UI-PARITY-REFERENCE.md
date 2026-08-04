@@ -71,8 +71,46 @@
 | streaming 光标/代码块高亮复制 | ✓ decorateCodeBlocks 已有 | ✓ | 无 |
 | empty/loading/inline-error | 明确三态 | 各面板自带 | 部分 |
 
-## 优先级建议
-1. **P0 右面板可 resizable + 宽度持久化**（最直接的对 Codex pixel-parity 差距）
-2. **P1 command palette Cmd/K 跨实体模糊**（已有 palette，强化 scope）
-3. **P1 状态栏补 branch/worktree**（呼应 R-P47/状态感知）
-4. **P2 empty-state 三态统一**（each pane）
+## 键盘快捷键对照 (Claude Code Desktop 官方表, code.claude.com/docs/en/desktop)
+
+| 官方快捷键 | 动作 | NeoTrix 现状 |
+|------------|------|--------------|
+| `⌘/` | 快捷键面板 | ✓ |
+| `⌘N` | 新建会话 | ✓ |
+| `⌘W` | 关闭会话 | ✓ |
+| `Ctrl Tab` / `Ctrl Shift Tab` | 下/上一会话 | ✓ |
+| `⌘Shift ]` / `⌘Shift [` | 下/上一会话 | ✓ (2026-08-04 补) |
+| `Esc` | 停止生成 | ✓ |
+| `⌘Shift D` | 切换 Diff 面板 | ✓ (修 Shift 大写 key 隐性 bug) |
+| `⌘Shift B` | 切换 Browser 面板 | ✓ (2026-08-04 补, 原仅 ⌘Shift P) |
+| `Ctrl ~` | 切换终端 | ✓ |
+| `⌘\` | 关闭焦点面板 | ✓ (2026-08-04 补, 关闭右 dock) |
+| `⌘;` | 侧聊 | ✓ (dock Chat tab) |
+| `Ctrl O` | 循环视图模式 | ✓ |
+| `⌘Shift M` | 审批模式菜单 | ✓ (2026-08-04 补, 循环 tri-state) |
+| `⌘Shift I` | 模型菜单 | ✓ (2026-08-04 补, window event→ModelSelector) |
+| `⌘Shift E` | effort 菜单 | 无 (后端无 effort 概念, 跳过) |
+| `1–9` | 选中打开菜单中的项 | ⌘1-9 用于会话切换 (differentiator) |
+| `⌘Shift S` | Browser 选元素 | 无 (依赖 Browser 交互后端) |
+
+> 教训 (2026-08-04): 真实 keydown 事件 Shift+字母产出大写 `e.key` (如 ⌘Shift+F → "F"),
+> 此前 `e.key === "f"` 的判断在生产环境永不触发。已统一归一化
+> `key = e.key.length === 1 ? e.key.toLowerCase() : e.key`。同步修复 ⌘Shift+P 分支
+> 顺序 (shift 变体必须先于 ⌘P file palette 判断, 否则被吞)。
+
+## 其余官方交互补缺 (2026-08-04)
+
+| 能力 | 官方行为 | 现状 |
+|------|---------|------|
+| 右面板 resizable + 持久化 | 拖边缘调宽, per-project 持久化 | ✓ 早已实现 (`rightPanelWidth` + localStorage), **doc 原 P0 已过时** |
+| Diff stats indicator | 显示 `+12 -1`, 点击打开 diff viewer | ✓ 已有 (health.diff_stats), **新增点击切到 review 面板** |
+| Diff 行内评论 | 点 diff 行 → 评论框, Enter 添加, ⌘Enter 提交全部 | ✓ 2026-08-04 新增 (DiffPane line comments → window event → 走现有 chat send 管道, 无新 Rust IPC) |
+| Review code 按钮 | diff 工具栏顶部 | ✓ 已有 (`AI 审查` = cmd_diff_review) |
+| diff 支持 staged/unstaged/base/file/neocodex scope | 文件列表左 + 变更右 | ✓ 已有 |
+| 逐文件 accept/reject | per-file 按钮 | ✓ 已有 (含 untracked stage-add) |
+
+## 优先级建议 (更新)
+1. **P1 command palette Cmd/K 跨实体模糊**（已有 palette，强化 scope）
+2. **P1 状态栏补 branch/worktree**（呼应 R-P47/状态感知; branch 已有, worktree 待补）
+3. **P2 empty-state 三态统一**（each pane）
+4. **P2 file pane 磁盘变更警告/Save**（依赖 file 读写的 Rust IPC, 深度三 blocked 时不动）

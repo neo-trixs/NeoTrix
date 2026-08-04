@@ -242,4 +242,58 @@ describe("DiffPane", () => {
     // Claude/Codex review, which can accept new files into the review set.
     expect(screen.getByTestId("diff-accept-notes.txt")).toBeInTheDocument();
   });
+
+  it("diff line comments: click a line → add → badge → submit dispatches event", async () => {
+    mockInvoke("cmd_diff_unstaged", () => [
+      { type: "added", content: "fn new()", line_start: 12 },
+      { type: "added", content: "  let x = 1;", line_start: 13 },
+    ]);
+    const dispatched: any[] = [];
+    const onEvent = (e: Event) => dispatched.push((e as CustomEvent).detail);
+    window.addEventListener("neotrix:diff-submit-comments", onEvent);
+    render(<DiffPane />);
+    await screen.findByText("fn new()");
+
+    fireEvent.click(screen.getByTestId("diff-line-12"));
+    const input = screen.getByTestId("diff-comment-input");
+    fireEvent.change(input, { target: { value: "边界条件有误" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(await screen.findByTestId("diff-comment-badge-12")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("diff-comment-submit"));
+    await waitFor(() => {
+      expect(dispatched.length).toBe(1);
+      expect(dispatched[0].content).toContain("(当前文件):12");
+      expect(dispatched[0].content).toContain("边界条件有误");
+    });
+    window.removeEventListener("neotrix:diff-submit-comments", onEvent);
+  });
+
+  it("diff line comment is removed via the 删除 action", async () => {
+    mockInvoke("cmd_diff_unstaged", () => [{ type: "added", content: "fn foo()", line_start: 4 }]);
+    render(<DiffPane />);
+    await screen.findByText("fn foo()");
+
+    fireEvent.click(screen.getByTestId("diff-line-4"));
+    const input = screen.getByTestId("diff-comment-input");
+    fireEvent.change(input, { target: { value: "建议改名" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(await screen.findByTestId("diff-comment-badge-4")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("diff-line-4"));
+    fireEvent.click(screen.getByTestId("diff-comment-delete"));
+    expect(screen.queryByTestId("diff-comment-badge-4")).toBeNull();
+  });
+
+  it("Esc cancels the comment draft without adding it", async () => {
+    mockInvoke("cmd_diff_unstaged", () => [{ type: "added", content: "fn bar()", line_start: 7 }]);
+    render(<DiffPane />);
+    await screen.findByText("fn bar()");
+
+    fireEvent.click(screen.getByTestId("diff-line-7"));
+    const input = screen.getByTestId("diff-comment-input");
+    fireEvent.change(input, { target: { value: "不会保存" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByTestId("diff-comment-badge-7")).toBeNull();
+  });
 });

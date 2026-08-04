@@ -30,6 +30,80 @@ export function DiffPane() {
   const [fileDiffs, setFileDiffs] = useState<Map<string, FileDiff>>(new Map());
   const [neocodexLoading, setNeocodexLoading] = useState(false);
 
+  // Diff line comments (Claude Code Desktop parity): click a diff line to
+  // comment; Enter adds a comment; ⌘Enter submits all comments to the agent
+  // through the normal chat send pipeline.
+  const [comments, setComments] = useState<Map<number, string>>(new Map());
+  const [commentTarget, setCommentTarget] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+  const commentInputRef = useRef<HTMLInputElement>(null);
+
+  const openComment = (line: number, existing: string) => {
+    setCommentTarget(line);
+    setDraft(existing);
+  };
+
+  const saveComment = () => {
+    if (commentTarget === null) return;
+    const text = draft.trim();
+    if (!text) return;
+    setComments((prev) => {
+      const next = new Map(prev);
+      next.set(commentTarget, text);
+      return next;
+    });
+    setCommentTarget(null);
+    setDraft("");
+  };
+
+  const removeComment = (line: number) => {
+    setComments((prev) => {
+      const next = new Map(prev);
+      next.delete(line);
+      return next;
+    });
+    if (commentTarget === line) {
+      setCommentTarget(null);
+      setDraft("");
+    }
+  };
+
+  const submitComments = () => {
+    if (comments.size === 0) return;
+    const file = activeFile || filePath || "(当前文件)";
+    const body = [...comments.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([ln, text]) => `${file}:${ln} — ${text}`)
+      .join("\n");
+    const content = `针对以下代码变更的审阅意见，请据此修改代码：\n\n${body}`;
+    window.dispatchEvent(new CustomEvent("neotrix:diff-submit-comments", { detail: { content } }));
+    setComments(new Map());
+    setCommentTarget(null);
+    setDraft("");
+  };
+
+  useEffect(() => {
+    setComments(new Map());
+    setCommentTarget(null);
+    setDraft("");
+  }, [activeFile]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const inEditable = tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable;
+      if (inEditable) return;
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && comments.size > 0) {
+        e.preventDefault();
+        submitComments();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comments, activeFile, filePath]);
+
   const loadRef = useRef<() => Promise<void>>();
   const loadNeocodexDiffsRef = useRef<() => Promise<void>>();
 
@@ -439,6 +513,20 @@ export function DiffPane() {
             {(loading || neocodexLoading) && <span className={styles.muted}>加载中…</span>}
             {error && <span className={styles.errorText}>{error}</span>}
           </div>
+          {comments.size > 0 && (
+            <div className={styles.commentBar} data-testid="diff-comment-bar">
+              <span className={styles.commentCount}>{comments.size} 条评论</span>
+              <button
+                type="button"
+                className={styles.commentSubmitBtn}
+                onClick={submitComments}
+                data-testid="diff-comment-submit"
+                title="提交所有评论给 Agent 处理"
+              >
+                提交给 Agent（⌘Enter）
+              </button>
+            </div>
+          )}
           <div className={styles.actions}>
             <button type="button" className={styles.actionBtn} onClick={handleStage} disabled={loading || neocodexLoading} data-testid="diff-stage-all" title="暂存全部改动">
               暂存
@@ -503,11 +591,61 @@ export function DiffPane() {
             {!loading && !neocodexLoading && blocks.length === 0 && !error && (
               <div className={styles.empty}>无改动</div>
             )}
-            {blocks.map((b, i) => (
-              <div key={i} className={`${styles.block} ${styles[b.type] || styles.unchanged}`}>
-                {b.content || "\u00a0"}
-              </div>
-            ))}
+            {blocks.map((b, i) => {
+              const line = b.line_start ?? 0;
+              const comment = comments.get(line);
+              const isEditing = commentTarget === line;
+              return (
+                <React.Fragment key={i}>
+                  <div
+                    className={`${styles.block} ${styles[b.type] || styles.unchanged} ${comment ? styles.commented : ""}`}
+                    onClick={() => openComment(line, comment || "")}
+                    data-line={line}
+                    data-testid={`diff-line-${line}`}
+                  >
+                    <span className={styles.lineNo}>{line}</span>
+                    <span className={styles.lineContent}>{b.content || "\u00a0"}</span>
+                    {comment && <span className={styles.commentBadge} data-testid={`diff-comment-badge-${line}`}>💬</span>}
+                  </div>
+                  {isEditing && (
+                    <div className={styles.commentBox} data-testid={`diff-comment-box-${line}`}>
+                      <input
+                        autoFocus
+                        ref={commentInputRef}
+                        className={styles.commentInput}
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            saveComment();
+                          }
+                          if (e.key === "Escape") {
+                            setCommentTarget(null);
+                            setDraft("");
+                          }
+                        }}
+                        placeholder="针对此行写评论…（Enter 添加，⌘Enter 提交全部）"
+                        data-testid="diff-comment-input"
+                      />
+                      <div className={styles.commentActions}>
+                        <button type="button" className={styles.commentSaveBtn} onClick={saveComment} disabled={!draft.trim()} data-testid="diff-comment-save">
+                          添加评论
+                        </button>
+                        {comment && (
+                          <button type="button" className={styles.commentCancelBtn} onClick={() => removeComment(line)} data-testid="diff-comment-delete">
+                            删除
+                          </button>
+                        )}
+                        <button type="button" className={styles.commentCancelBtn} onClick={() => { setCommentTarget(null); setDraft(""); }}>
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
       </div>

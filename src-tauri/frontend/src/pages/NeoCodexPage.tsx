@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useStore } from "../stores";
 import { ChatView, CommandPalette, ContextPanel, FileTreePanel, ModelSelector, SessionSidebar, ShortcutHelp, TitleBar } from "../components/neocodex";
 import type { Attachment } from "../types";
@@ -17,7 +16,6 @@ const THEME_LABELS: Record<string, string> = {
 };
 
 export default function NeoCodexPage() {
-  const navigate = useNavigate();
   const {
     settings,
     setSettings,
@@ -490,6 +488,23 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Diff line comments → deliver to the agent through the same send pipeline as
+  // a normal message (Claude Code Desktop: ⌘Enter submits all comments).
+  const handleSendRef = useRef(handleSend);
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  }, [handleSend]);
+
+  useEffect(() => {
+    const onDiffSubmit = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.content) return;
+      handleSendRef.current(detail.content);
+    };
+    window.addEventListener("neotrix:diff-submit-comments", onDiffSubmit);
+    return () => window.removeEventListener("neotrix:diff-submit-comments", onDiffSubmit);
+  }, []);
+
   const handleModeChange = async (mode: string) => {
     try {
       await invoke("neocodex_set_mode", { mode });
@@ -833,6 +848,11 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     neocodexSessions.forEach((s: any) => {
       items.push({ id: `session-${s.id}`, label: s.name || "未命名会话", hint: s.mode, onSelect: () => handleSessionSelect(s) });
     });
+    // Cross-entity: surface projects/workspaces from session wire paths so ⌘K
+    // can switch context in place (Codex/Claude workspace-switcher parity).
+    Array.from(new Set(neocodexSessions.map((s: any) => s.wire_path).filter(Boolean))).forEach((path: string) => {
+      items.push({ id: `project-${path}`, label: `项目: ${path.split(/[\\/]/).filter(Boolean).pop() || path}`, hint: "项目", onSelect: () => handleProjectSwitch(path) });
+    });
     return items;
   }, [neocodexSessions, showSidebar, focusMode]);
 
@@ -855,75 +875,116 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     }
   }, []);
 
-  // Keyboard shortcuts: Cmd+K palette, Cmd+P file palette, Cmd+N new session, Cmd+B toggle sidebar, Ctrl+Tab cycle, Cmd+Shift+F focus
+  // Keyboard shortcuts (Claude Code Desktop parity): Cmd+K palette, Cmd+P file
+  // palette, Cmd+N new session, Cmd+B sidebar, Ctrl+Tab + Cmd+Shift+]/[ cycle
+  // sessions, Cmd+Shift+D diff, Cmd+Shift+B/⌘Shift+P browser, Cmd+\ close pane,
+  // Cmd+Shift+M permission menu, Cmd+Shift+I model menu, Cmd+Shift+F focus.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       const inEditable = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable;
+      // Normalize: Shift+letter produces uppercase e.key (e.g. ⌘Shift+F → "F"),
+      // so compare lowercased to match the intent behind the shortcut.
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       // ⌘K/⌘P/⌘/ palette + help are global (harmless in inputs); everything else
       // must not steal keystrokes the user is typing into a field.
-      const isPalette = (e.key === "k" || e.key === "p") && (e.metaKey || e.ctrlKey);
-      const isHelp = e.key === "/" && (e.metaKey || e.ctrlKey);
+      const isPalette = (key === "k" || key === "p") && (e.metaKey || e.ctrlKey) && !e.shiftKey;
+      const isHelp = key === "/" && (e.metaKey || e.ctrlKey);
       if (inEditable && !isPalette && !isHelp) return;
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+
+      const cycleSession = (dir: number) => {
+        if (neocodexSessions.length === 0) return;
+        const idx = neocodexSessions.findIndex((s: any) => s.id === neocodexActiveSessionId);
+        const next = neocodexSessions[(idx + dir + neocodexSessions.length) % neocodexSessions.length];
+        handleSessionSelect(next);
+      };
+      const cyclePermission = () => {
+        const current = settings?.permissionMode || "auto";
+        const next = current === "auto" ? "manual" : current === "manual" ? "accept" : "auto";
+        setSettings({ ...settings, permissionMode: next });
+        invoke("neocodex_set_permission_mode", { mode: next }).catch((e) => console.error("Set permission mode failed:", e));
+      };
+
+      if (key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setPaletteMode("command");
         setPaletteOpen((v) => !v);
-      } else if (e.key === "p" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        openFilePalette();
-      } else if (e.key === "/" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setShortcutHelpOpen((v) => !v);
-      } else if (e.key === "n" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent("neotrix:new-session"));
-      } else if (e.key === "b" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setShowSidebar((v) => !v);
-      } else if (e.key === "f" && e.metaKey && e.shiftKey) {
-        e.preventDefault();
-        setFocusMode((v) => !v);
-      } else if (e.key === "o" && e.ctrlKey) {
-        e.preventDefault();
-        setViewMode(v => v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose");
-      } else if (e.key === "," && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setSettingsOpen((v) => !v);
-      } else if (e.key === "Escape" && showUsage) {
-        e.preventDefault();
-        setShowUsage(false);
-      } else if (e.key === "Escape" && agentBusy && !(paletteOpen || shortcutHelpOpen || timelineOpen || pendingDeleteSession)) {
-        e.preventDefault();
-        handleStop();
-      } else if (e.key === "w" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        if (neocodexActiveSessionId) requestSessionDelete(neocodexActiveSessionId);
-      } else if (e.key === ";" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setRightPanelTab((t) => (t === "chat" ? null : "chat"));
-      } else if (e.key === "`" && e.ctrlKey) {
-        e.preventDefault();
-        setRightPanelTab(rightPanelTab === "terminal" ? null : "terminal");
-      } else if (e.key === "d" && e.metaKey && e.shiftKey) {
-        e.preventDefault();
-        setRightPanelTab(rightPanelTab === "review" ? null : "review");
-      } else if (e.key === "p" && e.metaKey && e.shiftKey) {
+      } else if (key === "p" && e.metaKey && e.shiftKey) {
+        // App preview / Browser pane (official ⌘Shift+B is also bound below).
         e.preventDefault();
         setRightPanelTab(rightPanelTab === "browser" ? null : "browser");
-      } else if (e.key === "Tab" && e.ctrlKey) {
+      } else if (key === "p" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        if (neocodexSessions.length === 0) return;
-        const idx = neocodexSessions.findIndex((s: any) => s.id === neocodexActiveSessionId);
-        const delta = e.shiftKey ? -1 : 1;
-        const next = neocodexSessions[(idx + delta + neocodexSessions.length) % neocodexSessions.length];
-        handleSessionSelect(next);
-      } else if (/^[1-9]$/.test(e.key) && (e.metaKey || e.ctrlKey)) {
+        openFilePalette();
+      } else if (key === "/" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setShortcutHelpOpen((v) => !v);
+      } else if (key === "n" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("neotrix:new-session"));
+      } else if (key === "b" && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        setShowSidebar((v) => !v);
+      } else if (key === "b" && e.metaKey && e.shiftKey) {
+        // Official: ⌘Shift+B toggles the Browser pane.
+        e.preventDefault();
+        setRightPanelTab(rightPanelTab === "browser" ? null : "browser");
+      } else if (key === "f" && e.metaKey && e.shiftKey) {
+        e.preventDefault();
+        setFocusMode((v) => !v);
+      } else if (key === "o" && e.ctrlKey) {
+        e.preventDefault();
+        setViewMode(v => v === "verbose" ? "normal" : v === "normal" ? "summary" : "verbose");
+      } else if (key === "," && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSettingsOpen((v) => !v);
+      } else if (key === "Escape" && showUsage) {
+        e.preventDefault();
+        setShowUsage(false);
+      } else if (key === "Escape" && agentBusy && !(paletteOpen || shortcutHelpOpen || timelineOpen || pendingDeleteSession)) {
+        e.preventDefault();
+        handleStop();
+      } else if (key === "w" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (neocodexActiveSessionId) requestSessionDelete(neocodexActiveSessionId);
+      } else if (key === ";" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setRightPanelTab((t) => (t === "chat" ? null : "chat"));
+      } else if (key === "`" && e.ctrlKey) {
+        e.preventDefault();
+        setRightPanelTab(rightPanelTab === "terminal" ? null : "terminal");
+      } else if (key === "d" && e.metaKey && e.shiftKey) {
+        e.preventDefault();
+        setRightPanelTab(rightPanelTab === "review" ? null : "review");
+      } else if (key === "Tab" && e.ctrlKey) {
+        e.preventDefault();
+        cycleSession(e.shiftKey ? -1 : 1);
+      } else if ((key === "]" || key === "}") && e.metaKey && e.shiftKey) {
+        // Official: ⌘Shift+] next session (Shift+] produces "}").
+        e.preventDefault();
+        cycleSession(1);
+      } else if ((key === "[" || key === "{") && e.metaKey && e.shiftKey) {
+        // Official: ⌘Shift+[ previous session (Shift+[ produces "{").
+        e.preventDefault();
+        cycleSession(-1);
+      } else if (key === "\\" && (e.metaKey || e.ctrlKey)) {
+        // Official: ⌘\ closes the focused pane.
+        e.preventDefault();
+        setRightPanelTab(null);
+      } else if (key === "m" && e.metaKey && e.shiftKey) {
+        // Official: ⌘Shift+M opens the permission mode menu (we cycle the tri-state).
+        e.preventDefault();
+        cyclePermission();
+      } else if (key === "i" && e.metaKey && e.shiftKey) {
+        // Official: ⌘Shift+I opens the model menu.
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("neotrix:toggle-model-menu"));
+      } else if (/^[1-9]$/.test(key) && (e.metaKey || e.ctrlKey)) {
         // Numbered session switch (Cmd+1..9) — a differentiator neither Claude
         // Code Desktop nor Codex Desktop offers.
         e.preventDefault();
-        const n = Number(e.key);
+        const n = Number(key);
         const target = neocodexSessions[n - 1];
         if (target && target.id !== neocodexActiveSessionId) {
           handleSessionSelect(target);
@@ -932,7 +993,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, showUsage, openFilePalette]);
+  }, [neocodexSessions, neocodexActiveSessionId, focusMode, agentBusy, showUsage, openFilePalette, settings, rightPanelTab]);
 
   return (
     <div className={styles.container}>
@@ -1089,7 +1150,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
                   {activeSession && (
                     <div className={styles.contextMenuItem} onClick={() => {
                       setContextMenuOpen(false);
-                      navigate(`/project/${encodeURIComponent(activeSession.wire_path)}`);
+                      handleProjectSwitch(activeSession.wire_path || currentProject || "");
                     }}>
                       <span>当前: </span>
                       <span className={styles.contextMenuPath}>{activeSession.wire_path.split(/[\\/]/).filter(Boolean).pop() || "本地"}</span>
@@ -1098,7 +1159,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
                   {Array.from(new Set(neocodexSessions.map((s: any) => s.wire_path).filter(Boolean))).map((path) => (
                     <div key={path} className={styles.contextMenuItem} onClick={() => {
                       setContextMenuOpen(false);
-                      navigate(`/project/${encodeURIComponent(path)}`);
+                      handleProjectSwitch(path);
                     }}>
                       <span className={styles.contextMenuPath}>{path.split(/[\\/]/).filter(Boolean).pop() || path}</span>
                     </div>
@@ -1193,7 +1254,15 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             </span>
           )}
           {health?.diff_stats && (
-            <span className={styles.diffStats}>
+            <span
+              className={styles.diffStats}
+              data-testid="diff-stats-toggle"
+              role="button"
+              tabIndex={0}
+              title="查看代码变更（点击打开 Diff 面板）"
+              onClick={() => setRightPanelTab(rightPanelTab === "review" ? null : "review")}
+              onKeyDown={(e) => { if (e.key === "Enter") setRightPanelTab(rightPanelTab === "review" ? null : "review"); }}
+            >
               <span className={styles.diffAdd}>+{health.diff_stats.added || 0}</span>
               <span className={styles.diffRemove}>-{health.diff_stats.removed || 0}</span>
             </span>
