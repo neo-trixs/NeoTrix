@@ -42,6 +42,12 @@ pub struct BackgroundConfig {
     pub always_on_interval_secs: u64,
     pub plugin_interval_secs: u64,
     pub scheduler_interval_secs: u64,
+    /// KB 守卫周期 (WAL 安全备份 + 自动恢复检测), 默认 600s (10min)
+    pub kb_guard_interval_secs: u64,
+    /// 工作区守卫周期 (git status 快照对比), 默认 600s
+    pub workspace_guard_interval_secs: u64,
+    /// KB 完整备份周期, 默认 21600s (6h)
+    pub kb_backup_interval_secs: u64,
 }
 
 impl Default for BackgroundConfig {
@@ -82,6 +88,9 @@ impl Default for BackgroundConfig {
             always_on_interval_secs: 60,
             plugin_interval_secs: 30,
             scheduler_interval_secs: 60,
+            kb_guard_interval_secs: 600,
+            workspace_guard_interval_secs: 600,
+            kb_backup_interval_secs: 21_600,
         }
     }
 }

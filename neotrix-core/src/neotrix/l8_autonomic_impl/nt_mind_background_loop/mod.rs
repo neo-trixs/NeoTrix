@@ -112,10 +112,19 @@ pub struct BackgroundLoop {
     /// 统一的 GlobalWorkspace 单例 —— 被 engine、panorama、consciousness_bridge 共享。
     /// 消除 panorama 独立 new(13.0) 与 engine new(0.5) 的双实例分裂。
     pub gwt: Option<GlobalWorkspace>,
+    /// KB 守卫 (WAL 备份 + 自动恢复) + 工作区守卫 + 文件编辑安全。
+    /// Rust 化自 scripts/kb-guard.sh + workspace-guard.sh + file-edit-safety.sh。
+    pub kb_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::KbGuard,
+    pub workspace_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::WorkspaceGuard,
 }
 
 impl BackgroundLoop {
     pub fn new(brain: Arc<RwLock<SelfIteratingBrain>>) -> Self {
+        // 统一 GWT 单例: 阈值 0.3 匹配 activation∈[0,1] 值域 + 注册 14 默认基线专家。
+        // 此前 13.0 是温度概念误填 threshold 槽位, 且无默认专家, 令共振过滤恒空
+        // (cycle 205 伪收敛溯源); 与 PanoramaPipeline::new() 保持一致。
+        let mut shared_gwt = GlobalWorkspace::new(0.3);
+        shared_gwt.register_default_specialists();
         Self {
             cleanup_engine: Some(CleanupEngine::new()),
             knowledge_chain: None,
@@ -164,7 +173,11 @@ impl BackgroundLoop {
             cognitive_load: Some(CognitiveLoadMonitor::new()),
             second_brain: Some(SecondBrain::new()),
             kb: None,
-            gwt: Some(GlobalWorkspace::new(13.0)),
+            gwt: Some(shared_gwt),
+            kb_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::KbGuard::default(),
+            workspace_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::WorkspaceGuard::default_for(
+                std::env::current_dir().unwrap_or_default(),
+            ),
         }
     }
 }

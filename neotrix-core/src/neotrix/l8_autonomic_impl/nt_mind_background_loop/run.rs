@@ -11,6 +11,8 @@ mod handlers_core;
 mod handlers_consciousness;
 #[path = "handlers_maintenance.rs"]
 mod handlers_maintenance;
+#[path = "handlers_guard.rs"]
+mod handlers_guard;
 
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,
@@ -430,6 +432,10 @@ cognitive_load: self.cognitive_load.take(),
             tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
             // 门控注册表 — 默认只读工具, 运行时可扩展。
             gate_registry: Some(ToolRegistry::from_read_only(&["get", "query", "read", "search"])),
+            kb_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::KbGuard::default(),
+            workspace_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::WorkspaceGuard::default_for(
+                std::env::current_dir().unwrap_or_default(),
+            ),
         }));
 
         macro_rules! spawn_handler {
@@ -488,7 +494,10 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(cfg.metacog_interval_secs, |h| h.handle_awareness().await);
         spawn_handler!(cfg.cleanup_interval_secs, |h| h.handle_cleanup().await);
         spawn_handler!(21_600, |h| h.handle_backup().await); // every 6h
-        spawn_handler!(60, |h| h.handle_agent_discovery().await);
+        // ── 守卫层 (Rust 化自 sh 守护脚本, cycle 207) ──
+        spawn_handler!(cfg.kb_guard_interval_secs, |h| h.handle_kb_guard().await);
+        spawn_handler!(cfg.kb_backup_interval_secs, |h| h.handle_kb_backup().await);
+        spawn_handler!(cfg.workspace_guard_interval_secs, |h| h.handle_workspace_guard().await);        spawn_handler!(60, |h| h.handle_agent_discovery().await);
         spawn_handler!(120, |h| h.handle_always_on().await);
         spawn_handler!(cfg.scheduler_interval_secs, |h| h.handle_scheduler_tick().await);
         spawn_handler!(cfg.evolution_interval_secs, |h| h.handle_evolve().await);
@@ -620,6 +629,9 @@ pub struct BackgroundLoopHandle {
     tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
     /// 门控注册表 — 背景循环工具执行前置检查用。
     gate_registry: Option<ToolRegistry>,
+    /// KB 守卫 + 工作区守卫 (Rust 化自 sh 守护脚本)
+    kb_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::KbGuard,
+    workspace_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::WorkspaceGuard,
 }
 
 impl BackgroundLoopHandle {
