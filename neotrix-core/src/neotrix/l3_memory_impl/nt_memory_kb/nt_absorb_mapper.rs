@@ -559,10 +559,39 @@ impl MappingReport {
 
 /// 读取 batch_% 节点并映射, 返回映射表 (不写库)。
 pub fn map_batch_nodes(conn: &Connection) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
-    let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, content, url, metadata FROM nodes WHERE id LIKE 'batch_%'",
-    )?;
-    let rows = stmt.query_map([], |row| {
+    map_nodes(conn, Some("batch_"), None, None)
+}
+
+/// 读取全部节点并映射 (全库本源溯源, 对应 scripts/absorb_full_kb.py)。
+pub fn map_all_nodes(conn: &Connection) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
+    map_nodes(conn, None, None, None)
+}
+
+/// 泛化节点映射: 可选 id 前缀 / node_type 白名单 / limit。
+pub fn map_nodes(
+    conn: &Connection,
+    prefix: Option<&str>,
+    types: Option<&[String]>,
+    limit: Option<usize>,
+) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
+    let pattern = prefix.map(|p| format!("{}%", p)).unwrap_or_else(|| "%".to_string());
+    let mut sql = String::from(
+        "SELECT id, node_type, title, content, url, metadata FROM nodes WHERE id LIKE ?1",
+    );
+    let mut binds: Vec<String> = vec![pattern];
+    if let Some(ts) = types {
+        if !ts.is_empty() {
+            let placeholders = vec!["?"; ts.len()].join(",");
+            sql.push_str(&format!(" AND node_type IN ({})", placeholders));
+            binds.extend(ts.iter().cloned());
+        }
+    }
+    if let Some(l) = limit {
+        sql.push_str(" LIMIT ?");
+        binds.push(l.to_string());
+    }
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(rusqlite::params_from_iter(binds.iter()), |row| {
         Ok((
             row.get::<_, String>(0)?,
             row.get::<_, String>(1)?,
@@ -802,6 +831,39 @@ mod tests {
         let v: Value = serde_json::from_str(&meta.unwrap()).unwrap();
         assert_eq!(v["absorbed_capability"]["capability"], "execute");
         assert_eq!(v["knowledge_source"]["source_core"], "Reality");
+    }
+
+    #[test]
+    fn test_map_all_nodes_with_type_and_limit() {
+        let conn = test_db();
+        let now = unix_now();
+        for (i, (nid, ntype)) in [
+            ("u_aaa1", "repository"),
+            ("u_aaa2", "paper"),
+            ("u_aaa3", "article"),
+        ]
+        .iter()
+        .enumerate()
+        {
+            conn.execute(
+                "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier) VALUES(?1,?2,?3,'s','c','https://github.com/openai/codex','github.com','en',1.0,0.7,?4,?5,0,'{}','cache',NULL,NULL,NULL,'warm')",
+                params![format!("{}_{}", nid, now), ntype, format!("GitHub - openai/codex #{}", i), now, now],
+            ).unwrap();
+        }
+
+        // 全库: 3 节点全部进入
+        let (mapped_all, _) = map_all_nodes(&conn).unwrap();
+        assert_eq!(mapped_all.len(), 3);
+
+        // 类型白名单: 仅 repository
+        let types = vec!["repository".to_string()];
+        let (mapped_repo, _) = map_nodes(&conn, None, Some(&types), None).unwrap();
+        assert_eq!(mapped_repo.len(), 1);
+        assert_eq!(mapped_repo[0].1.node_type, "repository");
+
+        // limit: 全库仅取 2
+        let (mapped_lim, _) = map_nodes(&conn, None, None, Some(2)).unwrap();
+        assert_eq!(mapped_lim.len(), 2);
     }
 
     #[test]

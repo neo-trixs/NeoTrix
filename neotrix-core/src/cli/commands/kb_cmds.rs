@@ -73,7 +73,7 @@ impl CliCommand for KbCmd {
         vec!["/knowledge", "/knowledge-base"]
     }
     fn description(&self) -> &str {
-        "Knowledge base operations: /kb stats | /kb search <query> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets"
+        "Knowledge base operations: /kb stats | /kb search <query> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map"
     }
     fn execute(
         &self,
@@ -94,7 +94,8 @@ impl CliCommand for KbCmd {
                   /kb serve [--port 8337]        启动 MCP 知识服务\n\
                   /kb export <node_id> [--format json|svg]  导出子图\n\
                   /kb import-assets [path]       导入 assets/knowledge_data.json 到 KB\n\
-                  /kb import-review [path]      导入 review-findings.json 缺陷记录到 KB",
+                  /kb import-review [path]      导入 review-findings.json 缺陷记录到 KB\n\
+                  /kb absorb-map [--dry-run] [--limit N] [--types a,b] 全库本源溯源+能力映射 (R-P79)",
             );
         }
 
@@ -112,9 +113,10 @@ impl CliCommand for KbCmd {
             "export" => cmd_export(rest),
             "import-assets" => cmd_import_assets(rest),
             "import-review" => cmd_import_review(rest),
+            "absorb-map" => cmd_absorb_map(rest),
             "embed" => cmd_embed(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review, embed",
+                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed",
                 sub
             )),
         }
@@ -135,6 +137,75 @@ fn cmd_embed(_args: &[String]) -> CommandOutput {
             n
         )),
         Err(e) => CommandOutput::err(&format!("Embedding 补跑失败: {}", e)),
+    }
+}
+
+/// 全库本源溯源 + 能力映射 (对应 scripts/absorb_full_kb.py, R-P79)。
+/// /kb absorb-map [--dry-run] [--limit N] [--types a,b]
+fn cmd_absorb_map(args: &[String]) -> CommandOutput {
+    let dry_run = !args.contains(&"--apply".to_string());
+    let limit = parse_usize(args, "--limit", usize::MAX);
+    let types_raw = parse_str(args, "--types", "");
+
+    let conn = match open_raw_conn() {
+        Some(c) => c,
+        None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
+    };
+    let types: Option<Vec<String>> = if types_raw.is_empty() {
+        None
+    } else {
+        Some(
+            types_raw
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
+        )
+    };
+    let limit_opt = if limit == usize::MAX { None } else { Some(limit) };
+
+    let (mapped, report) = match crate::neotrix::nt_memory_kb::map_nodes(&conn, None, types.as_deref(), limit_opt)
+    {
+        Ok(r) => r,
+        Err(e) => return CommandOutput::err(&format!("全库溯源失败: {}", e)),
+    };
+
+    let mut lines = vec![format!("=== 全库本源溯源报告 (total {}) ===", report.total)];
+    let all_sources = ["E8", "VSA", "GWT", "ConsciousnessTree", "Reality"];
+    for core in all_sources {
+        let cnt = report.per_source.get(core).copied().unwrap_or(0);
+        let pct = if report.total > 0 {
+            100 * cnt / report.total
+        } else {
+            0
+        };
+        lines.push(format!("  {:<18} {:>7} ({}%)", core, cnt, pct));
+    }
+    let unknown = report.unknown_source(report.total);
+    lines.push(format!("  未映射本源: {}", unknown));
+    lines.push(format!("  未映射能力: {}", report.unmapped.len()));
+    lines.push(String::new());
+    lines.push("=== 能力分布 (top 15) ===".to_string());
+    let mut caps: Vec<(&String, &usize)> = report.per_cap.iter().collect();
+    caps.sort_by(|a, b| b.1.cmp(a.1));
+    for (cap, cnt) in caps.into_iter().take(15) {
+        lines.push(format!("  {:<12} {}", cap, cnt));
+    }
+
+    if dry_run {
+        lines.push(String::new());
+        lines.push(format!("[absorb-map] dry-run, 未写库. 已映射 {} 条, 未映射 {} 条 (可加 --apply 写库)",
+            report.per_source.values().sum::<usize>(), report.unmapped.len()));
+        return CommandOutput::ok(&lines.join("\n"));
+    }
+
+    match crate::neotrix::nt_memory_kb::apply_mappings(&conn, &mapped) {
+        Ok(n) => {
+            lines.push(String::new());
+            lines.push(format!("[absorb-map] 已写库: {} 条 absorbed_capability + knowledge_source", n));
+            CommandOutput::ok(&lines.join("\n"))
+        }
+        Err(e) => CommandOutput::err(&format!("写库失败: {}", e)),
     }
 }
 
@@ -792,3 +863,74 @@ fn node_title_escape(s: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    static HOME_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn with_temp_home<T>(f: impl FnOnce() -> T) -> T {
+        let _g = HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let old = std::env::var("HOME").ok();
+        let dir = std::env::temp_dir().join(format!("nt_kb_cmds_{}", std::process::id()));
+        std::fs::create_dir_all(dir.join(".neotrix")).unwrap();
+        std::env::set_var("HOME", &dir);
+        let r = f();
+        match old {
+            Some(o) => std::env::set_var("HOME", o),
+            None => std::env::remove_var("HOME"),
+        }
+        r
+    }
+
+    fn seed_node(conn: &Connection, id: &str, ntype: &str, title: &str, url: &str) {
+        let now = 1750000000i64;
+        conn.execute(
+            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,confidence,importance,created_at,updated_at,access_count,metadata,data_tier,temporal,supersedes,source_episode,tier) VALUES(?1,?2,?3,'s','c',?4,'github.com','en',1.0,0.7,?5,?6,0,'{}','cache',NULL,NULL,NULL,'warm')",
+            rusqlite::params![id, ntype, title, url, now, now],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_absorb_map_dry_run() {
+        with_temp_home(|| {
+            let conn = Connection::open(kb_path()).unwrap();
+            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
+            seed_node(&conn, "u_2", "paper", "Attention Is All You Need", "https://arxiv.org/abs/1706.03762");
+            drop(conn);
+
+            let out = cmd_absorb_map(&["--dry-run".to_string(), "--limit".to_string(), "10".to_string()]);
+            assert!(out.success, "{}", out.message);
+            assert!(out.message.contains("全库本源溯源报告"));
+            assert!(out.message.contains("Reality"));
+            assert!(out.message.contains("未写库"));
+        });
+    }
+
+    #[test]
+    fn test_absorb_map_apply_writes_metadata() {
+        with_temp_home(|| {
+            let conn = Connection::open(kb_path()).unwrap();
+            crate::neotrix::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+            seed_node(&conn, "u_1", "repository", "GitHub - openai/codex: desc", "https://github.com/openai/codex");
+            drop(conn);
+
+            let out = cmd_absorb_map(&["--apply".to_string(), "--limit".to_string(), "10".to_string()]);
+            assert!(out.success, "{}", out.message);
+            assert!(out.message.contains("已写库"));
+
+            let conn = open_raw_conn().unwrap();
+            let meta: Option<String> = conn
+                .query_row("SELECT metadata FROM nodes WHERE id = 'u_1'", [], |r| r.get(0))
+                .unwrap();
+            let v: serde_json::Value = serde_json::from_str(&meta.unwrap()).unwrap();
+            assert_eq!(v["absorbed_capability"]["capability"], "execute");
+            assert_eq!(v["knowledge_source"]["source_core"], "Reality");
+        });
+    }
+}
+
