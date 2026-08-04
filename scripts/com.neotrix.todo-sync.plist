@@ -7,7 +7,8 @@
     
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/neo/.local/bin/neotrix</string>        <string>todo</string>
+        <string>/Users/neo/.local/bin/neotrix</string>
+        <string>todo</string>
         <string>sync</string>
     </array>
     
