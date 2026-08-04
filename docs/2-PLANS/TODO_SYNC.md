@@ -1,7 +1,7 @@
 # NeoTrix 多 Session TODO 同步标准
 > 代数视角：每个 session 是向量空间 V_s，同步 = 并集 + 去重 + 排序
 > 最后更新：2026-04-29
-> 自动同步脚本：`scripts/sync_todos.py`
+> 自动同步命令：`neotrix todo sync`（原 `scripts/sync_todos.py` 已吸收进 Rust kanban 板）
 
 ## TODO 项标准格式（YAML front matter + Markdown）
 
@@ -72,9 +72,9 @@ $$Priority = w_1 \cdot P_{priority} + w_2 \cdot P_{session_age} + w_3 \cdot P_{d
 
 ## 同步触发条件
 
-1. **手动触发**：`python scripts/sync_todos.py`
+1. **手动触发**：`neotrix todo sync`（或 `make sync-todo`）
 2. **Session 结束前**：自动运行（集成到 session end hook）
-3. **文件变更检测**：核心文件变更时自动检查相关 TODO
+3. **文件变更检测**：核心文件变更时自动检查相关 TODO（经 git-hook.sh）
 
 ## 输出文件
 
