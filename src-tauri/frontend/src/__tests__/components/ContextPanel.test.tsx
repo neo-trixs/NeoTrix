@@ -12,6 +12,7 @@ vi.mock("../../components/neocodex/index", () => {
     PreviewPane: mk("preview"),
     TerminalPane: mk("terminal"),
     FileTreePanel: mk("file"),
+    SideChatPane: mk("sidechat"),
   };
 });
 
@@ -54,5 +55,21 @@ describe("ContextPanel route-by-rail-tab", () => {
     expect(screen.getByTestId("mock-file")).toBeInTheDocument();
     expect(container.innerHTML).toContain("fake");
     expect(onFilePick).toBeDefined();
+  });
+
+  it("renders SideChatPane for chat tab and forwards side-chat props", () => {
+    render(
+      <ContextPanel
+        activeTab="chat"
+        {...base}
+        sideChatMessages={[{ role: "user", content: "hi" }]}
+        sideChatInput="hello"
+        onSideChatInputChange={vi.fn()}
+        onSideChatSend={vi.fn()}
+      />
+    );
+    const pane = screen.getByTestId("mock-sidechat");
+    expect(pane).toBeInTheDocument();
+    expect(pane.getAttribute("input")).toBe("hello");
   });
 });

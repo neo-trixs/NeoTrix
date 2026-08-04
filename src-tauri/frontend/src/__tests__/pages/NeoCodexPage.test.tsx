@@ -338,6 +338,21 @@ describe("NeoCodexPage task pane", () => {
     expect(await screen.findByTestId("task-pane")).toBeInTheDocument();
     expect(screen.getByTestId("task-pane-empty")).toBeInTheDocument();
   });
+
+  it("chat rail toggles the dock side-chat pane (Codex dock Chat tab)", async () => {
+    renderPage();
+    await screen.findByTestId("session-title");
+
+    fireEvent.click(screen.getByTestId("rail-btn-chat"));
+    expect(await screen.findByTestId("side-chat-pane")).toBeInTheDocument();
+
+    const input = screen.getByTestId("side-chat-input");
+    fireEvent.change(input, { target: { value: "hi" } });
+    expect(input).toHaveValue("hi");
+
+    fireEvent.click(screen.getByTestId("rail-btn-chat"));
+    expect(screen.queryByTestId("side-chat-pane")).not.toBeInTheDocument();
+  });
 });
 
 describe("NeoCodexPage — status bar parity", () => {

@@ -38,7 +38,7 @@ export default function NeoCodexPage() {
   const [showSidebar, setShowSidebar] = React.useState(true);
   const [fileTreeOpen, setFileTreeOpen] = React.useState(false);
   const [showUsage, setShowUsage] = React.useState(false);
-  const [rightPanelTab, setRightPanelTab] = React.useState<"browser" | "terminal" | "review" | "file" | "tasks" | null>("review");
+  const [rightPanelTab, setRightPanelTab] = React.useState<"browser" | "terminal" | "review" | "file" | "tasks" | "chat" | null>("review");
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [rightPanelWidth, setRightPanelWidth] = React.useState<number>(() => {
     const raw = localStorage.getItem("neotrix.rightPanelWidth");
@@ -69,7 +69,6 @@ export default function NeoCodexPage() {
   const stopRef = useRef(false);
   const taskSeenRef = useRef<Set<string>>(new Set());
   const taskLastIndexRef = useRef(0);
-  const [sideChatOpen, setSideChatOpen] = useState(false);
   const [sideChatMessages, setSideChatMessages] = useState<Array<{ role: string; content: string }>>([]);
   const [sideChatInput, setSideChatInput] = useState("");
   const [renamingTitle, setRenamingTitle] = useState(false);
@@ -572,7 +571,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       } else if (cmd === "/status") {
         setShowUsage(true);
       } else if (cmd === "/btw") {
-        setSideChatOpen((v) => !v);
+        setRightPanelTab((t) => (t === "chat" ? null : "chat"));
       }
     } catch (e) {
       console.error("Slash action failed:", e);
@@ -826,7 +825,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
       { id: "sidebar", label: showSidebar ? "收起侧栏" : "展开侧栏", hint: "⌘B", onSelect: () => setShowSidebar((v) => !v) },
       { id: "focus", label: focusMode ? "退出专注模式" : "专注模式", hint: "⌘Shift+F", onSelect: () => setFocusMode((v) => !v) },
       { id: "viewmode", label: "切换视图模式", hint: "Ctrl+O", onSelect: () => cycleViewMode() },
-      { id: "sidechat", label: "侧聊", hint: "⌘+;", onSelect: () => setSideChatOpen((v) => !v) },
+      { id: "sidechat", label: "侧聊", hint: "⌘+;", onSelect: () => setRightPanelTab((t) => (t === "chat" ? null : "chat")) },
     ];
     (["Agent", "Shell", "Plan"] as const).forEach((m) => {
       items.push({ id: `mode-${m}`, label: `切换到 ${m} 模式`, hint: "Mode", onSelect: () => handleModeChange(m) });
@@ -903,7 +902,7 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
         if (neocodexActiveSessionId) requestSessionDelete(neocodexActiveSessionId);
       } else if (e.key === ";" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setSideChatOpen((v) => !v);
+        setRightPanelTab((t) => (t === "chat" ? null : "chat"));
       } else if (e.key === "`" && e.ctrlKey) {
         e.preventDefault();
         setRightPanelTab(rightPanelTab === "terminal" ? null : "terminal");
@@ -1157,35 +1156,6 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
             mode={neocodexMode}
             onModeChange={handleModeChange}
           />
-          {sideChatOpen && (
-            <div className={styles.sideChat}>
-              <div className={styles.sideChatHeader}>
-                <span>侧聊</span>
-                <button className={styles.sideChatClose} onClick={() => setSideChatOpen(false)} title="关闭侧聊" aria-label="关闭侧聊">✕</button>
-              </div>
-              <div className={styles.sideChatMessages}>
-                {sideChatMessages.map((m, i) => (
-                  <div
-                    key={i}
-                    className={`${styles.sideChatMsg} ${m.role === "user" ? styles.sideChatMsgUser : styles.sideChatMsgAssistant}`}
-                  >
-                    {m.content}
-                  </div>
-                ))}
-              </div>
-              <div className={styles.sideChatInputRow}>
-                <input
-                  className={styles.sideChatInput}
-                  value={sideChatInput}
-                  onChange={(e) => setSideChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleSideChatSend(); }}
-                  placeholder="输入内容..."
-                />
-                <button className={styles.sideChatSend} onClick={handleSideChatSend}>发送</button>
-              </div>
-              <div className={styles.sideChatHint}>侧聊不写入主会话 ⌘+; 关闭</div>
-            </div>
-          )}
         </div>
 
         <footer className={styles.statusBar} data-testid="status-bar">
@@ -1311,6 +1281,18 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               <path d="M3 5h12M3 9h12M3 13h8"/>
             </svg>
           </button>
+          <button
+            role="tab"
+            aria-selected={rightPanelTab === "chat"}
+            className={`${styles.railBtn} ${rightPanelTab === "chat" ? styles.railBtnActive : ""}`}
+            onClick={() => setRightPanelTab(rightPanelTab === "chat" ? null : "chat")}
+            title="Chat (⌘;)"
+            data-testid="rail-btn-chat"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3h12v9H6l-3 3V3z"/>
+            </svg>
+          </button>
         </div>
         {rightPanelTab && (
           <div className={styles.rightPanelExpanded} style={{ width: rightPanelWidth }} data-testid="right-panel">
@@ -1324,6 +1306,10 @@ const handleSend = async (content: string, attachments?: Attachment[], regenerat
               activeTab={rightPanelTab}
               taskSteps={taskSteps}
               taskStartedAt={taskStartedAt}
+              sideChatMessages={sideChatMessages}
+              sideChatInput={sideChatInput}
+              onSideChatInputChange={setSideChatInput}
+              onSideChatSend={handleSideChatSend}
               onFilePick={(path) => {
                 window.dispatchEvent(new CustomEvent("neotrix:mention-file", { detail: path }));
               }}

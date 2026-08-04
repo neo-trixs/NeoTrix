@@ -9,5 +9,6 @@ export { PreviewPane } from "./PreviewPane";
 export { SessionSidebar } from "./SessionSidebar";
 export { SettingsView } from "./SettingsView";
 export { ShortcutHelp } from "./ShortcutHelp";
+export { SideChatPane } from "./SideChatPane";
 export { TaskPane } from "./TaskPane";
 export { TerminalPane } from "./TerminalPane";
