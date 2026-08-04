@@ -600,6 +600,10 @@ impl SelfIteratingBrain {
     pub fn save_cortex(&self) -> NeoTrixResult<()> {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let path = std::path::PathBuf::from(&home).join(".neotrix").join("cortex.json");
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| NeoTrixError::Io(format!("创建 .neotrix 目录失败: {}", e)))?;
+        }
         let json = self.cortex.export_json();
         let data = serde_json::to_string_pretty(&json)
             .map_err(|e| NeoTrixError::Serde(format!("cortex序列化失败: {}", e)))?;
@@ -754,6 +758,8 @@ impl SelfIteratingBrain {
 
         engine = engine
             .with_gwt({
+                // Reasoner 侧 GWT — 温度 0.5, 满载 specialist + VSA scorer。共振职责
+                // 已收敛至后台环 (cycle 204 HIGH-2), 此实例保留供未来注入/查询。
                 let mut gwt = GlobalWorkspace::new(0.5).with_vsa_scorer(VsaContentScorer::new(64));
                 gwt.register_default_specialists();
                 gwt.init_oscillators(gwt.specialists.len());
@@ -878,44 +884,248 @@ impl SelfIteratingBrain {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use crate::neotrix::l8_autonomic_impl::nt_mind::{
+        AttentionRouter, KnowledgeSource, MemoryTrace, Modality, ReasoningMemory,
+        SelfIteratingBrain,
+    };
+    use crate::neotrix::nt_mind::element::registry::RegistryState;
+    use crate::neotrix::nt_world_model::TaskType;
+    use crate::neotrix::nt_core_error::NeoTrixResult;
 
-    use super::SelfIteratingBrain;
+    // 1. 构造：核心字段在构建后被正确初始化。
+    #[test]
+    fn seal_loop_construct_initializes_core_fields() {
+        let brain = SelfIteratingBrain::new();
 
-    fn sealed() -> SelfIteratingBrain {
-        SelfIteratingBrain::new()
+        assert_eq!(brain.iteration, 0);
+        assert_eq!(brain.quality_threshold, 0.85);
+        assert!(brain.auto_absorb);
+        assert!(brain.policy_learning_rate > 0.0);
+        assert!(brain.regularization_weight > 0.0);
+        // 惰性初始化：这几项在构造时为 None，由 run_* 按需装配。
+        assert!(brain.reasoning_engine.is_none());
+        assert!(brain.attention_router.is_none());
+        assert!(brain.select_operator.is_none());
+        assert!(brain.sleep_engine.is_none());
+        // 能力向量维度固定为 23。
+        assert_eq!(brain.brain.capability.total_dim(), 23);
+        // 独立验证器 / 元素注册表装配完成。
+        assert_eq!(brain.element_registry.element_count(), 3);
+        assert_eq!(brain.element_registry.state(), RegistryState::Started);
+        // SEAL 主管线已装配大量 stage。
+        assert!(brain.pipeline.stages.len() >= 40, "pipeline stages = {}", brain.pipeline.stages.len());
+        // 记忆库空、默认模型占位。
+        assert_eq!(brain.reasoning_bank.stats().total_memories, 0);
+        assert_eq!(brain.default_model, "default");
+        assert!(brain.evaluation_history.is_empty());
     }
 
+    // 2. 状态转换：iterate() 推进 iteration 并记录评估历史。
     #[test]
-    fn test_default_seal_loop_augmented_signal() {
-        let brain = sealed();
-        assert_eq!(brain.iteration, 0, "iteration should start at 0");
-        assert!(brain.auto_absorb, "auto_absorb defaults on so iterate can learn");
-        assert!(brain.quality_threshold > 0.0);
+    fn seal_loop_iterate_advances_state() {
+        let mut brain = SelfIteratingBrain::new();
+
+        let r1 = brain.iterate(TaskType::General);
+        assert_eq!(r1.iteration, 1);
+        assert_eq!(brain.iteration, 1);
+        assert!((0.0..=1.0).contains(&r1.score_before));
+        assert!((0.0..=1.0).contains(&r1.score_after));
+        assert_eq!(brain.evaluation_history.len(), 1);
+        assert!(r1.absorbed_count >= 0);
+
+        let r2 = brain.iterate(TaskType::General);
+        assert_eq!(r2.iteration, 2);
+        assert_eq!(brain.iteration, 2);
+        assert_eq!(brain.evaluation_history.len(), 2);
+
+        let report = brain.get_brain_report();
+        assert!(report.iteration == 2);
+        assert!(report.capability_sum >= 0.0);
     }
 
+    // 2b. 状态转换：kernel_iterate 走四条支管线，iteration 单调递增。
     #[test]
-    fn test_code_review_iterate_advances_and_applies_edits() {
-        let mut brain = sealed();
-        let mut files = HashMap::new();
-        // 注入一个含 Critical 级别代码缺陷的文件，触发维度调整 + normalize
-        files.insert(
-            std::path::PathBuf::from("test.rs"),
-            "\nfn main() {\n    let x: &u8 = std::mem::uninitialized();\n}\n".to_string(),
-        );
-        let r = brain.code_review_iterate(&files);
-        assert_eq!(r.task_type, crate::neotrix::nt_world_model::TaskType::CodeReview);
-        assert!(r.iteration >= 1);
-        assert!(r.absorbed_count >= 0);
+    fn seal_loop_kernel_iterate_runs_pipeline() {
+        let mut brain = SelfIteratingBrain::new();
+
+        let k1 = brain.kernel_iterate("unit test a dataset loader");
+        assert_eq!(k1.iteration, 1);
+        assert_eq!(brain.iteration, 1);
+        assert!(k1.score_before.is_finite());
+        assert!((0.0..=1.0).contains(&k1.score_after));
+
+        let k2 = brain.kernel_iterate("add error handling to the loader");
+        assert_eq!(k2.iteration, 2);
+        assert_eq!(brain.iteration, 2);
     }
 
+    // 3. 预算边界：高奖励推高学习率但有上限；低奖励压低学习率有下限。
     #[test]
-    fn test_plain_iterate_runs_without_panic() {
-        let mut brain = sealed();
-        let before = brain.iteration;
-        let r = brain.iterate(crate::neotrix::nt_world_model::TaskType::General);
-        assert_eq!(r.iteration, before + 1, "iterate should bump iteration count");
-        // iterate 是纯内存路径，不应触发 LLM 调用
-        assert!(r.score_after.is_finite());
+    fn seal_loop_update_policy_budget_boundaries() {
+        let mut brain = SelfIteratingBrain::new();
+        assert_eq!(brain.brain.learning_rate, 0.05);
+
+        // 高奖励 → 学习率上升。
+        let lr0 = brain.brain.learning_rate;
+        brain.update_policy(0.9);
+        assert!(brain.brain.learning_rate > lr0, "high reward should raise lr");
+        // 饱和推进 → 触顶 0.3。
+        for _ in 0..300 {
+            brain.update_policy(0.9);
+        }
+        assert!(brain.brain.learning_rate <= 0.3, "lr capped at 0.3, got {}", brain.brain.learning_rate);
+
+        // 负奖励 → 学习率回落，且不跌破 0.01。
+        let mut brain = SelfIteratingBrain::new();
+        for _ in 0..300 {
+            brain.update_policy(-1.0);
+        }
+        assert!(brain.brain.learning_rate >= 0.01, "lr floor 0.01, got {}", brain.brain.learning_rate);
+    }
+
+    // 3b. 正则化：未偏离 → 0；偏离快照 → 负惩罚。
+    #[test]
+    fn seal_loop_compute_regularization_penalizes_deviation() {
+        let brain = SelfIteratingBrain::new();
+        let current = brain.brain.capability.clone();
+
+        // 与自身完全一致 → 距离 0 → 惩罚 0。
+        assert_eq!(brain.compute_regularization(&current), 0.0);
+
+        // 扰动一个维度 → 产生负正则惩罚（约束偏离）。
+        let mut drifted = current.clone();
+        drifted.set_analysis(drifted.analysis() + 0.2);
+        let penalty = brain.compute_regularization(&drifted);
+        assert!(penalty < 0.0, "drift should be penalized, got {}", penalty);
+    }
+
+    // 3c. 工具调用记账 + ECHO 轨迹导出。
+    #[test]
+    fn seal_loop_record_tool_calls_and_echo() {
+        let mut brain = SelfIteratingBrain::new();
+        brain.record_tool_call("cargo build", 120, true);
+        brain.record_tool_call("cargo test", 60, false);
+        brain.record_tool_call("cargo check", 30, true);
+
+        assert_eq!(brain.tool_call_count, 3);
+        assert_eq!(brain.tool_traces.len(), 3);
+        assert_eq!(brain.tool_traces[0], ("cargo build".to_string(), 120, true));
+        assert_eq!(brain.tool_traces[1], ("cargo test".to_string(), 60, false));
+
+        // 每次工具调用应产出同一条 ECHO 轨迹上的 3 条观测。
+        let traj = brain.build_echo_trajectories();
+        assert_eq!(traj.len(), 1, "one merged trajectory expected");
+        assert_eq!(traj[0].observations.len(), 3);
+        assert_eq!(traj[0].observations[0].exit_code, 0);
+        assert!(traj[0].observations[1].success == false);
+    }
+
+    // 4. 子组件装配：attention_router（GWT + HyperCube 路由）初始化并驱动上下文。
+    //   （init_attention_router 内部 consume 真实 KB 的 all_nodes()，在 20 万节点库上过慢，
+    //   故退而直接验证其相同装配：AttentionRouter::new + seed_knowledge + route。）
+    #[test]
+    fn seal_loop_attention_router_assembly() {
+        let mut router = AttentionRouter::new();
+        assert_eq!(router.workspace.active_specialists().len(), 0, "no activation before routing");
+
+        router.seed_knowledge();
+        let ctx = router.route("debug an unusual error pattern in the cargo build");
+
+        // 路由结果非空、salience 递减且归一在 (0,1]。
+        assert!(!ctx.winning_topic.is_empty(), "must produce a winning specialist");
+        assert!(!ctx.active_specialists.is_empty());
+        assert!(ctx.salience_report.len() >= 1);
+        for (_st, s) in &ctx.salience_report {
+            assert!(s.is_finite() && *s > 0.0 && *s <= 1.0);
+        }
+        // salience 按降序排列。
+        for w in ctx.salience_report.windows(2) {
+            assert!(w[0].1 >= w[1].1);
+        }
+
+        // GWT 接线：route 把赢家写入 active_content 与广播历史。
+        assert_eq!(router.workspace.active_content.as_deref(), Some(ctx.winning_topic.as_str()));
+        assert!(!router.workspace.broadcast_history.is_empty());
+
+        // 上下文后缀构造不 panic 且与 knowledge_lines 一致。
+        let suffix = router.build_knowledge_prompt_suffix(&ctx);
+        assert_eq!(suffix.trim_start().starts_with("[Knowledge from HyperCube"), !ctx.knowledge_lines.is_empty());
+    }
+
+    // 5. 预算存活门禁：delta 太小则不吸收（拒绝），否则允许吸收并计数。
+    #[test]
+    fn seal_loop_safe_absorb_gate() {
+        let mut brain = SelfIteratingBrain::new();
+        let (_before, _after, delta) = brain.preview_absorb(KnowledgeSource::DesignPhilosophy);
+        let before_count = brain.brain.total_absorb_count;
+
+        if delta >= 0.001 {
+            assert!(brain.safe_absorb(KnowledgeSource::DesignPhilosophy, None));
+            assert_eq!(brain.brain.total_absorb_count, before_count + 1);
+        } else {
+            assert!(!brain.safe_absorb(KnowledgeSource::DesignPhilosophy, None));
+            assert_eq!(brain.brain.total_absorb_count, before_count);
+        }
+
+        // preview_absorb 不修改状态：吸收前 count 不变。
+        assert_eq!(brain.brain.total_absorb_count, before_count);
+    }
+
+    // 6. 持久化/导出：save_cortex 落盘、load_cortex 回读同一条记忆。
+    //   （重定向 HOME 至临时目录，避免覆写真实 ~/.neotrix/cortex.json。）
+    #[test]
+    fn seal_loop_save_load_cortex_roundtrip() {
+        let tmp = std::env::temp_dir().join(format!("neotrix_seal_cortex_{}", std::process::id()));
+        let old_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", &tmp);
+
+        let result = (|| -> NeoTrixResult<bool> {
+            let mut brain = SelfIteratingBrain::new();
+            let trace = MemoryTrace::new(
+                "neotrix-seal-persist-test",
+                "cortex_roundtrip",
+                "一轮持久化往返验证",
+                Modality::Text,
+                vec![],
+            );
+            brain.cortex.store(trace);
+            brain.save_cortex()?;
+
+            let path = tmp.join(".neotrix").join("cortex.json");
+            assert!(path.exists(), "cortex.json 应已落盘");
+
+            // 全新 brain 从已持久化文件读回同一条 trace。
+            let mut reloaded = SelfIteratingBrain::new();
+            reloaded.load_cortex();
+            let traces = reloaded.cortex.all_traces();
+            assert_eq!(traces.len(), 1, "应读回 1 条 trace");
+            assert_eq!(traces[0].title, "neotrix-seal-persist-test");
+            Ok(true)
+        })();
+
+        // 恢复环境变量（best-effort）。
+        match old_home {
+            Some(h) => std::env::set_var("HOME", h),
+            None => std::env::remove_var("HOME"),
+        }
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        result.expect("cortex 持久化往返应无 I/O 错误");
+    }
+
+    // 7. 记忆巩固：consolidate_memories 返回真实统计。
+    #[test]
+    fn seal_loop_consolidate_memories_reports_stats() {
+        let mut brain = SelfIteratingBrain::new();
+        let _ = brain.reasoning_bank.store(ReasoningMemory::new(
+            "t1", TaskType::CodeGeneration, &[], 0.5,
+        ));
+        let _ = brain.reasoning_bank.store(ReasoningMemory::new(
+            "t2", TaskType::CodeAnalysis, &[], 0.6,
+        ));
+
+        let res = brain.consolidate_memories();
+        assert_eq!(res.before.total_memories, 2, "存入 2 条应在结果中体现");
+        assert!(res.after.total_memories > 0);
     }
 }
