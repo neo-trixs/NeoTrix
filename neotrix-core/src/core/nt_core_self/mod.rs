@@ -40,7 +40,7 @@ pub use skill_crystal::{SkillCrystal, CrystalRegistry};
 pub use system_identity::{SystemIdentity, CognitiveCapability, ValueConstraint};
 pub use self_model::{SelfModel, SelfState};
 pub use thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
-pub use evolution_analysis::{KbDefect, KbHealthReport, analyze_kb_health, store_report_to_kb, print_report};
+pub use evolution_analysis::{KbDefect, KbHealthReport, analyze_kb_health, store_report_to_kb, print_report, record_meta_cognition_defect};
 pub use intra_reflection::{PreActionIntrospector, IntraReflection, IntraReflectionReport, PredictedOutcome};
 pub use meta_calibrate::{
     CalibrationReport, CalibrationSignal, CalibrationState, CalibrationTarget,

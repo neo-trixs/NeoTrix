@@ -55,6 +55,26 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
             model TEXT DEFAULT 'text-embedding-3-small'
         );
 
+        CREATE TABLE IF NOT EXISTS pq_codebook (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            m INTEGER NOT NULL,
+            ks INTEGER NOT NULL,
+            sub_dim INTEGER NOT NULL,
+            codewords BLOB NOT NULL,
+            dimension INTEGER NOT NULL,
+            model TEXT,
+            trained_at INTEGER,
+            num_vectors INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS embeddings_pq (
+            node_id TEXT PRIMARY KEY REFERENCES nodes(id) ON DELETE CASCADE,
+            pq_codes BLOB NOT NULL,
+            codebook_id INTEGER REFERENCES pq_codebook(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_emb_pq_codebook ON embeddings_pq(codebook_id);
+
         CREATE VIRTUAL TABLE IF NOT EXISTS nodes_fts USING fts5(
             title, summary, content, domain,
             tokenize='porter unicode61'

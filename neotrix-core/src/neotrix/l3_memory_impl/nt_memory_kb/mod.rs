@@ -40,6 +40,7 @@ pub mod user_memory;
 pub mod vector_adapter;
 pub mod nt_normalizer;
 pub mod knowledge_storage;
+pub mod nt_absorb_mapper;
 
 
 pub use nt_discovery_github_topics::{DiscoveryPipelineConfig, GithubDiscoveryStats};
@@ -65,6 +66,7 @@ pub use nt_memory_tech_reserve::{
 };
 pub use nt_normalizer::{normalize_text, strip_markdown, normalize_lang, content_fingerprint, extract_key_sections, detect_language, compute_quality_score, validate_node_type, validate_relation_type};
 pub use knowledge_storage::{KnowledgeStorage, migrate_from_json};
+pub use nt_absorb_mapper::{map_batch_nodes, apply_mappings, map_node, map_source_core, CapabilityMapping, MappingReport};
 
 use rusqlite::Connection;
 use std::collections::HashMap;

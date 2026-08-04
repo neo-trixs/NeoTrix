@@ -27,6 +27,18 @@ use serde::{Serialize, Deserialize};
 use crate::core::nt_core_e8::E8TransitionMatrix;
 use crate::core::nt_core_e8::domain_transition::{E8TaskType, E8DomainTransitionModel};
 
+/// 20-hex md5 of a string, used to derive deterministic node/edge ids.
+/// Mirrors `scripts/deep-absorb-fable5.py:ndig`. md5 here is used only for
+/// storage-key derivation (not security).
+fn qidian_hash(s: &str) -> String {
+    use md5::{Digest, Md5};
+    let mut h = Md5::new();
+    h.update(s.as_bytes());
+    let digest = h.finalize();
+    let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+    hex[..20].to_string()
+}
+
 /// A named community dataset with weight and pre-extracted transition patterns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunityDataset {
@@ -125,6 +137,171 @@ impl CommunityDataIngester {
             }
         }
         total
+    }
+
+    /// Materialize the E8 community-dataset hub + per-dataset Concept nodes and
+    /// edges into the KB. Faithful port of `scripts/deep-absorb-fable5.py`:
+    /// creates `community_e8_datasets_hub`, one `community_dataset_{name}` node
+    /// per dataset, `contains` edges hub→dataset, `related` edges within themed
+    /// groups, and cross-theme `related` edges with lower weight.
+    ///
+    /// Idempotent (INSERT OR IGNORE). Returns the number of nodes written.
+    pub fn persist_to_kb(&self, conn: &rusqlite::Connection, now: i64) -> rusqlite::Result<usize> {
+        let hub_id = "community_e8_datasets_hub";
+        let hub_meta = serde_json::json!({
+            "source": "fable5-absorption",
+            "type": "dataset-hub",
+            "count": self.datasets.len(),
+            "domain": "community-datasets",
+            "quality_score": 0.95,
+        })
+        .to_string();
+        conn.execute(
+            "INSERT OR IGNORE INTO nodes
+             (id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, metadata)
+             VALUES (?1,'Concept',?2,?3,'',?4,'neotrix.local','en',1.0,0.95,?5,?5,?6)",
+            rusqlite::params![
+                hub_id,
+                "E8 Community Datasets",
+                format!(
+                    "Fable-5 / Open-SWE-Traces community datasets ({} datasets). Injected by Fable-5 deep absorption.",
+                    self.datasets.len()
+                ),
+                "neotrix://community-datasets/e8",
+                now,
+                hub_meta,
+            ],
+        )?;
+
+        let mut written = 1usize;
+        let mut ids: std::collections::BTreeMap<&str, String> = std::collections::BTreeMap::new();
+        for ds in &self.datasets {
+            let ds_id = format!("community_dataset_{}", ds.name);
+            let meta = serde_json::json!({
+                "source": "fable5-absorption",
+                "type": "community-dataset",
+                "weight": ds.weight,
+                "tags": [],
+            })
+            .to_string();
+            conn.execute(
+                "INSERT OR IGNORE INTO nodes
+                 (id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, metadata)
+                 VALUES (?1,'Concept',?2,?3,'',?4,'neotrix.local','en',1.0,?5,?6,?6,?7)",
+                rusqlite::params![
+                    ds_id,
+                    ds.name,
+                    ds.description,
+                    format!("neotrix://community-datasets/{}", ds.name),
+                    ds.weight,
+                    now,
+                    meta,
+                ],
+            )?;
+            written += 1;
+            ids.insert(&ds.name, ds_id);
+        }
+
+        // contains edges hub → dataset
+        for ds in &self.datasets {
+            let ds_id = &ids[ds.name.as_str()];
+            let eid = format!("re-{}", qidian_hash(&format!("{hub_id}{ds_id}")));
+            conn.execute(
+                "INSERT OR IGNORE INTO edges (id, source_id, target_id, relation_type, weight, description, created_at)
+                 VALUES (?1,?2,?3,'contains',?4,?5,?6)",
+                rusqlite::params![
+                    eid,
+                    hub_id,
+                    ds_id,
+                    ds.weight,
+                    format!("E8 Community Hub → {}", ds.name),
+                    now,
+                ],
+            )?;
+        }
+
+        // related edges within themed groups (faithful group split)
+        let ssm_papers = ["priming_hybrid_ssm_fable", "retrieval_aware_distill_ssm"];
+        let fable_traces = ["fable5_sft_traces_kelexine_4k", "fable5_swarm_traces_sft_4k"];
+        let swe_related = ["nvidia_open_swe_traces_207k", "open_swe_agent_thinking_dual"];
+        for group in [&ssm_papers[..], &fable_traces[..], &swe_related[..]] {
+            for i in 0..group.len() {
+                for j in (i + 1)..group.len() {
+                    let (src, tgt) = (group[i], group[j]);
+                    if let (Some(s), Some(t)) = (ids.get(src), ids.get(tgt)) {
+                        let eid = format!("re-{}", qidian_hash(&format!("{s}{t}")));
+                        conn.execute(
+                            "INSERT OR IGNORE INTO edges (id, source_id, target_id, relation_type, weight, description, created_at)
+                             VALUES (?1,?2,?3,'related',0.7,?4,?5)",
+                            rusqlite::params![eid, s, t, format!("Thematic link: {src} ↔ {tgt}"), now],
+                        )?;
+                    }
+                }
+            }
+        }
+
+        // cross-theme edges with lower weight
+        let cross: &[(&str, &str, f64, &str)] = &[
+            ("nvidia_open_swe_traces_207k", "fable5_sft_traces_kelexine_4k", 0.4, "SWE-bench ↔ Kelexine SFT"),
+            ("nvidia_open_swe_traces_207k", "fable5_swarm_traces_sft_4k", 0.35, "SWE-bench ↔ Swarm-AI SFT"),
+            ("open_swe_agent_thinking_dual", "fable5_sft_traces_kelexine_4k", 0.4, "Dual-mode ↔ Kelexine SFT"),
+            ("open_swe_agent_thinking_dual", "fable5_swarm_traces_sft_4k", 0.4, "Dual-mode ↔ Swarm-AI SFT"),
+            ("priming_hybrid_ssm_fable", "fable5_sft_traces_kelexine_4k", 0.3, "SSM ↔ Kelexine SFT"),
+            ("retrieval_aware_distill_ssm", "fable5_swarm_traces_sft_4k", 0.3, "Distilled SSM ↔ Swarm-AI SFT"),
+        ];
+        for (s, t, w, desc) in cross {
+            if let (Some(src), Some(tgt)) = (ids.get(*s), ids.get(*t)) {
+                let eid = format!("re-{}", qidian_hash(&format!("{src}{tgt}")));
+                conn.execute(
+                    "INSERT OR IGNORE INTO edges (id, source_id, target_id, relation_type, weight, description, created_at)
+                     VALUES (?1,?2,?3,'related',?4,?5,?6)",
+                    rusqlite::params![eid, src, tgt, w, desc, now],
+                )?;
+            }
+        }
+
+        Ok(written)
+    }
+
+    /// Load a runtime transition-counts file (the JSON shape written by
+    /// `scripts/absorb-fable-2m.py`: per-task-type lists of {from,to,count},
+    /// plus a `_meta` object) and build a `CommunityDataIngester` from it.
+    ///
+    /// This replaces the hardcoded `default_datasets()` priors with real
+    /// 2M-trace data at runtime (the previously-missing `RuntimeCommunityLoader`).
+    /// Unknown task types fall back to "General". Returns `None` if the file
+    /// cannot be parsed.
+    pub fn from_runtime_jsonl(
+        path: &std::path::Path,
+        base_source_url: &str,
+        base_weight: f64,
+    ) -> Option<Self> {
+        let raw = std::fs::read_to_string(path).ok()?;
+        let root: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        let mut datasets = Vec::new();
+        for (task_type, val) in root.as_object()? {
+            if task_type == "_meta" {
+                continue;
+            }
+            let arr = val.as_array()?;
+            let mut transitions: Vec<(u8, u8, u64)> = Vec::new();
+            for item in arr {
+                let obj = item.as_object()?;
+                let from = obj.get("from")?.as_u64()? as u8;
+                let to = obj.get("to")?.as_u64()? as u8;
+                let count = obj.get("count")?.as_u64()?;
+                transitions.push((from, to, count));
+            }
+            let name = format!("runtime_{task_type}");
+            datasets.push(CommunityDataset {
+                name: name.clone(),
+                source_url: format!("{base_source_url}/{}", task_type.to_lowercase()),
+                weight: base_weight,
+                transitions,
+                description: format!("Runtime-loaded {task_type} transitions from {base_source_url}"),
+            });
+        }
+        Some(Self { datasets })
     }
 }
 
@@ -1314,6 +1491,19 @@ fn default_datasets() -> Vec<CommunityDataset> {
                 (48, 34, 1_000),
             ],
         },
+        // Port of scripts/deep-absorb-fable5.py dataset — the dual-mode thinking paper.
+        CommunityDataset {
+            name: "open_swe_agent_thinking_dual".into(),
+            source_url: "https://arxiv.org/abs/2606.16038".into(),
+            weight: 0.15,
+            description: "Open SWE Agent dual-mode thinking paper (arXiv 2606.16038). Dual-mode reasoning alternating between fast and slow thinking for SWE-bench tasks.".into(),
+            transitions: vec![
+                (56, 50, 4_000), (50, 42, 3_200), (42, 40, 2_500),
+                (40, 26, 2_000), (26, 16, 1_500), (16, 8, 1_000),
+                (8, 0, 500), (0, 4, 300), (56, 40, 800),
+                (48, 32, 600),
+            ],
+        },
     ]
 }
 
@@ -1409,5 +1599,71 @@ mod tests {
         ingester.fuse_into_domain(&mut dtm);
         let after: u64 = dtm.general_matrix.visit_counts.0.iter().sum();
         assert!(after > before, "general matrix should gain observations");
+    }
+
+    #[test]
+    fn test_persist_to_kb_materializes_hub_and_datasets() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE nodes (id TEXT PRIMARY KEY, node_type TEXT, title TEXT, summary TEXT, content TEXT, url TEXT, domain TEXT, language TEXT, confidence REAL, importance REAL, created_at INTEGER, updated_at INTEGER, metadata TEXT);
+             CREATE TABLE edges (id TEXT PRIMARY KEY, source_id TEXT, target_id TEXT, relation_type TEXT, weight REAL, description TEXT, created_at INTEGER);",
+        )
+        .unwrap();
+        let ingester = CommunityDataIngester::default();
+        let written = ingester.persist_to_kb(&conn, 1700000000).unwrap();
+        assert!(written >= 1);
+
+        let hub: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM nodes WHERE id='community_e8_datasets_hub'", [], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(hub, 1);
+
+        // The 6 deep-absorb-fable5 datasets must be materialized
+        for name in [
+            "nvidia_open_swe_traces_207k",
+            "fable5_sft_traces_kelexine_4k",
+            "fable5_swarm_traces_sft_4k",
+            "priming_hybrid_ssm_fable",
+            "retrieval_aware_distill_ssm",
+            "open_swe_agent_thinking_dual",
+        ] {
+            let c: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM nodes WHERE id=?1", rusqlite::params![format!("community_dataset_{name}")], |r| r.get(0),
+            ).unwrap();
+            assert_eq!(c, 1, "missing dataset node {name}");
+        }
+
+        // Idempotent second run
+        let written2 = ingester.persist_to_kb(&conn, 1700000000).unwrap();
+        assert_eq!(written2, written);
+        let contains: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM edges WHERE relation_type='contains'", [], |r| r.get(0),
+        ).unwrap();
+        assert!(contains >= 6);
+    }
+
+    #[test]
+    fn test_from_runtime_jsonl_parses_fable2m_shape() {
+        use std::io::Write;
+        let mut tmp = std::env::temp_dir();
+        tmp.push(format!("nt_fable2m_test_{}", std::process::id()));
+        let json = r#"{
+            "Reasoning": [{"from": 56, "to": 48, "count": 100}, {"from": 48, "to": 40, "count": 80}],
+            "Coding": [{"from": 56, "to": 42, "count": 40}],
+            "_meta": {"source": "x", "total_rows": 10, "valid_traces": 5, "task_type_distribution": {}, "total_transition_pairs": 220}
+        }"#;
+        {
+            let mut f = std::fs::File::create(&tmp).unwrap();
+            f.write_all(json.as_bytes()).unwrap();
+        }
+        let ingester = CommunityDataIngester::from_runtime_jsonl(&tmp, "https://huggingface.co/datasets/Complete-FABLE.5-traces-2M", 0.15);
+        let _ = std::fs::remove_file(&tmp);
+        let ingester = ingester.expect("runtime loader should parse");
+        assert_eq!(ingester.datasets.len(), 2);
+        assert!(ingester.datasets.iter().any(|d| d.name == "runtime_Reasoning"));
+        assert!(ingester.datasets.iter().any(|d| d.name == "runtime_Coding"));
+        let reasoning = ingester.datasets.iter().find(|d| d.name == "runtime_Reasoning").unwrap();
+        assert_eq!(reasoning.transitions, vec![(56, 48, 100), (48, 40, 80)]);
+        assert!((reasoning.weight - 0.15).abs() < 1e-9);
     }
 }

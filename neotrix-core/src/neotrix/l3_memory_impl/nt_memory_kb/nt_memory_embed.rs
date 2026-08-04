@@ -367,6 +367,186 @@ fn load_latest_codebook(conn: &Connection, codebook_id: Option<i64>) -> rusqlite
     Ok(Some(PqCodebook { m, ks, sub_dim, codewords }))
 }
 
+/// Result of a PQ training run.
+#[derive(Debug)]
+pub struct PqTrainReport {
+    pub codebook_id: i64,
+    pub m: usize,
+    pub ks: usize,
+    pub sub_dim: usize,
+    pub vector_count: usize,
+}
+
+/// Lloyd k-means over `rows` (n×d subspaces) with `k` centroids for `iters` iterations.
+/// Faithful port of `scripts/kb-embed-pq.py:kmeans` (seed 42, random init w/o replacement).
+fn pq_kmeans(rows: &[&[f32]], k: usize, iters: usize) -> Vec<Vec<f32>> {
+    let n = rows.len();
+    let d = rows[0].len();
+    use std::collections::HashSet;
+    let mut seed: u64 = 42;
+    let mut next_u64 = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed.wrapping_mul(2685821657736338717)
+    };
+    let mut used: HashSet<usize> = HashSet::new();
+    let mut chosen: Vec<usize> = Vec::new();
+    let k = k.min(n);
+    while chosen.len() < k {
+        let idx = (next_u64() as usize) % n;
+        if used.insert(idx) {
+            chosen.push(idx);
+        }
+    }
+    let mut centroids: Vec<Vec<f32>> = chosen.iter().map(|&i| rows[i].to_vec()).collect();
+    for _ in 0..iters {
+        let mut labels: Vec<usize> = Vec::with_capacity(n);
+        for r in rows {
+            let mut best = 0usize;
+            let mut best_dist = f32::INFINITY;
+            for (c, cen) in centroids.iter().enumerate() {
+                let mut dist = 0.0f32;
+                for (a, b) in r.iter().zip(cen.iter()) {
+                    let diff = a - b;
+                    dist += diff * diff;
+                }
+                if dist < best_dist {
+                    best_dist = dist;
+                    best = c;
+                }
+            }
+            labels.push(best);
+        }
+        let mut sums: Vec<Vec<f32>> = vec![vec![0.0f32; d]; centroids.len()];
+        let mut counts: Vec<usize> = vec![0usize; centroids.len()];
+        for (i, r) in rows.iter().enumerate() {
+            let c = labels[i];
+            counts[c] += 1;
+            for (j, v) in r.iter().enumerate() {
+                sums[c][j] += v;
+            }
+        }
+        for c in 0..centroids.len() {
+            if counts[c] > 0 {
+                for j in 0..d {
+                    centroids[c][j] = sums[c][j] / counts[c] as f32;
+                }
+            }
+        }
+    }
+    centroids
+}
+
+/// Load all vectors from the `embeddings` table (optionally the first `limit` rows).
+fn load_embeddings_raw(conn: &Connection, limit: Option<usize>) -> rusqlite::Result<(Vec<String>, Vec<Vec<f32>>)> {
+    let sql = match limit {
+        Some(l) => format!("SELECT node_id, vector FROM embeddings LIMIT {l}"),
+        None => "SELECT node_id, vector FROM embeddings".to_string(),
+    };
+    let mut stmt = conn.prepare(&sql)?;
+    let mut ids = Vec::new();
+    let mut vecs = Vec::new();
+    let rows = stmt.query_map([], |row| {
+        let node_id: String = row.get(0)?;
+        let blob: Vec<u8> = row.get(1)?;
+        Ok((node_id, blob_to_vector(&blob)))
+    })?;
+    for row in rows {
+        let (id, v) = row?;
+        ids.push(id);
+        vecs.push(v);
+    }
+    Ok((ids, vecs))
+}
+
+/// Train a PQ codebook from the `embeddings` table and persist both the codebook
+/// (`pq_codebook`) and per-node compressed codes (`embeddings_pq`).
+///
+/// Faithful port of `scripts/kb-embed-pq.py` main flow: reshapes each vector into
+/// `m` sub-spaces, trains one centroid set of size `ks` per subspace (Python
+/// recommander defaults m=24/ks=256/iters=10 on 384-dim), then assigns each
+/// vector's nearest centroid index per subspace into a packed `<m}B` byte code.
+///
+/// Errors (with a caller-facing message) if there aren't enough vectors to train
+/// the requested `ks`, or if `m` doesn't divide `dimension`.
+pub fn train_pq_codebook(
+    conn: &Connection,
+    m: usize,
+    ks: usize,
+    dimension: usize,
+    limit: Option<usize>,
+) -> Result<PqTrainReport, String> {
+    if m == 0 || !dimension.is_multiple_of(m) {
+        return Err(format!("m must be a positive divisor of {dimension}"));
+    }
+    let total: i64 = conn.query_row("SELECT COUNT(*) FROM embeddings", [], |r| r.get(0))
+        .map_err(|e| format!("PQ: count embeddings: {e}"))?;
+    if (total as usize) < ks * 4 {
+        return Err(format!(
+            "Not enough vectors to train PQ: {total} < {}( = ks×4). Need more embeddings first.",
+            ks * 4
+        ));
+    }
+    let (ids, vecs) = load_embeddings_raw(conn, limit).map_err(|e| format!("PQ: load embeddings: {e}"))?;
+    let n = vecs.len();
+    let sub_dim = dimension / m;
+
+    let mut codewords_all: Vec<Vec<Vec<f32>>> = Vec::with_capacity(m);
+    for s in 0..m {
+        let sub: Vec<&[f32]> = vecs.iter().map(|r| &r[s * sub_dim..(s + 1) * sub_dim]).collect();
+        codewords_all.push(pq_kmeans(&sub, ks, 10));
+    }
+
+    let mut codeword_blob: Vec<u8> = Vec::new();
+    for cw in &codewords_all {
+        for centroid in cw {
+            for v in centroid {
+                codeword_blob.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+    }
+    let now = crate::neotrix::nt_memory_kb::nt_memory_embed::unix_now();
+    conn.execute(
+        "INSERT INTO pq_codebook (m, ks, sub_dim, codewords, dimension, model, trained_at, num_vectors) VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+        params![m as i64, ks as i64, sub_dim as i64, codeword_blob, dimension as i64, "all-MiniLM-L6-v2", now, n as i64],
+    ).map_err(|e| format!("insert pq_codebook: {e}"))?;
+    let codebook_id = conn.last_insert_rowid();
+
+    for i in 0..n {
+        let mut codes: Vec<u8> = Vec::with_capacity(m);
+        for s in 0..m {
+            let sub = &vecs[i][s * sub_dim..(s + 1) * sub_dim];
+            let mut best = 0usize;
+            let mut best_dist = f32::INFINITY;
+            for (c, centroid) in codewords_all[s].iter().enumerate() {
+                let mut dist = 0.0f32;
+                for (a, b) in sub.iter().zip(centroid.iter()) {
+                    let diff = a - b;
+                    dist += diff * diff;
+                }
+                if dist < best_dist {
+                    best_dist = dist;
+                    best = c;
+                }
+            }
+            codes.push(best as u8);
+        }
+        conn.execute(
+            "INSERT OR REPLACE INTO embeddings_pq (node_id, pq_codes, codebook_id) VALUES (?1,?2,?3)",
+            params![ids[i], codes, codebook_id],
+        ).map_err(|e| format!("insert embeddings_pq for {}: {e}", ids[i]))?;
+    }
+    Ok(PqTrainReport { codebook_id, m, ks, sub_dim, vector_count: n })
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -440,5 +620,67 @@ mod tests {
         assert_eq!(hits[0].0, "n1");
         // After exact re-ranking the score is cosine similarity (positive for a match).
         assert!(hits[0].1 > 0.0, "re-ranked score should be cosine similarity");
+    }
+
+    #[test]
+    fn test_train_pq_codebook_roundtrip() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE pq_codebook(id INTEGER PRIMARY KEY AUTOINCREMENT, m INTEGER, ks INTEGER, sub_dim INTEGER, codewords BLOB, dimension INTEGER, model TEXT, trained_at INTEGER, num_vectors INTEGER);
+             CREATE TABLE embeddings_pq(node_id TEXT PRIMARY KEY, pq_codes BLOB, codebook_id INTEGER);
+             CREATE TABLE embeddings(node_id TEXT PRIMARY KEY, vector BLOB, dimension INTEGER, model TEXT, created_at INTEGER);",
+        )
+        .unwrap();
+        // 8 vectors of dim 4 clustered so kmeans converges: two clusters of 4
+        let vecs: Vec<Vec<f32>> = (0..8)
+            .map(|i| if i < 4 { vec![1.0, 1.0, 1.0, 1.0] } else { vec![5.0, 5.0, 5.0, 5.0] })
+            .collect();
+        for (i, v) in vecs.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO embeddings (node_id, vector, dimension, model, created_at) VALUES (?1, ?2, 4, 'mini', 0)",
+                params![format!("n{i}"), vector_to_blob(v)],
+            )
+            .unwrap();
+        }
+        // m=2 sub-spaces × ks=2 centroids; 8 vectors >= ks*4
+        let report = train_pq_codebook(&conn, 2, 2, 4, None).unwrap();
+        assert_eq!(report.m, 2);
+        assert_eq!(report.ks, 2);
+        assert_eq!(report.sub_dim, 2);
+        assert_eq!(report.vector_count, 8);
+        assert!(report.codebook_id >= 1);
+
+        let pq_count: i64 = conn.query_row("SELECT COUNT(*) FROM embeddings_pq", [], |r| r.get(0)).unwrap();
+        assert_eq!(pq_count, 8);
+        let cb_count: i64 = conn.query_row("SELECT COUNT(*) FROM pq_codebook", [], |r| r.get(0)).unwrap();
+        assert_eq!(cb_count, 1);
+
+        // The trained codebook must be loadable and searchable: query == cluster A
+        let q: Vec<f32> = vec![1.0, 1.0, 1.0, 1.0];
+        let hits = pq_ann_search(&conn, &q, 2, Some(report.codebook_id)).unwrap();
+        assert!(!hits.is_empty());
+        // n0/n1 (cluster A) must rank above n2/n3 (cluster B)
+        let top = &hits[0].0;
+        assert!(top == "n0" || top == "n1");
+    }
+
+    #[test]
+    fn test_train_pq_too_few_vectors() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE pq_codebook(id INTEGER PRIMARY KEY AUTOINCREMENT, m INTEGER, ks INTEGER, sub_dim INTEGER, codewords BLOB, dimension INTEGER, model TEXT, trained_at INTEGER, num_vectors INTEGER);
+             CREATE TABLE embeddings_pq(node_id TEXT PRIMARY KEY, pq_codes BLOB, codebook_id INTEGER);
+             CREATE TABLE embeddings(node_id TEXT PRIMARY KEY, vector BLOB, dimension INTEGER, model TEXT, created_at INTEGER);",
+        )
+        .unwrap();
+        for i in 0..3 {
+            conn.execute(
+                "INSERT INTO embeddings (node_id, vector, dimension, model, created_at) VALUES (?1, ?2, 4, 'mini', 0)",
+                params![format!("n{i}"), vector_to_blob(&vec![0.0, 0.0, 0.0, 0.0])],
+            )
+            .unwrap();
+        }
+        let err = train_pq_codebook(&conn, 2, 2, 4, None).unwrap_err();
+        assert!(err.contains("Not enough vectors"), "err: {err}");
     }
 }

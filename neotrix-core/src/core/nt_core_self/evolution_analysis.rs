@@ -289,6 +289,54 @@ pub fn store_report_to_kb(conn: &Connection, report: &KbHealthReport) -> rusqlit
     Ok(())
 }
 
+/// Record a runtime operational defect to the KB `kv_store` `meta_cognition`
+/// namespace. Generalized port of `scripts/novel-world-absorb.py:record_defect`
+/// (and the equivalent pattern in other absorb daemons): a thin, retry-silent
+/// append of a structured defect event keyed by a hex timestamp + sequence.
+///
+/// Returns the generated key on success, `None` if the write failed (callers treat
+/// defect recording as best-effort, never fatal).
+pub fn record_meta_cognition_defect(
+    conn: &Connection,
+    defect_type: &str,
+    source: &str,
+    description: &str,
+    severity: f64,
+    cycle: i64,
+) -> Option<String> {
+    let now = unix_now();
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS kv_store (namespace TEXT, key TEXT, value TEXT, updated_at INTEGER,
+         PRIMARY KEY (namespace, key))"
+    )
+    .ok()?;
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let key = format!("novel_{cycle:04}_{:x}_{:04x}", now, seq);
+    let value = serde_json::json!({
+        "defect_type": defect_type,
+        "source": source,
+        "description": description,
+        "severity": severity,
+        "ts": now,
+        "cycle": cycle,
+    })
+    .to_string();
+    conn.execute(
+        "INSERT OR IGNORE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params!["meta_cognition", key, value, now],
+    )
+    .ok()?;
+    Some(key)
+}
+
+pub fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
 /// Pretty-print the health report.
 pub fn print_report(report: &KbHealthReport) {
     println!();
