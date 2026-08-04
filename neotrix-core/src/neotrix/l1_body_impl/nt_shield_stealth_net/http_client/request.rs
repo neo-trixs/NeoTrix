@@ -61,6 +61,14 @@ impl StealthHttpClient {
             req = req.header(k, v);
         }
 
+        if let Some(persona) = *self.comm_persona.read().await {
+            let extra_ref: Vec<(&str, &str)> = extra.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+            let ordered = crate::neotrix::l1_body_impl::nt_shield_comm::build_headers(&persona, parsed.as_str(), &extra_ref);
+            for (k, v) in ordered {
+                req = req.header(k, v);
+            }
+        }
+
         let resp = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
         let status = resp.status().as_u16();
         let headers: HashMap<String, String> = resp

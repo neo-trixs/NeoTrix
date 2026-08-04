@@ -58,6 +58,7 @@ pub struct StealthHttpClient {
     pub(super) isolation_map: RwLock<HashMap<String, Arc<DynamicProxyChain>>>,
     pub(super) entropy_budget: RwLock<EntropyBudget>,
     pub(super) detection_streak: AtomicU64,
+    pub(super) comm_persona: RwLock<Option<crate::neotrix::l1_body_impl::nt_shield_comm::Persona>>,
 }
 
 impl Default for StealthHttpClient {
@@ -123,6 +124,7 @@ impl StealthHttpClient {
                         isolation_map: RwLock::new(HashMap::new()),
                         entropy_budget: RwLock::new(EntropyBudget::new(20.0)),
                         detection_streak: AtomicU64::new(0),
+                        comm_persona: RwLock::new(None),
                     }
                 })
             }
@@ -166,6 +168,7 @@ impl StealthHttpClient {
             isolation_map: RwLock::new(HashMap::new()),
             entropy_budget: RwLock::new(EntropyBudget::new(20.0)),
             detection_streak: AtomicU64::new(0),
+            comm_persona: RwLock::new(None),
         })
     }
 
@@ -321,6 +324,28 @@ impl StealthHttpClient {
 
     pub async fn extra_headers(&self) -> HashMap<String, String> {
         self.extra_headers.read().await.clone()
+    }
+
+    /// 启用 NT-SHIELD 通信伪装层: 请求携带随机全球真实浏览器 persona 头
+    /// (user-agent / sec-ch-ua / accept-language 等), 覆盖内部系统指纹。
+    /// persona_key 为空时按市场占有率加权随机选择。
+    pub async fn enable_persona(&self, persona_key: &str) {
+        use crate::neotrix::l1_body_impl::nt_shield_comm::{persona_by_key, select_persona_weighted};
+        let persona = if persona_key.is_empty() {
+            *select_persona_weighted()
+        } else {
+            *persona_by_key(persona_key).unwrap_or_else(select_persona_weighted)
+        };
+        *self.comm_persona.write().await = Some(persona);
+    }
+
+    /// 关闭伪装层, 恢复系统指纹头。
+    pub async fn disable_persona(&self) {
+        *self.comm_persona.write().await = None;
+    }
+
+    pub async fn active_persona(&self) -> Option<String> {
+        self.comm_persona.read().await.map(|p| p.key.to_string())
     }
 }
 

@@ -136,6 +136,7 @@ pub use l1_body_impl::nt_shield_sandbox;
 pub use l1_body_impl::nt_shield_manager;
 #[cfg(feature = "stealth-net")]
 pub use l1_body_impl::nt_shield_stealth_net;
+pub use l1_body_impl::nt_shield_comm;
 
 pub use l1_body_impl::nt_shield_redteam;
 pub use l1_body_impl::nt_shield_agentic_scan;

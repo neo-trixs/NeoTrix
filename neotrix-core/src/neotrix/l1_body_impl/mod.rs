@@ -46,6 +46,7 @@ pub mod nt_shield_stealth_net;
 pub mod nt_shield_traffic;
 pub mod nt_shield_redteam;
 pub mod nt_shield_agentic_scan;
+pub mod nt_shield_comm;
 
 // Act
 pub mod nt_act_autonomy;

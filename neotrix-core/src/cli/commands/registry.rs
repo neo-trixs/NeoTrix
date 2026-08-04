@@ -38,6 +38,7 @@ use crate::cli::commands::kb_cmds::KbCmd;
 use crate::cli::commands::wiki_cmds::WikiCmd;
 use crate::cli::commands::self_audit_cmds::SelfAuditCmd;
 use crate::cli::commands::osint_cmds::OsintCmd;
+use crate::cli::commands::comm_cmds::CommCmd;
 use crate::cli::commands::consolidated_cmds::{
     FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd,
 };
@@ -147,6 +148,9 @@ pub fn default_registry() -> CommandRegistry {
     // L4 capability: Rust-native OSINT and self-audit
     reg.register(Box::new(OsintCmd));
     reg.register(Box::new(SelfAuditCmd));
+
+    // L1 capability: NT-SHIELD 通信伪装层观测
+    reg.register(Box::new(CommCmd));
 
     reg
 }

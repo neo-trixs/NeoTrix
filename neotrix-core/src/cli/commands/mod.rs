@@ -44,6 +44,7 @@ pub mod wiki_cmds;
 pub mod consciousness_cmds;
 pub mod osint_cmds;
 pub mod self_audit_cmds;
+pub mod comm_cmds;
 
 pub use types::*;
 pub use sandbox_cmds::*;
