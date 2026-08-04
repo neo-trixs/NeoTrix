@@ -96,6 +96,27 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS idx_crawl_status ON crawl_queue(status);
         CREATE INDEX IF NOT EXISTS idx_crawl_priority ON crawl_queue(priority, status);
 
+        CREATE TABLE IF NOT EXISTS novel_queue (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            author TEXT,
+            genre TEXT,
+            sub_genre TEXT,
+            book_url TEXT NOT NULL UNIQUE,
+            rank INTEGER DEFAULT 0,
+            synopsis TEXT,
+            tags TEXT,
+            word_count TEXT,
+            status TEXT DEFAULT 'pending',
+            chapter_count INTEGER DEFAULT 0,
+            ranking_name TEXT,
+            discovered_at INTEGER NOT NULL,
+            last_attempt INTEGER,
+            retry_count INTEGER DEFAULT 0,
+            error_message TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_novel_status ON novel_queue(status);
+
         CREATE TABLE IF NOT EXISTS procedural_memory (
             id TEXT PRIMARY KEY,
             skill_id TEXT UNIQUE NOT NULL,

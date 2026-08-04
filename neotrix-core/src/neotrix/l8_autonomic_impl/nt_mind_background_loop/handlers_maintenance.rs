@@ -258,4 +258,25 @@ impl BackgroundLoopHandle {
         }
     }
 
+    /// 网络小说世界构建知识吸收 (R-P79 closure for nt_world_novel):
+    /// ① 消费 novel_queue(外部起点采集器入队) → ingest_qidian_book;
+    /// ② 离线为既有 Book 节点补世界观分类。
+    pub(crate) async fn handle_novel_ingest(&mut self) {
+        use crate::neotrix::l2_world_impl::nt_world_novel::{drain_novel_queue, classify_unanalyzed_books};
+        let kb = match self.kb_pipeline.kb.as_ref() {
+            Some(kb) => kb,
+            None => { log::warn!("[bg] novel_ingest: kb not attached"); return; }
+        };
+        let conn = match kb.conn.lock() {
+            Ok(c) => c,
+            Err(e) => { log::warn!("[bg] novel_ingest lock: {}", e); return; }
+        };
+
+        let queue_report = drain_novel_queue(&conn, 50);
+        let (classified, edges) = classify_unanalyzed_books(&conn, 50);
+
+        log::info!("[bg] novel_ingest: queue={} books/{} edges, classified={}/{}",
+            queue_report.books, queue_report.edges, classified, edges);
+    }
+
 }

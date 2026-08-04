@@ -97,6 +97,7 @@ pub use l2_world_impl::nt_world_journal_index;
 pub use l2_world_impl::nt_world_code_search;
 pub use l2_world_impl::nt_world_video_pipeline;
 pub use l2_world_impl::nt_world_osint;
+pub use l2_world_impl::nt_world_novel;
 
 // L1 — Body (身体层) — 行动、界面、安全
 pub use l1_body_impl::nt_io_logging;

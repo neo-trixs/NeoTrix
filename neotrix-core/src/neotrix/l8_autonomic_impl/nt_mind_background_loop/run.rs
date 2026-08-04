@@ -502,6 +502,8 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(600, |h| h.handle_session_recovery().await);
         spawn_handler!(300, |h| h.handle_crawl_queue().await);
         spawn_handler!(3600, |h| h.handle_architecture_audit().await);
+        // 43200s — 网络小说世界构建吸收 (novel_queue drain + 离线重分类), 12h cadence
+        spawn_handler!(43_200, |h| h.handle_novel_ingest().await);
         // ── Constitution hot-reload ──
         spawn_handler!(86400, |h| h.handle_constitution_reload().await);
         // 3600s — consciousness evolves at architecture-audit tempo, not real-time
