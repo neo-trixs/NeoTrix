@@ -152,6 +152,7 @@
 - **R-P96 (死 bin 独立逻辑必查重复 HTTP)**: bin 若 0 处生产 lib use (=自包含逻辑), 必查其是否内联了与生产重复的安全敏感路径 (HTTP client/抓取/鉴权)。`kb_crawl_batch` 自建 `http_client()` (无 SSRF guard/无 connect 期 DNS pinning) 平行于已收敛的 `nt_http` — 属 R-P42 平行实现, 其多源抓取能力 (OpenLibrary/退避重试/429-retry-after) 应**提炼函数并入生产 `nt_http`/`nt_memory_crawl`**, 而非保留独立 bin。
 - **R-P97 (python 原型按 Rust port 退役)**: `scripts/*.py` 仅是 `//! port of ...py` 注释中被 Rust 移植的原型, 无 launchd/daemon/生产引用 → 退役 (git rm)。判定: `rg -rln "<script>" --hidden | rg -v scripts/` 为空 + `pgrep -fl` 无活进程 + `ls ~/Library/LaunchAgents/com.neotrix.*` 无对应 plist。例外: Makefile 有 `make <target>` 直接调用的 (如 `shanhai-*`) 视为活跃 CLI 工具链, 保留。
 - **R-P98 (死代码拆解三态, 非二元)**: 死代码不能只判"删/留"。拆解前先归三态: ①能力已在活跃 lib (薄包装 bin) → 删 bin 留 lib; ②能力独立且生产缺失 → 提炼并入最近生产节点, 再删源; ③能力废弃/无价值 → 直接删。三态判定后统一删源, 避免"融一半留一半"。
+- **R-P99 (死模块能力先融合后删, 不直接删整体)**: 判定某模块零生产调用后, 先拆解其**通用能力**, 融合进同域活跃节点 (R-P42 强化现有节点), 再删源。例: 顶层 `server/http.rs+h5.rs+ws.rs` 零生产调用, 其 WsBridge+IM 适配器 / Session share API / H5 远程聊天 / WS echo 拆解融合进 `nt_io_web` (保留成熟 AppState+brain API), 然后删 3 个死文件, 保留 `server/session.rs` (被 session_cmds 用)。判定活/死: `grep -rln "<模块>" --include="*.rs" | grep -v "^<模块路径>/"` 为空即零生产调用。
 
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 

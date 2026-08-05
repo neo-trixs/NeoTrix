@@ -1,26 +1,5 @@
-pub mod http;
-pub mod ws;
-pub mod h5;
+//! 服务层 — 仅保留 `session` (被 `cli/commands/session_cmds` 生产引用)。
+//! HTTP API / WebSocket / H5 通信能力已拆解融合到 `nt_io_web` (R-P42)。
+
 pub mod session;
-pub use http::start_server;
-pub use ws::{WsBridge, WsBridgeConfig, ImAdapter, TelegramAdapter, WhatsAppAdapter};
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ws_bridge_config_default() {
-        let cfg = WsBridgeConfig::default();
-        assert_eq!(cfg.heartbeat_interval, std::time::Duration::from_secs(30));
-    }
-
-    #[test]
-    fn test_ws_bridge_config_clone() {
-        let cfg = WsBridgeConfig::default();
-        let cloned = WsBridgeConfig { ..cfg };
-        assert_eq!(cloned.max_reconnect_attempts, cfg.max_reconnect_attempts);
-    }
-}
-
-// pub mod server_interface; — removed during dead module cleanup
+pub use session::{SessionManager, SessionShare, SessionShareManager};

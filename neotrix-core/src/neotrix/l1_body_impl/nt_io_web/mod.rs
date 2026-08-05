@@ -1,5 +1,7 @@
 pub mod api;
 pub mod server;
+pub mod share;
+pub mod ws;
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicU64;

@@ -6,7 +6,7 @@ use axum::{
     },
 };
 use futures::stream::{self, Stream};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::atomic::Ordering;
 
@@ -764,9 +764,146 @@ pub async fn cli_command_handler(
 }
 
 
+// ─── Session Share (通用能力: 从 server/http.rs 拆解融合) ──────────
+
+#[derive(Deserialize)]
+pub struct ShareCreateRequest {
+    pub name: String,
+    pub ttl_hours: Option<u64>,
+}
+
+#[derive(Serialize)]
+pub struct ShareCreateResponse {
+    pub token: String,
+    pub url: String,
+    pub session_name: String,
+    pub created_at: String,
+    pub expires_at: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ShareGetResponse {
+    pub session_name: String,
+    pub session_json: serde_json::Value,
+    pub created_at: String,
+    pub expires_at: Option<String>,
+}
+
+/// GET /api/sessions/share/:token — 按 token 取回分享的会话
+pub async fn share_get_handler(
+    Path(token): Path<String>,
+) -> Json<Result<ShareGetResponse, String>> {
+    let mgr = crate::neotrix::l1_body_impl::nt_io_web::share::SessionShareManager::new();
+    match mgr.get(&token) {
+        Ok(share) => Json(Ok(ShareGetResponse {
+            session_name: share.session_name,
+            session_json: share.session_json,
+            created_at: share.created_at.to_rfc3339(),
+            expires_at: share.expires_at.map(|e| e.to_rfc3339()),
+        })),
+        Err(e) => Json(Err(e)),
+    }
+}
+
+/// POST /api/sessions/share — 从已保存会话创建分享链接
+pub async fn share_create_handler(
+    Json(req): Json<ShareCreateRequest>,
+) -> Json<Result<ShareCreateResponse, String>> {
+    let store = crate::cli::tui::session_store::SessionStore::new();
+    let session_json = match crate::cli::tui::session_store::SessionStore::export_to_json(&store, &req.name).or_else(|_| store.export_to_json(&req.name)) {
+        Ok(j) => j,
+        Err(e) => return Json(Err(format!("无法加载会话 '{}': {}", req.name, e))),
+    };
+    let json_value: serde_json::Value = match serde_json::from_str(&session_json) {
+        Ok(v) => v,
+        Err(_) => return Json(Err("会话 JSON 解析失败".to_string())),
+    };
+    let mgr = crate::neotrix::l1_body_impl::nt_io_web::share::SessionShareManager::new();
+    match mgr.create(&req.name, json_value, req.ttl_hours) {
+        Ok(share) => Json(Ok(ShareCreateResponse {
+            token: share.token.clone(),
+            url: format!("/api/sessions/share/{}", share.token),
+            session_name: share.session_name,
+            created_at: share.created_at.to_rfc3339(),
+            expires_at: share.expires_at.map(|e| e.to_rfc3339()),
+        })),
+        Err(e) => Json(Err(e)),
+    }
+}
+
+// ─── H5 远程聊天页 (通用能力: 从 server/h5.rs 拆解融合) ──────────
+
+const H5_PAGE: &str = r##"<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>NeoTrix 远程会话</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; background: #0f0f1a; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
+#header { padding: 12px 16px; background: #1a1a2e; border-bottom: 1px solid #2a2a4a; display: flex; justify-content: space-between; align-items: center; }
+#header h1 { font-size: 16px; color: #00d4ff; }
+#token-bar { padding: 8px 16px; background: #16213e; display: flex; gap: 8px; }
+#token-bar input { flex:1; padding:6px 10px; border:1px solid #2a2a4a; border-radius:4px; background:#0f0f1a; color:#e0e0e0; }
+#token-bar button { padding:6px 16px; border:none; border-radius:4px; background:#00d4ff; color:#000; cursor:pointer; }
+#chat { flex:1; overflow-y:auto; padding:16px; }
+.msg { margin-bottom:12px; max-width:85%; }
+.msg.user { margin-left:auto; }
+.msg .bubble { padding:10px 14px; border-radius:12px; line-height:1.5; font-size:14px; }
+.msg.user .bubble { background:#00d4ff22; border:1px solid #00d4ff44; }
+.msg.assistant .bubble { background:#2a2a4a; border:1px solid #3a3a5a; }
+.msg .role { font-size:11px; color:#888; margin-bottom:4px; }
+#input-bar { padding:12px 16px; background:#1a1a2e; border-top:1px solid #2a2a4a; display:flex; gap:8px; }
+#input-bar input { flex:1; padding:10px 14px; border:1px solid #2a2a4a; border-radius:8px; background:#0f0f1a; color:#e0e0e0; font-size:14px; }
+#input-bar button { padding:10px 20px; border:none; border-radius:8px; background:#00d4ff; color:#000; font-size:14px; cursor:pointer; }
+#status { font-size:12px; color:#666; padding:4px 16px; text-align:center; }
+</style></head><body>
+<div id="header"><h1>🧠 NeoTrix</h1><span style="font-size:12px;color:#666;">远程会话</span></div>
+<div id="token-bar">
+  <input id="token-input" type="password" placeholder="输入访问 Token...">
+  <button onclick="connect()">连接</button>
+</div>
+<div id="chat"></div>
+<div id="status">未连接</div>
+<div id="input-bar">
+  <input id="msg-input" type="text" placeholder="输入消息..." disabled onkeydown="if(event.key==='Enter')send()">
+  <button id="send-btn" disabled onclick="send()">发送</button>
+</div>
+<script>
+let ws = null; let token = '';
+function connect() { token = document.getElementById('token-input').value; if(!token) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto+'//'+location.host+'/ws?token='+encodeURIComponent(token));
+  ws.onopen = () => { document.getElementById('status').textContent = '已连接';
+    document.getElementById('msg-input').disabled=false; document.getElementById('send-btn').disabled=false; };
+  ws.onclose = () => { document.getElementById('status').textContent = '已断开';
+    document.getElementById('msg-input').disabled=true; document.getElementById('send-btn').disabled=true; };
+  ws.onmessage = (e) => addMsg('assistant', e.data); }
+function send() { const inp = document.getElementById('msg-input'); const text = inp.value.trim(); if(!text) return;
+  addMsg('user', text); ws.send(JSON.stringify({type:'text',token,content:text})); inp.value=''; }
+function addMsg(role, content) {
+  const div = document.createElement('div'); div.className = 'msg '+role;
+  div.innerHTML = '<div class="role">'+(role==='user'?'你':'NeoTrix')+'</div><div class="bubble">'+esc(content)+'</div>';
+  document.getElementById('chat').appendChild(div);
+  div.scrollIntoView({behavior:'smooth'}); }
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+</script></body></html>"##;
+
+/// GET /chat — H5 远程聊天页
+pub async fn h5_page() -> axum::response::Html<&'static str> {
+    axum::response::Html(H5_PAGE)
+}
+
+/// CORS 中间件头
+pub fn cors_headers() -> axum::http::HeaderMap {
+    let mut h = axum::http::HeaderMap::new();
+    h.insert("Access-Control-Allow-Origin", axum::http::HeaderValue::from_static("*"));
+    h.insert("Access-Control-Allow-Methods", axum::http::HeaderValue::from_static("GET,POST,OPTIONS"));
+    h.insert("Access-Control-Allow-Headers", axum::http::HeaderValue::from_static("Authorization,Content-Type"));
+    h
+}
+
 #[cfg(test)]
 mod tests {
-
     #[test]
     fn test_basic() {
         assert!(true);

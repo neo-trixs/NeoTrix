@@ -116,6 +116,16 @@ pub fn build_router(state: AppState) -> Router {
             post(api::save_provider_handler),
         )
         .route("/api/mcp/command", post(api::cli_command_handler))
+        // Session share (从 server/http.rs 融合)
+        .route("/api/sessions/share", post(api::share_create_handler))
+        .route(
+            "/api/sessions/share/{token}",
+            get(api::share_get_handler),
+        )
+        // H5 远程聊天 (从 server/h5.rs 融合)
+        .route("/chat", get(api::h5_page))
+        // WebSocket echo (从 server/http.rs ws_handler 融合)
+        .route("/ws", get(ws_echo_handler))
         // Frontend + fallback
         .route("/", get(handle_frontend))
         .fallback(not_found_handler)
@@ -123,6 +133,27 @@ pub fn build_router(state: AppState) -> Router {
         .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .with_state(state)
+}
+
+/// WebSocket echo — 从 server/http.rs 拆解融合
+pub async fn ws_echo_handler(
+    ws: axum::extract::ws::WebSocketUpgrade,
+) -> impl axum::response::IntoResponse {
+    ws.on_upgrade(|socket| ws_echo_loop(socket))
+}
+
+async fn ws_echo_loop(socket: axum::extract::ws::WebSocket) {
+    use axum::extract::ws::{Message};
+    use futures::{SinkExt, StreamExt};
+    let (mut sender, mut receiver) = socket.split();
+    while let Some(msg) = receiver.next().await {
+        if let Ok(Message::Text(text)) = msg {
+            let echo = format!("echo: {}", text);
+            if sender.send(Message::Text(echo.into())).await.is_err() {
+                break;
+            }
+        }
+    }
 }
 
 pub async fn start_server(port: u16) {
