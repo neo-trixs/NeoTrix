@@ -14,9 +14,9 @@ use uuid::Uuid;
 
 pub const NONCE_LEN: usize = 12;
 
-/// kv_store value 透明压缩魔数 (Python 侧 absorb_session.py 的 _VALUE_MAGIC)。
-/// 魔数前缀 + zlib 表示 value 已压缩 (仅 Python 侧写入)。Rust 侧读到该前缀时
-/// 视为压缩数据: 不尝试解码为明文 (避免乱码), 按无数据跳过, 配合 Python 侧完整解压读取。
+/// kv_store value 透明压缩魔数 (neotrix-experience 的 _VALUE_MAGIC, 与旧 Python 版兼容)。
+/// 魔数前缀 + zlib 表示 value 已压缩。Rust 侧读到该前缀时
+/// 视为压缩数据: 不尝试解码为明文 (避免乱码), 按无数据跳过, 配合 neotrix-experience 完整解压读取。
 pub const VALUE_COMPRESSED_MAGIC: &[u8] = b"NTZ1";
 
 fn now() -> i64 {

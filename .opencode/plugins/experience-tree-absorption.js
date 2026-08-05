@@ -4,7 +4,7 @@
 // Session-end flow is: absorb session.json → close snapshot.
 // Session-start snapshot is created manually by the agent (see SKILL.md).
 
-const ABSORB = process.env.HOME + "/.agents/skills/experience-tree/scripts/absorb_session.py";
+const ABSORB = "neotrix-experience";
 const PENDING = process.env.HOME + "/.neotrix/pending-absorb.json";
 
 import { readFileSync, existsSync } from "node:fs";
@@ -18,9 +18,9 @@ export const AbsorptionPlugin = async ({ $ }) => {
           if (!existsSync(PENDING)) return;
           const pending = JSON.parse(readFileSync(PENDING, "utf8"));
           const cycle = pending.cycle || "unknown";
-          await $`python3 ${ABSORB} absorb ${PENDING}`;
+          await $`${ABSORB} absorb ${PENDING}`;
           await $`rm -f ${PENDING}`;
-          await $`python3 ${ABSORB} close --cycle ${cycle}`;
+          await $`${ABSORB} close --cycle ${cycle}`;
         } catch (e) {
           console.error("[experience-tree] session-end absorption failed:", e);
         }

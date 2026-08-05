@@ -9,7 +9,7 @@
 //   AGENTS.md is a PURE GUIDANCE doc. The Experience Index section (previously sanctioned
 //   to grow one row per cycle) was the root cause of chronic false "131 lines" violations:
 //   pointer growth collided with the global ceiling and byte headroom. It is now FORBIDDEN
-//   entirely — cycle pointers live only in the KB `experience` hub (absorb_session.py
+//   entirely — cycle pointers live only in the KB `experience` hub (neotrix-experience
 //   hub/query). The guard therefore enforces simple total ceilings on the constant content
 //   plus an explicit "no Experience Index section" check.
 
@@ -86,7 +86,7 @@ export const AgentsGuardPlugin = async ({ $ }) => {
         const growth = h2Sections.filter((s) => FORBIDDEN_SECTIONS.includes(s));
         if (growth.length > 0) {
           violated = true;
-          logViolation(`AGENTS.md contains forbidden per-cycle growth area: ${growth.join(", ")}. Cycle pointers live in KB (absorb_session.py hub/query), never in AGENTS.md.`);
+          logViolation(`AGENTS.md contains forbidden per-cycle growth area: ${growth.join(", ")}. Cycle pointers live in KB (neotrix-experience hub/query), never in AGENTS.md.`);
         }
 
         // 5. No inline Experience Index table (header or data rows)

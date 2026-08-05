@@ -1,7 +1,6 @@
-//! neotrix-experience — Unified End-of-Conversation Absorption Engine (Rust port).
-//!
-//! 忠实移植 `~/.agents/skills/experience-tree/scripts/absorb_session.py`:
-//!   单入口: 每次会话结束时运行 `neotrix-experience absorb <session.json>`
+//! neotrix-experience — Unified End-of-Conversation Absorption Engine (Rust native,
+//! 生产路径; 历史原型为 Python 版 `absorb_session.py`, 已退役).
+//! 单入口: 每次会话结束时运行 `neotrix-experience absorb <session.json>`
 //!   统一数据层: ~/.neotrix/knowledge.db 的 kv_store, namespace='experience'.
 //!   统一 schema: 每条经验含 {schema_version, type, session_id, cycle, ts, domain,
 //!                content, evidence, source, verify_by}.

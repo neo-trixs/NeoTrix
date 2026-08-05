@@ -1288,7 +1288,7 @@ impl CalibrationSet {
     /// 从 experience-tree KB 的 kv_store `experience` namespace 构建真实黄金集
     /// (FPAM P1: 用真实轨迹校准, 而非 fixture)。
     ///
-    /// 输入: `(key, value)` 序列, 每条 value 是 absorb_session.py 写入的
+    /// 输入: `(key, value)` 序列, 每条 value 是 neotrix-experience 写入的
     /// `JSON {type, domain, content, evidence, verify_by}`。
     ///
     /// 标签规则 (确定性, 非猜测): `type` ∈ 失败族 → Broken; 其余 → Clean。
