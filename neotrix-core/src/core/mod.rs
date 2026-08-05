@@ -175,9 +175,7 @@ pub use l7_capability::{
     Capability, CapabilityId, capability_id_from_name,
     CapabilityKind, CapabilityCost, CapabilityStats, ContextSlot, SlotKind,
     CapabilityRegistry,
-    // 调度
-    CapabilityScheduler, SchedulerConfig, SchedulingStrategy,
-    Bid, ScheduleResult,
+    // 调度 (thater stub archived — use real nt_core_scheduler)
     // 协议
     StarPulse, PulseKind, PulseBus,
     // 大过滤器
