@@ -7,6 +7,22 @@ const PRELOAD_SCRIPT = `(function() {
 
   const DEFAULTS = {
     neocodex_app_version: () => "0.18.0-test",
+    neocodex_agent_status: () => ({
+      running: false, current_task: null, uptime_secs: 0, turn_count: 0,
+      tokens_used: 0, context_usage: 0, provider_model: "test-model",
+      evolution_iterations: 0, cost_spent: 0, cost_budget: 0,
+    }),
+    neocodex_send_message_stream: () => "ok",
+    neocodex_stop_stream: () => "ok",
+    neocodex_mcp_register: () => [],
+    neocodex_mcp_list: () => [],
+    neocodex_mcp_tools: () => [],
+    neocodex_health_report: () => ({
+      mode: "idle", turn_count: 0, tool_call_count: 0, tokens_used: 0,
+      context_usage: 0, context_turns: 0, provider_count: 1,
+      provider_resolvable: true, provider_model: "test-model",
+      session_writable: true,
+    }),
     neocodex_list_sessions: () => [],
     neocodex_list_archived: () => [],
     neocodex_get_session_messages: () => [],
@@ -47,18 +63,27 @@ const PRELOAD_SCRIPT = `(function() {
 
     if (cmd === "plugin:event|listen") {
       const { event, handler } = args;
-      if (!LISTENERS.has(event)) LISTENERS.set(event, new Map());
-      LISTENERS.get(event).set(handler, CALLBACKS.get(handler));
-      return Promise.resolve(handler);
+      if (!handler || typeof handler !== "function") {
+        // tauri wraps the handler in a callback id; unwrap via CALLBACKS
+        if (!LISTENERS.has(event)) LISTENERS.set(event, new Set());
+        const fn = CALLBACKS.get(handler);
+        if (fn) LISTENERS.get(event).add(fn);
+        return Promise.resolve(handler);
+      }
+      if (!LISTENERS.has(event)) LISTENERS.set(event, new Set());
+      LISTENERS.get(event).add(handler);
+      return Promise.resolve(null);
     }
     if (cmd === "plugin:event|unlisten") {
       const { event, handler } = args;
-      LISTENERS.get(event)?.delete(handler);
+      const set = LISTENERS.get(event);
+      const fn = CALLBACKS.get(handler);
+      set?.delete(fn ?? handler);
       return Promise.resolve(null);
     }
     if (cmd === "plugin:event|emit" || cmd === "plugin:event|emit_to") {
       const { event, payload } = args;
-      for (const fn of LISTENERS.get(event)?.values() ?? []) fn({ event, payload });
+      for (const fn of LISTENERS.get(event) ?? []) fn(payload);
       return Promise.resolve(null);
     }
 
@@ -66,18 +91,31 @@ const PRELOAD_SCRIPT = `(function() {
     if (!mock) return Promise.reject(new Error('[preload] no mock for "' + cmd + '"'));
     return Promise.resolve(mock(args));
   };
-  E.unregisterListener = (event, id) => LISTENERS.get(event)?.delete(id);
+  E.unregisterListener = (event, id) => LISTENERS.get(event)?.delete(CALLBACKS.get(id) ?? id);
 
   window.__TAURI_MOCKS__ = window.__TAURI_MOCKS__ || {};
   window.__TAURI_DEFAULTS__ = DEFAULTS;
   window.__TAURI_EMIT__ = (event, payload) => {
-    for (const fn of LISTENERS.get(event)?.values() ?? []) fn({ event, payload });
+    for (const fn of LISTENERS.get(event) ?? []) fn(payload);
   };
 })();`
 
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.addInitScript(PRELOAD_SCRIPT);
+    // Neutralize infinite CSS animations: the liquid-glass / nebula effects spin
+    // and pulse forever, which Playwright counts as "element not stable" and
+    // refuses to click. Disabling animation/transition makes e2e deterministic.
+    await page.addInitScript(() => {
+      const style = document.createElement("style");
+      style.textContent = `*, *::before, *::after { animation: none !important; transition: none !important; }`;
+      const mount = () => (document.head || document.documentElement).appendChild(style);
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", mount, { once: true });
+      } else {
+        mount();
+      }
+    });
     // Intercept external font CDNs: the index.html links Google Fonts, and if
     // the test runner has no network, `page.goto` blocks on the font <link>
     // and times out. Abort them so e2e is deterministic offline.
