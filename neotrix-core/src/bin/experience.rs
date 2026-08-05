@@ -1148,6 +1148,18 @@ fn cmd_hub(conn: &Connection) {
 }
 
 fn cmd_route(conn: &Connection, kw: &str, branch: &str) {
+    // 门禁: 分支必须真实存在于 kv_store (branch_% key), 否则拒绝 route 防 ghost ROUTE
+    // (root cause fix: ghost branches 来自 route 命令接受任意字符串且不回显校验)
+    let branch_key = branch.trim_end_matches('/');
+    if !branch_key.starts_with("branch_")
+        || kv_get(conn, NS, branch_key).is_none()
+    {
+        eprintln!(
+            "[route] 拒绝 ghost branch '{}': 不存在于 kv_store (branch_% key). 先用 query --kw 或 get 确认真实 key.",
+            branch_key
+        );
+        std::process::exit(1);
+    }
     let mut hub = ensure_hub(conn);
     let mut list = hub["hub"]["route_table"]
         .as_object_mut()
