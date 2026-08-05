@@ -1,6 +1,6 @@
 # API Overview
 
-NeoTrix provides both a CLI and a desktop application. The HTTP API is available when running the `neotrix-web` binary.
+NeoTrix provides both a CLI and a desktop application. The desktop (Tauri) application exposes the HTTP API internally.
 
 ## Base URL
 

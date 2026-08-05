@@ -23,16 +23,8 @@ path = "src/bin/proxy_daemon.rs"
 required-features = ["stealth-net"]
 
 [[bin]]
-name = "neotrix-web"
-path = "src/bin/neotrix_web.rs"
-
-[[bin]]
 name = "neotrix-kb-crawl"
 path = "src/bin/kb_crawl_daemon.rs"
-
-[[bin]]
-name = "neotrix-discovery-daemon"
-path = "src/bin/discovery_daemon.rs"
 
 [[bin]]
 name = "neotrix-shanhai-ingest"
@@ -57,22 +49,6 @@ path = "src/bin/shanhai_query.rs"
 [[bin]]
 name = "neotrix-shanhai-link"
 path = "src/bin/shanhai_link.rs"
-
-[[bin]]
-name = "neotrix-kb-crawl-wikipedia"
-path = "src/bin/kb_crawl_wikipedia.rs"
-
-[[bin]]
-name = "neotrix-kb-crawl-batch"
-path = "src/bin/kb_crawl_batch.rs"
-
-[[bin]]
-name = "neotrix-world-novel-ingest"
-path = "src/bin/nt_world_novel_ingest.rs"
-
-[[bin]]
-name = "absorb_crawl"
-path = "src/bin/absorb_crawl.rs"
 
 [[bin]]
 name = "neotrix-experience"
