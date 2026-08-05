@@ -14,6 +14,7 @@ g.dispatch = dispatch;
 g.expandPreview = expandPreview;
 g.handleKey = handleKey;
 g.onNavClick = onNavClick;
+g.openRecent = openRecent;
 g.onRbLeave = onRbLeave;
 g.openRbSidebar = openRbSidebar;
 g.openSettingsModal = openSettingsModal;
@@ -24,6 +25,7 @@ g.selectSetting = selectSetting;
 g.sendMsg = sendMsg;
 g.setPreviewMode = setPreviewMode;
 g.showFilePreviewFromChat = showFilePreviewFromChat;
+g.showFilePreview = showFilePreview;
 g.showToast = showToast;
 g.switchArtifactView = switchArtifactView;
 g.switchView = switchView;
@@ -40,6 +42,7 @@ g.runAgent = runAgent;
 g.runMsgCode = runMsgCode;
 g.stopAgent = stopAgent;
 g.loadHypercube = loadHypercube;
+g.loadSessions = loadSessions;
 g.loadRegistry = loadRegistry;
 g.kbSearch = kbSearch;
 g.sendSuggestion = sendSuggestion;
@@ -278,8 +281,47 @@ g.cwFilter = cwFilter;
         return `<div class="re-i ghost"><span class="circle"></span><span class="t">${escHtml(r.text)}</span></div>`;
       }
       const timeHtml = r.time ? `<span class="re-time">${r.time}</span>` : '';
-      return `<div class="re-i" onclick="dispatch('toast:打开 ${escHtml(r.text)}')"><span class="dot"></span><span class="t">${escHtml(r.text)}</span>${timeHtml}</div>`;
+      const click = r.id
+        ? `onclick="openRecent('${tab}','${r.id}',${r.cowork ? 'true' : 'false'})"`
+        : `onclick="dispatch('toast:打开 ${escHtml(r.text)}')"`;
+      return `<div class="re-i" ${click}><span class="dot"></span><span class="t">${escHtml(r.text)}</span>${timeHtml}</div>`;
     }).join('');
+  }
+
+  async function openRecent(tab, id, cowork){
+    if(!isTauri() || !id){ dispatch('toast:打开 ' + (recentData[tab].find(x=>x.id===id)?.text || '')); return; }
+    const title = recentData[tab].find(x=>x.id===id)?.text || id;
+    try{
+      if(cowork){
+        const idx = backendSessionList.findIndex(s => s.id === id && s.isCowork);
+        if(idx >= 0){
+          switchView(document.querySelector('.segb[data-view="cowork"]'), 'cowork');
+          selectCwSession(idx, true);
+          showToast('已打开协同会话: ' + title);
+          return;
+        }
+      }
+      await invoke('neocodex_switch_session', { session_id: id });
+      const msgs = await invoke('neocodex_get_session_messages', { session_id: id });
+      if(!Array.isArray(msgs)) return;
+      switchView(document.querySelector('.segb[data-view="chat"]'), 'chat');
+      document.getElementById('heroSection').style.display = 'none';
+      const cs = document.getElementById('chatScroll');
+      cs.style.display = 'flex';
+      cs.innerHTML = '';
+      msgs.forEach(m => {
+        const u = document.createElement('div');
+        u.className = 'msg r';
+        u.innerHTML = `<div class="mb">${escHtml(m.content)}</div>`;
+        cs.appendChild(u);
+        const a = document.createElement('div');
+        a.className = 'msg l';
+        const t = new Date((m.timestamp || Date.now()/1000) * 1000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+        a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">${t}</span></div><div class="mb">${renderRichText(m.content)}</div>`;
+        cs.appendChild(a);
+      });
+      showToast('已打开会话: ' + title);
+    }catch(e){ showToast('打开会话失败: ' + e); }
   }
 
   function onNavClick(tab, index) {
@@ -381,17 +423,28 @@ g.cwFilter = cwFilter;
     renderPreviewContent(name, content);
   }
 
-  function showFilePreview(node){
+  async function showFilePreview(node){
     openRbSidebar();
     const ap = document.getElementById('filePreview');
     ap.classList.remove('mini');
     const body = document.getElementById('fpBody');
     body.classList.add('open');
     ap._currentName = node.name;
-    ap._currentContent = node.content || '// (empty)';
+    let content = node.content || '// (empty)';
+    if(node.load && isTauri()){
+      content = '// 加载中…';
+      renderPreviewContent(node.name, content);
+      try{
+        const raw = await invoke('read_file', { path: node.load });
+        content = (typeof raw === 'string' && raw) ? raw : '// (empty)';
+      }catch(e){
+        content = '// 读取失败: ' + String(e);
+      }
+    }
+    ap._currentContent = content;
     document.getElementById('fpName').textContent = node.name;
     renderFormatTabs();
-    renderPreviewContent(node.name, node.content);
+    renderPreviewContent(node.name, content);
   }
 
   /* ── View Toggle: Preview ↔ Code ── */
@@ -635,6 +688,16 @@ g.cwFilter = cwFilter;
     renderCowork();
   }
   let agentRunning = false, agentTask = '', agentUp = 0;
+
+  function fmtRelTime(ts){
+    if(!ts) return '';
+    const diff = Date.now() - (typeof ts === 'number' ? ts * 1000 : new Date(ts).getTime());
+    if(diff < 60e3) return '刚刚';
+    if(diff < 3600e3) return Math.floor(diff/60e3) + '分钟前';
+    if(diff < 86400e3) return Math.floor(diff/3600e3) + '小时前';
+    if(diff < 604800e3) return Math.floor(diff/86400e3) + '天前';
+    return Math.floor(diff/604800e3) + '周前';
+  }
 
   function fmtUptime(sec){
     if(sec < 60) return `${Math.round(sec)}s`;
@@ -985,6 +1048,7 @@ g.cwFilter = cwFilter;
             agents,
             id: s.id,
             message_count: s.message_count || 0,
+            updated_at: s.updated_at || s.created_at || 0,
           };
         }));
       }
@@ -994,7 +1058,7 @@ g.cwFilter = cwFilter;
           backendSessionMap.set(idx, c.id);
           merged.push({
             name: c.name || ('协同 ' + (i+1)),
-            status: c.status === 'active' ? '进行中' : (c.status === 'paused' ? '已暂停' : c.status || '就绪'),
+            status: c.status === 'active' ? '进行中' : (c.status === 'paused' ? '已暂停' : (c.status === 'completed' ? '已完成' : (c.status || '就绪'))),
             tasks: (c.deliverables ? c.deliverables.length : 0),
             done: Math.min((c.deliverables ? c.deliverables.length : 0), c.files_created || 0),
             fail: 0,
@@ -1007,6 +1071,13 @@ g.cwFilter = cwFilter;
       }
       if(merged.length) backendSessionList = merged;
       CW_DATA = merged.length ? merged : CW_DATA;
+      recentData.chat = merged.filter(s => !s.isCowork).slice(0, 5).map(s => ({
+        text: s.name, time: fmtRelTime(s.updated_at), id: s.id,
+      }));
+      recentData.cowork = merged.filter(s => s.isCowork).slice(0, 5).map(s => ({
+        text: s.name, time: fmtRelTime(s.cw?.last_active_at || s.cw?.updated_at), id: s.id, cowork: true,
+      }));
+      renderSidebar(currentView);
       renderCowork();
       if(CW_DATA.length) showToast('已加载 ' + CW_DATA.length + ' 个会话');
     }catch(e){ /* keep demo data */ }
