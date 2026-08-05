@@ -1,0 +1,273 @@
+{
+  "nodes": [
+    {
+      "id": "nt_http::fetch_safe_http",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c4mainpipeline",
+      "provides": [
+        "ssrf_guard",
+        "dns_pinning",
+        "redirect_none"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_http::fetch_safe_http_with_headers",
+        "nt_world_novel::qidian_ingest",
+        "nt_io_web::ws_bridge"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "cycle 164 graft: folded web_miner/search/self_evolver clients",
+          "timestamp": "2026-08-05T10:11:47.677425Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "grafting",
+          "from_nodes": [
+            "web_miner.http_client",
+            "search.client",
+            "self_evolver.fetch_http"
+          ],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "folded scattered NT-MIND fetcher clients into unified SSRF-safe primitive",
+          "timestamp": "2026-08-05T10:11:52.403568Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-05T10:13:24.678054Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-05T10:13:24.685011Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-05T10:13:24.691331Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-05T10:13:24.697808Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-05T10:11:47.677408Z",
+      "updated_at": "2026-08-05T10:13:24.697809Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_http::fetch_safe_http_with_headers",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "ssrf_guard",
+        "http_headers"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http_with_headers",
+          "note": "bud: GitHub Accept header variant",
+          "timestamp": "2026-08-05T10:11:52.409287Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http_with_headers",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-05T10:13:24.741648Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-05T10:11:52.409286Z",
+      "updated_at": "2026-08-05T10:13:24.741649Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io_web::ws_bridge",
+      "domain": "io",
+      "layer": "l1composite",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "im_bridge",
+        "websocket",
+        "im_adapters"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io_web::ws_bridge",
+          "note": "grafted from server/ws.rs",
+          "timestamp": "2026-08-05T10:11:58.196656Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_web::ws_bridge",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-05T10:13:24.729116Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_web::ws_bridge",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-05T10:13:24.735720Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-05T10:11:58.196654Z",
+      "updated_at": "2026-08-05T10:13:24.735721Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_io_web::share_api",
+      "domain": "io",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "session_share",
+        "h5_chat",
+        "cors"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_io_web::share_api",
+          "note": "grafted from server/http.rs+h5.rs",
+          "timestamp": "2026-08-05T10:11:58.203021Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_web::share_api",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-05T10:13:24.747250Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-05T10:11:58.203020Z",
+      "updated_at": "2026-08-05T10:13:24.747251Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_world_novel::qidian_ingest",
+      "domain": "world",
+      "layer": "l1composite",
+      "constellation": "c4mainpipeline",
+      "provides": [
+        "novel_ingest",
+        "qidian_classify"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_world_novel::qidian_ingest",
+          "note": "pruned 323 lines dead crawler, kept production ingest path",
+          "timestamp": "2026-08-05T10:11:58.209033Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_novel::qidian_ingest",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-05T10:13:24.704410Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_novel::qidian_ingest",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-05T10:13:24.710249Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_novel::qidian_ingest",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-05T10:13:24.716957Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_novel::qidian_ingest",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-05T10:13:24.723447Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-05T10:11:58.209032Z",
+      "updated_at": "2026-08-05T10:13:24.723448Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    }
+  ],
+  "edges": [
+    [
+      "nt_http::fetch_safe_http_with_headers",
+      "nt_http::fetch_safe_http"
+    ],
+    [
+      "nt_world_novel::qidian_ingest",
+      "nt_http::fetch_safe_http"
+    ],
+    [
+      "nt_io_web::ws_bridge",
+      "nt_http::fetch_safe_http"
+    ]
+  ]
+}
