@@ -132,7 +132,8 @@ test.describe('NeoTrix Desktop — Vanilla UI', () => {
     await page.goto('/');
     await page.locator('#userBar').click({ force: true });
     await expect(page.locator('#userPopover')).toBeVisible();
-    await expect(page.locator('.pop-item', { hasText: '帮助' })).toBeVisible();
+    await expect(page.locator('.pop-item', { hasText: '设置' })).toBeVisible();
+    await expect(page.locator('#popVersion')).toHaveText(/v\d/);
   });
 
   test('no uncaught errors on load', async ({ page }) => {

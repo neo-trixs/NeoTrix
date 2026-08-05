@@ -126,4 +126,52 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     const calls = await invokeCalls(page);
     expect(calls.some((c) => c.cmd === "neocodex_regenerate")).toBeTruthy();
   });
+
+  test("assistant message exposes like/dislike feedback wired to neocodex_feedback", async ({ page }) => {
+    await mockCommand(page, "neocodex_feedback", () => "ok");
+    await page.goto("/");
+    await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      (w.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+        { role: "user", content: "反馈", timestamp: 1700000000 },
+        { role: "agent", content: "回答", timestamp: 1700000001 },
+      ], "s-fb");
+    });
+    const like = page.locator('#chatScroll .msg.l .ma-btn[data-op="like"]');
+    await expect(like).toBeVisible({ timeout: 10_000 });
+    await like.click({ force: true });
+    await expect(like).toHaveClass(/on/);
+    const calls = await invokeCalls(page);
+    const fb = calls.find((c) => c.cmd === "neocodex_feedback");
+    expect(fb).toBeTruthy();
+    expect(fb.args).toMatchObject({ session_id: "s-fb" });
+  });
+
+  test("session ops menu opens from toolbar and shows rename/archive/export", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      (w.openSessionOps as (anchor: HTMLElement | null, id: string) => void)(null, "s-ops");
+    });
+    const menu = page.locator("#sessionOpsMenu");
+    await expect(menu).toHaveClass(/open/);
+    await expect(menu.locator(".ses-item", { hasText: "重命名" })).toBeVisible();
+    await expect(menu.locator(".ses-item", { hasText: "归档" })).toBeVisible();
+    await expect(menu.locator(".ses-item", { hasText: "导出" })).toBeVisible();
+    await expect(menu.locator(".ses-item.danger", { hasText: "删除会话" })).toBeVisible();
+  });
+
+  test("session search queries backend and renders hits", async ({ page }) => {
+    await mockCommand(page, "neocodex_search_sessions", () => [
+      { session_id: "s-hit", session_name: "全文命中", role: "agent", snippet: "缓存重建完成", match_count: 3, timestamp: 1700000000 },
+    ]);
+    await page.goto("/");
+    await page.locator('.segb[data-view="cowork"]').click({ force: true });
+    await page.locator('#cwSearchInput').fill("缓存");
+    const res = page.locator("#cwSearchResults");
+    await expect(res).toContainText("全文命中", { timeout: 10_000 });
+    await expect(res).toContainText("3 处");
+    const calls = await invokeCalls(page);
+    expect(calls.some((c) => c.cmd === "neocodex_search_sessions")).toBeTruthy();
+  });
 });
