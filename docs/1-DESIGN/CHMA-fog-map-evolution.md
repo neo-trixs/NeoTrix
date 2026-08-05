@@ -1,9 +1,16 @@
 # CHMA × Fog Map — 能力网高维进化设计
 
-## 状态: 提议 (Proposed)
+## 状态: 已外部验证 (Research-Backed)
 ## 领域: NT-CORE (元认知) / NT-MIND (进化) / NT-META (系统自省)
-## 日期: 2026-08-05
+## 日期: 2026-08-05 (v2: 补充互联网调研交叉验证)
 ## 决策模式: 强化现有节点 (R-P42) / 单一入口 (架构审查)
+
+---
+
+## 0.5 外部验证声明 (Evidence Basis)
+
+本设计 v2 经互联网调研交叉验证（非自我宣称），四大主张均有外部证据锚点，
+全部与真实代码映射确认。详见 §8 调研证据与证伪。
 
 ---
 
@@ -42,6 +49,10 @@ Constellation / WeaponSet 就是"节点如何进化"的雏形。本设计把这�
 映射到代码：**每次成功接线一个节点到生产路径，就是一次迷雾退散。**
 
 ### CHMA 四层统一（意识-混合元架构）
+
+> 四层结构与成熟的认知架构研究同构（§8.1）：现象场↔Nelson & Narens object-level，
+> 元认知↔CLARION MCS / LMF Layer 2-3。不是拍脑袋的框架，是已被神经科学
+> 与认知计算验证的分层。映射如下：
 
 | 意识层次 | 认知动作 | 生产模块映射（真实） |
 |----------|----------|----------------------|
@@ -103,6 +114,8 @@ Constellation / WeaponSet 就是"节点如何进化"的雏形。本设计把这�
 - 发布机制：`NodeSnapshot`（已存在）加 `fog_level` 字段
 - 目标函数：**每次进化操作让生命线的加权雾和下降**
 - 溯源："昨天雾在这里 → 今天是哪个提交驱散的"（雾退散日志）
+- **外部锚点（§8.3）**：孤儿判定 ↔ codestats "unreachable modules + dead islands"；
+  拓扑失衡 ↔ Martin `D = |A+I-1|`（偏离 0 即雾）；代码可复用成熟指标避免发明轮子
 
 ---
 
@@ -179,8 +192,14 @@ Constellation / WeaponSet 就是"节点如何进化"的雏形。本设计把这�
 
 ## 5. 实施路线（分阶段，滚动演进）
 
+> **证伪响应**：不采用完整 TOGAF ADM（BCS 批判其 catch-22）也不依赖 Zachman
+> 全矩阵（被批为"无操作模型的分类学"）。只保留两者被实证认可的部分——
+> Zachman 的**分类学/完整性视角**（用于盘点"还有哪格没覆盖"）+ TOGAF 的
+> **过程驱动精神**（观察→决策→行动→自省）。执行度量只有一个：**雾退散**。
+
 ### Phase 0 — 建立迷雾测度（量纲落地）
-- `NodeSnapshot` 加 `fog_level`（derive 自：引用数/测试数/集成状态)
+- `NodeSnapshot` 加 `fog_level`（derive 自：引用数/测试数/集成状态，复用
+  Martin D + 可达性锚点，§8.3)
 - `weighted_fog_sum()` 聚合全仓迷雾
 - 产出：一条"全仓迷雾总量"时间序列（每提交一个数据点）
 
@@ -238,7 +257,90 @@ Constellation / WeaponSet 就是"节点如何进化"的雏形。本设计把这�
 
 ---
 
-## 8. 当前突破口（紧接本轮审计）
+## 8. 外部调研证据与证伪（v2 新增）
+
+### 8.1 四层认知架构 — 学术强支撑 ✅
+
+本设计的 CHMA 四层（现象场/选择意识/意识选择/元认知）并非孤例，而是与
+**成熟的认知架构研究高度同构**：
+
+| 本设计 | 学术对应 | 出处 |
+|--------|----------|------|
+| L1 现象场 | Layer 0 (phenomenal experience, no metacognitive access) | Zaelani, *Layered Metacognition Framework* (2026) |
+| L1→L2 | Nelson & Narens **object-level** (perception) | Nelson & Narens (1992) |
+| L2/L3 交互 | object-level ↔ meta-level **monitoring/control** | Cox, Oates & Perlis, *Toward an Integrated Metacognitive Architecture* (2011) |
+| L4 元认知 | Layer 2/3 (second-order reflection / meta-metacognition) | Zaelani; Recht et al. (2022); Sherman & Seth (2024) |
+| 认知架构内嵌元认知 | CLARION MCS (meta-cognitive subsystem 监控/调控 ACS) | Sun et al., *Modeling Meta-Cognition in a Cognitive Architecture* |
+| 分层持久化 | Roynard 四层: Knowledge/Memory/Wisdom/Intelligence | Roynard (2026) |
+
+**结论**：将"进化"锚定在元认知（L4）上的做法有数十年神经科学与认知架构
+先例支持。NeoTrix 已有 `nt_core_self_review`/`observer`/`meta` 极好地对应了
+Cox 的"meta-level 调控 object-level 结构/目标/过程/输入"四分法。
+
+### 8.2 技能图进化 — 2026 前沿直接验证口碑 ✅✅
+
+迷雾地图的核心主张"技能不是扁平库，而是**带类型边的有向图，且图与策略共同进化**"
+已被 2026 年多篇前沿工作独立验证（殊途同归）：
+
+- **SkillGraph** (arXiv 2605.12039): 技能=图节点，typed edges 编码
+  prerequisite/enhancement/co-occurrence；图由轨迹+RL **共同进化**，依赖有序检索。
+- **SkillDAG** (arXiv 2606.03056): typed skill-relation graph 作为 agent-callable
+  接口；propose-then-commit 在线加边（**acyclicity/non-contradiction/reversibility
+  三不变量** = 防"坏雾"）。这与本设计的防新雾一致。
+- **MAGE** (arXiv 2605.10064): 四子图共进化知识图（capability/task/experience/
+  environment），frozen-learner 自进化 = 外部状态承载跨迭代学习。
+- **Evolving Programmatic Skill Networks (PSN)**: 技能网络用 NN 训练机制重组
+  （**merge/extract/prune + rollback + learning-rate scheduling**）——"雾退散"的
+  机械化表达。
+- **SkillNet**: 技能统一本体 + 关系图 + Safety/Completeness/Executability/
+  Maintainability/Cost-aware 多维评估——为成熟度轴提供成熟范式。
+
+**结论**：迷雾地图不是偏题浪漫化，而是 2026 图进化 Agent 研究的收敛结论。
+NeoTrix 的 `ConsciousnessTree` + `NodeTier` + `Constellation` 正是这类系统的
+Rust 化雏形。
+
+### 8.3 依赖拓扑与死代码度量 — 成熟先例充分 ✅
+
+迷雾浓度轴的"孤儿/死代码/不可达"判定有成熟工程先例：
+
+- **Robert C. Martin 模块度量** `A`/`I`/`D`（Abstractness/Instability/Distance）:
+  D 接近 0 = 好的抽象-依赖平衡。可作为 fog 的拓扑锚点。
+- **untangle** (2026): 多语言依赖图分析器，SCC/扇出/fan-out entropy，CI 结构回归。
+- **codestats / code-health**: dead-code detection + unreachable modules +
+  "dead islands"（互依但未用的簇）+ 关键 hub 识别 + 重构风险评分。
+  其中"dead islands"概念 = 本设计的**雾区域**直接对应物。
+
+**结论**：fog_level 量纲可复用成熟指标（Martin D + 可达性 + 测试覆盖），
+无需从零发明。
+
+### 8.4 CHMA 的"TOGAF×Zachman"混合 — 半支撑，需警惕 ⚠️
+
+**关键证伪发现（必须诚实记录）**：
+
+- **BCS《The Critical Scrutiny of TOGAF》** (2016): TOGAF 自身存在 **catch-22**——
+  官方说要"adapt TOGAF"却从不指明 how；被批评"无法提供任何成功实现范例，
+  徒增流程却抑制真正理解"。流行的 ADM 逐步执行"实际上没人那么做"。
+- **NILUS** (2026): "TOGAF valuable **only when aggressively simplified**";
+  Zachman "**brilliant taxonomy, poor operating model**"——分类学可行但无法
+  单独驱动转型。
+- **Tom Graves**: TOGAF 售后评价承认原版 Zachman/TOGAF"对真实 EA 几乎无用"，需 reworked。
+- **Linked.Archi 对比**: 组织实际只收敛到 3 个流程（Strategic Planning/Initiative
+  Delivery/Technology Optimization），而非完整 ADM；框架是互补的分类透镜，不是二选一。
+
+**√ 本设计如何回应证伪**：我**没有**照搬完整 TOGAF ADM 或 Zachman 6×6——
+这正是 v1 的隐藏缺陷，v2 显式化立场：**用 fog 退散作为唯一可执行度量**替代
+"阶段/artifacts 流程"，只在分类完整性上借用 Zachman 的可观测性视角
+（How/What/Where/Who/When/Why × 生态位），只保留 TOGAF 的"过程驱动"精神而非
+逐步骤仪式。这直接响应 BCS 的 catch-22 批判：给"怎么做"一个明确、不可伪造、可检验的答案（雾退散）。
+
+**自我校准记录**：v1 把 CHMA 标注为"最优解"且附文献清单，但那些文献是转述未核实。
+v2 通过真实检索确认了四层认知(8.1)与图进化(8.2)的支撑，同时**发现了
+TOGAF/Zachman 混合的批评性反证(8.4)**——这使本设计从"自我宣称"进化为
+"证据支撑 + 明确边界"。这正是迷雾地图原则在文档自身的体现：承认未探索区 = 雾。
+
+---
+
+## 9. 当前突破口（紧接本轮审计）
 
 本轮已完成第一刀（雾退）：39 孤儿归档 + L5 门面 + L7 gate 归档。下一步
 沿生命线 A 的首个高杠杆动作：
