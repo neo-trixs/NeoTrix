@@ -4,14 +4,14 @@
   "version": "0.18.0",
   "identifier": "ai.neotrix.desktop",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "cd frontend && npm ci && npm run build",
+    "beforeDevCommand": "cd \"$(git rev-parse --show-toplevel)/src-tauri/frontend\" && npm run dev",
+    "beforeBuildCommand": "cd \"$(git rev-parse --show-toplevel)/src-tauri/frontend\" && npm ci && npm run build",
     "frontendDist": "./frontend/dist",
     "devUrl": "http://localhost:1420"
   },
   "app": {
     "windows": [
-{
+      {
         "title": "NeoTrix Desktop V2",
         "width": 1200,
         "height": 800,
@@ -31,21 +31,32 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "appimage", "msi"],
-    "icon": ["icons/icon.png"],
+    "targets": [
+      "dmg",
+      "appimage",
+      "msi"
+    ],
+    "icon": [
+      "icons/icon.png"
+    ],
     "macOS": {
       "minimumSystemVersion": "12.0"
     },
     "linux": {
       "deb": {
-        "depends": ["openssl", "ca-certificates"]
+        "depends": [
+          "openssl",
+          "ca-certificates"
+        ]
       }
     }
   },
   "plugins": {
     "updater": {
       "active": true,
-      "endpoints": ["https://releases.neotrix.ai/update/{{target}}/{{current_version}}"],
+      "endpoints": [
+        "https://releases.neotrix.ai/update/{{target}}/{{current_version}}"
+      ],
       "pubkey": "Z6H2pSM2XdraNQHZwul9ygc9EdWnFmV0DASod02i/R0"
     }
   }
