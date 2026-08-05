@@ -73,7 +73,6 @@ pub mod nt_core_td;
 pub mod nt_core_crt;
 pub mod nt_core_ttc;
 pub mod nt_core_trajectory_compress;
-pub mod nt_core_echo_terminal;
 pub mod nt_core_aura;
 pub mod nt_core_plan;
 pub mod nt_core_credit;
@@ -81,8 +80,14 @@ pub mod nt_core_credit;
 // ═══════════════════════════════════════════════════════════════════
 // L5 — 意识层 (Consciousness)
 // ═══════════════════════════════════════════════════════════════════
+pub mod l5_consciousness;
 pub mod nt_core_gwt;
 pub mod nt_core_context;
+// L5 意识组件（过渡期保留原路径，供 l5_consciousness 门面转发）
+pub mod nt_core_consciousness;
+pub mod nt_core_consciousness_tree;
+pub mod nt_core_consciousness_review;
+pub mod nt_core_echo_terminal;
 
 // ═══════════════════════════════════════════════════════════════════
 // L6 — 自我层 (Self)
@@ -90,11 +95,6 @@ pub mod nt_core_context;
 pub mod l6_self;
 pub mod nt_core_self;
 pub mod nt_core_aware;
-
-// L6 中的 consciousness 组件（过渡期保留原路径）
-pub mod nt_core_consciousness;
-pub mod nt_core_consciousness_tree;
-pub mod nt_core_consciousness_review;
 pub mod nt_core_self_constitution;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -175,9 +175,7 @@ pub use l7_capability::{
     Capability, CapabilityId, capability_id_from_name,
     CapabilityKind, CapabilityCost, CapabilityStats, ContextSlot, SlotKind,
     CapabilityRegistry,
-    // 调度
-    CapabilityScheduler, SchedulerConfig, SchedulingStrategy,
-    Bid, ScheduleResult,
+    // 调度 (thater stub archived — use real nt_core_scheduler)
     // 协议
     StarPulse, PulseKind, PulseBus,
     // 大过滤器
@@ -266,7 +264,7 @@ pub use nt_core_e8::e8_abduction_bridge::{
 };
 
 // --- L5: Consciousness ---
-pub use nt_core_gwt::resonance::{
+pub use l5_consciousness::resonance::{
     ResonanceMatrix, ResonanceReport, MODULE_COUNT,
     resonate_and_select, resonate_cycle, default_specialist_states,
     RESONANCE_THRESHOLD,

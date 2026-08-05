@@ -10,7 +10,6 @@
 //! - L7 不执行能力，只调度
 
 pub mod registry;
-pub mod scheduler;
 pub mod protocol;
 pub mod gate;
 pub mod mature;
@@ -26,7 +25,6 @@ pub mod nt_cap_geo;
 pub mod nt_core_orch_agent;
 
 pub use registry::*;
-pub use scheduler::*;
 pub use protocol::*;
 pub use gate::*;
 pub use mature::*;

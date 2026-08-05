@@ -17,9 +17,9 @@ pub use crate::core::nt_core_bank::{
 };
 
 // VSA 标记体系（从 consciousness/移入中，所有记忆必须标记）
-pub use crate::core::nt_core_consciousness::vsa_tag::{
+pub use crate::core::l5_consciousness::conscious::vsa_tag::{
     VsaOrigin, VsaSelfCategory, VsaWorldCategory, VsaTagged,
 };
-pub use crate::core::nt_core_consciousness::source_hierarchy::{
+pub use crate::core::l5_consciousness::conscious::source_hierarchy::{
     SourceHierarchy, KnowledgeLayer, ProvenanceChain,
 };
