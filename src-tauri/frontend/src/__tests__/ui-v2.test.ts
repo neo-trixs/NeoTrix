@@ -193,4 +193,69 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "1", metaKey: true, cancelable: true, bubbles: true }));
     expect(document.getElementById("viewChat")!.style.display).toBe("flex");
   });
+
+  it("loadSessions maps backend sessions into recentData + cowork status", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mock: Record<string, (a: unknown) => unknown> = {};
+    mock["neocodex_list_sessions"] = () => [
+      { id: "s-1", name: "真实会话A", mode: "Agent", message_count: 3, updated_at: 1700000000 },
+    ];
+    mock["cowork_list"] = () => [
+      { id: "c-1", name: "真实协同", status: "completed", deliverables: [{ name: "d1", kind: "md" }], files_created: 1 },
+    ];
+    // For the ipc module to route to the handler table we must fake Tauri.
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: unknown) => {
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+    };
+    try {
+      await (g.loadSessions as () => Promise<void>)();
+      const list = document.querySelectorAll("#cwSessionList .cw-sitem");
+      expect(list.length).toBeGreaterThan(0);
+      // recent sidebar should now be populated with the real chat session
+      const recent = document.querySelector("#recentList");
+      expect(recent!.textContent).toContain("真实会话A");
+      // switch to cowork: recent list shows the real cowork session
+      (g.switchView as (el: HTMLElement, v: string) => void)(
+        document.querySelector('.segb[data-view="cowork"]') as HTMLElement,
+        "cowork",
+      );
+      const recentCowork = document.querySelector("#recentList");
+      expect(recentCowork!.textContent).toContain("真实协同");
+      // status mapping unified to 已完成
+      (g.cwFilter as (s: string) => void)("done");
+      const shown = [...document.querySelectorAll("#cwSessionList .cw-sitem")].map((e) => e.textContent);
+      expect(shown.some((t) => t.includes("真实协同"))).toBe(true);
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("read_file content renders in file preview when node.load is set", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mock: Record<string, (a: unknown) => unknown> = {};
+    mock["read_file"] = () => "fn real_content() {}";
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: unknown) => {
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+    };
+    try {
+      await (g.showFilePreview as (n: unknown) => Promise<void>)({
+        name: "real.rs",
+        load: "/tmp/real.rs",
+        content: "// placeholder",
+      });
+      expect(document.getElementById("fpContent")!.textContent).toContain("fn real_content");
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });
