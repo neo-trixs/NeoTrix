@@ -942,6 +942,20 @@ g.kbSearch = kbSearch;
     renderAgentRow();
   }
 
+  function renderAgentRow(){
+    const al = document.getElementById('cwAgentList');
+    if(!al) return;
+    const color = agentRunning ? 'var(--suc)' : 'var(--tx-meta)';
+    const label = agentRunning
+      ? `<span class="adot" style="background:${color}"></span>运行中 · ${escHtml(agentTask || '处理任务')} · ${agentUp}s`
+      : `<span class="adot"></span>空闲`;
+    al.innerHTML = `<div class="cw-agent">${label}</div>
+      <div class="cw-actions">
+        <button class="cw-abtn" onclick="${agentRunning ? 'stopAgent()' : 'runAgent()'}">${agentRunning ? '■ 停止' : '▶ 启动'}</button>
+        <button class="cw-abtn" onclick="refreshAgent()">↻ 刷新</button>
+      </div>`;
+  }
+
   async function runAgent(){
     if(!isTauri()){ showToast('浏览器模式：无法启动智能体'); return; }
     const s = CW_DATA.find(x => x.id);
