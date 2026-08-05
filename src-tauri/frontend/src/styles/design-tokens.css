@@ -10,17 +10,17 @@
      ════════════════════════════════════════ */
 
   --app-font-size: 13px;
-  /* ── Brand Palette (Claude Code Desktop clay) ── */
+  /* ── Brand Palette (Warm Amber — "Consciousness Amber") ── */
   --nt-red: #E85454;
   --nt-green: #4CAF50;
   --nt-yellow: #FFC107;
-  --nt-orange: #FF9800;
-  --nt-clay: #D9764E;
-  --nt-clay-hover: #E28358;
-  --nt-clay-light: #E8A07E;
+  --nt-orange: #F97316;
+  --nt-clay: #F97316;
+  --nt-clay-hover: #EA580C;
+  --nt-clay-light: #FB923C;
   --nt-primary: var(--nt-clay);
   --nt-primary-hover: var(--nt-clay-hover);
-  --nt-primary-light: #E8A07E;
+  --nt-primary-light: #FB923C;
 
   /* ── Neutral Scale (light) ── */
   --nt-white: #FFFFFF;
@@ -154,10 +154,10 @@
   /* ── Interaction Tokens ── */
   --nt-hover: rgba(0,0,0,0.03);
   --nt-hover-strong: rgba(0,0,0,0.06);
-  --nt-active: rgba(232,84,84,0.08);
-  --nt-active-bg: rgba(232,84,84,0.08);
-  --nt-primary-glow: rgba(232,84,84,0.06);
-  --nt-primary-light-bg: rgba(232,84,84,0.08);
+  --nt-active: rgba(249,115,22,0.09);
+  --nt-active-bg: rgba(249,115,22,0.09);
+  --nt-primary-glow: rgba(249,115,22,0.07);
+  --nt-primary-light-bg: rgba(249,115,22,0.09);
 
   /* ── Text Tokens ── */
   --nt-text: #1A1A20;
@@ -218,7 +218,7 @@
   --nt-transition-slow: 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
 
   /* ── Semantic state colors ── */
-  --nt-danger-bg: rgba(232, 84, 84, 0.10);
+  --nt-danger-bg: rgba(249, 115, 22, 0.12);
   --nt-success-bg: rgba(76, 175, 80, 0.10);
   --nt-warning-bg: rgba(255, 193, 7, 0.12);
   --nt-info: #5AB0FF;
@@ -317,10 +317,10 @@
   /* ── Interaction (dark) ── */
   --nt-hover: rgba(255,255,255,0.03);
   --nt-hover-strong: rgba(255,255,255,0.06);
-  --nt-active: rgba(255,107,107,0.10);
-  --nt-active-bg: rgba(255,107,107,0.10);
-  --nt-primary-glow: rgba(255,107,107,0.08);
-  --nt-primary-light-bg: rgba(232,84,84,0.10);
+  --nt-active: rgba(251,146,60,0.12);
+  --nt-active-bg: rgba(251,146,60,0.12);
+  --nt-primary-glow: rgba(251,146,60,0.09);
+  --nt-primary-light-bg: rgba(249,115,22,0.12);
 
   /* ── Text (dark) ── */
   --nt-text: #EDEDED;
@@ -348,7 +348,7 @@
   --nt-overlay: rgba(0, 0, 0, 0.50);
   --nt-overlay-light: rgba(0, 0, 0, 0.12);
   --nt-overlay-dark: rgba(0, 0, 0, 0.70);
-  --nt-danger-bg: rgba(255, 107, 107, 0.15);
+  --nt-danger-bg: rgba(251, 146, 60, 0.16);
   --nt-success-bg: rgba(102, 187, 106, 0.15);
   --nt-warning-bg: rgba(255, 213, 79, 0.15);
   --nt-info-bg: rgba(90, 176, 255, 0.15);
@@ -386,7 +386,7 @@
 /* ════════════════════════════════════════
    Claude Code Desktop — warm surface layer
    Maps the NeoCodex semantic tokens to Claude's
-   warm-clay canvas (light + dark) for 1:1 feel.
+   warm-amber canvas (light + dark) for 1:1 feel.
    Later in cascade → wins against base tokens.
    ════════════════════════════════════════ */
 
@@ -407,7 +407,7 @@
   --accent-on: #FFFFFF;
   --nt-primary: var(--nt-clay);
   --nt-primary-hover: var(--nt-clay-hover);
-  --nt-primary-light: #E8A07E;
+  --nt-primary-light: #FB923C;
   --nt-active: rgba(217, 118, 78, 0.16);
   --nt-active-bg: rgba(217, 118, 78, 0.14);
   --nt-primary-glow: rgba(217, 118, 78, 0.12);
@@ -431,7 +431,7 @@
   --accent-on: #FFFFFF;
   --nt-primary: var(--nt-clay);
   --nt-primary-hover: var(--nt-clay-hover);
-  --nt-primary-light: var(--nt-clay-light, #E8A07E);
+  --nt-primary-light: var(--nt-clay-light, #FB923C);
   --nt-active: rgba(217, 118, 78, 0.14);
   --nt-active-bg: rgba(217, 118, 78, 0.10);
   --nt-primary-glow: rgba(217, 118, 78, 0.10);

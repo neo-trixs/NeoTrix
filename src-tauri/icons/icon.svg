@@ -1,93 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0f0f1a"/>
-      <stop offset="100%" stop-color="#1a0a2e"/>
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="45%" stop-color="#F97316"/>
+      <stop offset="100%" stop-color="#C2410C"/>
     </linearGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#d4a843"/>
-      <stop offset="50%" stop-color="#42a5f5"/>
-      <stop offset="100%" stop-color="#7c4dff"/>
-    </linearGradient>
-    <linearGradient id="glyph" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#d4a843" stop-opacity="0.95"/>
-      <stop offset="50%" stop-color="#42a5f5" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="#7c4dff" stop-opacity="0.85"/>
-    </linearGradient>
-    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#d4a843" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#7c4dff" stop-opacity="0.15"/>
-    </linearGradient>
-    <filter id="glowFilter" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="12" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <radialGradient id="centerGlow" cx="0.5" cy="0.45" r="0.5">
-      <stop offset="0%" stop-color="#42a5f5" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#0f0f1a" stop-opacity="0"/>
+    <radialGradient id="centerGlow" cx="0.5" cy="0.45" r="0.55">
+      <stop offset="0%" stop-color="#FFF7ED" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#FFF7ED" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="glyph" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFBEB"/>
+      <stop offset="100%" stop-color="#FFEDD5"/>
+    </linearGradient>
   </defs>
 
-  <!-- Background rounded rect -->
-  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+  <!-- Warm amber rounded-square background -->
+  <rect width="512" height="512" rx="115" ry="115" fill="url(#bg)"/>
 
-  <!-- Inner glow -->
-  <rect width="512" height="512" rx="96" ry="96" fill="url(#centerGlow)"/>
+  <!-- Soft inner luminosity -->
+  <rect width="512" height="512" rx="115" ry="115" fill="url(#centerGlow)"/>
 
-  <!-- Rim glow -->
-  <rect x="3" y="3" width="506" height="506" rx="93" ry="93" fill="none" stroke="url(#rim)" stroke-width="2.5"/>
-
-  <!-- E8 Hexagram (6-pointed star) as base geometry -->
-  <g transform="translate(256, 256)" filter="url(#glowFilter)">
-    <!-- Outer hexagram - 6 pointed star made from two equilateral triangles -->
-    <polygon points="0,-130 112.6,65 -112.6,65" fill="none" stroke="url(#glow)" stroke-width="2.5" opacity="0.7"/>
-    <polygon points="0,130 -112.6,-65 112.6,-65" fill="none" stroke="url(#glow)" stroke-width="2.5" opacity="0.7"/>
+  <!-- VSA HyperCube — tesseract 2D projection (outer + inner square, corner links) -->
+  <g fill="none" stroke="url(#glyph)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- inner square -->
+    <rect x="221" y="221" width="70" height="70" rx="6" stroke-width="12"/>
+    <!-- outer square -->
+    <rect x="151" y="151" width="210" height="210" rx="12" stroke-width="10" opacity="0.55"/>
+    <!-- corner connections: outer → inner -->
+    <line x1="151" y1="151" x2="221" y2="221" stroke-width="10"/>
+    <line x1="361" y1="151" x2="291" y2="221" stroke-width="10"/>
+    <line x1="361" y1="361" x2="291" y2="291" stroke-width="10"/>
+    <line x1="151" y1="361" x2="221" y2="291" stroke-width="10"/>
   </g>
 
-  <!-- Central "N" glyph with E8 integration -->
-  <g transform="translate(256, 256)">
-    <!-- Main N letterform - 6-segment geometric N that extends into hexagram -->
-    <g filter="url(#glowFilter)">
-      <!-- N left vertical -->
-      <polygon points="-28,-95 -28,95 -10,95 -10,-95" fill="url(#glyph)"/>
-      <!-- N diagonal -->
-      <polygon points="-10,-95 -10,-15 28,95 10,95 10,15 -28,-95" fill="url(#glyph)"/>
-      <!-- N right vertical -->
-      <polygon points="10,-95 28,-95 28,95 10,95" fill="url(#glyph)"/>
-    </g>
-
-    <!-- Diagonal connector bar (N crossbar) -->
-    <rect x="-10" y="-15" width="38" height="30" rx="4" fill="url(#glow)" opacity="0.6" transform="skewX(-45)"/>
-  </g>
-
-  <!-- 7 Faction orbit dots -->
-  <g filter="url(#softGlow)">
-    <!-- CORE gold -->
-    <circle cx="256" cy="80" r="6" fill="#d4a843" opacity="0.9"/>
-    <!-- MIND blue -->
-    <circle cx="376" cy="136" r="6" fill="#42a5f5" opacity="0.9"/>
-    <!-- MEMORY green -->
-    <circle cx="432" cy="256" r="6" fill="#66bb6a" opacity="0.9"/>
-    <!-- WORLD purple -->
-    <circle cx="376" cy="376" r="6" fill="#7c4dff" opacity="0.9"/>
-    <!-- ACT red -->
-    <circle cx="256" cy="432" r="6" fill="#ef5350" opacity="0.9"/>
-    <!-- SHIELD teal -->
-    <circle cx="136" cy="376" r="6" fill="#26a69a" opacity="0.9"/>
-    <!-- IO cyan -->
-    <circle cx="80" cy="256" r="6" fill="#26c6da" opacity="0.9"/>
-  </g>
-
-  <!-- Subtle highlight on top -->
-  <rect x="3" y="3" width="506" height="253" rx="93" ry="93" fill="url(#glow)" opacity="0.04"/>
+  <!-- E8 consciousness core — luminous center dot -->
+  <circle cx="256" cy="256" r="17" fill="#FFFBEB" opacity="0.95"/>
+  <circle cx="256" cy="256" r="7.5" fill="#EA580C"/>
 </svg>
