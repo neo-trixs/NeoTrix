@@ -1494,6 +1494,17 @@ impl KnowledgeBase {
         nt_memory_unify::session_log_get(&conn, session_id, limit, offset)
     }
 
+    pub fn session_log_list(&self) -> Result<Vec<(String, i64, i64)>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_unify::session_log_list_sessions(&conn)
+    }
+
+    pub fn session_log_delete(&self, session_id: &str) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        conn.execute("DELETE FROM session_logs WHERE session_id=?1", rusqlite::params![session_id])
+            .map_err(|e| format!("session_log_delete: {}", e))
+    }
+
     pub fn asset_store(&self, namespace: &str, name: &str, data: &[u8], mime_type: Option<&str>, metadata: Option<&serde_json::Value>) -> Result<String, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_unify::asset_store(&conn, namespace, name, data, mime_type, metadata)

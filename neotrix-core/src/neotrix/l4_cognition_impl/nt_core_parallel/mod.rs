@@ -6,6 +6,7 @@ pub mod types;
 pub mod executor;
 pub mod coordinator;
 pub mod hands;
+pub mod contract;
 #[cfg(test)]
 pub mod tests;
 
@@ -14,3 +15,4 @@ pub use types::{TaskId, AgentId, TaskState, Task, Agent, AgentPool, TodoTask, Al
 pub use executor::{ExecMode, ParallelExecutor, OptimalTaskAllocator};
 pub use coordinator::MultiAgentCoordinator;
 pub use hands::{HandType, Hand, HandsController};
+pub use contract::{TaskContract, TaskContractWarden, ContractState, ContractStats};

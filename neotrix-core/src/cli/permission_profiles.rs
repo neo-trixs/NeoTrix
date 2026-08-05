@@ -344,6 +344,99 @@ pub fn action_type_to_key(action: &crate::cli::approval::ActionType) -> &'static
     }
 }
 
+// ====== 三轴权限统一查询模型 (PermissionAxes) ======
+//
+// 将分散的三套权限轴统一为可查询模型 (R-P42: 强化现有节点，不建平行模块):
+//   轴1 审批模式 (ApprovalMode):   Suggest / AutoEdit / FullAuto   → 来自 global_approval
+//   轴2 权限链模式 (PermissionMode): Plan / AcceptEdits / BypassPermissions → 来自 global_shield.perm_chain
+//   轴3 策略决策 (PolicyDecision):  Allow / RequireConfirmation / Deny → 来自 global_shield.policy
+// 只做统一查询/展示，不迁移任何现有决策逻辑（避免破坏已接线行为）。
+
+use crate::cli::approval::ApprovalMode;
+use crate::cli::shield_enforcer::global_shield;
+use crate::neotrix::l1_body_impl::nt_shield::perm_chain::PermissionMode;
+use crate::neotrix::l1_body_impl::nt_shield::policy::PolicyDecision;
+
+/// 三轴权限快照
+#[derive(Debug, Clone, Serialize)]
+pub struct PermissionAxes {
+    /// 轴1: 审批模式
+    pub approval_mode: String,
+    /// 轴2: 权限链模式
+    pub permission_chain_mode: String,
+    /// 轴3: 当前安全画像
+    pub policy_profile: String,
+    /// 当前激活的权限画像
+    pub active_profile: String,
+    /// 有效风险等级 (0=最安全 .. 3=最高自主)
+    pub autonomy_level: u8,
+}
+
+impl PermissionAxes {
+    /// 从全局状态采集三轴当前值
+    pub fn snapshot() -> Self {
+        let approval = match crate::cli::approval::global_approval().lock() {
+            Ok(g) => g.mode(),
+            Err(_) => ApprovalMode::Suggest,
+        };
+        let shield = match global_shield().lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        let chain_mode = shield.perm_chain.mode();
+        let policy_profile = shield.policy.profile.clone();
+        let active_profile = active_profile_name();
+        drop(shield);
+
+        let autonomy = match approval {
+            ApprovalMode::Suggest => 0,
+            ApprovalMode::AutoEdit => 1,
+            ApprovalMode::FullAuto => 2,
+        } + match chain_mode {
+            PermissionMode::Plan => 0,
+            PermissionMode::AcceptEdits => 1,
+            PermissionMode::BypassPermissions => 2,
+        };
+
+        Self {
+            approval_mode: format!("{:?}", approval),
+            permission_chain_mode: chain_mode.label().to_string(),
+            policy_profile,
+            active_profile,
+            autonomy_level: autonomy.min(3),
+        }
+    }
+
+    /// 针对指定 action key 查询轴3 策略决策
+    pub fn policy_decision_for(action: &str) -> PolicyDecision {
+        match global_shield().lock() {
+            Ok(g) => g.policy.decide(action),
+            Err(e) => e.into_inner().policy.decide(action),
+        }
+    }
+
+    /// 查询指定 action 在轴1 下是否需要审批
+    pub fn approval_required_for(action: &crate::cli::approval::ActionType) -> bool {
+        match crate::cli::approval::global_approval().lock() {
+            Ok(g) => g.require_approval(action),
+            Err(_) => true,
+        }
+    }
+
+    /// 汇总展示 (三轴并排)
+    pub fn summary() -> String {
+        let axes = Self::snapshot();
+        format!(
+            "三轴权限:\n  轴1 审批:   {} (Suggest=严格 / FullAuto=全自动)\n  轴2 权限链: {} (Plan=计划 / Bypass=旁路)\n  轴3 策略:   profile={}\n  激活画像:   {}\n  自主等级:   {}/3",
+            axes.approval_mode,
+            axes.permission_chain_mode,
+            axes.policy_profile,
+            axes.active_profile,
+            axes.autonomy_level,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,5 +581,18 @@ mod tests {
         assert_eq!(action_type_to_key(&ActionType::FileEdit { path: "x".into(), diff: "".into() }), "write_file");
         assert_eq!(action_type_to_key(&ActionType::ShellCommand { command: "ls".into() }), "execute_command");
         assert_eq!(action_type_to_key(&ActionType::GitOperation { description: "commit".into() }), "git_push");
+    }
+
+    #[test]
+    fn test_permission_axes_snapshot_and_summary() {
+        let axes = PermissionAxes::snapshot();
+        assert!(!axes.approval_mode.is_empty());
+        assert!(!axes.permission_chain_mode.is_empty());
+        assert!(axes.autonomy_level <= 3);
+        let summary = PermissionAxes::summary();
+        assert!(summary.contains("三轴权限"));
+        assert!(summary.contains("轴2"));
+        // 策略决策查询不 panic
+        let _ = PermissionAxes::policy_decision_for("write_file");
     }
 }

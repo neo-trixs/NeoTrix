@@ -108,19 +108,45 @@ impl CliCommand for SessionCmd {
                     return CommandOutput::err("用法: /session save <name>");
                 }
                 let name = args[1].clone();
+                let mut messages = Vec::new();
+                let mut reward_accum = 0.0f64;
+                let mut success_count = 0usize;
+                let mut total_count = 0usize;
                 if let Some(b) = brain {
                     let a = b.blocking_read();
                     let _ = a.brain.save();
+                    for mem in a.reasoning_bank.memories() {
+                        messages.push(format!("[{}][{:?}] {} (reward={:.2}, success={})",
+                            mem.timestamp, mem.task_type, mem.task_description, mem.reward, mem.success));
+                        reward_accum += mem.reward;
+                        total_count += 1;
+                        if mem.success { success_count += 1; }
+                    }
+                }
+                if messages.is_empty() {
+                    messages.push("(会话无落地记忆，仅保存标记)".to_string());
                 }
                 let data = SessionData {
                     id: uuid::Uuid::new_v4().to_string(),
                     name: name.clone(),
-                    messages: vec![],
+                    messages: messages.clone(),
                     created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                     updated_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                 };
                 match store.save_session(&name, &data) {
-                    Ok(()) => CommandOutput::ok(&format!("💾 会话 '{}' 已保存", name)),
+                    Ok(()) => {
+                        let mut out = format!("💾 会话 '{}' 已保存 ({} 条记忆, 成功率 {:.0}%, 累计奖励 {:.2})\n",
+                            name, total_count, if total_count > 0 { 100.0 * success_count as f64 / total_count as f64 } else { 0.0 }, reward_accum);
+                        // 同步蒸馏该会话
+                        match store.distill() {
+                            Ok(report) => {
+                                out.push_str(&format!("🧠 蒸馏完成: {} 会话 → {} 行为模式, {} 条建议\n",
+                                    report.session_count, report.patterns.len(), report.suggestions.len()));
+                            }
+                            Err(e) => out.push_str(&format!("⚠️ 蒸馏失败: {}\n", e)),
+                        }
+                        CommandOutput::ok(&out)
+                    }
                     Err(e) => CommandOutput::err(&format!("保存失败: {}", e)),
                 }
             }
@@ -223,7 +249,41 @@ impl CliCommand for SessionCmd {
                     Err(e) => CommandOutput::err(&format!("分享创建失败: {}", e)),
                 }
             }
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: list, save, load, delete, fork, export, import, share", cmd)),
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: list, save, load, delete, fork, export, import, share, distill", cmd)),
+        }
+    }
+}
+
+// ====== /distill ======
+
+pub struct DistillCmd;
+impl CliCommand for DistillCmd {
+    fn name(&self) -> &str { "/distill" }
+    fn aliases(&self) -> Vec<&str> { vec![] }
+    fn description(&self) -> &str { "会话蒸馏: /distill 扫描 session-logs 提取行为模式" }
+    fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+        let mut store = SessionStore::new();
+        match store.distill() {
+            Ok(report) => {
+                let mut out = format!("🧠 蒸馏报告 ({} 会话, {})\n", report.session_count, report.generated_at);
+                if report.patterns.is_empty() {
+                    out.push_str("  (无识别到的行为模式)\n");
+                } else {
+                    out.push_str("  行为模式:\n");
+                    for p in &report.patterns {
+                        out.push_str(&format!("    - {}: {} (频率 {}, 可行动: {})\n",
+                            p.name, p.description, p.frequency, p.actionable));
+                    }
+                }
+                if !report.suggestions.is_empty() {
+                    out.push_str("  建议:\n");
+                    for s in &report.suggestions {
+                        out.push_str(&format!("    · {}\n", s));
+                    }
+                }
+                CommandOutput::ok(&out)
+            }
+            Err(e) => CommandOutput::err(&format!("蒸馏失败: {}", e)),
         }
     }
 }

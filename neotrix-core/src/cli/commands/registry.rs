@@ -12,7 +12,7 @@ use crate::cli::commands::budget_cmds::BudgetCmd;
 use crate::cli::commands::file_cmds::{FileCreateCmd, FileDiffCmd, FileEditCmd, FilePatchCmd, FileReadCmd, FileWriteCmd};
 use crate::cli::commands::git_cmds::{CommitCmd, GitCmd, PrCmd};
 use crate::cli::commands::goal_cmds::GoalCmd;
-use crate::cli::commands::session_cmds::{CompactCmd, ContextCmd, ForkCmd, HistoryCmd, ResumeCmd, SessionCmd};
+use crate::cli::commands::session_cmds::{CompactCmd, ContextCmd, DistillCmd, ForkCmd, HistoryCmd, ResumeCmd, SessionCmd};
 use crate::cli::commands::theme_cmd::ThemeCmd;
 use crate::cli::commands::connector_cmds::ConnectorCmd;
 use crate::cli::commands::review_cmds::ReviewCmd;
@@ -24,6 +24,8 @@ use crate::cli::commands::doctor_cmds::DoctorCmd;
 use crate::cli::commands::plugin_cmds::PluginCmd;
 use crate::cli::commands::search_cmds::SearchCmd;
 use crate::cli::commands::model_cmds::ModelCmd;
+use crate::cli::commands::contract_cmds::ContractCmd;
+use crate::cli::commands::perm_cmds::PermCmd;
 use crate::cli::commands::profile_cmds::ProfileCmd;
 use crate::cli::commands::sandbox_cmds::SandboxCmd;
 use crate::cli::commands::hypothesis_cmds::HypothesisCmd;
@@ -84,6 +86,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(HistoryCmd));
     reg.register(Box::new(ContextCmd));
     reg.register(Box::new(CompactCmd));
+    reg.register(Box::new(DistillCmd));
 
     // Agent
     reg.register(Box::new(AgentCmd));
@@ -125,6 +128,8 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ProviderCmd));
     reg.register(Box::new(FreeCmd));
     reg.register(Box::new(ModelCmd));
+    reg.register(Box::new(ContractCmd));
+    reg.register(Box::new(PermCmd));
 
     // Skills
     reg.register(Box::new(SkillCmd));
