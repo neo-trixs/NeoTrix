@@ -60,13 +60,13 @@ pub use crate::core::nt_core_self::emotion_state::{
 };
 
 // 从 consciousness 移入 L6（自我组件）
-pub use crate::core::nt_core_consciousness::first_person_ref::FirstPersonRef;
-pub use crate::core::nt_core_consciousness::volition::{
+pub use crate::core::l5_consciousness::conscious::first_person_ref::FirstPersonRef;
+pub use crate::core::l5_consciousness::conscious::volition::{
     VolitionEngine, ActionCandidate,
 };
-pub use crate::core::nt_core_consciousness::inner_critic::{
+pub use crate::core::l5_consciousness::conscious::inner_critic::{
     InnerCritic, CritiqueResult,
 };
-pub use crate::core::nt_core_consciousness::awakening::{
+pub use crate::core::l5_consciousness::conscious::awakening::{
     ConsciousnessAwakening, AwakeningReport,
 };
