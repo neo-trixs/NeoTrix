@@ -50,12 +50,13 @@ impl Default for SessionStore {
 impl SessionStore {
     pub fn new() -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let base = std::path::PathBuf::from(home).join(".neotrix");
-        let kb = crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(None)
-            .unwrap_or_else(|_| {
-                crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(Some(base.join("knowledge.db")))
-                    .expect("KB open fallback")
-            });
+        Self::with_base(std::path::PathBuf::from(home).join(".neotrix"))
+    }
+
+    /// 测试/隔离环境: 指定 base 目录 (KB + session-logs 均在其下)
+    pub fn with_base(base: std::path::PathBuf) -> Self {
+        let kb = crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(Some(base.join("knowledge.db")))
+            .expect("KB open");
         Self { kb, base }
     }
 
@@ -197,7 +198,63 @@ impl SessionStore {
             self.logs_dir(),
             self.base.join("AGENTS-distilled.md"),
         );
-        d.generate_distillation_report();
         Ok(d.generate_distillation_report())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 端到端蒸馏链路验证 (R-P21 双重验证: 编译期调用链 + 运行时数据落地):
+    /// save_session → KB session_logs + session-logs/*.md 落盘 → distill() 读取 md → 产出报告
+    #[test]
+    fn test_distill_end_to_end() {
+        let dir = std::env::temp_dir().join(format!("nt_session_e2e_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).ok();
+        let mut store = SessionStore::with_base(dir.clone());
+
+        let data = SessionData {
+            id: "e2e-1".to_string(),
+            name: "e2e-1".to_string(),
+            messages: vec![
+                "[2026-08-05][Coding] 用户要求同步执行并行任务 (reward=1.00, success=true)".to_string(),
+                "[2026-08-05][Coding] 还有需要进化的路线吗 (reward=0.80, success=true)".to_string(),
+            ],
+            created_at: "2026-08-05 10:00:00".to_string(),
+            updated_at: "2026-08-05 10:05:00".to_string(),
+        };
+
+        // 1. save → KB + md 文件
+        store.save_session("e2e-1", &data).expect("save session");
+        let md_path = dir.join("session-logs").join("e2e-1.md");
+        assert!(md_path.exists(), "session-logs/e2e-1.md 必须落盘");
+        let md_content = std::fs::read_to_string(&md_path).expect("read md");
+        assert!(md_content.contains("同步执行"), "md 内容需保留消息文本");
+
+        // 2. KB 可读回
+        let loaded = store.load_session("e2e-1").expect("load session");
+        assert_eq!(loaded.name, "e2e-1");
+        assert_eq!(loaded.messages.len(), 2);
+
+        // 3. distill → 从 md 提取行为模式
+        let report = store.distill().expect("distill");
+        assert!(report.session_count >= 1, "报告应覆盖已保存会话");
+        assert!(
+            report.patterns.iter().any(|p| p.name == "parallel_dispatch"),
+            "应识别 parallel_dispatch 模式, got {:?}",
+            report.patterns.iter().map(|p| p.name.clone()).collect::<Vec<_>>()
+        );
+        assert!(
+            report.suggestions.iter().any(|s| s.contains("同步执行")),
+            "应产出 actionable 建议"
+        );
+
+        // 4. delete → 双端清理
+        store.delete_session("e2e-1").expect("delete session");
+        assert!(!md_path.exists(), "delete 应同时移除 md 文件");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
