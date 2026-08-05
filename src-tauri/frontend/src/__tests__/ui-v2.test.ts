@@ -258,4 +258,60 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  it("unified workspace header mounts with title + status pills", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.switchView as (el: HTMLElement, v: string) => void)(
+      document.querySelector('.segb[data-view="chat"]') as HTMLElement,
+      "chat",
+    );
+    expect(document.getElementById("wsTop")).not.toBeNull();
+    expect(document.getElementById("wsTitleTxt")!.textContent).toBe("对话");
+    const pills = document.querySelectorAll("#wsStatus .ws-pill").length;
+    expect(pills).toBeGreaterThanOrEqual(3);
+  });
+
+  it("switchView syncs the unified workspace title + cowork session items carry status dots", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.switchView as (el: HTMLElement, v: string) => void)(
+      document.querySelector('.segb[data-view="cowork"]') as HTMLElement,
+      "cowork",
+    );
+    expect(document.getElementById("wsTitleTxt")!.textContent).toBe("团队");
+    const dots = document.querySelectorAll("#cwSessionList .cw-sitem .st-dot");
+    expect(dots.length).toBeGreaterThan(0);
+    (g.switchView as (el: HTMLElement, v: string) => void)(
+      document.querySelector('.segb[data-view="chat"]') as HTMLElement,
+      "chat",
+    );
+    expect(document.getElementById("wsTitleTxt")!.textContent).toBe("对话");
+  });
+
+  it("loadWsStatus populates real brain stats into header + hero meta", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mock: Record<string, (a: unknown) => unknown> = {};
+    mock["brain_stats"] = () => ({
+      iteration: 7, absorb_count: 9, capability_sum: 4.2,
+      memory_count: 42, dimension_names: ["reasoning", "planning", "memory"],
+      capability_vector: [1, 2, 3], engine_active: false,
+    });
+    mock["neocodex_health_report"] = () => ({ context_usage: 10, turn_count: 2 });
+    mock["neocodex_agent_status"] = () => ({ running: false, current_task: null });
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: unknown) => {
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+    };
+    try {
+      await (g.loadWsStatus as () => Promise<void>)();
+      expect(document.getElementById("wsMemory")!.textContent).toContain("42");
+      expect(document.getElementById("wsDims")!.textContent).toContain("3");
+      expect(document.getElementById("heroMeta")!.innerHTML).toContain("VSA HyperCube");
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });

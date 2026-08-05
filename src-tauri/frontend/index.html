@@ -88,7 +88,17 @@
     <!-- ═══ MAIN ═══ -->
     <main class="ma">
 
-
+      <!-- ═══ 统一工作区状态栏 — 跨标签共享: 当前视图 + 实时系统状态 (NeoTrix 特性) ═══ -->
+      <div class="ws-top" id="wsTop">
+        <div class="ws-title" id="wsTitle"><span class="ws-title-ic" id="wsTitleIc"></span><span id="wsTitleTxt">对话</span></div>
+        <div class="ws-status" id="wsStatus">
+          <span class="ws-pill ws-pill-model" id="wsModel" title="当前模型"><span class="ws-dot"></span>—</span>
+          <span class="ws-pill" id="wsMemory" title="记忆容量">记忆 —</span>
+          <span class="ws-pill" id="wsDims" title="能力维度">能力 — 维</span>
+          <span class="ws-pill ws-pill-iter" id="wsIter" title="进化迭代">进化 —</span>
+          <span class="ws-pill ws-pill-agent" id="wsAgent" title="智能体状态"><span class="ws-dot"></span>空闲</span>
+        </div>
+      </div>
 
       <!-- ═══ VIEW: Chat (对话) — Claude 式: hero 问候 + 底部常驻输入框 ═══ -->
       <div class="vw-chat" id="viewChat">
@@ -103,8 +113,9 @@
                 <path d="M4 20q4-4 8 0t8-8 8 4" stroke="var(--pri2)" stroke-width="0.8" stroke-linecap="round" opacity="0.4" fill="none"/>
               </svg>
             </div>
-            <h1>下午好</h1>
+            <h1 id="heroGreeting">下午好</h1>
           </div>
+          <div class="hero-meta" id="heroMeta"></div>
           <div class="hero-sug" id="heroSuggest"></div>
         </div>
         <div class="cs" id="chatScroll" style="display:none"></div>

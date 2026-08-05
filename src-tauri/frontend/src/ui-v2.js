@@ -43,6 +43,7 @@ g.runMsgCode = runMsgCode;
 g.stopAgent = stopAgent;
 g.loadHypercube = loadHypercube;
 g.loadSessions = loadSessions;
+g.loadWsStatus = loadWsStatus;
 g.loadRegistry = loadRegistry;
 g.kbSearch = kbSearch;
 g.sendSuggestion = sendSuggestion;
@@ -345,8 +346,20 @@ g.cwFilter = cwFilter;
     if(t)t.style.display='flex';
     currentNav[view]=0;
     renderSidebar(view);
+    syncWsTitle(view);
     if(view==='chat'){ renderHeroSuggest(); }
     if(view==='cowork') { renderCowork(); }
+  }
+
+  function syncWsTitle(view){
+    const meta = {
+      chat: { txt:'对话', ic:'<svg viewBox="0 0 14 14"><path d="M3 4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H7L5 10.5V9H4a1 1 0 0 1-1-1V4z" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>' },
+      cowork: { txt:'团队', ic:'<svg viewBox="0 0 14 14"><circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M2 11.5a3 3 0 0 1 6 0" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/><circle cx="10" cy="5.5" r="1.6" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M8.5 11.5a3 3 0 0 1 3.5-2.9" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg>' },
+    };
+    const ic = document.getElementById('wsTitleIc');
+    const txt = document.getElementById('wsTitleTxt');
+    if(ic) ic.innerHTML = meta[view] ? meta[view].ic : '';
+    if(txt) txt.textContent = meta[view] ? meta[view].txt : '';
   }
 
   /* ===== Right Sidebar — File Tree ===== */
@@ -717,9 +730,16 @@ g.cwFilter = cwFilter;
     });
     sl.innerHTML = filtered.map((s,i) => {
       const pct = s.tasks > 0 ? Math.round(s.done/s.tasks*100) : 0;
+      const stCls = s.status === '已完成' ? 's-done' : (s.status === '已暂停' ? 's-paused' : 's-run');
+      const stTxt = s.status || '就绪';
+      const msg = s.message_count ? ` · ${s.message_count} 消息` : '';
       return `<div class="cw-sitem${i===0?' active':''}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
-        ${escHtml(s.name)}
-        <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%</span>
+        <div class="s">
+          <span class="st-dot ${stCls}"></span>
+          <span class="st-t">${escHtml(s.name)}</span>
+        </div>
+        <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%${msg}</span>
+        <span class="s">${escHtml(stTxt)}</span>
       </div>`;
     }).join('');
     if(!filtered.length){
@@ -1304,6 +1324,56 @@ g.cwFilter = cwFilter;
     }catch(e){}
   }
 
+  /* 统一工作区状态栏 — 跨标签实时系统状态 (NeoTrix 特性: 记忆量/能力维度/进化迭代/模型/智能体) */
+  async function loadWsStatus(){
+    if(!isTauri()) return;
+    try{
+      const [bs, h] = await Promise.all([
+        invoke('brain_stats').catch(() => null),
+        invoke('neocodex_health_report').catch(() => null),
+      ]);
+      const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = String(v); };
+      if(bs){
+        set('wsMemory', '记忆 ' + (bs.memory_count ?? 0));
+        set('wsDims', '能力 ' + ((bs.dimension_names && bs.dimension_names.length) || 0) + ' 维');
+        set('wsIter', '进化 ' + (bs.iteration ?? bs.absorb_count ?? 0));
+      }
+      const m = document.getElementById('wsModel');
+      if(m){
+        const cur = MODEL_POOL.find(x => x.id === currentModelId);
+        if(cur) m.lastChild.textContent = cur.title;
+      }
+      try{
+        const st = await invoke('neocodex_agent_status').catch(() => null);
+        const ag = document.getElementById('wsAgent');
+        if(ag && st){
+          if(st.running){
+            ag.classList.add('run');
+            ag.lastChild.textContent = st.current_task ? '运行中 · ' + String(st.current_task).slice(0, 10) : '运行中';
+          }else{
+            ag.classList.remove('run');
+            ag.lastChild.textContent = '空闲';
+          }
+        }
+      }catch(_e){}
+      const g = document.getElementById('heroGreeting');
+      if(g && !g.dataset.greeted){
+        const hr = new Date().getHours();
+        g.textContent = hr < 5 ? '夜深了' : (hr < 12 ? '上午好' : (hr < 14 ? '中午好' : (hr < 18 ? '下午好' : '晚上好')));
+        g.dataset.greeted = '1';
+      }
+      const meta = document.getElementById('heroMeta');
+      if(meta && !meta.dataset.filled){
+        const parts = [];
+        if(bs) parts.push({ ic:'<svg viewBox="0 0 12 12"><path d="M6 1l1.2 3.3 3.3 1.2-3.3 1.2L6 10l-1.2-3.3-3.3-1.2 3.3-1.2z" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round"/></svg>', t:`VSA HyperCube · 记忆 <b>${bs.memory_count ?? 0}</b>` });
+        parts.push({ ic:'<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1" fill="none"/><circle cx="6" cy="6" r="1" stroke="currentColor" stroke-width="1" fill="none"/></svg>', t:`能力 <b>${((bs && bs.dimension_names && bs.dimension_names.length) || 0)}</b> 维` });
+        parts.push({ ic:'<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1" fill="none"/><path d="M6 3.5V6l2 1.2" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/></svg>', t:`进化 <b>${(bs ? (bs.iteration ?? bs.absorb_count ?? 0) : 0)}</b> 代` });
+        meta.innerHTML = parts.map(p => `<span class="hm">${p.ic}${p.t}</span>`).join('');
+        meta.dataset.filled = '1';
+      }
+    }catch(e){}
+  }
+
   async function loadFileTree(){
     if(!isTauri()) return;
     try{
@@ -1366,7 +1436,7 @@ g.cwFilter = cwFilter;
 
   async function wireBackend(){
     if(!isTauri()) return;
-    await Promise.all([loadSessions(), loadHealth(), loadFileTree(), loadProxy(), loadUsage()]);
+    await Promise.all([loadSessions(), loadHealth(), loadFileTree(), loadProxy(), loadUsage(), loadWsStatus()]);
   }
 
   window.wireBackend = wireBackend;
