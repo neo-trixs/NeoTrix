@@ -10,11 +10,11 @@
   --nt-surface:         #EFECE6;
   --nt-surface-elevated:#FFFFFF;
 
-  /* ── Accent: Red (replaces previous amber) ── */
-  --nt-accent:          #E85454;
-  --nt-accent-hover:    #D04040;
-  --nt-accent-glow:     rgba(232, 84, 84, 0.12);
-  --nt-accent-light:    rgba(232, 84, 84, 0.10);
+  /* ── Accent: Warm Amber — Consciousness Amber ── */
+  --nt-accent:          #F97316;
+  --nt-accent-hover:    #EA580C;
+  --nt-accent-glow:     rgba(249, 115, 22, 0.14);
+  --nt-accent-light:    rgba(249, 115, 22, 0.12);
 
   /* ── Override existing --nt-* with warm equivalents ── */
   --nt-bg:              #F5F2EC;
@@ -23,13 +23,13 @@
   --nt-main-bg:         #EFECE6;
 
   /* ── Consciousness state colors ── */
-  --nt-e8-active:       rgba(232, 84, 84, 0.12);
+  --nt-e8-active:       rgba(249, 115, 22, 0.14);
   --nt-e8-line-yang:    var(--nt-accent);
   --nt-e8-line-yin:     var(--nt-text-muted);
   --nt-e8-line-changing: #D4855A;
 
-  --nt-gwt-resonance:   rgba(232, 84, 84, 0.08);
-  --nt-gwt-expert-bg:   rgba(232, 84, 84, 0.06);
+  --nt-gwt-resonance:   rgba(249, 115, 22, 0.09);
+  --nt-gwt-expert-bg:   rgba(249, 115, 22, 0.07);
 
   --nt-seal-progress:   #5A8F5A;
   --nt-seal-bg:         rgba(90, 143, 90, 0.1);
@@ -49,21 +49,21 @@
   --nt-surface:         #2A2824;
   --nt-surface-elevated:#33312C;
 
-  --nt-accent:          #FF6B6B;
-  --nt-accent-hover:    #E85555;
-  --nt-accent-glow:     rgba(255, 107, 107, 0.18);
-  --nt-accent-light:    rgba(255, 107, 107, 0.12);
+  --nt-accent:          #FB923C;
+  --nt-accent-hover:    #F97316;
+  --nt-accent-glow:     rgba(251, 146, 60, 0.2);
+  --nt-accent-light:    rgba(251, 146, 60, 0.14);
 
   --nt-bg:              #1E1C19;
   --nt-sidebar:         rgba(42, 40, 36, 0.85);
   --nt-chat:            rgba(51, 49, 44, 0.75);
   --nt-main-bg:         #2A2824;
 
-  --nt-e8-active:       rgba(255, 107, 107, 0.15);
+  --nt-e8-active:       rgba(251, 146, 60, 0.16);
   --nt-e8-line-changing: #E8965A;
 
-  --nt-gwt-resonance:   rgba(255, 107, 107, 0.10);
-  --nt-gwt-expert-bg:   rgba(255, 107, 107, 0.08);
+  --nt-gwt-resonance:   rgba(251, 146, 60, 0.12);
+  --nt-gwt-expert-bg:   rgba(251, 146, 60, 0.09);
 
   --nt-seal-bg:         rgba(90, 143, 90, 0.15);
 
@@ -73,11 +73,11 @@
 
 /* ── Consciousness mode: stronger glow when thinking ── */
 [data-consciousness="active"] {
-  --nt-accent-glow:     rgba(232, 84, 84, 0.25);
-  --nt-gwt-resonance:   rgba(232, 84, 84, 0.15);
+  --nt-accent-glow:     rgba(249, 115, 22, 0.28);
+  --nt-gwt-resonance:   rgba(249, 115, 22, 0.16);
 }
 
 [data-consciousness="active"][data-theme="dark"] {
-  --nt-accent-glow:     rgba(255, 107, 107, 0.35);
-  --nt-gwt-resonance:   rgba(255, 107, 107, 0.2);
+  --nt-accent-glow:     rgba(251, 146, 60, 0.35);
+  --nt-gwt-resonance:   rgba(251, 146, 60, 0.22);
 }
