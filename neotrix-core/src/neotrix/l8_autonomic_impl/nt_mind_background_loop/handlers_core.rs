@@ -25,6 +25,50 @@ impl BackgroundLoopHandle {
                 engine.kb = Some(kb_inner);
             }
         }
+
+        // ── Dreaming 巩固 (P0-3, skales 三阶段: 重组→提纯→巩固) ──
+        // 用主库近期节点内容构造 VSA 事件 (seeded_random 确定性向量),
+        // 跑 run_consolidation_cycle + prune_low_coherence。这是记忆大脑的
+        // 夜间整理 — 此前 dream_consolidation 零生产调用。
+        use crate::core::nt_core_hcube::vsa_quantized::{QuantizedVSA, VSA_DIM};
+        use crate::core::nt_core_hcube::dream_consolidation::{DreamConfig};
+        let dream_inputs: Vec<(String, f64)> = {
+            if let Some(ref kb) = self.kb {
+                if let Ok(nodes) = kb.all_nodes() {
+                    nodes
+                        .into_iter()
+                        .take(64)
+                        .filter_map(|n| {
+                            let text = n.title;
+                            let salience = n.importance.max(0.0).min(1.0);
+                            Some((text, salience))
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            }
+        };
+        if !dream_inputs.is_empty() {
+            for (label, salience) in dream_inputs {
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                use std::hash::Hasher;
+                h.write(label.as_bytes());
+                let seed = h.finish();
+                let vector = QuantizedVSA::seeded_random(seed, VSA_DIM);
+                self.dream.record_event(vector, &label, salience);
+            }
+            let report = self.dream.run_consolidation_cycle();
+            self.dream.prune_low_coherence(DreamConfig::default().merge_threshold);
+            eprintln!(
+                "[bg-dream] replayed={} merged={} abstracted={} pred={} novelty={:.2} coherence_gain={:.2}",
+                report.sequences_replayed, report.patterns_merged,
+                report.abstractions_formed, report.predictions_generated,
+                report.novelty_score, report.coherence_gain,
+            );
+        }
     }
 
     pub(crate) async fn handle_goal(&mut self) {

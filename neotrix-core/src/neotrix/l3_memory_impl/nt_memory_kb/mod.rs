@@ -1,6 +1,7 @@
 #![deny(clippy::unwrap_used)]
 
 pub mod bm25;
+pub mod nt_memory_blocks;
 pub mod nt_discovery_github_topics;
 pub mod nt_discovery_orchestrator;
 pub mod nt_discovery_sources;
@@ -707,6 +708,110 @@ impl KnowledgeBase {
             .map_err(|e| format!("update_node_metadata: {}", e))
     }
 
+    /// 统一写入弧 (Unified Ingestion Bus) — 记忆写入的唯一入口。
+    ///
+    /// Onyx/ai-knowledge-graph 吸收: 任何写记忆动作先落主库 (nodes), 再从主库
+    /// 派生 graph (graphrag_extract → entities/relations edges) 与 evidence
+    /// (source_id + run_id 元数据), 杜绝 5 条平行写入管线互不相通。
+    ///
+    /// 返回主库节点 id (已存在则复用, 不重复建点)。
+    pub fn write_memory_entry(
+        &self,
+        title: &str,
+        node_type: NodeType,
+        content: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+        evidence: Option<&serde_json::Value>,
+    ) -> Result<String, String> {
+        // 1. 主库写入 (插入或复用)
+        let node_id = self.insert_or_get_node(title, node_type, content, url, domain)?;
+
+        // 2. 代际版本化 (generation stamp) — 同源重写 (同 URL/同标题) 每次
+        //    经统一弧落库都在 metadata 递增 generation, 形成可审计的版本链。
+        //    来源: skales 经验代际模式 + Claude-OSINT 溯源要求 (P1-2 接线)。
+        let mut meta = self
+            .get_node(&node_id)?
+            .and_then(|n| n.metadata.clone())
+            .unwrap_or_else(|| serde_json::json!({}));
+        let generation = meta
+            .get("generation")
+            .and_then(|g| g.as_u64())
+            .unwrap_or(0)
+            + 1;
+        if let Some(obj) = meta.as_object_mut() {
+            obj.insert("generation".to_string(), serde_json::json!(generation));
+            obj.insert(
+                "written_at".to_string(),
+                serde_json::json!(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as i64
+                ),
+            );
+        }
+        self.update_node_metadata(&node_id, &meta)?;
+
+        // 2b. 类型化块分块 (typed block stats) — 保留表格/公式/代码/标题结构。
+        //     来源: MinerU 结构化文档解析 + Claude-OSINT 溯源 (P2 接线)。
+        let text_now = content.unwrap_or_default();
+        if !text_now.is_empty() {
+            let blocks = nt_memory_blocks::split_typed_blocks(text_now);
+            let stats = nt_memory_blocks::block_stats(&blocks);
+            let mut meta2 = self
+                .get_node(&node_id)?
+                .and_then(|n| n.metadata.clone())
+                .unwrap_or_else(|| serde_json::json!({}));
+            if let Some(obj) = meta2.as_object_mut() {
+                obj.insert(
+                    "block_types".to_string(),
+                    serde_json::json!(stats),
+                );
+            }
+            self.update_node_metadata(&node_id, &meta2)?;
+        }
+
+        // 3. evidence 元数据 (source_id + run_id + sha256) 落到主节点
+        if let Some(ev) = evidence {
+            let mut meta = self
+                .get_node(&node_id)?
+                .and_then(|n| n.metadata.clone())
+                .unwrap_or_else(|| serde_json::json!({}));
+            if let Some(obj) = meta.as_object_mut() {
+                obj.insert("evidence".to_string(), ev.clone());
+            }
+            self.update_node_metadata(&node_id, &meta)?;
+        }
+
+        // 3. GraphRAG 派生: 实体/关系从主库内容提取, 落 graphrag_store
+        let text = content.unwrap_or_default();
+        if !text.is_empty() {
+            // 惰性初始化 graphrag store (首次写入自动建立, 无需前置 init)
+            if self.graphrag_store.read().map(|gs| gs.as_ref().is_none()).unwrap_or(false) {
+                let _ = self.init_graphrag(nt_memory_graphrag::GraphRagConfig::default());
+            }
+            if let Ok((entities, relations)) = self.graphrag_extract(text, &node_id) {
+                // 关系边回写主库: node → entity (graphrag 实体作为主库概念点)
+                for rel in relations.iter().take(32) {
+                    let target_title = rel.target_entity.clone();
+                    if let Ok(target_id) = self.insert_or_get_node(
+                        &target_title, NodeType::Concept, None, None, domain,
+                    ) {
+                        let rtype = RelationType::from_str(&rel.relation_type);
+                        let _ = self.upsert_edge(
+                            &node_id, &target_id, rtype, rel.weight, Some(&rel.evidence),
+                        );
+                    }
+                }
+                let _ = entities.len(); // 实体已入 graphrag_store, 主库边来自关系
+            }
+        }
+
+        Ok(node_id)
+    }
+
+
     /// Query KB for Repository nodes by domain, with optional min_stars filter
     pub fn find_repositories(&self, domain: &str, min_stars: Option<i64>) -> Result<Vec<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
@@ -848,17 +953,46 @@ impl KnowledgeBase {
         Ok(results)
     }
 
-    /// Permission-aware retrieval (P0-2): runs the same hybrid search but filters
-    /// results by the caller's clearance. Nodes with sensitivity above the caller's
-    /// permission level are excluded (e.g. ThinkingTrace/Secret hidden from Public).
+    /// Permission-aware retrieval (P0-2): 决策式混合检索 — adaptive_rag 路由
+    /// (classify → retrieve → grade → Generate/Refine/WebSearch) 后按调用方
+    /// clearance 过滤。这是检索的**唯一权限出口** (R-P79 接线: adaptive_rag
+    /// 从死代码变为生产驱动)。
+    ///
+    /// 结果按相关度降序 (Relevant → Partial → Irrelevant), 敏感节点
+    /// (ThinkingTrace/Secret 等高于调用方权限) 剔除。
     pub fn search_permission_aware(
         &self,
         query: &str,
         limit: usize,
         permission: crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel,
     ) -> Result<Vec<SearchResult>, String> {
-        let all = self.search(query, limit * 3)?;
-        let filtered: Vec<SearchResult> = all
+        // 决策式管线: 复杂度分类 → 检索 → 文档分级 → 路由 (Generate/Refine/WebSearch)
+        let pipe = self.adaptive.execute_pipeline(self, query);
+
+        // 按相关度排序: Relevant 先, 再 Partial, Irrelevant 垫底
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_adaptive_rag::RelevanceGrade;
+        let graded = &pipe.graded;
+        let mut scored: Vec<SearchResult> = pipe
+            .results
+            .into_iter()
+            .map(|mut sr| {
+                let grade = graded
+                    .iter()
+                    .find(|g| g.node_id == sr.node.id)
+                    .map(|g| &g.relevance);
+                match grade {
+                    Some(RelevanceGrade::Relevant) => sr.score += 100.0,
+                    Some(RelevanceGrade::Partial) => sr.score += 50.0,
+                    Some(RelevanceGrade::Irrelevant) => sr.score -= 10.0,
+                    None => {}
+                }
+                sr
+            })
+            .collect();
+        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+
+        // 权限过滤: 剔除高于调用方 clearance 的敏感节点
+        let filtered: Vec<SearchResult> = scored
             .into_iter()
             .filter(|r| {
                 let sensitivity = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::node_sensitivity(&r.node.node_type);

@@ -7,6 +7,7 @@ use super::nt_evidence_types::{
 };
 use super::nt_evidence_hypothesis::HypothesisNetwork;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::{KnowledgeBase, KnowledgeEdge, KnowledgeNode, NodeType, RelationType};
+use crate::core::nt_core_consciousness_tree::EvidenceChain;
 
 const EWHR_DOMAIN: &str = "nt_memory_historian";
 
@@ -61,6 +62,45 @@ impl EvidenceStore {
         let kb = self.kb.lock().map_err(|e| format!("lock: {}", e))?;
         kb.insert_node(&node).map_err(|e| format!("insert: {}", e))?;
         Ok(())
+    }
+
+    /// 证据链统一入弧 — 将 ConsciousnessTree 的 EvidenceChain (WARC/sha256/run_id
+    /// 溯源三件套) 桥接为 historian 考古证据记录,落入同一 KB 命名空间,实现
+    /// 证据三套合一 (archaeology record / meta-cognition chain / KB node 同源)。
+    /// 来源: MetaClaw 溯源模式 + Claude-OSINT 可复现性要求 (P1-1 接线)。
+    pub fn store_chain_evidence(&self, chain: &EvidenceChain) -> Result<String, String> {
+        let ts = chain.timestamp.max(1).to_string();
+        let id = chain
+            .sha256
+            .clone()
+            .unwrap_or_else(|| format!("chain-{}", chain.timestamp));
+        let description = format!(
+            "warc={:?} run_id={:?} tools={:?}",
+            chain.warc_path, chain.run_id, chain.tool_versions
+        );
+        let record = EvidenceRecord {
+            id: id.clone(),
+            name: format!("chain-{}", id.chars().take(12).collect::<String>()),
+            latitude: 0.0,
+            longitude: 0.0,
+            era: "evidence-chain".into(),
+            category: "chain".into(),
+            description,
+            dating_methods: chain.tool_versions.clone(),
+            context_clarity: 1.0,
+            publication_level: 0.9,
+            independent_replications: 1,
+            provenance_gap: 0.0,
+            anachronism_index: 0.0,
+            motivation_score: 0.0,
+            verification_gap: 0.0,
+            references: chain.warc_path.clone().unwrap_or_default(),
+            connections: vec![],
+            created_at: ts.clone(),
+            updated_at: ts,
+        };
+        self.store_evidence(&record)?;
+        Ok(id)
     }
 
     pub fn get_evidence(&self, id: &str) -> Result<Option<EvidenceRecord>, String> {

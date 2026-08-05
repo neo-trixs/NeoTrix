@@ -423,6 +423,9 @@ cognitive_load: self.cognitive_load.take(),
                 }
                 Some(sb)
             },
+            dream: crate::core::nt_core_hcube::dream_consolidation::DreamConsolidation::new(
+                crate::core::nt_core_hcube::dream_consolidation::DreamConfig::default(),
+            ),
             kb,
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
             cognitive_mode: 0,
@@ -617,6 +620,9 @@ pub struct BackgroundLoopHandle {
     fep_iit_bridge: Option<crate::neotrix::nt_core_fep_iit::FEPIITBridge>,
     cognitive_load: Option<crate::core::nt_core_consciousness::CognitiveLoadMonitor>,
     second_brain: Option<SecondBrain>,
+    /// 梦境巩固器 — VSA 记忆重组/提纯/巩固 (skales Dreaming 模式, P0-3 接线)。
+    /// 低负载周期触发 run_consolidation_cycle + prune_low_coherence。
+    dream: crate::core::nt_core_hcube::dream_consolidation::DreamConsolidation,
     kb: Option<Arc<KnowledgeBase>>,
     emotion_restored: std::sync::atomic::AtomicBool,
     bbrain: crate::neotrix::nt_mind::bbrain_monitor::BMonitor,
