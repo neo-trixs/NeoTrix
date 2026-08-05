@@ -154,6 +154,13 @@
 - **R-P98 (死代码拆解三态, 非二元)**: 死代码不能只判"删/留"。拆解前先归三态: ①能力已在活跃 lib (薄包装 bin) → 删 bin 留 lib; ②能力独立且生产缺失 → 提炼并入最近生产节点, 再删源; ③能力废弃/无价值 → 直接删。三态判定后统一删源, 避免"融一半留一半"。
 - **R-P99 (死模块能力先融合后删, 不直接删整体)**: 判定某模块零生产调用后, 先拆解其**通用能力**, 融合进同域活跃节点 (R-P42 强化现有节点), 再删源。例: 顶层 `server/http.rs+h5.rs+ws.rs` 零生产调用, 其 WsBridge+IM 适配器 / Session share API / H5 远程聊天 / WS echo 拆解融合进 `nt_io_web` (保留成熟 AppState+brain API), 然后删 3 个死文件, 保留 `server/session.rs` (被 session_cmds 用)。判定活/死: `grep -rln "<模块>" --include="*.rs" | grep -v "^<模块路径>/"` 为空即零生产调用。
 
+## 能力树注册纪律 (R-P100) — 2026-08-05 NT-CAPABILITY-TREE 基础设施
+
+- **R-P100 (任何融合/新建生产能力必须注册进能力树, 禁裸增长)**: `nt_core_capability_tree` crate + `neotrix-capability` CLI 是唯一能力登记处。所有 R-P42 融合、R-P98/99 拆解提炼、新生产函数, 落地后必须 `bud` 注册节点 (领域/层/成熟度/依赖边), 否则视为未接线死代码 (R-P79 门)。成熟度晋升: C0 编译 → C1 单测 → C2 集成 → C3 benchmark → C4 主流水线 → C5 自愈 → C6 进化闭环; 已注册即记 C0, 随验证逐级 `mature`。
+- **能力树三维坐标 (注册必填)**: X=11 域 (NT-CORE/MIND/MEMORY/WORLD/ACT/SHIELD/IO/META/NEXUS/GOVERNANCE/REPAIR), Y=C0-C6 星座成熟度, Z=L0 Primitive(单一安全原语) → L1 Composite(组合) → L2 Orchestrator(编排) → L3 DomainService(域服务) → L4 Application(应用入口)。CLI 校验层级跨度: 原语只能依赖原语, 禁止 L0 依赖 L1+。
+- **五种演化机制**: Budding(注册新节点)/ Grafting(注入依赖边)/ Pruning(移除无 dependents 的废弃节点)/ CrossPollination(域间复用, 强化现有节点禁平行适配器 R-P42)/ Maturation(成熟度晋升)。依赖用 `provides_index` 语义注册, `link` 建立 uses 边, petgraph DAG 校验循环。
+- **持久化与 CLI**: 注册表存 `.neotrix/capability_registry.json` (RegistryExport: nodes+edges+evolution_log, 因 petgraph Graph 不可直接 Serialize)。`--cycle` 是顶层参数放子命令前。命令: `tree`(ASCII/Mermaid 视图)/ `bud`/ `graft`/ `prune`/ `mature`/ `cross-pollinate`/ `link`/ `scan`/ `validate`/ `list`/ `get`/ `stats`/ `export`/ `import`。
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：
