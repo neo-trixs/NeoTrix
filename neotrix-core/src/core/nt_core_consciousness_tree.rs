@@ -152,6 +152,8 @@ pub struct CapabilityBranch {
     pub runes: RuneSocket,
     /// Constellation 成熟度 7 档 (C0-C6), 由 maturity_c0..c5 派生
     pub constellation: Constellation,
+    /// 迷雾浓度 (CHMA Phase 0) — 节点未被生产验证的程度
+    pub fog: FogLevel,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -376,6 +378,73 @@ impl Default for Constellation {
     fn default() -> Self { Self::new() }
 }
 
+/// 迷雾浓度 — 节点未被生产验证的程度。[0,1]，0=全清晰 1=全雾。
+/// 对应 CHMA 轴 3 (雾退散量纲)。
+/// 外部锚点: Martin D + 可达性 + 测试覆盖 (见 CHMA-fog-map-evolution.md §8.3)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FogLevel {
+    /// 生产可达性: 是否被生产路径引用 (false=孤儿/死代码 → 浓雾)
+    pub wired: bool,
+    /// 消费者数量: 0 = 无消费者 (dead island 信号)
+    pub consumer_count: usize,
+    /// 测试覆盖: 无 SelfTest = 雾
+    pub has_tests: bool,
+    /// 聚合浓度 [0,1]
+    pub level: f64,
+}
+
+impl FogLevel {
+    /// 从真实模块指标推导迷雾浓度 (纯函数, 无硬编码)。
+    /// - 未接线 → 基础浓度 0.85 (孤儿)
+    /// - 无消费者 → 浓度 +0.10
+    /// - 无测试 → 浓度 +0.15
+    /// - 已接线 + 有消费者 + 有测试 → 收敛到 0.05 (近乎全清晰)
+    pub fn derive(wired: bool, consumer_count: usize, has_tests: bool) -> Self {
+        let mut level = 0.0_f64;
+        if !wired {
+            level += 0.85;
+        }
+        if consumer_count == 0 {
+            level += 0.10;
+        }
+        if !has_tests {
+            level += 0.15;
+        }
+        if wired && consumer_count > 0 && has_tests {
+            level = 0.05;
+        }
+        Self {
+            wired,
+            consumer_count,
+            has_tests,
+            level: level.clamp(0.0, 1.0),
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        if self.level <= 0.10 {
+            "Clear"
+        } else if self.level <= 0.15 {
+            "LightFog"
+        } else if self.level <= 0.8 {
+            "Fog"
+        } else {
+            "DenseFog"
+        }
+    }
+}
+
+impl Default for FogLevel {
+    fn default() -> Self {
+        Self {
+            wired: false,
+            consumer_count: 0,
+            has_tests: false,
+            level: 0.85,
+        }
+    }
+}
+
 /// Node snapshot — per-branch 节点状态快照, 供遥测/CLI/UI 消费
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeSnapshot {
@@ -385,6 +454,10 @@ pub struct NodeSnapshot {
     pub rune_filled_slots: usize,
     pub runeword: Option<String>,
     pub composite_effect: f64,
+    /// 迷雾浓度 [0,1] — CHMA 轴 3
+    pub fog_level: f64,
+    /// 迷雾标签: Clear/LightFog/Fog/DenseFog
+    pub fog_label: String,
 }
 
 impl CapabilityBranch {
@@ -416,6 +489,11 @@ impl CapabilityBranch {
         );
     }
 
+    /// 运行时评估迷雾浓度 (CHMA Phase 0) — 从真实模块指标派生
+    pub fn evaluate_fog(&mut self, wired: bool, consumer_count: usize, has_tests: bool) {
+        self.fog = FogLevel::derive(wired, consumer_count, has_tests);
+    }
+
     /// 带 Rune 效果的健康折算: health × (1 + rune_composite × tier_weight)
     pub fn health_with_runes(&self) -> f64 {
         let composite = self.runes.composite_effect();
@@ -435,6 +513,8 @@ impl CapabilityBranch {
             rune_filled_slots: self.runes.filled_slots(),
             runeword: self.runes.runeword(),
             composite_effect: self.runes.composite_effect(),
+            fog_level: self.fog.level,
+            fog_label: self.fog.label().to_string(),
         }
     }
 }
@@ -983,6 +1063,8 @@ impl ConsciousnessTree {
             let cross_domain_consumers = if constraints.max_active_modules >= 30 { 3 } else { 1 };
             branch.evaluate_node_tier(cross_domain_consumers);
             branch.evaluate_constellation();
+            // CHMA Phase 0: 迷雾浓度评估 (wired ≈ 约束无 idle/monitoring 违规; consumers = 跨域近似)
+            branch.evaluate_fog(cross_domain_consumers > 0, cross_domain_consumers, branch.self_test_count > 0);
             
             // Check SelfTest minimum (E2: atomic capability coverage)
             let atoms_for_branch = self.atoms.iter().filter(|(_, a)| a.branch == branch.kind && a.mandatory).count();
@@ -1061,6 +1143,10 @@ impl ConsciousnessTree {
         }
 
         report.phase4_guidance = self.core.last_cycle_guidance.len();
+
+        // CHMA Phase 0: 迷雾地图主量纲 — 全仓加权雾和 + 每域迷雾摘要
+        report.weighted_fog_sum = self.weighted_fog_sum();
+        report.fog_by_branch = self.fog_by_branch();
 
         report
     }
@@ -1189,6 +1275,21 @@ impl ConsciousnessTree {
         BranchKind::all().into_iter()
             .filter_map(|k| self.branches.get(&k))
             .map(|b| b.snapshot())
+            .collect()
+    }
+
+    /// 全仓加权雾和 (迷雾地图主量纲): 高权 tier 的浓雾贡献更大。
+    /// Keystone 节点停在浓雾 = 大问题 (跨域基石未验证)。
+    pub fn weighted_fog_sum(&self) -> f64 {
+        self.branches.values()
+            .map(|b| b.fog.level * b.node_tier.weight())
+            .sum()
+    }
+
+    /// 每域迷雾摘要: branch label → 浓度 [0,1]
+    pub fn fog_by_branch(&self) -> std::collections::BTreeMap<String, f64> {
+        self.branches.values()
+            .map(|b| (b.kind.label().to_string(), b.fog.level))
             .collect()
     }
 
@@ -1691,6 +1792,7 @@ impl CapabilityBranch {
             node_tier: NodeTier::SmallPassive,
             runes: RuneSocket::default(),
             constellation: Constellation::new(),
+            fog: FogLevel::default(),
         }
     }
 }
@@ -1704,6 +1806,10 @@ pub struct GrowthReport {
     pub phase4_guidance: usize,
     pub phase6_fulfillment: Option<ContractFulfillment>,
     pub phase7_drift: Option<DriftReport>,
+    /// 全仓加权雾和 (Σ branch.fog.level × NodeTier.weight) — 迷雾地图主量纲
+    pub weighted_fog_sum: f64,
+    /// 每域迷雾浓度摘要 (branch label → level)
+    pub fog_by_branch: std::collections::BTreeMap<String, f64>,
 }
 
 impl crate::core::nt_core_self_test::SelfTest for ConsciousnessTree {
@@ -1902,6 +2008,86 @@ mod tests {
         assert_eq!(snap.tier, NodeTier::Keystone);
         assert_eq!(snap.constellation_level, 2);
         assert_eq!(snap.rune_filled_slots, 1);
+    }
+
+    #[test]
+    fn test_fog_level_derive_matrix() {
+        // (wired, consumers, has_tests) → (level, label)
+        let cases: &[((bool, usize, bool), (f64, &str))] = &[
+            ((false, 0, false), (1.0, "DenseFog")),      // 孤儿: 未接线+无消费者+无测试
+            ((false, 1, true), (0.85, "DenseFog")),      // 未接线但有消费者+测试
+            ((true, 0, true), (0.10, "Clear")),          // 接线有测试但无消费者
+            ((true, 1, false), (0.15, "LightFog")),      // 接线有消费者但无测试
+            ((true, 1, true), (0.05, "Clear")),          // 全清晰
+        ];
+        for ((wired, consumers, has_tests), (level, label)) in cases {
+            let fog = FogLevel::derive(*wired, *consumers, *has_tests);
+            assert!((fog.level - level).abs() < 1e-9, "fog.level mismatch: got {}, want {}", fog.level, level);
+            assert_eq!(fog.label(), *label, "label mismatch for level {}", fog.level);
+        }
+    }
+
+    #[test]
+    fn test_fog_evaluate_and_snapshot_carries_fog() {
+        let mut branch = CapabilityBranch::new(BranchKind::Core);
+        branch.self_test_count = 3;
+        branch.evaluate_fog(true, 2, true);
+        assert_eq!(branch.fog.label(), "Clear");
+        let snap = branch.snapshot();
+        assert!((snap.fog_level - 0.05).abs() < 1e-9);
+        assert_eq!(snap.fog_label, "Clear");
+
+        // 未接线 → 浓雾
+        let mut orphan = CapabilityBranch::new(BranchKind::World);
+        orphan.evaluate_fog(false, 0, false);
+        assert_eq!(orphan.fog.label(), "DenseFog");
+        assert_eq!(orphan.snapshot().fog_label, "DenseFog");
+    }
+
+    #[test]
+    fn test_weighted_fog_sum_tier_weighting() {
+        let mut tree = ConsciousnessTree::new();
+        // 初始: 全 branch 默认 fog=0.85 (DenseFog)
+        for branch in tree.branches.values_mut() {
+            branch.evaluate_fog(false, 0, false);
+            branch.node_tier = NodeTier::NotablePassive;
+        }
+        let baseline = tree.weighted_fog_sum();
+        assert!(baseline > 0.0);
+        // 把一个 Keystone 推到浓雾 → sum 显著上升 (证明 tier 加权)
+        let keystone_branch = tree.branches.get_mut(&BranchKind::Core).unwrap();
+        keystone_branch.node_tier = NodeTier::Keystone;
+        keystone_branch.evaluate_fog(false, 0, false); // fog.level = 1.0
+        let after = tree.weighted_fog_sum();
+        // Keystone weight=3.0, fog=1.0 vs 原 Notable weight=2.0, fog=1.0 → +1.0
+        assert!((after - baseline - 1.0).abs() < 1e-9, "got baseline={} after={}", baseline, after);
+    }
+
+    #[test]
+    fn test_growth_cycle_reports_fog_summary() {
+        let mut tree = ConsciousnessTree::new();
+        for branch in tree.branches.values_mut() {
+            branch.health = 0.8;
+            branch.self_test_count = 5;
+            branch.module_count = 12;
+            branch.fruit_count = 1;
+        }
+        let report = tree.run_growth_cycle();
+        assert!(report.weighted_fog_sum > 0.0);
+        assert_eq!(report.fog_by_branch.len(), BranchKind::all().len());
+        // Phase 3 evaluate_fog(wired=true, consumers>0, has_tests=true) → Clear
+        assert!(report.fog_by_branch.values().all(|v| *v <= 0.15));
+    }
+
+    #[test]
+    fn test_node_snapshot_json_roundtrip_with_fog() {
+        let mut branch = CapabilityBranch::new(BranchKind::Shield);
+        branch.evaluate_fog(false, 0, false);
+        let snap = branch.snapshot();
+        let json = serde_json::to_string(&snap).unwrap();
+        let back: NodeSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.fog_level, snap.fog_level);
+        assert_eq!(back.fog_label, snap.fog_label);
     }
 
     #[test]
