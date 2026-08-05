@@ -543,7 +543,9 @@ mod tests {
 
     #[test]
     fn test_extract_links() {
-        let html = r#"<a href="https://example.com/page1">Link 1</a><a href="https://example.com/page2">Link 2</a>"#;
+        // 使用公网 IP 字面量 (8.8.8.8) 而非域名 — SSRF 守卫对域名做实时 DNS 解析,
+        // 离线测试环境 DNS 失败会误过滤全部链接 (预存失败修复)。
+        let html = r#"<a href="http://8.8.8.8/page1">Link 1</a><a href="http://8.8.8.8/page2">Link 2</a>"#;
         let links = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_links(html, "");
         assert_eq!(links.len(), 2);
         assert!(links.iter().any(|l| l.contains("page1")));
@@ -552,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_extract_links_deduplication() {
-        let html = r#"<a href="https://example.com/page">Link</a><a href="https://example.com/page">Dup</a>"#;
+        let html = r#"<a href="http://8.8.8.8/page">Link</a><a href="http://8.8.8.8/page">Dup</a>"#;
         let links = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_links(html, "");
         assert_eq!(links.len(), 1, "Duplicate links should be deduped");
     }

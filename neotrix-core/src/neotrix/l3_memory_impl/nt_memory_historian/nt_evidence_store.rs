@@ -547,8 +547,43 @@ impl EvidenceStore {
 
 #[cfg(test)]
 mod tests {
+    fn new_store() -> super::EvidenceStore {
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_evstore_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase::open(Some(tmp))
+            .expect("open kb");
+        super::EvidenceStore::new(kb)
+    }
+
     #[test]
     fn test_placeholder() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_store_chain_evidence_roundtrip() {
+        // P1-1: EvidenceChain (WARC/sha256/run_id) 桥接为考古证据记录并落库
+        use crate::core::nt_core_consciousness_tree::EvidenceChain;
+        let store = new_store();
+        let chain = EvidenceChain {
+            warc_path: Some("/tmp/chain.warc.gz".into()),
+            sha256: Some("deadbeef".into()),
+            run_id: Some("run-42".into()),
+            timestamp: 1700000000,
+            tool_versions: vec!["crawl-0.1".into(), "parse-0.2".into()],
+        };
+        let id = store.store_chain_evidence(&chain).expect("store chain");
+        assert_eq!(id, "deadbeef");
+
+        let rec = store.get_evidence(&id).expect("get").expect("record");
+        assert_eq!(rec.category, "chain");
+        assert!(rec.description.contains("run-42"), "run_id 应入 description");
+        assert_eq!(rec.dating_methods.len(), 2, "tool_versions 桥接为 dating_methods");
     }
 }

@@ -2117,6 +2117,119 @@ mod tests {
         assert_eq!(PermissionLevel::from_str("unknown"), PermissionLevel::Confidential);
         assert_eq!(PermissionLevel::Confidential.as_str(), "confidential");
     }
+
+    // ── P0-1 / P0-2 / P1-2 新方法单测 ──
+    fn test_kb() -> KnowledgeBase {
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_kbtest_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        KnowledgeBase::open(Some(tmp)).expect("open temp KB")
+    }
+
+    #[test]
+    fn test_write_memory_entry_generation_stamps() {
+        // P1-2: 同一 URL 重写两次 → generation 从 1 递增到 2
+        let kb = test_kb();
+        let url = "https://unified-arc.example/artifact";
+        kb.write_memory_entry(
+            "UnifiedArc Test",
+            super::nt_memory_types::NodeType::Concept,
+            Some("first version content"),
+            Some(url),
+            Some("test"),
+            None,
+        ).expect("first write");
+        kb.write_memory_entry(
+            "UnifiedArc Test",
+            super::nt_memory_types::NodeType::Concept,
+            Some("second version content"),
+            Some(url),
+            Some("test"),
+            None,
+        ).expect("second write");
+
+        let nodes = kb.find_node_by_url(url).expect("query url");
+        let node = nodes.expect("node exists");
+        let gen = node.metadata
+            .as_ref()
+            .and_then(|m| m.get("generation"))
+            .and_then(|g| g.as_u64())
+            .expect("generation stamped");
+        assert_eq!(gen, 2, "同源重写应递增 generation");
+        let written_at = node.metadata.as_ref().and_then(|m| m.get("written_at"));
+        assert!(written_at.is_some(), "written_at 应落库");
+    }
+
+    #[test]
+    fn test_write_memory_entry_derives_graphrag_edges() {
+        // P0-1: 写入内容应派生 graphrag 关系边到主库
+        let kb = test_kb();
+        kb.init_graphrag(super::nt_memory_graphrag::GraphRagConfig::default()).expect("init");
+        let id = kb.write_memory_entry(
+            "GraphRag Derive Test",
+            super::nt_memory_types::NodeType::Concept,
+            Some("The AlphaBravo System integrates with the GammaDelta API for streaming."),
+            None,
+            Some("test"),
+            None,
+        ).expect("write");
+
+        // graphrag_extract 至少产生实体; 主库节点可查询
+        let node = kb.get_node(&id).expect("get").expect("node");
+        assert!(!node.title.is_empty());
+        let stats = kb.graphrag_stats();
+        assert!(stats.is_some(), "graphrag store 应初始化");
+    }
+
+    #[test]
+    fn test_write_memory_entry_block_stats() {
+        // P2: 内容含表格/公式 → block_types metadata 应记录
+        let kb = test_kb();
+        let doc = "| A | B |\n|---|---|\n| 1 | 2 |\n\n$$E=mc^2$$\n\npara\n";
+        kb.write_memory_entry(
+            "BlockStats Test",
+            super::nt_memory_types::NodeType::Concept,
+            Some(doc),
+            None,
+            Some("test"),
+            None,
+        ).expect("write");
+        let node = kb.all_nodes().expect("all").pop().expect("node");
+        let bt = node.metadata
+            .as_ref()
+            .and_then(|m| m.get("block_types"))
+            .and_then(|b| b.as_object())
+            .expect("block_types object");
+        assert!(bt.contains_key("table"), "应记录 table 块: {:?}", bt);
+        assert!(bt.contains_key("formula"), "应记录 formula 块: {:?}", bt);
+    }
+
+    #[test]
+    fn test_search_permission_aware_decision_pipeline() {
+        // P0-2: 决策式管线检索按权限过滤; 写入的 public 概念可被 Public 检索到
+        let kb = test_kb();
+        kb.write_memory_entry(
+            "Searchable Concept Alpha",
+            super::nt_memory_types::NodeType::Concept,
+            Some("alpha queryable content for retrieval test"),
+            None,
+            Some("test"),
+            None,
+        ).expect("write");
+        use super::nt_memory_types::PermissionLevel;
+        let results = kb.search_permission_aware(
+            "alpha queryable",
+            5,
+            PermissionLevel::Public,
+        ).expect("search");
+        assert!(!results.is_empty(), "应检索到写入的概念");
+        assert!(results.iter().any(|r| r.node.title.contains("Alpha")));
+    }
 }
 
 

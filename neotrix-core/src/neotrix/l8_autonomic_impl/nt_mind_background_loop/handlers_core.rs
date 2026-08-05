@@ -1,4 +1,5 @@
 use super::*;
+use crate::neotrix::nt_mind::MemoryAgentCapability;
 
 impl BackgroundLoopHandle {
     pub(crate) async fn handle_save(&mut self) {
@@ -98,6 +99,20 @@ impl BackgroundLoopHandle {
         // then one pursue_iteration. pursue_all(.., 1) bails early when no
         // active goal exists and never exercises the auto-generation path.
         self.goal_loop.pursue_auto_iteration(&mut b);
+
+        // ── 记忆大脑 agent 能力接线 (R-P42/R-P79) ──
+        // goal 迭代后顺带跑一次记忆能力面: 巩固规模信号 + 证据计数,
+        // 让 meta_agent 不是死代码而是生产路径上的真实消费者。
+        if let Some(ref agent) = self.meta_agent {
+            if let Ok(outcome) = agent.capability_consolidate() {
+                match outcome {
+                    crate::neotrix::nt_mind::CapabilityOutcome::Count(n) => {
+                        eprintln!("[bg-agent] memory consolidate: nodes={}", n);
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     pub(crate) async fn handle_prediction(&mut self) {

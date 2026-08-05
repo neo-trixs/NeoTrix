@@ -93,16 +93,56 @@ mod tests {
         goal_loop.prioritize_from_motivation();
     }
 
+    /// 生成一个最小的确定性扫描夹具 (若干带缺陷的 .rs 文件), 供元认知测试用。
+    /// 全量测试并行时完整仓库递归扫描 (数千文件) 会与其它测试争抢 IO 造成
+    /// 时序抖动 (偶发 total_count==0 断言失败)。夹具把扫描面缩到固定数文件,
+    /// 消除对仓库整体结构与 IO 时序的依赖。
+    fn metacog_fixture() -> std::path::PathBuf {
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_metacog_fixture_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let src = tmp.join("src");
+        std::fs::create_dir_all(&src).expect("fixture src dir");
+        // 无测试 + 大量 unwrap/TODO + unsafe → 至少得到 LARGE_FILE/MISSING_TESTS 等弱点
+        std::fs::write(src.join("big_mod.rs"), {
+            // >800 行 (large_file_threshold) 触发 LARGE_FILE 弱点, 含 unwrap/TODO/unsafe
+            let mut s = String::new();
+            for i in 0..860 {
+                s.push_str("pub fn f");
+                s.push_str(&i.to_string());
+                s.push_str("() { let x = 1; let y = x.unwrap_or(0); // TODO handle\n");
+                s.push_str("}\n");
+            }
+            s
+        })
+        .expect("write fixture module");
+        std::fs::write(src.join("unsafe_mod.rs"), "pub fn g() { unsafe { core::ptr::null() } }\n")
+            .expect("write fixture unsafe module");
+        tmp
+    }
+
     #[test]
     fn test_metacognition_quick_scan() {
-        let bridge = crate::neotrix::nt_mind::distillation::MetaCognitionBridge::new(".");
+        let root = metacog_fixture();
+        let bridge = crate::neotrix::nt_mind::distillation::MetaCognitionBridge::new(
+            root.to_str().unwrap(),
+        );
         let report = bridge.quick_scan();
-        assert!(report.summary.total_count > 0, "Should detect some files");
+        assert!(report.summary.total_count > 0, "Fixture should trigger weaknesses");
     }
 
     #[test]
     fn test_metacognition_full_cycle() {
-        let mut bridge = crate::neotrix::nt_mind::distillation::MetaCognitionBridge::new(".");
+        let root = metacog_fixture();
+        let mut bridge = crate::neotrix::nt_mind::distillation::MetaCognitionBridge::new(
+            root.to_str().unwrap(),
+        );
         let result = bridge.run_full_cycle();
         assert!(result.iteration > 0);
         assert!(result.report.summary.total_count > 0);
@@ -151,7 +191,10 @@ mod tests {
 
     #[test]
     fn test_metacognition_bridge_reuses_across_cycles() {
-        let mut bridge = crate::neotrix::nt_mind::distillation::MetaCognitionBridge::new(".");
+        let root = metacog_fixture();
+        let mut bridge = crate::neotrix::nt_mind::distillation::MetaCognitionBridge::new(
+            root.to_str().unwrap(),
+        );
         let r1 = bridge.run_full_cycle();
         let r2 = bridge.run_full_cycle();
         assert_eq!(r1.iteration, 1);

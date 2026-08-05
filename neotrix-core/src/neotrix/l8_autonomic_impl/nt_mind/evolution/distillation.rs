@@ -395,6 +395,34 @@ impl MetaCognitionBridge {
 mod tests {
     use super::*;
 
+    /// 最小确定性扫描夹具 — 消除全量并行下整仓库递归扫描的 IO 时序抖动。
+    /// 生成 >800 行含 unwrap/TODO 的模块触发 LARGE_FILE 弱点。
+    fn fixture_root() -> std::path::PathBuf {
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_distill_fixture_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let src = tmp.join("src");
+        std::fs::create_dir_all(&src).expect("fixture src dir");
+        let mut big = String::new();
+        for i in 0..860 {
+            big.push_str(&format!(
+                "pub fn f{i}() {{ let x = 1; let y = x.unwrap_or(0); // TODO\n}}\n"
+            ));
+        }
+        std::fs::write(src.join("big_mod.rs"), big).expect("write fixture module");
+        tmp
+    }
+
+    fn fixture_bridge() -> MetaCognitionBridge {
+        MetaCognitionBridge::new(fixture_root().to_str().unwrap())
+    }
+
     #[test]
     fn test_distill_empty() {
         let principles = ExperienceDistiller::distill(&[]);
@@ -417,7 +445,7 @@ mod tests {
 
     #[test]
     fn test_bridge_full_cycle_no_reset() {
-        let mut bridge = MetaCognitionBridge::new(".");
+        let mut bridge = fixture_bridge();
         let r1 = bridge.run_full_cycle();
         assert_eq!(r1.iteration, 1);
         let r2 = bridge.run_full_cycle();
@@ -427,7 +455,7 @@ mod tests {
 
     #[test]
     fn test_weakest_modules() {
-        let mut bridge = MetaCognitionBridge::new(".");
+        let mut bridge = fixture_bridge();
         bridge.run_full_cycle();
         let weakest = bridge.weakest_modules(3);
         assert!(weakest.len() <= 3);
@@ -435,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_module_weakness_flags() {
-        let mut bridge = MetaCognitionBridge::new(".");
+        let mut bridge = fixture_bridge();
         bridge.run_full_cycle();
         let flags = bridge.module_weakness_flags(5);
         assert!(flags.len() <= 5);
@@ -443,7 +471,7 @@ mod tests {
 
     #[test]
     fn test_module_roadmaps() {
-        let mut bridge = MetaCognitionBridge::new(".");
+        let mut bridge = fixture_bridge();
         bridge.run_full_cycle();
         let roadmaps = bridge.module_roadmaps();
         for (_module, steps) in &roadmaps {
@@ -455,7 +483,7 @@ mod tests {
 
     #[test]
     fn test_enriched_status_summary() {
-        let mut bridge = MetaCognitionBridge::new(".");
+        let mut bridge = fixture_bridge();
         let summary = bridge.enriched_status_summary();
         assert!(summary.contains("MetaCognition Cycle"));
         bridge.run_full_cycle();
@@ -506,7 +534,7 @@ mod tests {
 
     #[test]
     fn test_module_weakness_flags_before_cycle() {
-        let bridge = MetaCognitionBridge::new(".");
+        let bridge = fixture_bridge();
         let flags = bridge.module_weakness_flags(5);
         assert!(flags.is_empty());
     }
@@ -578,7 +606,7 @@ mod tests {
 
     #[test]
     fn test_bridge_status_summary_format() {
-        let bridge = MetaCognitionBridge::new(".");
+        let bridge = fixture_bridge();
         let summary = bridge.status_summary();
         assert!(summary.contains("MetaCognition Cycle"));
     }
@@ -595,7 +623,7 @@ mod tests {
 
     #[test]
     fn test_bridge_weakest_modules_initial() {
-        let bridge = MetaCognitionBridge::new(".");
+        let bridge = fixture_bridge();
         let weakest = bridge.weakest_modules(5);
         assert!(weakest.is_empty());
     }

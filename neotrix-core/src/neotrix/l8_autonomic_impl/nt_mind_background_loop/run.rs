@@ -426,6 +426,9 @@ cognitive_load: self.cognitive_load.take(),
             dream: crate::core::nt_core_hcube::dream_consolidation::DreamConsolidation::new(
                 crate::core::nt_core_hcube::dream_consolidation::DreamConfig::default(),
             ),
+            meta_agent: self.kb.clone().map(|kb_ref| {
+                crate::neotrix::nt_mind::evolution::agent_capability::MemoryAgent { kb: kb_ref }
+            }),
             kb,
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
             cognitive_mode: 0,
@@ -623,6 +626,9 @@ pub struct BackgroundLoopHandle {
     /// 梦境巩固器 — VSA 记忆重组/提纯/巩固 (skales Dreaming 模式, P0-3 接线)。
     /// 低负载周期触发 run_consolidation_cycle + prune_low_coherence。
     dream: crate::core::nt_core_hcube::dream_consolidation::DreamConsolidation,
+    /// 记忆大脑 agent 外壳 — MemoryAgentCapability 统一能力面 (R-P42 接线)。
+    /// handle_goal 按事件路由写/检索/巩固/证据能力。
+    meta_agent: Option<crate::neotrix::nt_mind::evolution::agent_capability::MemoryAgent>,
     kb: Option<Arc<KnowledgeBase>>,
     emotion_restored: std::sync::atomic::AtomicBool,
     bbrain: crate::neotrix::nt_mind::bbrain_monitor::BMonitor,

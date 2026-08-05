@@ -5,6 +5,7 @@
 //
 
 pub mod causal_inventor;
+pub mod agent_capability;
 pub mod creation_engine;
 pub mod dao_engine;
 pub mod distillation;
