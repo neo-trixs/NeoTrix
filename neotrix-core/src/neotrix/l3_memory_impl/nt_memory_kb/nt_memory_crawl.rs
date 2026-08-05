@@ -139,6 +139,57 @@ pub fn ingest_from_arxiv(conn: &Connection, arxiv_id: &str) -> Result<usize, Str
     Ok(1)
 }
 
+/// 填充 OpenLibrary 节点 (能力源自 `bin/kb_crawl_batch::crawl_openlibrary`, R-P95/R-P96 提炼并入)。
+/// 仅更新已有但 content 为空的 OpenLibrary URL 节点; 复用安全抓取原语 (guard + pin + retry)。
+pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
+    let ts = now();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, url FROM nodes WHERE node_type='Article' AND (content IS NULL OR content = '') AND url LIKE '%openlibrary.org%'",
+        )
+        .map_err(|e| format!("DB prepare: {e}"))?;
+
+    let rows: Vec<(String, String)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .map_err(|e| format!("DB query: {e}"))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if rows.is_empty() {
+        return Ok(0);
+    }
+
+    let mut filled = 0;
+    for (id, url) in &rows {
+        let api_url = format!("{}.json", url.trim_end_matches('/'));
+        if let Ok((body, _host)) = super::nt_http::fetch_safe_http_with_retry(&api_url) {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&body) {
+                let desc = data["description"].as_str()
+                    .or_else(|| data["description"]["value"].as_str())
+                    .or_else(|| data["subtitle"].as_str())
+                    .or_else(|| {
+                        data["excerpts"].as_array()
+                            .and_then(|a| a.first())
+                            .and_then(|e| e["text"].as_str())
+                    });
+                if let Some(text) = desc {
+                    let clean = text.trim();
+                    if !clean.is_empty()
+                        && conn.execute(
+                            "UPDATE nodes SET content=?1, updated_at=?2 WHERE id=?3",
+                            rusqlite::params![clean, ts, id],
+                        ).is_ok()
+                    {
+                        filled += 1;
+                    }
+                }
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    Ok(filled)
+}
+
 pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<usize, String> {
     let api_url = format!("https://api.github.com/repos/{}/{}", owner, repo);
     let resp = http_client().get(&api_url).send().map_err(|e| format!("GitHub fetch error: {}", e))?;

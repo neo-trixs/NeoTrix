@@ -59,24 +59,12 @@ name = "neotrix-shanhai-link"
 path = "src/bin/shanhai_link.rs"
 
 [[bin]]
-name = "neotrix-nihaixia-ingest"
-path = "src/bin/nihaixia_ingest.rs"
-
-[[bin]]
-name = "neotrix-nihaixia-phase2"
-path = "src/bin/nihaixia_phase2.rs"
-
-[[bin]]
 name = "neotrix-kb-crawl-wikipedia"
 path = "src/bin/kb_crawl_wikipedia.rs"
 
 [[bin]]
 name = "neotrix-kb-crawl-batch"
 path = "src/bin/kb_crawl_batch.rs"
-
-[[bin]]
-name = "neotrix-session-ingest-0703"
-path = "src/bin/session_ingest_0703.rs"
 
 [[bin]]
 name = "neotrix-world-novel-ingest"

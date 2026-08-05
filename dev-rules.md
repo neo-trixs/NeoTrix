@@ -146,6 +146,13 @@
   3. 剩余本地 diff 若非本人改动 → 不 stage 不 commit，留给对方。
   4. 高危删除判定 (R-P76 四重验证) 必须在当前工作树重走，禁用 stash 前记忆 (R-P89)。
 
+## 死代码拆解吸收 (R-P95) — 2026-08-05 archive_star 清理 + bin/py 双轨梳理
+
+- **R-P95 (薄包装 bin 判定 — 死还是活看生产 lib 承载)**: 一次性/日期戳 bin (`session_ingest_0703`/`nihaixia_*`/`shanhai_*`) 若底层是活跃生产 lib (`ResourceIngester`/`nt_memory_crawl`/`nt_shanhai_geo`) 的薄配置调用, bin ≠ 独立能力, 可删; 能力已由 lib 承载, 无需"融合"。判定法: `rg -c "^use neotrix::"` 若 bin 仅 1 处生产 lib use 且 `main()` 全为数据灌入 → 薄包装。
+- **R-P96 (死 bin 独立逻辑必查重复 HTTP)**: bin 若 0 处生产 lib use (=自包含逻辑), 必查其是否内联了与生产重复的安全敏感路径 (HTTP client/抓取/鉴权)。`kb_crawl_batch` 自建 `http_client()` (无 SSRF guard/无 connect 期 DNS pinning) 平行于已收敛的 `nt_http` — 属 R-P42 平行实现, 其多源抓取能力 (OpenLibrary/退避重试/429-retry-after) 应**提炼函数并入生产 `nt_http`/`nt_memory_crawl`**, 而非保留独立 bin。
+- **R-P97 (python 原型按 Rust port 退役)**: `scripts/*.py` 仅是 `//! port of ...py` 注释中被 Rust 移植的原型, 无 launchd/daemon/生产引用 → 退役 (git rm)。判定: `rg -rln "<script>" --hidden | rg -v scripts/` 为空 + `pgrep -fl` 无活进程 + `ls ~/Library/LaunchAgents/com.neotrix.*` 无对应 plist。例外: Makefile 有 `make <target>` 直接调用的 (如 `shanhai-*`) 视为活跃 CLI 工具链, 保留。
+- **R-P98 (死代码拆解三态, 非二元)**: 死代码不能只判"删/留"。拆解前先归三态: ①能力已在活跃 lib (薄包装 bin) → 删 bin 留 lib; ②能力独立且生产缺失 → 提炼并入最近生产节点, 再删源; ③能力废弃/无价值 → 直接删。三态判定后统一删源, 避免"融一半留一半"。
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：

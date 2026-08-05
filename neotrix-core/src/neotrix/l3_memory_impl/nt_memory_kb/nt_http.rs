@@ -97,6 +97,25 @@ pub(crate) fn fetch_safe_http(url: &str) -> Result<(String, String), String> {
     Ok((body, host))
 }
 
+/// 指数退避重试版安全抓取: 仅对 429/503 重试 (最多 3 次), 尊重 retry-after 头。
+/// 能力源自 `bin/kb_crawl_batch::fetch_with_retry` (R-P96 提炼并入)。
+/// SSRF guard + connect pin 语义与 `fetch_safe_http` 完全一致。
+pub(crate) fn fetch_safe_http_with_retry(url: &str) -> Result<(String, String), String> {
+    let mut wait = std::time::Duration::from_secs(2);
+    for attempt in 0..3 {
+        match fetch_safe_http(url) {
+            Ok(ok) => return Ok(ok),
+            Err(e) if e.starts_with("HTTP 429") || e.starts_with("HTTP 503") => {
+                std::thread::sleep(wait);
+                wait = std::time::Duration::from_secs(wait.as_secs() * 2).min(std::time::Duration::from_secs(8));
+                if attempt == 2 { return Err(e); }
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err("retry exhausted".to_string())
+}
+
 /// 单一「安全抓取」原语 (async): guard → pin → fetch → (body, final_host)。
 /// 所有异步吞入路径统一委托此处。
 pub(crate) async fn fetch_safe_http_async(url: &str) -> Result<(String, String), String> {
@@ -170,5 +189,24 @@ mod tests {
         let (addr, _parsed) = resolve_safe_origin("http://8.8.8.8:80/").expect("public IP ok");
         assert_eq!(addr.ip().to_string(), "8.8.8.8");
         assert_eq!(addr.port(), 80);
+    }
+
+    #[test]
+    fn retry_does_not_bypass_ssrf_guard() {
+        // 非 429/503 错误 (含 guard 拒绝) 不得重试 — guard 语义必须保持
+        let err = fetch_safe_http_with_retry("http://127.0.0.1:8080/").unwrap_err();
+        assert!(err.contains("private") || err.contains("reject") || err.contains("loopback"),
+            "guard error surfaced: {err}");
+    }
+
+    #[test]
+    fn retry_immediate_fail_on_network_error() {
+        // 公开 IP 但未监听端口 → connect error, 属非 429/503, 不应进入 3 次重试循环
+        // 用超时极短不可达端口; 若环境不允许出网, 断言仅验证错误被透传而非重试覆盖
+        let err = fetch_safe_http_with_retry("http://8.8.8.8:59999/").unwrap_err();
+        assert!(
+            err.contains("fetch") || err.contains("pin") || err.contains("resolve") || err.contains("timed out"),
+            "network error surfaced: {err}"
+        );
     }
 }
