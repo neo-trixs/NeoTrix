@@ -26,6 +26,7 @@ use crate::cli::commands::search_cmds::SearchCmd;
 use crate::cli::commands::model_cmds::ModelCmd;
 use crate::cli::commands::contract_cmds::ContractCmd;
 use crate::cli::commands::perm_cmds::PermCmd;
+use crate::cli::commands::redact_cmds::RedactCmd;
 use crate::cli::commands::profile_cmds::ProfileCmd;
 use crate::cli::commands::sandbox_cmds::SandboxCmd;
 use crate::cli::commands::hypothesis_cmds::HypothesisCmd;
@@ -130,6 +131,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ModelCmd));
     reg.register(Box::new(ContractCmd));
     reg.register(Box::new(PermCmd));
+    reg.register(Box::new(RedactCmd));
 
     // Skills
     reg.register(Box::new(SkillCmd));

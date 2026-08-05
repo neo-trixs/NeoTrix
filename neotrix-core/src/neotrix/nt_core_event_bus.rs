@@ -46,13 +46,15 @@ impl EventBus {
     }
 
     /// Emit an event to all subscribers.
-    /// If logging is enabled, also persists as JSON line.
+    /// If logging is enabled, also persists as JSON line (secrets/PII redacted before write).
     pub fn emit(&self, event: CoreEvent) {
         if let Some(ref log_file) = self.log_file {
             if let Ok(mut file) = log_file.lock() {
                 if let Ok(line) = serde_json::to_string(&event) {
                     use std::io::Write;
-                    let _ = writeln!(file, "{}", line);
+                    // 隐私脱敏挂载点: 落盘前净化 secrets/PII (R-P42 强化 nt_shield 节点)
+                    let redacted = crate::neotrix::nt_shield::redaction::redact(&line);
+                    let _ = writeln!(file, "{}", redacted);
                 }
             }
         }

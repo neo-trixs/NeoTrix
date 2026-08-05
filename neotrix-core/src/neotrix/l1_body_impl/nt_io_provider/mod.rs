@@ -24,12 +24,16 @@ pub mod free_pool;
 pub mod gateway;
 pub mod provider_catalog;
 pub mod provider_swap;
+pub mod failover_history;
 
 // Re-export 核心类型
 pub use types::{
     LlmProvider, LlmRequest, Message, Role, Tool, ToolCallInfo, ToolCallFunction,
     LlmResponse, Usage, FinishReason, LlmError,
 };
+
+// Re-export 故障转移历史
+pub use failover_history::{FailoverEvent, FailoverHistory, record_failover, failover_history, total_failovers, clear_history, report as failover_report};
 
 // Re-export Provider 实现
 pub use openai::OpenAiProvider;

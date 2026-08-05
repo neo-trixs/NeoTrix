@@ -408,6 +408,13 @@ impl GatewayV2 {
                     let latency = start.elapsed().as_millis() as u64;
                     let success = result.is_ok();
                     self.record_sub_grid_call(target, success, latency);
+                    crate::neotrix::l1_body_impl::nt_io_provider::record_failover(
+                        &format!("{:?}", required),
+                        &format!("{:?}", target),
+                        success,
+                        &format!("{}", first_err),
+                        if success { &name } else { "" },
+                    );
                     if success {
                         return result.map(|r| (r, target, name));
                     }

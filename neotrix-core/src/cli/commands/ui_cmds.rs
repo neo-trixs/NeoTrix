@@ -275,7 +275,26 @@ impl CliCommand for RouterCmd {
                     }))
                 } else { out }
             }
-            _ => CommandOutput::err(&format!("未知子命令: {}。可用: status, enable, disable, reset, set, classify", sub)),
+            "failover" => {
+                let want_clear = plain_args.get(1).map(|s| *s == "clear").unwrap_or(false);
+                if want_clear {
+                    crate::neotrix::l1_body_impl::nt_io_provider::clear_history();
+                    return CommandOutput::ok("🔄 故障转移历史已清空");
+                }
+                let msg = crate::neotrix::l1_body_impl::nt_io_provider::failover_report();
+                let out = CommandOutput::ok(&msg);
+                if want_json {
+                    let events = crate::neotrix::l1_body_impl::nt_io_provider::failover_history();
+                    out.with_json(serde_json::json!({
+                        "total": crate::neotrix::l1_body_impl::nt_io_provider::total_failovers(),
+                        "events": events.iter().map(|e| serde_json::json!({
+                            "timestamp": e.timestamp, "from": e.from_profile, "to": e.to_profile,
+                            "success": e.success, "reason": e.reason, "provider": e.provider,
+                        })).collect::<Vec<_>>(),
+                    }))
+                } else { out }
+            }
+            _ => CommandOutput::err(&format!("未知子命令: {}。可用: status, enable, disable, reset, set, classify, failover", sub)),
         }
     }
 }
