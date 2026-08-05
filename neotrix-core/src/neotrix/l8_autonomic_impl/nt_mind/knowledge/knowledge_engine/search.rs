@@ -8,7 +8,6 @@ use crate::neotrix::nt_mind::embedding::TextEmbedder;
 use crate::neotrix::nt_core_signal::ops::cosine_similarity;
 
 pub struct LiteratureSearcher {
-    client: reqwest::blocking::Client,
     #[allow(dead_code)] // kept for future embedding-based reranking
     embedder: TextEmbedder,
 }
@@ -21,13 +20,7 @@ impl Default for LiteratureSearcher {
 
 impl LiteratureSearcher {
     pub fn new() -> Self {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .user_agent("NeoTrix/1.0 (knowledge-engine; research)")
-            .danger_accept_invalid_certs(true)
-            .build()
-            .unwrap_or_default();
-        Self { client, embedder: TextEmbedder::new() }
+        Self { embedder: TextEmbedder::new() }
     }
 
     pub fn search_arxiv(&mut self, query: &str, max_results: usize) -> Vec<KnowledgeEntry> {
@@ -35,11 +28,8 @@ impl LiteratureSearcher {
             "http://export.arxiv.org/api/query?search_query=all:{}&max_results={}&sortBy=relevance",
             urlencoding(query), max_results.min(50)
         );
-        match self.client.get(&url).send() {
-            Ok(resp) => {
-                let text = resp.text().unwrap_or_default();
-                self.parse_arxiv_response(&text, query)
-            }
+        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(&url) {
+            Ok((text, _host)) => self.parse_arxiv_response(&text, query),
             Err(e) => {
                 eprintln!("[LitSearch] arXiv error: {}", e);
                 Vec::new()
@@ -84,11 +74,8 @@ impl LiteratureSearcher {
             "https://api.semanticscholar.org/graph/v1/paper/search?query={}&limit={}&fields=title,abstract,authors,year,externalIds",
             urlencoding(query), limit.min(100)
         );
-        match self.client.get(&url).send() {
-            Ok(resp) => {
-                let text = resp.text().unwrap_or_default();
-                self.parse_s2_response(&text)
-            }
+        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(&url) {
+            Ok((text, _host)) => self.parse_s2_response(&text),
             Err(e) => {
                 eprintln!("[LitSearch] Semantic Scholar error: {}", e);
                 Vec::new()
@@ -119,11 +106,8 @@ impl LiteratureSearcher {
             "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={}&format=json&srlimit={}",
             urlencoding(query), limit.min(50)
         );
-        match self.client.get(&search_url).send() {
-            Ok(resp) => {
-                let text = resp.text().unwrap_or_default();
-                self.parse_wiki_search(&text)
-            }
+        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(&search_url) {
+            Ok((text, _host)) => self.parse_wiki_search(&text),
             Err(e) => {
                 eprintln!("[LitSearch] Wikipedia error: {}", e);
                 Vec::new()

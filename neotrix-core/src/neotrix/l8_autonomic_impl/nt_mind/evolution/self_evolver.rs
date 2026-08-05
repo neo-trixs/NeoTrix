@@ -212,16 +212,9 @@ impl SelfEvolver {
         if parsed.scheme() != "http" && parsed.scheme() != "https" {
             return Err(NeoTrixError::from("仅支持 http/https"));
         }
-        let agent = reqwest::blocking::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .timeout(std::time::Duration::from_secs(30))
-            .user_agent("Mozilla/5.0 (compatible; NeoTrix/1.0)")
-            .build()
-            .map_err(|e| NeoTrixError::Network(format!("创建 HTTP 客户端失败: {}", e)))?;
-        let resp = agent.get(url)
-            .send()
+        let (body, _host) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(url)
             .map_err(|e| NeoTrixError::Network(format!("请求失败: {}", e)))?;
-        resp.text().map_err(|e| NeoTrixError::Network(format!("读取响应失败: {}", e)))
+        Ok(body)
     }
 
     /// 深度分析（三流并行：Code + Docs + Insights）

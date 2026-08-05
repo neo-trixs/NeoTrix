@@ -72,22 +72,53 @@ pub(crate) fn resolve_safe_origin(url: &str) -> Result<(SocketAddr, url::Url), S
 /// 单一「安全抓取」原语 (blocking): guard → pin → fetch → (body, final_host)。
 /// 所有阻塞吞入路径统一委托此处。
 pub(crate) fn fetch_safe_http(url: &str) -> Result<(String, String), String> {
+    fetch_safe_http_inner(url, &[])
+}
+
+/// 带额外 headers 的安全抓取 (blocking): 用于需要特定 Accept/Authorization 等头的 API。
+/// SSRF guard + connect pin 语义与 `fetch_safe_http` 完全一致。
+pub(crate) fn fetch_safe_http_with_headers(
+    url: &str,
+    extra_headers: &[(&str, &str)],
+) -> Result<(String, String), String> {
+    fetch_safe_http_inner(url, extra_headers)
+}
+
+fn fetch_safe_http_inner(
+    url: &str,
+    extra_headers: &[(&str, &str)],
+) -> Result<(String, String), String> {
     let (addr, parsed) = resolve_safe_origin(url)?;
     let host = parsed.host_str().ok_or("no host")?.to_string();
 
     // connect-期 pin: 用已校验 IP 建立临时 client,阻断 DNS rebinding。
     // 因 `resolve` 是 per-client 的,不能复用共享单例,故按调用临时构造。
-    let pin_client = reqwest::blocking::Client::builder()
+    let mut builder = reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
         .timeout(TIMEOUT)
         .connect_timeout(CONNECT_TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
-        .resolve(&host, addr)
+        .resolve(&host, addr);
+
+    if !extra_headers.is_empty() {
+        let mut h = reqwest::header::HeaderMap::new();
+        for (k, v) in extra_headers {
+            let header_name = k.parse::<reqwest::header::HeaderName>().unwrap();
+            let header_value = v.parse::<reqwest::header::HeaderValue>().unwrap();
+            h.insert(header_name, header_value);
+        }
+        builder = builder.default_headers(h);
+    }
+
+    let pin_client = builder
         .build()
         .map_err(|e| format!("pin client: {e}"))?;
 
-    let resp = pin_client
-        .get(url)
+    let mut req = pin_client.get(url);
+    for (k, v) in extra_headers {
+        req = req.header(*k, *v);
+    }
+    let resp = req
         .send()
         .map_err(|e| format!("fetch: {e}"))?;
     if !resp.status().is_success() {

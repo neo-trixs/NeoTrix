@@ -74,7 +74,6 @@ pub struct WebMinedKnowledge {
 /// 统一网页知识挖掘器 — Wikipedia / arXiv / GitHub / 公开网址
 pub struct WebKnowledgeMiner {
     pub work_dir: PathBuf,
-    pub http_client: reqwest::blocking::Client,
     pub mined_history: Vec<WebMinedKnowledge>,
     pub nt_memory_kb: Option<KnowledgeBase>,
     processed: HashMap<String, bool>,
@@ -82,15 +81,8 @@ pub struct WebKnowledgeMiner {
 
 impl WebKnowledgeMiner {
     pub fn new(work_dir: PathBuf) -> Self {
-        let client = reqwest::blocking::Client::builder()
-            .danger_accept_invalid_certs(true)
-            .timeout(std::time::Duration::from_secs(60))
-            .user_agent("NeoTrix/1.0 (knowledge-miner; +https://github.com/neotrix)")
-            .build()
-            .unwrap_or_default();
         Self {
             work_dir,
-            http_client: client,
             mined_history: Vec::new(),
             nt_memory_kb: None,
             processed: HashMap::new(),
@@ -208,11 +200,8 @@ impl WebKnowledgeMiner {
             "https://en.wikipedia.org/api/rest_v1/page/summary/{}",
             urlencoding(article_name)
         );
-        let resp = self.http_client.get(&api_url)
-            .send()
+        let (text, _host) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(&api_url)
             .map_err(|e| NeoTrixError::Network(format!("Wikipedia API 请求失败: {}", e)))?;
-        let text = resp.text()
-            .map_err(|e| NeoTrixError::Network(format!("Wikipedia 响应读取失败: {}", e)))?;
 
         // 解析 JSON 响应
         let parsed_json: serde_json::Value = serde_json::from_str(&text)
@@ -246,11 +235,8 @@ impl WebKnowledgeMiner {
 
         // arXiv API
         let api_url = format!("http://export.arxiv.org/api/query?id_list={}", paper_id);
-        let resp = self.http_client.get(&api_url)
-            .send()
+        let (xml_text, _host) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(&api_url)
             .map_err(|e| NeoTrixError::Network(format!("arXiv API 请求失败: {}", e)))?;
-        let xml_text = resp.text()
-            .map_err(|e| NeoTrixError::Network(format!("arXiv 响应读取失败: {}", e)))?;
 
         // 简易 XML 解析
         let title = extract_xml_tag(&xml_text, "title").unwrap_or_else(|| format!("arXiv:{}", paper_id));
@@ -300,12 +286,11 @@ impl WebKnowledgeMiner {
 
         // 使用 GitHub API 获取仓库信息
         let api_url = format!("https://api.github.com/repos/{}", repo_full);
-        let resp = self.http_client.get(&api_url)
-            .header("Accept", "application/vnd.github.v3+json")
-            .send()
-            .map_err(|e| NeoTrixError::Network(format!("GitHub API 请求失败: {}", e)))?;
-        let text = resp.text()
-            .map_err(|e| NeoTrixError::Network(format!("GitHub 响应读取失败: {}", e)))?;
+        let (text, _host) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http_with_headers(
+            &api_url,
+            &[("Accept", "application/vnd.github.v3+json")],
+        )
+        .map_err(|e| NeoTrixError::Network(format!("GitHub API 请求失败: {}", e)))?;
 
         let parsed_json: serde_json::Value = serde_json::from_str(&text)
             .map_err(|e| NeoTrixError::Serde(format!("GitHub JSON 解析失败: {}", e)))?;
@@ -375,11 +360,8 @@ impl WebKnowledgeMiner {
 
     /// 通用 URL 挖掘
     fn mine_generic(&self, url_str: &str) -> NeoTrixResult<WebMinedKnowledge> {
-        let resp = self.http_client.get(url_str)
-            .send()
+        let (text, _host) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(url_str)
             .map_err(|e| NeoTrixError::Network(format!("请求失败: {}", e)))?;
-        let text = resp.text()
-            .map_err(|e| NeoTrixError::Network(format!("响应读取失败: {}", e)))?;
         let content_length = text.len();
 
         let parsed = Url::parse(url_str)
