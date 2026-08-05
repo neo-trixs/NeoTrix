@@ -389,38 +389,125 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     }
   });
 
-  it("openRecent renders thread via renderThread and keeps history on first send", async () => {
+  it("session ops + feedback + search functions are exposed globally", () => {
     const g = globalThis as Record<string, unknown>;
-    const mock: Record<string, (a: unknown) => unknown> = {
-      neocodex_switch_session: () => "ok",
-      neocodex_get_session_messages: () => [
-        { role: "user", content: "历史问题", timestamp: 1700000000 },
-        { role: "assistant", content: "历史回答", timestamp: 1700000001 },
-      ],
-    };
+    expect(typeof g.openSessionOps).toBe("function");
+    expect(typeof g.renameSession).toBe("function");
+    expect(typeof g.compactSession).toBe("function");
+    expect(typeof g.archiveSession).toBe("function");
+    expect(typeof g.exportSession).toBe("function");
+    expect(typeof g.deleteSession).toBe("function");
+    expect(typeof g.feedbackMessage).toBe("function");
+    expect(typeof g.searchSessions).toBe("function");
+    expect(typeof g.checkForUpdate).toBe("function");
+    expect(typeof g.cycleMode).toBe("function");
+    expect(document.getElementById("sessionOpsMenu")).not.toBeNull();
+    expect(document.getElementById("cwSearchInput")).not.toBeNull();
+  });
+
+  it("openSessionOps shows menu with session title", () => {
+    const g = globalThis as Record<string, unknown>;
+    const menu = document.getElementById("sessionOpsMenu")!;
+    (g.openSessionOps as (anchor: HTMLElement | null, id: string) => void)(null, "s-ops-1");
+    expect(menu.classList.contains("open")).toBe(true);
+    expect(menu.dataset.session).toBe("s-ops-1");
+    (g.closeSessionOps as () => void)();
+    expect(menu.classList.contains("open")).toBe(false);
+  });
+
+  it("renderThread adds like/dislike feedback buttons to assistant messages", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+      { role: "agent", content: "反馈测试", timestamp: 1700000001 },
+    ], "s-fb-1");
+    const ai = document.querySelector("#chatScroll .msg.l")!;
+    expect(ai.querySelector('.ma-btn[data-op="like"]')).not.toBeNull();
+    expect(ai.querySelector('.ma-btn[data-op="dislike"]')).not.toBeNull();
+  });
+
+  it("feedbackMessage persists state and calls neocodex_feedback", async () => {
+    const g = globalThis as Record<string, unknown>;
     const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const calls: { cmd: string; args: unknown }[] = [];
     (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
       invoke: (cmd: string, args?: unknown) => {
-        const h = mock[cmd];
-        return Promise.resolve(h ? h(args ?? {}) : undefined);
+        calls.push({ cmd, args: args ?? {} });
+        return Promise.resolve("ok");
       },
     };
     try {
-      (g.switchView as (el: HTMLElement, v: string) => void)(
-        document.querySelector('.segb[data-view="chat"]') as HTMLElement,
-        "chat",
-      );
-      await (g.openRecent as (tab: string, id: string, cowork: boolean) => Promise<void>)("chat", "s-1", false);
-      const cs = document.getElementById("chatScroll");
-      expect(cs!.textContent).toContain("历史回答");
-      // first send must NOT clear loaded history (isChatMode set)
-      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
-      input.value = "跟进";
-      mock["neocodex_send_message_stream"] = () => "ok";
-      (g.sendMsg as () => void)();
-      expect(cs!.textContent).toContain("历史回答");
-      expect(cs!.textContent).toContain("跟进");
+      (g.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+        { role: "agent", content: "反馈", timestamp: 1700000001 },
+      ], "s-fb-2");
+      await (g.feedbackMessage as (i: number, k: string) => Promise<void>)(0, "like");
+      const likeBtn = document.querySelector('#chatScroll .msg.l .ma-btn[data-op="like"]')!;
+      expect(likeBtn.classList.contains("on")).toBe(true);
+      const fbCall = calls.find((c) => c.cmd === "neocodex_feedback");
+      expect(fbCall).toBeTruthy();
+      expect((fbCall!.args as { session_id: string }).session_id).toBe("s-fb-2");
     } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("searchSessions renders backend hits into the search results pane", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string) =>
+        Promise.resolve(
+          cmd === "neocodex_search_sessions"
+            ? [{ session_id: "s-srch", session_name: "搜索结果", role: "user", snippet: "含关键词", match_count: 2, timestamp: 1700000000 }]
+            : undefined,
+        ),
+    };
+    try {
+      const input = document.getElementById("cwSearchInput") as HTMLInputElement;
+      input.value = "关键词";
+      await (g.searchSessions as (q: string) => Promise<void>)("关键词");
+      const res = document.getElementById("cwSearchResults")!;
+      expect(res.style.display).toBe("block");
+      expect(res.textContent).toContain("搜索结果");
+      expect(res.textContent).toContain("2 处");
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("sendMsg passes persisted temperature/max_tokens and permission mode", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const calls: { cmd: string; args: Record<string, unknown> }[] = [];
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        calls.push({ cmd, args: args ?? {} });
+        return Promise.resolve("ok");
+      },
+      transformCallback: () => 1,
+    };
+    const mem = new Map<string, string>();
+    const store = {
+      getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+      setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+      removeItem: (k: string) => { mem.delete(k); },
+    };
+    const realLS = (globalThis as Record<string, unknown>).localStorage;
+    (globalThis as Record<string, unknown>).localStorage = store;
+    try {
+      store.setItem("neotrix.settings", JSON.stringify({ "compute.temperature": 0.7, "compute.maxTokens": 16384 }));
+      (g.cycleMode as () => void)();
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "参数接线测试";
+      (g.sendMsg as () => void)();
+      const send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
+      expect(send).toBeTruthy();
+      expect(send!.args.temperature).toBe(0.7);
+      expect(send!.args.max_tokens).toBe(16384);
+      expect(send!.args.permission_mode).toBe("plan");
+    } finally {
+      (globalThis as Record<string, unknown>).localStorage = realLS;
       if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }

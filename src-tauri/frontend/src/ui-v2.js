@@ -55,6 +55,18 @@ g.kbSearch = kbSearch;
 g.sendSuggestion = sendSuggestion;
 g.renderHeroSuggest = renderHeroSuggest;
 g.cwFilter = cwFilter;
+g.openSessionOps = openSessionOps;
+g.renameSession = renameSession;
+g.compactSession = compactSession;
+g.archiveSession = archiveSession;
+g.exportSession = exportSession;
+g.deleteSession = deleteSession;
+g.feedbackMessage = feedbackMessage;
+g.searchSessions = searchSessions;
+g.closeSessionOps = closeSessionOps;
+g.checkForUpdate = checkForUpdate;
+g.openSessionFromSearch = openSessionFromSearch;
+g.cycleMode = cycleMode;
   /* Free LLM 模型池 — 模型选择下拉的数据源（Tauri 下与 neocodex_provider_config 合并） */
   const MODEL_POOL = [
     { id: 'Groq',        title: 'Groq',        model: 'Llama 3.3 70B', lat: 340, online: true  },
@@ -66,6 +78,34 @@ g.cwFilter = cwFilter;
   ];
   let currentModelId = 'Groq';
   let attachList = [];
+  const MODES = ['自动', '计划', '手动'];
+  let currentMode = '自动';
+  function cycleMode(){
+    const idx = MODES.indexOf(currentMode);
+    currentMode = MODES[(idx + 1) % MODES.length];
+    const lbl = document.getElementById('ntxModeLabel');
+    if(lbl) lbl.textContent = currentMode;
+    const permMap = { '自动': 'auto', '计划': 'plan', '手动': 'manual' };
+    if(isTauri()){
+      const modeName = permMap[currentMode];
+      invoke('neocodex_set_mode', { mode: modeName === 'auto' ? 'Agent' : (modeName === 'plan' ? 'Plan' : 'Shell') }).catch(() => {});
+      showToast('权限模式: ' + currentMode);
+    }else{
+      showToast('权限模式: ' + currentMode + '（浏览器演示）');
+    }
+  }
+  function currentPermissionMode(){
+    return { '自动': 'auto', '计划': 'plan', '手动': 'manual' }[currentMode] || 'auto';
+  }
+  function genParamsFromSettings(){
+    const s = loadSettings();
+    let temperature = Number(s['compute.temperature']);
+    let maxTokens = Number(s['compute.maxTokens']);
+    return {
+      temperature: Number.isFinite(temperature) && temperature >= 0 && temperature <= 2 ? temperature : null,
+      max_tokens: Number.isInteger(maxTokens) && maxTokens >= 256 ? maxTokens : null,
+    };
+  }
 
 
   /* ════════════════════════════════════════════════════════════
@@ -977,13 +1017,14 @@ g.cwFilter = cwFilter;
     }
 
     /* Real Tauri path: stream via neocodex_send_message_stream */
+    const g = genParamsFromSettings();
     invoke('neocodex_send_message_stream', {
       content: txt,
       attachments: null,
       regenerate: false,
-      permission_mode: 'auto',
-      temperature: null,
-      max_tokens: null,
+      permission_mode: currentPermissionMode(),
+      temperature: g.temperature,
+      max_tokens: g.max_tokens,
     }).catch(err=>{
       const mb=a.querySelector('.mb');
       if(mb){ mb.classList.remove('streaming'); mb.textContent='[IPC 错误] '+String(err); }
@@ -1178,11 +1219,16 @@ g.cwFilter = cwFilter;
         u.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(i);
         cs.appendChild(u);
       }else{
+        const aiIdx = cs.querySelectorAll('.msg.l').length;
         const a = document.createElement('div'); a.className = 'msg l';
-        a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">${t}</span></div><div class="msg-act"><button class="ma-btn" data-op="copy" title="复制内容">复制</button><button class="ma-btn" data-op="retry" title="重新生成回复">重试</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${renderRichText(m.content)}</div>`;
-        a.querySelector('.ma-btn[data-op="copy"]').onclick = () => copyMessageContent(i);
+        a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">${t}</span></div><div class="msg-act"><button class="ma-btn" data-op="copy" title="复制内容">复制</button><button class="ma-btn" data-op="retry" title="重新生成回复">重试</button><button class="ma-btn" data-op="like" title="有帮助">👍</button><button class="ma-btn" data-op="dislike" title="需改进">👎</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${renderRichText(m.content)}</div>`;
+        a.querySelector('.ma-btn[data-op="copy"]').onclick = () => copyMessageContent(aiIdx);
         a.querySelector('.ma-btn[data-op="retry"]').onclick = () => retryMessage(i);
         a.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(i);
+        a.querySelector('.ma-btn[data-op="like"]').onclick = () => feedbackMessage(aiIdx, 'like');
+        a.querySelector('.ma-btn[data-op="dislike"]').onclick = () => feedbackMessage(aiIdx, 'dislike');
+        const fb = loadFeedback()[currentSessionId + ':' + aiIdx];
+        if(fb) renderFeedbackState(aiIdx, fb);
         cs.appendChild(a);
       }
     });
@@ -1233,6 +1279,206 @@ g.cwFilter = cwFilter;
     const mb = cs.querySelectorAll('.msg.l')[index]?.querySelector('.mb');
     const text = mb?.innerText || mb?.textContent || '';
     try{ await navigator.clipboard.writeText(text); showToast('已复制'); }catch(_e){ showToast('复制失败'); }
+  }
+
+  /* ===== Session ops (会话操作: 重命名/压缩/归档/导出/删除) ===== */
+  const FB_KEY = 'neotrix.feedback';
+  function loadFeedback(){
+    try{ return JSON.parse(localStorage.getItem(FB_KEY) || '{}'); }catch(_e){ return {}; }
+  }
+  function saveFeedback(fb){
+    try{ localStorage.setItem(FB_KEY, JSON.stringify(fb)); }catch(_e){}
+  }
+
+  function sessionTitleFor(id){
+    const s = CW_DATA.find(x => x.id === id);
+    if(s) return s.name;
+    const r = recentData.chat.find(x => x.id === id);
+    return r ? r.text : id;
+  }
+
+  function openSessionOps(anchorEl, id){
+    const menu = document.getElementById('sessionOpsMenu');
+    if(!menu) return;
+    const targetId = id || currentSessionId;
+    if(!targetId){ showToast('请先打开一个会话'); return; }
+    document.getElementById('sesOpsName').textContent = sessionTitleFor(targetId) || targetId;
+    menu.dataset.session = String(targetId);
+    menu.classList.add('open');
+    if(anchorEl){
+      const r = anchorEl.getBoundingClientRect();
+      menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 220)) + 'px';
+      menu.style.top = (r.bottom + 6) + 'px';
+    }else{
+      menu.style.left = '50%';
+      menu.style.top = '50%';
+      menu.style.transform = 'translate(-50%,-50%)';
+    }
+  }
+  function closeSessionOps(){
+    const menu = document.getElementById('sessionOpsMenu');
+    if(menu) menu.classList.remove('open');
+  }
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('sessionOpsMenu');
+    if(menu && menu.classList.contains('open') && !e.target.closest('#sessionOpsMenu') && !e.target.closest('.ses-trigger')){
+      menu.classList.remove('open');
+    }
+  });
+
+  async function refreshSessionList(){
+    await loadSessions().catch(() => {});
+    renderCowork();
+  }
+
+  async function renameSession(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    if(!id){ showToast('无会话'); return; }
+    closeSessionOps();
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可重命名'); return; }
+    const next = prompt('新会话名称:', sessionTitleFor(id));
+    if(next === null || !next.trim()) return;
+    try{
+      await invoke('neocodex_rename_session', { session_id: id, name: next.trim() });
+      showToast('已重命名');
+      await refreshSessionList();
+    }catch(e){ showToast('重命名失败: ' + e); }
+  }
+
+  async function compactSession(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    if(!id){ showToast('无会话'); return; }
+    closeSessionOps();
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可压缩'); return; }
+    try{
+      const msgs = await invoke('neocodex_compact_session', { session_id: id, keep_messages: 20 });
+      if(Array.isArray(msgs)) renderThread(msgs);
+      showToast('上下文已压缩，保留最近 20 条');
+    }catch(e){ showToast('压缩失败: ' + e); }
+  }
+
+  async function archiveSession(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    if(!id){ showToast('无会话'); return; }
+    closeSessionOps();
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可归档'); return; }
+    try{
+      await invoke('neocodex_archive_session', { session_id: id });
+      showToast('已归档会话');
+      if(id === currentSessionId){ currentSessionId = null; actions.newChat(); }
+      await refreshSessionList();
+    }catch(e){ showToast('归档失败: ' + e); }
+  }
+
+  async function exportSession(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    if(!id){ showToast('无会话'); return; }
+    closeSessionOps();
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可导出'); return; }
+    try{
+      const out = await invoke('neocodex_export_session', { session_id: id, format: null });
+      const name = (sessionTitleFor(id) || 'session').replace(/[^\w\u4e00-\u9fa5-]+/g, '_');
+      const blob = new Blob([String(out || '')], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name + '.md'; a.click();
+      URL.revokeObjectURL(url);
+      showToast('会话已导出');
+    }catch(e){ showToast('导出失败: ' + e); }
+  }
+
+  async function deleteSession(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    if(!id){ showToast('无会话'); return; }
+    closeSessionOps();
+    if(!confirm('确定删除该会话？此操作不可恢复。')) return;
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可删除'); return; }
+    try{
+      await invoke('neocodex_delete_session', { session_id: id });
+      showToast('会话已删除');
+      if(id === currentSessionId){ currentSessionId = null; actions.newChat(); }
+      await refreshSessionList();
+    }catch(e){ showToast('删除失败: ' + e); }
+  }
+
+  async function feedbackMessage(index, kind){
+    if(!isTauri()){ showToast('浏览器模式：反馈仅在桌面端生效'); return; }
+    if(!currentSessionId){ showToast('无会话'); return; }
+    const fb = loadFeedback();
+    const key = currentSessionId + ':' + index;
+    const cur = fb[key];
+    const next = (cur === kind) ? null : kind; // toggle
+    if(next === null) delete fb[key]; else fb[key] = next;
+    saveFeedback(fb);
+    try{
+      await invoke('neocodex_feedback', { session_id: currentSessionId, text: next === null ? '' : (next === 'like' ? '👍 有帮助' : '👎 需改进') });
+    }catch(_e){}
+    renderFeedbackState(index, next);
+    showToast(next === null ? '已撤销反馈' : (next === 'like' ? '已标记有帮助' : '已标记需改进'));
+  }
+
+  function renderFeedbackState(index, state){
+    const cs = document.getElementById('chatScroll');
+    const msg = cs.querySelectorAll('.msg.l')[index];
+    if(!msg) return;
+    msg.querySelectorAll('.ma-btn[data-op="like"],.ma-btn[data-op="dislike"]').forEach(b => b.classList.remove('on'));
+    if(state){
+      const btn = msg.querySelector('.ma-btn[data-op="' + state + '"]');
+      if(btn) btn.classList.add('on');
+    }
+  }
+
+  /* ===== Session search (会话全文搜索, 对标 Codex ⌘G/Claude ⌘K) ===== */
+  let lastSessionQuery = '';
+  async function searchSessions(query){
+    const q = (query || '').trim();
+    const res = document.getElementById('cwSearchResults');
+    if(!res) return;
+    lastSessionQuery = q;
+    if(!q){ res.style.display = 'none'; res.innerHTML = ''; return; }
+    if(!isTauri()){
+      const local = CW_DATA.filter(s => (s.name || '').toLowerCase().includes(q.toLowerCase()));
+      renderSessionSearchResults(local.map(s => ({ session_id: s.id, session_name: s.name, role: '', snippet: '· ' + (s.status || ''), match_count: 1 })));
+      return;
+    }
+    try{
+      const hits = await invoke('neocodex_search_sessions', { query: q });
+      if(lastSessionQuery !== q) return; // stale guard
+      renderSessionSearchResults(Array.isArray(hits) ? hits : []);
+    }catch(_e){
+      renderSessionSearchResults([]);
+    }
+  }
+
+  function renderSessionSearchResults(hits){
+    const res = document.getElementById('cwSearchResults');
+    if(!res) return;
+    if(!hits.length){ res.innerHTML = '<div class="cw-empty" style="padding:10px 4px">无匹配会话</div>'; res.style.display = 'block'; return; }
+    res.innerHTML = hits.slice(0, 20).map(h => {
+      const role = h.role === 'user' ? '问' : (h.role === 'agent' || h.role === 'assistant' ? '答' : '');
+      const hitsTxt = h.match_count > 1 ? `<span class="re-time">${h.match_count} 处</span>` : '';
+      const when = h.timestamp ? fmtRelTime(h.timestamp) : '';
+      return `<div class="re-i" onclick="openSessionFromSearch('${escHtml(String(h.session_id))}')">
+        <span class="dot"></span><span class="t">${escHtml(h.session_name || '会话')}${role ? ' · ' + role : ''}</span>
+        <span class="re-time">${hitsTxt}${when}</span>
+        <div class="kb-hit-s" style="font-size:10px;color:var(--tx3);line-height:1.4">${escHtml(String(h.snippet || '').slice(0, 80))}</div>
+      </div>`;
+    }).join('');
+    res.style.display = 'block';
+  }
+
+  async function openSessionFromSearch(id){
+    if(!isTauri() || !id) return;
+    try{
+      await invoke('neocodex_switch_session', { session_id: id });
+      currentSessionId = id;
+      const msgs = await invoke('neocodex_get_session_messages', { session_id: id });
+      if(Array.isArray(msgs)){
+        switchView(document.querySelector('.segb[data-view="chat"]'), 'chat');
+        renderThread(msgs);
+      }
+      showToast('已打开搜索结果');
+    }catch(_e){}
   }
 
   async function loadSessionMessages(id){
@@ -1535,7 +1781,7 @@ g.cwFilter = cwFilter;
 
   async function wireBackend(){
     if(!isTauri()) return;
-    await Promise.all([loadSessions(), loadHealth(), loadFileTree(), loadProxy(), loadUsage(), loadWsStatus()]);
+    await Promise.all([loadSessions(), loadHealth(), loadFileTree(), loadProxy(), loadUsage(), loadWsStatus(), hydrateAppVersion()]);
   }
 
   window.wireBackend = wireBackend;
@@ -1608,6 +1854,13 @@ g.cwFilter = cwFilter;
       tb.className = 'ntx-chat-toolbar';
       tb.innerHTML = `<div class="l" id="ntxAttachArea"></div><div class="r" id="ntxToolbarRight"></div>`;
       cic.insertBefore(tb, cic.querySelector('.cic-actions'));
+    }
+
+    const tbRight = document.getElementById('ntxToolbarRight');
+    if(tbRight && !document.getElementById('ntxModeBtn')){
+      tbRight.innerHTML += `
+        <button class="ntx-mode-btn ses-trigger" id="ntxModeBtn" title="权限模式 (对标 Codex approval)" onclick="cycleMode()"><span id="ntxModeLabel">自动</span></button>
+        <button class="ntx-mode-btn ses-trigger" id="ntxSessionOps" title="会话操作" onclick="openSessionOps(this)"><span>⋯</span></button>`;
     }
 
     if(!window._ntxShortcutsBound){
@@ -2074,17 +2327,50 @@ g.cwFilter = cwFilter;
         if(isTauri()){
           try{
             await invoke('neocodex_set_provider', { name: providerSel.value });
+            saveSetting('compute.provider', providerSel.value);
             showToast('默认提供者已切换: ' + providerSel.value);
           }catch(e){ showToast('切换失败: ' + e); }
         }else{
+          saveSetting('compute.provider', providerSel.value);
           showToast('浏览器模式：仅 Tauri 下可切换提供者');
         }
       };
     }
-    const tokenSel = document.querySelector('#stCompute select:last-of-type');
-    if(tokenSel) tokenSel.onchange = () => showToast('最大 Token 已设为: ' + tokenSel.value);
+    const tokenSel = document.querySelector('#stMaxTokens') || document.querySelector('#stCompute select:last-of-type');
+    if(tokenSel){
+      const savedT = loadSettings()['compute.maxTokens'];
+      if(savedT !== undefined) tokenSel.value = String(savedT);
+      tokenSel.onchange = () => {
+        saveSetting('compute.maxTokens', Number(tokenSel.value));
+        showToast('最大 Token 已设为: ' + tokenSel.value + '（下次发送生效）');
+      };
+    }
+    const tempRange = document.getElementById('stTemperature');
+    if(tempRange){
+      const savedTemp = loadSettings()['compute.temperature'];
+      if(savedTemp !== undefined){
+        tempRange.value = String(savedTemp);
+        const tv = document.getElementById('stTemperatureVal');
+        if(tv) tv.textContent = String(Number(savedTemp).toFixed(1));
+      }
+      tempRange.oninput = () => {
+        const tv = document.getElementById('stTemperatureVal');
+        if(tv) tv.textContent = Number(tempRange.value).toFixed(1);
+      };
+      tempRange.onchange = () => {
+        saveSetting('compute.temperature', Number(tempRange.value));
+        showToast('温度已设为: ' + Number(tempRange.value).toFixed(1) + '（下次发送生效）');
+      };
+    }
     const localInfer = document.querySelector('#stCompute input[type="checkbox"]');
-    if(localInfer) localInfer.onchange = () => showToast(localInfer.checked ? '已启用本地推理引擎' : '已禁用本地推理引擎');
+    if(localInfer){
+      const saved = loadSettings()['compute.localInfer'];
+      if(saved !== undefined) localInfer.checked = !!saved;
+      localInfer.onchange = () => {
+        saveSetting('compute.localInfer', localInfer.checked);
+        showToast(localInfer.checked ? '已启用本地推理引擎' : '已禁用本地推理引擎');
+      };
+    }
   }
 
   function initPrivacyHandlers(){
@@ -2271,6 +2557,27 @@ g.cwFilter = cwFilter;
     const lbl=document.getElementById('popThemeLabel');
     if(lbl)lbl.textContent=isDark?'亮色':'暗色';
     showToast(isDark?'🌞 已切换为亮色模式':'🌙 已切换为暗色模式');
+  }
+
+  /* ===== App version & updates ===== */
+  async function hydrateAppVersion(){
+    if(!isTauri()) return;
+    try{
+      const v = await invoke('neocodex_app_version');
+      const el = document.getElementById('popVersion');
+      if(el && v) el.textContent = 'v' + String(v);
+    }catch(_e){}
+  }
+  async function checkForUpdate(){
+    if(!isTauri()){ showToast('浏览器模式：仅桌面版可检查更新'); return; }
+    try{
+      const r = await invoke('neocodex_check_update');
+      if(r && r.available){
+        showToast('发现新版本 v' + (r.latest || '?') + ' — 请从菜单升级');
+      }else{
+        showToast('已是最新版本 ' + (r ? 'v' + r.current : ''));
+      }
+    }catch(e){ showToast('检查更新失败: ' + e); }
   }
 
   function toggleSidebar(){

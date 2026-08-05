@@ -69,7 +69,7 @@
             <button class="pop-item" onclick="openSettingsModal();closePopover()"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="1.5" x2="7" y2="3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="10.5" x2="7" y2="12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="1.5" y1="7" x2="3.5" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10.5" y1="7" x2="12.5" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>设置<span class="pop-shortcut">⌘,</span></button>
             <button class="pop-item" onclick="closePopover();showToast('升级计划 — Pro 版本即将推出')"><svg viewBox="0 0 14 14"><line x1="7" y1="1.5" x2="7" y2="12.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>升级<span class="pop-shortcut">Pro</span></button>
             <button class="pop-item" id="popThemeToggle" onclick="toggleTheme();closePopover()"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="2" x2="7" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="10" x2="7" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="2" y1="7" x2="4" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>主题切换<span class="pop-shortcut" id="popThemeLabel">亮色</span></button>
-            <button class="pop-item" onclick="closePopover();showToast('帮助与反馈 · NeoTrix v0.19.0')"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="7" x2="7" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="10" r=".5" stroke="currentColor" stroke-width="1" fill="none"/></svg>帮助</button>
+            <button class="pop-item" onclick="closePopover();checkForUpdate()"><svg viewBox="0 0 14 14"><path d="M7 1.5v7M7 1.5L4.5 4M7 1.5L9.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M2.5 8.5V12h9V8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>检查更新<span class="pop-shortcut" id="popVersion">v0.19.0</span></button>
             <div class="pop-sep"></div>
             <button class="pop-item pop-logout" onclick="closePopover();showToast('已退出登录');clearChat()"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><polyline points="4,5 7,8 10,5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="2.5" y1="10" x2="11.5" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>退出登录</button>
           </div>
@@ -155,6 +155,10 @@
               <button class="cw-fchip" data-status="active" onclick="cwFilter('active',this)">进行中</button>
               <button class="cw-fchip" data-status="done" onclick="cwFilter('done',this)">已完成</button>
             </div>
+            <div class="cw-search">
+              <input id="cwSearchInput" type="text" placeholder="搜索会话/消息…" oninput="searchSessions(this.value)">
+            </div>
+            <div id="cwSearchResults"></div>
             <div class="cw-slist" id="cwSessionList"></div>
           </div>
           <!-- 右侧：任务详情 + 智能体 -->
@@ -423,11 +427,17 @@
           </div>
           <div class="st-field">
             <label class="st-lbl">默认提供者</label>
-            <select class="st-input"><option>GatewayV2（自动）</option><option>OpenAI</option><option>Anthropic</option><option>Groq（免费）</option></select>
+            <select class="st-input" id="stProviderSel"><option>GatewayV2（自动）</option><option>OpenAI</option><option>Anthropic</option><option>Groq（免费）</option></select>
           </div>
           <div class="st-field">
             <label class="st-lbl">最大 Token</label>
-            <select class="st-input"><option>4096</option><option selected>8192</option><option>16384</option><option>32768</option></select>
+            <select class="st-input" id="stMaxTokens"><option>4096</option><option selected>8192</option><option>16384</option><option>32768</option></select>
+          </div>
+          <div class="st-field">
+            <label class="st-lbl">温度 (temperature)</label>
+            <input type="range" class="st-range" id="stTemperature" min="0" max="2" step="0.1" value="0.3">
+            <span style="font-size:var(--fs-caption);color:var(--tx3)" id="stTemperatureVal">0.3</span>
+            <div class="st-desc">对话随机性：0 精确 · 1 平衡 · 2 发散。修改后自动用于新消息。</div>
           </div>
         </div>
 
@@ -664,6 +674,16 @@
   </div>
 </div>
 
+<!-- Session context menu (会话操作: 重命名/归档/压缩/导出/删除) -->
+<div class="ses-menu" id="sessionOpsMenu">
+  <div class="ses-menu-h" id="sesOpsName">会话</div>
+  <button class="ses-item" onclick="renameSession()"><svg viewBox="0 0 14 14"><path d="M10.5 3.5l1 1L6 10H5V9z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/><path d="M3 12.5h8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>重命名</button>
+  <button class="ses-item" onclick="compactSession()"><svg viewBox="0 0 14 14"><path d="M7 2v10M7 2L4.5 4.5M7 2l2.5 2.5M7 12l-2.5-2.5M7 12l2.5-2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>压缩上下文</button>
+  <button class="ses-item" onclick="archiveSession()"><svg viewBox="0 0 14 14"><rect x="2" y="2.5" width="10" height="3" rx="1" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M3.5 5.5V11a1 1 0 001 1h5a1 1 0 001-1V5.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="6" y1="7.5" x2="8" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>归档</button>
+  <button class="ses-item" onclick="exportSession()"><svg viewBox="0 0 14 14"><path d="M7 1.5v7M7 1.5L4.5 4M7 1.5L9.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M2.5 8.5V12h9V8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>导出</button>
+  <div class="ses-sep"></div>
+  <button class="ses-item danger" onclick="deleteSession()"><svg viewBox="0 0 14 14"><path d="M2.5 4h9M5 4V2.5h4V4M4 4l.5 7.5h5L10 4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg>删除会话</button>
+</div>
 
 </body>
 </html>
