@@ -8,3 +8,4 @@
 | `TREE_NEURAL_NET_DESIGN.md` | Tree neural network design |
 | `TREE_NN_DESIGN.md` | Tree NN design (alternative) |
 | `WARP_CLONE_DESIGN.md` | Warp clone design |
+| `CHMA-fog-map-evolution.md` | CHMA × Fog Map high-dimensional capability-net evolution design |
