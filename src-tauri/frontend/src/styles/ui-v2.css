@@ -1136,7 +1136,7 @@
   .st-top { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; flex-shrink:0; }
   .st-title { font-size:var(--fs-heading); font-weight:var(--fw-semibold); color:var(--tx); }
   .st-body { flex:1; overflow-y:auto; padding:0 24px 24px 24px; }
-  .st-section { display:none; } .st-section.open { display:block; animation:fo 0.15s ease-out; }
+  .st-section { display:none; } .st-section.open { display:block !important; animation:fo 0.15s ease-out; }
   .st-h2 { font-size:var(--fs-large); font-weight:var(--fw-semibold); color:var(--tx); margin-bottom:16px; }
   .st-card {
     border-radius:14px; border:1px solid var(--bd); background:var(--glass-L1-bg);

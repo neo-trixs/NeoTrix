@@ -61,100 +61,6 @@ fn pty_close(state: State<'_, Arc<commands::pty::PtyManager>>, session_id: Strin
     Ok(())
 }
 
-/// Run one auto-sync cycle: for each pair, diff and transfer, emit result event
-fn auto_sync_cycle(sync_state: &commands::SyncState, handle: &tauri::AppHandle) {
-    let start = std::time::Instant::now();
-
-    let peer_ids = {
-        let guard = match sync_state.lock() {
-            Ok(g) => g,
-            Err(_) => return,
-        };
-        let sync = match guard.as_ref() {
-            Some(s) => s,
-            None => return,
-        };
-        let ids: Vec<String> = sync.pairs().iter().map(|p| p.peer_id.clone()).collect();
-        if ids.is_empty() {
-            return;
-        }
-        ids
-    };
-
-    let mut total_files: usize = 0;
-    let mut has_error = false;
-
-    for peer_id in &peer_ids {
-        let count = {
-            let mut guard = match sync_state.lock() {
-                Ok(g) => g,
-                Err(_) => {
-                    has_error = true;
-                    continue;
-                }
-            };
-            let sync = match guard.as_mut() {
-                Some(s) => s,
-                None => {
-                    has_error = true;
-                    continue;
-                }
-            };
-            match sync.compute_diff(peer_id) {
-                Ok((_, _, diff)) => diff.to_send.len() + diff.to_receive.len(),
-                Err(e) => {
-                    log::warn!("[auto-sync] diff {}: {}", peer_id, e);
-                    has_error = true;
-                    continue;
-                }
-            }
-        };
-
-        {
-            let mut guard = match sync_state.lock() {
-                Ok(g) => g,
-                Err(_) => {
-                    has_error = true;
-                    continue;
-                }
-            };
-            let sync = match guard.as_mut() {
-                Some(s) => s,
-                None => {
-                    has_error = true;
-                    continue;
-                }
-            };
-            match sync.execute_sync(peer_id) {
-                Ok(_) => total_files += count,
-                Err(e) => {
-                    log::warn!("[auto-sync] sync {}: {}", peer_id, e);
-                    has_error = true;
-                }
-            }
-        }
-    }
-
-    let duration_ms = start.elapsed().as_millis() as u64;
-    let now = chrono::Local::now();
-    let timestamp = now.format("%Y-%m-%dT%H:%M:%S%.3f%z").to_string();
-
-    let payload = serde_json::json!({
-        "status": if has_error { "error" } else { "ok" },
-        "files_synced": total_files,
-        "duration_ms": duration_ms,
-        "timestamp": timestamp,
-    });
-    let _ = handle.emit("sync-complete", payload);
-
-    if let Some(tray) = handle.tray_by_id("main-tray") {
-            let _ = tray.set_tooltip(Some(format!(
-                "NeoTrix Desktop — Last sync: {}",
-                now.format("%H:%M:%S")
-            )));
-    }
-}
-
 fn main() {
     // MCP stdio 子进程入口: 父进程 mcp_host_start 以 NEOTRIX_MCP_STDIO=1 拉起本进程,
     // 必须最先拦截, 避免 clap 解析 / GUI 启动。
@@ -184,10 +90,6 @@ fn main() {
 
             // 用户画像蒸馏引擎
             let distillation_engine = Mutex::new(DistillationEngine::new());
-
-            // 文件同步状态
-            let sync_state: commands::SyncState = Arc::new(Mutex::new(None));
-            let sync_state_bg = sync_state.clone();
 
             // LLM 提供者统一网关
             let _gateway = commands::provider_cmds::init_gateway();
@@ -219,9 +121,6 @@ fn main() {
                 .manage(pty_manager.clone())
                 .manage(permission_manager)
                 .manage(distillation_engine)
-                .manage(sync_state)
-                .manage(commands::browser_cmds::WebAppState::new())
-                .manage(commands::browser_cmds::XAutoScrollState::new())
                 .invoke_handler(tauri::generate_handler![
                     commands::get_brain_stats, commands::absorb_source,
                     commands::session_list, commands::session_create,
@@ -324,14 +223,6 @@ fn main() {
                     commands::remote_bridge_poll,
                     commands::remote_bridge_devices,
                     commands::remote_bridge_history,
-                    commands::sync_init,
-                    commands::sync_discover,
-                    commands::sync_add_pair,
-                    commands::sync_remove_pair,
-                    commands::sync_list_pairs,
-                    commands::sync_preview,
-                    commands::sync_start,
-                    commands::sync_status,
                     commands::provider_status,
                     commands::save_api_key,
                     commands::has_api_key,
@@ -382,29 +273,9 @@ fn main() {
                       commands::neocodex_list_archived,
                       commands::neocodex_checkpoint_list,
                       commands::neocodex_checkpoint_restore,
-                      commands::neocodex_set_project,
-                      commands::neocodex_get_project,
-                     commands::browser_cmds::browser_open,
-                    commands::browser_cmds::browser_navigate,
-                    commands::browser_cmds::browser_back,
-                    commands::browser_cmds::browser_forward,
-                    commands::browser_cmds::browser_reload,
-                    commands::browser_cmds::browser_close,
-                    commands::browser_cmds::browser_execute_js,
-                    commands::browser_cmds::browser_agent_list,
-                    commands::browser_cmds::browser_agent_detect,
-                    commands::browser_cmds::browser_agent_execute,
-                    commands::browser_cmds::browser_extract_content,
-                    commands::browser_cmds::browser_ingest_content,
-                    commands::browser_cmds::browser_collected_knowledge,
-                    commands::browser_cmds::browser_x_start_session,
-                    commands::browser_cmds::browser_x_login,
-                    commands::browser_cmds::browser_x_auto_scroll,
-                    commands::browser_cmds::browser_x_human_scroll,
-                    commands::browser_cmds::browser_x_stop_session,
-                    commands::browser_cmds::browser_x_status,
-                    commands::browser_cmds::browser_x_human_profile,
-                    commands::pet_cmds::get_pet_state,
+commands::neocodex_set_project,
+                       commands::neocodex_get_project,
+                       commands::pet_cmds::get_pet_state,
                     commands::pet_cmds::feed_pet_conversation,
                     commands::pet_cmds::sync_pet_consciousness,
                     commands::tool_cmds::tool_execute,
@@ -885,34 +756,7 @@ fn main() {
                             }
                         }
                     });
- 
-                    // 自动文件同步后台线程（120 秒周期）
-                    let sync_state_auto = sync_state_bg.clone();
-                    let handle_auto = app.handle().clone();
-                    std::thread::spawn(move || {
-                        loop {
-                            std::thread::sleep(Duration::from_secs(120));
-                            auto_sync_cycle(&sync_state_auto, &handle_auto);
-                        }
-                    });
- 
-                    // 监听系统托盘 "Sync Now" 事件（去重：同一时刻只允许一个同步循环）
-                    let sync_state_trigger = sync_state_bg.clone();
-                    let handle_trigger = app.handle().clone();
-                    static SYNC_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-                    app.handle().listen("sync-trigger", move |_| {
-                        if SYNC_RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
-                            log::warn!("[auto-sync] trigger ignored: a sync cycle is already running");
-                            return;
-                        }
-                        let state = sync_state_trigger.clone();
-                        let handle = handle_trigger.clone();
-                        std::thread::spawn(move || {
-                            auto_sync_cycle(&state, &handle);
-                            SYNC_RUNNING.store(false, std::sync::atomic::Ordering::SeqCst);
-                        });
-                    });
- 
+
                     Ok(())
                 })
                 .build(tauri::generate_context!())
