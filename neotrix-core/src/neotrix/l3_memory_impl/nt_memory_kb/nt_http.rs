@@ -35,10 +35,19 @@ pub(crate) fn shared_blocking_client() -> &'static reqwest::blocking::Client {
 /// 校验 URL 安全,并返回可连接的目标地址 (connect-期 pin 使用)。
 /// 在 `is_safe_fetch_url` 之上:解析全部 A+AAAA,过滤内网/回环/链路本地/保留段,
 /// 取首个安全地址供调用方 `resolve(host, addr)` pin,彻底阻断 DNS rebinding。
+///
+/// 对齐 Windows-MCP Scrape 块清单 (agent-security 吸收):
+/// - 私有/回环/链路本地/保留段 (含 IPv4-mapped IPv6、CGNAT、benchmarking)
+/// - URL 内嵌 userinfo 凭据 (`user:pass@host`) — 凭据外泄 + 社工向量
+/// - 非 http/https scheme; localhost/.local 拒绝
 pub(crate) fn resolve_safe_origin(url: &str) -> Result<(SocketAddr, url::Url), String> {
     let parsed = url::Url::parse(url).map_err(|e| format!("URL parse: {e}"))?;
     if !matches!(parsed.scheme(), "http" | "https") {
         return Err("scheme must be http/https".into());
+    }
+    // URL 内嵌 userinfo 凭据: 凭据随请求外泄且是钓鱼/冒用向量,一律拒绝。
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err("URL embedded credentials (userinfo) rejected".into());
     }
     let host = parsed.host_str().ok_or("no host")?.to_ascii_lowercase();
     if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") {
@@ -179,8 +188,16 @@ pub(crate) async fn fetch_safe_http_async(url: &str) -> Result<(String, String),
 fn is_private_ip(ip: std::net::IpAddr) -> bool {
     match ip {
         std::net::IpAddr::V4(v4) => {
+            // std 已覆盖: loopback/private(10,172.16-31,192.168)/link-local(169.254)
+            // /broadcast/unspecified/documentation(192.0.2,198.51.100,203.0.113)
             v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_broadcast()
                 || v4.is_unspecified() || v4.is_documentation()
+                // CGNAT 100.64.0.0/10 — is_private() 不覆盖 (RFC 6598)
+                || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xc0) == 0x40)
+                // benchmarking 198.18.0.0/15 (RFC 2544) — 公网可达但禁止路由进服务
+                || (v4.octets()[0] == 198 && (v4.octets()[1] & 0xfe) == 0x12)
+                // 240.0.0.0/4 reserved + 0.0.0.0/8
+                || v4.octets()[0] >= 240 || v4.octets()[0] == 0
         }
         std::net::IpAddr::V6(v6) => {
             if let Some(v4) = v6.to_ipv4_mapped() {
@@ -213,6 +230,44 @@ mod tests {
         assert!(resolve_safe_origin("file:///etc/passwd").is_err());
         assert!(resolve_safe_origin("").is_err());
         assert!(resolve_safe_origin("not a url").is_err());
+    }
+
+    #[test]
+    fn resolve_safe_origin_rejects_userinfo_credentials() {
+        // URL 内嵌 userinfo 凭据 — agent-security 吸收: 凭据外泄 + 冒用向量
+        assert!(resolve_safe_origin("http://user:pass@8.8.8.8/").is_err());
+        assert!(resolve_safe_origin("https://user@example.com/").is_err());
+        assert!(resolve_safe_origin("http://admin:admin@192.168.1.1/").is_err());
+    }
+
+    #[test]
+    fn is_private_ip_covers_reserved_v4_ranges() {
+        use std::net::IpAddr;
+        // CGNAT 100.64.0.0/10 (RFC 6598) — std is_private() 不覆盖
+        assert!(is_private_ip(IpAddr::V4("100.64.0.1".parse().unwrap())));
+        assert!(is_private_ip(IpAddr::V4("100.127.255.254".parse().unwrap())));
+        // benchmarking 198.18.0.0/15 (RFC 2544)
+        assert!(is_private_ip(IpAddr::V4("198.18.0.1".parse().unwrap())));
+        assert!(is_private_ip(IpAddr::V4("198.19.255.254".parse().unwrap())));
+        // reserved 240.0.0.0/4 与 0.0.0.0/8
+        assert!(is_private_ip(IpAddr::V4("240.0.0.1".parse().unwrap())));
+        assert!(is_private_ip(IpAddr::V4("0.0.0.1".parse().unwrap())));
+        // 边界外: 100.63 与 100.128 为公网可路由 (非 CGNAT)
+        assert!(!is_private_ip(IpAddr::V4("100.63.0.1".parse().unwrap())));
+        assert!(!is_private_ip(IpAddr::V4("100.128.0.1".parse().unwrap())));
+        // 198.16 与 198.20 不在 198.18/15 内
+        assert!(!is_private_ip(IpAddr::V4("198.16.0.1".parse().unwrap())));
+        assert!(!is_private_ip(IpAddr::V4("198.20.0.1".parse().unwrap())));
+        // 公网普通地址不受影响
+        assert!(!is_private_ip(IpAddr::V4("8.8.8.8".parse().unwrap())));
+        assert!(!is_private_ip(IpAddr::V4("1.1.1.1".parse().unwrap())));
+    }
+
+    #[test]
+    fn resolve_safe_origin_rejects_cgnat_literal() {
+        // CGNAT 块走 IP 字面量路径直接拒绝
+        assert!(resolve_safe_origin("http://100.64.0.1/").is_err());
+        assert!(resolve_safe_origin("http://198.18.0.1/").is_err());
     }
 
     #[test]
