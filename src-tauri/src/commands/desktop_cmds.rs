@@ -3,6 +3,35 @@
 //! 补齐前端 lib/api.ts 调用但后端缺失的命令 (审计发现 8 个运行时缺失项)。
 
 use serde::Serialize;
+use tauri::{Manager, Window};
+
+/// 窗口最小化
+#[tauri::command]
+pub fn window_minimize(window: Window) -> Result<(), String> {
+    window.minimize().map_err(|e| e.to_string())
+}
+
+/// 窗口最大化/还原
+#[tauri::command]
+pub fn window_maximize(window: Window) -> Result<(), String> {
+    if window.is_maximized().map_err(|e| e.to_string())? {
+        window.unmaximize().map_err(|e| e.to_string())
+    } else {
+        window.maximize().map_err(|e| e.to_string())
+    }
+}
+
+/// 窗口关闭
+#[tauri::command]
+pub fn window_close(window: Window) -> Result<(), String> {
+    window.close().map_err(|e| e.to_string())
+}
+
+/// 窗口是否最大化
+#[tauri::command]
+pub fn window_is_maximized(window: Window) -> Result<bool, String> {
+    window.is_maximized().map_err(|e| e.to_string())
+}
 
 /// 读取剪贴板文本 (macOS/Windows/Linux 通用, 经 arboard)
 #[tauri::command]

@@ -14,15 +14,9 @@
     <!-- ═══ SIDEBAR ═══ -->
     <aside class="sb" id="sidebar">
       <div class="sb-top">
-        <!-- Window Header — unified traffic lights in chrome -->
-        <div class="sb-header">
+        <!-- Window Header — native macOS traffic lights (Overlay titlebar) -->
+        <div class="sb-header" data-tauri-drag-region>
           <div class="sb-header-actions">
-            <!-- Traffic lights — integrated in sidebar chrome -->
-            <div class="traffic">
-              <span class="t-dot t-c"></span>
-              <span class="t-dot t-m"></span>
-              <span class="t-dot t-x"></span>
-            </div>
             <button class="sbn" id="sidebarToggle" onclick="toggleSidebar()">
               <svg viewBox="0 0 14 14"><line x1="10" y1="3" x2="10" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><polyline points="7,5 5,7 7,9" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
@@ -85,6 +79,9 @@
     <button class="sb-float" id="sidebarFloat" onclick="toggleSidebar()">
       <svg viewBox="0 0 14 14"><line x1="10" y1="3" x2="10" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><polyline points="7,5 5,7 7,9" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+
+    <!-- Collapsed-sidebar drag fallback over traffic-light zone -->
+    <div class="drag-region" data-tauri-drag-region></div>
 
     <!-- ═══ MAIN ═══ -->
     <main class="ma">
@@ -180,15 +177,16 @@
         <div class="evo-card" style="flex:1"><div class="lbl">能力总值</div><div class="val reg-cap">—</div></div>
         <div class="evo-card" style="flex:1"><div class="lbl">引擎</div><div class="val reg-eng">—</div></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:3px">
-        <div class="pipeline-item"><span class="s">代码生成</span><span class="st ok">Mature 6</span></div>
-        <div class="pipeline-item"><span class="s">知识吸收</span><span class="st ok">Mature 5</span></div>
-        <div class="pipeline-item"><span class="s">E8 推理</span><span class="st run">Mature 4</span></div>
-        <div class="pipeline-item"><span class="s">SEAL 循环</span><span class="st run">Mature 3</span></div>
-        <div class="pipeline-item"><span class="s">工具调用</span><span class="st ok">Mature 5</span></div>
-        <div class="pipeline-item"><span class="s">记忆检索</span><span class="st ok">Mature 6</span></div>
-        <div class="pipeline-item"><span class="s">元认知监控</span><span class="st run">Mature 2</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div class="evo-card"><div class="lbl">对话轮次</div><div class="val" id="regTurns">—</div></div>
+        <div class="evo-card"><div class="lbl">工具调用</div><div class="val" id="regTools">—</div></div>
+        <div class="evo-card"><div class="lbl">Token 用量</div><div class="val" id="regTokens">—</div></div>
+        <div class="evo-card"><div class="lbl">上下文占用</div><div class="val" id="regCtx">—</div></div>
+        <div class="evo-card"><div class="lbl">进化迭代</div><div class="val" id="regEvo">—</div></div>
+        <div class="evo-card"><div class="lbl">成本</div><div class="val" id="regCost">—</div></div>
       </div>
+      <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:6px">能力向量 · 维度</div>
+      <div id="regVecBars" style="display:flex;flex-direction:column;gap:4px"></div>
     </div>
   </div>
 </div>
@@ -206,16 +204,18 @@
     </div>
     <div class="overlay-bd">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="evo-card"><div class="lbl">总节点</div><div class="val" id="hcNodes">1,247</div></div>
-        <div class="evo-card"><div class="lbl">能力总值</div><div class="val" id="hcCap">6.0</div></div>
-        <div class="evo-card"><div class="lbl">关系边</div><div class="val" id="hcEdges">4,382</div></div>
-        <div class="evo-card"><div class="lbl">VSA 维度</div><div class="val" id="hcVsa">D=2048</div></div>
+        <div class="evo-card"><div class="lbl">总节点</div><div class="val" id="hcNodes">—</div></div>
+        <div class="evo-card"><div class="lbl">能力总值</div><div class="val" id="hcCap">—</div></div>
+        <div class="evo-card"><div class="lbl">关系边</div><div class="val" id="hcEdges">—</div></div>
+        <div class="evo-card"><div class="lbl">VSA 维度</div><div class="val" id="hcVsa">—</div></div>
       </div>
       <div style="margin-top:12px">
-        <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:6px">最近写入</div>
-        <div class="pipeline-item"><span class="s">E8 Grounding 状态记录</span><span class="st ok">2m ago</span></div>
-        <div class="pipeline-item"><span class="s">CapabilityVector 更新</span><span class="st ok">5m ago</span></div>
-        <div class="pipeline-item"><span class="s">SEAL Epoch 7 摘要</span><span class="st ok">12m ago</span></div>
+        <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:6px">节点类型分布</div>
+        <div id="hcTypeDist" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:6px">能力向量 · VSA</div>
+        <div id="hcVector" style="display:flex;flex-direction:column;gap:4px"></div>
       </div>
     </div>
   </div>

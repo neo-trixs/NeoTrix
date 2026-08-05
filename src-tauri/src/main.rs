@@ -423,6 +423,10 @@ fn main() {
                     commands::desktop_cmds::image_generate,
                     commands::desktop_cmds::switch_app,
                     commands::desktop_cmds::ultra_review,
+                    commands::desktop_cmds::window_minimize,
+                    commands::desktop_cmds::window_maximize,
+                    commands::desktop_cmds::window_close,
+                    commands::desktop_cmds::window_is_maximized,
                     // Computer interactive (screen capture + mouse/keyboard)
                     commands::computer_screen_capture,
                     commands::computer_screen_list,
