@@ -184,15 +184,29 @@ g.kbSearch = kbSearch;
       cs.innerHTML = '';
       document.getElementById('chatInput').value = '';
     },
-    showProjects() {
+    async showProjects() {
       document.getElementById('opTitle').textContent = '项目';
-      document.getElementById('opBody').innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:16px;font-weight:600;margin:0">活跃项目</h3><span style="font-size:11px;color:var(--tx3)">3 个</span></div>
-        <div class="evo-card" onclick="showToast('载入: NeoTrix 核心引擎')" style="cursor:pointer"><span class="lbl">核心引擎</span><span class="val">NeoTrix</span><span style="font-size:10px;color:var(--tx3)">E8 · GWT · HyperCube · 32 文件</span></div>
-        <div class="evo-card" onclick="showToast('载入: 前端界面')" style="cursor:pointer"><span class="lbl">前端</span><span class="val">preview-ui-v2</span><span style="font-size:10px;color:var(--tx3)">React · Glass UI · 3 视图</span></div>
-        <div class="evo-card" onclick="showToast('载入: 沙箱环境')" style="cursor:pointer"><span class="lbl">沙箱</span><span class="val">Sandbox v2</span><span style="font-size:10px;color:var(--tx3)">Docker · 5 运行时</span></div>
-        <button class="cht" style="margin-top:4px" onclick="showToast('创建新项目...')">+ 新建项目</button>
-      </div>`;
+      const body = document.getElementById('opBody');
+      if(!body) return;
+      if(!isTauri()){
+        body.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:16px;font-weight:600;margin:0">活跃项目</h3><span style="font-size:11px;color:var(--tx3)">—</span></div>
+          <div class="kb-empty">浏览器模式：仅 Tauri 下可读取项目</div>
+        </div>`;
+        openOverlay('overlayProjects');
+        return;
+      }
+      try{
+        const projects = await invoke('project_list');
+        const list = Array.isArray(projects) ? projects : [];
+        body.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:16px;font-weight:600;margin:0">活跃项目</h3><span style="font-size:11px;color:var(--tx3)">${list.length} 个</span></div>
+          ${list.length ? list.map(p => `<div class="evo-card" style="cursor:pointer" onclick="showToast('项目: ${escHtml(p.name)}')"><span class="lbl">${escHtml(p.project_type || 'project')}</span><span class="val">${escHtml(p.name)}</span><span style="font-size:10px;color:var(--tx3)">${escHtml(p.path || '')}${p.pinned ? ' · 📌' : ''}</span></div>`).join('') : '<div class="kb-empty">暂无项目</div>'}
+          <button class="cht" style="margin-top:4px" onclick="showToast('创建新项目...')">+ 新建项目</button>
+        </div>`;
+      }catch(_e){
+        body.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;padding:12px"><div class="kb-empty">项目读取失败</div></div>`;
+      }
       openOverlay('overlayProjects');
     },
     showAchievements() {
@@ -608,6 +622,23 @@ g.kbSearch = kbSearch;
   ];
   let agentRunning = false, agentTask = '', agentUp = 0;
 
+  function renderAgentRow(){
+    const al = document.getElementById('cwAgentList');
+    if(!al) return;
+    const dotCls = agentRunning ? 'adot ok' : 'adot';
+    const label = agentRunning ? (agentTask ? `运行中 · ${escHtml(agentTask)}` : '运行中') : '空闲';
+    const up = agentUp > 0 ? ` · ${fmtUptime(agentUp)}` : '';
+    al.innerHTML = `<div class="cw-agent"><span class="${dotCls}"></span>${label}${up}</div>`;
+  }
+
+  function fmtUptime(sec){
+    if(sec < 60) return `${Math.round(sec)}s`;
+    const m = Math.floor(sec/60);
+    if(m < 60) return `${m}m`;
+    const h = Math.floor(m/60);
+    return `${h}h ${m%60}m`;
+  }
+
   function renderCowork(){
     const sl = document.getElementById('cwSessionList');
     if(!sl) return;
@@ -633,23 +664,42 @@ g.kbSearch = kbSearch;
 
     const tl = document.getElementById('cwTaskList');
     if(tl){
-      const tasks = [];
-      for(let i=0;i<s.tasks;i++){
-        const done = i < s.done;
-        const fail = !done && i < s.done + s.fail;
-        tasks.push({ name: `任务 #${i+1}`, done, fail });
+      let tasks = [];
+      if(s.isCowork && s.cw){
+        const c = s.cw;
+        const items = [];
+        if(c.deliverables && c.deliverables.length){
+          c.deliverables.forEach((d, i) => {
+            items.push({ name: d.name || ('交付物 #' + (i+1)), done: i < (c.files_created||0), fail: false, meta: d.kind || '' });
+          });
+        }
+        if(c.files_created || c.files_modified){
+          items.push({ name: '读取 ' + (c.files_read||0) + ' 文件', done: true, fail: false });
+          items.push({ name: '修改 ' + (c.files_modified||0) + ' 文件', done: true, fail: false });
+          items.push({ name: '创建 ' + (c.files_created||0) + ' 文件', done: (c.files_created||0) > 0, fail: false });
+        }
+        if(!items.length) items.push({ name: '无任务', done: false, fail: false });
+        tasks = items;
+      }else{
+        for(let i=0;i<s.tasks;i++){
+          const done = i < s.done;
+          const fail = !done && i < s.done + s.fail;
+          tasks.push({ name: `任务 #${i+1}`, done, fail });
+        }
+        if(!s.tasks) tasks.push({ name: '无任务 · 发送消息开始', done: false, fail: false });
       }
       tl.innerHTML = tasks.map(t => {
         const cls = t.done ? 'done' : (t.fail ? 'fail' : '');
         const label = t.done ? '已完成' : (t.fail ? '失败' : '进行中');
-        return `<div class="cw-task"><span class="dot ${cls}"></span><span class="tname">${escHtml(t.name)}</span><span class="tstat">${label}</span></div>`;
+        const meta = t.meta ? `<span class="tstat">${escHtml(t.meta)}</span>` : `<span class="tstat">${label}</span>`;
+        return `<div class="cw-task"><span class="dot ${cls}"></span><span class="tname">${escHtml(t.name)}</span>${meta}</div>`;
       }).join('');
     }
 
     const al = document.getElementById('cwAgentList');
     if(al) renderAgentRow();
 
-    if(load && s.id){ loadSessionMessages(s.id); }
+    if(load && s.id && !s.isCowork){ loadSessionMessages(s.id); }
     refreshAgent();
   }
 
@@ -820,6 +870,9 @@ g.kbSearch = kbSearch;
   /* ===== Keyboard Shortcuts ===== */
   document.addEventListener('keydown', e => {
     if((e.metaKey || e.ctrlKey) && e.key === ','){ e.preventDefault(); openSettingsModal(); }
+    if((e.metaKey || e.ctrlKey) && e.key === 'n'){ e.preventDefault(); createSession(); }
+    if((e.metaKey || e.ctrlKey) && e.key === 'f'){ e.preventDefault(); openStData(); }
+    if((e.metaKey || e.ctrlKey) && e.key === 'w'){ e.preventDefault(); closeWindow(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'k'){ e.preventDefault();
       const inp = document.querySelector('.st-search input');
       if(inp && document.getElementById('overlaySettings').classList.contains('open')){ inp.focus(); return; }
@@ -832,9 +885,24 @@ g.kbSearch = kbSearch;
       updateTrafficVisibility();
     }
     if(e.key === '?' && !e.target.closest('textarea, input')){
-      showToast('快捷键: ⌘, 设置 · ⌘K 搜索 · Esc 关闭 · ? 帮助');
+      showToast('快捷键: ⌘, 设置 · ⌘N 新建 · ⌘F 知识库 · ⌘W 关闭 · ⌘K 搜索 · Esc 关闭 · ? 帮助');
     }
   });
+
+  /* ⌘F — open Settings → Data control, focus KB search */
+  async function openStData(){
+    const nav = document.querySelector('.st-item[onclick*="selectSetting(this,\'data\')"]');
+    if(nav){ openSettingsModal(); nav.click(); }
+    else{ openSettingsModal(); }
+    setTimeout(() => { const si = document.getElementById('kbSearchInput'); if(si) si.focus(); }, 150);
+  }
+
+  /* ⌘W — close window; browser-mode fallback keeps session alive */
+  async function closeWindow(){
+    if(!isTauri()){ showToast('浏览器模式：⌘W 仅桌面版生效'); return; }
+    try{ await invoke('window_close'); }
+    catch(e){ showToast('关闭窗口失败: ' + e); }
+  }
 
   /* ===== Auto Init ===== */
   // DOM is already loaded at this point (script at end of body)
@@ -862,23 +930,45 @@ g.kbSearch = kbSearch;
   async function loadSessions(){
     if(!isTauri()) return;
     try{
-      const sessions = await invoke('neocodex_list_sessions', { project_path: null });
-      if(!Array.isArray(sessions)) return;
-      backendSessionList = sessions;
-      backendSessionMap.clear();
-      CW_DATA = sessions.map((s, i) => {
-        backendSessionMap.set(i, s.id);
-        const agents = [];
-        if(s.mode) agents.push({ n: s.mode === 'Plan' ? '规划' : 'Agent', on: true });
-        return {
-          name: s.name || ('会话 ' + (i+1)),
-          status: '就绪',
-          tasks: 0, done: 0, fail: 0,
-          agents,
-          id: s.id,
-          message_count: s.message_count || 0,
-        };
-      });
+      const [sessions, cowork] = await Promise.all([
+        invoke('neocodex_list_sessions', { project_path: null }),
+        invoke('cowork_list').catch(() => []),
+      ]);
+      const merged = [];
+      if(Array.isArray(sessions)){
+        merged.push(...sessions.map((s, i) => {
+          backendSessionMap.set(i, s.id);
+          const agents = [];
+          if(s.mode) agents.push({ n: s.mode === 'Plan' ? '规划' : 'Agent', on: true });
+          return {
+            name: s.name || ('会话 ' + (i+1)),
+            status: '就绪',
+            tasks: 0, done: 0, fail: 0,
+            agents,
+            id: s.id,
+            message_count: s.message_count || 0,
+          };
+        }));
+      }
+      if(Array.isArray(cowork) && cowork.length){
+        cowork.forEach((c, i) => {
+          const idx = merged.length + i;
+          backendSessionMap.set(idx, c.id);
+          merged.push({
+            name: c.name || ('协同 ' + (i+1)),
+            status: c.status === 'active' ? '进行中' : (c.status === 'paused' ? '已暂停' : c.status || '就绪'),
+            tasks: (c.deliverables ? c.deliverables.length : 0),
+            done: Math.min((c.deliverables ? c.deliverables.length : 0), c.files_created || 0),
+            fail: 0,
+            agents: [{ n: '协同', on: c.status === 'active' }],
+            id: c.id,
+            isCowork: true,
+            cw: c,
+          });
+        });
+      }
+      if(merged.length) backendSessionList = merged;
+      CW_DATA = merged.length ? merged : CW_DATA;
       renderCowork();
       if(CW_DATA.length) showToast('已加载 ' + CW_DATA.length + ' 个会话');
     }catch(e){ /* keep demo data */ }
@@ -938,7 +1028,17 @@ g.kbSearch = kbSearch;
         agentTask = st.current_task || '';
         agentUp = st.uptime_secs || 0;
       }
-    }catch(e){ agentRunning = false; agentTask = ''; agentUp = 0; }
+      const coord = await invoke('coordinator_list').catch(() => null);
+      if(coord && Array.isArray(coord.workers) && coord.workers.length){
+        const rows = coord.workers.slice(0, 6).map(w => {
+          const ok = w.status === 'running';
+          const pct = Math.max(0, Math.min(100, Math.round((w.progress || 0) * 100)));
+          return `<div class="cw-agent"><span class="adot ${ok ? 'ok' : ''}"></span><span class="cw-aname">${escHtml(w.id)}</span><span class="cw-atask">${escHtml(String(w.task).slice(0, 18))}</span><div class="cw-aprog"><div class="cw-aprog-f" style="width:${pct}%"></div></div><span class="cw-apct">${pct}%</span></div>`;
+        }).join('');
+        al.innerHTML = rows;
+        return;
+      }
+    }catch(e){ /* fall through */ }
     renderAgentRow();
   }
 
@@ -990,10 +1090,33 @@ g.kbSearch = kbSearch;
       if(bs){
         const set = (k, v) => { const p = root.querySelector(k); if(p) p.textContent = String(v); };
         set('.reg-iter', bs.iteration ?? '—');
-        set('.reg-cap', (bs.capability_sum ?? 0).toFixed(1));
+        set('.reg-cap', (bs.capability_sum ?? 0).toFixed(2));
         set('.reg-dim', (bs.dimension_names && bs.dimension_names.length) ? bs.dimension_names.length + ' 维' : '—');
+        if(Array.isArray(bs.capability_vector) && bs.capability_vector.length){
+          const dims = Array.isArray(bs.dimension_names) && bs.dimension_names.length
+            ? bs.dimension_names : bs.capability_vector.map((_, i) => 'dim_' + i);
+          const max = Math.max(...bs.capability_vector) || 1;
+          const bars = bs.capability_vector.slice(0, 12).map((v, i) => {
+            const pct = Math.max(2, Math.round(Math.abs(v) / max * 100));
+            return `<div class="vec-bar"><span class="vec-lbl">${escHtml(String(dims[i] || i))}</span><div class="vec-track"><div class="vec-fill" style="width:${pct}%"></div></div><span class="vec-val">${Number(v).toFixed(2)}</span></div>`;
+          }).join('');
+          const vb = document.getElementById('regVecBars');
+          if(vb) vb.innerHTML = bars;
+        }
       }
     }catch(e){ /* keep static list */ }
+    try{
+      const hr = await invoke('neocodex_health_report');
+      if(hr){
+        const id = (k, v) => { const p = document.getElementById(k); if(p) p.textContent = v; };
+        id('regTurns', (hr.turn_count ?? 0).toLocaleString());
+        id('regTools', (hr.tool_call_count ?? 0).toLocaleString());
+        id('regTokens', (hr.tokens_used ?? 0).toLocaleString());
+        id('regCtx', (Math.round((hr.context_usage ?? 0) * 100)) + '%');
+        id('regEvo', (hr.evolution_iterations ?? 0).toLocaleString());
+        id('regCost', '$' + Number(hr.cost_spent ?? 0).toFixed(2));
+      }
+    }catch(e){}
     try{
       const st = await invoke('neocodex_agent_status');
       const eng = root.querySelector('.reg-eng');
@@ -1004,15 +1127,41 @@ g.kbSearch = kbSearch;
   async function loadHypercube(){
     if(!isTauri()) return;
     try{
-      const bs = await invoke('brain_stats');
-      if(!bs) return;
+      const [ks, bs] = await Promise.all([
+        invoke('get_knowledge_stats').catch(() => null),
+        invoke('brain_stats').catch(() => null),
+      ]);
       const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = String(v); };
-      set('hcNodes', (bs.memory_count || 0).toLocaleString());
-      set('hcEdges', Math.round((bs.capability_sum || 0)).toLocaleString());
-      set('hcVsa', (bs.dimension_names && bs.dimension_names.length) ? 'D=' + bs.dimension_names.length : 'D=2048');
-      set('hcCap', (bs.capability_sum || 0).toFixed(1));
-      set('kbNodeCount', (bs.memory_count || 0).toLocaleString() + ' 节点');
-    }catch(e){ /* keep demo numbers */ }
+      if(ks && ks.total_nodes != null){
+        set('hcNodes', Number(ks.total_nodes).toLocaleString());
+        set('hcEdges', Number(ks.total_edges).toLocaleString());
+        if(ks.by_type && Array.isArray(ks.by_type) && ks.by_type.length){
+          const total = ks.by_type.reduce((a, t) => a + (Array.isArray(t) ? Number(t[1]) : Number(t.count)), 0) || 1;
+          const list = ks.by_type.map(t => {
+            const name = Array.isArray(t) ? t[0] : (t.node_type || t.name || 'other');
+            const count = Number(Array.isArray(t) ? t[1] : (t.count || t.total || 0));
+            const pct = Math.max(2, Math.round(count / total * 100));
+            return `<div class="vec-bar"><span class="vec-lbl">${escHtml(name)}</span><div class="vec-track"><div class="vec-fill" style="width:${Math.min(100, pct)}%"></div></div><span class="vec-val">${count.toLocaleString()}</span></div>`;
+          }).join('');
+          document.getElementById('hcTypeDist').innerHTML = list;
+        }
+      }
+      if(bs){
+        set('hcVsa', (bs.dimension_names && bs.dimension_names.length) ? 'D=' + bs.dimension_names.length : '—');
+        set('hcCap', (bs.capability_sum != null) ? Number(bs.capability_sum).toFixed(2) : '—');
+        set('kbNodeCount', (bs.memory_count || 0).toLocaleString() + ' 节点');
+        if(Array.isArray(bs.capability_vector) && bs.capability_vector.length){
+          const dims = Array.isArray(bs.dimension_names) && bs.dimension_names.length
+            ? bs.dimension_names : bs.capability_vector.map((_, i) => 'dim_' + i);
+          const max = Math.max(...bs.capability_vector) || 1;
+          const bars = bs.capability_vector.slice(0, 12).map((v, i) => {
+            const pct = Math.max(2, Math.round(Math.abs(v) / max * 100));
+            return `<div class="vec-bar"><span class="vec-lbl">${escHtml(String(dims[i] || i))}</span><div class="vec-track"><div class="vec-fill" style="width:${pct}%"></div></div><span class="vec-val">${Number(v).toFixed(2)}</span></div>`;
+          }).join('');
+          document.getElementById('hcVector').innerHTML = bars;
+        }
+      }
+    }catch(e){ /* keep em-dash placeholders */ }
   }
 
   async function kbSearch(){
@@ -1524,9 +1673,7 @@ g.kbSearch = kbSearch;
   });
 
   function updateTrafficVisibility(){
-    const open = document.querySelector('.overlay-panel.open');
-    document.querySelector('.traffic').style.opacity = open ? '0' : '1';
-    document.querySelector('.traffic').style.pointerEvents = open ? 'none' : 'auto';
+    /* Native traffic lights are OS-controlled; no-op kept for callers. */
   }
 
   function openOverlay(id){
@@ -1740,10 +1887,10 @@ g.kbSearch = kbSearch;
   async function renderStData(){
     if(!isTauri()) return;
     try{
-      const h = await invoke('neocodex_health_report');
-      if(h && h.memory_count){
+      const ks = await invoke('get_knowledge_stats');
+      if(ks && ks.total_nodes != null){
         const el = document.getElementById('kbNodeCount');
-        if(el) el.textContent = h.memory_count.toLocaleString() + ' 节点';
+        if(el) el.textContent = Number(ks.total_nodes).toLocaleString() + ' 节点';
       }
     }catch(e){ console.error('renderStData failed:', e); }
   }
@@ -1809,9 +1956,15 @@ g.kbSearch = kbSearch;
     if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); return; }
     autoResize(inp);
   }
-  function escHtml(str){
+function escHtml(str){
     if(!str)return'';
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(str).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"');
   }
+
+  /* ── Window controls: native macOS traffic lights (Overlay titlebar) handle
+     close/minimize/maximize. Tauri overlay only needs the drag region. ── */
+
+  // expose for inline onclick
+  g.toggleSidebar = toggleSidebar;
 
 

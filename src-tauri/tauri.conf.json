@@ -4,13 +4,14 @@
   "version": "0.18.0",
   "identifier": "ai.neotrix.desktop",
   "build": {
+    "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "cd frontend && npm ci && npm run build",
     "frontendDist": "./frontend/dist",
     "devUrl": "http://localhost:1420"
   },
   "app": {
     "windows": [
-      {
+{
         "title": "NeoTrix Desktop V2",
         "width": 1200,
         "height": 800,
@@ -18,6 +19,8 @@
         "minHeight": 600,
         "resizable": true,
         "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
         "center": true,
         "visible": true
       }
