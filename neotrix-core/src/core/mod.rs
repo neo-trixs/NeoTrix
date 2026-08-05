@@ -178,8 +178,6 @@ pub use l7_capability::{
     // 调度 (thater stub archived — use real nt_core_scheduler)
     // 协议
     StarPulse, PulseKind, PulseBus,
-    // 大过滤器
-    GreatFilterGate, GateResult, GateCheck, BudgetState,
     // 成熟度
     MaturityEngine, MaturityFeedback, EvolveResult,
     // 观察者

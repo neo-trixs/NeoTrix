@@ -6,12 +6,12 @@
 //! ## 规则
 //! - L7 是层间通信的唯一路由层
 //! - 每个能力必须通过 L7 注册后才能被系统发现
-//! - 调度必经 4 道大过滤器：权限 → 预算 → 熔断 → 谦逊
+//! - 调度门控：预算由 L1 rate_limiter 承载，谦逊/幻觉由 nt_core_gate 护栏承载，
+//!   成熟度由 Constellation 承载（原 GreatFilterGate 已归档，输入指标无生产源）
 //! - L7 不执行能力，只调度
 
 pub mod registry;
 pub mod protocol;
-pub mod gate;
 pub mod mature;
 pub mod observer;
 pub mod skill_acquire;
@@ -26,7 +26,6 @@ pub mod nt_core_orch_agent;
 
 pub use registry::*;
 pub use protocol::*;
-pub use gate::*;
 pub use mature::*;
 pub use observer::*;
 pub use skill_acquire::{
