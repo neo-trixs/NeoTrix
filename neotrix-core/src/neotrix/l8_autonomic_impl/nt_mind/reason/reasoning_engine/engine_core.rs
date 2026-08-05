@@ -863,21 +863,26 @@ impl ReasoningEngine {
                 let mut multi_input = MultimodalInput::text(task);
                 let mut vision_source: Option<std::path::PathBuf> = None;
                 if let Some(vid) = referenced_video_path(task) {
-                    if let Some(frame) = sample_video_frame(&vid) {
-                        if let Ok((_ev, feat)) = crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze(&frame) {
-                            multi_input = multi_input.with_image(feat);
-                            root_span.set_attribute(
-                                "vision_bridge_video",
-                                AttributeValue::String(vid.display().to_string()),
-                            );
-                            vision_source = Some(vid);
-                        }
+                    let frames = sample_video_frames(&vid, 6);
+                    if let Some((feat, summary)) = aggregate_video_features(&frames) {
+                        multi_input = multi_input.with_image(feat);
+                        root_span.set_attribute(
+                            "vision_bridge_video",
+                            AttributeValue::String(vid.display().to_string()),
+                        );
+                        root_span.set_attribute("vision_bridge_video_frames", AttributeValue::Int(summary.frames as i64));
+                        root_span.set_attribute("vision_bridge_video_key_frames", AttributeValue::Int(summary.key_frames as i64));
+                        root_span.set_attribute(
+                            "vision_bridge_video_classifications",
+                            AttributeValue::String(summary.classifications),
+                        );
+                        vision_source = Some(vid);
                     }
                 }
                 if vision_source.is_none() {
                     if let Some(path) = referenced_image_path(task) {
                         if let Ok(bytes) = std::fs::read(&path) {
-                            if let Ok((_evidence, feat)) = crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze(&bytes) {
+                            if let Ok((_evidence, feat)) = crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(&bytes) {
                                 multi_input = multi_input.with_image(feat);
                                 root_span.set_attribute(
                                     "vision_bridge_image",
@@ -1555,32 +1560,195 @@ fn referenced_video_path(task: &str) -> Option<std::path::PathBuf> {
     None
 }
 
-/// Sample a representative frame from a video via the ffmpeg subprocess
-/// (research finding: 1 FPS / scene-detection sampling beats uniform reads;
-/// for a single-frame bridge probe we grab the first keyframe). Returns the
-/// frame bytes (PNG) when ffmpeg is available and extraction succeeds.
-fn sample_video_frame(path: &std::path::Path) -> Option<Vec<u8>> {
-    let out = std::env::temp_dir().join(format!("nt_frame_{}.png", std::process::id()));
-    let _ = std::fs::remove_file(&out);
-    let status = std::process::Command::new("ffmpeg")
+/// Sample representative frames from a video via the ffmpeg subprocess.
+///
+/// Research findings (absorption_video.md): the *first keyframe* is often a
+/// black/logo intro frame — sampling it alone is misleading. Scene-aware
+/// sampling (scdet) picks one frame per visual scene; if scene detection finds
+/// too few cuts (static/slideshow video) we fall back to uniform 1 FPS.
+///
+/// Returns PNG frame bytes, bounded to `max_frames` (default 6).
+fn sample_video_frames(path: &std::path::Path, max_frames: usize) -> Vec<Vec<u8>> {
+    let max_frames = max_frames.clamp(1, 50);
+    let tmp = std::env::temp_dir();
+    let base = format!("nt_frame_{}_{}", std::process::id(), std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+
+    // Pass 1: probe duration (ffprobe) for the uniform-fallback FPS.
+    let duration: Option<f64> = std::process::Command::new("ffprobe")
+        .args([
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path.to_str().unwrap_or(""),
+        ])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.trim().parse::<f64>().ok());
+
+    // Pass 2: scene-detected frames (select='gt(scene,T)' with T=0.3 default).
+    let scene_out = tmp.join(format!("{}_s_%03d.png", base));
+    let _ = std::process::Command::new("ffmpeg")
         .args([
             "-y",
             "-v",
             "error",
             "-i",
-            path.to_str()?,
+            path.to_str().unwrap_or(""),
+            "-vf",
+            "select='gt(scene,0.3)',scale=768:-2",
             "-frames:v",
-            "1",
-            out.to_str()?,
+            &max_frames.to_string(),
+            scene_out.to_str().unwrap_or(""),
         ])
-        .output()
-        .ok()?;
-    if !status.status.success() {
+        .output();
+
+    let mut frames: Vec<Vec<u8>> = collect_frame_pattern(&scene_out);
+
+    // Fallback: too few scene cuts (static video) → uniform 1 FPS sampling.
+    if frames.len() < 2 {
+        if let Some(dur) = duration {
+            if dur > 0.5 {
+                let fps = (max_frames as f64 / dur).clamp(0.1, 30.0);
+                let uni_out = tmp.join(format!("{}_u_%03d.png", base));
+                let _ = std::process::Command::new("ffmpeg")
+                    .args([
+                        "-y",
+                        "-v",
+                        "error",
+                        "-i",
+                        path.to_str().unwrap_or(""),
+                        "-vf",
+                        &format!("fps={:.3},scale=768:-2", fps),
+                        "-frames:v",
+                        &max_frames.to_string(),
+                        uni_out.to_str().unwrap_or(""),
+                    ])
+                    .output();
+                frames = collect_frame_pattern(&uni_out);
+            }
+        }
+    }
+
+    // Cleanup all temp artifacts (scene + uniform patterns).
+    if let Some(parent) = scene_out.parent() {
+        if let Ok(entries) = std::fs::read_dir(parent) {
+            for e in entries.flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                if name.starts_with(&base) && name.ends_with(".png") {
+                    let _ = std::fs::remove_file(e.path());
+                }
+            }
+        }
+    }
+    frames
+}
+
+/// Collect and sort PNG frame files matching the given ffmpeg output pattern.
+fn collect_frame_pattern(pattern: &std::path::Path) -> Vec<Vec<u8>> {
+    let parent = match pattern.parent() {
+        Some(p) => p.to_path_buf(),
+        None => return Vec::new(),
+    };
+    let stem = pattern
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&parent) {
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name.starts_with(&stem) && name.ends_with(".png") {
+                files.push(e.path());
+            }
+        }
+    }
+    files.sort();
+    files
+        .into_iter()
+        .filter_map(|p| std::fs::read(&p).ok())
+        .collect()
+}
+
+/// Compatibility shim: single representative frame (first scene frame, or the
+/// uniform fallback's first frame) as PNG bytes.
+fn sample_video_frame(path: &std::path::Path) -> Option<Vec<u8>> {
+    let frames = sample_video_frames(path, 6);
+    frames.into_iter().next()
+}
+
+/// Aggregated multi-frame video features (research: absorption_video.md).
+///
+/// Decodes each sampled frame via the VisionBridge, drops Blank/near-duplicate
+/// frames (phash distance ≤ 10) so logo/black intro frames don't dominate the
+/// signature, then mean-pools the surviving 64-dim feature vectors and
+/// re-normalizes into the unified latent space. Classification counts let the
+/// reasoner see *how* the video looks (scenes vs document-like vs photo).
+struct VideoFeatureSummary {
+    frames: usize,
+    key_frames: usize,
+    classifications: String,
+}
+
+fn aggregate_video_features(frames: &[Vec<u8>]) -> Option<(Vec<f64>, VideoFeatureSummary)> {
+    use crate::core::nt_core_e8::nt_multimodal::{ImageClass, VisionBridge};
+    const PHASH_DUP_THRESHOLD: u32 = 10;
+
+    let mut pooled: Vec<f64> = Vec::new();
+    let mut kept: Vec<u64> = Vec::new();
+    let mut class_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut key_frames = 0usize;
+
+    for bytes in frames {
+        let (ev, feat) = VisionBridge::analyze_cached(bytes).ok()?;
+        if ev.classification == ImageClass::Blank {
+            continue; // black-screen/logo intro frames add no visual signal.
+        }
+        let is_dup = kept
+            .iter()
+            .any(|&h| VisionBridge::phash_distance(h, ev.phash) <= PHASH_DUP_THRESHOLD);
+        if is_dup {
+            continue;
+        }
+        kept.push(ev.phash);
+        key_frames += 1;
+        *class_counts.entry(ev.classification.as_str().to_string()).or_insert(0) += 1;
+        if pooled.is_empty() {
+            pooled = feat;
+        } else {
+            for (p, f) in pooled.iter_mut().zip(feat.iter()) {
+                *p += f;
+            }
+        }
+    }
+
+    if key_frames == 0 {
         return None;
     }
-    let bytes = std::fs::read(&out).ok();
-    let _ = std::fs::remove_file(&out);
-    bytes
+    let norm: f64 = pooled.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if norm > 1e-12 {
+        for p in pooled.iter_mut() {
+            *p /= norm;
+        }
+    }
+    let classifications = if class_counts.is_empty() {
+        "none".to_string()
+    } else {
+        class_counts
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    Some((
+        pooled,
+        VideoFeatureSummary {
+            frames: frames.len(),
+            key_frames,
+            classifications,
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -1714,6 +1882,48 @@ mod tests {
                 assert!(!bytes.is_empty());
             }
         }
+    }
+
+    #[test]
+    fn test_aggregate_video_features_dedups_blank_and_near_dup() {
+        use crate::core::nt_core_e8::nt_multimodal::VisionBridge;
+        // Two distinct synthetic frames: a white-with-black-text "document"
+        // pattern and a solid black frame (blank → dropped).
+        fn doc_frame() -> Vec<u8> {
+            let mut img = image::RgbImage::new(64, 64);
+            for (px, py, p) in img.enumerate_pixels_mut() {
+                let band = px / 8;
+                let stripe = (band % 2) == 0;
+                *p = if stripe { image::Rgb([20, 20, 20]) } else { image::Rgb([240, 240, 240]) };
+            }
+            let mut buf = std::io::Cursor::new(Vec::new());
+            image::DynamicImage::ImageRgb8(img)
+                .write_to(&mut buf, image::ImageFormat::Png)
+                .expect("encode");
+            buf.into_inner()
+        }
+        fn blank_frame() -> Vec<u8> {
+            let mut buf = std::io::Cursor::new(Vec::new());
+            image::DynamicImage::ImageRgb8(image::RgbImage::new(64, 64))
+                .write_to(&mut buf, image::ImageFormat::Png)
+                .expect("encode");
+            buf.into_inner()
+        }
+        // dup of doc_frame (phash distance ~0)
+        let mut dup = doc_frame();
+        dup.push(0); // trailing bytes still decode; same pixels.
+
+        let frames = vec![doc_frame(), blank_frame(), dup];
+        let (feat, summary) = aggregate_video_features(&frames).expect("aggregate");
+        assert_eq!(summary.frames, 3, "all sampled frames counted");
+        assert_eq!(summary.key_frames, 1, "blank + dup dropped, one kept");
+        assert!(!summary.classifications.contains("blank"), "got {}", summary.classifications);
+        assert_eq!(feat.len(), crate::core::nt_core_e8::nt_multimodal::IMAGE_FEATURE_DIM);
+        let norm: f64 = feat.iter().map(|x| x * x).sum();
+        assert!((norm - 1.0).abs() < 1e-6, "pooled feature normalized");
+        // Blank-only input aggregates to None.
+        assert!(aggregate_video_features(&[blank_frame()]).is_none());
+        let _ = VisionBridge::phash_distance(0, 0);
     }
 
     #[test]

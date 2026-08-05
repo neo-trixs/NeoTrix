@@ -36,7 +36,7 @@ pub use nt_latent_reasoning::{
     LATENT_MEMORY_SIZE, TOP_K_NEIGHBORS,
 };
 pub use nt_multimodal::{
-    MultimodalEncoder, MultimodalInput, TEXT_EMBED_DIM, VisionBridge, ImageEvidence,
+    MultimodalEncoder, MultimodalInput, TEXT_EMBED_DIM, VisionBridge, ImageEvidence, ImageClass,
     model_supports_vision,
 };
 

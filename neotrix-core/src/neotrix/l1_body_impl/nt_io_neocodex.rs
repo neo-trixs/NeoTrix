@@ -1948,7 +1948,7 @@ impl NeoCodexAgent {
             if let Some(b64) = image_data.take() {
                 if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
                     if let Ok((evidence, _feat)) =
-                        crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze(&bytes)
+                        crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(&bytes)
                     {
                         if let Some(last_user) = messages
                             .iter_mut()

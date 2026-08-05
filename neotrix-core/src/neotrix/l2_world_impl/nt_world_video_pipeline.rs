@@ -133,12 +133,13 @@ impl VideoPipeline {
 
 /// Convenience: open a video file and run the pipeline.
 ///
-/// # Notes
-/// - Actual pixel decoding requires `ffmpeg` or a Rust video crate.
-/// - This stub attempts to read file metadata and returns a simulated
-///   summary when frame-level decoding is unavailable.
-/// - The returned summary should not be used for analytical purposes;
-///   integrate with a real decoder for production use.
+/// Real decoder path: shells out to `ffmpeg` for scene-aware frame extraction
+/// (research absorption_video.md — first keyframe is often a black/logo intro,
+/// so `select='gt(scene,0.3)'` picks one frame per visual scene, falling back
+/// to uniform 1 FPS for static videos). Each extracted frame is decoded via
+/// the `image` crate into the 16×16 grayscale descriptor the dedup comparator
+/// expects. When ffmpeg is unavailable or extraction fails, falls back to the
+/// previous file-size heuristic so the summary never hard-errors.
 pub fn process_video(path: &str) -> Result<VideoSummary, String> {
     let p = Path::new(path);
     if !p.exists() {
@@ -146,26 +147,162 @@ pub fn process_video(path: &str) -> Result<VideoSummary, String> {
     }
     let meta = fs::metadata(p).map_err(|e| format!("cannot read metadata: {}", e))?;
 
-    // Heuristic: treat a non-empty file as having at least one frame.
-    let file_size = meta.len();
-    let estimated_frames = (file_size / 50_000).max(1);
-    let estimated_duration = estimated_frames as f64 / 30.0; // assume 30 fps
+    // Probe duration via ffprobe (for the uniform-fallback FPS).
+    let duration: Option<f64> = std::process::Command::new("ffprobe")
+        .args([
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path,
+        ])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|s| s.trim().parse::<f64>().ok());
 
-    // Build a one-frame pipeline for illustration.
-    let frame = VideoFrame {
-        timestamp: 0.0,
-        data_hash: file_size,
-        grayscale_16x16: [[0u8; 16]; 16],
-    };
+    // Scene-aware extraction: one frame per visual scene (threshold 0.3),
+    // bounded to a sane budget. Fallback to uniform 1 FPS when static.
+    let tmp = std::env::temp_dir().join(format!(
+        "nt_vp_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    let pattern = tmp.join("f_%03d.png");
+    let vpath = Path::new(path);
+    let mut frames = extract_scene_frames(vpath, &pattern, 50);
+    if frames.len() < 2 {
+        if let Some(dur) = duration {
+            if dur > 0.5 {
+                let fps = (50.0 / dur).clamp(0.1, 30.0);
+                frames = extract_uniform_frames(vpath, &pattern, &format!("{:.3}", fps), 50);
+            }
+        }
+    }
+
+    // Build VideoFrames from decoded pixels: 16×16 grayscale descriptor + phash.
     let mut pipeline = VideoPipeline::new();
-    pipeline.push_frame(frame);
-    pipeline.dedup_frames();
+    for (i, bytes) in frames.iter().enumerate() {
+        let mut frame = VideoFrame {
+            timestamp: i as f64,
+            data_hash: 0,
+            grayscale_16x16: [[0u8; 16]; 16],
+        };
+        if let Ok(img) = image::load_from_memory(bytes) {
+            let rgb = img.to_rgb8();
+            let (w, h) = (rgb.width().max(1), rgb.height().max(1));
+            let mut hash: u64 = 0;
+            let mut bit = 0u64;
+            for gy in 0..16usize {
+                for gx in 0..15usize {
+                    let x0 = (gx as u32 * w) / 16;
+                    let x1 = (((gx + 1) as u32 * w) / 16).min(w);
+                    let y0 = (gy as u32 * h) / 16;
+                    let y1 = (((gy + 1) as u32 * h) / 16).min(h);
+                    let a = cell_lum(&rgb, x0, x1, y0, y1);
+                    let x1b = (((gx + 2) as u32 * w) / 16).min(w);
+                    let b = cell_lum(&rgb, x1, x1b.max(x1 + 1), y0, y1);
+                    frame.grayscale_16x16[gy][gx] = (a * 255.0) as u8;
+                    if a >= b {
+                        hash |= 1u64 << bit;
+                    }
+                    bit += 1;
+                }
+            }
+            frame.data_hash = hash;
+        }
+        pipeline.push_frame(frame);
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
 
-    Ok(VideoSummary {
-        frame_count: estimated_frames,
-        key_frame_count: pipeline.key_frames.len() as u64,
-        duration_secs: estimated_duration,
-    })
+    if pipeline.frames.is_empty() {
+        // Fallback: heuristic summary (decoder unavailable).
+        let file_size = meta.len();
+        let estimated_frames = (file_size / 50_000).max(1);
+        let estimated_duration = estimated_frames as f64 / 30.0;
+        let frame = VideoFrame {
+            timestamp: 0.0,
+            data_hash: file_size,
+            grayscale_16x16: [[0u8; 16]; 16],
+        };
+        let mut p2 = VideoPipeline::new();
+        p2.push_frame(frame);
+        p2.dedup_frames();
+        return Ok(VideoSummary {
+            frame_count: estimated_frames,
+            key_frame_count: p2.key_frames.len() as u64,
+            duration_secs: duration.unwrap_or(estimated_duration),
+        });
+    }
+
+    Ok(pipeline.process())
+}
+
+/// Extract up to `max` scene-detected frames via ffmpeg, returning PNG bytes.
+fn extract_scene_frames(path: &Path, pattern: &Path, max: usize) -> Vec<Vec<u8>> {
+    let _ = std::process::Command::new("ffmpeg")
+        .args([
+            "-y", "-v", "error",
+            "-i", path.to_str().unwrap_or(""),
+            "-vf", "select='gt(scene,0.3)',scale=768:-2",
+            "-frames:v", &max.to_string(),
+            pattern.to_str().unwrap_or(""),
+        ])
+        .output();
+    collect_pattern(pattern)
+}
+
+/// Extract up to `max` uniform frames at the given FPS via ffmpeg.
+fn extract_uniform_frames(path: &Path, pattern: &Path, fps: &str, max: usize) -> Vec<Vec<u8>> {
+    let _ = std::process::Command::new("ffmpeg")
+        .args([
+            "-y", "-v", "error",
+            "-i", path.to_str().unwrap_or(""),
+            "-vf", &format!("fps={},scale=768:-2", fps),
+            "-frames:v", &max.to_string(),
+            pattern.to_str().unwrap_or(""),
+        ])
+        .output();
+    collect_pattern(pattern)
+}
+
+/// Collect and sort PNG frame bytes matching the ffmpeg output pattern.
+fn collect_pattern(pattern: &Path) -> Vec<Vec<u8>> {
+    let parent = match pattern.parent() {
+        Some(p) => p.to_path_buf(),
+        None => return Vec::new(),
+    };
+    let stem = pattern.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&parent) {
+        for e in entries.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name.starts_with(&stem) && name.ends_with(".png") {
+                files.push(e.path());
+            }
+        }
+    }
+    files.sort();
+    files.into_iter().filter_map(|f| fs::read(&f).ok()).collect()
+}
+
+/// Mean luminance of a pixel block in 0..1.
+fn cell_lum(rgb: &image::RgbImage, x0: u32, x1: u32, y0: u32, y1: u32) -> f64 {
+    let (mut sum, mut n) = (0.0f64, 0.0f64);
+    let mut py = y0;
+    while py < y1 {
+        let mut px = x0;
+        while px < x1 {
+            let p = rgb.get_pixel(px.min(rgb.width() - 1), py.min(rgb.height() - 1));
+            sum += 0.2126 * p[0] as f64 / 255.0 + 0.7152 * p[1] as f64 / 255.0 + 0.0722 * p[2] as f64 / 255.0;
+            n += 1.0;
+            px += 1;
+        }
+        py += 1;
+    }
+    if n > 0.0 { sum / n } else { 0.0 }
 }
 
 /// Build a pipeline from a pre-collected vector of frames,

@@ -275,14 +275,19 @@
         "image_feature_extraction",
         "structured_image_evidence",
         "video_frame_sampling",
-        "vision_capability_detection"
+        "video_scene_aware_multi_frame",
+        "vision_capability_detection",
+        "image_classification_routing",
+        "content_addressed_evidence_cache",
+        "perceptual_hash_dedup"
       ],
       "requires": [],
       "rune_sockets": [],
       "dependents": [
         "nt_mind.reasoning_engine.multimodal_phase",
         "nt_io_provider::gateway::describe_image",
-        "nt_io_neocodex::build_request"
+        "nt_io_neocodex::build_request",
+        "nt_world_video_pipeline::process_video"
       ],
       "evolution_log": [
         {
@@ -292,11 +297,19 @@
           "to_node": "nt_core_e8::nt_multimodal::VisionBridge",
           "note": "vision bridge: fills missing upstream image-feature extraction for MultimodalEncoder; model_supports_vision detection; evidence text contract for text-only models",
           "timestamp": "2026-08-05T11:30:45.198559+00:00"
+        },
+        {
+          "cycle": "cycle-168",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_core_e8::nt_multimodal::VisionBridge",
+          "note": "classification-first routing (ImageClass: document/screenshot/photo/blank/unknown) + content-addressed sha256 evidence cache (bounded 128) + 64-bit dHash phash dedup; video phase upgraded to scene-aware multi-frame aggregation (blank/near-dup frame dropping); nt_world_video_pipeline::process_video replaced heuristic stub with real ffmpeg scene-aware extraction; fixed phash bit-overflow panic + variance/contrast math bug",
+          "timestamp": "2026-08-05T12:30:00.000000+00:00"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-05T11:30:45.198559+00:00",
-      "updated_at": "2026-08-05T11:30:45.198559+00:00",
+      "updated_at": "2026-08-05T12:30:00.000000+00:00",
       "deprecated": false,
       "deprecated_reason": null
     }
@@ -320,6 +333,10 @@
     ],
     [
       "nt_io_provider::gateway::describe_image",
+      "nt_core_e8::nt_multimodal::VisionBridge"
+    ],
+    [
+      "nt_world_video_pipeline::process_video",
       "nt_core_e8::nt_multimodal::VisionBridge"
     ]
   ]
