@@ -245,6 +245,7 @@
     overflow:hidden; position:relative;
     animation:none;
   }
+  html.reduce-trans * { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; background-color:var(--bg-raised) !important; }
   .ab { flex:1; display:flex; min-height:0; position:relative; }
 
   /* ===== SIDEBAR — Liquid Glass ===== */
@@ -700,10 +701,21 @@
   .vc-send:hover { background:var(--pri); border-color:var(--pri); color:#fff; }
   .vc-send:disabled { opacity:0.3; cursor:default; }
   .vc-send svg { width:16px; height:16px; stroke-width:1.6; }
+  .vc-stop {
+    background:var(--bg-raised); border:1px solid var(--bd);
+    width:36px; height:36px; color:var(--des, #d46b6b);
+  }
+  .vc-stop:hover { background:var(--des, #d46b6b); border-color:var(--des, #d46b6b); color:#fff; }
+  .vc-stop svg { width:14px; height:14px; stroke-width:0; }
   .qa { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
   .qa-btn { display:flex; align-items:center; gap:5px; padding:6px 14px; border-radius:20px; font-size:var(--fs-small); font-weight:var(--fw-medium); background:transparent; border:1px solid var(--bd); cursor:pointer; color:var(--tx3); transition:var(--tr); font-family:var(--ff); }
   .qa-btn:hover { background:var(--ghost); border-color:var(--tx3); color:var(--tx); }
   .qa-btn svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+
+  .reduce-trans *, .reduce-trans *::before, .reduce-trans *::after {
+    backdrop-filter: none !important;
+    transition: none !important;
+  }
 
   /* Chat messages — flat */
   .cs { flex:1; overflow-y:auto; padding:16px 24px; display:none; flex-direction:column; gap:14px; width:100%; max-width:720px; }
@@ -714,6 +726,16 @@
   .msg-h { display:flex; align-items:baseline; gap:8px; font-size:var(--fs-caption); color:var(--tx-meta); padding:0 2px; }
   .msg-h .name { font-weight:var(--fw-semibold); color:var(--tx2); font-size:var(--fs-small); }
   .msg-h .time { opacity:0.5; }
+  .msg-act { display:flex; gap:4px; opacity:0; transition:var(--tr); padding:2px 0; }
+  .msg:hover .msg-act { opacity:1; }
+  .ma-btn {
+    border:1px solid var(--bd); background:var(--bg-raised); color:var(--tx3);
+    border-radius:6px; font-size:10px; padding:2px 8px; cursor:pointer;
+    font-family:var(--ff); line-height:1.5; transition:var(--tr);
+  }
+  .ma-btn:hover { color:var(--pri); border-color:var(--pri); }
+  .msg.r { align-items:flex-end; }
+  .msg.r .msg-act { flex-direction:row-reverse; }
   .mb { padding:10px 16px; border-radius:var(--r-lg); font-size:var(--fs-body); font-weight:var(--fw-regular); line-height:var(--lh-loose); position:relative; }
   .msg.r .mb { background:linear-gradient(135deg,var(--pri),var(--pri2)); color:#fff; border-top-right-radius:6px; }
   .msg.l .mb { background:var(--glass-L1-bg); backdrop-filter:var(--glass-L1-blur); -webkit-backdrop-filter:var(--glass-L1-blur); border:1px solid var(--bd); border-top-left-radius:6px; width:100%; }
@@ -1452,6 +1474,11 @@
 /* ═══════ Diff 行内评论 ═══════ */
 .diff-body { overflow-y: auto; max-height: 64vh; display: flex; flex-direction: column; gap: 14px; }
 .df-file { display: flex; flex-direction: column; gap: 4px; }
+.diff-sample-hint {
+  padding: 8px 10px; border-radius: 8px; font-size: var(--fs-caption, 11px);
+  color: var(--tx3); background: var(--ghost, rgba(0,0,0,0.04));
+  border: 1px dashed var(--bd, rgba(0,0,0,0.12));
+}
 .df-path {
   display: flex; align-items: center; gap: 6px; font-family: var(--fm, ui-monospace);
   font-size: 11.5px; color: var(--tx2); padding: 8px 10px;

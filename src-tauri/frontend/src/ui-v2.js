@@ -23,6 +23,7 @@ g.refreshPreview = refreshPreview;
 g.selectCwSession = selectCwSession;
 g.selectSetting = selectSetting;
 g.sendMsg = sendMsg;
+g.filterSettings = filterSettings;
 g.setPreviewMode = setPreviewMode;
 g.showFilePreviewFromChat = showFilePreviewFromChat;
 g.showFilePreview = showFilePreview;
@@ -36,11 +37,16 @@ g.toggleUserPopover = toggleUserPopover;
 g.copyMsgCode = copyMsgCode;
 g.renderRichText = renderRichText;
 g.escHtml = escHtml;
+g.editMessage = editMessage;
+g.deleteMessage = deleteMessage;
+g.retryMessage = retryMessage;
+g.renderThread = renderThread;
 g.createSession = createSession;
 g.refreshAgent = refreshAgent;
 g.runAgent = runAgent;
 g.runMsgCode = runMsgCode;
 g.stopAgent = stopAgent;
+g.stopStream = stopStream;
 g.loadHypercube = loadHypercube;
 g.loadSessions = loadSessions;
 g.loadWsStatus = loadWsStatus;
@@ -179,6 +185,21 @@ g.cwFilter = cwFilter;
   let currentNav = { chat: 0, cowork: 0 };
   let isChatMode = false;
   let currentView = 'chat';
+  let currentSessionId = null;
+
+  const SETTINGS_KEY = 'neotrix.settings';
+  function loadSettings(){
+    try{
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }catch(_e){ return {}; }
+  }
+  function saveSetting(key, value){
+    const s = loadSettings();
+    s[key] = value;
+    try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }catch(_e){}
+    return s;
+  }
 
   /* ===== Action Dispatch ===== */
   const actions = {
@@ -303,24 +324,11 @@ g.cwFilter = cwFilter;
         }
       }
       await invoke('neocodex_switch_session', { session_id: id });
+      currentSessionId = id;
       const msgs = await invoke('neocodex_get_session_messages', { session_id: id });
       if(!Array.isArray(msgs)) return;
       switchView(document.querySelector('.segb[data-view="chat"]'), 'chat');
-      document.getElementById('heroSection').style.display = 'none';
-      const cs = document.getElementById('chatScroll');
-      cs.style.display = 'flex';
-      cs.innerHTML = '';
-      msgs.forEach(m => {
-        const u = document.createElement('div');
-        u.className = 'msg r';
-        u.innerHTML = `<div class="mb">${escHtml(m.content)}</div>`;
-        cs.appendChild(u);
-        const a = document.createElement('div');
-        a.className = 'msg l';
-        const t = new Date((m.timestamp || Date.now()/1000) * 1000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-        a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">${t}</span></div><div class="mb">${renderRichText(m.content)}</div>`;
-        cs.appendChild(a);
-      });
+      renderThread(msgs);
       showToast('已打开会话: ' + title);
     }catch(e){ showToast('打开会话失败: ' + e); }
   }
@@ -344,7 +352,6 @@ g.cwFilter = cwFilter;
     const map={chat:'viewChat',cowork:'viewCowork'};
     const t=document.getElementById(map[view]);
     if(t)t.style.display='flex';
-    currentNav[view]=0;
     renderSidebar(view);
     syncWsTitle(view);
     if(view==='chat'){ renderHeroSuggest(); }
@@ -443,6 +450,7 @@ g.cwFilter = cwFilter;
     const body = document.getElementById('fpBody');
     body.classList.add('open');
     ap._currentName = node.name;
+    ap._currentLoad = node.load || '';
     let content = node.content || '// (empty)';
     if(node.load && isTauri()){
       content = '// 加载中…';
@@ -485,11 +493,11 @@ g.cwFilter = cwFilter;
 
     if(mode === 'raw'){
       const kw = ['pub','struct','impl','fn','let','mut','const','Self','for','in','return','if','else','match','use','mod','trait','enum','type','where','as','async','await','move'];
-      let html = text;
+      let html = escHtml(text);
       kw.forEach(k=>{ html = html.replace(new RegExp('\\b'+k+'\\b','g'),'<span class="kw">'+k+'</span>'); });
-      html = html.replace(/\/\/.*/g,m=>'<span class="cm">'+escHtml(m)+'</span>');
       html = html.replace(/\b[A-Z]\w+(?=\s*(?:[({<]|::))/g,m=>'<span class="fn">'+m+'</span>');
-      el.innerHTML = '<code style="font-family:var(--fm);font-size:10px;line-height:1.6;color:var(--tx2);">'+escHtml(html)+'</code>';
+      html = html.replace(/\/\/[^\n]*/g,m=>'<span class="cm">'+m+'</span>');
+      el.innerHTML = '<code style="font-family:var(--fm);font-size:10px;line-height:1.6;color:var(--tx2);">'+html+'</code>';
       return;
     }
 
@@ -550,9 +558,24 @@ g.cwFilter = cwFilter;
     navigator.clipboard.writeText(text).then(()=>showToast('已复制'));
   }
 
-  function refreshPreview(e){
+  async function refreshPreview(e){
     e.stopPropagation();
-    showToast('已刷新');
+    const ap = document.getElementById('filePreview');
+    const path = ap ? (ap._currentLoad || ap._currentName) : null;
+    if(!path){
+      showToast('当前无打开文件');
+      return;
+    }
+    if(!isTauri()){
+      showToast('已刷新（浏览器模式）');
+      return;
+    }
+    try{
+      const content = await invoke('read_file', { path });
+      ap._currentContent = content;
+      renderPreviewContent(ap._currentName, content);
+      showToast('已刷新文件');
+    }catch(err){ showToast('刷新失败: ' + err); }
   }
 
   /* ════════════════════════════════════════════════
@@ -769,7 +792,9 @@ g.cwFilter = cwFilter;
         const items = [];
         if(c.deliverables && c.deliverables.length){
           c.deliverables.forEach((d, i) => {
-            items.push({ name: d.name || ('交付物 #' + (i+1)), done: i < (c.files_created||0), fail: false, meta: d.kind || '' });
+            const name = (typeof d === 'string') ? d : (d.name || ('交付物 #' + (i+1)));
+            const kind = (typeof d === 'string') ? '' : (d.kind || '');
+            items.push({ name, done: i < (c.files_created||0), fail: false, meta: kind });
           });
         }
         if(c.files_created || c.files_modified){
@@ -871,6 +896,20 @@ g.cwFilter = cwFilter;
 
   /* ===== IPC-backed streaming send ===== */
   const streamSubs = new Map();
+  function setStreaming(on){
+    const send = document.getElementById('sendBtn');
+    const stop = document.getElementById('stopBtn');
+    if(send) send.disabled = on;
+    if(stop) stop.style.display = on ? 'inline-flex' : 'none';
+  }
+  function stopStream(){
+    if(!isTauri()){ setStreaming(false); return; }
+    invoke('neocodex_stop_stream').catch(()=>{});
+    setStreaming(false);
+    const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
+    if(el){ el.classList.remove('streaming'); attachUsageFooter(el.closest('.msg')); }
+    showToast('已停止生成');
+  }
   function ensureStreamListeners(){
     if(!isTauri() || streamSubs.size) return;
     const attach=(ev,fn)=>{ try{ listen(ev, fn).then(un=>streamSubs.set(ev,un)).catch(()=>{}); }catch(_e){} };
@@ -881,10 +920,10 @@ g.cwFilter = cwFilter;
     attach('neocodex_stream_end', p => {
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el){ el.classList.remove('streaming'); el.innerHTML = renderRichText(String(p)); attachUsageFooter(el.closest('.msg')); }
-      document.getElementById('sendBtn').disabled=false;
+      setStreaming(false);
     });
     attach('neocodex_stream_done', async () => {
-      document.getElementById('sendBtn').disabled=false;
+      setStreaming(false);
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el){ el.classList.remove('streaming'); attachUsageFooter(el.closest('.msg')); }
       await loadUsage();
@@ -912,7 +951,7 @@ g.cwFilter = cwFilter;
     u.innerHTML=`<div class="mb">${escHtml(txt)}</div>`;
     s.appendChild(u);
     inp.value='';inp.style.height='auto';
-    document.getElementById('sendBtn').disabled=true;
+    setStreaming(true);
     s.scrollTop=s.scrollHeight;
     openRbSidebar();
     const a=document.createElement('div');a.className='msg l';
@@ -931,7 +970,7 @@ g.cwFilter = cwFilter;
         mb.classList.remove('streaming');
         const demo = rs[Math.floor(Math.random()*rs.length)] + '\n\n```rust\nfn main() {\n    println!("Hello, NeoTrix!");\n    let engine = ReasoningEngine::new();\n    engine.run();\n}\n```';
         mb.innerHTML = renderRichText(demo);
-        document.getElementById('sendBtn').disabled=false;
+        setStreaming(false);
         attachUsageFooter(a);
       },600+Math.random()*400);
       return;
@@ -948,7 +987,7 @@ g.cwFilter = cwFilter;
     }).catch(err=>{
       const mb=a.querySelector('.mb');
       if(mb){ mb.classList.remove('streaming'); mb.textContent='[IPC 错误] '+String(err); }
-      document.getElementById('sendBtn').disabled=false;
+      setStreaming(false);
     });
   }
   function sendSuggestion(t){
@@ -1029,6 +1068,10 @@ g.cwFilter = cwFilter;
   renderSidebar('chat');
   renderHeroSuggest();
   renderCowork();
+  // Persisted appearance settings (localStorage) — apply before first paint of settings
+  const settings = loadSettings();
+  if(settings['appearance.fontSize']) document.documentElement.style.fontSize = settings['appearance.fontSize'] + 'px';
+  if(settings['appearance.reduceTransparency']) document.documentElement.classList.add('reduce-trans');
   // Send button initial state (direct call — no synthetic event needed)
   const ci0 = document.getElementById('chatInput');
   const sb0 = document.getElementById('sendBtn');
@@ -1119,30 +1162,86 @@ g.cwFilter = cwFilter;
     }catch(e){ showToast('创建失败: ' + e); }
   }
 
+  function renderThread(msgs, sessionId){
+    if(sessionId) currentSessionId = sessionId;
+    const cs = document.getElementById('chatScroll');
+    if(!cs) return;
+    document.getElementById('heroSection').style.display = 'none';
+    cs.style.display = 'flex';
+    cs.innerHTML = '';
+    (msgs || []).forEach((m, i) => {
+      const t = m.timestamp ? new Date(m.timestamp * 1000).toTimeString().slice(0,5) : '';
+      if(m.role === 'user'){
+        const u = document.createElement('div'); u.className = 'msg r';
+        u.innerHTML = `<div class="msg-act"><button class="ma-btn" data-op="edit" title="编辑消息">编辑</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${escHtml(m.content)}</div>`;
+        u.querySelector('.ma-btn[data-op="edit"]').onclick = () => editMessage(i);
+        u.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(i);
+        cs.appendChild(u);
+      }else{
+        const a = document.createElement('div'); a.className = 'msg l';
+        a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">${t}</span></div><div class="msg-act"><button class="ma-btn" data-op="copy" title="复制内容">复制</button><button class="ma-btn" data-op="retry" title="重新生成回复">重试</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${renderRichText(m.content)}</div>`;
+        a.querySelector('.ma-btn[data-op="copy"]').onclick = () => copyMessageContent(i);
+        a.querySelector('.ma-btn[data-op="retry"]').onclick = () => retryMessage(i);
+        a.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(i);
+        cs.appendChild(a);
+      }
+    });
+    isChatMode = true;
+    cs.scrollTop = cs.scrollHeight;
+  }
+
+  async function reloadThread(){
+    if(!isTauri() || !currentSessionId) return;
+    const msgs = await invoke('neocodex_get_session_messages', { session_id: currentSessionId }).catch(() => null);
+    if(Array.isArray(msgs)) renderThread(msgs);
+  }
+
+  async function editMessage(index){
+    if(!isTauri() || !currentSessionId) return;
+    const cs = document.getElementById('chatScroll');
+    const mb = cs.querySelectorAll('.msg.r')[index];
+    const content = mb ? (mb.querySelector('.mb')?.textContent || '') : '';
+    const next = prompt('编辑消息内容:', content);
+    if(next === null || !next.trim()) return;
+    const msgs = await invoke('neocodex_edit_message', { session_id: currentSessionId, index, content: next }).catch(e => { showToast('编辑失败: ' + e); return null; });
+    if(Array.isArray(msgs)) renderThread(msgs);
+  }
+
+  async function deleteMessage(index){
+    if(!isTauri() || !currentSessionId) return;
+    if(!confirm('删除该消息？')) return;
+    const msgs = await invoke('neocodex_delete_message', { session_id: currentSessionId, index }).catch(e => { showToast('删除失败: ' + e); return null; });
+    if(Array.isArray(msgs)) renderThread(msgs);
+  }
+
+  async function retryMessage(index){
+    if(!isTauri() || !currentSessionId) return;
+    const msgs = await invoke('neocodex_regenerate', { session_id: currentSessionId, index }).catch(e => { showToast('重试失败: ' + e); return null; });
+    if(Array.isArray(msgs)){
+      renderThread(msgs);
+      const lastUser = [...msgs].reverse().find(m => m.role === 'user');
+      if(lastUser){
+        const inp = document.getElementById('chatInput');
+        inp.value = lastUser.content || '';
+        sendMsg();
+      }
+    }
+  }
+
+  async function copyMessageContent(index){
+    const cs = document.getElementById('chatScroll');
+    const mb = cs.querySelectorAll('.msg.l')[index]?.querySelector('.mb');
+    const text = mb?.innerText || mb?.textContent || '';
+    try{ await navigator.clipboard.writeText(text); showToast('已复制'); }catch(_e){ showToast('复制失败'); }
+  }
+
   async function loadSessionMessages(id){
     if(!isTauri() || !id) return;
     try{
       await invoke('neocodex_switch_session', { session_id: id });
+      currentSessionId = id;
       const msgs = await invoke('neocodex_get_session_messages', { session_id: id });
-      if(!Array.isArray(msgs)) return;
-      document.getElementById('heroSection').style.display = 'none';
-      const cs = document.getElementById('chatScroll');
-      cs.style.display = 'flex';
-      cs.innerHTML = '';
-      msgs.forEach(m => {
-        const t = m.timestamp ? new Date(m.timestamp).toTimeString().slice(0,5) : '';
-        if(m.role === 'user'){
-          const u = document.createElement('div'); u.className = 'msg r';
-          u.innerHTML = `<div class="mb">${escHtml(m.content)}</div>`;
-          cs.appendChild(u);
-        }else{
-          const a = document.createElement('div'); a.className = 'msg l';
-          a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">${t}</span></div><div class="mb">${renderRichText(m.content)}</div>`;
-          cs.appendChild(a);
-        }
-      });
-      isChatMode = true;
-      cs.scrollTop = cs.scrollHeight;
+      if(Array.isArray(msgs)) renderThread(msgs);
     }catch(e){ /* keep current chat */ }
   }
 
@@ -1729,21 +1828,29 @@ g.cwFilter = cwFilter;
 
   async function openDiff(){
     let data = null;
+    let isSample = false;
     if(isTauri()){
       try { data = await invoke('neocodex_get_diff'); } catch(_e){}
     }
     if(!data || !Array.isArray(data.files) || !data.files.length){
       data = SAMPLE_DIFF;
+      isSample = true;
     }
-    renderDiff(data);
+    renderDiff(data, isSample);
     openOverlay('overlayDiff');
   }
 
-  function renderDiff(data){
+  function renderDiff(data, isSample){
     const title = document.getElementById('diffTitle');
-    if(title) title.textContent = '代码变更 · ' + data.files.length + ' 文件';
+    if(title) title.textContent = '代码变更 · ' + data.files.length + ' 文件' + (isSample ? '（示例数据）' : '');
     const body = document.getElementById('diffBody');
     if(!body) return;
+    if(isSample){
+      const hint = document.createElement('div');
+      hint.className = 'diff-sample-hint';
+      hint.textContent = '⚠ 当前为示例数据（未检测到真实代码变更）。点击文件运行代码或修改文件后刷新。';
+      body.appendChild(hint);
+    }
     body.innerHTML = '';
     const files = data.files.map((f, fi) => {
       const hunks = f.hunks.map((h, hi) => {
@@ -1868,6 +1975,25 @@ g.cwFilter = cwFilter;
     updateTrafficVisibility();
   }
 
+  function filterSettings(q){
+    const items = document.querySelectorAll('#overlaySettings .st-item');
+    const query = (q || '').trim().toLowerCase();
+    items.forEach(it => {
+      const text = (it.textContent || '').toLowerCase();
+      it.style.display = (!query || text.includes(query)) ? '' : 'none';
+    });
+    const grps = document.querySelectorAll('#overlaySettings .st-grp');
+    grps.forEach(grp => {
+      let next = grp.nextElementSibling;
+      let anyVisible = false;
+      while(next && !next.classList.contains('st-grp')){
+        if(next.classList.contains('st-item') && next.style.display !== 'none') anyVisible = true;
+        next = next.nextElementSibling;
+      }
+      grp.style.display = (!query || anyVisible) ? '' : 'none';
+    });
+  }
+
   function openSettingsModal(){
     closePopover();
     openOverlay('overlaySettings');
@@ -1894,21 +2020,50 @@ g.cwFilter = cwFilter;
   function initProfileHandlers(){
     const inputs = document.querySelectorAll('#stProfile input, #stProfile select');
     inputs.forEach(el => {
-      el.onchange = () => showToast('已保存: ' + (el.previousElementSibling?.textContent || el.name || '设置'));
+      const key = el.id || el.name || (el.previousElementSibling?.textContent || '').trim();
+      el.onchange = () => {
+        saveSetting('profile.' + key, el.value);
+        showToast('已保存: ' + (el.previousElementSibling?.textContent || el.name || '设置'));
+      };
     });
   }
 
   function initAppearanceHandlers(){
     const fontSel = document.querySelector('#stAppearance select');
-    if(fontSel) fontSel.onchange = () => showToast('字体大小已更改: ' + fontSel.value);
+    if(fontSel){
+      const saved = loadSettings()['appearance.fontSize'];
+      if(saved && saved !== fontSel.value) fontSel.value = saved;
+      fontSel.onchange = () => {
+        saveSetting('appearance.fontSize', fontSel.value);
+        document.documentElement.style.fontSize = fontSel.value + 'px';
+        showToast('字体大小已更改: ' + fontSel.value);
+      };
+    }
     const reduceTrans = document.querySelector('#stAppearance input[type="checkbox"]');
-    if(reduceTrans) reduceTrans.onchange = () => showToast(reduceTrans.checked ? '已开启减少透明效果' : '已关闭减少透明效果');
+    if(reduceTrans){
+      const saved = loadSettings()['appearance.reduceTransparency'];
+      if(saved !== undefined) reduceTrans.checked = !!saved;
+      reduceTrans.onchange = () => {
+        saveSetting('appearance.reduceTransparency', reduceTrans.checked);
+        document.documentElement.classList.toggle('reduce-trans', reduceTrans.checked);
+        showToast(reduceTrans.checked ? '已开启减少透明效果' : '已关闭减少透明效果');
+      };
+    }
   }
 
   function initSpeechHandlers(){
     const inputs = document.querySelectorAll('#stSpeech input, #stSpeech select');
     inputs.forEach(el => {
-      el.onchange = () => showToast('语音设置已更改: ' + (el.previousElementSibling?.textContent || '设置'));
+      const key = el.id || el.name || (el.previousElementSibling?.textContent || '设置').trim();
+      const saved = loadSettings()['speech.' + key];
+      if(saved !== undefined){
+        if(el.type === 'checkbox') el.checked = !!saved;
+        else el.value = String(saved);
+      }
+      el.onchange = () => {
+        saveSetting('speech.' + key, el.type === 'checkbox' ? el.checked : el.value);
+        showToast('语音设置已更改: ' + (el.previousElementSibling?.textContent || '设置'));
+      };
     });
   }
 
@@ -1936,7 +2091,12 @@ g.cwFilter = cwFilter;
     const switches = document.querySelectorAll('#stPrivacy input[type="checkbox"]');
     const labels = ['对话存储', '使用数据', '本地处理'];
     switches.forEach((sw, i) => {
-      sw.onchange = () => showToast((sw.checked ? '已开启' : '已关闭') + labels[i]);
+      const saved = loadSettings()['privacy.' + labels[i]];
+      if(saved !== undefined) sw.checked = !!saved;
+      sw.onchange = () => {
+        saveSetting('privacy.' + labels[i], sw.checked);
+        showToast((sw.checked ? '已开启' : '已关闭') + labels[i]);
+      };
     });
   }
 
@@ -2032,35 +2192,30 @@ g.cwFilter = cwFilter;
   }
 
   async function renderStLimits(){
-    if(!isTauri()) return;
+    const s = loadSettings();
     try{
-      const config = await invoke('neocodex_provider_config');
-      if(!config) return;
       const bars = document.querySelectorAll('#stLimits .gbar-f');
       if(bars.length >= 2){
-        const used = Math.min(100, Math.round((config.provider_count || 1) * 21));
+        const used = Math.min(100, Math.round((Number(s['limits.usedPct']) || 0)));
         bars[0].style.width = used + '%';
         bars[1].style.width = Math.min(100, used + 20) + '%';
       }
       document.querySelectorAll('#stLimits .st-desc').forEach((d,i) => {
-        if(i===0) d.textContent = `已用 ${config.provider_count || 0} / 200 次`;
-        if(i===1) d.textContent = `请求/分钟 18/30 · 令牌/分钟 45K/100K`;
+        if(i===0) d.textContent = `已用 ${s['limits.used'] || 0} / ${s['limits.quota'] || 200} 次`;
+        if(i===1) d.textContent = `请求/分钟 ${s['limits.rpm'] || 18}/30 · 令牌/分钟 ${s['limits.tpm'] || 45}K/100K`;
       });
     }catch(e){ console.error('renderStLimits failed:', e); }
   }
 
   async function renderStPrivacy(){
-    if(!isTauri()) return;
-    try{
-      const config = await invoke('neocodex_provider_config');
-      if(!config) return;
-      const switches = document.querySelectorAll('#stPrivacy input[type="checkbox"]');
-      if(switches.length >= 3){
-        switches[0].checked = config.provider_count > 0;
-        switches[1].checked = false;
-        switches[2].checked = true;
-      }
-    }catch(e){ console.error('renderStPrivacy failed:', e); }
+    const s = loadSettings();
+    const switches = document.querySelectorAll('#stPrivacy input[type="checkbox"]');
+    const labels = ['对话存储', '使用数据', '本地处理'];
+    if(switches.length >= 3){
+      switches[0].checked = s['privacy.对话存储'] !== false;
+      switches[1].checked = !!s['privacy.使用数据'];
+      switches[2].checked = s['privacy.本地处理'] !== false;
+    }
   }
 
   async function renderStData(){
@@ -2097,8 +2252,15 @@ g.cwFilter = cwFilter;
     if(!confirm('确定要清除所有本地数据吗？此操作不可恢复。')) return;
     if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可清除'); return; }
     try{
-      await invoke('neocodex_clear_session', { session_id: 'all' }).catch(()=>{});
-      showToast('已清除');
+      const sessions = await invoke('neocodex_list_sessions', { project_path: null }).catch(() => []);
+      let cleared = 0;
+      if(Array.isArray(sessions)){
+        for(const s of sessions){
+          if(!s || !s.id) continue;
+          try{ await invoke('neocodex_clear_session', { session_id: String(s.id) }); cleared++; }catch(_e){}
+        }
+      }
+      showToast('已清除 ' + cleared + ' 个会话');
     }catch(e){ showToast('清除失败: ' + e); }
   }
 
@@ -2137,7 +2299,7 @@ g.cwFilter = cwFilter;
   }
 function escHtml(str){
     if(!str)return'';
-    return String(str).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"');
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   /* ── Window controls: native macOS traffic lights (Overlay titlebar) handle

@@ -313,7 +313,12 @@ pub fn write_file(path: String, content: String) -> Result<(), NeoTrixError> {
 }
 
 #[command]
-pub fn detect_project(path: String) -> Result<ProjectInfo, NeoTrixError> {
+pub fn detect_project(path: Option<String>) -> Result<ProjectInfo, NeoTrixError> {
+    let path = path.unwrap_or_else(|| {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string())
+    });
     let pb = std::path::PathBuf::from(&path);
     let language = detect_project_type(&pb);
     let file_count = count_files(&pb, 0, 5).unwrap_or(0);
@@ -339,7 +344,7 @@ fn count_files(path: &std::path::Path, depth: u32, max_depth: u32) -> std::io::R
 
 #[command]
 pub fn cmd_project_open(path: String) -> Result<ProjectInfo, NeoTrixError> {
-    detect_project(path)
+    detect_project(Some(path))
 }
 
 #[command]

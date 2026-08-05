@@ -85,4 +85,45 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await page.waitForTimeout(800);
     expect(errors).toEqual([]);
   });
+
+  test("stop button appears while streaming and calls neocodex_stop_stream", async ({ page }) => {
+    await mockCommand(page, "neocodex_send_message_stream", () => "ok");
+    await mockCommand(page, "neocodex_stop_stream", () => "ok");
+    await page.goto("/");
+    const textarea = page.locator("#chatInput");
+    await textarea.fill("长任务");
+    await textarea.press("Enter");
+    await expect(page.locator("#stopBtn")).toBeVisible({ timeout: 10_000 });
+    await page.locator("#stopBtn").click({ force: true });
+    const calls = await invokeCalls(page);
+    expect(calls.some((c) => c.cmd === "neocodex_stop_stream")).toBeTruthy();
+    await expect(page.locator("#stopBtn")).toBeHidden({ timeout: 10_000 });
+  });
+
+  test("loaded thread exposes retry/delete actions wired to backend ops", async ({ page }) => {
+    await mockCommand(page, "neocodex_get_session_messages", () => [
+      { role: "user", content: "给我优化缓存", timestamp: 1700000000 },
+      { role: "agent", content: "已优化", timestamp: 1700000001 },
+    ]);
+    await mockCommand(page, "neocodex_regenerate", () => [
+      { role: "user", content: "给我优化缓存", timestamp: 1700000000 },
+    ]);
+    await page.goto("/");
+    const textarea = page.locator("#chatInput");
+    await textarea.fill("给我优化缓存");
+    await textarea.press("Enter");
+    await page.waitForTimeout(300);
+    // switch to a session id and reload the thread to attach action buttons
+    await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      (w.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+        { role: "user", content: "给我优化缓存", timestamp: 1700000000 },
+        { role: "agent", content: "已优化", timestamp: 1700000001 },
+      ], "s-1");
+    });
+    await expect(page.locator("#chatScroll .msg.l .ma-btn[data-op='retry']")).toBeVisible({ timeout: 10_000 });
+    await page.locator("#chatScroll .msg.l .ma-btn[data-op='retry']").click({ force: true });
+    const calls = await invokeCalls(page);
+    expect(calls.some((c) => c.cmd === "neocodex_regenerate")).toBeTruthy();
+  });
 });
