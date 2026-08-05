@@ -336,8 +336,34 @@ impl SelfIteratingBrain {
         // ── EWHR reasoning pass: analyze trajectory → propose hypotheses ──
         if let Some(ref mut engine) = self.reasoning_engine {
             let task_copy = self._current_task.clone();
-            if let Err(e) = engine.reason(&task_copy) {
+            let reason_result = engine.reason(&task_copy);
+            if let Err(e) = &reason_result {
                 log::warn!("[EWHR] reason pass failed: {}", e);
+            }
+
+            // ── LLM 评审组 (nt_core_gate run_async): 生产接线 R-P79 ──
+            // 用引擎已接线的 gateway 作 LLM 法官, 对推理结论独立打分; 分数低时
+            // 衰减当轮奖励 (喂给 transition learner), 高分歧时打日志供人工审计。
+            if let Ok(output) = &reason_result {
+                if let Some(verdict) = engine.llm_judge(
+                    output,
+                    &["seal self-iterating reasoning"],
+                    &[format!("seal-loop:{}", self.iteration)],
+                ) {
+                    let score = verdict.median_score;
+                    if score < 0.5 {
+                        reward *= 0.8;
+                        log::warn!(
+                            "[gate-llm] LLM 评审低分 (score={:.2}, agreement={:.2}), 衰减奖励: {}",
+                            score, verdict.agreement, verdict.reasoning
+                        );
+                    } else {
+                        log::trace!(
+                            "[gate-llm] LLM 评审通过 score={:.2} agreement={:.2}",
+                            score, verdict.agreement
+                        );
+                    }
+                }
             }
 
 

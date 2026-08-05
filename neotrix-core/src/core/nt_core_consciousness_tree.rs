@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// ConsciousnessTree — 意识树全景图
 ///
@@ -1083,10 +1084,7 @@ impl ConsciousnessTree {
                     produced_at_cycle: self.cycle,
                     quality: branch.maturity_score(),
                     claim: format!("Branch {:?} produces capability at maturity {:.2}", branch.kind, branch.maturity_score()),
-                    evidence: EvidenceChain::new(
-                        format!("run-{}-{}", self.cycle, branch.kind.label()),
-                        format!("sha256-cycle-{}-{}", self.cycle, branch.kind.label()),
-                    ),
+                    evidence: EvidenceChain::from_branch_state(self.cycle, &branch.kind, branch),
                     stop_rule: self.core.last_contract.as_ref().map(|c| c.stop_rule.clone()).unwrap_or_default(),
                     benchmark: ProviderBenchmark::default(),
                     generation: self.core.generation_counter,
@@ -1684,6 +1682,33 @@ impl EvidenceChain {
                 .unwrap_or_default()
                 .as_secs(),
             tool_versions: vec!["neotrix".into()],
+        }
+    }
+
+    /// Build an evidence chain from real branch state instead of placeholder values.
+    /// Fingerprints the branch's self-test results, health, maturity, and absorbed
+    /// capabilities so the chain reflects actual evolution output (Claude-OSINT pattern).
+    pub fn from_branch_state(cycle: u64, kind: &BranchKind, branch: &CapabilityBranch) -> Self {
+        let payload = format!(
+            "cycle={}|kind={}|tests={}|health={:.6}|maturity={:.6}|absorbed={:?}",
+            cycle,
+            kind.label(),
+            branch.self_test_count,
+            branch.health,
+            branch.maturity_score(),
+            branch.absorbed_capabilities,
+        );
+        let sha256 = hex::encode(Sha256::digest(payload.as_bytes()));
+        let run_id = format!("cycle-{}-{}", cycle, kind.label());
+        Self {
+            warc_path: None,
+            sha256: Some(sha256),
+            run_id: Some(run_id),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            tool_versions: vec![format!("neotrix-cycle-{}", cycle)],
         }
     }
 }

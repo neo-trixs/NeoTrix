@@ -318,7 +318,11 @@ fn cmd_search(args: &[String]) -> CommandOutput {
         None => return CommandOutput::err("无法打开知识库 (KnowledgeBase::open failed)"),
     };
     let query = args.join(" ");
-    match kb.search(&query, 10) {
+    // Operator terminal context: Confidential clearance (keeps Secret-tier nodes
+    // out unless the operator runs the full tree). Wiring the permission-aware
+    // retrieval path (Onyx pattern) instead of raw search.
+    let permission = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel::Confidential;
+    match kb.search_permission_aware(&query, 10, permission) {
         Ok(results) => {
             if results.is_empty() {
                 return CommandOutput::ok(&format!("未找到匹配 \"{}\" 的结果", query));

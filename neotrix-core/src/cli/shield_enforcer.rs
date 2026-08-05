@@ -16,6 +16,10 @@ pub struct ShieldEnforcer {
     pub sandbox: SandboxEnforcer,
     pub approval: ApprovalEngine,
     pub perm_chain: PermissionChain,
+    /// AgentENV-inspired action sandbox: evaluates the action string against
+    /// prefix rules before external execution. Fail-closed: unknown actions
+    /// require approval. (nt_act_sandbox — production wiring for R-P79.)
+    pub action_sandbox: std::sync::Mutex<crate::neotrix::l1_body_impl::nt_act_sandbox::ActionSandbox>,
 }
 
 #[derive(Debug)]
@@ -35,6 +39,7 @@ impl ShieldEnforcer {
             sandbox: SandboxEnforcer::new(SandboxMode::Disabled),
             approval: ApprovalEngine::new(ApprovalMode::Suggest),
             perm_chain: PermissionChain::new(PermissionMode::AcceptEdits),
+            action_sandbox: std::sync::Mutex::new(crate::neotrix::l1_body_impl::nt_act_sandbox::ActionSandbox::new()),
         }
     }
 
@@ -140,6 +145,33 @@ impl ShieldEnforcer {
                     act
                 )));
             }
+        }
+
+        // 7. ActionSandbox (nt_act_sandbox — AgentENV pattern, production gate)
+        // Evaluates the action string against the prefix rule set. Fail-closed:
+        // unknown action kinds require approval; destructive kinds are denied.
+        let sandbox_action = format!("{}:{}", action, target);
+        let verdict = self
+            .action_sandbox
+            .lock()
+            .map_err(|_| ShieldDecision::Block("ActionSandbox lock poisoned".into()))?
+            .evaluate(&sandbox_action);
+        match verdict {
+            crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::Denied => {
+                return Err(ShieldDecision::Block(format!(
+                    "ActionSandbox denied: {}",
+                    sandbox_action
+                )));
+            }
+            crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::RequiresApproval => {
+                if self.approval.mode() != ApprovalMode::FullAuto {
+                    return Err(ShieldDecision::RequireApproval(format!(
+                        "ActionSandbox requires approval for {}",
+                        sandbox_action
+                    )));
+                }
+            }
+            crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::Approved => {}
         }
 
         Ok(())

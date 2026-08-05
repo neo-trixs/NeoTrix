@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use reqwest::Client;
+use sha2::{Digest, Sha256};
 
 use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType;
@@ -135,14 +136,55 @@ impl OsintReport {
 }
 
 impl OsintReport {
+    /// Evidence run identifier for this report (Claude-OSINT pattern: JSONL run_id).
+    /// Stable per target+report so all nodes written by one run share traceability.
+    fn run_id(&self) -> String {
+        let target = self
+            .target
+            .domain
+            .clone()
+            .or_else(|| self.target.username.clone())
+            .or_else(|| self.target.email.clone())
+            .unwrap_or_else(|| "unknown".into());
+        let now = chrono::Utc::now().timestamp();
+        format!("osint-{}", hex::encode(Sha256::digest(format!("{}|{}", target, now).as_bytes())).chars().take(16).collect::<String>())
+    }
+
+    /// Write a node, then attach evidence metadata (sha256 fingerprint of title+summary+url,
+    /// run_id, tool version, timestamp) so every KB artifact is traceable.
+    fn write_with_evidence(
+        kb: &KnowledgeBase,
+        title: &str,
+        node_type: NodeType,
+        summary: Option<&str>,
+        url: Option<&str>,
+        domain_hint: Option<&str>,
+        run_id: &str,
+    ) -> Result<String, String> {
+        let id = kb.insert_or_get_node(title, node_type, summary, url, domain_hint)?;
+        let fingerprint = format!("{}|{}|{}", title, summary.unwrap_or(""), url.unwrap_or(""));
+        let sha256 = hex::encode(Sha256::digest(fingerprint.as_bytes()));
+        let meta = serde_json::json!({
+            "evidence": {
+                "run_id": run_id,
+                "sha256": sha256,
+                "tool": "neotrix-osint",
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+            }
+        });
+        kb.update_node_metadata(&id, &meta)?;
+        Ok(id)
+    }
+
     pub fn write_to_kb(&self, kb: &KnowledgeBase) -> Vec<(String, NodeType)> {
         let mut written = Vec::new();
+        let run_id = self.run_id();
         let domain_hint: Option<&str> = self.target.domain.as_deref()
             .or_else(|| self.target.email.as_ref().and_then(|e| e.split('@').nth(1)));
 
         if let Some(ref dns) = self.dns {
             for rec in &dns.subdomains {
-                if let Ok(id) = kb.insert_or_get_node(&format!("subdomain: {} ({})", rec.name, rec.record_type), NodeType::Source, Some(&format!("DNS {} record: {}", rec.record_type, rec.value)), Some(&format!("https://{}", rec.name)), domain_hint) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("subdomain: {} ({})", rec.name, rec.record_type), NodeType::Source, Some(&format!("DNS {} record: {}", rec.record_type, rec.value)), Some(&format!("https://{}", rec.name)), domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
@@ -150,7 +192,7 @@ impl OsintReport {
 
         if let Some(ref http) = self.http {
             for ep in &http.endpoints {
-                if let Ok(id) = kb.insert_or_get_node(&ep.url, NodeType::Source, ep.title.as_deref(), Some(&ep.url), domain_hint) {
+                if let Ok(id) = Self::write_with_evidence(kb, &ep.url, NodeType::Source, ep.title.as_deref(), Some(&ep.url), domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
@@ -158,7 +200,7 @@ impl OsintReport {
 
         if let Some(ref url) = self.url_history {
             for snap in &url.snapshots {
-                if let Ok(id) = kb.insert_or_get_node(&format!("Wayback: {}", snap.url), NodeType::Reference, Some(&format!("Snapshot {}", snap.timestamp)), Some(&snap.url), domain_hint) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("Wayback: {}", snap.url), NodeType::Reference, Some(&format!("Snapshot {}", snap.timestamp)), Some(&snap.url), domain_hint, &run_id) {
                     written.push((id, NodeType::Reference));
                 }
             }
@@ -167,7 +209,7 @@ impl OsintReport {
         if let Some(ref cred) = self.credential {
             for b in &cred.breaches {
                 let name = b.breach_name.as_deref().unwrap_or(&b.source);
-                if let Ok(id) = kb.insert_or_get_node(&format!("breach: {}", name), NodeType::DetectionFinding, b.description.as_deref().or(Some("Credential breach")), None, domain_hint) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("breach: {}", name), NodeType::DetectionFinding, b.description.as_deref().or(Some("Credential breach")), None, domain_hint, &run_id) {
                     written.push((id, NodeType::DetectionFinding));
                 }
             }
@@ -175,7 +217,7 @@ impl OsintReport {
 
         if let Some(ref person) = self.person {
             for p in &person.profiles {
-                if let Ok(id) = kb.insert_or_get_node(&format!("{} @ {}", p.username, p.platform), NodeType::Person, p.name_display.as_deref().or(Some(&p.username)), Some(&p.url), None) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("{} @ {}", p.username, p.platform), NodeType::Person, p.name_display.as_deref().or(Some(&p.username)), Some(&p.url), None, &run_id) {
                     written.push((id, NodeType::Person));
                 }
             }
@@ -184,7 +226,7 @@ impl OsintReport {
         if let Some(ref social) = self.social {
             for post in &social.posts {
                 if let Some(ref url) = post.url {
-                    if let Ok(id) = kb.insert_or_get_node(url, NodeType::Source, Some(&format!("Social: {} on {}", post.author, post.platform)), Some(url), None) {
+                    if let Ok(id) = Self::write_with_evidence(kb, url, NodeType::Source, Some(&format!("Social: {} on {}", post.author, post.platform)), Some(url), None, &run_id) {
                         written.push((id, NodeType::Source));
                     }
                 }
@@ -194,7 +236,7 @@ impl OsintReport {
         if let Some(ref vuln) = self.vuln {
             for v in &vuln.vulnerabilities {
                 let summary: String = v.summary.chars().take(80).collect();
-                if let Ok(id) = kb.insert_or_get_node(&format!("{}/{}", v.id, summary), NodeType::DetectionFinding, Some(&v.summary), Some(&format!("https://nvd.nist.gov/vuln/detail/{}", v.id)), domain_hint) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("{}/{}", v.id, summary), NodeType::DetectionFinding, Some(&v.summary), Some(&format!("https://nvd.nist.gov/vuln/detail/{}", v.id)), domain_hint, &run_id) {
                     written.push((id, NodeType::DetectionFinding));
                 }
             }
@@ -203,7 +245,7 @@ impl OsintReport {
         if let Some(ref net) = self.network {
             for svc in &net.services {
                 let name = svc.service.as_deref().unwrap_or("unknown");
-                if let Ok(id) = kb.insert_or_get_node(&format!("{}:{}/{}", svc.host, svc.port, name), NodeType::Source, svc.banner.as_deref(), None, domain_hint) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("{}:{}/{}", svc.host, svc.port, name), NodeType::Source, svc.banner.as_deref(), None, domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }
@@ -211,7 +253,7 @@ impl OsintReport {
 
         if let Some(ref dark) = self.dark {
             for result in &dark.results {
-                if let Ok(id) = kb.insert_or_get_node(&format!("dark: {}", result.title), NodeType::Source, Some(&result.snippet), Some(&result.url), domain_hint) {
+                if let Ok(id) = Self::write_with_evidence(kb, &format!("dark: {}", result.title), NodeType::Source, Some(&result.snippet), Some(&result.url), domain_hint, &run_id) {
                     written.push((id, NodeType::Source));
                 }
             }

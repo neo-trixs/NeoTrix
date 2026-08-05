@@ -1222,6 +1222,35 @@ impl ReasoningEngine {
         self.call_llm(&format!("{}\n\n{}", ctx, prompt))
     }
 
+    /// 生产 LLM 评审路径 — 用引擎已接线的 gateway 作为 LLM 法官, 走异步评审组
+    /// (run_async + JudgeRegistry + LLMJudgeAdapter, R-P79: 接线生产路径)。
+    ///
+    /// 法官即当前 provider 本身 (GatewayV2 impl LlmProvider), 家族 = Producer;
+    /// 机械护栏仍确定性前置, LLM 只是聚合打分器。无 gateway 时降级返回 None,
+    /// 调用方沿用同步启发式评审组, 不阻断执行。
+    pub fn llm_judge(&mut self, candidate: &str, claims: &[&str], evidence_ids: &[String]) -> Option<crate::core::nt_core_gate::PanelVerdict> {
+        use crate::core::nt_core_gate::{JudgeFamily, JudgeInput, JudgePanel, JudgeRegistry};
+        let provider = self.gateway.clone()?;
+        let input = JudgeInput {
+            candidate: candidate.to_string(),
+            claims: claims.iter().map(|c| crate::core::nt_core_gate::Claim::new(c, &[])).collect(),
+            evidence_ids: evidence_ids.to_vec(),
+            trajectory: None,
+            grounding_failures: 0,
+            schema_failures: Vec::new(),
+            producer_family: JudgeFamily::None,
+        };
+        let registry = JudgeRegistry::new().register(JudgeFamily::None, provider, &self.default_model);
+        let judges = registry.build_async_judges();
+        let refs: Vec<&dyn crate::core::nt_core_gate::AsyncPanelJudge> =
+            judges.iter().map(|j| j.as_ref()).collect();
+        let panel = JudgePanel::default_panel();
+        Some(tokio::task::block_in_place(|| {
+            let handle = tokio::runtime::Handle::current();
+            handle.block_on(panel.run_async(&input, &refs))
+        }))
+    }
+
     pub fn record_trace(
         &mut self,
         rt: ReasoningType,

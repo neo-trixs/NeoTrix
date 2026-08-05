@@ -43,11 +43,15 @@ impl ActionSandbox {
     pub fn new() -> Self {
         let mut rules = Vec::new();
         // Conservative defaults: destructive/external actions denied unless whitelisted
-        for prefix in ["rm:", "drop:", "destroy:", "wipe:"] {
+        for prefix in ["rm:", "drop:", "destroy:", "wipe:", "delete_file:"] {
             rules.push(SandboxRule { action_prefix: prefix.into(), allowed: false, requires_approval: false });
         }
+        // Safe read-only actions allowed by default (incl. ShieldEnforcer action kinds)
+        for prefix in ["read:", "query:", "search:", "list:", "file_read:"] {
+            rules.push(SandboxRule { action_prefix: prefix.into(), allowed: true, requires_approval: false });
+        }
         // High-risk actions require approval
-        for prefix in ["shell:", "network:", "send:", "write:/etc", "write:/usr"] {
+        for prefix in ["shell:", "network:", "send:", "execute_command:", "write:/etc", "write:/usr", "write:/var", "write_file:/etc", "write_file:/usr", "write_file:/var"] {
             rules.push(SandboxRule { action_prefix: prefix.into(), allowed: true, requires_approval: true });
         }
         Self { rules, executions: HashMap::new(), denied_count: 0, evaluated_count: 0 }
@@ -71,8 +75,10 @@ impl ActionSandbox {
             Some(rule) if rule.allowed && rule.requires_approval => SandboxVerdict::RequiresApproval,
             Some(rule) if rule.allowed => SandboxVerdict::Approved,
             Some(_) => SandboxVerdict::Denied,
-            // Unlisted actions default to approved (explicit allow model)
-            None => SandboxVerdict::Approved,
+            // Unlisted actions default to RequiresApproval (fail-closed):
+            // an unknown action kind must be explicitly whitelisted before it
+            // can run without human gate. Previously fail-open (Approved).
+            None => SandboxVerdict::RequiresApproval,
         };
         if verdict == SandboxVerdict::Denied {
             self.denied_count += 1;

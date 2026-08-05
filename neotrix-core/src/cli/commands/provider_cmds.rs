@@ -37,7 +37,12 @@ impl CliCommand for ProviderCmd {
                 let name = args.get(1).map(|s| s.as_str()).unwrap_or("");
                 self.cmd_info(name)
             }
-            _ => CommandOutput::err("Usage:\n  /provider list         列出所有支持的 provider\n  /provider info <name>  查看 provider 详情"),
+            "challenge" => {
+                let name = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                let task_type = args.get(2).map(|s| s.as_str()).unwrap_or("arithmetic");
+                self.cmd_challenge(name, task_type)
+            }
+            _ => CommandOutput::err("Usage:\n  /provider list                  列出所有支持的 provider\n  /provider info <name>           查看 provider 详情\n  /provider challenge <name> [task]  运行 LLM Challenge 基准 (arithmetic|extract|boolean)"),
         }
     }
 }
@@ -81,8 +86,7 @@ impl ProviderCmd {
 
     fn cmd_info(&self, name: &str) -> CommandOutput {
         if name.is_empty() {
-            return CommandOutput::err("Usage: /provider info <name>\n可用名称: openai, anthropic, gemini, groq, openrouter, ollama, ...");
-        }
+            return CommandOutput::err("Usage: /provider info <name>\n可用名称: openai, anthropic, gemini, groq, openrouter, ollama, ...");        }
         match lookup_provider(name) {
             Some(info) => {
                 let key_status = match info.api_key_env {
@@ -107,6 +111,37 @@ impl ProviderCmd {
                 CommandOutput::ok(&msg)
             }
             None => CommandOutput::err(&format!("未知 provider: {}。使用 /provider list 查看可用列表。", name)),
+        }
+    }
+
+    /// 运行 LLM Challenge 确定性基准 (P0-3, Unstract/LLM-Challenge pattern)。
+    /// 接线 gateway.run_llm_challenge → ProviderBenchmark, 打分 accuracy/latency/cost。
+    fn cmd_challenge(&self, name: &str, task_type: &str) -> CommandOutput {
+        if name.is_empty() {
+            return CommandOutput::err("Usage: /provider challenge <name> [task]\ntask: arithmetic | extraction | boolean (默认 arithmetic)");
+        }
+        let gateway = crate::neotrix::nt_io_provider::create_gateway();
+        let available = gateway.providers();
+        if !available.iter().any(|p| p == name) {
+            return CommandOutput::err(&format!(
+                "provider '{}' 未注册 (env 未配置或不可用)。已注册: {:?}",
+                name, available
+            ));
+        }
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => return CommandOutput::err(&format!("tokio runtime init failed: {e}")),
+        };
+        match rt.block_on(gateway.run_llm_challenge(name, task_type)) {
+            Ok(bench) => {
+                let grade = if bench.accuracy >= 1.0 { "PASS" } else if bench.accuracy >= 0.5 { "PARTIAL" } else { "FAIL" };
+                CommandOutput::ok(&format!(
+                    "LLM Challenge [{}] — {}\n  模型: {}\n  task: {}\n  accuracy: {:.0}%\n  avg latency: {} ms\n  cost: ${:.4}\n  评级: {}",
+                    name, grade, bench.model, bench.task_type,
+                    bench.accuracy * 100.0, bench.latency_ms, bench.cost_usd, grade
+                ))
+            }
+            Err(e) => CommandOutput::err(&format!("LLM Challenge 失败: {}", e)),
         }
     }
 }

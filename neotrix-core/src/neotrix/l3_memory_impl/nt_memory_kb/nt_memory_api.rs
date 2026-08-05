@@ -67,6 +67,9 @@ fn internal_err(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
 pub struct SearchParams {
     q: String,
     limit: Option<usize>,
+    /// Caller clearance. Defaults to Public so sensitive nodes
+    /// (ThinkingTrace/Secret) are filtered from public-facing search.
+    permission: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -116,7 +119,14 @@ pub async fn search_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let limit = params.limit.unwrap_or(10).min(100);
-    let results = kb.search(&params.q, limit).map_err(|e| internal_err(&e))?;
+    // Default to Public clearance for the public HTTP search surface so
+    // sensitive nodes (ThinkingTrace/Secret/DetectionFinding) are filtered out.
+    let permission = params
+        .permission
+        .as_deref()
+        .map(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel::from_str)
+        .unwrap_or(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel::Public);
+    let results = kb.search_permission_aware(&params.q, limit, permission).map_err(|e| internal_err(&e))?;
     Ok(json_ok(results))
 }
 

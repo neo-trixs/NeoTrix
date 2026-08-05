@@ -463,7 +463,10 @@ impl SecurityAuditor {
             .map(|c| CheckResult {
                 check_id: c.id.clone(),
                 status: CheckStatus::NotChecked,
-                evidence: None,
+                evidence: Some(format!(
+                    "check={} (domain={:?}) — {} — remediation: {}",
+                    c.id, c.domain, c.description, c.remediation
+                )),
                 confidence: 0.0,
             })
             .collect();
