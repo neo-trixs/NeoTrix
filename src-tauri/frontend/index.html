@@ -26,15 +26,17 @@
           </div>
         </div>
 
-        <!-- Segmented Control — icon-only consciousness modes -->
-        <div class="seg">
-          <button class="segb on" data-view="chat" onclick="switchView(this,'chat')">
+        <!-- Segmented Control — Claude/Codex 风格标签栏 (icon + label + kbd hint) -->
+        <div class="seg" role="tablist" aria-label="工作区切换">
+          <button class="segb on" data-view="chat" role="tab" aria-selected="true" onclick="switchView(this,'chat')">
             <svg viewBox="0 0 16 16"><path d="M3 4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H8L5.5 12.5V10H4a1 1 0 0 1-1-1V4z" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linejoin="round"/></svg>
             对话
+            <span class="segb-kbd">⌘1</span>
           </button>
-          <button class="segb" data-view="cowork" onclick="switchView(this,'cowork')">
+          <button class="segb" data-view="cowork" role="tab" aria-selected="false" onclick="switchView(this,'cowork')">
             <svg viewBox="0 0 16 16"><circle cx="5.5" cy="5.5" r="2.1" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M2 12.5a3.5 3.5 0 0 1 7 0" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/><circle cx="11.2" cy="6" r="1.7" stroke="currentColor" stroke-width="1.1" fill="none"/><path d="M9.7 12.5a3.4 3.4 0 0 1 4.3-3.3" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg>
             团队
+            <span class="segb-kbd">⌘2</span>
           </button>
         </div>
 
@@ -103,6 +105,7 @@
             </div>
             <h1>下午好</h1>
           </div>
+          <div class="hero-sug" id="heroSuggest"></div>
         </div>
         <div class="cs" id="chatScroll" style="display:none"></div>
         <div class="cic-wrap">
@@ -130,6 +133,11 @@
             <div class="cw-shead">
               <span>会话</span>
               <button class="cw-add" onclick="createSession()"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+            </div>
+            <div class="cw-filter" role="tablist" aria-label="会话状态筛选">
+              <button class="cw-fchip on" data-status="all" onclick="cwFilter('all',this)">全部</button>
+              <button class="cw-fchip" data-status="active" onclick="cwFilter('active',this)">进行中</button>
+              <button class="cw-fchip" data-status="done" onclick="cwFilter('done',this)">已完成</button>
             </div>
             <div class="cw-slist" id="cwSessionList"></div>
           </div>

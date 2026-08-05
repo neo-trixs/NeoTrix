@@ -148,4 +148,49 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(out).not.toBeNull();
     expect(out!.querySelector(".msg-code-res")!.textContent).toMatch(/NeoTrix shell/);
   });
+
+  it("tab bar renders kbd chips + hero suggestions in chat view", () => {
+    const segbs = document.querySelectorAll(".segb");
+    expect(segbs.length).toBe(2);
+    expect(document.querySelector(".segb[data-view='chat'] .segb-kbd")!.textContent).toBe("⌘1");
+    expect(document.querySelector(".segb[data-view='cowork'] .segb-kbd")!.textContent).toBe("⌘2");
+    expect(document.querySelectorAll("#heroSuggest .hero-sug-item").length).toBeGreaterThan(0);
+  });
+
+  it("switchView syncs aria-selected on the tab list", () => {
+    const g = globalThis as Record<string, unknown>;
+    const btn = document.querySelector('.segb[data-view="cowork"]') as HTMLElement;
+    (g.switchView as (el: HTMLElement, v: string) => void)(btn, "cowork");
+    expect(btn.getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector('.segb[data-view="chat"]')!.getAttribute("aria-selected")).toBe("false");
+    (g.switchView as (el: HTMLElement, v: string) => void)(
+      document.querySelector('.segb[data-view="chat"]') as HTMLElement,
+      "chat",
+    );
+    expect(document.querySelector('#heroSuggest')!.innerHTML.length).toBeGreaterThan(0);
+  });
+
+  it("cowork filter chips filter the session list", () => {
+    const g = globalThis as Record<string, unknown>;
+    const btn = document.querySelector('.segb[data-view="cowork"]') as HTMLElement;
+    (g.switchView as (el: HTMLElement, v: string) => void)(btn, "cowork");
+    const before = document.querySelectorAll("#cwSessionList .cw-sitem").length;
+    expect(before).toBeGreaterThan(1);
+    (g.cwFilter as (s: string) => void)("done");
+    expect(document.querySelectorAll("#cwSessionList .cw-sitem").length).toBeLessThan(before);
+    expect(document.querySelector("#cwSessionList .cw-sitem")!.textContent).toContain("文档生成");
+    (g.cwFilter as (s: string) => void)("all");
+    expect(document.querySelectorAll("#cwSessionList .cw-sitem").length).toBe(before);
+  });
+
+  it("meta+1 / meta+2 switch tabs", () => {
+    // ensure fresh state: start from chat
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "1", metaKey: true, cancelable: true, bubbles: true }));
+    expect(document.getElementById("viewChat")!.style.display).toBe("flex");
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "2", metaKey: true, cancelable: true, bubbles: true }));
+    expect(document.getElementById("viewCowork")!.style.display).toBe("flex");
+    expect(document.querySelector('.segb[data-view="cowork"]')!.classList.contains("on")).toBe(true);
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "1", metaKey: true, cancelable: true, bubbles: true }));
+    expect(document.getElementById("viewChat")!.style.display).toBe("flex");
+  });
 });

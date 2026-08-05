@@ -42,6 +42,9 @@ g.stopAgent = stopAgent;
 g.loadHypercube = loadHypercube;
 g.loadRegistry = loadRegistry;
 g.kbSearch = kbSearch;
+g.sendSuggestion = sendSuggestion;
+g.renderHeroSuggest = renderHeroSuggest;
+g.cwFilter = cwFilter;
   /* Free LLM 模型池 — 模型选择下拉的数据源（Tauri 下与 neocodex_provider_config 合并） */
   const MODEL_POOL = [
     { id: 'Groq',        title: 'Groq',        model: 'Llama 3.3 70B', lat: 340, online: true  },
@@ -287,8 +290,12 @@ g.kbSearch = kbSearch;
   }
 
   function switchView(el,view){
-    document.querySelectorAll('.segb').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('.segb').forEach(b=>{
+      b.classList.remove('on');
+      b.setAttribute('aria-selected','false');
+    });
     el.classList.add('on');
+    el.setAttribute('aria-selected','true');
     currentView=view;
     document.querySelectorAll('.vw-chat,.vw-cowork').forEach(v=>v.style.display='none');
     const map={chat:'viewChat',cowork:'viewCowork'};
@@ -296,6 +303,7 @@ g.kbSearch = kbSearch;
     if(t)t.style.display='flex';
     currentNav[view]=0;
     renderSidebar(view);
+    if(view==='chat'){ renderHeroSuggest(); }
     if(view==='cowork') { renderCowork(); }
   }
 
@@ -620,16 +628,13 @@ g.kbSearch = kbSearch;
     { name:'代码审查 Sprint', status:'进行中', tasks:5, done:3, fail:0, agents:[{n:'审查员',on:true},{n:'检查员',on:true}] },
     { name:'文档生成', status:'已完成', tasks:2, done:2, fail:0, agents:[{n:'写手',on:false}] },
   ];
-  let agentRunning = false, agentTask = '', agentUp = 0;
-
-  function renderAgentRow(){
-    const al = document.getElementById('cwAgentList');
-    if(!al) return;
-    const dotCls = agentRunning ? 'adot ok' : 'adot';
-    const label = agentRunning ? (agentTask ? `运行中 · ${escHtml(agentTask)}` : '运行中') : '空闲';
-    const up = agentUp > 0 ? ` · ${fmtUptime(agentUp)}` : '';
-    al.innerHTML = `<div class="cw-agent"><span class="${dotCls}"></span>${label}${up}</div>`;
+  let cwStatusFilter = 'all';
+  function cwFilter(status){
+    cwStatusFilter = status;
+    document.querySelectorAll('.cw-fchip').forEach(b=>b.classList.toggle('on', b.dataset.status===status));
+    renderCowork();
   }
+  let agentRunning = false, agentTask = '', agentUp = 0;
 
   function fmtUptime(sec){
     if(sec < 60) return `${Math.round(sec)}s`;
@@ -642,19 +647,30 @@ g.kbSearch = kbSearch;
   function renderCowork(){
     const sl = document.getElementById('cwSessionList');
     if(!sl) return;
-    sl.innerHTML = CW_DATA.map((s,i) => {
+    const filtered = CW_DATA.filter(s => {
+      if(cwStatusFilter === 'active') return s.status !== '已完成';
+      if(cwStatusFilter === 'done') return s.status === '已完成';
+      return true;
+    });
+    sl.innerHTML = filtered.map((s,i) => {
       const pct = s.tasks > 0 ? Math.round(s.done/s.tasks*100) : 0;
-      return `<div class="cw-sitem${i===0?' active':''}" onclick="selectCwSession(${i}, true)">
+      return `<div class="cw-sitem${i===0?' active':''}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
         ${escHtml(s.name)}
         <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%</span>
       </div>`;
     }).join('');
+    if(!filtered.length){
+      sl.innerHTML = `<div class="cw-empty" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px 12px;text-align:center"><p style="margin:0;font-size:var(--fs-small);color:var(--tx2)">没有符合条件的会话</p><span style="font-size:var(--fs-caption);color:var(--tx-meta)">切换其他状态或新建会话</span></div>`;
+      document.getElementById('cwEmpty').style.display = 'flex';
+      document.getElementById('cwContent').style.display = 'none';
+      return;
+    }
     selectCwSession(0);
   }
 
   function selectCwSession(idx, load){
     const s = CW_DATA[idx] || CW_DATA[0];
-    document.querySelectorAll('.cw-sitem').forEach((el,i) => el.classList.toggle('active', i===idx));
+    document.querySelectorAll('.cw-sitem').forEach(el => el.classList.toggle('active', String(el.dataset.idx) === String(idx)));
     document.getElementById('cwEmpty').style.display = 'none';
     document.getElementById('cwContent').style.display = 'flex';
     document.getElementById('cwDetailTitle').textContent = escHtml(s.name);
@@ -857,6 +873,20 @@ g.kbSearch = kbSearch;
     sendMsg();
   }
 
+  /* ===== Hero Quick Suggestions (Claude 式) ===== */
+  const HERO_SUGGESTIONS = [
+    { t: '复刻一个桌面 APP 的 UI 布局', icon: I.plus },
+    { t: '分析 neotrix-core 架构与依赖', icon: I.cube },
+    { t: '吸收一篇论文并登记到知识库', icon: I.folder },
+  ];
+  function renderHeroSuggest(){
+    const el = document.getElementById('heroSuggest');
+    if(!el) return;
+    el.innerHTML = HERO_SUGGESTIONS.map(s =>
+      `<button class="hero-sug-item" onclick="sendSuggestion('${escHtml(s.t)}')">${s.icon}<span>${escHtml(s.t)}</span></button>`
+    ).join('');
+  }
+
   function openSettings(){
     showToast('设置面板 (开发中)');
   }
@@ -873,6 +903,13 @@ g.kbSearch = kbSearch;
     if((e.metaKey || e.ctrlKey) && e.key === 'n'){ e.preventDefault(); createSession(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'f'){ e.preventDefault(); openStData(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'w'){ e.preventDefault(); closeWindow(); }
+    if((e.metaKey || e.ctrlKey) && (e.key === '1' || e.key === '2')){
+      if(e.target.closest('textarea, input')) return;
+      e.preventDefault();
+      const tab = e.key === '1' ? 'chat' : 'cowork';
+      const btn = document.querySelector('.segb[data-view="' + tab + '"]');
+      if(btn) switchView(btn, tab);
+    }
     if((e.metaKey || e.ctrlKey) && e.key === 'k'){ e.preventDefault();
       const inp = document.querySelector('.st-search input');
       if(inp && document.getElementById('overlaySettings').classList.contains('open')){ inp.focus(); return; }
@@ -885,7 +922,7 @@ g.kbSearch = kbSearch;
       updateTrafficVisibility();
     }
     if(e.key === '?' && !e.target.closest('textarea, input')){
-      showToast('快捷键: ⌘, 设置 · ⌘N 新建 · ⌘F 知识库 · ⌘W 关闭 · ⌘K 搜索 · Esc 关闭 · ? 帮助');
+      showToast('快捷键: ⌘1/⌘2 切换 · ⌘, 设置 · ⌘N 新建 · ⌘F 知识库 · ⌘W 关闭 · ⌘K 搜索 · Esc 关闭 · ? 帮助');
     }
   });
 
@@ -907,6 +944,7 @@ g.kbSearch = kbSearch;
   /* ===== Auto Init ===== */
   // DOM is already loaded at this point (script at end of body)
   renderSidebar('chat');
+  renderHeroSuggest();
   renderCowork();
   // Send button initial state (direct call — no synthetic event needed)
   const ci0 = document.getElementById('chatInput');
