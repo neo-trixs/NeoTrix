@@ -6,7 +6,6 @@
 pub mod nt_mind;
 pub mod nt_mind_background_loop;
 pub mod nt_mind_guard;
-pub mod nt_mind_ingestion;
 
 pub mod nt_mind_autofixer;
 pub mod nt_mind_background_config;

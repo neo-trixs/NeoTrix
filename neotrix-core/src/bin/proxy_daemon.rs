@@ -9,7 +9,7 @@ use neotrix::neotrix::nt_shield_stealth_net::geo_proxy::RuleUpdater;
 use neotrix::neotrix::nt_shield_stealth_net::tor_crawler::TorCrawler;
 use neotrix::neotrix::nt_shield_stealth_net::self_iterating::FingerprintManager;
 use neotrix::neotrix::nt_shield_stealth_net::proxy_control::{ProxyControl, DaemonMode};
-use neotrix::neotrix::l1_body_impl::nt_shield_traffic::api_proxy::{ApiProxy, ApiProxyConfig};
+use neotrix::neotrix::nt_shield_traffic::api_proxy::{ApiProxy, ApiProxyConfig};
 use neotrix::neotrix::l1_body_impl::nt_io_provider::gateway::GatewayV2;
 
 #[tokio::main]

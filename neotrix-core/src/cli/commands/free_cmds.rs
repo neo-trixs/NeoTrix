@@ -9,10 +9,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::l1_body_impl::nt_io_provider::free_catalog::FreeModelCatalog;
-use crate::neotrix::l1_body_impl::nt_io_provider::factory::LlmProviderType;
-use crate::neotrix::l1_body_impl::nt_io_provider::free_pool::global_free_pool;
-use crate::neotrix::l1_body_impl::nt_io_provider::rate_profiles::free_provider_rate_profiles;
+use crate::neotrix::nt_io_provider::free_catalog::FreeModelCatalog;
+use crate::neotrix::nt_io_provider::factory::LlmProviderType;
+use crate::neotrix::nt_io_provider::free_pool::global_free_pool;
+use crate::neotrix::nt_io_provider::rate_profiles::free_provider_rate_profiles;
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 pub struct FreeCmd;

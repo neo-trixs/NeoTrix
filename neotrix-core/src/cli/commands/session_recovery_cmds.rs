@@ -1,5 +1,5 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager;
+use crate::neotrix::nt_io_session_recovery::SessionRecoveryManager;
 
 pub struct SessionRecoveryCmd;
 

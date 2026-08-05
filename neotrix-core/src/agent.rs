@@ -447,7 +447,7 @@ pub mod workflow {
 pub mod tool {
     pub mod mcp {
         //! Re-export from the canonical MCP registry module.
-        pub use crate::neotrix::l1_body_impl::nt_agent_mcp_registry::*;
+        pub use crate::neotrix::nt_agent_mcp_registry::*;
     }
 
     use std::sync::{Arc, RwLock};

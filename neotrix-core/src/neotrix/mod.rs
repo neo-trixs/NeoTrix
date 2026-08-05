@@ -30,7 +30,6 @@ pub use l8_autonomic_impl::nt_mind_background_loop;
 pub use l8_autonomic_impl::nt_mind_autofixer;
 pub use l8_autonomic_impl::nt_mind_evolution_loop;
 pub use l8_autonomic_impl::nt_mind_evolution_daemon;
-pub use l8_autonomic_impl::nt_mind_ingestion;
 pub use l8_autonomic_impl::nt_mind_self_diagnose;
 pub use l8_autonomic_impl::nt_mind_benchmark;
 pub use l8_autonomic_impl::nt_mind_background_config;
@@ -117,6 +116,7 @@ pub use l1_body_impl::nt_shield_sandbox;
 #[cfg(feature = "stealth-net")]
 pub use l1_body_impl::nt_shield_stealth_net;
 pub use l1_body_impl::nt_shield_comm;
+pub use l1_body_impl::nt_shield_traffic;
 
 pub use l1_body_impl::nt_shield_agentic_scan;
 
@@ -141,6 +141,7 @@ pub use l1_body_impl::nt_agent_mcp_auth;
 pub use l1_body_impl::nt_agent_mcp_tools;
 pub use l1_body_impl::nt_agent_mcp_transport;
 pub use l1_body_impl::nt_agent_orchestrator;
+pub use l1_body_impl::nt_agent_mcp_registry;
 
 // L3 — Memory (cont.)
 

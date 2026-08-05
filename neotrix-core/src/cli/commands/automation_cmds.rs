@@ -3,7 +3,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::l1_body_impl::nt_act_autonomy::nt_mind_automation::{
+use crate::neotrix::nt_act_autonomy::nt_mind_automation::{
     AutomationEngine, AutomationRule, AutomationTrigger, AutomationAction,
 };
 

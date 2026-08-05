@@ -882,6 +882,9 @@ mod tests {
         let _g = HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let old = std::env::var("HOME").ok();
         let dir = std::env::temp_dir().join(format!("nt_kb_cmds_{}", std::process::id()));
+        // Purge any db left by an earlier test in this process (tests share the
+        // pid-named temp dir; stale nodes would violate the UNIQUE constraint).
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join(".neotrix")).unwrap();
         std::env::set_var("HOME", &dir);
         let r = f();

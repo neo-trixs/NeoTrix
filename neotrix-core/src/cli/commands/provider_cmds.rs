@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::l1_body_impl::nt_io_provider::provider_catalog::{
+use crate::neotrix::nt_io_provider::provider_catalog::{
     ProviderCategory, lookup_provider, providers_by_category,
 };
 

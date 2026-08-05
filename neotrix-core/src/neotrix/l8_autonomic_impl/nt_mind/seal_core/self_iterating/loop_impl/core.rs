@@ -32,7 +32,6 @@ use crate::core::nt_core_consciousness::{
 use crate::neotrix::nt_world_jepa::JepaWorldModel;
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::nt_act_autonomy::knowledge_distiller::KnowledgeDistiller;
-use crate::neotrix::nt_mind_ingestion::IngestionScratchpad;
 use crate::neotrix::l8_autonomic_impl::nt_mind_memory::{MemoryOrchestrator, MemoryTier};
 use crate::neotrix::nt_mind::element::registry::ElementRegistry;
 use crate::neotrix::nt_mind::element::{capability_element::CapabilityElement, memory_element::MemoryElement, skill_element::SkillElement};
@@ -100,7 +99,6 @@ pub struct SelfIteratingBrain {
     pub(crate) _dpo_stage: DpoStage,
     pub(crate) _constitutional_stage: ConstitutionalSelfCritiqueStage,
     pub(crate) _safety_stage: SafetyCheckStage,
-    pub(crate) _ingestion_scratchpad: Option<IngestionScratchpad>,
     pub(crate) _consciousness_stream: ConsciousnessStream,
     pub(crate) _first_person: FirstPersonRef,
     pub(crate) _cognitive_load: CognitiveLoadMonitor,
@@ -196,7 +194,6 @@ impl SelfIteratingBrain {
             _dpo_stage: DpoStage::new(),
             _constitutional_stage: ConstitutionalSelfCritiqueStage::new(),
             _safety_stage: SafetyCheckStage::new(),
-            _ingestion_scratchpad: None,
             _consciousness_stream: ConsciousnessStream::default(),
             _first_person: FirstPersonRef::bootstrap(0),
             _cognitive_load: CognitiveLoadMonitor::new(),
@@ -384,9 +381,6 @@ impl SelfIteratingBrain {
     pub(crate) fn _set_lr_scheduler(&mut self, s: LrScheduler) { self._lr_scheduler = s; }
     pub(crate) fn _set_validation_gate(&mut self, g: ValidationGate) { self._validation_gate = g; }
     pub(crate) fn _set_aging_monitor(&mut self, m: AgingMonitor) { self._aging_monitor = m; }
-    pub(crate) fn _ingestion_scratchpad_mut(&mut self) -> Option<&mut IngestionScratchpad> {
-        self._ingestion_scratchpad.as_mut()
-    }
 
     pub fn record_tool_call(&mut self, name: &str, duration_ms: u64, success: bool) {
         self.tool_call_count += 1;

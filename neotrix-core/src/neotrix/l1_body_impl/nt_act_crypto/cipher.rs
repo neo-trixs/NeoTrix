@@ -185,60 +185,93 @@ pub fn master_key_path_str() -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
     use super::*;
+
+    // cipher tests must not touch the real ~/neotrix/.master_key nor race with
+    // other HOME-dependent test modules under cargo test's parallel runner.
+    static HOME_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn with_temp_home<T>(f: impl FnOnce() -> T) -> T {
+        let _g = HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let old = std::env::var("HOME").ok();
+        let dir = std::env::temp_dir().join(format!("nt_cipher_{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("neotrix")).unwrap();
+        std::env::set_var("HOME", &dir);
+        let r = f();
+        match old {
+            Some(o) => std::env::set_var("HOME", o),
+            None => std::env::remove_var("HOME"),
+        }
+        r
+    }
 
     #[test]
     fn test_encrypt_decrypt_roundtrip() {
-        let original = "hello crypto world 42!";
-        let encrypted = encrypt_str(original).unwrap();
-        assert_ne!(encrypted, original);
-        let decrypted = decrypt_str(&encrypted).unwrap();
-        assert_eq!(original, decrypted);
+        with_temp_home(|| {
+            let original = "hello crypto world 42!";
+            let encrypted = encrypt_str(original).unwrap();
+            assert_ne!(encrypted, original);
+            let decrypted = decrypt_str(&encrypted).unwrap();
+            assert_eq!(original, decrypted);
+        });
     }
 
     #[test]
     fn test_encrypt_decrypt_hex_roundtrip() {
-        let hex_input = "0x1234567890abcdef";
-        let encrypted = encrypt_to_hex(hex_input).unwrap();
-        let decrypted = decrypt_from_hex(&encrypted).unwrap();
-        assert_eq!(hex_input, decrypted);
+        with_temp_home(|| {
+            let hex_input = "0x1234567890abcdef";
+            let encrypted = encrypt_to_hex(hex_input).unwrap();
+            let decrypted = decrypt_from_hex(&encrypted).unwrap();
+            assert_eq!(hex_input, decrypted);
+        });
     }
 
     #[test]
     fn test_encrypt_decrypt_bytes_roundtrip() {
-        let original = b"some binary data \x00\x01\x02";
-        let encrypted = encrypt_bytes(original).unwrap();
-        let decrypted = decrypt_bytes(&encrypted).unwrap();
-        assert_eq!(original.to_vec(), decrypted);
+        with_temp_home(|| {
+            let original = b"some binary data \x00\x01\x02";
+            let encrypted = encrypt_bytes(original).unwrap();
+            let decrypted = decrypt_bytes(&encrypted).unwrap();
+            assert_eq!(original.to_vec(), decrypted);
+        });
     }
 
     #[test]
     fn test_encrypt_json_roundtrip() {
-        let data = serde_json::json!({"key": "value", "num": 42});
-        let encrypted = encrypt_json(&data).unwrap();
-        let decrypted: serde_json::Value = decrypt_json(&encrypted).unwrap();
-        assert_eq!(data, decrypted);
+        with_temp_home(|| {
+            let data = serde_json::json!({"key": "value", "num": 42});
+            let encrypted = encrypt_json(&data).unwrap();
+            let decrypted: serde_json::Value = decrypt_json(&encrypted).unwrap();
+            assert_eq!(data, decrypted);
+        });
     }
 
     #[test]
     fn test_master_key_creation() {
-        assert!(has_master_key() || master_key_path().exists() || true);
-        // Key is auto-created on first encrypt call
-        let _ = encrypt_str("test key creation");
-        assert!(master_key_path().exists());
+        with_temp_home(|| {
+            assert!(has_master_key() || master_key_path().exists() || true);
+            // Key is auto-created on first encrypt call
+            let _ = encrypt_str("test key creation");
+            assert!(master_key_path().exists());
+        });
     }
 
     #[test]
     fn test_different_ciphertexts() {
-        let text = "same text";
-        let e1 = encrypt_str(text).unwrap();
-        let e2 = encrypt_str(text).unwrap();
-        assert_ne!(e1, e2, "each encryption should produce different ciphertext");
+        with_temp_home(|| {
+            let text = "same text";
+            let e1 = encrypt_str(text).unwrap();
+            let e2 = encrypt_str(text).unwrap();
+            assert_ne!(e1, e2, "each encryption should produce different ciphertext");
+        });
     }
 
     #[test]
     fn test_invalid_ciphertext() {
-        let result = decrypt_str("0xdeadbeef");
-        assert!(result.is_err());
+        with_temp_home(|| {
+            let result = decrypt_str("0xdeadbeef");
+            assert!(result.is_err());
+        });
     }
 }

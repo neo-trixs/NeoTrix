@@ -1,5 +1,5 @@
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::l1_body_impl::nt_shield_comm::{self, PERSONAS};
+use crate::neotrix::nt_shield_comm::{self, PERSONAS};
 
 const DB_NAME: &str = "comm_router.db";
 
