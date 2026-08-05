@@ -855,8 +855,38 @@ impl ReasoningEngine {
 
                 // Phase 10.3 — multimodal fusion: encode the task as text (the
                 // available modality in the reasoning loop) into the unified
-                // latent space, route via GWT modal attention, and fuse.
-                let multi_input = MultimodalInput::text(task);
+                // latent space, route via GWT modal attention, and fuse. When the
+                // task references an image or video file, the VisionBridge
+                // extracts real pixel features upstream (the missing half of the
+                // multimodal contract) so the Image modality is populated instead
+                // of a no-op.
+                let mut multi_input = MultimodalInput::text(task);
+                let mut vision_source: Option<std::path::PathBuf> = None;
+                if let Some(vid) = referenced_video_path(task) {
+                    if let Some(frame) = sample_video_frame(&vid) {
+                        if let Ok((_ev, feat)) = crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze(&frame) {
+                            multi_input = multi_input.with_image(feat);
+                            root_span.set_attribute(
+                                "vision_bridge_video",
+                                AttributeValue::String(vid.display().to_string()),
+                            );
+                            vision_source = Some(vid);
+                        }
+                    }
+                }
+                if vision_source.is_none() {
+                    if let Some(path) = referenced_image_path(task) {
+                        if let Ok(bytes) = std::fs::read(&path) {
+                            if let Ok((_evidence, feat)) = crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze(&bytes) {
+                                multi_input = multi_input.with_image(feat);
+                                root_span.set_attribute(
+                                    "vision_bridge_image",
+                                    AttributeValue::String(path.display().to_string()),
+                                );
+                            }
+                        }
+                    }
+                }
                 let multi_embeds = self.multimodal.encode_all(&multi_input);
                 if !multi_embeds.is_empty() {
                     let router_weights: BTreeMap<crate::core::nt_core_gwt::modality_router::Modality, f64> = {
@@ -1474,6 +1504,85 @@ pub fn split_response_into_steps(response: &str) -> Vec<ReasoningStep> {
         .collect()
 }
 
+/// Extract a candidate image file path referenced in a task string.
+///
+/// Matches common image-path forms (quoted or bare `.png/.jpg/.jpeg/.webp/.gif`
+/// or a `data:` style marker is handled by the caller). Returns the first path
+/// that exists on disk so the VisionBridge can load real pixels.
+fn referenced_image_path(task: &str) -> Option<std::path::PathBuf> {
+    let lower = task.to_ascii_lowercase();
+    for ext in [".png", ".jpg", ".jpeg", ".webp", ".gif"] {
+        for (i, _) in lower.match_indices(ext) {
+            let start = task[..i]
+                .rfind(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == '(' || c == '[')
+                .map(|p| p + 1)
+                .unwrap_or(0);
+            let end = task[i + ext.len()..]
+                .find(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == ')' || c == ']' || c == ',')
+                .map(|p| i + ext.len() + p)
+                .unwrap_or(task.len());
+            let candidate = task[start..end].trim();
+            let path = std::path::PathBuf::from(candidate);
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+/// Extract a candidate video file path referenced in a task string
+/// (`.mp4/.mov/.webm/.mkv/.avi`). The caller samples a frame for the bridge.
+fn referenced_video_path(task: &str) -> Option<std::path::PathBuf> {
+    let lower = task.to_ascii_lowercase();
+    for ext in [".mp4", ".mov", ".webm", ".mkv", ".avi"] {
+        for (i, _) in lower.match_indices(ext) {
+            let start = task[..i]
+                .rfind(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == '(' || c == '[')
+                .map(|p| p + 1)
+                .unwrap_or(0);
+            let end = task[i + ext.len()..]
+                .find(|c: char| c.is_whitespace() || c == '"' || c == '\'' || c == ')' || c == ']' || c == ',')
+                .map(|p| i + ext.len() + p)
+                .unwrap_or(task.len());
+            let candidate = task[start..end].trim();
+            let path = std::path::PathBuf::from(candidate);
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+/// Sample a representative frame from a video via the ffmpeg subprocess
+/// (research finding: 1 FPS / scene-detection sampling beats uniform reads;
+/// for a single-frame bridge probe we grab the first keyframe). Returns the
+/// frame bytes (PNG) when ffmpeg is available and extraction succeeds.
+fn sample_video_frame(path: &std::path::Path) -> Option<Vec<u8>> {
+    let out = std::env::temp_dir().join(format!("nt_frame_{}.png", std::process::id()));
+    let _ = std::fs::remove_file(&out);
+    let status = std::process::Command::new("ffmpeg")
+        .args([
+            "-y",
+            "-v",
+            "error",
+            "-i",
+            path.to_str()?,
+            "-frames:v",
+            "1",
+            out.to_str()?,
+        ])
+        .output()
+        .ok()?;
+    if !status.status.success() {
+        return None;
+    }
+    let bytes = std::fs::read(&out).ok();
+    let _ = std::fs::remove_file(&out);
+    bytes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1565,6 +1674,46 @@ mod tests {
     fn test_split_response_into_steps_empty() {
         assert!(split_response_into_steps("").is_empty());
         assert!(split_response_into_steps("   \n  ").is_empty());
+    }
+
+    #[test]
+    fn test_referenced_image_path_finds_existing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let png = tmp.path().join("shot.png");
+        std::fs::write(&png, b"\x89PNG\r\n\x1a\nnot-valid-but-exists").unwrap();
+        let task = format!("analyze this screenshot at {}", png.display());
+        let found = referenced_image_path(&task);
+        assert_eq!(found, Some(png));
+        // Missing file → None, not a false positive.
+        assert!(referenced_image_path("look at /nonexistent/foo.png").is_none());
+        assert!(referenced_image_path("no media here").is_none());
+    }
+
+    #[test]
+    fn test_referenced_video_path_finds_existing_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let vid = tmp.path().join("clip.mp4");
+        std::fs::write(&vid, b"not-valid-but-exists").unwrap();
+        let task = format!("summarize the video {}", vid.display());
+        assert_eq!(referenced_video_path(&task), Some(vid));
+        assert!(referenced_video_path("analyze the /missing/thing.mp4").is_none());
+        assert!(referenced_video_path("no media here").is_none());
+    }
+
+    #[test]
+    fn test_sample_video_frame_gracefully_degrades() {
+        // A fake video file must not panic; ffmpeg fails → None.
+        let tmp = tempfile::tempdir().unwrap();
+        let fake = tmp.path().join("fake.mp4");
+        std::fs::write(&fake, b"not a real video").unwrap();
+        let _ = sample_video_frame(&fake); // must not panic
+        // A real video (if ffmpeg present) yields decodable frame bytes.
+        let real = std::path::Path::new("/tmp/neotrix_test_src.mp4");
+        if real.exists() {
+            if let Some(bytes) = sample_video_frame(real) {
+                assert!(!bytes.is_empty());
+            }
+        }
     }
 
     #[test]

@@ -17,6 +17,236 @@ use crate::core::nt_core_gwt::modality_router::Modality;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Vision capability detection for model routing.
+///
+/// Text-only reasoning models (e.g. deepseek chat, most local Ollama qwen/llama
+/// variants without mm suffix) cannot consume `image_data`; vision-native models
+/// (gpt-4o, claude-3.5-sonnet, gemini-1.5/2.x) pass images through the provider.
+/// This mirrors the VisionBridge design: the *gateway* decides — if the active
+/// model is text-only, image bytes are converted to structured evidence text
+/// upstream; otherwise they are forwarded natively.
+pub fn model_supports_vision(model: &str) -> bool {
+    let m = model.to_ascii_lowercase();
+    if m.is_empty() {
+        return false;
+    }
+    if m.contains("-mm") || m.ends_with("-mm") {
+        return true;
+    }
+    if m.contains("vision") {
+        return true;
+    }
+    for vision_family in [
+        "gpt-4o",
+        "gpt-4.1",
+        "gpt-5",
+        "claude-3",
+        "claude-4",
+        "gemini-1.5",
+        "gemini-2",
+        "gemini-3",
+        "qwen-vl",
+        "qwen2-vl",
+        "qwen2.5-vl",
+        "llava",
+        "llama3.2-vision",
+        "molmo",
+        "pixtral",
+        "glm-4v",
+        "minicpm-v",
+    ] {
+        if m.contains(vision_family) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Structured image evidence — the deterministic, fabricate-free text contract
+/// a text-only model can reason over (VisionBridge / modlens pattern).
+///
+/// Every field is computed from the actual decoded pixels; `uncertainty` is
+/// first-class (higher = the bridge had less signal, model should be cautious).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageEvidence {
+    /// Decoded dimensions (width, height).
+    pub width: u32,
+    pub height: u32,
+    /// Aspect ratio (w/h), NaN-safe as f64.
+    pub aspect_ratio: f64,
+    /// Fraction of pixels within the active luminance range (0..1).
+    pub contrast: f64,
+    /// Mean luminance (0..1).
+    pub mean_luminance: f64,
+    /// Dominant color buckets (RGB triples) by pixel share, most frequent first.
+    pub dominant_colors: Vec<[u8; 3]>,
+    /// Per-tile luminance centroid row vector; feeds the image feature embedder.
+    pub tiles: Vec<f64>,
+    /// 0..1 — 1.0 when decode produced full signal, decaying with downscale loss.
+    pub confidence: f64,
+    /// Free-form: source byte length, codec guessed from magic bytes.
+    pub source: String,
+}
+
+impl ImageEvidence {
+    /// Deterministic text serialization for prompt injection (no JSON escaping
+    /// surprises in the LLM loop).
+    pub fn to_evidence_text(&self) -> String {
+        let mut out = String::from("<image_evidence>\n");
+        out.push_str(&format!("  source: {}\n", self.source));
+        out.push_str(&format!("  dimensions: {}x{}\n", self.width, self.height));
+        out.push_str(&format!("  aspect_ratio: {:.3}\n", self.aspect_ratio));
+        out.push_str(&format!("  mean_luminance: {:.3}\n", self.mean_luminance));
+        out.push_str(&format!("  contrast: {:.3}\n", self.contrast));
+        out.push_str(&format!("  confidence: {:.3}\n", self.confidence));
+        if !self.dominant_colors.is_empty() {
+            let colors = self
+                .dominant_colors
+                .iter()
+                .map(|c| format!("#{:02X}{:02X}{:02X}", c[0], c[1], c[2]))
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.push_str(&format!("  dominant_colors: {}\n", colors));
+        }
+        out.push_str("</image_evidence>");
+        out
+    }
+}
+
+/// VisionBridge — deterministic image feature extraction for the multimodal
+/// loop, filling the "image features already extracted upstream" contract that
+/// `MultimodalEncoder` was written against.
+///
+/// Pure local decode via the `image` crate (png/jpeg). No external vision model
+/// is required in the core loop; structured evidence + feature vector are
+/// produced from the raw pixels. `confidence` degrades with downscale.
+#[derive(Debug, Clone, Default)]
+pub struct VisionBridge;
+
+/// Number of tiles per side for the coarse luminance grid. 8×8 = 64 cells,
+/// exactly matching `IMAGE_FEATURE_DIM`.
+const TILE_SIDE: usize = 8;
+
+impl VisionBridge {
+    /// Decode image bytes and produce structured evidence + a fixed-dim image
+    /// feature vector (the missing upstream extractor for `MultimodalInput::image`).
+    pub fn analyze(bytes: &[u8]) -> Result<(ImageEvidence, Vec<f64>), String> {
+        let img = image::load_from_memory(bytes)
+            .map_err(|e| format!("image decode failed: {}", e))?;
+        let rgb = img.to_rgb8();
+        let (w, h) = (rgb.width(), rgb.height());
+        if w == 0 || h == 0 {
+            return Err("image has zero dimensions".into());
+        }
+
+        let aspect = w as f64 / h as f64;
+
+        // Downscale to 16x16 luminance grid (cheap bilinear-ish block sampling).
+        let gw = 16usize;
+        let gh = 16usize;
+        let mut lum_grid = vec![0.0f64; gw * gh];
+        let mut color_hist: BTreeMap<[u8; 3], u32> = BTreeMap::new();
+        let mut lum_sum = 0.0f64;
+        let mut lum_sq = 0.0f64;
+        let mut n: f64 = 0.0;
+
+        for gy in 0..gh {
+            for gx in 0..gw {
+                let x0 = (gx as u32 * w) / gw as u32;
+                let x1 = (((gx + 1) as u32 * w) / gw as u32).max(x0 + 1).min(w);
+                let y0 = (gy as u32 * h) / gh as u32;
+                let y1 = (((gy + 1) as u32 * h) / gh as u32).max(y0 + 1).min(h);
+                let mut cell = 0.0f64;
+                let mut cell_n = 0.0f64;
+                let mut px = x0;
+                while px < x1 {
+                    let mut py = y0;
+                    while py < y1 {
+                        let p = rgb.get_pixel(px, py);
+                        let lum = 0.2126 * p[0] as f64 / 255.0
+                            + 0.7152 * p[1] as f64 / 255.0
+                            + 0.0722 * p[2] as f64 / 255.0;
+                        cell += lum;
+                        cell_n += 1.0;
+                        // Quantize color to 32-bucket histogram for dominance.
+                        let key = [
+                            (p[0] >> 3) as u8,
+                            (p[1] >> 3) as u8,
+                            (p[2] >> 3) as u8,
+                        ];
+                        *color_hist.entry(key).or_insert(0) += 1;
+                        py += 1;
+                    }
+                    px += 1;
+                }
+                let mean_cell = if cell_n > 0.0 { cell / cell_n } else { 0.0 };
+                lum_grid[gy * gw + gx] = mean_cell;
+                lum_sum += cell;
+                lum_sq += cell * cell;
+                n += cell_n;
+            }
+        }
+
+        let mean_lum = if n > 0.0 { lum_sum / n } else { 0.0 };
+        let var = if n > 0.0 { (lum_sq / n) - mean_lum * mean_lum } else { 0.0 };
+        let contrast = var.clamp(0.0, 1.0).sqrt();
+
+        // Dominant colors: take top-4 by frequency.
+        let mut hist: Vec<([u8; 3], u32)> = color_hist.into_iter().collect();
+        hist.sort_by(|a, b| b.1.cmp(&a.1));
+        let dominant_colors: Vec<[u8; 3]> = hist
+            .iter()
+            .take(4)
+            .map(|(k, _)| [k[0] << 3 | 0b111, k[1] << 3 | 0b111, k[2] << 3 | 0b111])
+            .collect();
+
+        // Feature vector: 64-dim from the 16x16 grid (take every other cell) —
+        // deterministic, unit-normalized, luminance-centric.
+        let mut feat = Vec::with_capacity(IMAGE_FEATURE_DIM);
+        for gy in 0..TILE_SIDE {
+            for gx in 0..TILE_SIDE {
+                let v = lum_grid[gy * 2 * gw + gx * 2];
+                feat.push(v);
+            }
+        }
+        let norm: f64 = feat.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if norm > 1e-12 {
+            for x in feat.iter_mut() {
+                *x /= norm;
+            }
+        }
+
+        let confidence = if w >= 32 && h >= 32 { 1.0 } else if w >= 8 && h >= 8 { 0.6 } else { 0.3 };
+
+        // Codec guess from magic bytes for the human-readable source line.
+        let codec = if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
+            "png"
+        } else if bytes.len() > 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 {
+            "jpeg"
+        } else {
+            "raw"
+        };
+
+        let evidence = ImageEvidence {
+            width: w,
+            height: h,
+            aspect_ratio: aspect,
+            contrast,
+            mean_luminance: mean_lum,
+            dominant_colors,
+            tiles: lum_grid,
+            confidence,
+            source: format!("{} ({} bytes)", codec, bytes.len()),
+        };
+        Ok((evidence, feat))
+    }
+
+    /// Convenience: extract just the feature vector (feeds `MultimodalInput::with_image`).
+    pub fn image_features(bytes: &[u8]) -> Result<Vec<f64>, String> {
+        Self::analyze(bytes).map(|(_, f)| f)
+    }
+}
+
 /// Text embedding dimension (character n-gram hash kernel output).
 pub const TEXT_EMBED_DIM: usize = 128;
 /// Image feature dimension expected on input.
@@ -305,5 +535,87 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(enc.unified.cosine(&a, &b), 1.0);
         assert!(enc.unified.cosine(&a, &c) < 1.0);
+    }
+
+    // ─── VisionBridge ────────────────────────────────────────────────────
+
+    fn test_png(w: u32, h: u32, fill: [u8; 3]) -> Vec<u8> {
+        let mut buf = std::io::Cursor::new(Vec::new());
+        let img = image::RgbImage::from_pixel(w, h, image::Rgb(fill));
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut buf, image::ImageFormat::Png)
+            .expect("encode test png");
+        buf.into_inner()
+    }
+
+    #[test]
+    fn test_vision_bridge_analyze_black_square() {
+        let png = test_png(64, 64, [0, 0, 0]);
+        let (ev, feat) = VisionBridge::analyze(&png).expect("decode");
+        assert_eq!((ev.width, ev.height), (64, 64));
+        assert!((ev.aspect_ratio - 1.0).abs() < 1e-9);
+        assert!(ev.mean_luminance < 0.05, "black image mean {}", ev.mean_luminance);
+        assert_eq!(feat.len(), IMAGE_FEATURE_DIM);
+        assert!(ev.confidence > 0.9);
+        assert!(ev.source.starts_with("png"));
+        // Deterministic feature extraction.
+        let (_, feat2) = VisionBridge::analyze(&png).expect("decode");
+        assert_eq!(feat, feat2);
+    }
+
+    #[test]
+    fn test_vision_bridge_white_brighter_than_black() {
+        let black = VisionBridge::analyze(&test_png(64, 64, [0, 0, 0])).expect("black");
+        let white = VisionBridge::analyze(&test_png(64, 64, [255, 255, 255])).expect("white");
+        assert!(white.0.mean_luminance > black.0.mean_luminance);
+        // Distinct color dominance.
+        assert!(white.0.dominant_colors[0] != black.0.dominant_colors[0]);
+        // Feature vectors differ.
+        assert!(black.1 != white.1);
+    }
+
+    #[test]
+    fn test_vision_bridge_aspect_ratio() {
+        let wide = VisionBridge::analyze(&test_png(128, 32, [10, 20, 30])).expect("wide");
+        assert!((wide.0.aspect_ratio - 4.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_vision_bridge_evidence_text_embeds_fields() {
+        let png = test_png(32, 32, [200, 100, 50]);
+        let (ev, _) = VisionBridge::analyze(&png).expect("decode");
+        let txt = ev.to_evidence_text();
+        assert!(txt.contains("dimensions: 32x32"));
+        assert!(txt.contains("confidence:"));
+        assert!(txt.contains("dominant_colors:"));
+    }
+
+    #[test]
+    fn test_vision_bridge_rejects_garbage_bytes() {
+        assert!(VisionBridge::analyze(b"not an image at all").is_err());
+    }
+
+    #[test]
+    fn test_vision_features_feed_multimodal_encoder() {
+        let mut enc = MultimodalEncoder::new();
+        let feat = VisionBridge::image_features(&test_png(64, 64, [0, 0, 0])).expect("feat");
+        let input = MultimodalInput::text("analyze image").with_image(feat);
+        let map = enc.encode_all(&input);
+        assert!(map.contains_key(&Modality::Image));
+        assert!(map.contains_key(&Modality::Text));
+    }
+
+    #[test]
+    fn test_model_supports_vision_detection() {
+        assert!(model_supports_vision("gpt-4o"));
+        assert!(model_supports_vision("claude-3.5-sonnet-20241022"));
+        assert!(model_supports_vision("gemini-2.0-flash"));
+        assert!(model_supports_vision("qwen2.5-vl-7b-instruct"));
+        assert!(model_supports_vision("llava:7b"));
+        // Text-only families must NOT be flagged.
+        assert!(!model_supports_vision("deepseek-v4-flash"));
+        assert!(!model_supports_vision("qwen2.5:7b"));
+        assert!(!model_supports_vision("llama3.1:8b"));
+        assert!(!model_supports_vision(""));
     }
 }

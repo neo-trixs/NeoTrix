@@ -108,6 +108,22 @@ impl LlmRequest {
         self
     }
 
+    /// Attach a base64 image payload as `image_data` (data URI) for providers
+    /// that support vision. `image_b64` is the raw base64 of the image bytes;
+    /// the data-URI prefix is inferred as png/jpeg/jpeg by presence of the
+    /// PNG magic bytes.
+    pub fn with_image_b64(mut self, image_b64: &str) -> Self {
+        let prefix = if image_b64.starts_with("data:image/") {
+            String::new()
+        } else if image_b64.starts_with("/9j/") {
+            "data:image/jpeg;base64,".to_string()
+        } else {
+            "data:image/png;base64,".to_string()
+        };
+        self.image_data = Some(format!("{}{}", prefix, image_b64));
+        self
+    }
+
     pub fn with_provider_param(mut self, key: &str, value: serde_json::Value) -> Self {
         self.provider_params.insert(key.to_string(), value);
         self
@@ -252,5 +268,31 @@ impl From<String> for LlmError {
 impl From<&str> for LlmError {
     fn from(s: &str) -> Self {
         LlmError::Unknown(s.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_with_image_b64_plain_png_gets_data_uri() {
+        let req = LlmRequest::new("gpt-4o", "describe").with_image_b64("iVBORw0KGgo=");
+        let uri = req.image_data.expect("image_data set");
+        assert!(uri.starts_with("data:image/png;base64,iVBORw0KGgo="), "got {uri}");
+    }
+
+    #[test]
+    fn test_with_image_b64_jpeg_magic_gets_jpeg_uri() {
+        let req = LlmRequest::new("gpt-4o", "describe").with_image_b64("/9j/4AAQSkZJRg==");
+        let uri = req.image_data.expect("image_data set");
+        assert!(uri.starts_with("data:image/jpeg;base64,/9j/"), "got {uri}");
+    }
+
+    #[test]
+    fn test_with_image_b64_already_data_uri_unchanged() {
+        let req = LlmRequest::new("gpt-4o", "describe").with_image_b64("data:image/webp;base64,UklGRg==");
+        let uri = req.image_data.expect("image_data set");
+        assert_eq!(uri, "data:image/webp;base64,UklGRg==");
     }
 }

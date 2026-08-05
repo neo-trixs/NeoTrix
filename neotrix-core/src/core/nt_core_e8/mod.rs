@@ -35,7 +35,10 @@ pub use nt_latent_reasoning::{
     LatentReasoningPipeline, LatentRetrieval, LatentEpisodicEntry,
     LATENT_MEMORY_SIZE, TOP_K_NEIGHBORS,
 };
-pub use nt_multimodal::{MultimodalEncoder, MultimodalInput, TEXT_EMBED_DIM};
+pub use nt_multimodal::{
+    MultimodalEncoder, MultimodalInput, TEXT_EMBED_DIM, VisionBridge, ImageEvidence,
+    model_supports_vision,
+};
 
 #[cfg(test)]
 use std::collections::HashSet;

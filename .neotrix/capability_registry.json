@@ -265,6 +265,40 @@
       "updated_at": "2026-08-05T10:13:24.723448Z",
       "deprecated": false,
       "deprecated_reason": null
+    },
+    {
+      "id": "nt_core_e8::nt_multimodal::VisionBridge",
+      "domain": "core",
+      "layer": "l0primitive",
+      "constellation": "c2integrationtest",
+      "provides": [
+        "image_feature_extraction",
+        "structured_image_evidence",
+        "video_frame_sampling",
+        "vision_capability_detection"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_mind.reasoning_engine.multimodal_phase",
+        "nt_io_provider::gateway::describe_image",
+        "nt_io_neocodex::build_request"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "cycle-168",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core_e8::nt_multimodal::VisionBridge",
+          "note": "vision bridge: fills missing upstream image-feature extraction for MultimodalEncoder; model_supports_vision detection; evidence text contract for text-only models",
+          "timestamp": "2026-08-05T11:30:45.198559+00:00"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-05T11:30:45.198559+00:00",
+      "updated_at": "2026-08-05T11:30:45.198559+00:00",
+      "deprecated": false,
+      "deprecated_reason": null
     }
   ],
   "edges": [
@@ -279,6 +313,14 @@
     [
       "nt_io_web::ws_bridge",
       "nt_http::fetch_safe_http"
+    ],
+    [
+      "nt_io_neocodex::build_request",
+      "nt_core_e8::nt_multimodal::VisionBridge"
+    ],
+    [
+      "nt_io_provider::gateway::describe_image",
+      "nt_core_e8::nt_multimodal::VisionBridge"
     ]
   ]
 }

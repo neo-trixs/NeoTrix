@@ -129,6 +129,7 @@ lopdf = "0.42"
 serde_yaml = "0.9"
 zip = { version = "2", optional = true }
 quick-xml = { version = "0.41", optional = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 
 [dev-dependencies]

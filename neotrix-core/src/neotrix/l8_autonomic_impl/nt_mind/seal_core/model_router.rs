@@ -105,6 +105,10 @@ pub struct RouterFeatures {
     pub has_code_block: bool,
     pub contains_analysis_keywords: bool,
     pub estimated_tier: ModelTier,
+    /// Whether the prompt references an image/video attachment (image paths,
+    /// data:image URIs, or explicit image-analysis asks). When true and the
+    /// routed model is text-only, the caller must bridge image→evidence text.
+    pub references_media: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,6 +142,25 @@ impl RouterFeatures {
             has_code_block,
         );
 
+        let lower = prompt.to_ascii_lowercase();
+        let references_media = lower.contains(".png")
+            || lower.contains(".jpg")
+            || lower.contains(".jpeg")
+            || lower.contains(".gif")
+            || lower.contains(".webp")
+            || lower.contains("data:image/")
+            || lower.contains("image_path")
+            || lower.contains("分析图片")
+            || lower.contains("描述图片")
+            || lower.contains("识别图片")
+            || lower.contains("看这张图")
+            || lower.contains("look at this image")
+            || lower.contains("describe this image")
+            || lower.contains("ocr this")
+            || lower.contains("extract text from image")
+            || lower.contains("video file")
+            || lower.contains("视频");
+
         Self {
             prompt_length,
             language,
@@ -149,6 +172,7 @@ impl RouterFeatures {
             has_code_block,
             contains_analysis_keywords,
             estimated_tier,
+            references_media,
         }
     }
 }

@@ -996,6 +996,52 @@ impl GatewayV2 {
         provider.stream_complete(request).await
     }
 
+    /// Auxiliary vision reasoning — the third-party-model-as-reasoner path.
+    ///
+    /// NeoTrix's own VisionBridge produces deterministic pixel evidence; when
+    /// semantic understanding (OCR, object/scene description) is needed and a
+    /// vision-capable provider is registered, this routes the image to it and
+    /// returns the description as evidence text. Falls back to the default
+    /// provider if none is vision-capable — the model itself then decides
+    /// whether it can consume the image_data.
+    pub async fn describe_image(&self, image_b64: &str, question: &str) -> Result<String, LlmError> {
+        // Prefer a provider whose registered name advertises vision.
+        let mut used: Vec<String> = Vec::new();
+        let vision_candidates: Vec<String> = {
+            let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let mut names: Vec<String> = states.keys().cloned().collect();
+            names.sort_by_key(|n| (!crate::core::nt_core_e8::nt_multimodal::model_supports_vision(n), n.clone()));
+            names
+        };
+        let mut target: Option<String> = None;
+        for name in vision_candidates {
+            if crate::core::nt_core_e8::nt_multimodal::model_supports_vision(&name) {
+                target = Some(name);
+                break;
+            }
+        }
+        let name = match target {
+            Some(n) => {
+                used.push(n.clone());
+                n
+            }
+            None => match self.select_best().await {
+                Some(n) => {
+                    used.push(n.clone());
+                    n
+                }
+                None => return Err(LlmError::Unknown("no provider available for image description".into())),
+            },
+        };
+
+        let request = LlmRequest::new(&name, question)
+            .with_image_b64(image_b64)
+            .with_max_tokens(1024)
+            .with_temperature(Some(0.2));
+        let response = self.call_provider(&name, &request).await?;
+        Ok(response.content)
+    }
+
     /// Aggressive streaming fallback: temporarily override circuit breaker states
     /// and retry every registered provider once.
     async fn attempt_aggressive_retry_stream(

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
+use base64::Engine as _;
 use crate::neotrix::nt_io_provider::types::{LlmRequest, Message, Role, Tool};
 
 // ── Mode System (from Kimi Code: Agent + Shell dual-mode) ──
@@ -1932,7 +1933,40 @@ impl NeoCodexAgent {
                 .and_then(|a| a.data.clone()),
             _ => None,
         });
-        Some(LlmRequest {
+
+        // Vision-bridge: the active model may be text-only (e.g. deepseek-v4-flash,
+        // local qwen2.5:7b without -vl). Sending image_data to such providers is a
+        // no-op or an error — the VisionBridge converts the attachment into
+        // deterministic structured evidence text that the text-only model CAN
+        // reason over, and we drop the raw image channel.
+        let active_model = self.provider.active_model();
+        let active_has_vision = self.provider.has_capability(ModelCapability::Vision)
+            || crate::core::nt_core_e8::nt_multimodal::model_supports_vision(&active_model);
+        let mut messages = messages;
+        let mut image_data = image_data;
+        if image_data.is_some() && !active_has_vision {
+            if let Some(b64) = image_data.take() {
+                if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
+                    if let Ok((evidence, _feat)) =
+                        crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze(&bytes)
+                    {
+                        if let Some(last_user) = messages
+                            .iter_mut()
+                            .rev()
+                            .find(|m| m.role == Role::User)
+                        {
+                            last_user.content = format!(
+                                "{}\n\n{}\n\n(Note: the active model is text-only; the image attachment was bridged to structured pixel evidence above.)",
+                                last_user.content,
+                                evidence.to_evidence_text(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut req = LlmRequest {
             model: self.provider.active_model(),
             messages,
             // P2-1: honor the settings-panel generation params instead of the
@@ -1981,7 +2015,13 @@ impl NeoCodexAgent {
             provider_params: HashMap::new(),
             constraint_json: None,
             structured_output: None,
-        })
+        };
+        if req.image_data.is_some() && active_has_vision {
+            if let Some(raw) = req.image_data.clone() {
+                req = req.with_image_b64(&raw);
+            }
+        }
+        Some(req)
     }
 
     /// Parse a `<tool name="...">args</tool>` block from the model output.
@@ -3185,5 +3225,79 @@ mod tests {
         assert!(agent.tool_grounding.degraded_tools().len() <= 1);
         let report = agent.health_report();
         assert!(report.tool_call_count >= 0);
+    }
+
+    #[test]
+    fn test_build_request_bridges_image_for_text_only_model() {
+        // A real 4x4 PNG encoded as base64 → a valid VisionBridge decode target.
+        let png = {
+            use image::RgbImage;
+            let mut buf = std::io::Cursor::new(Vec::new());
+            let img = RgbImage::from_pixel(4, 4, image::Rgb([255, 0, 0]));
+            image::DynamicImage::ImageRgb8(img)
+                .write_to(&mut buf, image::ImageFormat::Png)
+                .expect("encode");
+            buf.into_inner()
+        };
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&png);
+
+        let mut agent = NeoCodexAgent::new("vision-bridge");
+        // Force a text-only active provider (default catalog: opencode stub, no Vision cap).
+        agent.wire.record(WireEvent::UserMessage {
+            content: "describe the image".into(),
+            timestamp: 1,
+            attachments: Some(vec![NeoCodexAttachment {
+                name: "shot.png".into(),
+                size: png.len() as u64,
+                mime_type: "image/png".into(),
+                data: Some(b64.clone()),
+            }]),
+        });
+        let messages = vec![
+            Message::new(Role::System, "system"),
+            Message::new(Role::User, "describe the image"),
+        ];
+        let req = agent.build_request(messages.clone()).expect("request built");
+        // Text-only model → image must be bridged into the user message, image_data None.
+        assert!(req.image_data.is_none(), "image_data must be dropped for text-only");
+        let user_msg = req.messages.iter().find(|m| m.role == Role::User).unwrap();
+        assert!(
+            user_msg.content.contains("<image_evidence>"),
+            "evidence must be injected: {}",
+            user_msg.content
+        );
+        assert!(user_msg.content.contains("dimensions: 4x4"));
+        // image_data None → data-URI wrap not applied (no vision).
+    }
+
+    #[test]
+    fn test_build_request_keeps_image_for_vision_model() {
+        let mut agent = NeoCodexAgent::new("vision-native");
+        agent.provider.add_provider(ProviderInfo {
+            name: "vision".into(),
+            model: "gpt-4o".into(),
+            capabilities: vec![ModelCapability::Vision],
+            context_limit: 100_000,
+            cost_per_m_input: 1.0,
+            cost_per_m_output: 1.0,
+        });
+        agent.provider.active = 1;
+        let b64 = "iVBORw0KGgo=";
+        agent.wire.record(WireEvent::UserMessage {
+            content: "describe".into(),
+            timestamp: 1,
+            attachments: Some(vec![NeoCodexAttachment {
+                name: "shot.png".into(),
+                size: 10,
+                mime_type: "image/png".into(),
+                data: Some(b64.into()),
+            }]),
+        });
+        let messages = vec![Message::new(Role::User, "describe")];
+        let req = agent.build_request(messages).expect("request built");
+        // Vision-capable model → raw base64 upgraded to a data URI and preserved.
+        let uri = req.image_data.expect("image_data preserved for vision model");
+        assert!(uri.starts_with("data:image/"), "data URI expected, got {uri}");
+        assert!(!req.messages[0].content.contains("<image_evidence>"));
     }
 }
