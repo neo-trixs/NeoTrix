@@ -5,8 +5,7 @@
 
 pub mod self_curriculum;
 
-use std::sync::LazyLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -98,14 +97,12 @@ impl Default for AbsorberConfig {
 pub struct UnifiedAbsorber {
     kb: KnowledgeBase,
     github: GitHubAbsorber,
-    http: Option<&'static reqwest::blocking::Client>,
 }
 
 impl UnifiedAbsorber {
     pub fn new(kb: KnowledgeBase, _config: AbsorberConfig) -> Result<Self, String> {
         Ok(Self {
             github: GitHubAbsorber::new(kb.clone_connection()?),
-            http: http_client(),
             kb,
         })
     }
@@ -372,20 +369,13 @@ impl UnifiedAbsorber {
     // ── Private ──
 
     fn absorb_webpage(&self, url: &str) -> Result<WebPageReport, String> {
-        let resp = match self.http {
-            Some(client) => client.get(url)
-                .timeout(Duration::from_secs(15))
-                .send()
-                .map_err(|e| format!("Fetch error: {e}"))?,
-            None => return Err("HTTP client not available (build failed)".into()),
-        };
-        let html = resp.text().map_err(|e| format!("Read error: {}", e))?;
-        let (title, text) = extract_html_content(&html);
+        let (html, host) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(url)?;
+        let (title, text) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_html_content(&html);
         if text.is_empty() {
             return Err("Empty content".into());
         }
         let summary = text.chars().take(2000).collect::<String>();
-        let domain = url.split('/').nth(2).unwrap_or("unknown").trim_start_matches("www.");
+        let domain = if host.is_empty() { "unknown" } else { &host };
         let _node_id = self.kb.insert_or_get_node(
             &if title.is_empty() { url.to_string() } else { title.clone() },
             NodeType::Article,
@@ -395,7 +385,7 @@ impl UnifiedAbsorber {
         )?;
 
         // Extract and enqueue links
-        let links = extract_links(&html);
+        let links = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_links(&html, url);
         let ts = now();
         for link in links.iter().take(20) {
             let link_domain = link.split('/').nth(2).unwrap_or("").trim_start_matches("www.").to_string();
@@ -499,84 +489,10 @@ mod nt_memory_store {
     }
 }
 
-// ── HTTP ──
-
-fn http_client() -> Option<&'static reqwest::blocking::Client> {
-    static CLIENT: LazyLock<Option<reqwest::blocking::Client>> = LazyLock::new(|| {
-        match reqwest::blocking::Client::builder()
-            .user_agent("NeoTrix/0.19 (UnifiedAbsorber)")
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(15))
-            .build()
-        {
-            Ok(c) => Some(c),
-            Err(e) => {
-                eprintln!("[UnifiedAbsorber] Failed to build HTTP client: {e}");
-                None
-            }
-        }
-    });
-    CLIENT.as_ref()
-}
+// ── HTTP (单一配置源在 nt_http,此处无独立 client) ──
 
 fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
-}
-
-fn extract_html_content(html: &str) -> (String, String) {
-    let title = if let Some(s) = html.find("<title>") {
-        let start = s + 7;
-        if let Some(e) = html[start..].find("</title>") {
-            html[start..start + e].trim().to_string()
-        } else { String::new() }
-    } else { String::new() };
-
-    let mut text = String::new();
-    let mut in_tag = false;
-    let mut in_script = false;
-    let mut in_style = false;
-    let bytes = html.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        let c = bytes[i] as char;
-        if in_script {
-            if c == '<' && html[i..].starts_with("</script") { in_script = false; i += 8; continue; }
-            i += 1; continue;
-        }
-        if in_style {
-            if c == '<' && html[i..].starts_with("</style") { in_style = false; i += 7; continue; }
-            i += 1; continue;
-        }
-        if c == '<' {
-            in_tag = true;
-            if html[i..].to_lowercase().starts_with("<script") { in_script = true; }
-            if html[i..].to_lowercase().starts_with("<style") { in_style = true; }
-            i += 1; continue;
-        }
-        if c == '>' { in_tag = false; i += 1; continue; }
-        if !in_tag { text.push(c); }
-        i += 1;
-    }
-    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    (title, text)
-}
-
-fn extract_links(html: &str) -> Vec<String> {
-    let mut links = Vec::new();
-    let mut pos = 0;
-    while let Some(s) = html[pos..].find("href=\"") {
-        let start = pos + s + 6;
-        if let Some(e) = html[start..].find('"') {
-            let href = &html[start..start + e];
-            if href.starts_with("http://") || href.starts_with("https://") {
-                links.push(href.to_string());
-            }
-            pos = start + e + 1;
-        } else { break; }
-    }
-    links.sort();
-    links.dedup();
-    links
 }
 
 #[cfg(test)]
@@ -605,7 +521,8 @@ mod tests {
 
     #[test]
     fn test_extract_html() {
-        let (title, text) = extract_html_content("<html><title>Test</title><body><p>Hello world</p></body></html>");
+        let (title, text) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_html_content(
+            "<html><title>Test</title><body><p>Hello world</p></body></html>");
         assert_eq!(title, "Test");
         assert!(text.contains("Hello world"));
     }
@@ -617,7 +534,7 @@ mod tests {
 <style>.cls{color:red}</style>
 <p>Visible content</p>
 </body></html>"#;
-        let (title, text) = extract_html_content(html);
+        let (title, text) = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_html_content(html);
         assert_eq!(title, "Page");
         assert!(text.contains("Visible content"), "Visible text should survive");
         assert!(!text.contains("alert"), "Script content should be stripped");
@@ -627,7 +544,7 @@ mod tests {
     #[test]
     fn test_extract_links() {
         let html = r#"<a href="https://example.com/page1">Link 1</a><a href="https://example.com/page2">Link 2</a>"#;
-        let links = extract_links(html);
+        let links = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_links(html, "");
         assert_eq!(links.len(), 2);
         assert!(links.iter().any(|l| l.contains("page1")));
         assert!(links.iter().any(|l| l.contains("page2")));
@@ -636,7 +553,7 @@ mod tests {
     #[test]
     fn test_extract_links_deduplication() {
         let html = r#"<a href="https://example.com/page">Link</a><a href="https://example.com/page">Dup</a>"#;
-        let links = extract_links(html);
+        let links = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::extract_links(html, "");
         assert_eq!(links.len(), 1, "Duplicate links should be deduped");
     }
 

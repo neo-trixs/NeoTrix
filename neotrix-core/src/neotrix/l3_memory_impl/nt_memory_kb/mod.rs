@@ -12,6 +12,7 @@ pub mod nt_memory_commitment;
 pub mod nt_memory_community;
 pub mod nt_memory_confidence;
 pub mod nt_memory_crawl;
+pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_embed;
 pub mod nt_memory_graph;

@@ -1,69 +1,13 @@
 //! NeoTrix 知识吸收管道 — GitHub/外部代码 → KB 蒸馏 → 去重更新
 
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::sync::Arc;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::{extract_html_content, is_safe_fetch_url};
 use crate::neotrix::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::NodeType;
-
-/// SSRF 防护：URL 必须为 http/https，且目标 IP 不得为内网/回环/链路本地/保留段。
-/// 对域名做一次性解析并校验所有解析出的地址，解析失败一律拒绝（保守）。
-pub fn is_safe_fetch_url(url: &str) -> bool {
-    let parsed = match url::Url::parse(url) {
-        Ok(u) => u,
-        Err(_) => return false,
-    };
-    if !matches!(parsed.scheme(), "http" | "https") {
-        return false;
-    }
-    let host = match parsed.host_str() {
-        Some(h) => h,
-        None => return false,
-    };
-    let lower = host.to_ascii_lowercase();
-    if lower == "localhost" || lower.ends_with(".localhost") || lower.ends_with(".local") {
-        return false;
-    }
-    // IP 字面量直接校验
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        return !is_private_ip(ip);
-    }
-    // 域名: 解析并校验全部结果 (过滤内网解析)
-    let addr = (host, parsed.port_or_known_default().unwrap_or(80));
-    match std::net::ToSocketAddrs::to_socket_addrs(&(addr.0.to_string(), addr.1)) {
-        Ok(addrs) => {
-            let mut any_safe = false;
-            for sa in addrs {
-                let ip = sa.ip();
-                if ip.is_unspecified() {
-                    return false;
-                }
-                if is_private_ip(ip) {
-                    return false;
-                }
-                any_safe = true;
-            }
-            any_safe
-        }
-        Err(_) => false,
-    }
-}
-
-fn is_private_ip(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            v4.is_loopback() || v4.is_private() || v4.is_link_local() || v4.is_broadcast()
-                || v4.is_unspecified() || v4.is_documentation()
-        }
-        IpAddr::V6(v6) => {
-            v6.is_loopback() || v6.is_unspecified() || v6.is_unique_local()
-                || v6.is_unicast_link_local() || v6.is_multicast()
-        }
-    }
-}
 
 // ============================================================
 // 源类型 (使用唯一名避免冲突)
@@ -169,83 +113,38 @@ impl KnowledgeAbsorptionPipeline {
         if !is_safe_fetch_url(url) {
             return Err(format!("URL rejected (SSRF guard): {}", url));
         }
-        let url_key = url.to_string();
-        if let Some(entry) = self.state.source_map.get(&url_key) {
-            let age = Utc::now().timestamp() - entry.last_absorbed;
-            if age < 86400 {
-                return Ok(AbsorptionReport {
-                    url: url.into(), source_type: KbSourceType::WebArticle,
-                    action: "cached".into(), nodes_created: 0, edges_created: 0,
-                    distil_summary: None,
-                });
-            }
-        }
-        if let Some(ref kb) = self.kb {
-            if let Ok(Some(_existing)) = kb.find_node_by_url(url) {
-                return Ok(AbsorptionReport {
-                    url: url.into(), source_type: KbSourceType::WebArticle,
-                    action: "cached".into(), nodes_created: 0, edges_created: 0,
-                    distil_summary: None,
-                });
-            }
+        if let Some(cached) = self.cached_report(url) {
+            return Ok(cached);
         }
 
         // HTTP fetch + content extraction (P0 fix: was inserting empty External nodes)
-        let (content, domain) = match reqwest::blocking::get(url) {
-            Ok(resp) => {
-                let domain = resp.url().host_str().unwrap_or("").to_string();
-                let body = resp.text().unwrap_or_default();
-                (body, domain)
-            }
-            Err(e) => {
-                return Err(format!("HTTP fetch failed for {}: {}", url, e));
-            }
-        };
+        let (content, domain) =
+            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http(url)?;
 
-        let summary = extract_text_content(&content);
-        let summary_short = if summary.len() > 5000 {
-            format!("{}...", summary.chars().take(5000).collect::<String>())
-        } else {
-            summary.clone()
-        };
-
-        let node_type = if url.contains("arxiv.org") || url.contains("paper") { NodeType::Paper }
-            else if url.contains("github.com") { NodeType::Repository }
-            else if url.contains("wikipedia.org") { NodeType::Reference }
-            else { NodeType::Article };
-
-        // 插入失败必须传播错误：绝不把失败 URL 记成已吸收 (record_source 会使其 24h 不再重试)
-        let kb = self.kb.as_ref().ok_or("knowledge base not initialized")?;
-        let node_id = kb.insert_or_get_node(url, node_type.clone(),
-            Some(&summary_short), Some(url), Some(&domain))
-            .map_err(|e| format!("KB insert failed for {}: {}", url, e))?;
-
-        self.record_source(url.to_string(), SourceEntry {
-            url: url.into(), source_type: KbSourceType::WebArticle,
-            title: url.into(), kb_node_id: Some(node_id.clone()),
-            last_absorbed: Utc::now().timestamp(),
-            sha_hash: None, distill_summary: None, tags: vec![],
-        });
-        self.state.total_absorbed += 1;
-
-        Ok(AbsorptionReport {
-            url: url.into(), source_type: KbSourceType::WebArticle,
-            action: "absorbed".into(),
-            nodes_created: 1,
-            edges_created: 0,
-            distil_summary: Some(summary_short),
-        })
+        self.finish_absorb(url, &content, &domain)
     }
 
     pub async fn absorb_url_async(&mut self, url: &str) -> Result<AbsorptionReport, String> {
         if !is_safe_fetch_url(url) {
             return Err(format!("URL rejected (SSRF guard): {}", url));
         }
-        let url_key = url.to_string();
-        if let Some(entry) = self.state.source_map.get(&url_key) {
+        if let Some(cached) = self.cached_report(url) {
+            return Ok(cached);
+        }
+
+        let (content, domain) =
+            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::fetch_safe_http_async(url)
+                .await?;
+
+        self.finish_absorb(url, &content, &domain)
+    }
+
+    /// 去重：source_map 24h 内已吸收 或 KB 已存在同 URL 节点 → 返回 cached 报告
+    fn cached_report(&self, url: &str) -> Option<AbsorptionReport> {
+        if let Some(entry) = self.state.source_map.get(url) {
             let age = Utc::now().timestamp() - entry.last_absorbed;
             if age < 86400 {
-                return Ok(AbsorptionReport {
+                return Some(AbsorptionReport {
                     url: url.into(), source_type: KbSourceType::WebArticle,
                     action: "cached".into(), nodes_created: 0, edges_created: 0,
                     distil_summary: None,
@@ -254,39 +153,19 @@ impl KnowledgeAbsorptionPipeline {
         }
         if let Some(ref kb) = self.kb {
             if let Ok(Some(_existing)) = kb.find_node_by_url(url) {
-                return Ok(AbsorptionReport {
+                return Some(AbsorptionReport {
                     url: url.into(), source_type: KbSourceType::WebArticle,
                     action: "cached".into(), nodes_created: 0, edges_created: 0,
                     distil_summary: None,
                 });
             }
         }
+        None
+    }
 
-        let (content, domain) = match tokio::time::timeout(
-            std::time::Duration::from_secs(15),
-            reqwest::get(url),
-        ).await {
-            Ok(Ok(resp)) => {
-                let domain = resp.url().host_str().unwrap_or("").to_string();
-                let body = match tokio::time::timeout(
-                    std::time::Duration::from_secs(15),
-                    resp.text(),
-                ).await {
-                    Ok(Ok(text)) => text,
-                    Ok(Err(e)) => return Err(format!("HTTP body read failed for {}: {}", url, e)),
-                    Err(_) => return Err(format!("HTTP body read timed out for {}", url)),
-                };
-                (body, domain)
-            }
-            Ok(Err(e)) => {
-                return Err(format!("HTTP fetch failed for {}: {}", url, e));
-            }
-            Err(_) => {
-                return Err(format!("HTTP fetch timed out for {}", url));
-            }
-        };
-
-        let summary = extract_text_content(&content);
+    /// 提取 → 插入 → 记录来源 (同步/异步共用)
+    fn finish_absorb(&mut self, url: &str, content: &str, domain: &str) -> Result<AbsorptionReport, String> {
+        let summary = extract_html_content(content).1;
         let summary_short = if summary.len() > 5000 {
             format!("{}...", summary.chars().take(5000).collect::<String>())
         } else {
@@ -301,7 +180,7 @@ impl KnowledgeAbsorptionPipeline {
         // 插入失败必须传播错误：绝不把失败 URL 记成已吸收 (record_source 会使其 24h 不再重试)
         let kb = self.kb.as_ref().ok_or("knowledge base not initialized")?;
         let node_id = kb.insert_or_get_node(url, node_type.clone(),
-            Some(&summary_short), Some(url), Some(&domain))
+            Some(&summary_short), Some(url), Some(domain))
             .map_err(|e| format!("KB insert failed for {}: {}", url, e))?;
 
         self.record_source(url.to_string(), SourceEntry {
@@ -444,28 +323,6 @@ pub struct KbPipelineStats {
 // Tests
 // ============================================================
 
-/// Strip HTML tags and decode common entities for plain text extraction.
-fn extract_text_content(html: &str) -> String {
-    let mut text = String::with_capacity(html.len());
-    let mut in_tag = false;
-    for ch in html.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => text.push(ch),
-            _ => {}
-        }
-    }
-    let text = text.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&#39;", "'")
-        .replace("&nbsp;", " ");
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -507,17 +364,17 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_text_content_basic() {
+    fn test_extract_html_content_basic() {
         let html = "<html><body><h1>Title</h1><p>Hello world</p></body></html>";
-        let text = extract_text_content(html);
+        let (_, text) = extract_html_content(html);
         assert!(text.contains("Title"));
         assert!(text.contains("Hello world"));
     }
 
     #[test]
-    fn test_extract_text_content_entities() {
+    fn test_extract_html_content_entities() {
         let html = "<p>foo &amp; bar &lt; 3</p>";
-        let text = extract_text_content(html);
+        let (_, text) = extract_html_content(html);
         assert_eq!(text, "foo & bar < 3");
     }
 }

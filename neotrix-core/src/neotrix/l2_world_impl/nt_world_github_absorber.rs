@@ -4,7 +4,6 @@
 //! 自动提取架构设计思路存入 KB，支持增量更新。
 //! 所有产出直接以 KnowledgeNode 形式存入 KB，构建可检索的代码知识图。
 
-use std::sync::LazyLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -16,21 +15,7 @@ use crate::neotrix::l2_world_impl::nt_memory_kb_bridge::{
 // ── HTTP Client ──
 
 fn http_client() -> Option<&'static reqwest::blocking::Client> {
-    static CLIENT: LazyLock<Option<reqwest::blocking::Client>> = LazyLock::new(|| {
-        match reqwest::blocking::Client::builder()
-            .user_agent("NeoTrix/0.19 (GitHubAbsorber)")
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(15))
-            .build()
-        {
-            Ok(c) => Some(c),
-            Err(e) => {
-                eprintln!("[GitHubAbsorber] Failed to build HTTP client: {e}");
-                None
-            }
-        }
-    });
-    CLIENT.as_ref()
+    Some(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::shared_blocking_client())
 }
 
 fn github_token() -> Option<String> {

@@ -1,5 +1,4 @@
-use std::sync::LazyLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
 
@@ -8,19 +7,13 @@ use super::nt_memory_types::*;
 
 // TODO: inject via DI — pass reqwest::blocking::Client through the crawler constructor
 fn http_client() -> &'static reqwest::blocking::Client {
-    static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
-        reqwest::blocking::Client::builder()
-            .user_agent("NeoTrix/0.18 (KnowledgeBase nt_world_crawl)")
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(15))
-            .no_proxy()
-            .build()
-            .unwrap_or_else(|e| {
-                eprintln!("[neotrix] WARNING: Failed to build HTTP client for MemoryCrawl: {}. Using default client.", e);
-                reqwest::blocking::Client::new()
-            })
-    });
-    &CLIENT
+    super::nt_http::shared_blocking_client()
+}
+
+/// SSRF 防护 (OWASP 对齐)：URL 必须为 http/https，目标 IP 不得为内网/回环/链路本地/保留段。
+/// 单一校验实现委托 `nt_http::resolve_safe_origin` (含 IPv4-mapped、编码绕过、DNS pin 校验)。
+pub fn is_safe_fetch_url(url: &str) -> bool {
+    super::nt_http::resolve_safe_origin(url).is_ok()
 }
 
 fn now() -> i64 {
@@ -266,23 +259,12 @@ pub fn run_crawl_cycle(conn: &Connection, max_items: usize) -> Result<CrawlCycle
 }
 
 fn fetch_and_ingest_url(conn: &Connection, url: &str) -> Result<(usize, usize), String> {
-    let resp = http_client()
-        .get(url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("Fetch error: {}", e))?;
-    let status = resp.status();
-    if !status.is_success() {
-        return Err(format!("HTTP {}", status));
+    if !is_safe_fetch_url(url) {
+        return Err(format!("URL rejected (SSRF guard): {}", url));
     }
-
-    let _content_type = resp.headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-
-    let html = resp.text().map_err(|e| format!("Read error: {}", e))?;
+    // connect-期 DNS pinning (防 rebinding): guard 已在 is_safe_fetch_url,
+    // fetch_safe_http 内部再次 resolve + pin。
+    let (html, _host) = super::nt_http::fetch_safe_http(url)?;
     let (title, text) = extract_html_content(&html);
 
     if text.is_empty() {
@@ -333,7 +315,9 @@ fn fetch_and_ingest_url(conn: &Connection, url: &str) -> Result<(usize, usize), 
     Ok((nodes_created, edges_created))
 }
 
-fn extract_html_content(html: &str) -> (String, String) {
+/// 单一 HTML→文本 原语：提取标题、剥离 script/style/tag、解码常见实体、归一空白。
+/// 所有吸收器 (UnifiedAbsorber / KnowledgeAbsorptionPipeline / MemoryCrawl) 统一委托此处。
+pub(crate) fn extract_html_content(html: &str) -> (String, String) {
     let title = if let Some(start) = html.find("<title>") {
         let start = start + 7;
         if let Some(end) = html[start..].find("</title>") {
@@ -395,7 +379,7 @@ fn extract_html_content(html: &str) -> (String, String) {
         i += 1;
     }
 
-    let text = text
+    let text = decode_html_entities(&text)
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
@@ -403,7 +387,20 @@ fn extract_html_content(html: &str) -> (String, String) {
     (title, text)
 }
 
-fn extract_links(html: &str, _base_url: &str) -> Vec<String> {
+/// 解码 HTML 常见实体 (合并自原 nt_mind_knowledge_pipeline::extract_text_content)
+fn decode_html_entities(text: &str) -> String {
+    text.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+}
+
+/// 单一 HTML→链接 原语：抽取 href、仅保留 http/https、SSRF 过滤内网/回环、去重。
+/// 所有吸收器统一委托此处。
+pub(crate) fn extract_links(html: &str, _base_url: &str) -> Vec<String> {
     let mut links = Vec::new();
     let mut pos = 0;
 
@@ -413,7 +410,7 @@ fn extract_links(html: &str, _base_url: &str) -> Vec<String> {
             let href = &html[start..start + end];
             // SSRF 防护: 仅 http/https 且目标 IP 非内网/回环/链路本地 (防自扩增内网抓取)
             if (href.starts_with("http://") || href.starts_with("https://"))
-                && crate::neotrix::l8_autonomic_impl::nt_mind_knowledge_pipeline::is_safe_fetch_url(href)
+                && is_safe_fetch_url(href)
             {
                 links.push(href.to_string());
             }
@@ -527,9 +524,56 @@ pub fn discover_from_seed(conn: &Connection, seed_topic: &str) -> Result<usize, 
 
 #[cfg(test)]
 mod tests {
+    use super::is_safe_fetch_url;
 
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_ssrf_rejects_loopback() {
+        assert!(!is_safe_fetch_url("http://127.0.0.1/"));
+        assert!(!is_safe_fetch_url("http://127.0.0.1:8080/admin"));
+        assert!(!is_safe_fetch_url("https://localhost/"));
+        assert!(!is_safe_fetch_url("http://localhost:3000"));
+        assert!(!is_safe_fetch_url("http://test.localhost/"));
+        assert!(!is_safe_fetch_url("http://foo.local/"));
+        assert!(!is_safe_fetch_url("http://[::1]/"));
+    }
+
+    #[test]
+    fn test_ssrf_rejects_private_and_reserved() {
+        assert!(!is_safe_fetch_url("http://10.0.0.1/"));
+        assert!(!is_safe_fetch_url("http://172.16.0.1/"));
+        assert!(!is_safe_fetch_url("http://192.168.1.1/"));
+        // AWS IMDS / cloud metadata (link-local)
+        assert!(!is_safe_fetch_url("http://169.254.169.254/latest/meta-data/"));
+        assert!(!is_safe_fetch_url("http://[fc00::1]/"));
+        assert!(!is_safe_fetch_url("http://[fe80::1]/"));
+    }
+
+    #[test]
+    fn test_ssrf_rejects_ipv4_mapped_ipv6() {
+        // `::ffff:127.0.0.1` 与 `::ffff:192.168.0.1` 曾绕过旧守卫 (is_loopback 只匹配 ::1)
+        assert!(!is_safe_fetch_url("http://[::ffff:127.0.0.1]/"));
+        assert!(!is_safe_fetch_url("http://[::ffff:127.0.0.2]:8080/"));
+        assert!(!is_safe_fetch_url("http://[::ffff:192.168.1.1]/"));
+        assert!(!is_safe_fetch_url("http://[::ffff:10.0.0.1]/"));
+    }
+
+    #[test]
+    fn test_ssrf_rejects_bad_scheme_and_unparseable() {
+        assert!(!is_safe_fetch_url("ftp://example.com/file"));
+        assert!(!is_safe_fetch_url("file:///etc/passwd"));
+        assert!(!is_safe_fetch_url("javascript:alert(1)"));
+        assert!(!is_safe_fetch_url(""));
+        assert!(!is_safe_fetch_url("not a url"));
+    }
+
+    #[test]
+    fn test_ssrf_allows_public() {
+        assert!(is_safe_fetch_url("http://8.8.8.8/"));
+        assert!(is_safe_fetch_url("https://1.1.1.1/"));
     }
 }
