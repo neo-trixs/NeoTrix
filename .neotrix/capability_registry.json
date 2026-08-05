@@ -312,6 +312,48 @@
       "updated_at": "2026-08-05T12:30:00.000000+00:00",
       "deprecated": false,
       "deprecated_reason": null
+    },
+    {
+      "id": "nt_core_harness::HarnessAdapter",
+      "domain": "core",
+      "layer": "l0primitive",
+      "constellation": "c4mainpipeline",
+      "provides": [
+        "harness_profile_persistence",
+        "environment_contracts",
+        "procedural_skill_transfer",
+        "harness_evolution"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [
+        "nt_mind.seal_core.self_iterating",
+        "nt_mind.reason.attention_router",
+        "nt_core_gwt.workspace"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "cycle-160",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_core_harness::HarnessAdapter",
+          "note": "harness adapter: environment contracts + procedural skills + performance-delta transfer, KB-persisted (HarnessKbExt)",
+          "timestamp": "2026-08-05T12:40:00.000000+00:00"
+        },
+        {
+          "cycle": "cycle-160",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_core_harness::HarnessAdapter",
+          "note": "HarnessX (arxiv 2606.14249) substitution-algebra trace->harness evolution verified as reinforce onto existing node per R-P42; no new node (typed harness primitives + trace distillation into profile updates)", 
+          "timestamp": "2026-08-05T12:40:00.000000+00:00"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-05T12:40:00.000000+00:00",
+      "updated_at": "2026-08-05T12:40:00.000000+00:00",
+      "deprecated": false,
+      "deprecated_reason": null
     }
   ],
   "edges": [
@@ -338,6 +380,10 @@
     [
       "nt_world_video_pipeline::process_video",
       "nt_core_e8::nt_multimodal::VisionBridge"
+    ],
+    [
+      "nt_mind.seal_core.harness_adapter",
+      "nt_core_harness::HarnessAdapter"
     ]
   ]
 }
