@@ -167,7 +167,7 @@ impl KbGuard {
         fs::create_dir_all(&dir).map_err(|e| format!("create backup dir: {e}"))?;
 
         let src = kb_path();
-        if !db_healthy_fast(&src) {
+        if !db_healthy(&src) {
             return Err("source KB not healthy, refusing to backup".into());
         }
 
