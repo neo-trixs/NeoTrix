@@ -367,6 +367,213 @@ pub struct AgentPoolStats {
     pub total_executions: u64,
 }
 
+// ---------------------------------------------------------------------------
+// AgentCatalog — 内置 agent 目录 + 工具权限矩阵 + 路由。
+// 设计对标：
+//   - Claude Code 的 5-agent 经济模型（Explore 只读 / Plan 先研究），避免过度专门化；
+//   - Codex 的 model 分级（haiku=explore, sonnet=plan, 旗舰=general）；
+//   - Kun 的 builtin-agent-catalog + subagent-router（目录即路由来源）。
+// 反模式警惕：Claude 官方明示 "too many specialist agents fails"，目录保持精简
+// （5 类），宁可让 general-purpose 兜底，也不为每个域造专属 agent。
+// ---------------------------------------------------------------------------
+
+/// 工具权限令牌 — 构建工具集权限矩阵（Explore 只读，Plan 只出方案等）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ToolPerm {
+    Read,
+    Write,
+    Execute,
+    Communicate,
+    Inspect,
+}
+
+/// E8 编排能力算子的抽象名称（映射到既定 E8 模式位域的能力表达）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CapabilityOp {
+    Reason,
+    Search,
+    Research,
+    Plan,
+    Execute,
+    Refactor,
+    Verify,
+    Monitor,
+    Communicate,
+}
+
+/// agent 分级 — 对应 Codex 的 model gradation 与成本感知路由。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgentTier {
+    /// 最小成本，只读探索（对应 haiku / Explore）
+    Leaf,
+    /// 中成本，先研究/出方案（对应 sonnet / Plan）
+    Branch,
+    /// 旗舰，通用执行兜底（对应 general-purpose / Codex 主 agent）
+    Trunk,
+}
+
+/// 内置 agent 档案 — 目录里的一条。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentProfile {
+    pub name: &'static str,
+    pub tier: AgentTier,
+    pub e8_mode: u8,
+    pub description: &'static str,
+    pub goal: &'static str,
+    pub capabilities: Vec<CapabilityOp>,
+    pub allowed_tools: Vec<ToolPerm>,
+    pub max_context: usize,
+}
+
+impl AgentProfile {
+    pub fn allows(&self, perm: ToolPerm) -> bool {
+        self.allowed_tools.contains(&perm)
+    }
+}
+
+/// 内置 agent 目录 — 参照 Claude Code 5 种内置 agent 精简为 5 类。
+pub struct AgentCatalog;
+
+impl AgentCatalog {
+    pub fn builtin() -> Vec<AgentProfile> {
+        vec![
+            AgentProfile {
+                name: "explorer",
+                tier: AgentTier::Leaf,
+                e8_mode: 1,
+                description: "只读探索 agent：定位文件、语义搜索、依赖图、只回答不改",
+                goal: "只读探查代码库并还原事实，绝不写文件或执行变更",
+                capabilities: vec![CapabilityOp::Search, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect],
+                max_context: 8192,
+            },
+            AgentProfile {
+                name: "planner",
+                tier: AgentTier::Branch,
+                e8_mode: 9,
+                description: "先研究再出：产出实施计划，构建前锁定方案",
+                goal: "调研约束并输出可执行计划，写字面方案不动生产代码",
+                capabilities: vec![CapabilityOp::Plan, CapabilityOp::Reason, CapabilityOp::Search],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "researcher",
+                tier: AgentTier::Branch,
+                e8_mode: 12,
+                description: "搜索研究 agent：统一有序后端搜索，聚合多源为可吸收结论",
+                goal: "先用有序搜索后端 (DDG→Wikipedia) 检索，再聚合为证据接地的结论，结果可落 KB",
+                capabilities: vec![CapabilityOp::Research, CapabilityOp::Search, CapabilityOp::Plan, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect, ToolPerm::Communicate],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "generalist",
+                tier: AgentTier::Trunk,
+                e8_mode: 24,
+                description: "旗舰通用执行 agent，兜底所有未路由任务",
+                goal: "全权执行：读、写、构建、验证、沟通",
+                capabilities: vec![
+                    CapabilityOp::Reason, CapabilityOp::Search, CapabilityOp::Plan,
+                    CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Communicate,
+                ],
+                allowed_tools: vec![
+                    ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate,
+                ],
+                max_context: 32768,
+            },
+            AgentProfile {
+                name: "verifier",
+                tier: AgentTier::Branch,
+                e8_mode: 33,
+                description: "审查/验证 agent：对照基因判据，专做回归与 EDV 校验",
+                goal: "以测试与构建判据审查产物，阻止自确认陷阱，回滚失败改动",
+                capabilities: vec![CapabilityOp::Verify, CapabilityOp::Search],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect, ToolPerm::Execute],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "watcher",
+                tier: AgentTier::Leaf,
+                e8_mode: 47,
+                description: "常驻监控 agent：健康度、心跳、过期心跳标 Stale",
+                goal: "后台监控系统健康，标记失效 agent 并为修复报告证据",
+                capabilities: vec![CapabilityOp::Monitor, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Inspect, ToolPerm::Read],
+                max_context: 4096,
+            },
+        ]
+    }
+
+    /// 按名称查内置 profile（目录即路由入口）。
+    pub fn by_name(name: &str) -> Option<AgentProfile> {
+        Self::builtin().into_iter().find(|p| p.name == name)
+    }
+
+    /// 成本感知路由：轻量任务（只读/探索）→ Leaf，研究型 → Branch，
+    /// 其余 → Trunk 兜底。对应 Codex 的 model gradation 意图。
+    pub fn route(task_hint: &str) -> AgentProfile {
+        let hint = task_hint.to_lowercase();
+        // 研究/搜索/聚合任务 → researcher（统一有序后端，非单点探索）。
+        // 必须在 explorer 之前判断: "research" 含 "search" 子串, 否则被误夺。
+        if hint.contains("research") || hint.contains("研究") || hint.contains("find")
+            || hint.contains("aggregate") || hint.contains("synthesize") {
+            return Self::by_name("researcher").unwrap();
+        }
+        if hint.contains("explore") || hint.contains("search") || hint.contains("read")
+            || hint.contains("inspect") || hint.contains("audit") || hint.contains("分析")
+            || hint.contains("查找") {
+            return Self::by_name("explorer").unwrap();
+        }
+        if hint.contains("plan") || hint.contains("design") || hint.contains("方案")
+            || hint.contains("调研") || hint.contains("architecture") {
+            return Self::by_name("planner").unwrap();
+        }
+        if hint.contains("verify") || hint.contains("test") || hint.contains("审查")
+            || hint.contains("review") || hint.contains("回滚") {
+            return Self::by_name("verifier").unwrap();
+        }
+        if hint.contains("monitor") || hint.contains("watch") || hint.contains("health")
+            || hint.contains("监控") || hint.contains("心跳") {
+            return Self::by_name("watcher").unwrap();
+        }
+        Self::by_name("generalist").unwrap()
+    }
+
+    /// 展示目录（供 `/agent catalog` 用）。
+    pub fn catalog_text() -> String {
+        let mut out = String::from("NeoTrix 内置 agent 目录:\n");
+        for p in Self::builtin() {
+            let perms = p.allowed_tools.iter()
+                .map(|t| format!("{:?}", t))
+                .collect::<Vec<_>>().join(",");
+            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description));
+        }
+        out
+    }
+}
+
+/// 把一个内置 agent 档案物化进 SubagentManager（生产接线，非死代码）。
+impl SubagentManager {
+    pub fn spawn_from_profile(&mut self, name: &str) -> Result<String, String> {
+        let profile = AgentCatalog::by_name(name)
+            .ok_or_else(|| format!("unknown agent profile '{}'", name))?;
+        let config = SubagentConfig {
+            name: profile.name.to_string(),
+            e8_mode: profile.e8_mode,
+            description: profile.description.to_string(),
+            goal: profile.goal.to_string(),
+            capabilities: profile.capabilities.iter()
+                .map(|c| format!("{:?}", c))
+                .collect(),
+            max_context: profile.max_context,
+            autostart: true,
+        };
+        Ok(self.spawn(config))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -534,5 +741,54 @@ mod tests {
         let count = reloaded.load_from_kb(&kb).expect("load");
         assert_eq!(count, 1);
         assert!(reloaded.list().iter().any(|a| a.config.goal == "S-TASK-5"));
+    }
+
+    #[test]
+    fn test_catalog_has_six_profiles() {
+        let profiles = AgentCatalog::builtin();
+        assert_eq!(profiles.len(), 6);
+        let names: Vec<&str> = profiles.iter().map(|p| p.name).collect();
+        assert!(names.contains(&"explorer"));
+        assert!(names.contains(&"planner"));
+        assert!(names.contains(&"researcher"));
+        assert!(names.contains(&"generalist"));
+        assert!(names.contains(&"verifier"));
+        assert!(names.contains(&"watcher"));
+    }
+
+    #[test]
+    fn test_catalog_route_maps_task_to_tier() {
+        assert_eq!(AgentCatalog::route("explore codebase").name, "explorer");
+        assert_eq!(AgentCatalog::route("设计 架构方案").name, "planner");
+        assert_eq!(AgentCatalog::route("review the diff").name, "verifier");
+        assert_eq!(AgentCatalog::route("监控系统健康").name, "watcher");
+        // 研究/聚合任务 → researcher（统一有序搜索后端）
+        assert_eq!(AgentCatalog::route("research the latest papers").name, "researcher");
+        assert_eq!(AgentCatalog::route("研究该主题").name, "researcher");
+        assert_eq!(AgentCatalog::route("synthesize findings").name, "researcher");
+        // 未知任务兜底到 generalist（旗舰通用）
+        assert_eq!(AgentCatalog::route("随便做点什么").name, "generalist");
+        // 工具权限矩阵：explorer 只读，generalist 可写/执行
+        let explorer = AgentCatalog::by_name("explorer").unwrap();
+        assert!(explorer.allows(ToolPerm::Read));
+        assert!(!explorer.allows(ToolPerm::Write));
+        assert!(!explorer.allows(ToolPerm::Execute));
+        let generalist = AgentCatalog::by_name("generalist").unwrap();
+        assert!(generalist.allows(ToolPerm::Write));
+        assert!(generalist.allows(ToolPerm::Execute));
+        // researcher 工具权限：只读 + 通信，无写入（研究不污染生产）
+        let researcher = AgentCatalog::by_name("researcher").unwrap();
+        assert!(researcher.allows(ToolPerm::Read));
+        assert!(!researcher.allows(ToolPerm::Write));
+    }
+
+    #[test]
+    fn test_catalog_spawn_from_profile() {
+        let mut mgr = SubagentManager::new();
+        let id = mgr.spawn_from_profile("explorer").expect("spawn explorer");
+        let agent = mgr.get(&id).unwrap();
+        assert_eq!(agent.config.e8_mode, 1);
+        assert_eq!(agent.config.max_context, 8192);
+        assert!(mgr.spawn_from_profile("nonexistent").is_err());
     }
 }

@@ -51,20 +51,35 @@ impl CliCommand for AgentCmd {
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok(
-                "Subagent管理:\n  /agent spawn <name> <mode>        创建新子代理 (mode: 0-63)\n  /agent list                        列出所有活跃子代理\n  /agent talk <id> <message>         向子代理发送消息\n  /agent kill <id>                   终止子代理\n  /agent status <id>                 查看子代理状态\n  /agent background <name> <mode>    创建后台异步任务\n  /agent tasks                       列出所有后台任务"
+                "Subagent管理:\n  /agent catalog                  查看内置 agent 目录\n  /agent spawn <name> <mode>        创建新子代理 (mode: 0-63)，name 为内置档案名时自动套用档案\n  /agent list                        列出所有活跃子代理\n  /agent talk <id> <message>         向子代理发送消息\n  /agent kill <id>                   终止子代理\n  /agent status <id>                 查看子代理状态\n  /agent background <name> <mode>    创建后台异步任务\n  /agent tasks                       列出所有后台任务"
             );
         }
         match args[0].as_str() {
+            "catalog" => {
+                return CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_text());
+            }
             "spawn" => {
                 if args.len() < 3 {
                     return CommandOutput::err("用法: /agent spawn <name> <mode>");
                 }
+                let mut mgr = AGENT_MANAGER.blocking_write();
                 let name = &args[1];
+                // 若 name 命中内置 agent 档案，则跳过裸模式、套用档案的工具权限矩阵与分级
+                if crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::by_name(name).is_some() {
+                    // 先去掉挡在前面阻塞写锁的临时借用再 spawn
+                    return match mgr.spawn_from_profile(name) {
+                        Ok(id) => CommandOutput::ok(&format!(
+                            "Subagent spawned from catalog: {} (id: {}, E8 mode: {})",
+                            name, id,
+                            mgr.get(&id).map(|a| a.config.e8_mode).unwrap_or(0)
+                        )),
+                        Err(e) => CommandOutput::err(&e),
+                    };
+                }
                 let mode: u8 = match args[2].parse() {
                     Ok(m) if m <= 63 => m,
                     _ => return CommandOutput::err("mode 必须是 0-63 之间的整数"),
                 };
-                let mut mgr = AGENT_MANAGER.blocking_write();
                 let config = SubagentConfig {
                     name: name.to_string(),
                     e8_mode: mode,

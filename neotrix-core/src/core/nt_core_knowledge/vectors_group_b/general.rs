@@ -595,6 +595,43 @@ pub(super) fn cap_vec_general(s: &KnowledgeSource) -> CapabilityVector {
             ]);
             cv
         }
+        KnowledgeSource::DialogueExperience => {
+            let mut cv = CapabilityVector::from_values(
+                0.3, 0.3, 0.3, 0.3,
+                0.3, 0.6, 0.3, 0.4,
+                0.85, 0.75, 0.85, 0.88, 0.86,
+                0.4, 0.5, 0.4,
+                0.3, 0.3, 0.3,
+                0.7, 0.75, 0.85, 0.82,
+            );
+            cv.extend_named(&[
+                ("conversation_grounding".into(), 0.95),
+                ("experience_distillation".into(), 0.93),
+                ("self_iteration_driver".into(), 0.92),
+                ("kb_session_mining".into(), 0.9),
+                ("prompt_refinement".into(), 0.85),
+                ("semantic_attention".into(), 0.88),
+            ]);
+            cv
+        }
+        KnowledgeSource::ResearchFindings => {
+            let mut cv = CapabilityVector::from_values(
+                0.3, 0.4, 0.35, 0.3,
+                0.4, 0.7, 0.3, 0.5,
+                0.85, 0.78, 0.88, 0.9, 0.86,
+                0.5, 0.5, 0.4,
+                0.35, 0.35, 0.4,
+                0.75, 0.8, 0.9, 0.84,
+            );
+            cv.extend_named(&[
+                ("search_aggregation".into(), 0.95),
+                ("multi_backend_fallback".into(), 0.92),
+                ("world_knowledge_grounding".into(), 0.9),
+                ("evidence_collection".into(), 0.88),
+                ("synthesis_distillation".into(), 0.85),
+            ]);
+            cv
+        }
         _ => CapabilityVector::default(),
     }
 }

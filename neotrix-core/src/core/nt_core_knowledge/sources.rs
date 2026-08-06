@@ -63,6 +63,8 @@ impl KnowledgeSource {
 //            KnowledgeSource::ActiveInference => "Active Inference / Free Energy Principle (Friston FEP) — generative models",
 //            KnowledgeSource::VSAHyperdim => "Hyperdimensional Computing (Kanerva HD/VSA) — bundle/bind/permute",
             KnowledgeSource::JEPAWorldModel => "JEPA World Model (LeCun Joint Embedding Predictive Architecture)",
+            KnowledgeSource::DialogueExperience => "neotrix-dialogue-experience",
+            KnowledgeSource::ResearchFindings => "neotrix-research-findings",
 //            KnowledgeSource::PredictiveCoding => "Predictive Coding (Rao & Ballard) — hierarchical inference",
             KnowledgeSource::OrchOR => "Orchestrated Objective Reduction (Penrose & Hameroff Orch-OR)",
 //            KnowledgeSource::AttentionSchema => "Attention Schema Theory (Graziano) — awareness as attention model",
@@ -124,6 +126,8 @@ impl KnowledgeSource {
             KnowledgeSource::SiaWeightUpdate,
             KnowledgeSource::SiaFeedbackLoop,
             KnowledgeSource::HyperAgents,
+            KnowledgeSource::DialogueExperience,
+            KnowledgeSource::ResearchFindings,
         ]
     }
 
@@ -202,6 +206,8 @@ impl KnowledgeSource {
             KnowledgeSource::SiaWeightUpdate => 0.85,
             KnowledgeSource::SiaFeedbackLoop => 0.95,
             KnowledgeSource::HyperAgents => 0.93,
+            KnowledgeSource::DialogueExperience => 0.82,
+            KnowledgeSource::ResearchFindings => 0.84,
         }
     }
 

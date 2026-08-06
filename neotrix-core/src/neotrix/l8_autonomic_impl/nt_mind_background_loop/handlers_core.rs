@@ -113,6 +113,52 @@ impl BackgroundLoopHandle {
                 }
             }
         }
+
+        // ── 对话吸收桥 (DialogueAbsorbBridge) ──
+        // 把 KB 近期 session/experience 蒸馏出的能力向量反哺 SelfIteratingBrain:
+        // 对话经验从"只落 KB"升级为"参与脑能力进化"。释放写锁前消费。
+        if let Some(ref bridge) = self.dialogue_bridge {
+            let outcome = bridge.absorb_pending(&mut b);
+            if outcome.absorbed > 0 {
+                eprintln!(
+                    "[bg-agent] dialogue absorb: {} experiences -> brain (critic_accepted={}, score_delta={:+.4})",
+                    outcome.absorbed, outcome.critic_accepted, outcome.score_delta
+                );
+            }
+        }
+        // ── 元认知 agent 外壳 (MetaAgentShell) + 派单执行桥 (P0) ──
+        // 多域刺激: 依据当前活动目标的内容派发不同注意力域 (不再永远只刺激
+        // SelfReflection)。派单结果经 AgentExecutor 接到真实子系统并执行,
+        // 把实测执行成败喂回 RouteLearner — 星系派单从仪式变控制面。
+        if let Some(ref mut shell) = self.meta_shell {
+            let task_hint = self.goal_loop.active_goal.as_ref()
+                .map(|g| g.description.clone())
+                .unwrap_or_default();
+            // 依据目标语义刺激对应注意力域 (research→PatternMatch, 编码→Code, ...)
+            for (domain, amount) in crate::neotrix::nt_mind::evolution::agent_capability::domains_for_goal(&task_hint) {
+                shell.stimulate(domain, amount);
+            }
+            let exec_task = if task_hint.is_empty() {
+                "general_dialogue_tick"
+            } else {
+                task_hint.as_str()
+            };
+            if let Some(executor) = self.agent_executor.as_ref() {
+                if let Some((agent, outcome)) = shell.dispatch_and_execute(executor, exec_task) {
+                    eprintln!(
+                        "[bg-meta] dispatched={} -> {}",
+                        agent,
+                        outcome.summary(),
+                    );
+                    // P1: 每次派单后把行为统计落盘 KB — 学习跨会话累积。
+                    if let Some(ref kb_ref) = self.kb {
+                        if let Err(e) = shell.learner.persist(kb_ref) {
+                            eprintln!("[bg-meta] route_learner persist failed: {}", e);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     pub(crate) async fn handle_prediction(&mut self) {
@@ -201,6 +247,20 @@ impl BackgroundLoopHandle {
                 let url = format!("https://en.wikipedia.org/wiki/{}", q.replace(' ', "_"));
                 let _ = ev.evolve_from_url(&url);
             }
+            // ── 研究结论吸收闭环 (R-P79: 搜索结论 → KB → 脑能力进化) ──
+            // 好奇心查询经统一搜索 (DDG→Wikipedia 有序后端) 产出结论, 由
+            // DialogueAbsorbBridge 落 KB + 蒸馏反哺 SelfIteratingBrain。
+            // 与 evolve_from_url 并列: 前者进化 self_evolver 爬取, 后者进化脑能力面。
+            if let Some(ref bridge) = self.dialogue_bridge {
+                let mut b = self.brain.write().await;
+                let outcome = bridge.absorb_research_query(&mut b, q, 5);
+                if outcome.absorbed > 0 {
+                    eprintln!(
+                        "[bg-research] query={} absorbed={} nodes -> brain (critic_accepted={}, score_delta={:+.4})",
+                        q, outcome.absorbed, outcome.critic_accepted, outcome.score_delta
+                    );
+                }
+            }
         }
         log::debug!("[bg] curiosity: cortex_traces={} gaps={} queries={}",
             cortex_traces, gaps.len(), self.curiosity_drive.top_signals(3).len());
@@ -223,6 +283,21 @@ impl BackgroundLoopHandle {
             if let Ok(r) = chain.run_chain(&mut brain, &mut bank) {
                 eprintln!("[bg] knowledge chain: discovered={}, mined={}, absorbed={}",
                     r.discovered, r.mined, r.absorbed);
+                // ── SEAL 微迭代 (R-P79: 吸收即进化, 禁止延期死代码) ──
+                // 爬取数据吸收进 KB 后, 触发一次 SelfIteratingBrain 微迭代,
+                // 让新知识立即参与能力进化而非仅仅落盘。门控: 有实际吸收才跑。
+                if r.absorbed > 0 {
+                    let mut b = self.brain.write().await;
+                    let task = format!("knowledge_chain_absorb_d{}_m{}_a{}", r.discovered, r.mined, r.absorbed);
+                    match b.run_seal_loop_pipeline(&task, None, Some(r.total_reward)) {
+                        Ok(reward) => {
+                            eprintln!("[bg] knowledge chain -> seal micro-iteration: reward={:.3}", reward);
+                        }
+                        Err(e) => {
+                            log::debug!("[bg] knowledge chain seal micro-iteration skipped: {}", e);
+                        }
+                    }
+                }
             }
         }
     }

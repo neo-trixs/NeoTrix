@@ -1,6 +1,12 @@
-# Dev Rules (R-P1 – R-P80) — 惰性加载全量规则
+# Dev Rules (R-P1 – R-P101) — 惰性加载全量规则
 
 > 本文件由 AGENTS.md 通过 `@dev-rules.md` 声明。**处理编码/审查任务时加载**，其余场景不预加载。加载后内容为强制规则。
+
+> **KB 镜像 (cycle 227)**: 每条 R-P 规则全文已镜像入 KB `experience` namespace
+> (`branch_227_*`, type=rule, domain=NT-GOVERNANCE, evidence=dev-rules.md)。
+> 本文件是**单一事实源** (强制规则加载载体); KB 镜像用于跨 session 检索
+> (`neotrix-experience query --kw "R-P42"`)。两处任何一方修订必须同步 (R-P101)。
+> 规则号 → KB key 映射见 `/tmp/rp-key-map.json`; 重新生成: 解析本文件 → absorb (cycle 227 覆写)。
 
 ## 编码基线 (R-P1 – R-P8)
 
@@ -160,6 +166,10 @@
 - **能力树三维坐标 (注册必填)**: X=11 域 (NT-CORE/MIND/MEMORY/WORLD/ACT/SHIELD/IO/META/NEXUS/GOVERNANCE/REPAIR), Y=C0-C6 星座成熟度, Z=L0 Primitive(单一安全原语) → L1 Composite(组合) → L2 Orchestrator(编排) → L3 DomainService(域服务) → L4 Application(应用入口)。CLI 校验层级跨度: 原语只能依赖原语, 禁止 L0 依赖 L1+。
 - **五种演化机制**: Budding(注册新节点)/ Grafting(注入依赖边)/ Pruning(移除无 dependents 的废弃节点)/ CrossPollination(域间复用, 强化现有节点禁平行适配器 R-P42)/ Maturation(成熟度晋升)。依赖用 `provides_index` 语义注册, `link` 建立 uses 边, petgraph DAG 校验循环。
 - **持久化与 CLI**: 注册表存 `.neotrix/capability_registry.json` (RegistryExport: nodes+edges+evolution_log, 因 petgraph Graph 不可直接 Serialize)。`--cycle` 是顶层参数放子命令前。命令: `tree`(ASCII/Mermaid 视图)/ `bud`/ `graft`/ `prune`/ `mature`/ `cross-pollinate`/ `link`/ `scan`/ `validate`/ `list`/ `get`/ `stats`/ `export`/ `import`。
+
+## 文档登记同步门槛 (R-P101) — 2026-08-06 从 mil CTREE 漂移复盘
+
+- **R-P101 (新建/升级/删除任何 skill 或资产, 必须登记双表 + 清理引用, 禁单登/留引用)**: 新建或升级任一 L1-L3 skill 或运行资产时, 必须**同时**登记 `~/.agents/skills/registry.md`(所有权 + C 成熟度)与 `~/.agents/skills/CTREE.md`(L1-L3 全量清单); 删除任何资产(如 Python 工具/二进制)必须**先**全库 grep 清理所有引用文档 (RULES / AGENTS / CTREE / registry / profile.yaml / SKILL.md / capability-*.md), 再毁源文件。任一单登或残留引用即视为未接线死代码 (R-P79 门), 记 C0。例: 本轮 mil 在 registry 已登 C4, CTREE L2 表却漏登 → 补登; cyc222 删 pipeline.py 后 profile/geoint-system/capability-tree 残留 6 处引用 → 清理。verify: `grep -rn "已删资产名\|待登 skill" <active docs>` 应零残留。
 
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 

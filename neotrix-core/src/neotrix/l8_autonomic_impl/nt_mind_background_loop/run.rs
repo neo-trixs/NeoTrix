@@ -429,6 +429,22 @@ cognitive_load: self.cognitive_load.take(),
             meta_agent: self.kb.clone().map(|kb_ref| {
                 crate::neotrix::nt_mind::evolution::agent_capability::MemoryAgent { kb: kb_ref }
             }),
+            dialogue_bridge: self.kb.clone().map(|kb_ref| {
+                crate::neotrix::nt_mind::evolution::agent_capability::DialogueAbsorbBridge::new(kb_ref)
+            }),
+            agent_executor: self.kb.clone().map(|kb_ref| {
+                crate::neotrix::nt_mind::ProductionAgentExecutor::new(kb_ref)
+            }),
+            meta_shell: {
+                // P1: 启动时从 KB 恢复派单学习证据 — 派单统计跨会话存活。
+                let mut shell = crate::neotrix::nt_mind::MetaAgentShell::new("dialogue");
+                if let Some(ref kb_ref) = kb {
+                    if let Err(e) = shell.learner.load(kb_ref) {
+                        log::warn!("[bg-meta] route_learner load failed: {}", e);
+                    }
+                }
+                Some(shell)
+            },
             kb,
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
             cognitive_mode: 0,
@@ -629,6 +645,14 @@ pub struct BackgroundLoopHandle {
     /// 记忆大脑 agent 外壳 — MemoryAgentCapability 统一能力面 (R-P42 接线)。
     /// handle_goal 按事件路由写/检索/巩固/证据能力。
     meta_agent: Option<crate::neotrix::nt_mind::evolution::agent_capability::MemoryAgent>,
+    /// 对话吸收桥 — 把 KB 近期 session/experience 蒸馏为能力向量反哺 SelfIteratingBrain。
+    /// handle_goal 末尾消费, 让对话经历驱动脑能力进化 (R-P79 接线, 非死代码)。
+    dialogue_bridge: Option<crate::neotrix::nt_mind::evolution::agent_capability::DialogueAbsorbBridge>,
+    /// 派单执行桥 (P0) — 把 MetaAgentShell 派单结果接到真实子系统,
+    /// 让星系派单从仪式变控制面。researcher→搜索, explorer→检索, 等。
+    agent_executor: Option<crate::neotrix::nt_mind::ProductionAgentExecutor>,
+    /// 元认知 agent 外壳 — 对话事件刺激注意力域后按路由跑内核 cycle。
+    meta_shell: Option<crate::neotrix::nt_mind::MetaAgentShell>,
     kb: Option<Arc<KnowledgeBase>>,
     emotion_restored: std::sync::atomic::AtomicBool,
     bbrain: crate::neotrix::nt_mind::bbrain_monitor::BMonitor,

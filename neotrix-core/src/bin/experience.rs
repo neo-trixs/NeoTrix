@@ -40,6 +40,10 @@ use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
+use neotrix::core::nt_core_hcube::ghrr_vsa::{
+    ghrr_bundle, ghrr_random_vector_dim, ghrr_similarity,
+};
+use neotrix::core::nt_core_hcube::{PersistentHomology, PointCloud};
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
@@ -275,6 +279,73 @@ fn cycle_opt(v: Option<&Value>) -> Option<String> {
 // ────────────────────────────────────────────────────────────────
 // 神经概念层 (Neural Concept Layer)
 // ────────────────────────────────────────────────────────────────
+/// 从字符串派生确定性 u64 种子 (供 ghrr 确定性向量)。
+fn seed_from_str(s: &str) -> u64 {
+    let mut h = Sha1::new();
+    h.update(s.as_bytes());
+    let d = h.finalize();
+    u64::from_be_bytes(d[..8].try_into().unwrap())
+}
+
+/// CJK 2-gram / ASCII 空白分词的 token 列表 (VSA 词袋)。
+fn vsa_tokens(s: &str) -> Vec<String> {
+    let mut toks = Vec::new();
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        if c.is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+        if c.is_ascii() {
+            let mut j = i;
+            while j < chars.len() && !chars[j].is_ascii_whitespace() {
+                j += 1;
+            }
+            let word: String = chars[i..j].iter().collect();
+            if !word.is_empty() {
+                toks.push(word.to_lowercase());
+            }
+            i = j;
+        } else if (0x4e00..=0x9fff).contains(&(c as u32)) {
+            let mut bigram = String::new();
+            bigram.push(c);
+            if i + 1 < chars.len() {
+                bigram.push(chars[i + 1]);
+            }
+            toks.push(bigram);
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+    toks
+}
+
+/// 文本 → GHRR 确定性向量 (词袋 bundle, 同 token 重叠 → 语义相近)。
+/// 使用全局 token 向量 memo: 同一 token (bigram/词) 只生成一次向量, 跨文档复用,
+/// 避免 per-token StdRng 高维生成爆炸。返回 (向量, 本文本 token 数)。
+fn text_doc_vector(s: &str, dim: usize, memo: &mut HashMap<String, Vec<f64>>) -> (Vec<f64>, usize) {
+    let toks = vsa_tokens(s);
+    if toks.is_empty() {
+        let v = ghrr_random_vector_dim(dim, 0);
+        return (v, 0);
+    }
+    let mut vecs: Vec<Vec<f64>> = Vec::with_capacity(toks.len());
+    for t in &toks {
+        if let Some(v) = memo.get(t) {
+            vecs.push(v.clone());
+        } else {
+            let v = ghrr_random_vector_dim(dim, seed_from_str(t));
+            memo.insert(t.clone(), v.clone());
+            vecs.push(v);
+        }
+    }
+    let refs: Vec<&[f64]> = vecs.iter().map(|v| v.as_slice()).collect();
+    (ghrr_bundle(&refs), toks.len())
+}
+
 fn concept_hash(term: &str) -> String {
     let mut h = Sha1::new();
     h.update(term.as_bytes());
@@ -671,7 +742,12 @@ fn cmd_close(conn: &Connection, cycle: &str) {
     let mut closed = 0;
     for (key, value) in rows {
         let Ok(mut v) = serde_json::from_str::<Value>(&value) else { continue };
-        if v.get("cycle").and_then(|c| c.as_str()) == Some(cycle) && v.get("ended_at").is_none() {
+        // 结束判定: snapshot 存 ended_at: null (字段存在但为 null) → 视为未关闭。
+        let not_ended = match v.get("ended_at") {
+            None => true,
+            Some(x) => x.is_null(),
+        };
+        if v.get("cycle").and_then(|c| c.as_str()) == Some(cycle) && not_ended {
             let started = v.get("started_at").and_then(|s| s.as_i64()).unwrap_or(now);
             v["ended_at"] = json!(now);
             v["duration_s"] = json!(now - started);
@@ -718,6 +794,19 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
         .and_then(|s| s.as_str())
         .map(String::from)
         .unwrap_or_else(|| format!("sess_{}_{}", now_ts(), uuid_hex(8)));
+    // 幂等门禁: 同一 session_id 已落盘则拒绝重复吸收 (防分支重复, cycle 218 教训)。
+    let dup = scan_values(conn, "branch_").into_iter().find(|(_, v)| {
+        serde_json::from_str::<Value>(v)
+            .map(|b| b.get("session_id").and_then(|s| s.as_str()) == Some(sid.as_str()))
+            .unwrap_or(false)
+    });
+    if let Some((key, _)) = dup {
+        println!(
+            "[absorb] 拒绝重复吸收 session_id={} (已存在于 {}) — 如需重吸先删除旧分支",
+            sid, key
+        );
+        return;
+    }
     let cycle = cycle_opt(session.get("cycle")).unwrap_or_else(|| "unknown".to_string());
     let ts = session.get("ts").and_then(|t| t.as_i64()).unwrap_or_else(now_ts);
 
@@ -758,6 +847,44 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
         if !errors.is_empty() {
             println!("[absorb] ✗ entry #{}: {:?}", i, errors);
             continue;
+        }
+        let dom = e.get("domain").and_then(|d| d.as_str()).unwrap_or("unknown");
+        // 写入前语义过滤 (SRMU 启示, 记忆大脑设计 §4.1a): 与同 domain 已有分支算 VSA
+        // 词袋相似度, 高冗余 (sim≥0.65, 校准自 2026-08-06 sim 分布: 精确=1.0, 改写≈0.75,
+        // 部分重叠≈0.02, 无关≈0) → 拒绝落盘, 防重复吸收冗余。
+        // 仅同 domain 比较 (跨 domain 不同语义面, 不裁), 且只在有已存分支时生效。
+        let new_content = e.get("content").and_then(|c| c.as_str()).unwrap_or("");
+        if !new_content.trim().is_empty() {
+            let dim = 2048usize;
+            let mut memo: HashMap<String, Vec<f64>> = HashMap::new();
+            let (qvec, _) = text_doc_vector(&new_content.to_lowercase(), dim, &mut memo);
+            let mut best_sim = 0.0f64;
+            for (_, value) in scan_values(conn, "branch_") {
+                let Ok(b) = serde_json::from_str::<Value>(&value) else { continue };
+                if b.get("domain").and_then(|d| d.as_str()) != Some(dom) {
+                    continue;
+                }
+                let bc = b
+                    .get("content")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+                if bc.is_empty() {
+                    continue;
+                }
+                let (dvec, _) = text_doc_vector(&bc, dim, &mut memo);
+                let sim = ghrr_similarity(&qvec, &dvec);
+                if sim > best_sim {
+                    best_sim = sim;
+                }
+            }
+            if best_sim >= 0.65 {
+                println!(
+                    "[absorb] 跳过冗余 entry #{} (sim={:.3} ≥0.65, 同 domain={}) — 防重复吸收",
+                    i, best_sim, dom
+                );
+                continue;
+            }
         }
         let key = format!("branch_{}_{}_{}", cycle, i, uuid_hex(6));
         // 神经网络化: 提取概念 → 去重神经元 → 分支保存概念引用 (内容词不重复落盘)
@@ -808,7 +935,8 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
 // 5. Feedback 反馈 / 查询
 // ────────────────────────────────────────────────────────────────
 /// 突触联想检索: 输入词 → 命中概念神经元 → 沿突触扩散到分支(1阶, 主结果) →
-/// Hebb 共现扩散到关联概念(2阶, 仅二阶且权重衰减, 作为相关推荐)。
+/// Hebb 共现多跳扩散到关联概念 (BFS, 每跳衰减, 记忆大脑设计 §3.3 图信号) →
+/// 关联概念分支获得加权分数 (作为相关推荐)。
 fn neural_associative(conn: &Connection, kws: &[String], hebb: bool) -> Option<Vec<(String, f64, i64)>> {
     if kws.is_empty() {
         return None;
@@ -867,28 +995,60 @@ fn neural_associative(conn: &Connection, kws: &[String], hebb: bool) -> Option<V
         });
         return Some(v);
     }
-    // 二阶: Hebb 共现扩散 — 与命中概念同现的关联概念 (只一跳), 其分支获得衰减权重
+    // 二阶+: Hebb 共现多跳扩散 (BFS, 每跳衰减 decay 系数) — 与命中概念关联的概念
+    // (经一跳及以上), 其分支获得衰减权重。hops 受限避免扩散爆炸: 每跳只保留
+    // top-K 高激活概念 (frontier 剪枝), 与设计文档 §3.3 图信号一致。
+    const HOP_LIMIT: usize = 3;
+    const DECAY: f64 = 0.5;
+    const FRONTIER_K: usize = 12;
     let mut order2: HashMap<String, f64> = HashMap::new();
-    for c in &first_neurons {
-        let co = co_full(c);
-        if co.is_empty() {
-            continue;
+    let mut frontier: Vec<(String, f64)> = first_neurons
+        .iter()
+        .filter_map(|c| {
+            c.get("id")
+                .and_then(|i| i.as_str())
+                .map(|id| (id.to_string(), 1.0))
+        })
+        .collect();
+    let mut seen: HashSet<String> = neuron_hits.clone();
+    for _ in 0..HOP_LIMIT {
+        if frontier.is_empty() {
+            break;
         }
-        let co_max = co.values().cloned().fold(1.0f64, f64::max);
-        for (oth_ch, w) in co {
-            if neuron_hits.contains(&oth_ch) {
+        let mut next: HashMap<String, f64> = HashMap::new();
+        for (ch, act) in &frontier {
+            let Some(c) = load_concept(conn, ch) else { continue };
+            let co = co_full(&c);
+            if co.is_empty() {
                 continue;
             }
-            let Some(oth) = load_concept(conn, &oth_ch) else { continue };
-            let boost = 0.5 * (w / co_max);
-            if let Some(bs) = oth.get("branches").and_then(|b| b.as_array()) {
-                for b in bs {
-                    if let Some(s) = b.as_str() {
-                        *order2.entry(s.to_string()).or_insert(0.0) += boost;
+            let co_max = co.values().cloned().fold(1.0f64, f64::max);
+            for (oth_ch, w) in co {
+                if seen.contains(&oth_ch) {
+                    continue;
+                }
+                let boost = act * DECAY * (w / co_max);
+                *next.entry(oth_ch.clone()).or_insert(0.0) += boost;
+            }
+        }
+        // Frontier 剪枝: 保留 top-K 高激活, 收集其分支; 同时标记 seen 防回环
+        let mut ranked: Vec<(String, f64)> = next.into_iter().collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        let mut keep: Vec<(String, f64)> = Vec::new();
+        for (ch, act) in ranked.into_iter().take(FRONTIER_K) {
+            if let Some(oth) = load_concept(conn, &ch) {
+                if let Some(bs) = oth.get("branches").and_then(|b| b.as_array()) {
+                    for b in bs {
+                        if let Some(s) = b.as_str() {
+                            *order2.entry(s.to_string()).or_insert(0.0) += act;
+                        }
                     }
                 }
             }
+            seen.insert(ch.clone());
+            keep.push((ch, act));
         }
+        frontier = keep;
     }
     // 合并: 一阶优先, 二阶作为相关推荐 (分数 *0.1 压后, 避免淹没直接命中)
     let mut merged: HashMap<String, (f64, i64)> = HashMap::new();
@@ -930,9 +1090,10 @@ struct QueryResult {
     verify_by: Option<Value>,
     score: f64,
     order: i64,
+    semantic: f64,
 }
 
-fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>, limit: usize, no_hebb: bool) {
+fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>, limit: usize, no_hebb: bool, json: bool, semantic: bool) {
     ensure_hub(conn);
     let kws: Vec<String> = kw
         .split_whitespace()
@@ -968,6 +1129,7 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
                 verify_by: v.get("verify_by").cloned(),
                 score,
                 order,
+                semantic: 0.0,
             });
         }
         results.sort_by(|a, b| {
@@ -1016,6 +1178,7 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
                 verify_by: v.get("verify_by").cloned(),
                 score: 0.0,
                 order: 0,
+                semantic: 0.0,
             });
         }
         results.sort_by(|a, b| {
@@ -1030,8 +1193,127 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
                 })
         });
     }
+    // 语义信号 (第三路混合): 与 query 的 VSA 词袋相似度, 重加权排序。
+    // 权重: 语义 0.4 / 原 FTS 图扩散 0.6 (研究 §6.3.1; 初始硬编码, C3 校准)。
+    // 分层 (TiMem/HiGMem 锚点思想): FTS 命中时只在 top-K 候选上 refine;
+    // FTS 0 命中时回退到全库扫描 (预算截断, 语义作 recall 补充, 非重排)。
+    // token 向量 memo 跨文档复用, 避免 per-token RNG 生成爆炸。
+    if semantic && !kw.trim().is_empty() {
+        let dim = 2048usize;
+        let mut memo: HashMap<String, Vec<f64>> = HashMap::new();
+        let (qvec, _) = text_doc_vector(&kw.to_lowercase(), dim, &mut memo);
+        if !results.is_empty() {
+            // 阶段A: FTS 命中 → 只 refine top-K
+            let k = (limit * 4).min(64).max(8);
+            let mut ranked: Vec<QueryResult> = results.clone();
+            ranked.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(Ordering::Equal)
+                    .then_with(|| a.key.cmp(&b.key))
+            });
+            let candidates: Vec<QueryResult> = ranked.into_iter().take(k).collect();
+            let mut scored: Vec<(f64, f64, String)> = Vec::with_capacity(candidates.len());
+            for r in &candidates {
+                let full = cache
+                    .get(&r.key)
+                    .and_then(|v| v.as_ref())
+                    .and_then(|v| v.get("content"))
+                    .and_then(|c| c.as_str())
+                    .unwrap_or(&r.content)
+                    .to_lowercase();
+                let (dvec, _) = text_doc_vector(&full, dim, &mut memo);
+                let sim = ghrr_similarity(&qvec, &dvec);
+                let fused = 0.4 * sim + 0.6 * r.score;
+                scored.push((fused, sim, r.key.clone()));
+            }
+            let order_map: HashMap<String, (f64, f64)> = scored
+                .into_iter()
+                .map(|(f, s, k)| (k, (f, s)))
+                .collect();
+            for r in &mut results {
+                if let Some(&(fused, sim)) = order_map.get(&r.key) {
+                    r.score = fused;
+                    r.order = 2; // 语义候选最高优先
+                    r.semantic = sim;
+                } else {
+                    r.order = 0; // 未进 top-K 预算的候选排最后
+                }
+            }
+            // 语义排序: order 降序 (语义候选 2 优先), 融合分高者先; 未进预算者殿后。
+            results.sort_by(|a, b| {
+                b.order
+                    .cmp(&a.order)
+                    .then_with(|| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal))
+                    .then_with(|| a.key.cmp(&b.key))
+            });
+        } else {
+            // 阶段B: FTS 0 命中 → 全库语义召回, 预算截断 (取 k 条最高 sim), 输出 fused=sim。
+            let k = (limit * 4).min(64).max(8);
+            let mut scored: Vec<(f64, f64, String)> = Vec::new();
+            for (key, v) in &cache {
+                let Some(v) = v else { continue };
+                let full = v
+                    .get("content")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+                if full.is_empty() {
+                    continue;
+                }
+                let (dvec, _) = text_doc_vector(&full, dim, &mut memo);
+                let sim = ghrr_similarity(&qvec, &dvec);
+                if sim > 0.0 {
+                    scored.push((sim, sim, key.clone()));
+                }
+            }
+            scored.sort_by(|a, b| {
+                b.0.partial_cmp(&a.0)
+                    .unwrap_or(Ordering::Equal)
+                    .then_with(|| a.2.cmp(&b.2))
+            });
+            results = scored
+                .into_iter()
+                .take(k)
+                .filter_map(|(fused, sim, key)| {
+                    let v = cache.get(&key).and_then(|x| x.as_ref())?;
+                    Some(QueryResult {
+                        cycle: cycle_opt(v.get("cycle")),
+                        ty: v.get("type").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+                        domain: v.get("domain").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+                        content: truncate(v.get("content").and_then(|c| c.as_str()).unwrap_or(""), 100),
+                        evidence: v.get("evidence").and_then(|e| e.as_str()).unwrap_or("").to_string(),
+                        key,
+                        verify_by: v.get("verify_by").cloned(),
+                        score: fused,
+                        order: 2,
+                        semantic: sim,
+                    })
+                })
+                .collect();
+        }
+    }
     let now = now_ts();
     let shown = results.len().min(limit);
+    if json {
+        // 机器可读输出: 顶层数组, 每元素 {key, cycle, type, domain, content, evidence}
+        // key 直接来自 kv_store branch_% —— 天然真实存在, 取代 Python 正则提取/二次校验。
+        let arr: Vec<Value> = results[..shown]
+            .iter()
+            .map(|r| {
+                json!({
+                    "key": r.key,
+                    "cycle": r.cycle.as_deref().unwrap_or(""),
+                    "type": r.ty,
+                    "domain": r.domain,
+                    "content": r.content,
+                    "evidence": r.evidence
+                })
+            })
+            .collect();
+        println!("{}", json!(arr));
+        return;
+    }
     for r in &results[..shown] {
         let stale_mark = if is_stale(r.verify_by.as_ref(), now) {
             "[STALE] "
@@ -1070,11 +1352,11 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
     );
 }
 
-fn cmd_list(conn: &Connection, ty: Option<&str>, domain: Option<&str>) {
+fn cmd_list(conn: &Connection, ty: Option<&str>, domain: Option<&str>, cycle: Option<&str>) {
     ensure_hub(conn);
     let rows = scan_values(conn, "branch_");
     let mut count = 0;
-    for (_, value) in rows {
+    for (key, value) in rows {
         let Ok(v) = serde_json::from_str::<Value>(&value) else { continue };
         if let Some(t) = ty {
             if v.get("type").and_then(|x| x.as_str()) != Some(t) {
@@ -1086,13 +1368,19 @@ fn cmd_list(conn: &Connection, ty: Option<&str>, domain: Option<&str>) {
                 continue;
             }
         }
+        if let Some(c) = cycle {
+            if v.get("cycle").and_then(|x| x.as_str()) != Some(c) {
+                continue;
+            }
+        }
         count += 1;
         println!(
-            "[{}] {:8} {:16} {}",
+            "[{}] {:8} {:16} {}  (key={})",
             cycle_opt(v.get("cycle")).unwrap_or_else(|| "?".to_string()),
             v.get("type").and_then(|x| x.as_str()).unwrap_or("?"),
             v.get("domain").and_then(|x| x.as_str()).unwrap_or("?"),
-            truncate(v.get("content").and_then(|c| c.as_str()).unwrap_or(""), 80)
+            truncate(v.get("content").and_then(|c| c.as_str()).unwrap_or(""), 80),
+            truncate(&key, 40)
         );
     }
     println!("[list] {} entries", count);
@@ -1175,6 +1463,56 @@ fn cmd_route(conn: &Connection, kw: &str, branch: &str) {
     hub["hub"]["route_table"][kw] = json!(list);
     save_hub(conn, &hub);
     println!("[route] '{}' → {}", kw, json!(list));
+}
+
+/// 巡检 route_table: 校验每条路由指向的 branch_% key 真实存在于 kv_store。
+/// --clean 移除 ghost 路由 (否则仅报告)。替代手工 SQL 编辑 (P1 修补的运维侧)。
+fn cmd_route_verify(conn: &Connection, clean: bool) {
+    let mut hub = ensure_hub(conn);
+    let mut new_rt: serde_json::Map<String, Value> = serde_json::Map::new();
+    let mut ghost_total = 0usize;
+    {
+        let rt = hub["hub"]["route_table"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        for (kw, arr) in rt {
+            let mut keep: Vec<Value> = Vec::new();
+            let mut ghosts: Vec<String> = Vec::new();
+            if let Some(list) = arr.as_array() {
+                for b in list {
+                    let key = b.as_str().unwrap_or("");
+                    if key.starts_with("branch_") && kv_get(conn, NS, key).is_some() {
+                        keep.push(b.clone());
+                    } else {
+                        ghost_total += 1;
+                        ghosts.push(key.to_string());
+                    }
+                }
+            }
+            if !ghosts.is_empty() {
+                eprintln!("[route-verify] ghost '{}' → {:?}", kw, ghosts);
+            }
+            if !keep.is_empty() {
+                new_rt.insert(kw, json!(keep));
+            }
+        }
+    }
+    hub["hub"]["route_table"] = json!(new_rt);
+    if clean {
+        save_hub(conn, &hub);
+        println!(
+            "[route-verify] cleaned {} ghost route(s), {} routes remain",
+            ghost_total,
+            hub["hub"]["route_table"].as_object().map(|m| m.len()).unwrap_or(0)
+        );
+    } else {
+        println!(
+            "[route-verify] {} ghost route(s) found (use --clean to remove), {} routes",
+            ghost_total,
+            hub["hub"]["route_table"].as_object().map(|m| m.len()).unwrap_or(0)
+        );
+    }
 }
 
 /// 神经概念图检视: 显示概念神经元的突触 (引用它的分支) 与联想扩散。
@@ -1346,6 +1684,106 @@ fn cmd_prune(conn: &Connection, extra_stop: &[String], stale_isolated: bool) {
         dropped,
         branches.len()
     );
+}
+
+/// 清理重复分支 (幂等): 内容空白归一化后完全相同 → 保留 cycle 最旧的一份,
+/// 删除其余。同步三处: 删 kv_store 行 / 从引用分支的 concepts 摘除 / 概念图
+/// branches 摘引用 / hub 指标刷新。--dry-run 只报告不删。
+fn cmd_dedup(conn: &Connection, dry_run: bool) {
+    let rows = scan_values(conn, "branch_");
+    // key → (归一化 content, 原始 value, cycle)
+    let mut norm: HashMap<String, Vec<(String, Value, String)>> = HashMap::new();
+    for (key, value) in &rows {
+        let Ok(v) = serde_json::from_str::<Value>(value) else { continue };
+        let content = v.get("content").and_then(|c| c.as_str()).unwrap_or("");
+        let n = content.split_whitespace().collect::<String>().to_lowercase();
+        if n.len() < 30 {
+            continue;
+        }
+        let cycle = match v.get("cycle") {
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Number(n)) => n.to_string(),
+            _ => String::new(),
+        };        norm.entry(n).or_default().push((key.clone(), v, cycle));
+    }
+
+    let mut to_delete: Vec<String> = Vec::new();
+    let mut groups = 0;
+    for (n, group) in &norm {
+        if group.len() < 2 {
+            continue;
+        }
+        groups += 1;
+        // 保留 cycle 最旧 (数值最小) 且 key 字典序最小的
+        let mut sorted = group.clone();
+        sorted.sort_by(|a, b| {
+            let ca = parse_cycle(&a.2);
+            let cb = parse_cycle(&b.2);
+            ca.cmp(&cb).then_with(|| a.0.cmp(&b.0))
+        });
+        for (key, _, _) in sorted.iter().skip(1) {
+            to_delete.push(key.clone());
+        }
+        println!(
+            "  [dedup] 组: {} 份 (保留 {}) — 删 {}",
+            sorted.len(),
+            sorted[0].0,
+            sorted
+                .iter()
+                .skip(1)
+                .map(|x| x.0.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    if to_delete.is_empty() {
+        println!("[dedup] 无重复分支");
+        return;
+    }
+    println!("[dedup] 发现 {} 组重复, 将删除 {} 条", groups, to_delete.len());
+    if dry_run {
+        println!("[dedup] (dry-run) 未删除 — 加 --dry-run 去掉则执行");
+        return;
+    }
+
+    // 1. 从引用分支的 concepts 摘除: 被删分支本身若被 concept 引用, 概念图 branches 需摘
+    let del_set: HashSet<String> = to_delete.iter().cloned().collect();
+    // 2. 概念图: 每个 concept 的 branches 摘除被删分支
+    for (ckey, cvalue) in scan_values(conn, "concept_") {
+        let Ok(mut c) = serde_json::from_str::<Value>(&cvalue) else { continue };
+        let mut changed = false;
+        if let Some(bs) = c.get_mut("branches").and_then(|b| b.as_array_mut()) {
+            let before = bs.len();
+            bs.retain(|b| !del_set.contains(b.as_str().unwrap_or("")));
+            changed = bs.len() != before;
+        }
+        if changed {
+            kv_set(conn, NS, &ckey, &c.to_string());
+        }
+    }
+    // 3. 删除 kv_store 行
+    for key in &to_delete {
+        conn.execute(
+            "DELETE FROM kv_store WHERE namespace=?1 AND key=?2",
+            params![NS, key],
+        )
+        .ok();
+    }
+    // 4. hub 指标刷新
+    let mut hub = ensure_hub(conn);
+    refresh_hub_metrics(conn, &mut hub);
+    save_hub(conn, &hub);
+    println!("[dedup] 已删除 {} 条重复分支, 概念图摘引用完成, hub 已刷新", to_delete.len());
+}
+
+fn parse_cycle(c: &str) -> i64 {
+    // cycle 可能是 "186" / "105" / "161k" 等, 取前缀数字
+    c.chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect::<String>()
+        .parse::<i64>()
+        .unwrap_or(i64::MAX)
 }
 
 /// 重建 Hebb 共现突触网络 (幂等 — 先清空 co 再全量重建)。
@@ -1651,6 +2089,11 @@ enum Cmd {
         limit: usize,
         #[arg(long)]
         no_hebb: bool,
+        #[arg(long)]
+        json: bool,
+        /// 增加 VSA 语义近邻信号: 检索后按嵌入相似度加权重排 (混合检索第三路)
+        #[arg(long)]
+        semantic: bool,
     },
     /// 列出条目
     List {
@@ -1658,6 +2101,8 @@ enum Cmd {
         r#type: Option<String>,
         #[arg(long)]
         domain: Option<String>,
+        #[arg(long)]
+        cycle: Option<String>,
     },
     /// 列出过期 (verify_by) 分支 — 复核清单
     Stale {
@@ -1672,6 +2117,11 @@ enum Cmd {
         kw: String,
         #[arg(long, required = true)]
         branch: String,
+    },
+    /// 巡检 route_table 幽灵路由 (--clean 移除)
+    RouteVerify {
+        #[arg(long)]
+        clean: bool,
     },
     /// 神经概念图检视 (突触链路)
     Neuron {
@@ -1690,6 +2140,11 @@ enum Cmd {
     },
     /// 重建 Hebb 共现突触网络
     Hebb,
+    /// 清理重复分支: 内容归一化相同 → 保留一份, 删其余 (含概念图摘引用 + hub 刷新)
+    Dedup {
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// 存量 value 透明压缩迁移 (zlib, 魔数标记)
     Compress {
         #[arg(long)]
@@ -1702,6 +2157,27 @@ enum Cmd {
         #[arg(long, default_value_t = 10)]
         limit: usize,
     },
+    /// 测量两段文本的 VSA 词袋相似度 (阈值校准工具)
+    Sim {
+        #[arg(long, default_value = "")]
+        a: String,
+        #[arg(long, default_value = "")]
+        b: String,
+        #[arg(long, default_value_t = 2048)]
+        dim: usize,
+    },
+    /// 记忆星系拓扑报告: 经验嵌入点云 → 持续同调 (Betti 数) + 记忆簇
+    Topology {
+        #[arg(long, default_value_t = 2048)]
+        dim: usize,
+        #[arg(long, default_value_t = 10)]
+        steps: usize,
+        /// 点云采样上限 (O(n³) 三角形计数防爆炸, 0=不限)
+        #[arg(long, default_value_t = 400)]
+        max_points: usize,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() {
@@ -1711,19 +2187,244 @@ fn main() {
         Cmd::Snapshot { cycle, task, domain } => cmd_snapshot(&conn, &cycle, &task, &domain),
         Cmd::Close { cycle } => cmd_close(&conn, &cycle),
         Cmd::Absorb { session } => cmd_absorb(&conn, &session),
-        Cmd::Query { kw, r#type, domain, limit, no_hebb } => {
-            cmd_query(&conn, &kw, r#type.as_deref(), domain.as_deref(), limit, no_hebb)
+        Cmd::Query { kw, r#type, domain, limit, no_hebb, json, semantic } => {
+            cmd_query(&conn, &kw, r#type.as_deref(), domain.as_deref(), limit, no_hebb, json, semantic)
         }
-        Cmd::List { r#type, domain } => cmd_list(&conn, r#type.as_deref(), domain.as_deref()),
+        Cmd::List { r#type, domain, cycle } => cmd_list(&conn, r#type.as_deref(), domain.as_deref(), cycle.as_deref()),
         Cmd::Stale { domain } => cmd_stale(&conn, domain.as_deref()),
         Cmd::Hub => cmd_hub(&conn),
         Cmd::Route { kw, branch } => cmd_route(&conn, &kw, &branch),
+        Cmd::RouteVerify { clean } => cmd_route_verify(&conn, clean),
         Cmd::Neuron { term, exact } => cmd_neuron(&conn, &term, exact),
         Cmd::Backfill => cmd_backfill(&conn),
         Cmd::Prune { stop, stale_isolated } => cmd_prune(&conn, &stop, stale_isolated),
         Cmd::Hebb => cmd_hebb(&mut conn),
+        Cmd::Dedup { dry_run } => cmd_dedup(&conn, dry_run),
         Cmd::Compress { all } => cmd_compress(&mut conn, all),
         Cmd::GenIndex { out, limit } => cmd_gen_index(&conn, &out, limit),
+        Cmd::Sim { a, b, dim } => cmd_sim(&a, &b, dim),        Cmd::Topology {
+            dim,
+            steps,
+            max_points,
+            json,
+        } => cmd_topology(&conn, dim, steps, max_points, json),
+    }
+}
+
+/// 测量两段文本的 VSA 词袋相似度 — 阈值校准工具。
+fn cmd_sim(a: &str, b: &str, dim: usize) {
+    let mut memo: HashMap<String, Vec<f64>> = HashMap::new();
+    let (va, _) = text_doc_vector(&a.to_lowercase(), dim, &mut memo);
+    let (vb, _) = text_doc_vector(&b.to_lowercase(), dim, &mut memo);
+    let sim = if va.is_empty() || vb.is_empty() {
+        0.0
+    } else {
+        ghrr_similarity(&va, &vb)
+    };
+    println!("sim(a,b) = {:.6}  (dim={})", sim, dim);
+    println!("  len(a)={} tokens, len(b)={} tokens", vsa_tokens(a).len(), vsa_tokens(b).len());
+}
+
+/// 记忆星系拓扑报告: 全量分支 → VSA 文档向量 (归一化) → 持续同调点云。
+/// 输出 Betti 曲线 (β₀=记忆簇/组件, β₁=环路=反复出现的模式链, β₂=填充四面体≈高密度凸起)
+/// + 积分估计 (Φ 代理) + 持久熵 + 选定尺度下的记忆簇成员 (凸起映射回真实分支)。
+/// 归一化向量欧氏距离: 语义相关 ≈0.4-0.6, 无关 ≈1.0-1.4 → scale_max=0.8 已覆盖相关区。
+/// O(n³) 三角形计数 → max_points 分层采样 (按 domain 均摊) 防爆炸。
+fn cmd_topology(conn: &Connection, dim: usize, steps: usize, max_points: usize, json: bool) {
+    ensure_hub(conn);
+    let mut memo: HashMap<String, Vec<f64>> = HashMap::new();
+    let mut entries: Vec<(String, String, String, Vec<f64>)> = Vec::new();
+    for (key, value) in scan_values(conn, "branch_") {
+        let Ok(v) = serde_json::from_str::<Value>(&value) else { continue };
+        let content = v
+            .get("content")
+            .and_then(|c| c.as_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if content.trim().is_empty() {
+            continue;
+        }
+        let (raw, _) = text_doc_vector(&content, dim, &mut memo);
+        let norm = l2_norm(&raw);
+        let vec: Vec<f64> = if norm > 1e-12 {
+            raw.iter().map(|x| x / norm).collect()
+        } else {
+            raw
+        };
+        entries.push((
+            key,
+            v.get("domain").and_then(|d| d.as_str()).unwrap_or("").to_string(),
+            truncate(
+                v.get("content").and_then(|c| c.as_str()).unwrap_or(""),
+                60,
+            ),
+            vec,
+        ));
+    }
+    if entries.len() < 2 {
+        println!("[topology] 至少需要 2 个分支 (当前 {})", entries.len());
+        return;
+    }
+
+    // 分层采样: 按 domain 均摊到 max_points, 保持域多样性
+    if max_points > 0 && entries.len() > max_points {
+        let mut by_domain: HashMap<String, Vec<usize>> = HashMap::new();
+        for (i, e) in entries.iter().enumerate() {
+            by_domain.entry(e.1.clone()).or_default().push(i);
+        }
+        let n_domains = by_domain.len();
+        let per = (max_points / n_domains).max(1);
+        let mut picked: Vec<usize> = Vec::with_capacity(max_points);
+        for idxs in by_domain.values() {
+            picked.extend(idxs.iter().take(per));
+        }
+        if picked.len() < max_points {
+            let mut rest: Vec<usize> = (0..entries.len()).filter(|i| !picked.contains(i)).collect();
+            rest.sort_by_key(|i| std::cmp::Reverse((entries[*i].1.len(), 0)));
+            picked.extend(rest.into_iter().take(max_points - picked.len()));
+        }
+        let mut filtered: Vec<(String, String, String, Vec<f64>)> = Vec::with_capacity(picked.len());
+        for &i in &picked {
+            filtered.push(entries[i].clone());
+        }
+        entries = filtered;
+    }
+
+    let mut cloud = PointCloud::new("memory-galaxy");
+    for e in &entries {
+        cloud.add_point(e.3.clone());
+    }
+
+    let scale_max = 0.8f64;
+    let ph = PersistentHomology::compute(&cloud, scale_max, steps);
+
+    // 报告 Betti 曲线 (采样几个代表性尺度)
+    let mut curve_lines = Vec::new();
+    for (s, b) in &ph.betti_curves {
+        curve_lines.push(format!(
+            "  scale={:.2} β0={} β1={} β2={}",
+            s, b.beta_0, b.beta_1, b.beta_2
+        ));
+    }
+    let phi = ph
+        .simplified_betti()
+        .integration_estimate();
+    let entropy = ph.persistence_entropy();
+
+    // 记忆簇: 在 scale 0.6 (语义相近距离) 做 union-find 聚类, 输出≥2 成员的簇
+    let mut parent: Vec<usize> = (0..entries.len()).collect();
+    let dists = cloud_distance_matrix(&cloud);
+    for i in 0..entries.len() {
+        for j in (i + 1)..entries.len() {
+            if dists[i][j] <= 0.6 {
+                cluster_union(&mut parent, i, j);
+            }
+        }
+    }
+    let mut roots: HashMap<usize, Vec<usize>> = HashMap::new();
+    for i in 0..parent.len() {
+        let r = cluster_find(&mut parent, i);
+        roots.entry(r).or_default().push(i);
+    }
+    let mut clusters: Vec<Vec<usize>> = roots.into_values().filter(|c| c.len() >= 2).collect();
+    clusters.sort_by_key(|c| std::cmp::Reverse(c.len()));
+
+    if json {
+        let mut cluster_json = Vec::new();
+        for c in &clusters {
+            let members: Vec<Value> = c
+                .iter()
+                .map(|&i| {
+                    json!({
+                        "key": entries[i].0,
+                        "domain": entries[i].1,
+                        "content": entries[i].2,
+                    })
+                })
+                .collect();
+            cluster_json.push(json!({ "size": c.len(), "members": members }));
+        }
+        let out = json!({
+            "dim": dim,
+            "points": entries.len(),
+            "betti": ph.betti_curves.iter().map(|(s, b)| json!({
+                "scale": s, "beta_0": b.beta_0, "beta_1": b.beta_1, "beta_2": b.beta_2
+            })).collect::<Vec<_>>(),
+            "integration_estimate": phi,
+            "persistence_entropy": entropy,
+            "clusters": cluster_json,
+        });
+        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    } else {
+        println!("[topology] 记忆星系拓扑 — {} 个分支, dim={}", entries.len(), dim);
+        println!("Betti 曲线 (scale∈[0,{}], {} 步):", scale_max, steps);
+        for l in curve_lines.iter().take(6) {
+            println!("{}", l);
+        }
+        if steps > 6 {
+            println!("  ... 共 {} 步, 中间省略 ...", steps + 1);
+            for l in curve_lines.iter().skip(curve_lines.len() - 2) {
+                println!("{}", l);
+            }
+        }
+        println!(
+            "integration_estimate (Φ 代理) = {:.4}, persistence_entropy = {:.4}",
+            phi, entropy
+        );
+        println!("\n记忆簇 (scale≤0.6, 语义相近 ≥2 分支): {} 个", clusters.len());
+        for (ci, c) in clusters.iter().enumerate().take(10) {
+            println!(" 簇 #{} ({} 分支):", ci + 1, c.len());
+            for &i in c.iter().take(5) {
+                println!("   · [{}] {} — {}", entries[i].1, entries[i].0, entries[i].2);
+            }
+            if c.len() > 5 {
+                println!("   ... 其余 {} 分支", c.len() - 5);
+            }
+        }
+    }
+}
+
+fn l2_norm(v: &[f64]) -> f64 {
+    v.iter().map(|x| x * x).sum::<f64>().sqrt()
+}
+
+fn cloud_distance_matrix(cloud: &PointCloud) -> Vec<Vec<f64>> {
+    let n = cloud.n();
+    let mut dists = vec![vec![0.0f64; n]; n];
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let d = l2_distance(&cloud.points[i], &cloud.points[j]);
+            dists[i][j] = d;
+            dists[j][i] = d;
+        }
+    }
+    dists
+}
+
+fn l2_distance(a: &[f64], b: &[f64]) -> f64 {
+    a.iter()
+        .zip(b.iter())
+        .map(|(x, y)| {
+            let d = x - y;
+            d * d
+        })
+        .sum::<f64>()
+        .sqrt()
+}
+
+fn cluster_find(parent: &mut [usize], mut i: usize) -> usize {
+    while parent[i] != i {
+        parent[i] = parent[parent[i]];
+        i = parent[i];
+    }
+    i
+}
+
+fn cluster_union(parent: &mut [usize], a: usize, b: usize) {
+    let ra = cluster_find(parent, a);
+    let rb = cluster_find(parent, b);
+    if ra != rb {
+        parent[ra] = rb;
     }
 }
 

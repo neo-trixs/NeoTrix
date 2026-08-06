@@ -47,10 +47,13 @@ pub(super) fn capability_vector_group_b(s: &KnowledgeSource) -> CapabilityVector
         | KnowledgeSource::PredictiveCoding
         | KnowledgeSource::OrchOR
         | KnowledgeSource::AttentionSchema
-        | KnowledgeSource::SiaHarnessUpdate
+        |         KnowledgeSource::SiaHarnessUpdate
         | KnowledgeSource::SiaWeightUpdate
         | KnowledgeSource::SiaFeedbackLoop
         | KnowledgeSource::HyperAgents => specialized::cap_vec_specialized(s),
+
+        KnowledgeSource::DialogueExperience => general::cap_vec_general(s),
+        KnowledgeSource::ResearchFindings => general::cap_vec_general(s),
 
         _ => CapabilityVector::default(),
     }

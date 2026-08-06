@@ -153,6 +153,13 @@ pub enum KnowledgeSource {
     SiaFeedbackLoop,        // 三体反馈循环架构
     // 🆕 2026-05-30: DGM-HyperAgents (arXiv 2603.19461, Meta FAIR)
     HyperAgents,            // 自指涉自我改进
+    // 🆕 2026-06-06: 对话经验反哺 — DialogueAbsorbBridge 把 KB 近期 session/experience
+    // 条目蒸馏出的能力向量以该源身份吸收, 让对话经历参与 SelfIteratingBrain 进化。
+    DialogueExperience,
+    // 🆕 2026-08-06: 研究结论反哺 — WebSearchTool/researcher agent 的统一搜索结论
+    // (DDG→Wikipedia 有序后端) 经 DialogueAbsorbBridge 蒸馏后以该源身份吸收,
+    // 让外部研究结论参与 SelfIteratingBrain 进化 (搜索结论 → KB → 脑能力闭环)。
+    ResearchFindings,
 }
 
 #[cfg(test)]

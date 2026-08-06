@@ -1161,6 +1161,20 @@ impl KnowledgeBase {
         Ok(())
     }
 
+    // ── RouteLearner 持久化 (P1) ──
+    // 派单路由学习者的行为统计存 kv_store `route_learner` namespace, 跨会话存活 —
+    // 让"派单从结果里学"不止在单次运行内生效, 重启后继续累积证据。
+
+    pub fn save_route_learner(&self, json: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_unify::kv_set(&conn, "route_learner", "state", json)
+    }
+
+    pub fn load_route_learner(&self) -> Result<Option<String>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_unify::kv_get(&conn, "route_learner", "state")
+    }
+
     // ── Agent Session Management (SQLite-backed) ──
 
     pub fn agent_session_begin(&self, agent_id: &str, label: &str) -> Result<String, String> {

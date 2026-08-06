@@ -54,6 +54,10 @@ path = "src/bin/shanhai_link.rs"
 name = "neotrix-experience"
 path = "src/bin/experience.rs"
 
+[[bin]]
+name = "neotrix-geoint"
+path = "src/bin/geoint.rs"
+
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
 thiserror = "1"
