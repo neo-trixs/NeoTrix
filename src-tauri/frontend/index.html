@@ -275,6 +275,36 @@
   </div>
 </div>
 
+<!-- ═══ OVERLAY: 归档会话 ═══ -->
+<div class="overlay-panel" id="overlayArchived">
+  <div class="overlay-box" style="max-width:640px;width:88vw;max-height:80vh">
+    <div class="overlay-h">
+      <h2>归档会话</h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayArchived')" title="关闭"></span>
+      </div>
+    </div>
+    <div class="arch-body" id="archivedBody">
+      <div class="cw-empty" style="padding:24px 12px;text-align:center;color:var(--tx2);font-size:var(--fs-small)">加载中…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: Checkpoint 时间线 ═══ -->
+<div class="overlay-panel" id="overlayCheckpoints">
+  <div class="overlay-box" style="max-width:620px;width:88vw;max-height:80vh">
+    <div class="overlay-h">
+      <h2 id="ckTitle">会话时间线</h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayCheckpoints')" title="关闭"></span>
+      </div>
+    </div>
+    <div class="arch-body" id="checkpointBody">
+      <div class="cw-empty" style="padding:24px 12px;text-align:center;color:var(--tx2);font-size:var(--fs-small)">加载中…</div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ OVERLAY: 设置面板 ═══ -->
 <div class="overlay-panel" id="overlaySettings">
   <div class="st-modal">
@@ -680,6 +710,8 @@
   <button class="ses-item" onclick="renameSession()"><svg viewBox="0 0 14 14"><path d="M10.5 3.5l1 1L6 10H5V9z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/><path d="M3 12.5h8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>重命名</button>
   <button class="ses-item" onclick="compactSession()"><svg viewBox="0 0 14 14"><path d="M7 2v10M7 2L4.5 4.5M7 2l2.5 2.5M7 12l-2.5-2.5M7 12l2.5-2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>压缩上下文</button>
   <button class="ses-item" onclick="archiveSession()"><svg viewBox="0 0 14 14"><rect x="2" y="2.5" width="10" height="3" rx="1" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M3.5 5.5V11a1 1 0 001 1h5a1 1 0 001-1V5.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="6" y1="7.5" x2="8" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>归档</button>
+  <button class="ses-item" onclick="openCheckpointTimeline()"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M7 3.5V7l2.5 2" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>时间线 · 回滚</button>
+  <button class="ses-item" onclick="openArchivedSessions()"><svg viewBox="0 0 14 14"><path d="M2.5 4.5h9M3.5 4.5l.8 7a1 1 0 001 1h3.4a1 1 0 001-1l.8-7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/><line x1="5" y1="7" x2="9" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>查看归档</button>
   <button class="ses-item" onclick="exportSession()"><svg viewBox="0 0 14 14"><path d="M7 1.5v7M7 1.5L4.5 4M7 1.5L9.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M2.5 8.5V12h9V8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>导出</button>
   <div class="ses-sep"></div>
   <button class="ses-item danger" onclick="deleteSession()"><svg viewBox="0 0 14 14"><path d="M2.5 4h9M5 4V2.5h4V4M4 4l.5 7.5h5L10 4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg>删除会话</button>

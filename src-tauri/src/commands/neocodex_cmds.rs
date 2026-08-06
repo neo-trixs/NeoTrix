@@ -1580,7 +1580,10 @@ pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), Strin
 }
 
 /// Get per-file diffs for the active neocodex session's working tree.
-/// Returns a map of file path -> diff blocks for all changed files.
+/// Returns the unified frontend contract:
+/// `{ "files": [ { "path": "...", "hunks": [ { "lines": [
+///    { "t": "ctx"|"del"|"add", "o": old_line|0, "n": new_line|0, "s": content } ] } ] } ] }`
+/// so the chat's diff panel can render real changes (Claude/Codex parity).
 #[tauri::command]
 pub fn neocodex_get_diff() -> Result<serde_json::Value, String> {
     use std::process::Command;
@@ -1597,18 +1600,18 @@ pub fn neocodex_get_diff() -> Result<serde_json::Value, String> {
         .map(|s| s.to_string())
         .collect();
 
-    let mut result = serde_json::Map::new();
+    let mut result: Vec<serde_json::Value> = Vec::new();
     for file in &files {
         let diff_out = Command::new("git")
             .args(["diff", "HEAD", "--", file])
             .output()
             .map_err(|e| e.to_string())?;
         let diff_text = String::from_utf8_lossy(&diff_out.stdout).to_string();
-        let blocks = parse_neocodex_diff(&diff_text);
-        result.insert(file.clone(), serde_json::to_value(blocks).unwrap());
+        let hunks = parse_unified_diff_rich(&diff_text);
+        result.push(serde_json::json!({ "path": file, "hunks": hunks }));
     }
 
-    // Also include untracked files
+    // Also include untracked files as a single all-added hunk
     let untracked_out = Command::new("git")
         .args(["status", "--porcelain"])
         .output()
@@ -1621,16 +1624,85 @@ pub fn neocodex_get_diff() -> Result<serde_json::Value, String> {
 
     for file in &untracked {
         if let Ok(content) = std::fs::read_to_string(file) {
-            let blocks = vec![crate::commands::DiffBlock {
-                r#type: "added".into(),
-                content,
-                line_start: 0,
-            }];
-            result.insert(file.clone(), serde_json::to_value(blocks).unwrap());
+            let lines: Vec<serde_json::Value> = content
+                .lines()
+                .enumerate()
+                .map(|(i, l)| serde_json::json!({ "t": "add", "o": null, "n": i + 1, "s": l }))
+                .collect();
+            result.push(serde_json::json!({ "path": file, "hunks": [ { "lines": lines } ] }));
         }
     }
 
-    Ok(serde_json::Value::Object(result))
+    Ok(serde_json::json!({ "files": result }))
+}
+
+/// Parse a unified git diff into frontend hunk/line rows with old & new line
+/// numbers so the panel can render +/- badges and per-line comments.
+/// Header format: `@@ -old_start[,old_count] +new_start[,new_count] @@`
+fn commit_header(num: &str, is_old: bool, old_nr: &mut u64, new_nr: &mut u64) {
+    if !num.is_empty() {
+        if let Ok(v) = num.parse() {
+            if is_old { *old_nr = v; } else { *new_nr = v; }
+        }
+    }
+}
+
+fn parse_unified_diff_rich(diff_text: &str) -> Vec<serde_json::Value> {
+    let mut hunks: Vec<serde_json::Value> = Vec::new();
+    let mut lines: Vec<serde_json::Value> = Vec::new();
+    let mut old_nr: u64 = 0;
+    let mut new_nr: u64 = 0;
+
+    for raw in diff_text.lines() {
+        let line = raw.strip_suffix('\r').unwrap_or(raw);
+        if let Some(rest) = line.strip_prefix("@@") {
+            if !lines.is_empty() {
+                hunks.push(serde_json::json!({ "lines": std::mem::take(&mut lines) }));
+            }
+            // extract the two numeric starts: -A[,B] and +C[,D]
+            let mut num = String::new();
+            let mut is_old = true;
+            let mut skip_count = false;
+            for ch in rest.chars() {
+                match ch {
+                    '-' => { commit_header(&num, is_old, &mut old_nr, &mut new_nr); is_old = true; num.clear(); skip_count = false; }
+                    '+' => { commit_header(&num, is_old, &mut old_nr, &mut new_nr); is_old = false; num.clear(); skip_count = false; }
+                    '0'..='9' if !skip_count => num.push(ch),
+                    ',' => { commit_header(&num, is_old, &mut old_nr, &mut new_nr); num.clear(); skip_count = true; }
+                    _ => { commit_header(&num, is_old, &mut old_nr, &mut new_nr); num.clear(); }
+                }
+            }
+            commit_header(&num, is_old, &mut old_nr, &mut new_nr);
+            old_nr = old_nr.max(1);
+            new_nr = new_nr.max(1);
+            continue;
+        }
+        if let Some(s) = line.strip_prefix('+') {
+            if !s.starts_with('+') {
+                lines.push(serde_json::json!({ "t": "add", "o": null, "n": new_nr, "s": s }));
+                new_nr += 1;
+                continue;
+            }
+        }
+        if let Some(s) = line.strip_prefix('-') {
+            if !s.starts_with('-') {
+                lines.push(serde_json::json!({ "t": "del", "o": old_nr, "n": null, "s": s }));
+                old_nr += 1;
+                continue;
+            }
+        }
+        if line.starts_with("diff") || line.starts_with("index")
+            || line.starts_with("---") || line.starts_with("+++") || line.starts_with("\\ ") {
+            continue;
+        }
+        lines.push(serde_json::json!({ "t": "ctx", "o": old_nr, "n": new_nr, "s": line }));
+        old_nr += 1;
+        new_nr += 1;
+    }
+    if !lines.is_empty() {
+        hunks.push(serde_json::json!({ "lines": lines }));
+    }
+    hunks
 }
 
 /// Apply (accept) or reject a file's diff in the neocodex session.
