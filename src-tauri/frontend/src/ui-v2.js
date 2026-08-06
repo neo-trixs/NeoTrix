@@ -67,6 +67,11 @@ g.closeSessionOps = closeSessionOps;
 g.checkForUpdate = checkForUpdate;
 g.openSessionFromSearch = openSessionFromSearch;
 g.cycleMode = cycleMode;
+g.openArchivedSessions = openArchivedSessions;
+g.restoreArchived = restoreArchived;
+g.deleteArchived = deleteArchived;
+g.openCheckpointTimeline = openCheckpointTimeline;
+g.restoreCheckpoint = restoreCheckpoint;
   /* Free LLM 模型池 — 模型选择下拉的数据源（Tauri 下与 neocodex_provider_config 合并） */
   const MODEL_POOL = [
     { id: 'Groq',        title: 'Groq',        model: 'Llama 3.3 70B', lat: 340, online: true  },
@@ -1401,6 +1406,113 @@ g.cycleMode = cycleMode;
     }catch(e){ showToast('删除失败: ' + e); }
   }
 
+  async function openArchivedSessions(){
+    closeSessionOps();
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可查看归档'); return; }
+    const body = document.getElementById('archivedBody');
+    if(!body) return;
+    body.innerHTML = '<div class="cw-empty" style="padding:24px 12px;text-align:center;color:var(--tx2);font-size:var(--fs-small)">加载中…</div>';
+    openOverlay('overlayArchived');
+    try{
+      const list = await invoke('neocodex_list_archived');
+      const arr = Array.isArray(list) ? list : [];
+      if(!arr.length){
+        body.innerHTML = '<div class="cw-empty" style="padding:32px 12px;text-align:center;color:var(--tx2);font-size:var(--fs-small)">暂无归档会话</div>';
+        return;
+      }
+      body.innerHTML = arr.map(s => {
+        const id = s.id || '';
+        const msgs = s.message_count ? ` · ${s.message_count} 消息` : '';
+        const when = s.updated_at ? fmtRelTime(s.updated_at) : '';
+        return `<div class="arch-item">
+          <div class="arch-info">
+            <div class="arch-name">${escHtml(s.name || '会话')}</div>
+            <div class="arch-meta">${msgs}${when ? ' · ' + when : ''}</div>
+          </div>
+          <div class="arch-actions">
+            <button class="arch-btn restore" onclick="restoreArchived('${escHtml(id)}')">恢复</button>
+            <button class="arch-btn del" onclick="deleteArchived('${escHtml(id)}')">删除</button>
+          </div>
+        </div>`;
+      }).join('');
+    }catch(e){
+      body.innerHTML = `<div class="cw-empty" style="padding:24px 12px;text-align:center;color:var(--tx3);font-size:var(--fs-small)">加载失败: ${escHtml(e)}</div>`;
+    }
+  }
+
+  async function restoreArchived(id){
+    if(!id || !isTauri()) return;
+    try{
+      await invoke('neocodex_restore_session', { session_id: id });
+      showToast('会话已恢复');
+      await openArchivedSessions();
+      await refreshSessionList();
+    }catch(e){ showToast('恢复失败: ' + e); }
+  }
+
+  async function deleteArchived(id){
+    if(!id || !isTauri()) return;
+    if(!confirm('彻底删除该归档会话？此操作不可恢复。')) return;
+    try{
+      await invoke('neocodex_delete_session', { session_id: id });
+      showToast('归档会话已删除');
+      await openArchivedSessions();
+    }catch(e){ showToast('删除失败: ' + e); }
+  }
+
+  /* ===== Checkpoint 时间线 (Claude /rewind parity) ===== */
+  async function openCheckpointTimeline(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    closeSessionOps();
+    if(!id){ showToast('请先打开一个会话'); return; }
+    const body = document.getElementById('checkpointBody');
+    if(!body) return;
+    document.getElementById('ckTitle').textContent = '会话时间线 · ' + (sessionTitleFor(id) || id);
+    body.innerHTML = '<div class="cw-empty" style="padding:24px 12px;text-align:center;color:var(--tx2);font-size:var(--fs-small)">加载中…</div>';
+    openOverlay('overlayCheckpoints');
+    try{
+      const list = await invoke('neocodex_checkpoint_list', { session_id: id });
+      const arr = Array.isArray(list) ? list : [];
+      if(!arr.length){
+        body.innerHTML = '<div class="cw-empty" style="padding:32px 12px;text-align:center;color:var(--tx2);font-size:var(--fs-small)">该会话暂无 checkpoint（对话推进时会自动生成）</div>';
+        return;
+      }
+      body.innerHTML = arr.map((ck, i) => {
+        const when = ck.created_at ? fmtRelTime(ck.created_at) : '';
+        const msgs = ck.message_count ? ` · ${ck.message_count} 消息` : '';
+        const latest = i === 0 ? '<span class="ck-latest">当前</span>' : '';
+        return `<div class="ck-item">
+          <div class="ck-dot"></div>
+          <div class="ck-info">
+            <div class="ck-name">快照 #${arr.length - i}${latest ? '（最新）' : ''}</div>
+            <div class="arch-meta">${when}${msgs}</div>
+          </div>
+          <button class="arch-btn restore" onclick="restoreCheckpoint('${escHtml(String(ck.id))}')">回滚到此</button>
+        </div>`;
+      }).join('');
+      body.dataset.session = String(id);
+    }catch(e){
+      body.innerHTML = `<div class="cw-empty" style="padding:24px 12px;text-align:center;color:var(--tx3);font-size:var(--fs-small)">加载失败: ${escHtml(e)}</div>`;
+    }
+  }
+
+  async function restoreCheckpoint(checkpointId){
+    const body = document.getElementById('checkpointBody');
+    const sessionId = body ? (body.dataset.session || currentSessionId) : currentSessionId;
+    if(!checkpointId || !sessionId || !isTauri()) return;
+    if(!confirm('回滚到该时间点？当前会话进度将被替换（代码与对话快照）。')) return;
+    try{
+      const msgs = await invoke('neocodex_checkpoint_restore', { session_id: sessionId, checkpoint_id: checkpointId });
+      closeOverlay('overlayCheckpoints');
+      if(Array.isArray(msgs)){
+        currentSessionId = sessionId;
+        switchView(document.querySelector('.segb[data-view="chat"]'), 'chat');
+        renderThread(msgs);
+      }
+      showToast('已回滚到该时间点');
+    }catch(e){ showToast('回滚失败: ' + e); }
+  }
+
   async function feedbackMessage(index, kind){
     if(!isTauri()){ showToast('浏览器模式：反馈仅在桌面端生效'); return; }
     if(!currentSessionId){ showToast('无会话'); return; }
@@ -2127,7 +2239,11 @@ g.cycleMode = cycleMode;
         return `<div class="df-hunk">${rows}</div>`;
       }).join('');
       return `<div class="df-file">
-        <div class="df-path"><svg viewBox="0 0 12 12"><path d="M10.5 5v4.5a1 1 0 01-1 1h-7a1 1 0 01-1-1v-7a1 1 0 011-1H5" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 1.5h3v3" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/><path d="M6.5 5.5l4-4" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg>${escHtml(f.path)}</div>
+        <div class="df-path"><svg viewBox="0 0 12 12"><path d="M10.5 5v4.5a1 1 0 01-1 1h-7a1 1 0 01-1-1v-7a1 1 0 011-1H5" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 1.5h3v3" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/><path d="M6.5 5.5l4-4" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg><span class="df-fname">${escHtml(f.path)}</span></div>
+        <div class="df-actions">
+          <button class="df-act accept" onclick="diffApply(${fi},'accept')">接受</button>
+          <button class="df-act reject" onclick="diffApply(${fi},'reject')">放弃</button>
+        </div>
         ${hunks}</div>`;
     }).join('');
     body.innerHTML = files;
@@ -2174,6 +2290,34 @@ g.cycleMode = cycleMode;
       row.nextElementSibling.remove();
     }
   }
+
+  async function diffApply(fi, action){
+    const body = document.getElementById('diffBody');
+    const fileEl = body ? body.querySelectorAll('.df-file')[fi] : null;
+    const pathEl = fileEl ? fileEl.querySelector('.df-fname') : null;
+    if(!pathEl) return;
+    const path = pathEl.textContent.trim();
+    if(action === 'reject'){
+      const ok = window.confirm('放弃该文件的全部改动？(git restore)');
+      if(!ok) return;
+    }
+    try{
+      if(isTauri()){
+        await invoke('neocodex_apply_diff', { path, action });
+      } else {
+        throw new Error('仅桌面端支持');
+      }
+      fileEl.classList.add('df-done');
+      const actions = fileEl.querySelector('.df-actions');
+      if(actions){
+        actions.innerHTML = `<span class="df-done-tag">${action === 'accept' ? '✓ 已接受' : '✓ 已放弃'}</span>`;
+      }
+    }catch(e){
+      window.alert('操作失败: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  window.diffApply = diffApply;
 
   window.diffAddComment = diffAddComment;
   window.diffSaveComment = diffSaveComment;

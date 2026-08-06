@@ -156,7 +156,9 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     const menu = page.locator("#sessionOpsMenu");
     await expect(menu).toHaveClass(/open/);
     await expect(menu.locator(".ses-item", { hasText: "重命名" })).toBeVisible();
-    await expect(menu.locator(".ses-item", { hasText: "归档" })).toBeVisible();
+    await expect(menu.locator(".ses-item", { hasText: /^归档$/ })).toBeVisible();
+    await expect(menu.locator(".ses-item", { hasText: "查看归档" })).toBeVisible();
+    await expect(menu.locator(".ses-item", { hasText: "时间线" })).toBeVisible();
     await expect(menu.locator(".ses-item", { hasText: "导出" })).toBeVisible();
     await expect(menu.locator(".ses-item.danger", { hasText: "删除会话" })).toBeVisible();
   });
@@ -173,5 +175,75 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await expect(res).toContainText("3 处");
     const calls = await invokeCalls(page);
     expect(calls.some((c) => c.cmd === "neocodex_search_sessions")).toBeTruthy();
+  });
+
+  test("archived sessions overlay lists backend items and restores", async ({ page }) => {
+    await mockCommand(page, "neocodex_list_archived", () => [
+      { id: "a-1", name: "旧项目归档…", mode: "Agent", message_count: 12, updated_at: 1700000000 },
+    ]);
+    await mockCommand(page, "neocodex_restore_session", () => "Restored session a-1");
+    await page.goto("/");
+    await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      (w.openArchivedSessions as () => void)();
+    });
+    const overlay = page.locator("#overlayArchived");
+    await expect(overlay).toHaveClass(/open/);
+    await expect(page.locator("#archivedBody")).toContainText("旧项目归档…", { timeout: 10_000 });
+    await page.locator("#archivedBody .arch-btn.restore").first().click({ force: true });
+    const calls = await invokeCalls(page);
+    expect(calls.some((c) => c.cmd === "neocodex_restore_session" && c.args?.session_id === "a-1")).toBeTruthy();
+  });
+
+  test("checkpoint timeline lists snapshots and rewinds", async ({ page }) => {
+    await mockCommand(page, "neocodex_checkpoint_list", () => [
+      { id: "s-ck-1000.jsonl", created_at: 1700000010, message_count: 5 },
+      { id: "s-ck-900.jsonl", created_at: 1700000000, message_count: 3 },
+    ]);
+    await mockCommand(page, "neocodex_checkpoint_restore", () => [
+      { role: "user", content: "回滚后内容", timestamp: 1700000000 },
+    ]);
+    await page.goto("/");
+    page.on("dialog", (d) => d.accept());
+    await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      (w.openSessionOps as (anchor: HTMLElement | null, id: string) => void)(null, "s-ck");
+      (w.openCheckpointTimeline as () => void)();
+    });
+    const overlay = page.locator("#overlayCheckpoints");
+    await expect(overlay).toHaveClass(/open/);
+    await expect(page.locator("#checkpointBody")).toContainText("快照 #2", { timeout: 10_000 });
+    await page.locator("#checkpointBody .arch-btn.restore").first().click({ force: true });
+    const calls = await invokeCalls(page);
+    expect(calls.some((c) => c.cmd === "neocodex_checkpoint_restore" && c.args?.checkpoint_id === "s-ck-1000.jsonl")).toBeTruthy();
+  });
+
+  test("real backend diff renders files/hunks and apply_diff wires accept", async ({ page }) => {
+    await mockCommand(page, "neocodex_get_diff", () => ({
+      files: [
+        { path: "src/app.rs", hunks: [
+          { lines: [
+            { t: "ctx", o: 1, n: 1, s: "fn main() {" },
+            { t: "del", o: 2, n: null, s: "    todo!()" },
+            { t: "add", o: null, n: 2, s: "    run();" },
+          ]},
+        ]},
+      ],
+    }));
+    await mockCommand(page, "neocodex_apply_diff", () => "ok");
+    await page.goto("/");
+    await page.locator("#ntxPlusBtn").click({ force: true });
+    await page.locator('.ntx-pm-item[data-act="diff"]').click({ force: true });
+    await expect(page.locator("#overlayDiff")).toHaveClass(/open/);
+    await expect(page.locator("#diffTitle")).toContainText("1 文件");
+    await expect(page.locator("#diffBody .df-path")).toContainText("src/app.rs");
+    await expect(page.locator("#diffBody .df-line.add")).toContainText("run();");
+    await expect(page.locator("#diffTitle")).not.toContainText("示例数据");
+    await page.locator("#diffBody .df-act.accept").first().click({ force: true });
+    const calls = await invokeCalls(page);
+    const ap = calls.find((c) => c.cmd === "neocodex_apply_diff");
+    expect(ap).toBeTruthy();
+    expect(ap.args).toMatchObject({ path: "src/app.rs", action: "accept" });
+    await expect(page.locator("#diffBody .df-done-tag")).toContainText("已接受");
   });
 });

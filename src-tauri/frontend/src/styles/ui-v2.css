@@ -1504,8 +1504,7 @@
 .ntx-attach { position: relative; }
 .ntx-attach-list { position: absolute; bottom: calc(100% + 6px); left: 0; max-height: 220px; overflow-y: auto; }
 
-/* ═══════ Diff 行内评论 ═══════ */
-.diff-body { overflow-y: auto; max-height: 64vh; display: flex; flex-direction: column; gap: 14px; }
+/* ═══════ Diff 行内评论 ═══════ */.diff-body { overflow-y: auto; max-height: 64vh; display: flex; flex-direction: column; gap: 14px; }
 .df-file { display: flex; flex-direction: column; gap: 4px; }
 .diff-sample-hint {
   padding: 8px 10px; border-radius: 8px; font-size: var(--fs-caption, 11px);
@@ -1517,6 +1516,18 @@
   font-size: 11.5px; color: var(--tx2); padding: 8px 10px;
   background: var(--ghost, rgba(0,0,0,0.04)); border-radius: 8px;
 }
+.df-path .df-fname { flex: 1; word-break: break-all; }
+.df-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.df-act {
+  border: 1px solid var(--bd, rgba(0,0,0,0.15)); background: var(--panel, #fff);
+  border-radius: 6px; font-size: 11px; padding: 2px 10px; cursor: pointer;
+  color: var(--tx2); transition: background .15s;
+}
+.df-act:hover { background: var(--ghost, rgba(0,0,0,0.05)); }
+.df-act.accept:hover { color: #1a7f37; border-color: rgba(46,160,67,0.5); }
+.df-act.reject:hover { color: #cf222e; border-color: rgba(248,81,73,0.5); }
+.df-done-tag { font-size: 11px; color: #1a7f37; }
+.df-file.df-done { opacity: .6; pointer-events: none; }
 .df-path svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; }
 .df-hunk { border: 1px solid var(--bd, rgba(0,0,0,0.08)); border-radius: 8px; overflow: hidden; }
 .df-line { display: flex; align-items: stretch; font-family: var(--fm, ui-monospace); font-size: 11.5px; line-height: 1.7; position: relative; }
@@ -1555,3 +1566,42 @@
 .kb-dom { font-size:var(--fs-caption); color:var(--pri); border:1px solid var(--accent-bg); background:rgba(249,115,22,0.07); border-radius:4px; padding:0 5px; }
 .kb-hit-s { margin-top:2px; font-size:var(--fs-caption); color:var(--tx-meta); }
 .kb-empty { color:var(--tx-meta); font-size:var(--fs-caption); }
+
+/* ═══════ 归档会话 ═══════ */
+.arch-body { overflow-y: auto; max-height: 64vh; display: flex; flex-direction: column; gap: 8px; }
+.arch-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--bd, rgba(0,0,0,0.1)); border-radius: 10px; padding: 10px 14px;
+  background: var(--panel, #fff);
+}
+.arch-info { flex: 1; min-width: 0; }
+.arch-name { font-size: var(--fs-small, 12.5px); color: var(--tx, #111); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arch-meta { font-size: var(--fs-caption, 11px); color: var(--tx-meta, rgba(0,0,0,0.4)); margin-top: 2px; }
+.arch-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.arch-btn {
+  border: 1px solid var(--bd, rgba(0,0,0,0.15)); background: var(--panel, #fff);
+  border-radius: 6px; font-size: 11.5px; padding: 4px 12px; cursor: pointer; color: var(--tx2, #444);
+  font-family: var(--ff);
+}
+.arch-btn:hover { background: var(--ghost, rgba(0,0,0,0.05)); }
+.arch-btn.restore:hover { color: #1a7f37; border-color: rgba(46,160,67,0.5); }
+.arch-btn.del:hover { color: #cf222e; border-color: rgba(248,81,73,0.5); }
+
+/* ═══════ Checkpoint 时间线 ═══════ */
+.ck-item {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--bd, rgba(0,0,0,0.1)); border-radius: 10px; padding: 10px 14px;
+  background: var(--panel, #fff); position: relative;
+}
+.ck-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--pri, #F97316); flex-shrink: 0; }
+.ck-item:not(:last-child)::after {
+  content: ''; position: absolute; left: 18px; top: 24px; bottom: -14px; width: 2px;
+  background: var(--bd, rgba(0,0,0,0.1));
+}
+.ck-info { flex: 1; min-width: 0; }
+.ck-name { font-size: var(--fs-small, 12.5px); color: var(--tx, #111); font-weight: 500; }
+.ck-latest {
+  font-size: 10px; color: #1a7f37; border: 1px solid rgba(46,160,67,0.4);
+  background: rgba(46,160,67,0.08); border-radius: 4px; padding: 0 4px; margin-left: 6px;
+  font-weight: 500;
+}
