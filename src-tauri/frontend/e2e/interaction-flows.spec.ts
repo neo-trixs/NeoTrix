@@ -42,7 +42,7 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await page.locator("#mcpName").fill("search-tool");
     await page.locator("#mcpCmd").fill("python -m mcp_search");
     await page.locator("#mcpArgs").fill("--port,8080");
-    await page.locator("button", { hasText: "注册" }).click({ force: true });
+    await page.locator("#overlaySettings button", { hasText: "注册" }).click({ force: true });
 
     const calls = await invokeCalls(page);
     const reg = calls.find((c) => c.cmd === "neocodex_mcp_register");
@@ -324,5 +324,39 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await picker.locator(".rf-item").first().click();
     await expect(page.locator("#chatInput")).toHaveValue(/\[引用·我\] 早前的提问/);
     await expect(picker).not.toHaveClass(/open/);
+  });
+
+  test("command palette opens via ⌘K and searches sessions", async ({ page }) => {
+    await mockCommand(page, "neocodex_search_sessions", () => [
+      { session_id: "s-pal", session_name: "面板命中会话", role: "agent", snippet: "含关键词", match_count: 2, timestamp: 1700000000 },
+    ]);
+    await page.goto("/");
+    await page.keyboard.press("Meta+k");
+    const ov = page.locator("#overlayPalette");
+    await expect(ov).toHaveClass(/open/);
+    await expect(ov.locator(".pal-item[data-act]")).toHaveCount(7);
+    await page.locator("#palInput").fill("面板");
+    const res = page.locator("#palResults");
+    await expect(res).toContainText("面板命中会话", { timeout: 10_000 });
+    await expect(res).toContainText("2 处");
+    const calls = await invokeCalls(page);
+    expect(calls.some((c) => c.cmd === "neocodex_search_sessions" && c.args?.query === "面板")).toBeTruthy();
+  });
+
+  test("palette quick action opens settings and sidebar search button opens palette", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).openPalette();
+    });
+    const ov = page.locator("#overlayPalette");
+    await expect(ov).toHaveClass(/open/);
+    await ov.locator('.pal-item[data-act="settings"]').click({ force: true });
+    await expect(ov).not.toHaveClass(/open/);
+    await expect(page.locator("#overlaySettings")).toHaveClass(/open/);
+    // sidebar search button now opens the palette instead of a dead toast
+    await page.locator('.sbn[onclick*="openPalette"]').click({ force: true });
+    await expect(page.locator("#overlayPalette")).toHaveClass(/open/);
+    await page.locator("#palInput").press("Escape");
+    await expect(page.locator("#overlayPalette")).not.toHaveClass(/open/);
   });
 });
