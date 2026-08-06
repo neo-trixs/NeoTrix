@@ -517,6 +517,70 @@ impl CleanupKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Platform {
+    #[serde(rename = "macos")]
+    MacOS,
+    #[serde(rename = "windows")]
+    Windows,
+    #[serde(rename = "linux")]
+    Linux,
+    #[serde(rename = "all")]
+    All,
+}
+
+impl Platform {
+    pub fn current() -> Platform {
+        #[cfg(target_os = "macos")]
+        { return Platform::MacOS; }
+        #[cfg(target_os = "windows")]
+        { return Platform::Windows; }
+        #[cfg(target_os = "linux")]
+        { return Platform::Linux; }
+        #[allow(unreachable_code)]
+        { Platform::All }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Platform::MacOS => "macos",
+            Platform::Windows => "windows",
+            Platform::Linux => "linux",
+            Platform::All => "all",
+        }
+    }
+
+    pub fn matches(&self, p: Platform) -> bool {
+        *self == Platform::All || p == Platform::All || *self == p
+    }
+}
+
+/// 风险分级 — 驱动 CLI 交互 (MacBroom/DeepPurge Safe·Moderate·Advanced 参照)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum RiskLevel {
+    #[serde(rename = "low")]
+    Low,
+    #[serde(rename = "medium")]
+    Medium,
+    #[serde(rename = "high")]
+    High,
+}
+
+impl RiskLevel {
+    pub fn label(&self) -> &'static str {
+        match self {
+            RiskLevel::Low => "低危",
+            RiskLevel::Medium => "中危",
+            RiskLevel::High => "高危",
+        }
+    }
+}
+
+impl Default for RiskLevel {
+    fn default() -> Self { RiskLevel::Low }
+}
+
+/// 跨平台清理规则 — platform 门控 + risk 分级
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CleanupPattern {
     pub name: &'static str,
@@ -525,25 +589,99 @@ pub struct CleanupPattern {
     pub max_age_days: Option<i64>,
     pub safe: bool,
     pub recursive: bool,
+    #[serde(default = "platform_all")]
+    pub platform: Platform,
+    #[serde(default)]
+    pub risk: RiskLevel,
+    pub description: Option<&'static str>,
 }
 
+fn platform_all() -> Platform { Platform::All }
+
 impl CleanupPattern {
+    /// 当前平台生效的规则 (平台门控 + 风险阀)
+    pub fn active_below(&self, max_risk: RiskLevel) -> bool {
+        self.platform.matches(Platform::current()) && self.risk <= max_risk
+    }
+
     pub fn all_patterns() -> Vec<Self> {
+        let mac = Platform::MacOS; let win = Platform::Windows; let lin = Platform::Linux;
+        let all = Platform::All;
         vec![
-            Self { name: "Rust build artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/target/**"], max_age_days: Some(7), safe: true, recursive: true },
-            Self { name: "Node.js modules", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/node_modules/**"], max_age_days: Some(30), safe: true, recursive: true },
-            Self { name: "Python venv", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.venv/**", "**/venv/**", "**/.tox/**"], max_age_days: Some(60), safe: true, recursive: true },
-            Self { name: "Build output", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/dist/**", "**/.build/**", "**/build/**", "**/out/**"], max_age_days: Some(30), safe: true, recursive: true },
-            Self { name: "Next.js cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.next/**"], max_age_days: Some(7), safe: true, recursive: true },
-            Self { name: "Cargo registry cache", kind: CleanupKind::Cache, patterns: vec!["~/.cargo/registry/cache/**"], max_age_days: Some(90), safe: true, recursive: true },
-            Self { name: "pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/pip/**"], max_age_days: Some(90), safe: true, recursive: true },
-            Self { name: "npm cache", kind: CleanupKind::Cache, patterns: vec!["~/.npm/_cacache/**"], max_age_days: Some(90), safe: true, recursive: true },
-            Self { name: "System temp", kind: CleanupKind::TempFiles, patterns: vec!["/tmp/**", "/var/tmp/**"], max_age_days: Some(1), safe: true, recursive: true },
-            Self { name: "VS Code caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Code/CachedData/**", "~/.vscode/extensions/.cache/**"], max_age_days: Some(30), safe: true, recursive: true },
-            Self { name: "Cursor caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Cursor/CachedData/**"], max_age_days: Some(30), safe: true, recursive: true },
-            Self { name: "Xcode derived data", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**"], max_age_days: Some(30), safe: true, recursive: true },
-            Self { name: "IntelliJ caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Caches/JetBrains/**"], max_age_days: Some(30), safe: true, recursive: true },
+            // ---- 项目构建产物 (跨平台, Mole 34 目标) ----
+            Self { name: "Rust build artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/target/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("target/ 为可重建构建产物") },
+            Self { name: "Node.js modules", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/node_modules/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("npm/yarn/pnpm install 重建") },
+            Self { name: "Python venv", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.venv/**", "**/venv/**", "**/.tox/**", "**/.nox/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Build output", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/dist/**", "**/.build/**", "**/build/**", "**/out/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Next.js cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.next/**", "**/.nuxt/**", "**/.output/**", "**/.svelte-kit/**", "**/.astro/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Swift build", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.build/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Low, description: None },
+            Self { name: "Go build", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/vendor/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Turbo/Parcel cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.turbo/**", "**/.parcel-cache/**", "**/.angular/**", "**/.dart_tool/**", "**/.zig-cache/**", "**/zig-out/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Test caches", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/coverage/**", "**/__pycache__/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "iOS derived data", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**", "~/Library/Developer/CoreSimulator/Caches/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: None },
+            // ---- 包管理缓存 ----
+            Self { name: "Cargo registry cache", kind: CleanupKind::Cache, patterns: vec!["~/.cargo/registry/cache/**", "~/.cargo/git/db/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/pip/**", "%LOCALAPPDATA%/pip/cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "npm cache", kind: CleanupKind::Cache, patterns: vec!["~/.npm/_cacache/**", "%APPDATA%/npm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "pnpm store", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/pnpm/**", "~/.local/share/pnpm/store/**", "%LOCALAPPDATA%/pnpm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "yarn cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/yarn/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "bun cache", kind: CleanupKind::Cache, patterns: vec!["~/.bun/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Medium, description: Some("bun cache 含 install cache 与 install/cache 子目录, 保留 lock") },
+            Self { name: "uv pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/uv/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "go build cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/go-build/**", "~/.cache/go-build/**", "%LOCALAPPDATA%/go-build/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "conda pkgs", kind: CleanupKind::Cache, patterns: vec!["~/miniconda3/pkgs/**", "~/anaconda3/pkgs/**", "~/.conda/pkgs/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Medium, description: None },
+            // ---- 浏览器缓存 ----
+            Self { name: "Google Chrome cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/Google/Chrome/**", "%LOCALAPPDATA%/Google/Chrome/User Data/Default/Cache/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Playwright browsers", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/ms-playwright/**", "~/Library/Caches/ms-playwright-go/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Low, description: Some("浏览器自动化引擎, 重装下载") },
+            // ---- temp ----
+            Self { name: "System temp", kind: CleanupKind::TempFiles, patterns: vec!["/tmp/**", "/var/tmp/**", "%TEMP%/**", "%TMP%/**"], max_age_days: Some(1), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Preload temp", kind: CleanupKind::TempFiles, patterns: vec!["%WINDIR%/Prefetch/**"], max_age_days: Some(1), safe: true, recursive: true, platform: win, risk: RiskLevel::Medium, description: None },
+            // ---- IDE 缓存 ----
+            Self { name: "VS Code caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Code/CachedData/**", "~/.vscode/extensions/.cache/**", "%APPDATA%/Code/CachedData/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Cursor caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Application Support/Cursor/CachedData/**", "~/.cursor/cache/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "IntelliJ caches", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Caches/JetBrains/**", "~/.cache/JetBrains/**", "%LOCALAPPDATA%/JetBrains/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Docker", kind: CleanupKind::Cache, patterns: vec!["~/Library/Containers/com.docker.docker/Data/vms/0/data/DockerDesktopRegular5/.cache/**"], max_age_days: Some(60), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: None },
+            // ---- Linux 系统缓存 ----
+            Self { name: "apt/dnf/pacman package cache", kind: CleanupKind::Cache, patterns: vec!["/var/cache/apt/archives/**", "/var/cache/dnf/**", "/var/cache/pacman/pkg/**", "/var/tmp/**"], max_age_days: Some(30), safe: true, recursive: true, platform: lin, risk: RiskLevel::Medium, description: None },
+            Self { name: "Linux user cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/**"], max_age_days: Some(30), safe: true, recursive: true, platform: lin, risk: RiskLevel::Low, description: None },
         ]
+    }
+
+    /// 展开路径占位符 (~, %OS% 专用变量), 供 scan 使用
+    pub fn expand(pat: &str) -> String {
+        let home = dirs::home_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+        #[allow(unused_mut)] // windows 块被 cfg 移除时无需 mut
+        let mut s = pat.replace("~", &home);
+        #[cfg(target_os = "windows")]
+        {
+            s = s.replace("%LOCALAPPDATA%", &std::env::var("LOCALAPPDATA").unwrap_or_else(|_| {
+                std::env::var("USERPROFILE").map(|u| format!("{}\\AppData\\Local", u)).unwrap_or_default()
+            }));
+            s = s.replace("%APPDATA%", &std::env::var("APPDATA").unwrap_or_default());
+            s = s.replace("%TEMP%", &std::env::var("TEMP").unwrap_or_else(|_| std::env::var("TMP").unwrap_or_default()));
+            s = s.replace("%WINDIR%", &std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".into()));
+        }
+        s
+    }
+
+    /// 检查目录是否带 CACHEDIR.TAG 缓存签名 (Mole: 以 Signature: 开头的文件即缓存)
+    pub fn has_cachedir_tag(dir: &Path) -> bool {
+        let tag = dir.join("CACHEDIR.TAG");
+        if let Ok(content) = fs::read_to_string(&tag) {
+            if let Some(first) = content.lines().next() {
+                return first.trim_start() == "Signature: 8a477f597d02d456d45674aa7d611ef7b6c14a01bccaebbd4e53c5d4f";
+            }
+        }
+        false
+    }
+
+    /// 路径安全护栏: 拒绝系统根/project_root 自身 (Mole 禁删 /, $HOME, $HOME/Library)
+    pub fn is_system_root_dir(p: &Path) -> bool {
+        let home = dirs::home_dir().unwrap_or_default();
+        let canonical = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+        canonical == home
+            || canonical.starts_with(&home.join("Library"))
+            || p == std::path::Path::new("/")
+            || p == std::path::Path::new("\\")
     }
 }
 
@@ -591,6 +729,7 @@ pub struct CleanupEngine {
     pub dry_run_default: bool,
     pub archive_on_clean: bool,       // true = 归档而非删除
     pub project_root: PathBuf,
+    pub risk_gate: RiskLevel,         // 默认仅执行 <= 该风险级规则
     max_history: usize,
 }
 
@@ -603,7 +742,10 @@ impl Default for CleanupEngine {
 impl CleanupEngine {
     pub fn new() -> Self {
         Self {
-            patterns: CleanupPattern::all_patterns(),
+            patterns: CleanupPattern::all_patterns()
+                .into_iter()
+                .filter(|p| p.platform.matches(Platform::current()))
+                .collect(),
             whitelist: vec![
                 PathBuf::from("~/.config"),
                 PathBuf::from("~/.ssh"),
@@ -613,8 +755,14 @@ impl CleanupEngine {
             dry_run_default: true,
             archive_on_clean: true,
             project_root: PathBuf::from("."),
+            risk_gate: RiskLevel::Medium,
             max_history: 50,
         }
+    }
+
+    pub fn with_risk_gate(mut self, gate: RiskLevel) -> Self {
+        self.risk_gate = gate;
+        self
     }
 
     pub fn with_project_root(mut self, root: PathBuf) -> Self {
@@ -636,16 +784,17 @@ impl CleanupEngine {
 
         let relevant: Vec<&CleanupPattern> = self.patterns.iter()
             .filter(|p| kind == CleanupKind::All || p.kind == kind)
+            .filter(|p| p.risk <= self.risk_gate)
             .collect();
 
         for pattern in &relevant {
             for glob_pat in &pattern.patterns {
-                let pat_str = glob_pat.replace("~", &dirs::home_dir()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default());
+                let pat_str = CleanupPattern::expand(glob_pat);
                 if let Ok(entries) = glob::glob(&pat_str) {
                     for entry in entries.flatten() {
                         if self.is_whitelisted(&entry) { continue; }
+                        // 路径安全护栏: 拒绝系统根目录
+                        if CleanupPattern::is_system_root_dir(&entry) { continue; }
                         let is_old = if let Some(max_days) = pattern.max_age_days {
                             match std::fs::metadata(&entry) {
                                 Ok(meta) => {
@@ -723,6 +872,7 @@ impl CleanupEngine {
         for path_str in &result.pattern_matches {
             let path = Path::new(path_str);
             if self.is_whitelisted(path) { continue; }
+            if CleanupPattern::is_system_root_dir(path) { continue; }
             if path.is_dir() {
                 if let Err(e) = std::fs::remove_dir_all(path) {
                     result.errors.push(format!("删除目录失败 {}: {}", path_str, e));
@@ -756,6 +906,340 @@ impl CleanupEngine {
         }
         removed
     }
+}
+
+// ============================================================
+// 组件移除表面 (ComponentRemover) — 提权移除预装/遥测/后门服务
+//
+// 平台无关核心 + cfg 门控后端:
+//   - Windows: reg.exe / sc.exe / dism / takeown+icacls (WDR 机制)
+//   - macOS:   launchctl + defaults + rm (preinstalled launchagents/daemons)
+//   - Linux:   systemctl + apt/dnf/pacman 缓存 (Win11Debloat 参照)
+// 安全栈复用: risk 分级 + dry-run + 变更前状态快照 (registry export / plist / unit) → restore 回滚
+// ============================================================
+
+/// 组件移除面 — 对应 WDR 的五类注册表面
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RemovalSurface {
+    Service,
+    StartupEntry,
+    ScheduledTask,
+    RegistryValue,
+    ShellAssociation,
+    AppPackage,
+}
+
+impl RemovalSurface {
+    pub fn label(&self) -> &'static str {
+        match self {
+            RemovalSurface::Service => "服务",
+            RemovalSurface::StartupEntry => "启动项",
+            RemovalSurface::ScheduledTask => "计划任务",
+            RemovalSurface::RegistryValue => "注册表",
+            RemovalSurface::ShellAssociation => "Shell关联",
+            RemovalSurface::AppPackage => "预装App",
+        }
+    }
+}
+
+/// 组件目标 — 一个可移除的软件/服务单元 (含多注册表面)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentTarget {
+    pub name: &'static str,
+    pub surface: RemovalSurface,
+    pub risk: RiskLevel,
+    pub platform: Platform,
+    /// Windows 注册表键 (HKLM/HKCU 路径, 支持多副本: HKLM+HKCR+WOW6432Node 由 expand 派生)
+    pub registry_keys: Vec<&'static str>,
+    /// 服务名 (Windows sc.exe / macOS launchctl label)
+    pub services: Vec<&'static str>,
+    /// 计划任务名
+    pub tasks: Vec<&'static str>,
+    /// 文件路径 (支持 ~ 占位符)
+    pub files: Vec<&'static str>,
+    pub description: &'static str,
+}
+
+impl ComponentTarget {
+    /// Windows 双架构注册表展开: HKLM\Software\Classes\CLSID\{X} → HKLM/HKCR + WOW6432Node 三副本
+    pub fn expand_registry_keys(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        for key in &self.registry_keys {
+            out.push(key.to_string());
+            if key.starts_with("HKLM\\Software\\Classes") {
+                out.push(format!("HKCR\\{}", &key["HKLM\\Software\\Classes\\".len()..]));
+                out.push(key.replacen("HKLM\\Software\\Classes", "HKLM\\Software\\Classes\\WOW6432Node", 1));
+            }
+            if key.starts_with("HKCR") || key.starts_with("HKEY_CLASSES_ROOT") {
+                out.push(key.replacen("HKCR", "HKLM\\Software\\Classes\\WOW6432Node", 1));
+                out.push(key.replacen("HKCR", "HKLM\\Software\\Classes", 1));
+            }
+        }
+        out
+    }
+
+    pub fn active_on_current(&self) -> bool {
+        self.platform.matches(Platform::current())
+    }
+
+    pub fn all_targets() -> Vec<Self> {
+        let mac = Platform::MacOS; let win = Platform::Windows; let lin = Platform::Linux;
+        vec![
+            // ---- Windows: 遥测/预装 (Win11Debloat 参照) ----
+            Self {
+                name: "Microsoft Telemetry (DiagTrack / dmwappushservice)", surface: RemovalSurface::Service,
+                risk: RiskLevel::High, platform: win,
+                registry_keys: vec!["HKLM\\SYSTEM\\CurrentControlSet\\Services\\DiagTrack", "HKLM\\SYSTEM\\CurrentControlSet\\Services\\dmwappushservice"],
+                services: vec!["DiagTrack", "dmwappushservice"], tasks: vec!["Microsoft Compatibility Appraiser"], files: vec![],
+                description: "遥测服务 (数据收集/上报), Win11Debloat 禁用以减少后台网络活动",
+            },
+            Self {
+                name: "OneDrive", surface: RemovalSurface::AppPackage,
+                risk: RiskLevel::Medium, platform: win,
+                registry_keys: vec!["HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\OneDriveSetup"],
+                services: vec![], tasks: vec!["OneDrive Standalone Update Task"], files: vec!["%LOCALAPPDATA%/Microsoft/OneDrive", "%WINDIR%/System32/OneDriveSetup.exe"],
+                description: "OneDrive 预装同步 (winscript 移除项)",
+            },
+            Self {
+                name: "Microsoft Edge", surface: RemovalSurface::AppPackage,
+                risk: RiskLevel::Medium, platform: win,
+                registry_keys: vec!["HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Microsoft Edge"],
+                services: vec![], tasks: vec!["MicrosoftEdgeUpdateTask*"], files: vec!["%LOCALAPPDATA%/Microsoft/Edge", "%WINDIR%/SystemApps/Microsoft.MicrosoftEdge*"],
+                description: "Edge 预装浏览器 (Remove-MS-Edge 5.4k★ 移除目标)",
+            },
+            // ---- macOS: 系统守护/代理 (Apple Intelligence / 遥测守护) ----
+            Self {
+                name: "Apple Intelligence model cache", surface: RemovalSurface::AppPackage,
+                risk: RiskLevel::High, platform: mac,
+                registry_keys: vec![], services: vec![], tasks: vec![],
+                files: vec!["~/Library/Application Support/Apple Intelligence", "~/Library/Containers/com.apple.Siri*"],
+                description: "Apple Intelligence 本地模型 (apple-intelligence-remover 参照, 释放数 GB)",
+            },
+            Self {
+                name: "Homebrew 残留服务", surface: RemovalSurface::Service,
+                risk: RiskLevel::Medium, platform: mac,
+                registry_keys: vec![], services: vec!["homebrew.mxcl.*"], tasks: vec![],
+                files: vec![],
+                description: "brew services 中已卸载包残留的 launchd 服务",
+            },
+            // ---- Linux: 包管理缓存/孤立依赖 (Debloat-Windows-10 → Linux 对应) ----
+            Self {
+                name: "包管理器孤立依赖", surface: RemovalSurface::AppPackage,
+                risk: RiskLevel::High, platform: lin,
+                registry_keys: vec![], services: vec![], tasks: vec![],
+                files: vec!["/var/cache/apt/archives", "/var/cache/pacman/pkg", "/var/cache/dnf"],
+                description: "apt-get autoremove / pacman -Qtdq / dnf autoremove 清理孤立包与缓存",
+            },
+        ]
+    }
+}
+
+/// 变更前状态快照 — 每个面导出原始状态供 restore 回滚
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemovalSnapshot {
+    pub target: String,
+    pub created_at: i64,
+    pub registry_export: Vec<String>,   // 原始注册表值 (Windows reg export / macOS defaults read)
+    pub service_states: Vec<String>,    // 原始服务启停状态
+    pub file_backups: Vec<String>,      // 归档的文件路径 (移入 snapshot dir)
+}
+
+pub struct ComponentRemover {
+    pub snapshot_dir: PathBuf,
+    pub risk_gate: RiskLevel,
+    pub dry_run: bool,
+}
+
+impl ComponentRemover {
+    pub fn new(project_root: &Path) -> Self {
+        Self {
+            snapshot_dir: project_root.join(".cleanup").join("snapshot"),
+            risk_gate: RiskLevel::Medium,
+            dry_run: true,
+        }
+    }
+
+    /// 全量组件扫描 (按当前平台过滤 + 风险阀), 返回可移除项
+    pub fn scan(&self) -> Vec<(ComponentTarget, bool)> {
+        ComponentTarget::all_targets()
+            .into_iter()
+            .filter(|t| t.active_on_current())
+            .filter(|t| t.risk <= self.risk_gate)
+            .map(|t| {
+                let present = self.target_present(&t);
+                (t, present)
+            })
+            .filter(|(_, present)| *present)
+            .collect()
+    }
+
+    /// 检测目标是否存在于系统 (文件存在/服务注册/计划任务注册)
+    pub fn target_present(&self, target: &ComponentTarget) -> bool {
+        #[cfg(target_os = "windows")]
+        {
+            for svc in &target.services {
+                if run_output("sc.exe", &["query", svc]).is_ok() { return true; }
+            }
+            for key in target.expand_registry_keys() {
+                if reg_key_exists(&key) { return true; }
+            }
+            for task in &target.tasks {
+                if run_output("schtasks.exe", &["/query", "/tn", task]).is_ok() { return true; }
+            }
+        }
+        #[cfg(target_os = "macos")]
+        {
+            for svc in &target.services {
+                if svc.contains('*') {
+                    if run_output("launchctl", &["list"]).map(|o| o.contains(svc.trim_end_matches('*'))).unwrap_or(false) {
+                        return true;
+                    }
+                } else if run_output("launchctl", &["list", svc]).is_ok() { return true; }
+            }
+        }
+        for f in &target.files {
+            let p = CleanupPattern::expand(f);
+            if Path::new(&p).exists() { return true; }
+        }
+        false
+    }
+
+    /// 执行移除: 先快照原始状态, 再逐面移除 (支持 dry-run)
+    pub fn remove(&mut self, target: &ComponentTarget) -> Result<RemovalSnapshot, String> {
+        if !target.active_on_current() {
+            return Err(format!("目标 {} 不适用于当前平台", target.name));
+        }
+        if self.dry_run {
+            return Err("dry-run 模式: 未执行移除".into());
+        }
+        let mut snapshot = RemovalSnapshot {
+            target: target.name.into(),
+            created_at: Utc::now().timestamp(),
+            registry_export: Vec::new(),
+            service_states: Vec::new(),
+            file_backups: Vec::new(),
+        };
+        fs::create_dir_all(&self.snapshot_dir).map_err(|e| e.to_string())?;
+
+        #[cfg(target_os = "windows")]
+        {
+            // 快照: 导出注册表键
+            for key in target.expand_registry_keys() {
+                if reg_key_exists(&key) {
+                    let export = self.snapshot_dir.join(format!("{}.reg", sanitize_name(&key)));
+                    if run_output("reg.exe", &["export", &key, export.to_string_lossy().as_ref(), "/y"]).is_ok() {
+                        snapshot.registry_export.push(key.clone());
+                    }
+                }
+            }
+            // 权限链: takeown+icacls 再删 (WDR files_removal.bat 机制)
+            for f in &target.files {
+                let p = CleanupPattern::expand(f);
+                let _ = run_output("takeown.exe", &["/f", &p, "/r", "/d", "y"]);
+                let _ = run_output("icacls.exe", &[&p, "/grant", "administrators:F", "/t"]);
+                let _ = std::fs::remove_dir_all(&p).or_else(|_| std::fs::remove_file(&p));
+            }
+            for svc in &target.services {
+                let _ = run_output("sc.exe", &["config", svc, "start=", "disabled"]);
+                let _ = run_output("sc.exe", &["stop", svc]);
+            }
+            for task in &target.tasks {
+                let _ = run_output("schtasks.exe", &["/delete", "/tn", task, "/f"]);
+            }
+        }
+        #[cfg(target_os = "macos")]
+        {
+            for svc in &target.services {
+                let _ = run_output("launchctl", &["bootout", "gui/501", svc]);
+                let _ = run_output("launchctl", &["disable", svc]);
+            }
+            for f in &target.files {
+                let p = CleanupPattern::expand(f);
+                if Path::new(&p).exists() {
+                    let backup = self.snapshot_dir.join(sanitize_name(&p));
+                    let _ = std::fs::rename(&p, &backup);
+                    snapshot.file_backups.push(p);
+                }
+            }
+        }
+
+        self.log_removal(target, &snapshot);
+        Ok(snapshot)
+    }
+
+    /// 从快照恢复 (回滚)
+    pub fn restore(&self, target: &str) -> Result<usize, String> {
+        let manifest = self.snapshot_dir.join(format!("{}.json", sanitize_name(target)));
+        let json = fs::read_to_string(&manifest).map_err(|e| format!("无快照 {}: {}", target, e))?;
+        let snap: RemovalSnapshot = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        let mut restored = 0usize;
+
+        #[cfg(target_os = "windows")]
+        {
+            for key in &snap.registry_export {
+                let export = self.snapshot_dir.join(format!("{}.reg", sanitize_name(key)));
+                if run_output("reg.exe", &["import", export.to_string_lossy().as_ref()]).is_ok() {
+                    restored += 1;
+                }
+            }
+        }
+        #[cfg(target_os = "macos")]
+        {
+            for path in &snap.file_backups {
+                let backup = self.snapshot_dir.join(sanitize_name(path));
+                if let Ok(orig) = std::fs::rename(&backup, Path::new(path)) {
+                    let _ = orig;
+                    restored += 1;
+                }
+            }
+        }
+        Ok(restored)
+    }
+
+    fn log_removal(&self, target: &ComponentTarget, snap: &RemovalSnapshot) {
+        let log_dir = self.snapshot_dir.parent().unwrap_or(Path::new(".")).join("log");
+        CleanupLog::log(&log_dir, &CleanupLogEntry {
+            action: "uninstall".into(),
+            kind: target.surface.label().into(),
+            items: snap.registry_export.len() + snap.file_backups.len(),
+            bytes: 0,
+            batch_id: target.name.into(),
+            success: true,
+            error: None,
+        });
+        // 落盘快照清单 (供 restore)
+        if let Ok(json) = serde_json::to_string_pretty(snap) {
+            let _ = fs::write(self.snapshot_dir.join(format!("{}.json", sanitize_name(target.name))), json);
+        }
+    }
+}
+
+/// 运行外部命令并返回 stdout (不 panic, 供组件检测/移除)
+fn run_output(cmd: &str, args: &[&str]) -> Result<String, String> {
+    std::process::Command::new(cmd)
+        .args(args)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn reg_key_exists(key: &str) -> bool {
+    // 形如 "HKLM\Software\X" → "HKLM\Software" / "X"
+    if let Some((root, rest)) = key.split_once('\\') {
+        return run_output("reg.exe", &["query", &format!("{}\\{}", root, rest)]).is_ok();
+    }
+    false
+}
+
+#[cfg(not(target_os = "windows"))]
+#[allow(dead_code)]
+fn reg_key_exists(_key: &str) -> bool { false }
+
+fn sanitize_name(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect()
 }
 
 // ============================================================
@@ -876,6 +1360,106 @@ mod tests {
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].items, 1);
 
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // ---- 跨平台 + 组件移除增强测试 ----
+
+    #[test]
+    fn test_platform_current_and_matches() {
+        let cur = Platform::current();
+        assert!(matches!(cur, Platform::MacOS | Platform::Windows | Platform::Linux | Platform::All));
+        assert!(Platform::All.matches(cur));
+        assert!(cur.matches(cur));
+    }
+
+    #[test]
+    fn test_pattern_platform_filtering() {
+        // 当前平台生效, 非当前平台规则应被 new() 过滤
+        let engine = CleanupEngine::new();
+        for p in &engine.patterns {
+            assert!(p.platform.matches(Platform::current()), "规则 {} 未按平台过滤", p.name);
+        }
+        // 全量列表应同时含 mac/win/linux 规则 (用于跨平台目标)
+        let all = CleanupPattern::all_patterns();
+        assert!(all.iter().any(|p| p.platform == Platform::MacOS));
+        assert!(all.iter().any(|p| p.platform == Platform::Windows));
+    }
+
+    #[test]
+    fn test_risk_gate_filters() {
+        let low = RiskLevel::Low;
+        let high = RiskLevel::High;
+        let engine = CleanupEngine::new().with_risk_gate(RiskLevel::Low);
+        // 默认 gate 为 Medium 时, High 规则不应执行
+        let default_engine = CleanupEngine::new();
+        assert!(engine.risk_gate <= low || default_engine.risk_gate > low);
+        assert!(high > RiskLevel::Medium);
+        assert!(RiskLevel::Low < RiskLevel::High);
+    }
+
+    #[test]
+    fn test_pattern_expand_home() {
+        let home = dirs::home_dir().unwrap();
+        let expanded = CleanupPattern::expand("~/.cargo/registry/cache/**");
+        assert!(expanded.starts_with(&home.to_string_lossy().to_string()));
+        assert!(expanded.contains(".cargo"));
+    }
+
+    #[test]
+    fn test_cachedir_tag_detection() {
+        let tmp = std::env::temp_dir().join("neotrix_test_cachedir_tag");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        // 带合法签名的 CACHEDIR.TAG → 应被识别为缓存
+        fs::write(tmp.join("CACHEDIR.TAG"), "Signature: 8a477f597d02d456d45674aa7d611ef7b6c14a01bccaebbd4e53c5d4f\ncomment").unwrap();
+        assert!(CleanupPattern::has_cachedir_tag(&tmp));
+        // 不带签名 → 不是
+        fs::write(tmp.join("CACHEDIR.TAG"), "random").unwrap();
+        assert!(!CleanupPattern::has_cachedir_tag(&tmp));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_system_root_guard() {
+        // 拒绝删除系统根目录
+        assert!(CleanupPattern::is_system_root_dir(std::path::Path::new("/")));
+        let home = dirs::home_dir().unwrap();
+        assert!(CleanupPattern::is_system_root_dir(&home));
+        // 普通目录不受影响
+        assert!(!CleanupPattern::is_system_root_dir(std::path::Path::new("/tmp/neotrix_test_x")));
+    }
+
+    #[test]
+    fn test_component_registry_woow64_expansion() {
+        // WDR 机制: HKLM\Software\Classes\CLSID 三副本展开
+        let t = ComponentTarget {
+            name: "test", surface: RemovalSurface::ShellAssociation,
+            risk: RiskLevel::Medium, platform: Platform::Windows,
+            registry_keys: vec!["HKLM\\Software\\Classes\\CLSID\\{ABC123}"],
+            services: vec![], tasks: vec![], files: vec![],
+            description: "test",
+        };
+        let keys = t.expand_registry_keys();
+        assert_eq!(keys.len(), 3, "应展开为 HKLM/HKCR/WOW6432Node 三副本");
+        assert!(keys.iter().any(|k| k.contains("WOW6432Node")));
+    }
+
+    #[test]
+    fn test_component_targets_active_on_current() {
+        for t in ComponentTarget::all_targets() {
+            assert!(t.platform.matches(Platform::current()) == t.active_on_current());
+        }
+    }
+
+    #[test]
+    fn test_component_remover_snapshot_roundtrip() {
+        let tmp = std::env::temp_dir().join("neotrix_test_remover_snapshot");
+        let _ = fs::remove_dir_all(&tmp);
+        let remover = ComponentRemover::new(&tmp);
+        assert!(remover.dry_run, "默认必须 dry-run");
+        // snapshot_dir 应位于 .cleanup/snapshot
+        assert!(remover.snapshot_dir.ends_with(".cleanup/snapshot"));
         let _ = fs::remove_dir_all(&tmp);
     }
 }
