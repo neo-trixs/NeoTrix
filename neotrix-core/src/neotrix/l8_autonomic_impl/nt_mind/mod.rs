@@ -116,6 +116,7 @@ pub mod evolution;
 pub use evolution::agent_capability::{
     MemoryAgent, MemoryAgentCapability, MemoryCapabilityKind, MetaAgentShell, CapabilityOutcome,
     AgentExecutor, AgentExecutionOutcome, ProductionAgentExecutor,
+    DispatchTopology, TopologyRepair,
 };
 pub mod control_distillation;
 pub mod infrastructure;

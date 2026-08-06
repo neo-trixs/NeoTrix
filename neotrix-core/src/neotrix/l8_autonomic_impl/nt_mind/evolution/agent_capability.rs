@@ -365,6 +365,225 @@ impl AgentExecutionOutcome {
     }
 }
 
+/// MANTA 式拓扑修复提议 (P3) — trace 审计发现"当前组织不足"时的有界结构更新。
+#[derive(Debug, Clone, PartialEq)]
+pub struct TopologyRepair {
+    /// 发生组织不足的注意力域
+    pub domain: AttentionDomain,
+    /// 当前 (旧) 档案
+    pub from_agent: &'static str,
+    /// 建议改为的档案
+    pub to_agent: &'static str,
+    /// 旧档案在该域的实测成功率
+    pub from_success_rate: f64,
+    /// 新档案在该域的实测成功率
+    pub to_success_rate: f64,
+    /// 依据的证据样本数
+    pub evidence_attempts: u32,
+}
+
+impl TopologyRepair {
+    /// 人类可读摘要 (background_loop 日志用)。
+    pub fn summary(&self) -> String {
+        format!(
+            "{:?}: {} ({:.0}%) -> {} ({:.0}%), evidence={}",
+            self.domain,
+            self.from_agent,
+            self.from_success_rate * 100.0,
+            self.to_agent,
+            self.to_success_rate * 100.0,
+            self.evidence_attempts,
+        )
+    }
+}
+
+/// 派单拓扑 (P3, MANTA 式) — 域→档案 的边集合, 推理期可自进化。
+///
+/// MANTA (arXiv 2607.28527) 三个机制落到派单层:
+///   1. **任务条件化初始化** `for_task_type`: 不同任务类型给不同初始拓扑
+///      (如 research 任务初始把 PatternMatch 指向 researcher)。
+///   2. **trace 审计 + 有界结构修复** `audit`/`apply_repair`: 当某域当前档案
+///      长期成功率低于候选档案时, 改这条边 (改 agent 角色/链路), 保持 agent
+///      预算与任务接口不变 — 拓扑自进化, 而非永远固定静态映射。
+///   3. **跨轮 playbook** `persist`/`load`: 拓扑修复经验经 KB kv_store 跨会话
+///      存活, 让"什么样的组织更好"沉淀为可复用知识。
+///
+/// 修复是有界的: 仅接受规范档案名 (researcher/explorer/planner/generalist/
+/// verifier/watcher), 不改 agent 总数、不改派单接口 — MANTA "preserving the
+/// task interface and agent budget"。
+#[derive(Debug, Clone)]
+pub struct DispatchTopology {
+    /// 域 → 档案 的通信边 (派单拓扑的边集)
+    pub edges: std::collections::HashMap<AttentionDomain, &'static str>,
+    /// 已应用的修复次数 (拓扑修订号, 自进化履历)
+    pub revision: u64,
+    /// 最近一次修复记录
+    pub last_repair: Option<TopologyRepair>,
+}
+
+impl DispatchTopology {
+    /// 任务条件化初始化 — 依据任务类型给出初始边集 (MANTA: task-conditioned init)。
+    pub fn for_task_type(task_type: &str) -> Self {
+        let mut edges = std::collections::HashMap::new();
+        let lower = task_type.to_lowercase();
+        if lower.contains("research") || lower.contains("study") {
+            // research 任务: 初始把检索域指向 researcher (网络研究) 而非 explorer
+            edges.insert(AttentionDomain::PatternMatch, "researcher");
+        } else {
+            edges.insert(AttentionDomain::PatternMatch, "explorer");
+        }
+        if lower.contains("review") || lower.contains("audit") || lower.contains("verify") {
+            edges.insert(AttentionDomain::SelfReflection, "verifier");
+            edges.insert(AttentionDomain::RiskAssessment, "verifier");
+        } else {
+            edges.insert(AttentionDomain::SelfReflection, "verifier");
+            edges.insert(AttentionDomain::RiskAssessment, "verifier");
+        }
+        edges.insert(AttentionDomain::Planning, "planner");
+        edges.insert(AttentionDomain::GoalAlignment, "planner");
+        edges.insert(AttentionDomain::Code, "generalist");
+        edges.insert(AttentionDomain::ToolUse, "generalist");
+        edges.insert(AttentionDomain::Temporal, "generalist");
+        edges.insert(AttentionDomain::Semantic, "watcher");
+        edges.insert(AttentionDomain::Creativity, "planner");
+        Self {
+            edges,
+            revision: 0,
+            last_repair: None,
+        }
+    }
+
+    /// 当前某域的档案 (若边不存在回退 explorer)。
+    pub fn agent_for(&self, domain: AttentionDomain) -> &'static str {
+        self.edges.get(&domain).copied().unwrap_or("explorer")
+    }
+
+    /// trace 审计 — 对每个域, 若当前档案尝试 ≥ min_evidence 且候选档案
+    /// 成功率显著更高 (> 15pp), 提议结构修复 (MANTA: bounded structural update)。
+    pub fn audit(&self, learner: &RouteLearner) -> Vec<TopologyRepair> {
+        let mut repairs = Vec::new();
+        for (domain, current) in &self.edges {
+            let rates = learner.rates(*domain);
+            let current_rate = rates
+                .iter()
+                .find(|(a, _, _)| *a == *current)
+                .map(|(_, r, _)| *r)
+                .unwrap_or(0.0);
+            let current_attempts = rates
+                .iter()
+                .find(|(a, _, _)| *a == *current)
+                .map(|(_, _, t)| *t)
+                .unwrap_or(0);
+            if current_attempts < learner.config.min_evidence {
+                continue;
+            }
+            // 候选: 尝试 ≥ min_evidence 且成功率 > 当前 + 15pp
+            let best_alt = rates
+                .iter()
+                .filter(|(a, _, t)| *a != *current && *t >= learner.config.min_evidence)
+                .max_by(|(_, ra, _), (_, rb, _)| ra.partial_cmp(rb).unwrap_or(std::cmp::Ordering::Equal));
+            if let Some((candidate, candidate_rate, candidate_attempts)) = best_alt {
+                if *candidate_rate > current_rate + 0.15 {
+                    repairs.push(TopologyRepair {
+                        domain: *domain,
+                        from_agent: *current,
+                        to_agent: candidate,
+                        from_success_rate: current_rate,
+                        to_success_rate: *candidate_rate,
+                        evidence_attempts: *candidate_attempts,
+                    });
+                }
+            }
+        }
+        repairs
+    }
+
+    /// 有界结构修复 — 仅接受规范档案名, 应用后 revision+1, 记录 last_repair。
+    pub fn apply_repair(&mut self, repair: &TopologyRepair) -> bool {
+        let Some(canonical) = Self::canonical_agent(repair.to_agent) else {
+            return false;
+        };
+        self.edges.insert(repair.domain, canonical);
+        self.revision += 1;
+        self.last_repair = Some(repair.clone());
+        true
+    }
+
+    /// 拓扑边数量 (审计用)。
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// 持久化到 KB kv_store (MANTA cross-run playbook)。
+    pub fn persist(&self, kb: &KnowledgeBase) -> Result<(), String> {
+        let edges: std::collections::HashMap<String, String> = self
+            .edges
+            .iter()
+            .map(|(d, a)| (format!("{:?}", d), a.to_string()))
+            .collect();
+        let payload = serde_json::json!({
+            "edges": edges,
+            "revision": self.revision,
+        });
+        let json = serde_json::to_string(&payload)
+            .map_err(|e| format!("topology serialize: {}", e))?;
+        kb.save_dispatch_topology(&json)
+    }
+
+    /// 从 KB 恢复拓扑 (无存档则保持当前, 冷启动安全)。
+    pub fn load(&mut self, kb: &KnowledgeBase) -> Result<(), String> {
+        let Some(json) = kb.load_dispatch_topology()? else {
+            return Ok(());
+        };
+        let parsed: serde_json::Value = serde_json::from_str(&json)
+            .map_err(|e| format!("topology deserialize: {}", e))?;
+        self.revision = parsed.get("revision").and_then(|r| r.as_u64()).unwrap_or(0);
+        if let Some(edges) = parsed.get("edges").and_then(|e| e.as_object()) {
+            for (domain_key, agent) in edges {
+                let Some(domain) = Self::parse_domain(domain_key) else {
+                    continue;
+                };
+                if let Some(agent_str) = agent.as_str() {
+                    if let Some(canonical) = Self::canonical_agent(agent_str) {
+                        self.edges.insert(domain, canonical);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// 从字符串还原注意力域 (与 RouteLearner::parse_domain 一致, 复用持久化格式)。
+    fn parse_domain(s: &str) -> Option<AttentionDomain> {
+        match s {
+            "PatternMatch" => Some(AttentionDomain::PatternMatch),
+            "Code" => Some(AttentionDomain::Code),
+            "Semantic" => Some(AttentionDomain::Semantic),
+            "Temporal" => Some(AttentionDomain::Temporal),
+            "Planning" => Some(AttentionDomain::Planning),
+            "SelfReflection" => Some(AttentionDomain::SelfReflection),
+            "ToolUse" => Some(AttentionDomain::ToolUse),
+            "GoalAlignment" => Some(AttentionDomain::GoalAlignment),
+            "RiskAssessment" => Some(AttentionDomain::RiskAssessment),
+            "Creativity" => Some(AttentionDomain::Creativity),
+            _ => None,
+        }
+    }
+
+    /// 规范档案名白名单 (保持 agent 预算, 防注入)。
+    fn canonical_agent(s: &str) -> Option<&'static str> {
+        match s {
+            "researcher" => Some("researcher"),
+            "explorer" => Some("explorer"),
+            "planner" => Some("planner"),
+            "generalist" => Some("generalist"),
+            "verifier" => Some("verifier"),
+            "watcher" => Some("watcher"),
+            _ => None,
+        }
+    }
+}
+
 /// 派单执行桥 — 把 AgentCatalog 档案映射到真实执行器 (R-P42: 强化现有节点,
 /// 不建平行适配器模块)。背景循环持有生产实现, 测试可注入探针实现。
 pub trait AgentExecutor {
@@ -471,6 +690,9 @@ pub struct MetaAgentShell {
     pub last_dispatched: Option<&'static str>,
     /// 行为化路由学习者 — 用结果反馈覆盖静态映射 (D3)。
     pub learner: RouteLearner,
+    /// MANTA 式派单拓扑 (P3) — 域→档案边集合, 推理期可自进化。
+    /// 静态映射退居"初始组织", 拓扑经 trace 审计 + 有界修复自进化。
+    pub topology: DispatchTopology,
 }
 
 impl MetaAgentShell {
@@ -484,6 +706,7 @@ impl MetaAgentShell {
             iterations_run: 0,
             last_dispatched: None,
             learner: RouteLearner::new(),
+            topology: DispatchTopology::for_task_type(task_type),
         }
     }
 
@@ -497,6 +720,7 @@ impl MetaAgentShell {
             iterations_run: 0,
             last_dispatched: None,
             learner: RouteLearner::with_config(learner_config),
+            topology: DispatchTopology::for_task_type(task_type),
         }
     }
 
@@ -516,15 +740,10 @@ impl MetaAgentShell {
     ///   - 其余                     → 不派单 (None)
     pub fn route_to_catalog(&self) -> Option<&'static str> {
         let dominant = self.attention.dominant_domain()?;
-        let static_agent = match dominant {
-            AttentionDomain::PatternMatch => "explorer",
-            AttentionDomain::Planning | AttentionDomain::GoalAlignment => "planner",
-            AttentionDomain::Code | AttentionDomain::ToolUse | AttentionDomain::Temporal => "generalist",
-            AttentionDomain::SelfReflection | AttentionDomain::RiskAssessment => "verifier",
-            AttentionDomain::Semantic => "watcher",
-            AttentionDomain::Creativity => "planner",
-        };
-        // D3: 学习化路由 — 静态映射为冷启动基线, 有足够证据时用结果反馈覆盖。
+        // P3: 静态映射退居初始组织 — 派单拓扑的边是当前组织, 可被 trace 审计
+        // + 有界修复自进化 (MANTA)。冷启动时拓扑 = 任务条件化初始边。
+        let static_agent = self.topology.agent_for(dominant);
+        // D3: 学习化路由 — 拓扑边为基线, 有足够证据时用结果反馈覆盖。
         Some(self.learner.route(dominant, static_agent))
     }
 
@@ -596,6 +815,30 @@ impl MetaAgentShell {
     /// 激活特定域 — 供上层 (background_loop) 按事件触发。
     pub fn stimulate(&mut self, domain: AttentionDomain, amount: f64) {
         self.attention.stimulate_domain(domain, amount);
+    }
+
+    /// MANTA trace 审计 + 有界结构修复 (P3) — 依据 learner 的 (域, 档案, 成败)
+    /// 行为 trace, 发现"当前组织不足"时改派单拓扑的边 (域→档案), 让组织自进化。
+    /// 返回实际应用的修复列表 (空 = 当前组织仍足够)。
+    pub fn audit_and_repair_topology(&mut self) -> Vec<TopologyRepair> {
+        let repairs = self.topology.audit(&self.learner);
+        let mut applied = Vec::new();
+        for repair in repairs {
+            if self.topology.apply_repair(&repair) {
+                applied.push(repair);
+            }
+        }
+        applied
+    }
+
+    /// 拓扑跨轮 playbook — 持久化到 KB (MANTA: cross-run experience)。
+    pub fn persist_topology(&self, kb: &KnowledgeBase) -> Result<(), String> {
+        self.topology.persist(kb)
+    }
+
+    /// 拓扑跨轮 playbook — 从 KB 恢复 (冷启动无存档则保持当前)。
+    pub fn load_topology(&mut self, kb: &KnowledgeBase) -> Result<(), String> {
+        self.topology.load(kb)
     }
 }
 
@@ -1744,6 +1987,139 @@ mod tests {
             let domains = branch_attention_domains(&kind);
             assert!(!domains.is_empty(), "branch {kind:?} should map to >=1 attention domain");
         }
+    }
+
+    #[test]
+    fn topology_task_conditioned_init() {
+        // P3/MANTA: 任务条件化初始化 — research 任务 PatternMatch→researcher,
+        // 一般任务 PatternMatch→explorer。
+        let research = DispatchTopology::for_task_type("research_study");
+        assert_eq!(research.agent_for(AttentionDomain::PatternMatch), "researcher");
+        assert_eq!(research.agent_for(AttentionDomain::SelfReflection), "verifier");
+        let general = DispatchTopology::for_task_type("dialogue");
+        assert_eq!(general.agent_for(AttentionDomain::PatternMatch), "explorer");
+        assert_eq!(general.agent_for(AttentionDomain::Semantic), "watcher");
+        assert_eq!(general.agent_for(AttentionDomain::Code), "generalist");
+    }
+
+    #[test]
+    fn topology_audit_proposes_repair_on_underperformance() {
+        // P3/MANTA: trace 审计 — 某域当前档案长期低成功率, 候选档案明显更优 →
+        // 提议有界结构修复。
+        let mut learner = RouteLearner::new();
+        // Semantic 域: watcher (当前, 静态) 0/5 成功; planner 5/5 成功。
+        for _ in 0..5 {
+            learner.record(AttentionDomain::Semantic, "watcher", false);
+        }
+        for _ in 0..5 {
+            learner.record(AttentionDomain::Semantic, "planner", true);
+        }
+        let topology = DispatchTopology::for_task_type("dialogue");
+        let repairs = topology.audit(&learner);
+        assert_eq!(repairs.len(), 1, "one edge should be repaired");
+        assert_eq!(repairs[0].domain, AttentionDomain::Semantic);
+        assert_eq!(repairs[0].from_agent, "watcher");
+        assert_eq!(repairs[0].to_agent, "planner");
+        assert!(repairs[0].to_success_rate > repairs[0].from_success_rate);
+        // 健康域不产生修复: Code 域 generalist 5/5 成功 → 无替换提议。
+        let mut healthy = RouteLearner::new();
+        for _ in 0..5 {
+            healthy.record(AttentionDomain::Code, "generalist", true);
+        }
+        let repairs_healthy = topology.audit(&healthy);
+        assert!(repairs_healthy.is_empty(), "healthy edge should not be repaired");
+    }
+
+    #[test]
+    fn topology_apply_repair_is_bounded() {
+        // P3/MANTA: 有界修复 — 只接受规范档案名, 保持 agent 预算; 未知档案拒绝。
+        let mut topology = DispatchTopology::for_task_type("dialogue");
+        let repair = TopologyRepair {
+            domain: AttentionDomain::Semantic,
+            from_agent: "watcher",
+            to_agent: "planner",
+            from_success_rate: 0.0,
+            to_success_rate: 1.0,
+            evidence_attempts: 5,
+        };
+        assert!(topology.apply_repair(&repair));
+        assert_eq!(topology.agent_for(AttentionDomain::Semantic), "planner");
+        assert_eq!(topology.revision, 1);
+        assert!(topology.last_repair.is_some());
+        // 未知档案 (越界, 注入防护) → 拒绝。
+        let evil = TopologyRepair {
+            domain: AttentionDomain::Semantic,
+            from_agent: "planner",
+            to_agent: "root_backdoor",
+            from_success_rate: 0.0,
+            to_success_rate: 1.0,
+            evidence_attempts: 5,
+        };
+        assert!(!topology.apply_repair(&evil));
+        assert_eq!(topology.revision, 1, "rejected repair must not bump revision");
+    }
+
+    #[test]
+    fn topology_persist_load_round_trip() {
+        // P3/MANTA: 跨轮 playbook — 修复后的拓扑落盘 KB, 新实例可恢复。
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_topology_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = std::sync::Arc::new(KnowledgeBase::open(Some(tmp.into())).expect("open kb"));
+        let mut topology = DispatchTopology::for_task_type("dialogue");
+        topology.apply_repair(&TopologyRepair {
+            domain: AttentionDomain::Semantic,
+            from_agent: "watcher",
+            to_agent: "planner",
+            from_success_rate: 0.0,
+            to_success_rate: 1.0,
+            evidence_attempts: 5,
+        });
+        topology.persist(&kb).expect("persist");
+        // 全新实例恢复 → 边与修订号还原。
+        let mut restored = DispatchTopology::for_task_type("research_study");
+        assert_eq!(restored.agent_for(AttentionDomain::PatternMatch), "researcher");
+        restored.load(&kb).expect("load");
+        assert_eq!(restored.agent_for(AttentionDomain::Semantic), "planner", "repair survives restart");
+        assert_eq!(restored.revision, 1);
+    }
+
+    #[test]
+    fn shell_audit_repair_uses_real_learner_trace() {
+        // P3 端到端: 派单执行 → learner 积累 trace → audit_and_repair_topology
+        // 自动修复拓扑边。模拟 Semantic 域 watcher 连续失败。
+        let mut shell = MetaAgentShell::new("dialogue");
+        let fail_probe = ProbeExecutor {
+            calls: std::cell::RefCell::new(Vec::new()),
+            respond: AgentExecutionOutcome::Failure("consolidate unavailable".into()),
+        };
+        let success_probe = ProbeExecutor {
+            calls: std::cell::RefCell::new(Vec::new()),
+            respond: AgentExecutionOutcome::Success("search returned".into()),
+        };
+        // 5 次 Semantic 刺激 → watcher 连续失败。
+        for _ in 0..5 {
+            shell.stimulate(AttentionDomain::Semantic, 0.9);
+            shell.dispatch_and_execute(&fail_probe, "monitor health");
+        }
+        // 再让 explorer/planner 在 Semantic 上成功 (模拟其他域派单误入 Semantic 的修正路径)。
+        shell.learner.record(AttentionDomain::Semantic, "planner", true);
+        shell.learner.record(AttentionDomain::Semantic, "planner", true);
+        shell.learner.record(AttentionDomain::Semantic, "planner", true);
+        shell.learner.record(AttentionDomain::Semantic, "planner", true);
+        shell.learner.record(AttentionDomain::Semantic, "planner", true);
+        let repairs = shell.audit_and_repair_topology();
+        assert!(
+            repairs.iter().any(|r| r.domain == AttentionDomain::Semantic),
+            "Semantic edge should be repaired after underperformance"
+        );
+        assert_eq!(shell.topology.agent_for(AttentionDomain::Semantic), "planner");
+        assert!(shell.topology.revision >= 1);
     }
 
     #[test]

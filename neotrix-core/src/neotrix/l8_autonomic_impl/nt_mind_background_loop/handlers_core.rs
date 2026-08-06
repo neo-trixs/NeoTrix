@@ -171,6 +171,22 @@ impl BackgroundLoopHandle {
                             eprintln!("[bg-meta] route_learner persist failed: {}", e);
                         }
                     }
+                    // P3: MANTA trace 审计 + 有界结构修复 — 派单后依据行为 trace
+                    // 检查派单拓扑, 当前组织不足则改边 (域→档案), 并落盘 playbook。
+                    let repairs = shell.audit_and_repair_topology();
+                    if !repairs.is_empty() {
+                        eprintln!(
+                            "[bg-meta] topology repair x{} (revision={}): {}",
+                            repairs.len(),
+                            shell.topology.revision,
+                            repairs.iter().map(|r| r.summary()).collect::<Vec<_>>().join("; "),
+                        );
+                        if let Some(ref kb_ref) = self.kb {
+                            if let Err(e) = shell.persist_topology(kb_ref) {
+                                eprintln!("[bg-meta] dispatch_topology persist failed: {}", e);
+                            }
+                        }
+                    }
                 }
             }
         }
