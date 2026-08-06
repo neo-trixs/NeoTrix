@@ -620,4 +620,32 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await expect(dlg).toHaveCount(0, { timeout: 10_000 });
     expect((await invokeCalls(page)).filter((c) => c.cmd === "neocodex_delete_message").length).toBe(before + 1);
   });
+
+  test("cowork session list groups by time with 今天/昨天/更早 headers", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      const w = window as any;
+      const DAY = 86400;
+      const now = Math.floor(Date.now() / 1000);
+      w.CW_DATA = [
+        { name: "今日分组", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now },
+        { name: "昨日分组", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now - DAY },
+        { name: "更早分组", status: "已完成", tasks: 1, done: 1, fail: 0, updated_at: now - 30 * DAY },
+      ];
+      w.cwFilter("all");
+      w.renderCowork();
+    });
+    const list = page.locator("#cwSessionList");
+    await expect(list.locator(".cw-group-h").first()).toContainText("今天", { timeout: 10_000 });
+    await expect(list.locator(".cw-group-h").nth(1)).toContainText("昨天");
+    await expect(list.locator(".cw-group-h").nth(2)).toContainText("更早");
+    await expect(list.locator(".cw-sitem")).toHaveCount(3);
+    // group header precedes its items inside the same container
+    const order = await list.evaluate((el) =>
+      [...el.querySelectorAll(".cw-group-h, .cw-sitem")].map((n) =>
+        n.classList.contains("cw-group-h") ? n.textContent : "item"
+      )
+    );
+    expect(order).toEqual(["今天", "item", "昨天", "item", "更早", "item"]);
+  });
 });

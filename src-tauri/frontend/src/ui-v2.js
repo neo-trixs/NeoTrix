@@ -77,6 +77,9 @@ g.kbSearch = kbSearch;
 g.sendSuggestion = sendSuggestion;
 g.renderHeroSuggest = renderHeroSuggest;
 g.cwFilter = cwFilter;
+g.renderCowork = renderCowork;
+g.dayStartTs = dayStartTs;
+g.groupSessionsByTime = groupSessionsByTime;
 g.openSessionOps = openSessionOps;
 g.renameSession = renameSession;
 g.compactSession = compactSession;
@@ -785,6 +788,8 @@ g.restoreCheckpoint = restoreCheckpoint;
     { name:'代码审查 Sprint', status:'进行中', tasks:5, done:3, fail:0, agents:[{n:'审查员',on:true},{n:'检查员',on:true}] },
     { name:'文档生成', status:'已完成', tasks:2, done:2, fail:0, agents:[{n:'写手',on:false}] },
   ];
+  // Live reference so vitest/e2e can inject data then call renderCowork() directly
+  Object.defineProperty(g, 'CW_DATA', { get: () => CW_DATA, set: (v) => { CW_DATA = v; }, configurable: true });
   let cwStatusFilter = 'all';
   function cwFilter(status){
     cwStatusFilter = status;
@@ -811,6 +816,36 @@ g.restoreCheckpoint = restoreCheckpoint;
     return `${h}h ${m%60}m`;
   }
 
+  /** 今天 0 点（本地时区）的 Unix 秒；offsetDays 可回退到昨天/前 N 天 */
+  function dayStartTs(offsetDays = 0){
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    if(offsetDays) d.setDate(d.getDate() + offsetDays);
+    return Math.floor(d.getTime() / 1000);
+  }
+
+  /* 会话时间分组 (对标 ChatGPT/Claude 侧边栏 Today/Yesterday/7d/Earlier)
+     返回非空分组：[{ label:'今天', sessions:[...] }, { label:'昨天', ... }, { label:'7 天内', ... }, { label:'更早', ... }]
+     无 updated_at 的会话归入「更早」；组内按 updated_at 降序。 */
+  function groupSessionsByTime(sessions){
+    const DAY = 86400;
+    const todayStart = dayStartTs(0);
+    const yesterdayStart = todayStart - DAY;
+    const weekStart = todayStart - 7 * DAY;
+    const bucketOf = (s) => {
+      const ts = typeof (s && s.updated_at) === 'number' && s.updated_at > 0 ? s.updated_at : 0;
+      if(!ts || ts < weekStart) return '更早';
+      if(ts >= todayStart) return '今天';
+      if(ts >= yesterdayStart) return '昨天';
+      return '7 天内';
+    };
+    const order = ['今天', '昨天', '7 天内', '更早'];
+    const buckets = order.map(label => ({ label, sessions: [] }));
+    (sessions || []).forEach(s => buckets[order.indexOf(bucketOf(s))].sessions.push(s));
+    buckets.forEach(b => b.sessions.sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0)));
+    return buckets.filter(b => b.sessions.length > 0);
+  }
+
   function renderCowork(){
     const sl = document.getElementById('cwSessionList');
     if(!sl) return;
@@ -819,19 +854,26 @@ g.restoreCheckpoint = restoreCheckpoint;
       if(cwStatusFilter === 'done') return s.status === '已完成';
       return true;
     });
-    sl.innerHTML = filtered.map((s,i) => {
-      const pct = s.tasks > 0 ? Math.round(s.done/s.tasks*100) : 0;
-      const stCls = s.status === '已完成' ? 's-done' : (s.status === '已暂停' ? 's-paused' : 's-run');
-      const stTxt = s.status || '就绪';
-      const msg = s.message_count ? ` · ${s.message_count} 消息` : '';
-      return `<div class="cw-sitem${i===0?' active':''}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
-        <div class="s">
-          <span class="st-dot ${stCls}"></span>
-          <span class="st-t">${escHtml(s.name)}</span>
-        </div>
-        <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%${msg}</span>
-        <span class="s">${escHtml(stTxt)}</span>
-      </div>`;
+    const groups = groupSessionsByTime(filtered);
+    let firstShown = true;
+    sl.innerHTML = groups.map(grp => {
+      const items = grp.sessions.map(s => {
+        const pct = s.tasks > 0 ? Math.round(s.done/s.tasks*100) : 0;
+        const stCls = s.status === '已完成' ? 's-done' : (s.status === '已暂停' ? 's-paused' : 's-run');
+        const stTxt = s.status || '就绪';
+        const msg = s.message_count ? ` · ${s.message_count} 消息` : '';
+        const active = firstShown ? ' active' : '';
+        firstShown = false;
+        return `<div class="cw-sitem${active}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
+          <div class="s">
+            <span class="st-dot ${stCls}"></span>
+            <span class="st-t">${escHtml(s.name)}</span>
+          </div>
+          <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%${msg}</span>
+          <span class="s">${escHtml(stTxt)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="cw-group-h">${grp.label}</div>${items}`;
     }).join('');
     if(!filtered.length){
       sl.innerHTML = `<div class="cw-empty" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px 12px;text-align:center"><p style="margin:0;font-size:var(--fs-small);color:var(--tx2)">没有符合条件的会话</p><span style="font-size:var(--fs-caption);color:var(--tx-meta)">切换其他状态或新建会话</span></div>`;
