@@ -681,7 +681,10 @@
   .cic textarea { width:100%; background:transparent; border:none; outline:none; resize:none; font-family:var(--ff); font-size:var(--fs-body-lg); line-height:var(--lh-normal); color:var(--tx); min-height:24px; padding:2px 2px; }
   .cic textarea::placeholder { color:var(--tx3); }
   .cic-wrap { width:100%; max-width:640px; margin:0 auto; padding:8px 24px 12px; display:flex; flex-direction:column; gap:8px; }
-  .cic-hint { text-align:center; font-size:var(--fs-caption); color:var(--tx3); user-select:none; }
+  .cic-hint { display:flex; align-items:center; font-size:var(--fs-caption); color:var(--tx3); user-select:none; }
+  .cic-hint .cic-hint-txt { flex:1; text-align:center; }
+  .tok-count { flex-shrink:0; font-variant-numeric:tabular-nums; padding-left:12px; transition:var(--tr); }
+  .tok-count.over { color:var(--err, #ef4444); font-weight:var(--fw-semibold); }
   .cic-actions { display:flex; align-items:center; justify-content:space-between; }
   .cic-left { display:flex; align-items:center; }
   .cic-attach { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:50%; cursor:pointer; transition:var(--tr); color:var(--tx3); border:none; background:transparent; }
@@ -989,6 +992,7 @@
   #cwSearchResults .re-i:hover { background:var(--ghost); }
   #cwSearchResults .re-i .dot { width:6px; height:6px; border-radius:50%; background:var(--pri); flex-shrink:0; }
   .cw-slist { flex:1; overflow-y:auto; padding:6px; }
+  .cw-group-h { font-size:10px; font-weight:var(--fw-semibold); text-transform:uppercase; letter-spacing:0.8px; color:var(--tx-meta); margin:8px 2px 4px; padding:0 2px; }
   .cw-sitem { padding:8px 10px; border-radius:var(--r-sm); cursor:pointer; font-size:var(--fs-small); color:var(--tx2); transition:var(--tr); margin-bottom:2px; position:relative; border:1px solid transparent; }
   .cw-sitem:hover { background:var(--ghost); color:var(--tx); }
   .cw-sitem.active { background:var(--accent-bg); color:var(--tx); font-weight:var(--fw-medium); border-color:color-mix(in srgb, var(--pri) 22%, transparent); }

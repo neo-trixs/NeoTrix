@@ -1292,5 +1292,112 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  /* ── Token counter (wave 13: ChatGPT/Claude "123/4096" indicator) ── */
+  it("updateTokenCount shows word count vs 4096 limit", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    const count = document.getElementById("tokCount")!;
+    expect(count).not.toBeNull();
+    input.value = "hello world foo";
+    (g.updateTokenCount as () => void)();
+    expect(count.textContent).toBe("3 / 4096");
+    expect(count.classList.contains("over")).toBe(false);
+  });
+
+  it("updateTokenCount resets to 0 / 4096 on empty input", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = "";
+    (g.updateTokenCount as () => void)();
+    expect(document.getElementById("tokCount")!.textContent).toBe("0 / 4096");
+    expect(document.getElementById("tokCount")!.classList.contains("over")).toBe(false);
+  });
+
+  it("updateTokenCount marks .over when count exceeds 4096", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = Array.from({ length: 4097 }, (_, i) => "w" + i).join(" ");
+    (g.updateTokenCount as () => void)();
+    const count = document.getElementById("tokCount")!;
+    expect(count.textContent).toBe("4097 / 4096");
+    expect(count.classList.contains("over")).toBe(true);
+  });
+
+  it("autoResize triggers the token counter update on input", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = "alpha beta gamma";
+    (g.autoResize as (el: HTMLTextAreaElement) => void)(input);
+    expect(document.getElementById("tokCount")!.textContent).toBe("3 / 4096");
+  });
+
+  it("dayStartTs exposes today 0am local Unix seconds (and offsetDays shifts days)", () => {
+    const g = globalThis as Record<string, unknown>;
+    expect(typeof g.dayStartTs).toBe("function");
+    const today = g.dayStartTs as (d?: number) => number;
+    const now = new Date();
+    const todayDate = new Date(today(0) * 1000);
+    expect(todayDate.getHours()).toBe(0);
+    expect(todayDate.getMinutes()).toBe(0);
+    expect(todayDate.getSeconds()).toBe(0);
+    const diff = today(1) - today(0);
+    expect(diff).toBe(86400);
+  });
+
+  it("groupSessionsByTime buckets into 今天/昨天/7 天内/更早 in order (dynamic timestamps)", () => {
+    const g = globalThis as Record<string, unknown>;
+    const DAY = 86400;
+    const now = Math.floor(Date.now() / 1000);
+    const sessions = [
+      { id: "old", name: "三十天前", updated_at: now - 30 * DAY },
+      { id: "today", name: "今天", updated_at: now },
+      { id: "yest", name: "昨天", updated_at: now - DAY },
+      { id: "wk", name: "六天前", updated_at: now - 6 * DAY },
+      { id: "nots", name: "无时间", status: "进行中", tasks: 1, done: 0, fail: 0 },
+    ];
+    const groups = (g.groupSessionsByTime as (s: unknown[]) => { label: string; sessions: Array<{ id: string }> }[])(sessions);
+    expect(groups.map((x) => x.label)).toEqual(["今天", "昨天", "7 天内", "更早"]);
+    expect(groups[0].sessions.map((s) => s.id)).toEqual(["today"]);
+    expect(groups[1].sessions.map((s) => s.id)).toEqual(["yest"]);
+    expect(groups[2].sessions.map((s) => s.id)).toEqual(["wk"]);
+    // 无 updated_at 归入更早；更早组内按 updated_at 降序（有时间的在前）
+    expect(groups[3].sessions.map((s) => s.id)).toEqual(["old", "nots"]);
+  });
+
+  it("groupSessionsByTime sorts each bucket by updated_at descending", () => {
+    const g = globalThis as Record<string, unknown>;
+    const now = Math.floor(Date.now() / 1000);
+    const sessions = [
+      { id: "a", updated_at: now - 120 },
+      { id: "b", updated_at: now - 10 },
+      { id: "c", updated_at: now - 3600 },
+    ];
+    const groups = (g.groupSessionsByTime as (s: unknown[]) => { label: string; sessions: Array<{ id: string }> }[])(sessions);
+    expect(groups.map((x) => x.label)).toEqual(["今天"]);
+    expect(groups[0].sessions.map((s) => s.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("renderCowork renders .cw-group-h headers 今天/昨天/更早 with items intact", () => {
+    const g = globalThis as Record<string, unknown>;
+    const DAY = 86400;
+    const now = Math.floor(Date.now() / 1000);
+    (g as unknown as { CW_DATA: unknown[] }).CW_DATA = [
+      { name: "今日会话", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now },
+      { name: "昨日会话", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now - DAY },
+      { name: "更早会话", status: "已完成", tasks: 1, done: 1, fail: 0, updated_at: now - 30 * DAY },
+    ];
+    // reset status filter that earlier tests may have left at 'done'
+    (g.cwFilter as (s: string) => void)("all");
+    (g.renderCowork as () => void)();
+    const headers = [...document.querySelectorAll("#cwSessionList .cw-group-h")].map((e) => e.textContent);
+    expect(headers).toEqual(["今天", "昨天", "更早"]);
+    expect(headers.some((t) => t!.includes("今天"))).toBe(true);
+    expect(headers.some((t) => t!.includes("昨天"))).toBe(true);
+    expect(document.querySelectorAll("#cwSessionList .cw-sitem").length).toBe(3);
+    // item structure unchanged: status dot + name inside each item
+    expect(document.querySelectorAll("#cwSessionList .cw-sitem .st-dot").length).toBe(3);
+    expect(document.querySelector("#cwSessionList .cw-sitem")!.textContent).toContain("今日会话");
+  });
 });
 
