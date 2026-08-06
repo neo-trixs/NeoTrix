@@ -138,6 +138,21 @@ impl BackgroundLoopHandle {
             for (domain, amount) in crate::neotrix::nt_mind::evolution::agent_capability::domains_for_goal(&task_hint) {
                 shell.stimulate(domain, amount);
             }
+            // P2: 星系能力网络 → 控制面 — 树的分支薄弱信号驱动派单。
+            // ConsciousnessTree 的 branch health/fog/constellation 此前是纯观测,
+            // 现转为真实派单输入: 薄弱分支刺激对应注意力域, 派单去强化它。
+            if let Some(ref tree) = self.consciousness_tree {
+                let branch_stimuli = crate::neotrix::nt_mind::evolution::agent_capability::tree_branch_stimuli(tree);
+                if !branch_stimuli.is_empty() {
+                    eprintln!(
+                        "[bg-meta] tree-control: {} branch signals -> attention",
+                        branch_stimuli.len(),
+                    );
+                }
+                for (domain, amount) in branch_stimuli {
+                    shell.stimulate(domain, amount);
+                }
+            }
             let exec_task = if task_hint.is_empty() {
                 "general_dialogue_tick"
             } else {

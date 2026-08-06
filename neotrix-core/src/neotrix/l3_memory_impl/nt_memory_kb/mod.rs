@@ -1175,6 +1175,20 @@ impl KnowledgeBase {
         nt_memory_unify::kv_get(&conn, "route_learner", "state")
     }
 
+    // ── DispatchTopology 持久化 (P3, MANTA 跨轮 playbook) ──
+    // 派单拓扑 (域→档案边) 的修复履历存 kv_store `dispatch_topology` namespace,
+    // 跨会话存活 — 让"组织自进化"的经验跨运行传输 (MANTA cross-run playbook)。
+
+    pub fn save_dispatch_topology(&self, json: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_unify::kv_set(&conn, "dispatch_topology", "state", json)
+    }
+
+    pub fn load_dispatch_topology(&self) -> Result<Option<String>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_unify::kv_get(&conn, "dispatch_topology", "state")
+    }
+
     // ── Agent Session Management (SQLite-backed) ──
 
     pub fn agent_session_begin(&self, agent_id: &str, label: &str) -> Result<String, String> {

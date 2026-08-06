@@ -20,6 +20,7 @@ use crate::neotrix::l3_memory_impl::nt_memory_kb::{
 };
 use crate::neotrix::l2_world_impl::nt_world_search::{SearchResult, UnifiedSearch};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
 
 /// 记忆大脑能力类型 — agent 可按任务路由到具体能力。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -640,6 +641,53 @@ pub fn domains_for_goal(goal: &str) -> Vec<(AttentionDomain, f64)> {
         domains.push((AttentionDomain::SelfReflection, 0.3));
     }
     domains
+}
+
+/// 星系能力网络 → 派单刺激 (P2: 树从观测变控制面)。
+///
+/// 缺陷背景: `ConsciousnessTree` 的 branch health/fog/constellation 是纯观测
+/// 信号 — 只写日志、enqueue goal, 从不驱动派单。此函数把树的薄弱分支映射为
+/// 注意力域刺激: 分支越弱 (health 低 / fog 浓 / constellation 低) → 对应域
+/// 刺激越强 → 派单该域档案去强化它。让树真正成为星系派单的控制面。
+///
+/// 返回 (域, 刺激强度) 列表; 健康分支不产生刺激 (强度 0), 防空转。
+pub fn tree_branch_stimuli(tree: &ConsciousnessTree) -> Vec<(AttentionDomain, f64)> {
+    // 分支薄弱度阈值: 健康分支 (fog≈0.05, health 满, constellation 高) 薄弱度
+    // 仅 ~0.02, 会被过滤; 真薄弱分支 (fog 0.85+/health 低/C0) 达 ~0.9, 驱动派单。
+    const WEAK_THRESHOLD: f64 = 0.2;
+    let mut stimuli = Vec::new();
+    for (kind, branch) in &tree.branches {
+        let weakness = branch_weakness(branch);
+        if weakness < WEAK_THRESHOLD {
+            continue;
+        }
+        for domain in branch_attention_domains(kind) {
+            stimuli.push((domain, weakness));
+        }
+    }
+    stimuli
+}
+
+/// 分支薄弱度 [0,1] — health 越低 / fog 越浓 / constellation 越低, 越薄弱。
+/// 纯函数: (1-health)*0.4 + fog*0.4 + (1-constellation.score())*0.2。
+pub fn branch_weakness(branch: &CapabilityBranch) -> f64 {
+    let health_weak = (1.0 - branch.health.clamp(0.0, 1.0)) * 0.4;
+    let fog_weak = branch.fog.level.clamp(0.0, 1.0) * 0.4;
+    let constel_weak = (1.0 - branch.constellation.score().clamp(0.0, 1.0)) * 0.2;
+    (health_weak + fog_weak + constel_weak).clamp(0.0, 1.0)
+}
+
+/// 分支 → 注意力域映射 (P2 控制面) — 每个星系分支薄弱时应刺激哪些域。
+pub fn branch_attention_domains(kind: &BranchKind) -> Vec<AttentionDomain> {
+    match kind {
+        BranchKind::Core => vec![AttentionDomain::SelfReflection, AttentionDomain::RiskAssessment],
+        BranchKind::Mind => vec![AttentionDomain::Creativity, AttentionDomain::Planning],
+        BranchKind::Memory => vec![AttentionDomain::Semantic],
+        BranchKind::World => vec![AttentionDomain::PatternMatch],
+        BranchKind::Act => vec![AttentionDomain::GoalAlignment, AttentionDomain::ToolUse],
+        BranchKind::Io => vec![AttentionDomain::Code, AttentionDomain::ToolUse],
+        BranchKind::Shield => vec![AttentionDomain::RiskAssessment, AttentionDomain::SelfReflection],
+    }
 }
 
 /// 一条待吸收的对话经验 — 来自 KB 的 session/experience 节点。
@@ -1588,6 +1636,114 @@ mod tests {
         let empty = domains_for_goal("   ");
         assert_eq!(empty.len(), 1);
         assert_eq!(empty[0].0, AttentionDomain::SelfReflection);
+    }
+
+    #[test]
+    fn tree_branch_weakness_derived_from_health_fog_constellation() {
+        // P2: 分支薄弱度 = (1-health)*0.4 + fog*0.4 + (1-constellation)*0.2。
+        // 健康分支 (满 health, 低 fog, 满 constellation) → 0。
+        let mut healthy = CapabilityBranch::new(BranchKind::Memory);
+        healthy.health = 1.0;
+        healthy.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+            wired: true,
+            consumer_count: 3,
+            has_tests: true,
+            level: 0.05,
+        };
+        healthy.constellation = crate::core::nt_core_consciousness_tree::Constellation {
+            level: 5,
+            c0_compiles: true,
+            c1_unit_tests: true,
+            c2_integration: true,
+            c3_benchmark: true,
+            c4_pipeline: true,
+            c5_self_healing: true,
+            c6_adaptive: true,
+        };
+        let w_healthy = branch_weakness(&healthy);
+        assert!(w_healthy < 0.1, "healthy branch should be ~0, got {w_healthy}");
+        // 薄弱分支 (health 0, 高 fog, C0) → 接近 1。
+        let mut weak = CapabilityBranch::new(BranchKind::Memory);
+        weak.health = 0.0;
+        let w_weak = branch_weakness(&weak);
+        assert!(w_weak > 0.7, "weak branch should be high, got {w_weak}");
+    }
+
+    #[test]
+    fn tree_branch_stimuli_skips_healthy_drives_weak() {
+        // P2: 树作为控制面 — 健康分支不产生刺激, 薄弱分支驱动对应注意力域。
+        let mut tree = ConsciousnessTree::new();
+        // Memory 分支设健康 (低薄弱度) → 不应产生 Semantic 刺激。
+        if let Some(mem) = tree.branches.get_mut(&BranchKind::Memory) {
+            mem.health = 1.0;
+            mem.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+                wired: true,
+                consumer_count: 3,
+                has_tests: true,
+                level: 0.05,
+            };
+            mem.constellation = crate::core::nt_core_consciousness_tree::Constellation {
+                level: 5,
+                c0_compiles: true,
+                c1_unit_tests: true,
+                c2_integration: true,
+                c3_benchmark: true,
+                c4_pipeline: true,
+                c5_self_healing: true,
+                c6_adaptive: true,
+            };
+        }
+        // Shield 分支保持默认 (health 0, fog 0.85, C0) → 薄弱 → 应刺激 RiskAssessment。
+        let stimuli = tree_branch_stimuli(&tree);
+        assert!(
+            stimuli.iter().any(|(d, _)| *d == AttentionDomain::RiskAssessment),
+            "weak Shield branch should stimulate RiskAssessment"
+        );
+        assert!(
+            !stimuli.iter().any(|(d, _)| *d == AttentionDomain::Semantic),
+            "healthy Memory branch should not stimulate Semantic"
+        );
+    }
+
+    #[test]
+    fn tree_branch_stimuli_fuses_with_goal_dispatch() {
+        // P2: 端到端 — 薄弱分支刺激 + 派单执行闭环。Memory 薄弱 → Semantic 刺激 →
+        // dispatch_and_execute 派单 watcher (Semantic→watcher 静态映射)。
+        // 其余分支全部健康, 保证 Semantic 是唯一强刺激 → 派单确定性。
+        let mut tree = ConsciousnessTree::new();
+        for (kind, branch) in tree.branches.iter_mut() {
+            if kind == &BranchKind::Memory {
+                branch.health = 0.0; // 薄弱
+            } else {
+                branch.health = 1.0;
+                branch.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+                    wired: true,
+                    consumer_count: 3,
+                    has_tests: true,
+                    level: 0.05,
+                };
+            }
+        }
+        let mut shell = MetaAgentShell::new("dialogue");
+        for (domain, amount) in tree_branch_stimuli(&tree) {
+            shell.stimulate(domain, amount);
+        }
+        let probe = ProbeExecutor {
+            calls: std::cell::RefCell::new(Vec::new()),
+            respond: AgentExecutionOutcome::Success("consolidate ran".into()),
+        };
+        let (agent, _) = shell.dispatch_and_execute(&probe, "general_dialogue_tick").expect("dispatch");
+        // Semantic 刺激应让 watcher 成为主导派单 (Memory 分支薄弱被树驱动)。
+        assert_eq!(agent, "watcher");
+    }
+
+    #[test]
+    fn branch_attention_domains_covers_all_kinds() {
+        // P2: 7 星系分支均有非空注意力域映射 (控制面完整性)。
+        for kind in BranchKind::all() {
+            let domains = branch_attention_domains(&kind);
+            assert!(!domains.is_empty(), "branch {kind:?} should map to >=1 attention domain");
+        }
     }
 
     #[test]
