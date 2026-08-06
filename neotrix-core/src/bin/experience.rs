@@ -976,6 +976,203 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
 }
 
 // ────────────────────────────────────────────────────────────────
+// R-P97: 批量节点吸收 (Python insert_node 的 Rust port — 知识写入单一事实源)
+// ────────────────────────────────────────────────────────────────
+/// 批量节点吸收: 输入 JSON (节点数组或单对象) → URL 去重 → nodes/nodes_fts 双写。
+/// 语义对齐 scripts/kb_batch_absorb.py:insert_node:
+///   - 去重: SELECT 1 FROM nodes WHERE url=? (URL 为唯一键, 幂等)
+///   - FTS: 显式 INSERT INTO nodes_fts (非 external-content 表, rebuild 不会拉新数据)
+///   - capability: --apply-capability 写 metadata.absorbed_capability 四元组 (R-P79 闭环)
+/// node id 派生: batch_{ts}_{sha1(url)[:8]} (sha1 仅作存储键派生, 非安全用途)。
+fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capability: bool) {
+    // 1. 读取输入 (文件或 stdin)
+    let raw = if input == "-" {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)
+            .expect("read stdin");
+        buf
+    } else {
+        std::fs::read_to_string(input).unwrap_or_else(|e| {
+            panic!("read node json {}: {}", input, e)
+        })
+    };
+    let v: Value = serde_json::from_str(&raw).expect("node json is valid JSON");
+
+    // 2. 归一化为节点数组 (单对象 → [对象])
+    let nodes: Vec<Value> = match v {
+        Value::Array(arr) => arr,
+        Value::Object(_) => vec![v],
+        _ => panic!("input must be a JSON object or array of objects"),
+    };
+
+    // 3. 逐个处理
+    let mut inserted = 0usize;
+    let mut duplicated = 0usize;
+    let mut mapped = 0usize;
+    let now = now_ts();
+    for (i, n) in nodes.iter().enumerate() {
+        let url = n
+            .get("url")
+            .and_then(|u| u.as_str())
+            .unwrap_or("")
+            .trim();
+        if url.is_empty() {
+            println!("[absorb-node] ✗ node #{}: missing url — skipped", i);
+            continue;
+        }
+        let title = n
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or(url)
+            .to_string();
+        let summary = n
+            .get("summary")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string();
+        let content = n
+            .get("content")
+            .and_then(|c| c.as_str())
+            .unwrap_or("")
+            .to_string();
+        let node_type = n
+            .get("node_type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("article")
+            .to_string();
+        let language = n
+            .get("language")
+            .and_then(|l| l.as_str())
+            .unwrap_or("en")
+            .to_string();
+        let domain = n
+            .get("domain")
+            .and_then(|d| d.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| {
+                url.split("//")
+                    .nth(1)
+                    .and_then(|rest| rest.split('/').next())
+                    .unwrap_or("")
+                    .trim_start_matches("www.")
+                    .to_string()
+            });
+        let importance = n
+            .get("importance")
+            .and_then(|im| im.as_f64())
+            .unwrap_or(0.5);
+
+        // 4. 去重 (URL 唯一键, 幂等)
+        let dup: bool = conn
+            .query_row("SELECT 1 FROM nodes WHERE url=?1", params![url], |_| Ok(true))
+            .unwrap_or(false);
+        if dup {
+            duplicated += 1;
+            println!(
+                "[absorb-node] duplicate (url already in KB): {} — {}",
+                i, url
+            );
+            continue;
+        }
+        if dry_run {
+            println!("[absorb-node] would_insert #{}: {}", i, url);
+            inserted += 1;
+            continue;
+        }
+
+        // 5. node id: batch_{ts}_{sha1(url)[:8]} — sha1 仅存储键派生
+        let mut h = Sha1::new();
+        h.update(url.as_bytes());
+        let digest = h.finalize();
+        let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+        let eid = format!("batch_{}_{}", now, &hex[..8]);
+
+        // 6. metadata: 保留输入 meta 字段 + enriched_at
+        let mut meta = match n.get("meta") {
+            Some(Value::Object(m)) => Value::Object(m.clone()),
+            _ => json!({}),
+        };
+        if meta.get("enriched_at").is_none() {
+            meta["enriched_at"] = json!(now);
+        }
+
+        // 7. nodes + nodes_fts 双写 (FTS 显式插入, 防 PA011 desync)
+        conn.execute(
+            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,
+               confidence,importance,created_at,updated_at,access_count,metadata,
+               data_tier,temporal,supersedes,source_episode,tier)
+               VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
+            params![
+                eid, node_type, title, summary, content, url, domain, language,
+                1.0f64, importance, now, now, 0i64, meta.to_string(),
+                "cache", None::<String>, None::<String>, None::<String>, "warm"
+            ],
+        )
+        .expect("insert node");
+        conn.execute(
+            "INSERT INTO nodes_fts(rowid, title, summary, content, domain)
+             VALUES(last_insert_rowid(), ?1, ?2, ?3, ?4)",
+            params![title, summary, content, domain],
+        )
+        .expect("insert node_fts");
+        inserted += 1;
+        println!(
+            "[absorb-node] inserted #{}: {} ({}, lang={}, cap={})",
+            i,
+            url,
+            node_type,
+            language,
+            if apply_capability { "apply" } else { "-" }
+        );
+
+        // 8. capability 映射 (R-P79 闭环: metadata.absorbed_capability 四元组)
+        if apply_capability {
+            if let (Some(branch), Some(capability)) = (
+                n.get("capability")
+                    .and_then(|c| c.get("branch"))
+                    .and_then(|b| b.as_str()),
+                n.get("capability")
+                    .and_then(|c| c.get("capability"))
+                    .and_then(|c| c.as_str()),
+            ) {
+                let evidence = n
+                    .get("capability")
+                    .and_then(|c| c.get("evidence"))
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("");
+                let mapped_at = {
+                    // 本地时间 YYYY-MM-DDTHH:MM:SS
+                    let secs = now as i64;
+                    let dt = chrono::DateTime::from_timestamp(secs, 0)
+                        .unwrap_or_else(|| {
+                            chrono::DateTime::from_timestamp(0, 0).unwrap()
+                        });
+                    let local = dt.with_timezone(&chrono::Local);
+                    local.format("%Y-%m-%dT%H:%M:%S").to_string()
+                };
+                meta["absorbed_capability"] = json!({
+                    "branch": branch,
+                    "capability": capability,
+                    "evidence": evidence,
+                    "mapped_at": mapped_at,
+                });
+                conn.execute(
+                    "UPDATE nodes SET metadata=?1 WHERE id=?2",
+                    params![meta.to_string(), eid],
+                )
+                .expect("update node metadata");
+                mapped += 1;
+            }
+        }
+    }
+
+    println!(
+        "[absorb-node] done: {} inserted, {} duplicated, {} mapped (dry_run={})",
+        inserted, duplicated, mapped, dry_run
+    );
+}
+
+// ────────────────────────────────────────────────────────────────
 // 5. Feedback 反馈 / 查询
 // ────────────────────────────────────────────────────────────────
 /// 突触联想检索: 输入词 → 命中概念神经元 → 沿突触扩散到分支(1阶, 主结果) →
@@ -2121,6 +2318,20 @@ enum Cmd {
     Absorb {
         session: String,
     },
+    /// 批量节点吸收 (R-P97: Python insert_node 的 Rust port — 知识写入单一事实源)
+    /// 输入: JSON 文件 (节点数组或单节点), 每条含 node_type/title/summary/content/url/domain/
+    ///       language/importance/meta; 可含 capability {branch,capability,evidence} 四元组。
+    /// 语义: URL 去重 + nodes/nodes_fts 双写 (FTS 显式插入, 防 PA011 desync)。
+    AbsorbNode {
+        /// 节点 JSON 文件 (数组或单对象), 或 "-" 读 stdin
+        #[arg(default_value = "-")]
+        input: String,
+        #[arg(long)]
+        dry_run: bool,
+        /// 写 metadata.absorbed_capability 四元组 (R-P79 闭环)
+        #[arg(long)]
+        apply_capability: bool,
+    },
     /// 检索匹配分支
     Query {
         #[arg(long, default_value = "")]
@@ -2231,6 +2442,9 @@ fn main() {
         Cmd::Snapshot { cycle, task, domain } => cmd_snapshot(&conn, &cycle, &task, &domain),
         Cmd::Close { cycle } => cmd_close(&conn, &cycle),
         Cmd::Absorb { session } => cmd_absorb(&conn, &session),
+        Cmd::AbsorbNode { input, dry_run, apply_capability } => {
+            cmd_absorb_node(&conn, &input, dry_run, apply_capability)
+        }
         Cmd::Query { kw, r#type, domain, limit, no_hebb, json, semantic } => {
             cmd_query(&conn, &kw, r#type.as_deref(), domain.as_deref(), limit, no_hebb, json, semantic)
         }
