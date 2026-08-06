@@ -473,4 +473,45 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     const maxScroll = await cs.evaluate((el) => el.scrollHeight - el.clientHeight);
     await expect(cs).toHaveJSProperty("scrollTop", maxScroll);
   });
+
+  test("ArrowUp in empty composer recalls last user message, Escape clears", async ({ page }) => {
+    await mockCommand(page, "neocodex_send_message_stream", () => "ok");
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).renderThread([
+        { role: "user", content: "第一条问题", timestamp: 1700000001 },
+        { role: "assistant", content: "回答一", timestamp: 1700000002 },
+        { role: "user", content: "第二条问题", timestamp: 1700000003 },
+      ], "s-recall");
+    });
+    const textarea = page.locator("#chatInput");
+    await textarea.click();
+    await textarea.press("ArrowUp");
+    await expect(textarea).toHaveValue("第二条问题", { timeout: 10_000 });
+    await textarea.press("ArrowUp");
+    await expect(textarea).toHaveValue("第一条问题");
+    await textarea.press("Escape");
+    await expect(textarea).toHaveValue("");
+  });
+
+  test("stream_start shows live thinking indicator, token replaces it", async ({ page }) => {
+    await mockCommand(page, "neocodex_send_message_stream", () => "ok");
+    await page.goto("/");
+    const textarea = page.locator("#chatInput");
+    await textarea.fill("思考演示");
+    await textarea.press("Enter");
+
+    await expect(page.locator("#chatScroll .msg.r")).toContainText("思考演示", { timeout: 10_000 });
+
+    await emitEvent(page, "neocodex_stream_start", "思考演示");
+    const think = page.locator("#chatScroll .msg.l .mb .think");
+    await expect(think).toHaveCount(1, { timeout: 10_000 });
+    await expect(think).toContainText(/思考中.*\d+s?/, { timeout: 10_000 });
+
+    await emitEvent(page, "neocodex_stream_token", "首段输出");
+    await expect(page.locator("#chatScroll .msg.l .mb .think")).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.locator("#chatScroll .msg.l .mb")).toContainText("首段输出", { timeout: 10_000 });
+
+    await emitEvent(page, "neocodex_stream_done", { cancelled: false });
+  });
 });
