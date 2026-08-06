@@ -673,6 +673,7 @@
   .hero-sug-item svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
 
   .cic { width:100%; border-radius:var(--r-2xl); padding:16px;
+    position:relative;
     background: var(--glass-L2-bg); backdrop-filter: var(--glass-L2-blur);
     -webkit-backdrop-filter: var(--glass-L2-blur);
     border:1px solid var(--bd2); box-shadow:var(--shadow-sm); transition:var(--tr); display:flex; flex-direction:column; gap:12px; }
@@ -791,6 +792,47 @@
   }
   .me-cancel { border:1px solid var(--bd); background:transparent; color:var(--tx2); }
   .me-save { border:none; background:var(--pri); color:#fff; }
+
+  /* 重新生成版本轮播 — ChatGPT/Cursor 式 prior/next 浏览历史回复 */
+  .ver-bar {
+    display:flex; align-items:center; gap:6px; margin-top:8px; padding-top:6px;
+    border-top:1px dashed var(--bd); font-size:10.5px; color:var(--tx-meta);
+  }
+  .ver-ctrl {
+    display:inline-flex; align-items:center; gap:2px; border:1px solid var(--bd);
+    background:transparent; color:var(--tx2); border-radius:6px; cursor:pointer;
+    font-family:var(--ff); font-size:11px; padding:2px 7px; transition:var(--tr);
+  }
+  .ver-ctrl:hover { color:var(--pri); border-color:var(--pri); }
+  .ver-ctrl:disabled { opacity:0.35; cursor:default; }
+  .ver-ctrl .caret { font-size:9px; }
+  .ver-count { margin:0 2px; }
+  .ver-reset { margin-left:auto; border:none; background:transparent; color:var(--tx-meta);
+    font-size:10px; cursor:pointer; font-family:var(--ff); text-decoration:underline; }
+  .ver-reset:hover { color:var(--tx2); }
+
+  /* 输入框 @-mention + / 命令 弹出菜单 */
+  .qm {
+    position:absolute; left:16px; right:16px; bottom:calc(100% + 8px); z-index:40;
+    max-height:260px; overflow:auto; border:1px solid var(--bd); border-radius:12px;
+    background:var(--bg-raised); box-shadow:var(--shadow-lg); padding:4px;
+  }
+  .qm-item {
+    display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+    border:none; background:transparent; padding:7px 9px; border-radius:8px;
+    cursor:pointer; font-family:var(--ff); font-size:12.5px; color:var(--tx);
+  }
+  .qm-item:hover, .qm-item.on { background:var(--ghost); }
+  .qm-ic {
+    width:18px; height:18px; flex-shrink:0; border-radius:5px; display:flex;
+    align-items:center; justify-content:center; font-size:11px;
+    background:var(--pri-soft, rgba(90,120,255,0.14)); color:var(--pri);
+  }
+  .qm-item.mode-trigger .qm-ic { background:var(--acc-soft, rgba(255,170,60,0.14)); color:var(--acc, #ffaa3c); }
+  .qm-title { flex:1; font-weight:var(--fw-medium); }
+  .qm-desc { font-size:11px; color:var(--tx-meta); }
+  .qm-empty { padding:14px; text-align:center; font-size:12px; color:var(--tx-meta); }
+  .qm-kbd { font-size:10px; color:var(--tx-meta); border:1px solid var(--bd); border-radius:4px; padding:0 4px; }
 
   /* In-chat code blocks — 后端运行结果在对话中展示 */
   .msg-code {
