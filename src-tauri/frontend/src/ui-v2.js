@@ -38,8 +38,11 @@ g.copyMsgCode = copyMsgCode;
 g.renderRichText = renderRichText;
 g.escHtml = escHtml;
 g.editMessage = editMessage;
+g.saveMsgEdit = saveMsgEdit;
+g.cancelMsgEdit = cancelMsgEdit;
 g.deleteMessage = deleteMessage;
 g.retryMessage = retryMessage;
+g.streamResume = streamResume;
 g.renderThread = renderThread;
 g.createSession = createSession;
 g.refreshAgent = refreshAgent;
@@ -952,8 +955,38 @@ g.restoreCheckpoint = restoreCheckpoint;
     invoke('neocodex_stop_stream').catch(()=>{});
     setStreaming(false);
     const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
-    if(el){ el.classList.remove('streaming'); attachUsageFooter(el.closest('.msg')); }
+    if(el){
+      el.classList.remove('streaming');
+      attachUsageFooter(el.closest('.msg'));
+      const msgEl = el.closest('.msg');
+      if(msgEl && !msgEl.querySelector('.stream-resume')){
+        const card = document.createElement('div');
+        card.className = 'stream-resume';
+        card.innerHTML = `<button class="sr-btn" onclick="streamResume()">继续生成</button><span class="sr-note">已保留部分输出</span>`;
+        msgEl.appendChild(card);
+      }
+    }
     showToast('已停止生成');
+  }
+
+  async function streamResume(){
+    const card = document.querySelector('#chatScroll .msg.l .stream-resume');
+    if(card) card.remove();
+    if(!isTauri() || !currentSessionId) return;
+    // Regenerate from the last visible user message: drop the partial reply and
+    // re-send the latest user prompt for a fresh completion.
+    const msgs = await invoke('neocodex_get_session_messages', { session_id: currentSessionId }).catch(() => null);
+    if(Array.isArray(msgs)){
+      let lastUserIdx = -1;
+      msgs.forEach((m,i) => { if(m.role === 'user') lastUserIdx = i; });
+      if(lastUserIdx < 0){ showToast('没有可继续的用户消息'); return; }
+      await invoke('neocodex_regenerate', { session_id: currentSessionId, index: lastUserIdx }).catch(e => { showToast('重试失败: ' + e); return null; });
+      const refresh = await invoke('neocodex_get_session_messages', { session_id: currentSessionId }).catch(() => null);
+      if(Array.isArray(refresh)) renderThread(refresh);
+      const inp = document.getElementById('chatInput');
+      inp.value = msgs[lastUserIdx].content || '';
+      sendMsg();
+    }
   }
   function ensureStreamListeners(){
     if(!isTauri() || streamSubs.size) return;
@@ -1215,26 +1248,44 @@ g.restoreCheckpoint = restoreCheckpoint;
     document.getElementById('heroSection').style.display = 'none';
     cs.style.display = 'flex';
     cs.innerHTML = '';
+    let visIdx = 0; // visible index: only user/assistant count (backend contract)
     (msgs || []).forEach((m, i) => {
       const t = m.timestamp ? new Date(m.timestamp * 1000).toTimeString().slice(0,5) : '';
       if(m.role === 'user'){
+        const idx = visIdx++;
         const u = document.createElement('div'); u.className = 'msg r';
         u.innerHTML = `<div class="msg-act"><button class="ma-btn" data-op="edit" title="编辑消息">编辑</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${escHtml(m.content)}</div>`;
-        u.querySelector('.ma-btn[data-op="edit"]').onclick = () => editMessage(i);
-        u.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(i);
+        u.dataset.vid = String(idx);
+        u.querySelector('.ma-btn[data-op="edit"]').onclick = () => editMessage(idx);
+        u.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(idx);
         cs.appendChild(u);
-      }else{
+      }else if(m.role === 'assistant' || m.role === 'agent'){
         const aiIdx = cs.querySelectorAll('.msg.l').length;
+        const idx = visIdx++;
         const a = document.createElement('div'); a.className = 'msg l';
         a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">${t}</span></div><div class="msg-act"><button class="ma-btn" data-op="copy" title="复制内容">复制</button><button class="ma-btn" data-op="retry" title="重新生成回复">重试</button><button class="ma-btn" data-op="like" title="有帮助">👍</button><button class="ma-btn" data-op="dislike" title="需改进">👎</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${renderRichText(m.content)}</div>`;
+        a.dataset.vid = String(idx);
         a.querySelector('.ma-btn[data-op="copy"]').onclick = () => copyMessageContent(aiIdx);
-        a.querySelector('.ma-btn[data-op="retry"]').onclick = () => retryMessage(i);
-        a.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(i);
+        a.querySelector('.ma-btn[data-op="retry"]').onclick = () => retryMessage(idx);
+        a.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(idx);
         a.querySelector('.ma-btn[data-op="like"]').onclick = () => feedbackMessage(aiIdx, 'like');
         a.querySelector('.ma-btn[data-op="dislike"]').onclick = () => feedbackMessage(aiIdx, 'dislike');
         const fb = loadFeedback()[currentSessionId + ':' + aiIdx];
         if(fb) renderFeedbackState(aiIdx, fb);
         cs.appendChild(a);
+      }else if(m.role === 'tool'){
+        const tcard = document.createElement('div'); tcard.className = 'tool-card';
+        const head = document.createElement('div'); head.className = 'tool-head';
+        head.innerHTML = `<svg viewBox="0 0 14 14" class="tool-ic"><path d="M2.5 4.5h9M3.5 4.5l.8 7a1 1 0 001 1h3.4a1 1 0 001-1l.8-7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg><span class="tool-name">${escHtml((m.content||'').split('**')[1] || '工具调用')}</span><span class="tool-time">${t}</span><span class="tool-toggle">▾</span>`;
+        const body = document.createElement('div'); body.className = 'tool-body';
+        body.innerHTML = `<pre>${escHtml((m.content||'').replace(/^\*\*.*?\*\*/, '').slice(0, 600))}</pre>`;
+        tcard.appendChild(head); tcard.appendChild(body);
+        head.addEventListener('click', () => tcard.classList.toggle('open'));
+        cs.appendChild(tcard);
+      }else if(m.role === 'system' && m.content){
+        const scard = document.createElement('div'); scard.className = 'sys-card';
+        scard.innerHTML = `<span class="sys-dot"></span><span class="sys-txt">${renderRichText(String(m.content).slice(0, 200))}</span>`;
+        cs.appendChild(scard);
       }
     });
     isChatMode = true;
@@ -1247,13 +1298,43 @@ g.restoreCheckpoint = restoreCheckpoint;
     if(Array.isArray(msgs)) renderThread(msgs);
   }
 
+  function msgElByVid(vid){
+    const cs = document.getElementById('chatScroll');
+    if(!cs) return null;
+    return cs.querySelector(`[data-vid="${vid}"]`);
+  }
+
   async function editMessage(index){
     if(!isTauri() || !currentSessionId) return;
-    const cs = document.getElementById('chatScroll');
-    const mb = cs.querySelectorAll('.msg.r')[index];
-    const content = mb ? (mb.querySelector('.mb')?.textContent || '') : '';
-    const next = prompt('编辑消息内容:', content);
-    if(next === null || !next.trim()) return;
+    const u = msgElByVid(index);
+    const mb = u ? u.querySelector('.mb') : null;
+    const content = mb ? (mb.textContent || '') : '';
+    if(!u || !mb) return;
+    // inline editor replacing the bubble (replaces native prompt() with a proper composer)
+    const editor = document.createElement('div');
+    editor.className = 'msg-edit';
+    editor.innerHTML = `<textarea rows="3" placeholder="编辑消息…">${escHtml(content)}</textarea>
+      <div class="me-actions">
+        <span class="me-hint">编辑后，其后消息将重新生成</span>
+        <button class="me-cancel" onclick="cancelMsgEdit()">取消</button>
+        <button class="me-save" onclick="saveMsgEdit(${index})">保存</button>
+      </div>`;
+    u.replaceWith(editor);
+    editor.querySelector('textarea').focus();
+    window.__msgEditIndex = index;
+  }
+
+  function cancelMsgEdit(){
+    const ed = document.querySelector('#chatScroll .msg-edit');
+    if(ed && window.__msgEditIndex !== undefined) reloadThread();
+  }
+
+  async function saveMsgEdit(index){
+    const ed = document.querySelector('#chatScroll .msg-edit');
+    if(!ed) return;
+    const ta = ed.querySelector('textarea');
+    const next = ta ? ta.value.trim() : '';
+    if(!next){ showToast('内容为空'); return; }
     const msgs = await invoke('neocodex_edit_message', { session_id: currentSessionId, index, content: next }).catch(e => { showToast('编辑失败: ' + e); return null; });
     if(Array.isArray(msgs)) renderThread(msgs);
   }

@@ -749,6 +749,49 @@
   .typing span:nth-child(3) { animation-delay:0.4s; }
   @keyframes typingB { 0%,60%,100%{ opacity:0.3; transform:scale(0.8); } 30%{ opacity:1; transform:scale(1.2); } }
 
+  /* 停止后 Continue 卡片 — 保留部分输出, 提供继续/重生成 */
+  .stream-resume {
+    display:flex; align-items:center; gap:10px; padding:8px 4px 0;
+  }
+  .sr-btn {
+    border:1px solid var(--bd); background:var(--glass-L1-bg); color:var(--tx2);
+    border-radius:8px; font-size:11.5px; padding:5px 14px; cursor:pointer;
+    font-family:var(--ff); transition:var(--tr);
+  }
+  .sr-btn:hover { color:var(--pri); border-color:var(--pri); }
+  .sr-note { font-size:10.5px; color:var(--tx-meta); }
+
+  /* 工具调用卡片 — Cursor/ChatGPT 式生命周期折叠 */
+  .tool-card {
+    align-self:flex-start; max-width:85%; margin:4px 0; border:1px solid var(--bd);
+    border-radius:10px; background:var(--bg-raised); overflow:hidden;
+  }
+  .tool-head { display:flex; align-items:center; gap:6px; padding:6px 10px; cursor:pointer; font-size:11.5px; color:var(--tx2); }
+  .tool-head:hover { background:var(--ghost); }
+  .tool-ic { width:12px; height:12px; color:var(--pri); flex-shrink:0; }
+  .tool-name { flex:1; font-family:var(--fm); font-size:11px; }
+  .tool-time { font-size:10px; color:var(--tx-meta); }
+  .tool-toggle { font-size:10px; color:var(--tx-meta); transition:transform .15s; }
+  .tool-card.open .tool-toggle { transform:rotate(180deg); }
+  .tool-body { display:none; padding:8px 10px; border-top:1px solid var(--bd); }
+  .tool-card.open .tool-body { display:block; }
+  .tool-body pre { margin:0; font-family:var(--fm); font-size:11px; white-space:pre-wrap; word-break:break-all; color:var(--tx3); }
+
+  /* 系统事件气泡 */
+  .sys-card { align-self:center; display:flex; align-items:center; gap:6px; max-width:80%; margin:4px 0; padding:4px 12px; border-radius:20px; background:var(--ghost); font-size:11px; color:var(--tx3); }
+  .sys-dot { width:5px; height:5px; border-radius:50%; background:var(--tx-meta); flex-shrink:0; }
+
+  /* 消息行内编辑 — 对标 Claude/ChatGPT 编辑重发 */
+  .msg-edit { max-width:85%; display:flex; flex-direction:column; gap:8px; padding:6px; border:1px solid var(--pri); border-radius:12px; background:var(--bg-raised); }
+  .msg-edit textarea { width:100%; border:none; background:transparent; color:var(--tx); font-family:var(--ff); font-size:var(--fs-body); resize:vertical; outline:none; min-height:64px; }
+  .me-actions { display:flex; align-items:center; gap:8px; justify-content:flex-end; }
+  .me-hint { font-size:10.5px; color:var(--tx-meta); margin-right:auto; }
+  .me-cancel, .me-save {
+    border-radius:8px; font-size:11.5px; padding:4px 14px; cursor:pointer; font-family:var(--ff);
+  }
+  .me-cancel { border:1px solid var(--bd); background:transparent; color:var(--tx2); }
+  .me-save { border:none; background:var(--pri); color:#fff; }
+
   /* In-chat code blocks — 后端运行结果在对话中展示 */
   .msg-code {
     margin:8px 0 4px; border-radius:10px; overflow:hidden;
