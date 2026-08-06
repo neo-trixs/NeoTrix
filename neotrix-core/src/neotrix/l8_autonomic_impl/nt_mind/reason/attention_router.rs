@@ -646,9 +646,16 @@ mod tests {
 
     #[test]
     fn test_attach_kb_enables_kb_retrieval() {
+        // 并行测试隔离：临时 KB 文件，避免竞争真实 ~/.neotrix/knowledge.db
+        let tmp = std::env::temp_dir().join(format!("nt_router_test_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let db_file = tmp.join("router_test.sqlite3");
+        let _ = std::fs::remove_file(&db_file);
+        crate::neotrix::nt_memory_kb::set_kb_path_for_test(Some(db_file.clone()));
         let kb = std::sync::Arc::new(
             crate::neotrix::nt_memory_kb::KnowledgeBase::open(None).expect("open kb"),
         );
+        crate::neotrix::nt_memory_kb::set_kb_path_for_test(None);
         let _ = kb.insert_or_get_node(
             "KB-Wire-Test-Topic",
             crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Insight,
@@ -665,6 +672,7 @@ mod tests {
             "expected KB node retrieved, got {:?}",
             titles
         );
+        let _ = std::fs::remove_file(&db_file);
     }
 
     #[test]

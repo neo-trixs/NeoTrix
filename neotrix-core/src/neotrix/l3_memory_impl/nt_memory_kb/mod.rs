@@ -117,9 +117,31 @@ impl std::fmt::Debug for KnowledgeBase {
     }
 }
 
+/// 测试隔离：线程局部 KB 路径覆盖。测试用 `set_kb_path_for_test` 注入临时
+/// 路径，避免并行测试竞争真实 `~/.neotrix/knowledge.db`（SQLite "database is
+/// locked"）。生产路径不受影响（默认 HOME/.neotrix/knowledge.db）。
+#[cfg(test)]
+thread_local! {
+    static TEST_KB_PATH: std::cell::RefCell<Option<std::path::PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// 在测试线程内覆盖 KB 打开路径（仅测试构建启用）
+#[cfg(test)]
+pub fn set_kb_path_for_test(path: Option<std::path::PathBuf>) {
+    TEST_KB_PATH.with(|p| *p.borrow_mut() = path);
+}
+
 impl KnowledgeBase {
     pub fn open(path: Option<PathBuf>) -> Result<Self, String> {
         let db_path = path.unwrap_or_else(|| {
+            #[cfg(test)]
+            {
+                let test_path = TEST_KB_PATH.with(|p| p.borrow().clone());
+                if let Some(p) = test_path {
+                    return p;
+                }
+            }
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
             PathBuf::from(home).join(".neotrix").join("knowledge.db")
         });
