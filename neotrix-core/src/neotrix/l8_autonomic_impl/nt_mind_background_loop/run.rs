@@ -438,6 +438,7 @@ cognitive_load: self.cognitive_load.take(),
             meta_shell: {
                 // P1: 启动时从 KB 恢复派单学习证据 — 派单统计跨会话存活。
                 // P3: 同时恢复 MANTA 派单拓扑 (域→档案边, 跨轮 playbook)。
+                // P4: 同时恢复 MAGE 四子图共进化图谱 + 任务级搜索 bandit。
                 let mut shell = crate::neotrix::nt_mind::MetaAgentShell::new("dialogue");
                 if let Some(ref kb_ref) = kb {
                     if let Err(e) = shell.learner.load(kb_ref) {
@@ -445,6 +446,9 @@ cognitive_load: self.cognitive_load.take(),
                     }
                     if let Err(e) = shell.load_topology(kb_ref) {
                         log::warn!("[bg-meta] dispatch_topology load failed: {}", e);
+                    }
+                    if let Err(e) = shell.load_coevo(kb_ref) {
+                        log::warn!("[bg-meta] coevolution loop load failed: {}", e);
                     }
                 }
                 Some(shell)

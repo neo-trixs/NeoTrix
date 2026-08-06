@@ -21,6 +21,7 @@ use crate::neotrix::l3_memory_impl::nt_memory_kb::{
 use crate::neotrix::l2_world_impl::nt_world_search::{SearchResult, UnifiedSearch};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::core::nt_core_consciousness_tree::{BranchKind, CapabilityBranch, ConsciousnessTree};
+use super::co_evolution::{CoEvoConfig, CoEvolutionLoop};
 
 /// 记忆大脑能力类型 — agent 可按任务路由到具体能力。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -218,12 +219,33 @@ impl RouteLearner {
 
     /// 学习后的路由: 若有足够证据, 返回静态档案里在域上成功率最高的档案;
     /// 否则沿用静态映射。
+    ///
+    /// P5 (自进化验证发现): 纯利用会饿死备选档案 — 一旦某档案达到证据阈值,
+    /// 路由只从达标档案里选最优, 未达阈值的备选再无机会被观察, 形成死锁。
+    /// 修复: 冷启动覆盖 (MAGE curriculum coverage, 与 P4 任务级搜索 bandit 对齐) —
+    /// 只要存在未达证据阈值的已见候选, 就探索尝试最少的候选, 保证每臂都被观察;
+    /// 全部已见臂都达标后才纯利用。
     pub fn route(&self, domain: AttentionDomain, static_agent: &'static str) -> &'static str {
         if !self.has_enough_evidence(domain) {
             return static_agent;
         }
         let map = self.outcomes.get(&domain).expect("evidence implies map");
         let rate = |s: &u32, t: &u32| *s as f64 / (*t).max(1) as f64;
+        // 冷启动覆盖: 存在未达阈值的已见臂 → 探索尝试最少的臂。
+        let under_evidence: Vec<(&str, u32)> = map
+            .iter()
+            .filter(|(_, (_, attempts))| *attempts < self.config.min_evidence)
+            .map(|(agent, (_, attempts))| (*agent, *attempts))
+            .collect();
+        if !under_evidence.is_empty() {
+            if let Some((least, _)) = under_evidence
+                .iter()
+                .min_by_key(|(_, attempts)| *attempts)
+            {
+                return *least;
+            }
+        }
+        // 全部已见臂都达标 → 利用成功率最高的档案。
         map.iter()
             .filter(|(_, (_, attempts))| *attempts >= self.config.min_evidence)
             .max_by(|(_, (sa, ta)), (_, (sb, tb))| {
@@ -589,6 +611,18 @@ impl DispatchTopology {
 pub trait AgentExecutor {
     /// 按档案名执行任务, 返回真实动作结果。
     fn execute(&self, agent: &str, task: &str) -> AgentExecutionOutcome;
+
+    /// 策略感知执行 (P4, MAGE task-level search bandit 注入) — 按任务级搜索 bandit
+    /// 选出的检索策略执行。默认实现 = 常规执行 (frozen backbone, 不改变既有行为);
+    /// 生产执行桥可覆盖以把策略接入 confidence 检索缝。
+    fn execute_with_strategy(
+        &self,
+        agent: &str,
+        task: &str,
+        _strategy: &str,
+    ) -> AgentExecutionOutcome {
+        self.execute(agent, task)
+    }
 }
 
 /// 生产执行桥 — 把内置 6 档案接到已接线子系统, 让派单真正驱动动作。
@@ -671,6 +705,36 @@ impl AgentExecutor for ProductionAgentExecutor {
             other => AgentExecutionOutcome::NoOp(format!("no executor for agent '{}'", other)),
         }
     }
+
+    /// 策略感知执行 (P4, MAGE task-level search bandit) — 当任务级搜索 bandit 选出
+    /// 非默认策略时, explorer 走既有 confidence 检索缝 `search_with_confidence`
+    /// (R-P42: 强化既有检索节点, 非平行路径)。默认/unknown 策略回落常规执行。
+    fn execute_with_strategy(
+        &self,
+        agent: &str,
+        task: &str,
+        strategy: &str,
+    ) -> AgentExecutionOutcome {
+        use crate::neotrix::nt_mind::evolution::co_evolution::{parse_strategy, strategy_name};
+        let strategy = strategy_name(strategy);
+        match (agent, strategy) {
+            ("explorer", "balanced") => self.execute(agent, task),
+            ("explorer", parsed) => match self
+                .memory
+                .kb
+                .search_with_confidence(task, parse_strategy(parsed), 5)
+            {
+                Ok(results) if !results.is_empty() => AgentExecutionOutcome::Success(format!(
+                    "retrieved {} hits (strategy={})",
+                    results.len(),
+                    parsed
+                )),
+                Ok(_) => AgentExecutionOutcome::NoOp("no KB hits".into()),
+                Err(e) => AgentExecutionOutcome::Failure(format!("retrieve: {}", e)),
+            },
+            _ => self.execute(agent, task),
+        }
+    }
 }
 
 /// 元认知 agent 外壳 — 用 AttentionManager 按任务类型路由到确定性内核。
@@ -693,6 +757,11 @@ pub struct MetaAgentShell {
     /// MANTA 式派单拓扑 (P3) — 域→档案边集合, 推理期可自进化。
     /// 静态映射退居"初始组织", 拓扑经 trace 审计 + 有界修复自进化。
     pub topology: DispatchTopology,
+    /// MAGE 四子图共进化循环 (P4) — 同一 reward 驱动任务级搜索 bandit + 图共进化;
+    /// 技能级路由 bandit 复用 `learner`。任务类型用于选择检索策略。
+    pub coevo: CoEvolutionLoop,
+    /// 本外壳服务的任务类型 — 任务级搜索 bandit 的分组键。
+    pub task_type: String,
 }
 
 impl MetaAgentShell {
@@ -707,6 +776,8 @@ impl MetaAgentShell {
             last_dispatched: None,
             learner: RouteLearner::new(),
             topology: DispatchTopology::for_task_type(task_type),
+            coevo: CoEvolutionLoop::new(),
+            task_type: task_type.to_string(),
         }
     }
 
@@ -721,6 +792,24 @@ impl MetaAgentShell {
             last_dispatched: None,
             learner: RouteLearner::with_config(learner_config),
             topology: DispatchTopology::for_task_type(task_type),
+            coevo: CoEvolutionLoop::new(),
+            task_type: task_type.to_string(),
+        }
+    }
+
+    /// 以自定义共进化配置构造 (P4: epsilon/max_memories/min_evidence 注入)。
+    pub fn with_coevo_config(task_type: &str, coevo_config: CoEvoConfig) -> Self {
+        let attention = AttentionManager::from_task_type(0.3, task_type);
+        let metacog = MetaCognitiveLoop::new(crate::core::nt_core_meta::SelfModel::new());
+        Self {
+            attention,
+            metacog,
+            iterations_run: 0,
+            last_dispatched: None,
+            learner: RouteLearner::new(),
+            topology: DispatchTopology::for_task_type(task_type),
+            coevo: CoEvolutionLoop::with_config(coevo_config),
+            task_type: task_type.to_string(),
         }
     }
 
@@ -797,6 +886,11 @@ impl MetaAgentShell {
     /// 返回 (档案名, 执行结果) 供上层日志/决策; 无主导域时返回 None (不空转)。
     /// 与 `decide_and_run` 的区别: 后者只记录"是否派单成功", 前者真正激活执行器
     /// 并以动作成败为行为信号 — 让星系派单从仪式变控制面。
+    ///
+    /// P4 (MAGE): 同一次执行结果构成**单一 reward 流**, 同时驱动技能级路由 bandit
+    /// (`learner`) 与四子图共进化循环 (`coevo`, 含任务级搜索 bandit)。检索策略由
+    /// `coevo.select_strategy` 选出并注入 `execute_with_strategy` — 让任务 bandit 的
+    /// reward 与其选择因果绑定, 而非噪声。
     pub fn dispatch_and_execute(
         &mut self,
         executor: &dyn AgentExecutor,
@@ -806,9 +900,19 @@ impl MetaAgentShell {
         let dominant = self.attention.dominant_domain()?;
         let agent = self.route_with_hint(task)?;
         self.last_dispatched = Some(agent);
-        let outcome = executor.execute(agent, task);
-        // 真实行为信号: 执行成功才强化该档案对该域的派单。
+        let strategy = self.coevo.select_strategy(&self.task_type);
+        let outcome = executor.execute_with_strategy(agent, task, &strategy);
+        // 真实行为信号: 执行成功才强化该档案对该域的派单 (技能级路由 bandit)。
         self.learner.record(dominant, agent, outcome.is_success());
+        // P4: 同一 reward 流同时更新四子图 + 任务级搜索 bandit (MAGE 共进化)。
+        self.coevo.record_reward(
+            &self.task_type,
+            dominant,
+            agent,
+            &strategy,
+            outcome.is_success(),
+            &outcome.summary(),
+        );
         Some((agent, outcome))
     }
 
@@ -839,6 +943,16 @@ impl MetaAgentShell {
     /// 拓扑跨轮 playbook — 从 KB 恢复 (冷启动无存档则保持当前)。
     pub fn load_topology(&mut self, kb: &KnowledgeBase) -> Result<(), String> {
         self.topology.load(kb)
+    }
+
+    /// 四子图共进化循环持久化 (P4, MAGE) — 图谱 + 任务级搜索 bandit 跨会话存活。
+    pub fn persist_coevo(&self, kb: &KnowledgeBase) -> Result<(), String> {
+        self.coevo.persist(kb)
+    }
+
+    /// 四子图共进化循环恢复 (P4) — 冷启动无存档则保持空图谱 (从零累积, 不重头再来)。
+    pub fn load_coevo(&mut self, kb: &KnowledgeBase) -> Result<(), String> {
+        self.coevo.load(kb)
     }
 }
 
@@ -1184,6 +1298,119 @@ impl DialogueAbsorbBridge {
         }
     }
 
+    /// 派单经验 → 大脑能力吸收闭环 (P6, R-P79 生产接线) — coevo 经验子图回读。
+    ///
+    /// MAGE 的 experience 子图不能只写不读: 派单执行沉淀的成功/失败记忆
+    /// (双记忆索引) 经内容感知向量反哺 SelfIteratingBrain, 让"派单控制面学到的
+    /// 经验"真正改变脑能力, 而非停在 kv_store 当统计死数据。
+    ///
+    /// 吸收模式 (复用 `absorb_pending` 同机制, R-P42 强化既有节点):
+    ///   1. 只消费水位之上未吸收的新记忆 (ReMe 去重, 防反复吸收)。
+    ///   2. 实例级: 每条记忆派生 `derive_dispatch_vector` → absorb_from_custom。
+    ///   3. 批次级: 全部新记忆分量取 max 共振 → dispatch:batch 源吸收 (原则级持久)。
+    ///   4. Verify: `absorb_with_critic` 做吸收前后 PerformanceEvaluator 对比,
+    ///      能力下降则回滚 (EDV 反 Self-Confirmation) — 盲提升被批评器拦下。
+    ///   5. 无论批评器接受与否, 水位推进 (已尝试) — 不重试同一条, 防抖动。
+    pub fn absorb_dispatch_experiences(
+        &self,
+        brain: &mut SelfIteratingBrain,
+        coevo: &mut super::co_evolution::CoEvolutionLoop,
+    ) -> DialogueAbsorbOutcome {
+        let memories: Vec<&super::co_evolution::ExperienceMemory> =
+            coevo.new_memories_since_watermark();
+        if memories.is_empty() {
+            return DialogueAbsorbOutcome::empty();
+        }
+        // ── 批次级共振向量 (分量取 max, 反映派单控制面主题强度) ──
+        let mut batch = crate::core::CapabilityVector::default();
+        for m in &memories {
+            let v = self.derive_dispatch_vector(&m.summary);
+            for (i, val) in v.arr().iter().enumerate() {
+                if *val > batch.arr()[i] {
+                    batch.arr_mut()[i] = *val;
+                }
+            }
+        }
+        let has_batch_signal = batch.arr().iter().any(|&v| v > 0.0);
+        if !has_batch_signal {
+            // 无能力信号 → 标记已尝试, 无增益返回 (避免每次扫描同批死数据)。
+            coevo.commit_absorb();
+            return DialogueAbsorbOutcome::empty();
+        }
+
+        // 实测能力差: 吸收前打分 (D1/D2 行为化指标)。
+        let before_score = crate::neotrix::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+            &crate::neotrix::nt_world_model::TaskType::General,
+            &brain.brain.capability,
+        );
+
+        // ── 实例级: 每条派单经验内容感知吸收 ──
+        let mut absorbed = 0usize;
+        for m in &memories {
+            let custom_name = format!("dispatch:{}:{}", m.id, m.agent);
+            let vector = self.derive_dispatch_vector(&m.summary);
+            let has_signal = vector.arr().iter().any(|&v| v > 0.0);
+            brain.brain.register_knowledge_source(&custom_name, vector.clone());
+            if has_signal && brain.brain.absorb_from_custom(&custom_name) {
+                absorbed += 1;
+            }
+        }
+
+        // ── 批次级: 原则级共振向量经 batch 源吸收 ──
+        brain.brain.register_knowledge_source("dispatch:batch", batch.clone());
+        let _ = brain.brain.absorb_from_custom("dispatch:batch");
+
+        // ── Verify (EDV): 吸收前后性能对比, 能力下降则回滚 ──
+        let critic_accepted = brain.absorb_with_critic(crate::core::KnowledgeSource::DialogueExperience);
+
+        let after_score = crate::neotrix::nt_mind::seal_core::core::PerformanceEvaluator::evaluate(
+            &crate::neotrix::nt_world_model::TaskType::General,
+            &brain.brain.capability,
+        );
+
+        // 水位推进: 本批已尝试吸收 (即使批评器回滚也不重试, 防抖动)。
+        coevo.commit_absorb();
+
+        DialogueAbsorbOutcome {
+            absorbed,
+            critic_accepted,
+            score_before: before_score,
+            score_after: after_score,
+            score_delta: after_score - before_score,
+        }
+    }
+
+    /// 由派单经验摘要派生出内容感知向量 — 派单/控制面域关键词映射。
+    ///
+    /// 与 `derive_vector` (对话域)、`derive_research_vector` (研究域) 平行的
+    /// 派单域映射: 关键词侧重路由/拓扑/策略/检索成败/进化信号, 反映
+    /// "派单控制面学到的经验"被吸收进脑能力的信号面。复用同一
+    /// `DialogueAbsorbConfig` boost 系数 (D5 单一调参入口)。
+    pub fn derive_dispatch_vector(&self, content: &str) -> crate::core::CapabilityVector {
+        let text = content.to_lowercase();
+        let mut cv = crate::core::CapabilityVector::default();
+        let dispatch_dims: &[(&[&str], &str)] = &[
+            (&["route", "agent", "dispatch", "catalog"], "ai_native_states"),
+            (&["topology", "edge", "repair", "revision"], "compound_composition"),
+            (&["strategy", "bandit", "explor", "exploit", "epsilon"], "analysis"),
+            (&["retriev", "recall", "hit", "search", "kb", "searched"], "semantic_layer"),
+            (&["success", "found", "pass", "returned"], "verification"),
+            (&["fail", "error", "empty", "miss", "unavailable"], "quality_gates"),
+            (&["evolv", "co-evol", "memory", "graph", "absorb"], "experimental"),
+            (&["research", "study", "paper"], "inference_depth"),
+            (&["plan", "goal", "task", "strategy"], "compound_composition"),
+            (&["test", "assert", "verify", "audit", "evidence"], "verification"),
+        ];
+        for (kws, dim) in dispatch_dims {
+            let hits = kws.iter().filter(|k| text.contains(**k)).count();
+            if hits > 0 {
+                let boost = (self.config.boost_base + self.config.boost_per_hit * hits as f64).min(self.config.boost_cap);
+                let _ = cv.set_field_by_name(dim, boost);
+            }
+        }
+        cv
+    }
+
     /// 由研究结论正文派生出内容感知向量 — 研究域关键词 23 维提升。
     ///
     /// 与 `derive_vector` (对话域) 平行的研究域映射: 关键词侧重证据/来源/
@@ -1465,6 +1692,31 @@ mod tests {
         learner.record(AttentionDomain::SelfReflection, "verifier", false);
         assert!(!learner.has_enough_evidence(AttentionDomain::SelfReflection));
         assert_eq!(learner.route(AttentionDomain::SelfReflection, "verifier"), "verifier");
+    }
+
+    #[test]
+    fn route_learner_cold_start_covers_under_evidenced_arms() {
+        // P5: 纯利用会饿死备选档案 — 一旦某档案达标即锁定, 未达标备选再无机会
+        // 被观察 (死锁)。冷启动覆盖应探索尝试最少的臂, 保证每臂都被采样。
+        let mut learner = RouteLearner::with_config(RouteLearnerConfig { min_evidence: 2 });
+        learner.record(AttentionDomain::PatternMatch, "researcher", false); // 达标臂, 0 成功
+        learner.record(AttentionDomain::PatternMatch, "researcher", false);
+        learner.record(AttentionDomain::PatternMatch, "explorer", true); // 未达标备选 (1 次)
+        assert!(learner.has_enough_evidence(AttentionDomain::PatternMatch));
+        // 旧行为: 纯利用 → researcher (唯一达标臂), explorer 永远不再被采样。
+        // 新行为: 探索未达标的 explorer。
+        assert_eq!(
+            learner.route(AttentionDomain::PatternMatch, "researcher"),
+            "explorer",
+            "under-evidenced alternative must stay observable"
+        );
+        // 备选也达标后 → 纯利用, 选成功率最高的臂。
+        learner.record(AttentionDomain::PatternMatch, "explorer", true);
+        assert_eq!(
+            learner.route(AttentionDomain::PatternMatch, "researcher"),
+            "explorer",
+            "exploit highest-rate arm once all seen arms have evidence"
+        );
     }
 
     #[test]
@@ -1771,6 +2023,63 @@ mod tests {
         // 与对话域映射区分: 无 dialogue 关键词时 inference_depth 不应被对话映射污染。
         let dialogue_cv = bridge.derive_vector("just a chat");
         assert_eq!(dialogue_cv.inference_depth(), 0.0);
+    }
+
+    #[test]
+    fn dispatch_bridge_derive_dispatch_vector_content_aware() {
+        // P6: 派单域关键词映射 — 路由/拓扑/策略/检索/进化信号提升对应维度。
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_dispatch_vec_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = std::sync::Arc::new(KnowledgeBase::open(Some(tmp.into())).expect("open kb"));
+        let bridge = DialogueAbsorbBridge::new(kb);
+        let cv = bridge.derive_dispatch_vector(
+            "topology repair revision route agent strategy bandit retrieval hit",
+        );
+        assert!(cv.ai_native_states() > 0.0, "route/agent keywords should boost ai_native_states");
+        assert!(cv.compound_composition() > 0.0, "topology/repair keywords should boost compound_composition");
+        assert!(cv.analysis() > 0.0, "strategy/bandit keywords should boost analysis");
+        assert!(cv.semantic_layer() > 0.0, "retrieval/hit keywords should boost semantic_layer");
+    }
+
+    #[test]
+    fn dispatch_bridge_absorb_experiences_moves_capability_and_dedups() {
+        // P6: coevo 经验子图 → 大脑吸收闭环 — 水位去重防反复吸收, 新经验继续可吸收。
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_dispatch_abs_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = std::sync::Arc::new(KnowledgeBase::open(Some(tmp.into())).expect("open kb"));
+        let bridge = DialogueAbsorbBridge::new(kb.clone());
+        let mut brain = SelfIteratingBrain::new();
+
+        let mut coevo = CoEvolutionLoop::new();
+        coevo.record_reward("dialogue", AttentionDomain::PatternMatch, "explorer", "balanced", true, "retrieved 5 hits");
+        coevo.record_reward("dialogue", AttentionDomain::PatternMatch, "researcher", "conservative", false, "search returned empty");
+
+        // 首次吸收: 新经验被消费, 大脑能力面被推动。
+        let outcome = bridge.absorb_dispatch_experiences(&mut brain, &mut coevo);
+        assert!(outcome.absorbed > 0, "dispatch experiences should be absorbed");
+        // 水位推进 → 同一批不再重复吸收。
+        assert!(coevo.new_memories_since_watermark().is_empty());
+        let again = bridge.absorb_dispatch_experiences(&mut brain, &mut coevo);
+        assert_eq!(again.absorbed, 0, "watermark must dedup already-consumed experiences");
+
+        // 新经验 → 下一轮可吸收。
+        coevo.record_reward("dialogue", AttentionDomain::Code, "generalist", "exploratory", true, "combined 3 hits, 2 evidence");
+        assert_eq!(coevo.new_memories_since_watermark().len(), 1);
+        let next = bridge.absorb_dispatch_experiences(&mut brain, &mut coevo);
+        assert!(next.absorbed > 0, "new dispatch experience should be absorbable next cycle");
+        assert!(coevo.new_memories_since_watermark().is_empty());
     }
 
     #[test]
@@ -2161,6 +2470,133 @@ mod tests {
         assert_eq!(rates.len(), 1);
         assert_eq!(rates[0].2, 1, "one attempt recorded");
         assert_eq!(rates[0].1, 0.0, "zero success rate");
+    }
+
+    #[test]
+    fn dispatch_drives_coevo_same_reward_stream() {
+        // P4/MAGE: 同一次派单执行结果构成单一 reward 流 — 技能级路由 bandit (learner)
+        // 与四子图共进化循环 (coevo) 被同一 reward 同时更新。
+        let mut shell = MetaAgentShell::with_coevo_config("dialogue", CoEvoConfig {
+            epsilon: 0.0,
+            max_memories: 50,
+            min_evidence: 2,
+        });
+        let probe = ProbeExecutor {
+            calls: std::cell::RefCell::new(Vec::new()),
+            respond: AgentExecutionOutcome::Success("probe did work".into()),
+        };
+        shell.stimulate(AttentionDomain::SelfReflection, 0.9);
+        let (agent, outcome) = shell.dispatch_and_execute(&probe, "review the codebase").expect("dispatch");
+        assert!(outcome.is_success());
+        // 技能级 bandit: learner 记录了 verifier@SelfReflection 一次成功。
+        assert_eq!(shell.learner.rates(AttentionDomain::SelfReflection).len(), 1);
+        // 共进化循环: 同一 reward 更新四子图 + 任务级搜索 bandit。
+        assert_eq!(shell.coevo.total_rewards, 1);
+        assert_eq!(shell.coevo.evolution_revision, 1);
+        assert_eq!(shell.coevo.graph.memories.len(), 1);
+        assert!(shell.coevo.graph.memories[0].is_success());
+        // capability 子图: verifier 对 SelfReflection 掌握度 1.0。
+        assert_eq!(shell.coevo.mastery(AttentionDomain::SelfReflection, "verifier"), 1.0);
+        // experience 子图: 双记忆成功索引可检索到该记忆。
+        let g: Vec<_> = shell.coevo.guidance("dialogue", 5);
+        assert_eq!(g.len(), 1);
+        assert_eq!(g[0].agent, "verifier");
+        // task 子图 bandit: dialogue 任务已累积 bandit 观测。
+        assert_eq!(shell.coevo.bandit().stats("dialogue").len(), 1);
+    }
+
+    #[test]
+    fn coevo_persist_load_round_trip() {
+        // P4/MAGE: 四子图 + 任务级搜索 bandit 落盘 KB, 新实例恢复后继续共进化。
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_coevo_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = std::sync::Arc::new(KnowledgeBase::open(Some(tmp.into())).expect("open kb"));
+        let mut loop_ = CoEvolutionLoop::with_config(CoEvoConfig {
+            epsilon: 0.0,
+            max_memories: 50,
+            min_evidence: 2,
+        });
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "exploratory",
+            true,
+            "deep dive found hits",
+        );
+        loop_.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "exploratory",
+            false,
+            "second dive empty",
+        );
+        assert_eq!(loop_.evolution_revision, 2);
+        loop_.persist(&kb).expect("persist");
+        // 全新实例恢复 → 图谱、bandit 观测与修订号还原。
+        let mut restored = CoEvolutionLoop::new();
+        restored.load(&kb).expect("load");
+        assert_eq!(restored.evolution_revision, 2);
+        assert_eq!(restored.total_rewards, 2);
+        assert_eq!(restored.graph.memories.len(), 2);
+        assert_eq!(restored.mastery(AttentionDomain::PatternMatch, "explorer"), 0.5);
+        let stats = restored.bandit().stats("research");
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].strategy, "exploratory");
+        assert_eq!(stats[0].attempts, 2);
+        // append-only 语义在恢复后继续: 新 reward 递增 id, 不重写历史。
+        restored.record_reward(
+            "research",
+            AttentionDomain::PatternMatch,
+            "explorer",
+            "exploratory",
+            true,
+            "third dive",
+        );
+        assert_eq!(restored.graph.memories.len(), 3);
+        assert_eq!(restored.graph.memories[2].id, 2, "monotonic id survives restart");
+    }
+
+    #[test]
+    fn production_executor_strategy_aware_explorer() {
+        // P4/MAGE: 任务级搜索 bandit 的策略经 execute_with_strategy 注入 confidence 检索缝。
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_prod_strategy_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = std::sync::Arc::new(KnowledgeBase::open(Some(tmp.into())).expect("open kb"));
+        // 预置一条知识节点, 让 confidence 检索有可命中的内容。
+        kb.write_memory_entry(
+            "neotrix knowledge node",
+            NodeType::Concept,
+            Some("co-evolution knowledge graph marker"),
+            None,
+            Some("test"),
+            None,
+        )
+        .expect("write");
+        let executor = crate::neotrix::nt_mind::ProductionAgentExecutor::new(kb);
+        // balanced → 常规执行 (默认路径, 不改变行为)。
+        let outcome = executor.execute_with_strategy("explorer", "knowledge", "balanced");
+        assert!(outcome.is_success(), "default path still works: {}", outcome.summary());
+        // exploratory → 走 confidence 检索缝, 策略名出现在结果里。
+        let strategic = executor.execute_with_strategy("explorer", "knowledge", "exploratory");
+        assert!(
+            strategic.summary().contains("strategy=exploratory"),
+            "strategy should reach confidence seam: {}",
+            strategic.summary()
+        );
     }
 
     #[test]

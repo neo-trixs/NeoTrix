@@ -6,8 +6,10 @@
 
 pub mod causal_inventor;
 pub mod agent_capability;
+pub mod co_evolution;
 pub mod creation_engine;
 pub mod dao_engine;
+pub mod dispatch_self_test;
 pub mod distillation;
 pub mod experiment;
 pub mod goal_loop;

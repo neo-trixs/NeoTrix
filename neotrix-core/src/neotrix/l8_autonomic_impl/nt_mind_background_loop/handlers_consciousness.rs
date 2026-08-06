@@ -641,6 +641,12 @@ impl BackgroundLoopHandle {
         )));
         self_tests.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new()));
         self_tests.register(Box::new(crate::core::nt_core_telemetry::TelemetryStore::new(100)));
+        // ── 派单控制面 SelfTest (P5, T3 inline) — 周期验证 P0-P4 共进化闭环:
+        // 真实多轮派单 → learner 路由迁移 + MANTA 拓扑修复 + MAGE 四子图共进化 +
+        // 跨轮持久化恢复。控制面从"仪式"变"可验证的自进化系统"。
+        self_tests.register(Box::new(
+            crate::neotrix::nt_mind::DispatchControlPlaneSelfTest::default(),
+        ));
 
         // NOTE (Cycle 159b): NeoCodexSelfAudit::new() is intentionally NOT
         // registered here. Its Default snapshot reports provider-not-resolvable +
