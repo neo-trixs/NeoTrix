@@ -538,9 +538,21 @@ impl GatewayV2 {
     }
 
     /// Extract model id from `{provider}/{model_id}` registration names.
+    /// 无 `/` 的 keyless 注册名 (如 `pollinations`) 回退到 catalog 默认模型,
+    /// 避免把注册名当模型名发给端点 (pollinations 会 404 "Model not found")。
+    /// 非 keyless 的 provider (如 `openai`) 保持返回注册名本身。
     fn provider_model(&self, provider_name: &str) -> Option<String> {
         let model = provider_name.split('/').next_back().unwrap_or(provider_name);
-        if model.is_empty() { None } else { Some(model.to_string()) }
+        if model.is_empty() { return None; }
+        if model == provider_name {
+            // 无 `/` → 仅 keyless provider 回退到 catalog 默认模型
+            if let Some(info) = super::provider_catalog::lookup_provider(provider_name) {
+                if info.is_free && !info.default_model.is_empty() {
+                    return Some(info.default_model.to_string());
+                }
+            }
+        }
+        Some(model.to_string())
     }
 
     fn fire_event(&self, provider_name: &str, success: bool, latency_ms: f64, tokens: u32, model: &str, phase: AttemptPhase) {
@@ -645,7 +657,14 @@ impl GatewayV2 {
     async fn call_provider(&self, name: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let provider = self.providers.get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
-        provider.complete(request).await
+        // 剥离 `{provider}/` 前缀 (同 call_provider_stream)。
+        let stripped = request.model.strip_prefix(&format!("{}/", name))
+            .map(|m| m.to_string());
+        let mut req = request.clone();
+        if let Some(m) = stripped {
+            req.model = m;
+        }
+        provider.complete(&req).await
     }
 
     /// 单次调用指定 provider — 无 select_best/无重试连打。
@@ -706,8 +725,24 @@ impl GatewayV2 {
         }
         let mut used_names: Vec<String> = Vec::new();
 
-        for _ in 0..3 {
-            let name = self.select_best().await
+        // 显式 provider 前缀路由: 请求模型形如 `{provider}/{model_id}` 时优先该 provider
+        // (如 llm7/codestral-latest → llm7)。此前 select_best 无视 model 前缀,
+        // 导致 llm7 模型被路由到 pollinations/api-airforce (402/429)。
+        let prefix_provider: Option<String> = request.model.split('/').next()
+            .filter(|p| !p.is_empty())
+            .map(|p| p.to_string());
+
+        for i in 0..3 {
+            let prefix_sel = if i == 0 {
+                // 第一优先: 显式前缀 provider (若已注册)
+                prefix_provider.as_ref()
+                    .filter(|p| self.providers.contains_key(p.as_str()))
+                    .cloned()
+            } else {
+                None
+            };
+            let best = self.select_best().await;
+            let name = prefix_sel.or(best)
                 .or_else(|| {
                     let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                     states.keys().next().cloned()
@@ -981,8 +1016,24 @@ impl GatewayV2 {
         // Phase 1: Normal retry loop (up to 3 providers, best-first)
         let mut used_names: Vec<String> = Vec::new();
 
-        for _ in 0..3 {
-            let name = self.select_best().await
+        // 显式 provider 前缀路由: 请求模型形如 `{provider}/{model_id}` 时优先该 provider
+        // (如 llm7/codestral-latest → llm7)。此前 select_best 无视 model 前缀,
+        // 导致 llm7 模型被路由到 pollinations/api-airforce (402/429)。
+        let prefix_provider: Option<String> = request.model.split('/').next()
+            .filter(|p| !p.is_empty())
+            .map(|p| p.to_string());
+
+        for i in 0..3 {
+            let prefix_sel = if i == 0 {
+                // 第一优先: 显式前缀 provider (若已注册)
+                prefix_provider.as_ref()
+                    .filter(|p| self.providers.contains_key(p.as_str()))
+                    .cloned()
+            } else {
+                None
+            };
+            let best = self.select_best().await;
+            let name = prefix_sel.or(best)
                 .or_else(|| {
                     self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }).keys().next().cloned()
                 });
@@ -1046,7 +1097,15 @@ impl GatewayV2 {
     ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let provider = self.providers.get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
-        provider.stream_complete(request).await
+        // 剥离 `{provider}/` 前缀: 请求模型 `llm7/codestral-latest` 传给 provider 时
+        // 只传 `codestral-latest` (上游不认识 `llm7/` 前缀, 返回 model_unavailable)。
+        let stripped = request.model.strip_prefix(&format!("{}/", name))
+            .map(|m| m.to_string());
+        let mut req = request.clone();
+        if let Some(m) = stripped {
+            req.model = m;
+        }
+        provider.stream_complete(&req).await
     }
 
     /// Auxiliary vision reasoning — the third-party-model-as-reasoner path.
@@ -1211,7 +1270,7 @@ impl GatewayV2 {
             } else {
                 None
             };
-            let provider = super::factory::create_provider(super::factory::ProviderConfig {
+            let mut provider = super::factory::create_provider(super::factory::ProviderConfig {
                 provider_type: entry.provider_type,
                 api_key,
                 base_url: Some(entry.base_url.clone()),
@@ -1219,6 +1278,10 @@ impl GatewayV2 {
                 timeout_secs: 60,
                 proxy: None,
             });
+            // 代理注入: 与手工 keyless 注册一致, 本机 fake-ip 分流网络下直连会全部超时
+            if let Some(proxy_url) = super::super::nt_io_http_factory::proxy_from_env() {
+                provider.set_proxy(&proxy_url);
+            }
             self.register_provider_with_category(&name, provider, entry.is_free, ProviderCategory::Cloud);
             log::info!("[gateway] Registered from catalog: {} ({})", name, entry.display_name);
         }
@@ -2043,15 +2106,18 @@ mod tests {
     }
 
     // ── 真实 LLM 集成验证（本地手动跑，不进 CI）──────────────────
-    // 需要网络 + keyless provider（api-airforce）。运行时:
+    // 需要网络 + keyless provider（llm7）。运行时:
     //   cargo test -p neotrix --lib -- --ignored test_real_gateway_stream
     #[tokio::test]
     #[ignore]
     async fn test_real_gateway_stream() {
-        // 直接调 keyless pollinations provider 验证流式成功路径（绕过 gateway 选择逻辑）。
-        let provider = crate::neotrix::l1_body_impl::nt_io_provider::free_providers::PollinationsProvider::new();
+        // 真实 LLM 流式端到端: 经生产 factory gateway 全链路。
+        // 模型 llm7/codestral-latest — 2026-08-06 实测唯一匿名可用流式端点
+        // (api-airforce 全局 1req/s 排队 90s, pollinations 队列满 429 + 流式间歇 402)。
+        // 同时验证 gateway 前缀路由: llm7/ 应路由到 llm7 provider。
+        let gw = crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
         let req = LlmRequest {
-            model: "openai".into(),  // pollinations keyless 默认模型
+            model: "llm7/codestral-latest".into(),
             messages: vec![Message::new(Role::User, "Reply with exactly: E2E-OK")],
             max_tokens: 32,
             temperature: Some(0.0),
@@ -2062,7 +2128,7 @@ mod tests {
             constraint_json: None,
             structured_output: None,
         };
-        let mut rx = provider.stream_complete(&req).await.expect("stream init ok");
+        let mut rx = gw.stream_complete_with_selection(&req).await.expect("stream init ok");
         let mut buf = String::new();
         while let Some(chunk) = rx.recv().await {
             match chunk {
