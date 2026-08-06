@@ -45,8 +45,8 @@ impl CliCommand for CleanupCmd {
                 let present = remover.scan();
                 let mut lines = vec![format!("🧬 组件移除目标 ({} 个存在):", present.len())];
                 for (target, _) in &present {
-                    lines.push(format!("  [{}] {} — {}\n      风险: {} | 面: {}",
-                        target.name, target.description, "",
+                    lines.push(format!("  [{}] {} — 风险: {} | 面: {}",
+                        target.name, target.description,
                         target.risk.label(), target.surface.label()));
                 }
                 if present.is_empty() {

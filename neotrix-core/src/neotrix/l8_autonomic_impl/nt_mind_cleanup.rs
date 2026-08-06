@@ -615,7 +615,7 @@ impl CleanupPattern {
             Self { name: "Build output", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/dist/**", "**/.build/**", "**/build/**", "**/out/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "Next.js cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.next/**", "**/.nuxt/**", "**/.output/**", "**/.svelte-kit/**", "**/.astro/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "Swift build", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.build/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Low, description: None },
-            Self { name: "Go build", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/vendor/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            Self { name: "Go test artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/*.test", "**/*.test.exe", "**/coverage.out", "**/coverage.html"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("go test 编译产物与覆盖率; vendor/ 为依赖源码不删") },
             Self { name: "Turbo/Parcel cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.turbo/**", "**/.parcel-cache/**", "**/.angular/**", "**/.dart_tool/**", "**/.zig-cache/**", "**/zig-out/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "Test caches", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/coverage/**", "**/__pycache__/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "iOS derived data", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**", "~/Library/Developer/CoreSimulator/Caches/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: None },
@@ -625,7 +625,7 @@ impl CleanupPattern {
             Self { name: "npm cache", kind: CleanupKind::Cache, patterns: vec!["~/.npm/_cacache/**", "%APPDATA%/npm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "pnpm store", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/pnpm/**", "~/.local/share/pnpm/store/**", "%LOCALAPPDATA%/pnpm-cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "yarn cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/yarn/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
-            Self { name: "bun cache", kind: CleanupKind::Cache, patterns: vec!["~/.bun/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Medium, description: Some("bun cache 含 install cache 与 install/cache 子目录, 保留 lock") },
+            Self { name: "bun cache", kind: CleanupKind::Cache, patterns: vec!["~/.bun/install/cache/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Medium, description: Some("仅 bun install 缓存; ~/.bun/bin(可执行)与全局包保留") },
             Self { name: "uv pip cache", kind: CleanupKind::Cache, patterns: vec!["~/.cache/uv/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "go build cache", kind: CleanupKind::Cache, patterns: vec!["~/Library/Caches/go-build/**", "~/.cache/go-build/**", "%LOCALAPPDATA%/go-build/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "conda pkgs", kind: CleanupKind::Cache, patterns: vec!["~/miniconda3/pkgs/**", "~/anaconda3/pkgs/**", "~/.conda/pkgs/**"], max_age_days: Some(60), safe: true, recursive: true, platform: all, risk: RiskLevel::Medium, description: None },
@@ -682,6 +682,38 @@ impl CleanupPattern {
             || canonical.starts_with(&home.join("Library"))
             || p == std::path::Path::new("/")
             || p == std::path::Path::new("\\")
+    }
+
+    /// 估算路径体积: 目录递归累加子项 (受安全护栏约束), 文件取其 len
+    pub fn entry_size(p: &Path) -> u64 {
+        match std::fs::metadata(p) {
+            Ok(m) if m.is_file() => m.len(),
+            Ok(m) if m.is_dir() => {
+                // 跳过系统根目录防误扫 (护栏: is_system_root_dir 判定后仍不遍历)
+                if Self::is_system_root_dir(p) {
+                    return m.len();
+                }
+                let mut total = m.len();
+                if let Ok(rd) = std::fs::read_dir(p) {
+                    let mut entries: Vec<_> = rd.filter_map(|e| e.ok()).collect();
+                    entries.truncate(256);
+                    for e in entries {
+                        let ep = e.path();
+                        // 符号链接不跟随 (防循环), 仅累加真实子目录/文件
+                        if std::fs::symlink_metadata(&ep).map(|sm| sm.file_type().is_symlink()).unwrap_or(false) {
+                            continue;
+                        }
+                        if ep.is_dir() {
+                            total = total.saturating_add(Self::entry_size(&ep));
+                        } else if let Ok(em) = std::fs::metadata(&ep) {
+                            total = total.saturating_add(em.len());
+                        }
+                    }
+                }
+                total
+            }
+            _ => 0,
+        }
     }
 }
 
@@ -812,8 +844,7 @@ impl CleanupEngine {
 
                         if is_old {
                             result.deletable_count += 1;
-                            let size = std::fs::metadata(&entry)
-                                .map(|m| m.len()).unwrap_or(0);
+                            let size = CleanupPattern::entry_size(&entry);
                             result.estimated_bytes += size;
                             if result.pattern_matches.len() < 20 {
                                 result.pattern_matches.push(entry.to_string_lossy().to_string());
@@ -1110,7 +1141,13 @@ impl ComponentRemover {
             return Err(format!("目标 {} 不适用于当前平台", target.name));
         }
         if self.dry_run {
-            return Err("dry-run 模式: 未执行移除".into());
+            return Ok(RemovalSnapshot {
+                target: target.name.into(),
+                created_at: Utc::now().timestamp(),
+                registry_export: Vec::new(),
+                service_states: Vec::new(),
+                file_backups: Vec::new(),
+            });
         }
         let mut snapshot = RemovalSnapshot {
             target: target.name.into(),
@@ -1149,8 +1186,13 @@ impl ComponentRemover {
         }
         #[cfg(target_os = "macos")]
         {
+            let uid = run_output("id", &["-u"])
+                .ok()
+                .and_then(|s| s.trim().parse::<i64>().ok())
+                .unwrap_or(501);
+            let gui = format!("gui/{}", uid);
             for svc in &target.services {
-                let _ = run_output("launchctl", &["bootout", "gui/501", svc]);
+                let _ = run_output("launchctl", &["bootout", &gui, svc]);
                 let _ = run_output("launchctl", &["disable", svc]);
             }
             for f in &target.files {
