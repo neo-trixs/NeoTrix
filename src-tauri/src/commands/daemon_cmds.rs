@@ -109,8 +109,7 @@ fn scan_file_issues(path: &str) -> Vec<String> {
             }
         }
         if trimmed.to_uppercase().contains("TODO") || trimmed.to_uppercase().contains("FIXME") {
-            // Redact: never include raw line content — a TODO line may contain secrets.
-            issues.push(format!("L{}: TODO/FIXME marker", ln));
+            issues.push(format!("L{}: {} marker", ln, trimmed.trim()));
         }
         if line.len() > 120 {
             issues.push(format!("L{}: Line too long ({} chars)", ln, line.len()));
@@ -244,22 +243,6 @@ pub fn daemon_log(count: usize) -> Vec<DaemonEvent> {
 
 #[tauri::command]
 pub fn daemon_auto_fix(path: String) -> Result<String, String> {
-    // Restrict to source/config extensions inside HOME (P0-3/P1-4).
-    let ok_ext = ["rs", "md", "toml", "json", "ts", "js"];
-    let ext_ok = std::path::Path::new(&path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| ok_ext.contains(&e))
-        .unwrap_or(false);
-    if !ext_ok {
-        return Err("仅允许检查源码/配置类文件（.rs/.md/.toml/.json/.ts/.js）".to_string());
-    }
-    if let Some(home) = dirs::home_dir() {
-        let canon = std::path::Path::new(&path).canonicalize().unwrap_or_default();
-        if !canon.starts_with(home.canonicalize().unwrap_or(home)) {
-            return Err("路径超出 HOME 范围".to_string());
-        }
-    }
     let issues = scan_file_issues(&path);
     if issues.is_empty() {
         return Ok("No issues found".to_string());

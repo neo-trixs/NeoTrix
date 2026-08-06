@@ -74,7 +74,7 @@ impl GroqProvider {
             _ => FinishReason::Unknown,
         };
 
-        Ok(LlmResponse { content, model, usage, finish_reason: finish })
+        Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None })
     }
 }
 
@@ -171,6 +171,7 @@ impl LlmProvider for GroqProvider {
                                         model: v["model"].as_str().unwrap_or("").to_string(),
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
                                     })).await;
                                 }
                             }
@@ -265,7 +266,7 @@ impl LlmProvider for OpenRouterProvider {
                     Some("length") => FinishReason::Length,
                     _ => FinishReason::Unknown,
                 };
-                Ok(LlmResponse { content, model, usage, finish_reason: finish })
+                Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None })
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -333,6 +334,7 @@ impl LlmProvider for OpenRouterProvider {
                                         model: v["model"].as_str().unwrap_or("").to_string(),
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
                                     })).await;
                                 }
                             }
@@ -412,6 +414,7 @@ impl LlmProvider for PollinationsProvider {
                     model: request.model.clone(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })
             }
             429 => Err(LlmError::RateLimit(text)),
@@ -454,6 +457,7 @@ impl LlmProvider for PollinationsProvider {
                         model: String::new(),
                         usage: Usage::default(),
                         finish_reason: FinishReason::Unknown,
+                    tool_calls: None,
                     })).await;
                 }
             }
@@ -525,6 +529,7 @@ impl LlmProvider for CerebrasProvider {
                         total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
                     }).unwrap_or_default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })
             }
             401 => Err(LlmError::Authentication(text)),
@@ -591,6 +596,7 @@ impl LlmProvider for CerebrasProvider {
                                         model: v["model"].as_str().unwrap_or("").to_string(),
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
                                     })).await;
                                 }
                             }

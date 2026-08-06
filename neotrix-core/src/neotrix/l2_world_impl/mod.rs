@@ -14,6 +14,8 @@ pub mod nt_world_model;
 pub mod nt_world_model_v2;
 pub mod nt_world_scrape;
 pub mod nt_world_search;
+pub mod nt_world_prefetch;
+pub mod nt_world_doc;
 pub mod nt_world_sense;
 pub mod nt_world_exploration_engine;
 pub mod nt_world_github_absorber;

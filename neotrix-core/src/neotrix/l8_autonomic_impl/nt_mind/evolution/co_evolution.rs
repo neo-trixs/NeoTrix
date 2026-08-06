@@ -322,7 +322,7 @@ impl CoEvolutionLoop {
     /// append-only 落盘经验记忆 — 只追加不改写; 超上限仅淘汰最旧 (bounded curriculum)。
     fn append_memory(&mut self, mem: ExperienceMemory) {
         self.graph.memories.push(mem);
-        if self.graph.memories.len() > self.config.max_memories {
+        while self.graph.memories.len() > self.config.max_memories {
             self.graph.memories.remove(0);
         }
     }
@@ -523,6 +523,7 @@ CoEvoConfig {
     #[test]
     fn memories_are_append_only_and_bounded() {
         let mut loop_ = CoEvolutionLoop::with_config(cfg_deterministic()); // max=4
+        loop_.config.max_memories = 4;
         for i in 0..6 {
             loop_.append_memory(mem(i, "research", true));
         }

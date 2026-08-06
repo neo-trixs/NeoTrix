@@ -349,9 +349,6 @@
         <div class="st-item" onclick="selectSetting(this,'data')">
           <svg viewBox="0 0 14 14"><ellipse cx="7" cy="4" rx="4.5" ry="2" stroke="currentColor" stroke-width="1" fill="none"/><path d="M2.5 4v2.5c0 1.1 2 2 4.5 2s4.5-.9 4.5-2V4" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M2.5 6.5V9c0 1.1 2 2 4.5 2s4.5-.9 4.5-2V6.5" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/></svg>数据控制
         </div>
-        <div class="st-item" onclick="selectSetting(this,'security')">
-          <svg viewBox="0 0 14 14"><path d="M7 1l4.5 2v3.5c0 3-1.9 5.2-4.5 6.5C4.4 11.7 2.5 9.5 2.5 6.5V3z" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round"/><path d="M5 7l1.5 1.5L9.5 5.5" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>安全中心
-        </div>
       </div>
     </div>
     <div class="st-content">
@@ -656,34 +653,6 @@
                 <div class="st-desc">删除所有本地数据（不可恢复）</div>
               </div>
               <button onclick="clearAllData()" style="padding:5px 14px;border-radius:8px;border:1px solid var(--des);background:rgba(232,84,84,0.08);color:var(--des);font-size:var(--fs-small);cursor:pointer;font-family:var(--ff);transition:var(--tr)">清除</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 安全中心 -->
-        <div class="st-section" id="stSecurity" style="display:none">
-          <h2 class="st-h2">安全中心</h2>
-          <div class="st-card">
-            <div class="st-card-row">
-              <div class="st-card-info">
-                <div class="st-lbl">权限模式</div>
-                <div class="st-desc" id="stSecModeDesc">手动：敏感操作逐个确认</div>
-              </div>
-              <span class="px-pulse on" style="display:inline-block;width:6px;height:6px"></span>
-            </div>
-          </div>
-          <div class="st-card">
-            <div class="st-card-info">
-              <div class="st-lbl">待审批请求</div>
-              <div class="st-desc" style="margin-bottom:8px" id="stSecPendingDesc">无挂起请求</div>
-              <div id="stSecPendingList" style="display:flex;flex-direction:column;gap:6px"></div>
-            </div>
-          </div>
-          <div class="st-card">
-            <div class="st-card-info">
-              <div class="st-lbl">审计日志</div>
-              <div class="st-desc" style="margin-bottom:8px">最近的安全敏感操作记录</div>
-              <div id="stSecAuditList" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto"></div>
             </div>
           </div>
         </div>

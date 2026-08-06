@@ -11,6 +11,6 @@ pub mod layout;
 #[cfg(test)]
 mod tests;
 
-pub use app::TuiApp;
+pub use app::{KeyAction, TuiApp, TuiExit};
 pub use themes::{Theme, theme_by_name, theme_list};
 pub use session_store::{SessionStore, SessionData};

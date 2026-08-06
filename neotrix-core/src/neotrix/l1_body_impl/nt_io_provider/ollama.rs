@@ -83,7 +83,7 @@ impl LlmProvider for OllamaProvider {
                     completion_tokens: resp.get("eval_count").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
                     total_tokens: 0,
                 };
-                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop })
+                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop, tool_calls: None })
             }
             400 => Err(LlmError::InvalidRequest(text)),
             500..=599 => Err(LlmError::Server(text)),
@@ -128,6 +128,7 @@ impl LlmProvider for OllamaProvider {
                                 model: model.clone(),
                                 usage: Usage::default(),
                                 finish_reason: FinishReason::Unknown,
+                            tool_calls: None,
                             })).await;
                         }
                         if v.get("done").and_then(|d| d.as_bool()).unwrap_or(false) {
@@ -136,6 +137,7 @@ impl LlmProvider for OllamaProvider {
                                 model: model.clone(),
                                 usage: Usage::default(),
                                 finish_reason: FinishReason::Stop,
+                            tool_calls: None,
                             })).await;
                         }
                     }

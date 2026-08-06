@@ -15,6 +15,22 @@ use crate::core::nt_core_error_recovery::{ErrorContext, ErrorType, RecoveryActio
 use crate::core::nt_io_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_io_telemetry::{ConsoleTracer, CostTracker, SpanKind, Tracer};
 
+/// 识别配额耗尽错误 — 与瞬时限速 (429) 区分 (freellmapi/aimux 模式)。
+/// 覆盖常见 provider 配额/信用耗尽措辞。命中后应熔断 provider 而非重试。
+fn is_quota_exhaustion(msg: &str) -> bool {
+    let lowered = msg.to_lowercase();
+    lowered.contains("quota exceeded")
+        || lowered.contains("out of quota")
+        || lowered.contains("insufficient_quota")
+        || lowered.contains("insufficient quota")
+        || lowered.contains("quota exhausted")
+        || lowered.contains("credit limit")
+        || lowered.contains("out of credits")
+        || lowered.contains("exceeded your current quota")
+        || lowered.contains("billing")
+        && (lowered.contains("activate") || lowered.contains("limit"))
+}
+
 #[derive(Debug)]
 pub struct ProviderState {
     pub circuit_breaker: CircuitBreaker,
@@ -47,6 +63,19 @@ impl ProviderState {
 
     pub fn is_available(&self) -> bool {
         self.circuit_breaker.is_available()
+    }
+
+    /// 配额耗尽标记 — 记录 provider 处于配额耗尽状态 (freellmapi/aimux 模式)。
+    /// 配额耗尽 (quota/credit 耗尽) 与瞬时限速 (429) 语义不同: 重试无益, 应剔除该 provider
+    /// 直至配额恢复, 而不是反复重试同一个耗尽账户。
+    pub fn mark_quota_exhausted(&mut self) {
+        self.circuit_breaker.force_open();
+        self.total_errors += 1;
+    }
+
+    /// 配额耗尽后是否已过冷却期可再次尝试 (配额恢复探测)
+    pub fn quota_recovery_elapsed(&self) -> bool {
+        self.circuit_breaker.cooldown_elapsed()
     }
 
     pub fn composite_score(&self) -> f64 {
@@ -619,6 +648,20 @@ impl GatewayV2 {
         provider.complete(request).await
     }
 
+    /// 单次调用指定 provider — 无 select_best/无重试连打。
+    ///
+    /// 适用于对限流敏感的场景（如 keyless free 池 1 req/s 限制）：
+    /// 调用方自行控制节流与重试节奏，避免 complete_with_selection 的
+    /// 3 次 normal + aggressive retry 在限流窗口内连续触发 429。
+    /// `provider_name` 需为完整注册名（如 `api-airforce` 或 `api-airforce/grok-4.1-mini:free`）。
+    pub async fn complete_single(
+        &self,
+        provider_name: &str,
+        request: &LlmRequest,
+    ) -> Result<LlmResponse, LlmError> {
+        self.call_provider(provider_name, request).await
+    }
+
     pub async fn complete_with_selection(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         // Build prompt key for cache lookup
         let prompt_key: String = request.messages.iter()
@@ -735,16 +778,26 @@ impl GatewayV2 {
                 }
                 Err(err) => {
                     let error_msg = err.to_string();
+                    let is_quota_exhausted = is_quota_exhaustion(&error_msg);
                     {
                         let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get_mut(&name) {
-                            state.record_failure(elapsed);
+                            if is_quota_exhausted {
+                                // 配额耗尽 (freellmapi/aimux): 重试无益, 直接熔断剔除该 provider,
+                                // 避免反复打同一个耗尽账户。冷却期后配额恢复探测自动放行。
+                                state.mark_quota_exhausted();
+                                log::warn!("[gateway] provider '{}' quota exhausted → 熔断剔除: {}", name, error_msg);
+                            } else {
+                                state.record_failure(elapsed);
+                            }
                         }
                     }
                     self.fire_event(&name, false, elapsed, 0, &request.model, AttemptPhase::Normal);
 
                     // Consult recovery orchestrator
-                    let error_type = if error_msg.contains("rate limit") || error_msg.contains("429") {
+                    let error_type = if is_quota_exhausted {
+                        ErrorType::Unknown("quota exhausted — provider tripped, skip retry".to_string())
+                    } else if error_msg.contains("rate limit") || error_msg.contains("429") {
                         ErrorType::RateLimit { retry_after: None }
                     } else if error_msg.contains("timeout") || error_msg.contains("timed out") {
                         ErrorType::Timeout { elapsed_ms: elapsed as u64 }
@@ -1566,6 +1619,7 @@ mod tests {
                         model: "test".to_string(),
                         usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
                         finish_reason: FinishReason::Stop,
+                    tool_calls: None,
                     })
                 }
             }
@@ -1611,6 +1665,7 @@ mod tests {
                             model: "test".to_string(),
                             usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
                             finish_reason: FinishReason::Stop,
+                        tool_calls: None,
                         })).await;
                     });
                     Ok(rx)
@@ -1895,17 +1950,61 @@ mod tests {
         assert!(result.is_err(), "oversized single request must be budget-blocked");
     }
 
+    #[tokio::test]
+    async fn test_quota_exhaustion_trips_provider_not_retried() {
+        // D19 (freellmapi/aimux 模式): 配额耗尽应熔断剔除 provider, 而非反复重试
+        // 同一个耗尽账户。命中 quota 后将 provider 置为不可用 → select_best 跳过。
+        let mut gw = GatewayV2::new();
+        gw.register_provider("quota-exhausted", Box::new(MockProvider::quota_failing()), false);
+        gw.register_provider("working", Box::new(MockProvider::new("ok")), true);
+
+        // 直接触发 quota 路径的熔断 (与 complete 内错误分类同语义)
+        {
+            let mut states = gw.states.write().unwrap();
+            if let Some(state) = states.get_mut("quota-exhausted") {
+                state.mark_quota_exhausted();
+            }
+        }
+        {
+            let states = gw.states.read().unwrap();
+            let walked = states.get("quota-exhausted").map(|s| !s.is_available()).unwrap_or(true);
+            assert!(walked, "quota-exhausted provider must be circuit-open after exhaustion");
+            let still_ok = states.get("working").map(|s| s.is_available()).unwrap_or(false);
+            assert!(still_ok, "working provider must remain available");
+        }
+
+        // 熔断后调用应 failover 到 working 成功, 不再命中的耗尽 provider
+        let req = LlmRequest::new("test", "hi");
+        let result = gw.complete_with_selection(&req).await;
+        assert!(result.is_ok(), "request must fail over to a working provider after quota trip");
+    }
+
+    #[test]
+    fn test_is_quota_exhaustion_classifies_correctly() {
+        assert!(is_quota_exhaustion("Error 429: quota exceeded for resource"));
+        assert!(is_quota_exhaustion("insufficient_quota: you have exhausted your free tier"));
+        assert!(is_quota_exhaustion("You have exceeded your current quota, please check your plan and billing details"));
+        assert!(is_quota_exhaustion("out of quota: you are being rate limited due to billing"));
+        // 瞬时限速不误判为配额耗尽
+        assert!(!is_quota_exhaustion("rate limit exceeded: retry after 5s"));
+        assert!(!is_quota_exhaustion("429 too many requests"));
+    }
+
     struct MockProvider {
         response: String,
         should_fail: bool,
+        quota_fail: bool,
     }
 
     impl MockProvider {
         fn new(response: &str) -> Self {
-            Self { response: response.to_string(), should_fail: false }
+            Self { response: response.to_string(), should_fail: false, quota_fail: false }
         }
         fn failing() -> Self {
-            Self { response: String::new(), should_fail: true }
+            Self { response: String::new(), should_fail: true, quota_fail: false }
+        }
+        fn quota_failing() -> Self {
+            Self { response: String::new(), should_fail: false, quota_fail: true }
         }
     }
 
@@ -1914,12 +2013,15 @@ mod tests {
         async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
             if self.should_fail {
                 Err(LlmError::Server("mock failure".to_string()))
+            } else if self.quota_fail {
+                Err(LlmError::Unknown("insufficient_quota: quota exceeded for your account".to_string()))
             } else {
                 Ok(LlmResponse {
                     content: self.response.clone(),
                     model: "mock".to_string(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })
             }
         }
@@ -1933,9 +2035,47 @@ mod tests {
                     model: "mock".to_string(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })).await;
             });
             Ok(rx)
         }
+    }
+
+    // ── 真实 LLM 集成验证（本地手动跑，不进 CI）──────────────────
+    // 需要网络 + keyless provider（api-airforce）。运行时:
+    //   cargo test -p neotrix --lib -- --ignored test_real_gateway_stream
+    #[tokio::test]
+    #[ignore]
+    async fn test_real_gateway_stream() {
+        // 直接调 keyless pollinations provider 验证流式成功路径（绕过 gateway 选择逻辑）。
+        let provider = crate::neotrix::l1_body_impl::nt_io_provider::free_providers::PollinationsProvider::new();
+        let req = LlmRequest {
+            model: "openai".into(),  // pollinations keyless 默认模型
+            messages: vec![Message::new(Role::User, "Reply with exactly: E2E-OK")],
+            max_tokens: 32,
+            temperature: Some(0.0),
+            tools: vec![],
+            image_data: None,
+            thinking_budget: None,
+            provider_params: HashMap::new(),
+            constraint_json: None,
+            structured_output: None,
+        };
+        let mut rx = provider.stream_complete(&req).await.expect("stream init ok");
+        let mut buf = String::new();
+        while let Some(chunk) = rx.recv().await {
+            match chunk {
+                Ok(resp) => {
+                    buf.push_str(&resp.content);
+                    if resp.finish_reason == FinishReason::Stop {
+                        break;
+                    }
+                }
+                Err(e) => panic!("stream error: {:?}", e),
+            }
+        }
+        assert!(!buf.trim().is_empty(), "should receive streaming text, got: {:?}", buf);
+        println!("E2E-OK streamed: {:?}", buf);
     }
 }

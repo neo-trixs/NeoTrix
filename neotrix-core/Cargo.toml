@@ -180,3 +180,7 @@ path = "examples/evolve.rs"
 [[example]]
 name = "absorption_loop_200"
 path = "examples/absorption_loop_200.rs"
+
+[[example]]
+name = "guji_llm_pool_test"
+path = "examples/guji_llm_pool_test.rs"

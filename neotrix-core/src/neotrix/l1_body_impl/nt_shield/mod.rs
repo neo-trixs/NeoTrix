@@ -19,6 +19,7 @@ pub mod http_proxy;
 pub mod poc_engine;
 pub mod browser_security;
 pub mod redaction;
+pub mod nt_shield_secret_collector;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

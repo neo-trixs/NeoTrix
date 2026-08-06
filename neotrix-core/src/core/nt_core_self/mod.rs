@@ -1,7 +1,6 @@
 pub mod archive;
 pub mod attention_head;
 pub mod context_window;
-pub mod co_evolution;
 pub mod emotion_state;
 pub mod intra_reflection;
 pub mod intrinsic_motivation;
@@ -21,10 +20,6 @@ pub mod self_audit;
 pub use archive::{SiliconArchive, SiliconSnapshot, AttentionSnapshot};
 pub use attention_head::{AttentionHead, AttentionDomain, AttentionProfile, AttentionManager};
 pub use context_window::{ContextWindow, CognitiveUnit, CognitiveUnitKind};
-pub use co_evolution::{
-    CoEvolutionProfile, CoEvolutionTracker, CoEvolutionConfig, CoEvolutionStats,
-    InteractionMode, InteractionRecord, TrustLevel,
-};
 pub use emotion_state::{
     EmotionDimension, EmotionState, EmotionConfig, EmotionEngine, EmotionObservation, EmotionReport,
 };

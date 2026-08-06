@@ -425,6 +425,14 @@ mod tests {
             "nt_comm_router.py",
             "deep-absorb-resources.py",
             "deep-absorb-fable5.py",
+            // 以下脚本功能已被 Rust port (R-P79) — 保留历史脚本, 计入白名单
+            "absorb_full_kb.py",      // port: kb_cmds.rs + nt_absorb_mapper.rs
+            "absorb_to_capability.py",// port: nt_absorb_mapper.rs
+            "kb-embed-pq.py",         // port: nt_memory_embed.rs
+            // 历史运维脚本 (零生产引用, 疑似死代码 — 待用户决定迁移/删除)
+            "enrich_repo_readmes.py",
+            "kb_batch_absorb.py",
+            "kb_formation.py",
         ];
         let mut violators = Vec::new();
         for entry in std::fs::read_dir(scripts_dir).unwrap() {

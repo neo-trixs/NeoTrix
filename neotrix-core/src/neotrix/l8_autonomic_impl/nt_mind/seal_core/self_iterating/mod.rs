@@ -94,9 +94,7 @@ pub(crate) use hyperarchive::cosine_distance;
 mod tests {
     use super::*;
 
-    /// 慢测试（真实 RL 迭代，~60-75s）：默认跳过，CI/上线用 `--ignored` 显式跑
     #[test]
-    #[ignore = "seal RL 循环真实迭代耗时 60s+，默认跳过（CI 用 --ignored 显式验证）"]
     fn test_seal_rl_loop_single_task() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
@@ -122,9 +120,7 @@ mod tests {
         // Test disabled: benchmarks module disabled
     }
 
-    /// 慢测试（批量 3 个任务真实 RL 迭代）：默认跳过
     #[test]
-    #[ignore = "seal RL 批量循环真实迭代耗时 60s+，默认跳过"]
     fn test_seal_rl_loop_batch() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();

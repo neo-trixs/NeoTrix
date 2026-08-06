@@ -106,6 +106,7 @@ impl SelfTest for DispatchControlPlaneSelfTest {
                 epsilon: 0.0,
                 max_memories: 200,
                 min_evidence: 2,
+                mastery_gate: 0.5,
             },
         );
         shell.learner.config.min_evidence = 2;
@@ -280,6 +281,7 @@ mod tests {
                 epsilon: 0.0,
                 max_memories: 200,
                 min_evidence: 2,
+                mastery_gate: 0.5,
             },
         );
         shell.learner.config.min_evidence = 2;

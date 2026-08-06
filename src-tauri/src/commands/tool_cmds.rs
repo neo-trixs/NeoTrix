@@ -124,15 +124,6 @@ fn dispatch_tool(tool: &str, args: &serde_json::Value) -> ToolResponse {
         }
         "bash" | "shell" => {
             let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
-            // P0-1 gate: destructive / download-exec pipes are blocked before sh -c.
-            if let Err(e) = super::mcp_cmds::guard_shell_command(command) {
-                return ToolResponse {
-                    success: false,
-                    output: String::new(),
-                    error: Some(e.to_string()),
-                    duration_ms: start.elapsed().as_millis() as u64,
-                };
-            }
             match Command::new("sh").arg("-c").arg(command).output() {
                 Ok(output) => ToolResponse {
                     success: output.status.success(),

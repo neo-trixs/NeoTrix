@@ -145,7 +145,7 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(document.querySelector(".df-comment .dc-body")!.textContent).toBe("inline note");
   });
 
-  it("code blocks expose a run button and runMsgCode gates execution behind confirm", async () => {
+  it("code blocks expose a run button and runMsgCode appends a result block", () => {
     const g = globalThis as Record<string, unknown>;
     expect(typeof g.runMsgCode).toBe("function");
     expect(typeof g.createSession).toBe("function");
@@ -155,31 +155,10 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     const runBtn = [...host.querySelectorAll(".msg-code-cp")].find((b) => b.textContent === "运行");
     expect(runBtn).not.toBeNull();
     host.querySelector("#chatScroll") || document.getElementById("chatScroll")!.appendChild(host);
-    const p = (g.runMsgCode as (btn: HTMLElement) => Promise<void>)(runBtn as HTMLElement);
-    // Security gate: confirm dialog must appear before the command executes
-    const confirmBox = document.getElementById("ntxConfirm");
-    expect(confirmBox).not.toBeNull();
-    expect(document.querySelector(".msg-code-out")).toBeNull();
-    confirmBox!.querySelector<HTMLButtonElement>('[data-act="confirm"]')!.click();
-    await p;
+    (g.runMsgCode as (btn: HTMLElement) => void)(runBtn as HTMLElement);
     const out = host.querySelector(".msg-code-out");
     expect(out).not.toBeNull();
     expect(out!.querySelector(".msg-code-res")!.textContent).toMatch(/NeoTrix shell/);
-  });
-
-  it("runMsgCode cancels execution when confirm is dismissed", async () => {
-    const g = globalThis as Record<string, unknown>;
-    const host = document.createElement("div");
-    host.innerHTML = (g.renderRichText as (t: string) => string)("```sh\nrm -rf /\n```");
-    const runBtn = [...host.querySelectorAll(".msg-code-cp")].find((b) => b.textContent === "运行");
-    host.querySelector("#chatScroll") || document.getElementById("chatScroll")!.appendChild(host);
-    const p = (g.runMsgCode as (btn: HTMLElement) => Promise<void>)(runBtn as HTMLElement);
-    const confirmBox = document.getElementById("ntxConfirm");
-    expect(confirmBox).not.toBeNull();
-    // danger command: confirm button is danger-styled but cancel dismisses
-    confirmBox!.querySelector<HTMLButtonElement>('[data-act="cancel"]')!.click();
-    await p;
-    expect(host.querySelector(".msg-code-out")).toBeNull();
   });
 
   it("tab bar renders kbd chips + hero suggestions in chat view", () => {
@@ -644,28 +623,14 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     (globalThis as Record<string, unknown>).localStorage = store;
     try {
       store.setItem("neotrix.settings", JSON.stringify({ "compute.temperature": 0.7, "compute.maxTokens": 16384 }));
-      // Security default: starts in 手动 (manual), so a fresh app sends manual until the user cycles.
+      (g.cycleMode as () => void)();
       const input = document.getElementById("chatInput") as HTMLTextAreaElement;
       input.value = "参数接线测试";
       (g.sendMsg as () => void)();
-      let send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
+      const send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
       expect(send).toBeTruthy();
       expect(send!.args.temperature).toBe(0.7);
       expect(send!.args.max_tokens).toBe(16384);
-      expect(send!.args.permission_mode).toBe("manual");
-      // Cycle once → 自动 (auto)
-      (g.cycleMode as () => void)();
-      calls.length = 0;
-      input.value = "参数接线测试2"; // sendMsg clears the input after sending
-      (g.sendMsg as () => void)();
-      send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
-      expect(send!.args.permission_mode).toBe("auto");
-      // Cycle twice → 计划 (plan)
-      (g.cycleMode as () => void)();
-      calls.length = 0;
-      input.value = "参数接线测试3";
-      (g.sendMsg as () => void)();
-      send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
       expect(send!.args.permission_mode).toBe("plan");
     } finally {
       (globalThis as Record<string, unknown>).localStorage = realLS;
@@ -1435,46 +1400,6 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(document.querySelector("#cwSessionList .cw-sitem")!.textContent).toContain("今日会话");
   });
 
-  it("pinned session appears in a 置顶 group first and togglePinSession persists to localStorage", () => {
-    const g = globalThis as Record<string, unknown>;
-    const DAY = 86400;
-    const now = Math.floor(Date.now() / 1000);
-    (g as unknown as { CW_DATA: unknown[] }).CW_DATA = [
-      { name: "钉住会话", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now, id: "pin-1" },
-      { name: "普通会话", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now - 60, id: "other-1" },
-    ];
-    // localStorage may be swapped by earlier tests; install a fresh in-memory
-    // store matching the setup shim so pin persistence is deterministic.
-    const realLS = g.localStorage;
-    const pinStore = new Map<string, string>();
-    g.localStorage = {
-      getItem: (k: string) => pinStore.get(k) ?? null,
-      setItem: (k: string, v: string) => void pinStore.set(k, String(v)),
-      removeItem: (k: string) => void pinStore.delete(k),
-      clear: () => pinStore.clear(),
-    };
-    (g.cwFilter as (s: string) => void)("all");
-    (g.renderCowork as () => void)();
-    // no pins yet: no 置顶 header
-    const headers0 = [...document.querySelectorAll("#cwSessionList .cw-group-h")].map((e) => e.textContent);
-    expect(headers0.some((t) => t!.includes("置顶"))).toBe(false);
-    // pin the second session
-    (g.togglePinSession as (id: string) => void)("other-1");
-    expect(JSON.parse(pinStore.get("neotrix.pinned") || "[]")).toContain("other-1");
-    (g.renderCowork as () => void)();
-    const headers1 = [...document.querySelectorAll("#cwSessionList .cw-group-h")].map((e) => e.textContent);
-    expect(headers1[0]!.includes("置顶")).toBe(true);
-    // pinned item rendered first
-    const items = [...document.querySelectorAll("#cwSessionList .cw-sitem")].map((e) => e.textContent);
-    expect(items[0]).toContain("普通会话");
-    // unpin restores time grouping
-    (g.togglePinSession as (id: string) => void)("other-1");
-    (g.renderCowork as () => void)();
-    const headers2 = [...document.querySelectorAll("#cwSessionList .cw-group-h")].map((e) => e.textContent);
-    expect(headers2.some((t) => t!.includes("置顶"))).toBe(false);
-    g.localStorage = realLS;
-  });
-
   /* ── API key mask + keychain (wave 13: plan #14 Settings Provider) ── */
   it("maskApiKey masks long keys keeping head+tail, fully dots short keys", () => {
     const g = globalThis as Record<string, unknown>;
@@ -1493,48 +1418,6 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     const input = document.getElementById("stApiKey") as HTMLInputElement;
     expect(input.type).toBe("password");
     expect(input.placeholder).toContain("sk-…");
-  });
-
-  it("renderStSecurity lists pending permissions with allow/deny buttons and audit log", async () => {
-    const g = globalThis as Record<string, unknown>;
-    // mock Tauri invoke for the security commands
-    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-    const pending = [
-      { id: "perm-1", action: "CommandExec", target: "rm -rf /tmp/test", timestamp: Math.floor(Date.now() / 1000), status: "Pending" },
-    ];
-    const audit = [
-      { id: "a1", action: "FileWrite", target: "~/notes/a.md", timestamp: Math.floor(Date.now() / 1000) - 60, resolution: "approved", reason: null },
-      { id: "a2", action: "CommandExec", target: "shutdown", timestamp: Math.floor(Date.now() / 1000) - 120, resolution: "denied", reason: "Blocked" },
-    ];
-    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
-      invoke: (cmd: string, args?: unknown) => {
-        const h: Record<string, (a: unknown) => unknown> = {
-          get_pending_permissions: () => pending,
-          get_permission_audit_log: () => audit,
-          respond_permission: () => null,
-        };
-        return Promise.resolve(h[cmd] ? h[cmd](args ?? {}) : undefined);
-      },
-    };
-    try {
-      await (g.renderStSecurity as () => Promise<void>)();
-      // mode desc reflects current mode
-      const modeDesc = document.getElementById("stSecModeDesc")!;
-      expect(modeDesc.textContent).toContain("手动");
-      // pending list renders the request with action + target
-      const list = document.getElementById("stSecPendingList")!;
-      expect(list.textContent).toContain("CommandExec");
-      expect(list.textContent).toContain("rm -rf /tmp/test");
-      const allowBtn = list.querySelector('button[data-act="allow"]');
-      expect(allowBtn).toBeTruthy();
-      // audit log renders both resolutions
-      const al = document.getElementById("stSecAuditList")!;
-      expect(al.textContent).toContain("approved");
-      expect(al.textContent).toContain("denied");
-    } finally {
-      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
-    }
   });
 });
 

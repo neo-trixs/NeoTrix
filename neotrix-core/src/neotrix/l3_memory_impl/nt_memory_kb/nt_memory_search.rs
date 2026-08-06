@@ -7,24 +7,56 @@ use super::nt_memory_embed::{cosine_similarity, load_all_embeddings};
 use super::nt_memory_types::*;
 
 pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
+    // FTS5 rank = bm25 分数, 越大越相关 (大文档 term 密度低, rank 偏小 → 需标题加权纠正)
+    // ORDER BY rank DESC: 修正原实现 ASC + score=1.0-rank 的双重反向缺陷
+    // 标题加权在 SQL 层: title 与查询词完全相等 → 排最前 (LIMIT 前生效, 防大文档被截断)
     let mut stmt = conn.prepare(
         "SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
                 n.language, n.confidence, n.importance, n.created_at, n.updated_at,
                 n.access_count, n.metadata,
-                rank
+                rank,
+                CASE WHEN trim(n.title) = ?1 THEN 1
+                     WHEN trim(n.title) LIKE ?1 || '%' THEN 0.5
+                     ELSE 0 END as title_boost
          FROM nodes_fts f
          JOIN nodes n ON n.rowid = f.rowid
-         WHERE nodes_fts MATCH ?1
-         ORDER BY rank
-         LIMIT ?2",
+         WHERE nodes_fts MATCH ?2
+         ORDER BY title_boost DESC, rank DESC
+         LIMIT ?3",
     )?;
 
-    let rows = stmt.query_map(params![query, limit as i64], |row| {
+    // 标题加权: 查询词与节点标题精确相等 → 该节点是"本体"而非"引用者",
+    // 给予强加权 (score 拉高)。前缀相等 (标题以查询词开头) → 弱加权。
+    let query_trim = query.trim();
+    let exact_title = |title: &str| -> bool {
+        let t = title.trim();
+        t == query_trim
+    };
+    let prefix_title = |title: &str| -> bool {
+        let t = title.trim();
+        t.starts_with(query_trim) && t.len() > query_trim.len()
+    };
+
+    let rows = stmt.query_map(params![query, query, limit as i64], |row| {
+        let title: String = row.get(2)?;
+        let rank: f64 = row.get(14)?;
+        // score = rank + 偏移 (rank 为负值, 加 1.0 归一避免全负)
+        let mut score = rank + 1.0;
+        // 标题加权: 精确命中 +1.0 (远高于引用书的 rank 差异), 前缀命中 +0.3
+        let matched_on = if exact_title(&title) {
+            score += 1.0;
+            SearchMatchType::FtsTitle
+        } else {
+            if prefix_title(&title) {
+                score += 0.3;
+            }
+            SearchMatchType::FtsContent
+        };
         Ok(SearchResult {
             node: KnowledgeNode {
                 id: row.get(0)?,
                 node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-                title: row.get(2)?,
+                title: title,
                 summary: row.get(3)?,
                 content: row.get(4)?,
                 url: row.get(5)?,
@@ -40,13 +72,16 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
                 supersedes: None,
                 source_episode: None,
             },
-            score: 1.0 - row.get::<_, f64>(14)?,
-            matched_on: vec![SearchMatchType::FtsTitle],
+            score: score,
+            matched_on: vec![matched_on],
             signals: None,
         })
     })?;
 
-    rows.collect()
+    // 标题加权后按 score 降序重排
+    let mut results: Vec<SearchResult> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    Ok(results)
 }
 
 pub fn search_by_type(conn: &Connection, node_type: &NodeType, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
@@ -203,8 +238,13 @@ pub fn hybrid_search(
     };
 
     // Fetch full node data for fused IDs
-    let fused_ids: Vec<String> = fused.into_iter().take(limit).map(|(_, id)| id).collect();
-    let mut results = Vec::new();
+    let mut fused_ids: Vec<String> = Vec::new();
+    let mut fused_scores: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    for (score, id) in fused.into_iter().take(limit) {
+        fused_ids.push(id.clone());
+        fused_scores.insert(id, score);
+    }
+    let mut results: Vec<SearchResult> = Vec::new();
     let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     if !fused_ids.is_empty() {
@@ -222,9 +262,11 @@ pub fn hybrid_search(
                 .map(|id| id as &dyn rusqlite::types::ToSql)
                 .collect();
             if let Ok(rows) = stmt.query_map(params.as_slice(), |row| {
+                let id: String = row.get(0)?;
+                let score = fused_scores.get(&id).copied().unwrap_or(0.5);
                 Ok(SearchResult {
                     node: KnowledgeNode {
-                        id: row.get(0)?,
+                        id: id,
                         node_type: NodeType::from_str(&row.get::<_, String>(1)?),
                         title: row.get(2)?,
                         summary: row.get(3)?,
@@ -242,7 +284,7 @@ pub fn hybrid_search(
                         supersedes: None,
                         source_episode: None,
                     },
-                    score: 0.5,
+                    score: score,
                     matched_on: vec![SearchMatchType::Bm25],
                     signals: None,
                 })
@@ -255,6 +297,13 @@ pub fn hybrid_search(
             }
         }
     }
+
+    // fetch 后按 fused 排名恢复顺序 (WHERE id IN 不保证顺序)
+    results.sort_by(|a, b| {
+        let ia = fused_ids.iter().position(|x| *x == a.node.id).unwrap_or(usize::MAX);
+        let ib = fused_ids.iter().position(|x| *x == b.node.id).unwrap_or(usize::MAX);
+        ia.cmp(&ib)
+    });
 
     if results.len() >= limit {
         results.truncate(limit);

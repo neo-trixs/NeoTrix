@@ -118,7 +118,7 @@ impl LlmProvider for AnthropicProvider {
                     completion_tokens: resp["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32,
                     total_tokens: (resp["usage"]["input_tokens"].as_u64().unwrap_or(0) + resp["usage"]["output_tokens"].as_u64().unwrap_or(0)) as u32,
                 };
-                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop })
+                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: FinishReason::Stop, tool_calls: None })
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -218,6 +218,7 @@ impl LlmProvider for AnthropicProvider {
                                                 model: model_name.clone(),
                                                 usage: Usage::default(),
                                                 finish_reason: FinishReason::Unknown,
+                                            tool_calls: None,
                                             })).await;
                                         }
                                     }
@@ -227,6 +228,7 @@ impl LlmProvider for AnthropicProvider {
                                                 model: model_name.clone(),
                                             usage: Usage::default(),
                                             finish_reason: FinishReason::Stop,
+                                        tool_calls: None,
                                         })).await;
                                     }
                                     _ => {}

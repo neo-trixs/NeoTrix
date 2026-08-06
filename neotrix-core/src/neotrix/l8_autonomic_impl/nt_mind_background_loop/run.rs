@@ -236,6 +236,17 @@ impl BackgroundLoop {
                         constitution.experiences.len(),
                         constitution.tree_growth_rules.len(),
                         constitution.absorption_rules.len());
+                    // B2 (自审修复): 用真实宪法计数替换 floor 硬编码自欺 — 此前
+                    // constitution_rules_count/experiences_count 仅靠 config floor
+                    // (46/111) 抬升, 声明当事实。这里把 ConstitutionLoader 实测值
+                    // 同步进 tree.soil, run_growth_cycle 中的 floor 只作为兜底。
+                    if let Some(ref mut tree) = self.consciousness_tree {
+                        tree.soil.constitution_rules_count = constitution.rules.len();
+                        tree.soil.constitution_experiences_count = constitution.experiences.len();
+                        tree.soil.constitution_tree_growth_rules = constitution.tree_growth_rules.len();
+                        tree.soil.constitution_absorption_rules = constitution.absorption_rules.len();
+                        log::info!("[constitution] Wired real counts into ConsciousnessTree soil");
+                    }
                 }
                 Err(e) => log::warn!("[constitution] Failed to load AGENTS.md: {}", e),
             }

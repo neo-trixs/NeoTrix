@@ -48,6 +48,7 @@ use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
 use sha1::{Digest, Sha1};
+use sha2::{Digest as Sha2Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::{Read, Write};
@@ -129,9 +130,13 @@ fn value_decode(raw: &[u8]) -> Option<String> {
     }
 }
 
-fn open_kb() -> Connection {
+fn kb_dir() -> String {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let db_path = format!("{}/.neotrix/knowledge.db", home);
+    format!("{}/.neotrix", home)
+}
+
+fn open_kb() -> Connection {
+    let db_path = format!("{}/knowledge.db", kb_dir());
     let conn = Connection::open(&db_path).expect("Failed to open KB");
     conn.busy_timeout(std::time::Duration::from_secs(60)).ok();
     conn.execute_batch(
@@ -826,6 +831,9 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
     }
 
     let mut written = 0;
+    // D20 (aihot-skill/workflow_templates 参照): 吸收审计轨迹 — 记录每条 entry 的
+    // 决策 (written / redundant / invalid) 与内容哈希, 供事后核对吸收质量。
+    let mut audit_log: Vec<Value> = Vec::new();
     for (i, raw_entry) in entries.iter().enumerate() {
         let mut e = json!({
             "schema_version": SCHEMA_VERSION,
@@ -840,12 +848,24 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
             "source": raw_entry.get("source").or_else(|| session.get("source"))
                 .cloned().unwrap_or_else(|| json!("dialogue")),
         });
+        // D20: manifest — 内容 SHA-256, 落盘后可按哈希核对吸收内容未被篡改/漂移
+        let raw_content = e.get("content").and_then(|c| c.as_str()).unwrap_or("");
+        let content_hash = {
+            let mut hasher = Sha256::new();
+            hasher.update(raw_content.as_bytes());
+            format!("{:x}", hasher.finalize())
+        };
+        e["content_hash"] = json!(content_hash.clone());
         if let Some(vb) = norm_verify_by(&e, ts) {
             e["verify_by"] = json!(vb);
         }
         let errors = validate_entry(&e);
         if !errors.is_empty() {
             println!("[absorb] ✗ entry #{}: {:?}", i, errors);
+            audit_log.push(json!({
+                "idx": i, "decision": "invalid", "reason": format!("{:?}", errors),
+                "content_hash": content_hash, "ts": ts,
+            }));
             continue;
         }
         let dom = e.get("domain").and_then(|d| d.as_str()).unwrap_or("unknown");
@@ -883,6 +903,10 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
                     "[absorb] 跳过冗余 entry #{} (sim={:.3} ≥0.65, 同 domain={}) — 防重复吸收",
                     i, best_sim, dom
                 );
+                audit_log.push(json!({
+                    "idx": i, "decision": "redundant", "reason": format!("sim={:.3}", best_sim),
+                    "content_hash": content_hash, "ts": ts,
+                }));
                 continue;
             }
         }
@@ -924,8 +948,28 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
             domains.as_array_mut().unwrap().push(dom);
         }
         written += 1;
+        audit_log.push(json!({
+            "idx": i, "decision": "written", "key": key,
+            "content_hash": content_hash, "ts": ts,
+        }));
     }
 
+    // D20: audit jsonl 落盘 — 与 KB 同一目录, 供审计核对每次吸收的决策轨迹
+    let kb_dir = kb_dir();
+    let audit_path = format!(
+        "{}/audit_{}_{}.jsonl",
+        kb_dir,
+        cycle.replace(['/', '\\', ' '], "_"),
+        sid.replace(['/', '\\', ' ', ':'], "_")
+    );
+    if std::fs::create_dir_all(&kb_dir).is_ok() {
+        let mut blob = String::new();
+        for rec in &audit_log {
+            blob.push_str(&serde_json::to_string(rec).unwrap_or_default());
+            blob.push('\n');
+        }
+        let _ = std::fs::write(&audit_path, blob);
+    }
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
     println!("[absorb] {} entries from {} (cycle={})", written, sid, cycle);

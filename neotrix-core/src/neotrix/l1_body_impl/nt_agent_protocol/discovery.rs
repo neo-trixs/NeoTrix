@@ -95,28 +95,38 @@ impl AgentDiscovery {
         Ok(())
     }
 
-    /// Listen for agent broadcasts (non-blocking with timeout)
-    pub fn listen(&mut self) -> L1Result<()> {
-        let mut buf = [0u8; 4096];
-        match self.socket.recv_from(&mut buf) {
-            Ok((size, _src)) => {
-                if size == PROBE_MAGIC.len() && &buf[..size] == PROBE_MAGIC {
-                    return Ok(());
+    /// Listen for agent broadcasts — 排空 socket 缓冲区所有待处理数据报 (D17)。
+    ///
+    /// 背景: background loop 以固定间隔调用本方法 (默认 60s)。UDP 数据报在
+    /// socket buffer 排队, 若每次只 recv 一个, 积压会被逐个吞掉 — 一次轮询只
+    /// 消费一个, 其余在下次轮询才处理 (延迟放大), 且高频广播下持续积压。
+    /// 改为循环读到 WouldBlock/TimedOut 为止, 一次调用排空全部。
+    /// 返回新发现数 (0 = 无新 agent, 供上层判断是否触发事件)。
+    pub fn listen(&mut self) -> L1Result<usize> {
+        let mut discovered: usize = 0;
+        loop {
+            let mut buf = [0u8; 4096];
+            match self.socket.recv_from(&mut buf) {
+                Ok((size, _src)) => {
+                    if size == PROBE_MAGIC.len() && &buf[..size] == PROBE_MAGIC {
+                        continue;
+                    }
+                    if let Ok(info) = serde_json::from_slice::<AgentInfo>(&buf[..size]) {
+                        self.known_agents.insert(info.id.clone(), info);
+                        discovered += 1;
+                    }
                 }
-                if let Ok(info) = serde_json::from_slice::<AgentInfo>(&buf[..size]) {
-                    self.known_agents.insert(info.id.clone(), info);
-                }
-            }
-            Err(e) => {
-                if e.kind() != std::io::ErrorKind::WouldBlock
-                    && e.kind() != std::io::ErrorKind::TimedOut
-                {
-                    let err = from_string_result(Err(format!("Recv: {}", e)));
-                    return err;
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut
+                    {
+                        break;
+                    }
+                    return from_string_result(Err(format!("Recv: {}", e)));
                 }
             }
         }
-        Ok(())
+        Ok(discovered)
     }
 
     /// Active scan: broadcast a probe and listen for responses for `duration_ms`.
@@ -249,5 +259,27 @@ mod tests {
         let result = d.broadcast(&info, "127.0.0.1:42101");
         // May fail because nobody listening, but should not panic about broadcast
         let _ = result;
+    }
+
+    #[test]
+    fn test_listen_drains_multiple_datagrams() {
+        // D17: listen() 必须排空 socket buffer 全部积压数据报, 而非单次只读一个。
+        // 用本地 UDP 对: 发送 2 个 agent info, 一次 listen 应记录 2 个。
+        let d = AgentDiscovery::new(42110).expect("bind");
+        let port = 42110;
+
+        // 从另一个 socket 广播两个 agent 到本 socket
+        let sender = UdpSocket::bind("127.0.0.1:0").expect("bind sender");
+        let a = AgentInfo::new("one", "one", "127.0.0.1", port);
+        let b = AgentInfo::new("two", "two", "127.0.0.1", port);
+        sender.send_to(&serde_json::to_vec(&a).unwrap(), format!("127.0.0.1:{}", port)).unwrap();
+        sender.send_to(&serde_json::to_vec(&b).unwrap(), format!("127.0.0.1:{}", port)).unwrap();
+
+        // 给数据报到达 socket buffer 的窗口
+        std::thread::sleep(Duration::from_millis(50));
+        let mut d = d;
+        let n = d.listen().expect("listen");
+        assert_eq!(n, 2, "single listen() call must drain both queued datagrams");
+        assert_eq!(d.agent_count(), 2, "both agents recorded");
     }
 }

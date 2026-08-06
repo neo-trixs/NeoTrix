@@ -5,4 +5,4 @@ mod tui_app;
 mod tests;
 
 pub use types::{Session, ToolCall, ChatMessage, GoalDisplay, SideMessage};
-pub use tui_app::TuiApp;
+pub use tui_app::{KeyAction, TuiApp, TuiExit};

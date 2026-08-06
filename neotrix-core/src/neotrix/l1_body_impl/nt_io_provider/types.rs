@@ -216,6 +216,17 @@ pub struct LlmResponse {
     pub model: String,
     pub usage: Usage,
     pub finish_reason: FinishReason,
+    /// Tool calls requested by the model (when finish_reason == Tool).
+    /// Populated by providers that parse `tool_calls` from the raw response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCallInfo>>,
+}
+
+impl LlmResponse {
+    /// Convenience constructor for providers that do not surface tool calls.
+    pub fn plain(content: String, model: String, usage: Usage, finish_reason: FinishReason) -> Self {
+        Self { content, model, usage, finish_reason, tool_calls: None }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -22,6 +22,9 @@ struct Cli {
     #[arg(global = true, long, help = "Run standalone mode (no LLM)")]
     standalone: bool,
 
+    #[arg(global = true, long, help = "Run Agent Loop mode (NeoTrix as subject, LLM as backend)")]
+    agent: bool,
+
     #[arg(global = true, long, value_name = "ADDR", default_value_t = String::from("0.0.0.0:3000"), help = "Server address")]
     addr: String,
 
@@ -261,7 +264,9 @@ fn main() {
     let is_ops_cmd = matches!(
         cli.command,
         Some(Commands::Sysops { .. }) | Some(Commands::Status)
-    );
+    ) || cli.agent
+        || cli.standalone
+        || cli.headless;
     if !is_ops_cmd && !entry::check_provider_config() {
         entry::run_provider_wizard();
     }
@@ -436,6 +441,7 @@ fn main() {
         }
         None => {
             if cli.standalone { run_standalone_mode(cli.stage); }
+            else if cli.agent { entry::run_agent_tui(&cli.profile); }
             else if cli.serve { run_background_daemon(&cli.addr, &cli.profile); }
             else if cli.headless { run_headless_mode(&cfg, &cli.profile); }
             else { run_interactive(&cfg, &cli.profile); }

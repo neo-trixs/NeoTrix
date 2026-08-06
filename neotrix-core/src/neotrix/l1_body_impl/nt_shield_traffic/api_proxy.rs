@@ -469,6 +469,7 @@ mod tests {
                 total_tokens: 15,
             },
             model: "claude-sonnet-4-6".into(),
+            tool_calls: None,
         };
         let anthropic = to_anthropic_response(&resp, "claude-sonnet-4-6");
         assert_eq!(anthropic.role, "assistant");

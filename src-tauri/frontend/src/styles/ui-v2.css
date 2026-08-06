@@ -795,19 +795,6 @@
   .typing span:nth-child(3) { animation-delay:0.4s; }
   @keyframes typingB { 0%,60%,100%{ opacity:0.3; transform:scale(0.8); } 30%{ opacity:1; transform:scale(1.2); } }
 
-  /* IPC 错误 + 重试 (ChatGPT/Claude parity) */
-  .msg-ipc-err { display:flex; flex-direction:column; gap:8px; margin-top:8px; padding:10px 12px; border:1px solid color-mix(in srgb, var(--err,#E5484D) 35%, transparent); border-radius:10px; background:color-mix(in srgb, var(--err,#E5484D) 6%, transparent); }
-  .msg-ipc-err-txt { font-size:12px; color:var(--err,#E5484D); line-height:1.5; word-break:break-word; white-space:pre-wrap; }
-  .msg-ipc-retry { align-self:flex-start; border:1px solid var(--bd); background:var(--bg-raised); color:var(--tx2); border-radius:8px; font-size:11.5px; padding:4px 14px; cursor:pointer; font-family:var(--ff); transition:var(--tr); }
-  .msg-ipc-retry:hover { color:var(--pri); border-color:var(--pri); }
-
-  /* 会话置顶按钮 */
-  .cw-pin-btn { margin-left:auto; border:none; background:transparent; cursor:pointer; font-size:11px; padding:0 2px; opacity:0.4; transition:var(--tr); line-height:1; }
-  .cw-sitem:hover .cw-pin-btn { opacity:1; }
-  .cw-pin-btn:hover { opacity:1; transform:scale(1.15); }
-  .cw-group-h:first-child { margin-top:0; }
-
-
   .think { display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:11px; color:var(--tx3); font-variant-numeric:tabular-nums; }
   .think::before { content:''; width:8px; height:8px; border-radius:50%; background:var(--pri); animation:thinkP 1s ease-in-out infinite; }
   @keyframes thinkP { 0%,100%{ opacity:0.25; transform:scale(0.75); } 50%{ opacity:1; transform:scale(1.15); } }

@@ -21,13 +21,7 @@ pub fn read_provider_config() -> Result<ProviderConfigPayload, NeoTrixError> {
         .join("neotrix")
         .join("provider.json");
     let content = std::fs::read_to_string(&path).map_err(|e| NeoTrixError::Config(format!("无法读取 Provider 配置: {}", e)))?;
-    let mut payload: ProviderConfigPayload = serde_json::from_str(&content).map_err(|e| NeoTrixError::Config(format!("解析 Provider 配置失败: {}", e)))?;
-    // P1-2: api_key is stored in the OS keyring, never in provider.json.
-    if payload.api_key.is_empty() {
-        if let Ok(key) = super::mcp_cmds::read_provider_key(&payload.id) {
-            payload.api_key = key;
-        }
-    }
+    let payload: ProviderConfigPayload = serde_json::from_str(&content).map_err(|e| NeoTrixError::Config(format!("解析 Provider 配置失败: {}", e)))?;
     Ok(payload)
 }
 

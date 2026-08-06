@@ -426,6 +426,48 @@ fn scan_secrets_handler(ctx: &SecurityMcpContext) -> Result<SecurityMcpResponse,
     let start = std::time::Instant::now();
     let target = &ctx.target;
 
+    // 遗留3 (自审修复): SecretCollector 生产接线 — target 若为存在的目录/文件路径,
+    // 走多层 Collector (env + dir 递归, file:line 定位, 复用 Redactor 正则库)。
+    // 此前 SecretCollector 只有测试调用, 属剧场模块; 此处挂入 scan_secrets 工具生产路径。
+    let path = std::path::Path::new(target);
+    if !target.is_empty() && path.exists() {
+        use crate::neotrix::l1_body_impl::nt_shield::nt_shield_secret_collector::SecretCollector;
+        let collector = SecretCollector::new();
+        let report = collector.collect(if path.is_dir() { Some(path) } else { None });
+        let mut findings = Vec::new();
+        for hit in &report.hits {
+            findings.push(SecurityFinding {
+                severity: if hit.exposed { FindingSeverity::High } else { FindingSeverity::Medium },
+                category: "hardcoded-secret".to_string(),
+                description: format!("Secret detected in {} ({})", hit.location, hit.rule),
+                location: Some(match hit.line {
+                    Some(l) => format!("{}:{}", hit.location, l),
+                    None => hit.location.clone(),
+                }),
+                remediation: Some("Remove this credential from code. Store in environment variables or a secrets manager.".to_string()),
+                cwe_id: Some("CWE-798".to_string()),
+            });
+        }
+        let risk_score = if findings.is_empty() {
+            0.0
+        } else {
+            (findings.len() as f64).min(20.0) / 20.0 * 0.8
+        };
+        let summary = format!(
+            "Scanned {} ({} secrets found, {} hits)",
+            target,
+            report.total,
+            findings.len(),
+        );
+        return Ok(SecurityMcpResponse {
+            findings,
+            summary,
+            risk_score,
+            duration_ms: start.elapsed().as_millis() as u64,
+            tool_name: String::new(),
+        });
+    }
+
     if target.is_empty() {
         return Ok(SecurityMcpResponse {
             findings: vec![],

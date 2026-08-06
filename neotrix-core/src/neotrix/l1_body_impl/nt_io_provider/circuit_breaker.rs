@@ -70,6 +70,22 @@ impl CircuitBreaker {
         }
     }
 
+    /// 强制 Open — 配额耗尽等非瞬时错误直接熔断, 不依赖连续失败计数。
+    /// 冷却期沿用默认 cooldown, 期间 select_best 会跳过该 provider。
+    pub fn force_open(&mut self) {
+        self.state = BreakerState::Open;
+        self.last_state_change = Some(Instant::now());
+        self.half_open_probes_used = 0;
+    }
+
+    /// 熔断冷却是否已过 (配额恢复探测窗口)
+    pub fn cooldown_elapsed(&self) -> bool {
+        match self.last_state_change {
+            Some(t) => t.elapsed() >= self.cooldown,
+            None => true,
+        }
+    }
+
     pub fn on_success(&mut self) {
         self.sliding_window.push_back(true);
         if self.sliding_window.len() > self.window_size {
