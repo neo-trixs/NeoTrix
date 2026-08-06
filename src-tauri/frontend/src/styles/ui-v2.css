@@ -743,6 +743,35 @@
   .msg.l .mb { background:var(--glass-L1-bg); backdrop-filter:var(--glass-L1-blur); -webkit-backdrop-filter:var(--glass-L1-blur); border:1px solid var(--bd); border-top-left-radius:6px; width:100%; }
   .mb code { background:rgba(0,0,0,0.15); padding:1px 6px; border-radius:4px; font-family:var(--fm); font-size:var(--fs-small); }
   .msg.l .mb code { background:var(--bg-raised); color:var(--tx); }
+
+  /* ===== Markdown body typography ===== */
+  .msg.l .mb p { margin:0 0 8px; }
+  .msg.l .mb p:last-child { margin-bottom:0; }
+  .msg.l .mb h1, .msg.l .mb h2, .msg.l .mb h3, .msg.l .mb h4, .msg.l .mb h5, .msg.l .mb h6 {
+    margin:12px 0 6px; font-weight:var(--fw-semibold); color:var(--tx); line-height:1.35;
+  }
+  .msg.l .mb h1 { font-size:1.22em; } .msg.l .mb h2 { font-size:1.12em; } .msg.l .mb h3 { font-size:1.05em; }
+  .msg.l .mb h4, .msg.l .mb h5, .msg.l .mb h6 { font-size:1em; }
+  .msg.l .mb h1:first-child, .msg.l .mb h2:first-child, .msg.l .mb h3:first-child { margin-top:0; }
+  .msg.l .mb strong { font-weight:var(--fw-semibold); color:var(--tx); }
+  .msg.l .mb em { font-style:italic; }
+  .msg.l .mb del { color:var(--tx3); }
+  .msg.l .mb ul, .msg.l .mb ol { margin:4px 0 8px; padding-left:20px; }
+  .msg.l .mb ul:last-child, .msg.l .mb ol:last-child { margin-bottom:0; }
+  .msg.l .mb li { margin:2px 0; }
+  .msg.l .mb blockquote {
+    margin:6px 0; padding:4px 12px; border-left:3px solid var(--pri);
+    color:var(--tx2); background:var(--ghost); border-radius:0 var(--r-sm) var(--r-sm) 0;
+  }
+  .msg.l .mb hr { border:none; border-top:1px solid var(--bd); margin:10px 0; }
+  .msg.l .mb table { border-collapse:collapse; margin:6px 0 10px; font-size:var(--fs-small); width:100%; }
+  .msg.l .mb th, .msg.l .mb td { border:1px solid var(--bd); padding:5px 10px; text-align:left; }
+  .msg.l .mb th { background:var(--ghost); font-weight:var(--fw-medium); color:var(--tx); }
+  .msg.l .mb a { color:var(--pri); text-decoration:none; }
+  .msg.l .mb a:hover { text-decoration:underline; }
+  .msg.l .mb .md-task { list-style:none; }
+  .msg.l .mb .md-task .md-cb { display:inline-block; width:15px; color:var(--pri); font-weight:var(--fw-semibold); }
+  .msg.l .mb .md-task-done { color:var(--tx3); text-decoration:line-through; }
   .sc { display:inline-block; width:2px; height:13px; background:var(--pri); animation:bl 0.8s step-end infinite; vertical-align:middle; margin-left:2px; }
   .typing { display:inline-flex; align-items:center; gap:4px; padding:4px 0; }
   .typing span { width:5px; height:5px; border-radius:50%; background:var(--tx3); animation:typingB 1.2s ease-in-out infinite; }

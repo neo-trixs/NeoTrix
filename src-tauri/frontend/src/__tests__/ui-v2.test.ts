@@ -809,4 +809,65 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  it("renderRichText renders inline bold/italic/code/link", () => {
+    const g = globalThis as Record<string, unknown>;
+    const html = (g.renderRichText as (t: string) => string)("**加粗** 与 *斜体* 及 `代码` 和 [链接](https://example.com)");
+    const host = document.createElement("div");
+    host.innerHTML = html;
+    expect(host.querySelector("strong")!.textContent).toBe("加粗");
+    expect(host.querySelector("em")!.textContent).toBe("斜体");
+    expect(host.querySelector("code")!.textContent).toBe("代码");
+    expect(host.querySelector("a")!.getAttribute("href")).toBe("https://example.com");
+    expect(host.querySelector("a")!.textContent).toBe("链接");
+  });
+
+  it("renderRichText renders headings/lists/quote/task/hr/table", () => {
+    const g = globalThis as Record<string, unknown>;
+    const src = [
+      "# 标题一",
+      "",
+      "- 条目 A",
+      "- 条目 B",
+      "",
+      "1. 第一步",
+      "2. 第二步",
+      "",
+      "> 引用行",
+      "",
+      "- [x] 已完成",
+      "- [ ] 待办",
+      "",
+      "| 列A | 列B |",
+      "| --- | --- |",
+      "| 1   | 2   |",
+    ].join("\n");
+    const host = document.createElement("div");
+    host.innerHTML = (g.renderRichText as (t: string) => string)(src);
+    expect(host.querySelector("h1")!.textContent).toBe("标题一");
+    expect(host.querySelectorAll("ul li").length).toBe(4);
+    expect(host.querySelectorAll("ol li").length).toBe(2);
+    expect(host.querySelector("blockquote")!.textContent).toContain("引用行");
+    expect(host.querySelector(".md-task-done")!.textContent).toContain("已完成");
+    expect(host.querySelector("table th")!.textContent).toBe("列A");
+    expect(host.querySelectorAll("table td").length).toBe(2);
+  });
+
+  it("renderRichText is XSS-safe: escapes script and blocks javascript: links", () => {
+    const g = globalThis as Record<string, unknown>;
+    const html = (g.renderRichText as (t: string) => string)("<script>alert(1)</script> [x](javascript:alert(2)) `onerror`");
+    const host = document.createElement("div");
+    host.innerHTML = html;
+    expect(host.querySelector("script")).toBeNull();
+    expect(host.querySelector("a")).toBeNull();
+    expect(host.textContent).toContain("<script>alert(1)</script>");
+  });
+
+  it("renderRichText keeps code fences with run/copy buttons", () => {
+    const g = globalThis as Record<string, unknown>;
+    const host = document.createElement("div");
+    host.innerHTML = (g.renderRichText as (t: string) => string)("```rust\nfn main() {}\n```");
+    expect(host.querySelector(".msg-code-b")).not.toBeNull();
+    expect([...host.querySelectorAll(".msg-code-cp")].map((b) => b.textContent)).toEqual(["运行", "复制"]);
+  });
 });
