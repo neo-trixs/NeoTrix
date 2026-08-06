@@ -1292,5 +1292,44 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  /* ── Token counter (wave 13: ChatGPT/Claude "123/4096" indicator) ── */
+  it("updateTokenCount shows word count vs 4096 limit", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    const count = document.getElementById("tokCount")!;
+    expect(count).not.toBeNull();
+    input.value = "hello world foo";
+    (g.updateTokenCount as () => void)();
+    expect(count.textContent).toBe("3 / 4096");
+    expect(count.classList.contains("over")).toBe(false);
+  });
+
+  it("updateTokenCount resets to 0 / 4096 on empty input", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = "";
+    (g.updateTokenCount as () => void)();
+    expect(document.getElementById("tokCount")!.textContent).toBe("0 / 4096");
+    expect(document.getElementById("tokCount")!.classList.contains("over")).toBe(false);
+  });
+
+  it("updateTokenCount marks .over when count exceeds 4096", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = Array.from({ length: 4097 }, (_, i) => "w" + i).join(" ");
+    (g.updateTokenCount as () => void)();
+    const count = document.getElementById("tokCount")!;
+    expect(count.textContent).toBe("4097 / 4096");
+    expect(count.classList.contains("over")).toBe(true);
+  });
+
+  it("autoResize triggers the token counter update on input", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = "alpha beta gamma";
+    (g.autoResize as (el: HTMLTextAreaElement) => void)(input);
+    expect(document.getElementById("tokCount")!.textContent).toBe("3 / 4096");
+  });
 });
 

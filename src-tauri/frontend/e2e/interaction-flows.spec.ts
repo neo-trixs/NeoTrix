@@ -620,4 +620,26 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await expect(dlg).toHaveCount(0, { timeout: 10_000 });
     expect((await invokeCalls(page)).filter((c) => c.cmd === "neocodex_delete_message").length).toBe(before + 1);
   });
+
+  test("composer token counter updates live as the user types", async ({ page }) => {
+    await page.goto("/");
+    const input = page.locator("#chatInput");
+    const count = page.locator("#tokCount");
+    await expect(count).toHaveText("0 / 4096", { timeout: 10_000 });
+    await input.fill("alpha beta gamma");
+    await expect(count).toHaveText("3 / 4096");
+    await expect(count).not.toHaveClass(/over/);
+    await input.fill("");
+    await expect(count).toHaveText("0 / 4096");
+  });
+
+  test("composer token counter turns red (over) above the 4096 limit", async ({ page }) => {
+    await page.goto("/");
+    const input = page.locator("#chatInput");
+    const count = page.locator("#tokCount");
+    const long = Array.from({ length: 4097 }, (_, i) => "w" + i).join(" ");
+    await input.fill(long);
+    await expect(count).toHaveText("4097 / 4096", { timeout: 10_000 });
+    await expect(count).toHaveClass(/over/);
+  });
 });

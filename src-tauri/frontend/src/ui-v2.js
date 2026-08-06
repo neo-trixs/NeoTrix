@@ -4,6 +4,7 @@ import { invoke, listen, isTauri } from "./ipc";
 /* ===== Global exposure for inline onclick handlers ===== */
 const g = window;
 g.autoResize = autoResize;
+g.updateTokenCount = updateTokenCount;
 g.clearChat = clearChat;
 g.closeOverlay = closeOverlay;
 g.openOverlay = openOverlay;
@@ -279,6 +280,7 @@ g.restoreCheckpoint = restoreCheckpoint;
       cs.style.display = 'none';
       cs.innerHTML = '';
       document.getElementById('chatInput').value = '';
+      updateTokenCount();
     },
     async showProjects() {
       document.getElementById('opTitle').textContent = '项目';
@@ -1237,6 +1239,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     uCopy.onclick = () => copyUserContent(u);
     s.appendChild(u);
     inp.value='';inp.style.height='auto';
+    updateTokenCount();
     setStreaming(true);
     streamBuf = '';
     s.scrollTop=s.scrollHeight;
@@ -3466,6 +3469,18 @@ g.restoreCheckpoint = restoreCheckpoint;
       wrap.addEventListener('_ntxDone', () => window.removeEventListener('keydown', onKey));
     });
   }
+  /* ── Composer token counter (ChatGPT/Claude "123/4096" indicator) ──
+     Word-count approximation per wave-13 plan (no tiktoken in frontend). */
+  const TOKEN_LIMIT = 4096;
+  function updateTokenCount(){
+    const el = document.getElementById('tokCount');
+    if(!el) return; // silent skip when the indicator is absent
+    const inp = document.getElementById('chatInput');
+    const text = (inp && inp.value) || '';
+    const n = text.split(/\s+/).filter(Boolean).length;
+    el.textContent = n + ' / ' + TOKEN_LIMIT;
+    el.classList.toggle('over', n > TOKEN_LIMIT);
+  }
   function autoResize(el){
     el.style.height='auto';
     el.style.height=Math.min(el.scrollHeight,160)+'px';
@@ -3473,6 +3488,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     if(btn && !streamActive) btn.disabled=!el.value.trim();
     try{ QMUpdate(); }catch(_e){}
     try{ saveDraft(); }catch(_e){}
+    try{ updateTokenCount(); }catch(_e){}
   }
   function handleKey(e){
     const inp=e.target;

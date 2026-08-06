@@ -681,7 +681,10 @@
   .cic textarea { width:100%; background:transparent; border:none; outline:none; resize:none; font-family:var(--ff); font-size:var(--fs-body-lg); line-height:var(--lh-normal); color:var(--tx); min-height:24px; padding:2px 2px; }
   .cic textarea::placeholder { color:var(--tx3); }
   .cic-wrap { width:100%; max-width:640px; margin:0 auto; padding:8px 24px 12px; display:flex; flex-direction:column; gap:8px; }
-  .cic-hint { text-align:center; font-size:var(--fs-caption); color:var(--tx3); user-select:none; }
+  .cic-hint { display:flex; align-items:center; font-size:var(--fs-caption); color:var(--tx3); user-select:none; }
+  .cic-hint .cic-hint-txt { flex:1; text-align:center; }
+  .tok-count { flex-shrink:0; font-variant-numeric:tabular-nums; padding-left:12px; transition:var(--tr); }
+  .tok-count.over { color:var(--err, #ef4444); font-weight:var(--fw-semibold); }
   .cic-actions { display:flex; align-items:center; justify-content:space-between; }
   .cic-left { display:flex; align-items:center; }
   .cic-attach { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:50%; cursor:pointer; transition:var(--tr); color:var(--tx3); border:none; background:transparent; }
