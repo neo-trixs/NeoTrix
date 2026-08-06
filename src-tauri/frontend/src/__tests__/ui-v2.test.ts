@@ -638,4 +638,37 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(bar!.textContent).toContain("较旧");
     expect(bar!.textContent).toContain("较新");
   });
+
+  it("context meter renders usage % and popover hydrates from health report", async () => {
+    const g = globalThis as Record<string, unknown>;
+    // renderContextMeter uses the module-level lastContextUsage; drive it via loadUsage with fake health
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string) => {
+        if(cmd === "neocodex_health_report") return Promise.resolve({
+          context_usage: 0.85, context_turns: 12, tokens_used: 42000,
+          tool_call_count: 9, provider_model: "claude-sonnet", cost_spent: 1.2, cost_budget: 10,
+        });
+        return Promise.resolve("ok");
+      },
+      transformCallback: () => 1,
+    };
+    try {
+      await (g.loadUsage as () => Promise<void>)();
+      const chip = document.querySelector("#ntxCtxMeter .ctx-chip");
+      expect(chip).not.toBeNull();
+      expect(chip!.textContent).toContain("85%");
+      (g.toggleCtxPop as () => void)();
+      const pop = document.getElementById("ntxCtxPop");
+      expect(pop!.classList.contains("open")).toBe(true);
+      expect(pop!.textContent).toContain("42,000");
+      expect(pop!.textContent).toContain("对话轮次12");
+      expect(pop!.textContent).toContain("claude-sonnet");
+      (g.toggleCtxPop as () => void)();
+      expect(pop!.classList.contains("open")).toBe(false);
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });

@@ -268,4 +268,19 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await expect(menu).toBeVisible({ timeout: 10_000 });
     await expect(menu.locator(".qm-item").first()).toContainText("/diff");
   });
+
+  test("context meter renders health usage and opens breakdown popover", async ({ page }) => {
+    await mockCommand(page, "neocodex_health_report", () => ({
+      context_usage: 0.85, context_turns: 12, tokens_used: 42000,
+      tool_call_count: 9, provider_model: "claude-sonnet", cost_spent: 1.2, cost_budget: 10,
+    }));
+    await page.goto("/");
+    const chip = page.locator("#ntxCtxMeter .ctx-chip");
+    await expect(chip).toContainText("85%", { timeout: 10_000 });
+    await chip.click();
+    const pop = page.locator("#ntxCtxPop");
+    await expect(pop).toHaveClass(/open/);
+    await expect(pop).toContainText("42,000");
+    await expect(pop).toContainText("claude-sonnet");
+  });
 });

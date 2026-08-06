@@ -50,6 +50,9 @@ g.closeQM = closeQM;
 g.QMUpdate = QMUpdate;
 g.insertMention = insertMention;
 g.runSlashCommand = runSlashCommand;
+g.toggleCtxPop = toggleCtxPop;
+g.renderContextMeter = renderContextMeter;
+g.loadUsage = loadUsage;
 g.renderThread = renderThread;
 g.createSession = createSession;
 g.refreshAgent = refreshAgent;
@@ -2049,6 +2052,16 @@ g.restoreCheckpoint = restoreCheckpoint;
       cicRight.prepend(wrap);
     }
 
+    const cicLeftCtx = document.querySelector('#viewChat .cic-left');
+    if(cicLeftCtx && !document.getElementById('ntxCtxWrap')){
+      const wrap = document.createElement('div');
+      wrap.className = 'ctx-wrap';
+      wrap.style.cssText = 'position:relative;display:inline-flex;align-items:center';
+      wrap.innerHTML = `<div id="ntxCtxMeter"></div>
+        <div class="ct-pop" id="ntxCtxPop"></div>`;
+      cicLeftCtx.appendChild(wrap);
+    }
+
     const cic = document.querySelector('.cic');
     if(cic && !document.getElementById('ntxToolbar')){
       const tb = document.createElement('div');
@@ -2223,12 +2236,61 @@ g.restoreCheckpoint = restoreCheckpoint;
   }
 
   let lastContextUsage = 0;
+  let lastContextMeta = { turns: 0, tokens: 0, providerModel: '', costSpent: 0, costBudget: 0 };
+  let contextWarned = false;
   async function loadUsage(){
-    if(!isTauri()) return;
+    if(!isTauri()){ renderContextMeter(); return; }
     try{
       const h = await invoke('neocodex_health_report');
       lastContextUsage = Math.max(0, Math.min(1, (h && h.context_usage) || 0));
-    }catch(_e){}
+      if(h && typeof h === 'object'){
+        lastContextMeta = {
+          turns: (h.context_turns ?? h.turn_count ?? 0),
+          tokens: (h.tokens_used ?? 0),
+          tool: (h.provider_model ?? '') || (h.mode ?? ''),
+          toolsSpent: (h.tool_call_count ?? 0),
+          costSpent: (h.cost_spent ?? 0),
+          costBudget: (h.cost_budget ?? 0),
+        };
+      }
+      renderContextMeter();
+    }catch(_e){ renderContextMeter(); }
+  }
+
+  function renderContextMeter(){
+    const el = document.getElementById('ntxCtxMeter');
+    if(!el) return;
+    const pct = Math.round(lastContextUsage * 100);
+    const warn = lastContextUsage >= 0.9;
+    if(warn && !contextWarned){ contextWarned = true; showToast('上下文接近上限 ('+pct+'%)，建议 /compact 压缩'); }
+    if(!warn) contextWarned = false;
+    const tone = warn ? 'danger' : (lastContextUsage >= 0.7 ? 'high' : '');
+    el.innerHTML = `<button class="ctx-chip ${tone}" onclick="toggleCtxPop()" title="上下文状况"
+      style="--pct:${pct}%"> <span class="ctx-ring"><i></i></span>
+      <span class="ctx-label">${warn ? '⚠ ' : ''}上下文 ${pct}%</span></button>`;
+  }
+
+  function toggleCtxPop(){
+    const pop = document.getElementById('ntxCtxPop');
+    if(!pop) return;
+    const open = pop.classList.toggle('open');
+    if(open) hydrateCtxPop();
+  }
+
+  function hydrateCtxPop(){
+    const pop = document.getElementById('ntxCtxPop');
+    if(!pop) return;
+    const pct = Math.round(lastContextUsage * 100);
+    const m = lastContextMeta;
+    pop.innerHTML = `
+      <div class="ct-pop-h"><span>上下文使用</span><span class="ct-pct">${pct}%</span></div>
+      <div class="ct-bar"><i style="--pct:${pct}%"></i></div>
+      <div class="ct-row"><span>对话轮次</span><b>${m.turns}</b></div>
+      <div class="ct-row"><span>tokens 已用</span><b>${m.tokens.toLocaleString()}</b></div>
+      <div class="ct-row"><span>工具调用</span><b>${m.toolsSpent ?? 0}</b></div>
+      <div class="ct-row"><span>模型</span><b class="ct-mono">${m.tool || '—'}</b></div>
+      ${m.costBudget ? `<div class="ct-row"><span>支出</span><b>$${m.costSpent.toFixed(2)} / $${m.costBudget.toFixed(2)}</b></div>` : ''}
+      <div class="ct-foot"><button class="ct-act" onclick="window.compactSession()">压缩上下文 /compact</button></div>`;
   }
 
   function attachUsageFooter(msgEl){
