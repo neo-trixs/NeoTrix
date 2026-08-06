@@ -234,7 +234,6 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
       { role: "user", content: "回滚后内容", timestamp: 1700000000 },
     ]);
     await page.goto("/");
-    page.on("dialog", (d) => d.accept());
     await page.evaluate(() => {
       const w = window as unknown as Record<string, unknown>;
       (w.openSessionOps as (anchor: HTMLElement | null, id: string) => void)(null, "s-ck");
@@ -244,6 +243,11 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await expect(overlay).toHaveClass(/open/);
     await expect(page.locator("#checkpointBody")).toContainText("快照 #2", { timeout: 10_000 });
     await page.locator("#checkpointBody .arch-btn.restore").first().click({ force: true });
+    const dlg = page.locator("#ntxConfirm");
+    await expect(dlg).toHaveCount(1, { timeout: 10_000 });
+    await expect(dlg).toHaveClass(/open/);
+    await dlg.locator('[data-act="confirm"]').click();
+    await expect(dlg).toHaveCount(0, { timeout: 10_000 });
     const calls = await invokeCalls(page);
     expect(calls.some((c) => c.cmd === "neocodex_checkpoint_restore" && c.args?.checkpoint_id === "s-ck-1000.jsonl")).toBeTruthy();
   });
@@ -586,5 +590,34 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     const copied = await page.evaluate(() => (window as any).__copied);
     expect(copied).toContain("第一行内容");
     expect(copied).toContain("第二行内容");
+  });
+
+  test("deleteMessage opens in-app confirm; cancel does not invoke delete, confirm does", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).renderThread([
+        { role: "user", content: "要删的消息", timestamp: 1700000001 },
+        { role: "assistant", content: "回复", timestamp: 1700000002 },
+      ], "s-del");
+      (window as any).currentSessionId = "s-del";
+    });
+    const delBtn = page.locator('#chatScroll .msg.r .ma-btn[data-op="delete"]').first();
+    await delBtn.hover({ force: true });
+    await delBtn.click({ force: true });
+    const dlg = page.locator("#ntxConfirm");
+    await expect(dlg).toHaveCount(1, { timeout: 10_000 });
+    await expect(dlg).toHaveClass(/open/);
+    await expect(dlg.locator(".ntx-cf-msg")).toContainText("删除该消息？");
+    await expect(dlg.locator(".ntx-cf-danger")).toHaveCount(1);
+    const before = (await invokeCalls(page)).filter((c) => c.cmd === "neocodex_delete_message").length;
+    await dlg.locator('[data-act="cancel"]').click();
+    await expect(dlg).toHaveCount(0, { timeout: 10_000 });
+    expect((await invokeCalls(page)).filter((c) => c.cmd === "neocodex_delete_message").length).toBe(before);
+    await delBtn.click({ force: true });
+    await expect(dlg).toHaveCount(1);
+    await expect(dlg).toHaveClass(/open/);
+    await dlg.locator('[data-act="confirm"]').click();
+    await expect(dlg).toHaveCount(0, { timeout: 10_000 });
+    expect((await invokeCalls(page)).filter((c) => c.cmd === "neocodex_delete_message").length).toBe(before + 1);
   });
 });
