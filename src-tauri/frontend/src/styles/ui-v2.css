@@ -834,6 +834,47 @@
   .qm-empty { padding:14px; text-align:center; font-size:12px; color:var(--tx-meta); }
   .qm-kbd { font-size:10px; color:var(--tx-meta); border:1px solid var(--bd); border-radius:4px; padding:0 4px; }
 
+  /* 上下文可视化 — Cursor/ChatGPT 式上下文仪表 */
+  .ctx-wrap { margin-left:4px; }
+  .ctx-chip {
+    display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--bd); background:var(--ghost); color:var(--tx2);
+    border-radius:20px; padding:3px 10px 3px 5px; cursor:pointer;
+    font-family:var(--ff); font-size:11px; transition:var(--tr);
+  }
+  .ctx-chip:hover { border-color:var(--pri); color:var(--tx); }
+  .ctx-chip.high { border-color:var(--warn, #e6a23c); color:var(--warn, #e6a23c); }
+  .ctx-chip.danger { border-color:var(--err, #ef4444); color:var(--err, #ef4444); }
+  .ctx-ring {
+    position:relative; width:18px; height:18px; border-radius:50%;
+    background:conic-gradient(var(--pri) var(--pct), var(--bd) var(--pct));
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ctx-ring::after { content:''; width:12px; height:12px; border-radius:50%; background:var(--bg-raised); }
+  .ctx-chip.high .ctx-ring { background:conic-gradient(var(--acc, #ffc53d) var(--pct), var(--bd) var(--pct)); }
+  .ctx-chip.danger .ctx-ring { background:conic-gradient(var(--err, #ef4444) var(--pct), var(--bd) var(--pct)); }
+  .ctx-label { line-height:1; }
+
+  .ct-pop {
+    position:absolute; left:0; bottom:calc(100% + 8px); z-index:41; width:240px;
+    display:none; border:1px solid var(--bd); border-radius:12px;
+    background:var(--bg-raised); box-shadow:var(--shadow-lg); padding:12px;
+  }
+  .ct-pop.open { display:block; }
+  .ct-pop-h { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:var(--fw-medium); }
+  .ct-pct { color:var(--pri); font-weight:var(--fw-semibold); }
+  .ct-bar { height:6px; border-radius:4px; background:var(--bd); margin:8px 0 10px; overflow:hidden; }
+  .ct-bar i { display:block; height:100%; width:var(--pct); border-radius:4px; background:linear-gradient(90deg,var(--pri),var(--pri2, #7c8cff)); }
+  .ct-row { display:flex; justify-content:space-between; font-size:11.5px; color:var(--tx2); padding:3px 0; }
+  .ct-row b { color:var(--tx); font-weight:var(--fw-medium); }
+  .ct-mono { font-family:var(--fm); font-size:10.5px; }
+  .ct-foot { margin-top:10px; border-top:1px dashed var(--bd); padding-top:8px; }
+  .ct-act {
+    width:100%; border:1px solid var(--bd); background:var(--ghost); color:var(--tx2);
+    border-radius:8px; padding:5px; font-family:var(--ff); font-size:11px; cursor:pointer; transition:var(--tr);
+  }
+  .ct-act:hover { color:var(--pri); border-color:var(--pri); }
+
   /* In-chat code blocks — 后端运行结果在对话中展示 */
   .msg-code {
     margin:8px 0 4px; border-radius:10px; overflow:hidden;
