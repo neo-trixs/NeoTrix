@@ -47,7 +47,7 @@ impl InterceptRule {
     }
 }
 
-/// NeoTrix 内部标识模式列表 —— 与 Python nt_comm_router.py HEAD 保持同步
+/// NeoTrix 内部标识模式列表 —— 与已退役 Python nt_comm_router.py HEAD 保持同步
 const INTERNAL_PATTERNS: &[(&str, &str)] = &[
     (r"neotrix", "client"),
     (r"\bnt_[a-z]", "sys_"),

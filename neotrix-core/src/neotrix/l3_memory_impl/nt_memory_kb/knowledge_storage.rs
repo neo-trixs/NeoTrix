@@ -1,6 +1,6 @@
 //! knowledge_storage — NeoTrix Knowledge Engine v2 高性能增量存储引擎
 //!
-//! 忠实移植自 `scripts/knowledge_storage.py`。
+//! 忠实移植自已退役的 `scripts/knowledge_storage.py`。
 //! 参考: LevelDB (append-only log + periodic compact) / SQLite WAL / LMDB。
 //! 核心策略:
 //!   1. 内存优先 — 所有写入走内存，定期刷盘

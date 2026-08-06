@@ -1,6 +1,6 @@
 //! nt_shield_comm — NT-SHIELD 通信伪装层
 //!
-//! Port of `scripts/nt_comm_router.py` (IdentityPool / HeaderObfuscator /
+//! Port of the retired `scripts/nt_comm_router.py` (IdentityPool / HeaderObfuscator /
 //! TimingObfuscator / GeoCoherence / CommRouter) + `nt_api_client.py` 的
 //! persona 选择。目标: 使外部请求呈现为随机全球真实浏览器用户, 剥离内部
 //! NeoTrix 指纹。R-P79: 通过 `StealthHttpClient::with_persona` 接入生产网络
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS failure_log (
 ";
 
 // ============================================================================
-// Persona 目录 (2026 浏览器档案) — 与 nt_comm_router.py PERSONAS 一致
+// Persona 目录 (2026 浏览器档案) — 与已退役 nt_comm_router.py PERSONAS 一致
 // ============================================================================
 
 #[derive(Clone, Copy)]

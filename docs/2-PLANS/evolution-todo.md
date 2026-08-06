@@ -66,7 +66,7 @@
 ### P0-1: KB Embeddings = 0
 - **Blocked**: Needs `NEOTRIX_EMBEDDING_API_KEY` env var
 - **Impact**: RAG/semantic search non-functional
-- **Fix**: Set key, run `scripts/kb-generate-embeddings.py`
+- **Fix**: Set key, run Rust embedding pipeline (`/kb embed` — nt_memory_embed)
 
 ### P0-2: 14 SEAL Log-Only Stages
 - **Status**: Identified
@@ -126,8 +126,9 @@ cargo check --lib -p neotrix
 cargo check --features full --lib -p neotrix
 
 # Fix remaining embeddings (NEOTRIX_EMBEDDING_API_KEY required)
-python3 scripts/kb-generate-embeddings.py
+# Rust 原生 (kb-embed-pq 由 kb-embed-server.py 训练 codebook, 已保留):
+# python3 scripts/kb-embed-pq.py   # 仅当需要重新训练 PQ codebook 时
 
-# Generate evolution TODO from pipeline meta-cognition
-python3 scripts/neotrix-auto-absorb.py --generate-todo
+# Generate evolution TODO from pipeline meta-cognition (Rust port)
+# 等价命令: /self-audit evolution
 ```

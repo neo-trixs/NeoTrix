@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
+use crate::core::nt_core_self::evolution_analysis::{analyze_kb_health, store_report_to_kb, print_report};
 
 pub struct SelfAuditCmd;
 
@@ -35,10 +36,12 @@ impl CliCommand for SelfAuditCmd {
             "d48" => self.d48_energy_flow(&project),
             "d49" => self.d49_dead_weight(&project),
             "d50" => self.d50_meta_audit(&project),
+            "evolution" | "todo" => self.evolution_todo(),
             _ => {
                 let mut help = String::new();
                 help.push_str("NeoTrix Internal Audit (NTIA):\n");
                 help.push_str("  /self-audit all|ntia  — run all 16 checks\n");
+                help.push_str("  /self-audit evolution|todo — KB deep analysis + evolution todo (Rust port of generate-evolution-todo.py)\n");
                 help.push_str("  /self-audit d31-d50   — run single check\n\n");
                 help.push_str("  d31: Two-Layer EventBus | d32: Reentrant Scope\n");
                 help.push_str("  d33: Persistent Fields    | d34: Dependency Stages\n");
@@ -269,16 +272,23 @@ impl SelfAuditCmd {
             .unwrap_or(0);
         out.push_str(&format!("  T2 (registered in registry): {t2}\n"));
 
-        // T3: Called inline in production (non-test code)
+        // T3: Called inline in production (non-test code).
+        // 排除 assert!(...) 包裹的调用 (cfg(test) 模块特征), 避免虚高接线率。
         let t3 = Command::new("rg")
             .args(["\\.self_test\\(\\)", &src, "-g", "*.rs"])
             .output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).lines().count())
+            .map(|o: std::process::Output| {
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .filter(|l| !l.trim_start().starts_with("assert"))
+                    .count()
+            })
             .unwrap_or(0);
-        out.push_str(&format!("  T3 (inline self_test() in production): {t3}\n"));
+        out.push_str(&format!("  T3 (self_test() calls, test-assert excluded): {t3}\n"));
 
         let t1pct = if t1 > 0 { (t3 as f64 / t1 as f64) * 100.0 } else { 0.0 };
         out.push_str(&format!("  Wiring ratio (T3/T1): {t1pct:.0}%\n"));
+        out.push_str("  NOTE: 静态引用计数, 非运行时行为验证 — 真实 T3 需运行注册表驱动测试\n");
         if t3 as f64 / t1.max(1) as f64 > 0.5 {
             out.push_str("  ✅ Majority of SelfTest impls are production-wired\n");
         } else if t3 > 0 {
@@ -514,6 +524,30 @@ impl SelfAuditCmd {
             .unwrap_or(0);
         out.push_str(&format!("  Experience entries: {experiences}\n"));
 
+        CommandOutput::ok(&out)
+    }
+
+    /// Evolution TODO: KB deep health analysis + store to kv_store.
+    /// Rust port of the retired `scripts/generate-evolution-todo.py` (R-P97 / R-P79 wiring).
+    fn evolution_todo(&self) -> CommandOutput {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let kb_path = std::path::PathBuf::from(home).join(".neotrix").join("knowledge.db");
+        let conn = match rusqlite::Connection::open(&kb_path) {
+            Ok(c) => c,
+            Err(e) => return CommandOutput::err(&format!("无法打开知识库 {}: {e}", kb_path.display())),
+        };
+
+        let defects = analyze_kb_health(&conn);
+        let generated_at = crate::core::nt_core_self::evolution_analysis::unix_now();
+        let report = crate::core::nt_core_self::evolution_analysis::KbHealthReport { defects, generated_at };
+
+        if let Err(e) = store_report_to_kb(&conn, &report) {
+            return CommandOutput::err(&format!("写入 evolution_todo 失败: {e}"));
+        }
+
+        let mut out = String::new();
+        out.push_str(&format!("Evolution TODO stored to kv_store (evolution_todo): {} items (P0:{} P1:{} P2:{})\n",
+            report.defects.len(), report.p0_count(), report.p1_count(), report.p2_count()));
         CommandOutput::ok(&out)
     }
 }
