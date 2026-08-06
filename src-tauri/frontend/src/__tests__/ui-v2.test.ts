@@ -1133,5 +1133,67 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  it("renderThread adds copy button to user messages and copies its text", async () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+      { role: "user", content: "用户消息内容", timestamp: 1700000001 },
+      { role: "agent", content: "回复", timestamp: 1700000002 },
+    ], "s-ucopy");
+    const userMsg = document.querySelector("#chatScroll .msg.r")!;
+    const copyBtn = userMsg.querySelector('.ma-btn[data-op="copy"]');
+    expect(copyBtn).not.toBeNull();
+    const realClip = (navigator as { clipboard?: { writeText: (t: string) => Promise<void> } }).clipboard;
+    let copied = "";
+    (navigator as { clipboard?: { writeText: (t: string) => Promise<void> } }).clipboard = {
+      writeText: (t: string) => { copied = t; return Promise.resolve(); },
+    };
+    try {
+      (g.copyUserContent as (el: HTMLElement) => Promise<void>)(userMsg as HTMLElement);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(copied).toBe("用户消息内容");
+    } finally {
+      if (realClip === undefined) delete (navigator as { clipboard?: unknown }).clipboard;
+      else (navigator as { clipboard?: { writeText: (t: string) => Promise<void> } }).clipboard = realClip;
+    }
+  });
+
+  it("Esc while streaming invokes stop, Esc without stream does not", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const mock: Record<string, (a: unknown) => unknown> = { neocodex_send_message_stream: () => "ok" };
+    const calls: { cmd: string }[] = [];
+    const cbs: Record<string, (raw: unknown) => void> = {};
+    let cbRef: ((raw: unknown) => void) | null = null;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        if (cmd === "plugin:event|listen") {
+          const ev = String(args?.event);
+          cbs[ev] = cbRef!;
+          return Promise.resolve(() => {});
+        }
+        calls.push({ cmd });
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+      transformCallback: (fn: (raw: unknown) => void) => { cbRef = fn; return 1; },
+    };
+    try {
+      const sendBtn = document.getElementById("sendBtn") as HTMLButtonElement;
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "中断测试";
+      (g.sendMsg as () => void)();
+      expect(sendBtn.disabled).toBe(true);
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      expect(calls.some((c) => c.cmd === "neocodex_stop_stream")).toBe(true);
+      expect(sendBtn.disabled).toBe(false);
+      const stopCalls = calls.filter((c) => c.cmd === "neocodex_stop_stream").length;
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      expect(calls.filter((c) => c.cmd === "neocodex_stop_stream").length).toBe(stopCalls);
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });
 

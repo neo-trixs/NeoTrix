@@ -514,4 +514,50 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
 
     await emitEvent(page, "neocodex_stream_done", { cancelled: false });
   });
+
+  test("Escape while streaming stops generation (ChatGPT parity)", async ({ page }) => {
+    await mockCommand(page, "neocodex_send_message_stream", () => "ok");
+    await mockCommand(page, "neocodex_stop_stream", () => {});
+    await page.goto("/");
+    const textarea = page.locator("#chatInput");
+    await textarea.fill("中断回复");
+    await textarea.press("Enter");
+    await expect(page.locator("#chatScroll .msg.r")).toContainText("中断回复", { timeout: 10_000 });
+    await emitEvent(page, "neocodex_stream_start", "中断回复");
+    await expect(page.locator("#chatScroll .msg.l .mb .think")).toHaveCount(1, { timeout: 10_000 });
+    const sendBtn = page.locator("#sendBtn");
+    await expect(sendBtn).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(sendBtn).toBeEnabled();
+    const stopCalls = (await invokeCalls(page)).filter((c) => c.cmd === "neocodex_stop_stream");
+    expect(stopCalls.length).toBe(1);
+    await page.keyboard.press("Escape");
+    const stopCalls2 = (await invokeCalls(page)).filter((c) => c.cmd === "neocodex_stop_stream");
+    expect(stopCalls2.length).toBe(1);
+  });
+
+  test("user messages expose a copy button that copies their text", async ({ page }) => {
+    await page.goto("/");
+    let copied = "";
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: (t: string) => { (window as any).__copied = t; return Promise.resolve(); } },
+        configurable: true,
+      });
+    });
+    await page.evaluate(() => {
+      (window as any).renderThread([
+        { role: "user", content: "可复制的用户问题", timestamp: 1700000001 },
+        { role: "assistant", content: "回答", timestamp: 1700000002 },
+      ], "s-copy");
+    });
+    const msg = page.locator("#chatScroll .msg.r").first();
+    const copyBtn = msg.locator('.ma-btn[data-op="copy"]');
+    await expect(copyBtn).toHaveCount(1, { timeout: 10_000 });
+    await copyBtn.hover({ force: true });
+    await copyBtn.click({ force: true });
+    await page.waitForFunction(() => (window as any).__copied !== undefined);
+    copied = await page.evaluate(() => (window as any).__copied);
+    expect(copied).toBe("可复制的用户问题");
+  });
 });
