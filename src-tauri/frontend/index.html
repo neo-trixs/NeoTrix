@@ -20,10 +20,9 @@
             <button class="sbn" id="sidebarToggle" onclick="toggleSidebar()">
               <svg viewBox="0 0 14 14"><line x1="10" y1="3" x2="10" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><polyline points="7,5 5,7 7,9" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
-            <button class="sbn" onclick="showToast('搜索 (开发中)')">
+            <button class="sbn" onclick="openPalette()" title="全局搜索 (⌘K)">
               <svg viewBox="0 0 14 14"><circle cx="6" cy="6" r="3.5" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="9" y1="9" x2="12.5" y2="12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-            </button>
-          </div>
+            </button>          </div>
         </div>
 
         <!-- Segmented Control — Claude/Codex 风格标签栏 (icon + label + kbd hint) -->
@@ -716,6 +715,30 @@
   <button class="ses-item" onclick="exportSession()"><svg viewBox="0 0 14 14"><path d="M7 1.5v7M7 1.5L4.5 4M7 1.5L9.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M2.5 8.5V12h9V8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>导出</button>
   <div class="ses-sep"></div>
   <button class="ses-item danger" onclick="deleteSession()"><svg viewBox="0 0 14 14"><path d="M2.5 4h9M5 4V2.5h4V4M4 4l.5 7.5h5L10 4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg>删除会话</button>
+</div>
+
+<!-- ═══ OVERLAY: 全局命令面板 (Cmd/Ctrl+K · 会话搜索 + 快捷动作) ═══ -->
+<div class="overlay-panel" id="overlayPalette">
+  <div class="pal-box">
+    <div class="pal-in">
+      <svg viewBox="0 0 14 14" class="pal-ic"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <input id="palInput" type="text" placeholder="搜索会话或输入命令…" oninput="palFilter(this.value)" onkeydown="palKey(event)" />
+      <span class="pal-kbd">ESC</span>
+    </div>
+    <div class="pal-body" id="palBody">
+      <div class="pal-grp">快捷动作</div>
+      <button class="pal-item" data-act="new" onclick="palPick(this)"><span class="pal-a">⌘N</span><span>新建会话</span></button>
+      <button class="pal-item" data-act="settings" onclick="palPick(this)"><span class="pal-a">⌘,</span><span>设置</span></button>
+      <button class="pal-item" data-act="diff" onclick="palPick(this)"><span class="pal-a">/</span><span>查看 Diff</span></button>
+      <button class="pal-item" data-act="registry" onclick="palPick(this)"><span class="pal-a">◈</span><span>能力注册表</span></button>
+      <button class="pal-item" data-act="hypercube" onclick="palPick(this)"><span class="pal-a">◆</span><span>知识库</span></button>
+      <button class="pal-item" data-act="projects" onclick="palPick(this)"><span class="pal-a">▤</span><span>活跃项目</span></button>
+      <button class="pal-item" data-act="cowork" onclick="palPick(this)"><span class="pal-a">⌘2</span><span>团队 · 协同</span></button>
+      <div class="pal-grp" id="palResultsGrp" style="display:none">会话</div>
+      <div id="palResults"></div>
+      <div class="pal-empty" id="palEmpty" style="display:none">无匹配会话</div>
+    </div>
+  </div>
 </div>
 
 </body>

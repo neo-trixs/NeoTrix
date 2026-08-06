@@ -75,14 +75,19 @@ test.describe('NeoTrix Desktop — Vanilla UI', () => {
     await expect(page.locator('#overlayProjects')).not.toHaveClass(/open/);
   });
 
-  test('command palette shortcut opens settings search and focuses input', async ({ page }) => {
+  test('command palette shortcut opens global palette and quick action reaches settings', async ({ page }) => {
     await page.goto('/');
     await page.keyboard.press('Meta+k');
+    await expect(page.locator('#overlayPalette')).toHaveClass(/open/);
+    const palIn = page.locator('#palInput');
+    await expect(palIn).toBeVisible();
+    await palIn.fill('模型');
+    await expect(palIn).toHaveValue('模型');
+    // settings quick action navigates from the palette
+    await palIn.fill('');
+    await page.locator('#overlayPalette .pal-item[data-act="settings"]').click({ force: true });
     await expect(page.locator('#overlaySettings')).toHaveClass(/open/);
-    const si = page.locator('.st-search input');
-    await expect(si).toBeVisible();
-    await si.fill('模型');
-    await expect(si).toHaveValue('模型');
+    await expect(page.locator('#overlayPalette')).not.toHaveClass(/open/);
   });
 
   test('diff overlay opens from + menu and renders sample diff', async ({ page }) => {

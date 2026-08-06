@@ -714,4 +714,99 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(inp.value).toContain("[引用·NeoTrix] 历史回复内容");
     expect(inp.value).toContain("我的问题");
   });
+
+  it("openPalette mounts command panel and lists quick actions", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.openPalette as () => void)();
+    const ov = document.getElementById("overlayPalette")!;
+    expect(ov.classList.contains("open")).toBe(true);
+    expect(document.querySelectorAll("#palBody .pal-item[data-act]").length).toBeGreaterThanOrEqual(7);
+  });
+
+  it("closePalette hides the command panel", () => {
+    const g = globalThis as Record<string, unknown>;
+    const ov = document.getElementById("overlayPalette")!;
+    ov.classList.add("open");
+    (g.closePalette as () => void)();
+    expect(ov.classList.contains("open")).toBe(false);
+  });
+
+  it("palFilter renders backend session hits into palette results", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string) =>
+        Promise.resolve(
+          cmd === "neocodex_search_sessions"
+            ? [{ session_id: "s-pal", session_name: "面板命中", role: "user", snippet: "…", match_count: 1, timestamp: 1700000000 }]
+            : undefined,
+        ),
+    };
+    try {
+      const inp = document.getElementById("palInput") as HTMLInputElement;
+      inp.value = "面板";
+      await (g.palFilter as (q: string) => Promise<void>)("面板");
+      const results = document.getElementById("palResults")!;
+      expect(results.style.display).not.toBe("none");
+      expect(results.textContent).toContain("面板命中");
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("palFilter with empty query shows quick actions and hides results", async () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.openPalette as () => void)();
+    await (g.palFilter as (q: string) => Promise<void>)("");
+    const results = document.getElementById("palResults")!;
+    expect(results.style.display).toBe("none");
+    const empty = document.getElementById("palEmpty")!;
+    expect(empty.style.display).toBe("none");
+  });
+
+  it("palKey Enter picks highlighted item and runs the action", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.openPalette as () => void)();
+    const ov = document.getElementById("overlayPalette")!;
+    const item = document.querySelector('#palBody .pal-item[data-act="settings"]') as HTMLElement;
+    item.classList.add("sel");
+    (g.palKey as (e: KeyboardEvent) => void)({ key: "Enter", preventDefault: () => {}, stopPropagation: () => {} } as KeyboardEvent);
+    expect(ov.classList.contains("open")).toBe(false);
+  });
+
+  it("palKey Escape closes the palette without bubbling", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.openPalette as () => void)();
+    const ov = document.getElementById("overlayPalette")!;
+    let stopped = false;
+    (g.palKey as (e: KeyboardEvent) => void)({ key: "Escape", preventDefault: () => {}, stopPropagation: () => { stopped = true; } } as KeyboardEvent);
+    expect(ov.classList.contains("open")).toBe(false);
+    expect(stopped).toBe(true);
+  });
+
+  it("palPick opens a session hit via openSessionFromSearch", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const calls: { cmd: string; args: Record<string, unknown> }[] = [];
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        calls.push({ cmd, args: args ?? {} });
+        return Promise.resolve("ok");
+      },
+      transformCallback: () => 1,
+    };
+    try {
+      (g.openPalette as () => void)();
+      const hit = document.createElement("button");
+      hit.setAttribute("data-sid", "s-open");
+      (g.palPick as (el: HTMLElement) => void)(hit);
+      expect(document.getElementById("overlayPalette")!.classList.contains("open")).toBe(false);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(calls.some((c) => c.cmd === "neocodex_switch_session" && c.args?.session_id === "s-open")).toBeTruthy();
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });

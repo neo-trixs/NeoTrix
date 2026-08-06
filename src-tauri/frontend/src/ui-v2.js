@@ -1136,8 +1136,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     if((e.metaKey || e.ctrlKey) && e.key === 'k'){ e.preventDefault();
       const inp = document.querySelector('.st-search input');
       if(inp && document.getElementById('overlaySettings').classList.contains('open')){ inp.focus(); return; }
-      showToast('按 Cmd+K 搜索设置'); openSettingsModal();
-      setTimeout(() => { const si = document.querySelector('.st-search input'); if(si) si.focus(); }, 100);
+      openPalette();
     }
     if(e.key === 'Escape'){
       document.querySelectorAll('.overlay-panel.open').forEach(p => p.classList.remove('open'));
@@ -2669,6 +2668,113 @@ g.restoreCheckpoint = restoreCheckpoint;
   function updateTrafficVisibility(){
     /* Native traffic lights are OS-controlled; no-op kept for callers. */
   }
+
+  /* ===== Global Command Palette (⌘K / sidebar search) ===== */
+  const PAL_ACTIONS = [
+    { act: 'new',      hint: '⌘N', label: '新建会话' },
+    { act: 'settings', hint: '⌘,', label: '设置' },
+    { act: 'diff',     hint: '/',  label: '查看 Diff' },
+    { act: 'registry', hint: '◈',  label: '能力注册表' },
+    { act: 'hypercube',hint: '◆',  label: '知识库' },
+    { act: 'projects', hint: '▤',  label: '活跃项目' },
+    { act: 'cowork',   hint: '⌘2', label: '团队 · 协同' },
+  ];
+  const PAL_ACT_MAP = { new: createSession, settings: openSettingsModal, diff: () => openOverlay('overlayDiff'), registry: () => { openOverlay('overlayRegistry'); loadRegistry(); }, hypercube: () => openOverlay('overlayHypercube'), projects: () => openOverlay('overlayProjects'), cowork: () => { const b = document.querySelector('.segb[data-view="cowork"]'); if(b) switchView(b, 'cowork'); } };
+  let lastPalQuery = '';
+
+  function openPalette(){
+    const ov = document.getElementById('overlayPalette');
+    if(!ov) return;
+    ov.classList.add('open');
+    updateTrafficVisibility();
+    const inp = document.getElementById('palInput');
+    if(inp){ inp.value = ''; palFilter(''); setTimeout(() => inp.focus(), 30); }
+  }
+
+  function closePalette(){
+    const ov = document.getElementById('overlayPalette');
+    if(ov) ov.classList.remove('open');
+    updateTrafficVisibility();
+  }
+
+  async function palFilter(q){
+    const body = document.getElementById('palBody');
+    const results = document.getElementById('palResults');
+    const grp = document.getElementById('palResultsGrp');
+    const empty = document.getElementById('palEmpty');
+    const query = (q || '').trim();
+    const acts = Array.from(document.querySelectorAll('#palBody .pal-item[data-act]'));
+    acts.forEach(it => {
+      const label = (it.textContent || '').toLowerCase();
+      it.style.display = (!query || label.includes(query.toLowerCase())) ? '' : 'none';
+    });
+    if(!query){
+      if(results){ results.innerHTML = ''; results.style.display = 'none'; }
+      if(grp) grp.style.display = 'none';
+      if(empty) empty.style.display = 'none';
+      return;
+    }
+    lastPalQuery = query;
+    let hits = [];
+    if(isTauri()){
+      try{
+        const r = await invoke('neocodex_search_sessions', { query });
+        hits = Array.isArray(r) ? r : [];
+      }catch(_e){ hits = []; }
+    }
+    if(lastPalQuery !== query) return;
+    const sessionHits = hits.filter(h => h && h.session_id);
+    if(grp) grp.style.display = sessionHits.length ? '' : 'none';
+    if(empty) empty.style.display = (sessionHits.length ? 'none' : '');
+    if(results){
+      results.style.display = sessionHits.length ? '' : 'none';
+      results.innerHTML = sessionHits.slice(0, 12).map(h => {
+        const role = h.role === 'user' ? '问' : (h.role === 'agent' || h.role === 'assistant' ? '答' : '');
+        const hitsTxt = h.match_count > 1 ? ` <span class="re-time">${h.match_count} 处</span>` : '';
+        const when = h.timestamp ? fmtRelTime(h.timestamp) : '';
+        return `<button class="pal-item pal-hit" data-sid="${escHtml(String(h.session_id))}" onclick="palPick(this)">
+          <span class="pal-a">⇥</span><span class="pal-hit-t">${escHtml(h.session_name || '会话')}${role ? ' · ' + role : ''}</span>${hitsTxt}
+          ${when ? `<span class="re-time">${when}</span>` : ''}
+        </button>`;
+      }).join('');
+    }
+  }
+
+  function palKey(e){
+    if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); closePalette(); return; }
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      const items = Array.from(document.querySelectorAll('#palBody .pal-item:not([style*="display: none"])'));
+      if(!items.length) return;
+      e.preventDefault();
+      const idx = items.findIndex(it => it.classList.contains('sel'));
+      const next = e.key === 'ArrowDown' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+      items.forEach(it => it.classList.remove('sel'));
+      items[next].classList.add('sel');
+      items[next].scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if(e.key === 'Enter'){
+      const sel = document.querySelector('#palBody .pal-item.sel');
+      if(sel){ e.preventDefault(); palPick(sel); }
+    }
+  }
+
+  function palPick(el){
+    const sid = el.getAttribute('data-sid');
+    if(sid){ closePalette(); openSessionFromSearch(sid); return; }
+    const act = el.getAttribute('data-act');
+    closePalette();
+    const fn = PAL_ACT_MAP[act];
+    if(fn) fn();
+    else if(act) showToast('功能开发中: ' + act);
+  }
+
+  /* Cmd/Ctrl+K 已在全局 keydown 处理；点击侧栏搜索按钮同开面板 */
+  g.openPalette = openPalette;
+  g.closePalette = closePalette;
+  g.palFilter = palFilter;
+  g.palKey = palKey;
+  g.palPick = palPick;
 
   function openOverlay(id){
     const el=document.getElementById(id);
