@@ -53,6 +53,12 @@ g.runSlashCommand = runSlashCommand;
 g.toggleCtxPop = toggleCtxPop;
 g.renderContextMeter = renderContextMeter;
 g.loadUsage = loadUsage;
+g.pickAttachment = pickAttachment;
+g.openRefPicker = openRefPicker;
+g.closeRefPicker = closeRefPicker;
+g.insertReference = insertReference;
+g.addAttachChip = addAttachChip;
+g.clearAttachments = clearAttachments;
 g.renderThread = renderThread;
 g.createSession = createSession;
 g.refreshAgent = refreshAgent;
@@ -1064,11 +1070,11 @@ g.restoreCheckpoint = restoreCheckpoint;
       return;
     }
 
-    /* Real Tauri path: stream via neocodex_send_message_stream */
     const g = genParamsFromSettings();
+    const att = attachPayloads();
     invoke('neocodex_send_message_stream', {
       content: txt,
-      attachments: null,
+      attachments: att.length ? att : null,
       regenerate: false,
       permission_mode: currentPermissionMode(),
       temperature: g.temperature,
@@ -1078,6 +1084,12 @@ g.restoreCheckpoint = restoreCheckpoint;
       if(mb){ mb.classList.remove('streaming'); mb.textContent='[IPC 错误] '+String(err); }
       setStreaming(false);
     });
+    if(att.length) clearAttachments();
+  }
+  function clearAttachments(){
+    attachList = [];
+    const area = document.getElementById('ntxAttachArea');
+    if(area) area.innerHTML = '';
   }
   function sendSuggestion(t){
     document.getElementById('chatInput').value=t;
@@ -2214,25 +2226,173 @@ g.restoreCheckpoint = restoreCheckpoint;
       }
       return;
     }
+    if(act === 'attach'){
+      pickAttachment();
+      return;
+    }
+    if(act === 'ref'){
+      openRefPicker();
+      return;
+    }
     if(act === 'achievements'){ showAchievements(); return; }
     if(act === 'registry'){ openOverlay('overlayRegistry'); loadRegistry(); return; }
     if(act === 'hypercube'){ openOverlay('overlayHypercube'); return; }
+    if(act === 'slash'){ focusComposerSlash(); return; }
     showToast('「' + { slash: '命令 (Slash)', ref: '引用上下文' }[act] + '」功能开发中');
   }
 
-  function addAttachChip(name){
+  function focusComposerSlash(){
+    const inp = document.getElementById('chatInput');
+    if(!inp) return;
+    inp.focus();
+    inp.value = '/';
+    inp.selectionStart = inp.selectionEnd = 1;
+    try{ QMUpdate(); }catch(_e){}
+  }
+
+  /* 引用上下文 — 列出当前会话的历史消息, 点选后以引用块插入输入框 */
+  async function openRefPicker(){
+    if(!isTauri() || !currentSessionId){ showToast('需在会话中引用上下文'); return; }
+    const msgs = await invoke('neocodex_get_session_messages', { session_id: currentSessionId }).catch(() => null);
+    let picker = document.getElementById('ntxRefPicker');
+    if(!picker){
+      picker = document.createElement('div');
+      picker.id = 'ntxRefPicker';
+      picker.className = 'ref-picker';
+      picker.innerHTML = `<div class="rf-head">引用上下文 <button class="rf-close" onclick="closeRefPicker()">×</button></div><div class="rf-body"></div>`;
+      const ntxWrap = document.querySelector('#viewChat .cic-plus-wrap, #viewChat .cic-left');
+      (ntxWrap || document.body).appendChild(picker);
+    }
+    const body = picker.querySelector('.rf-body');
+    const list = Array.isArray(msgs) ? msgs : [];
+    const recent = list.slice(-8);
+    if(!recent.length){
+      body.innerHTML = '<div class="rf-empty">暂无历史消息可引用</div>';
+    } else {
+      body.innerHTML = recent.map((m, i) => {
+        const who = m.role === 'user' ? '我' : (m.role === 'tool' ? '工具' : 'NeoTrix');
+        const txt = String(m.content || '').slice(0, 90);
+        return `<button class="rf-item" data-i="${i}"><span class="rf-who">${who}</span><span class="rf-txt">${escHtml(txt)}</span></button>`;
+      }).join('');
+      body.querySelectorAll('.rf-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const idx = Number(el.dataset.i);
+          insertReference(recent[idx]);
+          closeRefPicker();
+        });
+      });
+    }
+    picker.classList.add('open');
+  }
+
+  function insertReference(msg){
+    const inp = document.getElementById('chatInput');
+    if(!inp) return;
+    const who = msg.role === 'user' ? '我' : (msg.role === 'tool' ? '工具输出' : 'NeoTrix');
+    const quote = String(msg.content || '').slice(0, 400);
+    const block = `[引用·${who}] ${quote}\n\n`;
+    inp.value = block + (inp.value || '');
+    inp.selectionStart = inp.selectionEnd = inp.value.length;
+    inp.focus(); autoResize(inp);
+  }
+
+  function closeRefPicker(){
+    const picker = document.getElementById('refPicker');
+    if(picker) picker.classList.remove('open');
+    const el = document.getElementById('ntxRefPicker');
+    if(el) el.classList.remove('open');
+  }
+
+  function addAttachChip(name, meta){
     const area = document.getElementById('ntxAttachArea');
     if(!area) return;
-    if(attachList.includes(name)) return;
-    attachList.push(name);
+    if(attachList.some(f => f.name === name)) return;
+    const att = { name, size: meta?.size || 0, mime_type: meta?.mime || '', data: meta?.data ?? null };
+    attachList.push(att);
     const chip = document.createElement('span');
     chip.className = 'ntx-attach-chip';
-    chip.innerHTML = `${escHtml(name)}<span class="x" data-f="${escHtml(name)}">×</span>`;
+    const sz = att.size ? (att.size > 1024 ? (att.size/1024).toFixed(1)+'K' : att.size+'B') : '';
+    chip.innerHTML = `<svg viewBox="0 0 12 12" class="at-ic"><path d="M2.5 1h4L9.5 4v7h-7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><path d="M6.5 1v3h3" fill="none" stroke="currentColor" stroke-width="1.1"/></svg><span class="at-nm">${escHtml(name)}</span>${sz?`<span class="at-sz">${sz}</span>`:''}<span class="x" data-f="${escHtml(name)}">×</span>`;
     chip.querySelector('.x').addEventListener('click', () => {
-      attachList = attachList.filter(f => f !== name);
+      attachList = attachList.filter(f => f.name !== name);
       chip.remove();
     });
     area.appendChild(chip);
+  }
+
+  function attachPayloads(){
+    // clip oversized payloads at the frontend too (backend enforces a 10MB cap)
+    return attachList
+      .filter(a => a.name && !a.name.startsWith('@'))
+      .map(a => ({
+        name: a.name,
+        size: Number(a.size) || 0,
+        mime_type: a.mime_type || '',
+        data: (a.data && a.data.length > 8 * 1024 * 1024) ? a.data.slice(0, 8 * 1024 * 1024) : (a.data ?? null),
+      }));
+  }
+
+  function mimeFromName(name){
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    const map = {
+      md:'text/markdown', rs:'text/plain', js:'text/javascript', ts:'text/typescript',
+      tsx:'text/typescript', json:'application/json', toml:'text/plain', yml:'application/yaml',
+      yaml:'application/yaml', txt:'text/plain', py:'text/x-python', go:'text/x-go',
+      sh:'application/x-sh', css:'text/css', html:'text/html', csv:'text/csv',
+      png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', svg:'image/svg+xml',
+      pdf:'application/pdf', sql:'text/plain', vue:'text/plain', svelte:'text/plain',
+    };
+    return map[ext] || 'application/octet-stream';
+  }
+
+  async function pickAttachment(){
+    // Tauri: native file dialog + fs read. Browser: hidden <input type=file>.
+    if(isTauri()){
+      try{
+        const picked = await invoke('plugin:dialog|open', {
+          options: { multiple: true, title: '附加文件', directory: false },
+        });
+        const files = Array.isArray(picked) ? picked : (picked ? [picked] : []);
+        for(const path of files){
+          const rel = String(path).replace(/^.*\/([^/]+)$/, '$1');
+          let data = null, size = 0, mime = '';
+          try{
+            const arr = await invoke('plugin:fs|readFile', { path });
+            size = (arr && arr.length) || 0;
+            if(size <= 512 * 1024){
+              const bytes = new Uint8Array(arr);
+              const enc = new TextDecoder('utf-8');
+              data = enc.decode(bytes); // text-first; non-UTF8 garbage is acceptable
+              mime = mimeFromName(rel);
+            }
+          }catch(_e){ /* binary/too-large: name-only attachment */ }
+          addAttachChip(rel, { size, mime, data });
+        }
+        if(files.length) showToast('已附加 ' + files.length + ' 个文件');
+        else showToast('未选择文件');
+      }catch(e){ showToast('附加失败: ' + String(e).slice(0, 60)); }
+      return;
+    }
+    let input = document.getElementById('atFileInput');
+    if(!input){
+      input = document.createElement('input');
+      input.id = 'atFileInput';
+      input.type = 'file';
+      input.multiple = true;
+      input.style.display = 'none';
+      document.body.appendChild(input);
+    }
+    input.onchange = () => {
+      [...(input.files || [])].slice(0, 6).forEach(async f => {
+        let data = null, mime = f.type || '';
+        if(f.size <= 512 * 1024){
+          data = await f.text().catch(() => null);
+        }
+        addAttachChip(f.name, { size: f.size, mime: mime || mimeFromName(f.name), data });
+      });
+      input.value = '';
+    };
+    input.click();
   }
 
   let lastContextUsage = 0;
