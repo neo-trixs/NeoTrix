@@ -3,8 +3,11 @@
 Bridge absorber: absorb *.github.io URLs via GitHub API channel (bypass GitHub Pages CDN).
 
 当 GitHub Pages CDN (185.199.x) 被网络出口白名单阻断时，站点内容 = 对应 repo 源码
-(has_pages 站点的部署源)。经 api.github.com contents API 拉取源文件，组装 node 字段
-(article node_type, 同 kb_batch_absorb.py insert_node schema), 插入 KB + FTS。
+(has_pages 站点的部署源)。经 api.github.com contents API 拉取源文件，组装 node 字段。
+
+架构 (R-P97, Cycle 232): 本脚本仅做【数据 prep】— 经 GitHub API 拉源 + 组装 node 字段;
+知识写入 (nodes/nodes_fts 双写 + URL 去重 + capability 四元组) 委托 Rust CLI
+`neotrix-experience absorb-node` (单一事实源)。本地 insert_node/apply_capability 已退役删除。
 
 用法:
   python3 scripts/bridge_pages_absorb.py --dry-run                    # 预览
@@ -33,9 +36,10 @@ Bridge absorber: absorb *.github.io URLs via GitHub API channel (bypass GitHub P
   }
 ]
 """
-import argparse, base64, hashlib, json, os, re, sqlite3, subprocess, time
+import argparse, base64, json, os, re, subprocess, tempfile, time
 
-KB = os.environ.get('NEOTRIX_KB', '/Users/neo/.neotrix/knowledge.db')
+# R-P97: 知识写入单一事实源 — Rust CLI (neotrix-experience absorb-node)
+RUST_BIN = os.environ.get('NEOTRIX_EXPERIENCE_BIN', 'neotrix-experience')
 PROXY = os.environ.get('NEOTRIX_PROXY', 'http://127.0.0.1:1082')
 API = 'https://api.github.com'
 
@@ -147,48 +151,37 @@ def urllib_parse_netloc(url):
     return urlparse(url).netloc.replace('www.', '')
 
 
-def insert_node(conn, node, dry_run=False):
-    url = node['url']
-    if conn.execute("SELECT 1 FROM nodes WHERE url=?", (url,)).fetchone():
-        return 'duplicate'
-    if dry_run:
-        return 'would_insert'
-    now = int(time.time())
-    eid = f"batch_{int(now)}_{hashlib.md5(url.encode()).hexdigest()[:8]}"
-    conn.execute(
-        """INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,
-           confidence,importance,created_at,updated_at,access_count,metadata,
-           data_tier,temporal,supersedes,source_episode,tier)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (eid, node['node_type'], node['title'], node['summary'], node['content'],
-         node['url'], node['domain'], node['language'], 1.0, node['importance'],
-         now, now, 0, node['meta'], 'cache', None, None, None, 'warm'))
-    conn.execute(
-        "INSERT INTO nodes_fts(rowid, title, summary, content, domain) "
-        "VALUES(last_insert_rowid(), ?, ?, ?, ?)",
-        (node['title'], node['summary'] or '', node['content'] or '',
-         node['domain'] or ''))
-    return 'inserted'
+def rust_absorb_nodes(nodes, dry_run=False, apply_capability=False):
+    """把 node 数组交给 Rust CLI 批量写入 (R-P97 单一事实源)。
 
-
-def apply_capability(conn, cfg, node_id, dry_run=False):
-    """写 capability 映射 (R-P79 闭环: metadata.absorbed_capability 四元组)."""
-    cap = cfg.get('capability')
-    if not cap:
-        return 'no_cap'
-    now = time.strftime('%Y-%m-%dT%H:%M:%S')
-    row = conn.execute('SELECT metadata FROM nodes WHERE id=?', (node_id,)).fetchone()
-    if not row:
-        return 'missing_node'
-    meta = json.loads(row[0]) if row[0] else {}
-    meta['absorbed_capability'] = {
-        'branch': cap['branch'], 'capability': cap['capability'],
-        'evidence': cap.get('evidence', ''), 'mapped_at': now}
+    Rust CLI 原生支持: URL 去重 + nodes/nodes_fts 双写 + capability 四元组写入。
+    返回 (inserted, duplicated)。
+    """
+    if not nodes:
+        return (0, 0)
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', prefix='nt_rust_', delete=False, encoding='utf-8')
+    with tmp:
+        json.dump(nodes, tmp, ensure_ascii=False)
+    cmd = [RUST_BIN, 'absorb-node', tmp.name]
     if dry_run:
-        return 'would_map'
-    conn.execute('UPDATE nodes SET metadata=? WHERE id=?',
-                 (json.dumps(meta, ensure_ascii=False), node_id))
-    return 'mapped'
+        cmd.append('--dry-run')
+    if apply_capability:
+        cmd.append('--apply-capability')
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    except FileNotFoundError:
+        print(f"  ✗ {RUST_BIN} 未找到 — 请先构建并安装 neotrix-experience",
+              flush=True)
+        return (0, 0)
+    out = (r.stdout or '') + (r.stderr or '')
+    for line in out.splitlines():
+        if 'absorb-node' in line:
+            print(f"  {line}", flush=True)
+    m = re.search(r"(\d+) inserted, (\d+) duplicated", out)
+    if m:
+        return (int(m.group(1)), int(m.group(2)))
+    return (0, 0)
 
 
 def main():
@@ -205,23 +198,18 @@ def main():
         sys_exit(1)
 
     configs = json.load(open(args.config))
-    conn = sqlite3.connect(KB)
-    conn.execute('PRAGMA busy_timeout=15000')
+    nodes = []
     for cfg in configs:
         node = build_node(cfg)
         print(f"\n=== {node['url']}")
         print(f"  title: {node['title'][:70]}")
         print(f"  content_len: {len(node['content'])}B")
-        r = insert_node(conn, node, dry_run=args.dry_run)
-        print(f"  -> {r}")
-        if args.apply and r == 'inserted':
-            nid = conn.execute('SELECT id FROM nodes WHERE url=?',
-                               (node['url'],)).fetchone()[0]
-            cr = apply_capability(conn, cfg, nid)
-            print(f"  capability -> {cr}")
-    conn.commit()
-    conn.close()
-    print("\nDone.")
+        if cfg.get('capability'):
+            node['capability'] = cfg['capability']
+        nodes.append(node)
+    ins, dup = rust_absorb_nodes(nodes, dry_run=args.dry_run,
+                                 apply_capability=args.apply)
+    print(f"\nDone. inserted={ins}, duplicated={dup}")
 
 
 def sys_exit(code):

@@ -245,6 +245,9 @@ pub fn hybrid_search(
     }
 
     // RRF fusion
+    #[cfg(feature = "full")]
+    eprintln!("[hybrid] q={} fts={} bm25={} fts_first5={:?}", query, fts_pairs.len(), bm25_results.len(),
+        fts_pairs.iter().take(5).map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>())).collect::<Vec<_>>());
     let fused = if ranklists.len() >= 2 {
         bm25::rrf_fuse(&ranklists)
     } else if ranklists.is_empty() {
@@ -253,7 +256,7 @@ pub fn hybrid_search(
         ranklists.into_iter().next().expect("non-empty ranklists")
     };
     #[cfg(feature = "full")]
-    eprintln!("[hybrid] q={} fts={} bm25={} fused={} first5={:?}", query, fts_pairs.len(), bm25_results.len(), fused.len(),
+    eprintln!("[hybrid] fused={} first5={:?}", fused.len(),
         fused.iter().take(5).map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>())).collect::<Vec<_>>());
 
     // Fetch full node data for fused IDs

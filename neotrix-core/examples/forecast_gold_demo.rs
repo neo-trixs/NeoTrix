@@ -6,43 +6,6 @@
 use neotrix::core::nt_core_forecast::ForecastEngine;
 
 fn main() {
-    // 临时诊断：验证 LLM 池子调用是否真实成功（跑完移除）
-    {
-        use neotrix::core::nt_core_forecast::LlmNarrator;
-        let n = LlmNarrator::new();
-        // 1) 池子有哪些注册名？
-        {
-            let handle = n.raw_gateway_handle_for_diag();
-            let names = handle.providers();
-            println!("[DIAG] providers: {:?}", names);
-        }
-        // 2) 直调 pollinations provider 看真实错误
-        {
-            use neotrix::neotrix::l1_body_impl::nt_io_provider::free_providers::PollinationsProvider;
-            use neotrix::neotrix::l1_body_impl::nt_io_provider::types::{LlmRequest, Message, Role};
-            use neotrix::neotrix::l1_body_impl::nt_io_provider::LlmProvider;
-            let p = PollinationsProvider::new();
-            let req = LlmRequest::new("openai", "Reply with exactly: E2E-OK");
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            match rt.block_on(p.stream_complete(&req)) {
-                Ok(mut rx) => {
-                    let mut buf = String::new();
-                    while let Some(Ok(r)) = rt.block_on(rx.recv()) {
-                        buf.push_str(&r.content);
-                    }
-                    while let Some(Err(e)) = rt.block_on(rx.recv()) {
-                        buf.push_str(&format!("<ERR:{e}>"));
-                    }
-                    println!("[DIAG] PollinationsProvider direct: OK -> {buf:?}");
-                }
-                Err(e) => println!("[DIAG] PollinationsProvider direct: ERR -> {e}"),
-            }
-        }
-        match n.narrate_scenarios("probe: is LLM path alive?") {
-            Some(s) => println!("[DIAG] LLM narrate OK: {}...", s.chars().take(100).collect::<String>()),
-            None => println!("[DIAG] LLM narrate returned None (degraded)"),
-        }
-    }
     // 真实宏观因子事件流（2026-08 上旬，黄金板块背景）
     let events: Vec<(&str, &str, &str, f64)> = vec![
         // 1. 金价突破 4100（8/4-8/5 大涨，ETF 净值 +7.08% 至 2.1743）

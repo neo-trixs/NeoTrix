@@ -401,11 +401,6 @@ impl LlmNarrator {
         }
     }
 
-    /// 诊断用 — 暴露底层 GatewayHandle（example 探针使用）。
-    pub fn raw_gateway_handle_for_diag(&self) -> &gateway_handle::GatewayHandle {
-        self.gateway.get_or_init(gateway_handle::GatewayHandle::new)
-    }
-
     /// 指定模型名（None = 池子自动选择）。
     pub fn with_model(mut self, model: &str) -> Self {
         self.model = Some(model.to_string());
@@ -414,7 +409,7 @@ impl LlmNarrator {
 
     /// 生成情景叙事 — 内部自动调用 LLM 池子。
     ///
-    /// 自动从池子选择可用模型（api-airforce keyless 优先），**单次调用 +
+    /// 自动从池子选择可用模型（pollinations 优先，api-airforce 备选），**单次调用 +
     /// 自控节流重试**（适配 free 池 1 req/s 全局限流，避免 gateway 连打 429）。
     /// 失败/无 provider 时返回 None（调用方降级到确定性模板）。
     pub fn narrate_scenarios(&self, context: &str) -> Option<String> {
