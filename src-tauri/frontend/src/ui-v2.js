@@ -1064,6 +1064,8 @@ g.restoreCheckpoint = restoreCheckpoint;
   const streamSubs = new Map();
   let streamFollow = true;
   let streamBuf = '';
+  const lastUserMsgs = [];
+  let recallIdx = -1;
   function streamScrollEl(){
     return document.getElementById('chatScroll');
   }
@@ -1096,6 +1098,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     if(!isTauri()){ setStreaming(false); return; }
     invoke('neocodex_stop_stream').catch(()=>{});
     setStreaming(false);
+    clearThink();
     const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
     if(el){
       el.classList.remove('streaming');
@@ -1130,20 +1133,40 @@ g.restoreCheckpoint = restoreCheckpoint;
       sendMsg();
     }
   }
+  let thinkStart = 0;
+  let thinkTimer = null;
+  function clearThink(){
+    if(thinkTimer){ clearInterval(thinkTimer); thinkTimer = null; }
+    const th = document.querySelector('#chatScroll .msg.l .mb .think');
+    if(th) th.remove();
+  }
+  function startThink(el){
+    clearThink();
+    thinkStart = Date.now();
+    const span = document.createElement('span');
+    span.className = 'think';
+    const tick = () => { span.textContent = '思考中… ' + Math.floor((Date.now() - thinkStart) / 1000) + 's'; };
+    tick();
+    (el.querySelector('.mb') || el).appendChild(span);
+    thinkTimer = setInterval(tick, 1000);
+  }
   function ensureStreamListeners(){
     if(!isTauri() || streamSubs.size) return;
     const attach=(ev,fn)=>{ try{ listen(ev, fn).then(un=>streamSubs.set(ev,un)).catch(()=>{}); }catch(_e){} };
     attach('neocodex_stream_token', p => {
+      clearThink();
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el){ streamBuf += String(p); renderStreamProgress(el); scrollChatToBottom(false); }
     });
     attach('neocodex_stream_end', p => {
+      clearThink();
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el){ el.classList.remove('streaming'); streamBuf = String(p); el.innerHTML = renderRichText(String(p)); attachUsageFooter(el.closest('.msg')); }
       setStreaming(false);
       scrollChatToBottom(true);
     });
     attach('neocodex_stream_done', async () => {
+      clearThink();
       setStreaming(false);
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el){ el.classList.remove('streaming'); attachUsageFooter(el.closest('.msg')); }
@@ -1153,7 +1176,10 @@ g.restoreCheckpoint = restoreCheckpoint;
       if(foot) foot.textContent = '上下文 ' + Math.round(lastContextUsage * 100) + '%';
       scrollChatToBottom(true);
     });
-    attach('neocodex_stream_start', () => { /* reserve */ });
+    attach('neocodex_stream_start', p => {
+      const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
+      if(el) startThink(el);
+    });
   }
 
   function wireStreamScroll(){
@@ -1186,6 +1212,8 @@ g.restoreCheckpoint = restoreCheckpoint;
     ensureStreamListeners();
     const inp=document.getElementById('chatInput');
     const txt=inp.value.trim();if(!txt)return;
+    if(lastUserMsgs[lastUserMsgs.length-1] !== txt) lastUserMsgs.push(txt);
+    recallIdx = -1;
     clearDraft();
     if(!isChatMode){
       isChatMode=true;
@@ -1423,10 +1451,13 @@ g.restoreCheckpoint = restoreCheckpoint;
     document.getElementById('heroSection').style.display = 'none';
     cs.style.display = 'flex';
     cs.innerHTML = '';
+    lastUserMsgs.length = 0;
+    recallIdx = -1;
     let visIdx = 0; // visible index: only user/assistant count (backend contract)
     (msgs || []).forEach((m, i) => {
       const t = m.timestamp ? new Date(m.timestamp * 1000).toTimeString().slice(0,5) : '';
       if(m.role === 'user'){
+        if(m.content && lastUserMsgs[lastUserMsgs.length-1] !== m.content) lastUserMsgs.push(m.content);
         const idx = visIdx++;
         const u = document.createElement('div'); u.className = 'msg r';
         u.innerHTML = `<div class="msg-act"><button class="ma-btn" data-op="edit" title="编辑消息">编辑</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${escHtml(m.content)}</div>`;
@@ -3364,8 +3395,22 @@ g.restoreCheckpoint = restoreCheckpoint;
     }
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){
       if(QKM.items.length){ e.preventDefault(); QMMove(e.key==='ArrowDown'?1:-1); return; }
+      if(recallIdx !== -1 || (!inp.value.trim() && lastUserMsgs.length)){
+        e.preventDefault();
+        if(e.key === 'ArrowUp' && recallIdx < lastUserMsgs.length - 1) recallIdx++;
+        else if(e.key === 'ArrowDown' && recallIdx > 0) recallIdx--;
+        else if(e.key === 'ArrowDown' && recallIdx === 0){ recallIdx = -1; inp.value = ''; autoResize(inp); return; }
+        const text = recallIdx >= 0 ? lastUserMsgs[lastUserMsgs.length - 1 - recallIdx] : '';
+        inp.value = text;
+        autoResize(inp);
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+        return;
+      }
     }
-    if(e.key==='Escape'){ if(QKM.items.length){ closeQM(); e.preventDefault(); return; } }
+    if(e.key==='Escape'){
+      if(QKM.items.length){ closeQM(); e.preventDefault(); return; }
+      if(recallIdx !== -1){ recallIdx = -1; inp.value = ''; autoResize(inp); e.preventDefault(); return; }
+    }
     autoResize(inp);
     QMUpdate();
   }

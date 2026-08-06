@@ -1057,4 +1057,81 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     const cs = document.getElementById("chatScroll")!;
     expect(cs.scrollTop).toBe(cs.scrollHeight);
   });
+
+  it("ArrowUp recalls previous user message, ArrowDown/Escape cycles back", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[], sid: string) => void)([
+      { role: "user", content: "第一条", timestamp: 1700000001 },
+      { role: "assistant", content: "回复", timestamp: 1700000002 },
+      { role: "user", content: "第二条", timestamp: 1700000003 },
+    ], "s-recall");
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    const key = (k: string) => (g.handleKey as (e: KeyboardEvent) => void)({
+      key: k, target: input, preventDefault: () => {}, stopPropagation: () => {},
+    } as unknown as KeyboardEvent);
+    input.value = "";
+    key("ArrowUp");
+    expect(input.value).toBe("第二条");
+    key("ArrowUp");
+    expect(input.value).toBe("第一条");
+    key("ArrowDown");
+    expect(input.value).toBe("第二条");
+    key("ArrowDown");
+    expect(input.value).toBe("");
+    key("ArrowUp");
+    expect(input.value).toBe("第二条");
+    key("Escape");
+    expect(input.value).toBe("");
+  });
+
+  it("ArrowUp is a no-op when no history and composer has text", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[], sid: string) => void)([], "s-nohistory");
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = "已有输入";
+    (g.handleKey as (e: KeyboardEvent) => void)({
+      key: "ArrowUp", target: input, preventDefault: () => {}, stopPropagation: () => {},
+    } as unknown as KeyboardEvent);
+    expect(input.value).toBe("已有输入");
+  });
+
+  it("stream_start shows thinking indicator, first token clears it", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mock: Record<string, (a: unknown) => unknown> = {
+      neocodex_send_message_stream: () => "ok",
+    };
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const cbs: Record<string, (raw: unknown) => void> = {};
+    let cbRef: ((raw: unknown) => void) | null = null;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        if (cmd === "plugin:event|listen") {
+          const ev = String(args?.event);
+          cbs[ev] = cbRef!;
+          return Promise.resolve(() => {});
+        }
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+      transformCallback: (fn: (raw: unknown) => void) => { cbRef = fn; return 1; },
+    };
+    try {
+      await reloadApp();
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "思考测试";
+      (g.sendMsg as () => void)();
+      cbs["neocodex_stream_start"]({ event: "neocodex_stream_start", id: 1, payload: "思考测试" });
+      const think = document.querySelector("#chatScroll .msg.l .mb .think");
+      expect(think).not.toBeNull();
+      expect(think!.textContent).toMatch(/思考中/);
+      cbs["neocodex_stream_token"]({ event: "neocodex_stream_token", id: 1, payload: "输出" });
+      expect(document.querySelector("#chatScroll .msg.l .mb .think")).toBeNull();
+      expect(document.querySelector("#chatScroll .msg.l .mb")).not.toBeNull();
+      cbs["neocodex_stream_done"]({ event: "neocodex_stream_done", id: 1, payload: { cancelled: false } });
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });
+
