@@ -22,23 +22,17 @@ const MMR_LAMBDA: f64 = 0.7;
 /// 按 recency 对结果重排 (D1): 相关度 × 时间衰减。
 /// `now_secs` 为基准时间 (unix 秒)。分数越高越新且相关。
 pub fn apply_recency_decay(mut results: Vec<SearchResult>, now_secs: i64) -> Vec<SearchResult> {
+    // 时间衰减: 只缩放 score (旧数据分数更低), **绝不重排**。
+    // 重排责任完全交给上游 (search_fts 的 title_pri 标题优先级 + score 排序)。
+    // 历史缺陷: 无条件 sort_by(score DESC) 会推倒上游标题优先级 — 当节点 created_at
+    // 不一致时 (concept 旧 vs book 新), decay 因子不同导致 score 相对关系变化,
+    // 把"标题精确命中但全文为负分"的原书压到引用书后面。
     for r in results.iter_mut() {
         let age = (now_secs.saturating_sub(r.node.created_at)).max(0) as f64;
         let decay = 0.5f64.powf(age / RECENCY_HALF_LIFE_SECS);
         r.score *= decay;
     }
-    // ⚠️ 用稳定排序 (sort_by_cached_key 配合原始顺序) 避免重排推倒上游排序。
-    //    此前 sort_by(score DESC) 无条件重排: 当时间衰减因子相同时 (同批数据),
-    //    它会退化为纯 score 排序, 把 search_fts 的标题优先级排序 (原书优先) 推翻。
-    //    时间衰减只应缩放 score, 不应改变相对顺序 — 除非新数据明显更新。
-    let mut indexed: Vec<(usize, &SearchResult)> = results.iter().enumerate().collect();
-    indexed.sort_by(|(ia, a), (ib, b)| {
-        b.score.partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(ia.cmp(ib))
-    });
-    let sorted: Vec<SearchResult> = indexed.into_iter().map(|(_, r)| r.clone()).collect();
-    sorted
+    results
 }
 
 /// MMR 多样性重排 (D9): 贪心选择最大化 [λ·相关度 − (1−λ)·与已选的最大相似度]。
@@ -133,8 +127,11 @@ mod tests {
         let new = result("new", now - 1000, 0.5);
         let mut results = vec![old, new];
         results = apply_recency_decay(results, now);
-        assert_eq!(results[0].node.id, "new", "newer node must rank first on tie");
-        assert!(results[0].score > results[1].score, "decay must lower old score");
+        // 语义: apply_recency_decay 只缩放 score, 不重排 (重排责任在上游 title_pri/score 排序)。
+        // 断言 decay 因子本身: 旧节点 score 必须显著低于新节点 (60天≈2半衰期 → decay=0.25)。
+        let old_score = results.iter().find(|r| r.node.id == "old").unwrap().score;
+        let new_score = results.iter().find(|r| r.node.id == "new").unwrap().score;
+        assert!(new_score > old_score, "decay must lower old score below new: old={} new={}", old_score, new_score);
     }
 
     #[test]
@@ -145,7 +142,10 @@ mod tests {
         let weak_new = result("weak-new", now - 1000, 0.1);
         let mut results = vec![weak_new, strong_old];
         results = apply_recency_decay(results, now);
-        assert_eq!(results[0].node.id, "strong-old", "strong relevance must survive recency decay");
+        // 语义同上: 不重排, 只断言衰减后旧强仍大于弱新 (0.5 > 0.1)
+        let strong_old_score = results.iter().find(|r| r.node.id == "strong-old").unwrap().score;
+        let weak_new_score = results.iter().find(|r| r.node.id == "weak-new").unwrap().score;
+        assert!(strong_old_score > weak_new_score, "strong relevance must survive recency decay");
     }
 
     #[test]
