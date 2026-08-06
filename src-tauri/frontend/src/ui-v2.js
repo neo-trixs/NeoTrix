@@ -1062,11 +1062,23 @@ g.restoreCheckpoint = restoreCheckpoint;
 
   /* ===== IPC-backed streaming send ===== */
   const streamSubs = new Map();
+  let streamFollow = true;
+  function streamScrollEl(){
+    return document.getElementById('chatScroll');
+  }
+  function scrollChatToBottom(force){
+    const cs = streamScrollEl();
+    if(!cs) return;
+    if(force || streamFollow) cs.scrollTop = cs.scrollHeight;
+  }
   function setStreaming(on){
     const send = document.getElementById('sendBtn');
     const stop = document.getElementById('stopBtn');
     if(send) send.disabled = on;
     if(stop) stop.style.display = on ? 'inline-flex' : 'none';
+    streamFollow = on;
+    const pill = document.getElementById('scrollJump');
+    if(pill) pill.classList.remove('show');
   }
   function stopStream(){
     if(!isTauri()){ setStreaming(false); return; }
@@ -1111,12 +1123,13 @@ g.restoreCheckpoint = restoreCheckpoint;
     const attach=(ev,fn)=>{ try{ listen(ev, fn).then(un=>streamSubs.set(ev,un)).catch(()=>{}); }catch(_e){} };
     attach('neocodex_stream_token', p => {
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
-      if(el) el.textContent += String(p);
+      if(el){ el.textContent += String(p); scrollChatToBottom(false); }
     });
     attach('neocodex_stream_end', p => {
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el){ el.classList.remove('streaming'); el.innerHTML = renderRichText(String(p)); attachUsageFooter(el.closest('.msg')); }
       setStreaming(false);
+      scrollChatToBottom(true);
     });
     attach('neocodex_stream_done', async () => {
       setStreaming(false);
@@ -1125,14 +1138,42 @@ g.restoreCheckpoint = restoreCheckpoint;
       await loadUsage();
       const foot=document.querySelector('#chatScroll .msg.l:last-child .msg-usage');
       if(foot) foot.textContent = '上下文 ' + Math.round(lastContextUsage * 100) + '%';
+      scrollChatToBottom(true);
     });
     attach('neocodex_stream_start', () => { /* reserve */ });
+  }
+
+  function wireStreamScroll(){
+    const cs = document.getElementById('chatScroll');
+    if(!cs || cs.dataset.scrollWired) return;
+    cs.dataset.scrollWired = '1';
+    cs.addEventListener('scroll', () => {
+      const nearBottom = cs.scrollHeight - cs.scrollTop - cs.clientHeight < 48;
+      const pill = document.getElementById('scrollJump');
+      if(nearBottom){
+        streamFollow = true;
+        if(pill) pill.classList.remove('show');
+      }else if(document.querySelector('#chatScroll .msg.l .mb.streaming')){
+        streamFollow = false;
+        if(pill) pill.classList.add('show');
+      }
+    });
+  }
+
+  function jumpToLatest(){
+    streamFollow = true;
+    const pill = document.getElementById('scrollJump');
+    if(pill) pill.classList.remove('show');
+    scrollChatToBottom(true);
+    const inp = document.getElementById('chatInput');
+    if(inp) inp.focus();
   }
 
   function sendMsg(){
     ensureStreamListeners();
     const inp=document.getElementById('chatInput');
     const txt=inp.value.trim();if(!txt)return;
+    clearDraft();
     if(!isChatMode){
       isChatMode=true;
       document.getElementById('heroSection').style.display='none';
@@ -1277,6 +1318,7 @@ g.restoreCheckpoint = restoreCheckpoint;
   if(sb0) sb0.disabled = !(ci0 && ci0.value.trim());
   // Live backend: hydrate real data when inside Tauri
   wireBackend();
+  wireStreamScroll();
   fusionInit();
 
 
@@ -1409,6 +1451,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     });
     isChatMode = true;
     cs.scrollTop = cs.scrollHeight;
+    restoreDraft();
   }
 
   async function reloadThread(){
@@ -1494,6 +1537,40 @@ g.restoreCheckpoint = restoreCheckpoint;
   }
   function saveFeedback(fb){
     try{ localStorage.setItem(FB_KEY, JSON.stringify(fb)); }catch(_e){}
+  }
+
+  /* ===== Composer draft persistence (per session) ===== */
+  const DRAFT_KEY = 'neotrix.drafts';
+  function draftMap(){
+    try{ return JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); }catch(_e){ return {}; }
+  }
+  function saveDraft(){
+    const inp = document.getElementById('chatInput');
+    if(!inp) return;
+    clearTimeout(window._draftT);
+    window._draftT = setTimeout(() => {
+      const key = currentSessionId || '__unsaved__';
+      const dm = draftMap();
+      const val = inp.value.trim();
+      if(val) dm[key] = inp.value;
+      else delete dm[key];
+      try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(dm)); }catch(_e){}
+    }, 300);
+  }
+  function clearDraft(){
+    const key = currentSessionId || '__unsaved__';
+    const dm = draftMap();
+    if(dm[key] !== undefined){ delete dm[key]; try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(dm)); }catch(_e){} }
+  }
+  function restoreDraft(){
+    const inp = document.getElementById('chatInput');
+    if(!inp || inp.value.trim()) return;
+    const key = currentSessionId || '__unsaved__';
+    const dm = draftMap();
+    if(dm[key]){
+      inp.value = String(dm[key]);
+      autoResize(inp);
+    }
   }
 
   function sessionTitleFor(id){
@@ -2873,6 +2950,10 @@ g.restoreCheckpoint = restoreCheckpoint;
   g.palFilter = palFilter;
   g.palKey = palKey;
   g.palPick = palPick;
+  g.jumpToLatest = jumpToLatest;
+  g.saveDraft = saveDraft;
+  g.restoreDraft = restoreDraft;
+  g.clearDraft = clearDraft;
 
   function openOverlay(id){
     const el=document.getElementById(id);
@@ -3258,6 +3339,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     const btn=document.getElementById('sendBtn');
     if(btn) btn.disabled=!el.value.trim();
     try{ QMUpdate(); }catch(_e){}
+    try{ saveDraft(); }catch(_e){}
   }
   function handleKey(e){
     const inp=e.target;

@@ -870,4 +870,65 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(host.querySelector(".msg-code-b")).not.toBeNull();
     expect([...host.querySelectorAll(".msg-code-cp")].map((b) => b.textContent)).toEqual(["运行", "复制"]);
   });
+
+  it("saveDraft persists composer text per session and clearDraft removes it", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mem = new Map<string, string>();
+    const realLS = (globalThis as Record<string, unknown>).localStorage;
+    (globalThis as Record<string, unknown>).localStorage = {
+      getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+      setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+      removeItem: (k: string) => { mem.delete(k); },
+    };
+    try {
+      (g.renderThread as (msgs: unknown[], sid: string) => void)([], "s-draft");
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "草稿内容";
+      (g.saveDraft as () => void)();
+      await new Promise((r) => setTimeout(r, 350));
+      const dm = JSON.parse(mem.get("neotrix.drafts") || "{}");
+      expect(dm["s-draft"]).toBe("草稿内容");
+      (g.clearDraft as () => void)();
+      await new Promise((r) => setTimeout(r, 10));
+      const after = JSON.parse(mem.get("neotrix.drafts") || "{}");
+      expect(after["s-draft"]).toBeUndefined();
+    } finally {
+      (globalThis as Record<string, unknown>).localStorage = realLS;
+    }
+  });
+
+  it("restoreDraft fills composer when empty and keeps non-empty input", () => {
+    const g = globalThis as Record<string, unknown>;
+    const mem = new Map<string, string>();
+    const realLS = (globalThis as Record<string, unknown>).localStorage;
+    (globalThis as Record<string, unknown>).localStorage = {
+      getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+      setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+      removeItem: (k: string) => { mem.delete(k); },
+    };
+    try {
+      // pin the active session id via renderThread so the draft key is deterministic
+      (g.renderThread as (msgs: unknown[], sid: string) => void)([], "s-draft");
+      mem.set("neotrix.drafts", JSON.stringify({ "s-draft": "待恢复草稿" }));
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "";
+      (g.restoreDraft as () => void)();
+      expect(input.value).toBe("待恢复草稿");
+      input.value = "已有输入";
+      (g.restoreDraft as () => void)();
+      expect(input.value).toBe("已有输入");
+    } finally {
+      (globalThis as Record<string, unknown>).localStorage = realLS;
+    }
+  });
+
+  it("jumpToLatest shows/hides scroll jump pill and scrolls to bottom", () => {
+    const g = globalThis as Record<string, unknown>;
+    const pill = document.getElementById("scrollJump")!;
+    pill.classList.add("show");
+    (g.jumpToLatest as () => void)();
+    expect(pill.classList.contains("show")).toBe(false);
+    const cs = document.getElementById("chatScroll")!;
+    expect(cs.scrollTop).toBe(cs.scrollHeight);
+  });
 });

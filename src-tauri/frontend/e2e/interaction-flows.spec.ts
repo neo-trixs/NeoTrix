@@ -393,4 +393,54 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await expect(mb.locator("a")).toHaveCount(0);
     await expect(mb).toContainText("[click](javascript:alert(2))");
   });
+
+  test("composer draft persists across session reload and restores", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).renderThread([], "s-draft-e2e");
+    });
+    await page.locator("#chatInput").fill("稍后发送的草稿");
+    // saveDraft is debounced; wait for persistence
+    await page.waitForTimeout(500);
+    let drafts = await page.evaluate(() => localStorage.getItem("neotrix.drafts") || "{}");
+    expect(JSON.parse(drafts)["s-draft-e2e"]).toBe("稍后发送的草稿");
+    // simulate switching away and back: empty composer + renderThread re-entry
+    await page.evaluate(() => {
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "";
+      (window as any).renderThread([], "s-draft-e2e");
+    });
+    await expect(page.locator("#chatInput")).toHaveValue("稍后发送的草稿");
+  });
+
+  test("streaming scroll pill appears when scrolled up and jumpToLatest restores", async ({ page }) => {
+    await page.goto("/");
+    const cs = page.locator("#chatScroll");
+    await page.evaluate(() => {
+      (window as any).renderThread([], "s-scroll");
+      // build tall content so the container overflows and scrollTop can sit away from bottom
+      const s = document.getElementById("chatScroll");
+      s.style.display = "flex";
+      s.innerHTML = "";
+      for (let k = 0; k < 40; k++) {
+        const m = document.createElement("div");
+        m.className = "msg l";
+        m.style.height = "48px";
+        m.innerHTML = '<div class="mb">垫片内容 ' + k + "</div>";
+        s.appendChild(m);
+      }
+      const a = document.createElement("div");
+      a.className = "msg l";
+      a.innerHTML = '<div class="mb streaming">部分输出…</div>';
+      s.appendChild(a);
+      // user scrolls away from the bottom while a stream is active
+      s.scrollTop = 0;
+      s.dispatchEvent(new Event("scroll"));
+    });
+    await expect(page.locator("#scrollJump")).toHaveClass(/show/);
+    await page.locator("#scrollJump").click({ force: true });
+    await expect(page.locator("#scrollJump")).not.toHaveClass(/show/);
+    const maxScroll = await cs.evaluate((el) => el.scrollHeight - el.clientHeight);
+    await expect(cs).toHaveJSProperty("scrollTop", maxScroll);
+  });
 });
