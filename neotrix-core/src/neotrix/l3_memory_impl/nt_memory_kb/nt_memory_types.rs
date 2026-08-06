@@ -410,7 +410,7 @@ pub struct SearchResult {
     pub signals: Option<[f64; 4]>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SearchMatchType {
     FtsTitle,
     FtsSummary,

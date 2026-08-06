@@ -43,13 +43,14 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
         // score = rank + 偏移 (rank 为负值, 加 1.0 归一避免全负)
         let mut score = rank + 1.0;
         // 标题加权: 精确命中 +1.0 (远高于引用书的 rank 差异), 前缀命中 +0.3
+        let is_prefix = prefix_title(&title);
         let matched_on = if exact_title(&title) {
             score += 1.0;
             SearchMatchType::FtsTitle
+        } else if is_prefix {
+            score += 0.3;
+            SearchMatchType::FtsTitle
         } else {
-            if prefix_title(&title) {
-                score += 0.3;
-            }
             SearchMatchType::FtsContent
         };
         Ok(SearchResult {
@@ -78,9 +79,20 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
         })
     })?;
 
-    // 标题加权后按 score 降序重排
+    // 标题加权后按 (FtsTitle > FtsContent, score) 重排:
+    // ⚠️ 不能用 score 降序 — rank 是 FTS5 负值, 大文档(原书全文) rank 极负,
+    // 标题加权 +1.0 不足以抵消 (-11 vs -0.01), 会把原书压到引用书后面。
+    // 正确排序键: 先精确标题命中(原书), 再按 score。
+    let title_pri = |r: &SearchResult| -> u8 {
+        if r.matched_on.iter().any(|m| matches!(m, SearchMatchType::FtsTitle)) { 2 }
+        else { 1 }
+    };
     let mut results: Vec<SearchResult> = rows.collect::<rusqlite::Result<Vec<_>>>()?;
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        let pa = title_pri(a);
+        let pb = title_pri(b);
+        pa.cmp(&pb).then(b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal))
+    });
     Ok(results)
 }
 

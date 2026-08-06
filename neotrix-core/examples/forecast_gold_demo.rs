@@ -6,6 +6,15 @@
 use neotrix::core::nt_core_forecast::ForecastEngine;
 
 fn main() {
+    // 临时诊断：验证 LLM 池子调用是否真实成功（跑完移除）
+    {
+        use neotrix::core::nt_core_forecast::LlmNarrator;
+        let n = LlmNarrator::new();
+        match n.narrate_scenarios("probe: is LLM path alive?") {
+            Some(s) => println!("[DIAG] LLM narrate OK: {}...", s.chars().take(100).collect::<String>()),
+            None => println!("[DIAG] LLM narrate returned None (degraded)"),
+        }
+    }
     // 真实宏观因子事件流（2026-08 上旬，黄金板块背景）
     let events: Vec<(&str, &str, &str, f64)> = vec![
         // 1. 金价突破 4100（8/4-8/5 大涨，ETF 净值 +7.08% 至 2.1743）
