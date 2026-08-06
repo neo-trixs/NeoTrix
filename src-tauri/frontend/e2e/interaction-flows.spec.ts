@@ -359,4 +359,38 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await page.locator("#palInput").press("Escape");
     await expect(page.locator("#overlayPalette")).not.toHaveClass(/open/);
   });
+
+  test("assistant markdown renders tables, tasks, headings and inline styles", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).renderThread([
+        {
+          role: "agent",
+          content: "# 方案\n\n**重点** 与 `code`\n\n| 步骤 | 状态 |\n| --- | --- |\n| 初始化 | 完成 |\n| 部署 | 待办 |\n\n- [x] 核对\n- [ ] 上线\n",
+          timestamp: 1700000000,
+        },
+      ], "s-md");
+    });
+    const mb = page.locator("#chatScroll .msg.l .mb");
+    await expect(mb.locator("h1")).toContainText("方案");
+    await expect(mb.locator("strong")).toContainText("重点");
+    await expect(mb.locator("code")).toContainText("code");
+    await expect(mb.locator("table th").first()).toContainText("步骤");
+    await expect(mb.locator("table td").nth(1)).toContainText("完成");
+    await expect(mb.locator(".md-task-done")).toContainText("核对");
+    await expect(mb.locator(".md-task:not(.md-task-done)")).toContainText("上线");
+  });
+
+  test("markdown XSS is neutralized in assistant output", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      (window as any).renderThread([
+        { role: "agent", content: "<img src=x onerror=alert(1)> [click](javascript:alert(2))", timestamp: 1700000000 },
+      ], "s-xss");
+    });
+    const mb = page.locator("#chatScroll .msg.l .mb");
+    await expect(mb.locator("img")).toHaveCount(0);
+    await expect(mb.locator("a")).toHaveCount(0);
+    await expect(mb).toContainText("[click](javascript:alert(2))");
+  });
 });

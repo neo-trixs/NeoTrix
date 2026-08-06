@@ -937,20 +937,122 @@ g.restoreCheckpoint = restoreCheckpoint;
     navigator.clipboard.writeText(text).then(() => showToast('代码已复制'));
   }
 
-  function renderRichText(text){
-    const esc = s => escHtml(s).replace(/\n/g, '<br>');
-    const parts = String(text || '').split(/```/);
-    let out = '', inBlock = false;
-    for(const part of parts){
-      if(!inBlock){ out += esc(part); }
-      else{
-        const nl = part.indexOf('\n');
-        const lang = nl === -1 ? part.trim() : part.slice(0, nl).trim();
-        const code = nl === -1 ? '' : part.slice(nl + 1);
-        out += `<div class="msg-code"><div class="msg-code-h"><span class="msg-code-lang">${escHtml(lang || 'code')}</span><span class="msg-code-actions"><button class="msg-code-cp" onclick="runMsgCode(this)">运行</button><button class="msg-code-cp" onclick="copyMsgCode(this)">复制</button></span></div><pre class="msg-code-b">${highlightCode(code)}</pre></div>`;
-      }
-      inBlock = !inBlock;
+  /* Lightweight XSS-safe Markdown: tokenize inline into safe HTML placeholders,
+     escape the remaining raw text, then restore. Raw \n survives for <br> post-pass.
+     Inline: `code`, **bold**, *italic*, ~~strike~~, [text](url http/https/mailto).
+     Block: # headings, > quotes, -/1. lists, - [ ] tasks, pipe tables, --- hr, code fences. */
+  function mdInline(s){
+    const esc = ss => escHtml(ss);
+    const ph = [];
+    const stash = r => { ph.push(r); return '\u0000' + (ph.length - 1) + '\u0000'; };
+    let out = String(s);
+    out = out.replace(/`([^`\n]+)`/g, (_, c) => stash('<code>' + esc(c) + '</code>'));
+    out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, t, u) => {
+      const href = String(u).replace(/"/g, '&quot;');
+      return /^(https?:|mailto:)/i.test(href) && !/javascript:/i.test(href)
+        ? stash('<a href="' + href + '" target="_blank" rel="noreferrer">' + esc(t) + '</a>')
+        : m;
+    });
+    out = out.replace(/\*\*([^*\n]+)\*\*/g, (_, b) => stash('<strong>' + esc(b) + '</strong>'));
+    out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, (_, p, b) => p + stash('<em>' + esc(b) + '</em>'));
+    out = out.replace(/~~([^~\n]+)~~/g, (_, d) => stash('<del>' + esc(d) + '</del>'));
+    out = esc(out);
+    return out.replace(/\u0000(\d+)\u0000/g, (_, n) => ph[+n]);
+  }
+
+  function mdTableBlock(rawLines, start){
+    const split = l => l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim());
+    const header = split(rawLines[start]);
+    let i = start + 2;
+    const rows = [];
+    while(i < rawLines.length && rawLines[i].trim() && rawLines[i].includes('|')){
+      rows.push(split(rawLines[i]));
+      i++;
     }
+    let out = '<table><thead><tr>';
+    header.forEach(h => { out += '<th>' + mdInline(h || '&nbsp;') + '</th>'; });
+    out += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      out += '<tr>';
+      header.forEach((_, ci) => { out += '<td>' + mdInline(r[ci] || '') + '</td>'; });
+      out += '</tr>';
+    });
+    out += '</tbody></table>';
+    return { html: out, next: i };
+  }
+
+  function renderRichText(text){
+    const rawLines = String(text || '').split('\n');
+    let out = '';
+    let i = 0;
+    let para = [];
+    const flush = () => {
+      if(!para.length) return;
+      out += '<p>' + mdInline(para.join('\n')).replace(/\n/g, '<br>') + '</p>';
+      para = [];
+    };
+    while(i < rawLines.length){
+      const line = rawLines[i];
+      const fence = line.match(/^\s*```([\w+-]*)\s*$/);
+      if(fence){
+        flush();
+        const lang = fence[1];
+        i++;
+        const code = [];
+        while(i < rawLines.length && !/^\s*```\s*$/.test(rawLines[i])){ code.push(rawLines[i]); i++; }
+        i++;
+        out += `<div class="msg-code"><div class="msg-code-h"><span class="msg-code-lang">${escHtml(lang || 'code')}</span><span class="msg-code-actions"><button class="msg-code-cp" onclick="runMsgCode(this)">运行</button><button class="msg-code-cp" onclick="copyMsgCode(this)">复制</button></span></div><pre class="msg-code-b">${highlightCode(code.join('\n'))}</pre></div>`;
+        continue;
+      }
+      if(!line.trim()){ flush(); i++; continue; }
+      const hd = line.match(/^(#{1,6})\s+(.+)$/);
+      if(hd){ flush(); const lvl = hd[1].length; out += `<h${lvl}>${mdInline(hd[2])}</h${lvl}>`; i++; continue; }
+      if(/^>\s?/.test(line)){
+        flush();
+        const q = [];
+        while(i < rawLines.length && /^>\s?/.test(rawLines[i])){ q.push(rawLines[i].replace(/^>\s?/, '')); i++; }
+        out += '<blockquote>' + mdInline(q.join('\n')).replace(/\n/g, '<br>') + '</blockquote>';
+        continue;
+      }
+      if(/^---+$|^\*\*\*+$|^___+$/.test(line.trim())){ flush(); out += '<hr>'; i++; continue; }
+      if(line.includes('|') && i + 1 < rawLines.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(rawLines[i + 1])){
+        flush();
+        const tb = mdTableBlock(rawLines, i);
+        out += tb.html;
+        i = tb.next;
+        continue;
+      }
+      if(/^\s*[-*+]\s+/.test(line)){
+        flush();
+        const items = [];
+        while(i < rawLines.length && /^\s*[-*+]\s+/.test(rawLines[i])){
+          let content = rawLines[i].replace(/^\s*[-*+]\s+/, '');
+          const task = content.match(/^\[([ xX])\]\s+(.+)$/);
+          if(task){
+            const done = /^[xX]$/.test(task[1]);
+            items.push(`<li class="md-task${done ? ' md-task-done' : ''}"><span class="md-cb">${done ? '✓' : '○'}</span>${mdInline(task[2])}</li>`);
+          } else {
+            items.push('<li>' + mdInline(content) + '</li>');
+          }
+          i++;
+        }
+        out += '<ul>' + items.join('') + '</ul>';
+        continue;
+      }
+      if(/^\s*\d+[.)]\s+/.test(line)){
+        flush();
+        const items = [];
+        while(i < rawLines.length && /^\s*\d+[.)]\s+/.test(rawLines[i])){
+          items.push('<li>' + mdInline(rawLines[i].replace(/^\s*\d+[.)]\s+/, '')) + '</li>');
+          i++;
+        }
+        out += '<ol>' + items.join('') + '</ol>';
+        continue;
+      }
+      para.push(line);
+      i++;
+    }
+    flush();
     return out || '<span></span>';
   }
 
@@ -1108,10 +1210,6 @@ g.restoreCheckpoint = restoreCheckpoint;
     el.innerHTML = HERO_SUGGESTIONS.map(s =>
       `<button class="hero-sug-item" onclick="sendSuggestion('${escHtml(s.t)}')">${s.icon}<span>${escHtml(s.t)}</span></button>`
     ).join('');
-  }
-
-  function openSettings(){
-    showToast('设置面板 (开发中)');
   }
 
   /* ===== Missing Functions ===== */
