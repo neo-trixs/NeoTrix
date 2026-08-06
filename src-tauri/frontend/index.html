@@ -120,6 +120,10 @@
           <div class="hero-sug" id="heroSuggest"></div>
         </div>
         <div class="cs" id="chatScroll" style="display:none"></div>
+        <button class="scroll-jump" id="scrollJump" onclick="jumpToLatest()" title="跳转到底部">
+          <svg viewBox="0 0 14 14"><path d="M7 2v10M7 12L3.5 8.5M7 12l3.5-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          <span>最新回复</span>
+        </button>
         <div class="cic-wrap">
           <div class="cic">
             <textarea id="chatInput" rows="1" placeholder="发消息…（Shift + Enter 换行）" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
