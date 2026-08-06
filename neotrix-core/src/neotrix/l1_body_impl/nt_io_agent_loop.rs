@@ -659,4 +659,23 @@ mod tests {
     fn test_tool_def_helper() {
         let _ = tool_def("x");
     }
+
+    // ── 真实 LLM 端到端（agent 循环层，本地手动跑，不进 CI）──────────
+    // 验证 TUI 实际调用路径: AgentLoop::turn_stream → gateway → llm7 keyless。
+    //   cargo test -p neotrix --lib -- --ignored test_turn_stream_real_llm7
+    #[tokio::test]
+    #[ignore]
+    async fn test_turn_stream_real_llm7() {
+        use crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
+        let gw = create_gateway_async().await;
+        let mut loop_ = AgentLoop::new(Arc::new(gw), "llm7/codestral-latest", "You are a test assistant. Be terse.");
+        let mut streamed = String::new();
+        let out = loop_.turn_stream(
+            "Reply with exactly: E2E-OK",
+            |tok| { streamed.push_str(tok); true },
+            |_, _| {},
+        ).await.expect("turn_stream ok");
+        assert!(streamed.contains("E2E-OK") || out.contains("E2E-OK"),
+            "expected E2E-OK in streamed output, got streamed={:?} out={:?}", streamed, out);
+    }
 }
