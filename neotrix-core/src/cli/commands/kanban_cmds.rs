@@ -1627,9 +1627,17 @@ mod tests {
 
     #[test]
     fn test_board_todo_allocate_respects_running_budget() {
+        // 并行测试隔离：本线程 KB 指向临时文件，避免竞争真实 ~/.neotrix/knowledge.db
+        let tmp = std::env::temp_dir().join(format!("nt_kanban_test_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let db_file = tmp.join("kanban_test.sqlite3");
+        let _ = std::fs::remove_file(&db_file);
+        crate::neotrix::nt_memory_kb::set_kb_path_for_test(Some(db_file.clone()));
         let cmd = BoardCmd;
         // Allocate with max_parallel=1 and no running agents should pick exactly 1
         let r = cmd.execute(&["todo".into(), "allocate".into(), "1".into()], None);
+        crate::neotrix::nt_memory_kb::set_kb_path_for_test(None);
+        let _ = std::fs::remove_file(&db_file);
         assert!(r.success, "{}", r.message);
     }
 

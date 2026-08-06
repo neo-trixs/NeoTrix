@@ -749,7 +749,16 @@ mod tests {
             }
         };
 
-        let kb = match super::super::KnowledgeBase::open(None) {
+        // 并行测试隔离：用临时目录 DB，避免与其它测试共享默认库导致
+        // SQLite "database is locked" 竞争（默认 open(None) 会撞同一文件）。
+        let tmp = std::env::temp_dir().join(format!("nt_kb_assets_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&tmp);
+        let db_path = tmp.join("test_kb.sqlite3");
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(format!("{}-wal", db_path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", db_path.display()));
+
+        let kb = match super::super::KnowledgeBase::open(Some(db_path.clone())) {
             Ok(kb) => kb,
             Err(e) => {
                 eprintln!("Skipping test: cannot open KB: {}", e);
@@ -765,5 +774,9 @@ mod tests {
             "Imported {} knowledge assets, {} edges created",
             report.imported, report.edges_created,
         );
+        drop(kb);
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_file(format!("{}-wal", db_path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", db_path.display()));
     }
 }
