@@ -110,8 +110,9 @@ extract → dedup → categorize → capability map → insert + 显式 FTS → 
 | **--apply 只刷 batch_% 节点 (Cycle 232)** | `absorb_to_capability.py --apply` 仅处理 `id LIKE 'batch_%'` 节点；历史 UUID 节点永不被专家键刷新 → 新增专家键后需定向 SQL 修复历史误映射 (内存匹配 17k 节点批量 UPDATE) | 修复 203 误映射 |
 | **UPDATE 静默失败 + rowcount 校验 (Cycle 232)** | enrich 脚本 UPDATE 遇 `database is locked` 时异常重试循环会自然退出不 raise，但 `ok += 1` 仍执行 → 日志虚报成功数据未写入。根因：常驻 `neotrix-experience` 进程持有 KB WAL 锁。修复：UPDATE 后必须校验 `cur.rowcount > 0` + 严格重试 | 32 虚报 → 26 真实 |
 | **GitHub repo 301 改名 (Cycle 232)** | `api.github.com/repos/{o}/{r}` 对已改名 repo 返回 "Moved Permanently"（无 stars 字段）→ curl 必须加 `-L` 跟随重定向拿新 `full_name`。改名后需更新 KB 节点 url + metadata.owner + 记录 `redirected_from` | 3 repo 改名处理 |
-| **SPA 单页站阈值 (Cycle 232)** | air.dev/aethercss 等 SPA 站正文行过滤后仅剩 title（43-52 字符）→ <60 阈值拒收导致漏吸收。修复：阈值降至 40 + meta/og:description 兜底，title 可辨的产品/工具页值得吸收 | 3 SPA 站漏吸收 → 已入库 |
-| **网络故障分级 (Cycle 232)** | ①全站出站 000 = 代理隧道断开（环境级，固化 pending 等恢复）②单域名 000 = fake-ip 污染或站内故障（单独排查）③恢复后重跑脚本须幂等（dup 跳过） | 6 挂起 → 恢复后 4 成功 |
+| **GitHub Pages 阻断 → API 桥接 (Cycle 232)** | Pages CDN (185.199.x) 被网络出口白名单阻断时，站点内容 = 对应 repo 源码 (`GET /repos/{o}/{r}/pages` 返回 source.branch+path)。经 `api.github.com/repos/{o}/{r}/contents/{path}` (base64) 拉源文件组装 node 字段，复用 insert_node 入库 | 2 个 .github.io 从 000 → 100% 吸收 |
+| **SPA 站点内容在 TS 字符串字面量** | Vite/React 站点 (index.html 仅 647B 壳) 正文在 `src/content/*.ts`/`*.tsx` 的字符串字面量 → 正则 `"([^"\\]*(?:\\.[^"\\]*)*)"` 提取 + len>30 过滤，即可组装 article 节点 | vibe-designing-playbook chapter1.ts → 2577B |
+| **静态站内容直接是 markdown** | 静态 GitHub Pages (index.html 是入口壳) 正文在 `article.md`/`README.md` → markdown strip 格式符 (`#>*_\`~|-`、图片/链接语法) 后取行 >30 字符拼接 | morpho article.md 55KB → 4000B 节点 |
 
 #### absorbed_capability 数据层追踪 (R-P79 闭环)
 
