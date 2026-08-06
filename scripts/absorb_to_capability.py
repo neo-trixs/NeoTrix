@@ -31,10 +31,46 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import sys
+import tempfile
 import time
 
 KB_PATH = os.path.expanduser("~/.neotrix/knowledge.db")
+
+# ── R-P97: 写回委托 Rust CLI (update-node-metadata) — 单一事实源 ──
+RUST_BIN = os.environ.get("NEOTRIX_EXPERIENCE_BIN", "neotrix-experience")
+
+
+def rust_update_node_metadata(updates, dry_run=False):
+    """把 [{node_id, patch}] 列表交给 Rust CLI 批量 merge 写回。
+
+    返回 (updated, missing)。Rust 侧读原 metadata → 合并 patch → 写回,
+    保留既有字段 (如 topics/description), 仅覆盖 patch 声明的键。
+    """
+    if not updates:
+        return (0, 0)
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', prefix='nt_meta_', delete=False, encoding='utf-8')
+    with tmp:
+        json.dump(updates, tmp, ensure_ascii=False)
+    cmd = [RUST_BIN, 'update-node-metadata', tmp.name]
+    if dry_run:
+        cmd.append('--dry-run')
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except FileNotFoundError:
+        print(f"  ✗ {RUST_BIN} 未找到 — 请先构建并安装 neotrix-experience", flush=True)
+        return (0, 0)
+    out = (r.stdout or '') + (r.stderr or '')
+    for line in out.splitlines():
+        if 'update-node-metadata' in line:
+            print(f"  {line}", flush=True)
+    m = re.search(r"(\d+) updated, (\d+) missing", out)
+    if m:
+        return (int(m.group(1)), int(m.group(2)))
+    return (0, 0)
+
 
 # 7 域 → 主属能力 (36 原子能力 Cycle 121)
 BRANCH_CAPABILITIES = {
@@ -654,33 +690,29 @@ def main():
             per_source[core] = per_source.get(core, 0) + 1
 
     if args.apply:
+        # R-P97: 写回委托 Rust CLI (update-node-metadata) — 单一事实源。
+        # Python 仅算映射结果 (286 专家键 + 规则 + 本源溯源), 写回交 Rust merge。
         now = int(time.time())
+        updates = []
         for nid, m in mapped.items():
-            try:
-                cur = conn.execute("SELECT metadata FROM nodes WHERE id=?", (nid,)).fetchone()
-                meta = {}
-                if cur and cur[0]:
-                    try:
-                        meta = json.loads(cur[0])
-                    except json.JSONDecodeError:
-                        meta = {}
-                meta['absorbed_capability'] = {'branch': m['branch'],
-                                               'capability': m['capability'],
-                                               'evidence': m['evidence'],
-                                               'mapped_at': now}
-                if m.get('source_core'):
-                    meta['knowledge_source'] = {
-                        'source_core': m['source_core'],
-                        'primary_domain': m.get('source_domain'),
-                        'trace_path': m.get('trace_keywords', []),
-                        'mapped_at': now,
-                    }
-                conn.execute("UPDATE nodes SET metadata=? WHERE id=?",
-                             (json.dumps(meta, ensure_ascii=False), nid))
-            except sqlite3.Error as e:
-                print(f'  ✗ {nid}: {e}', flush=True)
-        conn.commit()
-        print(f'[mapping] wrote {len(mapped)} capability mappings to KB', flush=True)
+            patch = {
+                'absorbed_capability': {
+                    'branch': m['branch'],
+                    'capability': m['capability'],
+                    'evidence': m['evidence'],
+                    'mapped_at': now,
+                }
+            }
+            if m.get('source_core'):
+                patch['knowledge_source'] = {
+                    'source_core': m['source_core'],
+                    'primary_domain': m.get('source_domain'),
+                    'trace_path': m.get('trace_keywords', []),
+                    'mapped_at': now,
+                }
+            updates.append({'node_id': nid, 'patch': patch})
+        ins, missing = rust_update_node_metadata(updates)
+        print(f'[mapping] wrote {ins} capability mappings to KB (missing={missing})', flush=True)
 
     # ── 覆盖率报告 ──
     print(f'\n=== 覆盖率报告 ===')

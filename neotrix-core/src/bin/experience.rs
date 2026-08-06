@@ -1173,6 +1173,95 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
 }
 
 // ────────────────────────────────────────────────────────────────
+// R-P97: 节点 metadata 批量更新 (absorb_to_capability.py 写回路径的 Rust port)
+// ────────────────────────────────────────────────────────────────
+/// 批量更新已有节点的 metadata: 输入 JSON 数组 [{node_id, patch: {key: value}}],
+/// 读原 metadata JSON → 合并 patch → 写回。patch 值可为任意 JSON
+/// (如 absorbed_capability 四元组 / knowledge_source 本源溯源对象)。
+/// 语义对齐 absorb_to_capability.py:678 UPDATE nodes SET metadata=? — 单一事实源。
+fn cmd_update_node_metadata(conn: &Connection, input: &str, dry_run: bool) {
+    let raw = if input == "-" {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)
+            .expect("read stdin");
+        buf
+    } else {
+        std::fs::read_to_string(input).unwrap_or_else(|e| panic!("read {}: {}", input, e))
+    };
+    let v: Value = serde_json::from_str(&raw).expect("update list is valid JSON");
+    let updates: Vec<Value> = match v {
+        Value::Array(arr) => arr,
+        Value::Object(_) => vec![v],
+        _ => panic!("input must be a JSON array of {{node_id, patch}} objects"),
+    };
+
+    let mut updated = 0usize;
+    let mut missing = 0usize;
+    for (i, u) in updates.iter().enumerate() {
+        let nid = u.get("node_id").and_then(|n| n.as_str()).unwrap_or("");
+        let patch = match u.get("patch") {
+            Some(Value::Object(p)) => p.clone(),
+            _ => {
+                println!("[update-node-metadata] ✗ #{}: missing patch — skipped", i);
+                continue;
+            }
+        };
+        if nid.is_empty() {
+            println!("[update-node-metadata] ✗ #{}: missing node_id — skipped", i);
+            continue;
+        }
+        // 读原 metadata
+        let meta_raw: Option<String> = conn
+            .query_row(
+                "SELECT metadata FROM nodes WHERE id=?1",
+                params![nid],
+                |r| r.get(0),
+            )
+            .ok();
+        let Some(meta_raw) = meta_raw else {
+            missing += 1;
+            println!("[update-node-metadata] ✗ #{}: node not found ({})", i, nid);
+            continue;
+        };
+        let mut meta: Map<String, Value> = if meta_raw.trim().is_empty() {
+            Map::new()
+        } else {
+            serde_json::from_str(&meta_raw).unwrap_or_else(|_| Map::new())
+        };
+        // 合并 patch
+        for (k, val) in &patch {
+            meta.insert(k.clone(), val.clone());
+        }
+        if dry_run {
+            println!(
+                "[update-node-metadata] would_update #{}: {} (keys: {:?})",
+                i,
+                nid,
+                patch.keys().collect::<Vec<_>>()
+            );
+            updated += 1;
+            continue;
+        }
+        conn.execute(
+            "UPDATE nodes SET metadata=?1, updated_at=?2 WHERE id=?3",
+            params![serde_json::to_string(&Value::Object(meta)).unwrap_or_default(), now_ts(), nid],
+        )
+        .expect("update node metadata");
+        updated += 1;
+        println!(
+            "[update-node-metadata] updated #{}: {} (keys: {:?})",
+            i,
+            nid,
+            patch.keys().collect::<Vec<_>>()
+        );
+    }
+    println!(
+        "[update-node-metadata] done: {} updated, {} missing (dry_run={})",
+        updated, missing, dry_run
+    );
+}
+
+// ────────────────────────────────────────────────────────────────
 // 5. Feedback 反馈 / 查询
 // ────────────────────────────────────────────────────────────────
 /// 突触联想检索: 输入词 → 命中概念神经元 → 沿突触扩散到分支(1阶, 主结果) →
@@ -2332,6 +2421,16 @@ enum Cmd {
         #[arg(long)]
         apply_capability: bool,
     },
+    /// 批量更新已有节点的 metadata (R-P97: absorb_to_capability.py 写回路径的 Rust port)
+    /// 输入: JSON 数组, 每项 {node_id, patch: {key: value}} — 读原 metadata JSON →
+    ///       合并 patch → 写回。patch 值可为任意 JSON (对象如 absorbed_capability 四元组)。
+    UpdateNodeMetadata {
+        /// 更新清单 JSON 文件, 或 "-" 读 stdin
+        #[arg(default_value = "-")]
+        input: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// 检索匹配分支
     Query {
         #[arg(long, default_value = "")]
@@ -2444,6 +2543,9 @@ fn main() {
         Cmd::Absorb { session } => cmd_absorb(&conn, &session),
         Cmd::AbsorbNode { input, dry_run, apply_capability } => {
             cmd_absorb_node(&conn, &input, dry_run, apply_capability)
+        }
+        Cmd::UpdateNodeMetadata { input, dry_run } => {
+            cmd_update_node_metadata(&conn, &input, dry_run)
         }
         Cmd::Query { kw, r#type, domain, limit, no_hebb, json, semantic } => {
             cmd_query(&conn, &kw, r#type.as_deref(), domain.as_deref(), limit, no_hebb, json, semantic)
@@ -2894,5 +2996,51 @@ mod tests {
         assert_eq!(m["absorbed_capability"]["capability"], "generate");
         assert_eq!(m["absorbed_capability"]["evidence"], "test");
         std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_update_node_metadata_merge_and_dry_run() {
+        let conn = node_test_db();
+        // 先插入一个带初始 metadata 的节点
+        let node = json!({
+            "url": "https://example.github.io/meta/",
+            "title": "Meta Page",
+            "content": "Metadata update test node with sufficient content length.",
+            "node_type": "article",
+            "meta": {"existing": "keep-me"},
+        });
+        let path = std::env::temp_dir().join("nt_test_meta_node.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
+        let nid: String = conn
+            .query_row("SELECT id FROM nodes LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        std::fs::remove_file(&path).ok();
+
+        // dry-run: 不写入
+        let updates = json!([{
+            "node_id": nid,
+            "patch": {"absorbed_capability": {"branch": "NT-ACT", "capability": "execute"}}
+        }]);
+        let up = std::env::temp_dir().join("nt_test_update.json");
+        std::fs::write(&up, updates.to_string()).unwrap();
+        cmd_update_node_metadata(&conn, up.to_str().unwrap(), true);
+        let meta: String = conn
+            .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
+            .unwrap();
+        let m: Value = serde_json::from_str(&meta).unwrap();
+        assert_eq!(m["existing"], "keep-me", "dry-run must not modify metadata");
+        assert!(m.get("absorbed_capability").is_none(), "dry-run must not add capability");
+
+        // 实际写入: 合并 patch, 保留既有字段
+        cmd_update_node_metadata(&conn, up.to_str().unwrap(), false);
+        let meta: String = conn
+            .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
+            .unwrap();
+        let m: Value = serde_json::from_str(&meta).unwrap();
+        assert_eq!(m["existing"], "keep-me", "existing metadata preserved");
+        assert_eq!(m["absorbed_capability"]["branch"], "NT-ACT");
+        assert_eq!(m["absorbed_capability"]["capability"], "execute");
+        std::fs::remove_file(&up).ok();
     }
 }

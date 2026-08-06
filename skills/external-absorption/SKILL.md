@@ -113,6 +113,7 @@ extract → dedup → categorize → capability map → insert + 显式 FTS → 
 | **GitHub Pages 阻断 → API 桥接 (Cycle 232)** | Pages CDN (185.199.x) 被网络出口白名单阻断时，站点内容 = 对应 repo 源码 (`GET /repos/{o}/{r}/pages` 返回 source.branch+path)。经 `api.github.com/repos/{o}/{r}/contents/{path}` (base64) 拉源文件组装 node 字段，复用 insert_node 入库 | 2 个 .github.io 从 000 → 100% 吸收 |
 | **SPA 站点内容在 TS 字符串字面量** | Vite/React 站点 (index.html 仅 647B 壳) 正文在 `src/content/*.ts`/`*.tsx` 的字符串字面量 → 正则 `"([^"\\]*(?:\\.[^"\\]*)*)"` 提取 + len>30 过滤，即可组装 article 节点 | vibe-designing-playbook chapter1.ts → 2577B |
 | **静态站内容直接是 markdown** | 静态 GitHub Pages (index.html 是入口壳) 正文在 `article.md`/`README.md` → markdown strip 格式符 (`#>*_\`~|-`、图片/链接语法) 后取行 >30 字符拼接 | morpho article.md 55KB → 4000B 节点 |
+| **R-P97 吸收写入 Rust 化 (Cycle 232)** | 知识写入单一事实源: Python 脚本 (kb_batch_absorb/bridge_pages_absorb/absorb_to_capability) 全部只做数据 prep + 映射算法, 写入委托 Rust CLI `neotrix-experience absorb-node` (URL 去重 + nodes/FTS 双写) 与 `update-node-metadata` (读原 metadata → merge patch → 写回)。本地 insert_node/UPDATE 已退役 | 3 个写入方 → 12 tests + 1262 节点 E2E |
 
 #### absorbed_capability 数据层追踪 (R-P79 闭环)
 
