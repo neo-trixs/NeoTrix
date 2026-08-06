@@ -79,6 +79,8 @@ g.sendSuggestion = sendSuggestion;
 g.renderHeroSuggest = renderHeroSuggest;
 g.cwFilter = cwFilter;
 g.renderCowork = renderCowork;
+g.togglePinSession = togglePinSession;
+g.isPinnedSession = isPinnedSession;
 g.dayStartTs = dayStartTs;
 g.groupSessionsByTime = groupSessionsByTime;
 g.openSessionOps = openSessionOps;
@@ -113,7 +115,7 @@ g.renderStApiKey = renderStApiKey;
   let currentModelId = 'Groq';
   let attachList = [];
   const MODES = ['自动', '计划', '手动'];
-  let currentMode = '自动';
+  let currentMode = '手动';
   function cycleMode(){
     const idx = MODES.indexOf(currentMode);
     currentMode = MODES[(idx + 1) % MODES.length];
@@ -576,29 +578,11 @@ g.renderStApiKey = renderStApiKey;
       return;
     }
 
-    /* Smart markdown → HTML */
-    let md = text
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/^#### (.+)$/gm,'<h4>$1</h4>')
-      .replace(/^### (.+)$/gm,'<h3>$1</h3>')
-      .replace(/^## (.+)$/gm,'<h2>$1</h2>')
-      .replace(/^# (.+)$/gm,'<h1>$1</h1>')
-      .replace(/```(\w*)\n([\s\S]*?)```/g,(m,lang,code)=>`<pre><code class="lang-${lang}">${escHtml(code)}</code></pre>`)
-      .replace(/`([^`]+)`/g,'<code>$1</code>')
-      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g,'<em>$1</em>')
-      .replace(/^> (.+)$/gm,(m,c)=>`<div class="callout">${c}</div>`)
-      .replace(/^- (.+)$/gm,'<li>$1</li>')
-      .replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>')
-      .replace(/^(\d+)\. (.+)$/gm,'<li value="$1">$2</li>')
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g,'<img src="$2" alt="$1" loading="lazy"/>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2">$1</a>')
-      .replace(/^---+$/gm,'<hr/>')
-      .replace(/\n\n/g,'</p><p>')
-      .replace(/^(?!<[hplib]|<[uo]l|<pre|<bl|<div|<h[1-4])/gm,'<p>')
-      .replace(/<\/p>\s*<p>/g,'</p><p>');
-
-    el.innerHTML = md;
+    /* Smart markdown → HTML.
+       Reuse the XSS-safe renderRichText pipeline (stash + escape, scheme-allowlisted links,
+       escaped code fences) instead of the legacy hand-rolled regex renderer that failed to
+       escape quotes and allowed javascript: hrefs. Single renderer = single security surface. */
+    el.innerHTML = renderRichText(text);
   }
 
   /* ── Artifact Pane Actions ── */
@@ -745,6 +729,11 @@ g.renderStApiKey = renderStApiKey;
 
   /* Initialize: collapsed by default */
   (function init(){
+    /* Restore persisted theme before first paint */
+    try{
+      const saved = localStorage.getItem('neotrix.theme');
+      if(saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+    }catch(_e){}
     const rb = document.getElementById('rightbar');
     rb.classList.remove('auto-hide');
     rb.classList.add('collapsed');
@@ -850,6 +839,25 @@ g.renderStApiKey = renderStApiKey;
     return buckets.filter(b => b.sessions.length > 0);
   }
 
+  /* 会话置顶（ChatGPT Pinned 对标）：localStorage 持久化，置顶会话优先展示在「置顶」组 */
+  function getPinnedSessions(){
+    try{ return JSON.parse(localStorage.getItem('neotrix.pinned') || '[]'); }
+    catch(_e){ return []; }
+  }
+  function isPinnedSession(id){
+    return getPinnedSessions().includes(String(id));
+  }
+  function togglePinSession(id, ev){
+    if(ev){ ev.stopPropagation(); }
+    let pins = getPinnedSessions();
+    const key = String(id);
+    if(pins.includes(key)) pins = pins.filter(x => x !== key);
+    else pins.unshift(key);
+    try{ localStorage.setItem('neotrix.pinned', JSON.stringify(pins)); }catch(_e){}
+    renderCowork();
+    showToast(pins.includes(key) ? '已置顶会话' : '已取消置顶');
+  }
+
   function renderCowork(){
     const sl = document.getElementById('cwSessionList');
     if(!sl) return;
@@ -858,9 +866,12 @@ g.renderStApiKey = renderStApiKey;
       if(cwStatusFilter === 'done') return s.status === '已完成';
       return true;
     });
-    const groups = groupSessionsByTime(filtered);
+    // Pinned bucket first, then time groups (ChatGPT parity)
+    const pinned = filtered.filter(s => isPinnedSession(s.id));
+    const rest = filtered.filter(s => !isPinnedSession(s.id));
+    const groups = groupSessionsByTime(rest);
     let firstShown = true;
-    sl.innerHTML = groups.map(grp => {
+    const renderItems = (grp) => {
       const items = grp.sessions.map(s => {
         const pct = s.tasks > 0 ? Math.round(s.done/s.tasks*100) : 0;
         const stCls = s.status === '已完成' ? 's-done' : (s.status === '已暂停' ? 's-paused' : 's-run');
@@ -868,17 +879,37 @@ g.renderStApiKey = renderStApiKey;
         const msg = s.message_count ? ` · ${s.message_count} 消息` : '';
         const active = firstShown ? ' active' : '';
         firstShown = false;
+        const pinBtn = `<button class="cw-pin-btn" title="置顶/取消置顶" onclick="togglePinSession('${escHtml(String(s.id))}', event)">📌</button>`;
         return `<div class="cw-sitem${active}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
           <div class="s">
             <span class="st-dot ${stCls}"></span>
             <span class="st-t">${escHtml(s.name)}</span>
+            ${pinBtn}
           </div>
           <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%${msg}</span>
           <span class="s">${escHtml(stTxt)}</span>
         </div>`;
       }).join('');
       return `<div class="cw-group-h">${grp.label}</div>${items}`;
-    }).join('');
+    };
+    // Compose: pinned bucket first, then time buckets
+    const pinnedHtml = pinned.length
+      ? `<div class="cw-group-h">📌 置顶</div>` + pinned.map(s => {
+          const pct = s.tasks > 0 ? Math.round(s.done/s.tasks*100) : 0;
+          const stCls = s.status === '已完成' ? 's-done' : (s.status === '已暂停' ? 's-paused' : 's-run');
+          const stTxt = s.status || '就绪';
+          const msg = s.message_count ? ` · ${s.message_count} 消息` : '';
+          const active = firstShown ? ' active' : '';
+          firstShown = false;
+          const pinBtn = `<button class="cw-pin-btn" title="取消置顶" onclick="togglePinSession('${escHtml(String(s.id))}', event)">📌</button>`;
+          return `<div class="cw-sitem${active}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
+            <div class="s"><span class="st-dot ${stCls}"></span><span class="st-t">${escHtml(s.name)}</span>${pinBtn}</div>
+            <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%${msg}</span>
+            <span class="s">${escHtml(stTxt)}</span>
+          </div>`;
+        }).join('')
+      : '';
+    sl.innerHTML = pinnedHtml + groups.map(renderItems).join('');
     if(!filtered.length){
       sl.innerHTML = `<div class="cw-empty" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px 12px;text-align:center"><p style="margin:0;font-size:var(--fs-small);color:var(--tx2)">没有符合条件的会话</p><span style="font-size:var(--fs-caption);color:var(--tx-meta)">切换其他状态或新建会话</span></div>`;
       document.getElementById('cwEmpty').style.display = 'flex';
@@ -946,6 +977,15 @@ g.renderStApiKey = renderStApiKey;
     if(!pre) return;
     const cmd = pre.textContent.trim();
     if(!cmd){ showToast('空命令'); return; }
+    /* Gate: confirm the exact command before executing shell (P1-1) — LLM output is untrusted.
+       Destructive/network-piping commands are flagged danger; plain commands still get a confirm. */
+    const danger = /(^|\s)(rm|mv|dd|mkfs|shutdown|reboot|sudo|curl|wget|git\s+push|git\s+reset\s+--hard)\b/.test(cmd) || /\|\s*(sh|bash|sudo)\s*$/.test(cmd) || /;\s*(sh|bash|sudo)\s/.test(cmd);
+    const ok = await ntxConfirm(cmd, {
+      title: danger ? '执行危险命令？' : '确认执行命令',
+      confirmText: danger ? '仍然执行' : '运行',
+      danger,
+    });
+    if(!ok){ showToast('已取消'); return; }
     btn.disabled = true;
     const out = document.createElement('div');
     out.className = 'msg-code-out';
@@ -1204,7 +1244,13 @@ g.renderStApiKey = renderStApiKey;
   }
   function ensureStreamListeners(){
     if(!isTauri() || streamSubs.size) return;
-    const attach=(ev,fn)=>{ try{ listen(ev, fn).then(un=>streamSubs.set(ev,un)).catch(()=>{}); }catch(_e){} };
+    const attach=(ev,fn)=>{
+      try{
+        listen(ev, fn)
+          .then(un=>{ streamSubs.set(ev,un); })
+          .catch(()=>{ if(ev==='neocodex_stream_token') showToast('流式事件订阅失败，消息可能无法实时显示'); });
+      }catch(_e){}
+    };
     attach('neocodex_stream_token', p => {
       clearThink();
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
@@ -1313,17 +1359,51 @@ g.renderStApiKey = renderStApiKey;
 
     const g = genParamsFromSettings();
     const att = attachPayloads();
-    invoke('neocodex_send_message_stream', {
+    // Auto-title (ChatGPT parity): first message of a fresh session names the session.
+    if(isTauri() && currentSessionId){
+      const prev = CW_DATA.find(x => x.id === currentSessionId);
+      const msgCount = (prev && prev.message_count) || 0;
+      if(msgCount === 0){
+        const title = txt.replace(/\s+/g, ' ').trim().slice(0, 28);
+        invoke('neocodex_rename_session', { sessionId: currentSessionId, name: title }).catch(()=>{});
+        if(prev) prev.name = title;
+        renderCowork();
+      }
+    }
+    const streamOpts = {
       content: txt,
       attachments: att.length ? att : null,
       regenerate: false,
       permission_mode: currentPermissionMode(),
       temperature: g.temperature,
       max_tokens: g.max_tokens,
-    }).catch(err=>{
+    };
+    invoke('neocodex_send_message_stream', streamOpts).catch(err=>{
       const mb=a.querySelector('.mb');
-      if(mb){ mb.classList.remove('streaming'); mb.textContent='[IPC 错误] '+String(err); }
       setStreaming(false);
+      if(mb){
+        mb.classList.remove('streaming');
+        mb.textContent='';
+        // Error + retry (ChatGPT/Claude parity): keep the failed bubble, offer one-tap retry.
+        const errBox = document.createElement('div');
+        errBox.className = 'msg-ipc-err';
+        const safeErr = String(err).slice(0, 300).replace(/sk-[A-Za-z0-9_-]{8,}/gi, 'sk-•••');
+        errBox.innerHTML = '<div class="msg-ipc-err-txt">⚠️ ' + escHtml(safeErr) + '</div>' +
+          '<button class="msg-ipc-retry" data-op="retry">重试</button>';
+        errBox.querySelector('[data-op="retry"]').onclick = () => {
+          mb.classList.add('streaming');
+          mb.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+          errBox.remove();
+          invoke('neocodex_send_message_stream', streamOpts)
+            .then(() => {})
+            .catch(err2 => {
+              mb.classList.remove('streaming');
+              const safe2 = String(err2).slice(0, 300).replace(/sk-[A-Za-z0-9_-]{8,}/gi, 'sk-•••');
+              mb.innerHTML = '<div class="msg-ipc-err-txt">⚠️ ' + escHtml(safe2) + '</div>';
+            });
+        };
+        mb.appendChild(errBox);
+      }
     });
     if(att.length) clearAttachments();
   }
@@ -2392,7 +2472,7 @@ g.renderStApiKey = renderStApiKey;
     const tbRight = document.getElementById('ntxToolbarRight');
     if(tbRight && !document.getElementById('ntxModeBtn')){
       tbRight.innerHTML += `
-        <button class="ntx-mode-btn ses-trigger" id="ntxModeBtn" title="权限模式 (对标 Codex approval)" onclick="cycleMode()"><span id="ntxModeLabel">自动</span></button>
+        <button class="ntx-mode-btn ses-trigger" id="ntxModeBtn" title="权限模式 (对标 Codex approval)" onclick="cycleMode()"><span id="ntxModeLabel">手动</span></button>
         <button class="ntx-mode-btn ses-trigger" id="ntxSessionOps" title="会话操作" onclick="openSessionOps(this)"><span>⋯</span></button>`;
     }
 
@@ -2437,10 +2517,10 @@ g.renderStApiKey = renderStApiKey;
     if(!menu) return;
     menu.innerHTML = MODEL_POOL.map(m => {
       const on = m.id === currentModelId;
-      const state = m.online ? `<span class="ntx-mm-lat">${m.lat ? m.lat + 'ms' : '—'}</span>` : `<span class="ntx-mm-lat off">离线</span>`;
-      return `<button class="ntx-mm-item${on ? ' on' : ''}" data-id="${m.id}">
-        <span class="ntx-mm-title"><span class="dot" style="background:${on ? 'var(--suc,#4CAF50)' : 'var(--tx3)'}"></span>${m.title}</span>
-        <span class="ntx-mm-desc">${m.model}</span>${state}
+      const state = m.online ? `<span class="ntx-mm-lat">${m.lat ? escHtml(String(m.lat)) + 'ms' : '—'}</span>` : `<span class="ntx-mm-lat off">离线</span>`;
+      return `<button class="ntx-mm-item${on ? ' on' : ''}" data-id="${escHtml(m.id)}">
+        <span class="ntx-mm-title"><span class="dot" style="background:${on ? 'var(--suc,#4CAF50)' : 'var(--tx3)'}"></span>${escHtml(m.title)}</span>
+        <span class="ntx-mm-desc">${escHtml(m.model)}</span>${state}
       </button>`;
     }).join('');
     const lbl = document.getElementById('ntxModelLabel');
@@ -3508,6 +3588,7 @@ g.renderStApiKey = renderStApiKey;
     const h=document.documentElement;
     const isDark=h.getAttribute('data-theme')==='dark';
     h.setAttribute('data-theme',isDark?'light':'dark');
+    try{ localStorage.setItem('neotrix.theme', isDark ? 'light' : 'dark'); }catch(_e){} // persist across restarts
     const lbl=document.getElementById('popThemeLabel');
     if(lbl)lbl.textContent=isDark?'亮色':'暗色';
     showToast(isDark?'🌞 已切换为亮色模式':'🌙 已切换为暗色模式');
