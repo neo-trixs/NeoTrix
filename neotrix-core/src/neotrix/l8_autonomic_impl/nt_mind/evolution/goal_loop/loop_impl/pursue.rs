@@ -7,6 +7,13 @@ use crate::neotrix::nt_world_model::TaskType;
 use super::core::GoalLoop;
 use super::core::truncate;
 
+/// 单次迭代的估算成本 (USD)。模拟环境无真实 LLM token 计量,
+/// 故以固定估算值 + 实际吸收工作量加权, 避免纯魔法数字。
+const COST_PER_ITERATION_USD: f64 = 0.002;
+const TOKENS_PER_ITERATION: u64 = 5000;
+/// 每次吸收额外计入的 token 估算 (反映实际工作量)。
+const TOKENS_PER_ABSORB: u64 = 800;
+
 impl GoalLoop {
     pub fn auto_goal_candidates(brain: &SelfIteratingBrain, count: usize) -> Vec<String> {
         let mut candidates = Vec::new();
@@ -78,8 +85,9 @@ impl GoalLoop {
         };
 
         tracker.iterations_completed += 1;
-        tracker.total_cost_estimate += 0.002;
-        tracker.tokens_consumed += 5000;
+        // 成本估算: 固定迭代成本 + 实际吸收工作量加权 (模拟环境无真实 token 计量)
+        tracker.total_cost_estimate += COST_PER_ITERATION_USD;
+        tracker.tokens_consumed += TOKENS_PER_ITERATION + result.absorbed_count * TOKENS_PER_ABSORB;
         tracker.score_current = score_after;
         tracker.last_reward = reward;
         tracker.updated_at = chrono::Utc::now().to_rfc3339();
