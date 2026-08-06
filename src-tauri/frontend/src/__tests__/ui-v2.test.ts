@@ -1237,5 +1237,60 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(a.querySelectorAll('.ma-btn[data-op="copy"]').length).toBe(1);
     expect(a.querySelectorAll('.ma-btn').length).toBe(2);
   });
+
+  it("ntxConfirm confirms on confirm click and removes the modal", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const p = (g.ntxConfirm as (msg: string, opts?: Record<string, unknown>) => Promise<boolean>)("确定删除该消息？", { title: "删除消息", danger: true });
+    const wrap = document.getElementById("ntxConfirm")!;
+    expect(wrap).not.toBeNull();
+    expect(wrap.querySelector(".ntx-cf-msg")!.textContent).toContain("确定删除该消息？");
+    expect(wrap.querySelector('[data-act="confirm"]')!.textContent).toBe("确认");
+    expect(wrap.querySelector(".ntx-cf-danger")).not.toBeNull();
+    (wrap.querySelector('[data-act="confirm"]') as HTMLButtonElement).click();
+    await expect(p).resolves.toBe(true);
+    await new Promise((r) => setTimeout(r, 250));
+    expect(document.getElementById("ntxConfirm")).toBeNull();
+  });
+
+  it("ntxConfirm resolves false on cancel click", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const p = (g.ntxConfirm as (msg: string, opts?: Record<string, unknown>) => Promise<boolean>)("取消这个？");
+    const wrap = document.getElementById("ntxConfirm")!;
+    (wrap.querySelector('[data-act="cancel"]') as HTMLButtonElement).click();
+    await expect(p).resolves.toBe(false);
+  });
+
+  it("ntxConfirm resolves false on Escape", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const p = (g.ntxConfirm as (msg: string, opts?: Record<string, unknown>) => Promise<boolean>)("按 Esc 取消");
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await expect(p).resolves.toBe(false);
+  });
+
+  it("deleteMessage uses ntxConfirm and calls invoke only on confirm", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const calls: { cmd: string }[] = [];
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string) => { calls.push({ cmd }); return Promise.resolve([]); },
+      transformCallback: () => 0,
+    };
+    try {
+      (g.deleteMessage as (i: number) => Promise<void>)(0);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(document.getElementById("ntxConfirm")).not.toBeNull();
+      (document.querySelector('#ntxConfirm [data-act="cancel"]') as HTMLButtonElement).click();
+      await new Promise((r) => setTimeout(r, 250));
+      expect(calls.some((c) => c.cmd === "neocodex_delete_message")).toBe(false);
+      (g.deleteMessage as (i: number) => Promise<void>)(0);
+      await new Promise((r) => setTimeout(r, 20));
+      (document.querySelector('#ntxConfirm [data-act="confirm"]') as HTMLButtonElement).click();
+      await new Promise((r) => setTimeout(r, 250));
+      expect(calls.some((c) => c.cmd === "neocodex_delete_message")).toBe(true);
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });
 

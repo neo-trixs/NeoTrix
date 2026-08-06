@@ -87,6 +87,7 @@ g.feedbackMessage = feedbackMessage;
 g.searchSessions = searchSessions;
 g.closeSessionOps = closeSessionOps;
 g.checkForUpdate = checkForUpdate;
+g.ntxConfirm = ntxConfirm;
 g.openSessionFromSearch = openSessionFromSearch;
 g.cycleMode = cycleMode;
 g.openArchivedSessions = openArchivedSessions;
@@ -1572,7 +1573,8 @@ g.restoreCheckpoint = restoreCheckpoint;
 
   async function deleteMessage(index){
     if(!isTauri() || !currentSessionId) return;
-    if(!confirm('删除该消息？')) return;
+    const ok = await ntxConfirm('删除该消息？此操作不可恢复。', { title: '删除消息', confirmText: '删除', danger: true });
+    if(!ok) return;
     const msgs = await invoke('neocodex_delete_message', { session_id: currentSessionId, index }).catch(e => { showToast('删除失败: ' + e); return null; });
     if(Array.isArray(msgs)) renderThread(msgs);
   }
@@ -1755,7 +1757,8 @@ g.restoreCheckpoint = restoreCheckpoint;
     const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
     if(!id){ showToast('无会话'); return; }
     closeSessionOps();
-    if(!confirm('确定删除该会话？此操作不可恢复。')) return;
+    const ok = await ntxConfirm('确定删除该会话？此操作不可恢复。', { title: '删除会话', confirmText: '删除', danger: true });
+    if(!ok) return;
     if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可删除'); return; }
     try{
       await invoke('neocodex_delete_session', { session_id: id });
@@ -1811,7 +1814,8 @@ g.restoreCheckpoint = restoreCheckpoint;
 
   async function deleteArchived(id){
     if(!id || !isTauri()) return;
-    if(!confirm('彻底删除该归档会话？此操作不可恢复。')) return;
+    const ok = await ntxConfirm('彻底删除该归档会话？此操作不可恢复。', { title: '删除归档会话', confirmText: '删除', danger: true });
+    if(!ok) return;
     try{
       await invoke('neocodex_delete_session', { session_id: id });
       showToast('归档会话已删除');
@@ -1859,7 +1863,8 @@ g.restoreCheckpoint = restoreCheckpoint;
     const body = document.getElementById('checkpointBody');
     const sessionId = body ? (body.dataset.session || currentSessionId) : currentSessionId;
     if(!checkpointId || !sessionId || !isTauri()) return;
-    if(!confirm('回滚到该时间点？当前会话进度将被替换（代码与对话快照）。')) return;
+    const ok = await ntxConfirm('回滚到该时间点？当前会话进度将被替换（代码与对话快照）。', { title: '回滚检查点', confirmText: '回滚', danger: true });
+    if(!ok) return;
     try{
       const msgs = await invoke('neocodex_checkpoint_restore', { session_id: sessionId, checkpoint_id: checkpointId });
       closeOverlay('overlayCheckpoints');
@@ -2881,7 +2886,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     if(!pathEl) return;
     const path = pathEl.textContent.trim();
     if(action === 'reject'){
-      const ok = window.confirm('放弃该文件的全部改动？(git restore)');
+      const ok = await ntxConfirm('放弃该文件的全部改动？(git restore)', { title: '放弃改动', confirmText: '放弃', danger: true });
       if(!ok) return;
     }
     try{
@@ -3373,7 +3378,8 @@ g.restoreCheckpoint = restoreCheckpoint;
   }
 
   async function clearAllData(){
-    if(!confirm('确定要清除所有本地数据吗？此操作不可恢复。')) return;
+    const ok = await ntxConfirm('确定要清除所有本地数据吗？此操作不可恢复。', { title: '清除所有数据', confirmText: '清除', danger: true });
+    if(!ok) return;
     if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可清除'); return; }
     try{
       const sessions = await invoke('neocodex_list_sessions', { project_path: null }).catch(() => []);
@@ -3430,6 +3436,35 @@ g.restoreCheckpoint = restoreCheckpoint;
     requestAnimationFrame(()=>t.style.opacity='1');
     clearTimeout(window._tt);
     window._tt=setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),200);},1500);
+  }
+
+  /* App 内二次确认对话框 (替代原生 confirm). 返回 Promise<boolean>.
+     ChatGPT/Claude 对齐: 桌面应用内 confirm, 而非浏览器阻塞对话框. */
+  let ntxConfirmRemove = new Set();
+  function ntxConfirm(message, { title = '确认操作', confirmText = '确认', danger = false, cancelText = '取消' } = {}){
+    const old = document.getElementById('ntxConfirm');
+    if(old) old.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'ntxConfirm';
+    wrap.className = 'ntx-confirm';
+    const bar = danger
+      ? `<button class="ntx-cf-btn ntx-cf-danger" data-act="confirm">${escHtml(confirmText)}</button><button class="ntx-cf-btn" data-act="cancel">${escHtml(cancelText)}</button>`
+      : `<button class="ntx-cf-btn" data-act="cancel">${escHtml(cancelText)}</button><button class="ntx-cf-btn ntx-cf-primary" data-act="confirm">${escHtml(confirmText)}</button>`;
+    wrap.innerHTML = `<div class="ntx-cf-box"><div class="ntx-cf-title">${escHtml(title)}</div><div class="ntx-cf-msg">${escHtml(message)}</div><div class="ntx-cf-actions">${bar}</div></div>`;
+    document.body.appendChild(wrap);
+    requestAnimationFrame(()=>wrap.classList.add('open'));
+    const done = (result) => { wrap.classList.remove('open'); wrap.dispatchEvent(new CustomEvent('_ntxDone')); ntxConfirmRemove.add(wrap); setTimeout(()=>{ if(ntxConfirmRemove.has(wrap)){ wrap.remove(); ntxConfirmRemove.delete(wrap); } }, 180); };
+    return new Promise(resolve => {
+      const settle = (val) => { done(val); resolve(val); };
+      wrap.querySelector('[data-act="confirm"]').onclick = () => settle(true);
+      wrap.querySelector('[data-act="cancel"]').onclick = () => settle(false);
+      wrap.addEventListener('click', e => { if(e.target === wrap) settle(false); });
+      const onKey = (e) => {
+        if(e.key === 'Escape' && document.getElementById('ntxConfirm') === wrap){ e.preventDefault(); settle(false); }
+      };
+      window.addEventListener('keydown', onKey);
+      wrap.addEventListener('_ntxDone', () => window.removeEventListener('keydown', onKey));
+    });
   }
   function autoResize(el){
     el.style.height='auto';
