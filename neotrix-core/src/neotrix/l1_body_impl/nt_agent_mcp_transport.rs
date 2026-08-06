@@ -63,6 +63,42 @@ impl TransportMode {
     }
 }
 
+/// P0-4: TLS verification must stay ON for remote MCP servers. The only
+/// legitimate case for skipping cert validation is an explicit loopback URL
+/// (localhost/127.0.0.1) where the user controls the endpoint — typically a
+/// local bridge with a self-signed cert. Everything else enforces TLS.
+fn is_loopback_url(url: &str) -> bool {
+    url.split("://").nth(1).unwrap_or(url)
+        .split(['/', '?']).next().unwrap_or("")
+        .split(':').next().unwrap_or("")
+        .to_lowercase()
+        .trim_matches(['[', ']'])
+        .eq_ignore_ascii_case("localhost")
+        || url.contains("127.0.0.1") || url.contains("::1")
+}
+
+/// P0-4: build a reqwest blocking client that enforces TLS by default and only
+/// relaxes cert validation for explicit loopback endpoints.
+fn build_mcp_blocking_client(url: &str) -> Result<reqwest::blocking::Client, reqwest::Error> {
+    let mut builder = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5));
+    if is_loopback_url(url) {
+        builder = builder.danger_accept_invalid_certs(true);
+    }
+    builder.build()
+}
+
+/// P0-4: build a reqwest async client that enforces TLS by default and only
+/// relaxes cert validation for explicit loopback endpoints.
+fn build_mcp_async_client(url: &str) -> Result<reqwest::Client, reqwest::Error> {
+    let mut builder = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5));
+    if is_loopback_url(url) {
+        builder = builder.danger_accept_invalid_certs(true);
+    }
+    builder.build()
+}
+
 /// Result of an MCP initialize handshake
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct McpInitResult {
@@ -345,10 +381,8 @@ pub fn streamable_http_transport(
     body: &str,
     mcp_method: &str,
 ) -> Result<StreamableHttpResult, TransportError> {
-    // 1. Initial POST
-    let client = reqwest::blocking::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()
+    // 1. Initial POST — TLS enforced except explicit loopback (P0-4)
+    let client = build_mcp_blocking_client(http_url)
         .map_err(|e| TransportError::Io(format!("Build client: {}", e)))?;
 
     let mut req = client.post(http_url)
@@ -410,10 +444,12 @@ pub fn streamable_http_sse_connect(
     auth: Option<&OAuthToken>,
     timeout: Duration,
 ) -> Result<Vec<SseEvent>, TransportError> {
-    let client = reqwest::blocking::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .timeout(timeout)
-        .build()
+    let mut builder = reqwest::blocking::Client::builder()
+        .timeout(timeout);
+    if is_loopback_url(sse_endpoint) {
+        builder = builder.danger_accept_invalid_certs(true);
+    }
+    let client = builder.build()
         .map_err(|e| TransportError::Io(format!("Build SSE client: {}", e)))?;
 
     let mut req = client.get(sse_endpoint)
@@ -614,10 +650,7 @@ pub fn mcp_initialized_notification(
         }
         TransportMode::Remote { http_url, headers, auth, .. }
         | TransportMode::StreamableHttp { http_url, headers, auth, .. } => {
-            let client = reqwest::blocking::Client::builder()
-                .danger_accept_invalid_certs(true)
-                .timeout(Duration::from_secs(5))
-                .build()
+            let client = build_mcp_blocking_client(http_url)
                 .map_err(|e| TransportError::Io(format!("Build client: {}", e)))?;
 
             let mut req = client.post(http_url)
@@ -708,10 +741,13 @@ fn initialize_remote(
     request_json: &str,
     timeout: Duration,
 ) -> Result<McpInitResult, TransportError> {
-    let client = reqwest::blocking::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .timeout(timeout)
-        .build()
+    // TLS enforced except explicit loopback (P0-4)
+    let mut builder = reqwest::blocking::Client::builder()
+        .timeout(timeout);
+    if is_loopback_url(url) {
+        builder = builder.danger_accept_invalid_certs(true);
+    }
+    let client = builder.build()
         .map_err(|e| TransportError::Io(format!("Build client: {}", e)))?;
 
     let mut req = client.post(url)
@@ -860,9 +896,7 @@ fn call_remote(
     mcp_method: Option<&str>,
     mcp_name: Option<&str>,
 ) -> Result<(String, Option<CacheableResult>), TransportError> {
-    let client = reqwest::blocking::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .build()
+    let client = build_mcp_blocking_client(url)
         .map_err(|e| TransportError::Io(format!("Build client: {}", e)))?;
 
     let mut req = client.post(url)
@@ -974,10 +1008,12 @@ pub fn mcp_server_discover(
         }
         TransportMode::Remote { http_url, headers, auth, .. }
         | TransportMode::StreamableHttp { http_url, headers, auth, .. } => {
-            let client = reqwest::blocking::Client::builder()
-                .danger_accept_invalid_certs(true)
-                .timeout(Duration::from_secs(10))
-                .build()
+            let mut builder = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(10));
+            if is_loopback_url(http_url) {
+                builder = builder.danger_accept_invalid_certs(true);
+            }
+            let client = builder.build()
                 .map_err(|e| TransportError::Io(format!("Build client: {}", e)))?;
 
             let mut req = client.post(http_url)
@@ -1039,11 +1075,13 @@ pub fn mcp_subscribe_listen(
         TransportMode::Remote { http_url, headers, auth, sse_url } => {
             // Use SSE URL if provided, otherwise fall back to HTTP POST
             let url = sse_url.as_deref().unwrap_or(http_url);
-
-            let client = reqwest::blocking::Client::builder()
-                .danger_accept_invalid_certs(true)
-                .timeout(Duration::from_secs(30))
-                .build()
+            // TLS enforced except explicit loopback (P0-4)
+            let mut builder = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(30));
+            if is_loopback_url(url) {
+                builder = builder.danger_accept_invalid_certs(true);
+            }
+            let client = builder.build()
                 .map_err(|e| TransportError::Io(format!("Build client: {}", e)))?;
 
             let mut req = client.post(url)
@@ -1075,11 +1113,14 @@ pub fn mcp_subscribe_listen(
             Ok(text)
         }
         TransportMode::StreamableHttp { http_url, headers, auth, sse_endpoint } => {
-            // Streamable HTTP: POST to http_url, then connect to SSE endpoint for streaming
-            let client = reqwest::blocking::Client::builder()
-                .danger_accept_invalid_certs(true)
-                .timeout(Duration::from_secs(30))
-                .build()
+            // Streamable HTTP: POST to http_url, then connect to SSE endpoint for streaming.
+            // TLS enforced except explicit loopback (P0-4).
+            let mut builder = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(30));
+            if is_loopback_url(http_url) {
+                builder = builder.danger_accept_invalid_certs(true);
+            }
+            let client = builder.build()
                 .map_err(|e| TransportError::Io(format!("Build client: {}", e)))?;
 
             let mut req = client.post(http_url)

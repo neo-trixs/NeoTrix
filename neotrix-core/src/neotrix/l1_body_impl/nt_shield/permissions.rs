@@ -214,6 +214,26 @@ impl PermissionManager {
         };
         pending.values().cloned().collect()
     }
+
+    /// Append a resolution directly to the audit log without creating a pending
+    /// request (used by P0-6 command-exec wiring: every webview-triggered
+    /// sensitive action is recorded, even when auto-approved by UI confirm).
+    pub fn record(&self, action: PermissionAction, target: &str, resolution: &str) {
+        let entry = AuditEntry {
+            request_id: uuid::Uuid::new_v4().to_string(),
+            action,
+            target: target.to_string(),
+            timestamp: chrono::Utc::now().timestamp(),
+            resolution: resolution.to_string(),
+            reason: Some("executed via webview confirm".into()),
+        };
+        if let Ok(mut audit) = self.audit_log.lock() {
+            audit.push(entry);
+            if audit.len() > 2000 {
+                audit.drain(0..500);
+            }
+        }
+    }
 }
 
 impl Default for PermissionManager {
