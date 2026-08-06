@@ -512,4 +512,82 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  it("renderThread renders tool-call cards and system bubbles (Cursor/ChatGPT parity)", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[]) => void)([
+      { role: "user", content: "跑一下", timestamp: 1700000000 },
+      { role: "tool", content: "**execute_command**\n```\ncargo check\n```", timestamp: 0 },
+      { role: "agent", content: "完成", timestamp: 1700000001 },
+      { role: "system", content: "context: 40%", timestamp: 1700000002 },
+    ]);
+    expect(document.querySelector("#chatScroll .tool-card")).not.toBeNull();
+    expect(document.querySelector("#chatScroll .tool-head .tool-name")!.textContent).toContain("execute_command");
+    expect(document.querySelector("#chatScroll .sys-card")).not.toBeNull();
+  });
+
+  it("tool card collapses/expands on head click", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[]) => void)([
+      { role: "tool", content: "**read_file**\n```\na\nb\n```", timestamp: 0 },
+    ]);
+    const card = document.querySelector("#chatScroll .tool-card") as HTMLElement;
+    const head = card.querySelector(".tool-head") as HTMLElement;
+    head.click();
+    expect(card.classList.contains("open")).toBe(true);
+    head.click();
+    expect(card.classList.contains("open")).toBe(false);
+  });
+
+  it("renderThread keeps visible index across tool/system messages for ops", () => {
+    document.getElementById("chatScroll")!.innerHTML = "";
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[]) => void)([
+      { role: "user", content: "第一问", timestamp: 1700000000 },
+      { role: "tool", content: "**x**\n```\n1\n```", timestamp: 0 },
+      { role: "agent", content: "第一答", timestamp: 1700000001 },
+      { role: "system", content: "hint", timestamp: 1700000002 },
+      { role: "user", content: "第二问", timestamp: 1700000003 },
+    ]);
+    // user messages render with data-vid = visible index (0, 1) — not raw array index (0, 4)
+    const users = [...document.querySelectorAll("#chatScroll .msg.r")];
+    expect(users.map((e) => Number((e as HTMLElement).dataset.vid))).toEqual([0, 2]);
+    const agents = [...document.querySelectorAll("#chatScroll .msg.l")];
+    expect(agents.map((e) => Number((e as HTMLElement).dataset.vid))).toEqual([1]);
+  });
+
+  it("editMessage opens inline composer instead of prompt", () => {
+    const g = globalThis as Record<string, unknown>;
+    const mem = new Map<string, string>();
+    const store = {
+      getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+      setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+      removeItem: (k: string) => { mem.delete(k); },
+    };
+    const realLS = (globalThis as Record<string, unknown>).localStorage;
+    (globalThis as Record<string, unknown>).localStorage = store;
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        if(cmd === "neocodex_get_session_messages") return Promise.resolve([
+          { role: "user", content: "原内容", timestamp: 1700000000 },
+        ]);
+        return Promise.resolve("ok");
+      },
+      transformCallback: () => 1,
+    };
+    try {
+      (g.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+        { role: "user", content: "原内容", timestamp: 1700000000 },
+      ], "s-edit");
+      (g.editMessage as (index: number) => void)(0);
+      const editor = document.querySelector("#chatScroll .msg-edit");
+      expect(editor).not.toBeNull();
+      expect(document.querySelector("#chatScroll .msg-edit .me-hint")!.textContent).toContain("重新生成");
+    } finally {
+      (globalThis as Record<string, unknown>).localStorage = realLS;
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });
