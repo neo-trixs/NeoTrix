@@ -16,6 +16,17 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(globalThis).toBe(window);
   });
 
+  async function reloadApp() {
+    const raw = await import("../../index.html?raw").catch(() => null);
+    if (raw && typeof raw.default === "string") {
+      document.body.innerHTML = raw.default.replace(/<script[\s\S]*?<\/script>/g, "");
+    }
+    vi.resetModules();
+    // ui-v2.js is plain-JS side-effect module (no type surface by design)
+    // @ts-expect-error no declarations for migrated JS entry
+    await import("../ui-v2.js");
+  }
+
   it("renders the app shell", () => {
     expect(document.querySelector(".app")).not.toBeNull();
     expect(document.querySelector("#viewChat")).not.toBeNull();
@@ -383,6 +394,121 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       expect(mb!.textContent).toContain("流式回复");
       cbs["neocodex_stream_done"]({ event: "neocodex_stream_done", id: 1, payload: { cancelled: false } });
       expect((document.getElementById("sendBtn") as HTMLButtonElement).disabled).toBe(false);
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("stream token renders markdown inline progressively", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mock: Record<string, (a: unknown) => unknown> = {
+      neocodex_send_message_stream: () => "ok",
+    };
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const cbs: Record<string, (raw: unknown) => void> = {};
+    let cbRef: ((raw: unknown) => void) | null = null;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        if (cmd === "plugin:event|listen") {
+          const ev = String(args?.event);
+          cbs[ev] = cbRef!;
+          return Promise.resolve(() => {});
+        }
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+      transformCallback: (fn: (raw: unknown) => void) => { cbRef = fn; return 1; },
+    };
+    try {
+      await reloadApp();
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "流式渲染";
+      (g.sendMsg as () => void)();
+      cbs["neocodex_stream_token"]({ event: "neocodex_stream_token", id: 1, payload: "**加粗**" });
+      const mb = document.querySelector("#chatScroll .msg.l .mb.streaming");
+      expect(mb!.innerHTML).toContain("<strong>加粗</strong>");
+      expect(mb!.textContent).not.toContain("**");
+      cbs["neocodex_stream_token"]({ event: "neocodex_stream_token", id: 1, payload: "与`行内码`" });
+      expect(mb!.innerHTML).toContain("<code>行内码</code>");
+      expect(mb!.textContent).toContain("与");
+      cbs["neocodex_stream_done"]({ event: "neocodex_stream_done", id: 1, payload: { cancelled: false } });
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("stream token keeps unclosed code fence in a streaming pre", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mock: Record<string, (a: unknown) => unknown> = {
+      neocodex_send_message_stream: () => "ok",
+    };
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const cbs: Record<string, (raw: unknown) => void> = {};
+    let cbRef: ((raw: unknown) => void) | null = null;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        if (cmd === "plugin:event|listen") {
+          const ev = String(args?.event);
+          cbs[ev] = cbRef!;
+          return Promise.resolve(() => {});
+        }
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+      transformCallback: (fn: (raw: unknown) => void) => { cbRef = fn; return 1; },
+    };
+    try {
+      await reloadApp();
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "流式代码";
+      (g.sendMsg as () => void)();
+      cbs["neocodex_stream_token"]({ event: "neocodex_stream_token", id: 1, payload: "```python\nprint(" });
+      const mb = document.querySelector("#chatScroll .msg.l .mb.streaming");
+      expect(mb!.innerHTML).toContain("msg-code-stream");
+      expect(mb!.textContent).toContain("print(");
+      cbs["neocodex_stream_token"]({ event: "neocodex_stream_token", id: 1, payload: "1)\n```" });
+      expect(mb!.querySelector(".msg-code-stream")).toBeNull();
+      expect(mb!.querySelector(".msg-code")).not.toBeNull();
+      cbs["neocodex_stream_done"]({ event: "neocodex_stream_done", id: 1, payload: { cancelled: false } });
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("stream end flips to final rendered markdown and clears streaming class", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const mock: Record<string, (a: unknown) => unknown> = {
+      neocodex_send_message_stream: () => "ok",
+    };
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const cbs: Record<string, (raw: unknown) => void> = {};
+    let cbRef: ((raw: unknown) => void) | null = null;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        if (cmd === "plugin:event|listen") {
+          const ev = String(args?.event);
+          cbs[ev] = cbRef!;
+          return Promise.resolve(() => {});
+        }
+        const h = mock[cmd];
+        return Promise.resolve(h ? h(args ?? {}) : undefined);
+      },
+      transformCallback: (fn: (raw: unknown) => void) => { cbRef = fn; return 1; },
+    };
+    try {
+      await reloadApp();
+      const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+      input.value = "流式完结";
+      (g.sendMsg as () => void)();
+      cbs["neocodex_stream_token"]({ event: "neocodex_stream_token", id: 1, payload: "# 标题" });
+      cbs["neocodex_stream_end"]({ event: "neocodex_stream_end", id: 1, payload: "# 标题\n\n**完整**" });
+      const mb = document.querySelector("#chatScroll .msg.l .mb");
+      expect(mb!.className).not.toContain("streaming");
+      expect(mb!.innerHTML).toContain("<h1>标题</h1>");
+      expect(mb!.innerHTML).toContain("<strong>完整</strong>");
     } finally {
       if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;

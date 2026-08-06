@@ -1063,6 +1063,7 @@ g.restoreCheckpoint = restoreCheckpoint;
   /* ===== IPC-backed streaming send ===== */
   const streamSubs = new Map();
   let streamFollow = true;
+  let streamBuf = '';
   function streamScrollEl(){
     return document.getElementById('chatScroll');
   }
@@ -1070,6 +1071,17 @@ g.restoreCheckpoint = restoreCheckpoint;
     const cs = streamScrollEl();
     if(!cs) return;
     if(force || streamFollow) cs.scrollTop = cs.scrollHeight;
+  }
+  function renderStreamProgress(el){
+    const parts = streamBuf.split(/```/);
+    const open = parts.length % 2 === 0;
+    if(open){
+      const closed = parts.slice(0, -1).join('```');
+      const tail = parts[parts.length - 1];
+      el.innerHTML = renderRichText(closed) + '<pre class="msg-code-b msg-code-stream">' + escHtml(tail) + '</pre>';
+    }else{
+      el.innerHTML = renderRichText(streamBuf);
+    }
   }
   function setStreaming(on){
     const send = document.getElementById('sendBtn');
@@ -1123,11 +1135,11 @@ g.restoreCheckpoint = restoreCheckpoint;
     const attach=(ev,fn)=>{ try{ listen(ev, fn).then(un=>streamSubs.set(ev,un)).catch(()=>{}); }catch(_e){} };
     attach('neocodex_stream_token', p => {
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
-      if(el){ el.textContent += String(p); scrollChatToBottom(false); }
+      if(el){ streamBuf += String(p); renderStreamProgress(el); scrollChatToBottom(false); }
     });
     attach('neocodex_stream_end', p => {
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
-      if(el){ el.classList.remove('streaming'); el.innerHTML = renderRichText(String(p)); attachUsageFooter(el.closest('.msg')); }
+      if(el){ el.classList.remove('streaming'); streamBuf = String(p); el.innerHTML = renderRichText(String(p)); attachUsageFooter(el.closest('.msg')); }
       setStreaming(false);
       scrollChatToBottom(true);
     });
@@ -1135,6 +1147,7 @@ g.restoreCheckpoint = restoreCheckpoint;
       setStreaming(false);
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el){ el.classList.remove('streaming'); attachUsageFooter(el.closest('.msg')); }
+      streamBuf = '';
       await loadUsage();
       const foot=document.querySelector('#chatScroll .msg.l:last-child .msg-usage');
       if(foot) foot.textContent = '上下文 ' + Math.round(lastContextUsage * 100) + '%';
@@ -1189,6 +1202,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     s.appendChild(u);
     inp.value='';inp.style.height='auto';
     setStreaming(true);
+    streamBuf = '';
     s.scrollTop=s.scrollHeight;
     openRbSidebar();
     const a=document.createElement('div');a.className='msg l';

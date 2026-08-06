@@ -34,6 +34,36 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     expect(calls.some((c) => c.cmd === "neocodex_send_message_stream")).toBeTruthy();
   });
 
+  test("stream token renders markdown inline live, code fence completes at close", async ({ page }) => {
+    await mockCommand(page, "neocodex_send_message_stream", () => "ok");
+    await page.goto("/");
+    const textarea = page.locator("#chatInput");
+    await textarea.fill("流式 markdown");
+    await textarea.press("Enter");
+
+    await expect(page.locator("#chatScroll .msg.r")).toContainText("流式 markdown", { timeout: 10_000 });
+
+    await emitEvent(page, "neocodex_stream_token", "**加粗**\n");
+    const mb = page.locator("#chatScroll .msg.l .mb.streaming").last();
+    await expect(mb.locator("strong")).toHaveText("加粗", { timeout: 10_000 });
+    expect(await mb.evaluate((el) => el.textContent)).not.toContain("**");
+
+    await emitEvent(page, "neocodex_stream_token", "```python\nprint(");
+    const pre = mb.locator("pre.msg-code-stream");
+    await expect(pre).toHaveCount(1, { timeout: 10_000 });
+    await expect(pre).toContainText("print(");
+
+    await emitEvent(page, "neocodex_stream_token", "1)\n```");
+    await expect(mb.locator("pre.msg-code-stream")).toHaveCount(0, { timeout: 10_000 });
+    await expect(mb.locator(".msg-code-b")).toHaveCount(1, { timeout: 10_000 });
+
+    const done = page.locator("#chatScroll .msg.l .mb").last();
+    await expect(done.locator(".msg-code-b")).toContainText("print(1)", { timeout: 10_000 });
+
+    await emitEvent(page, "neocodex_stream_done", { cancelled: false });
+    await expect(done).not.toHaveClass(/streaming/, { timeout: 10_000 });
+  });
+
   test("MCP register invokes backend with parsed args", async ({ page }) => {
     await mockCommand(page, "neocodex_mcp_register", () => "ok");
     await page.goto("/");
