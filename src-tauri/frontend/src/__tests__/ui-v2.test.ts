@@ -1494,5 +1494,47 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(input.type).toBe("password");
     expect(input.placeholder).toContain("sk-…");
   });
+
+  it("renderStSecurity lists pending permissions with allow/deny buttons and audit log", async () => {
+    const g = globalThis as Record<string, unknown>;
+    // mock Tauri invoke for the security commands
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const pending = [
+      { id: "perm-1", action: "CommandExec", target: "rm -rf /tmp/test", timestamp: Math.floor(Date.now() / 1000), status: "Pending" },
+    ];
+    const audit = [
+      { id: "a1", action: "FileWrite", target: "~/notes/a.md", timestamp: Math.floor(Date.now() / 1000) - 60, resolution: "approved", reason: null },
+      { id: "a2", action: "CommandExec", target: "shutdown", timestamp: Math.floor(Date.now() / 1000) - 120, resolution: "denied", reason: "Blocked" },
+    ];
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: unknown) => {
+        const h: Record<string, (a: unknown) => unknown> = {
+          get_pending_permissions: () => pending,
+          get_permission_audit_log: () => audit,
+          respond_permission: () => null,
+        };
+        return Promise.resolve(h[cmd] ? h[cmd](args ?? {}) : undefined);
+      },
+    };
+    try {
+      await (g.renderStSecurity as () => Promise<void>)();
+      // mode desc reflects current mode
+      const modeDesc = document.getElementById("stSecModeDesc")!;
+      expect(modeDesc.textContent).toContain("手动");
+      // pending list renders the request with action + target
+      const list = document.getElementById("stSecPendingList")!;
+      expect(list.textContent).toContain("CommandExec");
+      expect(list.textContent).toContain("rm -rf /tmp/test");
+      const allowBtn = list.querySelector('button[data-act="allow"]');
+      expect(allowBtn).toBeTruthy();
+      // audit log renders both resolutions
+      const al = document.getElementById("stSecAuditList")!;
+      expect(al.textContent).toContain("approved");
+      expect(al.textContent).toContain("denied");
+    } finally {
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
 });
 

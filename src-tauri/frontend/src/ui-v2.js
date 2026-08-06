@@ -81,6 +81,7 @@ g.cwFilter = cwFilter;
 g.renderCowork = renderCowork;
 g.togglePinSession = togglePinSession;
 g.isPinnedSession = isPinnedSession;
+g.renderStSecurity = renderStSecurity;
 g.dayStartTs = dayStartTs;
 g.groupSessionsByTime = groupSessionsByTime;
 g.openSessionOps = openSessionOps;
@@ -3233,6 +3234,7 @@ g.renderStApiKey = renderStApiKey;
     if(section==='limits') await renderStLimits();
     if(section==='privacy') await renderStPrivacy();
     if(section==='data') await renderStData();
+    if(section==='security') await renderStSecurity();
     if(section==='profile') initProfileHandlers();
     if(section==='appearance') initAppearanceHandlers();
     if(section==='speech') initSpeechHandlers();
@@ -3546,6 +3548,73 @@ g.renderStApiKey = renderStApiKey;
         if(el) el.textContent = Number(ks.total_nodes).toLocaleString() + ' 节点';
       }
     }catch(e){ console.error('renderStData failed:', e); }
+  }
+
+  /* ===== 安全中心 (审批面板 + 审计日志) ===== */
+  function permModeLabel(){
+    const map = { '手动': '手动：敏感操作逐个确认', '自动': '自动：敏感操作自动放行', '计划': '计划：仅非破坏性操作自动放行' };
+    return map[currentMode] || '手动：敏感操作逐个确认';
+  }
+
+  async function renderStSecurity(){
+    const modeDesc = document.getElementById('stSecModeDesc');
+    if(modeDesc) modeDesc.textContent = permModeLabel();
+    if(!isTauri()){ return; }
+    try{
+      const pending = await invoke('get_pending_permissions');
+      const list = document.getElementById('stSecPendingList');
+      const desc = document.getElementById('stSecPendingDesc');
+      if(list && Array.isArray(pending)){
+        const items = pending.filter(r => r.status === 'Pending' || !r.status);
+        if(items.length){
+          if(desc) desc.textContent = items.length + ' 个请求等待处理';
+          list.innerHTML = items.map(r => {
+            const act = escHtml(String(r.action || ''));
+            const tgt = escHtml(String(r.target || ''));
+            const rid = escHtml(String(r.id || ''));
+            const ts = r.timestamp ? fmtRelTime(Number(r.timestamp)) : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--ghost)">
+              <span style="flex:1;font-size:var(--fs-small);color:var(--tx2)"><b>${act}</b> → <code style="font-size:11px">${tgt}</code> <span style="color:var(--tx-meta);font-size:10.5px">${ts}</span></span>
+              <button class="msg-ipc-retry" data-act="allow" data-id="${rid}" style="color:var(--suc)">允许</button>
+              <button class="msg-ipc-retry" data-act="deny" data-id="${rid}" style="color:var(--err,#E5484D)">拒绝</button>
+            </div>`;
+          }).join('');
+          list.querySelectorAll('button[data-act]').forEach(btn => {
+            btn.onclick = async () => {
+              const id = btn.dataset.id;
+              const approved = btn.dataset.act === 'allow';
+              try{
+                await invoke('respond_permission', { requestId: id, approved });
+                showToast(approved ? '已允许该操作' : '已拒绝该操作');
+              }catch(e){ showToast('操作失败: ' + e); }
+              await renderStSecurity();
+            };
+          });
+        } else {
+          if(desc) desc.textContent = '无挂起请求';
+          list.innerHTML = '<span style="color:var(--tx-meta);font-size:var(--fs-caption)">所有敏感操作均已按策略处理</span>';
+        }
+      }
+    }catch(e){ console.error('renderStSecurity pending failed:', e); }
+    try{
+      const audit = await invoke('get_permission_audit_log', { count: 50 });
+      const al = document.getElementById('stSecAuditList');
+      if(al && Array.isArray(audit)){
+        if(!audit.length){
+          al.innerHTML = '<span style="color:var(--tx-meta);font-size:var(--fs-caption)">暂无审计记录</span>';
+          return;
+        }
+        al.innerHTML = audit.map(a => {
+          const ts = a.timestamp ? fmtRelTime(Number(a.timestamp)) : '';
+          const res = String(a.resolution || '');
+          const cls = res === 'denied' ? 'var(--err,#E5484D)' : (res === 'approved' ? 'var(--suc)' : 'var(--tx3)');
+          return `<div style="display:flex;gap:8px;font-size:var(--fs-caption);color:var(--tx2);padding:3px 0;border-bottom:1px solid var(--bd)">\
+<span style="color:var(--tx-meta);flex-shrink:0">${ts}</span>\
+<span style="flex-shrink:0;color:${cls};font-weight:var(--fw-medium)">${escHtml(res)}</span>\
+<span>${escHtml(String(a.action || ''))} → ${escHtml(String(a.target || ''))}</span></div>`;
+        }).join('');
+      }
+    }catch(e){ console.error('renderStSecurity audit failed:', e); }
   }
 
   async function exportAllData(){
