@@ -42,6 +42,7 @@ g.saveMsgEdit = saveMsgEdit;
 g.cancelMsgEdit = cancelMsgEdit;
 g.deleteMessage = deleteMessage;
 g.retryMessage = retryMessage;
+g.copyUserContent = copyUserContent;
 g.streamResume = streamResume;
 g.regenPush = regenPush;
 g.verNav = verNav;
@@ -1063,6 +1064,7 @@ g.restoreCheckpoint = restoreCheckpoint;
   /* ===== IPC-backed streaming send ===== */
   const streamSubs = new Map();
   let streamFollow = true;
+  let streamActive = window._ntxStreamActive = false;
   let streamBuf = '';
   const lastUserMsgs = [];
   let recallIdx = -1;
@@ -1086,6 +1088,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     }
   }
   function setStreaming(on){
+    streamActive = window._ntxStreamActive = on;
     const send = document.getElementById('sendBtn');
     const stop = document.getElementById('stopBtn');
     if(send) send.disabled = on;
@@ -1226,7 +1229,9 @@ g.restoreCheckpoint = restoreCheckpoint;
     const d=new Date();
     const t=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     const u=document.createElement('div');u.className='msg r';
-    u.innerHTML=`<div class="mb">${escHtml(txt)}</div>`;
+    u.innerHTML=`<div class="msg-act"><button class="ma-btn" data-op="copy" title="复制内容">复制</button></div><div class="mb">${escHtml(txt)}</div>`;
+    const uCopy = u.querySelector('.ma-btn[data-op="copy"]');
+    uCopy.onclick = () => copyUserContent(u);
     s.appendChild(u);
     inp.value='';inp.style.height='auto';
     setStreaming(true);
@@ -1302,6 +1307,8 @@ g.restoreCheckpoint = restoreCheckpoint;
   }
 
   /* ===== Keyboard Shortcuts ===== */
+  if(!window._ntxKeyBound){
+    window._ntxKeyBound = true;
   document.addEventListener('keydown', e => {
     if((e.metaKey || e.ctrlKey) && e.key === ','){ e.preventDefault(); openSettingsModal(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'n'){ e.preventDefault(); createSession(); }
@@ -1320,7 +1327,19 @@ g.restoreCheckpoint = restoreCheckpoint;
       openPalette();
     }
     if(e.key === 'Escape'){
-      document.querySelectorAll('.overlay-panel.open').forEach(p => p.classList.remove('open'));
+      const openOv = document.querySelectorAll('.overlay-panel.open');
+      if(openOv.length){
+        openOv.forEach(p => p.classList.remove('open'));
+        closePopover();
+        updateTrafficVisibility();
+        return;
+      }
+      // ChatGPT/Claude parity: Esc 中断正在生成的回复
+      if(window._ntxStreamActive){
+        e.preventDefault();
+        stopStream();
+        return;
+      }
       closePopover();
       updateTrafficVisibility();
     }
@@ -1328,6 +1347,7 @@ g.restoreCheckpoint = restoreCheckpoint;
       showToast('快捷键: ⌘1/⌘2 切换 · ⌘, 设置 · ⌘N 新建 · ⌘F 知识库 · ⌘W 关闭 · ⌘K 搜索 · Esc 关闭 · ? 帮助');
     }
   });
+  }
 
   /* ⌘F — open Settings → Data control, focus KB search */
   async function openStData(){
@@ -1460,8 +1480,9 @@ g.restoreCheckpoint = restoreCheckpoint;
         if(m.content && lastUserMsgs[lastUserMsgs.length-1] !== m.content) lastUserMsgs.push(m.content);
         const idx = visIdx++;
         const u = document.createElement('div'); u.className = 'msg r';
-        u.innerHTML = `<div class="msg-act"><button class="ma-btn" data-op="edit" title="编辑消息">编辑</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${escHtml(m.content)}</div>`;
+        u.innerHTML = `<div class="msg-act"><button class="ma-btn" data-op="copy" title="复制内容">复制</button><button class="ma-btn" data-op="edit" title="编辑消息">编辑</button><button class="ma-btn" data-op="delete" title="删除消息">删除</button></div><div class="mb">${escHtml(m.content)}</div>`;
         u.dataset.vid = String(idx);
+        u.querySelector('.ma-btn[data-op="copy"]').onclick = () => copyUserContent(u);
         u.querySelector('.ma-btn[data-op="edit"]').onclick = () => editMessage(idx);
         u.querySelector('.ma-btn[data-op="delete"]').onclick = () => deleteMessage(idx);
         cs.appendChild(u);
@@ -1571,6 +1592,12 @@ g.restoreCheckpoint = restoreCheckpoint;
   async function copyMessageContent(index){
     const cs = document.getElementById('chatScroll');
     const mb = cs.querySelectorAll('.msg.l')[index]?.querySelector('.mb');
+    const text = mb?.innerText || mb?.textContent || '';
+    try{ await navigator.clipboard.writeText(text); showToast('已复制'); }catch(_e){ showToast('复制失败'); }
+  }
+
+  async function copyUserContent(msgEl){
+    const mb = msgEl?.querySelector('.mb');
     const text = mb?.innerText || mb?.textContent || '';
     try{ await navigator.clipboard.writeText(text); showToast('已复制'); }catch(_e){ showToast('复制失败'); }
   }
@@ -3382,7 +3409,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     el.style.height='auto';
     el.style.height=Math.min(el.scrollHeight,160)+'px';
     const btn=document.getElementById('sendBtn');
-    if(btn) btn.disabled=!el.value.trim();
+    if(btn && !streamActive) btn.disabled=!el.value.trim();
     try{ QMUpdate(); }catch(_e){}
     try{ saveDraft(); }catch(_e){}
   }
