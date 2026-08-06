@@ -218,6 +218,20 @@ mod tests {
     }
 
     #[test]
+    fn test_default_registry_find_and_execute_model() {
+        let reg = default_registry();
+        // /model must be discoverable via find (by name and alias)
+        assert!(reg.find("/model").is_some());
+        assert!(reg.find("/provider").is_some());
+        assert!(reg.find("/llm").is_some());
+        // execute returns a CommandOutput (not a panic / not an unknown-command error)
+        let out = reg.execute("/model", None);
+        assert!(out.message.contains("model") || out.message.contains("Model")
+            || out.message.contains("Usage") || out.message.contains("provider"),
+            "unexpected /model output: {}", out.message);
+    }
+
+    #[test]
     fn test_auto_commands_not_in_registry() {
         let reg = default_registry();
         let names = reg.list();

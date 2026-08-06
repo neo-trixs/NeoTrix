@@ -1753,6 +1753,12 @@ You have tools available; call them when they help. Be concise and evidence-firs
             let cfg = crate::config::NeoTrixConfig::load();
             cfg.default_model.clone().unwrap_or_else(|| "default".to_string())
         });
+        // 整体链路链接: 未显式指定模型时, 从池子实际注册名解析默认 (而非硬编码 provider)。
+        let default_model = if default_model.is_empty() || default_model == "default" {
+            gateway.resolve_default_model()
+        } else {
+            default_model
+        };
 
         let agent = Arc::new(Mutex::new(
             AgentLoop::new(Arc::new(gateway), &default_model, NT_CORE_SYSTEM_PROMPT)
@@ -2016,7 +2022,22 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             app.push_message("system", "命令: /clear /new /save /load /exit /hist /help\n快捷键: Enter提交 Alt+E多行 ↑↓历史 Ctrl+R搜索 Ctrl+L清屏 Ctrl+C取消/退出 Tab补全".into());
             SlashResult::Handled
         }
-        _ => SlashResult::NotHandled,
+        _ => {
+            // Registry fallback: unknown slash commands route to the command
+            // registry (90+ commands). Hardcoded commands above take priority.
+            // If the registry also misses, return NotHandled so the input is
+            // treated as a normal message.
+            if input.starts_with('/') {
+                let reg = neotrix::cli::commands::registry::default_registry();
+                let cmd = input.split(' ').next().unwrap_or(input);
+                if reg.find(cmd).is_some() {
+                    let out = reg.execute(input, None);
+                    app.status_text = out.message;
+                    return SlashResult::Handled;
+                }
+            }
+            SlashResult::NotHandled
+        }
     }
 }
 

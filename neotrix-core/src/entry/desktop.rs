@@ -5,6 +5,8 @@ use tokio::sync::RwLock;
 use neotrix::neotrix::nt_io_neocodex::{NeoCodexUI, NeoCodexMode, NeoCodexAgent};
 use neotrix::neotrix::nt_mind::self_iterating::SelfIteratingBrain;
 
+use neotrix::cli::commands::registry::default_registry;
+
 /// Run a single evolution-loop iteration against the agent (diagnose → fix).
 /// Kept behind a free function so the loop can be triggered from the TUI
 /// without holding the mutex across the whole command.
@@ -13,9 +15,9 @@ pub(crate) async fn step_evolution(agent: &mut NeoCodexAgent) {
 }
 
 
-pub(crate) async fn run_tui(_agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: bool) {
+pub(crate) async fn run_tui(agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral: bool) {
     let mut agent_ui = NeoCodexUI::new("neotrix-session");
-    agent_ui.agent.lock().await.set_brain(_agent.clone());
+    agent_ui.agent.lock().await.set_brain(agent.clone());
 
     // Cycle 159b fix: ensure a real (non-stub) provider is selected at startup
     // so the ReAct loop is production-reachable instead of always falling back
@@ -140,7 +142,22 @@ pub(crate) async fn run_tui(_agent: Arc<RwLock<SelfIteratingBrain>>, _ephemeral:
                 eprintln!("[resume] restored {} prior events", n);
                 continue;
             }
-            _ => {}
+            _ => {
+                // Registry fallback: unknown slash commands route to the command
+                // registry (90+ commands). Hardcoded commands above take priority
+                // because they operate on agent internal state. Only commands the
+                // match does NOT cover reach here; if the registry also misses,
+                // fall through to send_message (treat as LLM prompt).
+                if input.starts_with('/') {
+                    let reg = default_registry();
+                    let cmd = input.split(' ').next().unwrap_or(input.as_str());
+                    if reg.find(cmd).is_some() {
+                        let out = reg.execute(&input, Some(&agent));
+                        eprintln!("{}", out.message);
+                        continue;
+                    }
+                }
+            }
         }
 
         agent_ui.send_message(&input).await;

@@ -10,8 +10,13 @@ use crate::neotrix::nt_mind::SelfIteratingBrain;
 macro_rules! delegate {
     ($name:expr, $args:expr, $brain:expr) => {{
         let reg = crate::cli::commands::registry::default_registry();
-        let input = format!("{} {}", $name, $args.join(" "));
-        reg.execute(&input, $brain)
+        match reg.find($name) {
+            // Call the target command instance directly, bypassing
+            // registry.execute's full dispatch (sandbox/shield/hook re-entry)
+            // to avoid the self-referential loop back into this aggregator.
+            Some(cmd) => cmd.execute($args, $brain),
+            None => CommandOutput::not_found(&format!("Unknown command: {}", $name)),
+        }
     }};
 }
 
