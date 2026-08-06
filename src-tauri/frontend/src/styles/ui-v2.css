@@ -970,6 +970,7 @@
   .msg-code-res { margin:0; padding:8px 12px; overflow-x:auto; white-space:pre; font-family:var(--fm); font-size:var(--fs-caption); color:var(--tx2); line-height:1.6; }
   .msg-code-err { display:block; padding:6px 12px; font-family:var(--fm); font-size:var(--fs-caption); color:var(--des); }
   .msg-code-emp { display:block; padding:6px 12px; font-family:var(--fm); font-size:var(--fs-caption); color:var(--tx-meta); }
+  .demo-badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:var(--fs-caption); font-weight:600; color:var(--yellow); border:1px solid var(--yellow); background:transparent; margin-bottom:8px; }
   .cw-actions { display:flex; gap:6px; margin-top:6px; }
   .cw-abtn { border:1px solid var(--bd); background:var(--ghost); color:var(--tx2); font-size:var(--fs-caption); font-family:var(--ff); padding:4px 12px; border-radius:7px; cursor:pointer; transition:var(--tr); }
   .cw-abtn:hover { background:var(--accent-bg); color:var(--pri); }

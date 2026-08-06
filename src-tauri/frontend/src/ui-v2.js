@@ -125,7 +125,10 @@ g.renderStApiKey = renderStApiKey;
     const permMap = { '自动': 'auto', '计划': 'plan', '手动': 'manual' };
     if(isTauri()){
       const modeName = permMap[currentMode];
-      invoke('neocodex_set_mode', { mode: modeName === 'auto' ? 'Agent' : (modeName === 'plan' ? 'Plan' : 'Shell') }).catch(() => {});
+      // 语义对齐: 自动/手动 → Agent mode (shell 由 permission 门控, 手动经 UI 审批层);
+      // 计划 → Plan mode (只读规划). 手动映射到 Shell 会与 policy_gate 的
+      // manual-deny-shell 自相矛盾 (nt_io_neocodex.rs:830).
+      invoke('neocodex_set_mode', { mode: modeName === 'plan' ? 'Plan' : 'Agent' }).catch(() => {});
       showToast('权限模式: ' + currentMode);
     }else{
       showToast('权限模式: ' + currentMode + '（浏览器演示）');
@@ -1005,15 +1008,36 @@ g.renderStApiKey = renderStApiKey;
   }
 
   /* ===== Code Tab Switching ===== */
-  function highlightCode(code){
-    const kwSet = new Set(['fn','pub','let','mut','Result','Ok','f64','std','use','match','for','in','if','else','return','struct','impl','enum','trait']);
+  /* 按语言选取关键字集 — 多语言高亮 (Rust/JS/TS/JSON/Python/Shell) */
+  const LANG_KW = {
+    rust:  new Set(['fn','pub','let','mut','Result','Ok','f64','std','use','match','for','in','if','else','return','struct','impl','enum','trait','async','await','mod','crate','self','Self','where','while','loop','break','continue','const','static','type','unsafe','ref','move','Some','None','Vec','String','Box','dyn','super','as','true','false','i32','i64','usize','u64','u32']),
+    js:    new Set(['function','const','let','var','if','else','return','for','while','class','import','export','from','async','await','try','catch','throw','new','this','typeof','instanceof','null','undefined','true','false','switch','case','break','continue','default','extends','super','yield','delete','in','of','void','do','static','get','set','Map','Set','Promise','Array','Object','console']),
+    ts:    new Set(['function','const','let','var','if','else','return','for','while','class','import','export','from','async','await','try','catch','throw','new','this','typeof','instanceof','null','undefined','true','false','switch','case','break','continue','default','extends','super','yield','delete','in','of','void','do','static','get','set','interface','type','enum','implements','readonly','public','private','protected','abstract','namespace','declare','satisfies','keyof','infer','never','unknown','any','string','number','boolean','Map','Set','Promise','Array','Object','console']),
+    json:  new Set(['true','false','null']),
+    python:new Set(['def','class','import','from','if','elif','else','for','while','return','try','except','finally','with','as','lambda','pass','break','continue','global','nonlocal','yield','async','await','raise','assert','del','not','and','or','in','is','None','True','False','self','print','len','range','dict','list','set','tuple','str','int','float','bool','__init__','super']),
+    shell: new Set(['if','then','else','fi','for','while','do','done','case','esac','function','export','local','return','echo','cd','ls','mkdir','rm','cp','mv','cat','grep','sed','awk','curl','wget','sudo','exit','read','set','shift','source','printf','test','true','false','&&','||']),
+  };
+  const DEFAULT_KW = LANG_KW.rust;
+  function langKwSet(lang){
+    const l = String(lang || '').toLowerCase();
+    if(l.includes('rust') || l.includes('rs')) return LANG_KW.rust;
+    if(l.includes('typescript') || l.includes('tsx') || l.includes('ts')) return LANG_KW.ts;
+    if(l.includes('javascript') || l.includes('jsx') || l.includes('js')) return LANG_KW.js;
+    if(l.includes('json')) return LANG_KW.json;
+    if(l.includes('python') || l.includes('py')) return LANG_KW.python;
+    if(l.includes('bash') || l.includes('sh') || l.includes('shell') || l.includes('zsh')) return LANG_KW.shell;
+    return DEFAULT_KW;
+  }
+  function highlightCode(code, lang){
+    const kwSet = langKwSet(lang);
     const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const re = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\/[^\n]*|[A-Z]\w+|\w+|[^a-zA-Z0-9_'"\s]+|\s+)/g;
+    const re = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|@\w+|[A-Z]\w+|\w+|[^a-zA-Z0-9_'"\s]+|\s+)/g;
     let out = '', m;
     while((m = re.exec(code)) !== null){
       const tok = m[0];
       if(tok.startsWith('"') || tok.startsWith("'")) out += '<span class="hl">' + esc(tok) + '</span>';
-      else if(tok.startsWith('//')) out += '<span class="cm">' + esc(tok) + '</span>';
+      else if(tok.startsWith('//') || tok.startsWith('#') || tok.startsWith('/*')) out += '<span class="cm">' + esc(tok) + '</span>';
+      else if(tok.startsWith('@')) out += '<span class="fn">' + tok + '</span>';
       else if(/^[A-Z]\w+$/.test(tok)) out += '<span class="fn">' + tok + '</span>';
       else if(/^\w+$/.test(tok)) out += kwSet.has(tok) ? '<span class="kw">' + tok + '</span>' : tok;
       else out += esc(tok);
@@ -1092,7 +1116,7 @@ g.renderStApiKey = renderStApiKey;
         const code = [];
         while(i < rawLines.length && !/^\s*```\s*$/.test(rawLines[i])){ code.push(rawLines[i]); i++; }
         i++;
-        out += `<div class="msg-code"><div class="msg-code-h"><span class="msg-code-lang">${escHtml(lang || 'code')}</span><span class="msg-code-actions"><button class="msg-code-cp" onclick="runMsgCode(this)">运行</button><button class="msg-code-cp" onclick="copyMsgCode(this)">复制</button></span></div><pre class="msg-code-b">${highlightCode(code.join('\n'))}</pre></div>`;
+        out += `<div class="msg-code"><div class="msg-code-h"><span class="msg-code-lang">${escHtml(lang || 'code')}</span><span class="msg-code-actions"><button class="msg-code-cp" onclick="runMsgCode(this)">运行</button><button class="msg-code-cp" onclick="copyMsgCode(this)">复制</button></span></div><pre class="msg-code-b">${highlightCode(code.join('\n'), lang)}</pre></div>`;
         continue;
       }
       if(!line.trim()){ flush(); i++; continue; }
@@ -1281,6 +1305,24 @@ g.renderStApiKey = renderStApiKey;
     });
   }
 
+  /* 原生菜单事件接线 (lib.rs setup_menu / setup_tray emit):
+     macOS 菜单 accelerator 优先于 webview keydown, 因此 Cmd+N/Cmd+,/Cmd+K/
+     Cmd+Shift+U 及托盘项必须经此监听转发到前端处理, 否则快捷键全部失效. */
+  function wireMenuEvents(){
+    if(!isTauri() || window._ntxMenuBound) return;
+    window._ntxMenuBound = true;
+    const attach=(ev,fn)=>{
+      try{ listen(ev, fn).catch(()=>{}); }catch(_e){}
+    };
+    attach('neotrix:new-session', () => createSession());
+    attach('open-settings', () => openSettingsModal());
+    attach('neocodex-open-palette', () => openPalette());
+    attach('neocodex-check-updates', () => checkForUpdate());
+    attach('sync-trigger', () => { showToast('同步触发'); refreshSessionList(); });
+    attach('proxy-mode-change', (mode) => { showToast('代理模式: ' + String(mode || '')); });
+    attach('open-proxy-status', () => { showToast('代理状态面板'); });
+  }
+
   function wireStreamScroll(){
     const cs = document.getElementById('chatScroll');
     if(!cs || cs.dataset.scrollWired) return;
@@ -1340,7 +1382,8 @@ g.renderStApiKey = renderStApiKey;
     s.appendChild(a);s.scrollTop=s.scrollHeight;
 
     if(!isTauri()){
-      /* Browser fallback: simulated reply so the UI stays demo-able */
+      /* Browser fallback: simulated reply so the UI stays demo-able.
+         标记演示模式, 避免用户误认为真实模型响应 (D8). */
       setTimeout(()=>{
         const rs=[
           '好的，我来逐步分析这个问题。',
@@ -1349,7 +1392,7 @@ g.renderStApiKey = renderStApiKey;
         ];
         const mb=a.querySelector('.mb');
         mb.classList.remove('streaming');
-        const demo = rs[Math.floor(Math.random()*rs.length)] + '\n\n```rust\nfn main() {\n    println!("Hello, NeoTrix!");\n    let engine = ReasoningEngine::new();\n    engine.run();\n}\n```';
+        const demo = '<span class="demo-badge">浏览器演示模式</span>\n\n' + rs[Math.floor(Math.random()*rs.length)] + '\n\n```rust\nfn main() {\n    println!("Hello, NeoTrix!");\n    let engine = ReasoningEngine::new();\n    engine.run();\n}\n```';
         mb.innerHTML = renderRichText(demo);
         setStreaming(false);
         attachUsageFooter(a);
@@ -1366,7 +1409,7 @@ g.renderStApiKey = renderStApiKey;
       const msgCount = (prev && prev.message_count) || 0;
       if(msgCount === 0){
         const title = txt.replace(/\s+/g, ' ').trim().slice(0, 28);
-        invoke('neocodex_rename_session', { sessionId: currentSessionId, name: title }).catch(()=>{});
+        invoke('neocodex_rename_session', { session_id: currentSessionId, name: title }).catch(()=>{});
         if(prev) prev.name = title;
         renderCowork();
       }
@@ -1514,6 +1557,7 @@ g.renderStApiKey = renderStApiKey;
   wireBackend();
   wireStreamScroll();
   fusionInit();
+  wireMenuEvents();
 
 
 
@@ -2537,9 +2581,15 @@ g.renderStApiKey = renderStApiKey;
         const known = MODEL_POOL.map(x => x.id);
         cfg.providers.forEach(p => {
           const idx = MODEL_POOL.findIndex(x => x.id.toLowerCase() === String(p.name||'').toLowerCase());
-          if(idx >= 0){ MODEL_POOL[idx].model = p.model || MODEL_POOL[idx].model; MODEL_POOL[idx].online = !!p.resolvable; }
+          if(idx >= 0){
+            MODEL_POOL[idx].model = p.model || MODEL_POOL[idx].model;
+            MODEL_POOL[idx].online = !!p.resolvable;
+            // 后端 neocodex_provider_config 不提供真实延迟 → 置 null 显示 "—",
+            // 避免把 browser demo 的静态假 lat 渲染给 Tauri 用户 (D7).
+            MODEL_POOL[idx].lat = null;
+          }
           else if(!known.includes(p.name)){
-            MODEL_POOL.push({ id: p.name, title: p.name, model: p.model || '', lat: 0, online: !!p.resolvable });
+            MODEL_POOL.push({ id: p.name, title: p.name, model: p.model || '', lat: null, online: !!p.resolvable });
           }
         });
         if(cfg.active_model){
@@ -2612,10 +2662,6 @@ g.renderStApiKey = renderStApiKey;
       } else {
         showToast('附加文件 (浏览器演示 — 需 Tauri)');
       }
-      return;
-    }
-    if(act === 'attach'){
-      pickAttachment();
       return;
     }
     if(act === 'ref'){
@@ -3646,9 +3692,17 @@ g.renderStApiKey = renderStApiKey;
       if(Array.isArray(sessions)){
         for(const s of sessions){
           if(!s || !s.id) continue;
-          try{ await invoke('neocodex_clear_session', { session_id: String(s.id) }); cleared++; }catch(_e){}
+          // neocodex_delete_session 删除会话文件本体; neocodex_clear_session 只清消息
+          // 保留元数据 — 不符合"清除所有数据"语义 (D6).
+          try{ await invoke('neocodex_delete_session', { session_id: String(s.id) }); cleared++; }catch(_e){}
         }
       }
+      // 清空本地存储中的 UI 状态 (主题保留, 会话相关键清除)
+      try{
+        Object.keys(localStorage).forEach(k => {
+          if(k.startsWith('neotrix.') && !k.startsWith('neotrix.theme')) localStorage.removeItem(k);
+        });
+      }catch(_e){}
       showToast('已清除 ' + cleared + ' 个会话');
     }catch(e){ showToast('清除失败: ' + e); }
   }
