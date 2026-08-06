@@ -63,6 +63,9 @@ pub struct CoEvoConfig {
     pub max_memories: usize,
     /// bandit 冷启动门: 某策略尝试 ≥ min_evidence 次才进入利用 (防噪声覆盖)。
     pub min_evidence: u32,
+    /// 拓扑修复掌握度门槛 (P7): 候选档案 mastery ≥ 该值才被视为"经验上可信"的
+    /// 修复依据 — 防把低观测噪声当成组织缺陷。
+    pub mastery_gate: f64,
 }
 
 impl Default for CoEvoConfig {
@@ -71,6 +74,7 @@ impl Default for CoEvoConfig {
             epsilon: 0.1,
             max_memories: 200,
             min_evidence: 2,
+            mastery_gate: 0.5,
         }
     }
 }
@@ -438,10 +442,11 @@ mod tests {
     use super::*;
 
     fn cfg_deterministic() -> CoEvoConfig {
-        CoEvoConfig {
-            epsilon: 0.0,
-            max_memories: 4,
+CoEvoConfig {
+            epsilon: 0.1,
+            max_memories: 200,
             min_evidence: 2,
+            mastery_gate: 0.5,
         }
     }
 

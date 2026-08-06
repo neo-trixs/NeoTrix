@@ -520,6 +520,59 @@ impl DispatchTopology {
         repairs
     }
 
+    /// 跨域能量流审计 (P7, D45) — 在 learner 统计之上, 叠加 coevo 经验子图证据:
+    /// 当前档案在该任务近期有失败警示, 且候选档案掌握度显著更高时, 提议结构修复。
+    /// 有界: 候选仅限规范档案; 证据不足 (任务 reward < min_evidence) 不动结构。
+    pub fn audit_with_experience(
+        &self,
+        learner: &RouteLearner,
+        coevo: &crate::neotrix::l8_autonomic_impl::nt_mind::evolution::co_evolution::CoEvolutionLoop,
+        task_type: &str,
+    ) -> Vec<TopologyRepair> {
+        let mut repairs = self.audit(learner);
+        if coevo.task_rewards(task_type) < coevo.config.min_evidence as usize {
+            return repairs;
+        }
+        let failed = coevo.failure_warnings(task_type, 3);
+        if failed.is_empty() {
+            return repairs;
+        }
+        let candidates = ["researcher", "explorer", "planner", "generalist", "verifier", "watcher"];
+        for (domain, current) in &self.edges {
+            let current_failures = failed.iter().filter(|m| m.agent == *current).count();
+            if current_failures == 0 {
+                continue;
+            }
+            let mut best: Option<(&'static str, f64, u32)> = None;
+            for agent in candidates {
+                if agent == *current {
+                    continue;
+                }
+                let mastery = coevo.mastery(*domain, agent);
+                if mastery < coevo.config.mastery_gate {
+                    continue;
+                }
+                if best.map(|(_, b, _)| mastery > b).unwrap_or(true) {
+                    best = Some((agent, mastery, current_failures as u32));
+                }
+            }
+            if let Some((candidate, candidate_mastery, evidence)) = best {
+                let current_mastery = coevo.mastery(*domain, current);
+                if candidate_mastery > current_mastery + 0.15 {
+                    repairs.push(TopologyRepair {
+                        domain: *domain,
+                        from_agent: *current,
+                        to_agent: candidate,
+                        from_success_rate: current_mastery,
+                        to_success_rate: candidate_mastery,
+                        evidence_attempts: evidence,
+                    });
+                }
+            }
+        }
+        repairs
+    }
+
     /// 有界结构修复 — 仅接受规范档案名, 应用后 revision+1, 记录 last_repair。
     pub fn apply_repair(&mut self, repair: &TopologyRepair) -> bool {
         let Some(canonical) = Self::canonical_agent(repair.to_agent) else {
@@ -925,7 +978,7 @@ impl MetaAgentShell {
     /// 行为 trace, 发现"当前组织不足"时改派单拓扑的边 (域→档案), 让组织自进化。
     /// 返回实际应用的修复列表 (空 = 当前组织仍足够)。
     pub fn audit_and_repair_topology(&mut self) -> Vec<TopologyRepair> {
-        let repairs = self.topology.audit(&self.learner);
+        let repairs = self.topology.audit_with_experience(&self.learner, &self.coevo, &self.task_type);
         let mut applied = Vec::new();
         for repair in repairs {
             if self.topology.apply_repair(&repair) {
@@ -2340,6 +2393,51 @@ mod tests {
     }
 
     #[test]
+    fn topology_audit_with_experience_fuses_coevo_evidence() {
+        // P7/D45: 跨域能量流 — coevo 失败警示 + 候选档案掌握度显著更高时提议修复;
+        // 证据不足 (reward < min_evidence) 或候选未达 mastery_gate 时不动结构。
+        let topology = DispatchTopology::for_task_type("dialogue");
+        let learner = RouteLearner::new(); // 空 trace — 传统 audit 不提议任何修复。
+
+        // 证据不足: 无 reward → 仅返回空 (learner 无观测)。
+        let empty_coevo = CoEvolutionLoop::new();
+        let no_reward = topology.audit_with_experience(&learner, &empty_coevo, "dialogue");
+        assert!(no_reward.is_empty(), "insufficient evidence must not repair");
+
+        // 有证据: PatternMatch 当前 explore 失败多次, 候选 researcher mastery 高。
+        let mut coevo = CoEvolutionLoop::new();
+        for _ in 0..3 {
+            coevo.record_reward(
+                "dialogue", AttentionDomain::PatternMatch, "explorer", "balanced", false,
+                "missed relevant hits",
+            );
+        }
+        for _ in 0..5 {
+            coevo.record_reward(
+                "dialogue", AttentionDomain::PatternMatch, "researcher", "conservative", true,
+                "search returned evidence",
+            );
+        }
+        let repairs = topology.audit_with_experience(&learner, &coevo, "dialogue");
+        assert!(!repairs.is_empty(), "coevo failure warning + mastery gap should repair");
+        // 修复边界是规范的: 提议的 to_agent 落在规范档案内。
+        for r in &repairs {
+            assert!(canonical_agent_ok(r.to_agent), "repair target must be canonical");
+        }
+        // 无当前档案失败的任务类型 → 不应触发经验修复。
+        let innocent = topology.audit_with_experience(&learner, &coevo, "research_study");
+        for r in &innocent {
+            assert_ne!(r.domain, AttentionDomain::PatternMatch,
+                "no failure warning for task means no experience-driven repair on its edge");
+        }
+    }
+
+    /// 测试辅助: 校验规范档案 (对私有 canonical_agent 的只读镜像)。
+    fn canonical_agent_ok(s: &str) -> bool {
+        matches!(s, "researcher" | "explorer" | "planner" | "generalist" | "verifier" | "watcher")
+    }
+
+    #[test]
     fn topology_apply_repair_is_bounded() {
         // P3/MANTA: 有界修复 — 只接受规范档案名, 保持 agent 预算; 未知档案拒绝。
         let mut topology = DispatchTopology::for_task_type("dialogue");
@@ -2480,6 +2578,7 @@ mod tests {
             epsilon: 0.0,
             max_memories: 50,
             min_evidence: 2,
+            mastery_gate: 0.5,
         });
         let probe = ProbeExecutor {
             calls: std::cell::RefCell::new(Vec::new()),
@@ -2521,6 +2620,7 @@ mod tests {
             epsilon: 0.0,
             max_memories: 50,
             min_evidence: 2,
+            mastery_gate: 0.5,
         });
         loop_.record_reward(
             "research",
