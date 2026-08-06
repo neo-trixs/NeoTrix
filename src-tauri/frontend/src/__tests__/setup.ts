@@ -81,6 +81,9 @@ const defaultResponses: Record<string, (args: any) => any> = {
   neocodex_download_update: () => null,
   neocodex_rename_session: (args: any) => ({ id: args?.sessionId ?? "s", name: args?.name ?? "" }),
   cmd_session_import_json: () => "imp-1,imp-2",
+  has_api_key: () => false,
+  save_api_key: () => null,
+  delete_api_key: () => null,
 };
 
 vi.mock("@tauri-apps/api/core", () => ({

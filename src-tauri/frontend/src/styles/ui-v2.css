@@ -1512,6 +1512,8 @@
   }
   .st-input:focus { border-color:var(--tx-meta); box-shadow:0 0 0 3px rgba(0,0,0,0.04); }
   .st-input::placeholder { color:var(--tx3); }
+  .ntx-mini-btn { padding:8px 10px; border-radius:10px; border:1px solid var(--bd); background:var(--glass-L1-bg); color:var(--tx2); font-size:12px; cursor:pointer; flex-shrink:0; line-height:1; transition:var(--tr); }
+  .ntx-mini-btn:hover { border-color:var(--tx-meta); color:var(--tx); }
   .st-switch { display:inline-flex; align-items:center; cursor:pointer; flex-shrink:0; }
   .st-switch input { width:36px; height:20px; border-radius:10px; border:1px solid var(--bd2); background:var(--ghost); appearance:none; -webkit-appearance:none; cursor:pointer; position:relative; transition:var(--tr); margin:0; }
   .st-switch input::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--tx3); transition:var(--tr); }

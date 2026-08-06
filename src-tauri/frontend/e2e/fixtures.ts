@@ -42,6 +42,9 @@ const PRELOAD_SCRIPT = `(function() {
     cmd_diff_staged: () => [],
     cmd_diff_base: () => [],
     cmd_diff_review: () => ({ score: 100, summary: "", critical: 0, warning: 0, info: 0, files: [] }),
+    has_api_key: () => false,
+    save_api_key: () => null,
+    delete_api_key: () => null,
   };
 
   const I = (window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ || {});

@@ -99,6 +99,8 @@ g.restoreArchived = restoreArchived;
 g.deleteArchived = deleteArchived;
 g.openCheckpointTimeline = openCheckpointTimeline;
 g.restoreCheckpoint = restoreCheckpoint;
+g.maskApiKey = maskApiKey;
+g.renderStApiKey = renderStApiKey;
   /* Free LLM 模型池 — 模型选择下拉的数据源（Tauri 下与 neocodex_provider_config 合并） */
   const MODEL_POOL = [
     { id: 'Groq',        title: 'Groq',        model: 'Llama 3.3 70B', lat: 340, online: true  },
@@ -3155,6 +3157,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     if(section==='appearance') initAppearanceHandlers();
     if(section==='speech') initSpeechHandlers();
     if(section==='compute') initComputeHandlers();
+    if(section==='compute') initApiKeyHandlers();
     if(section==='privacy') initPrivacyHandlers();
   }
 
@@ -3363,6 +3366,68 @@ g.restoreCheckpoint = restoreCheckpoint;
         sel.innerHTML = config.providers.map(p => `<option value="${p.name}" ${p.resolvable ? '' : 'disabled'}>${p.name} (${p.model})${p.resolvable ? '' : ' · 不可用'}</option>`).join('');
       }
     }catch(e){ console.error('renderStCompute failed:', e); }
+    await renderStApiKey();
+  }
+
+  /* ===== API Key mask + keychain (plan #14: Settings Provider) ===== */
+  function maskApiKey(key){
+    if(!key) return '';
+    if(key.length <= 8) return '•'.repeat(key.length);
+    return key.slice(0, 4) + '••••' + key.slice(-4);
+  }
+
+  async function renderStApiKey(){
+    const input = document.getElementById('stApiKey');
+    const state = document.getElementById('stApiKeyState');
+    if(!input) return;
+    input.value = '';
+    let has = false;
+    if(isTauri()){
+      try{ has = !!(await invoke('has_api_key')); }catch(_e){}
+    }
+    if(state){
+      state.textContent = has
+        ? '已保存到系统钥匙串（如要更换，输入新 Key 保存即可）'
+        : '未配置 API Key（保存到系统钥匙串，不落盘明文）';
+    }
+    input.placeholder = has ? 'sk-••••••••（已配置，覆盖保存）' : 'sk-…（留空则不配置）';
+  }
+
+  function initApiKeyHandlers(){
+    const input = document.getElementById('stApiKey');
+    const toggle = document.getElementById('stApiKeyToggle');
+    if(!input) return;
+    const state = document.getElementById('stApiKeyState');
+    if(toggle){
+      toggle.onclick = () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        toggle.textContent = show ? '🙈' : '👁';
+      };
+    }
+    input.onchange = async () => {
+      const key = (input.value || '').trim();
+      if(!key){
+        if(isTauri()){
+          try{ await invoke('delete_api_key'); }catch(_e){}
+          if(state) state.textContent = '已清除 API Key';
+          showToast('已清除 API Key');
+        }
+        return;
+      }
+      if(isTauri()){
+        try{
+          await invoke('save_api_key', { key });
+          input.value = '';
+          input.type = 'password';
+          if(toggle) toggle.textContent = '👁';
+          if(state) state.textContent = '已保存到系统钥匙串（如要更换，输入新 Key 保存即可）';
+          showToast('API Key 已保存到系统钥匙串');
+        }catch(e){ showToast('保存失败: ' + e); }
+      }else{
+        showToast('浏览器模式：仅 Tauri 下可保存到钥匙串');
+      }
+    };
   }
 
   async function renderStLimits(){
