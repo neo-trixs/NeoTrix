@@ -670,4 +670,28 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     );
     expect(order).toEqual(["今天", "item", "昨天", "item", "更早", "item"]);
   });
+
+  test("api key field is masked, toggles visibility, and saves via keychain command", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      const w = window as any;
+      w.openSettingsModal();
+      const item = [...document.querySelectorAll(".st-item")].find((i) => i.textContent?.includes("计算"));
+      if (item) item.click();
+    });
+    const input = page.locator("#stApiKey");
+    await expect(input).toBeVisible({ timeout: 10_000 });
+    await expect(input).toHaveAttribute("type", "password");
+    await expect(page.locator("#stApiKeyState")).toContainText("未配置 API Key");
+    await input.fill("sk-test1234567890");
+    await input.press("Enter");
+    await page.waitForFunction(() => (window as any).__TAURI_INVOKE_CALLS__?.some((c) => c.cmd === "save_api_key"));
+    await expect(page.locator("#stApiKeyState")).toContainText("已保存到系统钥匙串");
+    await expect(input).toHaveValue("");
+    // toggle reveals then hides
+    await page.locator("#stApiKeyToggle").click();
+    await expect(input).toHaveAttribute("type", "text");
+    await page.locator("#stApiKeyToggle").click();
+    await expect(input).toHaveAttribute("type", "password");
+  });
 });

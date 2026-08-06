@@ -1399,5 +1399,25 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(document.querySelectorAll("#cwSessionList .cw-sitem .st-dot").length).toBe(3);
     expect(document.querySelector("#cwSessionList .cw-sitem")!.textContent).toContain("今日会话");
   });
+
+  /* ── API key mask + keychain (wave 13: plan #14 Settings Provider) ── */
+  it("maskApiKey masks long keys keeping head+tail, fully dots short keys", () => {
+    const g = globalThis as Record<string, unknown>;
+    const mask = g.maskApiKey as (k: string) => string;
+    expect(mask("")).toBe("");
+    expect(mask("sk-abcdefghijkl")).toBe("sk-a" + "••••" + "ijkl");
+    expect(mask("short")).toBe("•••••");
+  });
+
+  it("renderStApiKey reflects has_api_key state into placeholder/desc", async () => {
+    const g = globalThis as Record<string, unknown>;
+    (g as any).renderStApiKey();
+    await new Promise(r => setTimeout(r, 0));
+    const state = document.getElementById("stApiKeyState")!;
+    expect(state.textContent).toContain("未配置 API Key");
+    const input = document.getElementById("stApiKey") as HTMLInputElement;
+    expect(input.type).toBe("password");
+    expect(input.placeholder).toContain("sk-…");
+  });
 });
 
