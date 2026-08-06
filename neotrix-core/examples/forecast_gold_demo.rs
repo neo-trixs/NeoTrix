@@ -10,6 +10,36 @@ fn main() {
     {
         use neotrix::core::nt_core_forecast::LlmNarrator;
         let n = LlmNarrator::new();
+        // 1) 池子有哪些注册名？
+        {
+            let handle = n.raw_gateway_handle_for_diag();
+            let names = handle.providers();
+            println!("[DIAG] providers: {:?}", names);
+        }
+        // 2) 直调 pollinations provider 看真实错误
+        {
+            use neotrix::neotrix::l1_body_impl::nt_io_provider::free_providers::PollinationsProvider;
+            use neotrix::neotrix::l1_body_impl::nt_io_provider::types::{LlmRequest, Message, Role};
+            let p = PollinationsProvider::new();
+            let req = LlmRequest::new("openai", "Reply with exactly: E2E-OK");
+            match std::thread::scope(|s| {
+                s.spawn(|| {
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.block_on(p.stream_complete(&req))
+                })
+                .join()
+            }) {
+                Ok(Ok(mut rx)) => {
+                    let mut buf = String::new();
+                    while let Ok(Some(Ok(r))) = tokio::runtime::Runtime::new().unwrap().block_on(rx.recv()) {
+                        buf.push_str(&r.content);
+                    }
+                    println!("[DIAG] PollinationsProvider direct: OK -> {buf:?}");
+                }
+                Ok(Err(e)) => println!("[DIAG] PollinationsProvider direct: ERR -> {e}"),
+                Err(_) => println!("[DIAG] PollinationsProvider direct: join panic"),
+            }
+        }
         match n.narrate_scenarios("probe: is LLM path alive?") {
             Some(s) => println!("[DIAG] LLM narrate OK: {}...", s.chars().take(100).collect::<String>()),
             None => println!("[DIAG] LLM narrate returned None (degraded)"),

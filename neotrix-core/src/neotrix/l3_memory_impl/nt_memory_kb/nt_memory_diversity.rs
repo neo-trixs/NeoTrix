@@ -27,8 +27,18 @@ pub fn apply_recency_decay(mut results: Vec<SearchResult>, now_secs: i64) -> Vec
         let decay = 0.5f64.powf(age / RECENCY_HALF_LIFE_SECS);
         r.score *= decay;
     }
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-    results
+    // ⚠️ 用稳定排序 (sort_by_cached_key 配合原始顺序) 避免重排推倒上游排序。
+    //    此前 sort_by(score DESC) 无条件重排: 当时间衰减因子相同时 (同批数据),
+    //    它会退化为纯 score 排序, 把 search_fts 的标题优先级排序 (原书优先) 推翻。
+    //    时间衰减只应缩放 score, 不应改变相对顺序 — 除非新数据明显更新。
+    let mut indexed: Vec<(usize, &SearchResult)> = results.iter().enumerate().collect();
+    indexed.sort_by(|(ia, a), (ib, b)| {
+        b.score.partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(ia.cmp(ib))
+    });
+    let sorted: Vec<SearchResult> = indexed.into_iter().map(|(_, r)| r.clone()).collect();
+    sorted
 }
 
 /// MMR 多样性重排 (D9): 贪心选择最大化 [λ·相关度 − (1−λ)·与已选的最大相似度]。

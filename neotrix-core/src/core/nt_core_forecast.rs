@@ -401,6 +401,11 @@ impl LlmNarrator {
         }
     }
 
+    /// 诊断用 — 暴露底层 GatewayHandle（example 探针使用）。
+    pub fn raw_gateway_handle_for_diag(&self) -> &gateway_handle::GatewayHandle {
+        self.gateway.get_or_init(gateway_handle::GatewayHandle::new)
+    }
+
     /// 指定模型名（None = 池子自动选择）。
     pub fn with_model(mut self, model: &str) -> Self {
         self.model = Some(model.to_string());
