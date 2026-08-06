@@ -398,6 +398,8 @@ impl LlmProvider for PollinationsProvider {
 
         let resp = self.client
             .post(&self.base_url)
+            // pollinations 匿名访问要求 referer=pollinations.ai 否则按认证用户返回 402
+            .header(reqwest::header::REFERER, "https://pollinations.ai/")
             .json(&body)
             .send()
             .await
@@ -448,7 +450,14 @@ impl LlmProvider for PollinationsProvider {
 
         tokio::spawn(async move {
             let client = global_client().clone();
-            if let Ok(response) = client.post(&base_url).json(&body).send().await {
+            if let Ok(response) = client
+                .post(&base_url)
+                // pollinations 匿名访问要求 referer=pollinations.ai 否则按认证用户返回 402
+                .header(reqwest::header::REFERER, "https://pollinations.ai/")
+                .json(&body)
+                .send()
+                .await
+            {
                 if !response.status().is_success() { return; }
                 let full_text = response.text().await.unwrap_or_default();
                 if !full_text.is_empty() {

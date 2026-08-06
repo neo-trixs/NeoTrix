@@ -139,11 +139,11 @@ async fn main() {
     // ── 0.5 标题加权排序验证 (原书应排到引用书前) ──
     println!("\n🏷️ 标题加权排序验证 (search_fts 增强)...");
     for q in ["史记", "论语", "道德经"] {
-        match kb.search(q, 5) {
+        match kb.search(q, 15) {
             Ok(results) => {
-                let titles: Vec<String> = results.iter().take(5)
-                    .map(|r| format!("{}[score={:.2}]", r.node.title, r.score)).collect();
-                println!("  「{}」top5: {}", q, titles.join(" → "));
+                let titles: Vec<String> = results.iter().take(15)
+                    .map(|r| format!("{}[{:?}][{:.2}]", r.node.title, r.node.node_type, r.score)).collect();
+                println!("  「{}」top15: {}", q, titles.join(" → "));
             }
             Err(e) => println!("  ❌ 「{}」: {}", q, e),
         }

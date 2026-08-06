@@ -2784,4 +2784,115 @@ mod tests {
             Some("compressed content here")
         );
     }
+
+    // ─── R-P97: absorb-node 测试 ──────────────────────────────
+    fn node_test_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE nodes (
+                id TEXT PRIMARY KEY, node_type TEXT NOT NULL, title TEXT NOT NULL,
+                summary TEXT, content TEXT, url TEXT, domain TEXT,
+                language TEXT DEFAULT 'en', confidence REAL DEFAULT 1.0,
+                importance REAL DEFAULT 0.5, created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL, access_count INTEGER DEFAULT 0,
+                metadata TEXT, data_tier TEXT NOT NULL DEFAULT 'core',
+                temporal TEXT, supersedes TEXT, source_episode TEXT,
+                tier TEXT NOT NULL DEFAULT 'warm');
+             CREATE VIRTUAL TABLE nodes_fts USING fts5(title, summary, content, domain);",
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_absorb_node_insert_and_fts() {
+        let conn = node_test_db();
+        let node = json!({
+            "url": "https://example.github.io/demo/",
+            "title": "Demo Page",
+            "summary": "A test article",
+            "content": "This is a test article body with enough length to be meaningful for the FTS index.",
+            "node_type": "article",
+            "language": "en",
+            "domain": "example.github.io",
+            "importance": 0.7,
+        });
+        // 写临时文件 (cmd_absorb_node 读文件)
+        let path = std::env::temp_dir().join("nt_test_node.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        let dry_run = false;
+        let apply_cap = false;
+        cmd_absorb_node(&conn, path.to_str().unwrap(), dry_run, apply_cap);
+        // 节点已写入
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "node inserted");
+        // FTS 已同步 (防 PA011 desync)
+        let fts_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes_fts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fts_count, 1, "FTS row inserted");
+        // id 前缀 batch_
+        let id: String = conn
+            .query_row("SELECT id FROM nodes LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert!(id.starts_with("batch_"), "id prefix batch_: {}", id);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_absorb_node_duplicate_dedup() {
+        let conn = node_test_db();
+        let node = json!({
+            "url": "https://example.github.io/demo/",
+            "title": "Demo Page",
+            "content": "Same URL must be deduplicated.",
+            "node_type": "article",
+        });
+        let path = std::env::temp_dir().join("nt_test_node2.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "duplicate URL must not double-insert");
+        let fts_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes_fts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fts_count, 1, "FTS also deduplicated");
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_absorb_node_dry_run_and_capability() {
+        let conn = node_test_db();
+        let node = json!({
+            "url": "https://example.github.io/cap/",
+            "title": "Cap Page",
+            "content": "Capability mapping test node with sufficient content length.",
+            "node_type": "article",
+            "capability": {"branch": "NT-MIND", "capability": "generate", "evidence": "test"},
+        });
+        let path = std::env::temp_dir().join("nt_test_node3.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        // dry-run: 不写入
+        cmd_absorb_node(&conn, path.to_str().unwrap(), true, false);
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "dry-run must not insert");
+        // 实际写入 + capability
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, true);
+        let meta: String = conn
+            .query_row("SELECT metadata FROM nodes WHERE url='https://example.github.io/cap/'",
+                       [], |r| r.get(0))
+            .unwrap();
+        let m: Value = serde_json::from_str(&meta).unwrap();
+        assert_eq!(m["absorbed_capability"]["branch"], "NT-MIND");
+        assert_eq!(m["absorbed_capability"]["capability"], "generate");
+        assert_eq!(m["absorbed_capability"]["evidence"], "test");
+        std::fs::remove_file(&path).ok();
+    }
 }

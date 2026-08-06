@@ -91,8 +91,12 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
     results.sort_by(|a, b| {
         let pa = title_pri(a);
         let pb = title_pri(b);
-        pa.cmp(&pb).then(b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal))
+        // 优先级大的排前 (FtsTitle=2 > FtsContent=1): 用 pb.cmp(&pa) 实现降序
+        pb.cmp(&pa).then(b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal))
     });
+    #[cfg(feature = "full")]
+    eprintln!("[search_fts] q={} rows={} first10={:?}", query, results.len(),
+        results.iter().take(10).map(|r| format!("{}|{:.2}|{:?}", r.node.title, r.score, r.matched_on)).collect::<Vec<_>>());
     Ok(results)
 }
 
@@ -248,6 +252,9 @@ pub fn hybrid_search(
     } else {
         ranklists.into_iter().next().expect("non-empty ranklists")
     };
+    #[cfg(feature = "full")]
+    eprintln!("[hybrid] q={} fts={} bm25={} fused={} first5={:?}", query, fts_pairs.len(), bm25_results.len(), fused.len(),
+        fused.iter().take(5).map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>())).collect::<Vec<_>>());
 
     // Fetch full node data for fused IDs
     let mut fused_ids: Vec<String> = Vec::new();
