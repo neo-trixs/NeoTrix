@@ -43,6 +43,13 @@ g.cancelMsgEdit = cancelMsgEdit;
 g.deleteMessage = deleteMessage;
 g.retryMessage = retryMessage;
 g.streamResume = streamResume;
+g.regenPush = regenPush;
+g.verNav = verNav;
+g.verReset = verReset;
+g.closeQM = closeQM;
+g.QMUpdate = QMUpdate;
+g.insertMention = insertMention;
+g.runSlashCommand = runSlashCommand;
 g.renderThread = renderThread;
 g.createSession = createSession;
 g.refreshAgent = refreshAgent;
@@ -1348,6 +1355,7 @@ g.restoreCheckpoint = restoreCheckpoint;
 
   async function retryMessage(index){
     if(!isTauri() || !currentSessionId) return;
+    try{ regenPush(currentSessionId, index); }catch(_e){}
     const msgs = await invoke('neocodex_regenerate', { session_id: currentSessionId, index }).catch(e => { showToast('重试失败: ' + e); return null; });
     if(Array.isArray(msgs)){
       renderThread(msgs);
@@ -2823,11 +2831,185 @@ g.restoreCheckpoint = restoreCheckpoint;
     el.style.height=Math.min(el.scrollHeight,160)+'px';
     const btn=document.getElementById('sendBtn');
     if(btn) btn.disabled=!el.value.trim();
+    try{ QMUpdate(); }catch(_e){}
   }
   function handleKey(e){
     const inp=e.target;
-    if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendMsg(); return; }
+    if(e.key==='Enter'&&!e.shiftKey){
+      e.preventDefault();
+      if(QKM.items.length && document.querySelector('#qmMenu .qm-item.on')){ QMExec(); return; }
+      sendMsg(); return;
+    }
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+      if(QKM.items.length){ e.preventDefault(); QMMove(e.key==='ArrowDown'?1:-1); return; }
+    }
+    if(e.key==='Escape'){ if(QKM.items.length){ closeQM(); e.preventDefault(); return; } }
     autoResize(inp);
+    QMUpdate();
+  }
+
+  /* ════════════════════════════════════════════════
+     @-mention 胶囊 + / 命令 弹出菜单 (Cursor/ChatGPT 式)
+     输入 @ 或行首 / 触发候选列表; Enter 或点击执行
+     ════════════════════════════════════════════════ */
+  const MENTION_TARGETS = [
+    { kind:'agent', id:'@nt-core',  desc:'引导者 · 总协调' },
+    { kind:'agent', id:'@nt-mind',  desc:'进化工匠 · 进化' },
+    { kind:'agent', id:'@nt-memory',desc:'知识守护 · 记忆' },
+    { kind:'agent', id:'@nt-world', desc:'探索 · 只读检索' },
+    { kind:'agent', id:'@nt-act',   desc:'执行 · 多步实现' },
+    { kind:'agent', id:'@nt-shield',desc:'影卫 · 审查' },
+    { kind:'agent', id:'@nt-io',    desc:'界面使徒 · UI' },
+    { kind:'agent', id:'@nt-scout', desc:'调研 · 外部检索' },
+    { kind:'tool',  id:'@/diff',    desc:'查看当前工作区 Diff' },
+    { kind:'tool',  id:'@/context', desc:'查看上下文使用率' },
+  ];
+  const SLASH_COMMANDS = [
+    { id:'/new',     desc:'新建会话' },
+    { id:'/clear',   desc:'清空当前对话' },
+    { id:'/compact', desc:'压缩当前会话上下文' },
+    { id:'/diff',    desc:'打开 Diff 面板' },
+    { id:'/plan',    desc:'切换 Plan 权限模式' },
+    { id:'/help',    desc:'快捷键与帮助' },
+    { id:'/archive', desc:'归档会话' },
+  ];
+
+  let QKM = { mode:null, items:[], sel:0 };
+
+  function closeQM(){ QKM = { mode:null, items:[], sel:0 }; const m=document.getElementById('qmMenu'); if(m){ m.innerHTML=''; m.style.display='none'; } }
+
+  function QMTriggerChar(inp){
+    const v=inp.value||''; const pos=inp.selectionStart==null? v.length : inp.selectionStart;
+    const before=v.slice(0,pos);
+    const at=/@([^@\s/]*)$/.exec(before);
+    if(at) return { mode:'@', q:at[1] };
+    // slash only when the current line (from line start) begins with '/'
+    const lineStart = before.lastIndexOf('\n') + 1;
+    const line = before.slice(lineStart);
+    const sl=/^\/([a-z]*)$/.exec(line);
+    if(sl && pos===before.length) return { mode:'/', q:sl[1]||'' };
+    return null;
+  }
+
+  function QMUpdate(){
+    const inp=document.getElementById('chatInput');
+    const tr=inp ? QMTriggerChar(inp) : null;
+    if(!tr){ closeQM(); return; }
+    const pool = tr.mode==='@' ? MENTION_TARGETS : SLASH_COMMANDS;
+    const ql=tr.q.toLowerCase();
+    const items=pool.filter(it => !ql || it.id.toLowerCase().includes(ql));
+    QKM = { mode:tr.mode, items, sel:0 };
+    const m=document.getElementById('qmMenu');
+    if(!m) return;
+    m.innerHTML = items.length
+      ? items.map((it,i)=>`<button type="button" class="qm-item ${i===0?'on':''}" data-i="${i}">`+
+          `<span class="qm-ic">${tr.mode==='@' ? (it.kind==='agent'?'◆':'⚙') : '/'}</span>`+
+          `<span class="qm-title">${escHtml(it.id)}</span>`+
+          `<span class="qm-desc">${escHtml(it.desc)}</span></button>`).join('')
+      : '<div class="qm-empty">无匹配项</div>';
+    m.style.display = items.length ? 'block' : 'none';
+    m.querySelectorAll('.qm-item').forEach(b => b.addEventListener('click', () => { QKM.sel=Number(b.dataset.i); QMExec(); }));
+  }
+
+  function QMMove(d){
+    if(!QKM.items.length) return;
+    QKM.sel = (QKM.sel + d + QKM.items.length) % QKM.items.length;
+    const m=document.getElementById('qmMenu');
+    m.querySelectorAll('.qm-item').forEach((el,i)=>el.classList.toggle('on', i===QKM.sel));
+  }
+
+  function QMExec(){
+    const { mode, items, sel } = QKM;
+    const it = items[sel];
+    if(!it) return;
+    closeQM();
+    if(mode==='/') runSlashCommand(it.id);
+    else insertMention(it.id);
+  }
+
+  function insertMention(id){
+    const inp=document.getElementById('chatInput');
+    if(!inp) return;
+    const v=inp.value||''; const pos=inp.selectionStart==null? v.length : inp.selectionStart;
+    const before=v.slice(0,pos);
+    const at=/@([^@\s/]*)$/.exec(before);
+    const base = at ? before.slice(0, before.length - at[0].length) : before;
+    const after=v.slice(pos);
+    inp.value = base + id + ' ' + after;
+    inp.selectionStart = inp.selectionEnd = base.length + id.length + 1;
+    inp.focus(); autoResize(inp);
+  }
+
+  function runSlashCommand(id){
+    switch(id){
+      case '/new':     createSession(); break;
+      case '/clear':   actions.newChat(); showToast('已清空对话'); break;
+      case '/compact': compactSession(); break;
+      case '/diff':    openDiff(); break;
+      case '/plan':    cycleMode(); break;
+      case '/help':    showToast('快捷键: ⌘, 设置 · ⌘N 新建 · ⌘F 检索 · ⌘W 关闭'); break;
+      case '/archive': openSessionOps(); break;
+      default: showToast('命令: '+id);
+    }
+  }
+
+  /* 重新生成版本轮播 — 快照 assistant 回复, 支持 较旧/较新 浏览 */
+  const regenVersions = new Map(); // key: sessionId+':'+vid -> snapshot html[]
+  const regenCursor = new Map();   // key -> current position
+
+  function regenPush(sessionId, vid){
+    const el = msgElByVid(vid);
+    const mb = el && el.querySelector('.mb');
+    if(!mb) return;
+    const html = mb.innerHTML;
+    if(!html) return;
+    const key = sessionId + ':' + vid;
+    const arr = regenVersions.get(key) || [];
+    if(arr[arr.length-1] !== html) arr.push(html);
+    regenVersions.set(key, arr);
+    if(!regenCursor.has(key)) regenCursor.set(key, arr.length);
+    renderVersionBar(el, sessionId, vid);
+  }
+
+  function renderVersionBar(msgEl, sessionId, vid){
+    const key = sessionId + ':' + vid;
+    const arr = regenVersions.get(key) || [];
+    const cur = Math.max(1, Math.min(arr.length, regenCursor.get(key) || arr.length));
+    if(arr.length < 2) return;
+    let bar = msgEl.querySelector('.ver-bar');
+    if(!bar){
+      bar = document.createElement('div'); bar.className='ver-bar';
+      msgEl.appendChild(bar);
+    }
+    bar.innerHTML = `<span>回复</span><button class="ver-ctrl" data-a="prev"><span class="caret">◀</span>较旧</button>`+
+      `<span class="ver-count">${cur}/${arr.length}</span>`+
+      `<button class="ver-ctrl" data-a="next">较新<span class="caret">▶</span></button>`+
+      `<button class="ver-reset">重置</button>`;
+    const prev=bar.querySelector('[data-a="prev"]'), next=bar.querySelector('[data-a="next"]');
+    prev.disabled = cur<=1; next.disabled = cur>=arr.length;
+    prev.onclick=()=>verNav(sessionId, vid, -1);
+    next.onclick=()=>verNav(sessionId, vid, 1);
+    bar.querySelector('.ver-reset').onclick=()=>verReset(sessionId, vid);
+  }
+
+  function verNav(sessionId, vid, delta){
+    const key = sessionId + ':' + vid;
+    const arr = regenVersions.get(key) || [];
+    let cur = regenCursor.get(key) || arr.length;
+    const next = Math.max(1, Math.min(arr.length, cur + delta));
+    if(next === cur) return;
+    regenCursor.set(key, next);
+    const el = msgElByVid(vid); const mb = el && el.querySelector('.mb');
+    if(mb && arr[next-1] !== undefined) mb.innerHTML = arr[next-1];
+    renderVersionBar(el, sessionId, vid);
+  }
+
+  function verReset(sessionId, vid){
+    const key = sessionId + ':' + vid;
+    regenCursor.delete(key);
+    const el = msgElByVid(vid);
+    if(el) renderVersionBar(el, sessionId, vid);
+    showToast('已显示最新回复');
   }
 function escHtml(str){
     if(!str)return'';

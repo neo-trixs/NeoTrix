@@ -590,4 +590,52 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  it("@ mention: typing @ opens popup, selecting inserts pill and closes", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = "@"; input.selectionStart = 1; input.selectionEnd = 1;
+    (g.QMUpdate as () => void)();
+    const menu = document.getElementById("qmMenu");
+    expect(menu!.style.display).toBe("block");
+    const items = menu!.querySelectorAll(".qm-item");
+    expect(items.length).toBeGreaterThan(0);
+    expect(menu!.textContent).toContain("@nt-core");
+    (items[0] as HTMLElement).click();
+    expect(input.value).toContain("@nt-core");
+    expect(menu!.style.display).toBe("none");
+  });
+
+  it("QUpdate: / at line start lists slash commands", () => {
+    const g = globalThis as Record<string, unknown>;
+    const input = document.getElementById("chatInput") as HTMLTextAreaElement;
+    input.value = "/di";
+    input.selectionStart = 3; input.selectionEnd = 3;
+    (g.QMUpdate as () => void)();
+    const menu = document.getElementById("qmMenu");
+    expect(menu!.style.display).toBe("block");
+    expect(menu!.textContent).toContain("/diff");
+    const items = menu!.querySelectorAll(".qm-item");
+    (items[0] as HTMLElement).click();
+    // selecting a slash command should close menu (runs locally)
+    expect(menu!.style.display).toBe("none");
+  });
+
+  it("regenPush snapshots assistant reply and shows version bar", () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+      { role: "user", content: "提问", timestamp: 1700000000 },
+      { role: "agent", content: "第一版回答", timestamp: 1700000001 },
+    ], "s-ver");
+    (g.regenPush as (sid: string, vid: number) => void)("s-ver", 1);
+    (g.renderThread as (msgs: unknown[], sessionId?: string) => void)([
+      { role: "user", content: "提问", timestamp: 1700000000 },
+      { role: "agent", content: "第二版回答", timestamp: 1700000001 },
+    ], "s-ver");
+    (g.regenPush as (sid: string, vid: number) => void)("s-ver", 1);
+    const bar = document.querySelector("#chatScroll .msg.l .ver-bar");
+    expect(bar).not.toBeNull();
+    expect(bar!.textContent).toContain("较旧");
+    expect(bar!.textContent).toContain("较新");
+  });
 });

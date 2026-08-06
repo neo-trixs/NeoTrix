@@ -246,4 +246,26 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     expect(ap.args).toMatchObject({ path: "src/app.rs", action: "accept" });
     await expect(page.locator("#diffBody .df-done-tag")).toContainText("已接受");
   });
+
+  test("@ mention popup opens on @ and inserts pill on select", async ({ page }) => {
+    await page.goto("/");
+    const textarea = page.locator("#chatInput");
+    await textarea.click();
+    await textarea.pressSequentially("@");
+    const menu = page.locator("#qmMenu");
+    await expect(menu).toBeVisible({ timeout: 10_000 });
+    await expect(menu.locator(".qm-item").first()).toContainText("@nt-core");
+    await menu.locator(".qm-item").first().click();
+    await expect(textarea).toHaveValue(/@nt-core/);
+  });
+
+  test("/ slash command menu lists commands", async ({ page }) => {
+    await page.goto("/");
+    const textarea = page.locator("#chatInput");
+    await textarea.click();
+    await textarea.pressSequentially("/di");
+    const menu = page.locator("#qmMenu");
+    await expect(menu).toBeVisible({ timeout: 10_000 });
+    await expect(menu.locator(".qm-item").first()).toContainText("/diff");
+  });
 });
