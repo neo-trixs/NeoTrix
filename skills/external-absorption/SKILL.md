@@ -101,7 +101,17 @@ extract → dedup → categorize → capability map → insert + 显式 FTS → 
 | **KNOWN_REPOS 确定性** | 已知顶级仓库 → 确定性 capability (如 `openai/codex`→NT-ACT/execute, `crawl4ai`→NT-WORLD/retrieve, `langfuse`→NT-SHIELD/verify) | 100% for known |
 | **API 429 → HTML fallback** | GitHub REST API 限流时降级到 `fetch_github_html` (OG meta + raw README)，保留 stars/language/topics 关键元数据 | 100% 降级成功 |
 | **404 pre-filter** | extract 前验证 URL 有效性；600 条中发现 6 个真 404 (1%) — 预检可避免 6 轮空跑 | 防 1% 无效源 |
+| **共享临时文件竞态 (Cycle 208 事故)** | `curl()` 若共享同一输出文件 (如 `/tmp/_batch_out`)，并发 workers 会互相覆盖 → 节点 title/content 错配且**无声失败**。必须每调用唯一临时文件 (PID+counter+thread_id)；插入后必须 title↔URL 匹配校验 (R-P16) | 13/45 首插节点污染，已修复 |
+| **KNOWN_REPOS 专家键 (Cycle 208)** | 大仓库 (ComfyUI/lobe-chat/semantica/graphrag/ragflow 等) 的 README 含 security/audit 等词会被 keyword 规则误伤 → 顶级仓库必须进 KNOWN_REPOS 确定性键，新增键须查重防 dict 覆盖 | 消除 ~20 误映射 |
 | **FTS5 rebuild 陷阱** | 非 external-content FTS5 表，`INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')` 只重建 shadow 表已有行，**不会**从 nodes 拉新数据 → 显式插入才是检索可用的唯一路径 | 已验证 (kb_batch_absorb.py:232) |
+| **顺序预检吞吐瓶颈 (Cycle 232)** | 脚本内置顺序 HEAD 预检是吞吐瓶颈 (150 URL × ≤10s ≈ 25min 超时) → 先外部并发预检 (16 workers) 过滤 dead，再 `--skip-prefilter` 跳过脚本内重复预检 (301 URL ≈ 2min) | 901s 超时 → 2min |
+| **fake-ip DNS 污染 (Cycle 232)** | 本地 DNS 被代理 fake-ip 污染 (api.github.com → 198.18.x，curl code:000) → `dig +short <host> @8.8.8.8` 拿真实 IP + `curl --resolve <host>:443:<IP>` 绕过。web 域名 (github.com) 不受影响，仅 API 子域可能被污染 | 235 enrich 全失败 → 0 失败 |
+| **enrich 数据文件字段契约 (Cycle 232)** | 外部生成的数据文件列格式必须在脚本内先校验：`owner/repo` 组合列若被当单独 owner 用 → 全批 404。`split('/', 1)` 拆解后再拼 URL | 235 全 Not Found |
+| **--apply 只刷 batch_% 节点 (Cycle 232)** | `absorb_to_capability.py --apply` 仅处理 `id LIKE 'batch_%'` 节点；历史 UUID 节点永不被专家键刷新 → 新增专家键后需定向 SQL 修复历史误映射 (内存匹配 17k 节点批量 UPDATE) | 修复 203 误映射 |
+| **UPDATE 静默失败 + rowcount 校验 (Cycle 232)** | enrich 脚本 UPDATE 遇 `database is locked` 时异常重试循环会自然退出不 raise，但 `ok += 1` 仍执行 → 日志虚报成功数据未写入。根因：常驻 `neotrix-experience` 进程持有 KB WAL 锁。修复：UPDATE 后必须校验 `cur.rowcount > 0` + 严格重试 | 32 虚报 → 26 真实 |
+| **GitHub repo 301 改名 (Cycle 232)** | `api.github.com/repos/{o}/{r}` 对已改名 repo 返回 "Moved Permanently"（无 stars 字段）→ curl 必须加 `-L` 跟随重定向拿新 `full_name`。改名后需更新 KB 节点 url + metadata.owner + 记录 `redirected_from` | 3 repo 改名处理 |
+| **SPA 单页站阈值 (Cycle 232)** | air.dev/aethercss 等 SPA 站正文行过滤后仅剩 title（43-52 字符）→ <60 阈值拒收导致漏吸收。修复：阈值降至 40 + meta/og:description 兜底，title 可辨的产品/工具页值得吸收 | 3 SPA 站漏吸收 → 已入库 |
+| **网络故障分级 (Cycle 232)** | ①全站出站 000 = 代理隧道断开（环境级，固化 pending 等恢复）②单域名 000 = fake-ip 污染或站内故障（单独排查）③恢复后重跑脚本须幂等（dup 跳过） | 6 挂起 → 恢复后 4 成功 |
 
 #### absorbed_capability 数据层追踪 (R-P79 闭环)
 

@@ -24,6 +24,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 import urllib.parse
 
@@ -53,9 +54,18 @@ def url_valid(url):
         return False
 
 
+_curl_counter = 0
+
+
 def curl(url, timeout=15, headers=None):
+    """Fetch a URL body. Each call uses a unique temp file to avoid
+    concurrent-writer race (shared /tmp/_batch_out corrupted node data
+    under ThreadPoolExecutor workers)."""
+    global _curl_counter
+    _curl_counter += 1
+    out = f'/tmp/_batch_out_{os.getpid()}_{_curl_counter}_{threading.get_ident()}'
     cmd = ['curl', '-s', '-L', '-m', str(timeout), '--connect-timeout', '10',
-           '-A', UA, '-o', '/tmp/_batch_out', '-w', '%{http_code}', url]
+           '-A', UA, '-o', out, '-w', '%{http_code}', url]
     if headers:
         for k, v in headers.items():
             cmd += ['-H', f'{k}: {v}']
@@ -63,13 +73,19 @@ def curl(url, timeout=15, headers=None):
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 15)
         if r.stdout.strip() == '200':
             try:
-                body = open('/tmp/_batch_out', encoding='utf-8', errors='ignore').read()
+                with open(out, encoding='utf-8', errors='ignore') as f:
+                    body = f.read()
                 if body.strip():
                     return body
             except OSError:
                 pass
     except (subprocess.TimeoutExpired, OSError):
         pass
+    finally:
+        try:
+            os.remove(out)
+        except OSError:
+            pass
     return None
 
 
@@ -225,8 +241,8 @@ def fetch_article(url):
     }
 
 
-def fetch_one(url):
-    if not url_valid(url):
+def fetch_one(url, skip_prefilter=False):
+    if not skip_prefilter and not url_valid(url):
         return None
     if 'github.com' in url:
         return fetch_github_repo(url)
@@ -267,21 +283,26 @@ def main():
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--workers', type=int, default=8)
+    ap.add_argument('--skip-prefilter', action='store_true',
+                    help='input already HEAD-prefiltered externally; skip sequential prefilter & per-URL HEAD check')
     args = ap.parse_args()
 
     urls = [l.strip() for l in open(args.urls) if l.strip()]
     if args.limit:
         urls = urls[:args.limit]
-    # Pre-filter: discard dead URLs via HEAD request before entering fetch pipeline
-    pre_filtered = []
-    pre_failed = 0
-    for u in urls:
-        if url_valid(u):
-            pre_filtered.append(u)
-        else:
-            pre_failed += 1
-    urls = pre_filtered
-    print(f'[batch] {len(urls)} URLs after pre-filter (-{pre_failed} dead/404)', flush=True)
+    if args.skip_prefilter:
+        print(f'[batch] {len(urls)} URLs (prefilter skipped)', flush=True)
+    else:
+        # Pre-filter: discard dead URLs via HEAD request before entering fetch pipeline
+        pre_filtered = []
+        pre_failed = 0
+        for u in urls:
+            if url_valid(u):
+                pre_filtered.append(u)
+            else:
+                pre_failed += 1
+        urls = pre_filtered
+        print(f'[batch] {len(urls)} URLs after pre-filter (-{pre_failed} dead/404)', flush=True)
 
     conn = sqlite3.connect(KB_PATH)
     conn.execute('PRAGMA journal_mode=WAL')
@@ -289,7 +310,7 @@ def main():
     stats = {'inserted': 0, 'duplicate': 0, 'failed': 0, 'would_insert': 0}
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {ex.submit(fetch_one, u): u for u in urls}
+        futs = {ex.submit(fetch_one, u, args.skip_prefilter): u for u in urls}
         for fut in concurrent.futures.as_completed(futs):
             u = futs[fut]
             done += 1
