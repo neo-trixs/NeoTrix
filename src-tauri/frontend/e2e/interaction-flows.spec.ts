@@ -283,4 +283,46 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await expect(pop).toContainText("42,000");
     await expect(pop).toContainText("claude-sonnet");
   });
+
+  test("add attachment chip via plus menu and sendMsg passes attachments", async ({ page }) => {
+    await mockCommand(page, "neocodex_send_message_stream", () => "ok");
+    await page.goto("/");
+    // drive the chip directly through the exposed global (matches Tauri file flow)
+    await page.evaluate(() => {
+      (window as any).addAttachChip("src/app.rs", { size: 512, mime: "text/plain", data: "fn main(){}" });
+    });
+    await expect(page.locator("#ntxAttachArea .ntx-attach-chip")).toContainText("src/app.rs");
+    await page.locator("#chatInput").fill("分析这个文件");
+    await page.locator("#chatInput").press("Enter");
+    await expect(page.locator("#chatScroll .msg.r")).toContainText("分析这个文件", { timeout: 10_000 });
+    const calls = await invokeCalls(page);
+    const send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
+    expect(send).toBeTruthy();
+    expect(send.args.attachments).toBeTruthy();
+    expect(send.args.attachments[0]).toMatchObject({ name: "src/app.rs", size: 512 });
+    // chips cleared after send
+    await expect(page.locator("#ntxAttachArea .ntx-attach-chip")).toHaveCount(0);
+  });
+
+  test("ref picker lists recent messages and insertReference quotes into composer", async ({ page }) => {
+    await mockCommand(page, "neocodex_get_session_messages", () => [
+      { role: "user", content: "早前的提问", timestamp: 1700000000 },
+      { role: "agent", content: "早前的回答", timestamp: 1700000001 },
+    ]);
+    await page.goto("/");
+    // simulate an active session id then open the ref picker
+    await page.evaluate(() => {
+      (window as any).renderThread([
+        { role: "user", content: "早前的提问", timestamp: 1700000000 },
+        { role: "agent", content: "早前的回答", timestamp: 1700000001 },
+      ], "s-ref");
+      (window as any).openRefPicker();
+    });
+    const picker = page.locator("#ntxRefPicker");
+    await expect(picker).toHaveClass(/open/);
+    await expect(picker.locator(".rf-item").first()).toContainText("早前的提问");
+    await picker.locator(".rf-item").first().click();
+    await expect(page.locator("#chatInput")).toHaveValue(/\[引用·我\] 早前的提问/);
+    await expect(picker).not.toHaveClass(/open/);
+  });
 });

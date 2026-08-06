@@ -671,4 +671,47 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  it("addAttachChip renders chip and sendMsg passes attachment payload", async () => {
+    const g = globalThis as Record<string, unknown>;
+    (g.addAttachChip as (name: string, meta?: object) => void)("Cargo.toml", { size: 2048, mime: "text/plain", data: "[package]" });
+    const chip = document.querySelector("#ntxAttachArea .ntx-attach-chip");
+    expect(chip).not.toBeNull();
+    expect(chip!.textContent).toContain("Cargo.toml");
+    expect(chip!.textContent).toContain("2.0K");
+    // wire sendMsg → assert payload
+    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+    const realLS = (globalThis as Record<string, unknown>).localStorage;
+    (globalThis as Record<string, unknown>).localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+    let sent: { cmd: string; args: Record<string, unknown> } | undefined;
+    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args?: Record<string, unknown>) => {
+        if(cmd === "neocodex_send_message_stream") sent = { cmd, args: args ?? {} };
+        return Promise.resolve("ok");
+      },
+      transformCallback: () => 1,
+    };
+    try {
+      const inp = document.getElementById("chatInput") as HTMLTextAreaElement;
+      inp.value = "带附件";
+      (g.sendMsg as () => void)();
+      expect(sent).toBeTruthy();
+      expect(sent!.args.attachments).toBeTruthy();
+      expect((sent!.args.attachments as unknown[])[0]).toMatchObject({ name: "Cargo.toml", size: 2048 });
+      expect((sent!.args.attachments as { data: string }[])[0].data).toBe("[package]");
+    } finally {
+      (globalThis as Record<string, unknown>).localStorage = realLS;
+      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+    }
+  });
+
+  it("insertReference quotes a message into the composer", () => {
+    const g = globalThis as Record<string, unknown>;
+    const inp = document.getElementById("chatInput") as HTMLTextAreaElement;
+    inp.value = "我的问题";
+    (g.insertReference as (msg: { role: string; content: string }) => void)({ role: "agent", content: "历史回复内容" });
+    expect(inp.value).toContain("[引用·NeoTrix] 历史回复内容");
+    expect(inp.value).toContain("我的问题");
+  });
 });

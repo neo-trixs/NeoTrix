@@ -1619,6 +1619,40 @@
 }
 .ntx-attach-chip .x { cursor: pointer; opacity: 0.7; font-size: 12px; padding: 0 2px; }
 .ntx-attach-chip .x:hover { opacity: 1; }
+.ntx-attach-chip .at-ic { width: 11px; height: 11px; color: var(--suc, #4CAF50); flex-shrink: 0; }
+.ntx-attach-chip .at-nm { color: var(--tx2); }
+.ntx-attach-chip .at-sz { color: var(--tx-meta); font-size: 9.5px; }
+
+/* 引用上下文选择器 */
+.ref-picker {
+  position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 42; width: 300px;
+  display: none; border: 1px solid var(--bd); border-radius: 12px;
+  background: var(--bg-raised); box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.ref-picker.open { display: block; }
+.rf-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; font-size: 12px; font-weight: var(--fw-medium);
+  border-bottom: 1px solid var(--bd); color: var(--tx2);
+}
+.rf-close { border: none; background: transparent; color: var(--tx-meta); font-size: 15px; cursor: pointer; line-height: 1; }
+.rf-close:hover { color: var(--tx); }
+.rf-body { max-height: 240px; overflow: auto; padding: 4px; }
+.rf-item {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left;
+  border: none; background: transparent; padding: 7px 9px; border-radius: 8px;
+  cursor: pointer; font-family: var(--ff); font-size: 12px; color: var(--tx);
+}
+.rf-item:hover { background: var(--ghost); }
+.rf-who {
+  flex-shrink: 0; font-size: 10px; color: var(--pri); border: 1px solid var(--bd);
+  border-radius: 4px; padding: 1px 5px; margin-top: 1px;
+}
+.rf-txt {
+  color: var(--tx2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11.5px; flex: 1;
+}
+.rf-empty { padding: 16px; text-align: center; font-size: 12px; color: var(--tx-meta); }
 
 .ntx-chat-toolbar {
   display: flex; align-items: center; justify-content: space-between;
