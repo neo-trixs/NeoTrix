@@ -409,20 +409,21 @@ impl LlmNarrator {
 
     /// 生成情景叙事 — 内部自动调用 LLM 池子。
     ///
-    /// 自动从池子选择可用模型（pollinations 优先，api-airforce 备选），**单次调用 +
+    /// 自动从池子选择可用模型（llm7 优先，pollinations/api-airforce 备选），**单次调用 +
     /// 自控节流重试**（适配 free 池 1 req/s 全局限流，避免 gateway 连打 429）。
     /// 失败/无 provider 时返回 None（调用方降级到确定性模板）。
     pub fn narrate_scenarios(&self, context: &str) -> Option<String> {
         let handle = self
             .gateway
             .get_or_init(gateway_handle::GatewayHandle::new);
-        // 选择注册名：pollinations 优先（keyless 匿名可用，接受任意模型名），
-        // api-airforce 备选（keyless 但服务端限流/认证行为不稳定）
+        // 选择注册名：llm7 优先（2026-08 实测匿名 200 可用），
+        // pollinations 次选（匿名层已关，仅 IP 信誉好时可用），api-airforce 备选。
         let provider = {
             let names = handle.providers();
             names
                 .iter()
-                .find(|n| n.starts_with("pollinations"))
+                .find(|n| n.starts_with("llm7"))
+                .or_else(|| names.iter().find(|n| n.starts_with("pollinations")))
                 .or_else(|| {
                     names
                         .iter()
@@ -434,12 +435,18 @@ impl LlmNarrator {
         let Some(provider) = provider else {
             return None; // 池子为空 → 降级
         };
-        // 显式指定模型名优先；否则用注册名里的 model_id（pollinations 无后缀则用注册名本身）
+        // 显式指定模型名优先；否则用注册名里的 model_id；无 `/` 的 keyless provider
+        // 用其默认模型（llm7 → codestral-latest：非 reasoning，叙事完整输出；
+        // gpt-oss:20b 是 reasoning 模型会把内容写进 reasoning 字段导致 content 空）。
         let model = self.model.clone().unwrap_or_else(|| {
             provider
                 .rsplit_once('/')
                 .map(|(_, m)| m.to_string())
-                .unwrap_or_else(|| provider.clone())
+                .unwrap_or_else(|| match provider.as_str() {
+                    "llm7" => "codestral-latest".to_string(),
+                    "pollinations" => "openai".to_string(),
+                    other => other.to_string(),
+                })
         });
 
         let mut request = LlmRequest::new(&model, context);
@@ -447,7 +454,7 @@ impl LlmNarrator {
         request.temperature = Some(0.8);
 
         // 单次调用 + 节流重试：限流敏感（free 池全局限流），失败等待后重试，
-        // 429 时等待窗口增长；最多 3 次。
+        // 429 / 并发限制时按服务端 retry_after（无则指数退避）等待；最多 3 次。
         let mut attempt = 0;
         while attempt < 3 {
             std::thread::sleep(std::time::Duration::from_millis(1200 + attempt * 800));
@@ -456,15 +463,32 @@ impl LlmNarrator {
                     log::info!("[nt_core_forecast] LLM narrate via {provider} ok ({} tokens)", resp.usage.total_tokens);
                     return Some(resp.content);
                 }
-                Ok(_) => return None,
+                Ok(_resp) => {
+                    // content 为空（reasoning 模型把内容写进 reasoning 字段）→ 非限流，降级
+                    log::warn!("[nt_core_forecast] LLM narrate via {provider} returned empty content");
+                    return None;
+                }
                 Err(e) => {
                     let msg = e.to_string();
-                    let is_429 = msg.contains("429") || msg.contains("rate limit") || msg.contains("RateLimit") || msg.contains("Queue full");
+                    let is_429 = msg.contains("429")
+                        || msg.contains("rate limit")
+                        || msg.contains("RateLimit")
+                        || msg.contains("Queue full")
+                        || msg.contains("concurrent_request_limit")
+                        || msg.contains("retry_after");
                     log::warn!("[nt_core_forecast] LLM narrate attempt {}/3 via {provider} failed: {e}", attempt + 1);
                     if !is_429 {
                         return None; // 非限流错误 → 立即降级
                     }
-                    // 429 → 等待限流窗口后重试
+                    // 解析服务端 retry_after（秒），无则指数退避；至少等 3s
+                    let retry_after = msg
+                        .split("\"retry_after\":")
+                        .nth(1)
+                        .and_then(|s| s.trim_start().split(|c: char| !c.is_ascii_digit()).next())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or((2u64.pow(attempt as u32) * 3) as u64);
+                    log::info!("[nt_core_forecast] LLM narrate rate-limited, waiting {retry_after}s before retry");
+                    std::thread::sleep(std::time::Duration::from_secs(retry_after));
                     attempt += 1;
                 }
             }
