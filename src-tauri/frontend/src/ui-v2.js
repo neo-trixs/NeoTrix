@@ -43,6 +43,8 @@ g.cancelMsgEdit = cancelMsgEdit;
 g.deleteMessage = deleteMessage;
 g.retryMessage = retryMessage;
 g.copyUserContent = copyUserContent;
+g.copyAssistantContent = copyAssistantContent;
+g.attachAssistantCopy = attachAssistantCopy;
 g.streamResume = streamResume;
 g.regenPush = regenPush;
 g.verNav = verNav;
@@ -1164,7 +1166,7 @@ g.restoreCheckpoint = restoreCheckpoint;
     attach('neocodex_stream_end', p => {
       clearThink();
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
-      if(el){ el.classList.remove('streaming'); streamBuf = String(p); el.innerHTML = renderRichText(String(p)); attachUsageFooter(el.closest('.msg')); }
+      if(el){ el.classList.remove('streaming'); streamBuf = String(p); el.innerHTML = renderRichText(String(p)); attachUsageFooter(el.closest('.msg')); attachAssistantCopy(el.closest('.msg')); }
       setStreaming(false);
       scrollChatToBottom(true);
     });
@@ -1172,7 +1174,7 @@ g.restoreCheckpoint = restoreCheckpoint;
       clearThink();
       setStreaming(false);
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
-      if(el){ el.classList.remove('streaming'); attachUsageFooter(el.closest('.msg')); }
+      if(el){ el.classList.remove('streaming'); attachUsageFooter(el.closest('.msg')); attachAssistantCopy(el.closest('.msg')); }
       streamBuf = '';
       await loadUsage();
       const foot=document.querySelector('#chatScroll .msg.l:last-child .msg-usage');
@@ -1256,6 +1258,7 @@ g.restoreCheckpoint = restoreCheckpoint;
         mb.innerHTML = renderRichText(demo);
         setStreaming(false);
         attachUsageFooter(a);
+        attachAssistantCopy(a);
       },600+Math.random()*400);
       return;
     }
@@ -1597,6 +1600,12 @@ g.restoreCheckpoint = restoreCheckpoint;
   }
 
   async function copyUserContent(msgEl){
+    const mb = msgEl?.querySelector('.mb');
+    const text = mb?.innerText || mb?.textContent || '';
+    try{ await navigator.clipboard.writeText(text); showToast('已复制'); }catch(_e){ showToast('复制失败'); }
+  }
+
+  async function copyAssistantContent(msgEl){
     const mb = msgEl?.querySelector('.mb');
     const text = mb?.innerText || mb?.textContent || '';
     try{ await navigator.clipboard.writeText(text); showToast('已复制'); }catch(_e){ showToast('复制失败'); }
@@ -2706,6 +2715,23 @@ g.restoreCheckpoint = restoreCheckpoint;
     el.className = 'msg-usage';
     el.textContent = '上下文 ' + Math.round(lastContextUsage * 100) + '%';
     mb.appendChild(el);
+  }
+
+  /* ChatGPT/Claude parity: 流式生成的回复完成后, 追加复制按钮(与 renderThread 的
+     assistant 消息保持一致). 幂等: 已有则跳过. */
+  function attachAssistantCopy(msgEl){
+    if(!msgEl || msgEl.querySelector('.msg-act .ma-btn[data-op="copy"]')) return;
+    const act = msgEl.querySelector('.msg-act');
+    const bar = act || document.createElement('div');
+    if(!act) bar.className = 'msg-act';
+    const btn = document.createElement('button');
+    btn.className = 'ma-btn';
+    btn.dataset.op = 'copy';
+    btn.title = '复制内容';
+    btn.textContent = '复制';
+    btn.onclick = () => copyAssistantContent(msgEl);
+    bar.appendChild(btn);
+    if(!act) msgEl.insertBefore(bar, msgEl.querySelector('.mb'));
   }
 
   /* ════════════════════════════════════════════════

@@ -560,4 +560,31 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     copied = await page.evaluate(() => (window as any).__copied);
     expect(copied).toBe("可复制的用户问题");
   });
+
+  test("streamed assistant reply gains a copy button after stream_end and copies rendered text", async ({ page }) => {
+    await mockCommand(page, "neocodex_send_message_stream", () => "ok");
+    await page.goto("/");
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: (t: string) => { (window as any).__copied = t; return Promise.resolve(); } },
+        configurable: true,
+      });
+    });
+    const textarea = page.locator("#chatInput");
+    await textarea.fill("给我一段回复");
+    await textarea.press("Enter");
+    await expect(page.locator("#chatScroll .msg.r")).toContainText("给我一段回复", { timeout: 10_000 });
+    await emitEvent(page, "neocodex_stream_start", "给我一段回复");
+    await emitEvent(page, "neocodex_stream_token", "第一行内容");
+    await emitEvent(page, "neocodex_stream_end", "第一行内容\n\n第二行内容");
+    const reply = page.locator("#chatScroll .msg.l").first();
+    const copyBtn = reply.locator('.ma-btn[data-op="copy"]');
+    await expect(copyBtn).toHaveCount(1, { timeout: 10_000 });
+    await copyBtn.hover({ force: true });
+    await copyBtn.click({ force: true });
+    await page.waitForFunction(() => (window as any).__copied !== undefined);
+    const copied = await page.evaluate(() => (window as any).__copied);
+    expect(copied).toContain("第一行内容");
+    expect(copied).toContain("第二行内容");
+  });
 });

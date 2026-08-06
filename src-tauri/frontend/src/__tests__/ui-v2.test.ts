@@ -1195,5 +1195,47 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  it("attachAssistantCopy adds copy button to streamed reply and copies its text", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const cs = document.getElementById("chatScroll")!;
+    cs.innerHTML = "";
+    const a = document.createElement("div");
+    a.className = "msg l";
+    a.innerHTML = `<div class="msg-h"><span class="name">NeoTrix</span><span class="time">12:00</span></div><div class="mb"><p>你好 <strong>世界</strong></p></div>`;
+    cs.appendChild(a);
+    (g.attachAssistantCopy as (el: HTMLElement) => void)(a);
+    const copyBtn = a.querySelector('.ma-btn[data-op="copy"]');
+    expect(copyBtn).not.toBeNull();
+    const realClip = (navigator as { clipboard?: { writeText: (t: string) => Promise<void> } }).clipboard;
+    let copied = "";
+    (navigator as { clipboard?: { writeText: (t: string) => Promise<void> } }).clipboard = {
+      writeText: (t: string) => { copied = t; return Promise.resolve(); },
+    };
+    try {
+      (g.copyAssistantContent as (el: HTMLElement) => Promise<void>)(a);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(copied).toBe("你好 世界");
+    } finally {
+      if (realClip === undefined) delete (navigator as { clipboard?: unknown }).clipboard;
+      else (navigator as { clipboard?: { writeText: (t: string) => Promise<void> } }).clipboard = realClip;
+    }
+  });
+
+  it("attachAssistantCopy is idempotent and reuses existing msg-act bar", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const cs = document.getElementById("chatScroll")!;
+    cs.innerHTML = "";
+    const a = document.createElement("div");
+    a.className = "msg l";
+    a.innerHTML = `<div class="msg-act"><button class="ma-btn" data-op="retry">重试</button></div><div class="mb">回复</div>`;
+    cs.appendChild(a);
+    (g.attachAssistantCopy as (el: HTMLElement) => void)(a);
+    (g.attachAssistantCopy as (el: HTMLElement) => void)(a);
+    const acts = a.querySelectorAll('.msg-act');
+    expect(acts.length).toBe(1);
+    expect(a.querySelectorAll('.ma-btn[data-op="copy"]').length).toBe(1);
+    expect(a.querySelectorAll('.ma-btn').length).toBe(2);
+  });
 });
 
