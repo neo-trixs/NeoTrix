@@ -409,91 +409,128 @@ impl LlmNarrator {
 
     /// 生成情景叙事 — 内部自动调用 LLM 池子。
     ///
-    /// 自动从池子选择可用模型（llm7 优先，pollinations/api-airforce 备选），**单次调用 +
-    /// 自控节流重试**（适配 free 池 1 req/s 全局限流，避免 gateway 连打 429）。
-    /// 失败/无 provider 时返回 None（调用方降级到确定性模板）。
+    /// 自动从池子构建候选链（llm7 → pollinations → api-airforce），**逐个尝试 +
+    /// 每候选自控节流重试**（适配 free 池限流，尊重服务端 retry_after）。
+    /// 某个候选非限流失败/空 content 时切下一个候选；全部失败返回 None
+    /// （调用方降级到确定性模板）。
     pub fn narrate_scenarios(&self, context: &str) -> Option<String> {
         let handle = self
             .gateway
             .get_or_init(gateway_handle::GatewayHandle::new);
-        // 选择注册名：llm7 优先（2026-08 实测匿名 200 可用），
-        // pollinations 次选（匿名层已关，仅 IP 信誉好时可用），api-airforce 备选。
-        let provider = {
-            let names = handle.providers();
-            names
-                .iter()
-                .find(|n| n.starts_with("llm7"))
-                .or_else(|| names.iter().find(|n| n.starts_with("pollinations")))
-                .or_else(|| {
-                    names
-                        .iter()
-                        .find(|n| n.starts_with("api-airforce") && n.contains('/'))
-                })
-                .or_else(|| names.iter().find(|n| !n.contains("ollama")))
-                .cloned()
+
+        // ── 构建候选链 (provider注册名, model)：按可用性优先级排序 ──
+        let candidates = if let Some(m) = &self.model {
+            vec![(self.default_provider(handle.providers()).unwrap_or_default(), m.clone())]
+        } else {
+            Self::build_candidates(handle.providers())
         };
-        let Some(provider) = provider else {
+        if candidates.is_empty() {
             return None; // 池子为空 → 降级
-        };
-        // 显式指定模型名优先；否则用注册名里的 model_id；无 `/` 的 keyless provider
-        // 用其默认模型（llm7 → codestral-latest：非 reasoning，叙事完整输出；
-        // gpt-oss:20b 是 reasoning 模型会把内容写进 reasoning 字段导致 content 空）。
-        let model = self.model.clone().unwrap_or_else(|| {
-            provider
-                .rsplit_once('/')
-                .map(|(_, m)| m.to_string())
-                .unwrap_or_else(|| match provider.as_str() {
-                    "llm7" => "codestral-latest".to_string(),
-                    "pollinations" => "openai".to_string(),
-                    other => other.to_string(),
-                })
-        });
+        }
 
-        let mut request = LlmRequest::new(&model, context);
-        request.max_tokens = self.max_tokens;
-        request.temperature = Some(0.8);
+        for (provider, model) in &candidates {
+            let mut request = LlmRequest::new(model, context);
+            request.max_tokens = self.max_tokens;
+            request.temperature = Some(0.8);
 
-        // 单次调用 + 节流重试：限流敏感（free 池全局限流），失败等待后重试，
-        // 429 / 并发限制时按服务端 retry_after（无则指数退避）等待；最多 3 次。
-        let mut attempt = 0;
-        while attempt < 3 {
-            std::thread::sleep(std::time::Duration::from_millis(1200 + attempt * 800));
-            match handle.complete_single(&provider, &request) {
-                Ok(resp) if !resp.content.trim().is_empty() => {
-                    log::info!("[nt_core_forecast] LLM narrate via {provider} ok ({} tokens)", resp.usage.total_tokens);
-                    return Some(resp.content);
-                }
-                Ok(_resp) => {
-                    // content 为空（reasoning 模型把内容写进 reasoning 字段）→ 非限流，降级
-                    log::warn!("[nt_core_forecast] LLM narrate via {provider} returned empty content");
-                    return None;
-                }
-                Err(e) => {
-                    let msg = e.to_string();
-                    let is_429 = msg.contains("429")
-                        || msg.contains("rate limit")
-                        || msg.contains("RateLimit")
-                        || msg.contains("Queue full")
-                        || msg.contains("concurrent_request_limit")
-                        || msg.contains("retry_after");
-                    log::warn!("[nt_core_forecast] LLM narrate attempt {}/3 via {provider} failed: {e}", attempt + 1);
-                    if !is_429 {
-                        return None; // 非限流错误 → 立即降级
+            // 每候选：节流重试（429/并发限制 → 尊重 retry_after；非限流 → 切下一候选）
+            let mut attempt = 0;
+            let mut last_err: Option<String> = None;
+            while attempt < 3 {
+                std::thread::sleep(std::time::Duration::from_millis(1200 + attempt * 800));
+                match handle.complete_single(provider, &request) {
+                    Ok(resp) if !resp.content.trim().is_empty() => {
+                        log::info!(
+                            "[nt_core_forecast] LLM narrate via {provider}/{model} ok ({} tokens)",
+                            resp.usage.total_tokens
+                        );
+                        return Some(resp.content);
                     }
-                    // 解析服务端 retry_after（秒），无则指数退避；至少等 3s
-                    let retry_after = msg
-                        .split("\"retry_after\":")
-                        .nth(1)
-                        .and_then(|s| s.trim_start().split(|c: char| !c.is_ascii_digit()).next())
-                        .and_then(|s| s.parse::<u64>().ok())
-                        .unwrap_or((2u64.pow(attempt as u32) * 3) as u64);
-                    log::info!("[nt_core_forecast] LLM narrate rate-limited, waiting {retry_after}s before retry");
-                    std::thread::sleep(std::time::Duration::from_secs(retry_after));
-                    attempt += 1;
+                    Ok(_resp) => {
+                        // 空 content（reasoning 模型把内容写进 reasoning 字段）→ 切下一候选
+                        log::warn!(
+                            "[nt_core_forecast] LLM narrate via {provider}/{model} returned empty content, trying next candidate"
+                        );
+                        break;
+                    }
+                    Err(e) => {
+                        let msg = e.to_string();
+                        let is_429 = msg.contains("429")
+                            || msg.contains("rate limit")
+                            || msg.contains("RateLimit")
+                            || msg.contains("Queue full")
+                            || msg.contains("concurrent_request_limit")
+                            || msg.contains("retry_after");
+                        log::warn!(
+                            "[nt_core_forecast] LLM narrate attempt {}/3 via {provider}/{model} failed: {e}",
+                            attempt + 1
+                        );
+                        last_err = Some(msg.clone());
+                        if !is_429 {
+                            break; // 非限流错误 → 切下一候选
+                        }
+                        // 解析服务端 retry_after（秒），无则指数退避；至少等 3s
+                        let retry_after = msg
+                            .split("\"retry_after\":")
+                            .nth(1)
+                            .and_then(|s| s.trim_start().split(|c: char| !c.is_ascii_digit()).next())
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .unwrap_or((2u64.pow(attempt as u32) * 3) as u64);
+                        log::info!(
+                            "[nt_core_forecast] LLM narrate via {provider}/{model} rate-limited, waiting {retry_after}s before retry"
+                        );
+                        std::thread::sleep(std::time::Duration::from_secs(retry_after));
+                        attempt += 1;
+                    }
                 }
+            }
+            if let Some(e) = last_err {
+                log::warn!("[nt_core_forecast] LLM narrate candidate {provider}/{model} exhausted: {e}");
             }
         }
         None
+    }
+
+    /// 从池子挑一个默认 provider（仅用于显式指定模型时的宿主选择）。
+    fn default_provider(&self, names: Vec<String>) -> Option<String> {
+        names
+            .iter()
+            .find(|n| n.starts_with("llm7"))
+            .or_else(|| names.iter().find(|n| n.starts_with("pollinations")))
+            .or_else(|| names.iter().find(|n| n.starts_with("api-airforce")))
+            .or_else(|| names.iter().find(|n| !n.contains("ollama")))
+            .cloned()
+    }
+
+    /// 构建候选链 (provider注册名, model)：按可用性优先级排序。
+    ///
+    /// provider 注册名直接用池子里的真实条目（含 model 后缀如 `llm7/codestral-latest`，
+    /// 或裸名如 `llm7`），保证 complete_single 能命中。顺序：
+    /// 1) llm7 — 首选，匿名 200 可用；先 codestral（非 reasoning，叙事完整），
+    ///    再 gpt-oss:20b（reasoning：content 常空但兜底尝试）。
+    /// 2) pollinations — 匿名层已关，仅 IP 信誉好时可用。
+    /// 3) api-airforce — 有模型条目时用其 model_id。
+    fn build_candidates(names: Vec<String>) -> Vec<(String, String)> {
+        let mut c = Vec::new();
+        // 1) llm7
+        for n in &names {
+            if n == "llm7" || n.starts_with("llm7/") {
+                c.push((n.clone(), "codestral-latest".to_string()));
+                c.push((n.clone(), "gpt-oss:20b".to_string()));
+                break;
+            }
+        }
+        // 2) pollinations
+        if let Some(n) = names.iter().find(|n| n.starts_with("pollinations")) {
+            c.push((n.clone(), "openai".to_string()));
+        }
+        // 3) api-airforce — 有模型条目时用其 model_id
+        if let Some(n) = names.iter().find(|n| n.starts_with("api-airforce") && n.contains('/')) {
+            if let Some((_, m)) = n.rsplit_once('/') {
+                c.push((n.clone(), m.to_string()));
+            }
+        }
+        c
     }
 
     /// 是否已初始化 gateway（幂等，供诊断用）。
@@ -1051,17 +1088,17 @@ mod tests {
     }
 
     /// 启用 LLM 叙事层后，生成推演不因缺 provider 而 panic（优雅降级）。
+    ///
+    /// llm7 匿名可用时走真实 LLM 叙事；不可用时降级确定性叙事。两种都合法，
+    /// 关键是：不 panic、每个叶子都有非空叙事。
     #[test]
     fn test_llm_narrator_enabled_falls_back_gracefully() {
-        // 不设置任何 LLM API key 的环境下，启用 narrator 也应返回确定性叙事
         let mut engine = ForecastEngine::new().with_llm_narrator(None);
         engine.ingest_event("fed", "cut", "rates", 0.9);
         let f = engine.generate_forecast("gold", 1);
         for leaf in f.tree.leaves() {
-            assert!(
-                leaf.narrative.as_deref().unwrap_or("").contains("scenario"),
-                "应降级到确定性叙事"
-            );
+            let narr = leaf.narrative.as_deref().unwrap_or("");
+            assert!(!narr.trim().is_empty(), "每个叶子都应有叙事（LLM 或确定性）");
         }
     }
 
@@ -1088,5 +1125,47 @@ mod tests {
         engine.ingest_event("fed", "cut", "rates", 0.8);
         engine.generate_forecast("gold", 1);
         assert!(engine.self_test().is_ok());
+    }
+
+    // ── 候选链构建（多 provider 故障转移）──
+
+    #[test]
+    fn test_build_candidates_llm7_first_with_model_fallback() {
+        let names = vec![
+            "api-airforce/grok-4.1-mini:free".to_string(),
+            "llm7/codestral-latest".to_string(),
+            "pollinations".to_string(),
+        ];
+        let c = LlmNarrator::build_candidates(names);
+        // llm7 优先，且 codestral 在 gpt-oss 前（非 reasoning 优先）
+        assert_eq!(c[0], ("llm7/codestral-latest".to_string(), "codestral-latest".to_string()));
+        assert_eq!(c[1], ("llm7/codestral-latest".to_string(), "gpt-oss:20b".to_string()));
+        // pollinations 次选
+        assert_eq!(c[2], ("pollinations".to_string(), "openai".to_string()));
+        // api-airforce 有模型条目时用其 model_id
+        assert_eq!(c[3], ("api-airforce/grok-4.1-mini:free".to_string(), "grok-4.1-mini:free".to_string()));
+    }
+
+    #[test]
+    fn test_build_candidates_bare_llm7_name() {
+        // 池子只有裸名 llm7（factory 注册，无 catalog 条目）
+        let names = vec!["llm7".to_string(), "ollama".to_string()];
+        let c = LlmNarrator::build_candidates(names);
+        assert_eq!(c.len(), 2);
+        assert_eq!(c[0], ("llm7".to_string(), "codestral-latest".to_string()));
+        assert_eq!(c[1], ("llm7".to_string(), "gpt-oss:20b".to_string()));
+    }
+
+    #[test]
+    fn test_build_candidates_empty_pool() {
+        let c = LlmNarrator::build_candidates(vec![]);
+        assert!(c.is_empty());
+    }
+
+    #[test]
+    fn test_build_candidates_skips_ollama_only() {
+        // 只有 ollama（本地）→ 无候选（不把本地模型当 free 池）
+        let c = LlmNarrator::build_candidates(vec!["ollama".to_string()]);
+        assert!(c.is_empty());
     }
 }
