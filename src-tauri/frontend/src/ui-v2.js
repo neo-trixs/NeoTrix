@@ -96,6 +96,10 @@ g.loadSideChat = loadSideChat;
 g.sendSideChat = sendSideChat;
 g.setAutoArchiveDays = setAutoArchiveDays;
 g.autoArchiveIdleSessions = autoArchiveIdleSessions;
+g.keyComboString = keyComboString;
+g.loadUserKeymap = loadUserKeymap;
+g.saveUserKeymap = saveUserKeymap;
+g.comboToLabel = comboToLabel;
 g.deleteSession = deleteSession;
 g.feedbackMessage = feedbackMessage;
 g.searchSessions = searchSessions;
@@ -1558,9 +1562,56 @@ g.renderStApiKey = renderStApiKey;
   }
 
   /* ===== Keyboard Shortcuts ===== */
+  // 可重绑定动作注册表: action 名 → 执行函数
+  const USER_KEY_ACTIONS = {
+    openSettings: () => openSettingsModal(),
+    newSession: () => createSession(),
+    openSearch: () => openStData(),
+    closeWindow: () => closeWindow(),
+    openPalette: () => openPalette(),
+    openShortcuts: () => openOverlay('overlayShortcuts'),
+    openSideChat: () => { openOverlay('overlaySideChat'); const i = document.getElementById('sideChatInput'); if(i) setTimeout(() => i.focus(), 30); },
+    toggleSidebar: () => toggleSidebar(),
+    toggleTheme: () => toggleTheme(),
+    copyLastReply: () => copyLastReply(),
+    copyLastCode: () => copyLastCode(),
+  };
+  // 用户自定义键位 (localStorage 持久化): { "meta+,": "openSettings", ... }
+  function loadUserKeymap(){
+    try{
+      const raw = localStorage.getItem('ntx_user_keymap');
+      return raw ? JSON.parse(raw) : null;
+    }catch(_e){ return null; }
+  }
+  function saveUserKeymap(map){
+    try{ localStorage.setItem('ntx_user_keymap', JSON.stringify(map || {})); }catch(_e){}
+  }
+  // 把 KeyboardEvent 归一化为 "meta+shift+key" 形式 (仅记录按下的修饰键)
+  function keyComboString(e){
+    const parts = [];
+    if(e.metaKey) parts.push('meta');
+    if(e.ctrlKey) parts.push('ctrl');
+    if(e.altKey) parts.push('alt');
+    if(e.shiftKey) parts.push('shift');
+    const key = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    parts.push(key);
+    return parts.join('+');
+  }
   if(!window._ntxKeyBound){
     window._ntxKeyBound = true;
   document.addEventListener('keydown', e => {
+    // ── 用户自定义键位覆盖层 (keybindings) ─────────────────
+    // 用户可在设置中重绑定常用快捷键; 命中自定义映射则执行对应 action。
+    const custom = loadUserKeymap();
+    if(custom && !e.target.closest('textarea, input')){
+      const combo = keyComboString(e);
+      const action = custom[combo];
+      if(action && USER_KEY_ACTIONS[action]){
+        e.preventDefault();
+        USER_KEY_ACTIONS[action]();
+        return;
+      }
+    }
     if((e.metaKey || e.ctrlKey) && e.key === ','){ e.preventDefault(); openSettingsModal(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'n'){ e.preventDefault(); createSession(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'f'){ e.preventDefault(); openStData(); }
@@ -3612,6 +3663,81 @@ g.renderStApiKey = renderStApiKey;
         showToast(sel.value === '0' ? '已关闭自动归档' : '自动归档阈值: ' + sel.value + ' 天');
       };
     }
+    renderKeymapList();
+  }
+
+  // 可重绑定快捷键的默认键位 (action → 默认组合键)
+  const DEFAULT_KEYBIND = {
+    openSettings: 'meta+,',
+    newSession: 'meta+n',
+    openSearch: 'meta+f',
+    openPalette: 'meta+k',
+    openShortcuts: 'meta+/',
+    openSideChat: 'meta+;',
+    toggleSidebar: 'meta+shift+s',
+    toggleTheme: 'meta+shift+l',
+    copyLastReply: 'meta+shift+c',
+    copyLastCode: 'meta+shift+;',
+  };
+  const KEYMAP_LABELS = {
+    openSettings: '打开设置', newSession: '新建会话', openSearch: '知识库检索',
+    openPalette: '命令面板 / 搜索', openShortcuts: '快捷键总览', openSideChat: '侧向对话',
+    toggleSidebar: '切换侧边栏', toggleTheme: '切换主题',
+    copyLastReply: '复制最后回复', copyLastCode: '复制最后代码块',
+  };
+  // 组合键字符串 → 可读符号 (meta→⌘, shift→⇧, alt→⌥, ctrl→⌃)
+  function comboToLabel(combo){
+    if(!combo) return '未绑定';
+    const parts = combo.split('+');
+    const mods = { meta: '⌘', ctrl: '⌃', alt: '⌥', shift: '⇧' };
+    const key = parts[parts.length - 1];
+    const modStr = parts.slice(0, -1).map(p => mods[p] || '').join('');
+    const keyLabel = key.length === 1 ? key.toUpperCase() : key;
+    return (modStr + keyLabel) || combo;
+  }
+  function renderKeymapList(){
+    const list = document.getElementById('stKeymapList');
+    if(!list) return;
+    const user = loadUserKeymap() || {};
+    list.innerHTML = Object.keys(DEFAULT_KEYBIND).map(action => {
+      const combo = user[action] || DEFAULT_KEYBIND[action];
+      return '<div class="st-card-row" style="justify-content:space-between;align-items:center">' +
+        '<div class="st-card-info"><div class="st-lbl">' + (KEYMAP_LABELS[action] || action) + '</div></div>' +
+        '<button class="st-input km-rec" data-action="' + action + '" style="width:130px;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-small);cursor:pointer">' + comboToLabel(combo) + '</button>' +
+        '</div>';
+    }).join('');
+    // 录制交互: 点击后进入录制态, 下一次 keydown 捕获组合键
+    list.querySelectorAll('.km-rec').forEach(btn => {
+      btn.onclick = () => {
+        btn.textContent = '按下新键位…';
+        btn.classList.add('recording');
+        const onKey = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          btn.classList.remove('recording');
+          document.removeEventListener('keydown', onKey, true);
+          if(ev.key === 'Escape'){ btn.textContent = comboToLabel(user[btn.dataset.action] || DEFAULT_KEYBIND[btn.dataset.action]); return; }
+          if(ev.key === 'Backspace' || ev.key === 'Delete'){
+            delete user[btn.dataset.action];
+            saveUserKeymap(user);
+            btn.textContent = comboToLabel(DEFAULT_KEYBIND[btn.dataset.action]);
+            showToast('已恢复默认键位');
+            return;
+          }
+          const combo = keyComboString(ev);
+          if(!ev.metaKey && !ev.ctrlKey && !ev.altKey && !ev.shiftKey){
+            btn.textContent = comboToLabel(DEFAULT_KEYBIND[btn.dataset.action]);
+            showToast('快捷键需包含修饰键 (⌘/⌃/⌥/⇧)');
+            return;
+          }
+          user[btn.dataset.action] = combo;
+          saveUserKeymap(user);
+          btn.textContent = comboToLabel(combo);
+          showToast('已绑定: ' + comboToLabel(combo));
+        };
+        document.addEventListener('keydown', onKey, true);
+      };
+    });
   }
 
   function setAutoArchiveDays(v){

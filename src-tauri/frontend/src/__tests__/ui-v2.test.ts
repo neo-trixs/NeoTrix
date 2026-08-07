@@ -1747,5 +1747,42 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       }
     });
   });
+
+  describe("keybinding rebinding (custom keymap)", () => {
+    it("keyComboString normalizes modifier combos", () => {
+      const g = globalThis as Record<string, unknown>;
+      const fn = g.keyComboString as (e: KeyboardEvent) => string;
+      expect(fn({ metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, key: "k" } as KeyboardEvent)).toBe("meta+k");
+      expect(fn({ metaKey: true, shiftKey: true, key: "S" } as KeyboardEvent)).toBe("meta+shift+s");
+      expect(fn({ metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, key: "Escape" } as KeyboardEvent)).toBe("Escape");
+    });
+
+    it("comboToLabel renders readable symbols", () => {
+      const g = globalThis as Record<string, unknown>;
+      const fn = g.comboToLabel as (c: string) => string;
+      expect(fn("meta+shift+s")).toBe("⌘⇧S");
+      expect(fn("meta+;")).toBe("⌘;");
+      expect(fn("")).toBe("未绑定");
+    });
+
+    it("saveUserKeymap persists and loadUserKeymap reads back", () => {
+      const g = globalThis as Record<string, unknown>;
+      const mem = new Map<string, string>();
+      const store = {
+        getItem: (k: string) => mem.get(k) ?? null,
+        setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+        removeItem: (k: string) => { mem.delete(k); },
+      };
+      const realLS = (globalThis as Record<string, unknown>).localStorage;
+      (globalThis as Record<string, unknown>).localStorage = store;
+      try {
+        (g.saveUserKeymap as (m: Record<string, string>) => void)({ openSettings: "meta+," });
+        const loaded = (g.loadUserKeymap as () => Record<string, string>)();
+        expect(loaded).toEqual({ openSettings: "meta+," });
+      } finally {
+        (globalThis as Record<string, unknown>).localStorage = realLS;
+      }
+    });
+  });
 });
 
