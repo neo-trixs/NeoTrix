@@ -307,6 +307,8 @@ commands::neocodex_set_project,
                     // Computer interactive (screen capture + mouse/keyboard)
                     commands::computer_screen_capture,
                     commands::computer_screen_list,
+                    commands::computer_get_frontmost_app,
+                    commands::computer_get_window_list,
                     commands::computer_mouse_move,
                     commands::computer_mouse_click,
                     commands::computer_mouse_position,

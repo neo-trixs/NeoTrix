@@ -36,6 +36,19 @@ pub struct DisplayInfo {
     pub scale_factor: f64,
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct WindowInfo {
+    pub title: String,
+    pub pid: i32,
+    pub app_name: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct FrontmostApp {
+    pub app_name: String,
+    pub title: String,
+}
+
 // ── Helpers ──
 
 fn timestamp_nanos() -> u64 {
@@ -51,6 +64,24 @@ fn escape_applescript_string(s: &str) -> String {
         .replace('\n', "\\n")
         .replace('\r', "\\r")
         .replace('\t', "\\t")
+}
+
+/// 解析 AppleScript 返回的列表文本（如 `{"A", "B"}` 或 `A, B`），
+/// 逐项去除花括号与引号，返回非空字符串列表。
+fn parse_applescript_list(s: &str) -> Vec<String> {
+    let s = s.trim();
+    if s.is_empty() {
+        return Vec::new();
+    }
+    let inner = s
+        .strip_prefix('{')
+        .and_then(|x| x.strip_suffix('}'))
+        .unwrap_or(s);
+    inner
+        .split(',')
+        .map(|item| item.trim().trim_matches('"').trim().to_string())
+        .filter(|item| !item.is_empty())
+        .collect()
 }
 
 // ── Commands ──
@@ -94,6 +125,94 @@ pub fn computer_screen_list() -> Result<Vec<DisplayInfo>, String> {
         is_primary: true,
         scale_factor: 2.0,
     }])
+}
+
+#[tauri::command]
+pub fn computer_get_frontmost_app() -> Result<FrontmostApp, String> {
+    let script = r#"tell application "System Events" to get {name of first application process whose frontmost is true, name of front window of first application process whose frontmost is true}"#;
+    let output = Command::new("osascript")
+        .args(["-e", script])
+        .output()
+        .map_err(|e| format!("Failed to get frontmost app: {}", e))?;
+
+    // 无辅助功能权限或解析失败时返回默认值，避免前端捕获异常
+    if !output.status.success() {
+        return Ok(FrontmostApp {
+            app_name: "Unknown".into(),
+            title: String::new(),
+        });
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    // 输出形如 `"AppName, Window Title"`，按首个逗号切分为 app_name 与 title
+    let parts: Vec<&str> = stdout.splitn(2, ',').map(|s| s.trim()).collect();
+    let app_name = parts
+        .first()
+        .map(|s| s.trim_matches('"').trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Unknown".into());
+    let title = parts
+        .get(1)
+        .map(|s| s.trim_matches('"').trim().to_string())
+        .unwrap_or_default();
+
+    Ok(FrontmostApp { app_name, title })
+}
+
+#[tauri::command]
+pub fn computer_get_window_list() -> Result<Vec<WindowInfo>, String> {
+    // 前台应用名称
+    let app_script = r#"tell application "System Events" to get name of first application process whose frontmost is true"#;
+    let app_output = Command::new("osascript")
+        .args(["-e", app_script])
+        .output()
+        .map_err(|e| format!("Failed to get frontmost app: {}", e))?;
+    let app_name = if app_output.status.success() {
+        String::from_utf8_lossy(&app_output.stdout).trim().to_string()
+    } else {
+        String::new()
+    };
+
+    // 前台应用 pid
+    let pid_script = r#"tell application "System Events" to get unix id of first application process whose frontmost is true"#;
+    let pid_output = Command::new("osascript")
+        .args(["-e", pid_script])
+        .output()
+        .map_err(|e| format!("Failed to get frontmost pid: {}", e))?;
+    let pid: i32 = if pid_output.status.success() {
+        String::from_utf8_lossy(&pid_output.stdout)
+            .trim()
+            .parse()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    // 前台应用所有窗口标题
+    let win_script = r#"tell application "System Events" to tell (first application process whose frontmost is true) to get name of every window"#;
+    let win_output = Command::new("osascript")
+        .args(["-e", win_script])
+        .output()
+        .map_err(|e| format!("Failed to list windows: {}", e))?;
+
+    // 无辅助功能权限时返回空列表，避免前端捕获异常
+    if !win_output.status.success() {
+        return Ok(Vec::new());
+    }
+
+    let stdout = String::from_utf8_lossy(&win_output.stdout).trim().to_string();
+    let titles = parse_applescript_list(&stdout);
+
+    let windows: Vec<WindowInfo> = titles
+        .into_iter()
+        .map(|title| WindowInfo {
+            title,
+            pid,
+            app_name: app_name.clone(),
+        })
+        .collect();
+
+    Ok(windows)
 }
 
 #[tauri::command]
