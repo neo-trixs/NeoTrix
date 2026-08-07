@@ -13,7 +13,7 @@ use neotrix::neotrix::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBra
 use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 use neotrix::neotrix::nt_io_mention::resolve_mentions;
 
-use crate::config::NeoTrixConfig;
+use neotrix::config::NeoTrixConfig;
 
 mod proxy_cmd;
 mod standalone;
@@ -53,7 +53,7 @@ fn tokio_runtime() -> tokio::runtime::Runtime {
 }
 
 pub fn check_provider_config() -> bool {
-    let cfg = crate::config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
     if cfg.provider.is_some() && cfg.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
         return true;
     }
@@ -123,7 +123,7 @@ pub fn run_provider_wizard() {
         _ => "gpt-4o-mini".to_string(),
     };
 
-    let config_path = crate::config::NeoTrixConfig::path();
+    let config_path = neotrix::config::NeoTrixConfig::path();
     if let Some(parent) = config_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             eprintln!("[config] warning: failed to create config directory ({}); continuing", e);
@@ -223,7 +223,7 @@ fn init_brain(profile: &str) -> (ReasoningBrain, ReasoningBank) {
 }
 
 fn set_default_model_from_config(agent: &mut SelfIteratingBrain) {
-    let cfg = crate::config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
     if let Some(ref model) = cfg.default_model {
         if !model.is_empty() {
             agent.default_model = model.clone();
@@ -233,7 +233,7 @@ fn set_default_model_from_config(agent: &mut SelfIteratingBrain) {
 
 /// 将 config.toml 中的 provider/api_key 提升为环境变量，使 GatewayV2 能发现
 fn ensure_provider_env_from_config() {
-    let cfg = crate::config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
     if let (Some(provider), Some(api_key)) = (&cfg.provider, &cfg.api_key) {
         if !api_key.is_empty() {
             match provider.as_str() {
@@ -1385,7 +1385,7 @@ pub fn run_features_list() {
 
 pub fn run_config_encrypt_keys() {
     use neotrix::neotrix::nt_shield::key_encryption;
-    let config_path = crate::config::NeoTrixConfig::path();
+    let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
         return;
@@ -1450,7 +1450,7 @@ pub fn run_config_encrypt_keys() {
 
 pub fn run_config_decrypt_keys() {
     use neotrix::neotrix::nt_shield::key_encryption;
-    let config_path = crate::config::NeoTrixConfig::path();
+    let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
         return;
@@ -1647,7 +1647,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
-            let cfg = crate::config::NeoTrixConfig::load();
+            let cfg = neotrix::config::NeoTrixConfig::load();
             cfg.default_model.clone().unwrap_or_else(|| "default".to_string())
         });
 
@@ -1750,7 +1750,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
-            let cfg = crate::config::NeoTrixConfig::load();
+            let cfg = neotrix::config::NeoTrixConfig::load();
             cfg.default_model.clone().unwrap_or_else(|| "default".to_string())
         });
         // 整体链路链接: 未显式指定模型时, 从池子实际注册名解析默认 (而非硬编码 provider)。

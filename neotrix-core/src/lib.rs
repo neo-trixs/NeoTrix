@@ -41,6 +41,7 @@ pub mod cli;
 pub mod server;
 pub mod agent;
 pub mod neotrix;
+pub mod config;
 
 #[macro_export]
 macro_rules! make_stage {

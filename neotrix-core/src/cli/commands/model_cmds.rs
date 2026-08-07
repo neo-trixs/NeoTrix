@@ -6,8 +6,7 @@ use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 fn config_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".config").join("neotrix").join("config.toml")
+    crate::config::NeoTrixConfig::path()
 }
 
 fn read_config_toml() -> toml::Value {

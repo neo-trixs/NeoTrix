@@ -1,8 +1,8 @@
-mod config;
 mod entry;
 
 use clap::{Parser, Subcommand, CommandFactory};
 use entry::*;
+// config 模块由 lib 提供 (neotrix::config), 避免与 lib.rs 重复定义。
 
 #[derive(Parser, Debug)]
 #[command(name = "neotrix", version, about = "NeoTrix — Self-evolving reasoning engine")]
@@ -271,7 +271,7 @@ fn main() {
         entry::run_provider_wizard();
     }
 
-    let cfg = config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
 
     let color_mode = cli.color.as_deref().or(cfg.color_mode.as_deref()).unwrap_or("auto");
     if color_mode == "never" {
