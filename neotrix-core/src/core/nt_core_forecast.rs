@@ -428,21 +428,26 @@ impl LlmNarrator {
             return None; // 池子为空 → 降级
         }
 
+        // Token 优化 (2026-08): ① 输入压缩 — context 按预算截断, 控制每调用成本;
+        // ② 调用预算门 — 全候选+全重试总调用 ≤ MAX_NARRATION_CALLS, 防 9 次全量重发。
+        let context = Self::truncate_context(context, Self::DEFAULT_CONTEXT_TOKEN_BUDGET);
+        let mut budget = CallBudgetImpl::new(Self::MAX_NARRATION_CALLS);
+
         for (provider, model) in &candidates {
-            let mut request = LlmRequest::new(model, context);
+            let mut request = LlmRequest::new(model, &context);
             request.max_tokens = self.max_tokens;
             request.temperature = Some(0.8);
 
             // 每候选：节流重试（429/并发限制 → 尊重 retry_after；非限流 → 切下一候选）
             let mut attempt = 0;
             let mut last_err: Option<String> = None;
-            while attempt < 3 {
+            while attempt < 3 && budget.try_spend() {
                 std::thread::sleep(std::time::Duration::from_millis(1200 + attempt * 800));
                 match handle.complete_single(provider, &request) {
                     Ok(resp) if !resp.content.trim().is_empty() => {
                         log::info!(
-                            "[nt_core_forecast] LLM narrate via {provider}/{model} ok ({} tokens)",
-                            resp.usage.total_tokens
+                            "[nt_core_forecast] LLM narrate via {provider}/{model} ok ({} tokens, budget spent {}/{})",
+                            resp.usage.total_tokens, budget.spent, budget.max_calls
                         );
                         return Some(resp.content);
                     }
@@ -466,6 +471,13 @@ impl LlmNarrator {
                             attempt + 1
                         );
                         last_err = Some(msg.clone());
+                        if budget.exhausted() {
+                            log::warn!(
+                                "[nt_core_forecast] LLM narrate call budget exhausted ({}/{}) — 停止重试, 降级确定性模板",
+                                budget.spent, budget.max_calls
+                            );
+                            return None;
+                        }
                         if !is_429 {
                             break; // 非限流错误 → 切下一候选
                         }
@@ -537,7 +549,67 @@ impl LlmNarrator {
     pub fn is_initialized(&self) -> bool {
         self.gateway.get().is_some()
     }
+
+    // ── Token 消耗优化 (2026-08) ──────────────────────────────────────────
+    // 依据外部文献 (SitePoint 2026 / Redis 2026 / tokenoptimize 2026) + 本地盘点:
+    // ① 输入压缩: 上下文全量传入无截断 → 每调用全额重付
+    // ② 调用预算: 3候选×3重试=9次全量调用 → 超预算即停 (对齐 aggressive-retry 放大成本)
+    // ③ CJK 感知估算: 中文按字 1 token, 英文按 4 字符 1 token (对齐 nt_memory_skill_cost.rs:107)
+
+    /// 默认输入上下文 token 预算（对齐 max_tokens=512 的输出预算, 输入控制在输出 2 倍内）。
+    pub const DEFAULT_CONTEXT_TOKEN_BUDGET: usize = 800;
+
+    /// CJK 感知 token 估算: 中文(含全角标点)按字符计 1 token, 其余按 4 字符计 1 token。
+    pub fn estimate_tokens(text: &str) -> usize {
+        let mut cjk = 0usize;
+        let mut rest = 0usize;
+        for ch in text.chars() {
+            if is_cjk(ch) {
+                cjk += 1;
+            } else {
+                rest += 1;
+            }
+        }
+        cjk + rest.div_ceil(4)
+    }
+
+    /// 按预算截断上下文: 保留开头, 超预算部分截断并附标记。
+    /// 保留语义前置信息 (背景在前, 预测对象在前), 丢弃尾部冗长。
+    pub fn truncate_context(context: &str, budget: usize) -> String {
+        if context.is_empty() || Self::estimate_tokens(context) <= budget {
+            return context.to_string();
+        }
+        // 二分找到预算内的截断点 (按 char 边界, 不劈开中文字符)
+        let marker = "\n…(截断)";
+        let marker_cost = Self::estimate_tokens(marker);
+        let mut lo = 0usize;
+        let mut hi = context.chars().count();
+        let chars: Vec<char> = context.chars().collect();
+        // 找最大 char 数使 estimate_tokens(chars[..n]) <= budget - marker_cost
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2;
+            let part: String = chars[..mid].iter().collect();
+            if Self::estimate_tokens(&part) <= budget.saturating_sub(marker_cost) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        let part: String = chars[..lo].iter().collect();
+        let mut out = part;
+        out.push_str(marker);
+        out
+    }
+
+    /// 调用预算门: 限制单次叙事总 LLM 调用次数 (默认 5, 对应 1候选×3重试 的合理上限,
+    /// 防止 3候选×3重试=9 次全量调用放大成本, 对齐本地盘点#5 aggressive-retry)。
+    ///
+    /// 注: 结构定义在 impl 外 (Rust 不允许 impl 内定义 struct), 见 `CallBudgetImpl`。
+    pub const MAX_NARRATION_CALLS: u32 = 5;
 }
+
+/// 调用预算门别名 — LlmNarrator::CallBudget 的模块级真身 (见 impl 内注释)。
+pub type CallBudget = CallBudgetImpl;
 
 impl Default for LlmNarrator {
     fn default() -> Self {
@@ -896,6 +968,45 @@ impl ForecastEngine {
     }
 }
 
+/// CJK 字符判断（中文/日文/韩文 + 全角标点）— 用于 CJK 感知 token 估算。
+fn is_cjk(ch: char) -> bool {
+    let c = ch as u32;
+    (0x4E00..=0x9FFF).contains(&c)   // CJK 统一表意文字
+        || (0x3400..=0x4DBF).contains(&c) // CJK 扩展 A
+        || (0x3000..=0x303F).contains(&c) // CJK 符号/标点
+        || (0xFF00..=0xFFEF).contains(&c) // 全角形式
+}
+
+/// 调用预算门 — 限制单次叙事总 LLM 调用次数。
+#[derive(Debug, Clone)]
+pub struct CallBudgetImpl {
+    /// 已花费调用数。
+    pub spent: u32,
+    /// 总预算上限。
+    pub max_calls: u32,
+}
+
+impl CallBudgetImpl {
+    /// 构造预算门。
+    pub fn new(max_calls: u32) -> Self {
+        Self { spent: 0, max_calls }
+    }
+
+    /// 尝试花费一次调用; 超预算返回 false。
+    pub fn try_spend(&mut self) -> bool {
+        if self.spent >= self.max_calls {
+            return false;
+        }
+        self.spent += 1;
+        true
+    }
+
+    /// 是否已耗尽。
+    pub fn exhausted(&self) -> bool {
+        self.spent >= self.max_calls
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1167,5 +1278,57 @@ mod tests {
         // 只有 ollama（本地）→ 无候选（不把本地模型当 free 池）
         let c = LlmNarrator::build_candidates(vec!["ollama".to_string()]);
         assert!(c.is_empty());
+    }
+
+    // ── Token 消耗优化 (2026-08): CJK 感知估算 + context 截断 + 调用预算门 ──
+
+    #[test]
+    fn test_estimate_tokens_cjk_aware() {
+        // 中文按字计 1 token, 英文按 4 字符计 1 token (对齐 nt_memory_skill_cost 启发式)
+        let cn = LlmNarrator::estimate_tokens("这是中文测试句子");
+        assert_eq!(cn, 8); // 8 个中文字符
+        let en = LlmNarrator::estimate_tokens("hello world");
+        assert_eq!(en, 3); // 11 字符 / 4 = 2.75 → 3
+        let mixed = LlmNarrator::estimate_tokens("中文 mixed 测试");
+        assert!(mixed > 0);
+        let empty = LlmNarrator::estimate_tokens("");
+        assert_eq!(empty, 0);
+    }
+
+    #[test]
+    fn test_truncate_context_respects_budget() {
+        // 长 context 应被截断到预算内 (保留开头, 附截断标记)
+        let long = "这是很长的中文内容".repeat(200); // 2000+ 字
+        let truncated = LlmNarrator::truncate_context(&long, 100);
+        assert!(LlmNarrator::estimate_tokens(&truncated) <= 110, "应在预算内: {} tokens", LlmNarrator::estimate_tokens(&truncated));
+        assert!(truncated.contains("…(截断)"), "应带截断标记");
+        assert!(truncated.starts_with("这是"), "保留开头");
+
+        // 短 context 不应被截断
+        let short = "简短内容";
+        assert_eq!(LlmNarrator::truncate_context(short, 1000), short);
+    }
+
+    #[test]
+    fn test_budget_gate_blocks_excessive_calls() {
+        // 总预算门: 超过 max_calls 时停止重试 (防止 3候选×3重试=9次全量调用)
+        let mut gate = super::CallBudgetImpl::new(5);
+        assert!(gate.try_spend());
+        for _ in 0..4 {
+            assert!(gate.try_spend());
+        }
+        assert!(!gate.try_spend(), "第 6 次调用应被预算门拦截");
+        assert_eq!(gate.spent, 5);
+        assert!(gate.exhausted());
+    }
+
+    #[test]
+    fn test_truncate_context_cjk_budget_aligns_max_tokens() {
+        // 对齐外部文献 (SitePoint 2026): 输出受限 → 输入也应受限, 控制每调用成本
+        let context = "预测背景: 黄金市场当前处于多头动能, 美联储 9 月降息预期升温, 地缘风险溢价支撑避险需求。".repeat(50);
+        let budget = LlmNarrator::DEFAULT_CONTEXT_TOKEN_BUDGET;
+        let truncated = LlmNarrator::truncate_context(&context, budget);
+        let est = LlmNarrator::estimate_tokens(&truncated);
+        assert!(est <= budget + 10, "截断后 {} tokens 应 ≤ 预算 {}+10", est, budget);
     }
 }
