@@ -1,5 +1,7 @@
 //! AutoFixer — 自执行修复引擎
 
+use crate::core::nt_core_error_parse::{self, CompilerDiagnostic, DiagnosticSeverity};
+
 /// 自动修复执行器 — 对已检测问题执行真实代码修改
 pub struct AutoFixer;
 
@@ -197,6 +199,36 @@ impl AutoFixer {
         log::info!("[AutoFixer] Test gap recorded for: {}", file_path);
         Ok(format!("Test gap recorded (no stub written): {}", file_path))
     }
+
+    /// 解析 cargo check 输出 → 按错误码生成修复建议 (NT-REPAIR 经验库接线)。
+    ///
+    /// 把 `nt_core_error_parse` 的解析 + `suggest_fix` 映射暴露给生产修复路径,
+    /// 使编译错误从"仅检测"升级为"可执行修复指引" (T3 生产接线)。
+    pub fn suggest_fixes_from_output(output: &str) -> Vec<(String, String, String)> {
+        let diags = nt_core_error_parse::parse_compiler_output(output);
+        diags
+            .iter()
+            .filter_map(|d| {
+                nt_core_error_parse::suggest_fix(d).map(|f| {
+                    (f.code, f.action.to_string(), f.guidance.clone())
+                })
+            })
+            .collect()
+    }
+
+    /// 便捷: 从单个错误码直接查修复建议 (供诊断器/守护进程直接调用)。
+    pub fn suggest_fix_for_code(code: &str) -> Option<(String, String)> {
+        let d = CompilerDiagnostic {
+            file: String::new(),
+            line: 0,
+            column: 0,
+            severity: DiagnosticSeverity::Error,
+            code: Some(code.to_string()),
+            message: String::new(),
+            span_text: None,
+        };
+        nt_core_error_parse::suggest_fix(&d).map(|f| (f.action.to_string(), f.guidance.clone()))
+    }
 }
 
 #[cfg(test)]
@@ -207,5 +239,24 @@ mod tests {
     fn test_autofixer_cargo_check_structure() {
         let result = AutoFixer::cargo_check();
         assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_suggest_fixes_from_output_wires_parser() {
+        let output = "error[E0433]: failed to resolve: use of undeclared type `Foo`\n  --> src/b.rs:2:3\nerror[E0308]: mismatched types\n  --> src/lib.rs:5:1\n";
+        let fixes = AutoFixer::suggest_fixes_from_output(output);
+        assert_eq!(fixes.len(), 2);
+        assert_eq!(fixes[0].0, "E0433");
+        assert_eq!(fixes[0].1, "add");
+        assert_eq!(fixes[1].0, "E0308");
+        assert_eq!(fixes[1].1, "type_fix");
+    }
+
+    #[test]
+    fn test_suggest_fix_for_code_direct() {
+        let fix = AutoFixer::suggest_fix_for_code("E0382").expect("E0382 should map");
+        assert_eq!(fix.0, "clone");
+        assert!(fix.1.contains("clone"));
+        assert!(AutoFixer::suggest_fix_for_code("E9999").is_none());
     }
 }

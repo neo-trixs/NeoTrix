@@ -153,6 +153,68 @@ pub fn is_fixable(diag: &CompilerDiagnostic) -> bool {
     }
 }
 
+/// 修复动作建议 — 基于错误码映射到可执行修复动作 (NT-REPAIR 经验库 cycle 246/248)。
+///
+/// 经验规则 (distill_errors.json error_fix_pairs, 2026-08-06 全量 49 万条实证):
+///   1. unwrap/panic 崩溃 (E0308 类型不匹配 / 运行时 panic) → 首选 wrap() 包裹 (6699 次)
+///   2. 缺失符号 (E0425/E0433/E0412) → 首选 add 补全 use/定义 (4491 次)
+///   3. 借用检查错误 (E0382/E0505) → 首选 clone() 切断借用链
+///   4. 非穷尽 match (E0004) → 补 match 分支
+///   5. 字段缺失 (E0063) → 补字段
+///   6. 方法不存在 (E0599) → 修正方法名
+///   7. 重复定义 (E0428) → 移除重复
+///   8. 未使用项 (dead_code/unused_import/unused_variable/unused_mut) → cargo fix 清理
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FixSuggestion {
+    /// 错误码 (如 "E0308"), 无码时为 "unknown"
+    pub code: String,
+    /// 修复动作类别 (wrap / add / clone / match_arm / field / rename / dedup / cleanup)
+    pub action: &'static str,
+    /// 人类可读的修复指引
+    pub guidance: String,
+}
+
+/// 根据错误码生成修复建议。返回 None 表示无已知自动修复策略。
+pub fn suggest_fix(diag: &CompilerDiagnostic) -> Option<FixSuggestion> {
+    let code = diag.code.as_deref()?;
+    let (action, guidance) = match code {
+        // 缺失符号 → add 补全 (经验: 缺失 16535 次, 首选 add 4491 次)
+        "E0425" | "E0433" | "E0412" => (
+            "add",
+            "缺失符号: 补 use 导入或定义缺失的项 (经验: 缺失符号首选 add 补全)",
+        ),
+        // 类型不匹配 → 对齐类型 / wrap 包裹
+        "E0308" => (
+            "type_fix",
+            "类型不匹配: 对齐类型或用 as/into 转换; 若为 unwrap 崩溃点则用 wrap() 包裹",
+        ),
+        // 借用/移动 → clone 切断借用链
+        "E0382" | "E0505" => (
+            "clone",
+            "借用/移动错误: 首选 clone() 切断借用链 (经验: 借用检查错误首选 clone)",
+        ),
+        // 非穷尽 match → 补分支
+        "E0004" => ("match_arm", "非穷尽 match: 补全缺失的 match 分支"),
+        // 字段缺失 → 补字段
+        "E0063" => ("field", "结构体字段缺失: 补全缺失字段初始化"),
+        // 方法不存在 → 修正方法名
+        "E0599" => ("method", "方法不存在: 修正方法名或补 impl"),
+        // 重复定义 → 去重
+        "E0428" => ("dedup", "重复定义: 移除重复的项定义"),
+        // 未使用 → cargo fix 清理
+        "dead_code" | "unused_import" | "unused_variable" | "unused_mut" => (
+            "cleanup",
+            "未使用项: 运行 cargo fix --lib --allow-dirty 自动清理",
+        ),
+        _ => return None,
+    };
+    Some(FixSuggestion {
+        code: code.to_string(),
+        action,
+        guidance: guidance.to_string(),
+    })
+}
+
 /// Group diagnostics by error code for batch fix strategy.
 pub fn group_by_code(diagnostics: &[CompilerDiagnostic]) -> Vec<(Option<String>, Vec<&CompilerDiagnostic>)> {
     let mut groups: std::collections::BTreeMap<Option<String>, Vec<&CompilerDiagnostic>> =
@@ -243,6 +305,62 @@ mod tests {
         assert!(is_fixable(&d));
         d.code = Some("unknown".into());
         assert!(!is_fixable(&d));
+    }
+
+    #[test]
+    fn test_suggest_fix_missing_symbol_add() {
+        let d = CompilerDiagnostic {
+            file: "x.rs".into(), line: 1, column: 1,
+            severity: DiagnosticSeverity::Error,
+            code: Some("E0433".into()), message: "".into(), span_text: None,
+        };
+        let fix = suggest_fix(&d).expect("E0433 should have a fix");
+        assert_eq!(fix.action, "add");
+        assert!(fix.guidance.contains("add"));
+    }
+
+    #[test]
+    fn test_suggest_fix_unwrap_type_wrap() {
+        let d = CompilerDiagnostic {
+            file: "x.rs".into(), line: 1, column: 1,
+            severity: DiagnosticSeverity::Error,
+            code: Some("E0308".into()), message: "".into(), span_text: None,
+        };
+        let fix = suggest_fix(&d).expect("E0308 should have a fix");
+        assert_eq!(fix.action, "type_fix");
+        assert!(fix.guidance.contains("wrap"));
+    }
+
+    #[test]
+    fn test_suggest_fix_borrow_clone() {
+        let d = CompilerDiagnostic {
+            file: "x.rs".into(), line: 1, column: 1,
+            severity: DiagnosticSeverity::Error,
+            code: Some("E0382".into()), message: "".into(), span_text: None,
+        };
+        let fix = suggest_fix(&d).expect("E0382 should have a fix");
+        assert_eq!(fix.action, "clone");
+        assert!(fix.guidance.contains("clone"));
+    }
+
+    #[test]
+    fn test_suggest_fix_unknown_none() {
+        let d = CompilerDiagnostic {
+            file: "x.rs".into(), line: 1, column: 1,
+            severity: DiagnosticSeverity::Error,
+            code: Some("E9999".into()), message: "".into(), span_text: None,
+        };
+        assert!(suggest_fix(&d).is_none());
+    }
+
+    #[test]
+    fn test_suggest_fix_no_code_none() {
+        let d = CompilerDiagnostic {
+            file: "x.rs".into(), line: 1, column: 1,
+            severity: DiagnosticSeverity::Error,
+            code: None, message: "".into(), span_text: None,
+        };
+        assert!(suggest_fix(&d).is_none());
     }
 
     #[test]
