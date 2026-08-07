@@ -1616,5 +1616,62 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       expect(document.querySelectorAll("#ntxAttachArea .ntx-attach-chip").length).toBe(0);
     });
   });
+
+  describe("registry & hypercube panels (A4 blind spots)", () => {
+    it("loadRegistry renders capability + health stats from backend", async () => {
+      const g = globalThis as Record<string, unknown>;
+      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+        invoke: (cmd: string) => {
+          const h: Record<string, unknown> = {
+            brain_stats: { iteration: 42, capability_sum: 3.14, dimension_names: ["a", "b", "c"], capability_vector: [0.5, 0.3, 0.2] },
+            neocodex_health_report: { turn_count: 100, tool_call_count: 50, tokens_used: 1000, context_usage: 0.4, evolution_iterations: 7, cost_spent: 1.25 },
+            neocodex_agent_status: { running: true },
+          };
+          return Promise.resolve(h[cmd]);
+        },
+      };
+      try {
+        await (g.loadRegistry as () => Promise<void>)();
+        const root = document.querySelector("#overlayRegistry .overlay-bd")!;
+        expect(root.querySelector(".reg-iter")!.textContent).toBe("42");
+        expect(root.querySelector(".reg-cap")!.textContent).toBe("3.14");
+        expect(root.querySelector(".reg-dim")!.textContent).toContain("3 维");
+        expect(document.getElementById("regTurns")!.textContent).toBe("100");
+        expect(document.getElementById("regCost")!.textContent).toBe("$1.25");
+        expect(root.querySelector(".reg-eng")!.textContent).toBe("运行中");
+        expect(document.querySelectorAll("#regVecBars .vec-bar").length).toBeGreaterThan(0);
+      } finally {
+        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+      }
+    });
+
+    it("loadHypercube renders node/edge stats", async () => {
+      const g = globalThis as Record<string, unknown>;
+      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+        invoke: (cmd: string) => {
+          const h: Record<string, unknown> = {
+            get_knowledge_stats: { total_nodes: 1234, total_edges: 567, by_type: [["concept", 100], ["entity", 200]] },
+            brain_stats: { dimension_names: ["a", "b"], capability_sum: 2.5, memory_count: 99, capability_vector: [0.8, 0.2] },
+          };
+          return Promise.resolve(h[cmd]);
+        },
+      };
+      try {
+        await (g.loadHypercube as () => Promise<void>)();
+        expect(document.getElementById("hcNodes")!.textContent).toBe("1,234");
+        expect(document.getElementById("hcEdges")!.textContent).toBe("567");
+        expect(document.getElementById("hcVsa")!.textContent).toBe("D=2");
+        expect(document.getElementById("hcCap")!.textContent).toBe("2.50");
+        expect(document.getElementById("kbNodeCount")!.textContent).toContain("99");
+        expect(document.querySelectorAll("#hcTypeDist .vec-bar").length).toBe(2);
+      } finally {
+        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+      }
+    });
+  });
 });
 

@@ -1354,7 +1354,13 @@ g.renderStApiKey = renderStApiKey;
     attach('neocodex-check-updates', () => checkForUpdate());
     attach('sync-trigger', () => { showToast('同步触发'); refreshSessionList(); });
     attach('proxy-mode-change', (mode) => { showToast('代理模式: ' + String(mode || '')); });
+    attach('proxy-mode-change', (mode) => { showToast('代理模式: ' + String(mode || '')); });
     attach('open-proxy-status', () => { showToast('代理状态面板'); });
+    // C10: 全局呼出热键 (CmdOrCtrl+Shift+Space) — 窗口已由 Rust 显示聚焦, 前端聚焦输入框
+    attach('neotrix-global-shortcut', () => {
+      const inp = document.getElementById('chatInput');
+      if(inp) inp.focus();
+    });
   }
 
   function wireStreamScroll(){
