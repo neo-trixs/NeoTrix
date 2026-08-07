@@ -270,7 +270,7 @@ impl SelfIteratingBrain {
                         gwt.entropy_monitor.stimulus_attempts,
                         gwt.entropy_monitor.stuck_ratio(),
                     );
-                    let reward = self._reward;
+                    let reward = self._reward.clamp(0.0, 1.0);
                     // Actually restore the pre-iteration brain snapshot instead of
                     // dropping the rollback. Previous code returned Ok(reward) without
                     // restoring state — a silent Rollback drop that permanently kept the
@@ -532,7 +532,11 @@ impl SelfIteratingBrain {
                         self._current_task, reward
                     ));
                 }
-                let final_reward = self._reward;
+                // SEAL reward 是归一化信号 (契约 0..=1, 下游 self_model 亦 clamp)。
+                // RDR 乘法 (ratio=depth/total_steps 可>1) + 加法 bonus 可能推高上界,
+                // 返回前 clamp 保证 transition learner / 调用方契约稳定。
+                let final_reward = self._reward.clamp(0.0, 1.0);
+                self._reward = final_reward;
                 Ok(final_reward)
             }
             Err(e) => {

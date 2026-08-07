@@ -79,6 +79,34 @@ mod tests {
     }
 
     #[test]
+    fn test_seal_loop_reward_bounded() {
+        // 契约: SEAL reward 是归一化信号, 返回必须 ∈ [0,1]。
+        // RDR 乘法 (ratio=depth/total_steps 可>1) + 4 个加法 bonus
+        // (curiosity/goal/depth/tool) 可能把 reward 推出上界, 返回点必须 clamp。
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut system = SelfIteratingBrain::new();
+
+        // 多轮迭代让 state_trajectory 增长, 提高 depth/total_steps ratio
+        let tasks = [
+            "design a UI component",
+            "implement code generation",
+            "analyze performance bottleneck",
+            "refactor data pipeline",
+            "optimize query path",
+        ];
+        for task in &tasks {
+            let reward = system.run_seal_loop(task, None, None);
+            assert!(reward.is_ok());
+            let r = reward.expect("reward should be ok");
+            assert!(
+                r >= 0.0 && r <= 1.0,
+                "SEAL reward must stay in [0,1] (normalized signal), got {r}"
+            );
+        }
+    }
+
+    #[test]
     fn test_self_iterating_brain_creation() {
         let system = SelfIteratingBrain::new();
         assert_eq!(system.iteration, 0);
