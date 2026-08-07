@@ -641,7 +641,6 @@
     color: #e85454;
     box-shadow: 0 0 16px rgba(232, 84, 84, 0.15);
     font-weight: 600;
-    animation: pulseGlow 3s ease-in-out infinite;
   }
 
   .segb svg {
@@ -1192,14 +1191,6 @@
   .cw-header { display: flex; align-items: center; justify-content: space-between; }
   .cw-title { font-size: 13px; font-weight: 600; color: #1a1a20; }
   .cw-sub { font-size: 10px; color: #b0b0b8; }
-  .cw-hbadge {
-    padding: 3px 10px;
-    border-radius: 99px;
-    font-size: 10px;
-    font-weight: 500;
-    background: rgba(232, 84, 84, 0.08);
-    color: #e85454;
-  }
   .cw-section-title {
     font-size: 11px;
     font-weight: 500;
@@ -1389,5 +1380,15 @@
   50% {
     filter: drop-shadow(0 0 12px rgba(232, 84, 84, 0.35)) drop-shadow(0 0 24px rgba(232, 84, 84, 0.15));
     transform: scale(1.04) rotate(-8deg);
+  }
+}
+
+/* —— 动效克制：尊重系统减少动态偏好 —— */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

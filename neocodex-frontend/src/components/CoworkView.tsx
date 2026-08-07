@@ -36,6 +36,13 @@ const CW_DATA: CwSession[] = [
   },
 ]
 
+/* 状态 → 语义徽章类（与 badge-success/warn/error 体系一致） */
+function statusBadge(status: string): string {
+  if (status.includes('完成')) return 'badge-success'
+  if (status.includes('失败') || status.includes('错误')) return 'badge-error'
+  return 'badge-warn' // 进行中/待处理
+}
+
 export function CoworkView() {
   const [sessions, setSessions] = createSignal<CwSession[]>(CW_DATA)
   const [activeIdx, setActiveIdx] = createSignal(0)
@@ -90,7 +97,7 @@ export function CoworkView() {
                     <div class="cw-title">{a().name}</div>
                     <div class="cw-sub">{a().tasks} 任务 · {a().done} 完成 · {a().fail} 失败</div>
                   </div>
-                  <div class="cw-hbadge">{a().status}</div>
+                  <div class={clsx('badge', statusBadge(a().status))}>{a().status}</div>
                 </div>
 
                 <div class="cw-section-title">
