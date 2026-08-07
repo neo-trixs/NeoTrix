@@ -63,6 +63,9 @@ g.closeRefPicker = closeRefPicker;
 g.insertReference = insertReference;
 g.addAttachChip = addAttachChip;
 g.clearAttachments = clearAttachments;
+g.wireAttachmentDnD = wireAttachmentDnD;
+g.escJs = escJs;
+g.renderOnboarding = renderOnboarding;
 g.renderThread = renderThread;
 g.createSession = createSession;
 g.refreshAgent = refreshAgent;
@@ -1171,10 +1174,6 @@ g.renderStApiKey = renderStApiKey;
     return out || '<span></span>';
   }
 
-  function switchProvider(val){
-    showToast('切换提供者: ' + val);
-  }
-
   /* ===== IPC-backed streaming send ===== */
   const streamSubs = new Map();
   let streamFollow = true;
@@ -1510,6 +1509,38 @@ g.renderStApiKey = renderStApiKey;
     ).join('');
   }
 
+  /* C9: Onboarding — 首次启动欢迎条 (对标 Cursor 欢迎屏): 功能速览 + 快捷键入口.
+     显示一次后 localStorage 标记, 用户可手动关闭. */
+  const ONBOARDING_KEY = 'neotrix.onboarding.done.v1';
+  function renderOnboarding(){
+    if(window._ntxOnboarded) return;
+    window._ntxOnboarded = true;
+    const el = document.getElementById('heroOnboarding');
+    if(!el) return;
+    try{ if(localStorage.getItem(ONBOARDING_KEY)) return; }catch(_e){}
+    const items = [
+      ['⌘K', '命令面板 — 搜索会话 / 快捷动作'],
+      ['↑', '编辑上一条消息'],
+      ['⌘⇧C / ⌘⇧;', '复制最后回复 / 代码块'],
+      ['Shift+Tab', '循环权限模式'],
+      ['⌘⇧S / ⌘⇧L', '侧边栏 / 明暗主题'],
+      ['⌘/', '查看全部快捷键'],
+    ];
+    el.style.display = 'block';
+    el.innerHTML = `<div class="hero-onb-in">
+      <div class="hero-onb-t"><span>👋 欢迎使用 NoeCodex</span><span class="hero-onb-x" title="不再显示" role="button">×</span></div>
+      <div class="hero-onb-grid">${items.map(([k,d]) => `<div class="hero-onb-it"><span class="hero-onb-k">${k}</span><span>${d}</span></div>`).join('')}</div>
+      <div class="hero-onb-f"><button class="hero-onb-btn" id="onbClose">开始使用 →</button></div>
+    </div>`;
+    el.querySelector('.hero-onb-x').addEventListener('click', () => { dismissOnboarding(); });
+    el.querySelector('#onbClose').addEventListener('click', () => { dismissOnboarding(); });
+  }
+  function dismissOnboarding(){
+    try{ localStorage.setItem(ONBOARDING_KEY, '1'); }catch(_e){}
+    const el = document.getElementById('heroOnboarding');
+    if(el) el.style.display = 'none';
+  }
+
   /* ===== Missing Functions ===== */
   function clearChat(){
     actions.newChat();
@@ -1594,7 +1625,76 @@ g.renderStApiKey = renderStApiKey;
       e.preventDefault();
       copyLastCodeBlock();
     }
+    // C8: Shift+Tab 循环权限模式 (Cursor 式) — 输入框聚焦时也可用, 不抢焦点
+    if(e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey){
+      const isComposer = e.target.closest('textarea, input');
+      if(!isComposer || document.activeElement === document.getElementById('chatInput')){
+        e.preventDefault();
+        cycleMode();
+      }
+    }
   });
+  }
+
+  /* C6: 附件闭环 — 拖拽文件/粘贴图片 + Backspace 移除最近附件
+     (ChatGPT/Claude 式: 拖拽即附、⌘V 粘贴剪贴板图片、⌫ 移除最近) */
+  function wireAttachmentDnD(){
+    const area = document.getElementById('ntxAttachArea');
+    const input = document.getElementById('chatInput');
+    if(!area || !input) return;
+    if(window._ntxDnDBound) return;
+    window._ntxDnDBound = true;
+
+    const dropZone = document.getElementById('chatScroll') || document.body;
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); });
+    dropZone.addEventListener('drop', async e => {
+      e.preventDefault();
+      const files = e.dataTransfer ? Array.from(e.dataTransfer.files || []) : [];
+      if(!files.length) return;
+      for(const f of files){
+        // 浏览器模式: File 对象; Tauri 模式经 dialog/fs 走 pickAttachment 同路径
+        const name = f.name || 'file';
+        const mime = f.type || mimeFromName(name);
+        let data = null;
+        if(f.size <= 8 * 1024 * 1024){
+          try{ data = new Uint8Array(await f.arrayBuffer()); }catch(_e){}
+        }
+        addAttachChip(name, { size: f.size, mime, data });
+      }
+      showToast('已附加 ' + files.length + ' 个文件');
+    });
+
+    // 粘贴剪贴板图片 (Cmd+V 在输入框内时, dataTransfer 带 files)
+    document.addEventListener('paste', e => {
+      const items = e.clipboardData ? Array.from(e.clipboardData.items || []) : [];
+      const images = items.filter(it => it.type && it.type.startsWith('image/'));
+      if(!images.length) return;
+      e.preventDefault();
+      images.forEach(it => {
+        const f = it.getAsFile();
+        if(!f) return;
+        f.arrayBuffer().then(buf => {
+          addAttachChip('paste-' + Date.now() + '.png', {
+            size: buf.byteLength,
+            mime: f.type || 'image/png',
+            data: new Uint8Array(buf),
+          });
+        }).catch(()=>{});
+      });
+      showToast('已附加剪贴板图片');
+    });
+
+    // Backspace 在输入框空时移除最近附件 (ChatGPT 式 ⌫)
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Backspace' && !input.value && attachList.length){
+        e.preventDefault();
+        const last = attachList[attachList.length - 1];
+        attachList = attachList.filter(f => f.name !== last.name);
+        const chip = area.querySelector('.ntx-attach-chip:last-child');
+        if(chip) chip.remove();
+        showToast('已移除附件: ' + last.name);
+      }
+    });
   }
 
   /* ⌘F — open Settings → Data control, focus KB search */
@@ -1617,6 +1717,7 @@ g.renderStApiKey = renderStApiKey;
   renderSidebar('chat');
   renderHeroSuggest();
   renderCowork();
+  renderOnboarding();
   // Persisted appearance settings (localStorage) — apply before first paint of settings
   const settings = loadSettings();
   if(settings['appearance.fontSize']) document.documentElement.style.fontSize = settings['appearance.fontSize'] + 'px';
@@ -1631,6 +1732,7 @@ g.renderStApiKey = renderStApiKey;
   wireStreamScroll();
   fusionInit();
   wireMenuEvents();
+  wireAttachmentDnD();
 
 
 

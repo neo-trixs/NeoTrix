@@ -1536,5 +1536,85 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
     }
   });
+
+  describe("escJs — JS 单引号字符串上下文安全转义 (S1)", () => {
+    it("escapes single quotes to \\u0027 (not HTML entity)", () => {
+      const g = globalThis as Record<string, unknown>;
+      const escJs = (g as Record<string, (s: unknown) => string>).escJs;
+      const out = escJs("a'b");
+      expect(out).toContain("\\u0027");
+      expect(out).not.toContain("&#39;");
+      // round-trips to the original value (escape is reversible, no data loss)
+      const decoded = out.replace(/\\u0027/g, "'").replace(/\\n/g, "\n").replace(/\\\\/g, "\\");
+      expect(decoded).toBe("a'b");
+    });
+
+    it("escapes newline and backslash", () => {
+      const g = globalThis as Record<string, unknown>;
+      const escJs = (g as Record<string, (s: unknown) => string>).escJs;
+      expect(escJs("line1\nline2")).toContain("\\n");
+      expect(escJs("a\\b")).toContain("\\\\");
+    });
+
+    it("returns empty string for null/undefined", () => {
+      const g = globalThis as Record<string, unknown>;
+      const escJs = (g as Record<string, (s: unknown) => string>).escJs;
+      expect(escJs(null)).toBe("");
+      expect(escJs(undefined)).toBe("");
+    });
+  });
+
+  describe("onboarding welcome bar (C9)", () => {
+    it("renders onboarding items and dismisses with localStorage marker", () => {
+      const mem = new Map<string, string>();
+      const store = {
+        getItem: (k: string) => mem.get(k) ?? null,
+        setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+        removeItem: (k: string) => { mem.delete(k); },
+      };
+      const realLS = (globalThis as Record<string, unknown>).localStorage;
+      (globalThis as Record<string, unknown>).localStorage = store;
+      try {
+        const g = globalThis as Record<string, unknown>;
+        // reset the module-level guard so renderOnboarding actually runs
+        (globalThis as Record<string, unknown>)._ntxOnboarded = undefined;
+        (g.renderOnboarding as () => void)();
+        const el = document.getElementById("heroOnboarding")!;
+        expect(el.style.display).toBe("block");
+        expect(el.textContent).toContain("欢迎使用 NoeCodex");
+        expect(el.textContent).toContain("⌘/");
+        const close = el.querySelector("#onbClose") as HTMLElement;
+        close.click();
+        expect(mem.get("neotrix.onboarding.done.v1")).toBe("1");
+        expect(el.style.display).toBe("none");
+      } finally {
+        (globalThis as Record<string, unknown>).localStorage = realLS;
+        (globalThis as Record<string, unknown>)._ntxOnboarded = undefined;
+      }
+    });
+  });
+
+  describe("attachment DnD wiring (C6)", () => {
+    it("wires drop zone and paste listeners without duplication", () => {
+      const g = globalThis as Record<string, unknown>;
+      (g.wireAttachmentDnD as () => void)();
+      (g.wireAttachmentDnD as () => void)();
+      // guard flag prevents double-binding
+      expect((globalThis as Record<string, unknown>)._ntxDnDBound).toBe(true);
+    });
+
+    it("adds a chip for a dropped file", async () => {
+      const g = globalThis as Record<string, unknown>;
+      const addChip = g.addAttachChip as (name: string, meta?: unknown) => void;
+      addChip("test.md", { size: 1024, mime: "text/markdown" });
+      const chip = document.querySelector("#ntxAttachArea .ntx-attach-chip");
+      expect(chip).toBeTruthy();
+      expect(chip!.textContent).toContain("test.md");
+      // remove via the x button
+      const x = chip!.querySelector(".x") as HTMLElement;
+      x.click();
+      expect(document.querySelectorAll("#ntxAttachArea .ntx-attach-chip").length).toBe(0);
+    });
+  });
 });
 
