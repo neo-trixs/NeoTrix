@@ -995,8 +995,12 @@ impl BrainStage for GwtAbsorbStage {
         // Route state summary into GWT workspace for specialist broadcast
         if let Some(ref mut router) = brain.attention_router {
             let content = format!("pipeline_iter={} reward={:.4} avg_cap={:.4}", iteration, reward, avg_cap);
-            router.wm().broadcast(&content);
-            log::debug!("[gwt_absorb] broadcast to GWT: {}", content);
+            // 升级: 从 no-op broadcast (仅 push history) 改为 resonant_broadcast —
+            // 真正进入 E8 注意力偏置 + Kuramoto 同步 + 共振竞争, 让 SEAL 状态
+            // 参与 GWT 注意力路由 (修复信息流转对内断点 #2)。
+            let states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+            let _report = router.wm().resonant_broadcast(&content, &states);
+            log::debug!("[gwt_absorb] resonant broadcast to GWT: {}", content);
             if let Some(ref kb) = brain._nt_memory_kb {
                 if let Ok(results) = kb.query_broadcast_context(&content, 3) {
                     log::debug!("[gwt_absorb] broadcast context results: {} found", results.len());

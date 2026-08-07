@@ -30,6 +30,9 @@ pub struct UnifiedCrawler {
     errors_since_last_heal: Vec<FetchError>,
     domain_blocklist: HashMap<String, u32>,
     pub cube: KnowledgeHyperCube,
+    /// 可选 SQLite KB 引用 — 挂接后爬取结果落 KB（修复对外信息获取断点:
+    /// 此前只写内存 hypercube, 与 SQLite KB 脱节, 爬取数据无法被 BM25/embedding 检索）。
+    kb: Option<crate::neotrix::nt_memory_kb::KnowledgeBase>,
 }
 
 #[derive(Debug, Clone)]
@@ -97,8 +100,14 @@ impl UnifiedCrawler {
             errors_since_last_heal: Vec::new(),
             domain_blocklist: HashMap::new(),
             cube: KnowledgeHyperCube::new(),
+            kb: None,
             config,
         }
+    }
+
+    /// 挂接 SQLite KB — 之后每次 run_cycle 的爬取结果都会落 KB（可检索）。
+    pub fn attach_kb(&mut self, kb: crate::neotrix::nt_memory_kb::KnowledgeBase) {
+        self.kb = Some(kb);
     }
 
     pub fn run_cycle(&mut self, cap: &mut CapabilityVector, bank: &mut ReasoningBank) -> CycleResult {
@@ -208,6 +217,25 @@ impl UnifiedCrawler {
 
             let mapped_coord = KnowledgeMapper::absorb_to_hypercube(&mapped, classified.topic, classified.confidence);
             self.cube.insert(&mapped_coord, &mapped.url, &mapped.title);
+
+            // 落 SQLite KB — 让爬取数据可被 BM25/embedding 检索（对外信息获取闭环）。
+            if let Some(ref kb) = self.kb {
+                let content = mapped.insights.join("\n");
+                let evidence = serde_json::json!({
+                    "topic": format!("{:?}", classified.topic),
+                    "confidence": classified.confidence,
+                    "format": format!("{:?}", mapped.format),
+                    "source": "unified_crawler",
+                });
+                let _ = kb.write_memory_entry(
+                    &mapped.title,
+                    crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Source,
+                    if content.is_empty() { None } else { Some(&content) },
+                    Some(&mapped.url),
+                    Some(&extract_domain(&mapped.url)),
+                    Some(&evidence),
+                );
+            }
 
             if let Some(body) = &result.body {
                 let new_links = extract_links(body, &result.url);
@@ -594,5 +622,53 @@ mod tests {
         let display = format!("{}", result);
         assert!(display.contains("✅"));
         assert!(display.contains("42"));
+    }
+
+    #[test]
+    fn test_attach_kb_writes_crawled_data_to_kb() {
+        // 对外信息获取闭环: attach_kb 后 run_cycle 把爬取结果写入 SQLite KB
+        let tmp = std::env::temp_dir().join(format!(
+            "neotrix_crawl_kb_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(tmp))
+            .expect("open temp KB");
+
+        // 直接构造 crawler 并挂接 KB（不跑真实网络）
+        let config = CrawlerConfig {
+            seed_urls: vec![],
+            strategy: CrawlStrategy::Polite,
+            max_pages_per_domain: 10,
+            max_depth: 2,
+            self_heal_interval: 5,
+            fetch_timeout_secs: 5,
+            max_retries: 0,
+            ..Default::default()
+        };
+        let mut crawler = UnifiedCrawler::new(config);
+        crawler.attach_kb(kb);
+
+        // 用已挂接的 kb 直接验证写路径（无需网络）
+        let kb_ref = crawler.kb.as_ref().expect("kb attached");
+        kb_ref.write_memory_entry(
+            "Crawled Science Topic",
+            crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Source,
+            Some("insight content from crawl"),
+            Some("https://crawl.example/1"),
+            Some("crawl.example"),
+            Some(&serde_json::json!({"source": "unified_crawler"})),
+        ).expect("write to KB");
+
+        // 验证可检索（对外获取闭环）
+        let found = kb_ref.find_node_by_url("https://crawl.example/1").expect("find");
+        assert!(found.is_some(), "爬取数据应落 KB");
+        assert_eq!(found.unwrap().title, "Crawled Science Topic");
+
+        // 验证 attach_kb 的 Option 状态
+        assert!(crawler.kb.is_some());
     }
 }

@@ -23,6 +23,7 @@ pub mod nt_core_antidistil;
 pub mod nt_cap_media;
 pub mod nt_cap_geo;
 pub mod nt_core_orch_agent;
+pub mod nt_core_grounded_gate;
 
 pub use registry::*;
 pub use protocol::*;
@@ -41,4 +42,7 @@ pub use group_evolve::{
 pub use nt_core_orch_agent::{
     SubagentConfig, SubagentInstance, SubagentStatus, AgentMessage, MessageType,
     SubagentManager, AgentPoolStats,
+};
+pub use nt_core_grounded_gate::{
+    GroundedCheck, GroundedGate, GroundedDecision, AgentContract, Field, FieldType, Domain,
 };

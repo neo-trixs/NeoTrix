@@ -15,7 +15,7 @@ impl CliCommand for CleanupCmd {
     fn name(&self) -> &str { "/cleanup" }
     fn aliases(&self) -> Vec<&str> { vec!["/gc", "/purge", "/archive"] }
     fn description(&self) -> &str {
-        "清理/归档/备份: /cleanup [status|now|quick|deep|archive|backup|search <q>|log]"
+        "清理/归档/备份: /cleanup [status|now|quick|deep|archive|backup|kb-compact [prune_days]|search <q>|log]"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -226,6 +226,21 @@ impl CliCommand for CleanupCmd {
                         m.file_count, m.total_bytes as f64 / 1024.0, m.backup_id
                     )),
                     Err(e) => CommandOutput::err(&format!("备份失败: {}", e)),
+                }
+            }
+
+            "kb-compact" | "kb-vacuum" => {
+                // KB 物理压缩 (VACUUM) — 一次性运维脚本的正式能力沉淀。
+                // 用法: /cleanup kb-compact [prune_days]   (prune_days>0 先删过期未访问节点)
+                let prune_days = args.get(1)
+                    .and_then(|s| s.parse::<u32>().ok());
+                let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(None);
+                match kb.and_then(|k| k.compact(prune_days)) {
+                    Ok((pruned, freed)) => CommandOutput::ok(&format!(
+                        "🗜️ KB 压缩完成: 清理 {} 个过期节点, 释放 {:.1} MB",
+                        pruned, freed as f64 / 1_048_576.0
+                    )),
+                    Err(e) => CommandOutput::err(&format!("KB 压缩失败: {}", e)),
                 }
             }
 

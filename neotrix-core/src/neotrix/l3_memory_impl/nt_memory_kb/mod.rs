@@ -288,6 +288,49 @@ impl KnowledgeBase {
         issues
     }
 
+    /// 物理压缩数据库（VACUUM）— 回收删除/更新产生的空闲页，缩小文件体积。
+    ///
+    /// 这是对一次性运维脚本（如 cleanup-opencode.sh）的正式能力沉淀：
+    /// 数据库维护/压缩应作为 KB 一等公民能力，而非每次手写脚本。
+    ///
+    /// `prune_stale_days` 若 >0，先删除超过该天数且从未访问的节点（回收逻辑空间），
+    /// 再 VACUUM 回收物理空间。返回 `(pruned_nodes, freed_bytes)`。
+    pub fn compact(&self, prune_stale_days: Option<u32>) -> Result<(usize, i64), String> {
+        let mut conn = self.conn.lock().map_err(|e| format!("KB compact lock: {}", e))?;
+
+        // 1. 可选：清理过期节点（逻辑空间回收）
+        let mut pruned = 0usize;
+        if let Some(days) = prune_stale_days {
+            let threshold = chrono::Utc::now().timestamp() - (days as i64) * 86_400;
+            let deleted = conn.execute(
+                "DELETE FROM nodes WHERE created_at < ?1 AND access_count = 0",
+                [threshold],
+            ).map_err(|e| format!("KB compact prune: {}", e))?;
+            pruned = deleted;
+            // 清理孤儿边（被删节点的边）
+            let _ = conn.execute(
+                "DELETE FROM edges WHERE source_id NOT IN (SELECT id FROM nodes) \
+                 OR target_id NOT IN (SELECT id FROM nodes)",
+                [],
+            );
+        }
+
+        // 2. 记录压缩前文件大小
+        let before = std::fs::metadata(&self.db_path).map(|m| m.len() as i64).unwrap_or(0);
+
+        // 3. VACUUM 物理压缩
+        conn.execute_batch("VACUUM;").map_err(|e| format!("KB compact vacuum: {}", e))?;
+
+        let after = std::fs::metadata(&self.db_path).map(|m| m.len() as i64).unwrap_or(before);
+        let freed = before.saturating_sub(after);
+
+        log::info!(
+            "[KB] compact: pruned={} nodes, size {} -> {} (freed {} bytes)",
+            pruned, before, after, freed
+        );
+        Ok((pruned, freed))
+    }
+
     /// Open a clone connection to the same DB (for sharing across subsystems)
     pub fn clone_connection(&self) -> Self {
         Self::open(Some(self.db_path.clone())).unwrap_or_else(|e| {
@@ -2323,6 +2366,33 @@ mod tests {
         ).expect("search");
         assert!(!results.is_empty(), "应检索到写入的概念");
         assert!(results.iter().any(|r| r.node.title.contains("Alpha")));
+    }
+
+    #[test]
+    fn test_compact_vacuum_reclaims_space() {
+        // 一次性脚本能力沉淀: compact() 应能 VACUUM 回收空间且不破坏数据
+        let kb = test_kb();
+        kb.write_memory_entry(
+            "Compact Test Node",
+            super::nt_memory_types::NodeType::Concept,
+            Some("content to persist across compact"),
+            Some("https://compact.example/1"),
+            Some("test"),
+            None,
+        ).expect("write");
+
+        // 无 prune 时 compact 应成功且保留数据
+        let (pruned, freed) = kb.compact(None).expect("compact without prune");
+        assert_eq!(pruned, 0, "无 prune 不应删节点");
+
+        // 数据仍可检索
+        let found = kb.find_node_by_url("https://compact.example/1").expect("find");
+        assert!(found.is_some(), "compact 后数据应保留");
+
+        // 有 prune 时不应误删新节点（last_accessed 为当前时间）
+        let (pruned2, _) = kb.compact(Some(30)).expect("compact with prune");
+        assert_eq!(pruned2, 0, "新节点不应被 30 天 prune 删除");
+        let _ = freed; // freed 可能为 0（小库），不强制断言
     }
 }
 
