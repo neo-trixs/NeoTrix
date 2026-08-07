@@ -221,7 +221,20 @@ impl UnifiedCrawler {
                 }
             };
 
-            let classified = self.classifier.classify(&url_entry.url, text);
+            // 统一文档解析 + 长文档滑窗 (nt_world_doc 接线, D12/D14 缺陷网修复):
+            // 用 ParsedDoc 统一解析正文, 长文档按窗口分块, 分类取首块 (保留阅读顺序)。
+            let text = {
+                use crate::neotrix::l2_world_impl::nt_world_doc;
+                let mut doc = nt_world_doc::parse("html", text);
+                nt_world_doc::apply_chunking(&mut doc, 2048, 128);
+                if doc.blocks.is_empty() {
+                    doc.text
+                } else {
+                    doc.blocks[0].text.clone()
+                }
+            };
+
+            let classified = self.classifier.classify(&url_entry.url, &text);
             self.total_classified += 1;
 
             let mapped = self.mapper.map(&classified);
