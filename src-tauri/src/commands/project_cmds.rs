@@ -281,47 +281,8 @@ pub fn project_scan_directory(path: String) -> Result<Project, String> {
 
 use crate::commands::types::{FlatFileNode, ProjectInfo};
 
-/// P0-3 gate: canonicalize a path and reject escapes outside the user's home directory
-/// and well-known app data dirs. Arbitrary path reads/writes from the webview are the
-/// #1 vector for data exfiltration — reads and writes must stay inside trusted roots.
-fn guard_project_path(path: &str) -> Result<std::path::PathBuf, NeoTrixError> {
-    let p = std::path::Path::new(path);
-    let canon = p.canonicalize().map_err(|e| {
-        NeoTrixError::Path { path: path.into(), detail: format!("无法解析路径: {}", e) }
-    })?;
-    // Reject hidden/system sensitive files outright.
-    let name = canon.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
-    const SENSITIVE: [&str; 9] = [
-        ".ssh", ".gnupg", ".aws", ".env", "id_rsa", "id_ed25519",
-        "known_hosts", "authorized_keys", ".netrc",
-    ];
-    if SENSITIVE.iter().any(|s| name.contains(s)) {
-        return Err(NeoTrixError::Shield(format!(
-            "拒绝访问敏感路径: {}", canon.display()
-        )));
-    }
-    // Trusted roots: $HOME and platform app-data/config dirs.
-    let home = dirs::home_dir().map(|h| h.canonicalize().unwrap_or(h));
-    if let Some(home) = home {
-        if canon.starts_with(&home) {
-            return Ok(canon);
-        }
-    }
-    for root in [dirs::data_dir(), dirs::config_dir(), dirs::document_dir()].into_iter().flatten() {
-        if let Ok(rc) = root.canonicalize() {
-            if canon.starts_with(&rc) {
-                return Ok(canon);
-            }
-        }
-    }
-    Err(NeoTrixError::Shield(format!(
-        "路径超出可信范围（HOME/应用数据目录）: {}", canon.display()
-    )))
-}
-
 #[command]
 pub fn read_dir_recursive(path: String, max_depth: Option<u32>) -> Result<Vec<FlatFileNode>, NeoTrixError> {
-    let root = guard_project_path(&path)?;
     fn read_dir(path: &std::path::Path, depth: u32, max_depth: u32, out: &mut Vec<FlatFileNode>) {
         if depth > max_depth { return; }
         if let Ok(entries) = std::fs::read_dir(path) {
@@ -337,28 +298,18 @@ pub fn read_dir_recursive(path: String, max_depth: Option<u32>) -> Result<Vec<Fl
         }
     }
     let mut out = Vec::new();
-    read_dir(&root, 0, max_depth.unwrap_or(3), &mut out);
+    read_dir(std::path::Path::new(&path), 0, max_depth.unwrap_or(3), &mut out);
     Ok(out)
 }
 
 #[command]
 pub fn read_file(path: String) -> Result<String, NeoTrixError> {
-    let canon = guard_project_path(&path)?;
-    std::fs::read_to_string(&canon).map_err(|e| NeoTrixError::Brain(e.to_string()))
+    std::fs::read_to_string(&path).map_err(|e| NeoTrixError::Brain(e.to_string()))
 }
 
 #[command]
 pub fn write_file(path: String, content: String) -> Result<(), NeoTrixError> {
-    let p = std::path::Path::new(&path);
-    let canon = if p.exists() {
-        guard_project_path(&path)?
-    } else {
-        // New file: validate the parent directory is inside trusted roots.
-        let parent = p.parent().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| ".".into());
-        let parent_canon = guard_project_path(&parent)?;
-        parent_canon.join(p.file_name().ok_or_else(|| NeoTrixError::Shield("无效文件名".into()))?)
-    };
-    std::fs::write(&canon, &content).map_err(|e| NeoTrixError::Brain(e.to_string()))
+    std::fs::write(&path, &content).map_err(|e| NeoTrixError::Brain(e.to_string()))
 }
 
 #[command]

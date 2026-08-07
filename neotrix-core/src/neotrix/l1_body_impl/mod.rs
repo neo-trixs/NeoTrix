@@ -6,6 +6,7 @@ pub mod nt_l1_error;
 pub mod nt_l1_shared_types;
 
 // IO
+pub mod nt_io_agent_loop;
 pub mod nt_io_avatar_channel;
 pub mod nt_io_hotreload;
 pub mod nt_io_http_factory;
@@ -45,6 +46,8 @@ pub mod nt_act_crypto;
 pub mod nt_act_goal;
 pub mod nt_act_orchestrator;
 pub mod nt_act_sandbox;
+pub mod nt_act_disk_guard;
+pub mod nt_act_action_cache;
 pub mod nt_act_voice;
 pub mod nt_agent_agent_team;
 

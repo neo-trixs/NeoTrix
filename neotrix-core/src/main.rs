@@ -1,8 +1,8 @@
-mod config;
 mod entry;
 
 use clap::{Parser, Subcommand, CommandFactory};
 use entry::*;
+// config 模块由 lib 提供 (neotrix::config), 避免与 lib.rs 重复定义。
 
 #[derive(Parser, Debug)]
 #[command(name = "neotrix", version, about = "NeoTrix — Self-evolving reasoning engine")]
@@ -21,6 +21,9 @@ struct Cli {
 
     #[arg(global = true, long, help = "Run standalone mode (no LLM)")]
     standalone: bool,
+
+    #[arg(global = true, long, help = "Run Agent Loop mode (NeoTrix as subject, LLM as backend)")]
+    agent: bool,
 
     #[arg(global = true, long, value_name = "ADDR", default_value_t = String::from("0.0.0.0:3000"), help = "Server address")]
     addr: String,
@@ -261,12 +264,14 @@ fn main() {
     let is_ops_cmd = matches!(
         cli.command,
         Some(Commands::Sysops { .. }) | Some(Commands::Status)
-    );
+    ) || cli.agent
+        || cli.standalone
+        || cli.headless;
     if !is_ops_cmd && !entry::check_provider_config() {
         entry::run_provider_wizard();
     }
 
-    let cfg = config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
 
     let color_mode = cli.color.as_deref().or(cfg.color_mode.as_deref()).unwrap_or("auto");
     if color_mode == "never" {
@@ -436,6 +441,7 @@ fn main() {
         }
         None => {
             if cli.standalone { run_standalone_mode(cli.stage); }
+            else if cli.agent { entry::run_agent_tui(&cli.profile); }
             else if cli.serve { run_background_daemon(&cli.addr, &cli.profile); }
             else if cli.headless { run_headless_mode(&cfg, &cli.profile); }
             else { run_interactive(&cfg, &cli.profile); }

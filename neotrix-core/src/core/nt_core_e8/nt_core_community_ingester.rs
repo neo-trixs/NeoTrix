@@ -28,7 +28,7 @@ use crate::core::nt_core_e8::E8TransitionMatrix;
 use crate::core::nt_core_e8::domain_transition::{E8TaskType, E8DomainTransitionModel};
 
 /// 20-hex md5 of a string, used to derive deterministic node/edge ids.
-/// Mirrors `scripts/deep-absorb-fable5.py:ndig`. md5 here is used only for
+/// Mirrors the retired prototype `scripts/deep-absorb-fable5.py:ndig`. md5 here is used only for
 /// storage-key derivation (not security).
 fn qidian_hash(s: &str) -> String {
     use md5::{Digest, Md5};
@@ -140,7 +140,7 @@ impl CommunityDataIngester {
     }
 
     /// Materialize the E8 community-dataset hub + per-dataset Concept nodes and
-    /// edges into the KB. Faithful port of `scripts/deep-absorb-fable5.py`:
+    /// edges into the KB. Faithful port of the retired `scripts/deep-absorb-fable5.py`:
     /// creates `community_e8_datasets_hub`, one `community_dataset_{name}` node
     /// per dataset, `contains` edges hub→dataset, `related` edges within themed
     /// groups, and cross-theme `related` edges with lower weight.
@@ -1491,7 +1491,7 @@ fn default_datasets() -> Vec<CommunityDataset> {
                 (48, 34, 1_000),
             ],
         },
-        // Port of scripts/deep-absorb-fable5.py dataset — the dual-mode thinking paper.
+        // Port of retired scripts/deep-absorb-fable5.py dataset — the dual-mode thinking paper.
         CommunityDataset {
             name: "open_swe_agent_thinking_dual".into(),
             source_url: "https://arxiv.org/abs/2606.16038".into(),

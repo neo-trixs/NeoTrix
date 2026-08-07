@@ -400,7 +400,8 @@ pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
             Box::new(provider)
         }
         LlmProviderType::Llm7 => {
-            let base_url = config.base_url.unwrap_or_else(|| "https://api.llm7.ai/v1".to_string());
+            // .ai 域名已死（HTTP 000）；.io 是当前匿名可用端点（2026-08 实测 200）
+            let base_url = config.base_url.unwrap_or_else(|| "https://api.llm7.io/v1".to_string());
             let mut provider = OpenAiProvider::new(String::new());
             provider = provider.with_base_url(&base_url);
             Box::new(provider)
@@ -582,13 +583,42 @@ pub async fn create_gateway_async() -> GatewayV2 {
     }
 
     // 始终注册 keyless 免费提供者
+    // 代理注入: 本机常为 fake-ip 分流网络 (如 198.18.0.x + 系统代理), 直连会全部超时,
+    // 因此统一把 NEOTRIX_PROXY_URL / NEOTRIX_TOR_PROXY 注入每个 keyless provider 客户端。
+    let proxy = super::super::nt_io_http_factory::proxy_from_env();
+    let mut keyless_provider = |ptype: LlmProviderType| {
+        let mut p = create_provider_from_type(ptype, None);
+        if let Some(proxy_url) = &proxy {
+            p.set_proxy(proxy_url);
+            log::debug!("[gateway] keyless provider {:?} routed through proxy {}", ptype, proxy_url);
+        }
+        p
+    };
+
     let pollinations = PollinationsProvider::new();
-    gateway.register_provider_with_category("pollinations", Box::new(pollinations), true, ProviderCategory::Cloud);
+    let mut pollinations: Box<dyn LlmProvider> = Box::new(pollinations);
+    if let Some(proxy_url) = &proxy {
+        pollinations.set_proxy(proxy_url);
+    }
+    gateway.register_provider_with_category("pollinations", pollinations, true, ProviderCategory::Cloud);
     log::info!("[gateway] Registered keyless: pollinations");
 
-    let api_airforce = create_provider_from_type(LlmProviderType::ApiAirforce, None);
+    // LLM7 — 匿名 keyless（Bearer unused 即可），turbo 层模型（gpt-oss:20b 等），~30 RPM。
+    // 2026-08 实测 .io 端点 200 可用；.ai 旧域名已死。
+    gateway.register_provider_with_category("llm7", keyless_provider(LlmProviderType::Llm7), true, ProviderCategory::Cloud);
+    log::info!("[gateway] Registered keyless: llm7 (api.llm7.io, anonymous turbo models)");
+
+    let api_airforce = keyless_provider(LlmProviderType::ApiAirforce);
     gateway.register_provider_with_category("api-airforce", api_airforce, true, ProviderCategory::Cloud);
-    log::info!("[gateway] Registered keyless: api-airforce (api.airforce, 209+ free models)");
+    log::info!("[gateway] Registered keyless: api-airforce (api.airforce, 254+ models; 实测 POST 需真 key 时返回 401)");
+
+    // ── free_pool 已断言 budget 的 keyless 提供者 (类型实现齐全, 此处补接线) ──
+    // 2026-08-06 走代理实测:
+    //   llm7(api.llm7.io)           ✅ 匿名可用 (已在上面注册)
+    //   kilo(api.kilocode.ai)       ❌ HTML 404 端点已死 → 不注册
+    //   opencode-zen(opencode.ai)   ❌ POST 需 API key (AuthError) → 不注册
+    //   ovh(modelscope/freetheai)   ❌ DNS 不可达 (fake-ip 未命中) → 不注册
+    // 结论: 当前真 keyless 仅 llm7 + pollinations(匿名层已关, 探测项)。
 
     // Install CostTracker for per-query budget enforcement
     let tracker = CostTracker::new();

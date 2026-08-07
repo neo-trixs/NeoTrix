@@ -1,6 +1,6 @@
 //! nt_normalizer — NeoTrix Knowledge Base Text Normalization Module
 //!
-//! 忠实移植自 `scripts/nt_normalizer.py`。基于 2024-2026 知识图谱构建、实体解析与
+//! 忠实移植自已退役的 `scripts/nt_normalizer.py`。基于 2024-2026 知识图谱构建、实体解析与
 //! 数据标准化文献实践。所有函数与 Python 数据结构保持一致，输出逐字节对齐。
 
 use html_escape::decode_html_entities;

@@ -20,6 +20,9 @@ pub mod nt_memory_graph;
 pub mod nt_memory_hierarchical;
 pub mod nt_memory_graphrag;
 pub mod nt_memory_gwtq;
+pub mod nt_memory_diversity;
+pub mod nt_memory_curation;
+pub mod nt_memory_skill_cost;
 pub mod nt_memory_ingest;
 pub mod nt_memory_proficiency;
 pub mod nt_memory_integration;
@@ -117,31 +120,9 @@ impl std::fmt::Debug for KnowledgeBase {
     }
 }
 
-/// 测试隔离：线程局部 KB 路径覆盖。测试用 `set_kb_path_for_test` 注入临时
-/// 路径，避免并行测试竞争真实 `~/.neotrix/knowledge.db`（SQLite "database is
-/// locked"）。生产路径不受影响（默认 HOME/.neotrix/knowledge.db）。
-#[cfg(test)]
-thread_local! {
-    static TEST_KB_PATH: std::cell::RefCell<Option<std::path::PathBuf>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// 在测试线程内覆盖 KB 打开路径（仅测试构建启用）
-#[cfg(test)]
-pub fn set_kb_path_for_test(path: Option<std::path::PathBuf>) {
-    TEST_KB_PATH.with(|p| *p.borrow_mut() = path);
-}
-
 impl KnowledgeBase {
     pub fn open(path: Option<PathBuf>) -> Result<Self, String> {
         let db_path = path.unwrap_or_else(|| {
-            #[cfg(test)]
-            {
-                let test_path = TEST_KB_PATH.with(|p| p.borrow().clone());
-                if let Some(p) = test_path {
-                    return p;
-                }
-            }
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
             PathBuf::from(home).join(".neotrix").join("knowledge.db")
         });
@@ -928,6 +909,7 @@ impl KnowledgeBase {
     /// Unified search entry: auto-selects the best available method.
     /// Priority: PQ (if codebook exists + embedding configured) → semantic (if embedding configured) → hybrid (BM25+FTS fallback).
     /// This single-entry design eliminates parallel redundant paths and converges to the optimal call chain per first principles.
+    /// D1 (supermemory 参照): 结果统一应用 recency 时间衰减重排 — 同相关度新者优先。
     pub fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
         let cache_key = format!("search:{}:{}", query, limit);
         let cached_hit = self.fused_cache.lock().ok().and_then(|mut c| c.get(&cache_key).cloned());
@@ -947,6 +929,7 @@ impl KnowledgeBase {
         let config = self.embedding_config.read().map_err(|e| format!("embedding_config read: {}", e))?.clone();
         if has_codebook && config.is_some() {
             if let Ok(results) = self.pq_search(query, limit) {
+                let results = self.recency_rerank(results);
                 if let Ok(mut cache) = self.fused_cache.lock() {
                     cache.put(cache_key, results.clone());
                 }
@@ -957,6 +940,7 @@ impl KnowledgeBase {
         // Try semantic if embedding configured (full cosine)
         if config.is_some() {
             if let Ok(results) = self.semantic_search(query, limit) {
+                let results = self.recency_rerank(results);
                 if let Ok(mut cache) = self.fused_cache.lock() {
                     cache.put(cache_key, results.clone());
                 }
@@ -969,10 +953,55 @@ impl KnowledgeBase {
         let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
         let results = nt_memory_search::hybrid_search(&conn, query, limit, bm25.as_ref())
             .map_err(|e| format!("search: {}", e))?;
+        let results = self.recency_rerank(results);
         if let Ok(mut cache) = self.fused_cache.lock() {
             cache.put(cache_key, results.clone());
         }
         Ok(results)
+    }
+
+    /// D1: recency 时间衰减重排 (supermemory 参照) — 同相关度新者优先。
+    /// 纯函数封装在 nt_memory_diversity, 这里只喂 now 基准时间。
+    fn recency_rerank(&self, results: Vec<SearchResult>) -> Vec<SearchResult> {
+        let now = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_diversity::now_unix_secs();
+        nt_memory_diversity::apply_recency_decay(results, now)
+    }
+
+    /// D9: 多样性检索 (the-librarian MMR 参照) — 可选启用 MMR 去冗余,
+    /// 加载 embeddings 计算相似度。无向量时退化为 recency 排序。
+    pub fn search_diverse(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, String> {
+        let results = self.search(query, limit.saturating_mul(3))?;
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let embeddings: std::collections::HashMap<String, Vec<f32>> =
+            nt_memory_embed::load_all_embeddings(&conn)
+                .map(|pairs| pairs.into_iter().collect())
+                .unwrap_or_default();
+        drop(conn);
+        let now = nt_memory_diversity::now_unix_secs();
+        Ok(nt_memory_diversity::rerank_with_recency_and_mmr(
+            results, now, limit, &embeddings,
+        ))
+    }
+
+    /// D10/D2/D3 (缺陷网): 聚合知识策展 — 冲突检测+胜者 supersedes、陈旧节点遗忘
+    /// 归档、低命中率重写/下架建议。返回决策统计, 供运行日志与审计。
+    pub fn run_curation(
+        &self,
+        title_sim: f64,
+        max_age_days: i64,
+        importance_threshold: f64,
+        max_access: i64,
+        min_age_days: i64,
+    ) -> Result<serde_json::Value, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_curation::run_curation(
+            &conn,
+            title_sim,
+            max_age_days,
+            importance_threshold,
+            max_access,
+            min_age_days,
+        )
     }
 
     /// Permission-aware retrieval (P0-2): 决策式混合检索 — adaptive_rag 路由
@@ -1209,6 +1238,21 @@ impl KnowledgeBase {
     pub fn load_dispatch_topology(&self) -> Result<Option<String>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_unify::kv_get(&conn, "dispatch_topology", "state")
+    }
+
+    // ── CoEvolutionLoop 持久化 (P4, MAGE 四子图共进化) ──
+    // 共进化知识图谱 (capability/task/experience/environment 四子图) 与任务级搜索 bandit
+    // 存 kv_store `coevolution` namespace, 跨会话存活 — 让"同一 reward 驱动图+bandit 共进化"
+    // 的成果跨运行传输, 重启后继续在既有图谱上累积 (append-only 不重头再来)。
+
+    pub fn save_coevo(&self, json: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_unify::kv_set(&conn, "coevolution", "state", json)
+    }
+
+    pub fn load_coevo(&self) -> Result<Option<String>, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_unify::kv_get(&conn, "coevolution", "state")
     }
 
     // ── Agent Session Management (SQLite-backed) ──

@@ -562,7 +562,7 @@ pub fn map_batch_nodes(conn: &Connection) -> rusqlite::Result<(Vec<(String, Capa
     map_nodes(conn, Some("batch_"), None, None)
 }
 
-/// 读取全部节点并映射 (全库本源溯源, 对应 scripts/absorb_full_kb.py)。
+/// 读取全部节点并映射 (全库本源溯源, Rust 原生取代 scripts/absorb_full_kb.py)。
 pub fn map_all_nodes(conn: &Connection) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
     map_nodes(conn, None, None, None)
 }

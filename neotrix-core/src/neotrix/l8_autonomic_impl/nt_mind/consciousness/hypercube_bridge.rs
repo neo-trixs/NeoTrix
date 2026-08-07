@@ -304,10 +304,10 @@ mod tests {
     #[test]
     fn test_ingest_from_kb_populates_hypercube() {
         use crate::neotrix::nt_memory_kb::nt_memory_types::NodeType;
-        // 并行测试隔离：:memory: SQLite，避免与其它测试竞争真实 ~/.neotrix/knowledge.db
+        // B1 测试隔离: 用内存 KB 而非 open(None) (生产路径会被并行锁+污染)
         let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(
             Some(std::path::PathBuf::from(":memory:")),
-        ).expect("open kb");
+        ).expect("open memory kb");
         let _ = kb.insert_or_get_node(
             "KB-Bridge-Ingest-Topic",
             NodeType::Concept,
@@ -327,10 +327,9 @@ mod tests {
     #[test]
     fn test_empty_kb_ingest_zero() {
         // 打开一个新 KB 且不插入任何节点，灌入应为 0（或非负）
-        // 并行测试隔离：:memory: SQLite
         let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(
             Some(std::path::PathBuf::from(":memory:")),
-        ).expect("open kb");
+        ).expect("open memory kb");
         let mut bridge = HyperCubeBridge::new();
         let count = bridge.ingest_from_kb(&kb);
         assert!(count >= 0);

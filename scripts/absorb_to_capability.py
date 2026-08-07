@@ -31,10 +31,46 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import sys
+import tempfile
 import time
 
 KB_PATH = os.path.expanduser("~/.neotrix/knowledge.db")
+
+# ── R-P97: 写回委托 Rust CLI (update-node-metadata) — 单一事实源 ──
+RUST_BIN = os.environ.get("NEOTRIX_EXPERIENCE_BIN", "neotrix-experience")
+
+
+def rust_update_node_metadata(updates, dry_run=False):
+    """把 [{node_id, patch}] 列表交给 Rust CLI 批量 merge 写回。
+
+    返回 (updated, missing)。Rust 侧读原 metadata → 合并 patch → 写回,
+    保留既有字段 (如 topics/description), 仅覆盖 patch 声明的键。
+    """
+    if not updates:
+        return (0, 0)
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', prefix='nt_meta_', delete=False, encoding='utf-8')
+    with tmp:
+        json.dump(updates, tmp, ensure_ascii=False)
+    cmd = [RUST_BIN, 'update-node-metadata', tmp.name]
+    if dry_run:
+        cmd.append('--dry-run')
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except FileNotFoundError:
+        print(f"  ✗ {RUST_BIN} 未找到 — 请先构建并安装 neotrix-experience", flush=True)
+        return (0, 0)
+    out = (r.stdout or '') + (r.stderr or '')
+    for line in out.splitlines():
+        if 'update-node-metadata' in line:
+            print(f"  {line}", flush=True)
+    m = re.search(r"(\d+) updated, (\d+) missing", out)
+    if m:
+        return (int(m.group(1)), int(m.group(2)))
+    return (0, 0)
+
 
 # 7 域 → 主属能力 (36 原子能力 Cycle 121)
 BRANCH_CAPABILITIES = {
@@ -203,9 +239,100 @@ KEYWORD_RULES = [
     (re.compile(r'provider|gateway|model_router|llm_api|auth|login|sso|oauth', re.I), "NT-IO", "inquire"),
 ]
 
-# 代码库已有节点名 → 能力树 (NT- 域) — 为 repository 节点提供确定性映射
+    # 代码库已有节点名 → 能力树 (NT- 域) — 为 repository 节点提供确定性映射
 KNOWN_REPOS = {
     "mattpocock/skills": ("NT-CORE", "plan"),       # shared language + domain skills
+    # Cycle 208 批 (2026-08-06 吸收 97 源) — 专家判定 (防 keyword 误伤)
+    "mypaios/mypaios": ("NT-CORE", "plan"),         # AI-native OS/knowledge workspace
+    "lizhipay/acg-faka": ("NT-ACT", "execute"),     # 发卡系统 (web panel)
+    "yorukot/superfile": ("NT-IO", "invoke"),       # TUI 文件管理器
+    "Integuru-AI/Integuru": ("NT-ACT", "delegate"), # 集成 agent 编排
+    "HKUDS/DeepCode": ("NT-MIND", "transform"),     # LLM 代码修复 (DeepCode)
+    "ciembor/agent-rules-books": ("NT-CORE", "plan"), # AGENTS.md 规则书集合
+    "freestylefly/awesome-gpt-image-2": ("NT-MIND", "generate"), # GPT 图像生成合集
+    "semantica-agi/semantica": ("NT-MEMORY", "recall"), # graph-native 上下文基础设施
+    "ln-dev7/circle": ("NT-IO", "invoke"),          # web UI 组件/应用
+    "KnowledgeXLab/MemHarness": ("NT-MEMORY", "recall"), # 记忆重建 benchmark
+    "666ghj/MiroFish": ("NT-WORLD", "observe"),     # 鱼眼/多模态感知
+    "esengine/DeepSeek-Reasonix": ("NT-CORE", "critique"), # DeepSeek 推理工程
+    "eugeneyan/news-agents": ("NT-WORLD", "observe"), # 新闻 agent (MCP)
+    "microsoft/graphrag": ("NT-MEMORY", "recall"),  # graph RAG
+    "langchain-ai/deepagents": ("NT-IO", "delegate"), # agent harness
+    "overspace-labs/HaESkill": ("NT-SHIELD", "audit"), # HaE (Burp HTTP 编辑器) skill
+    "opendatalab/MinerU": ("NT-MIND", "transform"), # PDF/文档解析
+    "TencentCloud/Octop": ("NT-ACT", "delegate"),   # 自托管多用户多 agent 助手
+    "goauthentik/authentik": ("NT-SHIELD", "constrain"), # 身份认证/SSO
+    "firecrawl/anydoc": ("NT-WORLD", "retrieve"),   # 文档转换
+    "webpack/webpack": ("NT-MIND", "transform"),    # 打包器
+    "AeternaLabsHQ/pullmd": ("NT-MIND", "transform"), # URL/文件 → markdown
+    "TencentCloud/TencentDB-Agent-Memory": ("NT-MEMORY", "recall"), # agent 记忆中枢
+    "agentchatme/agentchat-hermes": ("NT-IO", "delegate"), # hermes agent 编排
+    "asimons81/hermes-dreaming": ("NT-MIND", "integrate"), # 记忆梦想合成
+    "kaishi00/hermes-community-plugins": ("NT-IO", "delegate"), # 社区插件
+    "Hmbown/Wizards-of-the-Ghosts": ("NT-MIND", "generate"), # agent 创作
+    "markoblogo/abvx-agent-skills": ("NT-IO", "delegate"), # agent skills 集
+    "Romanescu11/hermes-skill-factory": ("NT-MIND", "integrate"), # 技能工厂
+    "42-evey/hermes-plugins": ("NT-IO", "delegate"), # hermes 插件
+    "witt3rd/oh-my-hermes": ("NT-IO", "delegate"),  # hermes 配置/编排
+    "tlehman/litprog-skill": ("NT-MIND", "integrate"), # 文学编程 skill
+    "DeployFaith/hermes-bible-skill": ("NT-MIND", "integrate"), # 圣经 skill
+    "x1xhlol/system-prompts-and-models-of-ai-tools": ("NT-CORE", "critique"), # 系统提示词集
+    "leonickson1/Swiftlet": ("NT-IO", "invoke"),    # Swift/macOS app
+    "bozhouDev/codex-orange-book": ("NT-ACT", "execute"), # Codex 使用指南
+    "sxyazi/yazi": ("NT-IO", "invoke"),             # TUI 文件管理器
+    "rasbt/MachineLearning-QandAI-book": ("NT-CORE", "explain"), # ML Q&A 书
+    "iOfficeAI/OfficeCLI": ("NT-ACT", "execute"),   # Office 办公 CLI
+    "AUTOMATIC1111/stable-diffusion-webui": ("NT-MIND", "generate"), # SD webui
+    "zhulin025/Codex-QQ-Skin": ("NT-IO", "invoke"), # Codex 皮肤
+    "arxhr007/Aliens_eye": ("NT-WORLD", "observe"), # 840+ 社媒账号搜索 (OSINT)
+    "iOfficeAI/AionUi": ("NT-IO", "invoke"),        # 24/7 Cowork UI
+    "SteinsHead/ghostty-studio": ("NT-IO", "invoke"), # ghostty 终端主题/配置
+    "ifixai-ai/iFixAi": ("NT-SHIELD", "verify"),    # AI agent 独立审计
+    "public-apis/public-apis": ("NT-WORLD", "search"), # 公共 API 目录
+    "codecrafters-io/build-your-own-x": ("NT-CORE", "plan"), # 造轮子教程
+    "kamranahmedse/developer-roadmap": ("NT-CORE", "plan"), # 开发路线图
+    "EbookFoundation/free-programming-books": ("NT-MEMORY", "recall"), # 免费书
+    "donnemartin/system-design-primer": ("NT-CORE", "explain"), # 系统设计
+    "jwasham/coding-interview-university": ("NT-CORE", "explain"), # 面试学习
+    "jlevy/the-art-of-command-line": ("NT-ACT", "execute"), # 命令行艺术
+    "practical-tutorials/project-based-learning": ("NT-CORE", "plan"), # 项目制学习
+    "getify/You-Dont-Know-JS": ("NT-MEMORY", "recall"), # JS 深度书
+    "trimstray/the-book-of-secret-knowledge": ("NT-CORE", "explain"), # 秘密知识手册
+    "yangshun/tech-interview-handbook": ("NT-CORE", "explain"), # 面试手册
+    "awesome-selfhosted/awesome-selfhosted": ("NT-ACT", "delegate"), # 自托管清单
+    "trekhleb/javascript-algorithms": ("NT-CORE", "measure"), # JS 算法
+    "30-seconds/30-seconds-of-code": ("NT-CORE", "measure"), # 代码片段
+    "github/gitignore": ("NT-ACT", "execute"),      # gitignore 模板
+    "ollama/ollama": ("NT-IO", "inquire"),          # 本地 LLM 运行时
+    "langchain-ai/langchain": ("NT-MIND", "integrate"), # agent 框架
+    "n8n-io/n8n": ("NT-ACT", "delegate"),           # 工作流自动化
+    "openclaw/openclaw": ("NT-IO", "delegate"),     # agent 网关
+    "langgenius/dify": ("NT-MIND", "integrate"),    # LLM app 平台
+    "langflow-ai/langflow": ("NT-MIND", "integrate"), # 可视化 agent 编排
+    "mem0ai/mem0": ("NT-MEMORY", "recall"),         # agent 记忆层
+    "browser-use/browser-use": ("NT-WORLD", "retrieve"), # 浏览器 agent
+    "crewAIInc/crewAI": ("NT-IO", "delegate"),      # 多 agent 编排
+    "geekan/MetaGPT": ("NT-IO", "delegate"),        # 多 agent 软件公司
+    "microsoft/autogen": ("NT-IO", "delegate"),     # 多 agent 框架
+    "Aider-AI/aider": ("NT-ACT", "execute"),        # AI pair programming
+    "microsoft/markitdown": ("NT-MIND", "transform"), # 文件→markdown
+    "open-webui/open-webui": ("NT-IO", "invoke"),   # web UI
+    "soxoj/maigret": ("NT-WORLD", "observe"),       # 用户信息 OSINT
+    "TauricResearch/TradingAgents": ("NT-CORE", "predict"), # 交易 agent
+    "browserbase/stagehand": ("NT-WORLD", "retrieve"), # 浏览器自动化
+    "firecrawl/firecrawl": ("NT-WORLD", "retrieve"), # 爬取/搜索 API
+    "huggingface/transformers": ("NT-MIND", "generate"), # 模型库
+    "vllm-project/vllm": ("NT-MIND", "generate"),   # LLM 推理引擎
+    "ggerganov/llama.cpp": ("NT-MIND", "generate"), # LLM 推理
+    "run-llama/llama_index": ("NT-MEMORY", "recall"), # RAG 框架
+    "karpathy/nanoGPT": ("NT-MIND", "generate"),    # GPT 训练
+    "infiniflow/ragflow": ("NT-MEMORY", "recall"),  # RAG 引擎
+    "supermemoryai/supermemory": ("NT-MEMORY", "recall"), # 记忆层
+    "ComposioHQ/awesome-claude-skills": ("NT-CORE", "plan"), # Claude skills 集
+    "perplexityai/bumblebee": ("NT-WORLD", "search"), # 搜索
+    "comfyanonymous/ComfyUI": ("NT-MIND", "generate"), # 节点式图像生成
+    "lobehub/lobe-chat": ("NT-IO", "invoke"),       # AI 聊天 UI
+    # NT-CORE 确定性映射 (Cycle 161q)
     "anthropics/skills": ("NT-CORE", "plan"),
     "google/skills": ("NT-CORE", "plan"),
     "claude-code": ("NT-ACT", "execute"),
@@ -392,6 +519,26 @@ KNOWN_REPOS = {
     # 认知/神经 (Cycle 161t)
     "opencog": ("NT-MEMORY", "simulate"),
     "bids-validator": ("NT-CORE", "verify"),
+    # Cycle 232 批 (2026-08-06 吸收 436 源) — 专家判定 (防 keyword 误伤)
+    "expo/expo": ("NT-IO", "invoke"),                 # React Native 跨端框架
+    "milvus-io/milvus": ("NT-MEMORY", "recall"),      # 向量数据库 (KB 检索)
+    "karpathy/autoresearch": ("NT-MIND", "integrate"), # 自主实验循环
+    "hacksider/Deep-Live-Cam": ("NT-MIND", "generate"), # 实时人脸替换 (生成)
+    "openinterpreter/openinterpreter": ("NT-ACT", "execute"), # 自然语言代码执行
+    "livekit/agents": ("NT-IO", "delegate"),          # 语音/实时 agent 框架
+    "microsoft/Resource2Skill": ("NT-MIND", "integrate"), # 文档→skill 转换
+    "google-research/timesfm": ("NT-CORE", "predict"), # 时序预测基础模型
+    "coqui-ai/TTS": ("NT-MIND", "generate"),          # TTS 语音合成
+    "openai/swarm": ("NT-ACT", "delegate"),           # 多 agent 编排
+    "anthropics/claude-code": ("NT-ACT", "execute"),  # Claude Code CLI agent
+    "unslothai/unsloth": ("NT-MIND", "transform"),    # LLM 微调加速
+    "microsoft/agent-framework": ("NT-IO", "delegate"), # agent 运行时框架
+    "harbor-framework/harbor": ("NT-CORE", "plan"),   # agent 系统架构框架
+    "CodebuffAI/codebuff": ("NT-ACT", "execute"),     # 自主编码 agent
+    "facebookresearch/map-anything": ("NT-WORLD", "observe"), # 分割/感知
+    "anthropics/prompt-eng-interactive-tutorial": ("NT-CORE", "explain"), # 提示工程教程
+    "ItusiAI/MokerSaaS": ("NT-ACT", "execute"),       # SaaS 出海启动模板 (rename from get-saas)
+    "Anil-matcha/ai-creator-academy": ("NT-CORE", "explain"), # AI 创作免费课程 (rename from awesome-hermes-agent)
 }
 
 
@@ -543,33 +690,29 @@ def main():
             per_source[core] = per_source.get(core, 0) + 1
 
     if args.apply:
+        # R-P97: 写回委托 Rust CLI (update-node-metadata) — 单一事实源。
+        # Python 仅算映射结果 (286 专家键 + 规则 + 本源溯源), 写回交 Rust merge。
         now = int(time.time())
+        updates = []
         for nid, m in mapped.items():
-            try:
-                cur = conn.execute("SELECT metadata FROM nodes WHERE id=?", (nid,)).fetchone()
-                meta = {}
-                if cur and cur[0]:
-                    try:
-                        meta = json.loads(cur[0])
-                    except json.JSONDecodeError:
-                        meta = {}
-                meta['absorbed_capability'] = {'branch': m['branch'],
-                                               'capability': m['capability'],
-                                               'evidence': m['evidence'],
-                                               'mapped_at': now}
-                if m.get('source_core'):
-                    meta['knowledge_source'] = {
-                        'source_core': m['source_core'],
-                        'primary_domain': m.get('source_domain'),
-                        'trace_path': m.get('trace_keywords', []),
-                        'mapped_at': now,
-                    }
-                conn.execute("UPDATE nodes SET metadata=? WHERE id=?",
-                             (json.dumps(meta, ensure_ascii=False), nid))
-            except sqlite3.Error as e:
-                print(f'  ✗ {nid}: {e}', flush=True)
-        conn.commit()
-        print(f'[mapping] wrote {len(mapped)} capability mappings to KB', flush=True)
+            patch = {
+                'absorbed_capability': {
+                    'branch': m['branch'],
+                    'capability': m['capability'],
+                    'evidence': m['evidence'],
+                    'mapped_at': now,
+                }
+            }
+            if m.get('source_core'):
+                patch['knowledge_source'] = {
+                    'source_core': m['source_core'],
+                    'primary_domain': m.get('source_domain'),
+                    'trace_path': m.get('trace_keywords', []),
+                    'mapped_at': now,
+                }
+            updates.append({'node_id': nid, 'patch': patch})
+        ins, missing = rust_update_node_metadata(updates)
+        print(f'[mapping] wrote {ins} capability mappings to KB (missing={missing})', flush=True)
 
     # ── 覆盖率报告 ──
     print(f'\n=== 覆盖率报告 ===')

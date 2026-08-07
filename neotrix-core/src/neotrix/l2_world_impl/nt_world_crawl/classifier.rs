@@ -485,6 +485,7 @@ mod tests {
                 model: "mock".into(),
                 usage: crate::neotrix::nt_io_provider::Usage::default(),
                 finish_reason: crate::neotrix::nt_io_provider::FinishReason::Stop,
+                tool_calls: None,
             })
         }
 

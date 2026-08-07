@@ -236,6 +236,17 @@ impl BackgroundLoop {
                         constitution.experiences.len(),
                         constitution.tree_growth_rules.len(),
                         constitution.absorption_rules.len());
+                    // B2 (自审修复): 用真实宪法计数替换 floor 硬编码自欺 — 此前
+                    // constitution_rules_count/experiences_count 仅靠 config floor
+                    // (46/111) 抬升, 声明当事实。这里把 ConstitutionLoader 实测值
+                    // 同步进 tree.soil, run_growth_cycle 中的 floor 只作为兜底。
+                    if let Some(ref mut tree) = self.consciousness_tree {
+                        tree.soil.constitution_rules_count = constitution.rules.len();
+                        tree.soil.constitution_experiences_count = constitution.experiences.len();
+                        tree.soil.constitution_tree_growth_rules = constitution.tree_growth_rules.len();
+                        tree.soil.constitution_absorption_rules = constitution.absorption_rules.len();
+                        log::info!("[constitution] Wired real counts into ConsciousnessTree soil");
+                    }
                 }
                 Err(e) => log::warn!("[constitution] Failed to load AGENTS.md: {}", e),
             }
@@ -438,6 +449,7 @@ cognitive_load: self.cognitive_load.take(),
             meta_shell: {
                 // P1: 启动时从 KB 恢复派单学习证据 — 派单统计跨会话存活。
                 // P3: 同时恢复 MANTA 派单拓扑 (域→档案边, 跨轮 playbook)。
+                // P4: 同时恢复 MAGE 四子图共进化图谱 + 任务级搜索 bandit。
                 let mut shell = crate::neotrix::nt_mind::MetaAgentShell::new("dialogue");
                 if let Some(ref kb_ref) = kb {
                     if let Err(e) = shell.learner.load(kb_ref) {
@@ -445,6 +457,9 @@ cognitive_load: self.cognitive_load.take(),
                     }
                     if let Err(e) = shell.load_topology(kb_ref) {
                         log::warn!("[bg-meta] dispatch_topology load failed: {}", e);
+                    }
+                    if let Err(e) = shell.load_coevo(kb_ref) {
+                        log::warn!("[bg-meta] coevolution loop load failed: {}", e);
                     }
                 }
                 Some(shell)

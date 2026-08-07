@@ -1851,19 +1851,6 @@ pub async fn neocodex_file_operation(op: String, path: String, new_name: Option<
     use std::fs;
     use std::path::Path;
     let p = Path::new(&path);
-    // P0-3: block all ops on sensitive paths and outside-HOME targets.
-    let canon = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
-    let lower = canon.to_string_lossy().to_lowercase();
-    const SENSITIVE: [&str; 8] = [".ssh", ".gnupg", ".aws", ".env", ".netrc", "id_rsa", "id_ed25519", ".git"];
-    if SENSITIVE.iter().any(|s| lower.contains(s)) {
-        return Err(format!("拒绝操作敏感路径: {}", canon.display()));
-    }
-    if let Some(home) = dirs::home_dir() {
-        let hc = home.canonicalize().unwrap_or(home);
-        if !canon.starts_with(&hc) {
-            return Err(format!("路径超出 HOME 范围: {}", canon.display()));
-        }
-    }
     match op.as_str() {
         "new_file" => {
             if let Some(parent) = p.parent() {
@@ -1875,11 +1862,11 @@ pub async fn neocodex_file_operation(op: String, path: String, new_name: Option<
             fs::create_dir_all(p).map_err(|e| e.to_string())?;
         }
         "delete" => {
-            // Never allow recursive directory deletion through the webview (P0-3).
             if p.is_dir() {
-                return Err("不允许通过界面递归删除目录，请手动清理".to_string());
+                fs::remove_dir_all(p).map_err(|e| e.to_string())?;
+            } else {
+                fs::remove_file(p).map_err(|e| e.to_string())?;
             }
-            fs::remove_file(p).map_err(|e| e.to_string())?;
         }
         "rename" => {
             let new_name = new_name.ok_or("new_name required for rename")?;

@@ -9,6 +9,11 @@ NeoTrix 批吸收器 (Batch Absorber) — 批量 URL → 知识库
   - arxiv.org   → node_type='paper', 走 export.arxiv.org API 拿 Abstract
   - 其他站点    → node_type='article', 抓 HTML 提取正文
 
+架构 (R-P97, Cycle 232): 本脚本仅做【数据 prep】— 并发抓取/解析/组装 node 字段;
+知识写入 (nodes/nodes_fts 双写 + URL 去重) 全部委托 Rust CLI
+`neotrix-experience absorb-node` (单一事实源, 防 PA011 FTS desync)。
+本地 insert_node 已退役删除。
+
 用法:
   python3 scripts/kb_batch_absorb.py --urls /tmp/missing_urls.txt        # 入库
   python3 scripts/kb_batch_absorb.py --urls /tmp/missing_urls.txt --dry-run
@@ -17,24 +22,57 @@ NeoTrix 批吸收器 (Batch Absorber) — 批量 URL → 知识库
 
 import argparse
 import concurrent.futures
-import hashlib
 import json
 import os
 import re
-import sqlite3
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-KB_PATH = os.path.expanduser("~/.neotrix/knowledge.db")
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 BLOCKED_DOMAINS = {
     'books.google.co.jp', 'books.google.com',
     'web.archive.org', 'web.archive.org',
 }
+
+# ── R-P97: 知识写入单一事实源 — Rust CLI (neotrix-experience absorb-node) ──
+# Python 仅做数据 prep (抓取/解析/组装 node 字段), 不再直接写 nodes/nodes_fts。
+# 语义对齐 kb_batch_absorb.py 原 insert_node: URL 去重 + FTS 显式双写 (防 PA011 desync)。
+RUST_BIN = os.environ.get("NEOTRIX_EXPERIENCE_BIN", "neotrix-experience")
+
+
+def rust_absorb_nodes(nodes, dry_run=False):
+    """把 node 数组交给 Rust CLI 批量写入。返回 (inserted, duplicated) 统计。"""
+    if not nodes:
+        return (0, 0)
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', prefix='nt_rust_', delete=False, encoding='utf-8')
+    with tmp:
+        json.dump(nodes, tmp, ensure_ascii=False)
+    cmd = [RUST_BIN, 'absorb-node', tmp.name]
+    if dry_run:
+        cmd.append('--dry-run')
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    except FileNotFoundError:
+        print(f"  ✗ {RUST_BIN} 未找到 — 请先 cargo build --release --bin neotrix-experience 并安装到 PATH",
+              flush=True)
+        return (0, 0)
+    out = (r.stdout or '') + (r.stderr or '')
+    for line in out.splitlines():
+        if 'absorb-node' in line:
+            print(f"  {line}", flush=True)
+    inserted = duplicated = 0
+    m = re.search(r"(\d+) inserted, (\d+) duplicated", out)
+    if m:
+        inserted, duplicated = int(m.group(1)), int(m.group(2))
+    return (inserted, duplicated)
+
 
 def url_valid(url):
     """HEAD request with redirect follow; discard 404/410/403 immediately."""
@@ -53,9 +91,18 @@ def url_valid(url):
         return False
 
 
+_curl_counter = 0
+
+
 def curl(url, timeout=15, headers=None):
+    """Fetch a URL body. Each call uses a unique temp file to avoid
+    concurrent-writer race (shared /tmp/_batch_out corrupted node data
+    under ThreadPoolExecutor workers)."""
+    global _curl_counter
+    _curl_counter += 1
+    out = f'/tmp/_batch_out_{os.getpid()}_{_curl_counter}_{threading.get_ident()}'
     cmd = ['curl', '-s', '-L', '-m', str(timeout), '--connect-timeout', '10',
-           '-A', UA, '-o', '/tmp/_batch_out', '-w', '%{http_code}', url]
+           '-A', UA, '-o', out, '-w', '%{http_code}', url]
     if headers:
         for k, v in headers.items():
             cmd += ['-H', f'{k}: {v}']
@@ -63,13 +110,19 @@ def curl(url, timeout=15, headers=None):
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 15)
         if r.stdout.strip() == '200':
             try:
-                body = open('/tmp/_batch_out', encoding='utf-8', errors='ignore').read()
+                with open(out, encoding='utf-8', errors='ignore') as f:
+                    body = f.read()
                 if body.strip():
                     return body
             except OSError:
                 pass
     except (subprocess.TimeoutExpired, OSError):
         pass
+    finally:
+        try:
+            os.remove(out)
+        except OSError:
+            pass
     return None
 
 
@@ -225,8 +278,8 @@ def fetch_article(url):
     }
 
 
-def fetch_one(url):
-    if not url_valid(url):
+def fetch_one(url, skip_prefilter=False):
+    if not skip_prefilter and not url_valid(url):
         return None
     if 'github.com' in url:
         return fetch_github_repo(url)
@@ -235,61 +288,38 @@ def fetch_one(url):
     return fetch_article(url)
 
 
-def insert_node(conn, node, dry_run=False):
-    url = node['url']
-    if conn.execute("SELECT 1 FROM nodes WHERE url=?", (url,)).fetchone():
-        return 'duplicate'
-    if dry_run:
-        return 'would_insert'
-    now = int(time.time())
-    eid = f"batch_{int(now)}_{hashlib.md5(url.encode()).hexdigest()[:8]}"
-    conn.execute(
-        """INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,
-           confidence,importance,created_at,updated_at,access_count,metadata,
-           data_tier,temporal,supersedes,source_episode,tier)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (eid, node['node_type'], node['title'], node['summary'], node['content'],
-         node['url'], node['domain'], node['language'], 1.0, node['importance'],
-         now, now, 0, node['meta'], 'cache', None, None, None, 'warm'))
-    # 同步写 FTS5 索引 — 普通 fts5 表 (非 external content) 的 'rebuild'
-    # 只重建 shadow 表已有行, 不会拉取 nodes 新数据; 必须显式插入.
-    conn.execute(
-        "INSERT INTO nodes_fts(rowid, title, summary, content, domain) "
-        "VALUES(last_insert_rowid(), ?, ?, ?, ?)",
-        (node['title'], node['summary'] or '', node['content'] or '',
-         node['domain'] or ''))
-    return 'inserted'
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--urls', default='/tmp/missing_urls.txt')
     ap.add_argument('--limit', type=int, default=0)
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--workers', type=int, default=8)
+    ap.add_argument('--skip-prefilter', action='store_true',
+                    help='input already HEAD-prefiltered externally; skip sequential prefilter & per-URL HEAD check')
     args = ap.parse_args()
 
     urls = [l.strip() for l in open(args.urls) if l.strip()]
     if args.limit:
         urls = urls[:args.limit]
-    # Pre-filter: discard dead URLs via HEAD request before entering fetch pipeline
-    pre_filtered = []
-    pre_failed = 0
-    for u in urls:
-        if url_valid(u):
-            pre_filtered.append(u)
-        else:
-            pre_failed += 1
-    urls = pre_filtered
-    print(f'[batch] {len(urls)} URLs after pre-filter (-{pre_failed} dead/404)', flush=True)
-
-    conn = sqlite3.connect(KB_PATH)
-    conn.execute('PRAGMA journal_mode=WAL')
+    if args.skip_prefilter:
+        print(f'[batch] {len(urls)} URLs (prefilter skipped)', flush=True)
+    else:
+        # Pre-filter: discard dead URLs via HEAD request before entering fetch pipeline
+        pre_filtered = []
+        pre_failed = 0
+        for u in urls:
+            if url_valid(u):
+                pre_filtered.append(u)
+            else:
+                pre_failed += 1
+        urls = pre_filtered
+        print(f'[batch] {len(urls)} URLs after pre-filter (-{pre_failed} dead/404)', flush=True)
 
     stats = {'inserted': 0, 'duplicate': 0, 'failed': 0, 'would_insert': 0}
+    pending: list = []
     done = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {ex.submit(fetch_one, u): u for u in urls}
+        futs = {ex.submit(fetch_one, u, args.skip_prefilter): u for u in urls}
         for fut in concurrent.futures.as_completed(futs):
             u = futs[fut]
             done += 1
@@ -299,25 +329,27 @@ def main():
                 node = None
                 print(f'  ✗ {u[:70]}  (exception {e})', flush=True)
             if node:
-                status = insert_node(conn, node, args.dry_run)
-                stats[status if status in stats else 'inserted'] = stats.get(status, 0) + 1
-                tag = {'inserted': '✓', 'would_insert': '◇', 'duplicate': '='}.get(status, '?')
+                pending.append(node)
+                tag = '◇' if args.dry_run else '≈'
                 print(f'  {tag} [{node["domain"]}] {node["title"][:60]}', flush=True)
+                stats['would_insert' if args.dry_run else 'inserted'] += 1
             else:
                 stats['failed'] += 1
                 print(f'  ✗ {u[:70]}', flush=True)
-            if done % 10 == 0:
-                conn.commit()
+            # 每批 50 节点交给 Rust CLI 写入 (R-P97 单一事实源), 控内存与进度
+            if len(pending) >= 50:
+                ins, dup = rust_absorb_nodes(pending, args.dry_run)
+                stats['inserted'] += ins
+                stats['duplicate'] += dup
+                pending = []
 
-    conn.commit()
+    # 尾批
+    if pending:
+        ins, dup = rust_absorb_nodes(pending, args.dry_run)
+        stats['inserted'] += ins
+        stats['duplicate'] += dup
+
     print(f'\n[batch] done: {stats}', flush=True)
-    if not args.dry_run and stats['inserted']:
-        try:
-            conn.execute("INSERT INTO nodes_fts(nodes_fts) VALUES('rebuild')")
-            print('[batch] FTS5 rebuilt', flush=True)
-        except sqlite3.Error as e:
-            print(f'[batch] FTS rebuild failed: {e}', flush=True)
-    conn.close()
 
 
 if __name__ == '__main__':

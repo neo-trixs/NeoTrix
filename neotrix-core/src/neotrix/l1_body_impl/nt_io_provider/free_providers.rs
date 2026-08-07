@@ -74,7 +74,7 @@ impl GroqProvider {
             _ => FinishReason::Unknown,
         };
 
-        Ok(LlmResponse { content, model, usage, finish_reason: finish })
+        Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None })
     }
 }
 
@@ -171,6 +171,7 @@ impl LlmProvider for GroqProvider {
                                         model: v["model"].as_str().unwrap_or("").to_string(),
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
                                     })).await;
                                 }
                             }
@@ -215,6 +216,7 @@ impl LlmProvider for OpenRouterProvider {
     }
 
     async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+        let url = format!("{}/chat/completions", self.base_url);
         let mut body = serde_json::json!({
             "model": request.model,
             "messages": request.messages.iter().map(|m| {
@@ -235,7 +237,6 @@ impl LlmProvider for OpenRouterProvider {
             body["temperature"] = serde_json::json!(temp);
         }
 
-        let url = format!("{}/chat/completions", self.base_url);
         let resp = self.client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.api_key))
@@ -265,7 +266,7 @@ impl LlmProvider for OpenRouterProvider {
                     Some("length") => FinishReason::Length,
                     _ => FinishReason::Unknown,
                 };
-                Ok(LlmResponse { content, model, usage, finish_reason: finish })
+                Ok(LlmResponse { content, model, usage, finish_reason: finish, tool_calls: None })
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -333,6 +334,7 @@ impl LlmProvider for OpenRouterProvider {
                                         model: v["model"].as_str().unwrap_or("").to_string(),
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
                                     })).await;
                                 }
                             }
@@ -388,6 +390,9 @@ impl LlmProvider for PollinationsProvider {
                 "content": m.content,
             })).collect::<Vec<_>>(),
             "max_tokens": request.max_tokens,
+            // pollinations 匿名访问: body 内 referrer 字段 + Referer header 双要求,
+            // 缺一即按认证用户返回 402 (实测 2026-08-06)。
+            "referrer": "https://pollinations.ai/",
         });
 
         if let Some(temp) = request.temperature {
@@ -396,6 +401,8 @@ impl LlmProvider for PollinationsProvider {
 
         let resp = self.client
             .post(&self.base_url)
+            // pollinations 匿名访问要求 referer=pollinations.ai 否则按认证用户返回 402
+            .header(reqwest::header::REFERER, "https://pollinations.ai/")
             .json(&body)
             .send()
             .await
@@ -412,6 +419,7 @@ impl LlmProvider for PollinationsProvider {
                     model: request.model.clone(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })
             }
             429 => Err(LlmError::RateLimit(text)),
@@ -434,6 +442,9 @@ impl LlmProvider for PollinationsProvider {
             })).collect::<Vec<_>>(),
             "max_tokens": request.max_tokens,
             "stream": true,
+            // pollinations 匿名访问: body 内 referrer 字段 + Referer header 双要求,
+            // 缺一即按认证用户返回 402 (实测 2026-08-06)。
+            "referrer": "https://pollinations.ai/",
         });
 
         if let Some(temp) = request.temperature {
@@ -445,16 +456,51 @@ impl LlmProvider for PollinationsProvider {
 
         tokio::spawn(async move {
             let client = global_client().clone();
-            if let Ok(response) = client.post(&base_url).json(&body).send().await {
-                if !response.status().is_success() { return; }
-                let full_text = response.text().await.unwrap_or_default();
-                if !full_text.is_empty() {
-                    let _ = tx.send(Ok(LlmResponse {
-                        content: full_text,
-                        model: String::new(),
-                        usage: Usage::default(),
-                        finish_reason: FinishReason::Unknown,
-                    })).await;
+            let response = match client
+                .post(&base_url)
+                // pollinations 匿名访问要求 referer=pollinations.ai 否则按认证用户返回 402
+                .header(reqwest::header::REFERER, "https://pollinations.ai/")
+                .json(&body)
+                .send()
+                .await
+            {
+                Ok(resp) => resp,
+                Err(e) => {
+                    let _ = tx.send(Err(LlmError::Network(format!("{}", e)))).await;
+                    return;
+                }
+            };
+            // 非 200 时上报明确错误 (此前静默丢弃导致调用方看到空内容)
+            let status = response.status();
+            if !status.is_success() {
+                let text = response.text().await.unwrap_or_default();
+                let err = match status.as_u16() {
+                    429 => LlmError::RateLimit(text),
+                    401 | 402 | 403 => LlmError::Authentication(text),
+                    500..=599 => LlmError::Server(text),
+                    _ => LlmError::Unknown(text),
+                };
+                let _ = tx.send(Err(err)).await;
+                return;
+            }
+            let full_text = response.text().await.unwrap_or_default();
+            // SSE 逐行解析 (pollinations 返回 OpenAI 兼容 data: {...} 流),
+            // 对齐 openai.rs 的解析模式 — 此前整段 text 当单 chunk 发出含 data: 前缀。
+            for line in full_text.lines() {
+                let line = line.trim();
+                if line.is_empty() || line == "data: [DONE]" { continue; }
+                if let Some(data) = line.strip_prefix("data: ") {
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
+                        if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
+                            let _ = tx.send(Ok(LlmResponse {
+                                content: delta.to_string(),
+                                model: v["model"].as_str().unwrap_or("").to_string(),
+                                usage: Usage::default(),
+                                finish_reason: FinishReason::Unknown,
+                            tool_calls: None,
+                            })).await;
+                        }
+                    }
                 }
             }
         });
@@ -525,6 +571,7 @@ impl LlmProvider for CerebrasProvider {
                         total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
                     }).unwrap_or_default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })
             }
             401 => Err(LlmError::Authentication(text)),
@@ -591,6 +638,7 @@ impl LlmProvider for CerebrasProvider {
                                         model: v["model"].as_str().unwrap_or("").to_string(),
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
                                     })).await;
                                 }
                             }

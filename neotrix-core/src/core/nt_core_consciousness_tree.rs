@@ -1015,8 +1015,14 @@ impl ConsciousnessTree {
 
         // ═══ Phase 1: Roots absorb from soil (Data Foundation → Information Roots) ═══
         // Constitution internalization: soil feeds roots with principles
-        self.soil.constitution_rules_count = self.soil.constitution_rules_count.max(self.config.constitution_rules_floor);
-        self.soil.constitution_experiences_count = self.soil.constitution_experiences_count.max(self.config.constitution_experiences_floor);
+        // B2 (自审修复): 宪法计数以真实 ConstitutionLoader 接线值为准 (run.rs 启动时写入)。
+        // floor 仅作"未接线时的兜底" (max 抬升会覆盖真实值, 属声明当事实的自欺 — 已废弃)。
+        if self.soil.constitution_rules_count == 0 {
+            self.soil.constitution_rules_count = self.config.constitution_rules_floor;
+        }
+        if self.soil.constitution_experiences_count == 0 {
+            self.soil.constitution_experiences_count = self.config.constitution_experiences_floor;
+        }
         self.soil.constitution_tree_growth_rules = self.config.constitution_tree_growth_rules; // R-P42~R-P48
         self.soil.constitution_absorption_rules = self.config.constitution_absorption_rules; // R-P43
         
@@ -1312,6 +1318,19 @@ impl ConsciousnessTree {
                     let total = branch_results.len();
                     // Health = pass rate, but minimum floor to avoid zero
                     branch.health = (passed as f64 / total as f64).max(self.config.min_branch_health);
+                    // B2 (自审修复): 从真实 SelfTest 结果接线生产计数 — 此前 self_test_count/
+                    // module_count 仅在 #[cfg(test)] 中赋值, 生产恒 0 → 果实门永 0、maturity
+                    // 恒低、drift_recovery 校正空转。此处用真实注册器结果填充。
+                    branch.self_test_count = total;
+                    // module_count: 该域注册器唯一模块数 (近似真实模块数下限,
+                    // 避免 0 值导致 "not viable" 误报)。
+                    let unique_modules = branch_results.iter()
+                        .map(|r| r.name.as_str())
+                        .collect::<std::collections::HashSet<_>>()
+                        .len();
+                    branch.module_count = branch.module_count.max(unique_modules);
+                    // 由真实计数重算成熟度 (maturity_c0..c5 由 NodeTier/Constellation 派生)
+                    branch.evaluate_constellation();
                 }
             }
         }

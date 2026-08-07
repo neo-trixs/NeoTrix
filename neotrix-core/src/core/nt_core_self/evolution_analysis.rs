@@ -1,5 +1,5 @@
 //! KB health analysis and evolution todo generation.
-//! Port of `scripts/generate-evolution-todo.py` into the self-audit pipeline.
+//! Port of the retired `scripts/generate-evolution-todo.py` into the self-audit pipeline.
 
 use rusqlite::Connection;
 
@@ -88,7 +88,7 @@ pub fn analyze_kb_health(conn: &Connection) -> Vec<KbDefect> {
             priority: "P0".into(), severity: 0.8,
             title: "0 embeddings — semantic search dead, RAG pipeline non-functional".into(),
             area: "kb-embedding".into(),
-            detail: "Must run kb-generate-embeddings.py with NEOTRIX_EMBEDDING_API_KEY set".into(),
+            detail: "Must run Rust embedding pipeline (nt_memory_embed) with NEOTRIX_EMBEDDING_API_KEY set".into(),
         });
     }
 

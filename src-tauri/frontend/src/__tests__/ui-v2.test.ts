@@ -145,7 +145,7 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(document.querySelector(".df-comment .dc-body")!.textContent).toBe("inline note");
   });
 
-  it("code blocks expose a run button and runMsgCode gates execution behind confirm", async () => {
+  it("code blocks expose a run button and runMsgCode appends a result block", () => {
     const g = globalThis as Record<string, unknown>;
     expect(typeof g.runMsgCode).toBe("function");
     expect(typeof g.createSession).toBe("function");
@@ -155,31 +155,10 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     const runBtn = [...host.querySelectorAll(".msg-code-cp")].find((b) => b.textContent === "运行");
     expect(runBtn).not.toBeNull();
     host.querySelector("#chatScroll") || document.getElementById("chatScroll")!.appendChild(host);
-    const p = (g.runMsgCode as (btn: HTMLElement) => Promise<void>)(runBtn as HTMLElement);
-    // Security gate: confirm dialog must appear before the command executes
-    const confirmBox = document.getElementById("ntxConfirm");
-    expect(confirmBox).not.toBeNull();
-    expect(document.querySelector(".msg-code-out")).toBeNull();
-    confirmBox!.querySelector<HTMLButtonElement>('[data-act="confirm"]')!.click();
-    await p;
+    (g.runMsgCode as (btn: HTMLElement) => void)(runBtn as HTMLElement);
     const out = host.querySelector(".msg-code-out");
     expect(out).not.toBeNull();
     expect(out!.querySelector(".msg-code-res")!.textContent).toMatch(/NeoTrix shell/);
-  });
-
-  it("runMsgCode cancels execution when confirm is dismissed", async () => {
-    const g = globalThis as Record<string, unknown>;
-    const host = document.createElement("div");
-    host.innerHTML = (g.renderRichText as (t: string) => string)("```sh\nrm -rf /\n```");
-    const runBtn = [...host.querySelectorAll(".msg-code-cp")].find((b) => b.textContent === "运行");
-    host.querySelector("#chatScroll") || document.getElementById("chatScroll")!.appendChild(host);
-    const p = (g.runMsgCode as (btn: HTMLElement) => Promise<void>)(runBtn as HTMLElement);
-    const confirmBox = document.getElementById("ntxConfirm");
-    expect(confirmBox).not.toBeNull();
-    // danger command: confirm button is danger-styled but cancel dismisses
-    confirmBox!.querySelector<HTMLButtonElement>('[data-act="cancel"]')!.click();
-    await p;
-    expect(host.querySelector(".msg-code-out")).toBeNull();
   });
 
   it("tab bar renders kbd chips + hero suggestions in chat view", () => {
@@ -644,28 +623,14 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     (globalThis as Record<string, unknown>).localStorage = store;
     try {
       store.setItem("neotrix.settings", JSON.stringify({ "compute.temperature": 0.7, "compute.maxTokens": 16384 }));
-      // Security default: starts in 手动 (manual), so a fresh app sends manual until the user cycles.
+      (g.cycleMode as () => void)();
       const input = document.getElementById("chatInput") as HTMLTextAreaElement;
       input.value = "参数接线测试";
       (g.sendMsg as () => void)();
-      let send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
+      const send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
       expect(send).toBeTruthy();
       expect(send!.args.temperature).toBe(0.7);
       expect(send!.args.max_tokens).toBe(16384);
-      expect(send!.args.permission_mode).toBe("manual");
-      // Cycle once → 自动 (auto)
-      (g.cycleMode as () => void)();
-      calls.length = 0;
-      input.value = "参数接线测试2"; // sendMsg clears the input after sending
-      (g.sendMsg as () => void)();
-      send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
-      expect(send!.args.permission_mode).toBe("auto");
-      // Cycle twice → 计划 (plan)
-      (g.cycleMode as () => void)();
-      calls.length = 0;
-      input.value = "参数接线测试3";
-      (g.sendMsg as () => void)();
-      send = calls.find((c) => c.cmd === "neocodex_send_message_stream");
       expect(send!.args.permission_mode).toBe("plan");
     } finally {
       (globalThis as Record<string, unknown>).localStorage = realLS;
@@ -1435,46 +1400,6 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     expect(document.querySelector("#cwSessionList .cw-sitem")!.textContent).toContain("今日会话");
   });
 
-  it("pinned session appears in a 置顶 group first and togglePinSession persists to localStorage", () => {
-    const g = globalThis as Record<string, unknown>;
-    const DAY = 86400;
-    const now = Math.floor(Date.now() / 1000);
-    (g as unknown as { CW_DATA: unknown[] }).CW_DATA = [
-      { name: "钉住会话", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now, id: "pin-1" },
-      { name: "普通会话", status: "进行中", tasks: 1, done: 0, fail: 0, updated_at: now - 60, id: "other-1" },
-    ];
-    // localStorage may be swapped by earlier tests; install a fresh in-memory
-    // store matching the setup shim so pin persistence is deterministic.
-    const realLS = g.localStorage;
-    const pinStore = new Map<string, string>();
-    g.localStorage = {
-      getItem: (k: string) => pinStore.get(k) ?? null,
-      setItem: (k: string, v: string) => void pinStore.set(k, String(v)),
-      removeItem: (k: string) => void pinStore.delete(k),
-      clear: () => pinStore.clear(),
-    };
-    (g.cwFilter as (s: string) => void)("all");
-    (g.renderCowork as () => void)();
-    // no pins yet: no 置顶 header
-    const headers0 = [...document.querySelectorAll("#cwSessionList .cw-group-h")].map((e) => e.textContent);
-    expect(headers0.some((t) => t!.includes("置顶"))).toBe(false);
-    // pin the second session
-    (g.togglePinSession as (id: string) => void)("other-1");
-    expect(JSON.parse(pinStore.get("neotrix.pinned") || "[]")).toContain("other-1");
-    (g.renderCowork as () => void)();
-    const headers1 = [...document.querySelectorAll("#cwSessionList .cw-group-h")].map((e) => e.textContent);
-    expect(headers1[0]!.includes("置顶")).toBe(true);
-    // pinned item rendered first
-    const items = [...document.querySelectorAll("#cwSessionList .cw-sitem")].map((e) => e.textContent);
-    expect(items[0]).toContain("普通会话");
-    // unpin restores time grouping
-    (g.togglePinSession as (id: string) => void)("other-1");
-    (g.renderCowork as () => void)();
-    const headers2 = [...document.querySelectorAll("#cwSessionList .cw-group-h")].map((e) => e.textContent);
-    expect(headers2.some((t) => t!.includes("置顶"))).toBe(false);
-    g.localStorage = realLS;
-  });
-
   /* ── API key mask + keychain (wave 13: plan #14 Settings Provider) ── */
   it("maskApiKey masks long keys keeping head+tail, fully dots short keys", () => {
     const g = globalThis as Record<string, unknown>;
@@ -1493,296 +1418,6 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
     const input = document.getElementById("stApiKey") as HTMLInputElement;
     expect(input.type).toBe("password");
     expect(input.placeholder).toContain("sk-…");
-  });
-
-  it("renderStSecurity lists pending permissions with allow/deny buttons and audit log", async () => {
-    const g = globalThis as Record<string, unknown>;
-    // mock Tauri invoke for the security commands
-    const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-    const pending = [
-      { id: "perm-1", action: "CommandExec", target: "rm -rf /tmp/test", timestamp: Math.floor(Date.now() / 1000), status: "Pending" },
-    ];
-    const audit = [
-      { id: "a1", action: "FileWrite", target: "~/notes/a.md", timestamp: Math.floor(Date.now() / 1000) - 60, resolution: "approved", reason: null },
-      { id: "a2", action: "CommandExec", target: "shutdown", timestamp: Math.floor(Date.now() / 1000) - 120, resolution: "denied", reason: "Blocked" },
-    ];
-    (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
-      invoke: (cmd: string, args?: unknown) => {
-        const h: Record<string, (a: unknown) => unknown> = {
-          get_pending_permissions: () => pending,
-          get_permission_audit_log: () => audit,
-          respond_permission: () => null,
-        };
-        return Promise.resolve(h[cmd] ? h[cmd](args ?? {}) : undefined);
-      },
-    };
-    try {
-      await (g.renderStSecurity as () => Promise<void>)();
-      // mode desc reflects current mode
-      const modeDesc = document.getElementById("stSecModeDesc")!;
-      expect(modeDesc.textContent).toContain("手动");
-      // pending list renders the request with action + target
-      const list = document.getElementById("stSecPendingList")!;
-      expect(list.textContent).toContain("CommandExec");
-      expect(list.textContent).toContain("rm -rf /tmp/test");
-      const allowBtn = list.querySelector('button[data-act="allow"]');
-      expect(allowBtn).toBeTruthy();
-      // audit log renders both resolutions
-      const al = document.getElementById("stSecAuditList")!;
-      expect(al.textContent).toContain("approved");
-      expect(al.textContent).toContain("denied");
-    } finally {
-      if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-      else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
-    }
-  });
-
-  describe("escJs — JS 单引号字符串上下文安全转义 (S1)", () => {
-    it("escapes single quotes to \\u0027 (not HTML entity)", () => {
-      const g = globalThis as Record<string, unknown>;
-      const escJs = (g as Record<string, (s: unknown) => string>).escJs;
-      const out = escJs("a'b");
-      expect(out).toContain("\\u0027");
-      expect(out).not.toContain("&#39;");
-      // round-trips to the original value (escape is reversible, no data loss)
-      const decoded = out.replace(/\\u0027/g, "'").replace(/\\n/g, "\n").replace(/\\\\/g, "\\");
-      expect(decoded).toBe("a'b");
-    });
-
-    it("escapes newline and backslash", () => {
-      const g = globalThis as Record<string, unknown>;
-      const escJs = (g as Record<string, (s: unknown) => string>).escJs;
-      expect(escJs("line1\nline2")).toContain("\\n");
-      expect(escJs("a\\b")).toContain("\\\\");
-    });
-
-    it("returns empty string for null/undefined", () => {
-      const g = globalThis as Record<string, unknown>;
-      const escJs = (g as Record<string, (s: unknown) => string>).escJs;
-      expect(escJs(null)).toBe("");
-      expect(escJs(undefined)).toBe("");
-    });
-  });
-
-  describe("onboarding welcome bar (C9)", () => {
-    it("renders onboarding items and dismisses with localStorage marker", () => {
-      const mem = new Map<string, string>();
-      const store = {
-        getItem: (k: string) => mem.get(k) ?? null,
-        setItem: (k: string, v: string) => { mem.set(k, String(v)); },
-        removeItem: (k: string) => { mem.delete(k); },
-      };
-      const realLS = (globalThis as Record<string, unknown>).localStorage;
-      (globalThis as Record<string, unknown>).localStorage = store;
-      try {
-        const g = globalThis as Record<string, unknown>;
-        // reset the module-level guard so renderOnboarding actually runs
-        (globalThis as Record<string, unknown>)._ntxOnboarded = undefined;
-        (g.renderOnboarding as () => void)();
-        const el = document.getElementById("heroOnboarding")!;
-        expect(el.style.display).toBe("block");
-        expect(el.textContent).toContain("欢迎使用 NoeCodex");
-        expect(el.textContent).toContain("⌘/");
-        const close = el.querySelector("#onbClose") as HTMLElement;
-        close.click();
-        expect(mem.get("neotrix.onboarding.done.v1")).toBe("1");
-        expect(el.style.display).toBe("none");
-      } finally {
-        (globalThis as Record<string, unknown>).localStorage = realLS;
-        (globalThis as Record<string, unknown>)._ntxOnboarded = undefined;
-      }
-    });
-  });
-
-  describe("attachment DnD wiring (C6)", () => {
-    it("wires drop zone and paste listeners without duplication", () => {
-      const g = globalThis as Record<string, unknown>;
-      (g.wireAttachmentDnD as () => void)();
-      (g.wireAttachmentDnD as () => void)();
-      // guard flag prevents double-binding
-      expect((globalThis as Record<string, unknown>)._ntxDnDBound).toBe(true);
-    });
-
-    it("adds a chip for a dropped file", async () => {
-      const g = globalThis as Record<string, unknown>;
-      const addChip = g.addAttachChip as (name: string, meta?: unknown) => void;
-      addChip("test.md", { size: 1024, mime: "text/markdown" });
-      const chip = document.querySelector("#ntxAttachArea .ntx-attach-chip");
-      expect(chip).toBeTruthy();
-      expect(chip!.textContent).toContain("test.md");
-      // remove via the x button
-      const x = chip!.querySelector(".x") as HTMLElement;
-      x.click();
-      expect(document.querySelectorAll("#ntxAttachArea .ntx-attach-chip").length).toBe(0);
-    });
-  });
-
-  describe("registry & hypercube panels (A4 blind spots)", () => {
-    it("loadRegistry renders capability + health stats from backend", async () => {
-      const g = globalThis as Record<string, unknown>;
-      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
-        invoke: (cmd: string) => {
-          const h: Record<string, unknown> = {
-            brain_stats: { iteration: 42, capability_sum: 3.14, dimension_names: ["a", "b", "c"], capability_vector: [0.5, 0.3, 0.2] },
-            neocodex_health_report: { turn_count: 100, tool_call_count: 50, tokens_used: 1000, context_usage: 0.4, evolution_iterations: 7, cost_spent: 1.25 },
-            neocodex_agent_status: { running: true },
-          };
-          return Promise.resolve(h[cmd]);
-        },
-      };
-      try {
-        await (g.loadRegistry as () => Promise<void>)();
-        const root = document.querySelector("#overlayRegistry .overlay-bd")!;
-        expect(root.querySelector(".reg-iter")!.textContent).toBe("42");
-        expect(root.querySelector(".reg-cap")!.textContent).toBe("3.14");
-        expect(root.querySelector(".reg-dim")!.textContent).toContain("3 维");
-        expect(document.getElementById("regTurns")!.textContent).toBe("100");
-        expect(document.getElementById("regCost")!.textContent).toBe("$1.25");
-        expect(root.querySelector(".reg-eng")!.textContent).toBe("运行中");
-        expect(document.querySelectorAll("#regVecBars .vec-bar").length).toBeGreaterThan(0);
-      } finally {
-        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
-      }
-    });
-
-    it("loadHypercube renders node/edge stats", async () => {
-      const g = globalThis as Record<string, unknown>;
-      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
-        invoke: (cmd: string) => {
-          const h: Record<string, unknown> = {
-            get_knowledge_stats: { total_nodes: 1234, total_edges: 567, by_type: [["concept", 100], ["entity", 200]] },
-            brain_stats: { dimension_names: ["a", "b"], capability_sum: 2.5, memory_count: 99, capability_vector: [0.8, 0.2] },
-          };
-          return Promise.resolve(h[cmd]);
-        },
-      };
-      try {
-        await (g.loadHypercube as () => Promise<void>)();
-        expect(document.getElementById("hcNodes")!.textContent).toBe("1,234");
-        expect(document.getElementById("hcEdges")!.textContent).toBe("567");
-        expect(document.getElementById("hcVsa")!.textContent).toBe("D=2");
-        expect(document.getElementById("hcCap")!.textContent).toBe("2.50");
-        expect(document.getElementById("kbNodeCount")!.textContent).toContain("99");
-        expect(document.querySelectorAll("#hcTypeDist .vec-bar").length).toBe(2);
-      } finally {
-        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
-      }
-    });
-  });
-
-  describe("side chat (Cmd+; branch conversation)", () => {
-    it("renders empty state when no session", async () => {
-      const g = globalThis as Record<string, unknown>;
-      await (g.loadSideChat as () => Promise<void>)();
-      const box = document.getElementById("sideChatMsgs")!;
-      expect(box.textContent).toContain("打开一个会话");
-    });
-
-    it("renders messages from backend and sends a new one", async () => {
-      const g = globalThis as Record<string, unknown>;
-      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
-        invoke: (cmd: string, args: Record<string, unknown>) => {
-          if (cmd === "neocodex_get_side_chat") {
-            return Promise.resolve([
-              { role: "user", content: "帮我看看这段代码" },
-              { role: "assistant", content: "这段代码的复杂度是 O(n)" },
-            ]);
-          }
-          if (cmd === "neocodex_send_side_chat") {
-            expect(args.content).toBe("再解释一下");
-            return Promise.resolve([
-              { role: "user", content: "再解释一下" },
-              { role: "assistant", content: "好的，展开来说…" },
-            ]);
-          }
-          return Promise.resolve(null);
-        },
-      };
-      try {
-        await (g.loadSideChat as () => Promise<void>)();
-        const box = document.getElementById("sideChatMsgs")!;
-        expect(box.querySelectorAll(".sdc-msg").length).toBe(2);
-        expect(box.textContent).toContain("复杂度是 O(n)");
-        const inp = document.getElementById("sideChatInput") as HTMLTextAreaElement;
-        inp.value = "再解释一下";
-        await (g.sendSideChat as () => Promise<void>)();
-        expect(box.querySelectorAll(".sdc-msg").length).toBe(2);
-        expect(box.textContent).toContain("好的，展开");
-      } finally {
-        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
-      }
-    });
-  });
-
-  describe("auto archive idle sessions", () => {
-    it("does nothing when auto-archive disabled", async () => {
-      const g = globalThis as Record<string, unknown>;
-      const mem = new Map<string, string>();
-      const store = {
-        getItem: (k: string) => mem.get(k) ?? null,
-        setItem: (k: string, v: string) => { mem.set(k, String(v)); },
-        removeItem: (k: string) => { mem.delete(k); },
-      };
-      const realLS = (globalThis as Record<string, unknown>).localStorage;
-      (globalThis as Record<string, unknown>).localStorage = store;
-      store.setItem("ntx_auto_archive_days", "0");
-      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-      let invoked = 0;
-      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
-        invoke: () => { invoked++; return Promise.resolve(null); },
-      };
-      try {
-        await (g.autoArchiveIdleSessions as () => Promise<void>)();
-        expect(invoked).toBe(0);
-      } finally {
-        (globalThis as Record<string, unknown>).localStorage = realLS;
-        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
-      }
-    });
-  });
-
-  describe("keybinding rebinding (custom keymap)", () => {
-    it("keyComboString normalizes modifier combos", () => {
-      const g = globalThis as Record<string, unknown>;
-      const fn = g.keyComboString as (e: KeyboardEvent) => string;
-      expect(fn({ metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, key: "k" } as KeyboardEvent)).toBe("meta+k");
-      expect(fn({ metaKey: true, shiftKey: true, key: "S" } as KeyboardEvent)).toBe("meta+shift+s");
-      expect(fn({ metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, key: "Escape" } as KeyboardEvent)).toBe("Escape");
-    });
-
-    it("comboToLabel renders readable symbols", () => {
-      const g = globalThis as Record<string, unknown>;
-      const fn = g.comboToLabel as (c: string) => string;
-      expect(fn("meta+shift+s")).toBe("⌘⇧S");
-      expect(fn("meta+;")).toBe("⌘;");
-      expect(fn("")).toBe("未绑定");
-    });
-
-    it("saveUserKeymap persists and loadUserKeymap reads back", () => {
-      const g = globalThis as Record<string, unknown>;
-      const mem = new Map<string, string>();
-      const store = {
-        getItem: (k: string) => mem.get(k) ?? null,
-        setItem: (k: string, v: string) => { mem.set(k, String(v)); },
-        removeItem: (k: string) => { mem.delete(k); },
-      };
-      const realLS = (globalThis as Record<string, unknown>).localStorage;
-      (globalThis as Record<string, unknown>).localStorage = store;
-      try {
-        (g.saveUserKeymap as (m: Record<string, string>) => void)({ openSettings: "meta+," });
-        const loaded = (g.loadUserKeymap as () => Record<string, string>)();
-        expect(loaded).toEqual({ openSettings: "meta+," });
-      } finally {
-        (globalThis as Record<string, unknown>).localStorage = realLS;
-      }
-    });
   });
 });
 

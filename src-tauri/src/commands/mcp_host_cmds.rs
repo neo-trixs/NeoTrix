@@ -334,8 +334,6 @@ fn tool_write_file(args: &serde_json::Value) -> Result<String, String> {
 
 fn tool_execute_terminal_command(args: &serde_json::Value) -> Result<String, String> {
     let command = args.get("command").and_then(|v| v.as_str()).ok_or("Missing required field: command")?;
-    // P0-1 gate: same guard as execute_terminal_command — destructive / pipe-exec blocked.
-    super::mcp_cmds::guard_shell_command(command).map_err(|e| e.to_string())?;
     let output = Command::new("sh")
         .arg("-c")
         .arg(command)

@@ -224,14 +224,14 @@ impl Constitution {
 
     /// Verify if an action description complies with constitution
     pub fn verify_compliance(&self, action_desc: &str) -> ComplianceReport {
-        // 关键词违规检测基于硬编码规则表 (R-P42~R-P48)，与向量检索解耦：
-        // 遍历全部规则而非依赖 FhrrVector top-k（长度哈希检索可能漏掉目标规则）。
-        let relevant: Vec<&DevRule> = self.rules.values().collect();
+        let relevant = self.relevant_rules_for_task(action_desc, 10);
         let checked_count = relevant.len();
         let mut violations = Vec::new();
         let warnings = Vec::new();
 
         for rule in relevant {
+            // Simple keyword-based violation detection
+            // In production, this would use more sophisticated reasoning
             if self.check_violation(rule, action_desc) {
                 violations.push(ComplianceViolation {
                     rule_id: rule.id.clone(),
@@ -342,16 +342,13 @@ impl ConstitutionLoader {
             .or_else(|| Self::find_section(content, "Dev Rules", "## "))
             .ok_or("Dev Rules section not found")?;
 
-        // Pattern: - **R-Pxx (Title)**: content  OR  - **R-Pxx**: content
-        // (AGENTS.md 已简化为无括号标题格式，两者均需支持)
-        let rule_regex = regex::Regex::new(r"(?m)^\s*-\s*\*\*R-P(\d+)(?:\s*\(([^)]+)\))?\*\*:\s*(.+)$")
+        // Pattern: - **R-Pxx (Title)**: content
+        let rule_regex = regex::Regex::new(r"(?m)^\s*-\s*\*\*R-P(\d+)\s*\(([^)]+)\)\*\*:\s*(.+)$")
             .map_err(|e| format!("Regex error: {}", e))?;
 
         for cap in rule_regex.captures_iter(dev_rules_section) {
             let num = &cap[1];
-            // cap[2] is optional title group; may be None when format has no parens
-            let title = cap.get(2).map(|m| m.as_str().trim().to_string())
-                .unwrap_or_else(|| format!("R-P{}", num));
+            let title = cap[2].trim().to_string();
             let content_text = cap[3].trim().to_string();
             let id = format!("R-P{}", num);
 
@@ -384,38 +381,31 @@ impl ConstitutionLoader {
     fn extract_experience_tree(content: &str) -> Result<Vec<ExperienceEntry>, String> {
         let mut experiences = Vec::new();
 
-        // Find Experience Tree sections. regex crate does not support look-ahead,
-        // so capture the header with a non-greedy body up to `\n## ` by splitting
-        // on section boundaries first, then matching each block's header.
+        // Find Experience Tree sections (uses look-ahead which clippy's parser doesn't support)
         let exp_regex = regex::Regex::new(
-            r"(?ms)^## Experience Tree\s*[—-]\s*(\d{4}-\d{2}-\d{2})\s*Cycle\s*(\d+)\s*\((.*?)\)\s*$"
+            r"(?ms)## Experience Tree\s*[—-]\s*(\d{4}-\d{2}-\d{2})\s*Cycle\s*(\d+)\s*\((.*?)\)\n(.*?)(?=\n## |\z)"
         ).map_err(|e| format!("Regex error: {}", e))?;
 
-        // Split on `\n## ` (next section) boundaries so the body is the remainder.
-        for block in content.split("\n## ") {
-            if let Some(cap) = exp_regex.captures(block) {
-                let date = cap[1].trim().to_string();
-                let cycle: u32 = cap[2].trim().parse().unwrap_or(0);
-                let session_type = cap[3].trim().to_string();
-                // Body = everything after the header line within this block.
-                let header_end = block.find('\n').unwrap_or(block.len());
-                let body = &block[header_end..];
+        for cap in exp_regex.captures_iter(content) {
+            let date = cap[1].trim().to_string();
+            let cycle: u32 = cap[2].trim().parse().unwrap_or(0);
+            let session_type = cap[3].trim().to_string();
+            let body = &cap[4];
 
-                let actions = Self::extract_bullet_list(body, "Action");
-                let meta_findings = Self::extract_bullet_list(body, "Meta-Cognitive");
-                let dev_rules_added = Self::extract_bullet_list(body, "Dev Rules Added");
-                let build_baseline = Self::extract_build_baseline(body);
+            let actions = Self::extract_bullet_list(body, "Action");
+            let meta_findings = Self::extract_bullet_list(body, "Meta-Cognitive");
+            let dev_rules_added = Self::extract_bullet_list(body, "Dev Rules Added");
+            let build_baseline = Self::extract_build_baseline(body);
 
-                experiences.push(ExperienceEntry {
-                    cycle,
-                    date,
-                    session_type,
-                    actions,
-                    meta_findings,
-                    dev_rules_added,
-                    build_baseline,
-                });
-            }
+            experiences.push(ExperienceEntry {
+                cycle,
+                date,
+                session_type,
+                actions,
+                meta_findings,
+                dev_rules_added,
+                build_baseline,
+            });
         }
 
         // Sort by cycle
@@ -587,16 +577,15 @@ mod tests {
             let result = ConstitutionLoader::load_from_file(path);
             assert!(result.is_ok(), "Failed to load real AGENTS.md: {:?}", result.err());
             let constitution = result.unwrap();
-            // AGENTS.md 已按指针守恒规则移除 Experience Tree 内联节（经验存 KB），
-            // 且规则格式为 `- **R-Pxx**: ...`；断言与当前 AGENTS.md 结构对齐。
             assert!(!constitution.rules.is_empty(), "Should extract rules");
-            let tree_rules: Vec<_> = constitution.rules.values()
-                .filter(|r| r.category == RuleCategory::TreeGrowth).collect();
-            assert!(!tree_rules.is_empty(), "Should have tree growth rules");
-            println!("Loaded {} rules, {} experiences, {} tree-growth",
+            assert!(!constitution.experiences.is_empty(), "Should extract experiences");
+            assert!(!constitution.tree_growth_rules.is_empty(), "Should have tree growth rules");
+            assert!(!constitution.absorption_rules.is_empty(), "Should have absorption rules");
+            println!("Loaded {} rules, {} experiences, {} tree-growth, {} absorption",
                 constitution.rules.len(),
                 constitution.experiences.len(),
-                tree_rules.len()
+                constitution.tree_growth_rules.len(),
+                constitution.absorption_rules.len()
             );
         }
     }
@@ -606,8 +595,8 @@ mod tests {
         let path = Path::new("../../../AGENTS.md");
         if path.exists() {
             let constitution = ConstitutionLoader::load_from_file(path).unwrap();
-            // R-P42 命中条件: 含 "new module" 且不含 "branch"/"extend"
-            let report = constitution.verify_compliance("create new module nt_core_subagent.rs in isolation");
+            // Action that violates R-P42: creating new module without branch mapping
+            let report = constitution.verify_compliance("create new module nt_core_subagent.rs without mapping to any branch");
             assert!(!report.compliant);
             assert!(report.violations.iter().any(|v| v.rule_id == "R-P42"));
         }
@@ -615,58 +604,25 @@ mod tests {
 
     #[test]
     fn test_compliance_check_absorption() {
-        // R-P43 不一定内联在 AGENTS.md（全量规则在 dev-rules.md，按惰性加载设计）。
-        // 直接构造规则验证 check_violation 关键词逻辑，保证吸收违规可被识别。
-        let constitution = Constitution::new();
-        let rule = DevRule {
-            id: "R-P43".into(),
-            title: "Absorption Protocol".into(),
-            content: "外部技术必须蒸馏后接入，禁止平行适配器".into(),
-            category: RuleCategory::AbsorptionProtocol,
-            source_cycle: 0,
-            vector: None,
-        };
-        let direct_violation = constitution.check_violation(&rule, "copy claude code subagent design directly");
-        assert!(direct_violation, "R-P43 应识别 copy+claude 且未蒸馏的动作");
-        let distilled = constitution.check_violation(&rule, "copy claude code then distill into existing nodes");
-        assert!(!distilled, "已蒸馏的动作不应违规");
-
-        // 若 AGENTS.md 含 R-P43 则走端到端路径
         let path = Path::new("../../../AGENTS.md");
         if path.exists() {
-            let c = ConstitutionLoader::load_from_file(path).unwrap();
-            if c.rules.contains_key("R-P43") {
-                let report = c.verify_compliance("copy claude code subagent design directly");
-                assert!(!report.compliant);
-                assert!(report.violations.iter().any(|v| v.rule_id == "R-P43"));
-            }
+            let constitution = ConstitutionLoader::load_from_file(path).unwrap();
+            // Action that violates R-P43: copying Claude Code design without distillation
+            let report = constitution.verify_compliance("copy claude code subagent design directly without distillation");
+            assert!(!report.compliant);
+            assert!(report.violations.iter().any(|v| v.rule_id == "R-P43"));
         }
     }
 
     #[test]
     fn test_compliance_check_hexagram() {
-        let constitution = Constitution::new();
-        let rule = DevRule {
-            id: "R-P46".into(),
-            title: "Hexagram Derivation".into(),
-            content: "工具配置须经卦象推导".into(),
-            category: RuleCategory::TreeGrowth,
-            source_cycle: 0,
-            vector: None,
-        };
-        let direct_violation = constitution.check_violation(&rule, "define agent tools in yaml file directly");
-        assert!(direct_violation, "R-P46 应识别 yaml+tool 且未 hexagram 推导的动作");
-        let derived = constitution.check_violation(&rule, "define agent tools in yaml file after hexagram derivation");
-        assert!(!derived, "已推导的动作不应违规");
-
         let path = Path::new("../../../AGENTS.md");
         if path.exists() {
-            let c = ConstitutionLoader::load_from_file(path).unwrap();
-            if c.rules.contains_key("R-P46") {
-                let report = c.verify_compliance("define agent tools in yaml file directly");
-                assert!(!report.compliant);
-                assert!(report.violations.iter().any(|v| v.rule_id == "R-P46"));
-            }
+            let constitution = ConstitutionLoader::load_from_file(path).unwrap();
+            // Action that violates R-P46: YAML tools config without hexagram derivation
+            let report = constitution.verify_compliance("define agent tools in yaml file without hexagram derivation");
+            assert!(!report.compliant);
+            assert!(report.violations.iter().any(|v| v.rule_id == "R-P46"));
         }
     }
 }

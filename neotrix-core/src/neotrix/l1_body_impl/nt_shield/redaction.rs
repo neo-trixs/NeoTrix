@@ -122,6 +122,23 @@ impl Redactor {
         }
         result
     }
+
+    /// 查找文本中命中的所有 secret 规则及首次命中位置 (供 Collector 扫描 file:line 定位)
+    /// 返回 (规则名, 命中字节偏移)。PII 不计入 (仅 secret)。
+    pub fn find_secrets(&self, text: &str) -> Vec<(String, usize)> {
+        let mut hits = Vec::new();
+        for (desc, re) in &self.secret_regexes {
+            if let Some(m) = re.find(text) {
+                hits.push((desc.to_string(), m.start()));
+            }
+        }
+        for &p in &self.secret_strs {
+            if let Some(pos) = text.find(p) {
+                hits.push((p.to_string(), pos));
+            }
+        }
+        hits
+    }
 }
 
 /// 便捷函数: 全局脱敏 API
@@ -142,6 +159,40 @@ pub fn analyze(text: &str) -> (RiskLevel, Vec<String>) {
 /// 便捷函数: 判定安全
 pub fn is_safe(text: &str) -> bool {
     Redactor::new().is_safe(text)
+}
+
+/// JSON 感知脱敏 — 递归替换所有字符串字段值中的 secrets/PII, 保留数值与结构。
+/// 用于结构化落盘 (事件总线 JSONL): 纯文本级 `redact()` 会把 13 位时间戳等
+/// 数字误判为 PII (phone regex \d{10,15}) 替换为 [REDACTED], 破坏 JSON 可解析性。
+/// 解析失败时回退文本级脱敏。
+pub fn redact_json_line(line: &str) -> String {
+    let redactor = Redactor::new();
+    match serde_json::from_str::<serde_json::Value>(line) {
+        Ok(mut value) => {
+            redact_value(&redactor, &mut value);
+            serde_json::to_string(&value).unwrap_or_else(|_| line.to_string())
+        }
+        Err(_) => redactor.redact(line),
+    }
+}
+
+fn redact_value(redactor: &Redactor, value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::String(s) => {
+            *s = redactor.redact(s);
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                redact_value(redactor, item);
+            }
+        }
+        serde_json::Value::Object(obj) => {
+            for item in obj.values_mut() {
+                redact_value(redactor, item);
+            }
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]

@@ -1033,6 +1033,103 @@ impl PanelVerdict {
     }
 }
 
+// ───────────────────────────── 辩论决策 (D6) ─────────────────────────────
+
+/// 辩论角色 — TradingAgents 多空辩论 + oh-my-hermes Planner→Architect→Critic 参照。
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum DebateRole {
+    Pro,     // 正方: 支持提案
+    Con,     // 反方: 反对提案
+    Neutral, // 中立: 仲裁
+}
+
+/// 单轮辩论发言。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebateRound {
+    pub role: DebateRole,
+    pub score: f64,
+    pub confidence: f64,
+    pub argument: String,
+}
+
+/// 辩论报告 — 对抗轮次 + 收敛结果。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebateReport {
+    pub rounds: Vec<DebateRound>,
+    /// 辩论后收敛分数 (反方意见修正正方)。
+    pub converged_score: f64,
+    /// 分歧度 (0=一致, 1=完全对抗)。
+    pub divergence: f64,
+    /// 是否收敛到明确结论。
+    pub converged: bool,
+}
+
+/// D6: 对抗式辩论 — 用 panel 的多数意见与少数意见互搏, 收敛出修正分数。
+/// 机制: 高分意见=Pro, 低分意见=Con, 中间=Neutral; 3 轮辩论按分歧度衰减
+/// Pro/Con 偏差, 得到更稳健的最终分。无外部 LLM 依赖, 纯启发式对抗。
+pub fn deliberate(opinions: &[JudgeOpinion]) -> DebateReport {
+    if opinions.is_empty() {
+        return DebateReport {
+            rounds: Vec::new(),
+            converged_score: 0.0,
+            divergence: 0.0,
+            converged: true,
+        };
+    }
+    let scores: Vec<f64> = opinions.iter().map(|o| o.debiased_score).collect();
+    let n = scores.len() as f64;
+    let mean: f64 = scores.iter().sum::<f64>() / n;
+    let (min, max) = (
+        scores.iter().cloned().fold(f64::INFINITY, f64::min),
+        scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+    );
+    let spread = max - min;
+    // 分歧度 = 极差 (0=一致, 1=最大对立), 不用 /2 以反映真实对抗强度
+    let divergence = if spread < 1e-9 { 0.0 } else { spread.min(1.0) };
+
+    // 角色分配: 低于均值 → Con, 高于 → Pro, 等于 → Neutral
+    let mut rounds = Vec::new();
+    for (i, o) in opinions.iter().enumerate() {
+        let role = if o.debiased_score < mean - 1e-9 {
+            DebateRole::Con
+        } else if o.debiased_score > mean + 1e-9 {
+            DebateRole::Pro
+        } else {
+            DebateRole::Neutral
+        };
+        rounds.push(DebateRound {
+            role,
+            score: o.debiased_score,
+            confidence: o.confidence,
+            argument: format!(
+                "{} opinion #{} {:.2}",
+                match role {
+                    DebateRole::Pro => "支持",
+                    DebateRole::Con => "反对",
+                    DebateRole::Neutral => "中立",
+                },
+                i,
+                o.debiased_score
+            ),
+        });
+    }
+
+    // 收敛: 反方拉动 (均值向 Con 方向收敛), 分歧大时收敛更强 (取反方意见更重)。
+    let con_mean: Vec<f64> = rounds.iter().filter(|r| r.role == DebateRole::Con).map(|r| r.score).collect();
+    let pro_mean: Vec<f64> = rounds.iter().filter(|r| r.role == DebateRole::Pro).map(|r| r.score).collect();
+    let con_avg = if con_mean.is_empty() { mean } else { con_mean.iter().sum::<f64>() / con_mean.len() as f64 };
+    let pro_avg = if pro_mean.is_empty() { mean } else { pro_mean.iter().sum::<f64>() / pro_mean.len() as f64 };
+    // 三因素修正: 基准均值 + 反方权重 (分歧度) + 正方残余 (1-分歧度)
+    let converged_score = mean * 0.5 + con_avg * divergence * 0.5 + pro_avg * (1.0 - divergence) * 0.5;
+
+    DebateReport {
+        rounds,
+        converged_score,
+        divergence,
+        converged: divergence < 0.5,
+    }
+}
+
 /// pass^k 汇总裁决。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnsembleVerdict {
@@ -1427,6 +1524,7 @@ mod tests {
                 model: "mock-judge".into(),
                 usage: Usage::default(),
                 finish_reason: FinishReason::Stop,
+            tool_calls: None,
             })
         }
 
@@ -1926,5 +2024,49 @@ mod tests {
         assert!(report.broken_total >= 1);
         assert!(report.clean_total >= 1);
         assert!(report.balanced > 0.0 || report.broken_precision == 1.0);
+    }
+
+    #[test]
+    fn deliberate_converges_when_consensus() {
+        // D6: 意见一致 (高分) → 辩论收敛, 无分歧
+        let mut ops = Vec::new();
+        for i in 0..3 {
+            let mut op = JudgeOpinion::new(&format!("j{}", i), JudgeFamily::Analytic);
+            op.debiased_score = 0.9;
+            op.confidence = 0.8;
+            ops.push(op);
+        }
+        let report = deliberate(&ops);
+        assert!(report.converged, "consensus → converged");
+        assert!(report.divergence < 0.1, "no divergence on consensus");
+        assert!((report.converged_score - 0.9).abs() < 0.1);
+        assert_eq!(report.rounds.len(), 3);
+    }
+
+    #[test]
+    fn deliberate_pulls_toward_contrarian_on_split() {
+        // D6: 意见分裂 (两高一分低) → 辩论向反方收敛, 分数被拉低
+        let mut ops = Vec::new();
+        for (i, s) in [0.9, 0.9, 0.1].iter().enumerate() {
+            let mut op = JudgeOpinion::new(&format!("j{}", i), JudgeFamily::Symbolic);
+            op.debiased_score = *s;
+            op.confidence = 0.7;
+            ops.push(op);
+        }
+        let report = deliberate(&ops);
+        assert!(!report.converged, "split → not converged");
+        assert!(report.divergence > 0.3, "split creates divergence");
+        // 反方 0.1 显著拉低收敛分 (低于纯均值 0.633)
+        assert!(report.converged_score < 0.6, "contrarian drags below mean, got {}", report.converged_score);
+        // 反方角色被分配
+        assert!(report.rounds.iter().any(|r| r.role == DebateRole::Con));
+        assert!(report.rounds.iter().any(|r| r.role == DebateRole::Pro));
+    }
+
+    #[test]
+    fn deliberate_empty_opinions_is_trivial() {
+        let report = deliberate(&[]);
+        assert!(report.converged);
+        assert_eq!(report.converged_score, 0.0);
     }
 }

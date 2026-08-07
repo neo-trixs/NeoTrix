@@ -76,6 +76,7 @@ pub mod nt_core_trajectory_compress;
 pub mod nt_core_aura;
 pub mod nt_core_plan;
 pub mod nt_core_credit;
+pub mod nt_core_forecast;
 
 // ═══════════════════════════════════════════════════════════════════
 // L5 — 意识层 (Consciousness)

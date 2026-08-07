@@ -118,6 +118,13 @@ pub use evolution::agent_capability::{
     AgentExecutor, AgentExecutionOutcome, ProductionAgentExecutor,
     DispatchTopology, TopologyRepair,
 };
+pub use evolution::co_evolution::{
+    CoEvolutionLoop, CoEvoConfig, CoEvoGraph, ExperienceMemory, StrategyStats, TaskSearchBandit,
+    parse_strategy, strategy_name, COEVO_STRATEGIES,
+};
+pub use evolution::dispatch_self_test::{
+    DispatchControlPlaneSelfTest, ScriptedExecutor, MissionReport, run_mission,
+};
 pub mod control_distillation;
 pub mod infrastructure;
 // ============================================================================

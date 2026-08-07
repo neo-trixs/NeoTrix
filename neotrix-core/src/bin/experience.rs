@@ -48,6 +48,7 @@ use rusqlite::types::Value as SqlValue;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
 use sha1::{Digest, Sha1};
+use sha2::{Digest as Sha2Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io::{Read, Write};
@@ -129,9 +130,13 @@ fn value_decode(raw: &[u8]) -> Option<String> {
     }
 }
 
-fn open_kb() -> Connection {
+fn kb_dir() -> String {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let db_path = format!("{}/.neotrix/knowledge.db", home);
+    format!("{}/.neotrix", home)
+}
+
+fn open_kb() -> Connection {
+    let db_path = format!("{}/knowledge.db", kb_dir());
     let conn = Connection::open(&db_path).expect("Failed to open KB");
     conn.busy_timeout(std::time::Duration::from_secs(60)).ok();
     conn.execute_batch(
@@ -826,6 +831,9 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
     }
 
     let mut written = 0;
+    // D20 (aihot-skill/workflow_templates 参照): 吸收审计轨迹 — 记录每条 entry 的
+    // 决策 (written / redundant / invalid) 与内容哈希, 供事后核对吸收质量。
+    let mut audit_log: Vec<Value> = Vec::new();
     for (i, raw_entry) in entries.iter().enumerate() {
         let mut e = json!({
             "schema_version": SCHEMA_VERSION,
@@ -840,12 +848,24 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
             "source": raw_entry.get("source").or_else(|| session.get("source"))
                 .cloned().unwrap_or_else(|| json!("dialogue")),
         });
+        // D20: manifest — 内容 SHA-256, 落盘后可按哈希核对吸收内容未被篡改/漂移
+        let raw_content = e.get("content").and_then(|c| c.as_str()).unwrap_or("");
+        let content_hash = {
+            let mut hasher = Sha256::new();
+            hasher.update(raw_content.as_bytes());
+            format!("{:x}", hasher.finalize())
+        };
+        e["content_hash"] = json!(content_hash.clone());
         if let Some(vb) = norm_verify_by(&e, ts) {
             e["verify_by"] = json!(vb);
         }
         let errors = validate_entry(&e);
         if !errors.is_empty() {
             println!("[absorb] ✗ entry #{}: {:?}", i, errors);
+            audit_log.push(json!({
+                "idx": i, "decision": "invalid", "reason": format!("{:?}", errors),
+                "content_hash": content_hash, "ts": ts,
+            }));
             continue;
         }
         let dom = e.get("domain").and_then(|d| d.as_str()).unwrap_or("unknown");
@@ -883,6 +903,10 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
                     "[absorb] 跳过冗余 entry #{} (sim={:.3} ≥0.65, 同 domain={}) — 防重复吸收",
                     i, best_sim, dom
                 );
+                audit_log.push(json!({
+                    "idx": i, "decision": "redundant", "reason": format!("sim={:.3}", best_sim),
+                    "content_hash": content_hash, "ts": ts,
+                }));
                 continue;
             }
         }
@@ -924,11 +948,317 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
             domains.as_array_mut().unwrap().push(dom);
         }
         written += 1;
+        audit_log.push(json!({
+            "idx": i, "decision": "written", "key": key,
+            "content_hash": content_hash, "ts": ts,
+        }));
     }
 
+    // D20: audit jsonl 落盘 — 与 KB 同一目录, 供审计核对每次吸收的决策轨迹
+    let kb_dir = kb_dir();
+    let audit_path = format!(
+        "{}/audit_{}_{}.jsonl",
+        kb_dir,
+        cycle.replace(['/', '\\', ' '], "_"),
+        sid.replace(['/', '\\', ' ', ':'], "_")
+    );
+    if std::fs::create_dir_all(&kb_dir).is_ok() {
+        let mut blob = String::new();
+        for rec in &audit_log {
+            blob.push_str(&serde_json::to_string(rec).unwrap_or_default());
+            blob.push('\n');
+        }
+        let _ = std::fs::write(&audit_path, blob);
+    }
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
     println!("[absorb] {} entries from {} (cycle={})", written, sid, cycle);
+}
+
+// ────────────────────────────────────────────────────────────────
+// R-P97: 批量节点吸收 (Python insert_node 的 Rust port — 知识写入单一事实源)
+// ────────────────────────────────────────────────────────────────
+/// 批量节点吸收: 输入 JSON (节点数组或单对象) → URL 去重 → nodes/nodes_fts 双写。
+/// 语义对齐 scripts/kb_batch_absorb.py:insert_node:
+///   - 去重: SELECT 1 FROM nodes WHERE url=? (URL 为唯一键, 幂等)
+///   - FTS: 显式 INSERT INTO nodes_fts (非 external-content 表, rebuild 不会拉新数据)
+///   - capability: --apply-capability 写 metadata.absorbed_capability 四元组 (R-P79 闭环)
+/// node id 派生: batch_{ts}_{sha1(url)[:8]} (sha1 仅作存储键派生, 非安全用途)。
+fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capability: bool) {
+    // 1. 读取输入 (文件或 stdin)
+    let raw = if input == "-" {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)
+            .expect("read stdin");
+        buf
+    } else {
+        std::fs::read_to_string(input).unwrap_or_else(|e| {
+            panic!("read node json {}: {}", input, e)
+        })
+    };
+    let v: Value = serde_json::from_str(&raw).expect("node json is valid JSON");
+
+    // 2. 归一化为节点数组 (单对象 → [对象])
+    let nodes: Vec<Value> = match v {
+        Value::Array(arr) => arr,
+        Value::Object(_) => vec![v],
+        _ => panic!("input must be a JSON object or array of objects"),
+    };
+
+    // 3. 逐个处理
+    let mut inserted = 0usize;
+    let mut duplicated = 0usize;
+    let mut mapped = 0usize;
+    let now = now_ts();
+    for (i, n) in nodes.iter().enumerate() {
+        let url = n
+            .get("url")
+            .and_then(|u| u.as_str())
+            .unwrap_or("")
+            .trim();
+        if url.is_empty() {
+            println!("[absorb-node] ✗ node #{}: missing url — skipped", i);
+            continue;
+        }
+        let title = n
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or(url)
+            .to_string();
+        let summary = n
+            .get("summary")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string();
+        let content = n
+            .get("content")
+            .and_then(|c| c.as_str())
+            .unwrap_or("")
+            .to_string();
+        let node_type = n
+            .get("node_type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("article")
+            .to_string();
+        let language = n
+            .get("language")
+            .and_then(|l| l.as_str())
+            .unwrap_or("en")
+            .to_string();
+        let domain = n
+            .get("domain")
+            .and_then(|d| d.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| {
+                url.split("//")
+                    .nth(1)
+                    .and_then(|rest| rest.split('/').next())
+                    .unwrap_or("")
+                    .trim_start_matches("www.")
+                    .to_string()
+            });
+        let importance = n
+            .get("importance")
+            .and_then(|im| im.as_f64())
+            .unwrap_or(0.5);
+
+        // 4. 去重 (URL 唯一键, 幂等)
+        let dup: bool = conn
+            .query_row("SELECT 1 FROM nodes WHERE url=?1", params![url], |_| Ok(true))
+            .unwrap_or(false);
+        if dup {
+            duplicated += 1;
+            println!(
+                "[absorb-node] duplicate (url already in KB): {} — {}",
+                i, url
+            );
+            continue;
+        }
+        if dry_run {
+            println!("[absorb-node] would_insert #{}: {}", i, url);
+            inserted += 1;
+            continue;
+        }
+
+        // 5. node id: batch_{ts}_{sha1(url)[:8]} — sha1 仅存储键派生
+        let mut h = Sha1::new();
+        h.update(url.as_bytes());
+        let digest = h.finalize();
+        let hex: String = digest.iter().map(|b| format!("{:02x}", b)).collect();
+        let eid = format!("batch_{}_{}", now, &hex[..8]);
+
+        // 6. metadata: 保留输入 meta 字段 + enriched_at
+        let mut meta = match n.get("meta") {
+            Some(Value::Object(m)) => Value::Object(m.clone()),
+            _ => json!({}),
+        };
+        if meta.get("enriched_at").is_none() {
+            meta["enriched_at"] = json!(now);
+        }
+
+        // 7. nodes + nodes_fts 双写 (FTS 显式插入, 防 PA011 desync)
+        conn.execute(
+            "INSERT INTO nodes(id,node_type,title,summary,content,url,domain,language,
+               confidence,importance,created_at,updated_at,access_count,metadata,
+               data_tier,temporal,supersedes,source_episode,tier)
+               VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
+            params![
+                eid, node_type, title, summary, content, url, domain, language,
+                1.0f64, importance, now, now, 0i64, meta.to_string(),
+                "cache", None::<String>, None::<String>, None::<String>, "warm"
+            ],
+        )
+        .expect("insert node");
+        conn.execute(
+            "INSERT INTO nodes_fts(rowid, title, summary, content, domain)
+             VALUES(last_insert_rowid(), ?1, ?2, ?3, ?4)",
+            params![title, summary, content, domain],
+        )
+        .expect("insert node_fts");
+        inserted += 1;
+        println!(
+            "[absorb-node] inserted #{}: {} ({}, lang={}, cap={})",
+            i,
+            url,
+            node_type,
+            language,
+            if apply_capability { "apply" } else { "-" }
+        );
+
+        // 8. capability 映射 (R-P79 闭环: metadata.absorbed_capability 四元组)
+        if apply_capability {
+            if let (Some(branch), Some(capability)) = (
+                n.get("capability")
+                    .and_then(|c| c.get("branch"))
+                    .and_then(|b| b.as_str()),
+                n.get("capability")
+                    .and_then(|c| c.get("capability"))
+                    .and_then(|c| c.as_str()),
+            ) {
+                let evidence = n
+                    .get("capability")
+                    .and_then(|c| c.get("evidence"))
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("");
+                let mapped_at = {
+                    // 本地时间 YYYY-MM-DDTHH:MM:SS
+                    let secs = now as i64;
+                    let dt = chrono::DateTime::from_timestamp(secs, 0)
+                        .unwrap_or_else(|| {
+                            chrono::DateTime::from_timestamp(0, 0).unwrap()
+                        });
+                    let local = dt.with_timezone(&chrono::Local);
+                    local.format("%Y-%m-%dT%H:%M:%S").to_string()
+                };
+                meta["absorbed_capability"] = json!({
+                    "branch": branch,
+                    "capability": capability,
+                    "evidence": evidence,
+                    "mapped_at": mapped_at,
+                });
+                conn.execute(
+                    "UPDATE nodes SET metadata=?1 WHERE id=?2",
+                    params![meta.to_string(), eid],
+                )
+                .expect("update node metadata");
+                mapped += 1;
+            }
+        }
+    }
+
+    println!(
+        "[absorb-node] done: {} inserted, {} duplicated, {} mapped (dry_run={})",
+        inserted, duplicated, mapped, dry_run
+    );
+}
+
+// ────────────────────────────────────────────────────────────────
+// R-P97: 节点 metadata 批量更新 (absorb_to_capability.py 写回路径的 Rust port)
+// ────────────────────────────────────────────────────────────────
+/// 批量更新已有节点的 metadata: 输入 JSON 数组 [{node_id, patch: {key: value}}],
+/// 读原 metadata JSON → 合并 patch → 写回。patch 值可为任意 JSON
+/// (如 absorbed_capability 四元组 / knowledge_source 本源溯源对象)。
+/// 语义对齐 absorb_to_capability.py:678 UPDATE nodes SET metadata=? — 单一事实源。
+fn cmd_update_node_metadata(conn: &Connection, input: &str, dry_run: bool) {
+    let raw = if input == "-" {
+        let mut buf = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)
+            .expect("read stdin");
+        buf
+    } else {
+        std::fs::read_to_string(input).unwrap_or_else(|e| panic!("read {}: {}", input, e))
+    };
+    let v: Value = serde_json::from_str(&raw).expect("update list is valid JSON");
+    let updates: Vec<Value> = match v {
+        Value::Array(arr) => arr,
+        Value::Object(_) => vec![v],
+        _ => panic!("input must be a JSON array of {{node_id, patch}} objects"),
+    };
+
+    let mut updated = 0usize;
+    let mut missing = 0usize;
+    for (i, u) in updates.iter().enumerate() {
+        let nid = u.get("node_id").and_then(|n| n.as_str()).unwrap_or("");
+        let patch = match u.get("patch") {
+            Some(Value::Object(p)) => p.clone(),
+            _ => {
+                println!("[update-node-metadata] ✗ #{}: missing patch — skipped", i);
+                continue;
+            }
+        };
+        if nid.is_empty() {
+            println!("[update-node-metadata] ✗ #{}: missing node_id — skipped", i);
+            continue;
+        }
+        // 读原 metadata
+        let meta_raw: Option<String> = conn
+            .query_row(
+                "SELECT metadata FROM nodes WHERE id=?1",
+                params![nid],
+                |r| r.get(0),
+            )
+            .ok();
+        let Some(meta_raw) = meta_raw else {
+            missing += 1;
+            println!("[update-node-metadata] ✗ #{}: node not found ({})", i, nid);
+            continue;
+        };
+        let mut meta: Map<String, Value> = if meta_raw.trim().is_empty() {
+            Map::new()
+        } else {
+            serde_json::from_str(&meta_raw).unwrap_or_else(|_| Map::new())
+        };
+        // 合并 patch
+        for (k, val) in &patch {
+            meta.insert(k.clone(), val.clone());
+        }
+        if dry_run {
+            println!(
+                "[update-node-metadata] would_update #{}: {} (keys: {:?})",
+                i,
+                nid,
+                patch.keys().collect::<Vec<_>>()
+            );
+            updated += 1;
+            continue;
+        }
+        conn.execute(
+            "UPDATE nodes SET metadata=?1, updated_at=?2 WHERE id=?3",
+            params![serde_json::to_string(&Value::Object(meta)).unwrap_or_default(), now_ts(), nid],
+        )
+        .expect("update node metadata");
+        updated += 1;
+        println!(
+            "[update-node-metadata] updated #{}: {} (keys: {:?})",
+            i,
+            nid,
+            patch.keys().collect::<Vec<_>>()
+        );
+    }
+    println!(
+        "[update-node-metadata] done: {} updated, {} missing (dry_run={})",
+        updated, missing, dry_run
+    );
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -2077,6 +2407,30 @@ enum Cmd {
     Absorb {
         session: String,
     },
+    /// 批量节点吸收 (R-P97: Python insert_node 的 Rust port — 知识写入单一事实源)
+    /// 输入: JSON 文件 (节点数组或单节点), 每条含 node_type/title/summary/content/url/domain/
+    ///       language/importance/meta; 可含 capability {branch,capability,evidence} 四元组。
+    /// 语义: URL 去重 + nodes/nodes_fts 双写 (FTS 显式插入, 防 PA011 desync)。
+    AbsorbNode {
+        /// 节点 JSON 文件 (数组或单对象), 或 "-" 读 stdin
+        #[arg(default_value = "-")]
+        input: String,
+        #[arg(long)]
+        dry_run: bool,
+        /// 写 metadata.absorbed_capability 四元组 (R-P79 闭环)
+        #[arg(long)]
+        apply_capability: bool,
+    },
+    /// 批量更新已有节点的 metadata (R-P97: absorb_to_capability.py 写回路径的 Rust port)
+    /// 输入: JSON 数组, 每项 {node_id, patch: {key: value}} — 读原 metadata JSON →
+    ///       合并 patch → 写回。patch 值可为任意 JSON (对象如 absorbed_capability 四元组)。
+    UpdateNodeMetadata {
+        /// 更新清单 JSON 文件, 或 "-" 读 stdin
+        #[arg(default_value = "-")]
+        input: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// 检索匹配分支
     Query {
         #[arg(long, default_value = "")]
@@ -2187,6 +2541,12 @@ fn main() {
         Cmd::Snapshot { cycle, task, domain } => cmd_snapshot(&conn, &cycle, &task, &domain),
         Cmd::Close { cycle } => cmd_close(&conn, &cycle),
         Cmd::Absorb { session } => cmd_absorb(&conn, &session),
+        Cmd::AbsorbNode { input, dry_run, apply_capability } => {
+            cmd_absorb_node(&conn, &input, dry_run, apply_capability)
+        }
+        Cmd::UpdateNodeMetadata { input, dry_run } => {
+            cmd_update_node_metadata(&conn, &input, dry_run)
+        }
         Cmd::Query { kw, r#type, domain, limit, no_hebb, json, semantic } => {
             cmd_query(&conn, &kw, r#type.as_deref(), domain.as_deref(), limit, no_hebb, json, semantic)
         }
@@ -2525,5 +2885,162 @@ mod tests {
             kv_get(&conn, NS, "concept_b").as_deref(),
             Some("compressed content here")
         );
+    }
+
+    // ─── R-P97: absorb-node 测试 ──────────────────────────────
+    fn node_test_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE nodes (
+                id TEXT PRIMARY KEY, node_type TEXT NOT NULL, title TEXT NOT NULL,
+                summary TEXT, content TEXT, url TEXT, domain TEXT,
+                language TEXT DEFAULT 'en', confidence REAL DEFAULT 1.0,
+                importance REAL DEFAULT 0.5, created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL, access_count INTEGER DEFAULT 0,
+                metadata TEXT, data_tier TEXT NOT NULL DEFAULT 'core',
+                temporal TEXT, supersedes TEXT, source_episode TEXT,
+                tier TEXT NOT NULL DEFAULT 'warm');
+             CREATE VIRTUAL TABLE nodes_fts USING fts5(title, summary, content, domain);",
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_absorb_node_insert_and_fts() {
+        let conn = node_test_db();
+        let node = json!({
+            "url": "https://example.github.io/demo/",
+            "title": "Demo Page",
+            "summary": "A test article",
+            "content": "This is a test article body with enough length to be meaningful for the FTS index.",
+            "node_type": "article",
+            "language": "en",
+            "domain": "example.github.io",
+            "importance": 0.7,
+        });
+        // 写临时文件 (cmd_absorb_node 读文件)
+        let path = std::env::temp_dir().join("nt_test_node.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        let dry_run = false;
+        let apply_cap = false;
+        cmd_absorb_node(&conn, path.to_str().unwrap(), dry_run, apply_cap);
+        // 节点已写入
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "node inserted");
+        // FTS 已同步 (防 PA011 desync)
+        let fts_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes_fts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fts_count, 1, "FTS row inserted");
+        // id 前缀 batch_
+        let id: String = conn
+            .query_row("SELECT id FROM nodes LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert!(id.starts_with("batch_"), "id prefix batch_: {}", id);
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_absorb_node_duplicate_dedup() {
+        let conn = node_test_db();
+        let node = json!({
+            "url": "https://example.github.io/demo/",
+            "title": "Demo Page",
+            "content": "Same URL must be deduplicated.",
+            "node_type": "article",
+        });
+        let path = std::env::temp_dir().join("nt_test_node2.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "duplicate URL must not double-insert");
+        let fts_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes_fts", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(fts_count, 1, "FTS also deduplicated");
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_absorb_node_dry_run_and_capability() {
+        let conn = node_test_db();
+        let node = json!({
+            "url": "https://example.github.io/cap/",
+            "title": "Cap Page",
+            "content": "Capability mapping test node with sufficient content length.",
+            "node_type": "article",
+            "capability": {"branch": "NT-MIND", "capability": "generate", "evidence": "test"},
+        });
+        let path = std::env::temp_dir().join("nt_test_node3.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        // dry-run: 不写入
+        cmd_absorb_node(&conn, path.to_str().unwrap(), true, false);
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "dry-run must not insert");
+        // 实际写入 + capability
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, true);
+        let meta: String = conn
+            .query_row("SELECT metadata FROM nodes WHERE url='https://example.github.io/cap/'",
+                       [], |r| r.get(0))
+            .unwrap();
+        let m: Value = serde_json::from_str(&meta).unwrap();
+        assert_eq!(m["absorbed_capability"]["branch"], "NT-MIND");
+        assert_eq!(m["absorbed_capability"]["capability"], "generate");
+        assert_eq!(m["absorbed_capability"]["evidence"], "test");
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_update_node_metadata_merge_and_dry_run() {
+        let conn = node_test_db();
+        // 先插入一个带初始 metadata 的节点
+        let node = json!({
+            "url": "https://example.github.io/meta/",
+            "title": "Meta Page",
+            "content": "Metadata update test node with sufficient content length.",
+            "node_type": "article",
+            "meta": {"existing": "keep-me"},
+        });
+        let path = std::env::temp_dir().join("nt_test_meta_node.json");
+        std::fs::write(&path, node.to_string()).unwrap();
+        cmd_absorb_node(&conn, path.to_str().unwrap(), false, false);
+        let nid: String = conn
+            .query_row("SELECT id FROM nodes LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        std::fs::remove_file(&path).ok();
+
+        // dry-run: 不写入
+        let updates = json!([{
+            "node_id": nid,
+            "patch": {"absorbed_capability": {"branch": "NT-ACT", "capability": "execute"}}
+        }]);
+        let up = std::env::temp_dir().join("nt_test_update.json");
+        std::fs::write(&up, updates.to_string()).unwrap();
+        cmd_update_node_metadata(&conn, up.to_str().unwrap(), true);
+        let meta: String = conn
+            .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
+            .unwrap();
+        let m: Value = serde_json::from_str(&meta).unwrap();
+        assert_eq!(m["existing"], "keep-me", "dry-run must not modify metadata");
+        assert!(m.get("absorbed_capability").is_none(), "dry-run must not add capability");
+
+        // 实际写入: 合并 patch, 保留既有字段
+        cmd_update_node_metadata(&conn, up.to_str().unwrap(), false);
+        let meta: String = conn
+            .query_row("SELECT metadata FROM nodes WHERE id=?1", params![nid], |r| r.get(0))
+            .unwrap();
+        let m: Value = serde_json::from_str(&meta).unwrap();
+        assert_eq!(m["existing"], "keep-me", "existing metadata preserved");
+        assert_eq!(m["absorbed_capability"]["branch"], "NT-ACT");
+        assert_eq!(m["absorbed_capability"]["capability"], "execute");
+        std::fs::remove_file(&up).ok();
     }
 }

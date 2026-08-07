@@ -412,19 +412,11 @@ mod tests {
             return;
         }
         let whitelist: Vec<&str> = vec![
-            "auto-absorb.py",
             "crawl-queue-absorb.sh",
-            "mass_queue_processor.py",
-            "novel-world-absorb.py",
-            "generate-evolution-todo.py",
-            "kb-generate-embeddings.py",
-            "diagnose_absorption.py",
-            "kb-init-schema.py",
-            "launch-absorb-10h.sh",
-            "neotrix-auto-absorb.py",
-            "nt_comm_router.py",
-            "deep-absorb-resources.py",
-            "deep-absorb-fable5.py",
+            // 以下 Python 脚本为 R-P97 保留的活跃工具链 (Rust CLI 委托):
+            "absorb_to_capability.py",// 写回委托 Rust update-node-metadata (R-P97)
+            "kb_batch_absorb.py",     // 写回委托 Rust absorb-node (R-P97)
+            "kb-embed-pq.py",         // Rust pq_ann_search 的上游 codebook 生产者 (nt_memory_embed.rs)
         ];
         let mut violators = Vec::new();
         for entry in std::fs::read_dir(scripts_dir).unwrap() {

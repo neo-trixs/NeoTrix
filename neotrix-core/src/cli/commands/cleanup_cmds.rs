@@ -6,6 +6,7 @@ use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 use crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::{
     CleanupEngine, CleanupKind, Archiver, BackupEngine, CleanupLog,
+    ComponentRemover, ComponentTarget, RiskLevel,
 };
 
 pub struct CleanupCmd;
@@ -21,6 +22,107 @@ impl CliCommand for CleanupCmd {
         let mode = args.first().map(|s| s.as_str()).unwrap_or("status");
 
         match mode {
+            "scan-system" | "scan" => {
+                // 跨平台系统缓存扫描 (含风险分级摘要)
+                let engine = CleanupEngine::new();
+                let mut lines = vec!["🔎 系统缓存扫描:".to_string()];
+                let mut total_bytes = 0u64;
+                for kind in &[CleanupKind::ProjectArtifacts, CleanupKind::Cache, CleanupKind::Logs,
+                             CleanupKind::TempFiles, CleanupKind::IDECaches] {
+                    let r = engine.scan(*kind, true);
+                    total_bytes += r.estimated_bytes;
+                    lines.push(format!("  [{}] {} 项 (约 {:.1} MB)",
+                        kind.description(), r.deletable_count, r.estimated_bytes as f64 / 1_048_576.0));
+                }
+                lines.push(format!("  合计可释放: {:.1} MB", total_bytes as f64 / 1_048_576.0));
+                lines.push("  提示: 使用 /cleanup deep 执行清理 (默认归档到 .cleanup/archive/ 可回滚)".into());
+                CommandOutput::ok(&lines.join("\n"))
+            }
+
+            "targets" | "list-targets" => {
+                // 列出可移除的预装/遥测/后门组件
+                let remover = ComponentRemover::new(std::path::Path::new("."));
+                let present = remover.scan();
+                let mut lines = vec![format!("🧬 组件移除目标 ({} 个存在):", present.len())];
+                for (target, _) in &present {
+                    lines.push(format!("  [{}] {} — 风险: {} | 面: {}",
+                        target.name, target.description,
+                        target.risk.label(), target.surface.label()));
+                }
+                if present.is_empty() {
+                    lines.push("  当前平台无符合风险阀的组件目标".to_string());
+                }
+                lines.push("  用法: /cleanup uninstall <目标名关键词> | restore <目标名>".into());
+                CommandOutput::ok(&lines.join("\n"))
+            }
+
+            "uninstall" => {
+                let query = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                if query.is_empty() {
+                    return CommandOutput::err("用法: /cleanup uninstall <目标关键词>");
+                }
+                let mut remover = ComponentRemover::new(std::path::Path::new("."));
+                let targets = ComponentTarget::all_targets()
+                    .into_iter()
+                    .filter(|t| t.name.to_lowercase().contains(&query.to_lowercase()))
+                    .collect::<Vec<_>>();
+                if targets.is_empty() {
+                    return CommandOutput::ok(&format!("未找到匹配 \"{}\" 的组件目标 (用 /cleanup targets 查看)", query));
+                }
+                let mut lines = vec![format!("🧹 移除 {} 个组件:", targets.len())];
+                for target in &targets {
+                    let present = remover.target_present(target);
+                    if present {
+                        remover.dry_run = true;
+                        match remover.remove(target) {
+                            Ok(_) => lines.push(format!("  ✅ [dry-run 预览] {}", target.name)),
+                            Err(e) => lines.push(format!("  ⚠️ {}: {}", target.name, e)),
+                        }
+                    } else {
+                        lines.push(format!("  ⏭️  未检测到: {}", target.name));
+                    }
+                }
+                lines.push("  确认执行: 先运行 /cleanup confirm-uninstall <关键词> 关闭 dry-run".into());
+                CommandOutput::ok(&lines.join("\n"))
+            }
+
+            "confirm-uninstall" => {
+                let query = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                if query.is_empty() {
+                    return CommandOutput::err("用法: /cleanup confirm-uninstall <目标关键词> (高危, 执行真实移除)");
+                }
+                let mut remover = ComponentRemover::new(std::path::Path::new("."));
+                remover.dry_run = false;
+                remover.risk_gate = RiskLevel::High;
+                let targets = ComponentTarget::all_targets()
+                    .into_iter()
+                    .filter(|t| t.name.to_lowercase().contains(&query.to_lowercase()))
+                    .collect::<Vec<_>>();
+                if targets.is_empty() {
+                    return CommandOutput::ok(&format!("未找到匹配 \"{}\" 的组件目标", query));
+                }
+                let mut lines = vec![format!("🧹 执行移除 {} 个组件 (已建快照, 可 /cleanup restore 回滚):", targets.len())];
+                for target in &targets {
+                    match remover.remove(target) {
+                        Ok(snap) => lines.push(format!("  ✅ {} (快照 @{})", target.name, snap.created_at)),
+                        Err(e) => lines.push(format!("  ⚠️ {}: {}", target.name, e)),
+                    }
+                }
+                CommandOutput::ok(&lines.join("\n"))
+            }
+
+            "restore" => {
+                let target = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                if target.is_empty() {
+                    return CommandOutput::err("用法: /cleanup restore <目标关键词> (从快照回滚组件移除)");
+                }
+                let remover = ComponentRemover::new(std::path::Path::new("."));
+                match remover.restore(target) {
+                    Ok(n) => CommandOutput::ok(&format!("↩️  从快照恢复 {} 项", n)),
+                    Err(e) => CommandOutput::err(&format!("恢复失败: {}", e)),
+                }
+            }
+
             "status" | "stat" | "info" => {
                 let engine = CleanupEngine::new();
                 let mut lines = vec!["📊 清理状态:".to_string()];
@@ -176,7 +278,7 @@ impl CliCommand for CleanupCmd {
                     format!("{} | {} 项", recent[0].action, recent[0].items)
                 };
                 CommandOutput::ok(&format!(
-                    "🔍 预览 (dry-run):\n  {} 项可归档 (约 {:.1} MB)\n  📸 快照: {} 个\n  📋 上次清理: {}\n\n子命令:\n  /cleanup now      归档并清理构建产物\n  /cleanup quick    仅清理构建产物\n  /cleanup deep     深度清理 (含缓存/日志)\n  /cleanup backup   执行代码备份 → .backup/\n  /cleanup archive  归档过期文件\n  /cleanup search q 搜索归档\n  /cleanup log      查看清理历史\n  /cleanup status   查看状态",
+                    "🔍 预览 (dry-run):\n  {} 项可归档 (约 {:.1} MB)\n  📸 快照: {} 个\n  📋 上次清理: {}\n\n子命令:\n  /cleanup now      归档并清理构建产物\n  /cleanup quick    仅清理构建产物\n  /cleanup deep     深度清理 (含缓存/日志)\n  /cleanup backup   执行代码备份 → .backup/\n  /cleanup archive  归档过期文件\n  /cleanup search q 搜索归档\n  /cleanup log      查看清理历史\n  /cleanup status   查看状态\n  /cleanup scan-system 跨平台系统缓存扫描\n  /cleanup targets  列出可移除组件 (预装/遥测)\n  /cleanup uninstall q 组件移除预览\n  /cleanup confirm-uninstall q 真实移除 (快照可回滚)\n  /cleanup restore q 从快照恢复",
                     r.deletable_count, r.estimated_bytes as f64 / 1_048_576.0, snapshots, last
                 ))
             }

@@ -1,6 +1,7 @@
 use super::*;
 use crate::cli::sandbox::SandboxMode;
 use crate::cli::tui::vim_mode::VimMode;
+use crossterm::event::{KeyCode, KeyModifiers};
 
 // ── App State Machine ──
 
@@ -14,7 +15,6 @@ fn test_app_initialization() {
     assert_eq!(app.sessions[0].name, "Default Session");
     assert!(app.sessions[0].messages.is_empty());
     assert!(app.input.is_empty());
-    assert!(app.command_history.entries.is_empty());
     assert_eq!(app.scroll_offset, 0);
     assert!(!app.multi_line);
     assert!(!app.agent_busy);
@@ -31,72 +31,76 @@ fn test_app_default_trait() {
     assert_eq!(app.status_text, "Ready");
 }
 
-// ── Keyboard: Escape sets running false ──
+// ── Keyboard: Escape / Ctrl+C / Ctrl+D ──
 
 #[test]
-fn test_keyboard_escape_sets_running_false() {
+fn test_keyboard_escape_does_not_quit() {
     let mut app = TuiApp::new(false);
     assert!(app.running);
-    app.handle_key(0x1b, 0);
-    // Note: handle_key is a stub returning false; actual key handling is in TUI event loop
-    // This test verifies the stub doesn't crash on Escape
+    let action = app.handle_key(KeyCode::Esc, KeyModifiers::NONE);
+    assert_eq!(action, KeyAction::None);
     assert!(app.running);
 }
 
 #[test]
-fn test_keyboard_ctrl_d_sets_running_false() {
+fn test_keyboard_ctrl_d_quits_when_idle_empty() {
     let mut app = TuiApp::new(false);
     assert!(app.running);
-    app.handle_key(b'd', 1);
-    assert!(app.running);
+    let action = app.handle_key(KeyCode::Char('d'), KeyModifiers::CONTROL);
+    assert_eq!(action, KeyAction::Quit);
 }
 
 #[test]
-fn test_keyboard_ctrl_c_sets_running_false() {
+fn test_keyboard_ctrl_c_quits_when_idle_empty() {
     let mut app = TuiApp::new(false);
     assert!(app.running);
-    app.handle_key(b'c', 1);
-    assert!(app.running);
+    let action = app.handle_key(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(action, KeyAction::Quit);
+}
+
+#[test]
+fn test_keyboard_ctrl_c_cancels_when_streaming() {
+    let mut app = TuiApp::new(false);
+    app.streaming = true;
+    let action = app.handle_key(KeyCode::Char('c'), KeyModifiers::CONTROL);
+    assert_eq!(action, KeyAction::CancelGeneration);
+    assert!(!app.streaming);
 }
 
 // ── Keyboard: Enter / Submit ──
 
 #[test]
-fn test_keyboard_enter_submits_non_empty_input() {
+fn test_keyboard_enter_submits() {
     let mut app = TuiApp::new(false);
-    app.handle_key(b'h', 0);
-    app.handle_key(b'i', 0);
-    let _result = app.handle_key(b'\r', 0);
-    assert!(app.command_history.entries.len() <= 1);
+    app.handle_key(KeyCode::Char('h'), KeyModifiers::NONE);
+    app.handle_key(KeyCode::Char('i'), KeyModifiers::NONE);
+    let action = app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+    assert_eq!(action, KeyAction::Submit);
 }
 
 #[test]
-fn test_keyboard_enter_empty_input_no_submit() {
+fn test_keyboard_enter_empty_input_submits() {
     let mut app = TuiApp::new(false);
-    let _result = app.handle_key(b'\r', 0);
-    assert!(app.command_history.entries.is_empty());
+    let action = app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+    assert_eq!(action, KeyAction::Submit);
+    // run() 层会判断 trim 为空则不发请求。
 }
 
+// ── Scroll ──
+
 #[test]
-fn test_keyboard_page_up_scrolls_down() {
+fn test_keyboard_page_up_scrolls() {
     let mut app = TuiApp::new(false);
     app.scroll_offset = 20;
-    app.handle_key(2, 0);
-    assert!(app.scroll_offset <= 20);
+    app.handle_key(KeyCode::PageUp, KeyModifiers::NONE);
+    assert_eq!(app.scroll_offset, 25);
 }
 
 #[test]
-fn test_keyboard_page_up_clamps_at_zero() {
+fn test_keyboard_page_down_scrolls() {
     let mut app = TuiApp::new(false);
     app.scroll_offset = 5;
-    app.handle_key(2, 0);
-    assert!(app.scroll_offset <= 5);
-}
-
-#[test]
-fn test_keyboard_page_down_scrolls_or_stays() {
-    let mut app = TuiApp::new(false);
-    app.handle_key(3, 0);
+    app.handle_key(KeyCode::PageDown, KeyModifiers::NONE);
     assert_eq!(app.scroll_offset, 0);
 }
 
@@ -105,16 +109,16 @@ fn test_keyboard_page_down_scrolls_or_stays() {
 #[test]
 fn test_tab_completion_no_crash() {
     let mut app = TuiApp::new(false);
-    app.handle_key(b'\t', 0);
+    app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
     assert!(app.running);
 }
 
 #[test]
 fn test_tab_completion_partial() {
     let mut app = TuiApp::new(false);
-    app.handle_key(b'h', 0);
-    app.handle_key(b'\t', 0);
-    assert!(app.running);
+    app.input = "/ex".into();
+    app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+    assert!(app.input.starts_with("/exit"));
 }
 
 // ── History Navigation ──
@@ -122,14 +126,14 @@ fn test_tab_completion_partial() {
 #[test]
 fn test_history_up_no_crash_when_empty() {
     let mut app = TuiApp::new(false);
-    app.handle_key(1, 0);
+    app.handle_key(KeyCode::Up, KeyModifiers::NONE);
     assert!(app.running);
 }
 
 #[test]
 fn test_history_down_no_crash_when_empty() {
     let mut app = TuiApp::new(false);
-    app.handle_key(1, 0);
+    app.handle_key(KeyCode::Down, KeyModifiers::NONE);
     assert!(app.running);
 }
 
@@ -146,27 +150,21 @@ fn test_toggle_multi_line() {
 fn test_multi_line_enter_behavior() {
     let mut app = TuiApp::new(false);
     app.multi_line = true;
-    app.handle_key(b'h', 0);
-    app.handle_key(b'\r', 0);
-    assert!(app.running);
+    app.handle_key(KeyCode::Char('h'), KeyModifiers::NONE);
+    let action = app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+    assert_eq!(action, KeyAction::None);
+    assert_eq!(app.input, "h\n");
 }
 
 // ── Streaming & Agent Busy Guards ──
 
 #[test]
-fn test_input_ignored_while_streaming() {
+fn test_input_allowed_while_streaming() {
+    // 新语义：流式中仍允许输入（排队），由 run() 层决定是否忽略。
     let mut app = TuiApp::new(false);
     app.streaming = true;
-    app.handle_key(b'h', 0);
-    assert!(app.input.is_empty());
-}
-
-#[test]
-fn test_input_ignored_while_agent_busy() {
-    let mut app = TuiApp::new(false);
-    app.agent_busy = true;
-    app.handle_key(b'h', 0);
-    assert!(app.input.is_empty());
+    app.handle_key(KeyCode::Char('h'), KeyModifiers::NONE);
+    assert_eq!(app.input, "h");
 }
 
 // ── Vim Mode ──
@@ -180,22 +178,22 @@ fn test_vim_mode_default_state() {
 #[test]
 fn test_vim_mode_insert_char() {
     let mut app = TuiApp::new(false);
-    app.handle_key(b'i', 0);
+    app.handle_key(KeyCode::Char('i'), KeyModifiers::NONE);
     assert!(app.running);
 }
 
 #[test]
 fn test_vim_mode_escape_insert() {
     let mut app = TuiApp::new(false);
-    app.handle_key(b'i', 0);
-    app.handle_key(0x1b, 0);
+    app.handle_key(KeyCode::Char('i'), KeyModifiers::NONE);
+    app.handle_key(KeyCode::Esc, KeyModifiers::NONE);
     assert!(app.running);
 }
 
 #[test]
 fn test_vim_mode_visual_mode() {
     let mut app = TuiApp::new(false);
-    app.handle_key(b'v', 0);
+    app.handle_key(KeyCode::Char('v'), KeyModifiers::NONE);
     assert!(app.running);
 }
 
@@ -231,13 +229,6 @@ fn test_push_message_adds_multiple() {
 fn test_default_sandbox_mode() {
     let app = TuiApp::new(false);
     assert_eq!(app.sandbox_mode, SandboxMode::Disabled);
-}
-
-#[test]
-fn test_push_message_preserves_content() {
-    let mut app = TuiApp::new(true);
-    app.push_message("user", "hello".into());
-    assert_eq!(app.sessions[0].messages[0].content, "hello");
 }
 
 // ── Scroll Offset ──

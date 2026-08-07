@@ -51,10 +51,6 @@ pub use crate::core::nt_core_self::skill_crystal::{
 pub use crate::core::nt_core_self::archive::{
     SiliconArchive, SiliconSnapshot, AttentionSnapshot,
 };
-pub use crate::core::nt_core_self::co_evolution::{
-    CoEvolutionProfile, CoEvolutionTracker, CoEvolutionConfig, CoEvolutionStats,
-    InteractionMode, InteractionRecord, TrustLevel,
-};
 pub use crate::core::nt_core_self::emotion_state::{
     EmotionDimension, EmotionState, EmotionConfig, EmotionEngine, EmotionObservation, EmotionReport,
 };

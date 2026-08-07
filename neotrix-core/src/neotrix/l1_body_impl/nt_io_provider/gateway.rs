@@ -15,6 +15,22 @@ use crate::core::nt_core_error_recovery::{ErrorContext, ErrorType, RecoveryActio
 use crate::core::nt_io_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_io_telemetry::{ConsoleTracer, CostTracker, SpanKind, Tracer};
 
+/// 识别配额耗尽错误 — 与瞬时限速 (429) 区分 (freellmapi/aimux 模式)。
+/// 覆盖常见 provider 配额/信用耗尽措辞。命中后应熔断 provider 而非重试。
+fn is_quota_exhaustion(msg: &str) -> bool {
+    let lowered = msg.to_lowercase();
+    lowered.contains("quota exceeded")
+        || lowered.contains("out of quota")
+        || lowered.contains("insufficient_quota")
+        || lowered.contains("insufficient quota")
+        || lowered.contains("quota exhausted")
+        || lowered.contains("credit limit")
+        || lowered.contains("out of credits")
+        || lowered.contains("exceeded your current quota")
+        || lowered.contains("billing")
+        && (lowered.contains("activate") || lowered.contains("limit"))
+}
+
 #[derive(Debug)]
 pub struct ProviderState {
     pub circuit_breaker: CircuitBreaker,
@@ -47,6 +63,19 @@ impl ProviderState {
 
     pub fn is_available(&self) -> bool {
         self.circuit_breaker.is_available()
+    }
+
+    /// 配额耗尽标记 — 记录 provider 处于配额耗尽状态 (freellmapi/aimux 模式)。
+    /// 配额耗尽 (quota/credit 耗尽) 与瞬时限速 (429) 语义不同: 重试无益, 应剔除该 provider
+    /// 直至配额恢复, 而不是反复重试同一个耗尽账户。
+    pub fn mark_quota_exhausted(&mut self) {
+        self.circuit_breaker.force_open();
+        self.total_errors += 1;
+    }
+
+    /// 配额耗尽后是否已过冷却期可再次尝试 (配额恢复探测)
+    pub fn quota_recovery_elapsed(&self) -> bool {
+        self.circuit_breaker.cooldown_elapsed()
     }
 
     pub fn composite_score(&self) -> f64 {
@@ -509,9 +538,21 @@ impl GatewayV2 {
     }
 
     /// Extract model id from `{provider}/{model_id}` registration names.
+    /// 无 `/` 的 keyless 注册名 (如 `pollinations`) 回退到 catalog 默认模型,
+    /// 避免把注册名当模型名发给端点 (pollinations 会 404 "Model not found")。
+    /// 非 keyless 的 provider (如 `openai`) 保持返回注册名本身。
     fn provider_model(&self, provider_name: &str) -> Option<String> {
         let model = provider_name.split('/').next_back().unwrap_or(provider_name);
-        if model.is_empty() { None } else { Some(model.to_string()) }
+        if model.is_empty() { return None; }
+        if model == provider_name {
+            // 无 `/` → 仅 keyless provider 回退到 catalog 默认模型
+            if let Some(info) = super::provider_catalog::lookup_provider(provider_name) {
+                if info.is_free && !info.default_model.is_empty() {
+                    return Some(info.default_model.to_string());
+                }
+            }
+        }
+        Some(model.to_string())
     }
 
     fn fire_event(&self, provider_name: &str, success: bool, latency_ms: f64, tokens: u32, model: &str, phase: AttemptPhase) {
@@ -616,7 +657,28 @@ impl GatewayV2 {
     async fn call_provider(&self, name: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let provider = self.providers.get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
-        provider.complete(request).await
+        // 剥离 `{provider}/` 前缀 (同 call_provider_stream)。
+        let stripped = request.model.strip_prefix(&format!("{}/", name))
+            .map(|m| m.to_string());
+        let mut req = request.clone();
+        if let Some(m) = stripped {
+            req.model = m;
+        }
+        provider.complete(&req).await
+    }
+
+    /// 单次调用指定 provider — 无 select_best/无重试连打。
+    ///
+    /// 适用于对限流敏感的场景（如 keyless free 池 1 req/s 限制）：
+    /// 调用方自行控制节流与重试节奏，避免 complete_with_selection 的
+    /// 3 次 normal + aggressive retry 在限流窗口内连续触发 429。
+    /// `provider_name` 需为完整注册名（如 `api-airforce` 或 `api-airforce/grok-4.1-mini:free`）。
+    pub async fn complete_single(
+        &self,
+        provider_name: &str,
+        request: &LlmRequest,
+    ) -> Result<LlmResponse, LlmError> {
+        self.call_provider(provider_name, request).await
     }
 
     pub async fn complete_with_selection(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
@@ -663,8 +725,24 @@ impl GatewayV2 {
         }
         let mut used_names: Vec<String> = Vec::new();
 
-        for _ in 0..3 {
-            let name = self.select_best().await
+        // 显式 provider 前缀路由: 请求模型形如 `{provider}/{model_id}` 时优先该 provider
+        // (如 llm7/codestral-latest → llm7)。此前 select_best 无视 model 前缀,
+        // 导致 llm7 模型被路由到 pollinations/api-airforce (402/429)。
+        let prefix_provider: Option<String> = request.model.split('/').next()
+            .filter(|p| !p.is_empty())
+            .map(|p| p.to_string());
+
+        for i in 0..3 {
+            let prefix_sel = if i == 0 {
+                // 第一优先: 显式前缀 provider (若已注册)
+                prefix_provider.as_ref()
+                    .filter(|p| self.providers.contains_key(p.as_str()))
+                    .cloned()
+            } else {
+                None
+            };
+            let best = self.select_best().await;
+            let name = prefix_sel.or(best)
                 .or_else(|| {
                     let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                     states.keys().next().cloned()
@@ -735,16 +813,26 @@ impl GatewayV2 {
                 }
                 Err(err) => {
                     let error_msg = err.to_string();
+                    let is_quota_exhausted = is_quota_exhaustion(&error_msg);
                     {
                         let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
                         if let Some(state) = states.get_mut(&name) {
-                            state.record_failure(elapsed);
+                            if is_quota_exhausted {
+                                // 配额耗尽 (freellmapi/aimux): 重试无益, 直接熔断剔除该 provider,
+                                // 避免反复打同一个耗尽账户。冷却期后配额恢复探测自动放行。
+                                state.mark_quota_exhausted();
+                                log::warn!("[gateway] provider '{}' quota exhausted → 熔断剔除: {}", name, error_msg);
+                            } else {
+                                state.record_failure(elapsed);
+                            }
                         }
                     }
                     self.fire_event(&name, false, elapsed, 0, &request.model, AttemptPhase::Normal);
 
                     // Consult recovery orchestrator
-                    let error_type = if error_msg.contains("rate limit") || error_msg.contains("429") {
+                    let error_type = if is_quota_exhausted {
+                        ErrorType::Unknown("quota exhausted — provider tripped, skip retry".to_string())
+                    } else if error_msg.contains("rate limit") || error_msg.contains("429") {
                         ErrorType::RateLimit { retry_after: None }
                     } else if error_msg.contains("timeout") || error_msg.contains("timed out") {
                         ErrorType::Timeout { elapsed_ms: elapsed as u64 }
@@ -928,8 +1016,24 @@ impl GatewayV2 {
         // Phase 1: Normal retry loop (up to 3 providers, best-first)
         let mut used_names: Vec<String> = Vec::new();
 
-        for _ in 0..3 {
-            let name = self.select_best().await
+        // 显式 provider 前缀路由: 请求模型形如 `{provider}/{model_id}` 时优先该 provider
+        // (如 llm7/codestral-latest → llm7)。此前 select_best 无视 model 前缀,
+        // 导致 llm7 模型被路由到 pollinations/api-airforce (402/429)。
+        let prefix_provider: Option<String> = request.model.split('/').next()
+            .filter(|p| !p.is_empty())
+            .map(|p| p.to_string());
+
+        for i in 0..3 {
+            let prefix_sel = if i == 0 {
+                // 第一优先: 显式前缀 provider (若已注册)
+                prefix_provider.as_ref()
+                    .filter(|p| self.providers.contains_key(p.as_str()))
+                    .cloned()
+            } else {
+                None
+            };
+            let best = self.select_best().await;
+            let name = prefix_sel.or(best)
                 .or_else(|| {
                     self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }).keys().next().cloned()
                 });
@@ -993,7 +1097,15 @@ impl GatewayV2 {
     ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let provider = self.providers.get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
-        provider.stream_complete(request).await
+        // 剥离 `{provider}/` 前缀: 请求模型 `llm7/codestral-latest` 传给 provider 时
+        // 只传 `codestral-latest` (上游不认识 `llm7/` 前缀, 返回 model_unavailable)。
+        let stripped = request.model.strip_prefix(&format!("{}/", name))
+            .map(|m| m.to_string());
+        let mut req = request.clone();
+        if let Some(m) = stripped {
+            req.model = m;
+        }
+        provider.stream_complete(&req).await
     }
 
     /// Auxiliary vision reasoning — the third-party-model-as-reasoner path.
@@ -1158,7 +1270,7 @@ impl GatewayV2 {
             } else {
                 None
             };
-            let provider = super::factory::create_provider(super::factory::ProviderConfig {
+            let mut provider = super::factory::create_provider(super::factory::ProviderConfig {
                 provider_type: entry.provider_type,
                 api_key,
                 base_url: Some(entry.base_url.clone()),
@@ -1166,6 +1278,10 @@ impl GatewayV2 {
                 timeout_secs: 60,
                 proxy: None,
             });
+            // 代理注入: 与手工 keyless 注册一致, 本机 fake-ip 分流网络下直连会全部超时
+            if let Some(proxy_url) = super::super::nt_io_http_factory::proxy_from_env() {
+                provider.set_proxy(&proxy_url);
+            }
             self.register_provider_with_category(&name, provider, entry.is_free, ProviderCategory::Cloud);
             log::info!("[gateway] Registered from catalog: {} ({})", name, entry.display_name);
         }
@@ -1566,6 +1682,7 @@ mod tests {
                         model: "test".to_string(),
                         usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
                         finish_reason: FinishReason::Stop,
+                    tool_calls: None,
                     })
                 }
             }
@@ -1611,6 +1728,7 @@ mod tests {
                             model: "test".to_string(),
                             usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
                             finish_reason: FinishReason::Stop,
+                        tool_calls: None,
                         })).await;
                     });
                     Ok(rx)
@@ -1895,17 +2013,61 @@ mod tests {
         assert!(result.is_err(), "oversized single request must be budget-blocked");
     }
 
+    #[tokio::test]
+    async fn test_quota_exhaustion_trips_provider_not_retried() {
+        // D19 (freellmapi/aimux 模式): 配额耗尽应熔断剔除 provider, 而非反复重试
+        // 同一个耗尽账户。命中 quota 后将 provider 置为不可用 → select_best 跳过。
+        let mut gw = GatewayV2::new();
+        gw.register_provider("quota-exhausted", Box::new(MockProvider::quota_failing()), false);
+        gw.register_provider("working", Box::new(MockProvider::new("ok")), true);
+
+        // 直接触发 quota 路径的熔断 (与 complete 内错误分类同语义)
+        {
+            let mut states = gw.states.write().unwrap();
+            if let Some(state) = states.get_mut("quota-exhausted") {
+                state.mark_quota_exhausted();
+            }
+        }
+        {
+            let states = gw.states.read().unwrap();
+            let walked = states.get("quota-exhausted").map(|s| !s.is_available()).unwrap_or(true);
+            assert!(walked, "quota-exhausted provider must be circuit-open after exhaustion");
+            let still_ok = states.get("working").map(|s| s.is_available()).unwrap_or(false);
+            assert!(still_ok, "working provider must remain available");
+        }
+
+        // 熔断后调用应 failover 到 working 成功, 不再命中的耗尽 provider
+        let req = LlmRequest::new("test", "hi");
+        let result = gw.complete_with_selection(&req).await;
+        assert!(result.is_ok(), "request must fail over to a working provider after quota trip");
+    }
+
+    #[test]
+    fn test_is_quota_exhaustion_classifies_correctly() {
+        assert!(is_quota_exhaustion("Error 429: quota exceeded for resource"));
+        assert!(is_quota_exhaustion("insufficient_quota: you have exhausted your free tier"));
+        assert!(is_quota_exhaustion("You have exceeded your current quota, please check your plan and billing details"));
+        assert!(is_quota_exhaustion("out of quota: you are being rate limited due to billing"));
+        // 瞬时限速不误判为配额耗尽
+        assert!(!is_quota_exhaustion("rate limit exceeded: retry after 5s"));
+        assert!(!is_quota_exhaustion("429 too many requests"));
+    }
+
     struct MockProvider {
         response: String,
         should_fail: bool,
+        quota_fail: bool,
     }
 
     impl MockProvider {
         fn new(response: &str) -> Self {
-            Self { response: response.to_string(), should_fail: false }
+            Self { response: response.to_string(), should_fail: false, quota_fail: false }
         }
         fn failing() -> Self {
-            Self { response: String::new(), should_fail: true }
+            Self { response: String::new(), should_fail: true, quota_fail: false }
+        }
+        fn quota_failing() -> Self {
+            Self { response: String::new(), should_fail: false, quota_fail: true }
         }
     }
 
@@ -1914,12 +2076,15 @@ mod tests {
         async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
             if self.should_fail {
                 Err(LlmError::Server("mock failure".to_string()))
+            } else if self.quota_fail {
+                Err(LlmError::Unknown("insufficient_quota: quota exceeded for your account".to_string()))
             } else {
                 Ok(LlmResponse {
                     content: self.response.clone(),
                     model: "mock".to_string(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })
             }
         }
@@ -1933,9 +2098,50 @@ mod tests {
                     model: "mock".to_string(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
+                tool_calls: None,
                 })).await;
             });
             Ok(rx)
         }
+    }
+
+    // ── 真实 LLM 集成验证（本地手动跑，不进 CI）──────────────────
+    // 需要网络 + keyless provider（llm7）。运行时:
+    //   cargo test -p neotrix --lib -- --ignored test_real_gateway_stream
+    #[tokio::test]
+    #[ignore]
+    async fn test_real_gateway_stream() {
+        // 真实 LLM 流式端到端: 经生产 factory gateway 全链路。
+        // 模型 llm7/codestral-latest — 2026-08-06 实测唯一匿名可用流式端点
+        // (api-airforce 全局 1req/s 排队 90s, pollinations 队列满 429 + 流式间歇 402)。
+        // 同时验证 gateway 前缀路由: llm7/ 应路由到 llm7 provider。
+        let gw = crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
+        let req = LlmRequest {
+            model: "llm7/codestral-latest".into(),
+            messages: vec![Message::new(Role::User, "Reply with exactly: E2E-OK")],
+            max_tokens: 32,
+            temperature: Some(0.0),
+            tools: vec![],
+            image_data: None,
+            thinking_budget: None,
+            provider_params: HashMap::new(),
+            constraint_json: None,
+            structured_output: None,
+        };
+        let mut rx = gw.stream_complete_with_selection(&req).await.expect("stream init ok");
+        let mut buf = String::new();
+        while let Some(chunk) = rx.recv().await {
+            match chunk {
+                Ok(resp) => {
+                    buf.push_str(&resp.content);
+                    if resp.finish_reason == FinishReason::Stop {
+                        break;
+                    }
+                }
+                Err(e) => panic!("stream error: {:?}", e),
+            }
+        }
+        assert!(!buf.trim().is_empty(), "should receive streaming text, got: {:?}", buf);
+        println!("E2E-OK streamed: {:?}", buf);
     }
 }

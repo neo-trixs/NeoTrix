@@ -171,6 +171,31 @@ impl BackgroundLoopHandle {
                             eprintln!("[bg-meta] route_learner persist failed: {}", e);
                         }
                     }
+                    // P4: MAGE 四子图共进化循环同步落盘 — 同一 reward 驱动的图谱 +
+                    // 任务级搜索 bandit 跨会话存活 (append-only, 重启后继续累积)。
+                    if let Some(ref kb_ref) = self.kb {
+                        if let Err(e) = shell.persist_coevo(kb_ref) {
+                            eprintln!("[bg-meta] coevolution loop persist failed: {}", e);
+                        }
+                    }
+                    // P6: 派单经验回读 — coevo 经验子图 → 大脑吸收闭环 (R-P79)。
+                    // 水位之上的新经验 (成败双索引) 经 EDV 批评器反哺 SelfIteratingBrain,
+                    // 同一 coevo 图谱: 写 (record_reward) 在派单时, 读 (吸收) 在派单后。
+                    if let Some(ref bridge) = self.dialogue_bridge {
+                        let absorb = bridge.absorb_dispatch_experiences(&mut b, &mut shell.coevo);
+                        if absorb.absorbed > 0 {
+                            eprintln!(
+                                "[bg-agent] dispatch absorb: {} experiences -> brain (critic_accepted={}, score_delta={:+.4})",
+                                absorb.absorbed, absorb.critic_accepted, absorb.score_delta
+                            );
+                        }
+                        // 水位推进后落盘, 防止重启后重复吸收同一批经验。
+                        if let Some(ref kb_ref) = self.kb {
+                            if let Err(e) = shell.persist_coevo(kb_ref) {
+                                eprintln!("[bg-meta] coevolution watermark persist failed: {}", e);
+                            }
+                        }
+                    }
                     // P3: MANTA trace 审计 + 有界结构修复 — 派单后依据行为 trace
                     // 检查派单拓扑, 当前组织不足则改边 (域→档案), 并落盘 playbook。
                     let repairs = shell.audit_and_repair_topology();
@@ -257,7 +282,14 @@ impl BackgroundLoopHandle {
 
     pub(crate) async fn handle_agent_discovery(&mut self) {
         if let Some(ref mut d) = self.agent_discovery {
-            if let Err(e) = d.listen() { log::warn!("[bg] discovery: {}", e); }
+            match d.listen() {
+                Ok(discovered) if discovered > 0 => {
+                    // D17: listen 排空返回新增数 — 有新增即触发可观测信号 (日志 + 状态), 供感知层响应
+                    eprintln!("[bg] discovery: +{} agents ({} known)", discovered, d.known_agents.len());
+                }
+                Ok(_) => {}
+                Err(e) => log::warn!("[bg] discovery: {}", e),
+            }
         }
     }
 

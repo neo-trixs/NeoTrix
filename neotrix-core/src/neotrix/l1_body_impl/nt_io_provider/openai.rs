@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, StructuredOutputConfig, Usage};
+use super::types::{FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, StructuredOutputConfig, ToolCallInfo, Usage};
 
 pub struct OpenAiProvider {
     api_key: String,
@@ -23,15 +23,33 @@ impl OpenAiProvider {
     }
 
     fn build_body(&self, request: &LlmRequest, stream: bool) -> serde_json::Value {
+        let messages: Vec<serde_json::Value> = request.messages.iter()
+            .map(|m| serialize_message(m))
+            .collect();
+
         let mut body = serde_json::json!({
             "model": request.model,
-            "messages": request.messages,
+            "messages": messages,
             "max_tokens": request.max_tokens,
             "stream": stream,
         });
 
         if let Some(temp) = request.temperature {
             body["temperature"] = serde_json::json!(temp);
+        }
+
+        if !request.tools.is_empty() {
+            let tools: Vec<serde_json::Value> = request.tools.iter().map(|t| {
+                serde_json::json!({
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.input_schema,
+                    }
+                })
+            }).collect();
+            body["tools"] = serde_json::json!(tools);
         }
 
         if let Some(so) = &request.structured_output {
@@ -81,11 +99,18 @@ impl LlmProvider for OpenAiProvider {
 
         log::info!("[openai] calling {} with model={}, stream=false", url, model_name);
 
-        let response = self.client
+        let mut request_builder = self.client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .json(&body)
+            .json(&body);
+        // keyless provider（api.airforce 等）：无 API key 时发送占位 token
+        // （api.airforce 接受任意 Bearer token，空 header 反而被拒为 Missing Authorization）
+        if !self.api_key.is_empty() {
+            request_builder = request_builder.header("Authorization", format!("Bearer {}", self.api_key));
+        } else {
+            request_builder = request_builder.header("Authorization", "Bearer free");
+        }
+        let response = request_builder
             .send()
             .await
             .map_err(|e| LlmError::Network(e.to_string()))?;
@@ -114,7 +139,22 @@ impl LlmProvider for OpenAiProvider {
                     Some("content_filter") => FinishReason::ContentFilter,
                     _ => FinishReason::Unknown,
                 };
-                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: finish })
+                // Parse tool_calls from the raw response — required for agent tool loops.
+                let tool_calls = resp["choices"][0]["message"]["tool_calls"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter().filter_map(|tc| {
+                            Some(ToolCallInfo {
+                                id: tc["id"].as_str().unwrap_or("").to_string(),
+                                call_type: tc["type"].as_str().unwrap_or("function").to_string(),
+                                function: super::types::ToolCallFunction {
+                                    name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
+                                    arguments: tc["function"]["arguments"].as_str().unwrap_or("{}").to_string(),
+                                },
+                            })
+                        }).collect()
+                    });
+                Ok(LlmResponse { content, model: request.model.clone(), usage, finish_reason: finish, tool_calls })
             }
             401 => Err(LlmError::Authentication(text)),
             429 => Err(LlmError::RateLimit(text)),
@@ -132,10 +172,15 @@ impl LlmProvider for OpenAiProvider {
 
         tokio::spawn(async move {
             let client = crate::neotrix::nt_io_http_factory::global_client().clone();
-            match client.post(&url)
-                .header("Authorization", format!("Bearer {}", api_key))
-                .json(&body)
-                .send().await
+            let mut req = client.post(&url).json(&body);
+            // keyless provider（api.airforce 等）：无 key 时发送占位 token，
+            // 空 header 反而被服务端拒为 Missing Authorization
+            if !api_key.is_empty() {
+                req = req.header("Authorization", format!("Bearer {}", api_key));
+            } else {
+                req = req.header("Authorization", "Bearer free");
+            }
+            match req.send().await
             {
                 Ok(response) => {
                     let status = response.status();
@@ -161,6 +206,7 @@ impl LlmProvider for OpenAiProvider {
                                         model: v["model"].as_str().unwrap_or("").to_string(),
                                         usage: Usage::default(),
                                         finish_reason: FinishReason::Unknown,
+                                    tool_calls: None,
                                     })).await;
                                 }
                             }
@@ -173,4 +219,39 @@ impl LlmProvider for OpenAiProvider {
 
         Ok(rx)
     }
+}
+
+/// Serialize a Message into the OpenAI wire format.
+///
+/// The `Role` enum serializes as PascalCase by default ("User"/"Assistant"),
+/// which OpenAI-compatible APIs reject. This maps to lowercase roles and
+/// carries `tool_calls` / `tool_call_id` for tool loops.
+fn serialize_message(m: &Message) -> serde_json::Value {
+    let role = match m.role {
+        Role::System => "system",
+        Role::User => "user",
+        Role::Assistant => "assistant",
+        Role::Tool => "tool",
+    };
+    let mut msg = serde_json::json!({
+        "role": role,
+        "content": m.content,
+    });
+    if let Some(calls) = &m.tool_calls {
+        let calls: Vec<serde_json::Value> = calls.iter().map(|tc| {
+            serde_json::json!({
+                "id": tc.id,
+                "type": tc.call_type,
+                "function": {
+                    "name": tc.function.name,
+                    "arguments": tc.function.arguments,
+                }
+            })
+        }).collect();
+        msg["tool_calls"] = serde_json::json!(calls);
+    }
+    if let Some(tool_call_id) = &m.tool_call_id {
+        msg["tool_call_id"] = serde_json::json!(tool_call_id);
+    }
+    msg
 }

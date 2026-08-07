@@ -1,8 +1,23 @@
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use crate::core::nt_core_event::CoreEvent;
+
+/// 事件溯源信封 (D4 — maka 'Log is the Runtime' / buzz 事件日志 + 身份 + receipts)
+/// 落盘时包裹在 CoreEvent 之外, 提供可重建事件链的溯源字段 (全局 seq + 来源身份 + 时间戳),
+/// 且不改变 CoreEvent enum schema (R-P84: 避免波及全部变体的 schema 变更)。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EventEnvelope {
+    /// 全局单调递增序列号 — 事件链回放顺序
+    pub seq: u64,
+    /// 事件来源身份 (agent/进程/模块标识, 如 "nt_act::executor")
+    pub source: String,
+    /// 产生时刻 (unix 毫秒)
+    pub timestamp_ms: i64,
+    /// 载荷事件
+    pub event: CoreEvent,
+}
 
 /// Type-safe event bus using tokio broadcast channel.
 /// No `dyn Any` downcasting — every event is `CoreEvent` enum.
@@ -11,11 +26,12 @@ pub struct EventBus {
     log_file: Option<std::sync::Mutex<std::fs::File>>,
     shutdown_flag: Arc<AtomicBool>,
     handles: std::sync::Mutex<Vec<std::thread::JoinHandle<()>>>,
+    seq: Arc<AtomicU64>,
 }
 
 impl Clone for EventBus {
     fn clone(&self) -> Self {
-        Self { sender: self.sender.clone(), log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()) }
+        Self { sender: self.sender.clone(), log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: self.seq.clone() }
     }
 }
 
@@ -26,7 +42,7 @@ impl Default for EventBus {
 impl EventBus {
     pub fn new(capacity: usize) -> Self {
         let (sender, _) = broadcast::channel(capacity);
-        Self { sender, log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()) }
+        Self { sender, log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: Arc::new(AtomicU64::new(0)) }
     }
 
     pub fn with_persistence(path: PathBuf) -> Self {
@@ -42,18 +58,37 @@ impl EventBus {
             }
         };
         let (sender, _) = broadcast::channel(1024);
-        Self { sender, log_file: file, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()) }
+        Self { sender, log_file: file, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: Arc::new(AtomicU64::new(0)) }
+    }
+
+    /// 当前已发出的溯源序号 (供外部记录事件链高水位)
+    pub fn seq_watermark(&self) -> u64 {
+        self.seq.load(Ordering::SeqCst)
     }
 
     /// Emit an event to all subscribers.
     /// If logging is enabled, also persists as JSON line (secrets/PII redacted before write).
     pub fn emit(&self, event: CoreEvent) {
+        self.emit_from("unknown", event);
+    }
+
+    /// Emit with 事件溯源身份 (D4) — 记录来源 agent/模块 + 全局 seq, 落盘为 envelope。
+    /// 与导出的 emit() 行为一致, 仅多带身份与递增序号。
+    pub fn emit_from(&self, source: &str, event: CoreEvent) {
         if let Some(ref log_file) = self.log_file {
+            let seq = self.seq.fetch_add(1, Ordering::SeqCst);
+            let env = EventEnvelope {
+                seq,
+                source: source.to_string(),
+                timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                event: event.clone(),
+            };
             if let Ok(mut file) = log_file.lock() {
-                if let Ok(line) = serde_json::to_string(&event) {
+                if let Ok(line) = serde_json::to_string(&env) {
                     use std::io::Write;
-                    // 隐私脱敏挂载点: 落盘前净化 secrets/PII (R-P42 强化 nt_shield 节点)
-                    let redacted = crate::neotrix::nt_shield::redaction::redact(&line);
+                    // 隐私脱敏挂载点: 落盘前净化 secrets/PII (R-P42 强化 nt_shield 节点)。
+                    // 用 JSON 感知脱敏 — 只替换字符串值, 不破坏数值/结构 (R-P86 类教训)。
+                    let redacted = crate::neotrix::nt_shield::redaction::redact_json_line(&line);
                     let _ = writeln!(file, "{}", redacted);
                 }
             }
@@ -101,6 +136,7 @@ impl Drop for EventBus {
 }
 
 /// Replay events from a JSONL log file, calling `callback` for each.
+/// 兼容旧格式 (裸 CoreEvent JSON) 与新格式 (EventEnvelope)。
 pub fn replay<F>(path: &PathBuf, callback: F)
 where
     F: Fn(CoreEvent) + Send + Sync + 'static,
@@ -110,10 +146,38 @@ where
         Err(_) => return,
     };
     for line in content.lines() {
-        if let Ok(event) = serde_json::from_str::<CoreEvent>(line) {
+        // 优先新格式 enveloped; 失败回退旧格式裸事件
+        if let Ok(env) = serde_json::from_str::<EventEnvelope>(line) {
+            callback(env.event);
+        } else if let Ok(event) = serde_json::from_str::<CoreEvent>(line) {
             callback(event);
         }
     }
+}
+
+/// 事件溯源回放 (D4) — 从 JSONL 重建带身份与 seq 的完整事件链。
+/// 兼容新格式 envelope; 旧格式裸事件以 seq=0 / source="legacy" 包裹。
+pub fn replay_enveloped(path: &PathBuf) -> Vec<EventEnvelope> {
+    let mut chain = Vec::new();
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return chain,
+    };
+    let mut fallback_seq: u64 = 0;
+    for line in content.lines() {
+        if let Ok(env) = serde_json::from_str::<EventEnvelope>(line) {
+            chain.push(env);
+        } else if let Ok(event) = serde_json::from_str::<CoreEvent>(line) {
+            chain.push(EventEnvelope {
+                seq: fallback_seq,
+                source: "legacy".into(),
+                timestamp_ms: 0,
+                event,
+            });
+            fallback_seq += 1;
+        }
+    }
+    chain
 }
 
 // ── Layer-aware subscriber registration ────────────────────────────────────
@@ -355,6 +419,25 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         replay(&path, |e| { drop(e); });
         // No panic = pass
+    }
+
+    #[test]
+    fn test_enveloped_persistence_and_replay_chain() {
+        // D4 (maka/buzz): 事件溯源 — envelope 携带 seq + 来源身份, replay 可重建事件链
+        let path = PathBuf::from(format!("/tmp/neotrix_test_enveloped_{}.jsonl", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let bus = EventBus::with_persistence(path.clone());
+        bus.emit_from("nt_act::executor", CoreEvent::TaskSubmitted { task: "t".into(), task_type: "g".into(), priority: 1 });
+        bus.emit_from("nt_core::gateway", CoreEvent::GoalCompleted { goal_id: "g1".into(), goal: "test".into(), iterations: 5, score: 0.8 });
+        drop(bus);
+
+        let chain = replay_enveloped(&path);
+        assert_eq!(chain.len(), 2, "both events must be replayed with envelope");
+        assert_eq!(chain[0].seq, 0, "first event seq = 0");
+        assert_eq!(chain[1].seq, 1, "second event seq = 1 (monotonic chain)");
+        assert_eq!(chain[0].source, "nt_act::executor", "identity must survive serialization");
+        assert!(matches!(chain[1].event, CoreEvent::GoalCompleted { .. }), "payload must round-trip");
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

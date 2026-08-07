@@ -25,12 +25,12 @@ impl CliCommand for ConfigCmd {
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
-        let config_path = dirs::home_dir().unwrap_or_default().join(".config").join("neotrix").join("config.toml");
+        let config_path = crate::config::NeoTrixConfig::path();
 
         if args.is_empty() || (args.len() == 1 && args[0] == "--json") {
             let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
             let msg = if config_str.is_empty() {
-                "Usage:\n  /config show              Show current configuration\n  /config set <key> <value>  Set a config key\n  /config --json             Output as JSON\n(no config file found at ~/.neotrix/config.toml)".to_string()
+                format!("Usage:\n  /config show              Show current configuration\n  /config set <key> <value>  Set a config key\n  /config --json             Output as JSON\n(no config file found at {})", config_path.display())
             } else {
                 format!("Config at {}:\n{}", config_path.display(), config_str)
             };

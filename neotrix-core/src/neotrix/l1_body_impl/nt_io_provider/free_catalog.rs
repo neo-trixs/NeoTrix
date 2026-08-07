@@ -291,7 +291,8 @@ impl FreeModelCatalog {
     pub fn discover_keyless_providers() -> Vec<FreeModelEntry> {
         let mut entries = Vec::new();
         // Only OpenCode Zen — verified working with free tier API key (opencode.ai)
-        // LLM7/Kilo/OVH/ModelScope endpoints all dead as of 2026-07-22 (404/timeout)
+        // NOTE: LLM7 .io endpoint re-verified alive 2026-08 (anonymous 200) — registered in factory keyless section;
+        // Kilo/OVH/ModelScope remain unverified (404/timeout as of 2026-07-22)
         let zen_base = "https://opencode.ai/zen/v1";
         entries.push(FreeModelEntry {
             provider: "opencode-zen".into(),
@@ -355,6 +356,17 @@ impl FreeModelCatalog {
             is_free: true, requires_api_key: true,
             api_key_env: Some("OPENCODE_API_KEY".into()),
             provider_type: LlmProviderType::OpenCodeZen,
+        });
+        // LLM7 .io — 匿名可用端点 (2026-08-06 实测 200 + SSE 流式)。
+        // 仅 codestral-latest 匿名免费, 其余模型需 API key (missing_api_key)。
+        entries.push(FreeModelEntry {
+            provider: "llm7".into(),
+            model_id: "codestral-latest".into(),
+            display_name: "Codestral Latest (LLM7, anonymous)".into(),
+            base_url: "https://api.llm7.io/v1".into(), tier: "t2-capable".into(),
+            is_free: true, requires_api_key: false,
+            api_key_env: None,
+            provider_type: LlmProviderType::Llm7,
         });
         entries
     }

@@ -2,6 +2,7 @@ pub mod session_lifecycle;
 pub mod worktree_manager;
 pub mod session_manager;
 pub mod spawn_flow;
+pub mod task_execution;
 pub mod orchestrator_agent;
 
 pub use session_lifecycle::{SessionState, AgentSession};

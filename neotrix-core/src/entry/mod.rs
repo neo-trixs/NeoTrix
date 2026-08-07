@@ -13,7 +13,7 @@ use neotrix::neotrix::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBra
 use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 use neotrix::neotrix::nt_io_mention::resolve_mentions;
 
-use crate::config::NeoTrixConfig;
+use neotrix::config::NeoTrixConfig;
 
 mod proxy_cmd;
 mod standalone;
@@ -53,7 +53,7 @@ fn tokio_runtime() -> tokio::runtime::Runtime {
 }
 
 pub fn check_provider_config() -> bool {
-    let cfg = crate::config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
     if cfg.provider.is_some() && cfg.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
         return true;
     }
@@ -123,7 +123,7 @@ pub fn run_provider_wizard() {
         _ => "gpt-4o-mini".to_string(),
     };
 
-    let config_path = crate::config::NeoTrixConfig::path();
+    let config_path = neotrix::config::NeoTrixConfig::path();
     if let Some(parent) = config_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             eprintln!("[config] warning: failed to create config directory ({}); continuing", e);
@@ -223,7 +223,7 @@ fn init_brain(profile: &str) -> (ReasoningBrain, ReasoningBank) {
 }
 
 fn set_default_model_from_config(agent: &mut SelfIteratingBrain) {
-    let cfg = crate::config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
     if let Some(ref model) = cfg.default_model {
         if !model.is_empty() {
             agent.default_model = model.clone();
@@ -231,9 +231,25 @@ fn set_default_model_from_config(agent: &mut SelfIteratingBrain) {
     }
 }
 
+/// 构建自进化 brain — 抽取 7 处重复初始化样板 (审计 R-P99 去重)。
+///
+/// 核心 5 步: init_brain → SelfIteratingBrain::new → 挂载 brain/reasoning_bank
+/// → set_default_model_from_config → ensure_provider_env_from_config → init_reasoning_engine。
+/// 带 load_cortex 的变体 (run_daemon/evolution) 不共用, 因顺序不同。
+fn build_brain(profile: &str) -> SelfIteratingBrain {
+    let (brain, bank) = init_brain(profile);
+    let mut agent = SelfIteratingBrain::new();
+    agent.brain = brain;
+    agent.reasoning_bank = bank;
+    set_default_model_from_config(&mut agent);
+    ensure_provider_env_from_config();
+    agent.init_reasoning_engine();
+    agent
+}
+
 /// 将 config.toml 中的 provider/api_key 提升为环境变量，使 GatewayV2 能发现
 fn ensure_provider_env_from_config() {
-    let cfg = crate::config::NeoTrixConfig::load();
+    let cfg = neotrix::config::NeoTrixConfig::load();
     if let (Some(provider), Some(api_key)) = (&cfg.provider, &cfg.api_key) {
         if !api_key.is_empty() {
             match provider.as_str() {
@@ -359,13 +375,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
         writer.emit_start(&prompt, None, None, None);
 
         let result = rt.block_on(async {
-            let (brain, bank) = init_brain("default");
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain("default");
 
             let timeout = tokio::time::Duration::from_secs(timeout_secs);
             let task = async {
@@ -402,13 +412,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     } else if stream {
         // Streaming mode — print tokens as they arrive
         let result = rt.block_on(async {
-            let (brain, bank) = init_brain("default");
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain("default");
 
             if let Some(ref mut engine) = agent.reasoning_engine {
                 match engine.reason_stream(&prompt, None).await {
@@ -436,13 +440,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     } else {
         // Plain text mode (original behavior)
         let result = rt.block_on(async {
-            let (brain, bank) = init_brain("default");
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain("default");
 
             let timeout = tokio::time::Duration::from_secs(timeout_secs);
             let task = async {
@@ -488,13 +486,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     if stream {
         // Streaming mode — print tokens as they arrive, no progress bar
         rt.block_on(async {
-            let (brain, bank) = init_brain(profile);
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain(profile);
 
             let result = if let Some(ref mut engine) = agent.reasoning_engine {
                 match engine.reason_stream(&prompt, None).await {
@@ -544,13 +536,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     } else {
         // Non-streaming mode — original behavior with progress bar
         rt.block_on(async {
-            let (brain, bank) = init_brain(profile);
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain(profile);
 
             let pb = indicatif::ProgressBar::new(100);
             match indicatif::ProgressStyle::default_bar()
@@ -1385,7 +1371,7 @@ pub fn run_features_list() {
 
 pub fn run_config_encrypt_keys() {
     use neotrix::neotrix::nt_shield::key_encryption;
-    let config_path = crate::config::NeoTrixConfig::path();
+    let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
         return;
@@ -1450,7 +1436,7 @@ pub fn run_config_encrypt_keys() {
 
 pub fn run_config_decrypt_keys() {
     use neotrix::neotrix::nt_shield::key_encryption;
-    let config_path = crate::config::NeoTrixConfig::path();
+    let config_path = neotrix::config::NeoTrixConfig::path();
     if !config_path.exists() {
         eprintln!("{} No config file found at {}", err("Error:"), config_path.display());
         return;
@@ -1604,11 +1590,543 @@ pub fn run_wallet_export(label: &str) {
     }
 }
 
+/// NT-AGENT 模式 — NeoTrix 作为主体的对话驱动循环。
+///
+/// 架构目标：LLM 降级为后端能力（`LlmProvider`），决策循环由 Rust 的
+/// `AgentLoop` 持有。本入口：
+///   1. 初始化 GatewayV2（provider 路由/熔断/限流）
+///   2. 装配 MCP 原生工具（ToolOrchestrator → AgentLoop 工具集）
+///   3. 启动交互 REPL：每轮 `loop_.turn(input)` 驱动 用户→LLM→工具→回答
+pub fn run_agent_mode(profile: &str) {
+    use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
+    use neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop;
+    use neotrix::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
+    use std::io::{self, Write};
+    use std::sync::Arc;
+
+    const NT_CORE_SYSTEM_PROMPT: &str = "\
+You are NT-CORE, the orchestrating brain of the NeoTrix system. \
+You hold state, route work, and decide. The language model you are part of is a \
+backend reasoning engine you call — not your master. Answer the user directly. \
+You have tools available; call them when they help. Be concise and evidence-first.";
+
+    let rt = tokio_runtime();
+    rt.block_on(async {
+        ensure_provider_env_from_config();
+
+        let mut mcp_registry = McpRegistry::new();
+        let mut builtin_tools = vec![McpToolDef {
+            name: "neotrix_info".to_string(),
+            description: "NeoTrix MCP system info".to_string(),
+            server_name: "built-in".to_string(),
+            transport: McpTransport::Local {
+                command: "echo".to_string(),
+                args: vec![],
+            },
+            input_schema: serde_json::json!({"type": "object"}),
+            schema_version: None,
+        }];
+        builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
+        mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
+        neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
+        let tools = mcp_registry.as_native_tools();
+
+        let gateway = create_gateway_async().await;
+        let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
+            let cfg = neotrix::config::NeoTrixConfig::load();
+            cfg.default_model.clone().unwrap_or_else(|| "default".to_string())
+        });
+
+        let mut loop_ = AgentLoop::new(Arc::new(gateway), &default_model, NT_CORE_SYSTEM_PROMPT)
+            .with_tools(tools);
+        let _ = profile;
+
+        println!("╭─ NeoTrix Agent Loop ─────────────────────────────╮");
+        println!("│  NT-CORE 作为主体 · LLM 作为后端推理引擎        │");
+        println!("│  model: {} · tools: {}          │",
+            loop_.model(), loop_.tool_count());
+        println!("│  /exit 退出 · /tools 查看工具 · /hist 查看历史  │");
+        println!("╰──────────────────────────────────────────────────╯");
+
+        loop {
+            print!("\n❯ ");
+            io::stdout().flush().unwrap_or(());
+            let mut input = String::new();
+            match io::stdin().read_line(&mut input) {
+                Ok(0) => break,
+                Ok(_) => {
+                    let trimmed = input.trim();
+                    match trimmed {
+                        "/exit" | "/q" => { println!("Exiting."); break; }
+                        "/tools" => {
+                            for t in loop_.tool_count()..loop_.tool_count() {
+                                let _ = t;
+                            }
+                            println!("{} tools registered", loop_.tool_count());
+                            for inv in &loop_.tool_log {
+                                println!("  {} → {}: {}", if inv.success { "✓" } else { "✗" }, inv.name, inv.output);
+                            }
+                        }
+                        "/hist" => {
+                            println!("{} messages in history", loop_.history_len());
+                        }
+                        _ if !trimmed.is_empty() => {
+                            match loop_.turn(trimmed).await {
+                                Ok(response) => println!("\n{}", response),
+                                Err(e) => eprintln!("\n{} {}", err("Error:"), e),
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                Err(e) => { eprintln!("Error: {}", e); break; }
+            }
+        }
+    });
+}
+
+/// NT-AGENT TUI 模式 — 基于 ratatui 的完整对话终端。
+///
+/// 与 [`run_agent_mode`]（逐行 REPL）不同，本入口使用 `TuiApp` 状态机 +
+/// crossterm 事件循环 + `AgentLoop::turn_stream()` 流式渲染：
+///   - 多行输入 / 历史（↑↓ / Ctrl+R 搜索）/ vim 模式 / Tab 斜杠补全
+///   - 工具调用行内状态、token 计数、tokens/sec、会话切换
+///   - 流式 markdown 增量渲染（`streaming_text` → `commit_stream`）
+pub fn run_agent_tui(profile: &str) {
+    use neotrix::agent::tool::mcp::{McpRegistry, McpTransport, McpToolDef};
+    use neotrix::neotrix::l1_body_impl::nt_io_agent_loop::AgentLoop;
+    use neotrix::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
+    use neotrix::cli::tui::TuiApp;
+    use neotrix::cli::tui::app::KeyAction;
+    use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+    use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
+    use crossterm::execute;
+    use ratatui::backend::CrosstermBackend;
+    use ratatui::Terminal;
+    use std::io;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    const NT_CORE_SYSTEM_PROMPT: &str = "\
+You are NT-CORE, the orchestrating brain of the NeoTrix system. \
+You hold state, route work, and decide. The language model you are part of is a \
+backend reasoning engine you call — not your master. Answer the user directly. \
+You have tools available; call them when they help. Be concise and evidence-first.";
+
+    let rt = tokio_runtime();
+    rt.block_on(async {
+        ensure_provider_env_from_config();
+
+        let mut mcp_registry = McpRegistry::new();
+        let mut builtin_tools = vec![McpToolDef {
+            name: "neotrix_info".to_string(),
+            description: "NeoTrix MCP system info".to_string(),
+            server_name: "built-in".to_string(),
+            transport: McpTransport::Local {
+                command: "echo".to_string(),
+                args: vec![],
+            },
+            input_schema: serde_json::json!({"type": "object"}),
+            schema_version: None,
+        }];
+        builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
+        mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
+        neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
+        let tools = mcp_registry.as_native_tools();
+
+        let gateway = create_gateway_async().await;
+        let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
+            let cfg = neotrix::config::NeoTrixConfig::load();
+            cfg.default_model.clone().unwrap_or_else(|| "default".to_string())
+        });
+        // 整体链路链接: 未显式指定模型时, 从池子实际注册名解析默认 (而非硬编码 provider)。
+        let default_model = if default_model.is_empty() || default_model == "default" {
+            gateway.resolve_default_model()
+        } else {
+            default_model
+        };
+
+        let agent = Arc::new(Mutex::new(
+            AgentLoop::new(Arc::new(gateway), &default_model, NT_CORE_SYSTEM_PROMPT)
+                .with_tools(tools),
+        ));
+        let _ = profile;
+        // ── TUI 初始化 ──────────────────────────────────────────────
+        terminal::enable_raw_mode().ok();
+        let mut stdout = io::stdout();
+        let _ = execute!(stdout, EnterAlternateScreen);
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = match Terminal::new(backend) {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = execute!(io::stdout(), LeaveAlternateScreen);
+                let _ = terminal::disable_raw_mode();
+                eprintln!("{} TUI init failed: {}", err("Error"), e);
+                return;
+            }
+        };
+        let _ = terminal.clear();
+
+        let mut app = TuiApp::new(false);
+        app.status_text = format!("Ready | model: {}", {
+            let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
+            guard.model().to_string()
+        });
+
+        let draw = |terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &TuiApp| {
+            let theme = neotrix::cli::tui::theme_by_name("dark");
+            let _ = terminal.draw(|frame| {
+                let area = frame.area();
+                use neotrix::cli::tui::layout::{
+                    compute_layout, render_session_list, render_chat_panel,
+                    render_goal_panel, render_input_panel, render_status_bar,
+                };
+                let (left, chat, goal, input_area, status) = compute_layout(area);
+                render_session_list(frame, left, app, &theme);
+                render_chat_panel(frame, chat, app, &theme);
+                render_goal_panel(frame, goal, app, "", &theme);
+                render_input_panel(frame, input_area, app, &theme);
+                render_status_bar(frame, status, app, &theme);
+            });
+        };
+
+        let mut exit = neotrix::cli::tui::app::TuiExit::Quit;
+
+        // ── 事件循环 ────────────────────────────────────────────────
+        loop {
+            draw(&mut terminal, &app);
+
+            if !event::poll(Duration::from_millis(100)).unwrap_or(false) {
+                continue;
+            }
+            let ev = match event::read() {
+                Ok(e) => e,
+                Err(_) => break,
+            };
+
+            match ev {
+                Event::Key(key) => {
+                    let action = app.handle_key(key.code, key.modifiers);
+                    match action {
+                        KeyAction::Quit => { exit = neotrix::cli::tui::app::TuiExit::Quit; break; }
+                        KeyAction::ClearScreen => {
+                            let _ = terminal.clear();
+                            app.scroll_offset = 0;
+                        }
+                        KeyAction::CancelGeneration => {}
+                        KeyAction::Submit => {
+                            let input = app.trim().to_string();
+                            if input.is_empty() { continue; }
+                            // 斜杠命令
+                            if input.starts_with('/') {
+                                match handle_slash_tui(&mut app, &input) {
+                                    SlashResult::Quit => { exit = neotrix::cli::tui::app::TuiExit::Quit; break; }
+                                    SlashResult::Handled => { app.input.clear(); continue; }
+                                    SlashResult::NotHandled => {
+                                        // 作为普通消息发给 AgentLoop。
+                                    }
+                                }
+                            }
+                            // 交给 AgentLoop 流式生成（后台线程，主循环边收 chunk 边渲染）。
+                            let text = input;
+                            app.push_message("user", text.clone());
+                            app.command_history.push(text.clone());
+                            app.input.clear();
+                            app.agent_busy = true;
+                            app.streaming = true;
+                            app.streaming_role = "assistant".into();
+                            app.streaming_text.clear();
+
+                            use std::sync::mpsc as sync_mpsc;
+                            let (chunk_tx, chunk_rx) = sync_mpsc::channel::<String>();
+                            let agent_worker = agent.clone();
+                            let text_worker = text.clone();
+                            std::thread::spawn(move || {
+                                let rt = match tokio::runtime::Runtime::new() {
+                                    Ok(rt) => rt,
+                                    Err(_) => {
+                                        let _ = chunk_tx.send("[error] runtime init failed".into());
+                                        return;
+                                    }
+                                };
+                                let mut guard = match agent_worker.lock() {
+                                    Ok(g) => g,
+                                    Err(poisoned) => poisoned.into_inner(),
+                                };
+                                let result = rt.block_on(guard.turn_stream(
+                                    &text_worker,
+                                    |chunk| {
+                                        let _ = chunk_tx.send(chunk.to_string());
+                                        true
+                                    },
+                                    |call, output| {
+                                        let entry = format!("[tool] {} {}", call.function.name, output.content);
+                                        let _ = chunk_tx.send(entry);
+                                    },
+                                ));
+                                if let Err(e) = result {
+                                    let _ = chunk_tx.send(format!("[error] {}", e));
+                                }
+                            });
+
+                            // 主循环：边收 chunk 边渲染，同时仍响应键盘（Ctrl+C 取消）。
+                            let mut worker_done = false;
+                            while !worker_done {
+                                let mut got = false;
+                                while let Ok(chunk) = chunk_rx.try_recv() {
+                                    got = true;
+                                    if chunk.starts_with("[error]") {
+                                        app.status_text = chunk;
+                                    } else {
+                                        app.feed_stream(&chunk);
+                                    }
+                                }
+                                if got {
+                                    draw(&mut terminal, &app);
+                                }
+                                // 处理键盘（Ctrl+C 取消）。
+                                if let Ok(true) = event::poll(Duration::from_millis(30)) {
+                                    if let Ok(Event::Key(key)) = event::read() {
+                                        if let KeyAction::CancelGeneration = app.handle_key(key.code, key.modifiers) {
+                                            app.agent_busy = false;
+                                            app.streaming = false;
+                                            app.status_text = "生成已取消".into();
+                                            worker_done = true;
+                                        }
+                                    }
+                                }
+                                // sender drop → 工作线程结束。
+                                match chunk_rx.try_recv() {
+                                    Err(sync_mpsc::TryRecvError::Disconnected) => worker_done = true,
+                                    Err(sync_mpsc::TryRecvError::Empty) => {}
+                                    Ok(chunk) => {
+                                        if chunk.starts_with("[error]") {
+                                            app.status_text = chunk;
+                                        } else {
+                                            app.feed_stream(&chunk);
+                                        }
+                                        draw(&mut terminal, &app);
+                                    }
+                                }
+                            }
+
+                            // 收尾：应用剩余 chunks 并提交。
+                            while let Ok(chunk) = chunk_rx.try_recv() {
+                                if !chunk.starts_with("[error]") {
+                                    app.feed_stream(&chunk);
+                                }
+                            }
+                            if app.streaming_text.trim().is_empty() && app.status_text.contains("[error]") {
+                                let _ = app.status_text.clone();
+                            }
+                            app.agent_busy = false;
+                            app.streaming = false;
+                            app.commit_stream("assistant");
+                        }
+                        KeyAction::None => {}
+                    }
+                }
+                Event::Resize(_, _) => {
+                    let _ = terminal.clear();
+                }
+                _ => {}
+            }
+        }
+
+        // ── TUI 清理 ────────────────────────────────────────────────
+        let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
+        let _ = terminal::disable_raw_mode();
+        println!("{}", info("NT-AGENT TUI 结束"));
+        let _ = exit;
+    });
+}
+
+enum SlashResult {
+    Quit,
+    Handled,
+    NotHandled,
+}
+
+/// TUI 模式斜杠命令分发（当前仅本地命令；其余透传给 AgentLoop 当消息）。
+fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashResult {
+    let (cmd, rest) = match input.split_once(' ') {
+        Some((c, r)) => (c, r),
+        None => (input, ""),
+    };
+    match cmd {
+        "/exit" | "/quit" | "/q" => SlashResult::Quit,
+        "/clear" => {
+            app.clear_session();
+            app.status_text = "已清空会话".into();
+            SlashResult::Handled
+        }
+        "/new" => {
+            app.new_session();
+            app.status_text = format!("已切换到会话 {}", app.sessions.len());
+            SlashResult::Handled
+        }
+        "/hist" => {
+            let n = app.sessions[app.active_session].messages.len();
+            app.status_text = format!("{} 条消息", n);
+            SlashResult::Handled
+        }
+        "/save" => {
+            let name = if rest.trim().is_empty() {
+                format!("session-{}", app.sessions[app.active_session].id)
+            } else {
+                rest.trim().to_string()
+            };
+            match save_tui_session(app, &name) {
+                Ok(()) => {
+                    app.status_text = format!("会话已保存到 KB + session-logs ({})", name);
+                    SlashResult::Handled
+                }
+                Err(e) => {
+                    app.status_text = format!("保存失败: {}", e);
+                    SlashResult::Handled
+                }
+            }
+        }
+        "/load" => {
+            let name = rest.trim().to_string();
+            if name.is_empty() {
+                app.status_text = "用法: /load <会话名>".into();
+                return SlashResult::Handled;
+            }
+            match load_tui_session(app, &name) {
+                Ok(n) => {
+                    app.status_text = format!("已加载会话 {} ({} 条消息)", name, n);
+                    SlashResult::Handled
+                }
+                Err(e) => {
+                    app.status_text = format!("加载失败: {}", e);
+                    SlashResult::Handled
+                }
+            }
+        }
+        "/help" => {
+            app.push_message("system", "命令: /clear /new /save /load /exit /hist /help\n快捷键: Enter提交 Alt+E多行 ↑↓历史 Ctrl+R搜索 Ctrl+L清屏 Ctrl+C取消/退出 Tab补全".into());
+            SlashResult::Handled
+        }
+        _ => {
+            // Registry fallback: unknown slash commands route to the command
+            // registry (90+ commands). Hardcoded commands above take priority.
+            // If the registry also misses, return NotHandled so the input is
+            // treated as a normal message.
+            if input.starts_with('/') {
+                let reg = neotrix::cli::commands::registry::default_registry();
+                let cmd = input.split(' ').next().unwrap_or(input);
+                if reg.find(cmd).is_some() {
+                    let out = reg.execute(input, None);
+                    app.status_text = out.message;
+                    return SlashResult::Handled;
+                }
+            }
+            SlashResult::NotHandled
+        }
+    }
+}
+
+/// 把 TuiApp 当前会话持久化到 SessionStore（KB + session-logs 双落盘）。
+fn save_tui_session(app: &neotrix::cli::tui::TuiApp, name: &str) -> Result<(), String> {
+    use neotrix::cli::tui::session_store::{SessionData, SessionStore};
+    let session = &app.sessions[app.active_session];
+    let now = chrono::Utc::now().to_rfc3339();
+    let messages: Vec<String> = session.messages.iter()
+        .map(|m| format!("[{}] {}", m.role, m.content))
+        .collect();
+    let data = SessionData {
+        id: session.id.clone(),
+        name: name.to_string(),
+        messages,
+        created_at: now.clone(),
+        updated_at: now,
+    };
+    let mut store = SessionStore::new();
+    store.save_session(name, &data)
+}
+
+/// 从 SessionStore 加载会话到 TuiApp。
+fn load_tui_session(app: &mut neotrix::cli::tui::TuiApp, name: &str) -> Result<usize, String> {
+    use neotrix::cli::tui::session_store::SessionStore;
+    let store = SessionStore::new();
+    let data = store.load_session(name)?;
+    app.clear_session();
+    for line in &data.messages {
+        let (role, content) = if let Some(c) = line.strip_prefix("[user] ") {
+            ("user", c.to_string())
+        } else if let Some(c) = line.strip_prefix("[assistant] ") {
+            ("assistant", c.to_string())
+        } else {
+            ("system", line.clone())
+        };
+        app.push_message(role, content);
+    }
+    Ok(data.messages.len())
+}
+
 #[cfg(test)]
 mod tests {
 
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_save_load_tui_session_roundtrip() {
+        // 用隔离 base 目录验证 save/load 闭环（不污染真实 ~/.neotrix KB）。
+        use neotrix::cli::tui::TuiApp;
+        use neotrix::cli::tui::session_store::SessionStore;
+
+        let tmp = std::env::temp_dir().join(format!("nt-tui-session-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).expect("create tmp");
+
+        // 用 with_base 隔离的 store 直接验证 SessionStore 落盘逻辑。
+        let mut store = SessionStore::with_base(tmp.clone());
+        let now = chrono::Utc::now().to_rfc3339();
+        let data = neotrix::cli::tui::session_store::SessionData {
+            id: "s-1".into(),
+            name: "roundtrip".into(),
+            messages: vec!["[user] hello".into(), "[assistant] hi there".into()],
+            created_at: now.clone(),
+            updated_at: now,
+        };
+        store.save_session("roundtrip", &data).expect("save ok");
+
+        // 重新打开验证持久化。
+        let store2 = SessionStore::with_base(tmp.clone());
+        let loaded = store2.load_session("roundtrip").expect("load ok");
+        assert_eq!(loaded.name, "roundtrip");
+        assert_eq!(loaded.messages.len(), 2);
+        assert!(loaded.messages[0].contains("hello"));
+        assert!(loaded.messages[1].contains("hi there"));
+
+        // session-logs/*.md 应已落盘。
+        let md = tmp.join("session-logs").join("roundtrip.md");
+        assert!(md.exists(), "session-logs markdown should exist");
+        let content = std::fs::read_to_string(&md).expect("read md");
+        assert!(content.contains("hello"));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_slash_command_dispatch() {
+        use neotrix::cli::tui::TuiApp;
+        let mut app = TuiApp::new(true);
+        use super::SlashResult;
+        // /clear
+        app.push_message("user", "x".into());
+        assert!(matches!(super::handle_slash_tui(&mut app, "/clear"), SlashResult::Handled));
+        assert!(app.sessions[0].messages.is_empty());
+        // /new
+        assert!(matches!(super::handle_slash_tui(&mut app, "/new"), SlashResult::Handled));
+        assert_eq!(app.sessions.len(), 2);
+        // /exit
+        assert!(matches!(super::handle_slash_tui(&mut app, "/exit"), SlashResult::Quit));
+        // 未知命令透传
+        assert!(matches!(super::handle_slash_tui(&mut app, "/bogus"), SlashResult::NotHandled));
     }
 }

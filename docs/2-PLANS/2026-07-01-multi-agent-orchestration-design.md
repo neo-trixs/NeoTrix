@@ -324,3 +324,116 @@ pub enum SpanType {
 - **Cost tests**: Budget halts after N calls
 - **HITL tests**: Checkpoint at pause → human input → resume from checkpoint
 - **Debate tests**: N rounds → converge → result contains synthesis
+
+---
+
+## 6. 补强：外部接地验证门（External-Grounded Gate）— 2026-08 增补
+
+> 依据：Huang et al. (ICLR 2024) 证明内在自纠错无外部接地时**降级**；MAST 分析 1600+ 轨迹，79% 失败源于规格歧义(41.8%)+协调断裂(36.9%)，验证缺口仅 21.3%。现有 `QualityGate`（§2.3）是**文本质量门**（Completeness/Coherence/Safety），缺可执行证据。
+
+### 6.1 问题
+现有 gate 只做文本启发式判断，无法验证"代码真的能编译/测试通过"。对编码类子 agent 输出，必须用**可执行证据**接地。
+
+### 6.2 设计：`GroundedGate`（外部接地验证门）
+
+```rust
+/// 外部接地验证门 — 用可执行证据（编译/测试/lint）验证子 agent 输出，
+/// 而非仅文本启发式。对应 Huang 2024 的"外部接地"要求。
+pub enum GroundedCheck {
+    /// cargo check 编译通过（Rust 子任务）
+    Compile { crate_name: String },
+    /// cargo test 指定测试通过
+    Test { crate_name: String, filter: String },
+    /// 静态 lint（clippy / 自定义）
+    Lint { tool: String, args: Vec<String> },
+    /// 检索/工具输出对比（非代码任务）
+    ToolOutput { expected: String },
+}
+
+pub struct GroundedGate {
+    pub name: String,
+    pub checks: Vec<GroundedCheck>,
+    pub max_retries: u8,          // 失败后允许 worker 重试次数
+    pub timeout_secs: u64,       // 沙箱超时
+}
+
+pub enum GroundedDecision {
+    Pass,
+    Revise { feedback: Vec<String> },  // 附编译错误/测试失败详情
+    Fail { reason: String },           // 超时/重试耗尽 → 升级
+}
+```
+
+**执行语义**：`AgentOutput → GroundedGate → [Pass → next] | [Revise → worker (max_retries)] | [Fail → escalation]`
+与 §2.3 的 `QualityGate` 组合：**先文本门（快）→ 后接地门（准）**，控制成本。
+
+### 6.3 三边界门控（文献洞见）
+质量门应放在三个边界，跳过中间推理步的逐行判断以控成本：
+1. **用户输出前** — 最终交付物验证
+2. **不可逆工具执行前** — 写文件/发消息/部署前
+3. **持久内存写入前** — KB/经验落盘前
+
+### 6.4 复用现有资产
+- 本地 SEAL 已有 `SelfReviewGate`（静态审查：panic/死代码/API 文档）— 作为**接地门的补充**（静态 + 动态）
+- 本地 `cargo check`/`cargo test` 双验证纪律（R-P9/R-P16）即接地门的手动形态
+
+---
+
+## 7. 补强：类型化契约（Typed Contract）— 2026-08 外部修订
+
+> 依据：MetaGPT (ICLR 2024) 核心洞见是"结构化工件 + 数据契约 + 可执行反馈"（+15.6% 成功率），
+  而非"更多角色"。现有路由是 `Coordinator::route_task()` 关键词匹配（§4 迁移表），缺契约层。
+
+### 7.1 设计：`AgentContract`（子 agent 契约）
+
+```rust
+/// 子 agent 类型化契约 — 定义输入/输出 schema 与成功标准。
+/// 让编排器从"聊天式委托"升级为"契约式委托"（MetaGPT 模式）。
+pub struct AgentContract {
+    pub domain: Domain,              // NT-WORLD / NT-ACT / ...
+    pub input_schema: Vec<Field>,    // 期望输入字段
+    pub output_schema: Vec<Field>,   // 承诺输出字段
+    pub success_criteria: Vec<GroundedCheck>, // 成功标准（可执行）
+    pub upstream_watch: Vec<String>, // 上游工件 watch list
+}
+
+pub struct Field {
+    pub name: String,
+    pub ty: FieldType,               // String / Number / Json / File
+    pub required: bool,
+}
+```
+
+**委托协议**：`orchestrator 定义契约 → 子 agent 按契约产出 → GroundedGate 按 success_criteria 验证 → 采纳/重做`
+
+### 7.2 委托原则（对齐外部洞见）
+- **默认单 agent**：仅在 ①并行化 ②上下文保护 ③自主编排 三情形委托（arXiv:2604.02460）
+- **委托收集、保留决策**：子 agent 只产出工件，综合/决策永远在 orchestrator
+- **深度限制**：`max_spawn_depth`（默认 1=扁平），防失控递归（Hermes 模式）
+- **预算门**：每委托设 token/时间预算，超限即停（对齐 §2.4 budget）
+
+---
+
+## 8. 单 agent 默认原则（2026-08 外部修订）
+
+> 证据：单 agent 在等 token 预算下反超多 agent（arXiv:2604.02460）；Cognition "Don't Build Multi-Agents"；
+  MAS 收益随模型能力递减。**多 agent 是"并行广度换 15× token + 14 种失败模式"的权衡，非默认答案。**
+
+- **默认路径**：单 agent 直接执行（当前 `AgentTeam::execute()` 语义）
+- **委托触发**：仅当任务可并行 / 需隔离上下文 / 需自主编排时，才走 `AgentGraph` 多 agent 路径
+- **GWT 定位**：只当**注意力路由隐喻**（广播+瓶颈），勿作为"意识"功能投资（Theater of Mind 被审稿人批无实证；Anthropic 发现工作空间自发涌现）
+
+---
+
+## 9. 落地优先级（2026-08）
+
+| 优先级 | 动作 | 依赖 |
+|---|---|---|
+| **P0** | 实现 `GroundedGate`（外部接地验证门）— 复用 cargo check/test | 无 |
+| **P0** | 定义 `AgentContract` 类型化契约 + 委托协议 | 无 |
+| **P1** | 实现 `nt_cap_orch_graph` 落地（现有设计 §2.1 是纸面蓝图，零实现） | P0 |
+| **P1** | 委托加 `max_spawn_depth` + 预算门 | P0 |
+| **P2** | 建委托基准（DecisionBench 式）+ MAST 分类学审计 | P1 |
+
+> 注：现有 `nt_cap_orch_*` 8 模块（§2.1-2.8）**全部未实现**（2026-08 核实 find 无结果），
+  本补强文档与 §2 设计互补，落地时统一实现。

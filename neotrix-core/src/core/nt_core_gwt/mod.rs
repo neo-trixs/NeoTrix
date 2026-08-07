@@ -14,6 +14,7 @@ pub mod compaction;
 pub mod moe_router;
 pub mod vsa_scorer;
 pub mod pipeline;
+pub mod ambiguity_park;
 
 pub use workspace::{AuditBlock, AuditEventType};
 pub use inner_speech::InnerSpeech;

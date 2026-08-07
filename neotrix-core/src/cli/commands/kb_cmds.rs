@@ -147,7 +147,7 @@ fn cmd_embed(_args: &[String]) -> CommandOutput {
     }
 }
 
-/// 全库本源溯源 + 能力映射 (对应 scripts/absorb_full_kb.py, R-P79)。
+/// 全库本源溯源 + 能力映射 (R-P79, Rust 原生取代 scripts/absorb_full_kb.py)。
 /// /kb absorb-map [--dry-run] [--limit N] [--types a,b]
 fn cmd_absorb_map(args: &[String]) -> CommandOutput {
     let dry_run = !args.contains(&"--apply".to_string());

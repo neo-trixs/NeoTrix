@@ -1822,6 +1822,11 @@ impl BrainStage for SelfTestStage {
                     log::error!("[seal] self_test: {}", r.summary());
                 }
             }
+            // T2.5: 自测失败必须改变行为, 不能只写日志。对本次演化施加负向奖励惩罚,
+            // 使检测系统降级真实传导到演化信号 (而非静默 Continue)。
+            let degradation = ((total - passed) as f64 / total.max(1) as f64) * -1.0;
+            let base = brain._reward();
+            brain._set_reward(base + degradation);
         }
         Ok(StageDecision::Continue)
     }
