@@ -41,6 +41,9 @@ pub struct EvolutionGoal {
     pub expected_impact: f64,
     pub effort_estimate: f64,
     pub dependencies: Vec<String>,
+    /// CRT 多尺度时间视野 (nt_core_crt 接线 — 意识体维度升维):
+    /// 目标生成具备战术/运营/战略三层时间意识, 而非扁平化即时任务。
+    pub time_scale: crate::core::nt_core_crt::CrtTimeScale,
 }
 
 /// 目标生成器
@@ -63,6 +66,7 @@ impl AutoGoalGenerator {
                 expected_impact: 0.6,
                 effort_estimate: 0.4,
                 dependencies: vec![],
+                time_scale: crate::core::nt_core_crt::CrtTimeScale::Huntian,
             });
         }
 
@@ -77,6 +81,7 @@ impl AutoGoalGenerator {
                 expected_impact: 0.7,
                 effort_estimate: 0.3,
                 dependencies: vec![],
+                time_scale: crate::core::nt_core_crt::CrtTimeScale::Gaitian,
             });
         }
 
@@ -91,6 +96,7 @@ impl AutoGoalGenerator {
                 expected_impact: 1.0,
                 effort_estimate: 0.8,
                 dependencies: vec![],
+                time_scale: crate::core::nt_core_crt::CrtTimeScale::Gaitian,
             });
         }
 
@@ -105,6 +111,7 @@ impl AutoGoalGenerator {
                 expected_impact: 0.3,
                 effort_estimate: 0.3,
                 dependencies: vec![],
+                time_scale: crate::core::nt_core_crt::CrtTimeScale::Huntian,
             });
         }
 
@@ -119,6 +126,7 @@ impl AutoGoalGenerator {
                 expected_impact: 0.2,
                 effort_estimate: 0.2,
                 dependencies: vec![],
+                time_scale: crate::core::nt_core_crt::CrtTimeScale::Gaitian,
             });
         }
 
@@ -133,6 +141,7 @@ impl AutoGoalGenerator {
                 expected_impact: 0.5,
                 effort_estimate: 0.6,
                 dependencies: vec![],
+                time_scale: crate::core::nt_core_crt::CrtTimeScale::Xuanye,
             });
         }
 
@@ -199,6 +208,32 @@ mod tests {
         let goals = AutoGoalGenerator::generate_from_snapshot(&sample_snapshot());
         let split_goals: Vec<_> = goals.iter().filter(|g| g.id.starts_with("SPLIT-")).collect();
         assert_eq!(split_goals.len(), 2);
+    }
+
+    #[test]
+    fn test_goals_have_crt_time_scales() {
+        // 意识体维度升维: 目标应具备 CRT 多尺度时间视野 (战术/运营/战略)
+        use crate::core::nt_core_crt::CrtTimeScale;
+        let goals = AutoGoalGenerator::generate_from_snapshot(&sample_snapshot());
+        assert!(!goals.is_empty());
+        for g in &goals {
+            let _ = g.time_scale; // 字段存在即可
+        }
+        // 编译错误 → 战术 (Gaitian)
+        let fix_goal = goals.iter().find(|g| g.id == "FIX-COMPILE-ERRORS").unwrap();
+        assert_eq!(fix_goal.time_scale, CrtTimeScale::Gaitian);
+        // 大文件拆分 → 运营 (Huntian)
+        let split_goal = goals.iter().find(|g| g.id.starts_with("SPLIT-")).unwrap();
+        assert_eq!(split_goal.time_scale, CrtTimeScale::Huntian);
+        // unsafe 审查 → 战略 (Xuanye)
+        let audit_goal = goals.iter().find(|g| g.id == "AUDIT-UNSAFE").unwrap();
+        assert_eq!(audit_goal.time_scale, CrtTimeScale::Xuanye);
+        // 三种尺度应覆盖 (战术/运营/战略全链路)
+        let scales: std::collections::HashSet<_> =
+            goals.iter().map(|g| g.time_scale).collect();
+        assert!(scales.contains(&CrtTimeScale::Gaitian), "应有战术尺度");
+        assert!(scales.contains(&CrtTimeScale::Huntian), "应有运营尺度");
+        assert!(scales.contains(&CrtTimeScale::Xuanye), "应有战略尺度");
     }
 
     #[test]

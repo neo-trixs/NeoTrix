@@ -244,10 +244,15 @@ pub fn hybrid_search(
         ranklists.push(bm25_results);
     }
 
+    // Walsh 正交通道 (nt_core_walsh 接线 — 能力网维度升维):
+    // 用 Hadamard 正交编码对查询与候选文档做语义比对, 生成第三 ranklist 加入 RRF 融合。
+    // 正交表示与 FTS/BM25 的词汇统计互补, 提升检索语义多样性 (cycle 251 经验: 检索排序三层缺陷)。
+    let walsh_ranklist = build_walsh_ranklist(conn, query, &fts_results, limit * 3);
+    if !walsh_ranklist.is_empty() {
+        ranklists.push(walsh_ranklist);
+    }
+
     // RRF fusion
-    #[cfg(feature = "full")]
-    eprintln!("[hybrid] q={} fts={} bm25={} fts_first5={:?}", query, fts_pairs.len(), bm25_results.len(),
-        fts_pairs.iter().take(5).map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>())).collect::<Vec<_>>());
     let fused = if ranklists.len() >= 2 {
         bm25::rrf_fuse(&ranklists)
     } else if ranklists.is_empty() {
@@ -398,6 +403,57 @@ pub fn hybrid_search(
     }
 
     Ok(results)
+}
+
+/// 构建 Walsh 正交 ranklist (nt_core_walsh 接线 — 能力网维度升维)。
+///
+/// 用 Hadamard 正交编码对查询与候选文档做语义比对, 生成 (score, id) 列表
+/// 加入 hybrid_search 的 RRF 融合。正交表示与 FTS/BM25 的词汇统计互补,
+/// 提升检索语义多样性。纯增量: 无 Walsh 索引时返回空, 不影响既有融合。
+fn build_walsh_ranklist(
+    conn: &Connection,
+    query: &str,
+    fts_results: &[SearchResult],
+    limit: usize,
+) -> Vec<(f64, String)> {
+    use crate::core::nt_core_walsh::WalshMemoryIndex;
+
+    if fts_results.is_empty() {
+        return Vec::new();
+    }
+    let walsh = WalshMemoryIndex::new();
+    let query_vec = walsh.encode(query);
+    if query_vec.iter().all(|x| *x == 0.0) {
+        return Vec::new();
+    }
+
+    let mut scored: Vec<(f64, String)> = Vec::new();
+    for r in fts_results.iter().take(limit) {
+        // 用 title + summary 作为文档表示 (避免 content 过长)
+        let doc_text = format!("{} {}", r.node.title, r.node.summary.as_deref().unwrap_or(""));
+        let doc_vec = walsh.encode(&doc_text);
+        let sim = cosine_similarity_f64(&query_vec, &doc_vec);
+        if sim > 0.0 {
+            scored.push((sim, r.node.id.clone()));
+        }
+    }
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    scored
+}
+
+/// f64 余弦相似度 (Walsh 正交向量)。
+fn cosine_similarity_f64(a: &[f64], b: &[f64]) -> f64 {
+    if a.len() != b.len() || a.is_empty() {
+        return 0.0;
+    }
+    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let na: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
+    let nb: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+    if na == 0.0 || nb == 0.0 {
+        0.0
+    } else {
+        dot / (na * nb)
+    }
 }
 
 /// Build a proxy query embedding by averaging stored embeddings of nodes
@@ -668,5 +724,41 @@ mod tests {
         let schema = super::Fts5OptimizerConfig::CONTENTLESS_FTS_SCHEMA;
         assert!(schema.contains("fts5"));
         assert!(schema.contains("content='nodes'"));
+    }
+
+    #[test]
+    fn test_cosine_similarity_f64() {
+        // 相同向量 → 1.0
+        let a = vec![1.0, 0.0, 0.0];
+        assert!((super::cosine_similarity_f64(&a, &a) - 1.0).abs() < 1e-9);
+        // 正交向量 → 0.0
+        let b = vec![0.0, 1.0, 0.0];
+        assert!(super::cosine_similarity_f64(&a, &b).abs() < 1e-9);
+        // 空向量 → 0.0
+        assert_eq!(super::cosine_similarity_f64(&[], &[]), 0.0);
+        // 长度不同 → 0.0
+        assert_eq!(super::cosine_similarity_f64(&[1.0], &[1.0, 2.0]), 0.0);
+    }
+
+    #[test]
+    fn test_build_walsh_ranklist_empty_fts() {
+        // 无 FTS 结果 → 空 ranklist (不阻塞融合)
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        let empty: Vec<super::SearchResult> = Vec::new();
+        let rank = super::build_walsh_ranklist(&conn, "query", &empty, 10);
+        assert!(rank.is_empty());
+    }
+
+    #[test]
+    fn test_walsh_ranklist_ranks_similar_higher() {
+        use crate::core::nt_core_walsh::WalshMemoryIndex;
+        let walsh = WalshMemoryIndex::new();
+        // 语义相似文档应比不相关文档得分更高
+        let q = walsh.encode("neural network training");
+        let similar = walsh.encode("neural network training methods");
+        let unrelated = walsh.encode("cooking recipes pasta");
+        let sim = super::cosine_similarity_f64(&q, &similar);
+        let unrel = super::cosine_similarity_f64(&q, &unrelated);
+        assert!(sim > unrel, "相似文档应得分更高: sim={} unrel={}", sim, unrel);
     }
 }

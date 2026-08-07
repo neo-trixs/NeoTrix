@@ -1126,6 +1126,11 @@ impl ConsciousnessTree {
         self.core.next_actions = next_actions;
         self.core.iteration = self.cycle;
 
+        // ═══ Phase 4.5: 演化趋势预测 (nt_core_forecast 接线 — 意识体维度升维) ═══
+        // 用 forecast 引擎基于当前 branch 健康/迷雾/果实数据, 预测下一 cycle 演化方向。
+        // 纯增量: 预测结果写入 report, 不改变既有演化决策路径 (无破坏)。
+        report.evolution_forecast = self.forecast_evolution();
+
         // ═══ Phase 5: ConsciousnessReview — panoramic topology + connectivity + health chain ═══
         let mut review = crate::core::nt_core_consciousness_review::ConsciousnessReview::new();
         let scan_report = review.full_review(self);
@@ -1155,7 +1160,78 @@ impl ConsciousnessTree {
         report
     }
 
-    /// 从 KB `absorbed_capability` 元数据同步到能力网 (Cycle 206 R-P79 闭环)。
+    /// 演化趋势预测 — 用 nt_core_forecast 引擎预测下一 cycle 演化方向。
+    ///
+    /// 输入: 各 branch 当前健康/迷雾/果实数据聚合为事件流; 输出: 方向 + 置信度 + 情景树。
+    /// 无 LLM 依赖 (ForecastEngine::new() 不启用 narrator), 纯确定性计算, 可安全用于测试。
+    fn forecast_evolution(&self) -> Option<EvolutionForecast> {
+        use crate::core::nt_core_forecast::ForecastEngine;
+
+        let mut engine = ForecastEngine::new();
+
+        // 聚合各 branch 健康/迷雾/果实为事件信号 (利多=健康上升, 利空=健康下降)
+        let mut health_sum = 0.0f64;
+        let mut branch_count = 0usize;
+        for branch in self.branches.values() {
+            health_sum += branch.health;
+            branch_count += 1;
+            // 迷雾浓度 → 利空信号 (迷雾越高健康越可能下降)
+            let fog_impact = -branch.fog.level * 0.3;
+            // 果实质量 → 利多信号 (果实越多演化越健康)
+            let fruit_impact = (branch.fruit_count as f64).min(3.0) * 0.2;
+            engine.ingest_signed_event(
+                "consciousness_tree",
+                "branch_health",
+                &branch.kind.label(),
+                fog_impact + fruit_impact,
+                if fog_impact + fruit_impact >= 0.0 { 1.0 } else { -1.0 },
+            );
+        }
+        if branch_count == 0 {
+            return None;
+        }
+        let avg_health = health_sum / branch_count as f64;
+
+        // 基准状态: 平均健康映射到 E8 状态 (0..7)
+        let base_state = ((avg_health * 7.0).round() as u8).min(7);
+
+        // 生成推演 (无 LLM, 确定性)
+        let forecast = engine.generate_forecast("overall-evolution", base_state);
+        if forecast.abstain {
+            return Some(EvolutionForecast {
+                target: "overall-evolution".into(),
+                direction: 0.0,
+                confidence: 0.0,
+                abstain: true,
+                scenario_probs: Vec::new(),
+                reason: "信息不足, 弃权".into(),
+            });
+        }
+
+        // 从情景树叶子提取概率摘要
+        let mut scenario_probs = Vec::new();
+        for leaf in forecast.tree.leaves() {
+            scenario_probs.push((leaf.name.clone(), leaf.probability));
+        }
+        // 方向 = 牛概率 - 熊概率 (从叶子标签识别)
+        let mut direction = 0.0f64;
+        for (label, prob) in &scenario_probs {
+            if label.contains("bull") {
+                direction += prob;
+            } else if label.contains("bear") {
+                direction -= prob;
+            }
+        }
+
+        Some(EvolutionForecast {
+            target: "overall-evolution".into(),
+            direction,
+            confidence: forecast.tree.leaves().first().map(|n| n.confidence).unwrap_or(0.0),
+            abstain: false,
+            scenario_probs,
+            reason: forecast.confidence_reason.clone(),
+        })
+    }
     /// 每个 `(branch_str, capability)` 对会合并进对应 CapabilityBranch.absorbed_capabilities,
     /// 避免重复条目。branch_str 形如 "NT-CORE"/"NT-SHIELD"。
     pub fn sync_absorbed_capabilities_from_kb(&mut self, pairs: &[(&str, &str)]) -> usize {
@@ -1841,6 +1917,27 @@ impl CapabilityBranch {
     }
 }
 
+#[derive(Debug, Clone)]
+/// 演化趋势预测 — 由 nt_core_forecast 引擎在 growth cycle 中生成。
+///
+/// 意识体维度升维 (cycle 251 经验): 让 ConsciousnessTree 从"评估当前状态"
+/// 升级为"预测演化趋势"。基于各 branch 当前健康/迷雾/果实数据, 用 E8 溯因
+/// 桥 + 情景树预测下一 cycle 的演化方向, 使演化决策具备前瞻性而非仅回看。
+pub struct EvolutionForecast {
+    /// 预测目标 (如 "overall-evolution" / "NT-IO")
+    pub target: String,
+    /// 预测方向: +1 利多(健康上升) / -1 利空(健康下降) / 0 震荡
+    pub direction: f64,
+    /// 校准置信度 (0..1)
+    pub confidence: f64,
+    /// 弃权信号 — 信息不足时置 true (不参与决策)
+    pub abstain: bool,
+    /// 情景树叶子概率摘要 (bull/bear/sideways)
+    pub scenario_probs: Vec<(String, f64)>,
+    /// 置信理由
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct GrowthReport {
     pub phase0_contract: Option<String>,
@@ -1850,10 +1947,12 @@ pub struct GrowthReport {
     pub phase4_guidance: usize,
     pub phase6_fulfillment: Option<ContractFulfillment>,
     pub phase7_drift: Option<DriftReport>,
-    /// 全仓加权雾和 (Σ branch.fog.level × NodeTier.weight) — 迷雾地图主量纲
+    /// 全仓加权雾和 (Σ w × fog.level) — 迷雾地图主量纲
     pub weighted_fog_sum: f64,
     /// 每域迷雾浓度摘要 (branch label → level)
     pub fog_by_branch: std::collections::BTreeMap<String, f64>,
+    /// 演化趋势预测 (nt_core_forecast 接线, 意识体维度升维)
+    pub evolution_forecast: Option<EvolutionForecast>,
 }
 
 impl crate::core::nt_core_self_test::SelfTest for ConsciousnessTree {
@@ -1872,6 +1971,36 @@ mod tests {
         let tree = ConsciousnessTree::new();
         assert_eq!(tree.branches.len(), 7);
         assert_eq!(tree.cycle, 0);
+    }
+
+    #[test]
+    fn test_growth_cycle_produces_evolution_forecast() {
+        // 意识体维度升维: growth cycle 应产出演化趋势预测 (nt_core_forecast 接线)
+        let mut tree = ConsciousnessTree::new();
+        let report = tree.run_growth_cycle();
+        let forecast = report.evolution_forecast.expect("growth cycle 应产出演化预测");
+        // 方向在 [-1, 1] 内
+        assert!(forecast.direction >= -1.0 && forecast.direction <= 1.0);
+        // 置信度在 [0, 1] 内
+        assert!(forecast.confidence >= 0.0 && forecast.confidence <= 1.0);
+        // 情景树应有叶子 (bull/bear/sideways)
+        assert!(!forecast.scenario_probs.is_empty(), "情景树应有叶子");
+        // 目标应为 overall-evolution
+        assert_eq!(forecast.target, "overall-evolution");
+    }
+
+    #[test]
+    fn test_evolution_forecast_direction_bounded() {
+        // 预测方向应始终有界, 且置信度非 NaN
+        let mut tree = ConsciousnessTree::new();
+        for _ in 0..3 {
+            let report = tree.run_growth_cycle();
+            if let Some(f) = report.evolution_forecast {
+                assert!(!f.direction.is_nan(), "direction 不应为 NaN");
+                assert!(!f.confidence.is_nan(), "confidence 不应为 NaN");
+                assert!(f.direction >= -1.0 && f.direction <= 1.0);
+            }
+        }
     }
 
     #[test]

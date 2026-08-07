@@ -154,6 +154,7 @@ impl MetaGoalGenerator {
             expected_impact: 0.5,
             effort_estimate: 0.3,
             dependencies: vec![],
+            time_scale: crate::core::nt_core_crt::CrtTimeScale::Xuanye,
         }
     }
 

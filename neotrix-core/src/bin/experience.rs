@@ -2116,6 +2116,232 @@ fn parse_cycle(c: &str) -> i64 {
         .unwrap_or(i64::MAX)
 }
 
+/// 维度蒸馏 — 消退蒸馏核心: 细枝末节经验 → 能力网/意识体维度模式。
+///
+/// 协议 (三阶段):
+///   1. 按 domain 分组 (可选 --domain 限定单域)。
+///   2. 组内按主题关键词聚类: 提取每条 content 的高信号词 (非停用词),
+///      词共现相似的两条归为一簇。
+///   3. 对 ≥ min_group 条的簇: 生成一条 pattern 类型蒸馏条目 (distilled_from
+///      记录溯源 keys), 原始条目标记 distilled:true 降权 (保留, 不删除)。
+///
+/// 设计依据: 经验无限追加会维度膨胀 — 高信号模式沉没在细枝末节中。
+/// 蒸馏使经验维度向"能力级模式"收敛 (能力网维度), 原始条目降权为溯源证据。
+fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dry_run: bool) {
+    let rows = scan_values(conn, "branch_");
+
+    // 1. 按 domain 分组 (跳过已蒸馏条目 — 幂等, 不重复蒸馏)
+    let mut by_domain: HashMap<String, Vec<(String, Value)>> = HashMap::new();
+    for (key, value) in &rows {
+        let Ok(v) = serde_json::from_str::<Value>(value) else { continue };
+        if v.get("distilled").and_then(|x| x.as_bool()).unwrap_or(false) {
+            continue;
+        }
+        let d = v.get("domain").and_then(|x| x.as_str()).unwrap_or("unknown");
+        if let Some(want) = domain {
+            if d != want {
+                continue;
+            }
+        }
+        by_domain.entry(d.to_string()).or_default().push((key.clone(), v));
+    }
+
+    // 2. 组内主题聚类 — 高信号词袋 Jaccard (并查集合并共享 ≥2 关键词的条目)
+    let mut distilled: Vec<(String, String, Vec<String>)> = Vec::new(); // (domain, pattern_content, src_keys)
+    let mut marked: Vec<String> = Vec::new(); // 标记 distilled 的 key
+    for (d, items) in &by_domain {
+        // 条目 → 高信号词集合 (限 top 12, 避免长条目过度重叠)
+        let mut item_kws: HashMap<String, HashSet<String>> = HashMap::new();
+        for (key, v) in items {
+            let content = v.get("content").and_then(|c| c.as_str()).unwrap_or("");
+            let kws: HashSet<String> = high_signal_words(content).into_iter().take(12).collect();
+            item_kws.insert(key.clone(), kws);
+        }
+        // 并查集: 两两共享 ≥3 个关键词 → 合并 (强主题信号, 避免过度合并)
+        let keys: Vec<String> = items.iter().map(|(k, _)| k.clone()).collect();
+        let mut parent: HashMap<String, String> = HashMap::new();
+        for k in &keys {
+            parent.insert(k.clone(), k.clone());
+        }
+        fn find(p: &mut HashMap<String, String>, x: &str) -> String {
+            let root = p.get(x).cloned().unwrap_or_else(|| x.to_string());
+            if root != x {
+                let r = find(p, &root);
+                p.insert(x.to_string(), r.clone());
+                r
+            } else {
+                root
+            }
+        }
+        for i in 0..keys.len() {
+            for j in (i + 1)..keys.len() {
+                let a = &keys[i];
+                let b = &keys[j];
+                let ka = item_kws.get(a).cloned().unwrap_or_default();
+                let kb = item_kws.get(b).cloned().unwrap_or_default();
+                let shared = ka.intersection(&kb).count();
+                if shared >= 3 {
+                    let ra = find(&mut parent, a);
+                    let rb = find(&mut parent, b);
+                    if ra != rb {
+                        let rra = find(&mut parent, &ra);
+                        parent.insert(rb.clone(), rra.clone());
+                    }
+                }
+            }
+        }
+        // 收集簇
+        let mut clusters: HashMap<String, Vec<String>> = HashMap::new();
+        for k in &keys {
+            let r = find(&mut parent, k);
+            clusters.entry(r).or_default().push(k.clone());
+        }
+        for (_root, cluster) in &clusters {
+            if cluster.len() < min_group {
+                continue;
+            }
+            let mut contents: Vec<String> = Vec::new();
+            for k in cluster {
+                if let Some(v) = items.iter().find(|(kk, _)| kk == k) {
+                    if let Some(c) = v.1.get("content").and_then(|x| x.as_str()) {
+                        contents.push(c.to_string());
+                    }
+                }
+            }
+            if contents.is_empty() {
+                continue;
+            }
+            let pattern_content = distill_pattern(d, &contents);
+            distilled.push((d.clone(), pattern_content, cluster.clone()));
+            marked.extend(cluster.iter().cloned());
+        }
+    }
+
+    if distilled.is_empty() {
+        println!("[distill] 无满足条件 (min_group={}) 的蒸馏组", min_group);
+        return;
+    }
+    println!("[distill] 发现 {} 个蒸馏组 (共标记 {} 条原始经验)", distilled.len(), marked.len());
+    if dry_run {
+        for (d, pc, src) in &distilled {
+            println!(
+                "  [dry-run] {} | {} ← {} 条",
+                d,
+                pc.chars().take(80).collect::<String>(),
+                src.len()
+            );
+        }
+        println!("[distill] (dry-run) 未落盘 — 去 --dry-run 则执行");
+        return;
+    }
+
+    // 3. 落盘: 蒸馏模式 + 原始条目降权标记
+    let now = now_ts();
+    let tx = conn.transaction().expect("distill tx");
+    for (d, pc, src) in &distilled {
+        let branch_key = format!("branch_distill_{}_{}", d, now);
+        let entry = json!({
+            "schema_version": 1,
+            "type": "pattern",
+            "session_id": "distill",
+            "cycle": "distill",
+            "ts": now,
+            "domain": d,
+            "content": pc,
+            "evidence": "",
+            "source": "distill",
+            "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+            "distilled_from": src,
+        });
+        tx.execute(
+            "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+            params![NS, branch_key, value_encode(&entry.to_string()), now],
+        )
+        .expect("distill insert");
+    }
+    for key in &marked {
+        if let Some((_, value)) = rows.iter().find(|(k, _)| k == key) {
+            let Ok(mut v) = serde_json::from_str::<Value>(value) else { continue };
+            if let Some(o) = v.as_object_mut() {
+                o.insert("distilled".to_string(), json!(true));
+            }
+            tx.execute(
+                "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                params![NS, key, value_encode(&v.to_string()), now],
+            )
+            .expect("distill mark");
+        }
+    }
+    tx.commit().expect("distill commit");
+
+    // 4. hub 指标刷新
+    let mut hub = ensure_hub(conn);
+    refresh_hub_metrics(conn, &mut hub);
+    save_hub(conn, &hub);
+    println!("[distill] 已落盘 {} 条能力模式, {} 条原始经验标记 distilled", distilled.len(), marked.len());
+}
+
+/// 提取高信号词: 非停用词、非纯数字、长度 ≥3 的 ASCII 词 (小写去重)。
+fn high_signal_words(content: &str) -> Vec<String> {
+    let stop: HashSet<String> = en_stop().iter().map(|s| s.to_string()).collect();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut out = Vec::new();
+    for w in content.split(|c: char| !c.is_alphanumeric()) {
+        let w = w.trim();
+        if w.len() < 3 {
+            continue;
+        }
+        let wl = w.to_lowercase();
+        if wl.chars().any(|c| c.is_numeric()) {
+            continue;
+        }
+        if stop.contains(&wl) {
+            continue;
+        }
+        if seen.insert(wl.clone()) {
+            out.push(wl);
+        }
+    }
+    out
+}
+
+/// 蒸馏模式合成: 簇内经验 → 能力网维度模式。
+/// 启发式: 最长 content 做骨架, 附簇规模 + 词频信号。
+fn distill_pattern(domain: &str, contents: &[String]) -> String {
+    let mut longest = String::new();
+    for c in contents {
+        if c.len() > longest.len() {
+            longest = c.clone();
+        }
+    }
+    let mut freq: HashMap<String, usize> = HashMap::new();
+    for c in contents {
+        for w in high_signal_words(c) {
+            *freq.entry(w).or_default() += 1;
+        }
+    }
+    let mut freq_v: Vec<(String, usize)> = freq.into_iter().collect();
+    freq_v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let top_kws: Vec<String> = freq_v
+        .iter()
+        .filter(|(_, n)| *n >= 2)
+        .take(8)
+        .map(|(w, _)| w.clone())
+        .collect();
+    let kw_str = if top_kws.is_empty() {
+        String::new()
+    } else {
+        format!(" [关键词: {}]", top_kws.join(", "))
+    };
+    format!(
+        "[蒸馏-{}] 聚合 {} 条经验的模式: {}{}",
+        domain,
+        contents.len(),
+        longest.chars().take(180).collect::<String>(),
+        kw_str
+    )
+}
+
 /// 重建 Hebb 共现突触网络 (幂等 — 先清空 co 再全量重建)。
 /// 全库 O(n²) 需内存批量: 全部概念载入 → 内存计共现 → 单事务写回。
 fn cmd_hebb(conn: &mut Connection) {
@@ -2499,6 +2725,17 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
+    /// 维度蒸馏: 按域+主题聚类细枝末节经验 → 升维为能力网/意识体维度模式,
+    /// 原始条目标记 distilled 降权 (保留溯源, 不删除)。消退蒸馏核心。
+    Distill {
+        #[arg(long)]
+        domain: Option<String>,
+        /// 组内最少条目数才蒸馏 (默认 3)
+        #[arg(long, default_value_t = 3)]
+        min_group: usize,
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// 存量 value 透明压缩迁移 (zlib, 魔数标记)
     Compress {
         #[arg(long)]
@@ -2560,6 +2797,9 @@ fn main() {
         Cmd::Prune { stop, stale_isolated } => cmd_prune(&conn, &stop, stale_isolated),
         Cmd::Hebb => cmd_hebb(&mut conn),
         Cmd::Dedup { dry_run } => cmd_dedup(&conn, dry_run),
+        Cmd::Distill { domain, min_group, dry_run } => {
+            cmd_distill(&mut conn, domain.as_deref(), min_group, dry_run)
+        }
         Cmd::Compress { all } => cmd_compress(&mut conn, all),
         Cmd::GenIndex { out, limit } => cmd_gen_index(&conn, &out, limit),
         Cmd::Sim { a, b, dim } => cmd_sim(&a, &b, dim),        Cmd::Topology {
@@ -3042,5 +3282,111 @@ mod tests {
         assert_eq!(m["absorbed_capability"]["branch"], "NT-ACT");
         assert_eq!(m["absorbed_capability"]["capability"], "execute");
         std::fs::remove_file(&up).ok();
+    }
+
+    #[test]
+    fn test_high_signal_words() {
+        let ws = high_signal_words("the neural network training on GPU failed");
+        // 停用词 the/on 剔除, 数字剔除, 短词剔除
+        assert!(!ws.contains(&"the".to_string()));
+        assert!(!ws.contains(&"on".to_string()));
+        assert!(ws.contains(&"neural".to_string()));
+        assert!(ws.contains(&"training".to_string()));
+        // 去重
+        let ws2 = high_signal_words("error error error retry");
+        assert_eq!(ws2.iter().filter(|w| *w == "error").count(), 1);
+        assert!(ws2.contains(&"retry".to_string()));
+    }
+
+    #[test]
+    fn test_distill_pattern_aggregates() {
+        let contents = vec![
+            "neural network training failed on GPU memory".to_string(),
+            "neural network training needs more GPU memory".to_string(),
+            "neural network training error GPU memory overflow".to_string(),
+        ];
+        let p = distill_pattern("NT-CORE", &contents);
+        assert!(p.starts_with("[蒸馏-NT-CORE]"));
+        assert!(p.contains("聚合 3 条经验"));
+        // 高频词 neural/network/training 应出现在关键词区
+        assert!(p.contains("neural"));
+        assert!(p.contains("training"));
+    }
+
+    #[test]
+    fn test_cmd_distill_dry_run_marks_nothing() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::nt_memory_schema::initialize(&conn).unwrap();
+        let now = now_ts();
+        // 插入 3 条同主题经验 (NT-CORE)
+        for i in 0..3 {
+            let key = format!("branch_test_{}", i);
+            let v = json!({
+                "schema_version": 1, "type": "insight", "session_id": "t",
+                "cycle": "1", "ts": now, "domain": "NT-CORE",
+                "content": format!("neural network training error GPU memory case {}", i),
+                "evidence": "file.rs:1", "source": "test",
+                "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+            });
+            conn.execute(
+                "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                params![NS, key, value_encode(&v.to_string()), now],
+            )
+            .unwrap();
+        }
+        // dry-run: 不落盘蒸馏, 不标记
+        cmd_distill(&mut conn, Some("NT-CORE"), 3, true);
+        let cnt: i64 = conn
+            .query_row("SELECT COUNT(*) FROM kv_store WHERE namespace=?1", params![NS], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cnt, 3, "dry-run must not add distilled pattern");
+        let marked: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM kv_store WHERE namespace=?1 AND value LIKE '%distilled%'",
+                params![NS],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(marked, 0, "dry-run must not mark distilled");
+    }
+
+    #[test]
+    fn test_cmd_distill_creates_pattern_and_marks() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::nt_memory_schema::initialize(&conn).unwrap();
+        let now = now_ts();
+        for i in 0..3 {
+            let key = format!("branch_test_{}", i);
+            let v = json!({
+                "schema_version": 1, "type": "insight", "session_id": "t",
+                "cycle": "1", "ts": now, "domain": "NT-CORE",
+                "content": format!("neural network training error GPU memory case {}", i),
+                "evidence": "file.rs:1", "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+            });
+            conn.execute(
+                "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                params![NS, key, value_encode(&v.to_string()), now],
+            )
+            .unwrap();
+        }
+        cmd_distill(&mut conn, Some("NT-CORE"), 3, false);
+        // 新增 1 条蒸馏 pattern (key 前缀 branch_distill_)
+        let patterns: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM kv_store WHERE namespace=?1 AND key LIKE 'branch_distill_%'",
+                params![NS],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(patterns, 1, "应生成 1 条蒸馏模式");
+        // 3 条原始经验标记 distilled (解码后检查)
+        let mut marked = 0;
+        for (_, value) in scan_values(&conn, "branch_test_") {
+            let j: Value = serde_json::from_str(&value).unwrap();
+            if j.get("distilled").and_then(|x| x.as_bool()).unwrap_or(false) {
+                marked += 1;
+            }
+        }
+        assert_eq!(marked, 3, "3 条原始经验应标记 distilled");
     }
 }
