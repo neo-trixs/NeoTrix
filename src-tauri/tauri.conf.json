@@ -4,10 +4,10 @@
   "version": "0.18.0",
   "identifier": "ai.neotrix.desktop",
   "build": {
-    "beforeDevCommand": "cd \"$(git rev-parse --show-toplevel)/src-tauri/frontend\" && npm run dev",
-    "beforeBuildCommand": "cd \"$(git rev-parse --show-toplevel)/src-tauri/frontend\" && npm ci && npm run build",
-    "frontendDist": "./frontend/dist",
-    "devUrl": "http://localhost:1420"
+    "beforeDevCommand": "cd \"$(git rev-parse --show-toplevel)/neocodex-frontend\" && npm run dev",
+    "beforeBuildCommand": "cd \"$(git rev-parse --show-toplevel)/neocodex-frontend\" && npm ci && npm run build",
+    "frontendDist": "../neocodex-frontend/dist",
+    "devUrl": "http://localhost:1421"
   },
   "app": {
     "windows": [
@@ -18,9 +18,7 @@
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
-        "decorations": true,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
+        "decorations": false,
         "center": true,
         "visible": true
       }

@@ -1,0 +1,667 @@
+import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
+import {
+  Send, Square, RotateCcw, Edit2, Copy, AlertCircle, Highlighter, X,
+  FolderTree, Bug, FlaskConical,
+} from 'lucide-solid'
+import { chatStore, Message, ToolCallRecord } from '../stores/chat'
+import { Sidebar } from '../components/Sidebar'
+import { RightBar } from '../components/RightBar'
+import { CoworkView } from '../components/CoworkView'
+import { ProviderSelector } from '../components/ProviderSelector'
+import { PermissionModeSelector, type PermissionMode } from '../components/PermissionModeSelector'
+import { ToolCallCard } from '../components/ToolCallCard'
+import { FilePreview } from '../components/FilePreview'
+import { Markdown } from '../components/Markdown'
+import { clsx } from 'clsx'
+import { invoke } from '@tauri-apps/api/core'
+import { listen, UnlistenFn } from '@tauri-apps/api/event'
+
+const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
+  { text: '解释当前项目结构', icon: FolderTree },
+  { text: '修复最近的编译错误', icon: Bug },
+  { text: '生成测试用例', icon: FlaskConical },
+]
+
+const actionBtnClass =
+  'p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors'
+/* —— 设计 v2 图标：E8 六芒星（hero） —— */
+function HeroMark() {
+  return (
+    <svg viewBox="0 0 32 32" fill="none">
+      <path d="M16 2l4 8 8 4-8 4-4 8-4-8-8-4 8-4 4-8z" fill="#E85454" opacity="0.25" />
+      <path d="M16 6l2.5 5 5.5 2.5-5.5 2.5-2.5 5-2.5-5L8 13.5l5.5-2.5 2.5-5z" fill="#E85454" />
+      <circle cx="16" cy="13.5" r="2.5" fill="#E85454" stroke="none" />
+      <circle cx="16" cy="13.5" r="1" fill="#fff" stroke="none" />
+      <path d="M4 20q4-4 8 0t8-8 8 4" stroke="#D04040" stroke-width="0.8" stroke-linecap="round" opacity="0.4" fill="none" />
+    </svg>
+  )
+}
+
+/* —— 设计 v2 头像图标：用户（人形）/ 助手（方框·意识） —— */
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 14 14">
+      <circle cx="7" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.2" fill="none" />
+      <path d="M2 12.5a5 5 0 0110 0" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
+    </svg>
+  )
+}
+
+function BotIcon() {
+  return (
+    <svg viewBox="0 0 14 14">
+      <rect x="2" y="3" width="10" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none" />
+      <circle cx="7" cy="7" r="1.5" stroke="currentColor" stroke-width="1" fill="none" />
+    </svg>
+  )
+}
+
+export function Chat() {
+  const [inputValue, setInputValue] = createSignal('')
+  const [textareaRef, setTextareaRef] = createSignal<HTMLTextAreaElement | null>(null)
+  const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null)
+  const [editContent, setEditContent] = createSignal('')
+  const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
+  const [streamError, setStreamError] = createSignal<string | null>(null)
+  const [permissionMode, setPermissionMode] = createSignal<PermissionMode>('auto')
+  const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
+  const [activeModel, setActiveModel] = createSignal<string | null>(null)
+
+  // 视图切换：chat / cowork（对应侧栏 segmented tabs）
+  const [activeView, setActiveView] = createSignal<'chat' | 'cowork'>('chat')
+
+  // 用函数访问 store，保证 store 变更时响应式重渲染
+  const messages = () => chatStore.currentMessages
+  const isGenerating = () => chatStore.isGenerating
+  const currentSession = () => chatStore.currentSession
+
+  // Event listener cleanup functions
+  const [unlistenStart, setUnlistenStart] = createSignal<UnlistenFn | null>(null)
+  const [unlistenToken, setUnlistenToken] = createSignal<UnlistenFn | null>(null)
+  const [unlistenEnd, setUnlistenEnd] = createSignal<UnlistenFn | null>(null)
+  const [unlistenDone, setUnlistenDone] = createSignal<UnlistenFn | null>(null)
+  const [unlistenTool, setUnlistenTool] = createSignal<UnlistenFn | null>(null)
+
+  // Current assistant message being streamed
+  const [currentAssistantMsgId, setCurrentAssistantMsgId] = createSignal<string | null>(null)
+
+  let scrollRef: HTMLDivElement | undefined
+  let prevSessionId: string | null = null
+
+  // Auto-resize textarea
+  const adjustTextarea = () => {
+    const textarea = textareaRef()
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+    }
+  }
+
+  // Set up event listeners for streaming
+  onMount(async () => {
+    // 启动时加载会话历史（原代码从未调用 loadSessions，侧边栏恒为空）
+    chatStore.loadSessions()
+
+    const startUnlisten = await listen<string>('neocodex_stream_start', (event) => {
+      // Stream started - could show user message echo if needed
+      console.log('[Chat] Stream started:', event.payload)
+    })
+    setUnlistenStart(() => startUnlisten)
+
+    const tokenUnlisten = await listen<string>('neocodex_stream_token', (event) => {
+      const msgId = currentAssistantMsgId()
+      if (msgId) {
+        chatStore.appendMessageContent(msgId, event.payload)
+      }
+    })
+    setUnlistenToken(() => tokenUnlisten)
+
+    const endUnlisten = await listen<string>('neocodex_stream_end', (event) => {
+      const msgId = currentAssistantMsgId()
+      if (msgId) {
+        chatStore.updateMessage(msgId, event.payload, false)
+      }
+    })
+    setUnlistenEnd(() => endUnlisten)
+
+    const doneUnlisten = await listen<{ cancelled: boolean; elapsed_ms: number; content: string }>('neocodex_stream_done', (event) => {
+      const msgId = currentAssistantMsgId()
+      const wasCancelled = event.payload.cancelled
+
+      if (msgId) {
+        if (wasCancelled) {
+          // Message already has partial content from tokens, just mark as not streaming
+          chatStore.updateMessage(msgId, event.payload.content, false)
+          setStreamError('生成已停止')
+          setTimeout(() => setStreamError(null), 3000)
+        } else {
+          chatStore.updateMessage(msgId, event.payload.content, false)
+        }
+      }
+
+      chatStore.setGenerating(false)
+      setCurrentAssistantMsgId(null)
+    })
+    setUnlistenDone(() => doneUnlisten)
+
+    const toolUnlisten = await listen<{ name: string; args: string; result: string; duration_ms: number; success: boolean }>('neocodex_stream_tool', (event) => {
+      const msgId = currentAssistantMsgId()
+      if (msgId) {
+        const toolCall: ToolCallRecord = {
+          id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: event.payload.name,
+          args: event.payload.args,
+          result: event.payload.result,
+          duration_ms: event.payload.duration_ms,
+          success: event.payload.success,
+        }
+        chatStore.appendToolCall(msgId, toolCall)
+      }
+    })
+    setUnlistenTool(() => toolUnlisten)
+
+    // 读取当前激活模型（仅用于状态栏展示，只读命令）
+    try {
+      const cfg = await invoke<{ active_model: string }>('neocodex_provider_config')
+      setActiveModel(cfg.active_model || null)
+    } catch {
+      /* 展示字段，静默失败 */
+    }
+  })
+
+  // Clean up event listeners
+  onCleanup(() => {
+    unlistenStart()?.()
+    unlistenToken()?.()
+    unlistenEnd()?.()
+    unlistenDone()?.()
+    unlistenTool()?.()
+  })
+
+  // 消息区自动滚动：新消息/会话切换强制到底，流式期间若在底部则跟随
+  createEffect(() => {
+    const sid = currentSession()?.id ?? null
+    const sessionChanged = sid !== prevSessionId
+    prevSessionId = sid
+    messages()
+    isGenerating()
+    const el = scrollRef
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 240
+    if (sessionChanged || nearBottom) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight
+      })
+    }
+  })
+
+  const handleInput = (e: Event) => {
+    const target = e.target as HTMLTextAreaElement
+    setInputValue(target.value)
+    adjustTextarea()
+  }
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  // 核心发送：addMessage(user) → addMessage(assistant placeholder) → invoke
+  // opts.userMessageAdded = true 表示用户消息已由编辑/重生成逻辑写入，跳过重复添加
+  const sendMessage = async (content: string, opts?: { userMessageAdded?: boolean }) => {
+    if (!content || isGenerating()) return
+
+    if (!currentSession()) {
+      chatStore.addSession()
+    }
+
+    if (!opts?.userMessageAdded) {
+      chatStore.addMessage({ role: 'user', content })
+    }
+    setInputValue('')
+    setAnnotationHint(null)
+    adjustTextarea()
+    setStreamError(null)
+
+    // Create assistant message placeholder
+    const assistantMsgId = chatStore.addMessage({
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+    })
+    setCurrentAssistantMsgId(assistantMsgId)
+    chatStore.setGenerating(true)
+
+    try {
+      // Call the real Tauri IPC command for streaming
+      await invoke('neocodex_send_message_stream', {
+        content,
+        attachments: null,
+        regenerate: false,
+        permission_mode: permissionMode(),
+        temperature: 0.7,
+        max_tokens: 4096,
+      })
+      // The actual streaming happens via events (neocodex_stream_token, etc.)
+    } catch (error) {
+      console.error('[Chat] Send message failed:', error)
+      const errorMsg = error instanceof Error ? error.message : '发送失败，请重试'
+      setStreamError(errorMsg)
+
+      // Update the assistant message with error
+      if (assistantMsgId) {
+        chatStore.updateMessage(assistantMsgId, `❌ ${errorMsg}`, false)
+      }
+      chatStore.setGenerating(false)
+      setCurrentAssistantMsgId(null)
+    }
+  }
+
+  const handleSend = async () => {
+    let content = inputValue().trim()
+    if (!content && !annotationHint()) return
+    if (!content) content = annotationHint()! // send the annotation even with empty text
+    if (annotationHint() && content !== annotationHint()!) {
+      content = `${content}\n\n${annotationHint()}`
+    }
+    await sendMessage(content)
+  }
+
+  const handleSuggestion = (text: string) => {
+    setInputValue(text)
+    handleSend()
+  }
+
+  const handleStop = async () => {
+    try {
+      await invoke('neocodex_stop_stream')
+    } catch (error) {
+      console.error('[Chat] Stop stream failed:', error)
+    }
+    chatStore.abortGeneration()
+    setCurrentAssistantMsgId(null)
+  }
+
+  const handleRegenerate = () => {
+    const userContent = chatStore.regenerateLast()
+    if (userContent) {
+      // regenerateLast 已删除最后一条助手消息，用户消息保留，跳过重复添加
+      sendMessage(userContent, { userMessageAdded: true })
+    }
+  }
+
+  const handleEditMessage = (message: Message) => {
+    setEditingMessageId(message.id)
+    setEditContent(message.content)
+  }
+
+  const handleSaveEdit = () => {
+    const content = editContent().trim()
+    const msgId = editingMessageId()
+    if (msgId && content) {
+      // editAndResend 已截断并添加新用户消息，跳过重复添加
+      chatStore.editAndResend(msgId, content)
+      setEditingMessageId(null)
+      setEditContent('')
+      sendMessage(content, { userMessageAdded: true })
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditContent('')
+  }
+
+  const handleCopy = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const formatTime = (date: Date) => {
+    return new Date(date).toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  return (
+    <div class="flex h-screen bg-bg-primary">
+      <Sidebar
+        collapsed={sidebarCollapsed()}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed())}
+        activeView={activeView()}
+        onSwitchView={setActiveView}
+      />
+
+      <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1">
+        {/* ===== 头部 ch-top：设计 v2（chat 视图） ===== */}
+        <Show when={activeView() === 'chat'}>
+          <header class="ch-top" data-tauri-drag-region>
+<div class="flex items-center gap-2 flex-shrink-0 min-w-0">
+              <Show when={currentSession()}>
+                <span class="text-[11px] text-text-muted px-1.5 py-0.5 rounded bg-white/50 border border-border-primary/60 flex-shrink-0 truncate max-w-[220px]">
+                  {currentSession()!.title} · {currentSession()!.messages.length} 条消息
+                </span>
+              </Show>
+            </div>
+          </header>
+        </Show>
+
+        {/* ===== 消息流：气泡式 msg.r / msg.l（chat 视图） ===== */}
+        <Show when={activeView() === 'chat'}>
+        <div ref={scrollRef} class="flex-1 overflow-y-auto">
+          <Show
+            when={messages().length > 0}
+            fallback={
+              /* ===== 空状态：hero + cic 输入区（设计 v2） ===== */
+              <div class="wc-inner h-full max-w-[640px] w-full mx-auto flex flex-col items-center justify-center gap-6 px-6 py-10 select-none">
+                <div class="hero">
+                  <div class="hero-svg">
+                    <HeroMark />
+                  </div>
+                  <h1>下午好</h1>
+                </div>
+
+                {/* cic 输入区 */}
+                <div class="cic w-full">
+                  <textarea
+                    id="chatInput"
+                    rows={2}
+                    placeholder="输入 / 查看技能"
+                    value={inputValue()}
+                    onInput={handleInput}
+                    onKeyDown={handleKeyDown}
+                    ref={setTextareaRef}
+                  />
+                  <div class="cic-actions">
+                    <div class="cic-left">
+                      <ProviderSelector iconOnly />
+                      <button class="cic-attach" aria-label="附加文件" title="附加文件">
+                        <svg viewBox="0 0 16 16">
+                          <line x1="8" y1="3" x2="8" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                          <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="cic-right">
+                      <button class="vc-btn vc-lang" aria-label="语音输入" title="语音输入">
+                        <svg viewBox="0 0 16 16">
+                          <rect x="5.5" y="2" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.2" fill="none" />
+                          <path d="M3 7v.5a5 5 0 0010 0V7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
+                          <line x1="8" y1="12" x2="8" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                          <line x1="5" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                      <button
+                        class="vc-btn vc-send"
+                        disabled={!inputValue().trim() || isGenerating()}
+                        onClick={isGenerating() ? handleStop : handleSend}
+                        aria-label={isGenerating() ? '停止生成' : '发送消息'}
+                        title={isGenerating() ? '停止生成' : '发送消息'}
+                      >
+                        {isGenerating() ? <Square class="w-4 h-4" /> : <Send class="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 快速问答 */}
+                <div class="qa flex flex-wrap gap-1.5 justify-center">
+                  <For each={SUGGESTIONS}>
+                    {(s) => (
+                      <button class="qa-btn" onClick={() => handleSuggestion(s.text)}>
+                        <s.icon />
+                        <span>{s.text}</span>
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </div>
+            }
+          >
+            <div class="cs max-w-[640px] mx-auto">
+              <For each={messages()}>
+                {(message: Message) => {
+                  const isUser = message.role === 'user'
+                  const isEditing = editingMessageId() === message.id
+                  const isTool = message.role === 'tool'
+                  return (
+                    <div class={clsx('group msg', isUser ? 'r' : 'l')}>
+                      {/* 头像 */}
+                      <div class="ma2">
+                        {isUser ? <UserIcon /> : <BotIcon />}
+                      </div>
+
+                      <div class="flex-1 min-w-0">
+                        {isEditing ? (
+                          <div class="p-2 rounded-lg bg-white/60 border border-nt-io-500/40">
+                            <textarea
+                              class="w-full min-h-[90px] px-3 py-2 bg-white/70 border border-border-primary rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-io-500 font-mono text-[13px] resize-y"
+                              value={editContent()}
+                              onInput={(e) => setEditContent(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                  handleSaveEdit()
+                                } else if (e.key === 'Escape') {
+                                  handleCancelEdit()
+                                }
+                              }}
+                              ref={(el) => el?.focus()}
+                            />
+                            <div class="flex justify-end gap-2 mt-2">
+                              <button
+                                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-tertiary text-text-primary hover:bg-border-primary transition-colors"
+                                onClick={handleCancelEdit}
+                              >
+                                取消
+                              </button>
+                              <button
+                                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-nt-io-600 text-white hover:bg-nt-io-700 transition-colors"
+                                onClick={handleSaveEdit}
+                              >
+                                保存并重发
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {isTool && message.toolCalls && message.toolCalls.length > 0 ? (
+                              <div class="space-y-1">
+                                <For each={message.toolCalls}>
+                                  {(call) => <ToolCallCard call={call} />}
+                                </For>
+                              </div>
+                            ) : (
+                              <div class="mb">
+                                {isUser ? (
+                                  <p class="whitespace-pre-wrap">{message.content}</p>
+                                ) : (
+                                  <Markdown content={message.content} />
+                                )}
+                                <div class="mb-t">{formatTime(message.timestamp)}</div>
+                              </div>
+                            )}
+
+                            <Show when={message.toolCalls && message.toolCalls.length > 0 && message.role !== 'tool'}>
+                              <div class="mt-1.5 space-y-1">
+                                <For each={message.toolCalls}>
+                                  {(call) => <ToolCallCard call={call} />}
+                                </For>
+                              </div>
+                            </Show>
+
+                            <Show when={message.attachments && message.attachments.length > 0}>
+                              <div class="mt-1.5 space-y-2">
+                                <For each={message.attachments}>
+                                  {(att) => (
+                                    <FilePreview
+                                      attachment={att}
+                                      onAnnotate={(hint) => setAnnotationHint(hint || null)}
+                                    />
+                                  )}
+                                </For>
+                              </div>
+                            </Show>
+
+                            {/* 流式光标：红色块状闪烁 */}
+                            {message.isStreaming && <span class="stream-cursor">▍</span>}
+                          </>
+                        )}
+
+                        {/* hover 操作行 */}
+                        <div class={clsx(
+                          'flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity',
+                          isEditing && 'opacity-0'
+                        )}>
+                          <div class="flex items-center gap-0.5">
+                            {message.role === 'assistant' && !message.isStreaming && (
+                              <>
+                                <button
+                                  class={actionBtnClass}
+                                  onClick={handleRegenerate}
+                                  aria-label="重新生成"
+                                  title="重新生成"
+                                >
+                                  <RotateCcw class="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  class={actionBtnClass}
+                                  onClick={() => handleEditMessage(message)}
+                                  aria-label="编辑并重发"
+                                  title="编辑并重发"
+                                >
+                                  <Edit2 class="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                            {message.role === 'user' && !message.isStreaming && (
+                              <button
+                                class={actionBtnClass}
+                                onClick={() => handleEditMessage(message)}
+                                aria-label="编辑并重发"
+                                title="编辑并重发"
+                              >
+                                <Edit2 class="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {!message.isStreaming && (
+                              <button
+                                class={actionBtnClass}
+                                onClick={() => handleCopy(message.content)}
+                                aria-label="复制"
+                                title="复制"
+                              >
+                                <Copy class="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }}
+              </For>
+            </div>
+          </Show>
+        </div>
+
+        {/* Stream Error Toast */}
+        <Show when={streamError()}>
+          <div class="mx-4 mb-2 p-3 bg-red-50/90 border border-red-600/25 rounded-xl flex items-center gap-2 animate-in flex-shrink-0 shadow-sm backdrop-blur-md">
+            <AlertCircle class="w-5 h-5 text-red-600 flex-shrink-0" />
+            <span class="text-sm text-red-700">{streamError()}</span>
+            <button
+              class="ml-auto p-1 text-red-600 hover:text-red-800"
+              onClick={() => setStreamError(null)}
+              aria-label="关闭错误提示"
+            >
+              <Square class="w-4 h-4" />
+            </button>
+          </div>
+        </Show>
+
+        {/* Annotation pending hint */}
+        <Show when={annotationHint()}>
+          <div class="mx-4 mb-2 p-2.5 bg-nt-core-500/10 border border-nt-core-500/30 rounded-lg flex items-center gap-2 flex-shrink-0">
+            <Highlighter class="w-4 h-4 text-nt-core-600 flex-shrink-0" />
+            <span class="text-xs text-nt-core-700 truncate font-mono">{annotationHint()}</span>
+            <button
+              class="ml-auto p-1 text-text-muted hover:text-text-primary flex-shrink-0"
+              onClick={() => setAnnotationHint(null)}
+              aria-label="移除标注"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+        </Show>
+
+        {/* ===== 底部输入区：cic 玻璃（消息流模式下） ===== */}
+        <Show when={messages().length > 0}>
+          <div class="flex-shrink-0 border-t border-border-primary/50 bg-white/25 backdrop-blur-xl">
+            <div class="max-w-[640px] mx-auto w-full px-6 pt-3 pb-2">
+              <div class="cic">
+                <textarea
+                  ref={setTextareaRef}
+                  class="flex-1 bg-transparent border-none resize-none min-h-[26px] max-h-[160px] py-1.5 text-[13.5px] leading-relaxed text-text-primary placeholder-text-muted/70 focus:outline-none focus:ring-0 focus:border-none"
+                  placeholder={isGenerating() ? '正在生成…' : '输入消息… (Enter 发送, Shift+Enter 换行)'}
+                  value={inputValue()}
+                  onInput={handleInput}
+                  onKeyDown={handleKeyDown}
+                  disabled={isGenerating()}
+                  rows={1}
+                />
+                <div class="cic-actions">
+                  <div class="cic-left">
+                    <ProviderSelector iconOnly />
+                    <PermissionModeSelector
+                      value={permissionMode()}
+                      onChange={setPermissionMode}
+                      disabled={isGenerating()}
+                      compact
+                    />
+                  </div>
+                  <div class="cic-right">
+                    <button
+                      class="vc-btn vc-send"
+                      disabled={!inputValue().trim() && !isGenerating()}
+                      onClick={isGenerating() ? handleStop : handleSend}
+                      aria-label={isGenerating() ? '停止生成' : '发送消息'}
+                      title={isGenerating() ? '停止生成' : '发送消息'}
+                    >
+                      {isGenerating() ? <Square class="w-4 h-4" /> : <Send class="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 底部状态条 */}
+              <div class="flex items-center justify-between mt-2 px-1 pb-1">
+                <div class="flex items-center gap-3 text-[10px] text-text-muted/80">
+                  <Show when={activeModel()}>
+                    <span class="font-mono text-nt-io-700">{activeModel()}</span>
+                  </Show>
+                  <span>NeoTrix v0.18.0</span>
+                  <span class="hidden md:inline">Enter 发送 · Shift+Enter 换行</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Show>
+        </Show>
+
+        {/* ===== 协同视图（cowork） ===== */}
+        <Show when={activeView() === 'cowork'}>
+          <CoworkView />
+        </Show>
+      </main>
+
+      {/* ===== 右栏：Artifact Pane + 文件树（设计 v2） ===== */}
+      <RightBar />
+    </div>
+  )
+}
