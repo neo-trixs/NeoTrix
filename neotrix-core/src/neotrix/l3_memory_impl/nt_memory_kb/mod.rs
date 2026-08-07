@@ -296,7 +296,7 @@ impl KnowledgeBase {
     /// `prune_stale_days` 若 >0，先删除超过该天数且从未访问的节点（回收逻辑空间），
     /// 再 VACUUM 回收物理空间。返回 `(pruned_nodes, freed_bytes)`。
     pub fn compact(&self, prune_stale_days: Option<u32>) -> Result<(usize, i64), String> {
-        let mut conn = self.conn.lock().map_err(|e| format!("KB compact lock: {}", e))?;
+        let conn = self.conn.lock().map_err(|e| format!("KB compact lock: {}", e))?;
 
         // 1. 可选：清理过期节点（逻辑空间回收）
         let mut pruned = 0usize;
