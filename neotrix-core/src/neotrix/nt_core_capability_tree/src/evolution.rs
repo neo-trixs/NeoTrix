@@ -32,6 +32,10 @@ pub enum EvolutionAction {
     Mature {
         node_id: String,
     },
+    Strengthen {
+        node_id: String,
+        note: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,6 +136,16 @@ impl<'a> EvolutionEngine<'a> {
         }
     }
 
+    /// 规划强化: 吸收经验强化既有节点 (R-P42 吸收强化现有节点, 不新建)
+    pub fn plan_strengthen(&self, node_id: String, note: String) -> EvolutionPlan {
+        let rationale = format!("Strengthen {} with absorbed experience: {}", node_id, note);
+        EvolutionPlan {
+            cycle: "pending".into(),
+            actions: vec![EvolutionAction::Strengthen { node_id: node_id.clone(), note }],
+            rationale,
+        }
+    }
+
     /// 执行计划
     pub fn execute(&mut self, mut plan: EvolutionPlan) -> Result<(), RegistryError> {
         for action in plan.actions.drain(..) {
@@ -204,6 +218,18 @@ impl<'a> EvolutionEngine<'a> {
                         node.promote_constellation();
                     }
                 }
+                EvolutionAction::Strengthen { node_id, note } => {
+                    if let Some(node) = self.registry.get_mut(&node_id) {
+                        node.record_evolution(EvolutionLogEntry {
+                            cycle: plan.cycle.clone(),
+                            op: EvolutionOp::Strengthen,
+                            from_nodes: vec![],
+                            to_node: Some(node_id.clone()),
+                            note,
+                            timestamp: chrono::Utc::now(),
+                        });
+                    }
+                }
             }
         }
         Ok(())
@@ -223,8 +249,12 @@ impl<'a> EvolutionEngine<'a> {
             }
         }
 
-        // 2. 发现过期节点 (C0/C1 超阈值)
+        // 2. 发现过期节点 (C0/C1 超阈值) — 但跳过经验驱动新节点 (exp:: 前缀):
+        //    刚被经验提升创建的 C0 节点, log 少会被误判 stale, 避免"建了又删"循环
         for node in self.registry.stale_nodes(3) {
+            if node.id.starts_with("exp::") {
+                continue;
+            }
             plans.push(self.plan_prune(
                 node.id.clone(),
                 format!("Stale at {} for 3+ cycles", node.constellation.as_str()),

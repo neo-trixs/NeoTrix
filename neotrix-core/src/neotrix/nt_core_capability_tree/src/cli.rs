@@ -2,7 +2,7 @@
 
 use crate::node::{CapabilityNode, Domain, NodeLayer};
 use crate::registry::{CapabilityRegistry, RegistryError};
-use crate::evolution::EvolutionEngine;
+use crate::evolution::{EvolutionAction, EvolutionEngine, EvolutionPlan};
 use clap::{Parser, Subcommand};
 use serde_json;
 use std::fs;
@@ -91,6 +91,16 @@ pub enum Commands {
         /// 节点 ID
         #[arg(long)]
         id: String,
+    },
+
+    /// 强化: 吸收经验强化既有节点 (R-P42)
+    Strengthen {
+        /// 节点 ID
+        #[arg(long)]
+        id: String,
+        /// 强化备注 (吸收的经验)
+        #[arg(long)]
+        note: String,
     },
 
     /// 异花授粉: 跨域共享
@@ -208,6 +218,9 @@ impl CapabilityCli {
             Commands::Mature { id } => {
                 self.cmd_mature(&mut registry, id)?;
             }
+            Commands::Strengthen { id, note } => {
+                self.cmd_strengthen(&mut registry, id, note)?;
+            }
             Commands::CrossPollinate { shared, domain_a, domain_b, note } => {
                 self.cmd_cross_pollinate(&mut registry, shared, domain_a, domain_b, note)?;
             }
@@ -250,8 +263,16 @@ impl CapabilityCli {
                 reg.register(node).map_err(|e| format!("Failed to register node: {}", e))?;
             }
             for (from, to) in export.edges {
+                // 外部消费者容错: 边的端点可能不在注册表中 (如 nt_io_neocodex::build_request 等外部模块)
+                // 这些是外部消费者引用, 非树内依赖, 跳过并警告而非阻塞加载
+                if !reg.nodes.contains_key(&from) || !reg.nodes.contains_key(&to) {
+                    eprintln!("[capability_tree] skip edge {} -> {} (external consumer, not in registry)", from, to);
+                    continue;
+                }
                 reg.add_dependency(&from, &to).map_err(|e| format!("Failed to add edge: {}", e))?;
             }
+            // 保留经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
+            reg.experience_targets = export.experience_targets;
             Ok(reg)
         } else {
             Ok(CapabilityRegistry::new())
@@ -470,6 +491,16 @@ impl CapabilityCli {
         Ok(())
     }
 
+    fn cmd_strengthen(&self, registry: &mut CapabilityRegistry, id: &str, note: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if registry.get(id).is_none() {
+            return Err(format!("Node '{}' not found", id).into());
+        }
+        let plan = EvolutionEngine::new(registry).plan_strengthen(id.to_string(), note.to_string());
+        EvolutionEngine::new(registry).execute(plan)?;
+        println!("Strengthened: {} <- {}", id, note);
+        Ok(())
+    }
+
     fn cmd_cross_pollinate(
         &self,
         registry: &mut CapabilityRegistry,
@@ -502,7 +533,11 @@ impl CapabilityCli {
 
     fn cmd_scan(&self, registry: &mut CapabilityRegistry, apply: bool) -> Result<(), Box<dyn std::error::Error>> {
         let engine = EvolutionEngine::new(registry);
-        let plans = engine.auto_scan(&self.cycle);
+        let mut plans = engine.auto_scan(&self.cycle);
+
+        // 经验驱动迭代目标: 消费 distill 写入的 experience_targets 区
+        // (经验升维闭环: 蒸馏经验 → experience_targets → 能力树 Strengthen/Bud 计划)
+        plans.extend(self.experience_target_plans(registry)?);
 
         if plans.is_empty() {
             println!("No evolution actions suggested.");
@@ -520,11 +555,80 @@ impl CapabilityCli {
         if apply {
             for plan in plans {
                 let mut engine = EvolutionEngine::new(registry);
-                engine.execute(plan)?;
+                if let Err(e) = engine.execute(plan) {
+                    // 单计划失败不中断: 记录并继续 (幂等容错, 防重复 id 等已存在错误阻断整批)
+                    eprintln!("[capability_tree] plan failed (skipped): {}", e);
+                }
             }
+            // 已消费的经验目标清空 (防重复执行累积)
+            registry.experience_targets.clear();
             println!("Applied all plans.");
         }
         Ok(())
+    }
+
+    /// 读取蒸馏写入的 experience_targets (capability_registry.json) 并生成迭代计划。
+    /// 闭环: distill_promote_to_capability 写入 → 此处消费 → 能力树 Strengthen/Bud 执行。
+    pub(crate) fn experience_target_plans(
+        &self,
+        registry: &CapabilityRegistry,
+    ) -> Result<Vec<EvolutionPlan>, Box<dyn std::error::Error>> {
+        let mut plans = Vec::new();
+        let targets = &registry.experience_targets;
+        if targets.is_empty() {
+            return Ok(plans);
+        }
+        // 去重: 同域同标签只生成一个 Bud/Strengthen 计划 (防止重复 id 注册失败中断 apply)
+        let mut already_planned: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for t in targets {
+            let Some(domain_s) = t.get("domain").and_then(|d| d.as_str()) else { continue };
+            let Some(signal) = t.get("signal").and_then(|s| s.as_f64()) else { continue };
+            let Some(rationale) = t.get("rationale").and_then(|r| r.as_str()) else { continue };
+            let domain = match Domain::from_str(domain_s) {
+                Some(d) => d,
+                None => continue,
+            };
+            let capability_tag = t.get("capability").and_then(|c| c.as_str()).unwrap_or("").to_string();
+            if capability_tag.is_empty() {
+                continue;
+            }
+            // 意识体觉醒目标: 不映射能力节点, 仅记录 (消费在 NT-META 层)
+            if capability_tag.starts_with("consciousness::") {
+                continue;
+            }
+            if !already_planned.insert(format!("{}::{}", domain_s, capability_tag)) {
+                continue;
+            }
+            // 找域内提供该标签的现有节点 → Strengthen; 缺失 → Bud
+            let candidates: Vec<&CapabilityNode> = registry
+                .by_domain(domain)
+                .into_iter()
+                .filter(|n| n.provides.iter().any(|p| p == &capability_tag) && !n.deprecated)
+                .collect();
+            if let Some(target) = candidates.first() {
+                plans.push(EvolutionPlan {
+                    cycle: self.cycle.clone(),
+                    actions: vec![EvolutionAction::Strengthen {
+                        node_id: target.id.clone(),
+                        note: format!("{} | signal={:.2}", rationale, signal),
+                    }],
+                    rationale: format!("经验驱动: 强化 {} | {}", capability_tag, rationale),
+                });
+            } else {
+                plans.push(EvolutionPlan {
+                    cycle: self.cycle.clone(),
+                    actions: vec![EvolutionAction::Budding {
+                        new_node_id: format!("exp::{}::{}", domain.as_str().to_lowercase(), capability_tag),
+                        domain,
+                        provides: vec![capability_tag.clone()],
+                        layer: crate::node::NodeLayer::L0Primitive,
+                        note: format!("经验驱动新节点: {}", rationale),
+                    }],
+                    rationale: format!("经验驱动: 新建 {} | {}", capability_tag, rationale),
+                });
+            }
+        }
+        Ok(plans)
     }
 
     fn cmd_get(&self, registry: &CapabilityRegistry, id: &str) -> Result<(), Box<dyn std::error::Error>> {

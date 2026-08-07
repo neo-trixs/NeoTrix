@@ -2351,7 +2351,21 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
     )
     .expect("consciousness distill insert");
 
-    // 5. hub 指标刷新
+    // 5. 高信号提升: 蒸馏出的能力模式 → 能力树迭代目标 (经验升维到能力网维度)
+    //    bridge 将每个蒸馏模式路由为 Strengthen/Bud 计划, 写入能力树 registry 文件的
+    //    "experience_targets" 建议区 — 由 neotrix-capability scan --apply 消费执行
+    let bridge_result = distill_promote_to_capability(&distilled);
+    if !bridge_result.is_empty() {
+        println!("[distill] 高信号提升: {} 条能力模式提升为能力树迭代目标", bridge_result.len());
+        for line in bridge_result.iter().take(5) {
+            println!("  [promote] {}", line);
+        }
+        if bridge_result.len() > 5 {
+            println!("  ... 其余 {} 条", bridge_result.len() - 5);
+        }
+    }
+
+    // 6. hub 指标刷新
     let mut hub = ensure_hub(conn);
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
@@ -2360,6 +2374,74 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
         distilled.len(),
         marked.len()
     );
+}
+
+/// 把蒸馏出的能力模式提升为能力树迭代目标 (经验升维: 细枝末节 → 能力网节点)。
+/// 返回提升建议的行描述 (实际写入 capability_registry.json 的 experience_targets 区)。
+///
+/// 接入点: 蒸馏模式 (domain, pattern, src_keys) → ExperienceRouter.route_experience
+///   → 能力标签路由 → EvolutionPlan (Strengthen 已有节点 / Bud 新节点建议)
+fn distill_promote_to_capability(distilled: &[(String, String, Vec<String>)]) -> Vec<String> {
+    use neotrix::neotrix::nt_capability_bridge::{
+        ExperienceDimension, ExperienceEntry, ExperienceRouter, promote_to_file,
+    };
+    let mut promoted = Vec::new();
+    let mut dims = Vec::new();
+    for (d, pc, src) in distilled {
+        let entry = ExperienceEntry {
+            id: format!("distill_{}", src.first().cloned().unwrap_or_else(|| "?".to_string())),
+            entry_type: "pattern".to_string(),
+            domain_name: d.clone(),
+            content: pc.clone(),
+            confidence: 0.8,       // 蒸馏聚合模式, 信号高
+            importance: 0.7,
+        };
+        let dim = ExperienceRouter::route_experience(&entry);
+        match &dim {
+            ExperienceDimension::CapabilityNetwork {
+                domain,
+                capability_tag,
+                rationale,
+                signal,
+                ..
+            } => {
+                promoted.push(format!(
+                    "{} → {} (signal={:.2}) | {}",
+                    domain.as_str(), capability_tag, signal, rationale
+                ));
+            }
+            ExperienceDimension::ConsciousnessAwakening { layer, signal, .. } => {
+                promoted.push(format!(
+                    "意识体觉醒 → {} (signal={:.2}) | {}",
+                    layer, signal, pc.chars().take(60).collect::<String>()
+                ));
+            }
+        }
+        dims.push(dim);
+    }
+    // 写入能力树 registry 的 experience_targets 区 (经验 → 能力节点迭代目标闭环)
+    // 优先 cwd (项目内, 被 git 追踪, 存在); home 目录为回退。两个都写, 确保闭环真实落盘。
+    let cwd_registry = std::path::PathBuf::from(".neotrix/capability_registry.json");
+    let home_registry = dirs::home_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join(".neotrix/capability_registry.json");
+    let mut written_total = 0usize;
+    for path in [&cwd_registry, &home_registry] {
+        if path.exists() {
+            written_total += promote_to_file(path, &dims);
+        }
+    }
+    // 两个文件都不存在 → 创建 cwd 文件再写
+    if written_total == 0 && !cwd_registry.exists() {
+        if let Some(parent) = cwd_registry.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        written_total += promote_to_file(&cwd_registry, &dims);
+    }
+    if written_total > 0 {
+        promoted.push(format!("写入 {} 条迭代目标到 {}", written_total, cwd_registry.display()));
+    }
+    promoted
 }
 
 /// 提取高信号词: 非停用词、非纯数字、长度 ≥3 的 ASCII 词 (小写去重)。

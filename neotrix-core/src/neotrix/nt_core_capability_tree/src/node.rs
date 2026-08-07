@@ -36,6 +36,24 @@ impl Domain {
             Domain::Repair => "NT-REPAIR",
         }
     }
+
+    /// 从 "NT-*" 字符串解析域 (大小写不敏感); 无法识别时返回 None。
+    pub fn from_str(name: &str) -> Option<Self> {
+        match name.to_uppercase().as_str() {
+            "NT-CORE" => Some(Domain::Core),
+            "NT-MIND" => Some(Domain::Mind),
+            "NT-MEMORY" => Some(Domain::Memory),
+            "NT-WORLD" => Some(Domain::World),
+            "NT-ACT" => Some(Domain::Act),
+            "NT-SHIELD" => Some(Domain::Shield),
+            "NT-IO" => Some(Domain::Io),
+            "NT-META" => Some(Domain::Meta),
+            "NT-NEXUS" => Some(Domain::Nexus),
+            "NT-GOVERNANCE" => Some(Domain::Governance),
+            "NT-REPAIR" => Some(Domain::Repair),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Domain {
@@ -138,6 +156,7 @@ pub enum EvolutionOp {
     Pruning,           // 修剪: 标记废弃/删除无用节点
     CrossPollination,  // 异花授粉: 跨域抽象共享 Primitive
     Maturation,        // 成熟晋升: Cn -> Cn+1
+    Strengthen,        // 强化: 吸收经验强化既有节点 (R-P42 吸收强化现有节点, 不新建)
 }
 
 /// 演化日志条目

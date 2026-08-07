@@ -33,6 +33,9 @@ pub struct CapabilityRegistry {
     provides_index: HashMap<String, Vec<String>>,   // capability tag -> node ids
     dag: petgraph::Graph<String, ()>,               // 依赖图
     node_indices: HashMap<String, petgraph::graph::NodeIndex>,
+    /// 经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)
+    /// 值结构: {domain, capability, action, rationale, signal, promoted_at}
+    pub experience_targets: Vec<serde_json::Value>,
 }
 
 impl Default for CapabilityRegistry {
@@ -51,6 +54,7 @@ impl CapabilityRegistry {
             provides_index: HashMap::new(),
             dag: petgraph::Graph::new(),
             node_indices: HashMap::new(),
+            experience_targets: Vec::new(),
         }
     }
 
@@ -300,6 +304,7 @@ impl CapabilityRegistry {
         RegistryExport {
             nodes: self.nodes.values().cloned().collect(),
             edges,
+            experience_targets: self.experience_targets.clone(),
         }
     }
 }
@@ -308,6 +313,10 @@ impl CapabilityRegistry {
 pub struct RegistryExport {
     pub nodes: Vec<CapabilityNode>,
     pub edges: Vec<(String, String)>,
+    /// 经验驱动迭代目标 (distill 蒸馏写入, scan --apply 消费)。
+    /// 默认空: 旧文件无此字段时兼容反序列化。
+    #[serde(default)]
+    pub experience_targets: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize)]

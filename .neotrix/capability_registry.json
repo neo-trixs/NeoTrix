@@ -80,47 +80,29 @@
           "to_node": "nt_http::fetch_safe_http",
           "note": "agent-security 吸收: URL userinfo 凭据拒绝 + CGNAT 100.64/10 + benchmarking 198.18/15 + reserved 240/4+0/8 补全 SSRF guard",
           "timestamp": "2026-08-05T10:35:08.392887Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "strengthen",
+          "from_nodes": [],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "cycle262经验: 混合检索FTS5+BM25+RRF做主力,向量只做Tier-3兜底,检索正确性不依赖向量层",
+          "timestamp": "2026-08-07T04:37:26.829474Z"
+        },
+        {
+          "cycle": "pending",
+          "op": "grafting",
+          "from_nodes": [
+            "nt_http::fetch_safe_http_with_headers"
+          ],
+          "to_node": "nt_http::fetch_safe_http",
+          "note": "Consolidate ssrf_guard providers in NT-MEMORY/L0",
+          "timestamp": "2026-08-07T04:37:29.848730Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-05T10:11:47.677408Z",
-      "updated_at": "2026-08-05T10:35:08.392888Z",
-      "deprecated": false,
-      "deprecated_reason": null
-    },
-    {
-      "id": "nt_http::fetch_safe_http_with_headers",
-      "domain": "memory",
-      "layer": "l0primitive",
-      "constellation": "c1unittest",
-      "provides": [
-        "ssrf_guard",
-        "http_headers"
-      ],
-      "requires": [],
-      "rune_sockets": [],
-      "dependents": [],
-      "evolution_log": [
-        {
-          "cycle": "pending",
-          "op": "budding",
-          "from_nodes": [],
-          "to_node": "nt_http::fetch_safe_http_with_headers",
-          "note": "bud: GitHub Accept header variant",
-          "timestamp": "2026-08-05T10:11:52.409287Z"
-        },
-        {
-          "cycle": "auto",
-          "op": "maturation",
-          "from_nodes": [],
-          "to_node": "nt_http::fetch_safe_http_with_headers",
-          "note": "Promoted to C1",
-          "timestamp": "2026-08-05T10:13:24.741648Z"
-        }
-      ],
-      "metadata": {},
-      "created_at": "2026-08-05T10:11:52.409286Z",
-      "updated_at": "2026-08-05T10:13:24.741649Z",
+      "updated_at": "2026-08-07T04:37:29.848731Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -128,7 +110,7 @@
       "id": "nt_io_web::ws_bridge",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c2integrationtest",
+      "constellation": "c6evolutionloop",
       "provides": [
         "im_bridge",
         "websocket",
@@ -161,48 +143,43 @@
           "to_node": "nt_io_web::ws_bridge",
           "note": "Promoted to C2",
           "timestamp": "2026-08-05T10:13:24.735720Z"
-        }
-      ],
-      "metadata": {},
-      "created_at": "2026-08-05T10:11:58.196654Z",
-      "updated_at": "2026-08-05T10:13:24.735721Z",
-      "deprecated": false,
-      "deprecated_reason": null
-    },
-    {
-      "id": "nt_io_web::share_api",
-      "domain": "io",
-      "layer": "l1composite",
-      "constellation": "c1unittest",
-      "provides": [
-        "session_share",
-        "h5_chat",
-        "cors"
-      ],
-      "requires": [],
-      "rune_sockets": [],
-      "dependents": [],
-      "evolution_log": [
-        {
-          "cycle": "pending",
-          "op": "budding",
-          "from_nodes": [],
-          "to_node": "nt_io_web::share_api",
-          "note": "grafted from server/http.rs+h5.rs",
-          "timestamp": "2026-08-05T10:11:58.203021Z"
         },
         {
           "cycle": "auto",
           "op": "maturation",
           "from_nodes": [],
-          "to_node": "nt_io_web::share_api",
-          "note": "Promoted to C1",
-          "timestamp": "2026-08-05T10:13:24.747250Z"
+          "to_node": "nt_io_web::ws_bridge",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-07T04:37:29.848727Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_web::ws_bridge",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-07T04:38:20.066426Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_web::ws_bridge",
+          "note": "Promoted to C5",
+          "timestamp": "2026-08-07T04:40:27.646516Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_web::ws_bridge",
+          "note": "Promoted to C6",
+          "timestamp": "2026-08-07T04:40:31.548321Z"
         }
       ],
       "metadata": {},
-      "created_at": "2026-08-05T10:11:58.203020Z",
-      "updated_at": "2026-08-05T10:13:24.747251Z",
+      "created_at": "2026-08-05T10:11:58.196654Z",
+      "updated_at": "2026-08-07T04:40:31.548321Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -210,7 +187,7 @@
       "id": "nt_world_novel::qidian_ingest",
       "domain": "world",
       "layer": "l1composite",
-      "constellation": "c4mainpipeline",
+      "constellation": "c6evolutionloop",
       "provides": [
         "novel_ingest",
         "qidian_classify"
@@ -258,11 +235,27 @@
           "to_node": "nt_world_novel::qidian_ingest",
           "note": "Promoted to C4",
           "timestamp": "2026-08-05T10:13:24.723447Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_novel::qidian_ingest",
+          "note": "Promoted to C5",
+          "timestamp": "2026-08-07T04:37:29.848729Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_world_novel::qidian_ingest",
+          "note": "Promoted to C6",
+          "timestamp": "2026-08-07T04:38:20.066429Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-05T10:11:58.209032Z",
-      "updated_at": "2026-08-05T10:13:24.723448Z",
+      "updated_at": "2026-08-07T04:38:20.066429Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -296,7 +289,7 @@
           "from_nodes": [],
           "to_node": "nt_core_e8::nt_multimodal::VisionBridge",
           "note": "vision bridge: fills missing upstream image-feature extraction for MultimodalEncoder; model_supports_vision detection; evidence text contract for text-only models",
-          "timestamp": "2026-08-05T11:30:45.198559+00:00"
+          "timestamp": "2026-08-05T11:30:45.198559Z"
         },
         {
           "cycle": "cycle-168",
@@ -304,12 +297,12 @@
           "from_nodes": [],
           "to_node": "nt_core_e8::nt_multimodal::VisionBridge",
           "note": "classification-first routing (ImageClass: document/screenshot/photo/blank/unknown) + content-addressed sha256 evidence cache (bounded 128) + 64-bit dHash phash dedup; video phase upgraded to scene-aware multi-frame aggregation (blank/near-dup frame dropping); nt_world_video_pipeline::process_video replaced heuristic stub with real ffmpeg scene-aware extraction; fixed phash bit-overflow panic + variance/contrast math bug",
-          "timestamp": "2026-08-05T12:30:00.000000+00:00"
+          "timestamp": "2026-08-05T12:30:00Z"
         }
       ],
       "metadata": {},
-      "created_at": "2026-08-05T11:30:45.198559+00:00",
-      "updated_at": "2026-08-05T12:30:00.000000+00:00",
+      "created_at": "2026-08-05T11:30:45.198559Z",
+      "updated_at": "2026-08-05T12:30:00Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -338,52 +331,488 @@
           "from_nodes": [],
           "to_node": "nt_core_harness::HarnessAdapter",
           "note": "harness adapter: environment contracts + procedural skills + performance-delta transfer, KB-persisted (HarnessKbExt)",
-          "timestamp": "2026-08-05T12:40:00.000000+00:00"
+          "timestamp": "2026-08-05T12:40:00Z"
         },
         {
           "cycle": "cycle-160",
           "op": "strengthen",
           "from_nodes": [],
           "to_node": "nt_core_harness::HarnessAdapter",
-          "note": "HarnessX (arxiv 2606.14249) substitution-algebra trace->harness evolution verified as reinforce onto existing node per R-P42; no new node (typed harness primitives + trace distillation into profile updates)", 
-          "timestamp": "2026-08-05T12:40:00.000000+00:00"
+          "note": "HarnessX (arxiv 2606.14249) substitution-algebra trace->harness evolution verified as reinforce onto existing node per R-P42; no new node (typed harness primitives + trace distillation into profile updates)",
+          "timestamp": "2026-08-05T12:40:00Z"
         }
       ],
       "metadata": {},
-      "created_at": "2026-08-05T12:40:00.000000+00:00",
-      "updated_at": "2026-08-05T12:40:00.000000+00:00",
+      "created_at": "2026-08-05T12:40:00Z",
+      "updated_at": "2026-08-05T12:40:00Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-core::architecture_decision",
+      "domain": "core",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "architecture_decision"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::architecture_decision",
+          "note": "经验驱动新节点: [深度挖掘] 架构决策链: 架构决策链5条(从22951长文本挖57条显式决策链)：1)连通性>编译性——模块能编译≠在工作，接线计数>0才是验证标准(156个ghost模块编译完美贡献为零)；2)万法归一——统一管线替代平台特化(6个extractor→1个，1243→380行-70%)；3)确定性内核直接接线拒绝Hook(",
+          "timestamp": "2026-08-07T04:41:56.192059Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::architecture_decision",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112208Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192057Z",
+      "updated_at": "2026-08-07T04:42:01.112210Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-core::performance_concurrency",
+      "domain": "core",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "performance_concurrency"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::performance_concurrency",
+          "note": "经验驱动新节点: [深度挖掘] 性能并发: 架构决策链第二轮5条(精读20+决策链)：1)合并裁决标准=生产消费者零+输入输出同映射，意图声明≠生产路径(4783行模块是尸体因seal_pipeline未注册)；2)项目自带架构门禁是迁移硬约束——re-export触发自身layer_violation审计，先修审计者预期而非动代码；3)语言",
+          "timestamp": "2026-08-07T04:41:56.192076Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::performance_concurrency",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112213Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192075Z",
+      "updated_at": "2026-08-07T04:42:01.112213Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-core::e8_reasoning",
+      "domain": "core",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "e8_reasoning"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::e8_reasoning",
+          "note": "经验驱动新节点: [深度挖掘] E8认知: 性能并发5条：1)VSA热路径——标量循环→打包表示(4096位压512字节)+SIMD(popcnt 8-16x)+连续内存布局，但simd-vsa特性是死代码([patch]覆盖dummy从未链接)——feature门控优化必须验证真实链接路径；2)并发锁——单全局锁→细粒度锁/RwLock快照",
+          "timestamp": "2026-08-07T04:41:56.192084Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::e8_reasoning",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112216Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192084Z",
+      "updated_at": "2026-08-07T04:42:01.112216Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-repair::root_cause_method",
+      "domain": "repair",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "root_cause_method"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::root_cause_method",
+          "note": "经验驱动新节点: [深度挖掘] 根因方法论: 根因分析方法论5条：1)并发故障多根因叠加，按P0→Pn严重度逐层剥离独立验证；2)编译错误冰山——编译器分阶段掩盖错误(57+40+55三轮波浪)，先聚类根因(150错误仅7根因)一次性消除；3)增量缓存污染——幻影错误用touch/cargo clean强制重编译，结构变更必clean；4)借用",
+          "timestamp": "2026-08-07T04:41:56.192103Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::root_cause_method",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112217Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192103Z",
+      "updated_at": "2026-08-07T04:42:01.112218Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-repair::failure_recovery",
+      "domain": "repair",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "failure_recovery"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::failure_recovery",
+          "note": "经验驱动新节点: [深度挖掘] 失败恢复: 跨会话高频问题(11.5K会话)：rust 8002 > compile 7523 > knowledge 5938 > memory 5899 > cargo 5719 > build 5441 > vsa 4072 > proxy 3014 > tauri 2452 > timeout 2414",
+          "timestamp": "2026-08-07T04:41:56.192128Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::failure_recovery",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112219Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192127Z",
+      "updated_at": "2026-08-07T04:42:01.112219Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-repair::build_hygiene",
+      "domain": "repair",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "build_hygiene"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::build_hygiene",
+          "note": "经验驱动新节点: [深度挖掘] 构建卫生: 失败恢复4条(量化证据)：1)编辑失败→重读→重试——edit error后read刷新再edit，1588次中1577成功(99.3%)；2)构建缓存不可信→clean build——cargo clean/rm fingerprint后check成功，20+次clean序列；3)网络失败→指数退",
+          "timestamp": "2026-08-07T04:41:56.192140Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::build_hygiene",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112221Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192140Z",
+      "updated_at": "2026-08-07T04:42:01.112221Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-act::tool_routing",
+      "domain": "act",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "tool_routing"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-act::tool_routing",
+          "note": "经验驱动新节点: [深度挖掘] 工具路由: 工具路由智慧5条：1)读文件用read不用cat(250倍频率,行号语义)；2)搜代码用grep工具优先bash grep，bash内用rg(更快忽略gitignore)；3)找文件用glob不用find(12倍)；4)网络先websearch后webfetch(先搜后取,webfetch错误率16",
+          "timestamp": "2026-08-07T04:41:56.192149Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-act::tool_routing",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112222Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192148Z",
+      "updated_at": "2026-08-07T04:42:01.112223Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-act::goal_decomposition",
+      "domain": "act",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "goal_decomposition"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-act::goal_decomposition",
+          "note": "经验驱动新节点: [深度挖掘] 需求分解: 用户需求表述模式(14万text全量)：fix修复29.5% > test测试22.8% > explore探索19.9% > question提问15.5% > implement实现14.3% > review审查12.7% > design设计8.4% > config配置6.8% > res",
+          "timestamp": "2026-08-07T04:41:56.192157Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-act::goal_decomposition",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112224Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192157Z",
+      "updated_at": "2026-08-07T04:42:01.112224Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-memory::hybrid_retrieval",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "hybrid_retrieval"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::hybrid_retrieval",
+          "note": "经验驱动新节点: [深度挖掘] 混合检索: 知识库演进5阶段：1)先统一存储(7套并存→单一SQLite骨干，63K节点时7套系统指数放大一致性问题)；2)再批量爆发(平台期63K→65K 12天+3%，爆发期07-31单日+149%靠kb_batch_absorb批量管线)；3)后语义校准(文理分科→本源溯源5本源，空节点63%比总数更致命",
+          "timestamp": "2026-08-07T04:41:56.192166Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::hybrid_retrieval",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112226Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192165Z",
+      "updated_at": "2026-08-07T04:42:01.112226Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-memory::schema_migration",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "schema_migration"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::schema_migration",
+          "note": "经验驱动新节点: [深度挖掘] schema迁移: 解法有效性验证(时间分布)：proxy网络故障06-18高峰45次/日→07-15后基本消失(收敛根治，neotrix-proxy-init.sh封装有效)；cargo编译错误持续高位(06-30达454次/日，08-06仍30次/日，未收敛，多为并发干扰非复发)；测试失败06-18高峰198→08",
+          "timestamp": "2026-08-07T04:41:56.192188Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::schema_migration",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112227Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192188Z",
+      "updated_at": "2026-08-07T04:42:01.112227Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-memory::vector_storage",
+      "domain": "memory",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "vector_storage"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::vector_storage",
+          "note": "经验驱动新节点: [深度挖掘] 向量存储: 数据层5条：1)混合检索FTS5+BM25+RRF融合做主力，向量重排只做Tier-3兜底——检索正确性不依赖向量层，向量缺失只损失排序不损失召回(NEOTRIX_EMBEDDING_API_KEY从未设置仍可用)；2)向量存储必须维度一致+持久化+有真实触发点，否则静默炸弹(DB存量384维all",
+          "timestamp": "2026-08-07T04:41:56.192214Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::vector_storage",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112229Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192214Z",
+      "updated_at": "2026-08-07T04:42:01.112229Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-shield::security_governance",
+      "domain": "shield",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "security_governance"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-shield::security_governance",
+          "note": "经验驱动新节点: [深度挖掘] 安全治理: 安全治理5条：1)密钥管理分层+加密+统一入口(env→加密内存KeyVault→AES-256-GCM保险库，secret_scanner主动泄漏检测，反例preview-ui明文存localStorage被判严重漏洞)；2)门禁默认拒绝+分层检查+可审计(SecurityGuard三态Allow",
+          "timestamp": "2026-08-07T04:41:56.192224Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-shield::security_governance",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112230Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192224Z",
+      "updated_at": "2026-08-07T04:42:01.112231Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "exp::nt-meta::meta_cognition",
+      "domain": "meta",
+      "layer": "l0primitive",
+      "constellation": "c1unittest",
+      "provides": [
+        "meta_cognition"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "auto",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "exp::nt-meta::meta_cognition",
+          "note": "经验驱动新节点: [深度挖掘] 元认知蒸馏: 蒸馏方法论修正：首轮采样2000条只产出6条宏观统计(读0.5%数据)；全量扫描49万条产出26缺陷类别+30修复对+50文件热点+11需求类型。结论：经验蒸馏必须全量聚类而非采样，采样只适合快速体检，深度知识提取需全量扫描。",
+          "timestamp": "2026-08-07T04:41:56.192234Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-meta::meta_cognition",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-07T04:42:01.112232Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-07T04:41:56.192234Z",
+      "updated_at": "2026-08-07T04:42:01.112232Z",
       "deprecated": false,
       "deprecated_reason": null
     }
   ],
   "edges": [
     [
-      "nt_http::fetch_safe_http_with_headers",
+      "nt_io_web::ws_bridge",
       "nt_http::fetch_safe_http"
     ],
     [
       "nt_world_novel::qidian_ingest",
       "nt_http::fetch_safe_http"
-    ],
-    [
-      "nt_io_web::ws_bridge",
-      "nt_http::fetch_safe_http"
-    ],
-    [
-      "nt_io_neocodex::build_request",
-      "nt_core_e8::nt_multimodal::VisionBridge"
-    ],
-    [
-      "nt_io_provider::gateway::describe_image",
-      "nt_core_e8::nt_multimodal::VisionBridge"
-    ],
-    [
-      "nt_world_video_pipeline::process_video",
-      "nt_core_e8::nt_multimodal::VisionBridge"
-    ],
-    [
-      "nt_mind.seal_core.harness_adapter",
-      "nt_core_harness::HarnessAdapter"
     ]
-  ]
+  ],
+  "experience_targets": []
 }
