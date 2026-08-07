@@ -22,7 +22,7 @@
 //!   cargo run -p neotrix --bin neotrix-experience snapshot --cycle NNN --task "..." [--domain X]
 //!   cargo run -p neotrix --bin neotrix-experience absorb <session.json>
 //!   cargo run -p neotrix --bin neotrix-experience close --cycle NNN
-//!   cargo run -p neotrix --bin neotrix-experience query --kw "关键词" [--type T] [--domain D] [--limit N] [--no-hebb]
+//!   cargo run -p neotrix --bin neotrix-experience query --kw "关键词" [--type T] [--domain D] [--limit N] [--no-hebb] [--include-distilled]
 //!   cargo run -p neotrix --bin neotrix-experience list [--type T] [--domain D]
 //!   cargo run -p neotrix --bin neotrix-experience stale [--domain D]
 //!   cargo run -p neotrix --bin neotrix-experience hub
@@ -31,6 +31,7 @@
 //!   cargo run -p neotrix --bin neotrix-experience backfill
 //!   cargo run -p neotrix --bin neotrix-experience prune [--stop WORD ...] [--stale-isolated]
 //!   cargo run -p neotrix --bin neotrix-experience hebb
+//!   cargo run -p neotrix --bin neotrix-experience distill [--domain D] [--min-group N] [--dry-run]
 //!   cargo run -p neotrix --bin neotrix-experience compress [--all]
 //!   cargo run -p neotrix --bin neotrix-experience gen-index [--out FILE] [--limit N]
 
@@ -789,7 +790,7 @@ fn validate_entry(e: &Value) -> Vec<String> {
     errors
 }
 
-fn cmd_absorb(conn: &Connection, session_path: &str) {
+fn cmd_absorb(conn: &mut Connection, session_path: &str) {
     let mut hub = ensure_hub(conn);
     let raw = std::fs::read_to_string(session_path).expect("read session.json");
     let session: Value = serde_json::from_str(&raw).expect("session.json is valid JSON");
@@ -973,6 +974,33 @@ fn cmd_absorb(conn: &Connection, session_path: &str) {
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
     println!("[absorb] {} entries from {} (cycle={})", written, sid, cycle);
+    // 自动消退蒸馏: 吸收后若未蒸馏分支累积超阈值, 自动触发 distill
+    // (经验无限追加 → 维度膨胀 → 自动收敛为能力模式, "始终处于最优解状态")
+    auto_distill_if_over_threshold(conn, &mut hub);
+}
+
+/// 吸收后自动蒸馏: 未蒸馏分支数 ≥ 阈值时触发 distill (min_group=3 默认)。
+/// 幂等 — distill 自身跳过已蒸馏条目; 阈值防频繁触发 (每 cycle 吸收 6 条
+/// 左右, 阈值 60 ≈ 10 cycle 一次收敛)。
+const AUTO_DISTILL_THRESHOLD: usize = 60;
+fn auto_distill_if_over_threshold(conn: &mut Connection, hub: &mut Value) {
+    let mut undistilled = 0;
+    for (_, value) in scan_values(conn, "branch_") {
+        let Ok(v) = serde_json::from_str::<Value>(&value) else { continue };
+        if !v.get("distilled").and_then(|x| x.as_bool()).unwrap_or(false) {
+            undistilled += 1;
+        }
+    }
+    if undistilled < AUTO_DISTILL_THRESHOLD {
+        return;
+    }
+    println!(
+        "[absorb] 未蒸馏分支 {} 条 ≥ 阈值 {}, 自动触发维度蒸馏...",
+        undistilled, AUTO_DISTILL_THRESHOLD
+    );
+    cmd_distill(conn, None, 3, false);
+    refresh_hub_metrics(conn, hub);
+    save_hub(conn, hub);
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -1423,8 +1451,11 @@ struct QueryResult {
     semantic: f64,
 }
 
-fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>, limit: usize, no_hebb: bool, json: bool, semantic: bool) {
+fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>, limit: usize, no_hebb: bool, json: bool, semantic: bool, include_distilled: bool) -> usize {
     ensure_hub(conn);
+    // 蒸馏降权: 默认过滤已蒸馏原始条目 (模式已升维), --include-distilled 保留溯源
+    let allow_distilled = |v: &Value| include_distilled
+        || !v.get("distilled").and_then(|x| x.as_bool()).unwrap_or(false);
     let kws: Vec<String> = kw
         .split_whitespace()
         .map(|k| k.to_lowercase())
@@ -1476,6 +1507,9 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
     } else {
         for (key, v) in &cache {
             let Some(v) = v else { continue };
+            if !allow_distilled(v) {
+                continue;
+            }
             if !kws.is_empty() {
                 let blob = format!(
                     "{} {} {}",
@@ -1642,7 +1676,7 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
             })
             .collect();
         println!("{}", json!(arr));
-        return;
+        return results.len();
     }
     for r in &results[..shown] {
         let stale_mark = if is_stale(r.verify_by.as_ref(), now) {
@@ -1680,6 +1714,7 @@ fn cmd_query(conn: &Connection, kw: &str, ty: Option<&str>, domain: Option<&str>
         results.len(),
         shown
     );
+    results.len()
 }
 
 fn cmd_list(conn: &Connection, ty: Option<&str>, domain: Option<&str>, cycle: Option<&str>) {
@@ -2274,11 +2309,57 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
     }
     tx.commit().expect("distill commit");
 
-    // 4. hub 指标刷新
+    // 4. 意识体维度蒸馏: 聚合本次蒸馏的元认知信号 → 意识体维度 insight
+    //    (ConsciousnessTree/GWT 消费: 域健康、主题演化、蒸馏收敛度)
+    let mut dom_counts: HashMap<String, usize> = HashMap::new();
+    for (d, _, src) in &distilled {
+        *dom_counts.entry(d.clone()).or_default() += src.len();
+    }
+    let mut dom_v: Vec<(String, usize)> = dom_counts.into_iter().collect();
+    dom_v.sort_by(|a, b| b.1.cmp(&a.1));
+    let dom_str = dom_v
+        .iter()
+        .map(|(d, n)| format!("{}:{}", d, n))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let consciousness_entry = json!({
+        "schema_version": 1,
+        "type": "insight",
+        "session_id": "distill",
+        "cycle": "distill",
+        "ts": now,
+        "domain": "NT-META",
+        "content": format!(
+            "[意识体蒸馏] 本轮收敛 {} 组经验为 {} 条能力模式, 标记 {} 条原始经验。\
+             跨域分布: {}. 意识体维度信号: 经验维度向能力网模式收敛, \
+             细枝末节降权为溯源证据。",
+            distilled.len(),
+            distilled.len(),
+            marked.len(),
+            dom_str
+        ),
+        "evidence": "neotrix-experience distill",
+        "source": "distill",
+        "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+        "dimension": "consciousness",
+        "distilled_from": marked.clone(),
+    });
+    let ckey = format!("branch_consciousness_{}", now);
+    conn.execute(
+        "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+        params![NS, ckey, value_encode(&consciousness_entry.to_string()), now],
+    )
+    .expect("consciousness distill insert");
+
+    // 5. hub 指标刷新
     let mut hub = ensure_hub(conn);
     refresh_hub_metrics(conn, &mut hub);
     save_hub(conn, &hub);
-    println!("[distill] 已落盘 {} 条能力模式, {} 条原始经验标记 distilled", distilled.len(), marked.len());
+    println!(
+        "[distill] 已落盘 {} 条能力模式 + 1 条意识体维度 insight, {} 条原始经验标记 distilled",
+        distilled.len(),
+        marked.len()
+    );
 }
 
 /// 提取高信号词: 非停用词、非纯数字、长度 ≥3 的 ASCII 词 (小写去重)。
@@ -2674,6 +2755,9 @@ enum Cmd {
         /// 增加 VSA 语义近邻信号: 检索后按嵌入相似度加权重排 (混合检索第三路)
         #[arg(long)]
         semantic: bool,
+        /// 包含已蒸馏 (distilled) 的原始经验 — 默认过滤 (模式已升维, 原始条目仅作溯源)
+        #[arg(long)]
+        include_distilled: bool,
     },
     /// 列出条目
     List {
@@ -2777,15 +2861,15 @@ fn main() {
     match cli.cmd {
         Cmd::Snapshot { cycle, task, domain } => cmd_snapshot(&conn, &cycle, &task, &domain),
         Cmd::Close { cycle } => cmd_close(&conn, &cycle),
-        Cmd::Absorb { session } => cmd_absorb(&conn, &session),
+        Cmd::Absorb { session } => cmd_absorb(&mut conn, &session),
         Cmd::AbsorbNode { input, dry_run, apply_capability } => {
             cmd_absorb_node(&conn, &input, dry_run, apply_capability)
         }
         Cmd::UpdateNodeMetadata { input, dry_run } => {
             cmd_update_node_metadata(&conn, &input, dry_run)
         }
-        Cmd::Query { kw, r#type, domain, limit, no_hebb, json, semantic } => {
-            cmd_query(&conn, &kw, r#type.as_deref(), domain.as_deref(), limit, no_hebb, json, semantic)
+        Cmd::Query { kw, r#type, domain, limit, no_hebb, json, semantic, include_distilled } => {
+            cmd_query(&conn, &kw, r#type.as_deref(), domain.as_deref(), limit, no_hebb, json, semantic, include_distilled);
         }
         Cmd::List { r#type, domain, cycle } => cmd_list(&conn, r#type.as_deref(), domain.as_deref(), cycle.as_deref()),
         Cmd::Stale { domain } => cmd_stale(&conn, domain.as_deref()),
@@ -3388,5 +3472,86 @@ mod tests {
             }
         }
         assert_eq!(marked, 3, "3 条原始经验应标记 distilled");
+    }
+
+    #[test]
+    fn test_cmd_distill_generates_consciousness_entry() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::nt_memory_schema::initialize(&conn).unwrap();
+        let now = now_ts();
+        for i in 0..3 {
+            let key = format!("branch_test_{}", i);
+            let v = json!({
+                "schema_version": 1, "type": "insight", "session_id": "t",
+                "cycle": "1", "ts": now, "domain": "NT-CORE",
+                "content": format!("neural network training error GPU memory case {}", i),
+                "evidence": "file.rs:1", "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+            });
+            conn.execute(
+                "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                params![NS, key, value_encode(&v.to_string()), now],
+            )
+            .unwrap();
+        }
+        cmd_distill(&mut conn, Some("NT-CORE"), 3, false);
+        // 意识体维度条目生成
+        let ckey: String = conn
+            .query_row(
+                "SELECT key FROM kv_store WHERE namespace=?1 AND key LIKE 'branch_consciousness_%'",
+                params![NS],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let (_, cvalue) = scan_values(&conn, "branch_consciousness_")
+            .into_iter()
+            .next()
+            .unwrap();
+        let c: Value = serde_json::from_str(&cvalue).unwrap();
+        assert_eq!(c["dimension"], "consciousness");
+        assert_eq!(c["type"], "insight");
+        assert!(c["content"].as_str().unwrap().contains("意识体蒸馏"));
+        assert!(c["distilled_from"].as_array().unwrap().len() >= 3);
+        let _ = ckey;
+    }
+
+    #[test]
+    fn test_query_filters_distilled_by_default() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::nt_memory_schema::initialize(&conn).unwrap();
+        let now = now_ts();
+        // 2 条普通 + 1 条 distilled
+        let mut entries = vec![
+            ("branch_a_1", json!({
+                "schema_version": 1, "type": "insight", "session_id": "t",
+                "cycle": "1", "ts": now, "domain": "NT-CORE",
+                "content": "neural network training tip one", "evidence": "f:1",
+                "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+            })),
+            ("branch_a_2", json!({
+                "schema_version": 1, "type": "insight", "session_id": "t",
+                "cycle": "1", "ts": now, "domain": "NT-CORE",
+                "content": "neural network training tip two", "evidence": "f:2",
+                "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+            })),
+            ("branch_a_3", json!({
+                "schema_version": 1, "type": "insight", "session_id": "t",
+                "cycle": "1", "ts": now, "domain": "NT-CORE",
+                "content": "neural network training distilled old", "evidence": "f:3",
+                "distilled": true, "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
+            })),
+        ];
+        for (k, v) in entries.drain(..) {
+            conn.execute(
+                "INSERT INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
+                params![NS, k, value_encode(&v.to_string()), now],
+            )
+            .unwrap();
+        }
+        // 默认过滤 distilled → 2 条
+        let res = cmd_query(&conn, "neural", None, None, 10, false, false, false, false);
+        assert_eq!(res, 2, "默认应过滤 distilled 条目, 得到 {}", res);
+        // include_distilled → 3 条
+        let res2 = cmd_query(&conn, "neural", None, None, 10, false, false, false, true);
+        assert_eq!(res2, 3, "include_distilled 应含原始条目");
     }
 }
