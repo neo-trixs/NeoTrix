@@ -92,6 +92,10 @@ g.renameSession = renameSession;
 g.compactSession = compactSession;
 g.archiveSession = archiveSession;
 g.exportSession = exportSession;
+g.loadSideChat = loadSideChat;
+g.sendSideChat = sendSideChat;
+g.setAutoArchiveDays = setAutoArchiveDays;
+g.autoArchiveIdleSessions = autoArchiveIdleSessions;
 g.deleteSession = deleteSession;
 g.feedbackMessage = feedbackMessage;
 g.searchSessions = searchSessions;
@@ -1604,6 +1608,13 @@ g.renderStApiKey = renderStApiKey;
       if(window._ntxStreamActive){ stopStream(); }
       else { closePopover(); updateTrafficVisibility(); }
     }
+    // Cmd+; 侧向对话 Side Chat (独立上下文, 不污染主线程)
+    if((e.metaKey || e.ctrlKey) && e.key === ';'){
+      e.preventDefault();
+      openOverlay('overlaySideChat');
+      const inp = document.getElementById('sideChatInput');
+      if(inp) setTimeout(() => inp.focus(), 30);
+    }
     // Cmd+Shift+S 侧边栏开关 (C7)
     if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'S' || e.key === 's')){
       e.preventDefault();
@@ -1802,7 +1813,36 @@ g.renderStApiKey = renderStApiKey;
       renderSidebar(currentView);
       renderCowork();
       if(CW_DATA.length) showToast('已加载 ' + CW_DATA.length + ' 个会话');
+      autoArchiveIdleSessions();
     }catch(e){ /* keep demo data */ }
+  }
+
+  // ── 自动归档触发 (空闲会话) ─────────────────────────────
+  // 对超过阈值未更新的非当前会话自动归档, 阈值可经设置 localStorage 调整。
+  // 默认关闭 (0 = 不启用), 避免误归档; 用户可在设置中开启并设天数。
+  async function autoArchiveIdleSessions(){
+    if(!isTauri()) return;
+    let days = 0;
+    try{ days = parseInt(localStorage.getItem('ntx_auto_archive_days') || '0', 10); }catch(_e){ days = 0; }
+    if(!days || days <= 0) return;
+    const now = Date.now();
+    const cutoff = now - days * 86400000;
+    const idle = (CW_DATA || []).filter(s =>
+      s.id && !s.isCowork && s.id !== currentSessionId &&
+      (!s.updated_at || s.updated_at * 1000 < cutoff)
+    );
+    if(!idle.length) return;
+    let archived = 0;
+    for(const s of idle){
+      try{
+        await invoke('neocodex_archive_session', { session_id: s.id });
+        archived++;
+      }catch(_e){ /* skip */ }
+    }
+    if(archived){
+      showToast('已自动归档 ' + archived + ' 个空闲会话');
+      await refreshSessionList();
+    }
   }
 
   async function createSession(){
@@ -3417,6 +3457,7 @@ g.renderStApiKey = renderStApiKey;
     const el=document.getElementById(id);
     if(el)el.classList.add('open');
     if(id === 'overlayHypercube') loadHypercube();
+    if(id === 'overlaySideChat') loadSideChat();
     updateTrafficVisibility();
   }
 
@@ -3425,6 +3466,62 @@ g.renderStApiKey = renderStApiKey;
     if(el)el.classList.remove('open');
     updateTrafficVisibility();
   }
+
+  // ── Side Chat (侧向对话, Cmd+;) ─────────────────────────────
+  // 独立上下文: 问题不进入主对话 wire, 由后端 side_chat_ask 生成隔离回答。
+  async function loadSideChat(){
+    const box = document.getElementById('sideChatMsgs');
+    if(!box) return;
+    if(!isTauri() || !currentSessionId){
+      box.innerHTML = '<div class="sdc-empty" style="color:var(--tx-meta);font-size:var(--fs-caption);padding:16px;text-align:center">打开一个会话后可用侧向对话</div>';
+      return;
+    }
+    try{
+      const msgs = await invoke('neocodex_get_side_chat', { session_id: currentSessionId });
+      renderSideChat(msgs || []);
+    }catch(e){
+      box.innerHTML = '<div class="sdc-empty" style="color:var(--tx-meta);font-size:var(--fs-caption);padding:16px;text-align:center">加载失败: ' + e + '</div>';
+    }
+  }
+
+  function renderSideChat(msgs){
+    const box = document.getElementById('sideChatMsgs');
+    if(!box) return;
+    if(!msgs.length){
+      box.innerHTML = '<div class="sdc-empty" style="color:var(--tx-meta);font-size:var(--fs-caption);padding:16px;text-align:center">侧向对话与主对话隔离，适合追问、头脑风暴、无关问题</div>';
+      return;
+    }
+    box.innerHTML = msgs.map(m => {
+      const role = m.role === 'user' ? 'user' : 'assistant';
+      const content = (m.content || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+      return '<div class="sdc-msg ' + role + '" style="margin-bottom:10px;padding:10px 12px;border-radius:10px;background:' +
+        (role === 'user' ? 'var(--bg-input,#1e1e1e)' : 'var(--bg-2,#262626)') +
+        ';border:1px solid var(--bd,#333);font-size:var(--fs-body);line-height:1.6;white-space:normal">' + content + '</div>';
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendSideChat(){
+    const inp = document.getElementById('sideChatInput');
+    const content = (inp && inp.value || '').trim();
+    if(!content) return;
+    if(!isTauri() || !currentSessionId){ showToast('需在会话中发起侧向对话'); return; }
+    inp.value = '';
+    try{
+      const msgs = await invoke('neocodex_send_side_chat', { session_id: currentSessionId, content });
+      renderSideChat(msgs || []);
+    }catch(e){
+      showToast('侧向对话失败: ' + e);
+    }
+  }
+
+  // Side Chat 输入框 Enter 发送 (Shift+Enter 换行)
+  document.addEventListener('keydown', function(e){
+    if(e.target && e.target.id === 'sideChatInput' && e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      sendSideChat();
+    }
+  });
 
   function filterSettings(q){
     const items = document.querySelectorAll('#overlaySettings .st-item');
@@ -3464,6 +3561,7 @@ g.renderStApiKey = renderStApiKey;
     if(section==='security') await renderStSecurity();
     if(section==='profile') initProfileHandlers();
     if(section==='appearance') initAppearanceHandlers();
+    if(section==='shortcuts') initShortcutsHandlers();
     if(section==='speech') initSpeechHandlers();
     if(section==='compute') initComputeHandlers();
     if(section==='compute') initApiKeyHandlers();
@@ -3502,6 +3600,23 @@ g.renderStApiKey = renderStApiKey;
         showToast(reduceTrans.checked ? '已开启减少透明效果' : '已关闭减少透明效果');
       };
     }
+  }
+
+  function initShortcutsHandlers(){
+    const sel = document.getElementById('stAutoArchiveDays');
+    if(sel){
+      const saved = localStorage.getItem('ntx_auto_archive_days') || '0';
+      sel.value = saved;
+      sel.onchange = () => {
+        localStorage.setItem('ntx_auto_archive_days', sel.value);
+        showToast(sel.value === '0' ? '已关闭自动归档' : '自动归档阈值: ' + sel.value + ' 天');
+      };
+    }
+  }
+
+  function setAutoArchiveDays(v){
+    localStorage.setItem('ntx_auto_archive_days', String(v));
+    showToast(v === '0' ? '已关闭自动归档' : '自动归档阈值: ' + v + ' 天');
   }
 
   function initSpeechHandlers(){

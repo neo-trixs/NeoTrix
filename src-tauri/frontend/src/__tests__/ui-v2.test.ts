@@ -1673,5 +1673,79 @@ describe("ui-v2 (design HTML migrated to vite entry)", () => {
       }
     });
   });
+
+  describe("side chat (Cmd+; branch conversation)", () => {
+    it("renders empty state when no session", async () => {
+      const g = globalThis as Record<string, unknown>;
+      await (g.loadSideChat as () => Promise<void>)();
+      const box = document.getElementById("sideChatMsgs")!;
+      expect(box.textContent).toContain("打开一个会话");
+    });
+
+    it("renders messages from backend and sends a new one", async () => {
+      const g = globalThis as Record<string, unknown>;
+      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+        invoke: (cmd: string, args: Record<string, unknown>) => {
+          if (cmd === "neocodex_get_side_chat") {
+            return Promise.resolve([
+              { role: "user", content: "帮我看看这段代码" },
+              { role: "assistant", content: "这段代码的复杂度是 O(n)" },
+            ]);
+          }
+          if (cmd === "neocodex_send_side_chat") {
+            expect(args.content).toBe("再解释一下");
+            return Promise.resolve([
+              { role: "user", content: "再解释一下" },
+              { role: "assistant", content: "好的，展开来说…" },
+            ]);
+          }
+          return Promise.resolve(null);
+        },
+      };
+      try {
+        await (g.loadSideChat as () => Promise<void>)();
+        const box = document.getElementById("sideChatMsgs")!;
+        expect(box.querySelectorAll(".sdc-msg").length).toBe(2);
+        expect(box.textContent).toContain("复杂度是 O(n)");
+        const inp = document.getElementById("sideChatInput") as HTMLTextAreaElement;
+        inp.value = "再解释一下";
+        await (g.sendSideChat as () => Promise<void>)();
+        expect(box.querySelectorAll(".sdc-msg").length).toBe(2);
+        expect(box.textContent).toContain("好的，展开");
+      } finally {
+        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+      }
+    });
+  });
+
+  describe("auto archive idle sessions", () => {
+    it("does nothing when auto-archive disabled", async () => {
+      const g = globalThis as Record<string, unknown>;
+      const mem = new Map<string, string>();
+      const store = {
+        getItem: (k: string) => mem.get(k) ?? null,
+        setItem: (k: string, v: string) => { mem.set(k, String(v)); },
+        removeItem: (k: string) => { mem.delete(k); },
+      };
+      const realLS = (globalThis as Record<string, unknown>).localStorage;
+      (globalThis as Record<string, unknown>).localStorage = store;
+      store.setItem("ntx_auto_archive_days", "0");
+      const realInternals = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+      let invoked = 0;
+      (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = {
+        invoke: () => { invoked++; return Promise.resolve(null); },
+      };
+      try {
+        await (g.autoArchiveIdleSessions as () => Promise<void>)();
+        expect(invoked).toBe(0);
+      } finally {
+        (globalThis as Record<string, unknown>).localStorage = realLS;
+        if (realInternals === undefined) delete (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
+        else (globalThis as Record<string, unknown>).__TAURI_INTERNALS__ = realInternals;
+      }
+    });
+  });
 });
 
