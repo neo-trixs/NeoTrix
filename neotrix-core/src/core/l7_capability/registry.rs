@@ -463,6 +463,52 @@ impl CapabilityRegistry {
     pub fn all(&self) -> &[Capability] { &self.capabilities }
     pub fn count(&self) -> usize { self.capabilities.len() }
 
+    /// 桥接 nt_core_model_skills 模型能力注册表 → L7 能力网。
+    /// 把模型能力 (vision/context_window/provider) 注册为 Cognitive 类 capability,
+    /// 使能力网可感知模型选择能力 (模型能力查询桥接, 消除 model_skills 死代码)。
+    pub fn register_model_skills(&mut self) -> usize {
+        use crate::core::nt_core_model_skills::REGISTRY;
+        let mut registered = 0;
+        for cap in REGISTRY.list_models() {
+            let id = capability_id_from_name(&format!("model_{}", cap.model_name));
+            if self.get(&id).is_some() {
+                continue;
+            }
+            let mut tags = vec!["model".to_string(), cap.provider.clone()];
+            if cap.supports_vision {
+                tags.push("vision".to_string());
+            }
+            self.register(Capability {
+                id,
+                name: cap.model_name.clone(),
+                tags,
+                kind: CapabilityKind::Cognitive,
+                maturity: MaturityLevel::Reviewed,
+                vector: CapabilityVector::default(),
+                e8_triggers: vec![],
+                context_requirements: vec![],
+                cost: CapabilityCost::default(),
+                stats: CapabilityStats::default(),
+                version: "0.1.0".to_string(),
+                layer: 7,
+                tier: CapabilityTier::Core,
+                runtime: CapabilityRuntime::Local,
+                stability: CapabilityStability::Production,
+                fallback_chain: vec![],
+                provider: Some(cap.provider.clone()),
+                domain: DomainCategory::General,
+                input_schema: None,
+                output_schema: None,
+                resource_cpu: 1.0,
+                resource_ram_mb: 64.0,
+                resource_vram_mb: 0.0,
+                dependencies: vec![],
+            });
+            registered += 1;
+        }
+        registered
+    }
+
     pub fn calculate_similarity(&self, a: &CapabilityId, b: &CapabilityId) -> f64 {
         match (self.get(a), self.get(b)) {
             (Some(ca), Some(cb)) => ca.vector.similarity(&cb.vector),
@@ -750,5 +796,23 @@ mod tests {
     #[test] fn test_id_deterministic() {
         assert_eq!(capability_id_from_name("a"), capability_id_from_name("a"));
         assert_ne!(capability_id_from_name("a"), capability_id_from_name("b"));
+    }
+
+    #[test]
+    fn test_register_model_skills_bridges_capabilities() {
+        // 桥接 nt_core_model_skills → L7 能力网: 模型能力注册为 Cognitive capability
+        let mut reg = CapabilityRegistry::new();
+        let registered = reg.register_model_skills();
+        assert!(registered > 0, "应注册至少一个模型能力");
+        assert_eq!(reg.count(), registered);
+        // 幂等: 再次注册不重复
+        let second = reg.register_model_skills();
+        assert_eq!(second, 0, "重复注册应幂等");
+        // 模型能力可被 tag 检索 (model / provider / vision)
+        let model_caps = reg.find_by_tag("model");
+        assert!(!model_caps.is_empty());
+        // vision 模型带 vision tag
+        let vision_caps = reg.find_by_tag("vision");
+        assert!(vision_caps.iter().any(|c| c.tags.contains(&"vision".to_string())));
     }
 }

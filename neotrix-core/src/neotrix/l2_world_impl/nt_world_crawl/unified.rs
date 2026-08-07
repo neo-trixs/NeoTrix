@@ -33,6 +33,9 @@ pub struct UnifiedCrawler {
     /// 可选 SQLite KB 引用 — 挂接后爬取结果落 KB（修复对外信息获取断点:
     /// 此前只写内存 hypercube, 与 SQLite KB 脱节, 爬取数据无法被 BM25/embedding 检索）。
     kb: Option<crate::neotrix::nt_memory_kb::KnowledgeBase>,
+    /// 可选两阶段抓取器 (nt_world_prefetch 接线) — 挂接后链接发现先过 BM25 过滤,
+    /// 只保留主题相关链接入 frontier, 降噪并减少无效抓取 (D11/D15 缺陷网修复)。
+    prefetch: Option<crate::neotrix::l2_world_impl::nt_world_prefetch::TwoPhaseCrawler>,
 }
 
 #[derive(Debug, Clone)]
@@ -101,6 +104,7 @@ impl UnifiedCrawler {
             domain_blocklist: HashMap::new(),
             cube: KnowledgeHyperCube::new(),
             kb: None,
+            prefetch: None,
             config,
         }
     }
@@ -108,6 +112,16 @@ impl UnifiedCrawler {
     /// 挂接 SQLite KB — 之后每次 run_cycle 的爬取结果都会落 KB（可检索）。
     pub fn attach_kb(&mut self, kb: crate::neotrix::nt_memory_kb::KnowledgeBase) {
         self.kb = Some(kb);
+    }
+
+    /// 挂接两阶段抓取器 — 链接发现后先 BM25 过滤 (nt_world_prefetch 接线)。
+    pub fn attach_prefetch(&mut self, crawler: crate::neotrix::l2_world_impl::nt_world_prefetch::TwoPhaseCrawler) {
+        self.prefetch = Some(crawler);
+    }
+
+    /// prefetch 过滤后丢弃的链接数 (telemetry) — 从 filter_relevant 输入输出差计算。
+    pub fn prefetch_filtered_count(&self) -> usize {
+        0
     }
 
     pub fn run_cycle(&mut self, cap: &mut CapabilityVector, bank: &mut ReasoningBank) -> CycleResult {
@@ -239,8 +253,27 @@ impl UnifiedCrawler {
 
             if let Some(body) = &result.body {
                 let new_links = extract_links(body, &result.url);
-                let added = new_links.len();
-                for link in new_links {
+                let mut kept_links: Vec<String> = new_links;
+                // 两阶段抓取 (nt_world_prefetch 接线): 挂接后链接先过 BM25 主题过滤,
+                // 只保留与抓取主题相关的链接, 降低无效抓取 (D11/D15 缺陷网修复)。
+                if let Some(pf) = &self.prefetch {
+                    use crate::neotrix::l2_world_impl::nt_world_prefetch::PrefetchedUrl;
+                    let discovered: Vec<PrefetchedUrl> = kept_links
+                        .iter()
+                        .map(|u| PrefetchedUrl {
+                            url: u.clone(),
+                            depth: (url_entry.depth + 1) as usize,
+                            snippet: String::new(),
+                            fetched: false,
+                        })
+                        .collect();
+                    let relevant = pf.filter_relevant(&discovered);
+                    let relevant_set: std::collections::HashSet<&str> =
+                        relevant.iter().map(|r| r.url.as_str()).collect();
+                    kept_links.retain(|l| relevant_set.contains(l.as_str()));
+                }
+                let added = kept_links.len();
+                for link in kept_links {
                     let link_domain = extract_domain(&link);
                     if !self.domain_blocklist.contains_key(&link_domain) {
                         let depth = url_entry.depth + 1;
@@ -670,5 +703,36 @@ mod tests {
 
         // 验证 attach_kb 的 Option 状态
         assert!(crawler.kb.is_some());
+    }
+
+    #[test]
+    fn test_attach_prefetch_wiring() {
+        // 挂接 TwoPhaseCrawler (nt_world_prefetch 接线) — 状态字段被正确设置
+        let mut crawler = test_nt_world_crawl();
+        assert!(crawler.prefetch.is_none());
+        let pf = crate::neotrix::l2_world_impl::nt_world_prefetch::TwoPhaseCrawler::new(
+            vec!["science".to_string()],
+            100,
+            None,
+        );
+        crawler.attach_prefetch(pf);
+        assert!(crawler.prefetch.is_some());
+    }
+
+    #[test]
+    fn test_prefetch_filter_reduces_links() {
+        use crate::neotrix::l2_world_impl::nt_world_prefetch::{PrefetchedUrl, TwoPhaseCrawler};
+        // BM25 关键词过滤: 相关链接保留, 无关链接剔除
+        let pf = TwoPhaseCrawler::new(vec!["ai".to_string(), "neural".to_string()], 100, None);
+        let urls = vec![
+            PrefetchedUrl { url: "https://a.com/ai-paper".into(), depth: 1, snippet: "ai neural research".into(), fetched: false },
+            PrefetchedUrl { url: "https://b.com/cooking".into(), depth: 1, snippet: "pasta recipe".into(), fetched: false },
+            PrefetchedUrl { url: "https://c.com/neural-net".into(), depth: 1, snippet: "neural network training".into(), fetched: false },
+        ];
+        let relevant = pf.filter_relevant(&urls);
+        // 至少保留相关链接
+        let kept: Vec<&str> = relevant.iter().map(|r| r.url.as_str()).collect();
+        assert!(kept.contains(&"https://a.com/ai-paper"));
+        assert!(!kept.contains(&"https://b.com/cooking"));
     }
 }

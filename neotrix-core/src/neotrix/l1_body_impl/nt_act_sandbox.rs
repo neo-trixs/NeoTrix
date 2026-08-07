@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::neotrix::l1_body_impl::nt_act_disk_guard::{DiskGuard, DiskVerdict};
+
 /// AgentENV-inspired action sandbox: evaluates an action against a permission +
 /// safety rule set BEFORE external execution. Only approved actions reach the
 /// real environment (permission-aware retrieval/execution gate).
@@ -37,6 +39,8 @@ pub struct ActionSandbox {
     pub denied_count: u64,
     /// Total actions evaluated
     pub evaluated_count: u64,
+    /// 磁盘沙盒 — 任务 allowlist 越界检查 (nt_act_disk_guard 接线)
+    pub disk_guard: Option<DiskGuard>,
 }
 
 impl ActionSandbox {
@@ -54,7 +58,54 @@ impl ActionSandbox {
         for prefix in ["shell:", "network:", "send:", "execute_command:", "write:/etc", "write:/usr", "write:/var", "write_file:/etc", "write_file:/usr", "write_file:/var"] {
             rules.push(SandboxRule { action_prefix: prefix.into(), allowed: true, requires_approval: true });
         }
-        Self { rules, executions: HashMap::new(), denied_count: 0, evaluated_count: 0 }
+        Self { rules, executions: HashMap::new(), denied_count: 0, evaluated_count: 0, disk_guard: None }
+    }
+
+    /// 挂接磁盘守卫 (任务 allowlist)。生产路径: 任务初始化时分配工作区后调用。
+    pub fn attach_disk_guard(&mut self, guard: DiskGuard) {
+        self.disk_guard = Some(guard);
+    }
+
+    /// 从动作字符串提取路径参数: "write:/tmp/a" → "/tmp/a", "file_write:/x" → "/x"。
+    fn extract_path(action: &str) -> Option<std::path::PathBuf> {
+        let (_, rest) = action.split_once(':')?;
+        let rest = rest.trim();
+        if rest.is_empty() || rest.contains(' ') {
+            return None;
+        }
+        Some(std::path::PathBuf::from(rest))
+    }
+
+    /// 带磁盘越界检查的求值: 先过规则, 再对 write/delete 类动作做路径 allowlist 检查。
+    /// 磁盘越界 → Denied (不依赖规则默认 fail-open/approval)。
+    pub fn evaluate_with_path(&mut self, action: &str) -> SandboxVerdict {
+        let verdict = self.evaluate(action);
+        if verdict == SandboxVerdict::Denied {
+            return verdict;
+        }
+        // 仅对写/删类动作做磁盘越界检查 (读放宽 — 沙盒外读取多为查询)
+        let is_write_like = action.starts_with("write:")
+            || action.starts_with("write_file:")
+            || action.starts_with("delete:")
+            || action.starts_with("delete_file:")
+            || action.starts_with("rm:");
+        if !is_write_like {
+            return verdict;
+        }
+        let Some(guard) = &mut self.disk_guard else {
+            // 未配置磁盘守卫: 保持规则判定 (向后兼容)
+            return verdict;
+        };
+        match Self::extract_path(action) {
+            Some(path) => match guard.check("write", &path) {
+                DiskVerdict::Allowed => verdict,
+                DiskVerdict::Blocked(_reason) => {
+                    self.denied_count += 1;
+                    SandboxVerdict::Denied
+                }
+            },
+            None => verdict,
+        }
     }
 
     pub fn add_rule(&mut self, rule: SandboxRule) {
@@ -122,6 +173,12 @@ impl crate::core::nt_core_self_test::SelfTest for ActionSandbox {
         if probe.evaluate("rm:important_file") != SandboxVerdict::Denied {
             failures.push("rm: prefix not denied by default".into());
         }
+        // DiskGuard 越界检查: 配置 allowlist 后 write: 越界必须 Denied
+        if let Some(guard) = &self.disk_guard {
+            if guard.allowlist().is_empty() {
+                failures.push("disk guard attached with empty allowlist".into());
+            }
+        }
         if failures.is_empty() { Ok(()) } else { Err(failures) }
     }
 }
@@ -180,6 +237,35 @@ mod tests {
         let _ = sandbox.evaluate("read:a");
         let _ = sandbox.evaluate("read:b");
         assert_eq!(sandbox.executions.get("read"), Some(&2));
+    }
+
+    #[test]
+    fn test_disk_guard_blocks_outside_workspace() {
+        use std::path::Path;
+        let mut sandbox = ActionSandbox::new();
+        let mut guard = DiskGuard::new();
+        guard.allow(Path::new("/tmp/ws"));
+        sandbox.attach_disk_guard(guard);
+        // 越界写入 → Denied (disk guard 覆盖规则)
+        assert_eq!(sandbox.evaluate_with_path("write:/etc/hosts"), SandboxVerdict::Denied);
+        // 允许区内写入 → 磁盘检查放行, 保持规则判定 (write: 默认 RequiresApproval)
+        assert_eq!(sandbox.evaluate_with_path("write:/tmp/ws/a.txt"), SandboxVerdict::RequiresApproval);
+    }
+
+    #[test]
+    fn test_disk_guard_not_attached_backward_compat() {
+        let mut sandbox = ActionSandbox::new();
+        // 未挂磁盘守卫: evaluate_with_path 退回纯规则
+        assert_eq!(sandbox.evaluate_with_path("write:/etc/hosts"), SandboxVerdict::RequiresApproval);
+    }
+
+    #[test]
+    fn test_disk_guard_allowlist_signal() {
+        use std::path::Path;
+        let mut guard = DiskGuard::new();
+        guard.allow(Path::new("/tmp/ws"));
+        assert!(guard.is_within(Path::new("/tmp/ws/a.txt")));
+        assert!(!guard.is_within(Path::new("/etc/hosts")));
     }
 
     // Silence unused import lint for SystemTime when not otherwise used
