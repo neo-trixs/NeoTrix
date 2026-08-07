@@ -3395,15 +3395,57 @@ g.renderStApiKey = renderStApiKey;
     const results = document.getElementById('palResults');
     const grp = document.getElementById('palResultsGrp');
     const empty = document.getElementById('palEmpty');
+    const cmds = document.getElementById('palCmds');
+    const cmdsGrp = document.getElementById('palCmdsGrp');
     const query = (q || '').trim();
     const acts = Array.from(document.querySelectorAll('#palBody .pal-item[data-act]'));
     acts.forEach(it => {
       const label = (it.textContent || '').toLowerCase();
       it.style.display = (!query || label.includes(query.toLowerCase())) ? '' : 'none';
     });
+
+    // 命令模式: 输入以 / 开头 → 搜索并执行 CLI 命令目录
+    if(query.startsWith('/')){
+      if(grp) grp.style.display = 'none';
+      if(results) results.style.display = 'none';
+      if(empty) empty.style.display = 'none';
+      const cmdQuery = query.toLowerCase();
+      let cmds_hits = [];
+      if(isTauri()){
+        try{
+          const list = await invoke('unified_cli_list');
+          if(Array.isArray(list)){
+            cmds_hits = list.filter(s => s && s.name && (
+              s.name.toLowerCase().includes(cmdQuery) ||
+              (s.aliases || []).some(a => a.toLowerCase().includes(cmdQuery))
+            ));
+          }
+        }catch(_e){ cmds_hits = []; }
+      }
+      lastPalQuery = query;
+      const anyHit = cmds_hits.length > 0;
+      if(cmdsGrp) cmdsGrp.style.display = cmds_hits.length ? '' : 'none';
+      if(cmds){
+        cmds.style.display = anyHit ? '' : 'none';
+        if(!anyHit){
+          cmds.innerHTML = `<button class="pal-item pal-cmd" onclick="palRunCmd(this)" data-cmd="${escHtml(query)}"><span class="pal-a">⏎</span><span>执行 ${escHtml(query)}</span></button>`;
+        } else {
+          cmds.innerHTML = cmds_hits.slice(0, 12).map(s => {
+            const aliases = (s.aliases || []).length ? ' · ' + s.aliases.map(escHtml).join(', ') : '';
+            return `<button class="pal-item pal-cmd" onclick="palRunCmd(this)" data-cmd="${escHtml(s.name)}"><span class="pal-a">/</span><span class="pal-cmd-n">${escHtml(s.name)}</span><span class="pal-cmd-d">${escHtml(s.description || '')}</span><span class="pal-cat">${escHtml(s.category || '')}</span></button>`;
+          }).join('');
+        }
+      }
+      if(empty) empty.style.display = cmds_hits.length ? 'none' : '';
+      return;
+    }
+
+    // 空查询: 无会话结果, 恢复静态动作
     if(!query){
       if(results){ results.innerHTML = ''; results.style.display = 'none'; }
       if(grp) grp.style.display = 'none';
+      if(cmdsGrp) cmdsGrp.style.display = 'none';
+      if(cmds) cmds.style.display = 'none';
       if(empty) empty.style.display = 'none';
       return;
     }
@@ -3431,6 +3473,59 @@ g.renderStApiKey = renderStApiKey;
         </button>`;
       }).join('');
     }
+    if(cmdsGrp) cmdsGrp.style.display = 'none';
+    if(cmds) cmds.style.display = 'none';
+  }
+
+  // 执行 CLI 命令 (unified_cli_execute 桥): 结果以 toast + 渲染进主线程
+  async function palRunCmd(el){
+    const cmd = el.getAttribute('data-cmd');
+    if(!cmd) return;
+    closePalette();
+    showToast('执行 ' + cmd + ' …');
+    if(!isTauri()){
+      showToast('CLI 命令仅在桌面端可用');
+      return;
+    }
+    try{
+      const r = await invoke('unified_cli_execute', { input: cmd });
+      const msg = (r && r.message || '').trim();
+      if(r && r.success){
+        renderCliResult(cmd, msg, true);
+        showToast('✓ ' + cmd + ' 执行成功');
+      } else {
+        renderCliResult(cmd, msg || '执行失败', false);
+        showToast('✗ ' + cmd + ' 执行失败');
+      }
+    }catch(e){
+      renderCliResult(cmd, '命令异常: ' + (e && e.message || String(e)), false);
+      showToast('✗ ' + cmd + ' 执行出错');
+    }
+  }
+
+  // 在当前线程渲染 CLI 命令的用户输入 + 结果 (与 renderThread 视觉一致)
+  function renderCliResult(cmd, text, ok){
+    const cs = document.getElementById('chatScroll');
+    if(!cs) return;
+    document.getElementById('heroSection').style.display = 'none';
+    cs.style.display = 'flex';
+    if(!currentSessionId){
+      showToast('请先创建/打开一个会话');
+      return;
+    }
+    const u = document.createElement('div'); u.className = 'msg r';
+    u.innerHTML = `<div class="mb">${escHtml(cmd)}</div>`;
+    cs.appendChild(u);
+    const a = document.createElement('div'); a.className = 'msg l';
+    const cls = ok ? '' : ' style="color:var(--err, #e5484d)"';
+    a.innerHTML = `<div class="msg-h"><span class="name">CLI</span><span class="time"></span></div><div class="mb"${cls}>${renderRichText(text)}</div>`;
+    cs.appendChild(a);
+    cs.scrollTop = cs.scrollHeight;
+    isChatMode = true;
+    // 尝试持久化到会话 (失败不阻塞渲染)
+    if(isTauri()){
+      invoke('neocodex_send_message_stream', { content: cmd, permission_mode: 'auto' }).catch(() => {});
+    }
   }
 
   function palKey(e){
@@ -3447,8 +3542,17 @@ g.renderStApiKey = renderStApiKey;
       return;
     }
     if(e.key === 'Enter'){
+      const inp = document.getElementById('palInput');
+      const val = (inp && inp.value || '').trim();
       const sel = document.querySelector('#palBody .pal-item.sel');
+      // 命令模式: 输入以 / 开头 → 直接执行 (选中项优先, 否则执行输入)
       if(sel){ e.preventDefault(); palPick(sel); }
+      else if(val.startsWith('/')){
+        e.preventDefault();
+        const fake = document.createElement('div');
+        fake.setAttribute('data-cmd', val);
+        palRunCmd(fake);
+      }
     }
   }
 
@@ -3468,6 +3572,8 @@ g.renderStApiKey = renderStApiKey;
   g.palFilter = palFilter;
   g.palKey = palKey;
   g.palPick = palPick;
+  g.palRunCmd = palRunCmd;
+  g.renderCliResult = renderCliResult;
   g.jumpToLatest = jumpToLatest;
   g.saveDraft = saveDraft;
   g.restoreDraft = restoreDraft;

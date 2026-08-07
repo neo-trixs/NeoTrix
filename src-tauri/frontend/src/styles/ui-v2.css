@@ -1467,6 +1467,13 @@
   .pal-body .re-time { margin-left:auto; font-size:var(--fs-caption); color:var(--tx3); flex-shrink:0; }
   .pal-body .re-time:first-child { margin-left:4px; }
 
+  /* CLI 命令面板项 */
+  .pal-cmd .pal-cmd-n { font-family:var(--fm); font-weight:var(--fw-semibold); color:var(--accent, var(--tx)); flex-shrink:0; }
+  .pal-cmd .pal-cmd-d { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--tx3); font-size:var(--fs-caption); }
+  .pal-cmd .pal-cat { margin-left:auto; flex-shrink:0; font-size:var(--fs-caption); color:var(--tx-meta); background:var(--glass-L1-bg); border:1px solid var(--bd2); border-radius:6px; padding:1px 6px; }
+  .pal-foot { padding:8px 12px; font-size:var(--fs-caption); color:var(--tx3); border-top:1px solid var(--bd2); }
+  .pal-foot b { color:var(--tx2); font-family:var(--fm); }
+
   /* ===== SETTINGS MODAL ===== */
   .st-modal {
     width:720px; max-width:calc(100vw - 60px); height:560px; max-height:calc(100vh - 60px);

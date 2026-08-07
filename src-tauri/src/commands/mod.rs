@@ -119,6 +119,9 @@ pub use cowork_cmds::*;
 pub mod unified_session_cmds;
 pub use unified_session_cmds::*;
 
+pub mod unified_cmds;
+pub use unified_cmds::*;
+
 // ========== Tests ==========
 
 #[cfg(test)]

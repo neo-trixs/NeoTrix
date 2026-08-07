@@ -60,6 +60,7 @@ path = "src/bin/geoint.rs"
 
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
+nt_core_capability_tree = { path = "src/neotrix/nt_core_capability_tree" }
 thiserror = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -89,6 +90,7 @@ sha3 = "0.10"
 glob = "0.3"
 regex = "1"
 html-escape = "0.2"
+uniffi = { version = "0.28", features = ["cli", "scaffolding-ffi-buffer-fns"], optional = true }
 unicode-normalization = "0.1"
 flate2 = "1"
 syn = { version = "2", features = ["full", "visit"] }
@@ -135,10 +137,12 @@ zip = { version = "2", optional = true }
 quick-xml = { version = "0.41", optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
-
 [dev-dependencies]
 tempfile = "3"
 criterion = { version = "0.5", features = ["html_reports"] }
+
+[build-dependencies]
+uniffi = { version = "0.28", features = ["build"] }
 
 [[bench]]
 name = "core_bench"
@@ -171,7 +175,8 @@ self-update = ["dep:self_update"]
 integration_tests = []
 network_tests = []
 echo_bridge = []
-full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "integration_tests", "network_tests", "echo_bridge", "office"]
+ios-bridge = ["dep:uniffi"]
+full = ["stealth-net", "sandbox", "telemetry", "anyhow", "self-update", "integration_tests", "network_tests", "echo_bridge", "office", "ios-bridge"]
 
 [[example]]
 name = "evolve"

@@ -341,6 +341,12 @@ fn check_sandbox_for_command(name: &str, args: &[String]) -> Option<CommandOutpu
 }
 
 fn check_shield_for_command(name: &str, _args: &[String]) -> Option<CommandOutput> {
+    // 只读 CLI 命令直接放行 — 与 check_sandbox_for_command 对称:
+    // shield 权限链 (PermissionChain AcceptEdits) 只拦截写操作,
+    // 否则 /help /kb /board 等只读命令在 App (unified_cli_execute) 内全部被误拦。
+    if !is_write_command(name) && name != "/git" {
+        return None;
+    }
     let shield = global_shield();
     let s = shield.lock().unwrap_or_else(|e| e.into_inner());
     let action = name.trim_start_matches('/');

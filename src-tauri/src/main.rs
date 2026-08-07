@@ -699,6 +699,12 @@ commands::neocodex_set_project,
                     commands::unified_session_export,
                     commands::unified_session_import,
                     commands::unified_session_refresh,
+                    // Unified Command Bridge (CLI ↔ NoeCodex)
+                    commands::unified_command_catalog,
+                    commands::unified_cli_execute,
+                    commands::unified_cli_list,
+                    commands::unified_cli_lookup,
+                    commands::unified_tauri_list,
                 ])
                 .setup(move |app| {
                     if let Err(e) = neotrix_tauri::setup_tray(app) {

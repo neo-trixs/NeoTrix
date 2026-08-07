@@ -36,12 +36,25 @@
 // is_empty not needed for all collection-like types
 #![allow(clippy::len_without_is_empty)]
 
+#[cfg(feature = "ios-bridge")]
+uniffi::setup_scaffolding!();
+
+// Re-export FFI types for uniffi scaffolding visibility
+#[cfg(feature = "ios-bridge")]
+pub use neotrix::ffi::{
+    E8ReasoningImpl, VSAHyperCubeImpl, GWTAttentionRouterImpl,
+    ConsciousnessTreeImpl, SEALPipelineImpl, KBBridgeImpl,
+    SkillTreeImpl, RuneSocketingImpl, ConstellationSystemImpl,
+    DualSpecializationImpl, NeoTrixHandle,
+};
+
 pub mod core;
 pub mod cli;
 pub mod server;
 pub mod agent;
 pub mod neotrix;
 pub mod config;
+pub mod unified_cmd;
 
 #[macro_export]
 macro_rules! make_stage {
