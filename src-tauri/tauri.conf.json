@@ -10,6 +10,7 @@
     "devUrl": "http://localhost:1421"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "NeoTrix Desktop V2",
@@ -20,6 +21,11 @@
         "resizable": true,
         "decorations": false,
         "shadow": true,
+        "transparent": true,
+        "windowEffects": {
+          "effects": ["windowBackground"],
+          "radius": 12
+        },
         "center": true,
         "visible": true
       }
