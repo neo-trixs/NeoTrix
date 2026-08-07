@@ -1342,6 +1342,13 @@
   .overlay-h h2 { font-size:var(--fs-heading); font-weight:var(--fw-semibold); color:var(--tx); }
   .overlay-bd { flex:1; overflow-y:auto; padding:16px 20px; }
 
+  /* ===== 快捷键总览面板 (Cmd+/) ===== */
+  .sc-grid { display:flex; flex-direction:column; gap:2px; }
+  .sc-row { display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-radius:8px; font-size:var(--fs-small); color:var(--tx2); }
+  .sc-row:hover { background:var(--ghost); }
+  .sc-row span:first-child { font-family:var(--fm); font-size:var(--fs-caption); color:var(--pri); background:var(--accent-bg); padding:2px 8px; border-radius:6px; border:1px solid var(--bd); white-space:nowrap; }
+  .sc-row span:last-child { text-align:right; }
+
   /* ===== App 内确认对话框 (替代原生 confirm) ===== */
   .ntx-confirm { position:fixed; inset:0; z-index:var(--z-overlay); display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); opacity:0; pointer-events:none; transition:opacity 0.15s ease-out; }
   .ntx-confirm.open { opacity:1; pointer-events:auto; }

@@ -784,5 +784,41 @@
   </div>
 </div>
 
+<!-- ═══ OVERLAY: 快捷键总览 (Cmd+/) ═══ -->
+<div class="overlay-panel" id="overlayShortcuts">
+  <div class="overlay-box" style="max-width:560px">
+    <div class="overlay-h">
+      <h2>键盘快捷键</h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayShortcuts')" title="关闭"></span>
+        <span class="tlg-dot tlg-y" onclick="showToast('需求分析中')" title="最小化"></span>
+        <span class="tlg-dot tlg-g" onclick="showToast('需求分析中')" title="最大化"></span>
+      </div>
+    </div>
+    <div class="overlay-bd" style="max-height:60vh;overflow-y:auto">
+      <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:8px">全局</div>
+      <div class="sc-grid">
+        <div class="sc-row"><span>⌘N</span><span>新建会话</span></div>
+        <div class="sc-row"><span>⌘1 / ⌘2</span><span>切换 对话 / 团队协同</span></div>
+        <div class="sc-row"><span>⌘K</span><span>命令面板 / 搜索</span></div>
+        <div class="sc-row"><span>⌘F</span><span>知识库检索</span></div>
+        <div class="sc-row"><span>⌘,</span><span>打开设置</span></div>
+        <div class="sc-row"><span>⌘W</span><span>关闭窗口</span></div>
+        <div class="sc-row"><span>⌘⇧S</span><span>切换侧边栏</span></div>
+        <div class="sc-row"><span>⌘⇧L</span><span>切换明暗主题</span></div>
+        <div class="sc-row"><span>⌘⇧U</span><span>检查更新</span></div>
+        <div class="sc-row"><span>⌘/</span><span>快捷键总览</span></div>
+      </div>
+      <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin:12px 0 8px">对话</div>
+      <div class="k-grid">
+        <div class="sc-row"><span>↑</span><span>编辑上一条消息</span></div>
+        <div class="sc-row"><span>Esc / ⌘.</span><span>停止生成</span></div>
+        <div class="sc-row"><span>⌘⇧C</span><span>复制最后回复</span></div>
+        <div class="sc-row"><span>⌘⇧;</span><span>复制最后代码块</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

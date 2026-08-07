@@ -310,7 +310,7 @@ g.renderStApiKey = renderStApiKey;
         const list = Array.isArray(projects) ? projects : [];
         body.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;padding:12px">
           <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:16px;font-weight:600;margin:0">活跃项目</h3><span style="font-size:11px;color:var(--tx3)">${list.length} 个</span></div>
-          ${list.length ? list.map(p => `<div class="evo-card" style="cursor:pointer" onclick="showToast('项目: ${escHtml(p.name)}')"><span class="lbl">${escHtml(p.project_type || 'project')}</span><span class="val">${escHtml(p.name)}</span><span style="font-size:10px;color:var(--tx3)">${escHtml(p.path || '')}${p.pinned ? ' · 📌' : ''}</span></div>`).join('') : '<div class="kb-empty">暂无项目</div>'}
+          ${list.length ? list.map(p => `<div class="evo-card" style="cursor:pointer" onclick="showToast('项目: ${escJs(p.name)}')"><span class="lbl">${escHtml(p.project_type || 'project')}</span><span class="val">${escHtml(p.name)}</span><span style="font-size:10px;color:var(--tx3)">${escHtml(p.path || '')}${p.pinned ? ' · 📌' : ''}</span></div>`).join('') : '<div class="kb-empty">暂无项目</div>'}
           <button class="cht" style="margin-top:4px" onclick="showToast('创建新项目...')">+ 新建项目</button>
         </div>`;
       }catch(_e){
@@ -385,8 +385,8 @@ g.renderStApiKey = renderStApiKey;
       }
       const timeHtml = r.time ? `<span class="re-time">${r.time}</span>` : '';
       const click = r.id
-        ? `onclick="openRecent('${tab}','${r.id}',${r.cowork ? 'true' : 'false'})"`
-        : `onclick="dispatch('toast:打开 ${escHtml(r.text)}')"`;
+        ? `onclick="openRecent('${escJs(tab)}','${escJs(r.id)}',${r.cowork ? 'true' : 'false'})"`
+        : `onclick="dispatch('toast:打开 ${escJs(r.text)}')"`;
       return `<div class="re-i" ${click}><span class="dot"></span><span class="t">${escHtml(r.text)}</span>${timeHtml}</div>`;
     }).join('');
   }
@@ -883,7 +883,7 @@ g.renderStApiKey = renderStApiKey;
         const msg = s.message_count ? ` · ${s.message_count} 消息` : '';
         const active = firstShown ? ' active' : '';
         firstShown = false;
-        const pinBtn = `<button class="cw-pin-btn" title="置顶/取消置顶" onclick="togglePinSession('${escHtml(String(s.id))}', event)">📌</button>`;
+        const pinBtn = `<button class="cw-pin-btn" title="置顶/取消置顶" onclick="togglePinSession('${escJs(String(s.id))}', event)">📌</button>`;
         return `<div class="cw-sitem${active}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
           <div class="s">
             <span class="st-dot ${stCls}"></span>
@@ -905,7 +905,7 @@ g.renderStApiKey = renderStApiKey;
           const msg = s.message_count ? ` · ${s.message_count} 消息` : '';
           const active = firstShown ? ' active' : '';
           firstShown = false;
-          const pinBtn = `<button class="cw-pin-btn" title="取消置顶" onclick="togglePinSession('${escHtml(String(s.id))}', event)">📌</button>`;
+          const pinBtn = `<button class="cw-pin-btn" title="取消置顶" onclick="togglePinSession('${escJs(String(s.id))}', event)">📌</button>`;
           return `<div class="cw-sitem${active}" data-idx="${CW_DATA.indexOf(s)}" onclick="selectCwSession(${CW_DATA.indexOf(s)}, true)">
             <div class="s"><span class="st-dot ${stCls}"></span><span class="st-t">${escHtml(s.name)}</span>${pinBtn}</div>
             <span class="s">${s.done}/${s.tasks} 任务 · ${pct}%${msg}</span>
@@ -1250,6 +1250,41 @@ g.renderStApiKey = renderStApiKey;
       sendMsg();
     }
   }
+  /* C2: ↑ 编辑上一条消息 — 把当前会话最后一条用户消息回填到输入框并聚焦 */
+  async function editLastUserMessage(){
+    if(!isTauri() || !currentSessionId){ showToast('需在会话中编辑'); return; }
+    const msgs = await invoke('neocodex_get_session_messages', { session_id: currentSessionId }).catch(() => null);
+    if(!Array.isArray(msgs)) return;
+    let lastUser = null;
+    for(let i = msgs.length - 1; i >= 0; i--){ if(msgs[i].role === 'user'){ lastUser = msgs[i]; break; } }
+    if(!lastUser){ showToast('没有可编辑的消息'); return; }
+    const inp = document.getElementById('chatInput');
+    if(!inp) return;
+    inp.value = lastUser.content || '';
+    autoResize(inp);
+    inp.focus();
+    const len = inp.value.length;
+    inp.setSelectionRange(len, len);
+    showToast('正在编辑上一条消息');
+  }
+  /* C3: 复制最后回复 / 最后代码块 (⌘⇧C / ⌘⇧;) */
+  function copyLastReply(){
+    const msgs = document.querySelectorAll('#chatScroll .msg.l');
+    if(!msgs.length){ showToast('没有可复制的回复'); return; }
+    const last = msgs[msgs.length - 1];
+    const mb = last.querySelector('.mb');
+    const text = mb ? mb.innerText : '';
+    if(!text.trim()){ showToast('没有可复制的回复'); return; }
+    navigator.clipboard.writeText(text.trim()).then(() => showToast('已复制最后回复')).catch(() => showToast('复制失败'));
+  }
+  function copyLastCodeBlock(){
+    const blocks = document.querySelectorAll('#chatScroll .msg-code pre');
+    if(!blocks.length){ showToast('没有代码块'); return; }
+    const last = blocks[blocks.length - 1];
+    const text = last.textContent || '';
+    if(!text.trim()){ showToast('没有代码块'); return; }
+    navigator.clipboard.writeText(text.trim()).then(() => showToast('已复制最后代码块')).catch(() => showToast('复制失败'));
+  }
   let thinkStart = 0;
   let thinkTimer = null;
   function clearThink(){
@@ -1471,7 +1506,7 @@ g.renderStApiKey = renderStApiKey;
     const el = document.getElementById('heroSuggest');
     if(!el) return;
     el.innerHTML = HERO_SUGGESTIONS.map(s =>
-      `<button class="hero-sug-item" onclick="sendSuggestion('${escHtml(s.t)}')">${s.icon}<span>${escHtml(s.t)}</span></button>`
+      `<button class="hero-sug-item" onclick="sendSuggestion('${escJs(s.t)}')">${s.icon}<span>${escHtml(s.t)}</span></button>`
     ).join('');
   }
 
@@ -1519,7 +1554,45 @@ g.renderStApiKey = renderStApiKey;
       updateTrafficVisibility();
     }
     if(e.key === '?' && !e.target.closest('textarea, input')){
-      showToast('快捷键: ⌘1/⌘2 切换 · ⌘, 设置 · ⌘N 新建 · ⌘F 知识库 · ⌘W 关闭 · ⌘K 搜索 · Esc 关闭 · ? 帮助');
+      openOverlay('overlayShortcuts');
+    }
+    // Cmd+/ 快捷键总览 (全竞品标配)
+    if((e.metaKey || e.ctrlKey) && e.key === '/'){
+      e.preventDefault();
+      openOverlay('overlayShortcuts');
+    }
+    // Cmd+. 双通道中断 (C4, 与 Esc 并存)
+    if((e.metaKey || e.ctrlKey) && e.key === '.'){
+      e.preventDefault();
+      if(window._ntxStreamActive){ stopStream(); }
+      else { closePopover(); updateTrafficVisibility(); }
+    }
+    // Cmd+Shift+S 侧边栏开关 (C7)
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'S' || e.key === 's')){
+      e.preventDefault();
+      toggleSidebar();
+    }
+    // Cmd+Shift+L 主题切换 (C7)
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'L' || e.key === 'l')){
+      e.preventDefault();
+      toggleTheme();
+    }
+    // ↑ 编辑上一条消息 (C2, 全竞品标配): 输入框为空时把最后一条用户消息回填
+    if(e.key === 'ArrowUp' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey){
+      const inp = document.getElementById('chatInput');
+      if(inp && !inp.value.trim() && !e.target.closest('textarea, input, select')){
+        e.preventDefault();
+        editLastUserMessage();
+      }
+    }
+    // Cmd+Shift+C 复制最后回复 / Cmd+Shift+; 复制最后代码块 (C3)
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')){
+      e.preventDefault();
+      copyLastReply();
+    }
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === ';')){
+      e.preventDefault();
+      copyLastCodeBlock();
     }
   });
   }
@@ -1964,8 +2037,8 @@ g.renderStApiKey = renderStApiKey;
             <div class="arch-meta">${msgs}${when ? ' · ' + when : ''}</div>
           </div>
           <div class="arch-actions">
-            <button class="arch-btn restore" onclick="restoreArchived('${escHtml(id)}')">恢复</button>
-            <button class="arch-btn del" onclick="deleteArchived('${escHtml(id)}')">删除</button>
+            <button class="arch-btn restore" onclick="restoreArchived('${escJs(id)}')">恢复</button>
+            <button class="arch-btn del" onclick="deleteArchived('${escJs(id)}')">删除</button>
           </div>
         </div>`;
       }).join('');
@@ -2022,7 +2095,7 @@ g.renderStApiKey = renderStApiKey;
             <div class="ck-name">快照 #${arr.length - i}${latest ? '（最新）' : ''}</div>
             <div class="arch-meta">${when}${msgs}</div>
           </div>
-          <button class="arch-btn restore" onclick="restoreCheckpoint('${escHtml(String(ck.id))}')">回滚到此</button>
+          <button class="arch-btn restore" onclick="restoreCheckpoint('${escJs(String(ck.id))}')">回滚到此</button>
         </div>`;
       }).join('');
       body.dataset.session = String(id);
@@ -2106,7 +2179,7 @@ g.renderStApiKey = renderStApiKey;
       const role = h.role === 'user' ? '问' : (h.role === 'agent' || h.role === 'assistant' ? '答' : '');
       const hitsTxt = h.match_count > 1 ? `<span class="re-time">${h.match_count} 处</span>` : '';
       const when = h.timestamp ? fmtRelTime(h.timestamp) : '';
-      return `<div class="re-i" onclick="openSessionFromSearch('${escHtml(String(h.session_id))}')">
+      return `<div class="re-i" onclick="openSessionFromSearch('${escJs(String(h.session_id))}')">
         <span class="dot"></span><span class="t">${escHtml(h.session_name || '会话')}${role ? ' · ' + role : ''}</span>
         <span class="re-time">${hitsTxt}${when}</span>
         <div class="kb-hit-s" style="font-size:10px;color:var(--tx3);line-height:1.4">${escHtml(String(h.snippet || '').slice(0, 80))}</div>
@@ -3996,6 +4069,14 @@ g.renderStApiKey = renderStApiKey;
 function escHtml(str){
     if(!str)return'';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  /* JS 单引号字符串上下文安全转义 (S1): escHtml 把 ' 转成 &#39;, 但 HTML 属性
+     内 &#39; 会被解码回 ', 突破 JS 字符串边界 → 注入面。escJs 直接把 ' 转成
+     \u0027 (JS 字面量), 与 \n \r \ 一并处理, 可安全嵌入 onclick="fn('...')"。 */
+  function escJs(str){
+    if(str === undefined || str === null) return '';
+    return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\u0027").replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/"/g,'\\"').replace(/`/g,'\\`');
   }
 
   /* ── Window controls: native macOS traffic lights (Overlay titlebar) handle
