@@ -231,6 +231,22 @@ fn set_default_model_from_config(agent: &mut SelfIteratingBrain) {
     }
 }
 
+/// 构建自进化 brain — 抽取 7 处重复初始化样板 (审计 R-P99 去重)。
+///
+/// 核心 5 步: init_brain → SelfIteratingBrain::new → 挂载 brain/reasoning_bank
+/// → set_default_model_from_config → ensure_provider_env_from_config → init_reasoning_engine。
+/// 带 load_cortex 的变体 (run_daemon/evolution) 不共用, 因顺序不同。
+fn build_brain(profile: &str) -> SelfIteratingBrain {
+    let (brain, bank) = init_brain(profile);
+    let mut agent = SelfIteratingBrain::new();
+    agent.brain = brain;
+    agent.reasoning_bank = bank;
+    set_default_model_from_config(&mut agent);
+    ensure_provider_env_from_config();
+    agent.init_reasoning_engine();
+    agent
+}
+
 /// 将 config.toml 中的 provider/api_key 提升为环境变量，使 GatewayV2 能发现
 fn ensure_provider_env_from_config() {
     let cfg = neotrix::config::NeoTrixConfig::load();
@@ -359,13 +375,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
         writer.emit_start(&prompt, None, None, None);
 
         let result = rt.block_on(async {
-            let (brain, bank) = init_brain("default");
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain("default");
 
             let timeout = tokio::time::Duration::from_secs(timeout_secs);
             let task = async {
@@ -402,13 +412,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     } else if stream {
         // Streaming mode — print tokens as they arrive
         let result = rt.block_on(async {
-            let (brain, bank) = init_brain("default");
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain("default");
 
             if let Some(ref mut engine) = agent.reasoning_engine {
                 match engine.reason_stream(&prompt, None).await {
@@ -436,13 +440,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
     } else {
         // Plain text mode (original behavior)
         let result = rt.block_on(async {
-            let (brain, bank) = init_brain("default");
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain("default");
 
             let timeout = tokio::time::Duration::from_secs(timeout_secs);
             let task = async {
@@ -488,13 +486,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     if stream {
         // Streaming mode — print tokens as they arrive, no progress bar
         rt.block_on(async {
-            let (brain, bank) = init_brain(profile);
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain(profile);
 
             let result = if let Some(ref mut engine) = agent.reasoning_engine {
                 match engine.reason_stream(&prompt, None).await {
@@ -544,13 +536,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     } else {
         // Non-streaming mode — original behavior with progress bar
         rt.block_on(async {
-            let (brain, bank) = init_brain(profile);
-            let mut agent = SelfIteratingBrain::new();
-            agent.brain = brain;
-            agent.reasoning_bank = bank;
-            set_default_model_from_config(&mut agent);
-            ensure_provider_env_from_config();
-            agent.init_reasoning_engine();
+            let mut agent = build_brain(profile);
 
             let pb = indicatif::ProgressBar::new(100);
             match indicatif::ProgressStyle::default_bar()
