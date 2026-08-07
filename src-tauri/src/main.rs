@@ -111,6 +111,12 @@ fn main() {
                     tauri_plugin_global_shortcut::Builder::new()
                         .with_handler(|app, shortcut, event| {
                             if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                                // C10: 全局呼出 — 显示并聚焦主窗口, 再通知前端聚焦输入框
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.unminimize();
+                                    let _ = window.set_focus();
+                                }
                                 let _ = app.emit("neotrix-global-shortcut", shortcut.to_string());
                             }
                         })

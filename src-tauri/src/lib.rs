@@ -53,15 +53,22 @@ pub fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(&cmd_palette)
+        .separator()
         .item(&PredefinedMenuItem::fullscreen(app, Some("Enter Full Screen"))?)
         .build()?;
 
     let window_menu = SubmenuBuilder::new(app, "Window")
         .item(&PredefinedMenuItem::minimize(app, Some("Minimize"))?)
+        .item(&PredefinedMenuItem::maximize(app, Some("Maximize"))?)
+        .item(&PredefinedMenuItem::close_window(app, Some("Close Window"))?)
+        .build()?;
+
+    let help_menu = SubmenuBuilder::new(app, "Help")
+        .item(&check_updates)
         .build()?;
 
     let menu = MenuBuilder::new(app)
-        .items(&[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu])
+        .items(&[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu, &help_menu])
         .build()?;
 
     app.set_menu(menu)?;

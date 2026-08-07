@@ -63,6 +63,9 @@ g.closeRefPicker = closeRefPicker;
 g.insertReference = insertReference;
 g.addAttachChip = addAttachChip;
 g.clearAttachments = clearAttachments;
+g.wireAttachmentDnD = wireAttachmentDnD;
+g.escJs = escJs;
+g.renderOnboarding = renderOnboarding;
 g.renderThread = renderThread;
 g.createSession = createSession;
 g.refreshAgent = refreshAgent;
@@ -86,6 +89,15 @@ g.renameSession = renameSession;
 g.compactSession = compactSession;
 g.archiveSession = archiveSession;
 g.exportSession = exportSession;
+g.copySessionAsMarkdown = copySessionAsMarkdown;
+g.loadSideChat = loadSideChat;
+g.sendSideChat = sendSideChat;
+g.setAutoArchiveDays = setAutoArchiveDays;
+g.autoArchiveIdleSessions = autoArchiveIdleSessions;
+g.keyComboString = keyComboString;
+g.loadUserKeymap = loadUserKeymap;
+g.saveUserKeymap = saveUserKeymap;
+g.comboToLabel = comboToLabel;
 g.deleteSession = deleteSession;
 g.feedbackMessage = feedbackMessage;
 g.searchSessions = searchSessions;
@@ -122,7 +134,10 @@ g.renderStApiKey = renderStApiKey;
     const permMap = { '自动': 'auto', '计划': 'plan', '手动': 'manual' };
     if(isTauri()){
       const modeName = permMap[currentMode];
-      invoke('neocodex_set_mode', { mode: modeName === 'auto' ? 'Agent' : (modeName === 'plan' ? 'Plan' : 'Shell') }).catch(() => {});
+      // 语义对齐: 自动/手动 → Agent mode (shell 由 permission 门控, 手动经 UI 审批层);
+      // 计划 → Plan mode (只读规划). 手动映射到 Shell 会与 policy_gate 的
+      // manual-deny-shell 自相矛盾 (nt_io_neocodex.rs:830).
+      invoke('neocodex_set_mode', { mode: modeName === 'plan' ? 'Plan' : 'Agent' }).catch(() => {});
       showToast('权限模式: ' + currentMode);
     }else{
       showToast('权限模式: ' + currentMode + '（浏览器演示）');
@@ -304,7 +319,7 @@ g.renderStApiKey = renderStApiKey;
         const list = Array.isArray(projects) ? projects : [];
         body.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;padding:12px">
           <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:16px;font-weight:600;margin:0">活跃项目</h3><span style="font-size:11px;color:var(--tx3)">${list.length} 个</span></div>
-          ${list.length ? list.map(p => `<div class="evo-card" style="cursor:pointer" onclick="showToast('项目: ${escHtml(p.name)}')"><span class="lbl">${escHtml(p.project_type || 'project')}</span><span class="val">${escHtml(p.name)}</span><span style="font-size:10px;color:var(--tx3)">${escHtml(p.path || '')}${p.pinned ? ' · 📌' : ''}</span></div>`).join('') : '<div class="kb-empty">暂无项目</div>'}
+          ${list.length ? list.map(p => `<div class="evo-card" style="cursor:pointer" onclick="showToast('项目: ${escJs(p.name)}')"><span class="lbl">${escHtml(p.project_type || 'project')}</span><span class="val">${escHtml(p.name)}</span><span style="font-size:10px;color:var(--tx3)">${escHtml(p.path || '')}${p.pinned ? ' · 📌' : ''}</span></div>`).join('') : '<div class="kb-empty">暂无项目</div>'}
           <button class="cht" style="margin-top:4px" onclick="showToast('创建新项目...')">+ 新建项目</button>
         </div>`;
       }catch(_e){
@@ -379,8 +394,8 @@ g.renderStApiKey = renderStApiKey;
       }
       const timeHtml = r.time ? `<span class="re-time">${r.time}</span>` : '';
       const click = r.id
-        ? `onclick="openRecent('${tab}','${r.id}',${r.cowork ? 'true' : 'false'})"`
-        : `onclick="dispatch('toast:打开 ${escHtml(r.text)}')"`;
+        ? `onclick="openRecent('${escJs(tab)}','${escJs(r.id)}',${r.cowork ? 'true' : 'false'})"`
+        : `onclick="dispatch('toast:打开 ${escJs(r.text)}')"`;
       return `<div class="re-i" ${click}><span class="dot"></span><span class="t">${escHtml(r.text)}</span>${timeHtml}</div>`;
     }).join('');
   }
@@ -964,15 +979,36 @@ g.renderStApiKey = renderStApiKey;
   }
 
   /* ===== Code Tab Switching ===== */
-  function highlightCode(code){
-    const kwSet = new Set(['fn','pub','let','mut','Result','Ok','f64','std','use','match','for','in','if','else','return','struct','impl','enum','trait']);
+  /* 按语言选取关键字集 — 多语言高亮 (Rust/JS/TS/JSON/Python/Shell) */
+  const LANG_KW = {
+    rust:  new Set(['fn','pub','let','mut','Result','Ok','f64','std','use','match','for','in','if','else','return','struct','impl','enum','trait','async','await','mod','crate','self','Self','where','while','loop','break','continue','const','static','type','unsafe','ref','move','Some','None','Vec','String','Box','dyn','super','as','true','false','i32','i64','usize','u64','u32']),
+    js:    new Set(['function','const','let','var','if','else','return','for','while','class','import','export','from','async','await','try','catch','throw','new','this','typeof','instanceof','null','undefined','true','false','switch','case','break','continue','default','extends','super','yield','delete','in','of','void','do','static','get','set','Map','Set','Promise','Array','Object','console']),
+    ts:    new Set(['function','const','let','var','if','else','return','for','while','class','import','export','from','async','await','try','catch','throw','new','this','typeof','instanceof','null','undefined','true','false','switch','case','break','continue','default','extends','super','yield','delete','in','of','void','do','static','get','set','interface','type','enum','implements','readonly','public','private','protected','abstract','namespace','declare','satisfies','keyof','infer','never','unknown','any','string','number','boolean','Map','Set','Promise','Array','Object','console']),
+    json:  new Set(['true','false','null']),
+    python:new Set(['def','class','import','from','if','elif','else','for','while','return','try','except','finally','with','as','lambda','pass','break','continue','global','nonlocal','yield','async','await','raise','assert','del','not','and','or','in','is','None','True','False','self','print','len','range','dict','list','set','tuple','str','int','float','bool','__init__','super']),
+    shell: new Set(['if','then','else','fi','for','while','do','done','case','esac','function','export','local','return','echo','cd','ls','mkdir','rm','cp','mv','cat','grep','sed','awk','curl','wget','sudo','exit','read','set','shift','source','printf','test','true','false','&&','||']),
+  };
+  const DEFAULT_KW = LANG_KW.rust;
+  function langKwSet(lang){
+    const l = String(lang || '').toLowerCase();
+    if(l.includes('rust') || l.includes('rs')) return LANG_KW.rust;
+    if(l.includes('typescript') || l.includes('tsx') || l.includes('ts')) return LANG_KW.ts;
+    if(l.includes('javascript') || l.includes('jsx') || l.includes('js')) return LANG_KW.js;
+    if(l.includes('json')) return LANG_KW.json;
+    if(l.includes('python') || l.includes('py')) return LANG_KW.python;
+    if(l.includes('bash') || l.includes('sh') || l.includes('shell') || l.includes('zsh')) return LANG_KW.shell;
+    return DEFAULT_KW;
+  }
+  function highlightCode(code, lang){
+    const kwSet = langKwSet(lang);
     const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const re = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\/[^\n]*|[A-Z]\w+|\w+|[^a-zA-Z0-9_'"\s]+|\s+)/g;
+    const re = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|@\w+|[A-Z]\w+|\w+|[^a-zA-Z0-9_'"\s]+|\s+)/g;
     let out = '', m;
     while((m = re.exec(code)) !== null){
       const tok = m[0];
       if(tok.startsWith('"') || tok.startsWith("'")) out += '<span class="hl">' + esc(tok) + '</span>';
-      else if(tok.startsWith('//')) out += '<span class="cm">' + esc(tok) + '</span>';
+      else if(tok.startsWith('//') || tok.startsWith('#') || tok.startsWith('/*')) out += '<span class="cm">' + esc(tok) + '</span>';
+      else if(tok.startsWith('@')) out += '<span class="fn">' + tok + '</span>';
       else if(/^[A-Z]\w+$/.test(tok)) out += '<span class="fn">' + tok + '</span>';
       else if(/^\w+$/.test(tok)) out += kwSet.has(tok) ? '<span class="kw">' + tok + '</span>' : tok;
       else out += esc(tok);
@@ -1051,7 +1087,7 @@ g.renderStApiKey = renderStApiKey;
         const code = [];
         while(i < rawLines.length && !/^\s*```\s*$/.test(rawLines[i])){ code.push(rawLines[i]); i++; }
         i++;
-        out += `<div class="msg-code"><div class="msg-code-h"><span class="msg-code-lang">${escHtml(lang || 'code')}</span><span class="msg-code-actions"><button class="msg-code-cp" onclick="runMsgCode(this)">运行</button><button class="msg-code-cp" onclick="copyMsgCode(this)">复制</button></span></div><pre class="msg-code-b">${highlightCode(code.join('\n'))}</pre></div>`;
+        out += `<div class="msg-code"><div class="msg-code-h"><span class="msg-code-lang">${escHtml(lang || 'code')}</span><span class="msg-code-actions"><button class="msg-code-cp" onclick="runMsgCode(this)">运行</button><button class="msg-code-cp" onclick="copyMsgCode(this)">复制</button></span></div><pre class="msg-code-b">${highlightCode(code.join('\n'), lang)}</pre></div>`;
         continue;
       }
       if(!line.trim()){ flush(); i++; continue; }
@@ -1104,10 +1140,6 @@ g.renderStApiKey = renderStApiKey;
     }
     flush();
     return out || '<span></span>';
-  }
-
-  function switchProvider(val){
-    showToast('切换提供者: ' + val);
   }
 
   /* ===== IPC-backed streaming send ===== */
@@ -1185,6 +1217,41 @@ g.renderStApiKey = renderStApiKey;
       sendMsg();
     }
   }
+  /* C2: ↑ 编辑上一条消息 — 把当前会话最后一条用户消息回填到输入框并聚焦 */
+  async function editLastUserMessage(){
+    if(!isTauri() || !currentSessionId){ showToast('需在会话中编辑'); return; }
+    const msgs = await invoke('neocodex_get_session_messages', { session_id: currentSessionId }).catch(() => null);
+    if(!Array.isArray(msgs)) return;
+    let lastUser = null;
+    for(let i = msgs.length - 1; i >= 0; i--){ if(msgs[i].role === 'user'){ lastUser = msgs[i]; break; } }
+    if(!lastUser){ showToast('没有可编辑的消息'); return; }
+    const inp = document.getElementById('chatInput');
+    if(!inp) return;
+    inp.value = lastUser.content || '';
+    autoResize(inp);
+    inp.focus();
+    const len = inp.value.length;
+    inp.setSelectionRange(len, len);
+    showToast('正在编辑上一条消息');
+  }
+  /* C3: 复制最后回复 / 最后代码块 (⌘⇧C / ⌘⇧;) */
+  function copyLastReply(){
+    const msgs = document.querySelectorAll('#chatScroll .msg.l');
+    if(!msgs.length){ showToast('没有可复制的回复'); return; }
+    const last = msgs[msgs.length - 1];
+    const mb = last.querySelector('.mb');
+    const text = mb ? mb.innerText : '';
+    if(!text.trim()){ showToast('没有可复制的回复'); return; }
+    navigator.clipboard.writeText(text.trim()).then(() => showToast('已复制最后回复')).catch(() => showToast('复制失败'));
+  }
+  function copyLastCodeBlock(){
+    const blocks = document.querySelectorAll('#chatScroll .msg-code pre');
+    if(!blocks.length){ showToast('没有代码块'); return; }
+    const last = blocks[blocks.length - 1];
+    const text = last.textContent || '';
+    if(!text.trim()){ showToast('没有代码块'); return; }
+    navigator.clipboard.writeText(text.trim()).then(() => showToast('已复制最后代码块')).catch(() => showToast('复制失败'));
+  }
   let thinkStart = 0;
   let thinkTimer = null;
   function clearThink(){
@@ -1231,6 +1298,30 @@ g.renderStApiKey = renderStApiKey;
     attach('neocodex_stream_start', p => {
       const el=document.querySelector('#chatScroll .msg.l .mb.streaming');
       if(el) startThink(el);
+    });
+  }
+
+  /* 原生菜单事件接线 (lib.rs setup_menu / setup_tray emit):
+     macOS 菜单 accelerator 优先于 webview keydown, 因此 Cmd+N/Cmd+,/Cmd+K/
+     Cmd+Shift+U 及托盘项必须经此监听转发到前端处理, 否则快捷键全部失效. */
+  function wireMenuEvents(){
+    if(!isTauri() || window._ntxMenuBound) return;
+    window._ntxMenuBound = true;
+    const attach=(ev,fn)=>{
+      try{ listen(ev, fn).catch(()=>{}); }catch(_e){}
+    };
+    attach('neotrix:new-session', () => createSession());
+    attach('open-settings', () => openSettingsModal());
+    attach('neocodex-open-palette', () => openPalette());
+    attach('neocodex-check-updates', () => checkForUpdate());
+    attach('sync-trigger', () => { showToast('同步触发'); refreshSessionList(); });
+    attach('proxy-mode-change', (mode) => { showToast('代理模式: ' + String(mode || '')); });
+    attach('proxy-mode-change', (mode) => { showToast('代理模式: ' + String(mode || '')); });
+    attach('open-proxy-status', () => { showToast('代理状态面板'); });
+    // C10: 全局呼出热键 (CmdOrCtrl+Shift+Space) — 窗口已由 Rust 显示聚焦, 前端聚焦输入框
+    attach('neotrix-global-shortcut', () => {
+      const inp = document.getElementById('chatInput');
+      if(inp) inp.focus();
     });
   }
 
@@ -1293,7 +1384,8 @@ g.renderStApiKey = renderStApiKey;
     s.appendChild(a);s.scrollTop=s.scrollHeight;
 
     if(!isTauri()){
-      /* Browser fallback: simulated reply so the UI stays demo-able */
+      /* Browser fallback: simulated reply so the UI stays demo-able.
+         标记演示模式, 避免用户误认为真实模型响应 (D8). */
       setTimeout(()=>{
         const rs=[
           '好的，我来逐步分析这个问题。',
@@ -1302,7 +1394,7 @@ g.renderStApiKey = renderStApiKey;
         ];
         const mb=a.querySelector('.mb');
         mb.classList.remove('streaming');
-        const demo = rs[Math.floor(Math.random()*rs.length)] + '\n\n```rust\nfn main() {\n    println!("Hello, NeoTrix!");\n    let engine = ReasoningEngine::new();\n    engine.run();\n}\n```';
+        const demo = '<span class="demo-badge">浏览器演示模式</span>\n\n' + rs[Math.floor(Math.random()*rs.length)] + '\n\n```rust\nfn main() {\n    println!("Hello, NeoTrix!");\n    let engine = ReasoningEngine::new();\n    engine.run();\n}\n```';
         mb.innerHTML = renderRichText(demo);
         setStreaming(false);
         attachUsageFooter(a);
@@ -1313,17 +1405,51 @@ g.renderStApiKey = renderStApiKey;
 
     const g = genParamsFromSettings();
     const att = attachPayloads();
-    invoke('neocodex_send_message_stream', {
+    // Auto-title (ChatGPT parity): first message of a fresh session names the session.
+    if(isTauri() && currentSessionId){
+      const prev = CW_DATA.find(x => x.id === currentSessionId);
+      const msgCount = (prev && prev.message_count) || 0;
+      if(msgCount === 0){
+        const title = txt.replace(/\s+/g, ' ').trim().slice(0, 28);
+        invoke('neocodex_rename_session', { session_id: currentSessionId, name: title }).catch(()=>{});
+        if(prev) prev.name = title;
+        renderCowork();
+      }
+    }
+    const streamOpts = {
       content: txt,
       attachments: att.length ? att : null,
       regenerate: false,
       permission_mode: currentPermissionMode(),
       temperature: g.temperature,
       max_tokens: g.max_tokens,
-    }).catch(err=>{
+    };
+    invoke('neocodex_send_message_stream', streamOpts).catch(err=>{
       const mb=a.querySelector('.mb');
-      if(mb){ mb.classList.remove('streaming'); mb.textContent='[IPC 错误] '+String(err); }
       setStreaming(false);
+      if(mb){
+        mb.classList.remove('streaming');
+        mb.textContent='';
+        // Error + retry (ChatGPT/Claude parity): keep the failed bubble, offer one-tap retry.
+        const errBox = document.createElement('div');
+        errBox.className = 'msg-ipc-err';
+        const safeErr = String(err).slice(0, 300).replace(/sk-[A-Za-z0-9_-]{8,}/gi, 'sk-•••');
+        errBox.innerHTML = '<div class="msg-ipc-err-txt">⚠️ ' + escHtml(safeErr) + '</div>' +
+          '<button class="msg-ipc-retry" data-op="retry">重试</button>';
+        errBox.querySelector('[data-op="retry"]').onclick = () => {
+          mb.classList.add('streaming');
+          mb.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+          errBox.remove();
+          invoke('neocodex_send_message_stream', streamOpts)
+            .then(() => {})
+            .catch(err2 => {
+              mb.classList.remove('streaming');
+              const safe2 = String(err2).slice(0, 300).replace(/sk-[A-Za-z0-9_-]{10,}/gi, 'sk-•••');
+              mb.innerHTML = '<div class="msg-ipc-err-txt">⚠️ ' + escHtml(safe2) + '</div>';
+            });
+        };
+        mb.appendChild(errBox);
+      }
     });
     if(att.length) clearAttachments();
   }
@@ -1347,8 +1473,40 @@ g.renderStApiKey = renderStApiKey;
     const el = document.getElementById('heroSuggest');
     if(!el) return;
     el.innerHTML = HERO_SUGGESTIONS.map(s =>
-      `<button class="hero-sug-item" onclick="sendSuggestion('${escHtml(s.t)}')">${s.icon}<span>${escHtml(s.t)}</span></button>`
+      `<button class="hero-sug-item" onclick="sendSuggestion('${escJs(s.t)}')">${s.icon}<span>${escHtml(s.t)}</span></button>`
     ).join('');
+  }
+
+  /* C9: Onboarding — 首次启动欢迎条 (对标 Cursor 欢迎屏): 功能速览 + 快捷键入口.
+     显示一次后 localStorage 标记, 用户可手动关闭. */
+  const ONBOARDING_KEY = 'neotrix.onboarding.done.v1';
+  function renderOnboarding(){
+    if(window._ntxOnboarded) return;
+    window._ntxOnboarded = true;
+    const el = document.getElementById('heroOnboarding');
+    if(!el) return;
+    try{ if(localStorage.getItem(ONBOARDING_KEY)) return; }catch(_e){}
+    const items = [
+      ['⌘K', '命令面板 — 搜索会话 / 快捷动作'],
+      ['↑', '编辑上一条消息'],
+      ['⌘⇧C / ⌘⇧;', '复制最后回复 / 代码块'],
+      ['Shift+Tab', '循环权限模式'],
+      ['⌘⇧S / ⌘⇧L', '侧边栏 / 明暗主题'],
+      ['⌘/', '查看全部快捷键'],
+    ];
+    el.style.display = 'block';
+    el.innerHTML = `<div class="hero-onb-in">
+      <div class="hero-onb-t"><span>👋 欢迎使用 NoeCodex</span><span class="hero-onb-x" title="不再显示" role="button">×</span></div>
+      <div class="hero-onb-grid">${items.map(([k,d]) => `<div class="hero-onb-it"><span class="hero-onb-k">${k}</span><span>${d}</span></div>`).join('')}</div>
+      <div class="hero-onb-f"><button class="hero-onb-btn" id="onbClose">开始使用 →</button></div>
+    </div>`;
+    el.querySelector('.hero-onb-x').addEventListener('click', () => { dismissOnboarding(); });
+    el.querySelector('#onbClose').addEventListener('click', () => { dismissOnboarding(); });
+  }
+  function dismissOnboarding(){
+    try{ localStorage.setItem(ONBOARDING_KEY, '1'); }catch(_e){}
+    const el = document.getElementById('heroOnboarding');
+    if(el) el.style.display = 'none';
   }
 
   /* ===== Missing Functions ===== */
@@ -1358,9 +1516,56 @@ g.renderStApiKey = renderStApiKey;
   }
 
   /* ===== Keyboard Shortcuts ===== */
+  // 可重绑定动作注册表: action 名 → 执行函数
+  const USER_KEY_ACTIONS = {
+    openSettings: () => openSettingsModal(),
+    newSession: () => createSession(),
+    openSearch: () => openStData(),
+    closeWindow: () => closeWindow(),
+    openPalette: () => openPalette(),
+    openShortcuts: () => openOverlay('overlayShortcuts'),
+    openSideChat: () => { openOverlay('overlaySideChat'); const i = document.getElementById('sideChatInput'); if(i) setTimeout(() => i.focus(), 30); },
+    toggleSidebar: () => toggleSidebar(),
+    toggleTheme: () => toggleTheme(),
+    copyLastReply: () => copyLastReply(),
+    copyLastCode: () => copyLastCode(),
+  };
+  // 用户自定义键位 (localStorage 持久化): { "meta+,": "openSettings", ... }
+  function loadUserKeymap(){
+    try{
+      const raw = localStorage.getItem('ntx_user_keymap');
+      return raw ? JSON.parse(raw) : null;
+    }catch(_e){ return null; }
+  }
+  function saveUserKeymap(map){
+    try{ localStorage.setItem('ntx_user_keymap', JSON.stringify(map || {})); }catch(_e){}
+  }
+  // 把 KeyboardEvent 归一化为 "meta+shift+key" 形式 (仅记录按下的修饰键)
+  function keyComboString(e){
+    const parts = [];
+    if(e.metaKey) parts.push('meta');
+    if(e.ctrlKey) parts.push('ctrl');
+    if(e.altKey) parts.push('alt');
+    if(e.shiftKey) parts.push('shift');
+    const key = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    parts.push(key);
+    return parts.join('+');
+  }
   if(!window._ntxKeyBound){
     window._ntxKeyBound = true;
   document.addEventListener('keydown', e => {
+    // ── 用户自定义键位覆盖层 (keybindings) ─────────────────
+    // 用户可在设置中重绑定常用快捷键; 命中自定义映射则执行对应 action。
+    const custom = loadUserKeymap();
+    if(custom && !e.target.closest('textarea, input')){
+      const combo = keyComboString(e);
+      const action = custom[combo];
+      if(action && USER_KEY_ACTIONS[action]){
+        e.preventDefault();
+        USER_KEY_ACTIONS[action]();
+        return;
+      }
+    }
     if((e.metaKey || e.ctrlKey) && e.key === ','){ e.preventDefault(); openSettingsModal(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'n'){ e.preventDefault(); createSession(); }
     if((e.metaKey || e.ctrlKey) && e.key === 'f'){ e.preventDefault(); openStData(); }
@@ -1395,9 +1600,123 @@ g.renderStApiKey = renderStApiKey;
       updateTrafficVisibility();
     }
     if(e.key === '?' && !e.target.closest('textarea, input')){
-      showToast('快捷键: ⌘1/⌘2 切换 · ⌘, 设置 · ⌘N 新建 · ⌘F 知识库 · ⌘W 关闭 · ⌘K 搜索 · Esc 关闭 · ? 帮助');
+      openOverlay('overlayShortcuts');
+    }
+    // Cmd+/ 快捷键总览 (全竞品标配)
+    if((e.metaKey || e.ctrlKey) && e.key === '/'){
+      e.preventDefault();
+      openOverlay('overlayShortcuts');
+    }
+    // Cmd+. 双通道中断 (C4, 与 Esc 并存)
+    if((e.metaKey || e.ctrlKey) && e.key === '.'){
+      e.preventDefault();
+      if(window._ntxStreamActive){ stopStream(); }
+      else { closePopover(); updateTrafficVisibility(); }
+    }
+    // Cmd+; 侧向对话 Side Chat (独立上下文, 不污染主线程)
+    if((e.metaKey || e.ctrlKey) && e.key === ';'){
+      e.preventDefault();
+      openOverlay('overlaySideChat');
+      const inp = document.getElementById('sideChatInput');
+      if(inp) setTimeout(() => inp.focus(), 30);
+    }
+    // Cmd+Shift+S 侧边栏开关 (C7)
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'S' || e.key === 's')){
+      e.preventDefault();
+      toggleSidebar();
+    }
+    // Cmd+Shift+L 主题切换 (C7)
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'L' || e.key === 'l')){
+      e.preventDefault();
+      toggleTheme();
+    }
+    // ↑ 编辑上一条消息 (C2, 全竞品标配): 输入框为空时把最后一条用户消息回填
+    if(e.key === 'ArrowUp' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey){
+      const inp = document.getElementById('chatInput');
+      if(inp && !inp.value.trim() && !e.target.closest('textarea, input, select')){
+        e.preventDefault();
+        editLastUserMessage();
+      }
+    }
+    // Cmd+Shift+C 复制最后回复 / Cmd+Shift+; 复制最后代码块 (C3)
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')){
+      e.preventDefault();
+      copyLastReply();
+    }
+    if((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === ';')){
+      e.preventDefault();
+      copyLastCodeBlock();
+    }
+    // C8: Shift+Tab 循环权限模式 (Cursor 式) — 输入框聚焦时也可用, 不抢焦点
+    if(e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey){
+      const isComposer = e.target.closest('textarea, input');
+      if(!isComposer || document.activeElement === document.getElementById('chatInput')){
+        e.preventDefault();
+        cycleMode();
+      }
     }
   });
+  }
+
+  /* C6: 附件闭环 — 拖拽文件/粘贴图片 + Backspace 移除最近附件
+     (ChatGPT/Claude 式: 拖拽即附、⌘V 粘贴剪贴板图片、⌫ 移除最近) */
+  function wireAttachmentDnD(){
+    const area = document.getElementById('ntxAttachArea');
+    const input = document.getElementById('chatInput');
+    if(!area || !input) return;
+    if(window._ntxDnDBound) return;
+    window._ntxDnDBound = true;
+
+    const dropZone = document.getElementById('chatScroll') || document.body;
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); });
+    dropZone.addEventListener('drop', async e => {
+      e.preventDefault();
+      const files = e.dataTransfer ? Array.from(e.dataTransfer.files || []) : [];
+      if(!files.length) return;
+      for(const f of files){
+        // 浏览器模式: File 对象; Tauri 模式经 dialog/fs 走 pickAttachment 同路径
+        const name = f.name || 'file';
+        const mime = f.type || mimeFromName(name);
+        let data = null;
+        if(f.size <= 8 * 1024 * 1024){
+          try{ data = new Uint8Array(await f.arrayBuffer()); }catch(_e){}
+        }
+        addAttachChip(name, { size: f.size, mime, data });
+      }
+      showToast('已附加 ' + files.length + ' 个文件');
+    });
+
+    // 粘贴剪贴板图片 (Cmd+V 在输入框内时, dataTransfer 带 files)
+    document.addEventListener('paste', e => {
+      const items = e.clipboardData ? Array.from(e.clipboardData.items || []) : [];
+      const images = items.filter(it => it.type && it.type.startsWith('image/'));
+      if(!images.length) return;
+      e.preventDefault();
+      images.forEach(it => {
+        const f = it.getAsFile();
+        if(!f) return;
+        f.arrayBuffer().then(buf => {
+          addAttachChip('paste-' + Date.now() + '.png', {
+            size: buf.byteLength,
+            mime: f.type || 'image/png',
+            data: new Uint8Array(buf),
+          });
+        }).catch(()=>{});
+      });
+      showToast('已附加剪贴板图片');
+    });
+
+    // Backspace 在输入框空时移除最近附件 (ChatGPT 式 ⌫)
+    input.addEventListener('keydown', e => {
+      if(e.key === 'Backspace' && !input.value && attachList.length){
+        e.preventDefault();
+        const last = attachList[attachList.length - 1];
+        attachList = attachList.filter(f => f.name !== last.name);
+        const chip = area.querySelector('.ntx-attach-chip:last-child');
+        if(chip) chip.remove();
+        showToast('已移除附件: ' + last.name);
+      }
+    });
   }
 
   /* ⌘F — open Settings → Data control, focus KB search */
@@ -1420,6 +1739,7 @@ g.renderStApiKey = renderStApiKey;
   renderSidebar('chat');
   renderHeroSuggest();
   renderCowork();
+  renderOnboarding();
   // Persisted appearance settings (localStorage) — apply before first paint of settings
   const settings = loadSettings();
   if(settings['appearance.fontSize']) document.documentElement.style.fontSize = settings['appearance.fontSize'] + 'px';
@@ -1433,6 +1753,8 @@ g.renderStApiKey = renderStApiKey;
   wireBackend();
   wireStreamScroll();
   fusionInit();
+  wireMenuEvents();
+  wireAttachmentDnD();
 
 
 
@@ -1496,7 +1818,36 @@ g.renderStApiKey = renderStApiKey;
       renderSidebar(currentView);
       renderCowork();
       if(CW_DATA.length) showToast('已加载 ' + CW_DATA.length + ' 个会话');
+      autoArchiveIdleSessions();
     }catch(e){ /* keep demo data */ }
+  }
+
+  // ── 自动归档触发 (空闲会话) ─────────────────────────────
+  // 对超过阈值未更新的非当前会话自动归档, 阈值可经设置 localStorage 调整。
+  // 默认关闭 (0 = 不启用), 避免误归档; 用户可在设置中开启并设天数。
+  async function autoArchiveIdleSessions(){
+    if(!isTauri()) return;
+    let days = 0;
+    try{ days = parseInt(localStorage.getItem('ntx_auto_archive_days') || '0', 10); }catch(_e){ days = 0; }
+    if(!days || days <= 0) return;
+    const now = Date.now();
+    const cutoff = now - days * 86400000;
+    const idle = (CW_DATA || []).filter(s =>
+      s.id && !s.isCowork && s.id !== currentSessionId &&
+      (!s.updated_at || s.updated_at * 1000 < cutoff)
+    );
+    if(!idle.length) return;
+    let archived = 0;
+    for(const s of idle){
+      try{
+        await invoke('neocodex_archive_session', { session_id: s.id });
+        archived++;
+      }catch(_e){ /* skip */ }
+    }
+    if(archived){
+      showToast('已自动归档 ' + archived + ' 个空闲会话');
+      await refreshSessionList();
+    }
   }
 
   async function createSession(){
@@ -1800,6 +2151,21 @@ g.renderStApiKey = renderStApiKey;
     }catch(e){ showToast('导出失败: ' + e); }
   }
 
+  // 复制对话为 Markdown (分享用): 与导出同源数据, 直接进剪贴板便于粘贴分享
+  async function copySessionAsMarkdown(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    if(!id){ showToast('无会话'); return; }
+    closeSessionOps();
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可复制'); return; }
+    try{
+      const out = await invoke('neocodex_export_session', { session_id: id, format: null });
+      const text = String(out || '');
+      if(!text.trim()){ showToast('会话内容为空'); return; }
+      await navigator.clipboard.writeText(text);
+      showToast('对话已复制 (可粘贴分享)');
+    }catch(e){ showToast('复制失败: ' + e); }
+  }
+
   async function deleteSession(){
     const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
     if(!id){ showToast('无会话'); return; }
@@ -1839,8 +2205,8 @@ g.renderStApiKey = renderStApiKey;
             <div class="arch-meta">${msgs}${when ? ' · ' + when : ''}</div>
           </div>
           <div class="arch-actions">
-            <button class="arch-btn restore" onclick="restoreArchived('${escHtml(id)}')">恢复</button>
-            <button class="arch-btn del" onclick="deleteArchived('${escHtml(id)}')">删除</button>
+            <button class="arch-btn restore" onclick="restoreArchived('${escJs(id)}')">恢复</button>
+            <button class="arch-btn del" onclick="deleteArchived('${escJs(id)}')">删除</button>
           </div>
         </div>`;
       }).join('');
@@ -1897,7 +2263,7 @@ g.renderStApiKey = renderStApiKey;
             <div class="ck-name">快照 #${arr.length - i}${latest ? '（最新）' : ''}</div>
             <div class="arch-meta">${when}${msgs}</div>
           </div>
-          <button class="arch-btn restore" onclick="restoreCheckpoint('${escHtml(String(ck.id))}')">回滚到此</button>
+          <button class="arch-btn restore" onclick="restoreCheckpoint('${escJs(String(ck.id))}')">回滚到此</button>
         </div>`;
       }).join('');
       body.dataset.session = String(id);
@@ -1981,7 +2347,7 @@ g.renderStApiKey = renderStApiKey;
       const role = h.role === 'user' ? '问' : (h.role === 'agent' || h.role === 'assistant' ? '答' : '');
       const hitsTxt = h.match_count > 1 ? `<span class="re-time">${h.match_count} 处</span>` : '';
       const when = h.timestamp ? fmtRelTime(h.timestamp) : '';
-      return `<div class="re-i" onclick="openSessionFromSearch('${escHtml(String(h.session_id))}')">
+      return `<div class="re-i" onclick="openSessionFromSearch('${escJs(String(h.session_id))}')">
         <span class="dot"></span><span class="t">${escHtml(h.session_name || '会话')}${role ? ' · ' + role : ''}</span>
         <span class="re-time">${hitsTxt}${when}</span>
         <div class="kb-hit-s" style="font-size:10px;color:var(--tx3);line-height:1.4">${escHtml(String(h.snippet || '').slice(0, 80))}</div>
@@ -2456,9 +2822,15 @@ g.renderStApiKey = renderStApiKey;
         const known = MODEL_POOL.map(x => x.id);
         cfg.providers.forEach(p => {
           const idx = MODEL_POOL.findIndex(x => x.id.toLowerCase() === String(p.name||'').toLowerCase());
-          if(idx >= 0){ MODEL_POOL[idx].model = p.model || MODEL_POOL[idx].model; MODEL_POOL[idx].online = !!p.resolvable; }
+          if(idx >= 0){
+            MODEL_POOL[idx].model = p.model || MODEL_POOL[idx].model;
+            MODEL_POOL[idx].online = !!p.resolvable;
+            // 后端 neocodex_provider_config 不提供真实延迟 → 置 null 显示 "—",
+            // 避免把 browser demo 的静态假 lat 渲染给 Tauri 用户 (D7).
+            MODEL_POOL[idx].lat = null;
+          }
           else if(!known.includes(p.name)){
-            MODEL_POOL.push({ id: p.name, title: p.name, model: p.model || '', lat: 0, online: !!p.resolvable });
+            MODEL_POOL.push({ id: p.name, title: p.name, model: p.model || '', lat: null, online: !!p.resolvable });
           }
         });
         if(cfg.active_model){
@@ -2531,10 +2903,6 @@ g.renderStApiKey = renderStApiKey;
       } else {
         showToast('附加文件 (浏览器演示 — 需 Tauri)');
       }
-      return;
-    }
-    if(act === 'attach'){
-      pickAttachment();
       return;
     }
     if(act === 'ref'){
@@ -3109,6 +3477,7 @@ g.renderStApiKey = renderStApiKey;
     const el=document.getElementById(id);
     if(el)el.classList.add('open');
     if(id === 'overlayHypercube') loadHypercube();
+    if(id === 'overlaySideChat') loadSideChat();
     updateTrafficVisibility();
   }
 
@@ -3117,6 +3486,62 @@ g.renderStApiKey = renderStApiKey;
     if(el)el.classList.remove('open');
     updateTrafficVisibility();
   }
+
+  // ── Side Chat (侧向对话, Cmd+;) ─────────────────────────────
+  // 独立上下文: 问题不进入主对话 wire, 由后端 side_chat_ask 生成隔离回答。
+  async function loadSideChat(){
+    const box = document.getElementById('sideChatMsgs');
+    if(!box) return;
+    if(!isTauri() || !currentSessionId){
+      box.innerHTML = '<div class="sdc-empty" style="color:var(--tx-meta);font-size:var(--fs-caption);padding:16px;text-align:center">打开一个会话后可用侧向对话</div>';
+      return;
+    }
+    try{
+      const msgs = await invoke('neocodex_get_side_chat', { session_id: currentSessionId });
+      renderSideChat(msgs || []);
+    }catch(e){
+      box.innerHTML = '<div class="sdc-empty" style="color:var(--tx-meta);font-size:var(--fs-caption);padding:16px;text-align:center">加载失败: ' + e + '</div>';
+    }
+  }
+
+  function renderSideChat(msgs){
+    const box = document.getElementById('sideChatMsgs');
+    if(!box) return;
+    if(!msgs.length){
+      box.innerHTML = '<div class="sdc-empty" style="color:var(--tx-meta);font-size:var(--fs-caption);padding:16px;text-align:center">侧向对话与主对话隔离，适合追问、头脑风暴、无关问题</div>';
+      return;
+    }
+    box.innerHTML = msgs.map(m => {
+      const role = m.role === 'user' ? 'user' : 'assistant';
+      const content = (m.content || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+      return '<div class="sdc-msg ' + role + '" style="margin-bottom:10px;padding:10px 12px;border-radius:10px;background:' +
+        (role === 'user' ? 'var(--bg-input,#1e1e1e)' : 'var(--bg-2,#262626)') +
+        ';border:1px solid var(--bd,#333);font-size:var(--fs-body);line-height:1.6;white-space:normal">' + content + '</div>';
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function sendSideChat(){
+    const inp = document.getElementById('sideChatInput');
+    const content = (inp && inp.value || '').trim();
+    if(!content) return;
+    if(!isTauri() || !currentSessionId){ showToast('需在会话中发起侧向对话'); return; }
+    inp.value = '';
+    try{
+      const msgs = await invoke('neocodex_send_side_chat', { session_id: currentSessionId, content });
+      renderSideChat(msgs || []);
+    }catch(e){
+      showToast('侧向对话失败: ' + e);
+    }
+  }
+
+  // Side Chat 输入框 Enter 发送 (Shift+Enter 换行)
+  document.addEventListener('keydown', function(e){
+    if(e.target && e.target.id === 'sideChatInput' && e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      sendSideChat();
+    }
+  });
 
   function filterSettings(q){
     const items = document.querySelectorAll('#overlaySettings .st-item');
@@ -3155,6 +3580,7 @@ g.renderStApiKey = renderStApiKey;
     if(section==='data') await renderStData();
     if(section==='profile') initProfileHandlers();
     if(section==='appearance') initAppearanceHandlers();
+    if(section==='shortcuts') initShortcutsHandlers();
     if(section==='speech') initSpeechHandlers();
     if(section==='compute') initComputeHandlers();
     if(section==='compute') initApiKeyHandlers();
@@ -3193,6 +3619,98 @@ g.renderStApiKey = renderStApiKey;
         showToast(reduceTrans.checked ? '已开启减少透明效果' : '已关闭减少透明效果');
       };
     }
+  }
+
+  function initShortcutsHandlers(){
+    const sel = document.getElementById('stAutoArchiveDays');
+    if(sel){
+      const saved = localStorage.getItem('ntx_auto_archive_days') || '0';
+      sel.value = saved;
+      sel.onchange = () => {
+        localStorage.setItem('ntx_auto_archive_days', sel.value);
+        showToast(sel.value === '0' ? '已关闭自动归档' : '自动归档阈值: ' + sel.value + ' 天');
+      };
+    }
+    renderKeymapList();
+  }
+
+  // 可重绑定快捷键的默认键位 (action → 默认组合键)
+  const DEFAULT_KEYBIND = {
+    openSettings: 'meta+,',
+    newSession: 'meta+n',
+    openSearch: 'meta+f',
+    openPalette: 'meta+k',
+    openShortcuts: 'meta+/',
+    openSideChat: 'meta+;',
+    toggleSidebar: 'meta+shift+s',
+    toggleTheme: 'meta+shift+l',
+    copyLastReply: 'meta+shift+c',
+    copyLastCode: 'meta+shift+;',
+  };
+  const KEYMAP_LABELS = {
+    openSettings: '打开设置', newSession: '新建会话', openSearch: '知识库检索',
+    openPalette: '命令面板 / 搜索', openShortcuts: '快捷键总览', openSideChat: '侧向对话',
+    toggleSidebar: '切换侧边栏', toggleTheme: '切换主题',
+    copyLastReply: '复制最后回复', copyLastCode: '复制最后代码块',
+  };
+  // 组合键字符串 → 可读符号 (meta→⌘, shift→⇧, alt→⌥, ctrl→⌃)
+  function comboToLabel(combo){
+    if(!combo) return '未绑定';
+    const parts = combo.split('+');
+    const mods = { meta: '⌘', ctrl: '⌃', alt: '⌥', shift: '⇧' };
+    const key = parts[parts.length - 1];
+    const modStr = parts.slice(0, -1).map(p => mods[p] || '').join('');
+    const keyLabel = key.length === 1 ? key.toUpperCase() : key;
+    return (modStr + keyLabel) || combo;
+  }
+  function renderKeymapList(){
+    const list = document.getElementById('stKeymapList');
+    if(!list) return;
+    const user = loadUserKeymap() || {};
+    list.innerHTML = Object.keys(DEFAULT_KEYBIND).map(action => {
+      const combo = user[action] || DEFAULT_KEYBIND[action];
+      return '<div class="st-card-row" style="justify-content:space-between;align-items:center">' +
+        '<div class="st-card-info"><div class="st-lbl">' + (KEYMAP_LABELS[action] || action) + '</div></div>' +
+        '<button class="st-input km-rec" data-action="' + action + '" style="width:130px;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-small);cursor:pointer">' + comboToLabel(combo) + '</button>' +
+        '</div>';
+    }).join('');
+    // 录制交互: 点击后进入录制态, 下一次 keydown 捕获组合键
+    list.querySelectorAll('.km-rec').forEach(btn => {
+      btn.onclick = () => {
+        btn.textContent = '按下新键位…';
+        btn.classList.add('recording');
+        const onKey = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          btn.classList.remove('recording');
+          document.removeEventListener('keydown', onKey, true);
+          if(ev.key === 'Escape'){ btn.textContent = comboToLabel(user[btn.dataset.action] || DEFAULT_KEYBIND[btn.dataset.action]); return; }
+          if(ev.key === 'Backspace' || ev.key === 'Delete'){
+            delete user[btn.dataset.action];
+            saveUserKeymap(user);
+            btn.textContent = comboToLabel(DEFAULT_KEYBIND[btn.dataset.action]);
+            showToast('已恢复默认键位');
+            return;
+          }
+          const combo = keyComboString(ev);
+          if(!ev.metaKey && !ev.ctrlKey && !ev.altKey && !ev.shiftKey){
+            btn.textContent = comboToLabel(DEFAULT_KEYBIND[btn.dataset.action]);
+            showToast('快捷键需包含修饰键 (⌘/⌃/⌥/⇧)');
+            return;
+          }
+          user[btn.dataset.action] = combo;
+          saveUserKeymap(user);
+          btn.textContent = comboToLabel(combo);
+          showToast('已绑定: ' + comboToLabel(combo));
+        };
+        document.addEventListener('keydown', onKey, true);
+      };
+    });
+  }
+
+  function setAutoArchiveDays(v){
+    localStorage.setItem('ntx_auto_archive_days', String(v));
+    showToast(v === '0' ? '已关闭自动归档' : '自动归档阈值: ' + v + ' 天');
   }
 
   function initSpeechHandlers(){
@@ -3497,9 +4015,17 @@ g.renderStApiKey = renderStApiKey;
       if(Array.isArray(sessions)){
         for(const s of sessions){
           if(!s || !s.id) continue;
-          try{ await invoke('neocodex_clear_session', { session_id: String(s.id) }); cleared++; }catch(_e){}
+          // neocodex_delete_session 删除会话文件本体; neocodex_clear_session 只清消息
+          // 保留元数据 — 不符合"清除所有数据"语义 (D6).
+          try{ await invoke('neocodex_delete_session', { session_id: String(s.id) }); cleared++; }catch(_e){}
         }
       }
+      // 清空本地存储中的 UI 状态 (主题保留, 会话相关键清除)
+      try{
+        Object.keys(localStorage).forEach(k => {
+          if(k.startsWith('neotrix.') && !k.startsWith('neotrix.theme')) localStorage.removeItem(k);
+        });
+      }catch(_e){}
       showToast('已清除 ' + cleared + ' 个会话');
     }catch(e){ showToast('清除失败: ' + e); }
   }
@@ -3792,6 +4318,14 @@ g.renderStApiKey = renderStApiKey;
 function escHtml(str){
     if(!str)return'';
     return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  /* JS 单引号字符串上下文安全转义 (S1): escHtml 把 ' 转成 &#39;, 但 HTML 属性
+     内 &#39; 会被解码回 ', 突破 JS 字符串边界 → 注入面。escJs 直接把 ' 转成
+     \u0027 (JS 字面量), 与 \n \r \ 一并处理, 可安全嵌入 onclick="fn('...')"。 */
+  function escJs(str){
+    if(str === undefined || str === null) return '';
+    return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\u0027").replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/"/g,'\\"').replace(/`/g,'\\`');
   }
 
   /* ── Window controls: native macOS traffic lights (Overlay titlebar) handle

@@ -118,6 +118,7 @@
           </div>
           <div class="hero-meta" id="heroMeta"></div>
           <div class="hero-sug" id="heroSuggest"></div>
+          <div class="hero-onb" id="heroOnboarding" style="display:none"></div>
         </div>
         <div class="cs" id="chatScroll" style="display:none"></div>
         <button class="scroll-jump" id="scrollJump" onclick="jumpToLatest()" title="跳转到底部">
@@ -326,6 +327,9 @@
         <div class="st-item" onclick="selectSetting(this,'appearance')">
           <svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="7" y1="2" x2="7" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="10" x2="7" y2="12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="2" y1="7" x2="4" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>外观
         </div>
+        <div class="st-item" onclick="selectSetting(this,'shortcuts')">
+          <svg viewBox="0 0 14 14"><rect x="2" y="3" width="10" height="8" rx="1.5" stroke="currentColor" stroke-width="1" fill="none"/><line x1="4.5" y1="6" x2="6" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="6" y1="6" x2="4.5" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="8" y1="7.5" x2="9.5" y2="7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>快捷键
+        </div>
         <div class="st-item" onclick="selectSetting(this,'speech')">
           <svg viewBox="0 0 14 14"><line x1="4" y1="3" x2="4" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="10" y1="4" x2="10" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>语音
         </div>
@@ -418,6 +422,61 @@
               <label class="st-switch"><input type="checkbox" /></label>
             </div>
           </div>
+        </div>
+
+        <div class="st-section" id="stShortcuts" style="display:none">
+          <h2 class="st-h2">快捷键</h2>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">全局呼出热键</div>
+                <div class="st-desc">Option+Space 从任意应用呼出 NeoTrix</div>
+              </div>
+              <span class="st-input" style="width:110px;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-small)">⌥ Space</span>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">侧向对话 (Side Chat)</div>
+                <div class="st-desc">独立上下文的分支提问</div>
+              </div>
+              <span class="st-input" style="width:110px;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-small)">⌘ ;</span>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">命令面板 / 搜索</div>
+                <div class="st-desc">快速执行命令与搜索会话</div>
+              </div>
+              <span class="st-input" style="width:110px;text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:var(--fs-small)">⌘ K</span>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">自动归档空闲会话</div>
+                <div class="st-desc">超过设定天数未更新的会话自动归档 (0 = 关闭)</div>
+              </div>
+              <select class="st-input" id="stAutoArchiveDays" onchange="setAutoArchiveDays(this.value)" style="width:120px">
+                <option value="0">关闭</option>
+                <option value="7">7 天</option>
+                <option value="14">14 天</option>
+                <option value="30">30 天</option>
+                <option value="60">60 天</option>
+              </select>
+            </div>
+          </div>
+          <div class="st-card">
+            <div class="st-card-row">
+              <div class="st-card-info">
+                <div class="st-lbl">自定义快捷键</div>
+                <div class="st-desc">点击键位后按下新组合键即可重绑定 (Esc 取消, 删除键恢复默认)</div>
+              </div>
+            </div>
+          </div>
+          <div class="st-card" id="stKeymapList" style="flex-direction:column;align-items:stretch;gap:6px"></div>
         </div>
 
         <!-- 语音 -->
@@ -725,6 +784,7 @@
   <button class="ses-item" onclick="openCheckpointTimeline()"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M7 3.5V7l2.5 2" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>时间线 · 回滚</button>
   <button class="ses-item" onclick="openArchivedSessions()"><svg viewBox="0 0 14 14"><path d="M2.5 4.5h9M3.5 4.5l.8 7a1 1 0 001 1h3.4a1 1 0 001-1l.8-7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/><line x1="5" y1="7" x2="9" y2="7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>查看归档</button>
   <button class="ses-item" onclick="exportSession()"><svg viewBox="0 0 14 14"><path d="M7 1.5v7M7 1.5L4.5 4M7 1.5L9.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M2.5 8.5V12h9V8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none"/></svg>导出</button>
+  <button class="ses-item" onclick="copySessionAsMarkdown()"><svg viewBox="0 0 14 14"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M5 8l1.5-3 1.5 3M4.5 6.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>复制对话</button>
   <div class="ses-sep"></div>
   <button class="ses-item danger" onclick="deleteSession()"><svg viewBox="0 0 14 14"><path d="M2.5 4h9M5 4V2.5h4V4M4 4l.5 7.5h5L10 4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg>删除会话</button>
 </div>
@@ -749,6 +809,66 @@
       <div class="pal-grp" id="palResultsGrp" style="display:none">会话</div>
       <div id="palResults"></div>
       <div class="pal-empty" id="palEmpty" style="display:none">无匹配会话</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: 快捷键总览 (Cmd+/) ═══ -->
+<div class="overlay-panel" id="overlayShortcuts">
+  <div class="overlay-box" style="max-width:560px">
+    <div class="overlay-h">
+      <h2>键盘快捷键</h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlayShortcuts')" title="关闭"></span>
+        <span class="tlg-dot tlg-y" onclick="showToast('需求分析中')" title="最小化"></span>
+        <span class="tlg-dot tlg-g" onclick="showToast('需求分析中')" title="最大化"></span>
+      </div>
+    </div>
+    <div class="overlay-bd" style="max-height:60vh;overflow-y:auto">
+      <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin-bottom:8px">全局</div>
+      <div class="sc-grid">
+        <div class="sc-row"><span>⌘N</span><span>新建会话</span></div>
+        <div class="sc-row"><span>⌘1 / ⌘2</span><span>切换 对话 / 团队协同</span></div>
+        <div class="sc-row"><span>⌘K</span><span>命令面板 / 搜索</span></div>
+        <div class="sc-row"><span>⌘F</span><span>知识库检索</span></div>
+        <div class="sc-row"><span>⌘,</span><span>打开设置</span></div>
+        <div class="sc-row"><span>⌘W</span><span>关闭窗口</span></div>
+        <div class="sc-row"><span>⌘⇧S</span><span>切换侧边栏</span></div>
+        <div class="sc-row"><span>⌘⇧L</span><span>切换明暗主题</span></div>
+        <div class="sc-row"><span>⌘⇧U</span><span>检查更新</span></div>
+        <div class="sc-row"><span>⌘/</span><span>快捷键总览</span></div>
+      </div>
+      <div class="lbl" style="font-size:var(--fs-caption);font-weight:var(--fw-semibold);text-transform:uppercase;letter-spacing:0.5px;color:var(--tx-meta);margin:12px 0 8px">对话</div>
+      <div class="k-grid">
+        <div class="sc-row"><span>↑</span><span>编辑上一条消息</span></div>
+        <div class="sc-row"><span>Esc / ⌘.</span><span>停止生成</span></div>
+        <div class="sc-row"><span>⌘⇧C</span><span>复制最后回复</span></div>
+        <div class="sc-row"><span>⌘⇧;</span><span>复制最后代码块</span></div>
+        <div class="sc-row"><span>⌘;</span><span>侧向对话 (Side Chat)</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OVERLAY: 侧向对话 Side Chat (Cmd+;) ═══ -->
+<div class="overlay-panel" id="overlaySideChat">
+  <div class="overlay-box" style="max-width:620px">
+    <div class="overlay-h">
+      <h2>侧向对话 <span class="sc-chip" style="font-size:0.7em;padding:2px 8px;border-radius:999px;border:1px solid var(--tx-meta);color:var(--tx-meta);vertical-align:middle">独立上下文</span></h2>
+      <div class="tlg-close">
+        <span class="tlg-dot tlg-r" onclick="closeOverlay('overlaySideChat')" title="关闭"></span>
+        <span class="tlg-dot tlg-y" onclick="closeOverlay('overlaySideChat')" title="最小化"></span>
+        <span class="tlg-dot tlg-g" onclick="closeOverlay('overlaySideChat')" title="最大化"></span>
+      </div>
+    </div>
+    <div class="overlay-bd" style="max-height:55vh;display:flex;flex-direction:column">
+      <div class="sdc-msgs" id="sideChatMsgs" style="flex:1;overflow-y:auto;margin-bottom:10px;padding-right:4px"></div>
+      <div class="sdc-input" style="display:flex;gap:8px;align-items:flex-end">
+        <textarea id="sideChatInput" rows="2" placeholder="提出一个与主对话无关的问题… (不污染主上下文)" style="flex:1;resize:none;background:var(--bg-input,#1e1e1e);color:var(--tx-1,#eee);border:1px solid var(--bd, #333);border-radius:10px;padding:10px 12px;font-size:var(--fs-body);line-height:1.5"></textarea>
+        <button class="btn-ghost" onclick="sendSideChat()" title="发送 (Enter)">
+          <svg viewBox="0 0 14 14" width="16" height="16"><path d="M2 7l10-4.5-3 4.5 3 4.5z" fill="currentColor"/></svg>
+        </button>
+      </div>
     </div>
   </div>
 </div>
