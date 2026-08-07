@@ -48,8 +48,14 @@ pub struct ExperienceEntry {
     pub entry_type: String,       // pattern / defect / insight / rule / cycle / artifact
     pub domain_name: String,      // NT-CORE / NT-MIND / ...
     pub content: String,
+    /// 负例: "NOT: 不该做什么" — 记录反面教训 (P0-2: 经验正负例结构)
+    pub not: Option<String>,
     pub confidence: f64,
     pub importance: f64,
+    /// 独立审计者标识 (P0-1: agent 不自我打分) — 记录验证来源 (如 "small-model-audit", "human-review", "benchmark")
+    pub verified_by: Option<String>,
+    /// 验证状态: "pending" | "verified" | "rejected"
+    pub verification_status: Option<String>,
 }
 
 impl ExperienceEntry {

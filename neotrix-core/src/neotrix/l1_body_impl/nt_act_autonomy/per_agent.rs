@@ -4,6 +4,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::super::nt_act_action_cache::ActionCache;
+
 // ---------------------------------------------------------------------------
 // Planner — decomposes a task into ordered, dependency-aware sub-steps
 // ---------------------------------------------------------------------------
@@ -132,6 +134,8 @@ pub struct ExecutorAgent {
     pub name: String,
     pub execution_count: u64,
     pub last_result: Option<ActionResult>,
+    /// 动作缓存 — 命中免 LLM 推理 (D16 自愈)。
+    pub action_cache: ActionCache,
 }
 
 impl ExecutorAgent {
@@ -140,12 +144,57 @@ impl ExecutorAgent {
             name: name.to_string(),
             execution_count: 0,
             last_result: None,
+            action_cache: ActionCache::new(),
         }
+    }
+
+    /// 确定性签名: step 描述 + 排序后的 context 键值 (FNV-1a)。
+    /// 用 FNV-1a 而非 DefaultHasher — 后者跨进程随机化 (HashDoS 防护),
+    /// 会导致同一 step 每次签名不同, 缓存永不命中。
+    fn signature(step: &PlanStep, context: &HashMap<String, String>) -> String {
+        let mut keys: Vec<&String> = context.keys().collect();
+        keys.sort();
+        let mut buf = format!("{}|{}", step.id, step.description);
+        for k in keys {
+            buf.push_str(&format!("|{}={}", k, context.get(k).unwrap_or(&String::new())));
+        }
+        let mut hash: u64 = 0xcbf29ce484222325;
+        for b in buf.as_bytes() {
+            hash ^= *b as u64;
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+        format!("{:016x}", hash)
     }
 }
 
 impl Executor for ExecutorAgent {
-    fn execute(&mut self, step: &PlanStep, _context: &HashMap<String, String>) -> ActionResult {
+    fn execute(&mut self, step: &PlanStep, context: &HashMap<String, String>) -> ActionResult {
+        // 缓存命中 → 免推理, 复用上次结果 (D16 自愈)。
+        let sig = Self::signature(step, context);
+        let hit = self.action_cache.lookup(&sig).is_some();
+        if hit {
+            self.action_cache.hit(&sig);
+            if let Some(ca) = self.action_cache.lookup(&sig) {
+                let result = ActionResult {
+                    step_id: step.id.clone(),
+                    success: true,
+                    artifacts: vec![],
+                    errors: vec![],
+                    warnings: vec![format!(
+                        "served from action_cache ({} hits): {}",
+                        ca.hits, ca.action
+                    )],
+                    duration_ms: 0,
+                    summary: format!(
+                        "Step '{}' served from action_cache (no re-execution)",
+                        step.description.chars().take(40).collect::<String>()
+                    ),
+                };
+                self.last_result = Some(result.clone());
+                return result;
+            }
+        }
+
         self.execution_count += 1;
         let start = now_ms();
 
@@ -170,6 +219,9 @@ impl Executor for ExecutorAgent {
             duration_ms: now_ms() - start,
             summary: format!("Step '{}' executed successfully", step.description.chars().take(40).collect::<String>()),
         };
+        // 记录成功动作供下次免推理。
+        self.action_cache
+            .remember(&sig, &result.summary, vec![step.id.clone()]);
         self.last_result = Some(result.clone());
         result
     }
@@ -522,6 +574,83 @@ mod tests {
     }
 
     #[test]
+    fn test_executor_action_cache_hit_avoids_reexecution() {
+        let mut executor = ExecutorAgent::new("test-exec");
+        let step = PlanStep {
+            id: "step-cache".into(),
+            description: "Cache me".into(),
+            priority: 5,
+            dependencies: vec![],
+            expected_outcome: "done".into(),
+            status: StepStatus::Pending,
+        };
+        let context = HashMap::new();
+        // 第一次: miss → 执行 + 记忆
+        let r1 = executor.execute(&step, &context);
+        assert!(r1.success);
+        assert_eq!(executor.execution_count, 1);
+        assert!(r1.warnings.is_empty());
+        // 第二次: 命中 → 免重执行, warning 标记 served from cache
+        let r2 = executor.execute(&step, &context);
+        assert!(r2.success);
+        assert_eq!(executor.execution_count, 1, "cache hit must not re-execute");
+        assert!(
+            r2.warnings.iter().any(|w| w.contains("served from action_cache")),
+            "cache hit should carry a served-from-cache warning"
+        );
+        assert!(r2.artifacts.is_empty(), "cache hit reuses prior result, no new artifact");
+    }
+
+    #[test]
+    fn test_executor_action_cache_different_context_miss() {
+        let mut executor = ExecutorAgent::new("test-exec");
+        let step = PlanStep {
+            id: "step-ctx".into(),
+            description: "Context sensitive".into(),
+            priority: 5,
+            dependencies: vec![],
+            expected_outcome: "done".into(),
+            status: StepStatus::Pending,
+        };
+        let mut ctx_a = HashMap::new();
+        ctx_a.insert("url".to_string(), "https://a.dev".to_string());
+        let mut ctx_b = HashMap::new();
+        ctx_b.insert("url".to_string(), "https://b.dev".to_string());
+        // 不同 context → 不同签名 → 各自 miss 执行
+        let r1 = executor.execute(&step, &ctx_a);
+        let r2 = executor.execute(&step, &ctx_b);
+        assert_eq!(executor.execution_count, 2, "different context must miss cache");
+        assert!(r1.warnings.is_empty());
+        assert!(r2.warnings.is_empty());
+        // 相同 context 再执行 → 命中
+        let r3 = executor.execute(&step, &ctx_a);
+        assert_eq!(executor.execution_count, 2, "same context re-execution hits cache");
+        assert!(r3.warnings.iter().any(|w| w.contains("served from action_cache")));
+    }
+
+    #[test]
+    fn test_executor_action_cache_signature_deterministic() {
+        let step = PlanStep {
+            id: "s".into(),
+            description: "d".into(),
+            priority: 1,
+            dependencies: vec![],
+            expected_outcome: "o".into(),
+            status: StepStatus::Pending,
+        };
+        let mut ctx = HashMap::new();
+        ctx.insert("b".to_string(), "2".to_string());
+        ctx.insert("a".to_string(), "1".to_string());
+        // 键顺序无关 → 签名确定
+        let s1 = ExecutorAgent::signature(&step, &ctx);
+        let mut ctx2 = HashMap::new();
+        ctx2.insert("a".to_string(), "1".to_string());
+        ctx2.insert("b".to_string(), "2".to_string());
+        let s2 = ExecutorAgent::signature(&step, &ctx2);
+        assert_eq!(s1, s2, "signature must be order-independent");
+    }
+
+    #[test]
     fn test_reflector_all_success_stops_loop() {
         let plan = TaskPlan {
             task: "Test task".into(),
@@ -616,6 +745,7 @@ mod tests {
             name: "flaky-exec".into(),
             execution_count: 0,
             last_result: None,
+            action_cache: ActionCache::new(),
         };
         let outcome = loop_.run("Simple task.");
         assert!(!outcome.iterations.is_empty());

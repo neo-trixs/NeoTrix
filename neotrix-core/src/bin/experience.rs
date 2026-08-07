@@ -848,6 +848,11 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
             "evidence": raw_entry.get("evidence").cloned().unwrap_or_else(|| json!("")),
             "source": raw_entry.get("source").or_else(|| session.get("source"))
                 .cloned().unwrap_or_else(|| json!("dialogue")),
+            // P0-2: 负例字段 (NOT: 不该做什么)
+            "not": raw_entry.get("not").cloned().unwrap_or(Value::Null),
+            // P0-1: 独立审计者字段
+            "verified_by": raw_entry.get("verified_by").cloned().unwrap_or(Value::Null),
+            "verification_status": raw_entry.get("verification_status").cloned().unwrap_or(Value::Null),
         });
         // D20: manifest — 内容 SHA-256, 落盘后可按哈希核对吸收内容未被篡改/漂移
         let raw_content = e.get("content").and_then(|c| c.as_str()).unwrap_or("");
@@ -2287,6 +2292,11 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
             "source": "distill",
             "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
             "distilled_from": src,
+            // P0-2: 负例字段
+            "not": Value::Null,
+            // P0-1: 独立审计者字段
+            "verified_by": Value::Null,
+            "verification_status": Value::Null,
         });
         tx.execute(
             "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
@@ -2343,6 +2353,11 @@ fn cmd_distill(conn: &mut Connection, domain: Option<&str>, min_group: usize, dr
         "verify_by": now + VERIFY_DEFAULT_DAYS * DAY,
         "dimension": "consciousness",
         "distilled_from": marked.clone(),
+        // P0-2: 负例字段
+        "not": Value::Null,
+        // P0-1: 独立审计者字段
+        "verified_by": Value::Null,
+        "verification_status": Value::Null,
     });
     let ckey = format!("branch_consciousness_{}", now);
     conn.execute(
@@ -2393,8 +2408,11 @@ fn distill_promote_to_capability(distilled: &[(String, String, Vec<String>)]) ->
             entry_type: "pattern".to_string(),
             domain_name: d.clone(),
             content: pc.clone(),
+            not: None,
             confidence: 0.8,       // 蒸馏聚合模式, 信号高
             importance: 0.7,
+            verified_by: None,
+            verification_status: None,
         };
         let dim = ExperienceRouter::route_experience(&entry);
         match &dim {

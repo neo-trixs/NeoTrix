@@ -18,6 +18,9 @@ pub mod l3_memory_impl;
 pub mod l2_world_impl;
 pub mod l1_body_impl;
 
+// ─── 经验 → 能力树迭代目标桥 (experience-tree 蒸馏 → capability registry) ─
+pub mod nt_capability_bridge;
+
 // ─── Migrated module re-exports (backward compat with crate::neotrix::nt_*) ─
 
 // L9 — Transcendent (超验层) — 观察自身
