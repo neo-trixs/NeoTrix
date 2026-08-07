@@ -92,6 +92,7 @@ g.renameSession = renameSession;
 g.compactSession = compactSession;
 g.archiveSession = archiveSession;
 g.exportSession = exportSession;
+g.copySessionAsMarkdown = copySessionAsMarkdown;
 g.loadSideChat = loadSideChat;
 g.sendSideChat = sendSideChat;
 g.setAutoArchiveDays = setAutoArchiveDays;
@@ -2195,6 +2196,21 @@ g.renderStApiKey = renderStApiKey;
       URL.revokeObjectURL(url);
       showToast('会话已导出');
     }catch(e){ showToast('导出失败: ' + e); }
+  }
+
+  // 复制对话为 Markdown (分享用): 与导出同源数据, 直接进剪贴板便于粘贴分享
+  async function copySessionAsMarkdown(){
+    const id = document.getElementById('sessionOpsMenu')?.dataset.session || currentSessionId;
+    if(!id){ showToast('无会话'); return; }
+    closeSessionOps();
+    if(!isTauri()){ showToast('浏览器模式：仅 Tauri 下可复制'); return; }
+    try{
+      const out = await invoke('neocodex_export_session', { session_id: id, format: null });
+      const text = String(out || '');
+      if(!text.trim()){ showToast('会话内容为空'); return; }
+      await navigator.clipboard.writeText(text);
+      showToast('对话已复制 (可粘贴分享)');
+    }catch(e){ showToast('复制失败: ' + e); }
   }
 
   async function deleteSession(){
