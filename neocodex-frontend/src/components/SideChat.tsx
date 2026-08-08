@@ -1,5 +1,5 @@
 import { createSignal, onMount, Show, For } from 'solid-js'
-import { MessageSquare, X, Send, Loader2 } from 'lucide-solid'
+import { MessageSquare, X, Send, Loader2, RefreshCw } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
 
@@ -74,6 +74,14 @@ export function SideChat(props: Props) {
           <MessageSquare class="panel-head-icon text-nt-mind-600" />
           <span class="panel-title">侧向对话</span>
           <span class="panel-sub">独立于主上下文</span>
+          <button
+            class="panel-close"
+            onClick={load}
+            aria-label="刷新"
+            title="刷新"
+          >
+            <RefreshCw class="w-4 h-4" />
+          </button>
           <button
             class="panel-close"
             onClick={props.onClose}
