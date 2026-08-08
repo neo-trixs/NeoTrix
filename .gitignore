@@ -28,6 +28,12 @@ src-tauri/frontend/playwright-report/
 __pycache__/
 *.py[cod]
 
+# Bazel workspace artifacts (neotrix-ios)
+bazel-bin
+bazel-out
+bazel-testlogs
+bazel-neotrix-ios
+
 # SQLite runtime artifacts (knowledge.db WAL/SHM)
 *.db-shm
 *.db-wal

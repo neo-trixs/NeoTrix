@@ -1,0 +1,32 @@
+# NeoGramApp entry point
+load("@rules_swift//swift:swift.bzl", "swift_library")
+load("@rules_cc//cc:defs.bzl", "objc_library")
+
+# =============================================================================
+# C module: neotrixFFI (uniffi C header + modulemap)
+# =============================================================================
+# The generated NeoTrixFFI.swift imports `neotrixFFI` (the C FFI layer defined
+# in neotrixFFI.h + neotrixFFI.modulemap). Expose it as an objc_library so the
+# Swift module can resolve `import neotrixFFI`.
+objc_library(
+    name = "neotrix_ffi_c",
+    hdrs = [
+        "Bridge/NeoTrixFFI/Generated/neotrixFFI.h",
+    ],
+    includes = ["Bridge/NeoTrixFFI/Generated"],
+    module_map = "Bridge/NeoTrixFFI/Generated/neotrixFFI.modulemap",
+    visibility = ["//visibility:public"],
+)
+
+swift_library(
+    name = "NeoGramApp",
+    srcs = ["NeoGramApp.swift"],
+    module_name = "NeoGramApp",
+    deps = [
+        "//:Core",
+        "//:UI",
+        "//:Premium",
+        "//:Features",
+    ],
+    visibility = ["//visibility:public"],
+)

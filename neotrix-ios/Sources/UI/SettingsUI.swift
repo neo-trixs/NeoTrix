@@ -1,0 +1,194 @@
+// SettingsUI - Telegram-style settings with Premium integration
+// Mirrors Telegram's SettingsController + SettingsSections
+
+import SwiftUI
+
+// MARK: - Settings Model
+
+public struct SettingsSection: Identifiable {
+    public let id: String
+    public let title: String
+    public let items: [SettingsItem]
+}
+
+public struct SettingsItem: Identifiable {
+    public let id: String
+    public let title: String
+    public let icon: String
+    public let iconColor: Color
+    public let badge: String?
+    public let isPremium: Bool
+}
+
+// MARK: - Settings View Model
+
+@MainActor
+public final class SettingsViewModel: ObservableObject {
+    @Published public var isPremium = false
+    @Published public var username = "user"
+    @Published public var phoneNumber = "+1 (555) 000-0000"
+    @Published public var storageUsed = "0 MB"
+    
+    private let core = NeoGramCore.shared
+    
+    public init() {
+        loadUserData()
+    }
+    
+    private func loadUserData() {
+        // Load from MTProto account info
+        if let savedUsername = UserDefaults.standard.string(forKey: "username") {
+            username = savedUsername
+        }
+        if let savedPhone = UserDefaults.standard.string(forKey: "phone") {
+            phoneNumber = savedPhone
+        }
+        isPremium = UserDefaults.standard.bool(forKey: "is_premium")
+    }
+    
+    public var sections: [SettingsSection] {
+        [
+            SettingsSection(id: "account", title: "Account", items: [
+                SettingsItem(id: "profile", title: "My Profile", icon: "person.crop.circle", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "saved", title: "Saved Messages", icon: "bookmark.fill", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "recent", title: "Recent Calls", icon: "phone.fill", iconColor: .green, badge: nil, isPremium: false),
+                SettingsItem(id: "devices", title: "Devices", icon: "laptopcomputer", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "chat_folders", title: "Chat Folders", icon: "folder.fill", iconColor: .blue, badge: nil, isPremium: false),
+            ]),
+            SettingsSection("Premium", items: [
+                SettingsItem(id: "premium", title: "NeoGram Premium", icon: "star.circle.fill", iconColor: .yellow, badge: isPremium ? "Active" : nil, isPremium: true),
+                SettingsItem(id: "gifts", title: "Premium Gifts", icon: "gift.fill", iconColor: .pink, badge: nil, isPremium: true),
+                SettingsItem(id: "boosts", title: "Boost Levels", icon: "bolt.fill", iconColor: .orange, badge: nil, isPremium: true),
+            ]),
+            SettingsSection("ai", title: "NeoTrix AI", items: [
+                SettingsItem(id: "ai_settings", title: "AI Settings", icon: "brain.head.profile", iconColor: .purple, badge: nil, isPremium: false),
+                SettingsItem(id: "ai_models", title: "AI Models", icon: "cpu.fill", iconColor: .indigo, badge: nil, isPremium: false),
+                SettingsItem(id: "ai_memory", title: "AI Memory", icon: "memorychip.fill", iconColor: .teal, badge: nil, isPremium: false),
+            ]),
+            SettingsSection("appearance", title: "Appearance", items: [
+                SettingsItem(id: "theme", title: "Theme", icon: "paintpalette.fill", iconColor: .purple, badge: nil, isPremium: false),
+                SettingsItem(id: "wallpapers", title: "Wallpapers", icon: "photo.on.rectangle", iconColor: .cyan, badge: nil, isPremium: false),
+                SettingsItem(id: "app_icons", title: "App Icons", icon: "app.badge.fill", iconColor: .blue, badge: nil, isPremium: false),
+            ]),
+            SettingsSection("privacy", title: "Privacy & Security", items: [
+                SettingsItem(id: "privacy", title: "Privacy", icon: "lock.fill", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "passcode", title: "Passcode & Face ID", icon: "faceid", iconColor: .green, badge: nil, isPremium: false),
+                SettingsItem(id: "two_step", title: "Two-Step Verification", icon: "key.fill", iconColor: .orange, badge: nil, isPremium: false),
+                SettingsItem(id: "sessions", title: "Active Sessions", icon: "iphone", iconColor: .blue, badge: nil, isPremium: false),
+            ]),
+            SettingsSection("data", title: "Data & Storage", items: [
+                SettingsItem(id: "storage", title: "Storage Usage", icon: "internaldrive.fill", iconColor: .gray, badge: storageUsed, isPremium: false),
+                SettingsItem(id: "data", title: "Data & Storage", icon: "chart.bar.fill", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "proxy", title: "Proxy", icon: "network", iconColor: .blue, badge: nil, isPremium: false),
+            ]),
+            SettingsSection("language", title: "Language", items: [
+                SettingsItem(id: "language", title: "Language", icon: "globe", iconColor: .blue, badge: "English", isPremium: false),
+            ]),
+            SettingsSection("about", title: "About", items: [
+                SettingsItem(id: "help", title: "Help", icon: "questionmark.circle.fill", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "about", title: "About NeoGram", icon: "info.circle.fill", iconColor: .blue, badge: "v1.0", isPremium: false),
+            ]),
+        ]
+    }
+}
+
+// MARK: - Settings View
+
+public struct SettingsView: View {
+    @StateObject private var viewModel = SettingsViewModel()
+    @State private var showPremium = false
+    @State private var showProfile = false
+    
+    public init() {}
+    
+    public var body: some View {
+        NavigationStack {
+            List {
+                // Profile header
+                Section {
+                    Button {
+                        showProfile = true
+                    } label: {
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.blue.gradient)
+                                    .frame(width: 60, height: 60)
+                                Text(String(viewModel.username.prefix(1)).uppercased())
+                                    .font(.title.bold())
+                                    .foregroundColor(.white)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(viewModel.username)
+                                    .font(.title3.bold())
+                                    .foregroundColor(.primary)
+                                Text(viewModel.phoneNumber)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                // Sections
+                ForEach(viewModel.sections) { section in
+                    Section(section.title) {
+                        ForEach(section.items) { item in
+                            SettingsRow(item: item)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+            .sheet(isPresented: $showPremium) {
+                PremiumIntroView()
+            }
+        }
+    }
+}
+
+struct SettingsRow: View {
+    let item: SettingsItem
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: item.icon)
+                .font(.body)
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(item.iconColor.gradient)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+            
+            Text(item.title)
+                .foregroundColor(.primary)
+            
+            Spacer()
+            
+            if let badge = item.badge {
+                Text(badge)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            if item.isPremium {
+                Image(systemName: "star.fill")
+                    .font(.caption)
+                    .foregroundColor(.yellow)
+            }
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 2)
+    }
+}

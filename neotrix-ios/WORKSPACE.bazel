@@ -1,0 +1,133 @@
+# NeoGram iOS - Bazel Workspace
+# Hybrid NeoTrix + Telegram iOS Architecture
+
+workspace(name = "neogram_ios")
+
+# Load Bazel rules
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+
+# =============================================================================
+# Apple Rules (for iOS/macOS builds)
+# =============================================================================
+http_archive(
+    name = "rules_apple",
+    sha256 = "133d51692dfd286a398514e598871a79951b10531794e9d9712947abdb693a81",
+    urls = ["https://github.com/bazelbuild/rules_apple/archive/refs/tags/3.22.0.tar.gz"],
+    strip_prefix = "rules_apple-3.22.0",
+)
+
+load("@rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
+apple_rules_dependencies()
+
+# =============================================================================
+# Apple CC Toolchain (required by objc_library / cc_library on Apple platforms)
+# =============================================================================
+# apple_support's apple_cc_configure() registers the local Apple CC toolchain
+# (local_config_apple_cc + local_config_apple_cc_toolchains). Required for
+# compiling the neotrixFFI C layer via objc_library.
+load("@build_bazel_apple_support//crosstool:setup.bzl", "apple_cc_configure")
+apple_cc_configure()
+
+# =============================================================================
+# Swift Rules
+# =============================================================================
+http_archive(
+    name = "rules_swift",
+    sha256 = "e1dad2d4e0fbd30e2426daf230dad1a56a480dfe691387b8ef5b37f3ae270513",
+    urls = ["https://github.com/bazelbuild/rules_swift/archive/refs/tags/3.6.1.tar.gz"],
+    strip_prefix = "rules_swift-3.6.1",
+)
+
+load("@rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
+swift_rules_dependencies()
+
+# =============================================================================
+# rules_swift 2.4.0 index-import worker (transitive dep via rules_apple)
+# =============================================================================
+# rules_apple 3.22.0 pulls in rules_swift 2.4.0, whose swift_runner worker
+# references @build_bazel_rules_swift_index_import. In WORKSPACE mode this
+# repo must be registered explicitly (rules_swift 3.6.1's
+# swift_rules_dependencies() does not include it).
+http_archive(
+    name = "build_bazel_rules_swift_index_import",
+    build_file = "@build_bazel_rules_swift//third_party:build_bazel_rules_swift_index_import/BUILD.overlay",
+    canonical_id = "index-import-5.8",
+    urls = ["https://github.com/MobileNativeFoundation/index-import/releases/download/5.8.0.1/index-import.tar.gz"],
+    sha256 = "28c1ffa39d99e74ed70623899b207b41f79214c498c603915aef55972a851a15",
+)
+
+# =============================================================================
+# C/C++ Compatibility Proxy (required by rules_cc 0.2.14 on bazel 7)
+# =============================================================================
+# rules_cc 0.2.14 loads @cc_compatibility_proxy//:proxy.bzl from its rules.
+# In WORKSPACE mode this repo must be registered explicitly (bazel 7 does not
+# autoload it for external rules_cc). See rules_cc/cc/extensions.bzl.
+# bazel_features is a transitive dep of rules_cc (via rules_swift); register
+# it explicitly so bazel_features_deps() can create bazel_features_version.
+http_archive(
+    name = "bazel_features",
+    sha256 = "a660027f5a87f13224ab54b8dc6e191693c554f2692fcca46e8e29ee7dabc43b",
+    strip_prefix = "bazel_features-1.30.0",
+    urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v1.30.0/bazel_features-v1.30.0.tar.gz"],
+)
+
+load("@bazel_features//:deps.bzl", "bazel_features_deps")
+bazel_features_deps()
+
+load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
+compatibility_proxy_repo()
+
+# =============================================================================
+# Protobuf (for MTProto TL schema)
+# =============================================================================
+http_archive(
+    name = "rules_proto",
+    sha256 = "6fb6767d1bef535310547e03247f7518b03487740c11b6c6adb7952033fe1295",
+    urls = ["https://github.com/bazelbuild/rules_proto/archive/refs/tags/6.0.2.tar.gz"],
+    strip_prefix = "rules_proto-6.0.2",
+)
+
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
+rules_proto_dependencies()
+
+# =============================================================================
+# GCDAsyncSocket (for MTProto transport)
+# =============================================================================
+git_repository(
+    name = "gcdasyncsocket",
+    remote = "https://github.com/robbiehanson/CocoaAsyncSocket.git",
+    tag = "7.6.5",
+)
+
+# =============================================================================
+# Lottie (for animated emoji/stickers)
+# =============================================================================
+git_repository(
+    name = "lottie_ios",
+    remote = "https://github.com/airbnb/lottie-ios.git",
+    tag = "4.4.3",
+)
+
+# =============================================================================
+# Telegram TL Schema (for API generation)
+# =============================================================================
+# NOTE: https://github.com/TelegramMessenger/Telegram-Schema returns 404 (repo
+# does not exist / was removed). MTProto TL schema handling is deferred; the
+# MTProto layer in Sources/Core currently uses a local TL schema definition.
+# Removed to keep WORKSPACE loadable.
+
+# =============================================================================
+# Configuration
+# =============================================================================
+# Build configurations
+# - debug_arm64: Development builds for device
+# - debug_x86_64: Development builds for simulator
+# - release_arm64: Release builds for device
+# - release_x86_64: Release builds for simulator
+
+# Platform constraints
+# NOTE: @rules_apple//apple/platforms:* targets do not exist in rules_apple 3.22.0
+# (only apple/constraints is provided). Execution platforms are auto-registered
+# by rules_apple's apple_rules_dependencies(); explicit registration removed.
+# Target platforms are declared in BUILD.bazel (bazel 7 forbids platform() in WORKSPACE).

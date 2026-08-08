@@ -1,0 +1,14 @@
+# NeoGram iOS - Bazel configuration
+# WORKSPACE mode (bzlmod disabled): external deps are resolved via WORKSPACE.bazel
+# with local distdir cache (GitHub downloads are blocked on this network).
+common --noenable_bzlmod
+
+# Local rule cache: /tmp/bazel-distdir holds all http_archive tarballs with
+# filenames matching the URL basename (bazel distdir requirement).
+# NOTE: distdir is a command option, so it must be passed per-invocation:
+#   bazel query/build --distdir=/tmp/bazel-distdir //...
+# (bazelrc `common --distdir` is not supported; keep it in the command line.)
+
+# Apple toolchain: Xcode is required for Swift/iOS compilation. With only
+# Command Line Tools installed, C targets (neotrix_ffi_c) build fine but
+# swift_library targets fail Xcode version detection.

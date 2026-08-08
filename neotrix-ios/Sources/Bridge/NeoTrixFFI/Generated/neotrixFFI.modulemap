@@ -1,0 +1,4 @@
+module neotrixFFI {
+    header "neotrixFFI.h"
+    export *
+}
