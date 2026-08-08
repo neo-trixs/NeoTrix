@@ -268,6 +268,7 @@ export function ComputerUse(props: Props) {
                 <input
                   value={keyText()}
                   onInput={(e) => setKeyText(e.currentTarget.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); typeText() } }}
                   placeholder="要输入的文本..."
                   class="flex-1 bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-core-400/50"
                 />
@@ -287,6 +288,7 @@ export function ComputerUse(props: Props) {
                 <input
                   value={keyCode()}
                   onInput={(e) => setKeyCode(e.currentTarget.value.replace(/\D/g, ''))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); pressKey() } }}
                   placeholder="如 36 (回车) / 49 (空格)"
                   class="flex-1 bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-core-400/50"
                 />
