@@ -1,74 +1,26 @@
 // NeoTrixAPIClient - 融合: 从 NeoTrix/ 死代码体系提炼的 HTTP 服务层
-// 原 NeoTrix/Services/NeoTrixAPI.swift（未被 Bazel 编译）迁移至此并补全模型类型。
-// 作为 LiveFeedEngine 的真实内容源（替代 mock 降级），Dark Forest: 有消费者。
+// 对接 NeoTrix Rust 服务真实端点（nt_io_web/server.rs）：
+//   - POST /api/brain/reason        {"prompt"} → {"output","success"}    LLM 推理
+//   - POST /api/agent/reason-stream  {"prompt"} → SSE {"token","done"}   流式推理
+//   - GET  /api/brain/stats          服务健康/能力探测
+// Dark Forest: 消费面 = LiveFeedEngine.NeoTrixAPIProvider（社交状态探测 + 搜索过滤配置）。
+// 注: scoreMoments/sendFeedback/socialLogin 原指向 /api/v1/* 不存在的端点，已删除（服务端无此能力）。
 
 import Foundation
 
-// MARK: - API 模型类型（补全: 原 NeoTrix/ 体系引用但未定义）
+// MARK: - API 模型类型（与服务端契约对齐）
 
-public struct ChatRequest: Codable {
-    public let message: String
-    public init(message: String) { self.message = message }
-}
-
-public struct ChatResponse: Codable {
-    public let reply: String
-}
-
-public struct VideoSubmission: Codable, Equatable {
-    public let id: String
-    public let title: String
-    public let author: String?
-    public let duration: Double?
-    public let viewCount: Int64?
-    public let likeCount: Int64?
-    public let url: String?
-    public init(id: String, title: String, author: String? = nil, duration: Double? = nil,
-                viewCount: Int64? = nil, likeCount: Int64? = nil, url: String? = nil) {
-        self.id = id
-        self.title = title
-        self.author = author
-        self.duration = duration
-        self.viewCount = viewCount
-        self.likeCount = likeCount
-        self.url = url
+/// /api/brain/reason 响应 — 服务端返回 {"output": "...", "success": true/false}
+public struct ReasonResponse: Codable {
+    public let output: String
+    public let success: Bool?
+    public init(output: String, success: Bool? = nil) {
+        self.output = output
+        self.success = success
     }
 }
 
-public struct ScoreRequest: Codable {
-    public let moments: [VideoSubmission]
-    public init(moments: [VideoSubmission]) { self.moments = moments }
-}
-
-public struct MomentItem: Codable, Equatable, Identifiable {
-    public let id: String
-    public let title: String
-    public let author: String?
-    public let score: Double?
-    public let reason: String?
-    public let createdAt: String?
-    public init(id: String, title: String, author: String? = nil, score: Double? = nil,
-                reason: String? = nil, createdAt: String? = nil) {
-        self.id = id
-        self.title = title
-        self.author = author
-        self.score = score
-        self.reason = reason
-        self.createdAt = createdAt
-    }
-}
-
-public struct FeedbackRequest: Codable {
-    public let momentId: String
-    public let liked: Bool
-    public let keywords: [String]?
-    public init(momentId: String, liked: Bool, keywords: [String]? = nil) {
-        self.momentId = momentId
-        self.liked = liked
-        self.keywords = keywords
-    }
-}
-
+/// 社交平台连接状态（LiveFeed 内容源探测用；本地 mock + 服务可用性门控）
 public struct SocialStatus: Codable, Equatable, Identifiable {
     public let id: String
     public let platform: String
@@ -84,17 +36,7 @@ public struct SocialStatus: Codable, Equatable, Identifiable {
     }
 }
 
-public struct SocialLoginRequest: Codable {
-    public let platform: String
-    public let token: String
-    public let refreshToken: String?
-    public init(platform: String, token: String, refreshToken: String? = nil) {
-        self.platform = platform
-        self.token = token
-        self.refreshToken = refreshToken
-    }
-}
-
+/// 搜索过滤配置（LiveFeed 搜索时取关键词）
 public struct FilterConfig: Codable, Equatable {
     public let filterAds: Bool
     public let filterKeywords: [String]
@@ -127,70 +69,38 @@ public actor NeoTrixAPIClient {
     
     public init() {}
     
-    // MARK: - Chat
+    // MARK: - LLM 推理（对接 /api/brain/reason）
     
-    public func chat(message: String) async throws -> String {
-        let req = ChatRequest(message: message)
-        let data = try await post("/api/v1/chat", body: req)
-        let resp = try decoder.decode(ChatResponse.self, from: data)
-        return resp.reply
+    public func reason(prompt: String) async throws -> String {
+        let body: [String: String] = ["prompt": prompt]
+        let data = try await post("/api/brain/reason", body: body)
+        let resp = try decoder.decode(ReasonResponse.self, from: data)
+        return resp.output
     }
     
-    public func chatStream(message: String) -> AsyncThrowingStream<String, Error> {
+    // MARK: - 流式推理（对接 /api/agent/reason-stream）
+    
+    public func reasonStream(prompt: String) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let req = ChatRequest(message: message)
-                    let body = try encoder.encode(req)
-                    var urlReq = URLRequest(url: URL(string: "\(baseURL)/api/v1/chat/stream")!)
+                    let body: [String: String] = ["prompt": prompt]
+                    var urlReq = URLRequest(url: URL(string: "\(baseURL)/api/agent/reason-stream")!)
                     urlReq.httpMethod = "POST"
                     urlReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    urlReq.httpBody = body
-                    
-                    let (bytes, _) = try await URLSession.shared.bytes(for: urlReq)
-                    for try await byte in bytes.lines {
-                        if !byte.isEmpty, byte.hasPrefix("data:") {
-                            let char = byte.dropFirst(5).trimmingCharacters(in: .whitespaces)
-                            if !char.isEmpty {
-                                continuation.yield(char)
-                            }
-                        }
-                    }
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-        }
-    }
-    
-    // MARK: - Moments
-    
-    public func scoreMoments(_ moments: [VideoSubmission]) async throws -> [MomentItem] {
-        let req = ScoreRequest(moments: moments)
-        let data = try await post("/api/v1/moments/score", body: req)
-        return try decoder.decode([MomentItem].self, from: data)
-    }
-    
-    public func scoreMomentsStream(_ moments: [VideoSubmission]) -> AsyncThrowingStream<MomentItem, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    let req = ScoreRequest(moments: moments)
-                    let body = try encoder.encode(req)
-                    var urlReq = URLRequest(url: URL(string: "\(baseURL)/api/v1/moments/score-stream")!)
-                    urlReq.httpMethod = "POST"
-                    urlReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                    urlReq.httpBody = body
+                    urlReq.httpBody = try encoder.encode(body)
                     
                     let (bytes, _) = try await URLSession.shared.bytes(for: urlReq)
                     for try await line in bytes.lines {
-                        if line.hasPrefix("data:") {
-                            let json = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                            if let data = json.data(using: .utf8),
-                               let item = try? decoder.decode(MomentItem.self, from: data) {
-                                continuation.yield(item)
-                            }
+                        guard line.hasPrefix("data:") else { continue }
+                        let json = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                        guard let data = json.data(using: .utf8),
+                              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+                        if let token = obj["token"] as? String {
+                            continuation.yield(token)
+                        } else if let error = obj["error"] as? String {
+                            continuation.finish(throwing: APIError.serverError(error))
+                            return
                         }
                     }
                     continuation.finish()
@@ -201,28 +111,23 @@ public actor NeoTrixAPIClient {
         }
     }
     
-    public func sendFeedback(momentId: String, liked: Bool, keywords: [String]? = nil) async throws {
-        let req = FeedbackRequest(momentId: momentId, liked: liked, keywords: keywords)
-        _ = try await post("/api/v1/moments/feedback", body: req)
-    }
+    // MARK: - 服务可用性探测（对接 /api/brain/stats）
     
-    // MARK: - Social
-    
+    /// 探测 NeoTrix 服务是否在线。在线时返回本地社交状态（标记 NeoTrix 已连接），
+    /// 离线抛错 → LiveFeedEngine 降级 mock（The Spice Must Flow: 无断流）。
     public func socialStatus() async throws -> [SocialStatus] {
-        let data = try await get("/api/v1/social/status")
-        return try decoder.decode([SocialStatus].self, from: data)
+        let _ = try await get("/api/brain/stats")
+        return [
+            SocialStatus(id: "neotrix-server", platform: "neotrix", isConnected: true, username: "neotrix", followers: 0)
+        ]
     }
     
-    public func socialLogin(platform: String, token: String, refreshToken: String? = nil) async throws {
-        let req = SocialLoginRequest(platform: platform, token: token, refreshToken: refreshToken)
-        _ = try await post("/api/v1/social/login", body: req)
-    }
+    // MARK: - 搜索过滤配置
     
-    // MARK: - Filter
-    
+    /// 服务在线时返回默认过滤配置（服务端暂无独立配置端点，使用内置默认值）。
     public func filterConfig() async throws -> FilterConfig {
-        let data = try await get("/api/v1/filter/config")
-        return try decoder.decode(FilterConfig.self, from: data)
+        let _ = try await get("/api/brain/stats")
+        return FilterConfig(filterAds: true, filterKeywords: ["spam", "ad"])
     }
     
     // MARK: - HTTP
@@ -252,14 +157,14 @@ public actor NeoTrixAPIClient {
 
 public enum APIError: Error, LocalizedError {
     case invalidResponse
-    case notFound
     case serverError(String)
     
     public var errorDescription: String? {
         switch self {
-        case .invalidResponse: return "Invalid server response"
-        case .notFound: return "Endpoint not found"
-        case .serverError(let msg): return msg
+        case .invalidResponse:
+            return "无效的服务响应"
+        case .serverError(let message):
+            return "服务错误: \(message)"
         }
     }
 }

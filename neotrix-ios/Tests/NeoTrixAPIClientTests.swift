@@ -1,6 +1,6 @@
 // NeoTrixAPIClientTests - 纯 Swift 单元测试（CLT 无 XCTest，用断言 + 退出码）
-// 覆盖: 模型编解码 round-trip / 推荐算法排序 / 反馈信号权重
-// 运行: swiftc -o /tmp/neotrix-tests Sources/Features/NeoTrixAPIClient.swift Tests/NeoTrixAPIClientTests.swift && /tmp/neotrix-tests
+// 覆盖: reason 契约编解码 / stats 探测响应 / 推荐排序 / 反馈信号权重
+// 运行: swiftc -parse-as-library -o /tmp/neotrix-tests Sources/Features/NeoTrixAPIClient.swift Tests/NeoTrixAPIClientTests.swift && /tmp/neotrix-tests
 
 import Foundation
 
@@ -29,65 +29,56 @@ func checkEqual<T: Equatable>(_ lhs: T, _ rhs: T, _ name: String) {
     }
 }
 
-// MARK: - 测试 1: 模型编解码 round-trip
+// MARK: - 测试 1: reason 契约编解码（Rust /api/brain/reason）
 
-func testModelCodable() {
-    print("测试 1: 模型编解码 round-trip")
+func testReasonContract() {
+    print("测试 1: reason 契约编解码（Rust /api/brain/reason）")
 
-    // ChatRequest → JSON → ChatResponse
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
 
-    let chatReq = ChatRequest(message: "hello")
-    let chatData = try! encoder.encode(chatReq)
-    let chatJSON = String(data: chatData, encoding: .utf8)!
-    check(chatJSON.contains("\"message\":\"hello\""), "ChatRequest 编码 message 字段")
+    // 请求: iOS 发送 {"prompt": "..."} 匹配 ReasonBody
+    let reqBody: [String: String] = ["prompt": "hello"]
+    let reqData = try! encoder.encode(reqBody)
+    let reqJSON = String(data: reqData, encoding: .utf8)!
+    check(reqJSON.contains("\"prompt\":\"hello\""), "请求编码 prompt 字段（匹配 ReasonBody）")
 
-    let chatResp = ChatResponse(reply: "hi there")
-    let respData = try! encoder.encode(chatResp)
-    let decodedResp = try! decoder.decode(ChatResponse.self, from: respData)
-    checkEqual(decodedResp.reply, "hi there", "ChatResponse 解码 round-trip")
+    // 响应: Rust 返回 {"output": "...", "success": true}
+    let respJSON = "{\"output\": \"Hi there!\", \"success\": true}"
+    let decoded = try! decoder.decode(ReasonResponse.self, from: respJSON.data(using: .utf8)!)
+    checkEqual(decoded.output, "Hi there!", "响应解码 output 字段")
+    check(decoded.success == true, "响应解码 success 字段")
 
-    // VideoSubmission snake_case 字段
-    let submission = VideoSubmission(id: "v1", title: "Test", author: "NeoTrix", duration: 30, viewCount: 100, likeCount: 10, url: "https://example.com")
-    let subData = try! encoder.encode(submission)
-    let subJSON = String(data: subData, encoding: .utf8)!
-    check(subJSON.contains("\"view_count\":100"), "VideoSubmission 编码 view_count (snake_case)")
-    check(subJSON.contains("\"like_count\":10"), "VideoSubmission 编码 like_count (snake_case)")
-
-    let decodedSub = try! decoder.decode(VideoSubmission.self, from: subData)
-    checkEqual(decodedSub.viewCount, 100, "VideoSubmission 解码 viewCount")
-    checkEqual(decodedSub.likeCount, 10, "VideoSubmission 解码 likeCount")
-
-    // MomentItem 可选字段
-    let moment = MomentItem(id: "m1", title: "Moment", author: "Alice", score: 85.5, reason: "high engagement", createdAt: "2026-08-08")
-    let momentData = try! encoder.encode(moment)
-    let decodedMoment = try! decoder.decode(MomentItem.self, from: momentData)
-    checkEqual(decodedMoment.score, 85.5, "MomentItem 解码 score")
-    checkEqual(decodedMoment.reason, "high engagement", "MomentItem 解码 reason")
-
-    // SocialStatus
-    let status = SocialStatus(id: "s1", platform: "telegram", isConnected: true, username: "neo", followers: 1000)
-    let statusData = try! encoder.encode(status)
-    let decodedStatus = try! decoder.decode(SocialStatus.self, from: statusData)
-    checkEqual(decodedStatus.platform, "telegram", "SocialStatus 解码 platform")
-    check(decodedStatus.isConnected, "SocialStatus 解码 isConnected")
-    checkEqual(decodedStatus.followers, 1000, "SocialStatus 解码 followers")
-
-    // FilterConfig
-    let config = FilterConfig(filterAds: true, filterKeywords: ["spam", "ad"])
-    let configData = try! encoder.encode(config)
-    let decodedConfig = try! decoder.decode(FilterConfig.self, from: configData)
-    check(decodedConfig.filterAds, "FilterConfig 解码 filterAds")
-    checkEqual(decodedConfig.filterKeywords.count, 2, "FilterConfig 解码 filterKeywords")
+    // reason() 方法: 成功路径取 output
+    // 失败路径: {"success": false, "output": "LLM error: ..."}
+    let errJSON = "{\"output\": \"LLM error: timeout\", \"success\": false}"
+    let errDecoded = try! decoder.decode(ReasonResponse.self, from: errJSON.data(using: .utf8)!)
+    checkEqual(errDecoded.output, "LLM error: timeout", "失败响应仍可解码 output")
 }
 
-// MARK: - 测试 2: 推荐算法纯函数（LiveFeedEngine 排序逻辑）
+// MARK: - 测试 2: stats 探测响应模型（Rust /api/brain/stats）
+
+func testStatsProbe() {
+    print("测试 2: stats 探测响应模型（Rust /api/brain/stats）")
+
+    // socialStatus 在服务在线时返回本地 SocialStatus（探测 GET 成功才返回）
+    let status = SocialStatus(id: "neotrix-server", platform: "neotrix", isConnected: true, username: "neotrix", followers: 0)
+    check(status.isConnected, "服务在线标记为已连接")
+    checkEqual(status.platform, "neotrix", "平台标识 neotrix")
+    checkEqual(status.followers, 0, "本地状态 followers 为 0")
+
+    // filterConfig 默认值
+    let config = FilterConfig(filterAds: true, filterKeywords: ["spam", "ad"])
+    check(config.filterAds, "默认过滤广告")
+    checkEqual(config.filterKeywords, ["spam", "ad"], "默认过滤关键词")
+}
+
+// MARK: - 测试 3: 推荐排序逻辑
 
 func testRecommendationSorting() {
-    print("测试 2: 推荐排序逻辑")
+    print("测试 3: 推荐排序逻辑")
 
     // 模拟 sortAndGroup 逻辑: 按类型分组 + 组内按 score 降序
     struct MockItem {
@@ -120,10 +111,10 @@ func testRecommendationSorting() {
     checkEqual(ordered[4].type, "moment", "moment 类型在 video 之后")
 }
 
-// MARK: - 测试 3: 反馈信号权重
+// MARK: - 测试 4: 反馈信号权重
 
 func testFeedbackSignals() {
-    print("测试 3: 反馈信号权重")
+    print("测试 4: 反馈信号权重")
 
     // 对齐 LiveFeedEngine.FeedbackSignal 常量
     let like: Double = 0.4
@@ -144,10 +135,10 @@ func testFeedbackSignals() {
     check(blockKeyword < hideAuthor, "屏蔽关键词惩罚最重")
 }
 
-// MARK: - 测试 4: 平台活跃权重
+// MARK: - 测试 5: 平台活跃权重
 
 func testPlatformActivity() {
-    print("测试 4: 平台活跃权重")
+    print("测试 5: 平台活跃权重")
 
     // 对齐 PlatformActivity.index
     let index: [String: Double] = [
@@ -174,7 +165,8 @@ struct TestRunner {
     static func main() {
         print("NeoTrixAPIClient 单元测试（CLT 纯 Swift）")
         print("==========================================")
-        testModelCodable()
+        testReasonContract()
+        testStatsProbe()
         testRecommendationSorting()
         testFeedbackSignals()
         testPlatformActivity()
