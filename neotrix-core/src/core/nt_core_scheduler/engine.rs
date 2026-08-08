@@ -16,6 +16,14 @@ pub struct ScheduledJob {
     pub anchor_ts: Option<u64>,
     pub context_gate: ContextGate,
     pub description: String,
+    /// Heartbeat monitoring (KiroCrew pattern): if Some(secs), the job must
+    /// report a heartbeat at least every `secs` seconds or it is considered
+    /// stale. None = no heartbeat monitoring.
+    #[serde(default)]
+    pub heartbeat_secs: Option<u64>,
+    /// Last heartbeat timestamp (unix seconds). None = never reported.
+    #[serde(default)]
+    pub last_heartbeat: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,17 +89,18 @@ impl SchedulerEngine {
         let mut due = Vec::new();
         let mut i = 0;
         while i < self.jobs.len() {
-            let pass = {
-                let j = &self.jobs[i];
-                j.enabled && j.next_run <= now_ts
-                    && match j.context_gate {
-                        ContextGate::Any => true,
-                        ContextGate::LowCogLoad(max) => cog_load <= max,
-                        ContextGate::MinDaLevel(min) => da_level >= min,
-                        ContextGate::SleepPressure(max) => sleep_pressure <= max,
-                        ContextGate::ExplorationMode => curiosity_level >= 0.5,
-                    }
-            };
+        let pass = {
+            let j = &self.jobs[i];
+            j.enabled && j.next_run <= now_ts
+                && j.last_run.map_or(true, |lr| now_ts.saturating_sub(lr) >= j.cooldown_secs)
+                && match j.context_gate {
+                    ContextGate::Any => true,
+                    ContextGate::LowCogLoad(max) => cog_load <= max,
+                    ContextGate::MinDaLevel(min) => da_level >= min,
+                    ContextGate::SleepPressure(max) => sleep_pressure <= max,
+                    ContextGate::ExplorationMode => curiosity_level >= 0.5,
+                }
+        };
             if pass {
                 let job = &mut self.jobs[i];
                 job.last_run = Some(now_ts);
@@ -101,6 +110,51 @@ impl SchedulerEngine {
             i += 1;
         }
         due
+    }
+
+    /// Report a heartbeat for a job. Returns true if the job exists and its
+    /// heartbeat was updated. KiroCrew pattern: unattended long-running jobs
+    /// must periodically report liveness; `stale_jobs` detects silent death.
+    pub fn report_heartbeat(&mut self, job_id: &str, ts: u64) -> bool {
+        match self.get_job_mut(job_id) {
+            Some(job) => { job.last_heartbeat = Some(ts); true }
+            None => false,
+        }
+    }
+
+    /// Jobs under heartbeat monitoring whose last heartbeat is missing or
+    /// older than `heartbeat_secs`. These are considered silently dead and
+    /// can be surfaced for repair/restart (NT-REPAIR self-healing loop).
+    pub fn stale_jobs(&self, now_ts: u64) -> Vec<String> {
+        self.jobs.iter()
+            .filter(|j| {
+                match j.heartbeat_secs {
+                    Some(secs) if secs > 0 => j.last_heartbeat
+                        .map_or(true, |hb| now_ts.saturating_sub(hb) > secs),
+                    _ => false,
+                }
+            })
+            .map(|j| j.id.clone())
+            .collect()
+    }
+
+    /// (monitored_count, stale_count) snapshot for telemetry/audit.
+    pub fn heartbeat_stats(&self, now_ts: u64) -> (u32, u32) {
+        let monitored = self.jobs.iter()
+            .filter(|j| j.heartbeat_secs.is_some_and(|s| s > 0)).count();
+        (monitored as u32, self.stale_jobs(now_ts).len() as u32)
+    }
+
+    /// Resume after process restart (cross-session continuity): any enabled
+    /// job whose next_run has passed is re-anchored forward so a restart does
+    /// not fire a burst of overdue jobs. KiroCrew persistent-orchestrator
+    /// pattern applied to the scheduler lifecycle.
+    pub fn resume(&mut self, now_ts: u64) {
+        for job in self.jobs.iter_mut() {
+            if job.enabled && job.next_run <= now_ts {
+                job.next_run = compute_next_run(&job.schedule, job.anchor_ts, now_ts);
+            }
+        }
     }
 
     pub fn record_run(
@@ -306,6 +360,7 @@ mod tests {
             handler: "h".into(), enabled: true, last_run: None, next_run: 100,
             max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         assert!(s.get_job("t").is_some());
         assert!(s.get_job("x").is_none());
@@ -319,6 +374,7 @@ mod tests {
             handler: "h".into(), enabled: true, last_run: None, next_run: 100,
             max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         assert!(s.remove_job("x")); assert!(!s.remove_job("nonexistent"));
         assert_eq!(s.stats().total_jobs, 0);
@@ -333,12 +389,14 @@ mod tests {
             handler: "h".into(), enabled: true, last_run: None, next_run: now - 1,
             max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         s.add_job(ScheduledJob {
             id: "not_due".into(), name: "N".into(), schedule: ScheduleType::Interval { secs: 3600 },
             handler: "h".into(), enabled: true, last_run: None, next_run: now + 1000,
             max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         let due = s.tick(now, 0.0, 0.5, 0.0, 0.5);
         assert_eq!(due.len(), 1);
@@ -353,6 +411,7 @@ mod tests {
             handler: "h".into(), enabled: true, last_run: None, next_run: now - 1,
             max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::LowCogLoad(0.5), description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         assert_eq!(s.tick(now, 0.8, 0.5, 0.0, 0.5).len(), 0); // blocked
         assert_eq!(s.tick(now, 0.3, 0.5, 0.0, 0.5).len(), 1); // passes
@@ -366,6 +425,7 @@ mod tests {
             handler: "h".into(), enabled: false, last_run: None, next_run: 0,
             max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         assert_eq!(s.tick(100, 0.0, 0.5, 0.0, 0.5).len(), 0);
     }
@@ -379,6 +439,7 @@ mod tests {
             handler: "h".into(), enabled: true, last_run: None, next_run: now - 1,
             max_retries: 2, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         s.record_run("flaky", now, 100, false, Some("fail1".into()));
         assert!(s.get_job("flaky").unwrap().enabled);
@@ -404,12 +465,14 @@ mod tests {
             handler: "h".into(), enabled: true, last_run: None, next_run: 0,
             max_retries: 3, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         s.add_job(ScheduledJob {
             id: "b".into(), name: "B".into(), schedule: ScheduleType::Interval { secs: 120 },
             handler: "h2".into(), enabled: false, last_run: None, next_run: 9999,
             max_retries: 1, retry_count: 0, cooldown_secs: 5, anchor_ts: None,
             context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         let stats = s.stats();
         assert_eq!(stats.total_jobs, 2);
@@ -432,6 +495,7 @@ mod tests {
             handler: "h".into(), enabled: true, last_run: None, next_run: 9999,
             max_retries: 2, retry_count: 0, cooldown_secs: 10, anchor_ts: None,
             context_gate: ContextGate::Any, description: "desc".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         let json = s.save_json().unwrap();
         let mut s2 = SchedulerEngine::new();
@@ -451,8 +515,105 @@ mod tests {
             last_run: None, next_run: 0, max_retries: 2, retry_count: 0,
             cooldown_secs: 3600, anchor_ts: Some(now),
             context_gate: ContextGate::LowCogLoad(0.6), description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
         });
         // Not due yet (anchor + 86400 > now since anchor = now)
         assert_eq!(s.tick(now, 0.3, 0.5, 0.0, 0.5).len(), 0);
+    }
+
+    // ---- Heartbeat / cooldown / resume tests (KiroCrew absorption) ----
+
+    fn hb_job(id: &str, hb: Option<u64>, last_hb: Option<u64>) -> ScheduledJob {
+        ScheduledJob {
+            id: id.into(), name: id.into(), schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(), enabled: true, last_run: None, next_run: 0,
+            max_retries: 3, retry_count: 0, cooldown_secs: 0, anchor_ts: None,
+            context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: hb, last_heartbeat: last_hb,
+        }
+    }
+
+    #[test]
+    fn test_heartbeat_report_updates() {
+        let mut s = SchedulerEngine::new();
+        s.add_job(hb_job("hb", Some(60), None));
+        assert!(s.report_heartbeat("hb", 1000));
+        assert_eq!(s.get_job("hb").unwrap().last_heartbeat, Some(1000));
+        assert!(!s.report_heartbeat("missing", 1000));
+    }
+
+    #[test]
+    fn test_stale_jobs_detection() {
+        let mut s = SchedulerEngine::new();
+        s.add_job(hb_job("never_hb", Some(60), None));          // stale: never reported
+        s.add_job(hb_job("fresh", Some(60), Some(1000)));      // ok: 1000 + 60 > 1050
+        s.add_job(hb_job("expired", Some(60), Some(900)));     // stale: 1050 - 900 > 60
+        s.add_job(hb_job("unmonitored", None, None));          // not monitored
+        let stale = s.stale_jobs(1050);
+        assert!(stale.contains(&"never_hb".to_string()));
+        assert!(stale.contains(&"expired".to_string()));
+        assert!(!stale.contains(&"fresh".to_string()));
+        assert!(!stale.contains(&"unmonitored".to_string()));
+    }
+
+    #[test]
+    fn test_heartbeat_stats() {
+        let mut s = SchedulerEngine::new();
+        s.add_job(hb_job("a", Some(60), Some(0)));
+        s.add_job(hb_job("b", Some(60), None));
+        s.add_job(hb_job("c", None, None));
+        let (monitored, stale) = s.heartbeat_stats(1000);
+        assert_eq!(monitored, 2);
+        assert_eq!(stale, 2); // a expired (1000-0>60), b never reported
+    }
+
+    #[test]
+    fn test_cooldown_blocks_tick() {
+        let mut s = SchedulerEngine::new();
+        let now = 1000;
+        s.add_job(ScheduledJob {
+            id: "cd".into(), name: "CD".into(), schedule: ScheduleType::Interval { secs: 60 },
+            handler: "h".into(), enabled: true, last_run: Some(now - 5),
+            next_run: now - 1, max_retries: 3, retry_count: 0, cooldown_secs: 60,
+            anchor_ts: None, context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
+        });
+        // last_run 5s ago < cooldown 60s -> blocked despite next_run due
+        assert_eq!(s.tick(now, 0.0, 0.5, 0.0, 0.5).len(), 0);
+        // after cooldown elapses, job runs
+        assert_eq!(s.tick(now + 60, 0.0, 0.5, 0.0, 0.5).len(), 1);
+    }
+
+    #[test]
+    fn test_resume_reanchors_overdue_jobs() {
+        let mut s = SchedulerEngine::new();
+        let now = 1000;
+        s.add_job(ScheduledJob {
+            id: "overdue".into(), name: "O".into(), schedule: ScheduleType::Interval { secs: 3600 },
+            handler: "h".into(), enabled: true, last_run: None, next_run: now - 500,
+            max_retries: 3, retry_count: 0, cooldown_secs: 0, anchor_ts: Some(0),
+            context_gate: ContextGate::Any, description: "".into(),
+            heartbeat_secs: None, last_heartbeat: None,
+        });
+        s.resume(now);
+        // re-anchored forward: next run is the next interval boundary after now
+        assert!(s.get_job("overdue").unwrap().next_run > now);
+        // no burst on the first tick after resume
+        assert_eq!(s.tick(now, 0.0, 0.5, 0.0, 0.5).len(), 0);
+    }
+
+    #[test]
+    fn test_load_legacy_json_without_heartbeat_fields() {
+        // Old serialized jobs (no heartbeat fields) must still load: serde(default)
+        let legacy = r#"[{"id":"old","name":"Old","schedule":{"Interval":{"secs":3600}},
+            "handler":"h","enabled":true,"last_run":null,"next_run":9999,
+            "max_retries":2,"retry_count":0,"cooldown_secs":10,"anchor_ts":null,
+            "context_gate":"Any","description":"legacy"}]"#;
+        let mut s = SchedulerEngine::new();
+        s.load_json(legacy).unwrap();
+        assert_eq!(s.stats().total_jobs, 1);
+        let job = s.get_job("old").unwrap();
+        assert_eq!(job.heartbeat_secs, None);
+        assert_eq!(job.last_heartbeat, None);
     }
 }

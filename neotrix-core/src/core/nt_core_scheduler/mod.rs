@@ -29,6 +29,8 @@ pub fn default_scheduler(anchor_now: u64) -> SchedulerEngine {
         context_gate: ContextGate::LowCogLoad(0.6),
         description: "Remove stale target/, node_modules/, dist/ build artifacts every 24h"
             .into(),
+        heartbeat_secs: None,
+        last_heartbeat: None,
     });
 
     // Hourly knowledge aging (was separate ticker)
@@ -46,6 +48,8 @@ pub fn default_scheduler(anchor_now: u64) -> SchedulerEngine {
         anchor_ts: Some(anchor_now),
         context_gate: ContextGate::Any,
         description: "Score decay, stale detection, re-scan scheduling".into(),
+        heartbeat_secs: None,
+        last_heartbeat: None,
     });
 
     // Evosc self-consolidation (consciousness-aware, every 30min)
@@ -63,7 +67,13 @@ pub fn default_scheduler(anchor_now: u64) -> SchedulerEngine {
         anchor_ts: Some(anchor_now),
         context_gate: ContextGate::LowCogLoad(0.7),
         description: "Contrastive reflection + parametric memory compression".into(),
+        heartbeat_secs: None,
+        last_heartbeat: None,
     });
+
+    // Cross-session continuity (KiroCrew pattern): re-anchor overdue jobs
+    // forward so a process restart does not fire a burst of stale jobs.
+    engine.resume(anchor_now);
 
     engine
 }

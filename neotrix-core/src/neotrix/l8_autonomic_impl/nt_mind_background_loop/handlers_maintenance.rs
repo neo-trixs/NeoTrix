@@ -62,6 +62,13 @@ impl BackgroundLoopHandle {
                     .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
                 sched.record_run(&job_id, now, 100, true, None);
             }
+            // Heartbeat liveness (KiroCrew pattern): surface silently-dead jobs
+            // for the NT-REPAIR self-healing loop instead of letting them rot.
+            let stale = sched.stale_jobs(now);
+            if !stale.is_empty() {
+                log::warn!("[scheduler] {} stale job(s) (heartbeat timeout): {:?}",
+                    stale.len(), stale);
+            }
         }
     }
 
