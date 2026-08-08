@@ -27,11 +27,18 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
     await loadConfig()
     // 设置面板切换提供商后同步刷新
     window.addEventListener('neotrix:provider-changed', handleProviderChanged)
+    // Esc 关闭下拉（对标 Codex 下拉规范）
+    window.addEventListener('keydown', handleEsc)
   })
 
   onCleanup(() => {
     window.removeEventListener('neotrix:provider-changed', handleProviderChanged)
+    window.removeEventListener('keydown', handleEsc)
   })
+
+  const handleEsc = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') setIsOpen(false)
+  }
 
   const handleProviderChanged = () => {
     loadConfig()

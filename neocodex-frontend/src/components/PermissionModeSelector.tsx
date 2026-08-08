@@ -1,4 +1,4 @@
-import { createSignal, For } from 'solid-js'
+import { createSignal, onMount, onCleanup, For } from 'solid-js'
 import { Shield, MousePointer2, Edit3, FileText, ChevronDown, Check } from 'lucide-solid'
 import { clsx } from 'clsx'
 
@@ -53,6 +53,13 @@ export interface PermissionModeSelectorProps {
 export function PermissionModeSelector(props: PermissionModeSelectorProps) {
   const { value, onChange, disabled = false, compact = false } = props
   const [isOpen, setIsOpen] = createSignal(false)
+
+  // Esc 关闭下拉（对标 Codex 下拉规范）
+  onMount(() => window.addEventListener('keydown', handleEsc))
+  onCleanup(() => window.removeEventListener('keydown', handleEsc))
+  const handleEsc = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') setIsOpen(false)
+  }
 
   const currentMode = PERMISSION_MODES.find(m => m.value === value) || PERMISSION_MODES[0]
 
