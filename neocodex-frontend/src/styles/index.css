@@ -54,6 +54,14 @@
     @apply bg-bg-secondary;
   }
 
+  /* 顶部工具栏按钮（ch-top 面板入口） */
+  .tb-btn {
+    @apply flex items-center justify-center w-7 h-7 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors;
+  }
+  .tb-btn.on {
+    @apply bg-nt-io-500/10 text-nt-io-600;
+  }
+
   .glass-L2 {
     @apply bg-[#efece6];
   }
@@ -816,6 +824,13 @@
     letter-spacing: -0.02em;
     color: #1a1a20;
     line-height: 1.3;
+  }
+
+  .hero-sub {
+    font-size: 12px;
+    color: #909098;
+    margin-top: 2px;
+    letter-spacing: 0.01em;
   }
 
   /* ════════════════════════════════════════════

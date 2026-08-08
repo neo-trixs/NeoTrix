@@ -1,7 +1,8 @@
 import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import {
   Send, Square, RotateCcw, Edit2, Copy, AlertCircle, Highlighter, X,
-  FolderTree, Bug, FlaskConical,
+  FolderTree, Bug, FlaskConical, GitBranch, FolderOpen, Puzzle, Clock,
+  Coins, History, MessageSquare, Monitor,
 } from 'lucide-solid'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
 import { Sidebar } from '../components/Sidebar'
@@ -12,6 +13,14 @@ import { PermissionModeSelector, type PermissionMode } from '../components/Permi
 import { ToolCallCard } from '../components/ToolCallCard'
 import { FilePreview } from '../components/FilePreview'
 import { Markdown } from '../components/Markdown'
+import { GitPanel } from '../components/GitPanel'
+import { ProjectView } from '../components/ProjectView'
+import { PluginMarketplace } from '../components/PluginMarketplace'
+import { ScheduledTasks } from '../components/ScheduledTasks'
+import { CostDashboard } from '../components/CostDashboard'
+import { CheckpointTimeline } from '../components/CheckpointTimeline'
+import { SideChat } from '../components/SideChat'
+import { ComputerUse } from '../components/ComputerUse'
 import { clsx } from 'clsx'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
@@ -57,6 +66,16 @@ function HeroMark() {
   )
 }
 
+/* 时间自适应问候语 */
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 6) return '夜深了'
+  if (h < 12) return '上午好'
+  if (h < 14) return '中午好'
+  if (h < 18) return '下午好'
+  return '晚上好'
+}
+
 /* —— 设计 v2 头像图标：用户（人形）/ 助手（方框·意识） —— */
 function UserIcon() {
   return (
@@ -91,6 +110,13 @@ export function Chat() {
 
   // 视图切换：chat / cowork（对应侧栏 segmented tabs）
   const [activeView, setActiveView] = createSignal<'chat' | 'cowork'>('chat')
+
+  // 顶部工具栏面板：一次只开一个
+  type PanelId = 'git' | 'project' | 'plugins' | 'tasks' | 'cost' | 'timeline' | 'sidechat' | 'computer'
+  const [activePanel, setActivePanel] = createSignal<PanelId | null>(null)
+  const togglePanel = (id: PanelId) => {
+    setActivePanel(activePanel() === id ? null : id)
+  }
 
   // 用函数访问 store，保证 store 变更时响应式重渲染
   const messages = () => chatStore.currentMessages
@@ -438,18 +464,123 @@ export function Chat() {
         onSwitchView={setActiveView}
       />
 
-      <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1">
+      <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative">
         {/* ===== 头部 ch-top：设计 v2（chat 视图） ===== */}
         <Show when={activeView() === 'chat'}>
           <header class="ch-top" data-tauri-drag-region>
-<div class="flex items-center gap-2 flex-shrink-0 min-w-0">
+            <div class="flex items-center gap-2 flex-shrink-0 min-w-0">
               <Show when={currentSession()}>
                 <span class="text-[11px] text-text-muted px-1.5 py-0.5 rounded bg-white/50 border border-border-primary/60 flex-shrink-0 truncate max-w-[220px]">
                   {currentSession()!.title} · {currentSession()!.messages.length} 条消息
                 </span>
               </Show>
             </div>
+
+            {/* 顶部工具栏：功能面板入口（对标 Codex Desktop） */}
+            <div class="flex items-center gap-0.5 ml-auto flex-shrink-0">
+              <button
+                class={clsx('tb-btn', activePanel() === 'git' && 'on')}
+                onClick={() => togglePanel('git')}
+                aria-label="Git 变更"
+                title="Git 变更"
+              >
+                <GitBranch class="w-4 h-4" />
+              </button>
+              <button
+                class={clsx('tb-btn', activePanel() === 'project' && 'on')}
+                onClick={() => togglePanel('project')}
+                aria-label="项目视图"
+                title="项目视图"
+              >
+                <FolderOpen class="w-4 h-4" />
+              </button>
+              <button
+                class={clsx('tb-btn', activePanel() === 'plugins' && 'on')}
+                onClick={() => togglePanel('plugins')}
+                aria-label="插件市场"
+                title="插件市场"
+              >
+                <Puzzle class="w-4 h-4" />
+              </button>
+              <button
+                class={clsx('tb-btn', activePanel() === 'tasks' && 'on')}
+                onClick={() => togglePanel('tasks')}
+                aria-label="定时任务"
+                title="定时任务"
+              >
+                <Clock class="w-4 h-4" />
+              </button>
+              <button
+                class={clsx('tb-btn', activePanel() === 'cost' && 'on')}
+                onClick={() => togglePanel('cost')}
+                aria-label="成本看板"
+                title="成本看板"
+              >
+                <Coins class="w-4 h-4" />
+              </button>
+              <button
+                class={clsx('tb-btn', activePanel() === 'timeline' && 'on')}
+                onClick={() => togglePanel('timeline')}
+                aria-label="时间线"
+                title="时间线"
+              >
+                <History class="w-4 h-4" />
+              </button>
+              <button
+                class={clsx('tb-btn', activePanel() === 'sidechat' && 'on')}
+                onClick={() => togglePanel('sidechat')}
+                aria-label="侧向对话"
+                title="侧向对话"
+              >
+                <MessageSquare class="w-4 h-4" />
+              </button>
+              <button
+                class={clsx('tb-btn', activePanel() === 'computer' && 'on')}
+                onClick={() => togglePanel('computer')}
+                aria-label="电脑控制"
+                title="电脑控制"
+              >
+                <Monitor class="w-4 h-4" />
+              </button>
+            </div>
           </header>
+        </Show>
+
+        {/* ===== 顶部工具栏面板（一次一个，右侧滑出） ===== */}
+        <Show when={activeView() === 'chat' && activePanel()}>
+          <Show when={activePanel() === 'git'}>
+            <GitPanel open onClose={() => setActivePanel(null)} />
+          </Show>
+          <Show when={activePanel() === 'project'}>
+            <ProjectView open onClose={() => setActivePanel(null)} />
+          </Show>
+          <Show when={activePanel() === 'plugins'}>
+            <PluginMarketplace open onClose={() => setActivePanel(null)} />
+          </Show>
+          <Show when={activePanel() === 'tasks'}>
+            <ScheduledTasks open onClose={() => setActivePanel(null)} />
+          </Show>
+          <Show when={activePanel() === 'cost'}>
+            <CostDashboard open onClose={() => setActivePanel(null)} />
+          </Show>
+          <Show when={activePanel() === 'timeline'}>
+            <CheckpointTimeline
+              open
+              sessionId={currentSession()?.id ?? null}
+              onClose={() => setActivePanel(null)}
+              onRestored={() => chatStore.loadSessions()}
+            />
+          </Show>
+          <Show when={activePanel() === 'sidechat'}>
+            <SideChat
+              open
+              sessionId={currentSession()?.id ?? null}
+              onClose={() => setActivePanel(null)}
+            />
+          </Show>
+          <Show when={activePanel() === 'computer'}>
+            <ComputerUse open onClose={() => setActivePanel(null)} />
+          </Show>
         </Show>
 
         {/* ===== 消息流：气泡式 msg.r / msg.l（chat 视图） ===== */}
@@ -464,7 +595,10 @@ export function Chat() {
                   <div class="hero-svg">
                     <HeroMark />
                   </div>
-                  <h1>下午好</h1>
+                  <div>
+                    <h1>{greeting()}</h1>
+                    <p class="hero-sub">我是 NeoTrix，你的 AI 原生开发伙伴</p>
+                  </div>
                 </div>
 
                 {/* cic 输入区 */}

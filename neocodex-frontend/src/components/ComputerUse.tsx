@@ -173,7 +173,7 @@ export function ComputerUse(props: Props) {
         {/* Header */}
         <div class="panel-head">
           <Monitor class="panel-head-icon text-nt-core-300" />
-          <span class="panel-title">Computer Use</span>
+          <span class="panel-title">电脑控制</span>
           <span class="panel-sub">macOS 控制</span>
           <button
             class="panel-close"

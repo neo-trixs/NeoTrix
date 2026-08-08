@@ -170,12 +170,11 @@ export function PluginMarketplace(props: Props) {
                     <span class="text-sm font-medium text-text-primary truncate flex-1">{p.name}</span>
                     <span class="text-[10px] text-text-muted font-mono">{p.version}</span>
                     <span
-                      class={clsx(
-                        'w-2 h-2 rounded-full flex-shrink-0',
-                        p.enabled ? 'bg-emerald-500' : 'bg-text-muted'
-                      )}
+                      class={clsx('badge', p.enabled ? 'badge-success' : 'badge-warn')}
                       title={p.enabled ? '已启用' : '已禁用'}
-                    />
+                    >
+                      {p.enabled ? '启用' : '禁用'}
+                    </span>
                   </div>
                   <div class="flex items-center gap-1 mt-2 ml-6">
                     <button

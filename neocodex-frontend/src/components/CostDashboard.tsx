@@ -157,8 +157,9 @@ export function CostDashboard(props: Props) {
             {/* Status */}
             <div class="rounded-xl border border-border-primary bg-bg-primary/40 p-3">
               <div class="flex items-center gap-2 text-sm">
-                <span class={clsx('w-2 h-2 rounded-full', status()!.running ? 'bg-emerald-500 animate-pulse' : 'bg-text-muted')} />
-                <span class="text-text-primary">{status()!.running ? '运行中' : '空闲'}</span>
+                <span class={clsx('badge', status()!.running ? 'badge-warn' : 'badge-success')}>
+                  {status()!.running ? '运行中' : '空闲'}
+                </span>
                 {status()!.current_task && <span class="text-xs text-text-muted truncate">{status()!.current_task}</span>}
               </div>
             </div>
