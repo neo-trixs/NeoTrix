@@ -70,7 +70,7 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 ### 操作步骤
 1. **发送消息**：在底部输入框输入内容，按 `Enter` 发送（`Shift+Enter` 换行）
 2. **停止生成**：生成期间发送按钮变为停止按钮（方块图标），点击即停止
-3. **快速问答**：空状态时点击建议卡片（解释项目结构/修复编译错误/生成测试用例）
+3. **快速问答**：空状态时点击建议卡片（解释项目结构/修复编译错误/生成测试用例/搜索代码符号/分析性能瓶颈/优化依赖构建）
 4. **重新生成**：悬停助手消息，点击 ↻ 图标
 5. **编辑并重发**：悬停消息点击 ✎ 图标，修改后 `Ctrl/Cmd+Enter` 保存重发，`Esc` 取消
 6. **复制**：悬停消息点击复制图标
@@ -492,10 +492,10 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 ### 分区说明
 | 分区 | 内容 | 后端命令 |
 |------|------|----------|
-| 通用 | 当前提供商卡片（API 可达性 badge）+ 提供商列表切换 | `neocodex_provider_config`, `neocodex_set_provider` |
+| 通用 | 当前提供商卡片（API 可达性 badge）+ 提供商列表切换（切换后广播 `neotrix:provider-changed`，输入区 ProviderSelector 即时同步） | `neocodex_provider_config`, `neocodex_set_provider` |
 | 外观 | 动效强度（完整/减弱）、界面密度（舒适/紧凑） | — |
 | 数据 | 记忆统计卡片（条目/分类/置信度/占用）+ 导出记忆（JSON 保存对话框）+ 清空记忆 | `memory_stats`, `memory_export`, `memory_clear` |
-| 关于 | 版本信息 + 诊断 | — |
+| 关于 | 版本信息（动态 `neocodex_app_version`）+ 提供商/API 状态/模型/平台诊断 | `neocodex_app_version` |
 
 ### 操作步骤
 1. **切换提供商**：通用 → 点击提供商卡片，`✓ 当前` 标记激活项
