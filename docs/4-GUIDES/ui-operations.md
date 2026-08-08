@@ -27,7 +27,8 @@
 17. [侧聊（SideChat）](#17-侧聊sidechat)
 18. [电脑控制（ComputerUse）](#18-电脑控制computeruse)
 19. [窗口控制（TrafficLights）](#19-窗口控制trafficlights)
-20. [后端命令域总览](#20-后端命令域总览)
+20. [设置面板（SettingsModal）](#195-设置面板settingsmodal)
+21. [后端命令域总览](#20-后端命令域总览)
 ```
 
 ---
@@ -38,15 +39,18 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 
 ```
 ┌─────────────┬──────────────────────────────┬──────────────┐
-│  Sidebar    │  主区域（Chat / Cowork）      │  RightBar    │
-│  (会话管理)  │  - 消息流 / 输入区 / 工具栏   │  (Artifact   │
-│  - 视图切换  │  - 或协同看板                 │   + 文件树)  │
-│  - 会话列表  │                              │              │
+│  Sidebar    │  ┌────────────────────────┐  │  RightBar    │
+│  (会话管理)  │  │ ch-top 工具栏（⌘1-⌘8）   │  │  (Artifact   │
+│  - 视图切换  │  ├────────────────────────┤  │   + 文件树)  │
+│  - 会话列表  │  │ 主区域（Chat / Cowork）  │  │              │
+│  - 搜索入口  │  │  - 消息流 / 输入区      │  │              │
+│  - 用户条    │  │  - 或协同看板            │  │              │
 └─────────────┴──────────────────────────────┴──────────────┘
 ```
 
 - **左栏 Sidebar**：视图切换（对话/协同）、会话管理（新建/切换/重命名/删除）、搜索入口、用户条
 - **主区域**：对话视图（消息流 + 输入区）或协同视图（任务看板）
+- **顶部工具栏**：8 个功能面板入口（Git/项目/插件/定时/成本/时间线/侧聊/电脑控制），`⌘1`~`⌘8` 切换，一次一个右侧滑出
 - **右栏 RightBar**：Artifact 预览面板 + 文件树（auto-hide 自动隐藏）
 
 ---
@@ -81,6 +85,8 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 | `Shift+Enter` | 换行 |
 | `Ctrl/Cmd+Enter`（编辑态） | 保存并重发 |
 | `Esc`（编辑态） | 取消编辑 |
+| `⌘1`~`⌘8` | 切换 8 个功能面板（Git/项目/插件/定时/成本/时间线/侧聊/电脑控制） |
+| `Esc`（面板打开时） | 关闭当前面板 |
 
 ### 后端对接
 - `neocodex_send_message_stream`（发送，参数: content/attachments/regenerate/permission_mode/temperature/max_tokens）
@@ -474,6 +480,32 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 
 ---
 
+## 19.5 设置面板（SettingsModal）
+
+**文件**: `src/components/SettingsModal.tsx`
+
+### 实际功能
+- 统一设置面板（对标 Claude/Cursor）：左侧分类导航 + 右侧内容分区
+- 4 个分区：通用 / 外观 / 数据 / 关于
+- 入口：侧边栏用户条点击（或任意处打开）
+
+### 分区说明
+| 分区 | 内容 | 后端命令 |
+|------|------|----------|
+| 通用 | 当前提供商卡片（API 可达性 badge）+ 提供商列表切换 | `neocodex_provider_config`, `neocodex_set_provider` |
+| 外观 | 动效强度（完整/减弱）、界面密度（舒适/紧凑） | — |
+| 数据 | 记忆统计卡片（条目/分类/置信度/占用）+ 导出记忆（JSON 保存对话框）+ 清空记忆 | `memory_stats`, `memory_export`, `memory_clear` |
+| 关于 | 版本信息 + 诊断 | — |
+
+### 操作步骤
+1. **切换提供商**：通用 → 点击提供商卡片，`✓ 当前` 标记激活项
+2. **导出记忆**：数据 → 导出记忆（JSON）→ 系统保存对话框选择路径
+3. **清空记忆**：数据 → 清空全部记忆（红色警示，不可恢复）
+
+> ⚠️ `memory_export` 返回 JSON 字符串（非文件路径），前端经 `plugin-dialog save()` + `plugin-fs writeTextFile()` 落盘。
+
+---
+
 ## 20. 后端命令域总览
 
 后端共 **55 个命令文件、521 个注册命令**。前端消费 39 个命令（§2-§19 已列）。主要命令域：
@@ -517,6 +549,7 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 |------|----------|
 | Chat | neocodex_send_message_stream, neocodex_stop_stream, neocodex_provider_config, read_file(附件), voice_get_transcription(语音) |
 | Sidebar | chatStore(会话管理) + neocodex_provider_config / neocodex_set_provider(设置面板) |
+| SettingsModal | neocodex_provider_config, neocodex_set_provider, memory_stats, memory_export, memory_clear |
 | ProviderSelector | neocodex_provider_config, neocodex_set_provider |
 | GitPanel | neocodex_git_status, neocodex_get_diff, neocodex_apply_diff |
 | ProjectView | neocodex_project_tree |
