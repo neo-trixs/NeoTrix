@@ -315,13 +315,20 @@ public struct LiveCardView: View {
     }
     
     private var typeBadge: some View {
-        Text(item.type.rawValue.capitalized)
-            .font(.system(size: 9, weight: .bold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(Color.black.opacity(0.6))
-            .foregroundColor(.white)
-            .clipShape(Capsule())
+        // 统一设计系统: NeoTrixTypeBadge（Moments/Stream 融合类型角标）
+        NeoTrixTypeBadge(title: item.type.rawValue.capitalized, color: typeBadgeColor(item.type))
+    }
+    
+    private func typeBadgeColor(_ type: FeedItemType) -> Color {
+        switch type {
+        case .moment: return .pink      // Moments: 社交状态流
+        case .stream: return .cyan      // Stream: 实时事件流
+        case .video: return .red
+        case .image: return .orange
+        case .chat: return .blue
+        case .contact: return .green
+        default: return .purple
+        }
     }
     
     private func typeIcon(_ type: FeedItemType) -> String {
@@ -332,6 +339,8 @@ public struct LiveCardView: View {
         case .document: return "doc"
         case .chat: return "bubble.left"
         case .contact: return "person"
+        case .moment: return "sparkles"
+        case .stream: return "dot.radiowaves.left.and.right"
         }
     }
     

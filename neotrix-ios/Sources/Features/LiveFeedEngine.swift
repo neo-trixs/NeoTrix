@@ -17,6 +17,8 @@ public enum FeedItemType: String, CaseIterable, Equatable {
     case document
     case chat
     case contact
+    case moment     // 融合: NeoTrix Moments（社交状态流）
+    case stream     // 融合: NeoTrix Stream（实时事件流）
 }
 
 public struct LiveFeedItem: Identifiable, Equatable {
@@ -424,7 +426,7 @@ public final class LiveFeedEngine: ObservableObject {
     private func sortAndGroup(_ items: [LiveFeedItem]) -> [LiveFeedItem] {
         let grouped = Dictionary(grouping: items) { $0.type }
         var ordered: [LiveFeedItem] = []
-        for type in [FeedItemType.chat, .text, .image, .video, .document, .contact] {
+        for type in [FeedItemType.chat, .text, .image, .video, .document, .contact, .moment, .stream] {
             let sorted = (grouped[type] ?? []).sorted { $0.score > $1.score }
             ordered.append(contentsOf: sorted)
         }
@@ -544,6 +546,12 @@ public final class TelegramContentProvider: ContentSourceProvider {
             ("独立开发者访谈", "如何用 AI 提升 10 倍效率", .video, .entertainment),
             ("VSA 向量符号架构入门", "高维向量计算基础", .text, .education),
             ("GWT 注意力路由实践", "全局工作空间理论工程化", .text, .tech),
+            // 融合: Moments（社交状态流）
+            ("Alice 的今日动态", "刚发布了新设计稿，欢迎点评", .moment, .entertainment),
+            ("NeoTrix 团队动态", "本周 Sprint 目标达成，庆祝一下", .moment, .tech),
+            // 融合: Stream（实时事件流）
+            ("E8 推理引擎实时直播", "架构师在线讲解 64 卦象推理", .stream, .live),
+            ("社区问答直播", "GWT 注意力路由实战答疑", .stream, .live),
         ]
         
         var result: [LiveFeedItem] = []

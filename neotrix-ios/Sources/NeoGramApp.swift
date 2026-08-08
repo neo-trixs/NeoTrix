@@ -48,6 +48,7 @@ public struct NeoGramApp: App {
 
 public struct MainTabView: View {
     @State private var selectedTab: Tab = .chats
+    @StateObject private var themeManager = ThemeManager()
     
     public enum Tab {
         case chats
@@ -78,8 +79,9 @@ public struct MainTabView: View {
                 }
                 .tag(Tab.me)
         }
-        // 统一设计系统：极简风格
-        .tint(NeoTrixTheme.Colors.accent)
+        // 统一设计系统：极简风格 + 主题联动（Premium 主题切换 → Tab 强调色）
+        .tint(themeManager.currentTheme.colors.primary)
+        .environmentObject(themeManager)
     }
 }
 

@@ -78,6 +78,22 @@ public final class StoryViewModel: ObservableObject {
         // Premium: stealth mode - capture view without notifying
         UserDefaults.standard.set(true, forKey: "story_stealth_mode")
     }
+    
+    /// 发布新 Story（融合: 官方 Stories + AI 摘要）
+    public func publishStory(caption: String, isCloseFriends: Bool = false) {
+        let newStory = StoryItem(
+            id: Int64(Date().timeIntervalSince1970),
+            authorName: "My Story",
+            authorInitial: String(caption.prefix(1)).uppercased(),
+            avatarColor: .purple,
+            isSeen: false,
+            isPremium: true,
+            isCloseFriends: isCloseFriends,
+            timestamp: Date(),
+            duration: 5
+        )
+        stories.insert(newStory, at: 0)
+    }
 }
 
 // MARK: - Story Ring (Story Circle)
@@ -246,6 +262,88 @@ public struct StoryViewerView: View {
     }
 }
 
+// MARK: - Story Composer（融合: 官方 Stories 发布 + AI 摘要）
+
+public struct StoryComposerView: View {
+    @Environment(\.dismiss) private var dismiss
+    let onPublish: (String, Bool) -> Void
+    @State private var caption = ""
+    @State private var isCloseFriends = false
+    
+    public init(onPublish: @escaping (String, Bool) -> Void) {
+        self.onPublish = onPublish
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                // 预览环
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.purple, .pink, .orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 96, height: 96)
+                    
+                    Text(String(caption.prefix(1)).uppercased())
+                        .font(.largeTitle.bold())
+                        .foregroundColor(.white)
+                }
+                .padding(.top, 24)
+                
+                // 文案输入
+                TextField("What's on your mind?", text: $caption, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(3...6)
+                    .padding(.horizontal)
+                
+                // 亲密好友开关
+                Toggle(isOn: $isCloseFriends) {
+                    Label("Close Friends", systemImage: "person.2.fill")
+                        .foregroundColor(.primary)
+                }
+                .padding(.horizontal)
+                .neoTrixCard()
+                
+                Spacer()
+            }
+            .navigationTitle("New Story")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Publish") {
+                        onPublish(caption, isCloseFriends)
+                        dismiss()
+                    }
+                    .disabled(caption.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Publish") {
+                        onPublish(caption, isCloseFriends)
+                        dismiss()
+                    }
+                    .disabled(caption.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                #endif
+            }
+        }
+    }
+}
+
 // MARK: - Stories List
 
 public struct StoriesListView: View {
@@ -304,5 +402,10 @@ public struct StoriesListView: View {
             StoryViewerView(stories: viewModel.stories)
         }
         #endif
+        .sheet(isPresented: $showComposer) {
+            StoryComposerView { caption, isCloseFriends in
+                viewModel.publishStory(caption: caption, isCloseFriends: isCloseFriends)
+            }
+        }
     }
 }

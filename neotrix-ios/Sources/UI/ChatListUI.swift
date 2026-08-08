@@ -135,7 +135,9 @@ public struct ChatListView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Stories 环（融合: 顶部故事 + AI 助手入口）
-                StoriesBar(stories: storyViewModel.stories, onAI: { showAI = true })
+                StoriesBar(stories: storyViewModel.stories, onAI: { showAI = true }) { caption, isCloseFriends in
+                    storyViewModel.publishStory(caption: caption, isCloseFriends: isCloseFriends)
+                }
                 
                 // Filter bar
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -397,11 +399,14 @@ struct ChatListRow: View {
 public struct StoriesBar: View {
     let stories: [StoryItem]
     let onAI: () -> Void
+    let onPublish: (String, Bool) -> Void
     @State private var showViewer = false
+    @State private var showComposer = false
     
-    public init(stories: [StoryItem], onAI: @escaping () -> Void) {
+    public init(stories: [StoryItem], onAI: @escaping () -> Void, onPublish: @escaping (String, Bool) -> Void = { _, _ in }) {
         self.stories = stories
         self.onAI = onAI
+        self.onPublish = onPublish
     }
     
     public var body: some View {
@@ -434,7 +439,7 @@ public struct StoriesBar: View {
                 
                 // My story
                 Button {
-                    // 打开故事发布器（占位）
+                    showComposer = true
                 } label: {
                     VStack(spacing: 6) {
                         ZStack {
@@ -471,5 +476,10 @@ public struct StoriesBar: View {
             StoryViewerView(stories: stories)
         }
         #endif
+        .sheet(isPresented: $showComposer) {
+            StoryComposerView { caption, isCloseFriends in
+                onPublish(caption, isCloseFriends)
+            }
+        }
     }
 }
