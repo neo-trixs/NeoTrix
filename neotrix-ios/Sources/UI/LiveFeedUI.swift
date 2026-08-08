@@ -9,12 +9,10 @@ import SwiftUI
 
 public struct LiveFeedView: View {
     @StateObject private var engine = LiveFeedEngine.shared
-    @State private var showBlockKeywordAlert = false
     @State private var pendingKeyword = ""
     @State private var shareItem: LiveFeedItem?
     @State private var showBlockedAlert = false
     @State private var toastMessage: String?
-    @State private var isDebouncing = false
     
     public init() {}
     

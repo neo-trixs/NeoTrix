@@ -475,7 +475,6 @@ struct MessageMediaView: View {
 
 public struct ChatView: View {
     @StateObject private var viewModel = ChatViewModel()
-    @State private var scrollProxy: ScrollViewProxy?
     @State private var showAIEditor = false
     @State private var showExport = false
     @State private var reactionTarget: UUID?

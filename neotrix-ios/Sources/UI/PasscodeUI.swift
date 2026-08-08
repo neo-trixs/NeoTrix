@@ -250,9 +250,6 @@ struct NumberButton: View {
 public struct PasscodeSettingsView: View {
     @StateObject private var manager = PasscodeManager()
     @State private var showSetup = false
-    @State private var newPasscode = ""
-    @State private var confirmPasscode = ""
-    @State private var setupStep = 0
     
     public var body: some View {
         List {

@@ -159,6 +159,9 @@ public struct SettingsView: View {
                 }
             }
             .navigationTitle("Me")
+            .navigationDestination(isPresented: $showProfile) {
+                ProfileView(viewModel: viewModel)
+            }
             .navigationDestination(isPresented: $showFilters) {
                 FilterSettingsView()
             }
@@ -261,5 +264,140 @@ struct SettingsRow: View {
         }
         .buttonStyle(.plain)
         .disabled(item.isDisabled)
+    }
+}
+
+// MARK: - Profile 页（对标 Telegram: 头像 + 姓名/号码编辑 + About + 共享媒体入口）
+
+struct ProfileView: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @State private var about = ""
+    @State private var isEditingAbout = false
+    
+    var body: some View {
+        List {
+            // 头部: 大号头像 + 姓名 + 号码
+            Section {
+                HStack(spacing: 16) {
+                    NeoTrixAvatar(title: viewModel.username, size: 72)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(viewModel.username)
+                            .font(.title2.bold())
+                            .foregroundColor(.primary)
+                        Text(viewModel.phoneNumber)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        if !about.isEmpty {
+                            Text(about)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Button {
+                        // 头像编辑（对标 Telegram: 拍照/选图/删除照片）
+                        #if os(iOS)
+                        let name = viewModel.username
+                        #endif
+                        print("Edit avatar: \(viewModel.username)")
+                    } label: {
+                        Image(systemName: "camera.fill")
+                            .font(.subheadline)
+                            .foregroundColor(NeoTrixTheme.Colors.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 8)
+            }
+            
+            // About（对标 Telegram: 编辑简介）
+            Section("Info") {
+                Button {
+                    isEditingAbout = true
+                } label: {
+                    HStack {
+                        Text("About")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Text(about.isEmpty ? "Add bio" : about)
+                            .foregroundColor(about.isEmpty ? .secondary : .primary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // 共享媒体/链接（对标 Telegram: Shared Media / Shared Links）
+            Section {
+                HStack {
+                    Label("Shared Media", systemImage: "photo.on.rectangle")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    disabledBadge
+                }
+                HStack {
+                    Label("Shared Links", systemImage: "link")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    disabledBadge
+                }
+            }
+            
+            // 操作（对标 Telegram: 通知/通话/星标）
+            Section {
+                HStack {
+                    Label("Notifications", systemImage: "bell")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    disabledBadge
+                }
+                HStack {
+                    Label("Start Secret Chat", systemImage: "lock.fill")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    disabledBadge
+                }
+            }
+        }
+        .navigationTitle("Profile")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        #if os(iOS)
+        .alert("Edit About", isPresented: $isEditingAbout) {
+            TextField("About", text: $about)
+            Button("Save") {}
+            Button("Cancel", role: .cancel) {}
+        }
+        #else
+        .sheet(isPresented: $isEditingAbout) {
+            VStack(spacing: 16) {
+                Text("Edit About")
+                    .font(.headline)
+                TextField("About", text: $about)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal)
+                Button("Save") { isEditingAbout = false }
+                    .buttonStyle(.borderedProminent)
+            }
+            .padding()
+            .frame(width: 300)
+        }
+        #endif
+    }
+    
+    /// 禁用态徽标（对标 Telegram: 未实现项置灰 + "Soon"）
+    private var disabledBadge: some View {
+        Text("Soon")
+            .font(.caption2)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(NeoTrixTheme.Colors.surface)
+            .foregroundColor(.secondary)
+            .clipShape(Capsule())
     }
 }

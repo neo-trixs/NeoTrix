@@ -138,13 +138,16 @@ public struct StoryRing: View {
 public struct StoryViewerView: View {
     @Environment(\.dismiss) private var dismiss
     let stories: [StoryItem]
+    /// 故事已读回调（对标 Telegram: 浏览即标记已读）
+    var onSeen: ((Int64) -> Void)?
     @State private var currentIndex = 0
     @State private var progress: CGFloat = 0
     @State private var timer: Timer?
     @State private var isPaused = false
     
-    public init(stories: [StoryItem]) {
+    public init(stories: [StoryItem], onSeen: ((Int64) -> Void)? = nil) {
         self.stories = stories
+        self.onSeen = onSeen
     }
     
     public var body: some View {
@@ -230,14 +233,28 @@ public struct StoryViewerView: View {
             }
         }
         .onAppear {
+            markCurrentAsSeen()
             startTimer()
         }
         .onDisappear {
             timer?.invalidate()
         }
         .onChange(of: currentIndex) { _, _ in
+            markCurrentAsSeen()
             startTimer()
         }
+        // 长按暂停（对标 Telegram: 按住故事暂停进度）
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.3)
+                .onChanged { _ in isPaused = true }
+                .onEnded { _ in isPaused = false }
+        )
+    }
+    
+    /// 标记当前故事已读（对标 Telegram: 浏览即已读）
+    private func markCurrentAsSeen() {
+        guard !stories.isEmpty, currentIndex < stories.count else { return }
+        onSeen?(stories[currentIndex].id)
     }
     
     private func startTimer() {

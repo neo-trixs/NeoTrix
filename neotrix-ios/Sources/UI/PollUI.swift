@@ -168,7 +168,7 @@ public struct PollView: View {
             ForEach(viewModel.polls) { poll in
                 PollCard(poll: poll, onVote: { optionId in
                     viewModel.vote(poll.id, optionId: optionId)
-                }, onClose: { text in
+                }, onSuggest: { text in
                     viewModel.suggestOption(poll.id, text: text)
                 })
             }
@@ -207,7 +207,7 @@ public struct PollView: View {
 struct PollCard: View {
     let poll: Poll
     let onVote: (UUID) -> Void
-    let onClose: (String) -> Void
+    let onSuggest: (String) -> Void
     
     @State private var suggestionText = ""
     @State private var showSuggestionField = false
@@ -292,7 +292,7 @@ struct PollCard: View {
                             let text = suggestionText
                             suggestionText = ""
                             showSuggestionField = false
-                            onClose(text)
+                            onSuggest(text)
                         }
                         .disabled(suggestionText.trimmingCharacters(in: .whitespaces).isEmpty)
                     }

@@ -94,9 +94,6 @@ public struct AIEditorPanel: View {
     @Binding var text: String
     let onApply: (String) -> Void
     
-    @State private var showActions = false
-    @State private var isTranslating = false
-    
     public init(text: Binding<String>, onApply: @escaping (String) -> Void) {
         self._text = text
         self.onApply = onApply

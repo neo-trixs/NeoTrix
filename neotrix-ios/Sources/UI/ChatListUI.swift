@@ -180,9 +180,12 @@ public struct ChatListView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Stories 环（融合: 顶部故事 + AI 助手入口）
-                StoriesBar(stories: storyViewModel.stories, onAI: { showAI = true }) { caption, isCloseFriends in
-                    storyViewModel.publishStory(caption: caption, isCloseFriends: isCloseFriends)
-                }
+                StoriesBar(stories: storyViewModel.stories,
+                           onAI: { showAI = true },
+                           onPublish: { caption, isCloseFriends in
+                               storyViewModel.publishStory(caption: caption, isCloseFriends: isCloseFriends)
+                           },
+                           onSeen: { id in storyViewModel.markAsSeen(id) })
                 
                 // Filter bar
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -491,13 +494,18 @@ public struct StoriesBar: View {
     let stories: [StoryItem]
     let onAI: () -> Void
     let onPublish: (String, Bool) -> Void
+    let onSeen: (Int64) -> Void
     @State private var showViewer = false
     @State private var showComposer = false
     
-    public init(stories: [StoryItem], onAI: @escaping () -> Void, onPublish: @escaping (String, Bool) -> Void = { _, _ in }) {
+    public init(stories: [StoryItem],
+                onAI: @escaping () -> Void,
+                onPublish: @escaping (String, Bool) -> Void = { _, _ in },
+                onSeen: @escaping (Int64) -> Void = { _ in }) {
         self.stories = stories
         self.onAI = onAI
         self.onPublish = onPublish
+        self.onSeen = onSeen
     }
     
     public var body: some View {
@@ -554,11 +562,11 @@ public struct StoriesBar: View {
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showViewer) {
-            StoryViewerView(stories: stories)
+            StoryViewerView(stories: stories, onSeen: onSeen)
         }
         #else
         .sheet(isPresented: $showViewer) {
-            StoryViewerView(stories: stories)
+            StoryViewerView(stories: stories, onSeen: onSeen)
         }
         #endif
         .sheet(isPresented: $showComposer) {
