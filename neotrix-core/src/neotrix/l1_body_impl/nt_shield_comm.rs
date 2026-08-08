@@ -289,10 +289,10 @@ pub fn language_for_region(region: &str) -> String {
 pub fn strip_internal(value: &str) -> String {
     let mut v = value.to_string();
     // "nt_" 独立成词才替换 (词边界, 避免命中 "client_" 尾部), 先于 "neotrix"
-    let nt_re = regex::Regex::new(r"(?i)\bnt_").unwrap();
+    let nt_re = regex::Regex::new(r"(?i)\bnt_").expect("static literal regex");
     v = nt_re.replace_all(&v, "sys_").into_owned();
     // case-insensitive neotrix → client, 保留输入大小写
-    let neotrix_re = regex::Regex::new(r"(?i)neotrix").unwrap();
+    let neotrix_re = regex::Regex::new(r"(?i)neotrix").expect("static literal regex");
     v = neotrix_re
         .replace_all(&v, |caps: &regex::Captures| {
             if caps[0].chars().all(|c| c.is_uppercase()) {
@@ -304,10 +304,10 @@ pub fn strip_internal(value: &str) -> String {
         .into_owned();
     v = v.replace("NEOTRIX_", "CLIENT_").replace("x-neotrix-", "x-client-").replace("x-nt-", "x-client-");
     // UUID-like → zeros
-    let uuid_re = regex::Regex::new(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b").unwrap();
+    let uuid_re = regex::Regex::new(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b").expect("static literal regex");
     v = uuid_re.replace_all(&v, "00000000-0000-0000-0000-000000000000").into_owned();
     // /Users/<name>/ → /home/user/
-    let path_re = regex::Regex::new(r"/Users/[^/]+/").unwrap();
+    let path_re = regex::Regex::new(r"/Users/[^/]+/").expect("static literal regex");
     v = path_re.replace_all(&v, "/home/user/").into_owned();
     v
 }

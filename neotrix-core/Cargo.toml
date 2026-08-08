@@ -9,9 +9,16 @@ description.workspace = true
 
 [lib]
 name = "neotrix"
+# cdylib enables uniffi-bindgen --library mode for iOS/Android binding generation
+crate-type = ["rlib", "cdylib"]
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["ios-bridge"]
 
 [[bin]]
 name = "neotrix"
@@ -136,6 +143,7 @@ serde_yaml = "0.9"
 zip = { version = "2", optional = true }
 quick-xml = { version = "0.41", optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+tiktoken-rs = "0.12.0"
 
 [dev-dependencies]
 tempfile = "3"

@@ -112,8 +112,12 @@ fn fetch_safe_http_inner(
     if !extra_headers.is_empty() {
         let mut h = reqwest::header::HeaderMap::new();
         for (k, v) in extra_headers {
-            let header_name = k.parse::<reqwest::header::HeaderName>().unwrap();
-            let header_value = v.parse::<reqwest::header::HeaderValue>().unwrap();
+            let header_name = k
+                .parse::<reqwest::header::HeaderName>()
+                .map_err(|e| format!("invalid header name {k:?}: {e}"))?;
+            let header_value = v
+                .parse::<reqwest::header::HeaderValue>()
+                .map_err(|e| format!("invalid header value for {k:?}: {e}"))?;
             h.insert(header_name, header_value);
         }
         builder = builder.default_headers(h);

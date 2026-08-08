@@ -344,6 +344,14 @@ impl GatewayV2 {
             .map(|(name, _)| name.clone())
     }
 
+    /// 解析默认模型名（用于交互模式初始化）。
+    /// 优先返回可用的免费 provider，其次任意可用 provider。
+    pub async fn resolve_default_model(&self) -> String {
+        self.select_best_for_profile(CommunicationProfile::Open)
+            .await
+            .unwrap_or_else(|| "default".to_string())
+    }
+
     /// 完整请求路由入口 — 通过满足安全画像的子网格完成一次 LLM 调用。
     /// 子母阵动态增幅的公共消费点 (R-P79 接线): 调用方声明所需安全级别，
     /// 网关自动从匹配子网格中选择 provider 并执行 complete()。

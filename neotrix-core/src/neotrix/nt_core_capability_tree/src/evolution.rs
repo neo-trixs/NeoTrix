@@ -289,8 +289,10 @@ impl<'a> EvolutionEngine<'a> {
                     });
                 for ((domain, layer), group) in by_domain_layer {
                     if group.len() > 1 && layer <= NodeLayer::L2Orchestrator {
-                        // 选择 constellation 最高的作为目标
-                        let target = group.iter().max_by_key(|n| n.constellation as u8).unwrap();
+                        // 选择 constellation 最高的作为目标（group.len()>1 保证非空）。
+                        let target = group.iter()
+                            .max_by_key(|n| n.constellation as u8)
+                            .expect("group.len() > 1 guarded above");
                         let folded: Vec<String> = group.iter()
                             .filter(|n| n.id != target.id)
                             .map(|n| n.id.clone())

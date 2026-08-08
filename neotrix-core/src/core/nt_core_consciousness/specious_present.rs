@@ -117,6 +117,48 @@ impl SpeciousPresent {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for SpeciousPresent {
+    fn name(&self) -> &str {
+        "SpeciousPresent"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        // 不变量 1: 窗口大小被 clamp 到 [MIN, MAX]。
+        if !(MIN_WINDOW_SIZE..=MAX_WINDOW_SIZE).contains(&self.window_size) {
+            failures.push(format!(
+                "window_size {} out of range [{MIN_WINDOW_SIZE}, {MAX_WINDOW_SIZE}]",
+                self.window_size
+            ));
+        }
+        // 不变量 2: 窗口长度不超过 window_size。
+        if self.window.len() > self.window_size {
+            failures.push(format!(
+                "window len {} exceeds window_size {}",
+                self.window.len(),
+                self.window_size
+            ));
+        }
+        // 不变量 3: coherence_trace 长度不超过 window_size-1 (N 项窗口最多 N-1 对)。
+        if self.coherence_trace.len() > self.window_size.saturating_sub(1) {
+            failures.push(format!(
+                "coherence_trace len {} exceeds window_size-1 {}",
+                self.coherence_trace.len(),
+                self.window_size.saturating_sub(1)
+            ));
+        }
+        // 不变量 4: 空窗口时 temporal_integral 返回 None (不 panic)。
+        if self.window.is_empty() && self.temporal_integral().is_some() {
+            failures.push("empty window must yield None temporal_integral".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

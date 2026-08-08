@@ -273,6 +273,7 @@ fn main() {
                       commands::neocodex_regenerate,
                       commands::neocodex_compact_session,
                       commands::neocodex_search_files,
+                      commands::neocodex_project_tree,
                       commands::neocodex_stop_stream,
                       commands::neocodex_archive_session,
                       commands::neocodex_restore_session,

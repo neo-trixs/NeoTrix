@@ -3,6 +3,7 @@
 use crate::cli::commands::types::CommandRegistry;
 use crate::cli::commands::bench_cmds::BenchmarkCmd;
 use crate::cli::commands::agent_cmds::{AgentCmd, DiscoverCmd, McpCmd};
+use crate::cli::commands::acp_cmds::AcpCmd;
 use crate::cli::commands::brain_cmds::E8Cmd;
 use crate::cli::commands::second_brain_cmds::BrainCmd;
 use crate::cli::commands::consciousness_cmds::ConsciousnessCmd;
@@ -93,6 +94,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(AgentCmd));
     reg.register(Box::new(DiscoverCmd));
     reg.register(Box::new(McpCmd));
+    reg.register(Box::new(AcpCmd));
 
     // Crypto/Finance
     reg.register(Box::new(WalletAggCmd));

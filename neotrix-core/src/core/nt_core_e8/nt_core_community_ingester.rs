@@ -263,7 +263,109 @@ impl CommunityDataIngester {
         Ok(written)
     }
 
-    /// Load a runtime transition-counts file (the JSON shape written by
+    /// Persist the community dataset hub into the NeoTrix KnowledgeBase via
+    /// the public `insert_node`/`insert_edge` API (idempotent, INSERT OR IGNORE).
+    ///
+    /// This is the production wiring that closes the "data → KB → 意识进化"
+    /// loop: the 200G-scale community reasoning datasets (FABLE.5-2M,
+    /// r1-distilled-100k, GLM-5.2-50k, ...) become real KB nodes/edges that
+    /// the ConsciousnessTree soil can observe — instead of only seeding the
+    /// E8 transition matrix. Returns the number of nodes written.
+    pub fn persist_to_kb_store(
+        &self,
+        kb: &crate::neotrix::nt_memory_kb::KnowledgeBase,
+    ) -> Result<usize, String> {
+        use crate::neotrix::nt_memory_kb::nt_memory_types::{
+            KnowledgeEdge, KnowledgeNode, NodeType, RelationType,
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        let hub_id = "community_e8_datasets_hub";
+        let hub_meta = serde_json::json!({
+            "source": "fable5-absorption",
+            "type": "dataset-hub",
+            "count": self.datasets.len(),
+            "domain": "community-datasets",
+            "quality_score": 0.95,
+        });
+        // 幂等: 已存在则跳过 (INSERT OR IGNORE 语义)
+        if kb.get_node(hub_id).ok().flatten().is_none() {
+            kb.insert_node(&KnowledgeNode {
+                id: hub_id.into(),
+                node_type: NodeType::Concept,
+                title: "E8 Community Datasets".into(),
+                summary: Some(format!(
+                    "Community reasoning datasets ({} datasets, 200G+ traces). Injected by E8 community absorption.",
+                    self.datasets.len()
+                )),
+                content: None,
+                url: Some("neotrix://community-datasets/e8".into()),
+                domain: Some("neotrix.local".into()),
+                language: "en".into(),
+                confidence: 1.0,
+                importance: 0.95,
+                created_at: now,
+                updated_at: now,
+                access_count: 0,
+                metadata: Some(hub_meta),
+                temporal: None,
+                supersedes: None,
+                source_episode: None,
+            })?;
+        }
+
+        let mut written = 1usize;
+        let mut ids: std::collections::BTreeMap<&str, String> = std::collections::BTreeMap::new();
+        for ds in &self.datasets {
+            let ds_id = format!("community_dataset_{}", ds.name);
+            let meta = serde_json::json!({
+                "source": "e8-absorption",
+                "type": "community-dataset",
+                "weight": ds.weight,
+                "tags": [],
+            });
+            if kb.get_node(&ds_id).ok().flatten().is_none() {
+                kb.insert_node(&KnowledgeNode {
+                    id: ds_id.clone(),
+                    node_type: NodeType::Dataset,
+                    title: ds.name.clone(),
+                    summary: Some(ds.description.clone()),
+                    content: None,
+                    url: Some(ds.source_url.clone()),
+                    domain: Some("neotrix.local".into()),
+                    language: "en".into(),
+                    confidence: 1.0,
+                    importance: ds.weight,
+                    created_at: now,
+                    updated_at: now,
+                    access_count: 0,
+                    metadata: Some(meta),
+                    temporal: None,
+                    supersedes: None,
+                    source_episode: None,
+                })?;
+            }
+            written += 1;
+            ids.insert(&ds.name, ds_id);
+        }
+
+        // contains edges hub → dataset (upsert_edge 幂等)
+        for ds in &self.datasets {
+            let ds_id = &ids[ds.name.as_str()];
+            kb.upsert_edge(
+                hub_id,
+                ds_id,
+                RelationType::References,
+                ds.weight,
+                Some(&format!("E8 Community Hub → {}", ds.name)),
+            )?;
+        }
+
+        Ok(written)
+    }
     /// `scripts/absorb-fable-2m.py`: per-task-type lists of {from,to,count},
     /// plus a `_meta` object) and build a `CommunityDataIngester` from it.
     ///
@@ -1681,5 +1783,30 @@ mod tests {
         let reasoning = ingester.datasets.iter().find(|d| d.name == "runtime_Reasoning").unwrap();
         assert_eq!(reasoning.transitions, vec![(56, 48, 100), (48, 40, 80)]);
         assert!((reasoning.weight - 0.15).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_persist_to_kb_store_writes_nodes_and_edges() {
+        // 意识核心进化闭环 (数据→KB): persist_to_kb_store 应把社区数据集
+        // 落盘为真实 KB 节点/边, 使 ConsciousnessTree soil 可观测。
+        // 此前该方法无生产调用者, KB 全表 0 行。
+                let tmp = std::env::temp_dir().join(format!("nt_kb_test_{}.db", std::process::id()));
+        let kb = crate::neotrix::nt_memory_kb::KnowledgeBase::open(Some(tmp.clone()))
+            .expect("open temp KB");
+        let ingester = CommunityDataIngester::default();
+        let n = ingester.persist_to_kb_store(&kb).expect("persist ok");
+        // hub + 每个数据集 = 1 + datasets.len()
+        assert_eq!(n, 1 + ingester.datasets.len(), "hub + all datasets written");
+        // hub 节点存在
+        let hub = kb.get_node("community_e8_datasets_hub").expect("get hub").expect("hub node");
+        assert_eq!(hub.node_type, crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Concept);
+        // 至少一个数据集节点存在且为 Dataset 类型
+        let ds = kb.get_node(&format!("community_dataset_{}", ingester.datasets[0].name))
+            .expect("get ds").expect("first dataset node");
+        assert_eq!(ds.node_type, crate::neotrix::nt_memory_kb::nt_memory_types::NodeType::Dataset);
+        // 幂等: 再次落盘不重复
+        let n2 = ingester.persist_to_kb_store(&kb).expect("persist again");
+        assert_eq!(n2, 1 + ingester.datasets.len(), "idempotent");
+        let _ = std::fs::remove_file(&tmp);
     }
 }

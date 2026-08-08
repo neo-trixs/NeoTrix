@@ -28,6 +28,9 @@ use super::secret_scanner::SecretScanner;
 use super::openspace_evolution::OpenSpaceEvolveStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::safety_stage::SafetyCheckStage;
+use super::sft_stage::{SftStage, SupervisedExample};
+use super::process_stage::{ProcessStage, ProcessExample, ReasoningTrace, ReasoningStep, TraceSource};
+use super::search_skill_stage::{SearchSkillStage, SearchExercise, SearchResult, Evidence, SearchTaskType};
 use super::hypercore::SafetyCheckResult;
 use super::hyperstage::{MetaEvolveStage, DGMMetaEvolveStage};
 use super::hyperarchive::{HyperAgentArchive, SelectionConfig};
@@ -150,6 +153,9 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(CheckpointStage::new()),
             Box::new(RecipeStage::new(Box::new(RewardCalculationStage::new())).with_frequency(3)),
             Box::new(ConsciousnessRewardStage::new()),
+            Box::new(SftWrapperStage::new()),
+            Box::new(ProcessWrapperStage::new()),
+            Box::new(SearchSkillWrapperStage::new()),
             Box::new(DpoWrapperStage::new()),
             Box::new(ConstitutionalWrapperStage::new()),
             Box::new(SafetyWrapperStage::new()),
@@ -804,6 +810,143 @@ impl BrainStage for OpenSourceCompareStage {
         }
         log::trace!("[open_source_compare] insights_present={} edits={}",
             brain._open_source_insights.is_some(), brain._open_source_edits.len());
+        Ok(StageDecision::Continue)
+    }
+}
+
+/// Wraps SftStage ::process() as a BrainStage.
+/// 监督微调：将能力增量作为监督信号，把当前最优 E8 模式推向目标质量。
+pub struct SftWrapperStage;
+impl Default for SftWrapperStage { fn default() -> Self { Self } }
+impl SftWrapperStage { pub fn new() -> Self { Self } }
+impl BrainStage for SftWrapperStage {
+    fn name(&self) -> &str { "sft_supervision" }
+    fn frequency(&self) -> usize { 1 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let deltas = compute_capability_deltas(brain);
+        let current_mode = brain._e8_policy.best_mode();
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs()).unwrap_or(0);
+        let examples: Vec<SupervisedExample> = deltas.iter()
+            .filter(|(_, d)| d.abs() > 0.01)
+            .map(|(name, delta)| SupervisedExample::new(
+                name,
+                current_mode.0,
+                delta.abs().clamp(0.0, 1.0),
+            ).with_timestamp(timestamp))
+            .collect();
+        let (_result, adjusted_reward) = brain._sft_stage.process(examples.clone(), brain._reward);
+        brain._set_reward(adjusted_reward);
+        log::trace!("[sft_supervision] reward={:.4} examples={} updates={}",
+            adjusted_reward, examples.len(), brain._sft_stage.total_updates);
+        Ok(StageDecision::Continue)
+    }
+}
+
+/// Wraps ProcessStage ::process() as a BrainStage.
+/// 过程知识习得：从工具调用轨迹构造推理链，监督"如何推理/分解/验证"。
+pub struct ProcessWrapperStage;
+impl Default for ProcessWrapperStage { fn default() -> Self { Self } }
+impl ProcessWrapperStage { pub fn new() -> Self { Self } }
+impl BrainStage for ProcessWrapperStage {
+    fn name(&self) -> &str { "process_supervision" }
+    fn frequency(&self) -> usize { 2 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task();
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs()).unwrap_or(0);
+        // 从工具调用轨迹构造推理链步骤
+        let steps: Vec<ReasoningStep> = brain.tool_traces.iter().enumerate().map(|(i, (tool, dur, ok))| {
+            ReasoningStep {
+                step_idx: i,
+                specialist: "Tool".to_string(),
+                e8_mode: 0,
+                action: tool.clone(),
+                input: String::new(),
+                output: if *ok { "ok".to_string() } else { "error".to_string() },
+                duration_ms: Some(*dur),
+                success: *ok,
+                reward: Some(if *ok { 1.0 } else { 0.0 }),
+            }
+        }).collect();
+        let examples: Vec<ProcessExample> = if steps.is_empty() {
+            Vec::new()
+        } else {
+            let trace = ReasoningTrace {
+                trace_id: format!("iter-{}", brain.iteration),
+                task,
+                steps,
+                completed: true,
+                final_quality: brain._reward.clamp(0.0, 1.0),
+                source: TraceSource::Synthesis,
+                timestamp,
+            };
+            vec![ProcessExample { trace, weight: 1.0 }]
+        };
+        // B5 (缺陷4修复): 消费意识树果实 → 转换为 ReasoningTrace 并入 process 样本。
+        // 此前 extract_from_consciousness_tree (process_stage.rs:130) 无生产调用者,
+        // 意识树产出的进化果实从不进入 SEAL 过程学习。果实轨迹以 quality 加权,
+        // 使高质量进化果实优先塑造 reasoning_depth/cot_quality 等能力维度。
+        let mut examples = examples;
+        let fruit_traces = ProcessStage::extract_from_consciousness_tree(&brain._consciousness_fruits);
+        for ft in fruit_traces {
+            let w = ft.final_quality.max(0.1);
+            examples.push(ProcessExample { trace: ft, weight: w });
+        }
+        let (_result, loss) = brain._process_stage.process(examples);
+        log::trace!("[process_supervision] loss={:.4} traces={}",
+            loss, brain._process_stage.buffer.len());
+        Ok(StageDecision::Continue)
+    }
+}
+
+/// Wraps SearchSkillStage ::process() as a BrainStage.
+/// 搜索技能内化：从当前任务构造搜索演练，学习 query/evidence/synthesis 子技能。
+pub struct SearchSkillWrapperStage;
+impl Default for SearchSkillWrapperStage { fn default() -> Self { Self } }
+impl SearchSkillWrapperStage { pub fn new() -> Self { Self } }
+impl BrainStage for SearchSkillWrapperStage {
+    fn name(&self) -> &str { "search_skill_supervision" }
+    fn frequency(&self) -> usize { 3 }
+    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
+        let task = brain._current_task.clone();
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs()).unwrap_or(0);
+        let exercises: Vec<SearchExercise> = if task.is_empty() {
+            Vec::new()
+        } else {
+            let grounding = brain._reward.clamp(0.0, 1.0);
+            vec![SearchExercise {
+                exercise_id: format!("search-{}", brain.iteration),
+                task_type: SearchTaskType::TechnicalQuery,
+                query: task.clone(),
+                raw_results: vec![SearchResult {
+                    url: "local://task".to_string(),
+                    title: task.clone(),
+                    snippet: String::new(),
+                    source_type: "doc".to_string(),
+                    credibility: grounding,
+                }],
+                filtered_evidence: vec![Evidence {
+                    source_url: "local://task".to_string(),
+                    claim: task.clone(),
+                    confidence: grounding,
+                    supports_answer: true,
+                }],
+                synthesized_answer: task.clone(),
+                grounding_score: grounding,
+                relevance_score: grounding,
+                synthesis_quality: grounding,
+                latency_ms: 0,
+                timestamp,
+            }]
+        };
+        let (_result, loss) = brain._search_skill_stage.process(exercises.clone());
+        log::info!("[search_skill_supervision] loss={:.4} exercises={} updates={}",
+            loss, exercises.len(), brain._search_skill_stage.total_updates);
         Ok(StageDecision::Continue)
     }
 }
@@ -1882,5 +2025,45 @@ mod tests {
         let task_type = crate::neotrix::nt_world_model::TaskType::General;
         let snapshot = BrainSnapshot::new(&brain, &task_type);
         assert!(snapshot.learning_rate >= 0.0);
+    }
+
+    #[test]
+    fn test_process_wrapper_consumes_consciousness_fruits() {
+        // B5 (缺陷4修复) 验证: ProcessWrapperStage 应消费意识树果实,
+        // 使 extract_from_consciousness_tree 的果实 trace 进入 process buffer。
+        // 此前果实从不被 SEAL 消费 (extract_from_consciousness_tree 无生产调用者)。
+        let mut brain = crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::loop_impl::core::SelfIteratingBrain::new();
+        // 注入一个意识树果实 (quality 0.9)
+        let fruit = crate::core::nt_core_consciousness_tree::EvolutionFruit {
+            name: "NT-CORE-evo-fruit-1".into(),
+            source_branch: crate::core::nt_core_consciousness_tree::BranchKind::Core,
+            description: "Evolution capability from NT-CORE".into(),
+            produced_at_cycle: 1,
+            quality: 0.9,
+            claim: "Branch Core produces capability at maturity 0.9".into(),
+            evidence: crate::core::nt_core_consciousness_tree::EvidenceChain {
+                run_id: Some("fruit-run-1".into()),
+                ..crate::core::nt_core_consciousness_tree::EvidenceChain::default()
+            },
+            stop_rule: crate::core::nt_core_consciousness_tree::StopRule::default(),
+            benchmark: crate::core::nt_core_consciousness_tree::ProviderBenchmark::default(),
+            generation: 0,
+        };
+        brain._consciousness_fruits = vec![fruit];
+        // 给 tool_traces 一个步骤, 使 process 有基础样本
+        brain.tool_traces.push(("search".into(), 10, true));
+
+        let stage = ProcessWrapperStage::new();
+        let decision = stage.process(&mut brain).expect("process ok");
+        match decision {
+            StageDecision::Continue => {}
+            other => panic!("expected Continue, got {:?}", other),
+        }
+        // 果实 trace 应进入 process buffer (至少 1 条来自 ConsciousnessTree)
+        assert!(
+            brain._process_stage.buffer.traces.iter().any(|t| t.source == TraceSource::ConsciousnessTree),
+            "consciousness fruit trace consumed by SEAL process: {:?}",
+            brain._process_stage.buffer.traces.iter().map(|t| t.source.clone()).collect::<Vec<_>>()
+        );
     }
 }

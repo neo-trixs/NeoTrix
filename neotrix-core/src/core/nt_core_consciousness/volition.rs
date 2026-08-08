@@ -135,6 +135,42 @@ impl VolitionEngine {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for VolitionEngine {
+    fn name(&self) -> &str {
+        "VolitionEngine"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        // 不变量 1: 候选数不超过 MAX_CANDIDATES 上限。
+        if self.candidates.len() > MAX_CANDIDATES {
+            failures.push(format!(
+                "candidate count {} exceeds MAX_CANDIDATES {MAX_CANDIDATES}",
+                self.candidates.len()
+            ));
+        }
+        // 不变量 2: 每个候选 confidence 已 clamp 到 [0, 1]。
+        for c in &self.candidates {
+            if !(0.0..=1.0).contains(&c.confidence) {
+                failures.push(format!(
+                    "candidate {:?} confidence {} out of [0,1]",
+                    c.description, c.confidence
+                ));
+            }
+        }
+        // 不变量 3: 空引擎时 select_best 返回 None (不 panic)。
+        // 只读验证: 空候选时 select_best 的守卫分支 (is_empty → None) 成立。
+        if self.candidates.is_empty() && !self.is_empty() {
+            failures.push("empty candidates must imply is_empty()".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

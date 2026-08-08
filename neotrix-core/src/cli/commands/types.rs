@@ -123,7 +123,7 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::Session,
         "e8"
             => CommandCategory::System,
-        "agent" | "agents" | "agent-all" | "agents-all" | "discover" | "mcp"
+        "agent" | "agents" | "agent-all" | "agents-all" | "discover" | "mcp" | "acp"
             => CommandCategory::Agent,
         "wallet" | "swap" | "approve" | "transfer" | "cost" | "budget" | "crypto" | "finance"
             => CommandCategory::Crypto,

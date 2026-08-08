@@ -176,7 +176,10 @@ impl CapabilityRegistry {
         self.dag.add_edge(from_idx, to_idx, ());
         
         if petgraph::algo::is_cyclic_directed(&self.dag) {
-            self.dag.remove_edge(self.dag.find_edge(from_idx, to_idx).unwrap());
+            // 回滚刚加的边；边必然存在（add_edge 刚成功），但防御性处理避免 panic。
+            if let Some(edge) = self.dag.find_edge(from_idx, to_idx) {
+                self.dag.remove_edge(edge);
+            }
             return Err(RegistryError::CircularDependency(from.into(), to.into()));
         }
 

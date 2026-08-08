@@ -352,7 +352,7 @@
       "id": "exp::nt-core::architecture_decision",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "architecture_decision"
       ],
@@ -375,11 +375,19 @@
           "to_node": "exp::nt-core::architecture_decision",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112208Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::architecture_decision",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562330Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192057Z",
-      "updated_at": "2026-08-07T04:42:01.112210Z",
+      "updated_at": "2026-08-07T06:35:08.562331Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -387,7 +395,7 @@
       "id": "exp::nt-core::performance_concurrency",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "performance_concurrency"
       ],
@@ -410,11 +418,19 @@
           "to_node": "exp::nt-core::performance_concurrency",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112213Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::performance_concurrency",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562334Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192075Z",
-      "updated_at": "2026-08-07T04:42:01.112213Z",
+      "updated_at": "2026-08-07T06:35:08.562334Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -422,7 +438,7 @@
       "id": "exp::nt-core::e8_reasoning",
       "domain": "core",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "e8_reasoning"
       ],
@@ -445,11 +461,19 @@
           "to_node": "exp::nt-core::e8_reasoning",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112216Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-core::e8_reasoning",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562335Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192084Z",
-      "updated_at": "2026-08-07T04:42:01.112216Z",
+      "updated_at": "2026-08-07T06:35:08.562335Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -457,7 +481,7 @@
       "id": "exp::nt-repair::root_cause_method",
       "domain": "repair",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "root_cause_method"
       ],
@@ -480,11 +504,19 @@
           "to_node": "exp::nt-repair::root_cause_method",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112217Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::root_cause_method",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562337Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192103Z",
-      "updated_at": "2026-08-07T04:42:01.112218Z",
+      "updated_at": "2026-08-07T06:35:08.562337Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -492,7 +524,7 @@
       "id": "exp::nt-repair::failure_recovery",
       "domain": "repair",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "failure_recovery"
       ],
@@ -515,11 +547,19 @@
           "to_node": "exp::nt-repair::failure_recovery",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112219Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::failure_recovery",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562338Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192127Z",
-      "updated_at": "2026-08-07T04:42:01.112219Z",
+      "updated_at": "2026-08-07T06:35:08.562338Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -527,7 +567,7 @@
       "id": "exp::nt-repair::build_hygiene",
       "domain": "repair",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "build_hygiene"
       ],
@@ -550,11 +590,19 @@
           "to_node": "exp::nt-repair::build_hygiene",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112221Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-repair::build_hygiene",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562339Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192140Z",
-      "updated_at": "2026-08-07T04:42:01.112221Z",
+      "updated_at": "2026-08-07T06:35:08.562339Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -562,7 +610,7 @@
       "id": "exp::nt-act::tool_routing",
       "domain": "act",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "tool_routing"
       ],
@@ -585,11 +633,19 @@
           "to_node": "exp::nt-act::tool_routing",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112222Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-act::tool_routing",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562341Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192148Z",
-      "updated_at": "2026-08-07T04:42:01.112223Z",
+      "updated_at": "2026-08-07T06:35:08.562341Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -597,7 +653,7 @@
       "id": "exp::nt-act::goal_decomposition",
       "domain": "act",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "goal_decomposition"
       ],
@@ -620,11 +676,19 @@
           "to_node": "exp::nt-act::goal_decomposition",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112224Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-act::goal_decomposition",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562342Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192157Z",
-      "updated_at": "2026-08-07T04:42:01.112224Z",
+      "updated_at": "2026-08-07T06:35:08.562342Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -632,7 +696,7 @@
       "id": "exp::nt-memory::hybrid_retrieval",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "hybrid_retrieval"
       ],
@@ -655,11 +719,19 @@
           "to_node": "exp::nt-memory::hybrid_retrieval",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112226Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::hybrid_retrieval",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562343Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192165Z",
-      "updated_at": "2026-08-07T04:42:01.112226Z",
+      "updated_at": "2026-08-07T06:35:08.562344Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -667,7 +739,7 @@
       "id": "exp::nt-memory::schema_migration",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "schema_migration"
       ],
@@ -690,11 +762,19 @@
           "to_node": "exp::nt-memory::schema_migration",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112227Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::schema_migration",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562345Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192188Z",
-      "updated_at": "2026-08-07T04:42:01.112227Z",
+      "updated_at": "2026-08-07T06:35:08.562345Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -702,7 +782,7 @@
       "id": "exp::nt-memory::vector_storage",
       "domain": "memory",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "vector_storage"
       ],
@@ -725,11 +805,19 @@
           "to_node": "exp::nt-memory::vector_storage",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112229Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-memory::vector_storage",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562346Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192214Z",
-      "updated_at": "2026-08-07T04:42:01.112229Z",
+      "updated_at": "2026-08-07T06:35:08.562346Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -737,7 +825,7 @@
       "id": "exp::nt-shield::security_governance",
       "domain": "shield",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "security_governance"
       ],
@@ -760,11 +848,19 @@
           "to_node": "exp::nt-shield::security_governance",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112230Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-shield::security_governance",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562347Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192224Z",
-      "updated_at": "2026-08-07T04:42:01.112231Z",
+      "updated_at": "2026-08-07T06:35:08.562347Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -772,7 +868,7 @@
       "id": "exp::nt-meta::meta_cognition",
       "domain": "meta",
       "layer": "l0primitive",
-      "constellation": "c1unittest",
+      "constellation": "c2integrationtest",
       "provides": [
         "meta_cognition"
       ],
@@ -795,11 +891,19 @@
           "to_node": "exp::nt-meta::meta_cognition",
           "note": "Promoted to C1",
           "timestamp": "2026-08-07T04:42:01.112232Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "exp::nt-meta::meta_cognition",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-07T06:35:08.562349Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-07T04:41:56.192234Z",
-      "updated_at": "2026-08-07T04:42:01.112232Z",
+      "updated_at": "2026-08-07T06:35:08.562349Z",
       "deprecated": false,
       "deprecated_reason": null
     }
@@ -814,5 +918,22 @@
       "nt_http::fetch_safe_http"
     ]
   ],
-  "experience_targets": []
+  "experience_targets": [
+    {
+      "action": "awakening_note",
+      "capability": "consciousness::consciousness_tree",
+      "domain": "NT-META",
+      "promoted_at": 1786084571,
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 2 条经验的模式: [蒸馏-NT-META] 聚合 2 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76
+    },
+    {
+      "action": "awakening_note",
+      "capability": "consciousness::meta_cognition",
+      "domain": "NT-META",
+      "promoted_at": 1786084571,
+      "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: [蒸馏-NT-CORE] 聚合 3 条经验的模式: smol-course SFT 核心教训：1) 数据质量 > 数据数量（1000 高质量 > 10000 平庸）；2) SFT 只重塑行",
+      "signal": 0.76
+    }
+  ]
 }

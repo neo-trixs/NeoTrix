@@ -57,6 +57,10 @@ pub use recursive_depth_reward::{RecursiveDepthReward, DepthRewardReport};
 pub mod dpo_stage;
 pub mod constitutional_stage;
 pub mod safety_stage;
+// SFT/Process/SearchSkill stages (smol-course 吸收: SFT→DPO 顺序, CoT 过程监督, 搜索技能内化)
+pub mod sft_stage;
+pub mod process_stage;
+pub mod search_skill_stage;
 
 pub mod dp_sgd_stage;
 pub mod creusot_proof_gate;

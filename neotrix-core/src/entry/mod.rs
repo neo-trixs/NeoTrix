@@ -1741,7 +1741,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
         });
         // 整体链路链接: 未显式指定模型时, 从池子实际注册名解析默认 (而非硬编码 provider)。
         let default_model = if default_model.is_empty() || default_model == "default" {
-            gateway.resolve_default_model()
+            gateway.resolve_default_model().await
         } else {
             default_model
         };

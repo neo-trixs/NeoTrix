@@ -746,6 +746,15 @@ impl SelfIteratingBrain {
             crate::core::nt_core_e8::nt_core_community_ingester::seed_transition_matrix_with_community(&mut load_tm);
             engine = engine.with_observer_transition_matrix(load_tm);
             log::info!("[E8-TM] community-seeded transition matrix active");
+            // 意识核心进化闭环 (数据→KB): 把 200G 级社区推理数据集落盘 KB,
+            // 使 ConsciousnessTree soil 能观测真实节点/边数, 而非仅内部模拟。
+            // 此前 persist_to_kb_store 无生产调用者, 社区数据只种子化 E8 TM,
+            // 从不进入知识库 (KB 全表 0 行)。
+            let ingester = crate::core::nt_core_e8::nt_core_community_ingester::CommunityDataIngester::default();
+            match ingester.persist_to_kb_store(&kb) {
+                Ok(n) => log::info!("[KB] community datasets persisted: {} nodes", n),
+                Err(e) => log::warn!("[KB] community datasets persist failed: {}", e),
+            }
             // Init agent session tables (SQLite-backed agent memory)
             if let Err(e) = kb.init_agent_session() {
                 log::warn!("[KB] agent session init: {}", e);

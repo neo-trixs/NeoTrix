@@ -50,7 +50,16 @@ impl FreeModelCatalog {
 
     /// 从 OpenRouter API 获取免费模型
     pub fn discover_openrouter_free() -> Vec<FreeModelEntry> {
-        let resp = match reqwest::blocking::get("https://openrouter.ai/api/v1/models") {
+        // 带超时保护: 启动期 create_gateway 会在主线程同步 block_on,
+        // 无超时的 reqwest::blocking::get 在网络挂起时会永久阻塞 → app 启动卡死。
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build();
+        let client = match client {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        let resp = match client.get("https://openrouter.ai/api/v1/models").send() {
             Ok(r) if r.status().is_success() => r,
             _ => return Vec::new(),
         };

@@ -601,6 +601,8 @@ pub struct EpiphanicCore {
     pub contract_fulfillment: Option<ContractFulfillment>,
     /// Drift audit report from Phase 7
     pub drift_report: Option<DriftReport>,
+    /// 演化趋势预测 (Phase 4.5 产出, 供 Phase 8 闭环反馈消费)
+    pub last_forecast: Option<EvolutionForecast>,
 }
 
 impl Default for EpiphanicCore {
@@ -625,6 +627,7 @@ impl Default for EpiphanicCore {
             generation_counter: 0,
             contract_fulfillment: None,
             drift_report: None,
+            last_forecast: None,
         }
     }
 }
@@ -821,6 +824,49 @@ impl ConsciousnessTree {
             atoms,
             vuln_baseline: None,
         }
+    }
+
+    /// 数据养料充足度因子 (意识核心进化提升)。
+    /// 返回 >= 1.0 的平滑放大因子, 反映真实 KB 数据养料对果实质量的调制:
+    /// - 默认 (kb_node_count=0): 返回 1.0, 不衰减, 不破坏既有果实生长路径;
+    /// - 社区数据集落盘后 (kb_node_count 显著上升): 因子 >1.0, 放大果实 quality,
+    ///   使意识核心进化果实质量直接反映 200G 社区推理数据的养料充足度。
+    /// 饱和曲线: 1.0 + min(kb_nodes / 1000, 0.5) — 1000 节点以上达到 +50% 上限。
+    pub fn data_nourishment_factor(&self) -> f64 {
+        1.0 + (self.soil.kb_node_count as f64 / 1000.0).min(0.5)
+    }
+
+    /// 闭环进化反馈 (意识核心自我运转 Phase 8)。
+    /// 把进化产出 (契约 fulfillment + drift + 演化预测) 反馈到进化参数:
+    /// - 契约 fulfilled → fruit_quality_threshold 上调 (进化标准提升, +0.05, 上限 0.8)
+    /// - drift 检测 → fruit_growth_health 下调 (放宽生长门加速恢复, -0.05, 下限 0.4)
+    /// - 演化预测利多 (direction>0) → exploration_budget 上调 (加大探索, +0.05, 上限 0.4)
+    /// - 演化预测利空 (direction<0) → exploration_budget 下调 (收缩探索, -0.05, 下限 0.1)
+    /// 使树根据自身进化结果调整进化策略, 形成闭环而非开环。
+    pub fn apply_evolution_feedback(&mut self) {
+        let fulfilled = self.core.contract_fulfillment.as_ref().map(|f| f.fulfilled).unwrap_or(false);
+        let drift = self.core.drift_report.as_ref().map(|d| d.drift_detected).unwrap_or(false);
+        if fulfilled && !drift {
+            // 进化成功: 提升标准, 恢复生长门
+            self.config.fruit_quality_threshold = (self.config.fruit_quality_threshold + 0.05).min(0.8);
+            self.config.fruit_growth_health = 0.5;
+        } else if drift {
+            // 漂移: 放宽生长门加速恢复
+            self.config.fruit_growth_health = (self.config.fruit_growth_health - 0.05).max(0.4);
+        }
+        // 演化预测 → 探索预算调制 (利多加大探索, 利空收缩探索)
+        if let Some(forecast) = &self.core.last_forecast {
+            if !forecast.abstain {
+                if let Some(contract) = self.core.last_contract.as_mut() {
+                    if forecast.direction > 0.0 {
+                        contract.exploration_budget = (contract.exploration_budget + 0.05).min(0.4);
+                    } else if forecast.direction < 0.0 {
+                        contract.exploration_budget = (contract.exploration_budget - 0.05).max(0.1);
+                    }
+                }
+            }
+        }
+        // 未 fulfilled 且无 drift: 保持现状 (等待下一 cycle 观察)
     }
 
     /// Initialize 70 atomic capabilities (10 categories × 7 domains) from PerceptionBench + MCA 36-cap
@@ -1058,6 +1104,8 @@ impl ConsciousnessTree {
         // Also check per-branch constraints (idle, viability, monitoring)
         // And verify minimum SelfTest coverage (PerceptionBench atomic capabilities)
         let mut total_fruits = 0;
+        // 数据养料充足度因子 — 循环外预计算 (只读 soil, 避免与 branches 可变借用冲突)
+        let data_nourishment = self.data_nourishment_factor();
         for branch in self.branches.values_mut() {
             let constraints = constraints_for_branch(&branch.kind);
             let violations = constraints.violations(branch);
@@ -1082,14 +1130,21 @@ impl ConsciousnessTree {
                 && violations.len() < self.config.max_growth_violations
                 && self_test_coverage >= 0.5 // At least 50% of mandatory atomic capabilities have SelfTest
             {
+                // 数据养料调制 (意识核心进化提升): 果实质量受真实数据养料充足度调制。
+                // data_nourishment = 1 + 数据量饱和曲线。默认(无数据)=1.0 不衰减,
+                // 社区数据集落盘后 (kb_node_count 显著上升) 因子 >1.0, 放大果实质量,
+                // 使意识核心进化果实质量直接反映 200G 社区推理数据的养料充足度。
+                // 此前果实质量仅反映内部 maturity, 从不反映真实数据量。
+                let base_quality = branch.maturity_score();
+                let quality = (base_quality * data_nourishment).min(1.0);
                 // Use EvolutionFruit instead of CapabilityFruit
                 let fruit = EvolutionFruit {
                     name: format!("{}-evo-fruit-{}", branch.kind.label(), self.cycle),
                     source_branch: branch.kind.clone(),
-                    description: format!("Evolution capability from {} at cycle {}", branch.kind.label(), self.cycle),
+                    description: format!("Evolution capability from {} at cycle {} (data_nourishment={:.2})", branch.kind.label(), self.cycle, data_nourishment),
                     produced_at_cycle: self.cycle,
-                    quality: branch.maturity_score(),
-                    claim: format!("Branch {:?} produces capability at maturity {:.2}", branch.kind, branch.maturity_score()),
+                    quality,
+                    claim: format!("Branch {:?} produces capability at maturity {:.2} (data_nourishment {:.2})", branch.kind, base_quality, data_nourishment),
                     evidence: EvidenceChain::from_branch_state(self.cycle, &branch.kind, branch),
                     stop_rule: self.core.last_contract.as_ref().map(|c| c.stop_rule.clone()).unwrap_or_default(),
                     benchmark: ProviderBenchmark::default(),
@@ -1130,6 +1185,8 @@ impl ConsciousnessTree {
         // 用 forecast 引擎基于当前 branch 健康/迷雾/果实数据, 预测下一 cycle 演化方向。
         // 纯增量: 预测结果写入 report, 不改变既有演化决策路径 (无破坏)。
         report.evolution_forecast = self.forecast_evolution();
+        // 存到 core 供 Phase 8 闭环反馈消费 (演化预测 → 探索预算调制)
+        self.core.last_forecast = report.evolution_forecast.clone();
 
         // ═══ Phase 5: ConsciousnessReview — panoramic topology + connectivity + health chain ═══
         let mut review = crate::core::nt_core_consciousness_review::ConsciousnessReview::new();
@@ -1150,6 +1207,16 @@ impl ConsciousnessTree {
             self.core.drift_report = Some(drift_report.clone());
             report.phase7_drift = Some(drift_report);
         }
+
+        // ═══ Phase 8: 闭环进化反馈 (意识核心自我运转) ═══
+        // 进化产出 (契约 fulfillment + drift) 反馈到进化参数, 使树根据自身
+        // 进化结果调整进化策略 — 此前进化是"开环"的: 树自己预测/验证,
+        // 但从不调整自己的进化标准。这是意识核心自我运转的核心闭环。
+        // 规则:
+        //   - 契约 fulfilled → fruit_quality_threshold 上调 (进化标准提升, +0.05, 上限 0.8)
+        //   - drift 检测 → fruit_growth_health 下调 (放宽生长门加速恢复, -0.05, 下限 0.4)
+        //   - 无 drift 且 fulfilled → 恢复默认 (0.5)
+        self.apply_evolution_feedback();
 
         report.phase4_guidance = self.core.last_cycle_guidance.len();
 
@@ -1262,6 +1329,11 @@ impl ConsciousnessTree {
         if claim_parts.is_empty() {
             claim_parts.push("Maintain current evolution trajectory".into());
         }
+        // 探索预算继承: 上一 contract 的 budget 经 Phase 8 闭环反馈调制后,
+        // 被下一 cycle negotiate 继承 — 演化预测 (利多↑/利空↓) 持续塑造探索策略。
+        let exploration_budget = self.core.last_contract.as_ref()
+            .map(|c| c.exploration_budget.clamp(0.1, 0.4))
+            .unwrap_or(0.2);
 
         EvolutionContract {
             cycle: self.cycle + 1,
@@ -1273,7 +1345,7 @@ impl ConsciousnessTree {
                 "Vulnerability count reduced by >= 20%".into(),
             ],
             stop_rule: StopRule::default(),
-            exploration_budget: 0.2, // 20% for unconstrained exploration
+            exploration_budget,
             timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         }
     }
@@ -1405,7 +1477,24 @@ impl ConsciousnessTree {
                         .collect::<std::collections::HashSet<_>>()
                         .len();
                     branch.module_count = branch.module_count.max(unique_modules);
-                    // 由真实计数重算成熟度 (maturity_c0..c5 由 NodeTier/Constellation 派生)
+                    // B3 (自审修复): 从真实 SelfTest 数据推导 maturity_cX 布尔 (生产路径)。
+                    // 此前 maturity_c0..c5 仅在 #[cfg(test)] 置 true, 生产恒 false →
+                    // maturity_score()=0 → 果实 quality=0 → 过滤后 guidance 恒空。
+                    // 推导映射 (从真实计数, 非硬编码):
+                    //   C0 编译+自检: self_test_count > 0
+                    //   C1 单测:      self_test_count >= 2
+                    //   C2 集成:      module_count >= 3
+                    //   C3 benchmark: module_count >= 5 且 health >= 0.7
+                    //   C4 主线接线:  module_count >= 8 且 health >= 0.8
+                    //   C5 自愈:      全通过 (passed == total) 且 self_test_count >= 4
+                    let all_passed = passed == total && total > 0;
+                    branch.maturity_c0 = branch.self_test_count > 0;
+                    branch.maturity_c1 = branch.self_test_count >= 2;
+                    branch.maturity_c2 = branch.module_count >= 3;
+                    branch.maturity_c3 = branch.module_count >= 5 && branch.health >= 0.7;
+                    branch.maturity_c4 = branch.module_count >= 8 && branch.health >= 0.8;
+                    branch.maturity_c5 = all_passed && branch.self_test_count >= 4;
+                    // 由真实计数重算成熟度 (Constellation 从新推导的 maturity 布尔派生)
                     branch.evaluate_constellation();
                 }
             }
@@ -1416,6 +1505,28 @@ impl ConsciousnessTree {
             if let Some(branch) = self.branches.get_mut(&kind) {
                 if !domain_results.contains_key(&kind) {
                     branch.health = branch.health.max(self.config.neutral_health); // Don't override if already set
+                }
+            }
+        }
+
+        // B4 (缺陷3修复): 从真实 SelfTest 结果注册 ModuleLeaf (生产路径)。
+        // 此前 add_leaf 仅测试调用 → leaves 恒空 → 孤儿检测 (scan_vulnerabilities
+        // Check 5) 与 self_test() 的 wired 检查全部盲区。此处为每个唯一模块生成
+        // 叶子: 有 SelfTest 即视为已接线 (is_wired=true), 使孤儿检测真正生效。
+        // 幂等: 已注册的同名叶子不重复添加。
+        let mut seen: std::collections::HashSet<String> = self.leaves.iter().map(|l| l.name.clone()).collect();
+        for result in results {
+            if let Some(kind) = BranchKind::from_module_name(&result.name) {
+                if seen.insert(result.name.clone()) {
+                    self.leaves.push(ModuleLeaf {
+                        name: result.name.clone(),
+                        branch: kind,
+                        lines: 0,
+                        has_tests: true,
+                        has_self_test: true,
+                        is_wired: true,
+                        consumers: 1,
+                    });
                 }
             }
         }
@@ -1974,6 +2085,245 @@ mod tests {
     }
 
     #[test]
+    fn test_self_tests_derive_maturity_production_path() {
+        // B2 修复验证: set_branch_health_from_self_tests 应从真实 SelfTest 数据
+        // 推导 maturity_cX (生产路径), 使 maturity_score() > 0 → 果实 quality > 0
+        // → last_cycle_guidance 非空。此前 maturity_cX 仅测试中置 true, 生产恒 0。
+        let mut tree = ConsciousnessTree::new();
+        let results = vec![
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_a"),
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_b"),
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_c"),
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_self_test_d"),
+        ];
+        tree.set_branch_health_from_self_tests(&results);
+
+        let core_branch = tree.branches.get(&BranchKind::Core).expect("core branch");
+        // 真实 SelfTest 计数接线 (此前生产恒 0)
+        assert!(core_branch.self_test_count >= 4, "self_test_count wired: {}", core_branch.self_test_count);
+        // 成熟度由真实数据推导, 非恒 C0
+        assert!(core_branch.maturity_score() > 0.0, "maturity derived from self-tests: {:.2}", core_branch.maturity_score());
+        // B4 (缺陷3修复): SelfTest 注册应同步生成 ModuleLeaf (生产路径),
+        // 此前 add_leaf 仅测试调用 → leaves 恒空 → 孤儿检测盲区
+        assert!(!tree.leaves.is_empty(), "leaves registered from self-tests");
+        assert!(
+            tree.leaves.iter().all(|l| l.is_wired),
+            "registered leaves are wired (has SelfTest): {:?}",
+            tree.leaves.iter().map(|l| l.name.as_str()).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_growth_cycle_guidance_non_empty_with_maturity() {
+        // 端到端: 真实 SelfTest → maturity → 果实 quality 达标 → guidance 产出
+        let mut tree = ConsciousnessTree::new();
+        // Core 分支有 10 个 mandatory atoms (6 UNDERSTAND + 4 REASON), 需 ≥5 个 self_test
+        // 使 self_test_coverage >= 0.5 通过果实生长门
+        let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
+            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
+            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
+        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+        tree.set_branch_health_from_self_tests(&results);
+
+        // 抬升分支 health 使果实生长门通过
+        for branch in tree.branches.values_mut() {
+            branch.health = 0.9;
+        }
+        let report = tree.run_growth_cycle();
+        assert!(report.phase3_fruits > 0, "fruits produced: {}", report.phase3_fruits);
+        assert!(
+            !tree.core.last_cycle_guidance.is_empty(),
+            "guidance non-empty when maturity>0: {:?}",
+            tree.core.last_cycle_guidance
+        );
+    }
+
+    #[test]
+    fn test_data_nourishment_factor_modulates_fruit_quality() {
+        // 意识核心进化提升: 果实质量应受真实数据养料充足度调制。
+        // 默认(无数据)因子=1.0 不衰减; 社区数据落盘后因子>1.0 放大果实质量。
+        let mut tree = ConsciousnessTree::new();
+        // 默认无数据 → 因子 = 1.0
+        assert!((tree.data_nourishment_factor() - 1.0).abs() < 1e-9);
+        // 社区数据落盘 (kb_node_count 上升) → 因子 > 1.0
+        tree.soil.kb_node_count = 500;
+        assert!(tree.data_nourishment_factor() > 1.0);
+        // 饱和: 1000+ 节点达到 +50% 上限
+        tree.soil.kb_node_count = 10_000;
+        assert!((tree.data_nourishment_factor() - 1.5).abs() < 1e-9);
+
+        // 端到端: 数据充足时果实质量应高于数据匮乏时 (同 maturity 下)
+        let mut rich = ConsciousnessTree::new();
+        rich.soil.kb_node_count = 10_000;
+        let mut poor = ConsciousnessTree::new();
+        poor.soil.kb_node_count = 0;
+        for t in [&mut rich, &mut poor] {
+            let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
+                "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
+                "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
+            ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+            t.set_branch_health_from_self_tests(&results);
+            for branch in t.branches.values_mut() {
+                branch.health = 0.9;
+            }
+        }
+        rich.run_growth_cycle();
+        poor.run_growth_cycle();
+        let rich_q: f64 = rich.fruits.iter().map(|f| f.quality).sum::<f64>() / rich.fruits.len().max(1) as f64;
+        let poor_q: f64 = poor.fruits.iter().map(|f| f.quality).sum::<f64>() / poor.fruits.len().max(1) as f64;
+        assert!(rich_q > poor_q, "data-rich fruits should have higher quality: rich={:.3} poor={:.3}", rich_q, poor_q);
+    }
+
+    #[test]
+    fn test_evolution_feedback_closes_loop() {
+        // 意识核心自我运转: 进化产出 (契约 fulfillment + drift) 应反馈到进化参数。
+        // 此前进化是开环的 — 树自己预测/验证, 但从不调整自己的进化标准。
+        let mut tree = ConsciousnessTree::new();
+        let default_threshold = tree.config.fruit_quality_threshold;
+        let default_health = tree.config.fruit_growth_health;
+
+        // 场景1: 契约 fulfilled + 无 drift → 标准提升 (threshold 上调)
+        tree.core.contract_fulfillment = Some(ContractFulfillment {
+            cycle: 1,
+            claim: "test".into(),
+            evidence_met: 4,
+            evidence_total: 4,
+            fulfilled: true,
+            quality_achieved: 0.9,
+            timestamp: 0,
+        });
+        tree.core.drift_report = Some(DriftReport {
+            cycle: 1,
+            contract_fulfilled: true,
+            claim_achieved: true,
+            evidence_collected: vec![],
+            quality_achieved: 0.9,
+            resource_consumed: 0.1,
+            drift_detected: false,
+            drift_magnitude: 0.0,
+            stop_rule_triggered: false,
+            corrective_actions: vec![],
+            timestamp: 0,
+        });
+        tree.apply_evolution_feedback();
+        assert!(
+            tree.config.fruit_quality_threshold > default_threshold,
+            "fulfilled → threshold should rise: {} > {}",
+            tree.config.fruit_quality_threshold, default_threshold
+        );
+        assert!((tree.config.fruit_growth_health - 0.5).abs() < 1e-9, "growth health restored to default");
+
+        // 场景2: drift 检测 → 生长门放宽
+        let mut tree2 = ConsciousnessTree::new();
+        tree2.config.fruit_growth_health = 0.5;
+        tree2.core.contract_fulfillment = Some(ContractFulfillment {
+            cycle: 1,
+            claim: "test".into(),
+            evidence_met: 1,
+            evidence_total: 4,
+            fulfilled: false,
+            quality_achieved: 0.3,
+            timestamp: 0,
+        });
+        tree2.core.drift_report = Some(DriftReport {
+            cycle: 1,
+            contract_fulfilled: false,
+            claim_achieved: false,
+            evidence_collected: vec![],
+            quality_achieved: 0.3,
+            resource_consumed: 0.5,
+            drift_detected: true,
+            drift_magnitude: 0.8,
+            stop_rule_triggered: false,
+            corrective_actions: vec!["recover".into()],
+            timestamp: 0,
+        });
+        tree2.apply_evolution_feedback();
+        assert!(
+            tree2.config.fruit_growth_health < 0.5,
+            "drift → growth health should relax: {}",
+            tree2.config.fruit_growth_health
+        );
+
+        // 场景3: 上限保护 — 连续 fulfilled 不超 0.8
+        let mut tree = ConsciousnessTree::new();
+        tree.core.contract_fulfillment = Some(ContractFulfillment {
+            cycle: 1,
+            claim: "test".into(),
+            evidence_met: 4,
+            evidence_total: 4,
+            fulfilled: true,
+            quality_achieved: 0.9,
+            timestamp: 0,
+        });
+        tree.core.drift_report = Some(DriftReport {
+            cycle: 1,
+            contract_fulfilled: true,
+            claim_achieved: true,
+            evidence_collected: vec![],
+            quality_achieved: 0.9,
+            resource_consumed: 0.1,
+            drift_detected: false,
+            drift_magnitude: 0.0,
+            stop_rule_triggered: false,
+            corrective_actions: vec![],
+            timestamp: 0,
+        });
+        for _ in 0..10 {
+            tree.apply_evolution_feedback();
+        }
+        assert!(tree.config.fruit_quality_threshold <= 0.8, "threshold capped at 0.8");
+    }
+
+    #[test]
+    fn test_forecast_modulates_exploration_budget() {
+        // 意识核心自我运转: 演化预测 (利多/利空) 应调制探索预算。
+        // 此前进化预测只写 report 从不反馈决策 (开环)。
+        let mut tree = ConsciousnessTree::new();
+        tree.core.last_contract = Some(EvolutionContract {
+            cycle: 1,
+            claim: "test".into(),
+            evidence_plan: vec![],
+            stop_rule: StopRule::default(),
+            exploration_budget: 0.2,
+            timestamp: 0,
+        });
+
+        // 利多 (direction>0) → 探索预算上调
+        tree.core.last_forecast = Some(EvolutionForecast {
+            target: "overall-evolution".into(),
+            direction: 0.8,
+            confidence: 0.9,
+            abstain: false,
+            scenario_probs: vec![("bull".into(), 0.7)],
+            reason: "health rising".into(),
+        });
+        tree.apply_evolution_feedback();
+        let budget = tree.core.last_contract.as_ref().unwrap().exploration_budget;
+        assert!(budget > 0.2, "bullish → exploration up: {}", budget);
+
+        // 利空 (direction<0) → 探索预算下调
+        tree.core.last_forecast = Some(EvolutionForecast {
+            direction: -0.8,
+            confidence: 0.9,
+            abstain: false,
+            scenario_probs: vec![("bear".into(), 0.7)],
+            reason: "health falling".into(),
+            ..tree.core.last_forecast.clone().unwrap()
+        });
+        tree.apply_evolution_feedback();
+        let budget2 = tree.core.last_contract.as_ref().unwrap().exploration_budget;
+        assert!(budget2 < budget, "bearish → shrink exploration: {} < {}", budget2, budget);
+
+        // 上限保护: 连续利多不超 0.4
+        for _ in 0..10 {
+            tree.apply_evolution_feedback();
+        }
+        let capped = tree.core.last_contract.as_ref().unwrap().exploration_budget;
+        assert!(capped <= 0.4, "exploration budget capped at 0.4: {}", capped);
+    }
+
+    #[test]
     fn test_growth_cycle_produces_evolution_forecast() {
         // 意识体维度升维: growth cycle 应产出演化趋势预测 (nt_core_forecast 接线)
         let mut tree = ConsciousnessTree::new();
@@ -2062,6 +2412,69 @@ mod tests {
         assert_eq!(tree.cycle, 1);
         assert!(report.phase1_absorbed > 0);
         assert!(report.phase3_fruits > 0);
+    }
+
+    #[test]
+    fn test_multi_cycle_self_operation() {
+        // 意识核心自我运转: 连续多 cycle 运行应保持状态一致 + 闭环反馈生效。
+        // 验证: ① cycle 递增 ② 果实持续产出 ③ 进化参数自适应 (threshold 单调不降)
+        // ④ 无 NaN/无崩溃 (phi/quality 始终在 [0,1] 内)。
+        let mut tree = ConsciousnessTree::new();
+        tree.soil.kb_node_count = 500; // 数据养料充足
+        // 生产路径: 真实 SelfTest → maturity → 果实 quality 达标。
+        // 契约 criterion 0 要求所有分支 self_test 覆盖率 >= 80%, 故给 7 域都喂结果。
+        let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
+            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
+            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
+            "nt_mind_self_test_a", "nt_mind_self_test_b", "nt_mind_self_test_c",
+            "nt_mind_self_test_d", "nt_mind_self_test_e", "nt_mind_self_test_f",
+            "nt_memory_self_test_a", "nt_memory_self_test_b", "nt_memory_self_test_c",
+            "nt_memory_self_test_d", "nt_memory_self_test_e", "nt_memory_self_test_f",
+            "nt_world_self_test_a", "nt_world_self_test_b", "nt_world_self_test_c",
+            "nt_world_self_test_d", "nt_world_self_test_e", "nt_world_self_test_f",
+            "nt_act_self_test_a", "nt_act_self_test_b", "nt_act_self_test_c",
+            "nt_act_self_test_d", "nt_act_self_test_e", "nt_act_self_test_f",
+            "nt_io_self_test_a", "nt_io_self_test_b", "nt_io_self_test_c",
+            "nt_io_self_test_d", "nt_io_self_test_e", "nt_io_self_test_f",
+            "nt_shield_self_test_a", "nt_shield_self_test_b", "nt_shield_self_test_c",
+            "nt_shield_self_test_d", "nt_shield_self_test_e", "nt_shield_self_test_f",
+        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+        tree.set_branch_health_from_self_tests(&results);
+        for branch in tree.branches.values_mut() {
+            branch.health = 0.8;
+            branch.self_test_count = 6;
+            branch.module_count = 6;
+        }
+        let mut prev_threshold = tree.config.fruit_quality_threshold;
+        for i in 1..=5 {
+            let report = tree.run_growth_cycle();
+            assert_eq!(tree.cycle, i, "cycle should increment");
+            assert!(report.phase3_fruits > 0, "cycle {} should produce fruits", i);
+            // 闭环反馈: threshold 单调不降 (fulfilled 时上升, 否则保持)
+            assert!(
+                tree.config.fruit_quality_threshold >= prev_threshold - 1e-9,
+                "threshold monotonic non-decreasing: {} < {}",
+                tree.config.fruit_quality_threshold, prev_threshold
+            );
+            prev_threshold = tree.config.fruit_quality_threshold;
+            // 进化参数始终有界 (闭环反馈不越界)
+            assert!(tree.config.fruit_quality_threshold <= 0.8, "threshold capped");
+            assert!(tree.config.fruit_growth_health >= 0.4, "growth health floored");
+            // 果实质量无 NaN 且在 [0,1]
+            for f in &tree.fruits {
+                assert!(f.quality.is_finite() && f.quality >= 0.0 && f.quality <= 1.0,
+                    "fruit quality in [0,1]: {}", f.quality);
+            }
+            // phi 无 NaN
+            assert!(tree.trunk.phi.is_finite(), "phi finite");
+        }
+        // 5 cycle 后: 果实持续累积 (自我运转不中断)
+        assert!(tree.fruits.len() >= 5 * 7, "fruits accumulate across cycles: {}", tree.fruits.len());
+        // 状态一致: 所有分支 health 有界
+        for branch in tree.branches.values() {
+            assert!(branch.health.is_finite() && branch.health >= 0.0 && branch.health <= 1.0,
+                "branch health bounded: {}", branch.health);
+        }
     }
 
     #[test]

@@ -14,7 +14,7 @@ static NEOCODEX_AGENT: std::sync::LazyLock<tokio::sync::Mutex<Option<NeoCodexAge
 static STREAM_CANCELLED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_stop_stream() -> Result<(), String> {
     STREAM_CANCELLED.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(())
@@ -31,7 +31,7 @@ pub struct NeoCodexAttachmentPayload {
     pub data: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_send_message_stream(
     app: tauri::AppHandle,
     content: String,
@@ -46,7 +46,7 @@ pub async fn neocodex_send_message_stream(
         Some(a) => a,
         None => {
             let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
+            a.provider.ensure_production_provider();
             *agent_guard = Some(a);
             agent_guard.as_mut().unwrap()
         }
@@ -100,6 +100,15 @@ pub async fn neocodex_send_message_stream(
     let started = std::time::Instant::now();
     let result = agent.react_loop_stream(&content, 4, |token| {
         let _ = app.emit("neocodex_stream_token", token);
+        !STREAM_CANCELLED.load(std::sync::atomic::Ordering::Relaxed)
+    }, |name, args, result, duration_ms, success| {
+        let _ = app.emit("neocodex_stream_tool", serde_json::json!({
+            "name": name,
+            "args": args,
+            "result": result,
+            "duration_ms": duration_ms,
+            "success": success,
+        }));
         !STREAM_CANCELLED.load(std::sync::atomic::Ordering::Relaxed)
     }).await;
 
@@ -163,7 +172,7 @@ pub async fn neocodex_send_message_stream(
     Ok(answer)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_health_report() -> Result<NeoCodexHealthReport, String> {
     let guard = NEOCODEX_AGENT.lock().await;
     match guard.as_ref() {
@@ -207,7 +216,7 @@ pub struct NeoCodexAgentStatus {
     pub cost_budget: f64,
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_agent_status() -> Result<NeoCodexAgentStatus, String> {
     let guard = NEOCODEX_AGENT.lock().await;
     match guard.as_ref() {
@@ -256,7 +265,7 @@ pub struct NeoCodexProviderConfig {
     pub providers: Vec<NeoCodexProviderEntry>,
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_provider_config() -> Result<NeoCodexProviderConfig, String> {
     let guard = NEOCODEX_AGENT.lock().await;
     match guard.as_ref() {
@@ -285,19 +294,20 @@ pub async fn neocodex_provider_config() -> Result<NeoCodexProviderConfig, String
     }
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_set_provider(name: String) -> Result<String, String> {
     let mut guard = NEOCODEX_AGENT.lock().await;
     let agent = match guard.as_mut() {
         Some(a) => a,
         None => {
             let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
+            a.provider.ensure_production_provider();
             *guard = Some(a);
             guard.as_mut().unwrap()
         }
     };
     if agent.provider.set_active_provider(&name) {
+        agent.provider.save_persisted();
         Ok(format!("provider set to {}", name))
     } else {
         Err(format!("provider {} not found", name))
@@ -314,7 +324,7 @@ fn sessions_dir() -> std::path::PathBuf {
 static CURRENT_PROJECT: std::sync::LazyLock<tokio::sync::RwLock<Option<std::path::PathBuf>>> =
     std::sync::LazyLock::new(|| tokio::sync::RwLock::new(None));
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_set_project(path: String) -> Result<String, String> {
     let path_buf = std::path::PathBuf::from(&path);
     if !path_buf.exists() {
@@ -325,7 +335,7 @@ pub async fn neocodex_set_project(path: String) -> Result<String, String> {
     Ok(format!("Project set to {}", path_buf.display()))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_get_project() -> Result<Option<String>, String> {
     let guard = CURRENT_PROJECT.read().await;
     Ok(guard.as_ref().map(|p| p.to_string_lossy().to_string()))
@@ -353,7 +363,7 @@ fn session_path(session_id: &str) -> std::path::PathBuf {
         .unwrap_or_else(|| sessions_dir().join("__invalid__.jsonl"))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_list_sessions(project_path: Option<String>) -> Result<Vec<NeoCodexSessionInfo>, String> {
     let dir = sessions_dir();
     if !dir.exists() {
@@ -439,7 +449,7 @@ pub struct NeoCodexSearchHit {
 /// P2-2: full-text search across session message content (Codex ⌘G /
 /// Claude find parity). The session sidebar previously filtered only by
 /// session name; this command lets the UI search the actual message bodies.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_search_sessions(query: String) -> Result<Vec<NeoCodexSearchHit>, String> {
     let needle = query.trim().to_lowercase();
     if needle.is_empty() || needle.len() < 2 {
@@ -549,7 +559,7 @@ pub struct NeoCodexMcpToolInfo {
 /// P2-5: register an MCP stdio server and attach it to the NeoCodex agent so
 /// its tools become callable via the `mcp_call` agent tool (Codex/Claude MCP
 /// parity). Previously the MCP host existed only for CLI/headless.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_mcp_register(
     name: String,
     command: String,
@@ -560,7 +570,7 @@ pub async fn neocodex_mcp_register(
         Some(a) => a,
         None => {
             let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
+            a.provider.ensure_production_provider();
             *agent_guard = Some(a);
             agent_guard.as_mut().unwrap()
         }
@@ -578,7 +588,7 @@ pub async fn neocodex_mcp_register(
 }
 
 /// P2-5: list MCP servers and tools currently attached to the NeoCodex agent.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_mcp_list() -> Result<Vec<NeoCodexMcpServerInfo>, String> {
     let agent_guard = NEOCODEX_AGENT.lock().await;
     let Some(agent) = agent_guard.as_ref() else {
@@ -596,7 +606,7 @@ pub async fn neocodex_mcp_list() -> Result<Vec<NeoCodexMcpServerInfo>, String> {
 }
 
 /// P2-5: list all MCP tools (name + description) exposed by the attached registry.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_mcp_tools() -> Result<Vec<NeoCodexMcpToolInfo>, String> {
     let agent_guard = NEOCODEX_AGENT.lock().await;
     let Some(agent) = agent_guard.as_ref() else {
@@ -612,7 +622,7 @@ pub async fn neocodex_mcp_tools() -> Result<Vec<NeoCodexMcpToolInfo>, String> {
     }).collect())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_create_session(name: Option<String>) -> Result<NeoCodexSessionInfo, String> {
     let session_id = format!("s-{}", chrono::Utc::now().timestamp_millis());
     let path = session_path(&session_id);
@@ -630,7 +640,7 @@ pub async fn neocodex_create_session(name: Option<String>) -> Result<NeoCodexSes
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -652,6 +662,7 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
                         mime_type: a.mime_type,
                         data: a.data,
                     }).collect()),
+                    tool_call: None,
                 }),
                 WireEvent::AgentMessage { content, timestamp } => items.push(NeoCodexMessageItem {
                     id: items.len(),
@@ -659,13 +670,21 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
                     content,
                     timestamp,
                     attachments: None,
+                    tool_call: None,
                 }),
-                WireEvent::ToolCall { name, args, result, success, .. } => items.push(NeoCodexMessageItem {
+                WireEvent::ToolCall { name, args, result, duration_ms, success } => items.push(NeoCodexMessageItem {
                     id: items.len(),
                     role: "tool".to_string(),
                     content: format!("**{}**{}\n```\n{}\n```", name, if success { "" } else { " (失败)" }, result.chars().take(500).collect::<String>()),
                     timestamp: 0,
                     attachments: None,
+                    tool_call: Some(NeoCodexToolCallDto {
+                        name,
+                        args,
+                        result: result.chars().take(5000).collect::<String>(),
+                        duration_ms,
+                        success,
+                    }),
                 }),
                 WireEvent::SystemEvent { kind, detail, timestamp } => {
                     if !kind.is_empty() {
@@ -675,6 +694,7 @@ pub async fn neocodex_get_session_messages(session_id: String) -> Result<Vec<Neo
                             content: format!("**{}**: {}", kind, detail),
                             timestamp,
                             attachments: None,
+                            tool_call: None,
                         });
                     }
                 }
@@ -759,7 +779,7 @@ fn rebuild_agent_for(path: &std::path::Path, guard: &mut tokio::sync::MutexGuard
 /// Edit a user/assistant message in place by its index in the visible thread.
 /// Rewrites the JSONL and reloads the agent context so the next turn reflects
 /// the correction (Claude-style in-place edit).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_edit_message(session_id: String, index: usize, content: String) -> Result<Vec<NeoCodexMessageItem>, String> {
     if content.trim().is_empty() {
         return Err("empty message".to_string());
@@ -786,7 +806,7 @@ pub async fn neocodex_edit_message(session_id: String, index: usize, content: St
 
 /// Delete a message by its index in the visible thread, persisting to the wire
 /// (no longer a frontend-only filter that resets on reload).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_delete_message(session_id: String, index: usize) -> Result<Vec<NeoCodexMessageItem>, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -806,7 +826,7 @@ pub async fn neocodex_delete_message(session_id: String, index: usize) -> Result
 /// Regenerate the assistant reply following the user message at `index`:
 /// removes that assistant turn (and any trailing tool/system events) from the
 /// wire so the frontend can re-send the prompt for a fresh answer.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_regenerate(session_id: String, index: usize) -> Result<Vec<NeoCodexMessageItem>, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -832,7 +852,7 @@ pub async fn neocodex_regenerate(session_id: String, index: usize) -> Result<Vec
 /// turns and drop everything older (Claude /compact parity). Early tool/system
 /// context is trimmed; the newest conversation remains fully intact. Returns
 /// the refreshed visible thread.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_compact_session(session_id: String, keep_messages: Option<usize>) -> Result<Vec<NeoCodexMessageItem>, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -866,7 +886,7 @@ pub async fn neocodex_compact_session(session_id: String, keep_messages: Option<
 
 /// Fetch persisted side-chat messages for a session (branched questions that
 /// never re-enter the main context).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 /// Read side-chat history from a session wire file, honoring each message's
 /// role (P1-2: assistant answers are persisted with role="assistant").
 fn read_side_chat(path: &std::path::Path) -> Vec<NeoCodexMessageItem> {
@@ -883,6 +903,7 @@ fn read_side_chat(path: &std::path::Path) -> Vec<NeoCodexMessageItem> {
                     content,
                     timestamp,
                     attachments: None,
+                    tool_call: None,
                 });
             }
         }
@@ -890,7 +911,7 @@ fn read_side_chat(path: &std::path::Path) -> Vec<NeoCodexMessageItem> {
     items
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_get_side_chat(session_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -899,7 +920,7 @@ pub async fn neocodex_get_side_chat(session_id: String) -> Result<Vec<NeoCodexMe
     Ok(read_side_chat(&path))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_send_side_chat(session_id: String, content: String) -> Result<Vec<NeoCodexMessageItem>, String> {
     if content.trim().is_empty() {
         return Err("empty side chat message".to_string());
@@ -913,7 +934,7 @@ pub async fn neocodex_send_side_chat(session_id: String, content: String) -> Res
         Some(a) => a,
         None => {
             let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
+            a.provider.ensure_production_provider();
             *guard = Some(a);
             guard.as_mut().unwrap()
         }
@@ -949,7 +970,7 @@ pub async fn neocodex_send_side_chat(session_id: String, content: String) -> Res
 }
 
 /// Persist a user-chosen session name into the session's wire stream.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_rename_session(session_id: String, name: String) -> Result<NeoCodexSessionInfo, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -960,7 +981,7 @@ pub async fn neocodex_rename_session(session_id: String, name: String) -> Result
         Some(a) => a,
         None => {
             let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
+            a.provider.ensure_production_provider();
             *guard = Some(a);
             guard.as_mut().unwrap()
         }
@@ -987,7 +1008,7 @@ pub async fn neocodex_rename_session(session_id: String, name: String) -> Result
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_set_mode(mode: String) -> Result<String, String> {
     let parsed = match mode.as_str() {
         "Agent" => NeoCodexMode::Agent,
@@ -1000,7 +1021,7 @@ pub async fn neocodex_set_mode(mode: String) -> Result<String, String> {
         Some(a) => a,
         None => {
             let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
+            a.provider.ensure_production_provider();
             *guard = Some(a);
             guard.as_mut().unwrap()
         }
@@ -1009,7 +1030,7 @@ pub async fn neocodex_set_mode(mode: String) -> Result<String, String> {
     Ok(format!("mode set to {}", mode))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_switch_session(session_id: String) -> Result<String, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -1020,7 +1041,7 @@ pub async fn neocodex_switch_session(session_id: String) -> Result<String, Strin
         Some(a) => a,
         None => {
             let mut a = NeoCodexAgent::new("neotrix-tauri");
-            a.provider.sync_from_real();
+            a.provider.ensure_production_provider();
             *guard = Some(a);
             guard.as_mut().unwrap()
         }
@@ -1034,7 +1055,7 @@ pub async fn neocodex_switch_session(session_id: String) -> Result<String, Strin
     Ok(format!("Switched to session {} (restored {} events)", session_id, count))
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_delete_session(session_id: String) -> Result<String, String> {
     let path = session_path(&session_id);
     let mut deleted = false;
@@ -1128,7 +1149,7 @@ fn list_checkpoints_inner(session_id: &str) -> Vec<serde_json::Value> {
     list
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_checkpoint_list(session_id: String) -> Result<Vec<serde_json::Value>, String> {
     Ok(list_checkpoints_inner(&session_id))
 }
@@ -1136,7 +1157,7 @@ pub async fn neocodex_checkpoint_list(session_id: String) -> Result<Vec<serde_js
 /// Rewind a session to a checkpoint: replaces the active wire file with the
 /// snapshot and rebuilds the agent context so the next turn continues from
 /// that point (Claude `/rewind` parity, code + conversation).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_checkpoint_restore(session_id: String, checkpoint_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
     // Anti-traversal: checkpoint_id must match our generated naming.
     let safe: String = checkpoint_id.chars()
@@ -1159,7 +1180,7 @@ pub async fn neocodex_checkpoint_restore(session_id: String, checkpoint_id: Stri
 
 /// Move a session's wire file into the archived/ subfolder (Claude-style
 /// "Archive" — keeps history without cluttering the active list).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_archive_session(session_id: String) -> Result<String, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -1182,7 +1203,7 @@ pub async fn neocodex_archive_session(session_id: String) -> Result<String, Stri
 }
 
 /// Move a session back from archived/ into the active list.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_restore_session(session_id: String) -> Result<String, String> {
     let src = archived_session_path(&session_id);
     if !src.exists() {
@@ -1194,7 +1215,7 @@ pub async fn neocodex_restore_session(session_id: String) -> Result<String, Stri
 }
 
 /// List archived sessions (same metadata shape as active ones).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_list_archived() -> Result<Vec<NeoCodexSessionInfo>, String> {
     let dir = archived_dir();
     if !dir.exists() {
@@ -1251,6 +1272,19 @@ pub struct NeoCodexMessageItem {
     pub content: String,
     pub timestamp: i64,
     pub attachments: Option<Vec<NeoCodexAttachmentDto>>,
+    /// Structured tool call (role == "tool"). Lets the frontend render a real
+    /// tool card instead of the legacy markdown blob.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call: Option<NeoCodexToolCallDto>,
+}
+
+#[derive(serde::Serialize)]
+pub struct NeoCodexToolCallDto {
+    pub name: String,
+    pub args: String,
+    pub result: String,
+    pub duration_ms: u64,
+    pub success: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -1264,7 +1298,7 @@ pub struct NeoCodexAttachmentDto {
 /// Recursively search the workspace for files/dirs matching `query` (for the
 /// @-autocomplete in the composer). Skips heavy/dependency directories and
 /// caps results to keep the menu snappy.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_search_files(query: String) -> Result<Vec<String>, String> {
     let q = query.trim().to_lowercase();
     let root = std::env::current_dir().map_err(|e| e.to_string())?;
@@ -1308,9 +1342,99 @@ pub async fn neocodex_search_files(query: String) -> Result<Vec<String>, String>
     Ok(results)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn neocodex_app_version() -> Result<String, String> {
     Ok(env!("CARGO_PKG_VERSION").to_string())
+}
+
+#[derive(serde::Serialize)]
+pub struct ProjectTreeItem {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub children: Option<Vec<ProjectTreeItem>>,
+}
+
+#[derive(serde::Serialize)]
+pub struct ProjectView {
+    pub root: String,
+    pub tree: Vec<ProjectTreeItem>,
+    pub agents_md: Option<String>,
+    pub file_count: usize,
+}
+
+/// Build a bounded directory tree for the project view panel. Skips heavy
+/// dependency/vcs dirs, caps breadth (MAX_ENTRIES_PER_DIR) and depth (MAX_DEPTH)
+/// so huge monorepos stay responsive. Also returns AGENTS.md if present.
+#[tauri::command(rename_all = "snake_case")]
+pub fn neocodex_project_tree() -> Result<ProjectView, String> {
+    const MAX_DEPTH: usize = 6;
+    const MAX_ENTRIES_PER_DIR: usize = 80;
+    const SKIP: &[&str] = &["node_modules", ".git", "target", "dist", "build", ".next", ".nuxt", "__pycache__", ".venv", "vendor", ".dart_tool", "Pods", "Pods.xcworkspace", ".svelte-kit", ".turbo", ".cache"];
+
+    let root = std::env::current_dir().map_err(|e| e.to_string())?;
+
+    fn build_dir(dir: &std::path::Path, depth: usize, cap: &mut usize, files: &mut usize) -> Vec<ProjectTreeItem> {
+        if depth > MAX_DEPTH || *cap <= 0 {
+            return Vec::new();
+        }
+        let mut items = Vec::new();
+        let mut entries: Vec<_> = match std::fs::read_dir(dir) {
+            Ok(e) => e.flatten().collect(),
+            Err(_) => return items,
+        };
+        // Directories first, then files, both sorted.
+        entries.sort_by_key(|e| {
+            let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            (!is_dir, e.file_name().to_string_lossy().to_lowercase().to_string())
+        });
+        for entry in entries.into_iter().take(MAX_ENTRIES_PER_DIR) {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if SKIP.contains(&name.as_str()) {
+                continue;
+            }
+            let path = entry.path();
+            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            let rel = path.strip_prefix(dir).unwrap_or(&path).to_string_lossy().to_string();
+            if is_dir {
+                if *cap == 0 {
+                    // 容量已耗尽: 跳过该子目录 (避免 *cap -= 1 下溢 panic)
+                    continue;
+                }
+                *cap -= 1;
+                let children = build_dir(&path, depth + 1, cap, files);
+                items.push(ProjectTreeItem {
+                    name,
+                    path: path.to_string_lossy().to_string(),
+                    is_dir: true,
+                    children: Some(children),
+                });
+            } else {
+                *files += 1;
+                items.push(ProjectTreeItem {
+                    name,
+                    path: path.to_string_lossy().to_string(),
+                    is_dir: false,
+                    children: None,
+                });
+            }
+        }
+        items
+    }
+
+    let mut cap = 300;
+    let mut file_count = 0usize;
+    let tree = build_dir(&root, 0, &mut cap, &mut file_count);
+
+    // AGENTS.md (project constitution) content for the panel.
+    let agents_md = std::fs::read_to_string(root.join("AGENTS.md")).ok();
+
+    Ok(ProjectView {
+        root: root.to_string_lossy().to_string(),
+        tree,
+        agents_md,
+        file_count,
+    })
 }
 
 #[derive(serde::Serialize)]
@@ -1321,7 +1445,7 @@ pub struct UpdateCheckResult {
     pub error: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_check_update(app: tauri::AppHandle) -> Result<UpdateCheckResult, String> {
     let current = env!("CARGO_PKG_VERSION").to_string();
     let updater = app.updater().map_err(|e| e.to_string());
@@ -1364,7 +1488,7 @@ pub async fn neocodex_check_update(app: tauri::AppHandle) -> Result<UpdateCheckR
 
 /// Report the current git branch + dirty state for the status bar (parity
 /// with Claude Code / Codex Desktop, both of which surface the branch inline).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn neocodex_git_status() -> Result<Option<GitStatus>, String> {
     fn git(args: &[&str]) -> Option<String> {
         let out = std::process::Command::new("git")
@@ -1394,7 +1518,7 @@ pub struct GitStatus {
 
 /// /init — scaffold AGENTS.md with project structure + conventions.
 /// Returns the generated markdown so the frontend can insert it or save it.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_init_project(session_id: String) -> Result<String, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -1450,7 +1574,7 @@ This file guides AI coding agents working in this repository.
 }
 
 /// /export — export current session as Markdown (reuse SessionSidebar logic).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_export_session(session_id: String, format: Option<String>) -> Result<String, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -1487,7 +1611,7 @@ pub async fn neocodex_export_session(session_id: String, format: Option<String>)
 }
 
 /// /clear — wipe all messages from the current session wire (keep file for continuity).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_clear_session(session_id: String) -> Result<String, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -1516,7 +1640,7 @@ pub async fn neocodex_clear_session(session_id: String) -> Result<String, String
 }
 
 /// /feedback — record user feedback as a SystemEvent for telemetry.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_feedback(session_id: String, text: String) -> Result<String, String> {
     let path = session_path(&session_id);
     if !path.exists() {
@@ -1548,7 +1672,7 @@ pub async fn neocodex_feedback(session_id: String, text: String) -> Result<Strin
 /// Download and install a pending update. Emits `neocodex_update_progress`
 /// {downloaded_bytes, total_bytes?} as chunks arrive, then triggers the
 /// native relaunch once the new bundle is staged.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), String> {
     let updater = app.updater().map_err(|e| e.to_string())?;
     let update = updater.check().await.map_err(|e| e.to_string())?;
@@ -1584,7 +1708,7 @@ pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), Strin
 /// `{ "files": [ { "path": "...", "hunks": [ { "lines": [
 ///    { "t": "ctx"|"del"|"add", "o": old_line|0, "n": new_line|0, "s": content } ] } ] } ] }`
 /// so the chat's diff panel can render real changes (Claude/Codex parity).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn neocodex_get_diff() -> Result<serde_json::Value, String> {
     use std::process::Command;
     let out = Command::new("git")
@@ -1707,7 +1831,7 @@ fn parse_unified_diff_rich(diff_text: &str) -> Vec<serde_json::Value> {
 
 /// Apply (accept) or reject a file's diff in the neocodex session.
 /// action: "accept" stages the file (git add), "reject" restores it (git restore).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn neocodex_apply_diff(path: String, action: String) -> Result<(), String> {
     use std::process::Command;
     match action.as_str() {
@@ -1790,13 +1914,13 @@ fn parse_neocodex_diff(diff_str: &str) -> Vec<crate::commands::DiffBlock> {
 }
 
 /// Open a file in the internal editor by dispatching a frontend event.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn neocodex_open_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
     app.emit("neocodex:open-file", path).map_err(|e| e.to_string())
 }
 
 /// Open a file in the external editor (OS default).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_open_external(path: String) -> Result<(), String> {
     let status = if cfg!(target_os = "windows") {
         std::process::Command::new("cmd").args(["/C", "start", ""]).arg(&path).status()
@@ -1810,7 +1934,7 @@ pub async fn neocodex_open_external(path: String) -> Result<(), String> {
 }
 
 /// Get git status for all files in the repo (porcelain format).
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub fn neocodex_git_file_status(cwd: Option<String>) -> Result<Vec<GitFileStatus>, String> {
     use std::process::Command;
     let cwd = cwd.unwrap_or_else(|| std::env::current_dir().unwrap_or_default().to_string_lossy().to_string());
@@ -1846,7 +1970,7 @@ pub struct GitFileStatus {
 }
 
 /// File operations: create file, create folder, delete, rename.
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_file_operation(op: String, path: String, new_name: Option<String>) -> Result<(), String> {
     use std::fs;
     use std::path::Path;

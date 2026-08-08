@@ -194,10 +194,53 @@ impl ProviderCatalog {
                 return;
             }
         }
+        // Restore the user's last provider choice (persisted by set_active_provider).
+        self.load_persisted();
         if !self.is_resolvable() {
             if let Some(idx) = self.providers.iter().position(|p| Self::provider_type_of(&p.name).is_some()) {
                 self.active = idx;
             }
+        }
+    }
+
+    /// Path to the persisted active-provider file (~/.neocodex/provider.json).
+    fn persist_path() -> std::path::PathBuf {
+        let base = dirs::data_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from(".neocodex"))
+            .join("neocodex");
+        base.join("provider.json")
+    }
+
+    /// Re-apply the persisted provider choice after a catalog sync.
+    /// Safe to call on every agent boot: no-ops when no file exists.
+    pub fn load_persisted(&mut self) {
+        let path = Self::persist_path();
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return;
+        };
+        let Ok(saved) = serde_json::from_str::<serde_json::Value>(&text) else {
+            return;
+        };
+        if let Some(name) = saved.get("active").and_then(|v| v.as_str()) {
+            if let Some(idx) = self.providers.iter().position(|p| p.name == name) {
+                self.active = idx;
+            }
+        }
+    }
+
+    /// Persist the active provider name so it survives app restarts.
+    pub fn save_persisted(&self) {
+        let path = Self::persist_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let name = self
+            .providers
+            .get(self.active)
+            .map(|p| p.name.clone())
+            .unwrap_or_default();
+        if let Ok(text) = serde_json::to_string(&serde_json::json!({ "active": name })) {
+            let _ = std::fs::write(path, text);
         }
     }
 
@@ -328,6 +371,21 @@ impl StreamingMarkdown {
 
 // ── Context Pipeline (from Claude Code: 5-layer compaction) ──
 
+/// Precise token counter backed by a lazily-initialized tiktoken BPE.
+/// Falls back to the classic chars/4 estimate if the BPE cannot be built
+/// (e.g. offline first-run). The BPE is built once per process.
+pub fn count_tokens(text: &str) -> usize {
+    static BPE: std::sync::OnceLock<Option<tiktoken_rs::CoreBPE>> = std::sync::OnceLock::new();
+    let bpe = BPE.get_or_init(|| {
+        tiktoken_rs::cl100k_base()
+            .ok()
+    });
+    match bpe {
+        Some(bpe) => bpe.encode_with_special_tokens(text).len(),
+        None => text.len() / 4,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ContextTurn {
     pub role: String,
@@ -342,6 +400,9 @@ pub struct ContextPipeline {
     pub max_tokens: usize,
     pub budget_high: f64,
     pub budget_low: f64,
+    /// When true, `push` counts tokens with tiktoken instead of trusting the
+    /// caller's chars/4 estimate (which over-counts CJK text badly).
+    pub use_tiktoken: bool,
 }
 
 impl ContextPipeline {
@@ -351,10 +412,16 @@ impl ContextPipeline {
             max_tokens,
             budget_high: 0.8,
             budget_low: 0.5,
+            use_tiktoken: true,
         }
     }
 
     pub fn push(&mut self, role: &str, content: String, token_count: usize) {
+        let token_count = if self.use_tiktoken {
+            count_tokens(&content)
+        } else {
+            token_count
+        };
         self.turns.push_back(ContextTurn {
             role: role.to_string(),
             content,
@@ -392,7 +459,7 @@ impl ContextPipeline {
                     kept,
                     turn.content.len().saturating_sub(kept.len())
                 );
-                turn.token_count = kept.len() / 4;
+                turn.token_count = if self.use_tiktoken { count_tokens(&turn.content) } else { kept.len() / 4 };
             }
         }
 
@@ -413,7 +480,7 @@ impl ContextPipeline {
             if self.turns[i].priority < 2 {
                 let kept = self.turns[i].content.chars().take(200).collect::<String>();
                 self.turns[i].content = format!("{}...", kept);
-                self.turns[i].token_count = kept.len() / 4;
+                self.turns[i].token_count = if self.use_tiktoken { count_tokens(&self.turns[i].content) } else { kept.len() / 4 };
             }
             i += 1;
         }
@@ -439,7 +506,7 @@ impl ContextPipeline {
             ));
         }
         if !distilled.is_empty() {
-            let distilled_tokens = distilled.len() / 4;
+            let distilled_tokens = if self.use_tiktoken { count_tokens(&distilled) } else { distilled.len() / 4 };
             self.turns.push_front(ContextTurn {
                 role: "summary".into(),
                 content: distilled,
@@ -1737,10 +1804,19 @@ impl NeoCodexAgent {
     /// Streaming ReAct loop: emits tokens via callback as they arrive from the provider.
     /// `on_token` returns `true` to continue or `false` to cancel; a cancelled
     /// stream returns the tokens accumulated so far (partial reply).
+    /// `on_tool` fires after each tool execution (name, args, result, duration_ms, success);
+    /// returning `false` cancels the loop (same semantics as `on_token`).
     /// Returns the final accumulated response (or error).
-    pub async fn react_loop_stream<F>(&mut self, input: &str, max_steps: usize, mut on_token: F) -> Option<String>
+    pub async fn react_loop_stream<F, G>(
+        &mut self,
+        input: &str,
+        max_steps: usize,
+        mut on_token: F,
+        mut on_tool: G,
+    ) -> Option<String>
     where
         F: FnMut(&str) -> bool + Send + Sync,
+        G: FnMut(&str, &str, &str, u64, bool) -> bool + Send + Sync,
     {
         let provider = self.provider.to_llm_provider()?;
 
@@ -1836,16 +1912,22 @@ impl NeoCodexAgent {
                         step += 1;
                         continue;
                     }
+                    let tool_started = Instant::now();
                     let result = self.execute_tool(&name, &args).await;
+                    let tool_duration_ms = tool_started.elapsed().as_millis() as u64;
                     let actual_ok = !result.starts_with('[');
                     self.tool_grounding.record_tool_result(&name, true, actual_ok);
                     self.wire.record(WireEvent::ToolCall {
                         name: name.clone(),
                         args: args.clone(),
                         result: result.clone(),
-                        duration_ms: 0,
+                        duration_ms: tool_duration_ms,
                         success: actual_ok,
                     });
+                    if !on_tool(&name, &args, &result, tool_duration_ms, actual_ok) {
+                        cancelled = true;
+                        break;
+                    }
                     messages.push(Message::assistant_with_calls(
                         &response_content,
                         vec![crate::neotrix::nt_io_provider::types::ToolCallInfo {
@@ -2661,6 +2743,7 @@ mod tests {
     #[test]
     fn test_context_pipeline_simple() {
         let mut ctx = ContextPipeline::new(1000);
+        ctx.use_tiktoken = false; // unit test of pipeline mechanics, not counting
         ctx.push("user", "test message".into(), 10);
         assert_eq!(ctx.turns.len(), 1);
         assert!(ctx.total_tokens() <= ctx.max_tokens);
@@ -2669,6 +2752,7 @@ mod tests {
     #[test]
     fn test_context_pipeline_compaction() {
         let mut ctx = ContextPipeline::new(500);
+        ctx.use_tiktoken = false; // drive compaction with exact caller estimates
         for i in 0..20 {
             ctx.push("user", format!("message {}", i), 100);
         }
@@ -2681,6 +2765,7 @@ mod tests {
         // the pipeline reached it with >10 turns. Sixty small turns force
         // Layer 2 -> Layer 4 while staying well under the hard cap.
         let mut ctx = ContextPipeline::new(5000);
+        ctx.use_tiktoken = false; // rely on caller estimates so compaction triggers
         for i in 0..60 {
             ctx.push("user", format!("message {} {}", i, "x".repeat(40)), 100);
         }
@@ -3033,6 +3118,114 @@ mod tests {
     }
 
     #[test]
+    fn test_count_tokens_cjk_is_precise() {
+        // Determinism: same text must count identically every time.
+        let cjk = "这是一个用于验证中文分词精确性的测试句子，包含标点符号和数字123，以及英文 mixed content here.";
+        let a = count_tokens(cjk);
+        let b = count_tokens(cjk);
+        assert_eq!(a, b, "token counting must be deterministic");
+
+        // Known reference: cl100k encodes "hello world" as 2 tokens.
+        assert_eq!(count_tokens("hello world"), 2);
+
+        // CJK is ~1-3 tokens per char under cl100k; the old bytes/4 estimate
+        // divides UTF-8 byte length (3 bytes/char for CJK) by 4, so it
+        // systematically UNDER-counts CJK-heavy text. Precise must be >= crude
+        // here — a full-character CJK string never collapses below bytes/4.
+        let precise = a;
+        let crude = cjk.len() / 4;
+        assert!(
+            precise >= crude.saturating_sub(1),
+            "precise {} should not fall below crude {} for CJK text (old estimator under-counts)",
+            precise,
+            crude
+        );
+        assert!(precise > 0);
+
+        // English stays ~4 chars/token: precise should track crude within a
+        // small band rather than blowing up.
+        let english = "the quick brown fox jumps over the lazy dog and runs far away from the town";
+        let en_precise = count_tokens(english);
+        let en_crude = english.len() / 4;
+        assert!(
+            en_precise >= en_crude.saturating_sub(2),
+            "english precise {} vs crude {}",
+            en_precise,
+            en_crude
+        );
+        assert!(en_precise <= en_crude + 4, "english precise {} vs crude {}", en_precise, en_crude);
+    }
+
+    #[test]
+    fn test_context_pipeline_push_uses_tiktoken() {
+        let mut pipe = ContextPipeline::new(10_000);
+        assert!(pipe.use_tiktoken, "tiktoken should be enabled by default");
+
+        // A payload whose true token count differs from the caller estimate.
+        let cjk = "上下文管线测试：中文内容不应该被错误估计，每一个字符大约一个token。".to_string();
+        pipe.push("user", cjk.clone(), 9999); // caller's estimate is deliberately wrong
+        let turn = pipe.turns.front().expect("one turn");
+        assert!(
+            turn.token_count < 9999,
+            "tiktoken should override the caller estimate: {}",
+            turn.token_count
+        );
+        assert!(turn.token_count > 0);
+        // The turn's count must equal the precise counter's output.
+        assert_eq!(turn.token_count, count_tokens(&cjk));
+    }
+
+    #[test]
+    fn test_context_pipeline_fallback_without_tiktoken() {
+        let mut pipe = ContextPipeline::new(10_000);
+        pipe.use_tiktoken = false;
+        let text = "plain ascii payload for fallback path".to_string();
+        pipe.push("user", text.clone(), 42);
+        let turn = pipe.turns.front().expect("one turn");
+        assert_eq!(turn.token_count, 42, "caller estimate should be honored when tiktoken disabled");
+    }
+
+    #[test]
+    fn test_provider_persist_roundtrip() {
+        // Isolate the persisted provider file to a temp data dir.
+        let tmp = std::env::temp_dir().join(format!("neocodex-provider-test-{}", std::process::id()));
+        let old_data = std::env::var("XDG_DATA_HOME").ok();
+        let old_home = std::env::var("HOME").ok();
+        std::env::set_var("XDG_DATA_HOME", &tmp);
+        std::env::set_var("HOME", &tmp);
+
+        // Save a persisted choice.
+        let mut catalog = ProviderCatalog::new();
+        catalog.sync_from_real();
+        assert!(catalog.set_active_provider("ollama"), "ollama should exist in real catalog");
+        catalog.save_persisted();
+        let persist_file = ProviderCatalog::persist_path();
+        assert!(persist_file.exists(), "provider.json should be written at {}", persist_file.display());
+
+        // Fresh catalog must restore the saved choice after sync.
+        let mut restored = ProviderCatalog::new();
+        restored.sync_from_real();
+        restored.load_persisted();
+        assert_eq!(restored.active_model(), catalog.active_model());
+
+        // ensure_production_provider also honors the persisted choice.
+        let mut via_ensure = ProviderCatalog::new();
+        via_ensure.ensure_production_provider();
+        assert_eq!(via_ensure.active_model(), catalog.active_model());
+
+        // Cleanup.
+        std::fs::remove_dir_all(&tmp).ok();
+        match old_data {
+            Some(v) => std::env::set_var("XDG_DATA_HOME", v),
+            None => std::env::remove_var("XDG_DATA_HOME"),
+        }
+        match old_home {
+            Some(v) => std::env::set_var("HOME", v),
+            None => std::env::remove_var("HOME"),
+        }
+    }
+
+    #[test]
     fn test_health_report_snapshot() {
         let agent = NeoCodexAgent::new("health-test");
         let report = agent.health_report();
@@ -3177,9 +3370,11 @@ mod tests {
             agent.provider.providers.push(ProviderInfo::default());
             agent.provider.active = 0;
             let mut seen = Vec::new();
-            let result = agent.react_loop_stream("hi", 3, |t| { seen.push(t.to_string()); true }).await;
+            let mut tools = Vec::new();
+            let result = agent.react_loop_stream("hi", 3, |t| { seen.push(t.to_string()); true }, |n, _, _, _, _| { tools.push(n.to_string()); true }).await;
             assert!(result.is_none());
             assert!(seen.is_empty());
+            assert!(tools.is_empty());
         });
     }
 

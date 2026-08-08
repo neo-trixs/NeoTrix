@@ -21,6 +21,10 @@ pub mod l1_body_impl;
 // ─── 经验 → 能力树迭代目标桥 (experience-tree 蒸馏 → capability registry) ─
 pub mod nt_capability_bridge;
 
+// ─── iOS FFI bridge (uniffi → Swift) ──────────────────────────────────────
+#[cfg(feature = "ios-bridge")]
+pub mod ffi;
+
 // ─── Migrated module re-exports (backward compat with crate::neotrix::nt_*) ─
 
 // L9 — Transcendent (超验层) — 观察自身

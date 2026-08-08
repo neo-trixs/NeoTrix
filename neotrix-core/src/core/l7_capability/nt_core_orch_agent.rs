@@ -518,26 +518,40 @@ impl AgentCatalog {
         // 必须在 explorer 之前判断: "research" 含 "search" 子串, 否则被误夺。
         if hint.contains("research") || hint.contains("研究") || hint.contains("find")
             || hint.contains("aggregate") || hint.contains("synthesize") {
-            return Self::by_name("researcher").unwrap();
+            return Self::by_name("researcher").unwrap_or_else(|| Self::fallback_profile());
         }
         if hint.contains("explore") || hint.contains("search") || hint.contains("read")
             || hint.contains("inspect") || hint.contains("audit") || hint.contains("分析")
             || hint.contains("查找") {
-            return Self::by_name("explorer").unwrap();
+            return Self::by_name("explorer").unwrap_or_else(|| Self::fallback_profile());
         }
         if hint.contains("plan") || hint.contains("design") || hint.contains("方案")
             || hint.contains("调研") || hint.contains("architecture") {
-            return Self::by_name("planner").unwrap();
+            return Self::by_name("planner").unwrap_or_else(|| Self::fallback_profile());
         }
         if hint.contains("verify") || hint.contains("test") || hint.contains("审查")
             || hint.contains("review") || hint.contains("回滚") {
-            return Self::by_name("verifier").unwrap();
+            return Self::by_name("verifier").unwrap_or_else(|| Self::fallback_profile());
         }
         if hint.contains("monitor") || hint.contains("watch") || hint.contains("health")
             || hint.contains("监控") || hint.contains("心跳") {
-            return Self::by_name("watcher").unwrap();
+            return Self::by_name("watcher").unwrap_or_else(|| Self::fallback_profile());
         }
-        Self::by_name("generalist").unwrap()
+        Self::by_name("generalist").unwrap_or_else(|| Self::fallback_profile())
+    }
+
+    /// 兜底 profile：目录意外缺名时保证 route() 恒有返回值（内部不变量防御）。
+    fn fallback_profile() -> AgentProfile {
+        Self::builtin().into_iter().next().unwrap_or_else(|| AgentProfile {
+            name: "generalist",
+            tier: AgentTier::Trunk,
+            e8_mode: 1,
+            description: "内置兜底 agent：目录损坏时的最后防线",
+            goal: "在目录缺失时保持最小可用能力",
+            capabilities: vec![CapabilityOp::Reason],
+            allowed_tools: vec![ToolPerm::Read],
+            max_context: 2048,
+        })
     }
 
     /// 展示目录（供 `/agent catalog` 用）。

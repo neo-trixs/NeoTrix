@@ -97,6 +97,9 @@ pub struct SelfIteratingBrain {
     pub nt_world_jepa: Option<JepaWorldModel>,
     pub default_model: String,
     pub(crate) _dpo_stage: DpoStage,
+    pub(crate) _sft_stage: super::super::sft_stage::SftStage,
+    pub(crate) _process_stage: super::super::process_stage::ProcessStage,
+    pub(crate) _search_skill_stage: super::super::search_skill_stage::SearchSkillStage,
     pub(crate) _constitutional_stage: ConstitutionalSelfCritiqueStage,
     pub(crate) _safety_stage: SafetyCheckStage,
     pub(crate) _consciousness_stream: ConsciousnessStream,
@@ -115,6 +118,10 @@ pub struct SelfIteratingBrain {
 
     /// Last consciousness quality score from InnerCritic (0.0–1.0)
     pub(crate) _last_consciousness_quality: f64,
+    /// 意识树果实 (EvolutionFruit) — 由 handlers_consciousness 注入, ProcessWrapperStage 消费。
+    /// 缺陷4修复: SEAL 从"只读 tool_traces"升级为"消费意识树果实", 打通
+    /// ConsciousnessTree → SEAL process 闭环 (外部调研: 果实→guidance 元认知闭环)。
+    pub(crate) _consciousness_fruits: Vec<crate::core::nt_core_consciousness_tree::EvolutionFruit>,
     /// Total consciousness critiques received
     pub(crate) _consciousness_critique_count: u64,
     /// Phase 9.2 — dynamic self-model: continuous estimate of capability,
@@ -192,6 +199,9 @@ impl SelfIteratingBrain {
             nt_world_jepa: None,
             default_model: "default".to_string(),
             _dpo_stage: DpoStage::new(),
+            _sft_stage: super::super::sft_stage::SftStage::new(),
+            _process_stage: super::super::process_stage::ProcessStage::new(),
+            _search_skill_stage: super::super::search_skill_stage::SearchSkillStage::new(),
             _constitutional_stage: ConstitutionalSelfCritiqueStage::new(),
             _safety_stage: SafetyCheckStage::new(),
             _consciousness_stream: ConsciousnessStream::default(),
@@ -212,6 +222,7 @@ impl SelfIteratingBrain {
                 std::path::PathBuf::from("~/.neotrix/cross_session_memory.json"),
             )),
             _last_consciousness_quality: 0.0,
+            _consciousness_fruits: Vec::new(),
             _consciousness_critique_count: 0,
             self_model: crate::core::nt_core_self::SelfModel::new(),
             element_registry: Self::build_element_registry(),

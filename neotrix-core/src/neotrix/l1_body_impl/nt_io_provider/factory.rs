@@ -641,9 +641,27 @@ pub async fn create_gateway_async() -> GatewayV2 {
 /// 同步版本 — 保留向后兼容 (内部调用 block_on)
 /// 如果已通过 Handle::try_current 或 enter() 存在 runtime 上下文，使用它；
 /// 否则创建新 runtime 避免嵌套 runtime 冲突。
+///
+/// 启动期安全: 整个初始化带总超时 (15s), 防止任一 provider 探测的网络调用
+/// 无超时保护时导致 app 启动永久卡死; 超时后返回空 gateway (可后续懒加载)。
+///
+/// 注意: 新建的 tokio Runtime 通过 Box::leak 长期存活, 避免 drop 时等待
+/// blocking 线程池 (若 spawn_blocking 的 reqwest 阻塞请求被 timeout 中断,
+/// 其后台线程仍可能存活, Runtime::drop 的 BlockingPool::shutdown 会死等)。
 pub fn create_gateway() -> GatewayV2 {
+    let fut = async {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            create_gateway_async(),
+        )
+        .await
+        .unwrap_or_else(|_elapsed| {
+            log::warn!("[gateway] init timed out after 15s; returning empty gateway (lazy-load providers later)");
+            GatewayV2::new()
+        })
+    };
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        handle.block_on(create_gateway_async())
+        handle.block_on(fut)
     } else {
         let rt = match tokio::runtime::Runtime::new() {
             Ok(rt) => rt,
@@ -652,6 +670,9 @@ pub fn create_gateway() -> GatewayV2 {
                 std::process::exit(1);
             }
         };
-        rt.block_on(create_gateway_async())
+        let gateway = rt.block_on(fut);
+        // 泄漏 runtime: 进程生命周期内保持存活, 避免 drop 卡死在 BlockingPool::shutdown。
+        std::mem::forget(rt);
+        gateway
     }
 }

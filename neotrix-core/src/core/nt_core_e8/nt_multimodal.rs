@@ -363,11 +363,12 @@ impl VisionBridge {
     /// served from memory. Bounded to `CACHE_CAPACITY` entries, thread-safe.
     pub fn analyze_cached(bytes: &[u8]) -> Result<(ImageEvidence, Vec<f64>), String> {
         let digest = hex::encode(Sha256::digest(bytes));
-        if let Some(hit) = EVIDENCE_CACHE.lock().unwrap().get(&digest) {
+        // 毒化锁 → 视为缓存不可用，直接重算（cache 只是性能优化，非正确性依赖）。
+        if let Some(hit) = EVIDENCE_CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(&digest) {
             return Ok(hit.clone());
         }
         let result = Self::analyze(bytes)?;
-        let mut guard = EVIDENCE_CACHE.lock().unwrap();
+        let mut guard = EVIDENCE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         if guard.len() >= CACHE_CAPACITY {
             guard.clear();
         }

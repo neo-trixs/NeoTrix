@@ -104,7 +104,10 @@ impl ActionCache {
         } else {
             let (action, selectors) = miss_handler();
             self.remember(signature, &action, selectors);
-            let ca = self.lookup(signature).cloned().unwrap();
+            // remember 刚写入，lookup 必然命中；防御性处理避免无谓 panic。
+            let Some(ca) = self.lookup(signature).cloned() else {
+                return (false, false);
+            };
             let ok = self.execute_with_fallback(&ca, executor) != FallbackOutcome::Failed;
             (false, ok)
         }

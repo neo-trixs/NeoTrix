@@ -214,6 +214,13 @@ impl BackgroundLoopHandle {
                     }
                 }
             }
+            // B5 (缺陷4修复): 把意识树果实注入 SEAL brain, 使 ProcessWrapperStage
+            // 消费 extract_from_consciousness_tree → 打通 ConsciousnessTree → SEAL
+            // process 闭环。此前果实仅存于树内, SEAL 从不消费 (process_stage.rs:130
+            // extract_from_consciousness_tree 无生产调用者)。
+            if let Ok(mut brain) = self.brain.try_write() {
+                brain._consciousness_fruits = tree.fruits.clone();
+            }
         }
 
         // ── Phase 2: Consciousness Runtime Tick with REAL resonance content ──
@@ -717,6 +724,10 @@ impl BackgroundLoopHandle {
         } else {
             self_tests.register(Box::new(crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime::new()));
         }
+
+        // SpeciousPresent + VolitionEngine — 意识基础件不变量 (T2 注册 + T3 生产接线)
+        self_tests.register(Box::new(crate::core::nt_core_consciousness::specious_present::SpeciousPresent::default()));
+        self_tests.register(Box::new(crate::core::nt_core_consciousness::volition::VolitionEngine::default()));
 
         // ConsciousnessMonitor (awareness)
         if let Some(ref monitor) = self.awareness {

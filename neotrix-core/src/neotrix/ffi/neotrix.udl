@@ -1,0 +1,650 @@
+// NeoTrix FFI Interface Definition
+// This UDL file defines the Rust-to-Swift API surface for NeoTrix core capabilities
+// Generated Swift bindings will be produced by uniffi-bindgen
+
+namespace neotrix;
+
+// =============================================================================
+// Core Types
+// =============================================================================
+
+// Error handling
+error NeoTrixError {
+    INIT_FAILED,
+    INVALID_INPUT,
+    OPERATION_FAILED,
+    NOT_INITIALIZED,
+    SERIALIZATION_ERROR,
+    NETWORK_ERROR,
+    PERMISSION_DENIED,
+};
+
+// Configuration
+record NeoTrixConfig {
+    server_url: string;
+    api_key: string;
+    enable_ai_features: boolean;
+    enable_premium_features: boolean;
+    log_level: string; // "debug", "info", "warn", "error"
+    data_directory: string;
+    cache_size_mb: u32;
+};
+
+// Initialization result
+record InitResult {
+    success: boolean;
+    version: string;
+    capabilities: CapabilityList;
+};
+
+// =============================================================================
+// E8 Hexagram Reasoning
+// =============================================================================
+
+record HexagramState {
+    lines: u8; // 6-bit representation (0-63)
+    interpretation: string;
+    confidence: f32;
+    timestamp: i64;
+};
+
+record ReasoningRequest {
+    query: string;
+    context: string;
+    max_depth: u32;
+    use_consciousness: boolean;
+};
+
+record ReasoningResponse {
+    hexagram: HexagramState;
+    reasoning_chain: string[];
+    conclusion: string;
+    confidence: f32;
+    processing_time_ms: u64;
+};
+
+interface E8Reasoning {
+    // Initialize E8 engine
+    init(config: NeoTrixConfig) -> InitResult;
+
+    // Perform hexagram-based reasoning
+    reason(request: ReasoningRequest) -> ReasoningResponse;
+
+    // Get current hexagram state
+    get_current_hexagram() -> HexagramState;
+
+    // Evolve hexagram based on feedback
+    evolve_hexagram(feedback: string, outcome: boolean) -> HexagramState;
+
+    // Get all 64 hexagram interpretations
+    get_hexagram_library() -> HexagramLibrary;
+};
+
+record HexagramLibrary {
+    hexagrams: HexagramInfo[];
+};
+
+record HexagramInfo {
+    index: u8; // 0-63
+    name: string;
+    chinese_name: string;
+    judgment: string;
+    image: string;
+    lines: LineInfo[];
+};
+
+record LineInfo {
+    position: u8; // 1-6 (bottom to top)
+    yin_yang: boolean; // true = yang, false = yin
+    text: string;
+};
+
+// =============================================================================
+// VSA HyperCube (Vector Symbolic Architecture)
+// =============================================================================
+
+record HyperVector {
+    dimensions: u32;
+    data: bytes; // Binary vector data
+    sparsity: f32;
+};
+
+record VSAOperation {
+    op_type: string; // "bind", "bundle", "permute", "similarity"
+    vectors: HyperVector[];
+    parameters: map<string, string>;
+};
+
+record VSAResult {
+    result_vector: HyperVector;
+    similarity_scores: f32[];
+    operation_time_ms: u64;
+};
+
+interface VSAHyperCube {
+    // Initialize HyperCube with dimensions
+    init(dimensions: u32, sparsity: f32) -> InitResult;
+
+    // Create random hypervector
+    random_vector(label: string) -> HyperVector;
+
+    // Bind two vectors (XOR for binary, circular convolution for complex)
+    bind(v1: HyperVector, v2: HyperVector) -> HyperVector;
+
+    // Bundle multiple vectors (superposition)
+    bundle(vectors: HyperVector[]) -> HyperVector;
+
+    // Permute vector (position encoding)
+    permute(vector: HyperVector, shifts: u32) -> HyperVector;
+
+    // Compute similarity (cosine for real, Hamming for binary)
+    similarity(v1: HyperVector, v2: HyperVector) -> f32;
+
+    // Cleanup: find closest known vector
+    cleanup(vector: HyperVector, known_vectors: map<string, HyperVector>) -> string;
+
+    // Store vector with label
+    store(label: string, vector: HyperVector) -> boolean;
+
+    // Retrieve vector by label
+    retrieve(label: string) -> HyperVector;
+
+    // Batch operations for performance
+    batch_operation(operations: VSAOperation[]) -> VSAResult[];
+};
+
+// =============================================================================
+// GWT (Global Workspace Theory) Attention Routing
+// =============================================================================
+
+record AttentionSignal {
+    source_module: string;
+    content: string;
+    salience: f32;
+    timestamp: i64;
+    metadata: map<string, string>;
+};
+
+record WorkspaceState {
+    active_signals: AttentionSignal[];
+    broadcast_history: BroadcastEvent[];
+    resonance_map: map<string, f32>;
+};
+
+record BroadcastEvent {
+    signal: AttentionSignal;
+    recipients: string[];
+    resonance: f32;
+    timestamp: i64;
+};
+
+record RoutingRequest {
+    signal: AttentionSignal;
+    target_modules: string[];
+    min_resonance: f32;
+};
+
+record RoutingResponse {
+    routed: boolean;
+    resonance_scores: map<string, f32>;
+    broadcast_event: BroadcastEvent;
+};
+
+interface GWTAttentionRouter {
+    // Initialize attention router
+    init(module_names: string[]) -> InitResult;
+
+    // Submit signal to global workspace
+    submit_signal(signal: AttentionSignal) -> RoutingResponse;
+
+    // Get current workspace state
+    get_workspace_state() -> WorkspaceState;
+
+    // Register module for attention
+    register_module(name: string, interest_keywords: string[]) -> boolean;
+
+    // Unregister module
+    unregister_module(name: string) -> boolean;
+
+    // Set module salience threshold
+    set_salience_threshold(module: string, threshold: f32) -> boolean;
+
+    // Get resonance between modules
+    get_resonance(module_a: string, module_b: string) -> f32;
+};
+
+// =============================================================================
+// ConsciousnessTree (11-Branch Meta-Cognition)
+// =============================================================================
+
+record BranchState {
+    branch_id: string; // "NT-META", "NT-REPAIR", "NT-GOVERNANCE", "NT-NEXUS", "NT-CORE", "NT-MIND", "NT-MEMORY", "NT-WORLD", "NT-ACT", "NT-IO", "NT-SHIELD"
+    health: f32; // 0.0 - 1.0
+    maturity: u8; // C0-C6
+    last_activity: i64;
+    metrics: map<string, f32>;
+};
+
+record ConsciousnessState {
+    branches: BranchState[];
+    overall_health: f32;
+    phi_score: f32; // IIT integration score
+    evolution_velocity: f32;
+    stage: string; // "Soil", "Roots", "Trunk", "Branches", "Fruits", "Core"
+    alerts: Alert[];
+};
+
+record Alert {
+    level: string; // "info", "warning", "critical"
+    branch: string;
+    message: string;
+    timestamp: i64;
+};
+
+record SelfTestResult {
+    test_id: string; // T1, T2, T3
+    passed: boolean;
+    details: string;
+    duration_ms: u64;
+};
+
+interface ConsciousnessTree {
+    // Initialize consciousness tree
+    init(config: NeoTrixConfig) -> InitResult;
+
+    // Get current consciousness state
+    get_state() -> ConsciousnessState;
+
+    // Run self-test (T1/T2/T3)
+    run_self_test(tier: u8) -> SelfTestResult[];
+
+    // Trigger meta-cognition cycle
+    trigger_meta_cognition() -> ConsciousnessState;
+
+    // Get branch details
+    get_branch(branch_id: string) -> BranchState;
+
+    // Update branch health
+    update_branch_health(branch_id: string, health: f32, metrics: map<string, f32>) -> boolean;
+
+    // Get evolution history
+    get_evolution_history(limit: u32) -> EvolutionEvent[];
+};
+
+record EvolutionEvent {
+    timestamp: i64;
+    branch: string;
+    event_type: string; // "maturity_upgrade", "health_change", "skill_crystallized", "pattern_absorbed"
+    details: string;
+    impact: f32;
+};
+
+// =============================================================================
+// SEAL Pipeline (Self-Evolving Architecture Loop)
+// =============================================================================
+
+record PipelineStage {
+    stage_id: string; // "exploration", "distillation", "self_test", "absorption"
+    status: string; // "pending", "running", "completed", "failed"
+    progress: f32; // 0.0 - 1.0
+    started_at: i64;
+    completed_at: i64;
+    metrics: map<string, f32>;
+};
+
+record PipelineStatus {
+    current_stage: string;
+    stages: PipelineStage[];
+    overall_progress: f32;
+    cycle_count: u64;
+    last_completed_cycle: i64;
+};
+
+record ExplorationResult {
+    discoveries: Discovery[];
+    patterns: Pattern[];
+    knowledge_gaps: KnowledgeGap[];
+};
+
+record Discovery {
+    id: string;
+    domain: string;
+    content: string;
+    confidence: f32;
+    source: string;
+};
+
+record Pattern {
+    id: string;
+    name: string;
+    description: string;
+    applicability: string[];
+    strength: f32;
+};
+
+record KnowledgeGap {
+    domain: string;
+    description: string;
+    priority: f32;
+};
+
+interface SEALPipeline {
+    // Initialize pipeline
+    init(config: NeoTrixConfig) -> InitResult;
+
+    // Get pipeline status
+    get_status() -> PipelineStatus;
+
+    // Run full pipeline cycle
+    run_cycle() -> PipelineStatus;
+
+    // Run specific stage
+    run_stage(stage_id: string) -> PipelineStage;
+
+    // Get exploration results
+    get_exploration_results() -> ExplorationResult;
+
+    // Trigger distillation
+    trigger_distillation() -> DistillationResult;
+
+    // Get absorption progress
+    get_absorption_progress() -> AbsorptionProgress;
+};
+
+record DistillationResult {
+    patterns_extracted: u32;
+    skills_crystallized: u32;
+    knowledge_compressed_mb: f32;
+    duration_ms: u64;
+};
+
+record AbsorptionProgress {
+    pending: u32;
+    in_progress: u32;
+    completed: u32;
+    failed: u32;
+    current_item: string;
+};
+
+// =============================================================================
+// Knowledge Base (KB) Bridge
+// =============================================================================
+
+record KBQuery {
+    query: string;
+    namespace: string; // "experience", "knowledge", "skills", "patterns"
+    limit: u32;
+    threshold: f32;
+    filters: map<string, string>;
+};
+
+record KBResult {
+    id: string;
+    namespace: string;
+    content: string;
+    embedding: HyperVector;
+    metadata: map<string, string>;
+    score: f32;
+};
+
+record KBStats {
+    total_nodes: u64;
+    total_edges: u64;
+    namespaces: map<string, u64>;
+    storage_mb: f32;
+    index_status: string;
+};
+
+interface KBBridge {
+    // Initialize KB connection
+    init(config: NeoTrixConfig) -> InitResult;
+
+    // Query knowledge base
+    query(query: KBQuery) -> KBResult[];
+
+    // Store experience
+    store_experience(content: string, namespace: string, metadata: map<string, string>) -> string;
+
+    // Get KB statistics
+    get_stats() -> KBStats;
+
+    // Semantic search
+    semantic_search(query: string, namespace: string, limit: u32) -> KBResult[];
+
+    // Get related concepts
+    get_related(concept_id: string, limit: u32) -> KBResult[];
+
+    // Run absorption cycle
+    run_absorption() -> AbsorptionProgress;
+};
+
+// =============================================================================
+// Skill Tree (POE-Inspired Capability Progression)
+// =============================================================================
+
+record SkillNode {
+    id: string;
+    name: string;
+    description: string;
+    tier: string; // "Small Passive", "Notable Passive", "Keystone"
+    domain: string; // "NT-CORE", "NT-MIND", "NT-MEMORY", "NT-WORLD", "NT-ACT", "NT-IO", "NT-SHIELD"
+    prerequisites: string[];
+    unlocked: boolean;
+    progress: f32; // 0.0 - 1.0
+    effects: SkillEffect[];
+};
+
+record SkillEffect {
+    effect_type: string; // "stat_boost", "new_ability", "efficiency", "unlock"
+    target: string;
+    value: f32;
+    description: string;
+};
+
+record SkillTreeState {
+    nodes: SkillNode[];
+    allocated_points: u32;
+    available_points: u32;
+    active_constellations: string[]; // C0-C6
+};
+
+interface SkillTree {
+    // Initialize skill tree
+    init() -> InitResult;
+
+    // Get full skill tree state
+    get_state() -> SkillTreeState;
+
+    // Allocate point to node
+    allocate_point(node_id: string) -> SkillNode;
+
+    // Respec (reset allocations)
+    respec() -> SkillTreeState;
+
+    // Get node details
+    get_node(node_id: string) -> SkillNode;
+
+    // Check if constellation active
+    is_constellation_active(constellation: string) -> boolean;
+
+    // Get recommended allocations
+    get_recommendations(playstyle: string) -> string[];
+};
+
+// =============================================================================
+// Rune Socketing (5-Slot Configuration)
+// =============================================================================
+
+record Rune {
+    color: string; // "Crimson", "Indigo", "Obsidian", "Golden", "Alabaster"
+    name: string;
+    description: string;
+    effects: RuneEffect[];
+};
+
+record RuneEffect {
+    target: string;
+    modifier: f32;
+    condition: string;
+};
+
+record Runeword {
+    name: string;
+    runes: string[]; // 5 rune colors
+    effect: string;
+    description: string;
+};
+
+record SocketConfig {
+    module: string;
+    sockets: map<string, string>; // slot -> rune name
+    active_runewords: Runeword[];
+};
+
+interface RuneSocketing {
+    // Initialize rune system
+    init() -> InitResult;
+
+    // Get available runes
+    get_runes() -> Rune[];
+
+    // Get runewords
+    get_runewords() -> Runeword[];
+
+    // Configure module sockets
+    configure_sockets(config: SocketConfig) -> boolean;
+
+    // Get module config
+    get_module_config(module: string) -> SocketConfig;
+
+    // Compute effective runewords
+    compute_runewords(module: string) -> Runeword[];
+};
+
+// =============================================================================
+// Constellation Maturity (C0-C6)
+// =============================================================================
+
+record ConstellationState {
+    module: string;
+    level: u8; // 0-6 (C0-C6)
+    requirements: ConstellationRequirement[];
+    progress: f32;
+    unlocked_features: string[];
+};
+
+record ConstellationRequirement {
+    requirement_type: string; // "tests_passing", "benchmarks", "integration", "self_healing"
+    description: string;
+    satisfied: boolean;
+    progress: f32;
+};
+
+interface ConstellationSystem {
+    // Get constellation state for module
+    get_state(module: string) -> ConstellationState;
+
+    // Get all constellation states
+    get_all_states() -> ConstellationState[];
+
+    // Check if module can upgrade
+    can_upgrade(module: string) -> boolean;
+
+    // Trigger upgrade check
+    check_upgrade(module: string) -> ConstellationState;
+
+    // Get upgrade path
+    get_upgrade_path(module: string) -> ConstellationRequirement[];
+};
+
+// =============================================================================
+// Dual Specialization (Weapon Sets)
+// =============================================================================
+
+record WeaponSet {
+    set_id: u8; // 1 or 2
+    name: string;
+    primary_domain: string;
+    secondary_domain: string;
+    active_skills: string[];
+    attention_mode: string; // "acquisition", "evolution", "balanced"
+};
+
+record SpecializationState {
+    current_set: u8;
+    sets: WeaponSet[];
+    switch_cooldown_ms: u64;
+    last_switch: i64;
+};
+
+interface DualSpecialization {
+    // Get current specialization state
+    get_state() -> SpecializationState;
+
+    // Switch weapon set
+    switch_set(set_id: u8) -> SpecializationState;
+
+    // Configure weapon set
+    configure_set(set_id: u8, config: WeaponSet) -> WeaponSet;
+
+    // Get recommended set for task
+    recommend_set(task_type: string) -> u8;
+};
+
+// =============================================================================
+// Capability List (for InitResult)
+// =============================================================================
+
+record CapabilityList {
+    e8_reasoning: boolean;
+    vsa_hypercube: boolean;
+    gwt_attention: boolean;
+    consciousness_tree: boolean;
+    seal_pipeline: boolean;
+    kb_bridge: boolean;
+    skill_tree: boolean;
+    rune_socketing: boolean;
+    constellation_system: boolean;
+    dual_specialization: boolean;
+    mtproto_networking: boolean;
+    telegram_premium: boolean;
+    ai_chat_assistant: boolean;
+    smart_filtering: boolean;
+    knowledge_injection: boolean;
+    consciousness_monitor: boolean;
+    auto_evolution: boolean;
+};
+
+// =============================================================================
+// Main NeoTrix Facade (Entry Point)
+// =============================================================================
+
+interface NeoTrix {
+    // Initialize all systems
+    initialize(config: NeoTrixConfig) -> InitResult;
+
+    // Get subsystem interfaces
+    e8_reasoning() -> E8Reasoning;
+    vsa_hypercube() -> VSAHyperCube;
+    gwt_attention() -> GWTAttentionRouter;
+    consciousness_tree() -> ConsciousnessTree;
+    seal_pipeline() -> SEALPipeline;
+    kb_bridge() -> KBBridge;
+    skill_tree() -> SkillTree;
+    rune_socketing() -> RuneSocketing;
+    constellation_system() -> ConstellationSystem;
+    dual_specialization() -> DualSpecialization;
+
+    // Health check
+    health_check() -> HealthStatus;
+
+    // Shutdown
+    shutdown() -> boolean;
+};
+
+record HealthStatus {
+    healthy: boolean;
+    subsystems: map<string, boolean>;
+    issues: string[];
+    uptime_seconds: u64;
+};
