@@ -40,19 +40,6 @@ function ExpandIcon() {
   )
 }
 
-function ModelIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none">
-      {/* 外扩方块 + 右上箭头（向外扩展） */}
-      <rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.2" />
-      <path d="M2.5 6.5h7v-4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-      <circle cx="8" cy="8" r="1.5" stroke="currentColor" stroke-width="1.1" />
-      <line x1="8" y1="4.5" x2="8" y2="6.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
-      <line x1="11.5" y1="8" x2="9.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
-    </svg>
-  )
-}
-
 function PaletteIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none">

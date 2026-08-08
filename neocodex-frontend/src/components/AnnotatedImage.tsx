@@ -238,18 +238,6 @@ export function AnnotatedImage(props: Props) {
     requestAnimationFrame(drawAll)
   }
 
-  /** Serialize annotations to a compact text hint appended to the message. */
-  const serialize = (): string => {
-    if (annotations().length === 0) return ''
-    const parts = annotations().map(a => {
-      if (a.kind === 'box') {
-        return `矩形${a.id}(x:${(a.x * 100).toFixed(1)}%,y:${(a.y * 100).toFixed(1)}%,w:${(a.w * 100).toFixed(1)}%,h:${(a.h * 100).toFixed(1)}%)`
-      }
-      return `箭头${a.id}(from:${(a.x * 100).toFixed(1)}%,${(a.y * 100).toFixed(1)}%→to:${((a.ex ?? 0) * 100).toFixed(1)}%,${((a.ey ?? 0) * 100).toFixed(1)}%)`
-    })
-    return `[图片标注 ${props.imageName}] ${parts.join('; ')}`
-  }
-
   const confirm = () => {
     if (annotations().length === 0) {
       // Allow confirm with no annotations (image itself still sent).

@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For } from 'solid-js'
+import { createSignal, For } from 'solid-js'
 import { Shield, MousePointer2, Edit3, FileText, ChevronDown, Check } from 'lucide-solid'
 import { clsx } from 'clsx'
 

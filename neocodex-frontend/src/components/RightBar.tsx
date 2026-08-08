@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show, onCleanup } from 'solid-js'
+import { createSignal, createEffect, For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
 
@@ -151,8 +151,6 @@ export function RightBar() {
   const [treeLoading, setTreeLoading] = createSignal(false)
   const [fileLoading, setFileLoading] = createSignal(false)
   const [treeError, setTreeError] = createSignal<string | null>(null)
-
-  const rbOpen = () => !collapsed()
 
   /* 加载真实项目树（neocodex_project_tree） */
   const loadTree = async () => {

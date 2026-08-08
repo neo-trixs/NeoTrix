@@ -42,7 +42,6 @@ interface Props {
 }
 
 export function ComputerUse(props: Props) {
-  const [screenshot, setScreenshot] = createSignal<ScreenCapture | null>(null)
   const [screenshotDataUrl, setScreenshotDataUrl] = createSignal<string | null>(null)
   const [windows, setWindows] = createSignal<WindowInfo[]>([])
   const [frontmost, setFrontmost] = createSignal<FrontmostApp | null>(null)
@@ -54,7 +53,6 @@ export function ComputerUse(props: Props) {
   const [keyText, setKeyText] = createSignal('')
   const [keyCode, setKeyCode] = createSignal('')
   const [mods, setMods] = createSignal<string[]>([])
-  const [clickEnabled, setClickEnabled] = createSignal(true)
 
   const load = async () => {
     setLoading(true)
@@ -81,8 +79,7 @@ export function ComputerUse(props: Props) {
       // Capture to temp path, then read as data URL
       const ts = Date.now()
       const filePath = `/tmp/neotrix_screen_${ts}.png`
-      const cap = await invoke<ScreenCapture>('computer_screenshot_and_save', { path: filePath })
-      setScreenshot(cap)
+      await invoke<ScreenCapture>('computer_screenshot_and_save', { path: filePath })
       // Read file content via tauri fs plugin
       const { readFile } = await import('@tauri-apps/plugin-fs')
       const bytes = await readFile(filePath)

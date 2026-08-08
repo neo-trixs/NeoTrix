@@ -32,7 +32,6 @@ export function Sidebar(props: SidebarProps) {
   // 会话搜索（前端过滤）
   const [searchOpen, setSearchOpen] = createSignal(false)
   const [searchQuery, setSearchQuery] = createSignal('')
-  const searchInputRef: HTMLInputElement | undefined = undefined
 
   const toggleSearch = () => {
     const next = !searchOpen()

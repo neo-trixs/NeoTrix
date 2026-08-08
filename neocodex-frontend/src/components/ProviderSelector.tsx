@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, createEffect, For } from 'solid-js'
+import { createSignal, onMount, onCleanup, For } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { ChevronDown, Loader2, Check, AlertCircle, Zap, Brain, Globe } from 'lucide-solid'
 import { clsx } from 'clsx'

@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show, For } from 'solid-js'
+import { createSignal, onMount, Show } from 'solid-js'
 import { Coins, X, RefreshCw, Loader2, Cpu, Activity, Wallet, Repeat } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'

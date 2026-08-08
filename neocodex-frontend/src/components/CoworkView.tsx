@@ -48,16 +48,6 @@ interface CoworkDeliverable {
   quality_score: number | null
 }
 
-interface CoworkStats {
-  total_sessions: number
-  total_deliverables: number
-  files_processed: number
-  active_sessions: number
-  avg_files_per_session: number
-  top_category: string
-  top_template: string
-}
-
 /* 状态 → 语义徽章类（与 badge-success/warn/error 体系一致） */
 function statusBadge(status: string): string {
   if (status === 'completed' || status === 'done') return 'badge-success'
@@ -77,7 +67,6 @@ export function CoworkView() {
   const [sessions, setSessions] = createSignal<CoworkSession[]>([])
   const [actions, setActions] = createSignal<CoworkAction[]>([])
   const [deliverables, setDeliverables] = createSignal<CoworkDeliverable[]>([])
-  const [stats, setStats] = createSignal<CoworkStats | null>(null)
   const [activeId, setActiveId] = createSignal<string | null>(null)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
@@ -97,12 +86,6 @@ export function CoworkView() {
     } catch (e) {
       setError(String(e))
     }
-  }
-
-  const loadStats = async () => {
-    try {
-      setStats(await invoke<CoworkStats>('cowork_stats'))
-    } catch { /* stats 非关键 */ }
   }
 
   const loadDetail = async (id: string) => {
@@ -126,7 +109,6 @@ export function CoworkView() {
   // 初始加载
   createEffect(() => {
     loadSessions()
-    loadStats()
   })
 
   const addSession = async () => {
@@ -171,7 +153,6 @@ export function CoworkView() {
   const refresh = async () => {
     setError(null)
     await loadSessions()
-    await loadStats()
     const id = active()?.id
     if (id) await loadDetail(id)
   }
