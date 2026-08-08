@@ -26,7 +26,7 @@ export function SideChat(props: Props) {
   const load = async () => {
     if (!props.sessionId) return
     try {
-      const msgs = await invoke<SideChatMsg[]>('neocodex_get_side_chat', { sessionId: props.sessionId })
+      const msgs = await invoke<SideChatMsg[]>('neocodex_get_side_chat', { session_id: props.sessionId })
       setMessages(msgs)
       scrollToBottom()
     } catch (e) {
@@ -48,7 +48,7 @@ export function SideChat(props: Props) {
     setError(null)
     try {
       const msgs = await invoke<SideChatMsg[]>('neocodex_send_side_chat', {
-        sessionId: props.sessionId,
+        session_id: props.sessionId,
         content,
       })
       setMessages(msgs)
