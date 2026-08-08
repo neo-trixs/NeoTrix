@@ -72,7 +72,7 @@ export function CheckpointTimeline(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class="fixed inset-y-0 right-0 w-80 bg-bg-secondary border-l border-border-primary flex flex-col z-40 shadow-2xl animate-in slide-in-from-right">
+      <div class="panel w-80">
         {/* Header */}
         <div class="panel-head">
           <History class="panel-head-icon text-nt-repair-600" />

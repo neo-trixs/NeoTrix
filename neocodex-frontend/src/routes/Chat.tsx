@@ -564,8 +564,13 @@ export function Chat() {
           </header>
         </Show>
 
-        {/* ===== 顶部工具栏面板（一次一个，右侧滑出） ===== */}
+        {/* ===== 顶部工具栏面板（一次一个，右侧滑出 + 遮罩点击关闭） ===== */}
         <Show when={activeView() === 'chat' && activePanel()}>
+          <div
+            class="fixed inset-0 z-30 bg-black/10 animate-fade-in"
+            onClick={() => setActivePanel(null)}
+            aria-hidden="true"
+          />
           <Show when={activePanel() === 'git'}>
             <GitPanel open onClose={() => setActivePanel(null)} />
           </Show>

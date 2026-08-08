@@ -56,7 +56,7 @@
 
   /* 顶部工具栏按钮（ch-top 面板入口） */
   .tb-btn {
-    @apply flex items-center justify-center w-7 h-7 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors;
+    @apply flex items-center justify-center w-7 h-7 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none;
   }
   .tb-btn.on {
     @apply bg-nt-io-500/10 text-nt-io-600;
@@ -167,7 +167,7 @@
   }
 
   .panel-close {
-    @apply ml-auto p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors flex-shrink-0;
+    @apply ml-auto p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none;
   }
 
   /* —— 状态徽章：成功/警告/错误（语义色统一） —— */
@@ -418,6 +418,9 @@
     width: 32px;
     height: 32px;
     display: flex;
+    border-radius: 8px;
+    outline: none;
+    transition: all 0.2s ease;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
@@ -467,6 +470,10 @@
   .vc-btn:hover {
     background: rgba(0, 0, 0, 0.03);
     color: #5a5a62;
+  }
+  .vc-btn:focus-visible {
+    outline: 2px solid #e85454;
+    outline-offset: 2px;
   }
 
   .vc-btn svg {
@@ -534,6 +541,10 @@
     transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
     font-family: inherit;
   }
+  .qa-btn:focus-visible {
+    outline: 2px solid rgba(232, 84, 84, 0.6);
+    outline-offset: 2px;
+  }
 
   .qa-btn:hover {
     background: rgba(0, 0, 0, 0.03);
@@ -590,13 +601,14 @@
   .segb {
     flex: 1;
     text-align: center;
+    outline: none;
+    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+    border-radius: 7px;
     padding: 6px 0;
     font-size: 10px;
     font-weight: 500;
     color: #909098;
-    border-radius: 7px;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
     border: none;
     background: transparent;
     font-family: inherit;
@@ -607,6 +619,10 @@
   }
 
   .segb:hover { color: #5a5a62; }
+  .segb:focus-visible {
+    outline: 2px solid rgba(232, 84, 84, 0.5);
+    outline-offset: 1px;
+  }
 
   .segb.on {
     background: #f5f2ec;
@@ -645,6 +661,13 @@
     background: #efece6;
     margin-top: auto;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    outline: none;
+    border-radius: 0;
+    transition: background 0.2s ease;
+  }
+  .sf:focus-visible {
+    outline: 2px solid rgba(232, 84, 84, 0.5);
+    outline-offset: -2px;
   }
 
   .sa {
@@ -1083,6 +1106,7 @@
     transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-add:hover { background: rgba(232, 84, 84, 0.08); color: #e85454; }
+  .cw-add:focus-visible { outline: 2px solid #e85454; outline-offset: 1px; }
   .cw-add svg { width: 12px; height: 12px; }
   .cw-slist { flex: 1; overflow-y: auto; padding: 6px; }
   .cw-sitem {
