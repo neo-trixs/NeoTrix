@@ -75,6 +75,8 @@ export function Sidebar(props: SidebarProps) {
 
   const handleDeleteSession = (e: Event, id: string) => {
     e.stopPropagation()
+    // 破坏性操作确认（对标 Codex）
+    if (!window.confirm('确定删除该会话？此操作不可撤销。')) return
     chatStore.deleteSession(id)
   }
 

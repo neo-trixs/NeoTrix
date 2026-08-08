@@ -84,6 +84,8 @@ export function ScheduledTasks(props: Props) {
   }
 
   const action = async (kind: 'pause' | 'resume' | 'delete' | 'run', id: string) => {
+    // 破坏性操作确认（对标 Codex）
+    if (kind === 'delete' && !window.confirm('确定删除该定时任务？')) return
     setBusy(`${kind}:${id}`)
     setError(null)
     try {

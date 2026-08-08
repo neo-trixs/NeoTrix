@@ -75,6 +75,8 @@ export function PluginMarketplace(props: Props) {
   }
 
   const uninstall = async (id: string) => {
+    // 破坏性操作确认（对标 Codex）
+    if (!window.confirm('确定卸载该插件？')) return
     setBusy(`uninstall:${id}`)
     setError(null)
     try {
