@@ -188,6 +188,7 @@ export function CoworkView() {
                 placeholder="工作区路径（如 /Users/me/proj）"
                 value={newPath()}
                 onInput={(e) => setNewPath(e.currentTarget.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSession() } }}
               />
               <input
                 class="cw-new-input"

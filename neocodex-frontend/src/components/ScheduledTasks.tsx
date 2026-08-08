@@ -172,6 +172,7 @@ export function ScheduledTasks(props: Props) {
                 <input
                   value={name()}
                   onInput={(e) => setName(e.currentTarget.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); create() } }}
                   placeholder="例如：每日代码库巡检"
                   class="mt-1 w-full bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
                 />
