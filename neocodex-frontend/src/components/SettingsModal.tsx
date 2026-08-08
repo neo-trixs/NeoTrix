@@ -115,6 +115,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [densityPref, setDensityPref] = createSignal<'comfortable' | 'compact'>('comfortable')
   const [memStats, setMemStats] = createSignal<{ total_entries: number; total_categories: number; avg_confidence: number; memory_usage_bytes: number } | null>(null)
   const [dataBusy, setDataBusy] = createSignal(false)
+  const [appVersion, setAppVersion] = createSignal<string | null>(null)
 
   const loadConfig = async () => {
     setLoading(true)
@@ -131,6 +132,12 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     try {
       setMemStats(await invoke<{ total_entries: number; total_categories: number; avg_confidence: number; memory_usage_bytes: number }>('memory_stats'))
     } catch { /* 记忆统计非关键 */ }
+  }
+
+  const loadAppVersion = async () => {
+    try {
+      setAppVersion(await invoke<string>('neocodex_app_version'))
+    } catch { /* 版本非关键 */ }
   }
 
   const exportMemory = async () => {
@@ -173,6 +180,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       setNotice(null)
       loadConfig()
       loadMemStats()
+      loadAppVersion()
     }
   })
 
@@ -436,7 +444,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     </span>
                     <div>
                       <div class="text-[14px] font-semibold text-text-primary">NeoTrix Desktop</div>
-                      <div class="text-[11px] text-text-muted font-mono">v0.18.0 · ai.neotrix.desktop</div>
+                      <div class="text-[11px] text-text-muted font-mono">v{appVersion() ?? '0.18.0'} · ai.neotrix.desktop</div>
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-2">

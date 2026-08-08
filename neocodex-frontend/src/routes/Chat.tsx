@@ -2,7 +2,7 @@ import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid
 import {
   Send, Square, RotateCcw, Edit2, Copy, AlertCircle, Highlighter, X,
   FolderTree, Bug, FlaskConical, GitBranch, FolderOpen, Puzzle, Clock,
-  Coins, History, MessageSquare, Monitor,
+  Coins, History, MessageSquare, Monitor, Search, Cpu, Zap,
 } from 'lucide-solid'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
 import { Sidebar } from '../components/Sidebar'
@@ -29,6 +29,9 @@ const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
   { text: '解释当前项目结构', icon: FolderTree },
   { text: '修复最近的编译错误', icon: Bug },
   { text: '生成测试用例', icon: FlaskConical },
+  { text: '搜索代码中的符号', icon: Search },
+  { text: '分析性能瓶颈', icon: Cpu },
+  { text: '优化依赖与构建', icon: Zap },
 ]
 
 const actionBtnClass =
