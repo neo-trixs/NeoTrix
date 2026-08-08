@@ -67,7 +67,8 @@ public final class ChatViewModel: ObservableObject {
     @Published public var isStreaming = false
     @Published public var inputText = ""
     @Published public var showAttachmentMenu = false
-    @Published public var selectedStickerPack: String?
+    /// 当前回复目标（对标 Telegram: 引用回复）
+    @Published public var replyTarget: ChatMessage?
     
     private let core = NeoGramCore.shared
     private var cancellables = Set<AnyCancellable>()
@@ -89,12 +90,13 @@ public final class ChatViewModel: ObservableObject {
             timestamp: Date(),
             status: .sending,
             reactions: [],
-            replyTo: nil,
+            replyTo: replyTarget?.id,
             media: []
         )
         
         messages.append(message)
         inputText = ""
+        replyTarget = nil
         isStreaming = true
         
         // Send via MTProto
@@ -107,6 +109,15 @@ public final class ChatViewModel: ObservableObject {
         
         // Get AI response
         await generateAIResponse(for: text)
+    }
+    
+    /// 设置回复目标（长按消息 → Reply）
+    public func setReplyTarget(_ message: ChatMessage) {
+        replyTarget = message
+    }
+    
+    public func clearReplyTarget() {
+        replyTarget = nil
     }
     
     private func sendViaMTProto(_ message: ChatMessage) async throws {
@@ -210,8 +221,23 @@ public final class ChatViewModel: ObservableObject {
 
 public struct MessageBubbleView: View {
     let message: ChatMessage
+    /// 被引用消息（replyTo 渲染，对标 Telegram 引用回复）
+    let replyToMessage: ChatMessage?
     let onReaction: (String) -> Void
     let onLongPress: () -> Void
+    let onReplyTap: (() -> Void)?
+    
+    public init(message: ChatMessage,
+                replyToMessage: ChatMessage? = nil,
+                onReaction: @escaping (String) -> Void,
+                onLongPress: @escaping () -> Void,
+                onReplyTap: (() -> Void)? = nil) {
+        self.message = message
+        self.replyToMessage = replyToMessage
+        self.onReaction = onReaction
+        self.onLongPress = onLongPress
+        self.onReplyTap = onReplyTap
+    }
     
     public var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -226,6 +252,31 @@ public struct MessageBubbleView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 12)
+                }
+                
+                // 引用回复条（对标 Telegram: 被引用消息预览 + 点击跳转）
+                if let replyToMessage {
+                    Button(action: { onReplyTap?() }) {
+                        HStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(NeoTrixTheme.Colors.accent)
+                                .frame(width: 3)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(senderName(replyToMessage.sender))
+                                    .font(.caption.bold())
+                                    .foregroundColor(NeoTrixTheme.Colors.accent)
+                                Text(replyToMessage.text.isEmpty ? "📎 Attachment" : replyToMessage.text)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(8)
+                        .background(NeoTrixTheme.Colors.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
                 }
                 
                 // Message content
@@ -301,6 +352,15 @@ public struct MessageBubbleView: View {
         switch message.sender {
         case .user: return .white
         default: return .primary
+        }
+    }
+    
+    /// 引用条发送者名（对标 Telegram: "You" / agent 名 / "System"）
+    private func senderName(_ sender: ChatMessage.Sender) -> String {
+        switch sender {
+        case .user: return "You"
+        case .agent(let name): return name
+        case .system: return "System"
         }
     }
     
@@ -428,23 +488,59 @@ public struct ChatView: View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 12) {
+                    LazyVStack(spacing: 0) {
                         // 日期分隔（对标 Telegram: Today/Yesterday/日期）
                         ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
                             if index == 0 || !Calendar.current.isDate(viewModel.messages[index - 1].timestamp, inSameDayAs: message.timestamp) {
                                 DateDivider(date: message.timestamp)
                             }
                             
+                            // 消息连续分组（对标 Telegram: 同发送者连续消息间距 4，新组间距 12）
+                            let isGrouped = index > 0
+                                && viewModel.messages[index - 1].sender == message.sender
+                                && Calendar.current.isDate(viewModel.messages[index - 1].timestamp, inSameDayAs: message.timestamp)
+                            
                             MessageBubbleView(
                                 message: message,
+                                replyToMessage: message.replyTo.flatMap { replyID in
+                                    viewModel.messages.first { $0.id == replyID }
+                                },
                                 onReaction: { emoji in viewModel.addReaction(emoji, to: message.id) },
                                 onLongPress: {
                                     // 融合: 长按消息 → ReactionPicker（官方 Reactions + Premium 门控）
                                     reactionTarget = message.id
                                     showReactionPicker = true
+                                },
+                                onReplyTap: {
+                                    // 点击引用条 → 滚动到被引用消息（对标 Telegram）
+                                    if let replyID = message.replyTo {
+                                        withAnimation { proxy.scrollTo(replyID, anchor: .center) }
+                                    }
                                 }
                             )
                             .id(message.id)
+                            .padding(.top, isGrouped ? 4 : 12)
+                            .contextMenu {
+                                // 对标 Telegram: 长按菜单 → Reply / Copy / Reactions
+                                Button {
+                                    viewModel.setReplyTarget(message)
+                                } label: {
+                                    Label("Reply", systemImage: "arrowshape.turn.up.left")
+                                }
+                                Button {
+                                    #if os(iOS)
+                                    UIPasteboard.general.string = message.text
+                                    #endif
+                                } label: {
+                                    Label("Copy", systemImage: "doc.on.doc")
+                                }
+                                Button {
+                                    reactionTarget = message.id
+                                    showReactionPicker = true
+                                } label: {
+                                    Label("Add Reaction", systemImage: "face.smiling")
+                                }
+                            }
                         }
                         
                         if viewModel.isStreaming {
@@ -453,6 +549,7 @@ public struct ChatView: View {
                                 Spacer()
                             }
                             .padding(.leading, 16)
+                            .padding(.top, 8)
                         }
                     }
                     .padding()
@@ -469,6 +566,35 @@ public struct ChatView: View {
                 AIEditorPanel(text: $viewModel.inputText) { edited in
                     viewModel.inputText = edited
                 }
+            }
+            
+            // 回复目标条（对标 Telegram: "Replying to X" + 取消）
+            if let replyTarget = viewModel.replyTarget {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrowshape.turn.up.left.fill")
+                        .font(.caption)
+                        .foregroundColor(NeoTrixTheme.Colors.accent)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Replying to \(replySenderName(replyTarget))")
+                            .font(.caption.bold())
+                            .foregroundColor(NeoTrixTheme.Colors.accent)
+                        Text(replyTarget.text.isEmpty ? "📎 Attachment" : replyTarget.text)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Button {
+                        viewModel.clearReplyTarget()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+                .background(NeoTrixTheme.Colors.surface)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             
             // Input bar
@@ -602,6 +728,15 @@ public struct ChatView: View {
         let text = viewModel.inputText
         viewModel.inputText = ""
         Task { await viewModel.sendMessage(text) }
+    }
+    
+    /// 回复目标条发送者名
+    private func replySenderName(_ message: ChatMessage) -> String {
+        switch message.sender {
+        case .user: return "You"
+        case .agent(let name): return name
+        case .system: return "System"
+        }
     }
 }
 
