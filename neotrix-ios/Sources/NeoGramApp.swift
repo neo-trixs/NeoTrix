@@ -51,6 +51,7 @@ public struct MainTabView: View {
     
     public enum Tab {
         case chats
+        case live
         case contacts
         case calls
         case settings
@@ -63,6 +64,12 @@ public struct MainTabView: View {
                     Label("Chats", systemImage: "bubble.left.and.bubble.right.fill")
                 }
                 .tag(Tab.chats)
+            
+            LiveFeedView()
+                .tabItem {
+                    Label("Live", systemImage: "rectangle.3.offgrid.bubble.left.fill")
+                }
+                .tag(Tab.live)
             
             ContactsView()
                 .tabItem {
