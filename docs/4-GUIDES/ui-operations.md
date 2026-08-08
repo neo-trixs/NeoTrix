@@ -516,7 +516,7 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 | 组件 | 后端命令 |
 |------|----------|
 | Chat | neocodex_send_message_stream, neocodex_stop_stream, neocodex_provider_config, read_file(附件), voice_get_transcription(语音) |
-| Sidebar | chatStore(会话管理) + neocodex_provider_config(设置弹窗) |
+| Sidebar | chatStore(会话管理) + neocodex_provider_config / neocodex_set_provider(设置面板) |
 | ProviderSelector | neocodex_provider_config, neocodex_set_provider |
 | GitPanel | neocodex_git_status, neocodex_get_diff, neocodex_apply_diff |
 | ProjectView | neocodex_project_tree |
@@ -535,7 +535,7 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 | 界面 | 状态 | 说明 |
 |------|------|------|
 | Sidebar 搜索 | 已接线 | 前端过滤会话标题（本地搜索，无需后端命令） |
-| Sidebar 用户条 | 已接线 | 设置弹窗显示提供商配置（neocodex_provider_config） |
+| Sidebar 用户条 | 已接线 | 统一设置面板（SettingsModal）：通用(提供商/模型切换)、外观(动效)、关于(版本/诊断) |
 | 语音输入按钮 | 已接线 | MediaRecorder 录音 → voice_get_transcription → 填入输入框（后端暂为 mock 转写） |
 | 附件按钮 | 已接线 | dialog 选文件 → read_file → 附件预览 → 随消息发送 |
 

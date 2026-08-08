@@ -155,8 +155,13 @@ export function CoworkView() {
   const controlSession = async (action: 'pause' | 'resume' | 'stop') => {
     const id = active()?.id
     if (!id) return
+    const cmdMap = {
+      pause: 'cowork_pause',
+      resume: 'cowork_resume',
+      stop: 'cowork_stop',
+    } as const
     try {
-      await invoke(`cowork_${action}`, { sessionId: id })
+      await invoke(cmdMap[action], { sessionId: id })
       await loadSessions()
     } catch (e) {
       setError(String(e))

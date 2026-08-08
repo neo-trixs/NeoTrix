@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search, X } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
-import { invoke } from '@tauri-apps/api/core'
+import { SettingsModal } from './SettingsModal'
 import { clsx } from 'clsx'
 
 interface SidebarProps {
@@ -40,18 +40,11 @@ export function Sidebar(props: SidebarProps) {
     if (!next) setSearchQuery('')
   }
 
-  // 设置弹窗：显示提供商配置
+  // 设置弹窗（统一 SettingsModal）
   const [settingsOpen, setSettingsOpen] = createSignal(false)
-  const [settingsInfo, setSettingsInfo] = createSignal<{ active_model: string; provider_count: number; resolvable: boolean } | null>(null)
 
-  const openSettings = async () => {
+  const openSettings = () => {
     setSettingsOpen(true)
-    try {
-      const cfg = await invoke<{ active_model: string; provider_count: number; resolvable: boolean }>('neocodex_provider_config')
-      setSettingsInfo(cfg)
-    } catch {
-      setSettingsInfo(null)
-    }
   }
 
   const switchView = (v: 'chat' | 'cowork') => {
@@ -312,39 +305,8 @@ export function Sidebar(props: SidebarProps) {
         </button>
       )}
 
-      {/* 设置弹窗 */}
-      <Show when={settingsOpen()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setSettingsOpen(false)}>
-          <div class="w-72 rounded-xl bg-white shadow-2xl border border-border-primary/40 p-4" onClick={(e) => e.stopPropagation()}>
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-sm font-semibold text-text-primary">设置</span>
-              <button class="p-1 text-text-muted hover:text-text-primary" onClick={() => setSettingsOpen(false)} aria-label="关闭设置" title="关闭设置">
-                <X class="w-4 h-4" />
-              </button>
-            </div>
-            <Show when={settingsInfo()} fallback={<div class="text-xs text-text-muted py-2">加载配置…</div>}>
-              {(info) => (
-                <div class="space-y-2 text-xs">
-                  <div class="flex justify-between">
-                    <span class="text-text-muted">当前模型</span>
-                    <span class="font-mono text-text-primary">{info().active_model || '—'}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-text-muted">提供商</span>
-                    <span class="text-text-primary">{info().provider_count} 个可用</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-text-muted">API 可达</span>
-                    <span class={info().resolvable ? 'text-nt-core-600' : 'text-nt-core-700'}>
-                      {info().resolvable ? '可用' : '不可用'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </Show>
-          </div>
-        </div>
-      </Show>
+      {/* 设置弹窗（统一设计） */}
+      <SettingsModal open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
     </aside>
   )
 }
