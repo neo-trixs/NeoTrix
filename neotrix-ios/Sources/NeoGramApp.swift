@@ -52,100 +52,34 @@ public struct MainTabView: View {
     public enum Tab {
         case chats
         case live
-        case contacts
-        case calls
-        case settings
+        case me
     }
     
     public var body: some View {
         TabView(selection: $selectedTab) {
+            // Tab 1: Chats（对话中枢）— Stories 环 + 聊天列表 + 联系人/通话融合 + AI 入口
             ChatListView()
                 .tabItem {
                     Label("Chats", systemImage: "bubble.left.and.bubble.right.fill")
                 }
                 .tag(Tab.chats)
             
+            // Tab 2: Live（发现中枢）— LiveFeed 瀑布流 + 搜索 + 类型角标
             LiveFeedView()
                 .tabItem {
                     Label("Live", systemImage: "rectangle.3.offgrid.bubble.left.fill")
                 }
                 .tag(Tab.live)
             
-            ContactsView()
-                .tabItem {
-                    Label("Contacts", systemImage: "person.2.fill")
-                }
-                .tag(Tab.contacts)
-            
-            CallsView()
-                .tabItem {
-                    Label("Calls", systemImage: "phone.fill")
-                }
-                .tag(Tab.calls)
-            
+            // Tab 3: Me（个人中枢）— 设置 + Premium + 主题 + 隐私 + AI 入口
             SettingsView()
                 .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
+                    Label("Me", systemImage: "person.crop.circle.fill")
                 }
-                .tag(Tab.settings)
+                .tag(Tab.me)
         }
-    }
-}
-
-// MARK: - Placeholder Views
-
-public struct ContactsView: View {
-    public init() {}
-    
-    public var body: some View {
-        NavigationStack {
-            List {
-                Section("Contacts") {
-                    ForEach(0..<10, id: \.self) { index in
-                        HStack {
-                            Circle()
-                                .fill(Color.blue.opacity(0.3))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Text("\(index + 1)")
-                                        .foregroundColor(.blue)
-                                )
-                            
-                            Text("Contact \(index + 1)")
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Contacts")
-        }
-    }
-}
-
-public struct CallsView: View {
-    public init() {}
-    
-    public var body: some View {
-        NavigationStack {
-            List {
-                Section("Recent") {
-                    ForEach(0..<5, id: \.self) { index in
-                        HStack {
-                            Image(systemName: index % 2 == 0 ? "phone.arrow.up.right.fill" : "phone.arrow.down.left.fill")
-                                .foregroundColor(index % 2 == 0 ? .red : .green)
-                            
-                            Text("Call \(index + 1)")
-                            
-                            Spacer()
-                            
-                            Text("Today")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Calls")
-        }
+        // 统一设计系统：极简风格
+        .tint(NeoTrixTheme.Colors.accent)
     }
 }
 

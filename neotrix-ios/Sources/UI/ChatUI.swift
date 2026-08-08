@@ -166,6 +166,41 @@ public final class ChatViewModel: ObservableObject {
         }
     }
     
+    /// AI Summarize（融合: 官方 Summarize + Export to LLM → NeoTrix KB）
+    public func summarizeChat() async {
+        guard !messages.isEmpty else { return }
+        guard let e8 = core.e8Reasoning else {
+            await addAgentMessage("AI not available")
+            return
+        }
+        
+        let transcript = messages
+            .prefix(50)
+            .map { message -> String in
+                let label: String
+                switch message.sender {
+                case .user: label = "User"
+                case .agent(let name): label = name
+                case .system: label = "System"
+                }
+                return "\(label): \(message.text)"
+            }
+            .joined(separator: "\n")
+        
+        do {
+            let request = ReasoningRequest(
+                query: "Summarize this conversation in 3 bullet points:\n\(transcript)",
+                context: "Chat summarization",
+                maxDepth: 2,
+                useConsciousness: true
+            )
+            let response = try e8.reason(request: request)
+            await addAgentMessage("📋 对话摘要\n\(response.conclusion)")
+        } catch {
+            await addAgentMessage("Error: \(error.localizedDescription)")
+        }
+    }
+    
     public func toggleStickerPicker() {
         showAttachmentMenu.toggle()
     }

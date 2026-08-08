@@ -49,11 +49,11 @@ swift_library(
 )
 
 # =============================================================================
-# Swift Module: UI (flat chat/settings/stories/etc.)
+# Swift Module: UI (flat chat/settings/stories/etc. + Design tokens)
 # =============================================================================
 swift_library(
     name = "UI",
-    srcs = glob(["Sources/UI/**/*.swift"]),
+    srcs = glob(["Sources/UI/**/*.swift"]) + glob(["Sources/Design/**/*.swift"]),
     module_name = "NeoGramUI",
     deps = [
         ":Core",

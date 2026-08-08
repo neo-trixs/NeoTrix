@@ -112,6 +112,9 @@ public struct SettingsView: View {
     @State private var showFolders = false
     @State private var showPolls = false
     @State private var showVoiceToText = false
+    @State private var showTheme = false
+    @State private var showPasscode = false
+    @State private var showAIEditor = false
     
     public init() {}
     
@@ -164,7 +167,7 @@ public struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("Me")
             .navigationDestination(isPresented: $showFilters) {
                 FilterSettingsView()
             }
@@ -180,6 +183,15 @@ public struct SettingsView: View {
             .navigationDestination(isPresented: $showVoiceToText) {
                 VoiceToTextView()
             }
+            .navigationDestination(isPresented: $showTheme) {
+                ThemeSettingsView()
+            }
+            .navigationDestination(isPresented: $showPasscode) {
+                PasscodeSettingsView()
+            }
+            .navigationDestination(isPresented: $showAIEditor) {
+                AIEditorView(original: "") { _ in }
+            }
             .sheet(isPresented: $showPremium) {
                 PremiumIntroView()
             }
@@ -194,6 +206,9 @@ public struct SettingsView: View {
         case "folders": showFolders = true
         case "polls": showPolls = true
         case "voice": showVoiceToText = true
+        case "theme": showTheme = true
+        case "passcode": showPasscode = true
+        case "ai_editor": showAIEditor = true
         default: break
         }
     }

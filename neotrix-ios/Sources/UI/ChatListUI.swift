@@ -123,15 +123,20 @@ public final class ChatListViewModel: ObservableObject {
 
 public struct ChatListView: View {
     @StateObject private var viewModel = ChatListViewModel()
+    @StateObject private var storyViewModel = StoryViewModel()
     @State private var selectedChat: ChatListItem?
     @State private var showSettings = false
     @State private var showPremium = false
+    @State private var showAI = false
     
     public init() {}
     
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Stories 环（融合: 顶部故事 + AI 助手入口）
+                StoriesBar(stories: storyViewModel.stories, onAI: { showAI = true })
+                
                 // Filter bar
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -150,6 +155,47 @@ public struct ChatListView: View {
                 
                 // Chat list
                 List {
+                    // 融合：联系人 Section（原 ContactsView 占位）
+                    if viewModel.searchText.isEmpty {
+                        Section {
+                            ForEach(0..<3, id: \.self) { index in
+                                HStack {
+                                    Circle()
+                                        .fill(Color.blue.opacity(0.3))
+                                        .frame(width: 40, height: 40)
+                                        .overlay(
+                                            Text("\(index + 1)")
+                                                .foregroundColor(.blue)
+                                        )
+                                    
+                                    Text("Contact \(index + 1)")
+                                }
+                            }
+                        } header: {
+                            Text("联系人")
+                        }
+                        
+                        // 融合：通话（原 CallsView 占位）
+                        Section {
+                            ForEach(0..<2, id: \.self) { index in
+                                HStack {
+                                    Image(systemName: index % 2 == 0 ? "phone.arrow.up.right.fill" : "phone.arrow.down.left.fill")
+                                        .foregroundColor(index % 2 == 0 ? .red : .green)
+                                    
+                                    Text("Call \(index + 1)")
+                                    
+                                    Spacer()
+                                    
+                                    Text("Today")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        } header: {
+                            Text("最近通话")
+                        }
+                    }
+                    
                     ForEach(viewModel.filteredChats) { chat in
                         ChatListRow(chat: chat)
                             .contentShape(Rectangle())
@@ -231,6 +277,13 @@ public struct ChatListView: View {
             }
             .sheet(isPresented: $showPremium) {
                 PremiumIntroView()
+            }
+            .sheet(isPresented: $showAI) {
+                // AI 助手入口（融合: AIHub 中枢）
+                NavigationStack {
+                    ChatView()
+                        .navigationTitle("AI 助手")
+                }
             }
             .navigationDestination(item: $selectedChat) { chat in
                 ChatView()
@@ -335,5 +388,88 @@ struct ChatListRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Stories Bar（融合: 顶部故事环 + AI 助手入口）
+
+/// Chats Tab 顶部横向 Stories 环，末尾固定 AI 助手入口
+public struct StoriesBar: View {
+    let stories: [StoryItem]
+    let onAI: () -> Void
+    @State private var showViewer = false
+    
+    public init(stories: [StoryItem], onAI: @escaping () -> Void) {
+        self.stories = stories
+        self.onAI = onAI
+    }
+    
+    public var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                // AI 助手入口（融合: AIHub 中枢）
+                Button(action: onAI) {
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.purple, .blue],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 64, height: 64)
+                            
+                            Image(systemName: "wand.and.stars")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                        }
+                        
+                        Text("AI 助手")
+                            .font(.caption)
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                // My story
+                Button {
+                    // 打开故事发布器（占位）
+                } label: {
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.gray.opacity(0.15))
+                                .frame(width: 64, height: 64)
+                            
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("My Story")
+                            .font(.caption)
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                ForEach(stories) { story in
+                    StoryRing(story: story) {
+                        showViewer = true
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showViewer) {
+            StoryViewerView(stories: stories)
+        }
+        #else
+        .sheet(isPresented: $showViewer) {
+            StoryViewerView(stories: stories)
+        }
+        #endif
     }
 }
