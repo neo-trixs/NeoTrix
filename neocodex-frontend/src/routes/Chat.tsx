@@ -3,7 +3,7 @@ import {
   Send, Square, RotateCcw, Edit2, Copy, AlertCircle, Highlighter, X,
   FolderTree, Bug, FlaskConical,
 } from 'lucide-solid'
-import { chatStore, Message, ToolCallRecord } from '../stores/chat'
+import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
 import { Sidebar } from '../components/Sidebar'
 import { RightBar } from '../components/RightBar'
 import { CoworkView } from '../components/CoworkView'
@@ -24,6 +24,26 @@ const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
 
 const actionBtnClass =
   'p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors'
+
+/* 根据扩展名猜测 MIME（附件预览用） */
+function guessMime(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() || ''
+  const map: Record<string, string> = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+    rs: 'text/rust', ts: 'text/typescript', tsx: 'text/typescript', js: 'text/javascript', jsx: 'text/javascript',
+    py: 'text/python', go: 'text/plain', java: 'text/plain', c: 'text/plain', cpp: 'text/plain', h: 'text/plain',
+    rb: 'text/plain', sh: 'text/plain', json: 'application/json', yaml: 'text/yaml', yml: 'text/yaml',
+    toml: 'text/plain', md: 'text/markdown', sql: 'text/plain', html: 'text/html', css: 'text/css',
+    csv: 'text/csv', txt: 'text/plain', pdf: 'application/pdf',
+  }
+  return map[ext] ?? 'application/octet-stream'
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
 /* —— 设计 v2 图标：E8 六芒星（hero） —— */
 function HeroMark() {
   return (
@@ -66,6 +86,8 @@ export function Chat() {
   const [permissionMode, setPermissionMode] = createSignal<PermissionMode>('auto')
   const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
   const [activeModel, setActiveModel] = createSignal<string | null>(null)
+  // 待发送附件（dialog 选择后暂存，随下一条消息发送）
+  const [pendingAttachments, setPendingAttachments] = createSignal<NeoCodexAttachmentDto[]>([])
 
   // 视图切换：chat / cowork（对应侧栏 segmented tabs）
   const [activeView, setActiveView] = createSignal<'chat' | 'cowork'>('chat')
@@ -220,8 +242,10 @@ export function Chat() {
     if (!opts?.userMessageAdded) {
       chatStore.addMessage({ role: 'user', content })
     }
+    const atts = pendingAttachments()
     setInputValue('')
     setAnnotationHint(null)
+    setPendingAttachments([])
     adjustTextarea()
     setStreamError(null)
 
@@ -238,7 +262,7 @@ export function Chat() {
       // Call the real Tauri IPC command for streaming
       await invoke('neocodex_send_message_stream', {
         content,
-        attachments: null,
+        attachments: atts.length > 0 ? atts : null,
         regenerate: false,
         permission_mode: permissionMode(),
         temperature: 0.7,
@@ -261,12 +285,88 @@ export function Chat() {
 
   const handleSend = async () => {
     let content = inputValue().trim()
-    if (!content && !annotationHint()) return
+    if (!content && !annotationHint() && pendingAttachments().length === 0) return
     if (!content) content = annotationHint()! // send the annotation even with empty text
     if (annotationHint() && content !== annotationHint()!) {
       content = `${content}\n\n${annotationHint()}`
     }
     await sendMessage(content)
+  }
+
+  /* 附件选择：dialog 选文件 → read_file 读取 → 暂存待发送 */
+  const handlePickAttachment = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: true })
+      if (!selected) return
+      const paths = Array.isArray(selected) ? selected : [selected]
+      const atts: NeoCodexAttachmentDto[] = []
+      for (const p of paths) {
+        try {
+          const content = await invoke<string>('read_file', { path: p })
+          const name = p.split('/').pop() || p
+          const mime = guessMime(name)
+          atts.push({ name, size: content.length, mime_type: mime, data: content })
+        } catch (e) {
+          console.error('[Chat] Read attachment failed:', p, e)
+        }
+      }
+      if (atts.length > 0) {
+        setPendingAttachments([...pendingAttachments(), ...atts])
+      }
+    } catch (e) {
+      console.error('[Chat] Open dialog failed:', e)
+    }
+  }
+
+  const removeAttachment = (idx: number) => {
+    setPendingAttachments(pendingAttachments().filter((_, i) => i !== idx))
+  }
+
+  /* ── 语音输入：MediaRecorder 录音 → voice_get_transcription → 填入输入框 ── */
+  const [recording, setRecording] = createSignal(false)
+  let mediaRecorder: MediaRecorder | null = null
+  let audioChunks: Blob[] = []
+
+  const handleVoiceToggle = async () => {
+    if (recording()) {
+      // 停止录音并转写
+      mediaRecorder?.stop()
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaRecorder = new MediaRecorder(stream)
+      audioChunks = []
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunks.push(e.data)
+      }
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setRecording(false)
+        const blob = new Blob(audioChunks, { type: 'audio/webm' })
+        if (blob.size === 0) return
+        try {
+          const buf = await blob.arrayBuffer()
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+          const tr = await invoke<{ text: string; confidence: number }>('voice_get_transcription', {
+            audioData: base64,
+            language: null,
+            model: null,
+          })
+          if (tr.text) {
+            setInputValue((prev) => (prev ? `${prev} ${tr.text}` : tr.text))
+            adjustTextarea()
+          }
+        } catch (e) {
+          console.error('[Chat] Transcription failed:', e)
+        }
+      }
+      mediaRecorder.start()
+      setRecording(true)
+    } catch (e) {
+      console.error('[Chat] Mic access denied:', e)
+    }
   }
 
   const handleSuggestion = (text: string) => {
@@ -381,7 +481,7 @@ export function Chat() {
                   <div class="cic-actions">
                     <div class="cic-left">
                       <ProviderSelector iconOnly />
-                      <button class="cic-attach" aria-label="附加文件" title="附加文件">
+                      <button class="cic-attach" onClick={handlePickAttachment} aria-label="附加文件" title="附加文件">
                         <svg viewBox="0 0 16 16">
                           <line x1="8" y1="3" x2="8" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
                           <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
@@ -389,7 +489,12 @@ export function Chat() {
                       </button>
                     </div>
                     <div class="cic-right">
-                      <button class="vc-btn vc-lang" aria-label="语音输入" title="语音输入">
+                      <button
+                        class={clsx('vc-btn vc-lang', recording() && 'recording')}
+                        onClick={handleVoiceToggle}
+                        aria-label={recording() ? '停止录音' : '语音输入'}
+                        title={recording() ? '停止录音并转写' : '语音输入'}
+                      >
                         <svg viewBox="0 0 16 16">
                           <rect x="5.5" y="2" width="5" height="7" rx="2.5" stroke="currentColor" stroke-width="1.2" fill="none" />
                           <path d="M3 7v.5a5 5 0 0010 0V7" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
@@ -597,6 +702,28 @@ export function Chat() {
             >
               <X class="w-4 h-4" />
             </button>
+          </div>
+        </Show>
+
+        {/* Pending attachments */}
+        <Show when={pendingAttachments().length > 0}>
+          <div class="mx-4 mb-2 flex flex-wrap gap-2 flex-shrink-0">
+            <For each={pendingAttachments()}>
+              {(att, i) => (
+                <div class="flex items-center gap-2 p-2 bg-white/60 border border-border-primary/60 rounded-lg text-xs text-text-primary">
+                  <span class="max-w-[160px] truncate font-mono">{att.name}</span>
+                  <span class="text-text-muted">{formatSize(att.size)}</span>
+                  <button
+                    class="p-0.5 text-text-muted hover:text-nt-core-600"
+                    onClick={() => removeAttachment(i())}
+                    aria-label={`移除附件 ${att.name}`}
+                    title="移除附件"
+                  >
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </For>
           </div>
         </Show>
 

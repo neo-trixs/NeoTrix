@@ -1,6 +1,7 @@
-import { For, Show } from 'solid-js'
-import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search } from 'lucide-solid'
+import { createSignal, For, Show } from 'solid-js'
+import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search, X } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
+import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
 
 interface SidebarProps {
@@ -28,6 +29,31 @@ export function Sidebar(props: SidebarProps) {
   const view = () => props.activeView ?? 'chat'
   const viewIdx = () => (view() === 'chat' ? 0 : 1)
 
+  // 会话搜索（前端过滤）
+  const [searchOpen, setSearchOpen] = createSignal(false)
+  const [searchQuery, setSearchQuery] = createSignal('')
+  const searchInputRef: HTMLInputElement | undefined = undefined
+
+  const toggleSearch = () => {
+    const next = !searchOpen()
+    setSearchOpen(next)
+    if (!next) setSearchQuery('')
+  }
+
+  // 设置弹窗：显示提供商配置
+  const [settingsOpen, setSettingsOpen] = createSignal(false)
+  const [settingsInfo, setSettingsInfo] = createSignal<{ active_model: string; provider_count: number; resolvable: boolean } | null>(null)
+
+  const openSettings = async () => {
+    setSettingsOpen(true)
+    try {
+      const cfg = await invoke<{ active_model: string; provider_count: number; resolvable: boolean }>('neocodex_provider_config')
+      setSettingsInfo(cfg)
+    } catch {
+      setSettingsInfo(null)
+    }
+  }
+
   const switchView = (v: 'chat' | 'cowork') => {
     props.onSwitchView?.(v)
   }
@@ -38,7 +64,9 @@ export function Sidebar(props: SidebarProps) {
   const groupedSessions = () => {
     const groups = new Map<GroupKey, typeof sessions>()
     for (const key of GROUP_ORDER) groups.set(key, [])
+    const q = searchQuery().trim().toLowerCase()
     for (const session of sessions) {
+      if (q && !session.title.toLowerCase().includes(q)) continue
       const key = getGroupKey(session.updatedAt)
       groups.get(key)?.push(session)
     }
@@ -125,14 +153,39 @@ export function Sidebar(props: SidebarProps) {
 
           {/* 搜索 + 新建 */}
           <div class="px-3 pb-2 flex items-center gap-2">
-            <button
-              class="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors text-left border border-border-primary/40"
-              aria-label="搜索"
-              title="搜索 (开发中)"
+            <Show
+              when={searchOpen()}
+              fallback={
+                <button
+                  class="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors text-left border border-border-primary/40"
+                  onClick={toggleSearch}
+                  aria-label="搜索会话"
+                  title="搜索会话"
+                >
+                  <Search class="w-3.5 h-3.5" />
+                  <span class="text-[12px]">搜索</span>
+                </button>
+              }
             >
-              <Search class="w-3.5 h-3.5" />
-              <span class="text-[12px]">搜索</span>
-            </button>
+              <div class="flex-1 flex items-center gap-1.5 px-2 py-1 rounded-lg border border-nt-io-500/40 bg-white/60">
+                <Search class="w-3.5 h-3.5 text-nt-io-600 flex-shrink-0" />
+                <input
+                  class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-text-primary placeholder-text-muted/60"
+                  placeholder="搜索会话标题…"
+                  value={searchQuery()}
+                  onInput={(e) => setSearchQuery(e.currentTarget.value)}
+                  autofocus
+                />
+                <button
+                  class="p-0.5 text-text-muted hover:text-text-primary flex-shrink-0"
+                  onClick={toggleSearch}
+                  aria-label="关闭搜索"
+                  title="关闭搜索"
+                >
+                  <X class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </Show>
             <button
               class="p-1.5 rounded-lg bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors"
               onClick={handleNewChat}
@@ -224,7 +277,7 @@ export function Sidebar(props: SidebarProps) {
           </div>
 
           {/* Footer: 用户条 sf（设计 v2）—— 头像+信息+设置整合为整体 */}
-          <button class="sf" onClick={() => console.log('[neocodex] open settings')} aria-label="用户设置" title="用户设置">
+          <button class="sf" onClick={openSettings} aria-label="用户设置" title="用户设置">
             <div class="sa">N</div>
             <div class="su-info">
               <div class="su-name">Neo</div>
@@ -251,13 +304,47 @@ export function Sidebar(props: SidebarProps) {
       {collapsed() && (
         <button
           class="flex items-center justify-center py-3 border-t border-border-primary/40 hover:bg-white/40 transition-colors"
-          onClick={() => console.log('[neocodex] open settings')}
+          onClick={openSettings}
           aria-label="用户设置"
           title="用户设置"
         >
           <div class="sa">N</div>
         </button>
       )}
+
+      {/* 设置弹窗 */}
+      <Show when={settingsOpen()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setSettingsOpen(false)}>
+          <div class="w-72 rounded-xl bg-white shadow-2xl border border-border-primary/40 p-4" onClick={(e) => e.stopPropagation()}>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-sm font-semibold text-text-primary">设置</span>
+              <button class="p-1 text-text-muted hover:text-text-primary" onClick={() => setSettingsOpen(false)} aria-label="关闭设置" title="关闭设置">
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+            <Show when={settingsInfo()} fallback={<div class="text-xs text-text-muted py-2">加载配置…</div>}>
+              {(info) => (
+                <div class="space-y-2 text-xs">
+                  <div class="flex justify-between">
+                    <span class="text-text-muted">当前模型</span>
+                    <span class="font-mono text-text-primary">{info().active_model || '—'}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-text-muted">提供商</span>
+                    <span class="text-text-primary">{info().provider_count} 个可用</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-text-muted">API 可达</span>
+                    <span class={info().resolvable ? 'text-nt-core-600' : 'text-nt-core-700'}>
+                      {info().resolvable ? '可用' : '不可用'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </Show>
+          </div>
+        </div>
+      </Show>
     </aside>
   )
 }

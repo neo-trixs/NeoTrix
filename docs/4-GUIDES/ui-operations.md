@@ -515,8 +515,8 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 
 | 组件 | 后端命令 |
 |------|----------|
-| Chat | neocodex_send_message_stream, neocodex_stop_stream, neocodex_provider_config |
-| Sidebar | （经 chatStore → neocodex_list_sessions 等） |
+| Chat | neocodex_send_message_stream, neocodex_stop_stream, neocodex_provider_config, read_file(附件), voice_get_transcription(语音) |
+| Sidebar | chatStore(会话管理) + neocodex_provider_config(设置弹窗) |
 | ProviderSelector | neocodex_provider_config, neocodex_set_provider |
 | GitPanel | neocodex_git_status, neocodex_get_diff, neocodex_apply_diff |
 | ProjectView | neocodex_project_tree |
@@ -534,7 +534,9 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 
 | 界面 | 状态 | 说明 |
 |------|------|------|
-| Sidebar 搜索 | 占位 | 搜索按钮无功能（开发中） |
-| Sidebar 用户条 | 占位 | 设置按钮仅 console.log |
-| 语音输入按钮 | 占位 | cic 输入区语音按钮无功能 |
-| 附件按钮 | 占位 | cic 输入区附件按钮无功能 |
+| Sidebar 搜索 | 已接线 | 前端过滤会话标题（本地搜索，无需后端命令） |
+| Sidebar 用户条 | 已接线 | 设置弹窗显示提供商配置（neocodex_provider_config） |
+| 语音输入按钮 | 已接线 | MediaRecorder 录音 → voice_get_transcription → 填入输入框（后端暂为 mock 转写） |
+| 附件按钮 | 已接线 | dialog 选文件 → read_file → 附件预览 → 随消息发送 |
+
+> 说明：语音后端 `voice_*` 命令当前返回 mock 转写文本；替换为真实 STT 后前端无需改动（IPC 链路已打通）。

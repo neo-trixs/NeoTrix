@@ -522,6 +522,17 @@
     stroke-width: 1.6;
   }
 
+  .vc-lang.recording {
+    background: rgba(232, 84, 84, 0.12);
+    color: #e85454;
+    animation: vc-pulse 1.2s ease-in-out infinite;
+  }
+  .vc-lang.recording:hover { background: rgba(232, 84, 84, 0.18); color: #e85454; }
+  @keyframes vc-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232, 84, 84, 0.25); }
+    50% { box-shadow: 0 0 0 5px rgba(232, 84, 84, 0); }
+  }
+
   .vc-send {
     background: #f2efe9;
     border: 1px solid rgba(0, 0, 0, 0.06);
