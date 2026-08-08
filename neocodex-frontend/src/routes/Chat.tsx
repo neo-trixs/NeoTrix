@@ -624,7 +624,7 @@ export function Chat() {
                   <textarea
                     id="chatInput"
                     rows={2}
-                    placeholder="输入 / 查看技能"
+                    placeholder="输入消息… (Enter 发送, Shift+Enter 换行)"
                     value={inputValue()}
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}

@@ -1,5 +1,5 @@
 import { createSignal, onMount, For, Show } from 'solid-js'
-import { Folder, FolderOpen, File, FileText, ChevronRight, ChevronDown, BookOpen, Loader2, X } from 'lucide-solid'
+import { Folder, FolderOpen, File, FileText, ChevronRight, ChevronDown, BookOpen, Loader2, X, RefreshCw } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
 
@@ -119,6 +119,14 @@ export function ProjectView(props: Props) {
           <Show when={view()}>
             <span class="panel-sub">({view()!.file_count} 文件)</span>
           </Show>
+          <button
+            class="panel-close"
+            onClick={load}
+            aria-label="刷新"
+            title="刷新"
+          >
+            <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
+          </button>
           <button
             class="panel-close"
             onClick={props.onClose}

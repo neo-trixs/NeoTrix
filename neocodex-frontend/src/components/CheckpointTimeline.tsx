@@ -1,5 +1,5 @@
 import { createSignal, onMount, Show, For } from 'solid-js'
-import { History, RotateCcw, Loader2, X, Clock } from 'lucide-solid'
+import { History, RotateCcw, Loader2, X, Clock, RefreshCw } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
 
@@ -78,6 +78,14 @@ export function CheckpointTimeline(props: Props) {
           <History class="panel-head-icon text-nt-repair-600" />
           <span class="panel-title">时间线</span>
           <span class="panel-sub">({checkpoints().length} 个快照)</span>
+          <button
+            class="panel-close"
+            onClick={load}
+            aria-label="刷新"
+            title="刷新"
+          >
+            <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
+          </button>
           <button
             class="panel-close"
             onClick={props.onClose}
