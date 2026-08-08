@@ -1,6 +1,6 @@
 import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import {
-  Send, Square, RotateCcw, Edit2, Copy, AlertCircle, Highlighter, X,
+  Send, Square, RotateCcw, Edit2, Copy, Check, AlertCircle, Highlighter, X,
   FolderTree, Bug, FlaskConical, GitBranch, FolderOpen, Puzzle, Clock,
   Coins, History, MessageSquare, Monitor, Search, Cpu, Zap,
 } from 'lucide-solid'
@@ -105,6 +105,7 @@ export function Chat() {
   const [editContent, setEditContent] = createSignal('')
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
   const [streamError, setStreamError] = createSignal<string | null>(null)
+  const [copiedId, setCopiedId] = createSignal<string | null>(null)
   const [permissionMode, setPermissionMode] = createSignal<PermissionMode>('auto')
   const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
   const [activeModel, setActiveModel] = createSignal<string | null>(null)
@@ -458,9 +459,11 @@ export function Chat() {
     setEditContent('')
   }
 
-  const handleCopy = async (content: string) => {
+  const handleCopy = async (content: string, id: string) => {
     try {
       await navigator.clipboard.writeText(content)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 1500)
     } catch {
       /* ignore */
     }
@@ -814,11 +817,13 @@ export function Chat() {
                             {!message.isStreaming && (
                               <button
                                 class={actionBtnClass}
-                                onClick={() => handleCopy(message.content)}
+                                onClick={() => handleCopy(message.content, message.id)}
                                 aria-label="复制"
                                 title="复制"
                               >
-                                <Copy class="w-3.5 h-3.5" />
+                                <Show when={copiedId() === message.id} fallback={<Copy class="w-3.5 h-3.5" />}>
+                                  <Check class="w-3.5 h-3.5 text-emerald-600" />
+                                </Show>
                               </button>
                             )}
                           </div>
