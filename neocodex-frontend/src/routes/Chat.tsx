@@ -777,7 +777,7 @@ export function Chat() {
 
                         {/* hover 操作行 */}
                         <div class={clsx(
-                          'flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity',
+                          'flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity',
                           isEditing && 'opacity-0'
                         )}>
                           <div class="flex items-center gap-0.5">

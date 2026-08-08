@@ -234,7 +234,7 @@ export function Sidebar(props: SidebarProps) {
                                     {formatRelativeTime(session.updatedAt)}
                                   </span>
                                 </button>
-                                <div class="flex items-center gap-0.5 pr-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="flex items-center gap-0.5 pr-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                                   <button
                                     class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-colors"
                                     onClick={(e) => handleRenameSession(e, session.id)}

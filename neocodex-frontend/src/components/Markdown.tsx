@@ -198,7 +198,7 @@ function CodeBlock(props: { language: string; code: string }) {
           {props.language || 'plaintext'}
         </span>
         <button
-          class="opacity-0 group-hover/code:opacity-100 p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-all"
+          class="opacity-0 group-hover/code:opacity-100 group-focus-within/code:opacity-100 p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-all"
           onClick={copy}
           aria-label="复制代码"
           title="复制代码"
