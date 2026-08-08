@@ -1,5 +1,6 @@
 // SettingsUI - Telegram-style settings with Premium integration
-// Mirrors Telegram's SettingsController + SettingsSections
+// 对标: Telegram SettingsController — Profile 头部 + 逻辑分组（Account/Privacy/Data/Appearance/AI/About）
+// 原则: 每个可点项必须有目标视图或明确禁用态（Dark Forest: 无死按钮）
 
 import SwiftUI
 
@@ -18,6 +19,7 @@ public struct SettingsItem: Identifiable {
     public let iconColor: Color
     public let badge: String?
     public let isPremium: Bool
+    public let isDisabled: Bool   // true = Coming Soon 禁用态（有明确视觉反馈）
 }
 
 // MARK: - Settings View Model
@@ -46,56 +48,52 @@ public final class SettingsViewModel: ObservableObject {
         isPremium = UserDefaults.standard.bool(forKey: "is_premium")
     }
     
+    /// 分组对标 Telegram 层级：Account → NeoTrix AI → Appearance → Privacy → Data → About
     public var sections: [SettingsSection] {
         [
             SettingsSection(id: "account", title: "Account", items: [
-                SettingsItem(id: "profile", title: "My Profile", icon: "person.crop.circle", iconColor: .blue, badge: nil, isPremium: false),
-                SettingsItem(id: "saved", title: "Saved Messages", icon: "bookmark.fill", iconColor: .blue, badge: nil, isPremium: false),
-                SettingsItem(id: "recent", title: "Recent Calls", icon: "phone.fill", iconColor: .green, badge: nil, isPremium: false),
-                SettingsItem(id: "devices", title: "Devices", icon: "laptopcomputer", iconColor: .blue, badge: nil, isPremium: false),
-                SettingsItem(id: "chat_folders", title: "Chat Folders", icon: "folder.fill", iconColor: .blue, badge: nil, isPremium: false),
-            ]),
-            SettingsSection(id: "premium", title: "Premium", items: [
-                SettingsItem(id: "premium", title: "NeoGram Premium", icon: "star.circle.fill", iconColor: .yellow, badge: isPremium ? "Active" : nil, isPremium: true),
-                SettingsItem(id: "gifts", title: "Premium Gifts", icon: "gift.fill", iconColor: .pink, badge: nil, isPremium: true),
-                SettingsItem(id: "boosts", title: "Boost Levels", icon: "bolt.fill", iconColor: .orange, badge: nil, isPremium: true),
+                SettingsItem(id: "profile", title: "My Profile", icon: "person.crop.circle", iconColor: .blue, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "saved", title: "Saved Messages", icon: "bookmark.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "devices", title: "Devices", icon: "laptopcomputer", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "chat_folders", title: "Chat Folders", icon: "folder.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
             ]),
             SettingsSection(id: "ai", title: "NeoTrix AI", items: [
-                SettingsItem(id: "ai_settings", title: "AI Settings", icon: "brain.head.profile", iconColor: .purple, badge: nil, isPremium: false),
-                SettingsItem(id: "ai_models", title: "AI Models", icon: "cpu.fill", iconColor: .indigo, badge: nil, isPremium: false),
-                SettingsItem(id: "ai_memory", title: "AI Memory", icon: "memorychip.fill", iconColor: .teal, badge: nil, isPremium: false),
-                SettingsItem(id: "ai_editor", title: "AI Editor", icon: "wand.and.stars", iconColor: .purple, badge: nil, isPremium: false),
-                SettingsItem(id: "ai_export", title: "Export to AI", icon: "square.and.arrow.up", iconColor: .indigo, badge: nil, isPremium: false),
-            ]),
-            SettingsSection(id: "fusion", title: "Fusion Features", items: [
-                SettingsItem(id: "filters", title: "Message Filter", icon: "line.3.horizontal.decrease.circle.fill", iconColor: .orange, badge: nil, isPremium: false),
-                SettingsItem(id: "privacy", title: "Privacy & Security", icon: "lock.shield.fill", iconColor: .green, badge: nil, isPremium: false),
-                SettingsItem(id: "folders", title: "Smart Folders", icon: "folder.fill.badge.gearshape", iconColor: .blue, badge: nil, isPremium: false),
-                SettingsItem(id: "polls", title: "Polls", icon: "chart.bar.xaxis", iconColor: .pink, badge: nil, isPremium: false),
-                SettingsItem(id: "voice", title: "Voice to Text", icon: "waveform", iconColor: .teal, badge: nil, isPremium: false),
+                SettingsItem(id: "ai_editor", title: "AI Editor", icon: "wand.and.stars", iconColor: .purple, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "ai_settings", title: "AI Settings", icon: "brain.head.profile", iconColor: .purple, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "ai_models", title: "AI Models", icon: "cpu.fill", iconColor: .indigo, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "ai_memory", title: "AI Memory", icon: "memorychip.fill", iconColor: .teal, badge: nil, isPremium: false, isDisabled: true),
             ]),
             SettingsSection(id: "appearance", title: "Appearance", items: [
-                SettingsItem(id: "theme", title: "Theme", icon: "paintpalette.fill", iconColor: .purple, badge: nil, isPremium: false),
-                SettingsItem(id: "wallpapers", title: "Wallpapers", icon: "photo.on.rectangle", iconColor: .cyan, badge: nil, isPremium: false),
-                SettingsItem(id: "app_icons", title: "App Icons", icon: "app.badge.fill", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "theme", title: "Theme", icon: "paintpalette.fill", iconColor: .purple, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "wallpapers", title: "Wallpapers", icon: "photo.on.rectangle", iconColor: .cyan, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "app_icons", title: "App Icons", icon: "app.badge.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
             ]),
             SettingsSection(id: "privacy", title: "Privacy & Security", items: [
-                SettingsItem(id: "privacy", title: "Privacy", icon: "lock.fill", iconColor: .blue, badge: nil, isPremium: false),
-                SettingsItem(id: "passcode", title: "Passcode & Face ID", icon: "faceid", iconColor: .green, badge: nil, isPremium: false),
-                SettingsItem(id: "two_step", title: "Two-Step Verification", icon: "key.fill", iconColor: .orange, badge: nil, isPremium: false),
-                SettingsItem(id: "sessions", title: "Active Sessions", icon: "iphone", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "passcode", title: "Passcode & Face ID", icon: "faceid", iconColor: .green, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "privacy", title: "Privacy", icon: "lock.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "two_step", title: "Two-Step Verification", icon: "key.fill", iconColor: .orange, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "sessions", title: "Active Sessions", icon: "iphone", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
+            ]),
+            SettingsSection(id: "content", title: "Content & Filters", items: [
+                SettingsItem(id: "filters", title: "Message Filter", icon: "line.3.horizontal.decrease.circle.fill", iconColor: .orange, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "folders", title: "Smart Folders", icon: "folder.fill.badge.gearshape", iconColor: .blue, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "polls", title: "Polls", icon: "chart.bar.xaxis", iconColor: .pink, badge: nil, isPremium: false, isDisabled: false),
+                SettingsItem(id: "voice", title: "Voice to Text", icon: "waveform", iconColor: .teal, badge: nil, isPremium: false, isDisabled: false),
+            ]),
+            SettingsSection(id: "premium", title: "Premium", items: [
+                SettingsItem(id: "premium", title: "NeoGram Premium", icon: "star.circle.fill", iconColor: .yellow, badge: isPremium ? "Active" : nil, isPremium: true, isDisabled: false),
+                SettingsItem(id: "gifts", title: "Premium Gifts", icon: "gift.fill", iconColor: .pink, badge: nil, isPremium: true, isDisabled: true),
+                SettingsItem(id: "boosts", title: "Boost Levels", icon: "bolt.fill", iconColor: .orange, badge: nil, isPremium: true, isDisabled: true),
             ]),
             SettingsSection(id: "data", title: "Data & Storage", items: [
-                SettingsItem(id: "storage", title: "Storage Usage", icon: "internaldrive.fill", iconColor: .gray, badge: storageUsed, isPremium: false),
-                SettingsItem(id: "data", title: "Data & Storage", icon: "chart.bar.fill", iconColor: .blue, badge: nil, isPremium: false),
-                SettingsItem(id: "proxy", title: "Proxy", icon: "network", iconColor: .blue, badge: nil, isPremium: false),
-            ]),
-            SettingsSection(id: "language", title: "Language", items: [
-                SettingsItem(id: "language", title: "Language", icon: "globe", iconColor: .blue, badge: "English", isPremium: false),
+                SettingsItem(id: "storage", title: "Storage Usage", icon: "internaldrive.fill", iconColor: .gray, badge: storageUsed, isPremium: false, isDisabled: true),
+                SettingsItem(id: "data", title: "Data & Storage", icon: "chart.bar.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "proxy", title: "Proxy", icon: "network", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
             ]),
             SettingsSection(id: "about", title: "About", items: [
-                SettingsItem(id: "help", title: "Help", icon: "questionmark.circle.fill", iconColor: .blue, badge: nil, isPremium: false),
-                SettingsItem(id: "about", title: "About NeoGram", icon: "info.circle.fill", iconColor: .blue, badge: "v1.0", isPremium: false),
+                SettingsItem(id: "language", title: "Language", icon: "globe", iconColor: .blue, badge: "English", isPremium: false, isDisabled: true),
+                SettingsItem(id: "help", title: "Help", icon: "questionmark.circle.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "about", title: "About NeoGram", icon: "info.circle.fill", iconColor: .blue, badge: "v1.0", isPremium: false, isDisabled: true),
             ]),
         ]
     }
@@ -121,20 +119,13 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationStack {
             List {
-                // Profile header
+                // Profile header（对标 Telegram: 头像 + 姓名 + 号码 → 个人页）
                 Section {
                     Button {
                         showProfile = true
                     } label: {
                         HStack(spacing: 16) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.blue.gradient)
-                                    .frame(width: 60, height: 60)
-                                Text(String(viewModel.username.prefix(1)).uppercased())
-                                    .font(.title.bold())
-                                    .foregroundColor(.white)
-                            }
+                            NeoTrixAvatar(title: viewModel.username, size: 60)
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(viewModel.username)
@@ -190,6 +181,7 @@ public struct SettingsView: View {
                 PasscodeSettingsView()
             }
             .navigationDestination(isPresented: $showAIEditor) {
+                // AI 编辑器（传入当前对话上下文；空原文 = 新建草稿）
                 AIEditorView(original: "") { _ in }
             }
             .sheet(isPresented: $showPremium) {
@@ -199,6 +191,8 @@ public struct SettingsView: View {
     }
     
     private func handleItemTap(_ item: SettingsItem) {
+        // Coming Soon 项: 不响应（禁用态已有视觉反馈）
+        guard !item.isDisabled else { return }
         switch item.id {
         case "premium": showPremium = true
         case "filters": showFilters = true
@@ -225,11 +219,15 @@ struct SettingsRow: View {
                     .font(.body)
                     .foregroundColor(.white)
                     .frame(width: 28, height: 28)
-                    .background(item.iconColor.gradient)
+                    .background(item.isDisabled
+                        ? AnyShapeStyle(NeoTrixTheme.Colors.surface)
+                        : AnyShapeStyle(item.iconColor.gradient))
                     .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .opacity(item.isDisabled ? 0.6 : 1)
                 
                 Text(item.title)
                     .foregroundColor(.primary)
+                    .opacity(item.isDisabled ? 0.6 : 1)
                 
                 Spacer()
                 
@@ -242,15 +240,26 @@ struct SettingsRow: View {
                 if item.isPremium {
                     Image(systemName: "star.fill")
                         .font(.caption)
-                        .foregroundColor(.yellow)
+                        .foregroundColor(NeoTrixTheme.Colors.premium)
                 }
                 
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if item.isDisabled {
+                    Text("Soon")
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(NeoTrixTheme.Colors.surface)
+                        .foregroundColor(.secondary)
+                        .clipShape(Capsule())
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
+        .disabled(item.isDisabled)
     }
 }

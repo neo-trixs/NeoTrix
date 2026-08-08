@@ -49,6 +49,7 @@ public struct NeoGramApp: App {
 public struct MainTabView: View {
     @State private var selectedTab: Tab = .chats
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var chatListVM = ChatListViewModel()
     
     public enum Tab {
         case chats
@@ -63,12 +64,13 @@ public struct MainTabView: View {
                 .tabItem {
                     Label("Chats", systemImage: "bubble.left.and.bubble.right.fill")
                 }
+                .badge(chatListVM.chats.reduce(0) { $0 + $1.unreadCount })
                 .tag(Tab.chats)
             
             // Tab 2: Live（发现中枢）— LiveFeed 瀑布流 + 搜索 + 类型角标
             LiveFeedView()
                 .tabItem {
-                    Label("Live", systemImage: "rectangle.3.offgrid.bubble.left.fill")
+                    Label("Live", systemImage: "sparkles.rectangle.stack.fill")
                 }
                 .tag(Tab.live)
             
@@ -94,13 +96,7 @@ public struct LaunchView: View {
         VStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.blue, Color.purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(NeoTrixTheme.Gradients.brand)
                     .frame(width: 96, height: 96)
                 
                 Image(systemName: "paperplane.fill")
@@ -112,7 +108,7 @@ public struct LaunchView: View {
                 .font(.title2.bold())
             
             ProgressView()
-                .tint(.blue)
+                .tint(NeoTrixTheme.Colors.accent)
         }
         .preferredColorScheme(.dark)
     }

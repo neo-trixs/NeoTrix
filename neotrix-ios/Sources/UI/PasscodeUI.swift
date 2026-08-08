@@ -133,7 +133,7 @@ public struct PasscodeLockView: View {
             HStack(spacing: 16) {
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
-                        .fill(index < enteredCode.count ? Color.blue : Color.gray.opacity(0.3))
+                        .fill(index < enteredCode.count ? NeoTrixTheme.Colors.accent : NeoTrixTheme.Colors.separator)
                         .frame(width: 20, height: 20)
                 }
             }
@@ -238,7 +238,7 @@ struct NumberButton: View {
             Text("\(number)")
                 .font(.title)
                 .frame(width: 80, height: 80)
-                .background(Color.gray.opacity(0.15))
+                .background(NeoTrixTheme.Colors.inputBackground)
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
@@ -322,7 +322,7 @@ struct PasscodeSetupView: View {
             HStack(spacing: 16) {
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
-                        .fill(index < currentEntry.count ? Color.blue : Color.secondary)
+                        .fill(index < currentEntry.count ? NeoTrixTheme.Colors.accent : NeoTrixTheme.Colors.textSecondary)
                         .frame(width: 20, height: 20)
                 }
             }

@@ -134,7 +134,7 @@ public struct ReactionPickerView: View {
                                     }
                                 }
                                 .padding(8)
-                                .background(Color.gray.opacity(0.15))
+.background(NeoTrixTheme.Colors.inputBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
@@ -216,7 +216,7 @@ struct SearchField: View {
             }
         }
         .padding(10)
-        .background(Color.gray.opacity(0.15))
+        .background(NeoTrixTheme.Colors.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }

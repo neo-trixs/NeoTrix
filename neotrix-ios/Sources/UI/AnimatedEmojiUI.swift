@@ -66,7 +66,7 @@ public struct FullScreenEmojiEffect: View {
     
     public var body: some View {
         ZStack {
-            Color.black.opacity(0.3).ignoresSafeArea()
+            NeoTrixTheme.Colors.toastBackground.ignoresSafeArea()
             
             ForEach(particles) { particle in
                 Text(emoji)
@@ -131,7 +131,7 @@ public struct EmojiStatusPickerView: View {
                             Text(emoji.emoji)
                                 .font(.system(size: 32))
                                 .padding(8)
-                                .background(Color.gray.opacity(0.15))
+                                .background(NeoTrixTheme.Colors.inputBackground)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)

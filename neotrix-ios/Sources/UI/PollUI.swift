@@ -217,7 +217,7 @@ struct PollCard: View {
                     .font(.caption.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(poll.isQuiz ? Color.orange.opacity(0.2) : Color.blue.opacity(0.2))
+                    .background(poll.isQuiz ? NeoTrixTheme.TypeColors.color(for: "video").opacity(0.2) : NeoTrixTheme.Colors.selection)
                     .clipShape(Capsule())
                 
                 if poll.isAnonymous {
@@ -324,7 +324,7 @@ struct PollCard: View {
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.1))
+        .background(NeoTrixTheme.Colors.placeholder)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.vertical, 4)
     }
@@ -374,12 +374,12 @@ struct PollOptionRow: View {
                     if showResults && totalVotes > 0 {
                         GeometryReader { geo in
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.blue.opacity(0.15))
+                                .fill(NeoTrixTheme.Colors.selection)
                                 .frame(width: geo.size.width * CGFloat(Double(option.voteCount) / Double(totalVotes)))
                         }
                     }
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.gray.opacity(0.1))
+                        .fill(NeoTrixTheme.Colors.placeholder)
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: 8))

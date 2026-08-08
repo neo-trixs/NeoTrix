@@ -107,7 +107,7 @@ public struct StoryRing: View {
             VStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .stroke(story.isSeen ? AnyShapeStyle(Color.gray.opacity(0.3)) : AnyShapeStyle(gradient), lineWidth: 3)
+                        .stroke(story.isSeen ? AnyShapeStyle(NeoTrixTheme.Colors.separator) : AnyShapeStyle(gradient), lineWidth: 3)
                         .frame(width: 64, height: 64)
                     
                     Circle()
@@ -153,7 +153,7 @@ public struct StoryViewerView: View {
     
     public var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            NeoTrixTheme.Colors.background.ignoresSafeArea()
             
             if !stories.isEmpty {
                 // Story content placeholder

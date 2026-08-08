@@ -20,6 +20,26 @@ public struct ChatListItem: Identifiable, Hashable {
     public let isVerified: Bool
 }
 
+/// 联系人（融合原 ContactsView 占位 → 真实模型）
+public struct ContactItem: Identifiable {
+    public let id: Int64
+    public let name: String
+    public let phone: String
+    public let avatarColor: Color
+    public let isOnline: Bool
+    public let isPremium: Bool
+}
+
+/// 通话记录（融合原 CallsView 占位 → 真实模型）
+public struct CallRecord: Identifiable {
+    public enum Direction { case incoming, outgoing, missed }
+    public let id: Int64
+    public let name: String
+    public let direction: Direction
+    public let timestamp: Date
+    public let duration: Int  // seconds
+}
+
 public enum ChatListFilter: String, CaseIterable {
     case all = "All"
     case unread = "Unread"
@@ -35,6 +55,8 @@ public enum ChatListFilter: String, CaseIterable {
 @MainActor
 public final class ChatListViewModel: ObservableObject {
     @Published public var chats: [ChatListItem] = []
+    @Published public var contacts: [ContactItem] = []
+    @Published public var calls: [CallRecord] = []
     @Published public var selectedFilter: ChatListFilter = .all
     @Published public var searchText = ""
     @Published public var isSearching = false
@@ -44,6 +66,8 @@ public final class ChatListViewModel: ObservableObject {
     
     public init() {
         loadChats()
+        loadContacts()
+        loadCalls()
         setupSearch()
     }
     
@@ -55,6 +79,27 @@ public final class ChatListViewModel: ObservableObject {
             ChatListItem(id: 3, title: "Work", lastMessage: "John: Meeting moved to 3pm", timestamp: Date().addingTimeInterval(-1800), unreadCount: 5, isPinned: false, isMuted: true, isOnline: true, avatarColor: .blue, isPremium: false, isVerified: false),
             ChatListItem(id: 4, title: "Tech News", lastMessage: "New AI model released", timestamp: Date().addingTimeInterval(-3600), unreadCount: 0, isPinned: false, isMuted: false, isOnline: false, avatarColor: .orange, isPremium: true, isVerified: true),
             ChatListItem(id: 5, title: "Design Team", lastMessage: "Alice: Updated the mockups", timestamp: Date().addingTimeInterval(-7200), unreadCount: 1, isPinned: false, isMuted: false, isOnline: false, avatarColor: .pink, isPremium: false, isVerified: false),
+        ]
+    }
+    
+    private func loadContacts() {
+        // 真实联系人模型（融合原 ContactsView 占位）
+        contacts = [
+            ContactItem(id: 101, name: "Alice", phone: "+1 (555) 0101", avatarColor: .pink, isOnline: true, isPremium: false),
+            ContactItem(id: 102, name: "Bob", phone: "+1 (555) 0102", avatarColor: .blue, isOnline: false, isPremium: false),
+            ContactItem(id: 103, name: "Charlie", phone: "+1 (555) 0103", avatarColor: .orange, isOnline: true, isPremium: true),
+            ContactItem(id: 104, name: "Diana", phone: "+1 (555) 0104", avatarColor: .green, isOnline: false, isPremium: false),
+        ]
+    }
+    
+    private func loadCalls() {
+        // 真实通话记录（融合原 CallsView 占位）
+        let now = Date()
+        calls = [
+            CallRecord(id: 201, name: "Alice", direction: .incoming, timestamp: now.addingTimeInterval(-600), duration: 186),
+            CallRecord(id: 202, name: "Work", direction: .missed, timestamp: now.addingTimeInterval(-3600), duration: 0),
+            CallRecord(id: 203, name: "Diana", direction: .outgoing, timestamp: now.addingTimeInterval(-7200), duration: 92),
+            CallRecord(id: 204, name: "Family Group", direction: .incoming, timestamp: now.addingTimeInterval(-10800), duration: 540),
         ]
     }
     
@@ -157,44 +202,71 @@ public struct ChatListView: View {
                 
                 // Chat list
                 List {
-                    // 融合：联系人 Section（原 ContactsView 占位）
+                    // 融合：联系人 Section（真实模型，替代 Contact N 占位）
                     if viewModel.searchText.isEmpty {
                         Section {
-                            ForEach(0..<3, id: \.self) { index in
-                                HStack {
-                                    Circle()
-                                        .fill(Color.blue.opacity(0.3))
-                                        .frame(width: 40, height: 40)
-                                        .overlay(
-                                            Text("\(index + 1)")
-                                                .foregroundColor(.blue)
-                                        )
+                            ForEach(viewModel.contacts) { contact in
+                                HStack(spacing: 12) {
+                                    ZStack(alignment: .bottomTrailing) {
+                                        Circle()
+                                            .fill(contact.avatarColor.gradient)
+                                            .frame(width: 40, height: 40)
+                                            .overlay(
+                                                Text(String(contact.name.prefix(1)).uppercased())
+                                                    .font(.subheadline.bold())
+                                                    .foregroundColor(.white)
+                                            )
+                                        
+                                        if contact.isOnline {
+                                            Circle()
+                                                .fill(NeoTrixTheme.Colors.online)
+                                                .frame(width: 10, height: 10)
+                                                .overlay(Circle().stroke(NeoTrixTheme.Colors.background, lineWidth: 1.5))
+                                        }
+                                    }
                                     
-                                    Text("Contact \(index + 1)")
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack(spacing: 4) {
+                                            Text(contact.name)
+                                                .font(.body)
+                                            if contact.isPremium {
+                                                Image(systemName: "star.fill")
+                                                    .font(.caption2)
+                                                    .foregroundColor(NeoTrixTheme.Colors.premium)
+                                            }
+                                        }
+                                        Text(contact.phone)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
+                                .padding(.vertical, 2)
                             }
                         } header: {
-                            Text("联系人")
+                            Text("Contacts")
                         }
                         
-                        // 融合：通话（原 CallsView 占位）
+                        // 融合：通话记录（真实模型，替代 Call N 占位）
                         Section {
-                            ForEach(0..<2, id: \.self) { index in
-                                HStack {
-                                    Image(systemName: index % 2 == 0 ? "phone.arrow.up.right.fill" : "phone.arrow.down.left.fill")
-                                        .foregroundColor(index % 2 == 0 ? .red : .green)
+                            ForEach(viewModel.calls) { call in
+                                HStack(spacing: 12) {
+                                    Image(systemName: iconForCall(call.direction))
+                                        .font(.body)
+                                        .foregroundColor(colorForCall(call.direction))
+                                        .frame(width: 24)
                                     
-                                    Text("Call \(index + 1)")
+                                    Text(call.name)
                                     
                                     Spacer()
                                     
-                                    Text("Today")
+                                    Text(callDurationText(call))
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
+                                .padding(.vertical, 2)
                             }
                         } header: {
-                            Text("最近通话")
+                            Text("Recent Calls")
                         }
                     }
                     
@@ -226,7 +298,9 @@ public struct ChatListView: View {
                                 Divider()
                                 
                                 Button(role: .destructive) {
-                                    // Delete chat
+                                    withAnimation {
+                                        viewModel.chats.removeAll { $0.id == chat.id }
+                                    }
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -295,6 +369,32 @@ public struct ChatListView: View {
     }
 }
 
+// MARK: - 通话方向辅助（真实通话记录渲染）
+
+private func iconForCall(_ direction: CallRecord.Direction) -> String {
+    switch direction {
+    case .incoming: return "phone.arrow.down.left.fill"
+    case .outgoing: return "phone.arrow.up.right.fill"
+    case .missed: return "phone.arrow.up.right.fill"
+    }
+}
+
+private func colorForCall(_ direction: CallRecord.Direction) -> Color {
+    switch direction {
+    case .incoming: return NeoTrixTheme.Colors.success
+    case .outgoing: return NeoTrixTheme.Colors.accent
+    case .missed: return NeoTrixTheme.Colors.danger
+    }
+}
+
+private func callDurationText(_ call: CallRecord) -> String {
+    if case .missed = call.direction { return "Missed" }
+    if call.duration >= 60 {
+        return "\(call.duration / 60)m \(call.duration % 60)s"
+    }
+    return "\(call.duration)s"
+}
+
 struct FilterChip: View {
     let title: String
     let isSelected: Bool
@@ -304,11 +404,7 @@ struct FilterChip: View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
-                .foregroundColor(isSelected ? .white : .primary)
-                .clipShape(Capsule())
+                .neoTrixCapsule(isSelected: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -319,22 +415,17 @@ struct ChatListRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Avatar
+            // Avatar（设计系统: 头像 + 在线点）
             ZStack(alignment: .bottomTrailing) {
-                ZStack {
-                    Circle()
-                        .fill(chat.avatarColor.gradient)
-                        .frame(width: 52, height: 52)
-                    Text(String(chat.title.prefix(1)).uppercased())
-                        .font(.title2.bold())
-                        .foregroundColor(.white)
-                }
+                NeoTrixAvatar(title: chat.title, size: 52,
+                              gradient: LinearGradient(colors: [chat.avatarColor, chat.avatarColor.opacity(0.7)],
+                                                       startPoint: .topLeading, endPoint: .bottomTrailing))
                 
                 if chat.isOnline {
-                    Circle()
-                        .fill(Color.green)
+                    NeoTrixTheme.Colors.online
                         .frame(width: 14, height: 14)
-                        .overlay(Circle().stroke(Color.primary.opacity(0.2), lineWidth: 2))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(NeoTrixTheme.Colors.textPrimary.opacity(0.2), lineWidth: 2))
                 }
             }
             
@@ -348,13 +439,13 @@ struct ChatListRow: View {
                     if chat.isVerified {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(NeoTrixTheme.Colors.verified)
                     }
                     
                     if chat.isPremium {
                         Image(systemName: "star.fill")
                             .font(.caption2)
-                            .foregroundColor(.yellow)
+                            .foregroundColor(NeoTrixTheme.Colors.premium)
                     }
                     
                     Spacer()
@@ -383,7 +474,7 @@ struct ChatListRow: View {
                             .font(.caption.bold())
                             .foregroundColor(.white)
                             .frame(minWidth: 20, minHeight: 20)
-                            .background(Color.blue)
+                            .background(NeoTrixTheme.Colors.badge)
                             .clipShape(Circle())
                     }
                 }
@@ -417,13 +508,7 @@ public struct StoriesBar: View {
                     VStack(spacing: 6) {
                         ZStack {
                             Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.purple, .blue],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                .fill(NeoTrixTheme.Gradients.brand)
                                 .frame(width: 64, height: 64)
                             
                             Image(systemName: "wand.and.stars")
@@ -444,7 +529,7 @@ public struct StoriesBar: View {
                     VStack(spacing: 6) {
                         ZStack {
                             Circle()
-                                .fill(Color.gray.opacity(0.15))
+                                .fill(NeoTrixTheme.Colors.placeholder)
                                 .frame(width: 64, height: 64)
                             
                             Image(systemName: "plus")

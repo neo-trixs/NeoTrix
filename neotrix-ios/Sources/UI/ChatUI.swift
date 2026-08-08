@@ -245,7 +245,7 @@ public struct MessageBubbleView: View {
                                     .font(.caption)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 2)
-                                    .background(reaction.isSelected ? Color.blue.opacity(0.2) : Color.clear)
+                                    .background(reaction.isSelected ? NeoTrixTheme.Colors.selection : Color.clear)
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
@@ -276,9 +276,9 @@ public struct MessageBubbleView: View {
     
     private var bubbleColor: Color {
         switch message.sender {
-        case .user: return .blue
-        case .agent: return Color.gray.opacity(0.25)
-        case .system: return Color.gray.opacity(0.15)
+        case .user: return NeoTrixTheme.Colors.accent
+        case .agent: return NeoTrixTheme.Colors.bubbleIncoming
+        case .system: return NeoTrixTheme.Colors.bubbleSystem
         }
     }
     
@@ -469,7 +469,7 @@ struct TypingIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<3) { i in
                 Circle()
-                    .fill(Color.gray)
+                    .fill(NeoTrixTheme.Colors.textSecondary)
                     .frame(width: 8, height: 8)
                     .scaleEffect(animating ? 1.0 : 0.5)
                     .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.2), value: animating)

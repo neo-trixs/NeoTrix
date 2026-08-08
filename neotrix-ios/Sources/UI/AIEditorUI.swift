@@ -115,7 +115,7 @@ public struct AIEditorPanel: View {
                                 .font(.caption)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(Color.blue.opacity(0.15))
+                                .background(NeoTrixTheme.Colors.selection)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -186,7 +186,7 @@ public struct AIEditorView: View {
                         .font(.body)
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.gray.opacity(0.15))
+                        .background(NeoTrixTheme.Colors.inputBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 
@@ -208,7 +208,7 @@ public struct AIEditorView: View {
                             .font(.body)
                             .padding()
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.blue.opacity(0.1))
+                            .background(NeoTrixTheme.Colors.selection)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }

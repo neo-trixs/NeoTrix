@@ -87,11 +87,7 @@ public struct LiveFeedView: View {
                     } label: {
                         Text(category.rawValue)
                             .font(.caption.weight(engine.selectedCategory == category ? .bold : .regular))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
-                            .background(engine.selectedCategory == category ? Color.blue : Color.gray.opacity(0.15))
-                            .foregroundColor(engine.selectedCategory == category ? .white : .primary)
-                            .clipShape(Capsule())
+                            .neoTrixCapsule(isSelected: engine.selectedCategory == category)
                     }
                 }
             }
@@ -150,17 +146,11 @@ public struct LiveFeedView: View {
     // MARK: - 空状态
     
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "rectangle.3.offgrid.bubble.left")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-            Text("No content yet")
-                .font(.headline)
-            Text("Pull to refresh or search across all resources")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        NeoTrixEmptyState(
+            icon: "rectangle.3.offgrid.bubble.left",
+            title: "No content yet",
+            message: "Pull to refresh or search across all resources"
+        )
     }
     
     // MARK: - Toast
@@ -175,12 +165,7 @@ public struct LiveFeedView: View {
     
     private var toastView: some View {
         Text(toastMessage ?? "")
-            .font(.subheadline)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.black.opacity(0.8))
-            .foregroundColor(.white)
-            .clipShape(Capsule())
+            .neoTrixToast(toastMessage ?? "")
             .padding(.top, 8)
             .transition(.move(edge: .top).combined(with: .opacity))
     }
@@ -300,14 +285,14 @@ public struct LiveCardView: View {
             .font(.system(size: 14))
         }
         .padding(10)
-        .background(Color(.white))
+        .background(NeoTrixTheme.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .shadow(color: NeoTrixTheme.Shadows.card, radius: 4, x: 0, y: 2)
     }
     
     private var placeholder: some View {
         ZStack {
-            Color.gray.opacity(0.1)
+            NeoTrixTheme.Colors.placeholder
             Image(systemName: typeIcon(item.type))
                 .font(.system(size: 32))
                 .foregroundColor(.gray)
@@ -320,15 +305,7 @@ public struct LiveCardView: View {
     }
     
     private func typeBadgeColor(_ type: FeedItemType) -> Color {
-        switch type {
-        case .moment: return .pink      // Moments: 社交状态流
-        case .stream: return .cyan      // Stream: 实时事件流
-        case .video: return .red
-        case .image: return .orange
-        case .chat: return .blue
-        case .contact: return .green
-        default: return .purple
-        }
+        NeoTrixTheme.TypeColors.color(for: type.rawValue)
     }
     
     private func typeIcon(_ type: FeedItemType) -> String {
@@ -345,20 +322,11 @@ public struct LiveCardView: View {
     }
     
     private func platformColor(_ p: String) -> Color {
-        switch p.lowercased() {
-        case "youtube": return .red
-        case "tiktok", "douyin": return .black
-        case "instagram": return .purple
-        case "twitter": return .blue
-        case "reddit": return .orange
-        case "telegram": return .cyan
-        case "bilibili": return .pink
-        default: return .gray
-        }
+        NeoTrixTheme.PlatformColors.color(for: p)
     }
     
     private func scoreColor(_ s: Double) -> Color {
-        s >= 70 ? .green : s >= 40 ? .orange : .red
+        NeoTrixTheme.ScoreColors.color(for: s)
     }
     
     private func formatCount(_ n: Int64) -> String {
