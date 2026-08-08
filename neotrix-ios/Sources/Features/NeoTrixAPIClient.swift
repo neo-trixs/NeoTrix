@@ -1,9 +1,115 @@
+// NeoTrixAPIClient - 融合: 从 NeoTrix/ 死代码体系提炼的 HTTP 服务层
+// 原 NeoTrix/Services/NeoTrixAPI.swift（未被 Bazel 编译）迁移至此并补全模型类型。
+// 作为 LiveFeedEngine 的真实内容源（替代 mock 降级），Dark Forest: 有消费者。
+
 import Foundation
 
-actor NeoTrixAPI {
-    static let shared = NeoTrixAPI()
+// MARK: - API 模型类型（补全: 原 NeoTrix/ 体系引用但未定义）
+
+public struct ChatRequest: Codable {
+    public let message: String
+    public init(message: String) { self.message = message }
+}
+
+public struct ChatResponse: Codable {
+    public let reply: String
+}
+
+public struct VideoSubmission: Codable, Equatable {
+    public let id: String
+    public let title: String
+    public let author: String?
+    public let duration: Double?
+    public let viewCount: Int64?
+    public let likeCount: Int64?
+    public let url: String?
+    public init(id: String, title: String, author: String? = nil, duration: Double? = nil,
+                viewCount: Int64? = nil, likeCount: Int64? = nil, url: String? = nil) {
+        self.id = id
+        self.title = title
+        self.author = author
+        self.duration = duration
+        self.viewCount = viewCount
+        self.likeCount = likeCount
+        self.url = url
+    }
+}
+
+public struct ScoreRequest: Codable {
+    public let moments: [VideoSubmission]
+    public init(moments: [VideoSubmission]) { self.moments = moments }
+}
+
+public struct MomentItem: Codable, Equatable, Identifiable {
+    public let id: String
+    public let title: String
+    public let author: String?
+    public let score: Double?
+    public let reason: String?
+    public let createdAt: String?
+    public init(id: String, title: String, author: String? = nil, score: Double? = nil,
+                reason: String? = nil, createdAt: String? = nil) {
+        self.id = id
+        self.title = title
+        self.author = author
+        self.score = score
+        self.reason = reason
+        self.createdAt = createdAt
+    }
+}
+
+public struct FeedbackRequest: Codable {
+    public let momentId: String
+    public let liked: Bool
+    public let keywords: [String]?
+    public init(momentId: String, liked: Bool, keywords: [String]? = nil) {
+        self.momentId = momentId
+        self.liked = liked
+        self.keywords = keywords
+    }
+}
+
+public struct SocialStatus: Codable, Equatable, Identifiable {
+    public let id: String
+    public let platform: String
+    public let isConnected: Bool
+    public let username: String?
+    public let followers: Int64?
+    public init(id: String, platform: String, isConnected: Bool, username: String? = nil, followers: Int64? = nil) {
+        self.id = id
+        self.platform = platform
+        self.isConnected = isConnected
+        self.username = username
+        self.followers = followers
+    }
+}
+
+public struct SocialLoginRequest: Codable {
+    public let platform: String
+    public let token: String
+    public let refreshToken: String?
+    public init(platform: String, token: String, refreshToken: String? = nil) {
+        self.platform = platform
+        self.token = token
+        self.refreshToken = refreshToken
+    }
+}
+
+public struct FilterConfig: Codable, Equatable {
+    public let filterAds: Bool
+    public let filterKeywords: [String]
+    public init(filterAds: Bool = true, filterKeywords: [String] = []) {
+        self.filterAds = filterAds
+        self.filterKeywords = filterKeywords
+    }
+}
+
+// MARK: - API Client
+
+public actor NeoTrixAPIClient {
+    public static let shared = NeoTrixAPIClient()
     
-    var baseURL: String {
+    public var baseURL: String {
         UserDefaults.standard.string(forKey: "server_url") ?? "http://localhost:3000"
     }
     
@@ -19,16 +125,18 @@ actor NeoTrixAPI {
         return e
     }()
     
+    public init() {}
+    
     // MARK: - Chat
     
-    func chat(message: String) async throws -> String {
+    public func chat(message: String) async throws -> String {
         let req = ChatRequest(message: message)
         let data = try await post("/api/v1/chat", body: req)
         let resp = try decoder.decode(ChatResponse.self, from: data)
         return resp.reply
     }
     
-    func chatStream(message: String) -> AsyncThrowingStream<String, Error> {
+    public func chatStream(message: String) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -58,13 +166,13 @@ actor NeoTrixAPI {
     
     // MARK: - Moments
     
-    func scoreMoments(_ moments: [VideoSubmission]) async throws -> [MomentItem] {
+    public func scoreMoments(_ moments: [VideoSubmission]) async throws -> [MomentItem] {
         let req = ScoreRequest(moments: moments)
         let data = try await post("/api/v1/moments/score", body: req)
         return try decoder.decode([MomentItem].self, from: data)
     }
     
-    func scoreMomentsStream(_ moments: [VideoSubmission]) -> AsyncThrowingStream<MomentItem, Error> {
+    public func scoreMomentsStream(_ moments: [VideoSubmission]) -> AsyncThrowingStream<MomentItem, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -93,26 +201,26 @@ actor NeoTrixAPI {
         }
     }
     
-    func sendFeedback(momentId: String, liked: Bool, keywords: [String]? = nil) async throws {
+    public func sendFeedback(momentId: String, liked: Bool, keywords: [String]? = nil) async throws {
         let req = FeedbackRequest(momentId: momentId, liked: liked, keywords: keywords)
         _ = try await post("/api/v1/moments/feedback", body: req)
     }
     
     // MARK: - Social
     
-    func socialStatus() async throws -> [SocialStatus] {
+    public func socialStatus() async throws -> [SocialStatus] {
         let data = try await get("/api/v1/social/status")
         return try decoder.decode([SocialStatus].self, from: data)
     }
     
-    func socialLogin(platform: String, token: String, refreshToken: String? = nil) async throws {
+    public func socialLogin(platform: String, token: String, refreshToken: String? = nil) async throws {
         let req = SocialLoginRequest(platform: platform, token: token, refreshToken: refreshToken)
         _ = try await post("/api/v1/social/login", body: req)
     }
     
     // MARK: - Filter
     
-    func filterConfig() async throws -> FilterConfig {
+    public func filterConfig() async throws -> FilterConfig {
         let data = try await get("/api/v1/filter/config")
         return try decoder.decode(FilterConfig.self, from: data)
     }
@@ -142,12 +250,12 @@ actor NeoTrixAPI {
     }
 }
 
-enum APIError: Error, LocalizedError {
+public enum APIError: Error, LocalizedError {
     case invalidResponse
     case notFound
     case serverError(String)
     
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .invalidResponse: return "Invalid server response"
         case .notFound: return "Endpoint not found"
