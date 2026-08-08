@@ -1,10 +1,11 @@
-import { createSignal, For, Show, onCleanup } from 'solid-js'
+import { createSignal, createEffect, For, Show, onCleanup } from 'solid-js'
+import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
 
 /* ════════════════════════════════════════════
-   RightBar — 右栏（设计 v2）
+   RightBar — 右栏（设计 v2，已接线后端）
    上部：Artifact Pane（预览/代码切换 + 格式 tabs + 内容）
-   下部：文件树（目录展开/折叠 + 文件选中预览）
+   下部：文件树（真实项目树 ← neocodex_project_tree）
    交互：auto-hide（hover/右侧边缘展开）或 collapsed 固定
    ════════════════════════════════════════════ */
 
@@ -13,66 +14,34 @@ interface FileNode {
   type: 'dir' | 'file'
   open?: boolean
   content?: string
+  path?: string
   children?: FileNode[]
 }
 
-const FILE_TREE: FileNode[] = [
-  {
-    name: 'src', type: 'dir', open: true, children: [
-      { name: 'main.rs', type: 'file' },
-      { name: 'lib.rs', type: 'file' },
-      {
-        name: 'engine_core.rs', type: 'file',
-        content: `pub struct ReasoningEngine {
-    pub gateway: Arc<GatewayV2>,
-    e8_state: E8State,
-    confidence: f64,
+interface ProjectTreeItem {
+  name: string
+  path: string
+  is_dir: boolean
+  children: ProjectTreeItem[] | null
 }
 
-impl ReasoningEngine {
-    pub fn new() -> Self {
-        Self {
-            gateway: GatewayV2::default(),
-            e8_state: E8State::Ground,
-            confidence: 0.92,
-        }
-    }
-}`,
-      },
-      {
-        name: 'config.rs', type: 'file',
-        content: `pub struct Config {
-    pub provider: ProviderType,
-    pub max_tokens: u32,
-    pub temperature: f64,
+interface ProjectView {
+  root: string
+  tree: ProjectTreeItem[]
+  agents_md: string | null
+  file_count: number
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            provider: ProviderType::OpenAI,
-            max_tokens: 4096,
-            temperature: 0.7,
-        }
-    }
-}`,
-      },
-    ],
-  },
-  {
-    name: 'components', type: 'dir', open: false, children: [
-      { name: 'mod.rs', type: 'file' },
-      { name: 'chat.rs', type: 'file' },
-      { name: 'sidebar.rs', type: 'file' },
-    ],
-  },
-  {
-    name: 'tests', type: 'dir', open: false, children: [
-      { name: 'test_engine.rs', type: 'file' },
-    ],
-  },
-  { name: 'Cargo.toml', type: 'file' },
-]
+/* 后端 ProjectTreeItem → 前端 FileNode */
+function toFileNode(item: ProjectTreeItem): FileNode {
+  return {
+    name: item.name,
+    type: item.is_dir ? 'dir' : 'file',
+    path: item.path,
+    open: item.is_dir && item.children != null && item.children.length > 0,
+    children: item.children?.map(toFileNode),
+  }
+}
 
 const PREVIEW_FORMATS = [
   { id: 'raw', label: 'Raw' },
@@ -176,9 +145,34 @@ export function RightBar() {
   const [currentFile, setCurrentFile] = createSignal<FileNode | null>(null)
   const [previewMode, setPreviewMode] = createSignal<PreviewMode>('rendered')
   const [artifactView, setArtifactView] = createSignal<'preview' | 'code'>('preview')
-  const [tree, setTree] = createSignal<FileNode[]>(FILE_TREE)
+  const [tree, setTree] = createSignal<FileNode[]>([])
+  const [rootPath, setRootPath] = createSignal('')
+  const [fileCount, setFileCount] = createSignal(0)
+  const [treeLoading, setTreeLoading] = createSignal(false)
+  const [fileLoading, setFileLoading] = createSignal(false)
+  const [treeError, setTreeError] = createSignal<string | null>(null)
 
   const rbOpen = () => !collapsed()
+
+  /* 加载真实项目树（neocodex_project_tree） */
+  const loadTree = async () => {
+    setTreeLoading(true)
+    setTreeError(null)
+    try {
+      const pv = await invoke<ProjectView>('neocodex_project_tree')
+      setTree(pv.tree.map(toFileNode))
+      setRootPath(pv.root)
+      setFileCount(pv.file_count)
+    } catch (e) {
+      setTreeError(String(e))
+    } finally {
+      setTreeLoading(false)
+    }
+  }
+
+  createEffect(() => {
+    loadTree()
+  })
 
   const toggleRb = () => {
     if (autoHide()) {
@@ -189,11 +183,25 @@ export function RightBar() {
     setCollapsed(!collapsed())
   }
 
-  const openPreview = (node: FileNode) => {
+  const openPreview = async (node: FileNode) => {
     setCollapsed(false)
     setAutoHide(false)
     setPreviewOpen(true)
     setCurrentFile(node)
+    // 文件内容懒加载：真实读取
+    if (node.type === 'file' && node.path && !node.content) {
+      setFileLoading(true)
+      try {
+        const content = await invoke<string>('read_file', { path: node.path })
+        node.content = content
+        setCurrentFile({ ...node, content })
+      } catch (e) {
+        node.content = `// 读取失败: ${e}`
+        setCurrentFile({ ...node })
+      } finally {
+        setFileLoading(false)
+      }
+    }
   }
 
   const toggleDir = (node: FileNode) => {
@@ -339,12 +347,28 @@ export function RightBar() {
 
         {/* ── File Tree ── */}
         <div class="ft">
+          <div class="ft-head">
+            <span class="ft-root" title={rootPath()}>{rootPath() || '项目'}</span>
+            <span class="ft-count">{fileCount()} 文件</span>
+          </div>
+          <Show when={treeLoading() && tree().length === 0}>
+            <div class="ft-loading">加载项目树…</div>
+          </Show>
+          <Show when={treeError()}>
+            <div class="ft-error">{treeError()}</div>
+          </Show>
+          <Show when={!treeLoading() && !treeError() && tree().length === 0}>
+            <div class="ft-empty">项目为空</div>
+          </Show>
           <FileTree
             nodes={tree()}
             onOpenFile={openPreview}
             activeFile={currentFile()?.name ?? null}
             onToggleDir={toggleDir}
           />
+          <Show when={fileLoading()}>
+            <div class="ft-loading">读取文件…</div>
+          </Show>
         </div>
       </div>
     </aside>

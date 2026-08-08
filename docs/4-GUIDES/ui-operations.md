@@ -129,7 +129,7 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 5. **复制**：点击"复制"按钮复制当前文件内容
 6. **展开/关闭**：点击"展开"放大面板，"关闭"关闭预览
 
-> ⚠️ 注意：当前文件树为**静态演示数据**（`FILE_TREE` 常量），未对接后端 `neocodex_project_tree`。真实项目树见 §12 ProjectView。
+> ✅ 已接线：文件树为**真实项目树**（`neocodex_project_tree`，跳过依赖/VCS 目录、深度/广度受限），点击文件经 `read_file` 懒加载真实内容。顶部显示项目根路径与文件数。
 
 ---
 
@@ -149,7 +149,7 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 3. **切换会话**：点击左侧会话项
 4. **查看任务**：右侧显示当前会话的任务列表、进度、智能体状态
 
-> ⚠️ 注意：当前为**静态演示数据**（`CW_DATA` 常量），未接入后端 `cowork_*` 命令（后端已有 20 个 cowork 命令，前端未接线）。
+> ✅ 已接线：会话列表来自 `cowork_list`，新建经 `cowork_start`（工作区路径+描述），行动列表来自 `cowork_actions`，交付物来自 `cowork_list_deliverables`，支持暂停/恢复/停止（`cowork_pause/resume/stop`），顶部统计来自 `cowork_stats`。
 
 ---
 
@@ -520,6 +520,8 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 | ProviderSelector | neocodex_provider_config, neocodex_set_provider |
 | GitPanel | neocodex_git_status, neocodex_get_diff, neocodex_apply_diff |
 | ProjectView | neocodex_project_tree |
+| RightBar | neocodex_project_tree, read_file |
+| CoworkView | cowork_list, cowork_start, cowork_actions, cowork_list_deliverables, cowork_pause/resume/stop, cowork_stats |
 | CostDashboard | neocodex_agent_status |
 | PluginMarketplace | plugin_list/install/uninstall/enable/disable/event_log |
 | ScheduledTasks | list_background_tasks, create_background_task, run/pause/resume/delete_background_task |
@@ -532,8 +534,6 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 
 | 界面 | 状态 | 说明 |
 |------|------|------|
-| RightBar 文件树 | 静态演示 | 未接入 neocodex_project_tree |
-| CoworkView | 静态演示 | 后端 cowork_* 命令未接线 |
 | Sidebar 搜索 | 占位 | 搜索按钮无功能（开发中） |
 | Sidebar 用户条 | 占位 | 设置按钮仅 console.log |
 | 语音输入按钮 | 占位 | cic 输入区语音按钮无功能 |

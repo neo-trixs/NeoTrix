@@ -1,59 +1,177 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, createEffect, For, Show } from 'solid-js'
+import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
 
 /* ════════════════════════════════════════════
-   CoworkView — 协同会话管理（设计 v2）
-   左栏：会话列表（cw-slist）
-   右栏：任务看板（cw-tlist）+ 智能体网格（cw-agents）
+   CoworkView — 协同会话管理（设计 v2，已接线后端）
+   左栏：会话列表（cw-slist）← cowork_list
+   右栏：任务看板（cw-tlist）← cowork_actions
+         + 交付物（cw-deliv）← cowork_list_deliverables
    ════════════════════════════════════════════ */
 
-interface CwAgent {
-  n: string
-  on: boolean
-}
-
-interface CwSession {
+interface CoworkSession {
+  id: string
   name: string
+  workspace_path: string
   status: string
-  tasks: number
-  done: number
-  fail: number
-  agents: CwAgent[]
+  files_read: number
+  files_created: number
+  files_modified: number
+  started_at: number
+  last_active_at: number
+  deliverables: string[]
+  description: string
+  tags: string[]
 }
 
-const CW_DATA: CwSession[] = [
-  {
-    name: '架构讨论', status: '进行中', tasks: 3, done: 1, fail: 0,
-    agents: [{ n: '分析员', on: true }, { n: '架构师', on: true }, { n: '审查员', on: false }],
-  },
-  {
-    name: '代码审查 Sprint', status: '进行中', tasks: 5, done: 3, fail: 0,
-    agents: [{ n: '审查员', on: true }, { n: '检查员', on: true }],
-  },
-  {
-    name: '文档生成', status: '已完成', tasks: 2, done: 2, fail: 0,
-    agents: [{ n: '写手', on: false }],
-  },
-]
+interface CoworkAction {
+  id: string
+  session_id: string
+  action_type: string
+  target_path: string
+  status: string
+  started_at: number
+  completed_at: number | null
+  details: string | null
+  result_summary: string | null
+}
+
+interface CoworkDeliverable {
+  id: string
+  session_id: string
+  name: string
+  path: string
+  kind: string
+  created_at: number
+  size_bytes: number
+  description: string
+  quality_score: number | null
+}
+
+interface CoworkStats {
+  total_sessions: number
+  total_deliverables: number
+  files_processed: number
+  active_sessions: number
+  avg_files_per_session: number
+  top_category: string
+  top_template: string
+}
 
 /* 状态 → 语义徽章类（与 badge-success/warn/error 体系一致） */
 function statusBadge(status: string): string {
-  if (status.includes('完成')) return 'badge-success'
-  if (status.includes('失败') || status.includes('错误')) return 'badge-error'
-  return 'badge-warn' // 进行中/待处理
+  if (status === 'completed' || status === 'done') return 'badge-success'
+  if (status === 'failed' || status === 'error' || status === 'stopped') return 'badge-error'
+  return 'badge-warn' // active / paused / running
+}
+
+function statusLabel(status: string): string {
+  const map: Record<string, string> = {
+    active: '进行中', paused: '已暂停', completed: '已完成',
+    stopped: '已停止', failed: '失败', running: '进行中', done: '已完成',
+  }
+  return map[status] ?? status
 }
 
 export function CoworkView() {
-  const [sessions, setSessions] = createSignal<CwSession[]>(CW_DATA)
-  const [activeIdx, setActiveIdx] = createSignal(0)
+  const [sessions, setSessions] = createSignal<CoworkSession[]>([])
+  const [actions, setActions] = createSignal<CoworkAction[]>([])
+  const [deliverables, setDeliverables] = createSignal<CoworkDeliverable[]>([])
+  const [stats, setStats] = createSignal<CoworkStats | null>(null)
+  const [activeId, setActiveId] = createSignal<string | null>(null)
+  const [loading, setLoading] = createSignal(false)
+  const [error, setError] = createSignal<string | null>(null)
+  const [showNew, setShowNew] = createSignal(false)
+  const [newPath, setNewPath] = createSignal('')
+  const [newDesc, setNewDesc] = createSignal('')
 
-  const active = () => sessions()[activeIdx()] ?? sessions()[0]
+  const active = () => sessions().find((s) => s.id === activeId()) ?? sessions()[0]
 
-  const addSession = () => {
-    const s: CwSession = { name: '新任务', status: '进行中', tasks: 1, done: 0, fail: 0, agents: [{ n: '协调员', on: true }] }
-    setSessions([s, ...sessions()])
-    setActiveIdx(0)
+  const loadSessions = async () => {
+    try {
+      const list = await invoke<CoworkSession[]>('cowork_list')
+      setSessions(list)
+      if (list.length > 0 && !list.some((s) => s.id === activeId())) {
+        setActiveId(list[0].id)
+      }
+    } catch (e) {
+      setError(String(e))
+    }
   }
+
+  const loadStats = async () => {
+    try {
+      setStats(await invoke<CoworkStats>('cowork_stats'))
+    } catch { /* stats 非关键 */ }
+  }
+
+  const loadDetail = async (id: string) => {
+    try {
+      const [acts, dels] = await Promise.all([
+        invoke<CoworkAction[]>('cowork_actions', { sessionId: id }),
+        invoke<CoworkDeliverable[]>('cowork_list_deliverables', { sessionId: id }),
+      ])
+      setActions(acts)
+      setDeliverables(dels)
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  createEffect(() => {
+    const id = activeId()
+    if (id) loadDetail(id)
+  })
+
+  // 初始加载
+  createEffect(() => {
+    loadSessions()
+    loadStats()
+  })
+
+  const addSession = async () => {
+    const path = newPath().trim() || '.'
+    setLoading(true)
+    setError(null)
+    try {
+      const id = await invoke<string>('cowork_start', {
+        workspacePath: path,
+        description: newDesc().trim(),
+        name: null,
+        tags: null,
+      })
+      setNewPath('')
+      setNewDesc('')
+      setShowNew(false)
+      await loadSessions()
+      setActiveId(id)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const controlSession = async (action: 'pause' | 'resume' | 'stop') => {
+    const id = active()?.id
+    if (!id) return
+    try {
+      await invoke(`cowork_${action}`, { sessionId: id })
+      await loadSessions()
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  const refresh = async () => {
+    setError(null)
+    await loadSessions()
+    await loadStats()
+    const id = active()?.id
+    if (id) await loadDetail(id)
+  }
+
+  const a = active()
 
   return (
     <div class="vw-cowork">
@@ -62,81 +180,132 @@ export function CoworkView() {
         <div class="cw-sidebar">
           <div class="cw-shead">
             <span>会话</span>
-            <button class="cw-add" onClick={addSession} title="新建会话" aria-label="新建会话">
-              <svg viewBox="0 0 14 14">
-                <line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-                <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-              </svg>
-            </button>
+            <div class="cw-shead-actions">
+              <button class="cw-add" onClick={() => setShowNew(!showNew())} title="新建会话" aria-label="新建会话">
+                <svg viewBox="0 0 14 14">
+                  <line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                  <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                </svg>
+              </button>
+              <button class="cw-refresh-btn" onClick={refresh} title="刷新" aria-label="刷新">
+                <svg viewBox="0 0 14 14">
+                  <path d="M12 7a5 5 0 11-1.5-3.5M12 2v3h-3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
           </div>
+
+          <Show when={showNew()}>
+            <div class="cw-new">
+              <input
+                class="cw-new-input"
+                placeholder="工作区路径（如 /Users/me/proj）"
+                value={newPath()}
+                onInput={(e) => setNewPath(e.currentTarget.value)}
+              />
+              <input
+                class="cw-new-input"
+                placeholder="描述（可选）"
+                value={newDesc()}
+                onInput={(e) => setNewDesc(e.currentTarget.value)}
+              />
+              <button class="cw-new-go" disabled={loading()} onClick={addSession}>
+                {loading() ? '创建中…' : '创建'}
+              </button>
+            </div>
+          </Show>
+
+          <Show when={error()}>
+            <div class="cw-error">{error()}</div>
+          </Show>
+
           <div class="cw-slist">
             <For each={sessions()}>
-              {(s, i) => {
-                const pct = s.tasks > 0 ? Math.round((s.done / s.tasks) * 100) : 0
-                return (
-                  <div
-                    class={clsx('cw-sitem', i() === activeIdx() && 'active')}
-                    onClick={() => setActiveIdx(i())}
-                  >
-                    {s.name}
-                    <span class="s">{s.done}/{s.tasks} 任务 · {pct}%</span>
-                  </div>
-                )
-              }}
+              {(s) => (
+                <div
+                  class={clsx('cw-sitem', s.id === activeId() && 'active')}
+                  onClick={() => setActiveId(s.id)}
+                >
+                  <div class="cw-sitem-name">{s.name}</div>
+                  <span class="s">
+                    {statusLabel(s.status)} · 读 {s.files_read} · 建 {s.files_created} · 改 {s.files_modified}
+                  </span>
+                </div>
+              )}
             </For>
+            <Show when={sessions().length === 0 && !loading()}>
+              <div class="cw-empty">暂无会话，点击 + 新建</div>
+            </Show>
           </div>
         </div>
 
-        {/* 右栏：任务详情 + 智能体 */}
+        {/* 右栏：任务详情 + 交付物 */}
         <div class="cw-main">
-          <Show when={active()}>
-            {(a) => (
+          <Show when={a} fallback={<div class="cw-empty-main">选择或新建一个协同会话</div>}>
+            {(s) => (
               <div class="cw-content">
                 <div class="cw-header">
                   <div>
-                    <div class="cw-title">{a().name}</div>
-                    <div class="cw-sub">{a().tasks} 任务 · {a().done} 完成 · {a().fail} 失败</div>
+                    <div class="cw-title">{s().name}</div>
+                    <div class="cw-sub">
+                      {s().workspace_path} · 读 {s().files_read} · 建 {s().files_created} · 改 {s().files_modified}
+                    </div>
                   </div>
-                  <div class={clsx('badge', statusBadge(a().status))}>{a().status}</div>
+                  <div class="cw-header-right">
+                    <div class={clsx('badge', statusBadge(s().status))}>{statusLabel(s().status)}</div>
+                    <Show when={s().status === 'active'}>
+                      <button class="cw-ctl" onClick={() => controlSession('pause')} title="暂停" aria-label="暂停">⏸</button>
+                    </Show>
+                    <Show when={s().status === 'paused'}>
+                      <button class="cw-ctl" onClick={() => controlSession('resume')} title="恢复" aria-label="恢复">▶</button>
+                    </Show>
+                    <Show when={s().status !== 'stopped' && s().status !== 'completed'}>
+                      <button class="cw-ctl" onClick={() => controlSession('stop')} title="停止" aria-label="停止">⏹</button>
+                    </Show>
+                  </div>
                 </div>
+
+                <Show when={s().description}>
+                  <div class="cw-desc">{s().description}</div>
+                </Show>
 
                 <div class="cw-section-title">
                   <svg viewBox="0 0 12 12">
                     <line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
                     <circle cx="6" cy="6" r="1.5" fill="none" stroke="currentColor" stroke-width="1" />
                   </svg>
-                  任务
+                  行动
                 </div>
                 <div class="cw-tlist">
-                  <For each={Array.from({ length: a().tasks }, (_, i) => i)}>
-                    {(i) => {
-                      const done = i < a().done
-                      const fail = !done && i < a().done + a().fail
-                      const label = done ? '已完成' : fail ? '失败' : '进行中'
-                      return (
-                        <div class="cw-task">
-                          <span class={clsx('dot', done && 'done', fail && 'fail')} />
-                          <span class="tname">任务 #{i + 1}</span>
-                          <span class="tstat">{label}</span>
-                        </div>
-                      )
-                    }}
+                  <For each={actions()} fallback={<div class="cw-empty">暂无行动</div>}>
+                    {(act) => (
+                      <div class="cw-task">
+                        <span class={clsx('dot', act.status === 'completed' && 'done', (act.status === 'failed' || act.status === 'error') && 'fail')} />
+                        <span class="tname">{act.action_type}</span>
+                        <span class="tpath">{act.target_path}</span>
+                        <span class="tstat">{statusLabel(act.status)}</span>
+                      </div>
+                    )}
                   </For>
                 </div>
 
                 <div class="cw-section-title">
                   <svg viewBox="0 0 12 12">
-                    <circle cx="6" cy="4" r="2.5" stroke="currentColor" stroke-width="1" fill="none" />
-                    <path d="M2 11a4 4 0 018 0" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round" />
+                    <path d="M2 3h8v6H2z" stroke="currentColor" stroke-width="1" fill="none" />
+                    <path d="M4 5h4" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
                   </svg>
-                  智能体
+                  交付物
                 </div>
-                <div class="cw-agents">
-                  <For each={a().agents}>
-                    {(ag) => (
-                      <div class="cw-agent">
-                        <span class="adot" style={{ background: ag.on ? '#4caf50' : '#b0b0b8' }} />
-                        {ag.n}
+                <div class="cw-deliverables">
+                  <For each={deliverables()} fallback={<div class="cw-empty">暂无交付物</div>}>
+                    {(d) => (
+                      <div class="cw-deliverable">
+                        <span class="dname">{d.name}</span>
+                        <span class="dkind">{d.kind}</span>
+                        <span class="dpath">{d.path}</span>
+                        <Show when={d.quality_score != null}>
+                          <span class="dscore">{d.quality_score}/100</span>
+                        </Show>
                       </div>
                     )}
                   </For>

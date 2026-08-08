@@ -2001,3 +2001,43 @@ pub async fn neocodex_file_operation(op: String, path: String, new_name: Option<
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// neocodex_project_tree 应返回当前目录树，跳过依赖/VCS 目录，且包含 AGENTS.md。
+    #[test]
+    fn test_project_tree_returns_bounded_tree() {
+        let pv = neocodex_project_tree().expect("project tree should build");
+        assert!(!pv.root.is_empty(), "root should be set");
+        assert!(pv.file_count > 0, "should find at least one file");
+        // 顶层不应包含被跳过的目录
+        let names: Vec<&str> = pv.tree.iter().map(|i| i.name.as_str()).collect();
+        assert!(!names.contains(&"node_modules"), "node_modules must be skipped");
+        assert!(!names.contains(&".git"), ".git must be skipped");
+        assert!(!names.contains(&"target"), "target must be skipped");
+        // 目录项应带 children，文件项不带
+        for item in &pv.tree {
+            if item.is_dir {
+                assert!(item.children.is_some(), "dir {} should have children", item.name);
+            } else {
+                assert!(item.children.is_none(), "file {} should have no children", item.name);
+            }
+        }
+    }
+
+    /// AGENTS.md 若存在于项目根则应被读取。
+    #[test]
+    fn project_tree_reads_agents_md() {
+        let pv = neocodex_project_tree().expect("project tree should build");
+        let root_has_agents = std::path::Path::new(&pv.root).join("AGENTS.md").exists();
+        if root_has_agents {
+            let agents = pv.agents_md.expect("agents_md should be Some when AGENTS.md exists");
+            assert!(!agents.trim().is_empty(), "AGENTS.md content should not be empty");
+        } else {
+            // 测试 cwd 可能不在仓库根（如 src-tauri/），此时 AGENTS.md 不存在属正常
+            assert!(pv.agents_md.is_none(), "no AGENTS.md in cwd -> agents_md should be None");
+        }
+    }
+}

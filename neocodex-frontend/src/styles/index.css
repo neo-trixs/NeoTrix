@@ -928,6 +928,27 @@
   .ft-item .chev.open { transform: rotate(-90deg); }
   .ft-children { display: none; padding-left: 14px; }
   .ft-children.open { display: block; }
+  .ft-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px 6px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    margin-bottom: 4px;
+  }
+  .ft-root {
+    font-size: 10px;
+    font-weight: 600;
+    color: #1a1a20;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+  }
+  .ft-count { font-size: 9px; color: #b0b0b8; flex-shrink: 0; }
+  .ft-loading { font-size: 10px; color: #b0b0b8; padding: 4px; }
+  .ft-error { font-size: 10px; color: #e85454; padding: 4px; }
+  .ft-empty { font-size: 10px; color: #b0b0b8; padding: 4px; }
   .ft-file { color: #909098; }
   .ft-file:hover { color: #1a1a20; background: rgba(0, 0, 0, 0.03); }
   .ft-active { background: rgba(232, 84, 84, 0.08); color: #e85454 !important; }
@@ -1242,6 +1263,51 @@
     color: #5a5a62;
   }
   .cw-agent .adot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .cw-shead-actions { display: flex; align-items: center; gap: 4px; }
+  .cw-refresh-btn {
+    width: 22px; height: 22px; border: none; background: rgba(0, 0, 0, 0.03);
+    border-radius: 6px; cursor: pointer; color: #5a5a62;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+  }
+  .cw-refresh-btn:hover { background: rgba(232, 84, 84, 0.08); color: #e85454; }
+  .cw-refresh-btn svg { width: 12px; height: 12px; }
+  .cw-new { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); }
+  .cw-new-input {
+    width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 11px;
+    border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 6px; background: #fff; color: #1a1a20;
+    outline: none;
+  }
+  .cw-new-input:focus { border-color: #e85454; }
+  .cw-new-go {
+    padding: 5px 10px; font-size: 11px; font-weight: 500; border: none; border-radius: 6px;
+    background: #e85454; color: #fff; cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+  }
+  .cw-new-go:hover { background: #d43f3f; }
+  .cw-new-go:disabled { opacity: 0.5; cursor: default; }
+  .cw-error { padding: 6px 10px; font-size: 10px; color: #e85454; background: rgba(232, 84, 84, 0.06); border-bottom: 1px solid rgba(232, 84, 84, 0.15); }
+  .cw-sitem-name { font-weight: 500; }
+  .cw-header-right { display: flex; align-items: center; gap: 6px; }
+  .cw-ctl {
+    width: 24px; height: 24px; border: 1px solid rgba(0, 0, 0, 0.1); background: rgba(0, 0, 0, 0.02);
+    border-radius: 6px; cursor: pointer; color: #5a5a62; font-size: 11px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+  }
+  .cw-ctl:hover { background: rgba(232, 84, 84, 0.08); color: #e85454; }
+  .cw-desc { font-size: 11px; color: #5a5a62; background: rgba(0, 0, 0, 0.02); border-radius: 8px; padding: 8px 10px; }
+  .cw-deliverables { display: flex; flex-direction: column; gap: 4px; }
+  .cw-deliverable {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px;
+    background: rgba(0, 0, 0, 0.02); border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  .cw-deliverable .dname { font-size: 11px; font-weight: 500; color: #1a1a20; }
+  .cw-deliverable .dkind { font-size: 10px; color: #e85454; background: rgba(232, 84, 84, 0.08); border-radius: 4px; padding: 1px 5px; }
+  .cw-deliverable .dpath { flex: 1; font-size: 10px; color: #b0b0b8; font-family: "SF Mono", "JetBrains Mono", Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cw-deliverable .dscore { font-size: 10px; color: #4caf50; font-family: "SF Mono", "JetBrains Mono", Menlo, monospace; }
+  .cw-task .tpath { font-size: 10px; color: #b0b0b8; font-family: "SF Mono", "JetBrains Mono", Menlo, monospace; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cw-empty-main { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #b0b0b8; }
 
   /* ════════════════════════════════════════════
      Design v2 — Code 代码视图
