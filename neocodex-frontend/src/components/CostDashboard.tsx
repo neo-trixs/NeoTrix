@@ -106,7 +106,7 @@ export function CostDashboard(props: Props) {
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>
           <button
-            class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+            class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
             onClick={props.onClose}
             aria-label="关闭"
           >

@@ -110,7 +110,7 @@ export function Sidebar(props: SidebarProps) {
       <div class="flex items-center justify-between h-14 px-4 pl-[64px]" data-tauri-drag-region>
         <div class="flex-1 min-w-0" data-tauri-drag-region />
         <button
-          class="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors flex-shrink-0"
+          class="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
           onClick={props.onToggleCollapse}
           aria-label={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
           title={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
@@ -181,7 +181,7 @@ export function Sidebar(props: SidebarProps) {
               </div>
             </Show>
             <button
-              class="p-1.5 rounded-lg bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors"
+              class="p-1.5 rounded-lg bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
               onClick={handleNewChat}
               aria-label="新建对话"
               title="新建对话"
@@ -238,7 +238,7 @@ export function Sidebar(props: SidebarProps) {
                                 </button>
                                 <div class="flex items-center gap-0.5 pr-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                                   <button
-                                    class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-colors"
+                                    class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                                     onClick={(e) => handleRenameSession(e, session.id)}
                                     aria-label="重命名会话"
                                     title="重命名"
@@ -246,7 +246,7 @@ export function Sidebar(props: SidebarProps) {
                                     <Pencil class="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    class="p-1 rounded text-text-muted hover:text-red-600 hover:bg-red-500/10 transition-colors"
+                                    class="p-1 rounded text-text-muted hover:text-red-600 hover:bg-red-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
                                     onClick={(e) => handleDeleteSession(e, session.id)}
                                     aria-label="删除会话"
                                     title="删除"

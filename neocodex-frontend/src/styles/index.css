@@ -1197,6 +1197,7 @@
     transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-refresh-btn:hover { background: rgba(232, 84, 84, 0.08); color: #e85454; }
+  .cw-refresh-btn:focus-visible { outline: 2px solid #e85454; outline-offset: 2px; }
   .cw-refresh-btn svg { width: 12px; height: 12px; }
   .cw-new { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); }
   .cw-new-input {
@@ -1211,6 +1212,7 @@
     transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-new-go:hover { background: #d43f3f; }
+  .cw-new-go:focus-visible { outline: 2px solid #e85454; outline-offset: 2px; }
   .cw-new-go:disabled { opacity: 0.5; cursor: default; }
   .cw-error { padding: 6px 10px; font-size: 10px; color: #e85454; background: rgba(232, 84, 84, 0.06); border-bottom: 1px solid rgba(232, 84, 84, 0.15); }
   .cw-sitem-name { font-weight: 500; }
@@ -1222,6 +1224,7 @@
     transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
   }
   .cw-ctl:hover { background: rgba(232, 84, 84, 0.08); color: #e85454; }
+  .cw-ctl:focus-visible { outline: 2px solid #e85454; outline-offset: 2px; }
   .cw-desc { font-size: 11px; color: #5a5a62; background: rgba(0, 0, 0, 0.02); border-radius: 8px; padding: 8px 10px; }
   .cw-deliverables { display: flex; flex-direction: column; gap: 4px; }
   .cw-deliverable {

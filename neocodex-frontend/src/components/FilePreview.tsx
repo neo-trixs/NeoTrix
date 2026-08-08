@@ -179,7 +179,7 @@ export function FilePreview(props: Props) {
         </Show>
         <Show when={props.onRemove}>
           <button
-            class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+            class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
             onClick={props.onRemove}
             aria-label="移除附件"
           >

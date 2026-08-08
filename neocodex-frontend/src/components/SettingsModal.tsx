@@ -258,7 +258,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 </div>
               </div>
               <button
-                class="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+                class="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                 onClick={props.onClose}
                 aria-label="关闭设置"
                 title="关闭设置"
