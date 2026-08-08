@@ -265,12 +265,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_all_domains_within_15s() {
+        // 环境 flaky 修复 (NT-SHIELD): 原断言硬编码 [2000, 15000], 但实际配置
+        // min_interval_secs=0.5 (500ms) / max_interval_secs=9.0 (9000ms), 高斯采样
+        // 低值被 clamp 到 500ms → 断言 `i >= 2000` 偶发失败。改为断言配置驱动范围:
+        // [min_interval_secs*1000, max_interval_secs*1000]。
+        let c = cfg();
+        let min_ms = (c.rotation.min_interval_secs * 1000.0) as u64;
+        let max_ms = (c.rotation.max_interval_secs * 1000.0) as u64;
         let coord = RotationCoordinator::new();
         for &domain in RotationDomain::all() {
             for _ in 0..100 {
                 let i = coord.next_interval_ms(domain).await;
-                assert!(i <= 15000, "domain {:?} interval {} exceeds 15s", domain, i);
-                assert!(i >= 2000, "domain {:?} interval {} below 2s", domain, i);
+                assert!(i <= max_ms, "domain {:?} interval {} exceeds max {max_ms}", domain, i);
+                assert!(i >= min_ms, "domain {:?} interval {} below min {min_ms}", domain, i);
             }
         }
     }

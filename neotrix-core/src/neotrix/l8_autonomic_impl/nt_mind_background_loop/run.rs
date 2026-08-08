@@ -556,8 +556,11 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(43_200, |h| h.handle_novel_ingest().await);
         // ── Constitution hot-reload ──
         spawn_handler!(86400, |h| h.handle_constitution_reload().await);
-        // 3600s — consciousness evolves at architecture-audit tempo, not real-time
-        spawn_handler!(3600, |h| h.handle_consciousness_tick().await);
+        // 缺陷1修复 (自我运转实际情况): 意识核心进化周期改为配置驱动
+        // (cfg.consciousness_interval_secs, 默认 600s), 与 SEAL 果实消费节奏对齐。
+        // 此前硬编码 3600s (1h) 且不可配置 — SEAL (goal_interval 180s) 在大部分
+        // 时间消费空果实, 意识核心进化节奏严重滞后于消费节奏。
+        spawn_handler!(cfg.consciousness_interval_secs, |h| h.handle_consciousness_tick().await);
         // 600s — Second Brain auto-sync (emotion + session notes to KB)
         spawn_handler!(600, |h| h.handle_second_brain_tick().await);
         // Startup: restore emotion state from KB (deferred 5s, then skips)

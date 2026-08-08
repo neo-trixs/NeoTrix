@@ -28,9 +28,9 @@ use super::secret_scanner::SecretScanner;
 use super::openspace_evolution::OpenSpaceEvolveStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::safety_stage::SafetyCheckStage;
-use super::sft_stage::{SftStage, SupervisedExample};
+use super::sft_stage::SupervisedExample;
 use super::process_stage::{ProcessStage, ProcessExample, ReasoningTrace, ReasoningStep, TraceSource};
-use super::search_skill_stage::{SearchSkillStage, SearchExercise, SearchResult, Evidence, SearchTaskType};
+use super::search_skill_stage::{SearchExercise, SearchResult, Evidence, SearchTaskType};
 use super::hypercore::SafetyCheckResult;
 use super::hyperstage::{MetaEvolveStage, DGMMetaEvolveStage};
 use super::hyperarchive::{HyperAgentArchive, SelectionConfig};
@@ -895,6 +895,10 @@ impl BrainStage for ProcessWrapperStage {
             let w = ft.final_quality.max(0.1);
             examples.push(ProcessExample { trace: ft, weight: w });
         }
+        // 缺陷2修复 (自我运转实际情况): 果实消费后立即清除, 防止同一批果实
+        // 被 SEAL 反复消费 (1h 注入 vs 10min 消费的时序错配 → 同一 trace 进
+        // buffer 6 次 → process 学习被重复污染)。一次性消费, 下次 tick 重新注入。
+        brain._consciousness_fruits.clear();
         let (_result, loss) = brain._process_stage.process(examples);
         log::trace!("[process_supervision] loss={:.4} traces={}",
             loss, brain._process_stage.buffer.len());
@@ -2065,5 +2069,19 @@ mod tests {
             "consciousness fruit trace consumed by SEAL process: {:?}",
             brain._process_stage.buffer.traces.iter().map(|t| t.source.clone()).collect::<Vec<_>>()
         );
+        // 缺陷2修复 (自我运转实际情况): 果实消费后应清除, 防止同一批果实被
+        // SEAL 反复消费 (1h 注入 vs 10min 消费时序错配 → 重复污染 process 学习)。
+        assert!(
+            brain._consciousness_fruits.is_empty(),
+            "fruits cleared after consumption (one-shot): {}",
+            brain._consciousness_fruits.len()
+        );
+        // 再次 process: 无果实可消费, buffer 不新增 ConsciousnessTree trace
+        let before = brain._process_stage.buffer.traces.iter()
+            .filter(|t| t.source == TraceSource::ConsciousnessTree).count();
+        let _ = stage.process(&mut brain).expect("process again ok");
+        let after = brain._process_stage.buffer.traces.iter()
+            .filter(|t| t.source == TraceSource::ConsciousnessTree).count();
+        assert_eq!(before, after, "no re-consumption after clear");
     }
 }

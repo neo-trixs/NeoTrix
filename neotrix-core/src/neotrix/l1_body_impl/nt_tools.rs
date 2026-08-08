@@ -363,9 +363,21 @@ mod tests {
 
     #[test]
     fn test_tool_grep_no_match() {
-        let r = tool_grep("__NONEXISTENT_PATTERN_42__", "/tmp");
+        // 修复 flaky: 原测试搜索全局 /tmp, 但 opencode 会把 bash 历史持久化到
+        // /tmp/opencode_bash_rows.json (含源码路径/测试模式), 导致 grep 意外匹配。
+        // 改用隔离的临时目录, 测试不受 /tmp 全局污染影响。
+        let dir = std::env::temp_dir().join(format!("neotrix_grep_test_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("sample.txt");
+        std::fs::write(&path, "hello world\nfoo bar\n").unwrap();
+        let r = tool_grep("__NONEXISTENT_PATTERN_42__", dir.to_str().unwrap());
         assert!(r.success);
         assert_eq!(r.output, "(no matches)");
+        // 确认模式确实存在时能匹配 (验证 grep 工具本身有效)
+        let r2 = tool_grep("hello", dir.to_str().unwrap());
+        assert!(r2.success);
+        assert!(r2.output.contains("hello world"), "expected match: {}", r2.output);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

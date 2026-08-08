@@ -1364,16 +1364,24 @@ impl ConsciousnessTree {
                 2 => self.fruits.iter().any(|f| f.quality >= 0.7),
                 3 => {
                     // Vulnerability reduction vs first-measured baseline.
-                    // Records baseline on first evaluation; thereafter requires >= 20% drop.
+                    // 缺陷3修复 (自我运转实际情况): 首次评估 (baseline 未建立) 视为满足 —
+                    // 记录 baseline 不阻塞 fulfillment。此前首次评估 reduction=0 < 0.2
+                    // 恒不满足 → 生产环境契约永不 fulfilled → 闭环反馈"标准提升"分支
+                    // 永不触发。首次后要求 >= 20% 减少 (vuln 数量下降才达标)。
                     let current = self.core.vuln_scan.len() as f64;
                     let baseline = self.vuln_baseline.unwrap_or(current as usize);
+                    let first_measure = self.vuln_baseline.is_none();
                     self.vuln_baseline = Some(baseline);
-                    let reduction = if baseline as f64 > 0.0 {
-                        (baseline as f64 - current) / baseline as f64
+                    if first_measure {
+                        true // 首次评估: 记录 baseline, 不阻塞 fulfillment
                     } else {
-                        0.0
-                    };
-                    reduction >= 0.2
+                        let reduction = if baseline as f64 > 0.0 {
+                            (baseline as f64 - current) / baseline as f64
+                        } else {
+                            0.0
+                        };
+                        reduction >= 0.2
+                    }
                 },
                 _ => false,
             };
@@ -2729,6 +2737,35 @@ mod tests {
         let fulfillment = tree.verify_contract_fulfillment(&contract);
         assert!(fulfillment.evidence_total == 4);
         assert!(fulfillment.fulfilled);
+    }
+
+    #[test]
+    fn test_contract_fulfillment_first_measurement_not_blocking() {
+        // 缺陷3修复 (自我运转实际情况): 首次评估 (vuln_baseline 未建立) 不应阻塞
+        // fulfillment — 记录 baseline 视为满足。此前首次 reduction=0 < 0.2 恒不满足
+        // → 生产环境契约永不 fulfilled → 闭环反馈"标准提升"分支永不触发。
+        let mut tree = ConsciousnessTree::new();
+        tree.core.vuln_scan.push(VulnerabilityFinding {
+            severity: VulnerabilitySeverity::High,
+            category: "architecture".into(),
+            module: "test_module".into(),
+            description: "test".into(),
+            fix_suggestion: "fix it".into(),
+        });
+        tree.cycle = 1;
+        let contract = tree.negotiate_contract();
+        for branch in tree.branches.values_mut() {
+            branch.health = 0.9;
+            branch.self_test_count = 8;
+            branch.module_count = 8;
+        }
+        tree.fruits.push(EvolutionFruit { quality: 0.9, ..Default::default() });
+        // 首次评估: vuln_baseline 未建立 → criterion 3 视为满足
+        assert!(tree.vuln_baseline.is_none(), "baseline not yet established");
+        let fulfillment = tree.verify_contract_fulfillment(&contract);
+        assert!(fulfillment.fulfilled, "first measurement should not block: {}/{}",
+            fulfillment.evidence_met, fulfillment.evidence_total);
+        assert_eq!(tree.vuln_baseline, Some(1), "baseline recorded after first eval");
     }
 
     #[test]

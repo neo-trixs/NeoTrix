@@ -48,6 +48,11 @@ pub struct BackgroundConfig {
     pub workspace_guard_interval_secs: u64,
     /// KB 完整备份周期, 默认 21600s (6h)
     pub kb_backup_interval_secs: u64,
+    /// 意识核心进化周期 (ConsciousnessTree run_growth_cycle), 默认 600s (10min)。
+    /// 缺陷1修复 (自我运转实际情况): 此前硬编码 3600s (1h) 且不可配置, 而 SEAL
+    /// 消费果实频率为 goal_interval_secs (默认 180s) — 时序错配导致 SEAL 在
+    /// 大部分时间消费空果实。改为配置驱动, 与 SEAL 消费节奏对齐。
+    pub consciousness_interval_secs: u64,
 }
 
 impl Default for BackgroundConfig {
@@ -91,6 +96,7 @@ impl Default for BackgroundConfig {
             kb_guard_interval_secs: 600,
             workspace_guard_interval_secs: 600,
             kb_backup_interval_secs: 21_600,
+            consciousness_interval_secs: 600,
         }
     }
 }
