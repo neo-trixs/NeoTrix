@@ -115,6 +115,16 @@ export function ScheduledTasks(props: Props) {
     }
   }
 
+  /* 状态 → 语义徽章类（与 badge-success/warn/error 体系一致） */
+  const statusBadge = (s: string) => {
+    switch (s) {
+      case 'error': return 'badge-error'
+      case 'paused': return 'badge-warn'
+      case 'running': return 'badge-warn' // 运行中 = 进行中
+      default: return 'badge-success' // 空闲
+    }
+  }
+
   return (
     <Show when={props.open}>
       <div class="panel w-[28rem]">
@@ -230,7 +240,7 @@ export function ScheduledTasks(props: Props) {
                   <div class="flex items-center gap-2">
                     <span class={clsx('w-2 h-2 rounded-full flex-shrink-0', statusClass(task.status))} />
                     <span class="text-sm font-medium text-text-primary truncate flex-1">{task.name}</span>
-                    <span class="text-[10px] text-text-muted flex-shrink-0">{statusLabel(task.status)}</span>
+                    <span class={clsx('badge', statusBadge(task.status))}>{statusLabel(task.status)}</span>
                   </div>
                   <div class="mt-1 text-xs text-text-secondary line-clamp-2">{task.prompt}</div>
                   <div class="mt-1 text-[10px] font-mono text-text-muted truncate">{task.schedule}</div>
