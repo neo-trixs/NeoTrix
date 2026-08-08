@@ -1,5 +1,7 @@
 import { createSignal, createEffect, For, Show } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
+import { save } from '@tauri-apps/plugin-dialog'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { clsx } from 'clsx'
 
 /* ════════════════════════════════════════════
@@ -22,7 +24,7 @@ interface ProviderConfig {
   providers: ProviderEntry[]
 }
 
-type SectionId = 'general' | 'appearance' | 'about'
+type SectionId = 'general' | 'appearance' | 'data' | 'about'
 
 /* ── 外扩线条图标（open/expand 语义，非内敛） ── */
 function ExpandIcon() {
@@ -73,6 +75,20 @@ function InfoIcon() {
   )
 }
 
+function DataIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none">
+      {/* 数据库圆柱 + 外扩箭头（导出语义） */}
+      <ellipse cx="8" cy="4" rx="5" ry="2.2" stroke="currentColor" stroke-width="1.2" />
+      <path d="M3 4v8c0 1.2 2.2 2.2 5 2.2s5-1 5-2.2V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+      <line x1="3" y1="8" x2="8" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+      <line x1="13" y1="8" x2="13" y2="3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+      <line x1="13" y1="3.5" x2="11.5" y2="5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+      <line x1="13" y1="3.5" x2="14.5" y2="5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  )
+}
+
 function XIcon() {
   return (
     <svg viewBox="0 0 12 12" fill="none">
@@ -85,6 +101,7 @@ function XIcon() {
 const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
   { id: 'general', label: '通用', icon: ExpandIcon },
   { id: 'appearance', label: '外观', icon: PaletteIcon },
+  { id: 'data', label: '数据', icon: DataIcon },
   { id: 'about', label: '关于', icon: InfoIcon },
 ]
 
@@ -95,6 +112,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [switching, setSwitching] = createSignal(false)
   const [notice, setNotice] = createSignal<string | null>(null)
   const [motionPref, setMotionPref] = createSignal<'full' | 'reduced'>('full')
+  const [densityPref, setDensityPref] = createSignal<'comfortable' | 'compact'>('comfortable')
+  const [memStats, setMemStats] = createSignal<{ total_entries: number; total_categories: number; avg_confidence: number; memory_usage_bytes: number } | null>(null)
+  const [dataBusy, setDataBusy] = createSignal(false)
 
   const loadConfig = async () => {
     setLoading(true)
@@ -107,11 +127,52 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     }
   }
 
+  const loadMemStats = async () => {
+    try {
+      setMemStats(await invoke<{ total_entries: number; total_categories: number; avg_confidence: number; memory_usage_bytes: number }>('memory_stats'))
+    } catch { /* 记忆统计非关键 */ }
+  }
+
+  const exportMemory = async () => {
+    setDataBusy(true)
+    setNotice(null)
+    try {
+      const json = await invoke<string>('memory_export', { format: 'json' })
+      const path = await save({
+        defaultPath: `neotrix-memory-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      })
+      if (path) {
+        await writeTextFile(path, json)
+        setNotice(`已导出记忆到 ${path}`)
+      }
+    } catch (e) {
+      setNotice(String(e))
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
+  const clearMemory = async () => {
+    setDataBusy(true)
+    setNotice(null)
+    try {
+      const n = await invoke<number>('memory_clear', { kind: null })
+      setNotice(`已清空 ${n} 条记忆`)
+      await loadMemStats()
+    } catch (e) {
+      setNotice(String(e))
+    } finally {
+      setDataBusy(false)
+    }
+  }
+
   createEffect(() => {
     if (props.open) {
       setSection('general')
       setNotice(null)
       loadConfig()
+      loadMemStats()
     }
   })
 
@@ -181,6 +242,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 <div class="text-[11px] text-text-muted">
                   {section() === 'general' && '模型提供商与运行参数'}
                   {section() === 'appearance' && '界面视觉与动效'}
+                  {section() === 'data' && '记忆与数据管理'}
                   {section() === 'about' && '版本与诊断信息'}
                 </div>
               </div>
@@ -287,6 +349,80 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       </button>
                     </div>
                     <p class="text-[10.5px] text-text-muted mt-1.5">减弱后移除无限循环动画，减少视觉干扰</p>
+                  </div>
+
+                  <div>
+                    <div class="text-[11px] font-medium text-text-secondary mb-2">界面密度</div>
+                    <div class="space-y-1.5">
+                      <button
+                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'comfortable' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        onClick={() => setDensityPref('comfortable')}
+                      >
+                        <div class="text-[12.5px] text-text-primary">舒适</div>
+                        <Show when={densityPref() === 'comfortable'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+                      </button>
+                      <button
+                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'compact' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        onClick={() => setDensityPref('compact')}
+                      >
+                        <div class="text-[12.5px] text-text-primary">紧凑</div>
+                        <Show when={densityPref() === 'compact'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+                      </button>
+                    </div>
+                    <p class="text-[10.5px] text-text-muted mt-1.5">紧凑模式缩小消息间距与面板内边距，单屏承载更多信息</p>
+                  </div>
+                </div>
+              </Show>
+
+              {/* ── 数据：记忆统计 + 导出/清空 ── */}
+              <Show when={section() === 'data'}>
+                <div class="space-y-5">
+                  <div>
+                    <div class="text-[11px] font-medium text-text-secondary mb-2">记忆统计</div>
+                    <Show when={memStats()} fallback={<div class="text-xs text-text-muted py-2">加载记忆统计…</div>}>
+                      {(ms) => (
+                        <div class="grid grid-cols-2 gap-2">
+                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                            <div class="text-[10px] text-text-muted mb-0.5">记忆条目</div>
+                            <div class="text-[13px] text-text-primary font-medium">{ms().total_entries}</div>
+                          </div>
+                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                            <div class="text-[10px] text-text-muted mb-0.5">分类</div>
+                            <div class="text-[13px] text-text-primary font-medium">{ms().total_categories}</div>
+                          </div>
+                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                            <div class="text-[10px] text-text-muted mb-0.5">平均置信度</div>
+                            <div class="text-[13px] text-text-primary font-medium">{(ms().avg_confidence * 100).toFixed(0)}%</div>
+                          </div>
+                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                            <div class="text-[10px] text-text-muted mb-0.5">占用空间</div>
+                            <div class="text-[13px] text-text-primary font-medium">{(ms().memory_usage_bytes / 1024).toFixed(1)} KB</div>
+                          </div>
+                        </div>
+                      )}
+                    </Show>
+                  </div>
+
+                  <div>
+                    <div class="text-[11px] font-medium text-text-secondary mb-2">数据操作</div>
+                    <div class="space-y-1.5">
+                      <button
+                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-border-primary/50 bg-white/40 hover:bg-white/70 transition-colors"
+                        onClick={exportMemory}
+                        disabled={dataBusy()}
+                      >
+                        <span class="text-[12.5px] text-text-primary">导出记忆（JSON）</span>
+                        <span class="text-[10px] text-text-muted">→ 文件</span>
+                      </button>
+                      <button
+                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+                        onClick={clearMemory}
+                        disabled={dataBusy()}
+                      >
+                        <span class="text-[12.5px] text-red-500">清空全部记忆</span>
+                        <span class="text-[10px] text-red-400">不可恢复</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </Show>

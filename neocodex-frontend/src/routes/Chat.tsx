@@ -250,6 +250,21 @@ export function Chat() {
   }
 
   const handleKeyDown = (e: KeyboardEvent) => {
+    // 面板快捷键：⌘1-⌘8 切换 8 个功能面板，Esc 关闭
+    if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '8') {
+      const idx = Number(e.key) - 1
+      const panels: PanelId[] = ['git', 'project', 'plugins', 'tasks', 'cost', 'timeline', 'sidechat', 'computer']
+      const target = panels[idx]
+      if (target) {
+        e.preventDefault()
+        togglePanel(target)
+      }
+      return
+    }
+    if (e.key === 'Escape' && activePanel()) {
+      setActivePanel(null)
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -482,7 +497,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'git' && 'on')}
                 onClick={() => togglePanel('git')}
                 aria-label="Git 变更"
-                title="Git 变更"
+                title="Git 变更 (⌘1)"
               >
                 <GitBranch class="w-4 h-4" />
               </button>
@@ -490,7 +505,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'project' && 'on')}
                 onClick={() => togglePanel('project')}
                 aria-label="项目视图"
-                title="项目视图"
+                title="项目视图 (⌘2)"
               >
                 <FolderOpen class="w-4 h-4" />
               </button>
@@ -498,7 +513,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'plugins' && 'on')}
                 onClick={() => togglePanel('plugins')}
                 aria-label="插件市场"
-                title="插件市场"
+                title="插件市场 (⌘3)"
               >
                 <Puzzle class="w-4 h-4" />
               </button>
@@ -506,7 +521,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'tasks' && 'on')}
                 onClick={() => togglePanel('tasks')}
                 aria-label="定时任务"
-                title="定时任务"
+                title="定时任务 (⌘4)"
               >
                 <Clock class="w-4 h-4" />
               </button>
@@ -514,7 +529,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'cost' && 'on')}
                 onClick={() => togglePanel('cost')}
                 aria-label="成本看板"
-                title="成本看板"
+                title="成本看板 (⌘5)"
               >
                 <Coins class="w-4 h-4" />
               </button>
@@ -522,7 +537,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'timeline' && 'on')}
                 onClick={() => togglePanel('timeline')}
                 aria-label="时间线"
-                title="时间线"
+                title="时间线 (⌘6)"
               >
                 <History class="w-4 h-4" />
               </button>
@@ -530,7 +545,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'sidechat' && 'on')}
                 onClick={() => togglePanel('sidechat')}
                 aria-label="侧向对话"
-                title="侧向对话"
+                title="侧向对话 (⌘7)"
               >
                 <MessageSquare class="w-4 h-4" />
               </button>
@@ -538,7 +553,7 @@ export function Chat() {
                 class={clsx('tb-btn', activePanel() === 'computer' && 'on')}
                 onClick={() => togglePanel('computer')}
                 aria-label="电脑控制"
-                title="电脑控制"
+                title="电脑控制 (⌘8)"
               >
                 <Monitor class="w-4 h-4" />
               </button>
