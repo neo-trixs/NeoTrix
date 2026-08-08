@@ -1136,7 +1136,7 @@ impl ConsciousnessTree {
                 // 使意识核心进化果实质量直接反映 200G 社区推理数据的养料充足度。
                 // 此前果实质量仅反映内部 maturity, 从不反映真实数据量。
                 let base_quality = branch.maturity_score();
-                let quality = (base_quality * data_nourishment).min(1.0);
+                let quality = (base_quality * data_nourishment).min(1.5);
                 // Use EvolutionFruit instead of CapabilityFruit
                 let fruit = EvolutionFruit {
                     name: format!("{}-evo-fruit-{}", branch.kind.label(), self.cycle),
@@ -2183,6 +2183,35 @@ mod tests {
     }
 
     #[test]
+    fn test_data_nourishment_breaks_quality_cap() {
+        // 缺陷6修复 (真实运转): 果实质量原 min(1.0) 截断 — 成熟分支 (C4=0.67)
+        // 乘数据养料 (1.79) 后 1.2 被截断到 1.0, 数据挖掘价值对成熟分支丢失。
+        // 修复: 上限放宽到 1.5, 使数据养料可突破 1.0 (表示数据增强的进化能力)。
+        let mut tree = ConsciousnessTree::new();
+        tree.soil.kb_node_count = 55_826; // 真实 KB 规模 → 因子 ≈ 1.79
+        let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
+            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
+            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
+        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+        tree.set_branch_health_from_self_tests(&results);
+        for branch in tree.branches.values_mut() {
+            branch.health = 0.9;
+            // 模拟成熟分支: C0-C4 达标 (maturity = 5/6 ≈ 0.83)
+            branch.maturity_c0 = true;
+            branch.maturity_c1 = true;
+            branch.maturity_c2 = true;
+            branch.maturity_c3 = true;
+            branch.maturity_c4 = true;
+        }
+        tree.run_growth_cycle();
+        assert!(!tree.fruits.is_empty(), "fruits produced");
+        let max_q = tree.fruits.iter().map(|f| f.quality).fold(0.0_f64, f64::max);
+        // 0.83 * 1.79 = 1.49 → 不被 1.0 截断
+        assert!(max_q > 1.0, "data nourishment should break 1.0 cap: max={max_q:.3}");
+        assert!(max_q <= 1.5, "bounded by 1.5 cap: {max_q:.3}");
+    }
+
+    #[test]
     fn test_evolution_feedback_closes_loop() {
         // 意识核心自我运转: 进化产出 (契约 fulfillment + drift) 应反馈到进化参数。
         // 此前进化是开环的 — 树自己预测/验证, 但从不调整自己的进化标准。
@@ -2468,10 +2497,11 @@ mod tests {
             // 进化参数始终有界 (闭环反馈不越界)
             assert!(tree.config.fruit_quality_threshold <= 0.8, "threshold capped");
             assert!(tree.config.fruit_growth_health >= 0.4, "growth health floored");
-            // 果实质量无 NaN 且在 [0,1]
+            // 果实质量无 NaN 且在 [0, 1.5] (缺陷6修复: 数据养料可突破 1.0,
+            // 表示数据增强的进化能力, 上限 1.5)
             for f in &tree.fruits {
-                assert!(f.quality.is_finite() && f.quality >= 0.0 && f.quality <= 1.0,
-                    "fruit quality in [0,1]: {}", f.quality);
+                assert!(f.quality.is_finite() && f.quality >= 0.0 && f.quality <= 1.5,
+                    "fruit quality in [0,1.5]: {}", f.quality);
             }
             // phi 无 NaN
             assert!(tree.trunk.phi.is_finite(), "phi finite");

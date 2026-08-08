@@ -285,7 +285,12 @@ pub fn build_node_text(title: &str, summary: Option<&str>, content: Option<&str>
     }
     if let Some(c) = content {
         text.push_str(". ");
-        text.push_str(&c[..c.len().min(500)]);
+        // 缺陷4修复 (真实运转): 原 &c[..c.len().min(500)] 用字节索引截断,
+        // 对多字节 UTF-8 (中文/日文/emoji) 在字符边界外 panic → 古籍等中文
+        // 内容节点嵌入必崩。改为字符边界安全截断: 取前 max_chars 字符。
+        const MAX_CHARS: usize = 500;
+        let truncated: String = c.chars().take(MAX_CHARS).collect();
+        text.push_str(&truncated);
     }
     text
 }
@@ -741,6 +746,25 @@ mod tests {
         assert_eq!(hits[0].0, "n1");
         // After exact re-ranking the score is cosine similarity (positive for a match).
         assert!(hits[0].1 > 0.0, "re-ranked score should be cosine similarity");
+    }
+
+    #[test]
+    fn test_build_node_text_unicode_boundary() {
+        // 缺陷4修复 (真实运转): build_node_text 用字节索引截断内容 (c[..500]),
+        // 对多字节 UTF-8 (中文) 在字符边界外 panic → 古籍/中文节点嵌入必崩。
+        // 验证: 超长中文内容截断不 panic, 且截断在字符边界。
+        let content = "案".repeat(600); // 1800 bytes, 全中文
+        let text = build_node_text("史记", Some("司马迁"), Some(&content));
+        assert!(text.contains("史记"), "title preserved");
+        assert!(text.contains("司马迁"), "summary preserved");
+        // 截断后的 content 部分必须是完整字符 (无 replacement char / 无 panic)
+        assert!(text.contains("案"), "content chars preserved");
+        // 若截断到 500 bytes, 应以完整字符结束 — 检查最后一个 char 合法
+        assert!(text.is_char_boundary(text.len()), "text ends at char boundary");
+        // 边界精确测试: 恰好在边界外的情况
+        let content2 = "案".repeat(250); // 750 bytes > 500
+        let text2 = build_node_text("t", None, Some(&content2));
+        assert!(text2.is_char_boundary(text2.len()));
     }
 
     #[test]

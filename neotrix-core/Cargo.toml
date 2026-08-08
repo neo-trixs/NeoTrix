@@ -197,3 +197,7 @@ path = "examples/absorption_loop_200.rs"
 [[example]]
 name = "guji_llm_pool_test"
 path = "examples/guji_llm_pool_test.rs"
+
+[[example]]
+name = "guji_embed_fill"
+path = "examples/guji_embed_fill.rs"
