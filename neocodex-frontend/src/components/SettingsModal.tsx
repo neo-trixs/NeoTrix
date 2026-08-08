@@ -191,6 +191,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       await invoke('neocodex_set_provider', { name })
       setNotice(`已切换到 ${name}`)
       await loadConfig()
+      // 广播提供商变更，输入区 ProviderSelector 即时刷新
+      window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name } }))
     } catch (e) {
       setNotice(String(e))
     } finally {

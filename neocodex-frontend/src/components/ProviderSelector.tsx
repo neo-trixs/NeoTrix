@@ -1,4 +1,4 @@
-import { createSignal, onMount, createEffect, For } from 'solid-js'
+import { createSignal, onMount, onCleanup, createEffect, For } from 'solid-js'
 import { invoke } from '@tauri-apps/api/core'
 import { ChevronDown, Loader2, Check, AlertCircle, Zap, Brain, Globe } from 'lucide-solid'
 import { clsx } from 'clsx'
@@ -25,7 +25,17 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
   // Load provider config on mount
   onMount(async () => {
     await loadConfig()
+    // 设置面板切换提供商后同步刷新
+    window.addEventListener('neotrix:provider-changed', handleProviderChanged)
   })
+
+  onCleanup(() => {
+    window.removeEventListener('neotrix:provider-changed', handleProviderChanged)
+  })
+
+  const handleProviderChanged = () => {
+    loadConfig()
+  }
 
   const loadConfig = async () => {
     setLoading(true)
