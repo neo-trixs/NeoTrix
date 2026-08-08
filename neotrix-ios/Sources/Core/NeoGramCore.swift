@@ -2,9 +2,10 @@
 // Mirrors Telegram's ApplicationContext + AccountContext pattern
 
 import Foundation
+import Combine
 import NeoTrixFFI
 
-public final class NeoGramCore {
+public final class NeoGramCore: ObservableObject {
     public static let shared = NeoGramCore()
     
     private var handle: NeoTrixHandle?

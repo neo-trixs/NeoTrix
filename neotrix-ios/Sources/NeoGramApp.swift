@@ -142,6 +142,39 @@ public struct CallsView: View {
     }
 }
 
+// MARK: - Launch View
+
+public struct LaunchView: View {
+    public init() {}
+    
+    public var body: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue, Color.purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 96, height: 96)
+                
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            
+            Text("NeoGram")
+                .font(.title2.bold())
+            
+            ProgressView()
+                .tint(.blue)
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
 // MARK: - Content View
 
 public struct ContentView: View {

@@ -31,37 +31,37 @@ public struct ThemeData {
             primary: .blue, secondary: .gray, background: .white,
             chatBackground: Color(red: 0.95, green: 0.95, blue: 0.97),
             bubbleIncoming: .white, bubbleOutgoing: .blue,
-            text: .black, accentText: .white
+            text: .black, accent: .white
         )),
         AppTheme(id: "night", name: "Night", isPremium: false, colors: ThemeColors(
             primary: .blue, secondary: .gray, background: .black,
             chatBackground: Color(red: 0.08, green: 0.08, blue: 0.1),
             bubbleIncoming: Color(red: 0.15, green: 0.15, blue: 0.17),
-            bubbleOutgoing: .blue, text: .white, accentText: .white
+            bubbleOutgoing: .blue, text: .white, accent: .white
         )),
         AppTheme(id: "ocean", name: "Ocean", isPremium: true, colors: ThemeColors(
             primary: .cyan, secondary: .teal, background: Color(red: 0.02, green: 0.1, blue: 0.2),
             chatBackground: Color(red: 0.03, green: 0.12, blue: 0.22),
             bubbleIncoming: Color(red: 0.05, green: 0.15, blue: 0.25),
-            bubbleOutgoing: .cyan, text: .white, accentText: .black
+            bubbleOutgoing: .cyan, text: .white, accent: .black
         )),
         AppTheme(id: "sunset", name: "Sunset", isPremium: true, colors: ThemeColors(
             primary: .orange, secondary: .pink, background: Color(red: 0.2, green: 0.05, blue: 0.1),
             chatBackground: Color(red: 0.22, green: 0.06, blue: 0.12),
             bubbleIncoming: Color(red: 0.25, green: 0.08, blue: 0.14),
-            bubbleOutgoing: .orange, text: .white, accentText: .white
+            bubbleOutgoing: .orange, text: .white, accent: .white
         )),
         AppTheme(id: "forest", name: "Forest", isPremium: true, colors: ThemeColors(
             primary: .green, secondary: .mint, background: Color(red: 0.02, green: 0.15, blue: 0.08),
             chatBackground: Color(red: 0.03, green: 0.17, blue: 0.1),
             bubbleIncoming: Color(red: 0.05, green: 0.2, blue: 0.12),
-            bubbleOutgoing: .green, text: .white, accentText: .white
+            bubbleOutgoing: .green, text: .white, accent: .white
         )),
         AppTheme(id: "midnight", name: "Midnight", isPremium: true, colors: ThemeColors(
             primary: .indigo, secondary: .purple, background: Color(red: 0.05, green: 0.05, blue: 0.15),
             chatBackground: Color(red: 0.07, green: 0.07, blue: 0.17),
             bubbleIncoming: Color(red: 0.1, green: 0.1, blue: 0.2),
-            bubbleOutgoing: .indigo, text: .white, accentText: .white
+            bubbleOutgoing: .indigo, text: .white, accent: .white
         )),
     ]
 }

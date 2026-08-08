@@ -55,36 +55,45 @@ public final class SettingsViewModel: ObservableObject {
                 SettingsItem(id: "devices", title: "Devices", icon: "laptopcomputer", iconColor: .blue, badge: nil, isPremium: false),
                 SettingsItem(id: "chat_folders", title: "Chat Folders", icon: "folder.fill", iconColor: .blue, badge: nil, isPremium: false),
             ]),
-            SettingsSection("Premium", items: [
+            SettingsSection(id: "premium", title: "Premium", items: [
                 SettingsItem(id: "premium", title: "NeoGram Premium", icon: "star.circle.fill", iconColor: .yellow, badge: isPremium ? "Active" : nil, isPremium: true),
                 SettingsItem(id: "gifts", title: "Premium Gifts", icon: "gift.fill", iconColor: .pink, badge: nil, isPremium: true),
                 SettingsItem(id: "boosts", title: "Boost Levels", icon: "bolt.fill", iconColor: .orange, badge: nil, isPremium: true),
             ]),
-            SettingsSection("ai", title: "NeoTrix AI", items: [
+            SettingsSection(id: "ai", title: "NeoTrix AI", items: [
                 SettingsItem(id: "ai_settings", title: "AI Settings", icon: "brain.head.profile", iconColor: .purple, badge: nil, isPremium: false),
                 SettingsItem(id: "ai_models", title: "AI Models", icon: "cpu.fill", iconColor: .indigo, badge: nil, isPremium: false),
                 SettingsItem(id: "ai_memory", title: "AI Memory", icon: "memorychip.fill", iconColor: .teal, badge: nil, isPremium: false),
+                SettingsItem(id: "ai_editor", title: "AI Editor", icon: "wand.and.stars", iconColor: .purple, badge: nil, isPremium: false),
+                SettingsItem(id: "ai_export", title: "Export to AI", icon: "square.and.arrow.up", iconColor: .indigo, badge: nil, isPremium: false),
             ]),
-            SettingsSection("appearance", title: "Appearance", items: [
+            SettingsSection(id: "fusion", title: "Fusion Features", items: [
+                SettingsItem(id: "filters", title: "Message Filter", icon: "line.3.horizontal.decrease.circle.fill", iconColor: .orange, badge: nil, isPremium: false),
+                SettingsItem(id: "privacy", title: "Privacy & Security", icon: "lock.shield.fill", iconColor: .green, badge: nil, isPremium: false),
+                SettingsItem(id: "folders", title: "Smart Folders", icon: "folder.fill.badge.gearshape", iconColor: .blue, badge: nil, isPremium: false),
+                SettingsItem(id: "polls", title: "Polls", icon: "chart.bar.xaxis", iconColor: .pink, badge: nil, isPremium: false),
+                SettingsItem(id: "voice", title: "Voice to Text", icon: "waveform", iconColor: .teal, badge: nil, isPremium: false),
+            ]),
+            SettingsSection(id: "appearance", title: "Appearance", items: [
                 SettingsItem(id: "theme", title: "Theme", icon: "paintpalette.fill", iconColor: .purple, badge: nil, isPremium: false),
                 SettingsItem(id: "wallpapers", title: "Wallpapers", icon: "photo.on.rectangle", iconColor: .cyan, badge: nil, isPremium: false),
                 SettingsItem(id: "app_icons", title: "App Icons", icon: "app.badge.fill", iconColor: .blue, badge: nil, isPremium: false),
             ]),
-            SettingsSection("privacy", title: "Privacy & Security", items: [
+            SettingsSection(id: "privacy", title: "Privacy & Security", items: [
                 SettingsItem(id: "privacy", title: "Privacy", icon: "lock.fill", iconColor: .blue, badge: nil, isPremium: false),
                 SettingsItem(id: "passcode", title: "Passcode & Face ID", icon: "faceid", iconColor: .green, badge: nil, isPremium: false),
                 SettingsItem(id: "two_step", title: "Two-Step Verification", icon: "key.fill", iconColor: .orange, badge: nil, isPremium: false),
                 SettingsItem(id: "sessions", title: "Active Sessions", icon: "iphone", iconColor: .blue, badge: nil, isPremium: false),
             ]),
-            SettingsSection("data", title: "Data & Storage", items: [
+            SettingsSection(id: "data", title: "Data & Storage", items: [
                 SettingsItem(id: "storage", title: "Storage Usage", icon: "internaldrive.fill", iconColor: .gray, badge: storageUsed, isPremium: false),
                 SettingsItem(id: "data", title: "Data & Storage", icon: "chart.bar.fill", iconColor: .blue, badge: nil, isPremium: false),
                 SettingsItem(id: "proxy", title: "Proxy", icon: "network", iconColor: .blue, badge: nil, isPremium: false),
             ]),
-            SettingsSection("language", title: "Language", items: [
+            SettingsSection(id: "language", title: "Language", items: [
                 SettingsItem(id: "language", title: "Language", icon: "globe", iconColor: .blue, badge: "English", isPremium: false),
             ]),
-            SettingsSection("about", title: "About", items: [
+            SettingsSection(id: "about", title: "About", items: [
                 SettingsItem(id: "help", title: "Help", icon: "questionmark.circle.fill", iconColor: .blue, badge: nil, isPremium: false),
                 SettingsItem(id: "about", title: "About NeoGram", icon: "info.circle.fill", iconColor: .blue, badge: "v1.0", isPremium: false),
             ]),
@@ -98,6 +107,11 @@ public struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @State private var showPremium = false
     @State private var showProfile = false
+    @State private var showFilters = false
+    @State private var showPrivacy = false
+    @State private var showFolders = false
+    @State private var showPolls = false
+    @State private var showVoiceToText = false
     
     public init() {}
     
@@ -143,52 +157,85 @@ public struct SettingsView: View {
                 ForEach(viewModel.sections) { section in
                     Section(section.title) {
                         ForEach(section.items) { item in
-                            SettingsRow(item: item)
+                            SettingsRow(item: item) {
+                                handleItemTap(item)
+                            }
                         }
                     }
                 }
             }
             .navigationTitle("Settings")
+            .navigationDestination(isPresented: $showFilters) {
+                FilterSettingsView()
+            }
+            .navigationDestination(isPresented: $showPrivacy) {
+                PrivacySettingsView()
+            }
+            .navigationDestination(isPresented: $showFolders) {
+                FolderManagementView()
+            }
+            .navigationDestination(isPresented: $showPolls) {
+                PollView()
+            }
+            .navigationDestination(isPresented: $showVoiceToText) {
+                VoiceToTextView()
+            }
             .sheet(isPresented: $showPremium) {
                 PremiumIntroView()
             }
+        }
+    }
+    
+    private func handleItemTap(_ item: SettingsItem) {
+        switch item.id {
+        case "premium": showPremium = true
+        case "filters": showFilters = true
+        case "privacy": showPrivacy = true
+        case "folders": showFolders = true
+        case "polls": showPolls = true
+        case "voice": showVoiceToText = true
+        default: break
         }
     }
 }
 
 struct SettingsRow: View {
     let item: SettingsItem
+    let action: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: item.icon)
-                .font(.body)
-                .foregroundColor(.white)
-                .frame(width: 28, height: 28)
-                .background(item.iconColor.gradient)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-            
-            Text(item.title)
-                .foregroundColor(.primary)
-            
-            Spacer()
-            
-            if let badge = item.badge {
-                Text(badge)
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: item.icon)
+                    .font(.body)
+                    .foregroundColor(.white)
+                    .frame(width: 28, height: 28)
+                    .background(item.iconColor.gradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                
+                Text(item.title)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                if let badge = item.badge {
+                    Text(badge)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                if item.isPremium {
+                    Image(systemName: "star.fill")
+                        .font(.caption)
+                        .foregroundColor(.yellow)
+                }
+                
+                Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
-            if item.isPremium {
-                Image(systemName: "star.fill")
-                    .font(.caption)
-                    .foregroundColor(.yellow)
-            }
-            
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .padding(.vertical, 2)
         }
-        .padding(.vertical, 2)
+        .buttonStyle(.plain)
     }
 }

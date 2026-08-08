@@ -143,7 +143,9 @@ public struct FullScreenEmojiEffect: View {
                 id: index,
                 position: CGPoint(x: CGFloat.random(in: 0...400), y: CGFloat.random(in: 0...800)),
                 size: CGFloat.random(in: 20...60),
-                duration: Double.random(in: 0.5...1.5)
+                duration: Double.random(in: 0.5...1.5),
+                opacity: Double.random(in: 0.6...1.0),
+                scale: CGFloat.random(in: 0.8...1.2)
             )
         }
     }
@@ -153,6 +155,8 @@ public struct FullScreenEmojiEffect: View {
         let position: CGPoint
         let size: CGFloat
         let duration: Double
+        let opacity: Double
+        let scale: CGFloat
     }
 }
 
@@ -203,7 +207,7 @@ public struct EmojiStatusPickerView: View {
                             Text(emoji.emoji)
                                 .font(.system(size: 32))
                                 .padding(8)
-                                .background(Color(.systemGray6))
+                                .background(Color.gray.opacity(0.15))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)
@@ -212,11 +216,19 @@ public struct EmojiStatusPickerView: View {
                 .padding()
             }
             .navigationTitle("Emoji Status")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") { dismiss() }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                #endif
             }
         }
     }

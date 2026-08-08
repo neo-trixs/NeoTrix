@@ -131,7 +131,7 @@ public struct ReactionPickerView: View {
                                     }
                                 }
                                 .padding(8)
-                                .background(Color(.systemGray6))
+                                .background(Color.gray.opacity(0.15))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
@@ -142,11 +142,19 @@ public struct ReactionPickerView: View {
                 }
             }
             .navigationTitle("Reactions")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") { dismiss() }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                #endif
             }
         }
     }
@@ -194,7 +202,7 @@ struct SearchField: View {
             }
         }
         .padding(10)
-        .background(Color(.systemGray6))
+        .background(Color.gray.opacity(0.15))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
@@ -225,7 +233,7 @@ public struct ReactionBarView: View {
                     }
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
-                    .background(reaction.isSelected ? Color.blue.opacity(0.3) : Color(.systemGray6))
+                    .background(reaction.isSelected ? Color.blue.opacity(0.3) : Color.gray.opacity(0.15))
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)

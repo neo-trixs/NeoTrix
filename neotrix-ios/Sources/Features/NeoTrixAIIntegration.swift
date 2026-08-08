@@ -250,7 +250,7 @@ public struct AIComposeView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(result.text)
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.gray.opacity(0.15))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         
                         // Suggestions
@@ -266,7 +266,7 @@ public struct AIComposeView: View {
                                     Text(suggestion)
                                         .padding()
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(Color(.systemGray6))
+                                        .background(Color.gray.opacity(0.15))
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
                                 .buttonStyle(.plain)
@@ -285,11 +285,19 @@ public struct AIComposeView: View {
                 Spacer()
             }
             .navigationTitle("AI Compose")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") { dismiss() }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                #endif
             }
         }
     }
@@ -336,7 +344,7 @@ public struct AISummaryView: View {
                         Text(summary.summary)
                             .font(.body)
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.gray.opacity(0.15))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         
                         // Key points
@@ -363,11 +371,19 @@ public struct AISummaryView: View {
                 .padding()
             }
             .navigationTitle("AI Summary")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+                #endif
             }
             .task {
                 summary = await manager.summarize(messages: messages)

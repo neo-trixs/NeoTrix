@@ -99,6 +99,7 @@ ios_application(
     families = ["iphone", "ipad"],
     minimum_os_version = "17.0",
     infoplists = ["Resources/Info.plist"],
+    app_icons = ["Resources/Assets.xcassets"],
     # NOTE: rules_apple 3.22.0 removed the built-in
     # @rules_apple//apple/provisioning:development target. Provisioning is now
     # resolved automatically via local_provisioning_profiles (searches for

@@ -6,11 +6,13 @@ import StoreKit
 
 // MARK: - Premium Status
 
-public enum PremiumTier: String, CaseIterable {
+public enum PremiumTier: String, CaseIterable, Identifiable {
     case free = "Free"
     case monthly = "Monthly"
     case yearly = "Yearly"
     case biannual = "Biannual"
+    
+    public var id: String { rawValue }
     
     public var displayName: String {
         switch self {
@@ -168,11 +170,19 @@ public struct PremiumIntroView: View {
                 }
             }
             .navigationTitle("Premium")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") { dismiss() }
+                }
+                #endif
             }
         }
     }
@@ -208,7 +218,7 @@ struct PremiumFeatureRow: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.gray.opacity(0.15))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -238,7 +248,7 @@ struct PremiumTierButton: View {
                 }
             }
             .padding()
-            .background(isSelected ? Color.blue.opacity(0.1) : Color(.systemGray6))
+            .background(isSelected ? Color.blue.opacity(0.1) : Color.gray.opacity(0.15))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

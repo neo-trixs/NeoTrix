@@ -6,14 +6,14 @@ import Combine
 
 // MARK: - Chat List Models
 
-public struct ChatListItem: Identifiable {
+public struct ChatListItem: Identifiable, Hashable {
     public let id: Int64
     public let title: String
     public let lastMessage: String
     public let timestamp: Date
-    public let unreadCount: Int
-    public let isPinned: Bool
-    public let isMuted: Bool
+    public var unreadCount: Int
+    public var isPinned: Bool
+    public var isMuted: Bool
     public let isOnline: Bool
     public let avatarColor: Color
     public let isPremium: Bool
@@ -34,7 +34,7 @@ public enum ChatListFilter: String, CaseIterable {
 
 @MainActor
 public final class ChatListViewModel: ObservableObject {
-    @Published public var chats: [ChatList] = []
+    @Published public var chats: [ChatListItem] = []
     @Published public var selectedFilter: ChatListFilter = .all
     @Published public var searchText = ""
     @Published public var isSearching = false
@@ -50,11 +50,11 @@ public final class ChatListViewModel: ObservableObject {
     private func loadChats() {
         // Load from MTProto dialogs
         chats = [
-            ChatList(id: 1, title: "NeoTrix AI", lastMessage: "Ready to help!", timestamp: Date(), unreadCount: 2, isPinned: true, isMuted: false, isOnline: true, avatarColor: .purple, isPremium: true, isVerified: true),
-            ChatList(id: 2, title: "Family Group", lastMessage: "Mom: Dinner at 7?", timestamp: Date().addingTimeInterval(-300), unreadCount: 0, isPinned: true, isMuted: false, isOnline: false, avatarColor: .green, isPremium: false, isVerified: false),
-            ChatList(id: 3, title: "Work", lastMessage: "John: Meeting moved to 3pm", timestamp: Date().addingTimeInterval(-1800), unreadCount: 5, isPinned: false, isMuted: true, isOnline: true, avatarColor: .blue, isPremium: false, isVerified: false),
-            ChatList(id: 4, title: "Tech News", lastMessage: "New AI model released", timestamp: Date().addingTimeInterval(-3600), unreadCount: 0, isPinned: false, isMuted: false, isOnline: false, avatarColor: .orange, isPremium: true, isVerified: true),
-            ChatList(id: 5, title: "Design Team", lastMessage: "Alice: Updated the mockups", timestamp: Date().addingTimeInterval(-7200), unreadCount: 1, isPinned: false, isMuted: false, isOnline: false, avatarColor: .pink, isPremium: false, isVerified: false),
+            ChatListItem(id: 1, title: "NeoTrix AI", lastMessage: "Ready to help!", timestamp: Date(), unreadCount: 2, isPinned: true, isMuted: false, isOnline: true, avatarColor: .purple, isPremium: true, isVerified: true),
+            ChatListItem(id: 2, title: "Family Group", lastMessage: "Mom: Dinner at 7?", timestamp: Date().addingTimeInterval(-300), unreadCount: 0, isPinned: true, isMuted: false, isOnline: false, avatarColor: .green, isPremium: false, isVerified: false),
+            ChatListItem(id: 3, title: "Work", lastMessage: "John: Meeting moved to 3pm", timestamp: Date().addingTimeInterval(-1800), unreadCount: 5, isPinned: false, isMuted: true, isOnline: true, avatarColor: .blue, isPremium: false, isVerified: false),
+            ChatListItem(id: 4, title: "Tech News", lastMessage: "New AI model released", timestamp: Date().addingTimeInterval(-3600), unreadCount: 0, isPinned: false, isMuted: false, isOnline: false, avatarColor: .orange, isPremium: true, isVerified: true),
+            ChatListItem(id: 5, title: "Design Team", lastMessage: "Alice: Updated the mockups", timestamp: Date().addingTimeInterval(-7200), unreadCount: 1, isPinned: false, isMuted: false, isOnline: false, avatarColor: .pink, isPremium: false, isVerified: false),
         ]
     }
     
@@ -67,7 +67,7 @@ public final class ChatListViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    public var filteredChats: [ChatList] {
+    public var filteredChats: [ChatListItem] {
         var result = chats
         
         // Filter by search
@@ -123,7 +123,7 @@ public final class ChatListViewModel: ObservableObject {
 
 public struct ChatListView: View {
     @StateObject private var viewModel = ChatListViewModel()
-    @State private var selectedChat: ChatList?
+    @State private var selectedChat: ChatListItem?
     @State private var showSettings = false
     @State private var showPremium = false
     
@@ -190,6 +190,7 @@ public struct ChatListView: View {
             }
             .navigationTitle("Chats")
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         showSettings = true
@@ -214,6 +215,16 @@ public struct ChatListView: View {
                         }
                     }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showPremium = true
+                    } label: {
+                        Image(systemName: "star.circle.fill")
+                            .foregroundColor(.yellow)
+                    }
+                }
+                #endif
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
@@ -240,7 +251,7 @@ struct FilterChip: View {
                 .font(.subheadline)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .background(isSelected ? Color.blue : Color(.systemGray6))
+                .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
                 .foregroundColor(isSelected ? .white : .primary)
                 .clipShape(Capsule())
         }
@@ -249,7 +260,7 @@ struct FilterChip: View {
 }
 
 struct ChatListRow: View {
-    let chat: ChatList
+    let chat: ChatListItem
     
     var body: some View {
         HStack(spacing: 12) {
@@ -268,7 +279,7 @@ struct ChatListRow: View {
                     Circle()
                         .fill(Color.green)
                         .frame(width: 14, height: 14)
-                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
+                        .overlay(Circle().stroke(Color.primary.opacity(0.2), lineWidth: 2))
                 }
             }
             

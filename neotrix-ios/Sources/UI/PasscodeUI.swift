@@ -133,7 +133,7 @@ public struct PasscodeLockView: View {
             HStack(spacing: 16) {
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
-                        .fill(index < enteredCode.count ? Color.blue : Color(.systemGray4))
+                        .fill(index < enteredCode.count ? Color.blue : Color.gray.opacity(0.3))
                         .frame(width: 20, height: 20)
                 }
             }
@@ -238,7 +238,7 @@ struct NumberButton: View {
             Text("\(number)")
                 .font(.title)
                 .frame(width: 80, height: 80)
-                .background(Color(.systemGray6))
+                .background(Color.gray.opacity(0.15))
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
@@ -350,7 +350,11 @@ struct PasscodeSetupView: View {
                     Color.clear.frame(width: 80, height: 80)
                     NumberButton(number: 0) { appendDigit(0) }
                     Button {
-                        if !currentEntry.isEmpty { currentEntry.removeLast() }
+                        if step == 0 {
+                            if !firstEntry.isEmpty { firstEntry.removeLast() }
+                        } else {
+                            if !secondEntry.isEmpty { secondEntry.removeLast() }
+                        }
                     } label: {
                         Image(systemName: "delete.left")
                             .font(.title2)

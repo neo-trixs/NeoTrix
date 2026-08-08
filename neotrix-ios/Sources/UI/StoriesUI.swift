@@ -10,7 +10,7 @@ public struct StoryItem: Identifiable {
     public let authorName: String
     public let authorInitial: String
     public let avatarColor: Color
-    public let isSeen: Bool
+    public var isSeen: Bool
     public let isPremium: Bool
     public let isCloseFriends: Bool
     public let timestamp: Date
@@ -86,12 +86,12 @@ public struct StoryRing: View {
     let story: StoryItem
     let action: () -> Void
     
-    var body: some View {
+    public var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .stroke(story.isSeen ? Color(.systemGray4) : gradient, lineWidth: 3)
+                        .stroke(story.isSeen ? AnyShapeStyle(Color.gray.opacity(0.3)) : AnyShapeStyle(gradient), lineWidth: 3)
                         .frame(width: 64, height: 64)
                     
                     Circle()
@@ -270,7 +270,7 @@ public struct StoriesListView: View {
                         VStack(spacing: 6) {
                             ZStack {
                                 Circle()
-                                    .fill(Color(.systemGray5))
+                                    .fill(Color.gray.opacity(0.15))
                                     .frame(width: 64, height: 64)
                                 
                                 Image(systemName: "plus")
@@ -295,8 +295,14 @@ public struct StoriesListView: View {
             }
         }
         .padding(.vertical)
+        #if os(iOS)
         .fullScreenCover(isPresented: $showViewer) {
             StoryViewerView(stories: viewModel.stories)
         }
+        #else
+        .sheet(isPresented: $showViewer) {
+            StoryViewerView(stories: viewModel.stories)
+        }
+        #endif
     }
 }

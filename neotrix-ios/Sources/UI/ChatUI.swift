@@ -44,7 +44,7 @@ public struct ChatMessage: Identifiable, Equatable {
     
     public struct Reaction: Equatable {
         public let emoji: String
-        public let count: Int
+        public var count: Int
         public var isSelected: Bool
     }
     
@@ -242,8 +242,8 @@ public struct MessageBubbleView: View {
     private var bubbleColor: Color {
         switch message.sender {
         case .user: return .blue
-        case .agent: return Color(.systemGray5)
-        case .system: return Color(.systemGray4)
+        case .agent: return Color.gray.opacity(0.25)
+        case .system: return Color.gray.opacity(0.15)
         }
     }
     
@@ -256,12 +256,18 @@ public struct MessageBubbleView: View {
     
     private var statusIcon: some View {
         Group {
-            switch message.status {
-            case .sending: ProgressView().scaleEffect(0.6)
-            case .sent: Image(systemName: "checkmark").foregroundColor(.secondary)
-            case .delivered: Image(systemName: "checkmark.circle.fill").foregroundColor(.secondary)
-            case .read: Image(systemName: "checkmark.circle.fill").foregroundColor(.blue)
-            case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundColor(.red)
+            // Ghost Mode: hide read receipts (Nicegram fusion)
+            if PrivacyEngine.shared.settings.ghostMode && message.status == .read {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.secondary)
+            } else {
+                switch message.status {
+                case .sending: ProgressView().scaleEffect(0.6)
+                case .sent: Image(systemName: "checkmark").foregroundColor(.secondary)
+                case .delivered: Image(systemName: "checkmark.circle.fill").foregroundColor(.secondary)
+                case .read: Image(systemName: "checkmark.circle.fill").foregroundColor(.blue)
+                case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundColor(.red)
+                }
             }
         }
         .font(.caption)
@@ -273,6 +279,8 @@ public struct MessageBubbleView: View {
 public struct ChatView: View {
     @StateObject private var viewModel = ChatViewModel()
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var showAIEditor = false
+    @State private var showExport = false
     
     public init() {}
     
@@ -319,6 +327,17 @@ public struct ChatView: View {
                     .lineLimit(1...5)
                     .disabled(viewModel.isStreaming)
                 
+                // AI Editor button (Fusion: official AI Editor + Swiftgram formatting)
+                if !viewModel.inputText.isEmpty {
+                    Button {
+                        showAIEditor = true
+                    } label: {
+                        Image(systemName: "wand.and.stars")
+                            .font(.title2)
+                            .foregroundColor(.purple)
+                    }
+                }
+                
                 Button(action: sendMessage) {
                     Image(systemName: viewModel.isStreaming ? "stop.circle" : "arrow.up.circle.fill")
                         .font(.title2)
@@ -329,16 +348,36 @@ public struct ChatView: View {
             .background(.bar)
         }
         .navigationTitle("Chat")
+        .sheet(isPresented: $showAIEditor) {
+            AIEditorView(original: viewModel.inputText) { edited in
+                viewModel.inputText = edited
+            }
+        }
+        .sheet(isPresented: $showExport) {
+            ExportView(messages: viewModel.messages, chatTitle: "Chat")
+        }
         .toolbar {
+            #if os(iOS)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button("Summarize", action: { /* summarize chat */ })
-                    Button("Export", action: { /* export chat */ })
+                    Button("Export to AI", action: { showExport = true })
                     Button("Clear", role: .destructive, action: { viewModel.messages.removeAll() })
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
             }
+            #else
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("Summarize", action: { /* summarize chat */ })
+                    Button("Export to AI", action: { showExport = true })
+                    Button("Clear", role: .destructive, action: { viewModel.messages.removeAll() })
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+            #endif
         }
     }
     
