@@ -88,6 +88,15 @@ NeoTrix Desktop 是单页应用（SolidJS + Tauri v2），主路由 `/` 与 `/ch
 | `⌘1`~`⌘8` | 切换 8 个功能面板（Git/项目/插件/定时/成本/时间线/侧聊/电脑控制） |
 | `Esc`（面板打开时） | 关闭当前面板 |
 
+### 交互规范（对标 Codex）
+| 规范 | 说明 |
+|------|------|
+| 面板自动聚焦 | 8 面板打开时自动聚焦首个可交互元素（刷新按钮或输入框），`createEffect` 监听 `props.open` |
+| hover 操作键盘可达 | 消息操作行/会话操作/代码块复制按钮补 `group-focus-within:opacity-100`，键盘 Tab 聚焦时可见 |
+| 表单 Enter 提交 | 定时任务名/工作区路径/电脑控制输入框 Enter 直接触发创建/执行 |
+| 复制视觉反馈 | 复制成功后按钮图标切换绿色 ✓ 1.5s |
+| 破坏性操作确认 | 删除会话/删除定时任务/卸载插件执行前弹 `window.confirm` |
+
 ### 后端对接
 - `neocodex_send_message_stream`（发送，参数: content/attachments/regenerate/permission_mode/temperature/max_tokens）
 - `neocodex_stop_stream`（停止）
