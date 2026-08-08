@@ -415,6 +415,42 @@ impl FEPIITBridge {
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
     }
+
+    /// EFE 前瞻动作选择 (Active Inference as a Model of Agency, arXiv:2401.12917):
+    /// 期望自由能 EFE = pragmatic(偏好满足) + epistemic(信息增益) 可加分解。
+    /// 本实现: EFE = FE - epistemic_scale * info_gain, 选最小 EFE 的动作。
+    ///   - info_gain = 动作 belief 与观测的差异度 (1 - cosine), 差异大 = 未知 = 值得探索
+    ///   - epistemic_scale = 0 → 纯利用 (退化为 min-FE 反应式)
+    ///   - epistemic_scale > 0 → 探索-利用平衡, 主动采样未知状态
+    /// 让 NT-CORE 从"响应输入"变为"主动提问/主动探索"。
+    pub fn efe_action_selection(
+        &self,
+        action_beliefs: &[FepIitHypervector],
+        observation: &FepIitHypervector,
+        epistemic_scale: f64,
+    ) -> Option<usize> {
+        if action_beliefs.is_empty() {
+            return None;
+        }
+        action_beliefs
+            .iter()
+            .enumerate()
+            .map(|(i, belief)| {
+                let fe = self.compute_free_energy(belief, observation);
+                // 信息增益: belief 与观测的 VSA 余弦差异 (0=相同, 1=正交/未知)
+                let a = belief.as_f64();
+                let b = observation.as_f64();
+                let dot: f64 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
+                let na: f64 = a.iter().map(|x| x * x).sum::<f64>().sqrt();
+                let nb: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+                let sim = if na > 1e-12 && nb > 1e-12 { dot / (na * nb) } else { 0.0 };
+                let info_gain = (1.0_f64 - sim).clamp(0.0, 1.0);
+                let efe = fe - epistemic_scale * info_gain;
+                (i, efe)
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+    }
 }
 
 impl crate::core::nt_core_self_test::SelfTest for FEPIITBridge {
@@ -457,5 +493,45 @@ mod tests {
         let mut bridge = FEPIITBridge::new();
         bridge.alpha = 0.0;
         assert!(bridge.self_test().is_err());
+    }
+
+    #[test]
+    fn test_efe_action_selection_pure_exploitation_matches_min_fe() {
+        // EFE 前瞻 (Active Inference as a Model of Agency, arXiv:2401.12917):
+        // epistemic_scale=0 → 纯利用, 与原有 min-FE 反应式选择一致。
+        let bridge = FEPIITBridge::new();
+        let obs = FepIitHypervector::random_from_seed(1);
+        let a1 = FepIitHypervector::random_from_seed(2); // 与 obs 更接近 (低 FE)
+        let a2 = FepIitHypervector::random_from_seed(3);
+        let beliefs = vec![a1, a2];
+        let efe_idx = bridge.efe_action_selection(&beliefs, &obs, 0.0);
+        let min_idx = bridge.action_selection(&beliefs, &obs);
+        assert_eq!(efe_idx, min_idx, "scale=0 应等价于 min-FE");
+    }
+
+    #[test]
+    fn test_efe_exploration_prefers_uncertain_action() {
+        // 探索-利用平衡: 高 epistemic_scale 时, 若两个动作 FE 接近,
+        // 应倾向选"信息增益更大"(与观测差异更大) 的动作 — 主动采样。
+        let bridge = FEPIITBridge::new();
+        let obs = FepIitHypervector::random_from_seed(1);
+        // a1 与观测几乎相同 (低 FE, 低信息增益 — 已知)
+        let a1 = obs.clone();
+        // a2 与观测差异大 (高 FE, 高信息增益 — 未知, 值得探索)
+        let a2 = FepIitHypervector::random_from_seed(2);
+        let beliefs = [a1, a2];
+        // 纯利用: 选 a1 (低 FE)
+        let exploit = bridge.efe_action_selection(&beliefs, &obs, 0.0).unwrap();
+        assert_eq!(exploit, 0, "纯利用应选低 FE 动作");
+        // 强探索: 选 a2 (高信息增益)
+        let explore = bridge.efe_action_selection(&beliefs, &obs, 5.0).unwrap();
+        assert_eq!(explore, 1, "强探索应选高信息增益动作");
+    }
+
+    #[test]
+    fn test_efe_empty_actions_returns_none() {
+        let bridge = FEPIITBridge::new();
+        let obs = FepIitHypervector::random_from_seed(1);
+        assert!(bridge.efe_action_selection(&[], &obs, 1.0).is_none());
     }
 }

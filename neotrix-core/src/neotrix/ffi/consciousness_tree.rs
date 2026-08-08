@@ -141,7 +141,9 @@ impl ConsciousnessTreeImpl {
     pub fn update_branch_health(&self, branch_id: &str, health: f32, metrics: HashMap<String, f32>) -> bool {
         let mut inner = self.inner.write().unwrap();
         if let Some(branch) = inner.branches.get_mut(branch_id) {
-            branch.health = health.clamp(0.0, 1.0);
+            // RLMF 元认知校准 (arXiv:2606.32032): 高置信错误 (高 ECE / 高置信错误率)
+            // 的模块健康分被惩罚 — 错误自信比低分更危险, 自愈应优先处理。
+            branch.health = apply_metacognitive_calibration(health, &metrics);
             branch.last_activity = now_ms();
             for (k, v) in metrics {
                 branch.metrics.insert(k, v);
@@ -185,4 +187,77 @@ fn now_ms() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+/// 元认知校准惩罚系数 (RLMF: Reinforcement Learning with Metacognitive Feedback,
+/// arXiv:2606.32032 — 高置信错误应重罚, 错误自信的模块比低分模块更危险)。
+/// ECE (Expected Calibration Error) 0=完美校准, 1=完全错误自信。
+/// 高置信错误率 = 置信度高但答错的占比。
+/// 惩罚 = w_ece * ece + w_hce * high_conf_error_rate, 上限 max_penalty。
+const CALIB_W_ECE: f32 = 0.6;
+const CALIB_W_HCE: f32 = 0.4;
+const CALIB_MAX_PENALTY: f32 = 0.35;
+
+/// 元认知校准: 根据模块的置信度校准质量调整健康分。
+/// 若 metrics 提供 ece / high_conf_error_rate, 则惩罚"过度自信"模块:
+///   calibrated = health * (1 - penalty), penalty ∈ [0, max_penalty]
+/// 纯函数, 便于测试。
+fn apply_metacognitive_calibration(health: f32, metrics: &HashMap<String, f32>) -> f32 {
+    let ece = metrics.get("ece").copied().unwrap_or(0.0).clamp(0.0, 1.0);
+    let hce = metrics.get("high_conf_error_rate").copied().unwrap_or(0.0).clamp(0.0, 1.0);
+    let penalty = (CALIB_W_ECE * ece + CALIB_W_HCE * hce).min(CALIB_MAX_PENALTY);
+    health.clamp(0.0, 1.0) * (1.0 - penalty)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calibration_well_calibrated_no_penalty() {
+        // 完美校准模块: 无 ece / high_conf_error_rate → 健康分不变
+        let mut m = HashMap::new();
+        let h = apply_metacognitive_calibration(0.8, &m);
+        assert!((h - 0.8).abs() < 1e-6, "无校准指标不应惩罚: {h}");
+        // ece=0 显式提供 → 无惩罚
+        m.insert("ece".into(), 0.0);
+        let h2 = apply_metacognitive_calibration(0.8, &m);
+        assert!((h2 - 0.8).abs() < 1e-6, "ece=0 不应惩罚: {h2}");
+    }
+
+    #[test]
+    fn test_calibration_penalizes_overconfidence() {
+        // RLMF 洞察: 高置信错误 → 健康分显著下降 (错误自信比低分更危险)
+        let mut m = HashMap::new();
+        m.insert("ece".into(), 0.5);           // 中度错误自信
+        let h = apply_metacognitive_calibration(0.8, &m);
+        assert!(h < 0.8, "高 ECE 应惩罚健康分: {h}");
+        // 惩罚上限: ece=1 + hce=1 → penalty=0.35
+        m.insert("ece".into(), 1.0);
+        m.insert("high_conf_error_rate".into(), 1.0);
+        let h_max = apply_metacognitive_calibration(0.8, &m);
+        assert!((h_max - 0.8 * (1.0 - 0.35)).abs() < 1e-6, "惩罚应封顶 0.35: {h_max}");
+    }
+
+    #[test]
+    fn test_update_branch_health_applies_calibration() {
+        // 集成: update_branch_health 传入高 ECE → 存储的健康分被校准
+        let cfg = NeoTrixConfig {
+            server_url: "".into(), api_key: "".into(),
+            enable_ai_features: false, enable_premium_features: false,
+            log_level: "info".into(), data_directory: "/tmp".into(), cache_size_mb: 0,
+        };
+        let impl_obj = ConsciousnessTreeImpl::init(cfg).unwrap();
+        let mut m = HashMap::new();
+        m.insert("ece".into(), 0.6_f32);
+        m.insert("high_conf_error_rate".into(), 0.4_f32);
+        let ok = impl_obj.update_branch_health("NT-CORE", 0.9, m);
+        assert!(ok);
+        let branch = impl_obj.get_branch("NT-CORE").unwrap();
+        let expected = 0.9_f32 * (1.0_f32 - (0.6_f32 * 0.6_f32 + 0.4_f32 * 0.4_f32).min(0.35_f32));
+        assert!((branch.health - expected).abs() < 1e-3,
+            "应应用校准: got={} expected={}", branch.health, expected);
+        // 校准指标已存入 metrics
+        assert_eq!(branch.metrics.get("ece"), Some(&0.6_f32));
+    }
 }

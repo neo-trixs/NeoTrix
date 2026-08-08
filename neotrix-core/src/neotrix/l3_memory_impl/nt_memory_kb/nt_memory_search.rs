@@ -253,13 +253,34 @@ pub fn hybrid_search(
     }
 
     // RRF fusion
-    let fused = if ranklists.len() >= 2 {
+    let mut fused = if ranklists.len() >= 2 {
         bm25::rrf_fuse(&ranklists)
     } else if ranklists.is_empty() {
         Vec::new()
     } else {
         ranklists.into_iter().next().expect("non-empty ranklists")
     };
+
+    // 缺陷7修复 (真实运转): RRF 融合只按排名位置融合, 丢弃 search_fts 的标题加权分数,
+    // 导致标题精确匹配的"本体"节点 (如《史记》book) 被内容高频引用它的 concept 节点
+    // (BM25/内容命中排名靠前) 挤到后面。融合后恢复标题加权: FtsTitle 精确命中 +1.0,
+    // 前缀命中 +0.3 (与 search_fts 内部加权一致), 再重排。
+    {
+        let title_boost: std::collections::HashMap<&str, f64> = fts_results.iter()
+            .filter(|r| r.matched_on.iter().any(|m| matches!(m, SearchMatchType::FtsTitle)))
+            .map(|r| {
+                let t = r.node.title.trim();
+                let boost = if t == query.trim() { 1.0 } else { 0.3 };
+                (r.node.id.as_str(), boost)
+            })
+            .collect();
+        for (score, id) in fused.iter_mut() {
+            if let Some(b) = title_boost.get(id.as_str()) {
+                *score += *b;
+            }
+        }
+        fused.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    }
     #[cfg(feature = "full")]
     eprintln!("[hybrid] fused={} first5={:?}", fused.len(),
         fused.iter().take(5).map(|(s, id)| format!("{:.2}|{}", s, id.chars().take(24).collect::<String>())).collect::<Vec<_>>());
@@ -411,7 +432,7 @@ pub fn hybrid_search(
 /// 加入 hybrid_search 的 RRF 融合。正交表示与 FTS/BM25 的词汇统计互补,
 /// 提升检索语义多样性。纯增量: 无 Walsh 索引时返回空, 不影响既有融合。
 fn build_walsh_ranklist(
-    conn: &Connection,
+    _conn: &Connection,
     query: &str,
     fts_results: &[SearchResult],
     limit: usize,
@@ -760,5 +781,54 @@ mod tests {
         let sim = super::cosine_similarity_f64(&q, &similar);
         let unrel = super::cosine_similarity_f64(&q, &unrelated);
         assert!(sim > unrel, "相似文档应得分更高: sim={} unrel={}", sim, unrel);
+    }
+
+    /// 缺陷7 回归测试 (真实运转): hybrid_search 的 RRF 融合只按排名位置融合,
+    /// 丢弃 search_fts 的标题加权分数 — 标题精确匹配的"本体"节点 (如《史记》book)
+    /// 被内容高频引用它的 concept 节点挤到后面。修复: 融合后对 FtsTitle 精确匹配节点加权。
+    #[test]
+    fn test_hybrid_search_preserves_title_exact_match() {
+        use rusqlite::Connection;
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE nodes (
+                id TEXT PRIMARY KEY, node_type TEXT, title TEXT, summary TEXT,
+                content TEXT, url TEXT, domain TEXT, language TEXT,
+                confidence REAL, importance REAL, created_at INTEGER,
+                updated_at INTEGER, access_count INTEGER, metadata TEXT
+            );
+            CREATE VIRTUAL TABLE nodes_fts USING fts5(title, summary, content, domain);",
+        ).unwrap();
+        // 本体: 标题精确匹配"史记" (FtsTitle)
+        conn.execute(
+            "INSERT INTO nodes (id, node_type, title, summary, content, domain, language,
+                                confidence, importance, created_at, updated_at, access_count, metadata)
+             VALUES ('book-shiji', 'book', '史记', '史记 司马迁 本纪 列传',
+                     '史记 司马迁 本纪 列传 世家 表 书 八书 十表 十二本纪 三十世家',
+                     'guji', 'zh', 0.9, 0.9, 1, 1, 0, NULL)",
+            [],
+        ).unwrap();
+        // 引用者: 标题含"史记"但内容高频重复 (BM25/内容命中会把它排前)
+        let spam = "史记 ".repeat(200);
+        conn.execute(
+            "INSERT INTO nodes (id, node_type, title, summary, content, domain, language,
+                                confidence, importance, created_at, updated_at, access_count, metadata)
+             VALUES ('concept-shiji', 'concept', '史记——史家之绝唱', '评论',
+                     ?1, 'guji', 'zh', 0.5, 0.5, 2, 2, 0, NULL)",
+            [spam],
+        ).unwrap();
+        // 同步 FTS (content 亦入索引)
+        conn.execute_batch(
+            "INSERT INTO nodes_fts(rowid, title, summary, content, domain)
+             SELECT rowid, title, summary, content, domain FROM nodes;",
+        ).unwrap();
+
+        let results = super::hybrid_search(&conn, "史记", 5, None).unwrap();
+        assert!(!results.is_empty(), "应检索到结果");
+        let first_title = results[0].node.title.clone();
+        assert_eq!(first_title, "史记",
+            "标题精确匹配的本体应排第一, 实际: {} | {:?}",
+            first_title,
+            results.iter().map(|r| format!("{}[{:.2}]", r.node.title, r.score)).collect::<Vec<_>>());
     }
 }

@@ -133,3 +133,63 @@ fn now_ms() -> i64 {
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn signal(source: &str, content: &str, salience: f32) -> AttentionSignal {
+        AttentionSignal {
+            source_module: source.into(),
+            content: content.into(),
+            salience,
+            timestamp: now_ms(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_resonance_routing_broadcasts_to_matching_modules() {
+        // GWT 竞争-广播 (Goyal et al., arXiv:2103.01197): 信号按兴趣关键词
+        // 共振路由到匹配模块 — 内容广播给所有共振超阈值的模块。
+        let router = GWTAttentionRouterImpl::init(
+            vec!["NT-WORLD".into(), "NT-MEMORY".into(), "NT-SHIELD".into()],
+        ).unwrap();
+        router.register_module("NT-WORLD", vec!["crawl".into(), "fetch".into(), "parse".into()]);
+        router.register_module("NT-MEMORY", vec!["store".into(), "embed".into(), "retrieve".into()]);
+        router.register_module("NT-SHIELD", vec!["threat".into(), "block".into(), "proxy".into()]);
+
+        let resp = router.submit_signal(signal("NT-CORE", "crawl new pages and store embeddings", 0.8));
+        assert!(resp.routed, "信号应被路由");
+        let recips = &resp.broadcast_event.recipients;
+        assert!(recips.contains(&"NT-WORLD".to_string()), "NT-WORLD 应接收: {recips:?}");
+        assert!(recips.contains(&"NT-MEMORY".to_string()), "NT-MEMORY 应接收: {recips:?}");
+        assert!(!recips.contains(&"NT-SHIELD".to_string()), "NT-SHIELD 不应接收: {recips:?}");
+    }
+
+    #[test]
+    fn test_salience_threshold_gates_broadcast() {
+        // 阈值门控: 低 salience 信号不触发低兴趣模块 (注意力稀缺性)
+        let router = GWTAttentionRouterImpl::init(vec!["NT-WORLD".into()]).unwrap();
+        router.register_module("NT-WORLD", vec!["crawl".into()]);
+        // 高 salience + 关键词命中 → 路由
+        let hi = router.submit_signal(signal("NT-CORE", "crawl the web", 0.9));
+        assert!(hi.routed);
+        // 低 salience + 无关键词 → 不路由
+        let lo = router.submit_signal(signal("NT-CORE", "unrelated noise", 0.1));
+        assert!(!lo.routed, "低 salience 无关键词不应路由");
+    }
+
+    #[test]
+    fn test_workspace_broadcast_history_capped() {
+        // 工作空间广播历史有界 (容量瓶颈 — GWT 核心属性)
+        let router = GWTAttentionRouterImpl::init(vec!["NT-MEMORY".into()]).unwrap();
+        router.register_module("NT-MEMORY", vec!["store".into()]);
+        for i in 0..120 {
+            router.submit_signal(signal("NT-CORE", &format!("store item {i}"), 0.5));
+        }
+        let ws = router.get_workspace_state();
+        assert!(ws.broadcast_history.len() <= 100, "广播历史应封顶 100: {}", ws.broadcast_history.len());
+        assert!(ws.active_signals.len() <= 50, "活跃信号应封顶 50: {}", ws.active_signals.len());
+    }
+}
