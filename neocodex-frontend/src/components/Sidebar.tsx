@@ -123,10 +123,16 @@ export function Sidebar(props: SidebarProps) {
         <>
           {/* Segmented Tabs：意识模式（设计 v2）—— E8 六芒星 / 星群 */}
           <div class="px-3 pb-3">
-            <div class="seg">
+            <div class="seg" role="tablist" aria-label="意识模式视图切换">
               <button
                 class={clsx('segb', viewIdx() === 0 && 'on')}
                 onClick={() => switchView('chat')}
+                role="tab"
+                aria-selected={viewIdx() === 0}
+                tabIndex={viewIdx() === 0 ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); switchView(view() === 'chat' ? 'cowork' : 'chat') }
+                }}
                 aria-label="对话"
                 title="对话"
               >
@@ -136,6 +142,12 @@ export function Sidebar(props: SidebarProps) {
               <button
                 class={clsx('segb', viewIdx() === 1 && 'on')}
                 onClick={() => switchView('cowork')}
+                role="tab"
+                aria-selected={viewIdx() === 1}
+                tabIndex={viewIdx() === 1 ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); switchView(view() === 'chat' ? 'cowork' : 'chat') }
+                }}
                 aria-label="协同"
                 title="协同"
               >

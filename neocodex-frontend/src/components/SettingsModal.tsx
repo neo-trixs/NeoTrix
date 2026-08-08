@@ -220,10 +220,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
           aria-modal="true"
         >
           {/* ── 左侧分类导航 ── */}
-          <nav ref={setNavRef} class="w-[148px] flex-shrink-0 border-r border-border-primary/40 bg-bg-secondary/60 py-4 px-2 flex flex-col gap-1">
+          <nav ref={setNavRef} class="w-[148px] flex-shrink-0 border-r border-border-primary/40 bg-bg-secondary/60 py-4 px-2 flex flex-col gap-1" role="tablist" aria-label="设置分类">
             <div class="px-3 pb-3 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">设置</div>
             <For each={SECTIONS}>
-              {(s) => (
+              {(s, i) => (
                 <button
                   class={clsx(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] transition-colors',
@@ -232,7 +232,20 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       : 'text-text-secondary hover:text-text-primary hover:bg-white/40'
                   )}
                   onClick={() => setSection(s.id)}
-                  aria-current={section() === s.id ? 'true' : 'false'}
+                  role="tab"
+                  aria-selected={section() === s.id}
+                  tabIndex={section() === s.id ? 0 : -1}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      const dir = e.key === 'ArrowDown' ? 1 : -1
+                      setSection(SECTIONS[(i() + dir + SECTIONS.length) % SECTIONS.length].id)
+                    } else if (e.key === 'Home') {
+                      e.preventDefault(); setSection(SECTIONS[0].id)
+                    } else if (e.key === 'End') {
+                      e.preventDefault(); setSection(SECTIONS[SECTIONS.length - 1].id)
+                    }
+                  }}
                 >
                   <span class={clsx('w-4 h-4 flex-shrink-0', section() === s.id ? 'text-nt-io-600' : 'text-text-muted')}>
                     <s.icon />

@@ -283,17 +283,39 @@ export function RightBar() {
                 </svg>
               </button>
             </div>
-            <span class="ap-title">{currentFile()?.name ?? '未选择文件'}</span>
+            <button
+              class="ap-title"
+              onClick={(e) => { e.stopPropagation(); toggleExpand() }}
+              aria-expanded={previewOpen()}
+              title={previewOpen() ? '折叠预览区' : '展开预览区'}
+            >
+              {currentFile()?.name ?? '未选择文件'}
+            </button>
           </div>
 
           <Show when={previewOpen()}>
             {/* ── 格式 tabs ── */}
-            <div class="ap-tabs" onClick={(e) => e.stopPropagation()}>
+            <div class="ap-tabs" onClick={(e) => e.stopPropagation()} role="tablist" aria-label="预览格式">
               <For each={PREVIEW_FORMATS}>
-                {(f) => (
+                {(f, i) => (
                   <button
                     class={clsx('ap-tab', previewMode() === f.id && 'on')}
                     onClick={() => setPreviewMode(f.id)}
+                    role="tab"
+                    aria-selected={previewMode() === f.id}
+                    tabIndex={previewMode() === f.id ? 0 : -1}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+                      e.preventDefault()
+                      const dir = e.key === 'ArrowRight' ? 1 : -1
+                      const next = PREVIEW_FORMATS[(i() + dir + PREVIEW_FORMATS.length) % PREVIEW_FORMATS.length]
+                      setPreviewMode(next.id)
+                      // 聚焦新选中的 tab（原生 roving tabindex 规范）
+                      requestAnimationFrame(() => {
+                        const tabs = document.querySelectorAll<HTMLElement>('.ap-tabs [role="tab"]')
+                        tabs[(i() + dir + PREVIEW_FORMATS.length) % PREVIEW_FORMATS.length]?.focus()
+                      })
+                    }}
                   >
                     {f.label}
                   </button>

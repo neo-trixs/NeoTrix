@@ -144,7 +144,7 @@ export function ProjectView(props: Props) {
         </div>
 
         {/* Tabs */}
-        <div class="flex border-b border-border-primary">
+        <div class="flex border-b border-border-primary" role="tablist" aria-label="项目视图切换">
           <button
             class={clsx(
               'flex-1 py-2 text-xs font-medium transition-colors',
@@ -153,6 +153,12 @@ export function ProjectView(props: Props) {
                 : 'text-text-muted hover:text-text-primary'
             )}
             onClick={() => setTab('tree')}
+            role="tab"
+            aria-selected={tab() === 'tree'}
+            tabIndex={tab() === 'tree' ? 0 : -1}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(tab() === 'tree' ? 'agents' : 'tree') }
+            }}
           >
             目录树
           </button>
@@ -164,6 +170,12 @@ export function ProjectView(props: Props) {
                 : 'text-text-muted hover:text-text-primary'
             )}
             onClick={() => setTab('agents')}
+            role="tab"
+            aria-selected={tab() === 'agents'}
+            tabIndex={tab() === 'agents' ? 0 : -1}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(tab() === 'tree' ? 'agents' : 'tree') }
+            }}
           >
             AGENTS.md
           </button>

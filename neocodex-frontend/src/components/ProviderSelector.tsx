@@ -156,9 +156,9 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
           </div>
 
           {/* Provider List */}
-          <div class="max-h-64 overflow-y-auto">
+          <div class="max-h-64 overflow-y-auto" role="listbox" aria-label="模型提供商列表">
             <For each={config()?.providers || []}>
-              {(provider: ProviderEntry) => {
+              {(provider: ProviderEntry, i) => {
                 const isActive = provider.model === config()?.active_model
                 return (
                   <button
@@ -171,6 +171,18 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                     disabled={loading() || isActive}
                     role="option"
                     aria-selected={isActive}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+                      e.preventDefault()
+                      const dir = e.key === 'ArrowDown' ? 1 : -1
+                      const list = config()?.providers || []
+                      if (list.length === 0) return
+                      // roving tabindex：聚焦下一选项
+                      requestAnimationFrame(() => {
+                        const opts = Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]'))
+                        opts[(i() + dir + list.length) % list.length]?.focus?.()
+                      })
+                    }}
                   >
                     {getProviderIcon(provider.name)}
                     <div class="flex-1 min-w-0 flex flex-col gap-0.5">

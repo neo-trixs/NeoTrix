@@ -915,7 +915,14 @@
     text-overflow: ellipsis;
     text-align: center;
     min-width: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 2px 4px;
   }
+  .ap-title:hover { color: #5a5a62; }
+  .ap-title:focus-visible { outline: 2px solid #e85454; outline-offset: -2px; }
 
   .ap-view-btn {
     width: 24px;
@@ -1117,8 +1124,13 @@
     color: #5a5a62;
     transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
     margin-bottom: 2px;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    text-align: left;
   }
   .cw-sitem:hover { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
+  .cw-sitem:focus-visible { outline: 2px solid #e85454; outline-offset: -2px; }
   .cw-sitem.active { background: rgba(232, 84, 84, 0.08); color: #1a1a20; font-weight: 500; }
   .cw-sitem .s { font-size: 10px; color: #b0b0b8; display: block; margin-top: 1px; }
   .cw-main { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }

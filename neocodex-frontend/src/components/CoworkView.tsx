@@ -209,15 +209,16 @@ export function CoworkView() {
           <div class="cw-slist">
             <For each={sessions()}>
               {(s) => (
-                <div
-                  class={clsx('cw-sitem', s.id === activeId() && 'active')}
+                <button
+                  class={clsx('cw-sitem w-full text-left', s.id === activeId() && 'active')}
                   onClick={() => setActiveId(s.id)}
+                  aria-pressed={s.id === activeId()}
                 >
                   <div class="cw-sitem-name">{s.name}</div>
                   <span class="s">
                     {statusLabel(s.status)} · 读 {s.files_read} · 建 {s.files_created} · 改 {s.files_modified}
                   </span>
-                </div>
+                </button>
               )}
             </For>
             <Show when={sessions().length === 0 && !loading()}>
