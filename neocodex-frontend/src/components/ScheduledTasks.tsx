@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show, For } from 'solid-js'
+import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { CalendarClock, X, RefreshCw, Loader2, Play, Plus, Trash2, Pause, CirclePlay, History } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
@@ -41,6 +41,12 @@ export function ScheduledTasks(props: Props) {
   const [name, setName] = createSignal('')
   const [prompt, setPrompt] = createSignal('')
   const [schedule, setSchedule] = createSignal(SCHEDULE_PRESETS[0].value)
+  let firstBtnRef: HTMLButtonElement | undefined
+
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  createEffect(() => {
+    if (props.open && firstBtnRef) firstBtnRef.focus()
+  })
 
   const load = async () => {
     setLoading(true)
@@ -134,6 +140,7 @@ export function ScheduledTasks(props: Props) {
           <span class="panel-title">定时任务</span>
           <span class="panel-sub">{tasks().length} 个任务</span>
           <button
+            ref={firstBtnRef}
             class="panel-close"
             onClick={load}
             aria-label="刷新"

@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show, For } from 'solid-js'
+import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { History, RotateCcw, Loader2, X, Clock, RefreshCw } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
@@ -32,6 +32,12 @@ export function CheckpointTimeline(props: Props) {
   const [loading, setLoading] = createSignal(false)
   const [restoring, setRestoring] = createSignal<string | null>(null)
   const [error, setError] = createSignal<string | null>(null)
+  let firstBtnRef: HTMLButtonElement | undefined
+
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  createEffect(() => {
+    if (props.open && firstBtnRef) firstBtnRef.focus()
+  })
 
   const load = async () => {
     if (!props.sessionId) return
@@ -79,6 +85,7 @@ export function CheckpointTimeline(props: Props) {
           <span class="panel-title">时间线</span>
           <span class="panel-sub">({checkpoints().length} 个快照)</span>
           <button
+            ref={firstBtnRef}
             class="panel-close"
             onClick={load}
             aria-label="刷新"

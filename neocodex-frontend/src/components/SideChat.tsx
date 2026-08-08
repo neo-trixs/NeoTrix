@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show, For } from 'solid-js'
+import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { MessageSquare, X, Send, Loader2, RefreshCw } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
@@ -22,6 +22,12 @@ export function SideChat(props: Props) {
   const [sending, setSending] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [bodyRef, setBodyRef] = createSignal<HTMLDivElement | null>(null)
+  let inputRef: HTMLTextAreaElement | undefined
+
+  // 面板打开时聚焦输入框（对标 Codex 面板聚焦规范）
+  createEffect(() => {
+    if (props.open && inputRef) inputRef.focus()
+  })
 
   const load = async () => {
     if (!props.sessionId) return
@@ -124,6 +130,7 @@ export function SideChat(props: Props) {
         <div class="border-t border-border-primary p-3">
           <div class="flex items-end gap-2">
             <textarea
+              ref={inputRef}
               value={input()}
               onInput={(e) => setInput(e.currentTarget.value)}
               onKeyDown={(e) => {

@@ -1,4 +1,4 @@
-import { createSignal, onMount, For, Show } from 'solid-js'
+import { createSignal, onMount, createEffect, For, Show } from 'solid-js'
 import { Folder, FolderOpen, File, FileText, ChevronRight, ChevronDown, BookOpen, Loader2, X, RefreshCw } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
@@ -30,6 +30,12 @@ export function ProjectView(props: Props) {
   const [error, setError] = createSignal<string | null>(null)
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
   const [tab, setTab] = createSignal<'tree' | 'agents'>('tree')
+  let firstBtnRef: HTMLButtonElement | undefined
+
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  createEffect(() => {
+    if (props.open && firstBtnRef) firstBtnRef.focus()
+  })
 
   const load = async () => {
     setLoading(true)
@@ -120,6 +126,7 @@ export function ProjectView(props: Props) {
             <span class="panel-sub">({view()!.file_count} 文件)</span>
           </Show>
           <button
+            ref={firstBtnRef}
             class="panel-close"
             onClick={load}
             aria-label="刷新"

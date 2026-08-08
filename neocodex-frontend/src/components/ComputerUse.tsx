@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show, For } from 'solid-js'
+import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { Monitor, X, RefreshCw, Loader2, MousePointerClick, Keyboard, AppWindow, Cpu } from 'lucide-solid'
 import { invoke } from '@tauri-apps/api/core'
 import { clsx } from 'clsx'
@@ -53,6 +53,12 @@ export function ComputerUse(props: Props) {
   const [keyText, setKeyText] = createSignal('')
   const [keyCode, setKeyCode] = createSignal('')
   const [mods, setMods] = createSignal<string[]>([])
+  let firstBtnRef: HTMLButtonElement | undefined
+
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  createEffect(() => {
+    if (props.open && firstBtnRef) firstBtnRef.focus()
+  })
 
   const load = async () => {
     setLoading(true)
@@ -173,6 +179,7 @@ export function ComputerUse(props: Props) {
           <span class="panel-title">电脑控制</span>
           <span class="panel-sub">macOS 控制</span>
           <button
+            ref={firstBtnRef}
             class="panel-close"
             onClick={load}
             aria-label="刷新"
