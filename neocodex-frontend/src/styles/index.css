@@ -82,16 +82,6 @@
       0 4px 16px rgba(0, 0, 0, 0.06);
   }
 
-  .glass-strong {
-    @apply bg-[#f2efe9] backdrop-blur-2xl border border-[rgba(0,0,0,0.10)];
-    box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.5) inset,
-      0 12px 40px rgba(0, 0, 0, 0.10);
-  }
-
-  .glass-hover {
-    @apply hover:bg-[#f2efe9] transition-colors;
-  }
 
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary disabled:opacity-50 disabled:cursor-not-allowed;
@@ -237,19 +227,6 @@
     box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.5) inset;
   }
 
-  /* —— 输入区聚焦 glow（红色主色，亮底温和） —— */
-  .input-wrap {
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .input-wrap:focus-within {
-    border-color: rgba(232, 84, 84, 0.45);
-    box-shadow:
-      0 0 0 1px rgba(232, 84, 84, 0.18),
-      0 0 24px rgba(232, 84, 84, 0.08),
-      0 1px 0 0 rgba(255, 255, 255, 0.7) inset;
-  }
-
   /* —— 流式光标：红色块状闪烁（设计文件 .sc） —— */
   .stream-cursor {
     color: #e85454;
@@ -387,30 +364,6 @@
     font-size: 10px;
     opacity: 0.35;
     margin-top: 4px;
-  }
-
-  /* —— Typing 三点动画 —— */
-  .typing {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 0;
-  }
-
-  .typing span {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: #909098;
-    animation: typingB 1.2s ease-in-out infinite;
-  }
-
-  .typing span:nth-child(2) { animation-delay: 0.2s; }
-  .typing span:nth-child(3) { animation-delay: 0.4s; }
-
-  @keyframes typingB {
-    0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
-    30% { opacity: 1; transform: scale(1.2); }
   }
 
   /* —— 输入区 cic：圆角 24px 玻璃容器 —— */
@@ -721,82 +674,6 @@
     transition: color 0.25s cubic-bezier(0.22,1,0.36,1);
   }
   .sf:hover .su-gear { color: #1a1a20; }
-
-  .sf-btn {
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    background: transparent;
-    color: #909098;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
-  }
-
-  .sf-btn:hover { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
-
-  .sf-btn svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  /* —— 侧栏导航项 —— */
-  .nl {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
-    font-size: 13px;
-    font-weight: 500;
-    color: #5a5a62;
-    position: relative;
-  }
-
-  .nl:hover { background: rgba(0, 0, 0, 0.03); color: #1a1a20; }
-
-  .nl.on {
-    background: rgba(232, 84, 84, 0.08);
-    color: #e85454;
-    font-weight: 600;
-  }
-
-  .nl.on::before {
-    content: '';
-    position: absolute;
-    left: -10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 18px;
-    border-radius: 3px;
-    background: #e85454;
-  }
-
-  .nl svg {
-    width: 15px;
-    height: 15px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    flex-shrink: 0;
-    transition: transform 0.3s ease, stroke-width 0.2s;
-  }
-
-  .nl:hover svg { transform: rotate(-72deg) scale(1.15); }
-  .nl.on svg { stroke-width: 2.2; }
 
   /* —— hero 区 —— */
   .hero {
@@ -1167,7 +1044,6 @@
 
   .kw { color: #e85454; }
   .fn { color: #4caf50; }
-  .hl { color: #e85454; }
   .cm { color: #909098; font-style: italic; }
 
   /* ════════════════════════════════════════════
