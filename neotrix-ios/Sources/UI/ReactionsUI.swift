@@ -85,6 +85,7 @@ public struct ReactionPickerView: View {
     
     @State private var searchText = ""
     @State private var selectedTab: Int = 0
+    @State private var fullScreenEmoji: String?
     
     public init(onSelect: @escaping (String) -> Void) {
         self.onSelect = onSelect
@@ -115,6 +116,8 @@ public struct ReactionPickerView: View {
                         ForEach(reactions) { reaction in
                             Button {
                                 if manager.canUse(reaction) {
+                                    // 融合: 全屏动画效果（AnimatedEmoji 接线）
+                                    fullScreenEmoji = reaction.emoji
                                     onSelect(reaction.emoji)
                                     dismiss()
                                 }
@@ -155,6 +158,17 @@ public struct ReactionPickerView: View {
                     Button("Cancel") { dismiss() }
                 }
                 #endif
+            }
+        }
+        .overlay {
+            if let emoji = fullScreenEmoji {
+                FullScreenEmojiEffect(emoji: emoji)
+                    .allowsHitTesting(false)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            fullScreenEmoji = nil
+                        }
+                    }
             }
         }
     }
@@ -208,36 +222,5 @@ struct SearchField: View {
 }
 
 // MARK: - Reaction Bar (attached to messages)
-
-public struct ReactionBarView: View {
-    let reactions: [MessageReaction]
-    let onSelect: (String) -> Void
-    
-    public var body: some View {
-        HStack(spacing: 6) {
-            Button {
-                // Expand picker
-            } label: {
-                Image(systemName: "face.smiling")
-                    .font(.caption)
-            }
-            
-            ForEach(reactions) { reaction in
-                Button {
-                    onSelect(reaction.emoji)
-                } label: {
-                    HStack(spacing: 2) {
-                        Text(reaction.emoji)
-                        Text("\(reaction.count)")
-                            .font(.caption)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(reaction.isSelected ? Color.blue.opacity(0.3) : Color.gray.opacity(0.15))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
+// 注: ReactionBarView 已删除（Dark Forest）— 消息 reactions 显示由 ChatUI.MessageBubbleView
+// 内联实现（ChatMessage.Reaction 模型），此组件用不同模型（MessageReaction）无法复用且无消费者。

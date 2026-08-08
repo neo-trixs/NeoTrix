@@ -141,6 +141,7 @@ public final class ThemeManager: ObservableObject {
 
 public struct ThemeSettingsView: View {
     @StateObject private var manager = ThemeManager()
+    @State private var previewWallpaper: Wallpaper?
     
     public var body: some View {
         List {
@@ -217,10 +218,29 @@ public struct ThemeSettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(wallpaper.isPremium && !manager.isPremium)
+                    .contextMenu {
+                        // 融合: 动画壁纸预览（AnimatedWallpaperView 接线）
+                        if wallpaper.isAnimated {
+                            Button {
+                                previewWallpaper = wallpaper
+                            } label: {
+                                Label("Preview", systemImage: "play.circle")
+                            }
+                        }
+                    }
                 }
             }
         }
         .navigationTitle("Themes & Wallpapers")
+        #if os(iOS)
+        .fullScreenCover(item: $previewWallpaper) { wallpaper in
+            AnimatedWallpaperView(wallpaper: wallpaper)
+        }
+        #else
+        .sheet(item: $previewWallpaper) { wallpaper in
+            AnimatedWallpaperView(wallpaper: wallpaper)
+        }
+        #endif
     }
 }
 

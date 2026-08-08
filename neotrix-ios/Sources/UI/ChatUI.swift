@@ -316,6 +316,9 @@ public struct ChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showAIEditor = false
     @State private var showExport = false
+    @State private var reactionTarget: UUID?
+    @State private var showReactionPicker = false
+    @State private var showEmojiStatus = false
     
     public init() {}
     
@@ -328,7 +331,11 @@ public struct ChatView: View {
                             MessageBubbleView(
                                 message: message,
                                 onReaction: { emoji in viewModel.addReaction(emoji, to: message.id) },
-                                onLongPress: { /* show context menu */ }
+                                onLongPress: {
+                                    // 融合: 长按消息 → ReactionPicker（官方 Reactions + Premium 门控）
+                                    reactionTarget = message.id
+                                    showReactionPicker = true
+                                }
                             )
                             .id(message.id)
                         }
@@ -350,11 +357,26 @@ public struct ChatView: View {
                 }
             }
             
+            // AI Editor 快捷面板（融合: 官方 AI Editor + Swiftgram Quick Formatting）
+            if !viewModel.inputText.isEmpty {
+                AIEditorPanel(text: $viewModel.inputText) { edited in
+                    viewModel.inputText = edited
+                }
+            }
+            
             // Input bar
             HStack(spacing: 8) {
                 Button(action: { viewModel.toggleStickerPicker() }) {
                     Image(systemName: "face.smiling")
                         .font(.title2)
+                }
+                .contextMenu {
+                    // 融合: 动画 Emoji 状态（AnimatedEmoji 接线）
+                    Button {
+                        showEmojiStatus = true
+                    } label: {
+                        Label("Emoji Status", systemImage: "sparkles")
+                    }
                 }
                 
                 TextField("Message", text: $viewModel.inputText, axis: .vertical)
@@ -391,11 +413,26 @@ public struct ChatView: View {
         .sheet(isPresented: $showExport) {
             ExportView(messages: viewModel.messages, chatTitle: "Chat")
         }
+        .sheet(isPresented: $showReactionPicker) {
+            // 融合: Reactions 工具栏（长按消息 → 选择 emoji → 应用到目标消息）
+            ReactionPickerView { emoji in
+                if let target = reactionTarget {
+                    viewModel.addReaction(emoji, to: target)
+                }
+            }
+        }
+        .sheet(isPresented: $showEmojiStatus) {
+            // 融合: 动画 Emoji 状态选择器
+            EmojiStatusPickerView { emoji in
+                // 选择后作为消息发送（动画 emoji 状态）
+                viewModel.inputText = emoji
+            }
+        }
         .toolbar {
             #if os(iOS)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button("Summarize", action: { /* summarize chat */ })
+                    Button("Summarize", action: { Task { await viewModel.summarizeChat() } })
                     Button("Export to AI", action: { showExport = true })
                     Button("Clear", role: .destructive, action: { viewModel.messages.removeAll() })
                 } label: {
@@ -405,7 +442,7 @@ public struct ChatView: View {
             #else
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button("Summarize", action: { /* summarize chat */ })
+                    Button("Summarize", action: { Task { await viewModel.summarizeChat() } })
                     Button("Export to AI", action: { showExport = true })
                     Button("Clear", role: .destructive, action: { viewModel.messages.removeAll() })
                 } label: {

@@ -53,60 +53,6 @@ public struct AnimatedEmojiData {
     }
 }
 
-// MARK: - Animated Emoji View
-
-public struct AnimatedEmojiView: View {
-    let emoji: AnimatedEmoji
-    @State private var animate = false
-    
-    public init(emoji: AnimatedEmoji) {
-        self.emoji = emoji
-    }
-    
-    public var body: some View {
-        Text(emoji.emoji)
-            .font(.system(size: 60))
-            .scaleEffect(scale)
-            .rotationEffect(rotation)
-            .offset(y: offset)
-            .onAppear {
-                animate = true
-            }
-    }
-    
-    private var scale: CGFloat {
-        guard animate else { return 1.0 }
-        switch emoji.effect {
-        case .pulse, .heart:
-            return animate ? 1.2 : 1.0
-        case .shake:
-            return 1.0
-        default:
-            return 1.0
-        }
-    }
-    
-    private var rotation: Angle {
-        guard animate else { return .zero }
-        switch emoji.effect {
-        case .shake:
-            return animate ? .degrees(10) : .degrees(-10)
-        default:
-            return .zero
-        }
-    }
-    
-    private var offset: CGFloat {
-        guard animate else { return 0 }
-        switch emoji.effect {
-        case .confetti, .firework:
-            return animate ? -20 : 0
-        default:
-            return 0
-        }
-    }
-}
-
 // MARK: - Full-Screen Emoji Effect
 
 public struct FullScreenEmojiEffect: View {
@@ -157,28 +103,6 @@ public struct FullScreenEmojiEffect: View {
         let duration: Double
         let opacity: Double
         let scale: CGFloat
-    }
-}
-
-// MARK: - Emoji Status
-
-public struct EmojiStatusView: View {
-    let emoji: String
-    @State private var isAnimating = false
-    
-    public init(emoji: String) {
-        self.emoji = emoji
-    }
-    
-    public var body: some View {
-        Text(emoji)
-            .font(.system(size: 20))
-            .scaleEffect(isAnimating ? 1.2 : 1.0)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
-                    isAnimating = true
-                }
-            }
     }
 }
 
