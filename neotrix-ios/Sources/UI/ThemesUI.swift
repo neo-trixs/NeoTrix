@@ -151,9 +151,22 @@ public struct ThemeSettingsView: View {
                         manager.applyTheme(theme)
                     } label: {
                         HStack {
-                            Circle()
-                                .fill(theme.colors.primary)
-                                .frame(width: 24, height: 24)
+                            // 迷你预览（对标 Telegram: 主题行内预览气泡 + 背景）
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(theme.colors.chatBackground)
+                                    .frame(width: 44, height: 32)
+                                HStack(spacing: 3) {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(theme.colors.bubbleIncoming)
+                                        .frame(width: 14, height: 10)
+                                    Spacer()
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(theme.colors.bubbleOutgoing)
+                                        .frame(width: 14, height: 10)
+                                }
+                                .padding(.horizontal, 5)
+                            }
                             
                             Text(theme.name)
                                 .foregroundColor(.primary)
@@ -161,14 +174,14 @@ public struct ThemeSettingsView: View {
                             if theme.isPremium {
                                 Image(systemName: "star.fill")
                                     .font(.caption)
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(NeoTrixTheme.Colors.premium)
                             }
                             
                             Spacer()
                             
                             if manager.currentTheme.id == theme.id {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(NeoTrixTheme.Colors.accent)
                             } else if theme.isPremium && !manager.isPremium {
                                 Image(systemName: "lock.fill")
                                     .foregroundColor(.secondary)
@@ -202,14 +215,14 @@ public struct ThemeSettingsView: View {
                             if wallpaper.isPremium {
                                 Image(systemName: "star.fill")
                                     .font(.caption)
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(NeoTrixTheme.Colors.premium)
                             }
                             
                             Spacer()
                             
                             if manager.currentWallpaper?.id == wallpaper.id {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(NeoTrixTheme.Colors.accent)
                             } else if wallpaper.isPremium && !manager.isPremium {
                                 Image(systemName: "lock.fill")
                                     .foregroundColor(.secondary)

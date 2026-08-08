@@ -229,12 +229,27 @@ public struct MessageBubbleView: View {
                 }
                 
                 // Message content
-                Text(message.text)
+                if !message.media.isEmpty {
+                    VStack(alignment: message.sender == .user ? .trailing : .leading, spacing: 6) {
+                        ForEach(Array(message.media.enumerated()), id: \.offset) { _, media in
+                            MessageMediaView(media: media)
+                        }
+                    }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(bubbleColor)
                     .foregroundColor(bubbleTextColor)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
+                }
+                
+                if !message.text.isEmpty {
+                    Text(message.text)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(bubbleColor)
+                        .foregroundColor(bubbleTextColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                }
                 
                 // Reactions
                 if !message.reactions.isEmpty {
@@ -300,12 +315,99 @@ public struct MessageBubbleView: View {
                 case .sending: ProgressView().scaleEffect(0.6)
                 case .sent: Image(systemName: "checkmark").foregroundColor(.secondary)
                 case .delivered: Image(systemName: "checkmark.circle.fill").foregroundColor(.secondary)
-                case .read: Image(systemName: "checkmark.circle.fill").foregroundColor(.blue)
-                case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundColor(.red)
+                case .read: Image(systemName: "checkmark.circle.fill").foregroundColor(NeoTrixTheme.Colors.accent)
+                case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundColor(NeoTrixTheme.Colors.danger)
                 }
             }
         }
         .font(.caption)
+    }
+}
+
+// MARK: - 日期分隔条（对标 Telegram: Today/Yesterday/具体日期）
+
+struct DateDivider: View {
+    let date: Date
+    
+    var body: some View {
+        Text(label)
+            .font(.caption2)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(NeoTrixTheme.Colors.surface)
+            .clipShape(Capsule())
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+    }
+    
+    private var label: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d"
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - 消息媒体渲染（对标 Telegram: 图片/文档/贴纸/位置/联系人）
+
+struct MessageMediaView: View {
+    let media: ChatMessage.MessageMedia
+    
+    var body: some View {
+        switch media {
+        case .image(let data):
+            #if os(iOS)
+            if let uiImage = UIImage(data: data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: NeoTrixTheme.Radius.small))
+            }
+            #else
+            Label("Image", systemImage: "photo.fill")
+                .font(.subheadline)
+                .padding(.vertical, 4)
+            #endif
+        case .video(let url):
+            Label("Video", systemImage: "play.rectangle.fill")
+                .font(.subheadline)
+                .padding(.vertical, 4)
+        case .audio(let url):
+            Label("Audio", systemImage: "waveform")
+                .font(.subheadline)
+                .padding(.vertical, 4)
+        case .document(let url, let name):
+            HStack(spacing: 8) {
+                Image(systemName: "doc.fill")
+                    .foregroundColor(NeoTrixTheme.Colors.accent)
+                Text(name)
+                    .font(.subheadline)
+                    .lineLimit(1)
+            }
+            .padding(.vertical, 4)
+        case .sticker(let emoji):
+            Text(emoji)
+                .font(.system(size: 64))
+                .padding(.vertical, 4)
+        case .location(let lat, let lon):
+            Label(String(format: "📍 %.4f, %.4f", lat, lon), systemImage: "mappin.and.ellipse")
+                .font(.subheadline)
+                .padding(.vertical, 4)
+        case .contact(let name, let phone):
+            HStack(spacing: 8) {
+                Image(systemName: "person.crop.circle.fill")
+                    .foregroundColor(NeoTrixTheme.Colors.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name).font(.subheadline)
+                    Text(phone).font(.caption).foregroundColor(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
+        }
     }
 }
 
@@ -327,7 +429,12 @@ public struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        ForEach(viewModel.messages) { message in
+                        // 日期分隔（对标 Telegram: Today/Yesterday/日期）
+                        ForEach(Array(viewModel.messages.enumerated()), id: \.element.id) { index, message in
+                            if index == 0 || !Calendar.current.isDate(viewModel.messages[index - 1].timestamp, inSameDayAs: message.timestamp) {
+                                DateDivider(date: message.timestamp)
+                            }
+                            
                             MessageBubbleView(
                                 message: message,
                                 onReaction: { emoji in viewModel.addReaction(emoji, to: message.id) },
@@ -366,8 +473,46 @@ public struct ChatView: View {
             
             // Input bar
             HStack(spacing: 8) {
-                Button(action: { viewModel.toggleStickerPicker() }) {
-                    Image(systemName: "face.smiling")
+                // 附件菜单（对标 Telegram: 照片/文件/位置/联系人）
+                Menu {
+                    Button {
+                        viewModel.messages.append(ChatMessage(
+                            id: UUID(), text: "", sender: .user, timestamp: Date(),
+                            status: .sent, reactions: [], replyTo: nil,
+                            media: [.sticker("😀")]
+                        ))
+                    } label: {
+                        Label("Sticker", systemImage: "face.smiling")
+                    }
+                    Button {
+                        viewModel.messages.append(ChatMessage(
+                            id: UUID(), text: "", sender: .user, timestamp: Date(),
+                            status: .sent, reactions: [], replyTo: nil,
+                            media: [.location(37.7749, -122.4194)]
+                        ))
+                    } label: {
+                        Label("Location", systemImage: "mappin.and.ellipse")
+                    }
+                    Button {
+                        viewModel.messages.append(ChatMessage(
+                            id: UUID(), text: "", sender: .user, timestamp: Date(),
+                            status: .sent, reactions: [], replyTo: nil,
+                            media: [.contact("Alice", "+1 (555) 0101")]
+                        ))
+                    } label: {
+                        Label("Contact", systemImage: "person.crop.circle")
+                    }
+                    Button {
+                        viewModel.messages.append(ChatMessage(
+                            id: UUID(), text: "", sender: .user, timestamp: Date(),
+                            status: .sent, reactions: [], replyTo: nil,
+                            media: [.document(URL(string: "file:///tmp/report.pdf")!, "report.pdf")]
+                        ))
+                    } label: {
+                        Label("Document", systemImage: "doc.fill")
+                    }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
                         .font(.title2)
                 }
                 .contextMenu {
@@ -391,7 +536,7 @@ public struct ChatView: View {
                     } label: {
                         Image(systemName: "wand.and.stars")
                             .font(.title2)
-                            .foregroundColor(.purple)
+                            .foregroundColor(NeoTrixTheme.Colors.accentSecondary)
                     }
                 }
                 
@@ -402,7 +547,7 @@ public struct ChatView: View {
                 .disabled(viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty && !viewModel.isStreaming)
             }
             .padding()
-            .background(.bar)
+            .background(NeoTrixTheme.Colors.surface)
         }
         .navigationTitle("Chat")
         .sheet(isPresented: $showAIEditor) {
@@ -466,15 +611,24 @@ struct TypingIndicator: View {
     @State private var animating = false
     
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<3) { i in
-                Circle()
-                    .fill(NeoTrixTheme.Colors.textSecondary)
-                    .frame(width: 8, height: 8)
-                    .scaleEffect(animating ? 1.0 : 0.5)
-                    .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.2), value: animating)
+        HStack(spacing: 6) {
+            HStack(spacing: 4) {
+                ForEach(0..<3) { i in
+                    Circle()
+                        .fill(NeoTrixTheme.Colors.textSecondary)
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(animating ? 1.0 : 0.5)
+                        .animation(.easeInOut(duration: 0.5).repeatForever().delay(Double(i) * 0.2), value: animating)
+                }
             }
+            Text("typing...")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(NeoTrixTheme.Colors.bubbleIncoming)
+        .clipShape(Capsule())
         .onAppear { animating = true }
     }
 }

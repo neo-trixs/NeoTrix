@@ -194,7 +194,10 @@ public struct PollView: View {
             #endif
         }
         .sheet(isPresented: $showCreatePoll) {
-            PollCreateView()
+            // 融合修复: Create 按钮真正创建投票（此前仅 dismiss 死功能）
+            PollCreateView { poll in
+                viewModel.polls.append(poll)
+            }
         }
     }
 }
@@ -231,7 +234,7 @@ struct PollCard: View {
                 if poll.isExpired || poll.isClosed {
                     Text("Closed")
                         .font(.caption.bold())
-                        .foregroundColor(.red)
+                        .foregroundColor(NeoTrixTheme.Colors.danger)
                 } else if let timeLimit = poll.timeLimit {
                     Text("\(formatRemaining(timeLimit)) left")
                         .font(.caption)
@@ -255,12 +258,12 @@ struct PollCard: View {
                     if poll.hasMedia {
                         Label("Media", systemImage: "photo.fill")
                             .font(.caption2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(NeoTrixTheme.Colors.accent)
                     }
                     if poll.hasLocation {
                         Label("Location", systemImage: "mappin.and.ellipse")
                             .font(.caption2)
-                            .foregroundColor(.green)
+                            .foregroundColor(NeoTrixTheme.Colors.success)
                     }
                 }
             }
@@ -299,7 +302,7 @@ struct PollCard: View {
                     } label: {
                         Label("Suggest an option", systemImage: "plus.circle")
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(NeoTrixTheme.Colors.accent)
                     }
                     .buttonStyle(.plain)
                 }
@@ -352,7 +355,7 @@ struct PollOptionRow: View {
             HStack(spacing: 12) {
                 // Selection indicator
                 Image(systemName: option.isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(option.isSelected ? .blue : .secondary)
+                    .foregroundColor(option.isSelected ? NeoTrixTheme.Colors.accent : .secondary)
                 
                 Text(option.text)
                     .font(.subheadline)
@@ -405,9 +408,12 @@ public struct PollCreateView: View {
     @State private var hasTimeLimit = false
     @State private var timeLimit = 24.0
     
+    let onCreate: (Poll) -> Void
     @Environment(\.dismiss) private var dismiss
     
-    public init() {}
+    public init(onCreate: @escaping (Poll) -> Void = { _ in }) {
+        self.onCreate = onCreate
+    }
     
     public var body: some View {
         NavigationStack {
@@ -471,7 +477,7 @@ public struct PollCreateView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Create") {
-                        dismiss()
+                        createPoll()
                     }
                     .disabled(question.isEmpty || options.filter { !$0.isEmpty }.count < 2)
                 }
@@ -481,7 +487,7 @@ public struct PollCreateView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        dismiss()
+                        createPoll()
                     }
                     .disabled(question.isEmpty || options.filter { !$0.isEmpty }.count < 2)
                 }
@@ -490,4 +496,25 @@ public struct PollCreateView: View {
         }
     }
     
+    /// 真正构建 Poll 并回调（修复: 此前 Create 仅 dismiss 死功能）
+    private func createPoll() {
+        let pollOptions = options
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .map { PollOption(text: $0) }
+        let poll = Poll(
+            question: question,
+            description: description,
+            options: pollOptions,
+            isQuiz: isQuiz,
+            isAnonymous: isAnonymous,
+            allowsMultipleAnswers: allowsMultipleAnswers,
+            allowsSuggestions: allowsSuggestions,
+            allowsRevote: allowsRevote,
+            shuffleOptions: shuffleOptions,
+            hideResults: hideResults,
+            timeLimit: hasTimeLimit ? timeLimit * 3600 : nil
+        )
+        onCreate(poll)
+        dismiss()
     }
+}

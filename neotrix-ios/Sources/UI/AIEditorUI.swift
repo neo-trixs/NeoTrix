@@ -137,7 +137,7 @@ public struct AIEditorPanel: View {
             if let error = manager.lastError {
                 Text(error)
                     .font(.caption)
-                    .foregroundColor(.red)
+                    .foregroundColor(NeoTrixTheme.Colors.danger)
             }
         }
         .padding(.horizontal)
@@ -210,6 +210,21 @@ public struct AIEditorView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(NeoTrixTheme.Colors.selection)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                        
+                        // 融合修复: Use 按钮应用结果（此前 onUse 回调无 UI 接线 = 死回调）
+                        Button {
+                            onUse(result)
+                            dismiss()
+                        } label: {
+                            Label("Use Result", systemImage: "checkmark.circle.fill")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(NeoTrixTheme.Colors.accent)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 

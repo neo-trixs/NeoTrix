@@ -129,7 +129,7 @@ public struct ReactionPickerView: View {
                                     if reaction.isPremium && !manager.isPremium {
                                         Image(systemName: "star.fill")
                                             .font(.system(size: 10))
-                                            .foregroundColor(.yellow)
+                                            .foregroundColor(NeoTrixTheme.Colors.premium)
                                             .offset(x: 6, y: -6)
                                     }
                                 }

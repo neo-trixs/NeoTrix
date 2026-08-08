@@ -129,11 +129,7 @@ public struct StoryRing: View {
     }
     
     private var gradient: LinearGradient {
-        LinearGradient(
-            colors: [.purple, .pink, .orange],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        NeoTrixTheme.Gradients.story
     }
 }
 
@@ -280,13 +276,7 @@ public struct StoryComposerView: View {
                 // 预览环
                 ZStack {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.purple, .pink, .orange],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(NeoTrixTheme.Gradients.story)
                         .frame(width: 96, height: 96)
                     
                     Text(String(caption.prefix(1)).uppercased())

@@ -124,7 +124,7 @@ public struct PasscodeLockView: View {
             // Lock icon
             Image(systemName: "lock.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.blue)
+                .foregroundColor(NeoTrixTheme.Colors.accent)
             
             Text("Enter Passcode")
                 .font(.title2.bold())
@@ -141,7 +141,7 @@ public struct PasscodeLockView: View {
             if showError {
                 Text("Incorrect passcode")
                     .font(.subheadline)
-                    .foregroundColor(.red)
+                    .foregroundColor(NeoTrixTheme.Colors.danger)
             }
             
             // Biometric button
@@ -155,7 +155,7 @@ public struct PasscodeLockView: View {
                 } label: {
                     Image(systemName: "faceid")
                         .font(.system(size: 40))
-                        .foregroundColor(.blue)
+                        .foregroundColor(NeoTrixTheme.Colors.accent)
                 }
                 .padding(.top, 8)
             }
