@@ -193,6 +193,19 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     return cfg.providers.find((p) => p.model === cfg.active_model) ?? cfg.providers[0] ?? null
   }
 
+  const [navRef, setNavRef] = createSignal<HTMLElement | null>(null)
+
+  // 弹窗键盘：Esc 关闭 + 打开聚焦（对标 Claude/Cursor 弹窗规范）
+  createEffect(() => {
+    if (!props.open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') props.onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    navRef()?.querySelector<HTMLButtonElement>('button')?.focus()
+    return () => window.removeEventListener('keydown', onKey)
+  })
+
   return (
     <Show when={props.open}>
       <div
@@ -204,9 +217,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-label="设置"
+          aria-modal="true"
         >
           {/* ── 左侧分类导航 ── */}
-          <nav class="w-[148px] flex-shrink-0 border-r border-border-primary/40 bg-bg-secondary/60 py-4 px-2 flex flex-col gap-1">
+          <nav ref={setNavRef} class="w-[148px] flex-shrink-0 border-r border-border-primary/40 bg-bg-secondary/60 py-4 px-2 flex flex-col gap-1">
             <div class="px-3 pb-3 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">设置</div>
             <For each={SECTIONS}>
               {(s) => (
