@@ -327,6 +327,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                                   )}
                                   onClick={() => !isActive && switchProvider(p.name)}
                                   disabled={switching()}
+                                  role="radio"
+                                  aria-checked={isActive}
                                 >
                                   <div class="flex items-center gap-2.5">
                                     <span class="text-[12.5px] text-text-primary font-medium">{p.name}</span>
@@ -360,6 +362,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', motionPref() === 'full' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setMotionPref('full')}
+                        role="radio"
+                        aria-checked={motionPref() === 'full'}
                       >
                         <div class="text-[12.5px] text-text-primary">完整动效</div>
                         <Show when={motionPref() === 'full'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
@@ -367,6 +371,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', motionPref() === 'reduced' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setMotionPref('reduced')}
+                        role="radio"
+                        aria-checked={motionPref() === 'reduced'}
                       >
                         <div class="text-[12.5px] text-text-primary">减弱动效</div>
                         <Show when={motionPref() === 'reduced'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
@@ -381,6 +387,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'comfortable' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setDensityPref('comfortable')}
+                        role="radio"
+                        aria-checked={densityPref() === 'comfortable'}
                       >
                         <div class="text-[12.5px] text-text-primary">舒适</div>
                         <Show when={densityPref() === 'comfortable'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
@@ -388,6 +396,8 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'compact' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setDensityPref('compact')}
+                        role="radio"
+                        aria-checked={densityPref() === 'compact'}
                       >
                         <div class="text-[12.5px] text-text-primary">紧凑</div>
                         <Show when={densityPref() === 'compact'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
