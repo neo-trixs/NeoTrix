@@ -477,6 +477,7 @@ cognitive_load: self.cognitive_load.take(),
             workspace_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::WorkspaceGuard::default_for(
                 std::env::current_dir().unwrap_or_default(),
             ),
+            last_consumed_fruit_cycle: 0,
         }));
 
         macro_rules! spawn_handler {
@@ -690,6 +691,10 @@ pub struct BackgroundLoopHandle {
     /// KB 守卫 + 工作区守卫 (Rust 化自 sh 守护脚本)
     kb_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::KbGuard,
     workspace_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::WorkspaceGuard,
+    /// 已注入 SEAL 的意识树果实最大 cycle (H1 修复: 增量注入防重复消费)。
+    /// 树内 fruits 从不清理, 全量克隆会让历史果实每 tick 重新注入 SEAL,
+    /// 同一 trace 反复进 process buffer → 学习被重复污染。只注入比此值新的果实。
+    last_consumed_fruit_cycle: u64,
 }
 
 impl BackgroundLoopHandle {

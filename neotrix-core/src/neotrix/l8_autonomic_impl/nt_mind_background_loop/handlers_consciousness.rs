@@ -218,8 +218,21 @@ impl BackgroundLoopHandle {
             // 消费 extract_from_consciousness_tree → 打通 ConsciousnessTree → SEAL
             // process 闭环。此前果实仅存于树内, SEAL 从不消费 (process_stage.rs:130
             // extract_from_consciousness_tree 无生产调用者)。
+            // H1 修复: 增量注入 — 树内 fruits 从不清理, 全量克隆会让历史果实每 tick
+            // 重新注入 SEAL (pipeline.rs:901 只清 brain 副本), 同一 trace 反复进
+            // process buffer → 学习被重复污染。只注入 produced_at_cycle 比上次更新的果实。
             if let Ok(mut brain) = self.brain.try_write() {
-                brain._consciousness_fruits = tree.fruits.clone();
+                let new_fruits: Vec<_> = tree.fruits.iter()
+                    .filter(|f| f.produced_at_cycle > self.last_consumed_fruit_cycle)
+                    .cloned()
+                    .collect();
+                if !new_fruits.is_empty() {
+                    let max_cycle = new_fruits.iter().map(|f| f.produced_at_cycle).max().unwrap_or(0);
+                    brain._consciousness_fruits = new_fruits;
+                    self.last_consumed_fruit_cycle = max_cycle;
+                    log::debug!("[bg] consciousness_tree: injected {} new fruits (cycle > {}), last_consumed={}",
+                        brain._consciousness_fruits.len(), self.last_consumed_fruit_cycle, max_cycle);
+                }
             }
         }
 
