@@ -27,6 +27,8 @@ pub struct ChatMessage {
     pub image_name: Option<String>,
     /// 产生该消息的模型名（仅 assistant 角色有效）
     pub model: Option<String>,
+    /// 消息时间戳（HH:MM 显示用）
+    pub timestamp: String,
 }
 
 impl ChatMessage {
@@ -37,6 +39,7 @@ impl ChatMessage {
     pub fn with_model(role: &str, content: String, model: Option<String>) -> Self {
         let (thinking_blocks, clean_content) = extract_thinking(&content);
         let tool_calls = extract_tool_calls(&clean_content);
+        let timestamp = chrono::Local::now().format("%H:%M").to_string();
         Self {
             role: role.to_string(),
             content: clean_content,
@@ -45,6 +48,7 @@ impl ChatMessage {
             image_data: None,
             image_name: None,
             model,
+            timestamp,
         }
     }
 

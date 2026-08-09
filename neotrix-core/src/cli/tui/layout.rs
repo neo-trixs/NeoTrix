@@ -101,9 +101,11 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
     for (msg_idx, msg) in session.messages.iter().enumerate() {
         match msg.role.as_str() {
             "user" => {
+                // opencode 风格：❯ 前缀 + 时间戳
                 let header = Line::from(vec![
-                    Span::styled("You: ", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                    Span::styled("❯ ", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
                     Span::raw(msg.content.clone()),
+                    Span::styled(format!("  {}", msg.timestamp), Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC)),
                 ]);
                 lines.push(apply_bg(header, theme.user_msg_bg));
             }
@@ -111,6 +113,7 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
                 let model_suffix = msg.model.as_ref().map(|m| format!(" ({})", m)).unwrap_or_default();
                 let header = Line::from(vec![
                     Span::styled(format!("assistant{}", model_suffix), Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
+                    Span::styled(format!("  {}", msg.timestamp), Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC)),
                 ]);
                 lines.push(apply_bg(header, theme.assistant_msg_bg));
 
@@ -403,12 +406,14 @@ fn render_goal_line(app: &TuiApp, theme: &Theme) -> Line<'static> {
 }
 
 /// 渲染底部状态栏 — 无边框信息行（左状态 + 右信息）。
+/// 借鉴 claude-code-local：流式/思考时显示 spinner 帧 + 计时（"沉默≠卡死"），
+/// 右段显示 context 用量百分比（≥90% 红 / ≥70% 黄 / 其余默认）。
 pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
-    // 左段：状态
+    // 左段：状态（spinner 帧 + label + 计时）
     let status = if app.streaming {
-        format!("生成中 {:.0} tok/s", app.tokens_per_sec)
+        format!("{} 生成中 {:.0} tok/s · {}s", app.spinner_char(), app.tokens_per_sec, app.busy_elapsed_secs())
     } else if app.agent_busy {
-        "思考中".to_string()
+        format!("{} 思考中 · {}s", app.spinner_char(), app.busy_elapsed_secs())
     } else {
         "就绪".to_string()
     };
@@ -430,7 +435,13 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
         }
     };
 
-    // 右段：会话 / 工作区 / token / 费用
+    // 右段：模型 / 会话 / token / context / 费用
+    let model_info = app.streaming_model.as_deref()
+        .map(|m| format!("{}", m))
+        .unwrap_or_else(|| app.sessions[app.active_session].messages.iter()
+            .rev().find(|m| m.role == "assistant" && m.model.is_some())
+            .and_then(|m| m.model.clone())
+            .unwrap_or_else(|| "model".to_string()));
     let session_info = format!("会话 {}/{}", app.active_session + 1, app.sessions.len());
     let ws_info = format!("WS:{} ({})", app.workspace_name, app.workspace_count);
     let cost_info = {
@@ -446,9 +457,12 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
         }
     };
     let tokens = format!("Tokens:{}", app.token_count);
+    let ctx_pct = app.context_pct();
+    let ctx_info = format!("ctx:{}%", ctx_pct);
 
     let left = format!("{}{}{}", status, vim, sandbox);
-    let right = format!("{} | {} | {}{}", session_info, ws_info, tokens, cost_info);
+    // 右段整体文本（用于宽度计算）
+    let right = format!("{} | {} | {} | {} | {}{}", model_info, session_info, ws_info, tokens, ctx_info, cost_info);
 
     // 左对齐 + 右对齐
     let left_len = left.chars().count();
@@ -470,8 +484,32 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
     } else {
         theme.bg
     };
-    let status = Paragraph::new(Line::from(Span::raw(text)))
-        .style(Style::default().bg(bg).fg(Color::White));
+    // context 颜色分级：≥90% 红加粗 / ≥70% 黄 / 其余白
+    let ctx_style = if ctx_pct >= 90 {
+        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+    } else if ctx_pct >= 70 {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    // 用多 Span 渲染：非 ctx 段白，ctx 段按分级色（状态栏单行同底色）。
+    let plain = Style::default().fg(Color::White);
+    let mut spans: Vec<Span> = Vec::new();
+    // 把对齐后的完整文本按 "ctx:N%" 切分，仅该段用 ctx_style
+    if let Some(idx) = text.find("ctx:") {
+        let mut end = idx + "ctx:".len();
+        let bytes = text.as_bytes();
+        while end < text.len() && (bytes[end].is_ascii_digit() || bytes[end] == b'%') {
+            end += 1;
+        }
+        spans.push(Span::styled(text[..idx].to_string(), plain));
+        spans.push(Span::styled(text[idx..end].to_string(), ctx_style));
+        spans.push(Span::styled(text[end..].to_string(), plain));
+    } else {
+        spans.push(Span::styled(text, plain));
+    }
+    let status = Paragraph::new(Line::from(spans))
+        .style(Style::default().bg(bg));
     frame.render_widget(status, area);
 }
 

@@ -27,6 +27,12 @@ pub enum TuiExit {
     IoError(String),
 }
 
+/// Spinner 动画帧（借鉴 claude-code-local 的 braille 帧，让"沉默≠卡死"）。
+pub const SPINNER_FRAMES: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+/// 估算的 context 窗口上限（tokens）。TUI 无真实 tokenizer，用 chunk 计数估算。
+pub const CONTEXT_LIMIT_ESTIMATE: usize = 128_000;
+
 #[derive(Clone)]
 pub struct TuiApp {
     pub running: bool,
@@ -70,6 +76,8 @@ pub struct TuiApp {
     pub auto_scroll: bool,
     /// 流式开始时记录，用于计算 tokens/sec。
     stream_started_at: Option<std::time::Instant>,
+    /// Spinner 动画帧索引（事件循环每 tick 推进一次）。
+    pub spinner_frame: usize,
 }
 
 impl TuiApp {
@@ -110,6 +118,7 @@ impl TuiApp {
             theme_name: "dark".to_string(),
             auto_scroll: true,
             stream_started_at: None,
+            spinner_frame: 0,
         }
     }
 
@@ -193,6 +202,29 @@ impl TuiApp {
         if self.auto_scroll {
             self.scroll_offset = 0;
         }
+    }
+
+    /// 推进 spinner 动画帧（事件循环每 tick 调用一次，驱动状态栏动画）。
+    pub fn tick_spinner(&mut self) {
+        self.spinner_frame = (self.spinner_frame + 1) % SPINNER_FRAMES.len();
+    }
+
+    /// 当前 spinner 帧字符。
+    pub fn spinner_char(&self) -> char {
+        SPINNER_FRAMES[self.spinner_frame]
+    }
+
+    /// 估算 context 用量百分比（token_count / 估算窗口，封顶 100）。
+    pub fn context_pct(&self) -> u8 {
+        let pct = (self.token_count as f64 / CONTEXT_LIMIT_ESTIMATE as f64) * 100.0;
+        pct.min(100.0) as u8
+    }
+
+    /// 流式/思考已持续的秒数（用于状态栏计时显示）。
+    pub fn busy_elapsed_secs(&self) -> u64 {
+        self.stream_started_at
+            .map(|t| t.elapsed().as_secs())
+            .unwrap_or(0)
     }
 
     /// 新会话：当前会话保留，追加一个空会话并切换。
@@ -570,7 +602,7 @@ impl TuiApp {
     /// 斜杠命令补全：把当前前缀匹配到的第一个命令补全。
     fn complete_slash(&mut self) {
         const SLASH_COMMANDS: &[&str] = &[
-            "/clear", "/compact", "/exit", "/help", "/hist", "/model",
+            "/clear", "/compact", "/context", "/exit", "/help", "/hist", "/model",
             "/new", "/quit", "/q", "/sessions", "/tools", "/undo", "/usage",
         ];
         let prefix = self.input.as_str();
@@ -609,6 +641,37 @@ mod tests {
         assert!(!app.agent_busy);
         assert!(!app.streaming);
         assert_eq!(app.token_count, 0);
+        assert_eq!(app.spinner_frame, 0);
+    }
+
+    #[test]
+    fn test_spinner_tick_cycles_frames() {
+        let mut app = TuiApp::new(true);
+        assert_eq!(app.spinner_char(), SPINNER_FRAMES[0]);
+        app.tick_spinner();
+        assert_eq!(app.spinner_frame, 1);
+        assert_eq!(app.spinner_char(), SPINNER_FRAMES[1]);
+        // 循环回绕
+        for _ in 0..SPINNER_FRAMES.len() {
+            app.tick_spinner();
+        }
+        assert_eq!(app.spinner_frame, 1, "帧索引应循环回绕");
+    }
+
+    #[test]
+    fn test_context_pct_bounds() {
+        let mut app = TuiApp::new(true);
+        assert_eq!(app.context_pct(), 0, "无 token 时 0%");
+        app.token_count = CONTEXT_LIMIT_ESTIMATE / 2;
+        assert_eq!(app.context_pct(), 50, "半窗口 50%");
+        app.token_count = CONTEXT_LIMIT_ESTIMATE * 2;
+        assert_eq!(app.context_pct(), 100, "超窗口封顶 100%");
+    }
+
+    #[test]
+    fn test_busy_elapsed_secs_zero_when_idle() {
+        let app = TuiApp::new(true);
+        assert_eq!(app.busy_elapsed_secs(), 0, "空闲时无计时");
     }
 
     #[test]

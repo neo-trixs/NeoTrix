@@ -1775,6 +1775,12 @@ You have tools available; call them when they help. Be concise and evidence-firs
         ));
         let _ = profile;
         // ── TUI 初始化 ──────────────────────────────────────────────
+        // 前置检查：stdin 必须是 tty（交互式终端），否则 crossterm 事件循环会立即失败。
+        use std::io::IsTerminal;
+        if !io::stdin().is_terminal() {
+            eprintln!("{} TUI 需要交互式终端（stdin 非 tty）。请直接在终端运行，或使用 --headless 模式。", err("Error"));
+            return;
+        }
         terminal::enable_raw_mode().ok();
         let mut stdout = io::stdout();
         let _ = execute!(stdout, EnterAlternateScreen);
@@ -1827,6 +1833,8 @@ You have tools available; call them when they help. Be concise and evidence-firs
 
         // ── 事件循环 ────────────────────────────────────────────────
         loop {
+            // 每 tick 推进 spinner 帧（poll 超时也会重绘 → 动画持续驱动）
+            app.tick_spinner();
             draw(&mut terminal, &app);
 
             if !event::poll(Duration::from_millis(100)).unwrap_or(false) {
@@ -1834,7 +1842,10 @@ You have tools available; call them when they help. Be concise and evidence-firs
             }
             let ev = match event::read() {
                 Ok(e) => e,
-                Err(_) => break,
+                Err(e) => {
+                    eprintln!("{} TUI 事件读取失败: {}", err("Error"), e);
+                    break;
+                }
             };
 
             match ev {
@@ -1912,18 +1923,17 @@ You have tools available; call them when they help. Be concise and evidence-firs
                             // 主循环：边收 chunk 边渲染，同时仍响应键盘（Ctrl+C 取消）。
                             let mut worker_done = false;
                             while !worker_done {
-                                let mut got = false;
                                 while let Ok(chunk) = chunk_rx.try_recv() {
-                                    got = true;
                                     if chunk.starts_with("[error]") {
                                         app.status_text = chunk;
                                     } else {
                                         app.feed_stream(&chunk);
                                     }
                                 }
-                                if got {
-                                    draw(&mut terminal, &app);
-                                }
+                                // 每 30ms 都推进 spinner 并重绘（无 chunk 时动画也持续，
+                                // 借鉴 claude-code-local：沉默≠卡死）。
+                                app.tick_spinner();
+                                draw(&mut terminal, &app);
                                 // 处理键盘（Ctrl+C 取消）。
                                 if let Ok(true) = event::poll(Duration::from_millis(30)) {
                                     if let Ok(Event::Key(key)) = event::read() {
@@ -2014,6 +2024,15 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             app.status_text = format!("{} 条消息", n);
             SlashResult::Handled
         }
+        "/context" => {
+            // 借鉴 claude-code-local 的 /context：显示估算的 context 用量。
+            let pct = app.context_pct();
+            let used_k = app.token_count as f64 / 1000.0;
+            let limit_k = neotrix::cli::tui::app::CONTEXT_LIMIT_ESTIMATE as f64 / 1000.0;
+            let warn = if pct >= 90 { " (接近上限，建议 /new 或 /clear)" } else { "" };
+            app.status_text = format!("ctx: {:.1}k / {:.1}k tokens ({pct}%){warn}", used_k, limit_k);
+            SlashResult::Handled
+        }
         "/save" => {
             let name = if rest.trim().is_empty() {
                 format!("session-{}", app.sessions[app.active_session].id)
@@ -2049,7 +2068,7 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             }
         }
         "/help" => {
-            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\n会话: /new /clear /save <名> /load <名> /hist\n其他: /exit /quit /help".into());
+            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\n会话: /new /clear /save <名> /load <名> /hist /context\n其他: /exit /quit /help".into());
             SlashResult::Handled
         }
         _ => {
