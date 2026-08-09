@@ -119,19 +119,29 @@ public final class ChatViewModel: ObservableObject {
         replyTarget = nil
     }
     
-    /// 发送媒体消息（对标 Telegram: 附件菜单 → 走统一发送管线，而非直接 append）
+    /// 发送媒体消息（对标 Telegram: 附件菜单 → 走统一发送管线，与 sendMessage 一致）
     public func sendMediaMessage(_ media: ChatMessage.MessageMedia) {
         let message = ChatMessage(
             id: UUID(),
             text: "",
             sender: .user,
             timestamp: Date(),
-            status: .sent,
+            status: .sending,
             reactions: [],
             replyTo: nil,
             media: [media]
         )
         messages.append(message)
+        // 修复 LOW-5: 此前直接 append 且 status 直接 .sent，绕过 sendViaMTProto 状态机。
+        // 现在走统一发送管线（sending → sent/failed），与文本消息一致。
+        Task {
+            do {
+                try await sendViaMTProto(message)
+                await updateMessageStatus(message.id, status: .sent)
+            } catch {
+                await updateMessageStatus(message.id, status: .failed(error))
+            }
+        }
     }
     
     private func sendViaMTProto(_ message: ChatMessage) async throws {

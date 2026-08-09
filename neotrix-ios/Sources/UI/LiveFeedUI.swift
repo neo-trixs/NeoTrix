@@ -33,11 +33,10 @@ public struct LiveFeedView: View {
             }
             .navigationTitle("Live")
             .searchable(text: $engine.searchQuery, prompt: "Search all resources")
-            .onSubmit(of: .search) {
-                Task { await engine.refresh() }
-            }
             // 修复: 此前 onChange 每次创建 Task 无取消 → 竞态（旧搜索覆盖新结果）。
-            // 改用 .task(id:) 自动取消旧任务 + 300ms debounce
+            // 改用 .task(id:) 自动取消旧任务 + 300ms debounce。
+            // 修复 LOW-6: 移除冗余 .onSubmit 立即刷新 — .task(id:) 已覆盖提交场景（searchQuery 变化即触发），
+            // 保留 onSubmit 会导致提交时双刷新（立即 + 300ms 后）。
             .task(id: engine.searchQuery) {
                 guard !engine.searchQuery.isEmpty else { return }
                 try? await Task.sleep(nanoseconds: 300_000_000)

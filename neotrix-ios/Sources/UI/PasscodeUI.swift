@@ -3,6 +3,52 @@
 
 import SwiftUI
 import LocalAuthentication
+import Security
+
+// MARK: - Keychain 辅助（修复 LOW-4: passcode 明文存 UserDefaults → Keychain 安全存储）
+// 对标 Telegram: 锁屏密码存 Keychain（kSecClassGenericPassword），UserDefaults 仅存开关标志
+
+enum PasscodeKeychain {
+    private static let service = "com.neotrix.neogram.passcode"
+    private static let account = "passcode"
+    
+    static func save(_ code: String) -> Bool {
+        let data = Data(code.utf8)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data,
+        ]
+        // 先删除旧条目（幂等），再写入
+        SecItemDelete(query as CFDictionary)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        return status == errSecSuccess
+    }
+    
+    static func load() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+    
+    static func delete() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+}
 
 // MARK: - Passcode Manager
 
@@ -47,19 +93,20 @@ public final class PasscodeManager: ObservableObject {
     }
     
     public func enablePasscode(_ code: String) {
-        UserDefaults.standard.set(code, forKey: "passcode")
+        // 修复 LOW-4: passcode 存 Keychain（此前明文存 UserDefaults，iOS 备份/越狱可读）
+        _ = PasscodeKeychain.save(code)
         UserDefaults.standard.set(true, forKey: "passcode_enabled")
         isPasscodeEnabled = true
     }
     
     public func verifyPasscode(_ code: String) -> Bool {
-        let saved = UserDefaults.standard.string(forKey: "passcode") ?? ""
+        let saved = PasscodeKeychain.load() ?? ""
         return code == saved
     }
     
     public func disablePasscode() {
         UserDefaults.standard.set(false, forKey: "passcode_enabled")
-        UserDefaults.standard.removeObject(forKey: "passcode")
+        PasscodeKeychain.delete()
         isPasscodeEnabled = false
         isLocked = false
     }

@@ -3,6 +3,7 @@
 // 原则: 每个可点项必须有目标视图或明确禁用态（Dark Forest: 无死按钮）
 
 import SwiftUI
+import UIKit
 
 // MARK: - Settings Model
 
@@ -280,13 +281,26 @@ struct ProfileView: View {
     @State private var about = ""
     @State private var isEditingAbout = false
     @State private var showAvatarMenu = false
+    // 修复 LOW-7: 头像编辑真实接线（此前 Take Photo/Choose Library/Remove 均为空闭包）
+    @State private var avatarImage: UIImage?
+    @State private var showImagePicker = false
+    @State private var imagePickerSource: UIImagePickerController.SourceType = .photoLibrary
     
     var body: some View {
         List {
             // 头部: 大号头像 + 姓名 + 号码
             Section {
                 HStack(spacing: 16) {
-                    NeoTrixAvatar(title: viewModel.username, size: 72)
+                    // 修复 LOW-7: 已选头像显示图片，否则回退首字母渐变
+                    if let avatarImage {
+                        Image(uiImage: avatarImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(Circle())
+                    } else {
+                        NeoTrixAvatar(title: viewModel.username, size: 72)
+                    }
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(viewModel.username)
@@ -399,11 +413,32 @@ struct ProfileView: View {
         }
         #endif
         .confirmationDialog("Change Avatar", isPresented: $showAvatarMenu, titleVisibility: .visible) {
-            Button("Take Photo") {}
-            Button("Choose from Library") {}
-            Button("Remove Photo", role: .destructive) {}
+            // 修复 LOW-7: 此前三个按钮均为空闭包（死按钮）→ 真实接线
+            Button("Take Photo") {
+                #if os(iOS)
+                imagePickerSource = .camera
+                showImagePicker = true
+                #endif
+            }
+            Button("Choose from Library") {
+                #if os(iOS)
+                imagePickerSource = .photoLibrary
+                showImagePicker = true
+                #endif
+            }
+            Button("Remove Photo", role: .destructive) {
+                avatarImage = nil
+            }
             Button("Cancel", role: .cancel) {}
         }
+        // 修复 LOW-7: 图片选择器（拍照/相册）
+        #if os(iOS)
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(sourceType: imagePickerSource) { image in
+                avatarImage = image
+            }
+        }
+        #endif
         .onAppear {
             // 加载已保存的 About（对标 Telegram: 简介持久化）
             if let saved = UserDefaults.standard.string(forKey: "profile_about") {
@@ -423,3 +458,46 @@ struct ProfileView: View {
             .clipShape(Capsule())
     }
 }
+
+// MARK: - Image Picker（修复 LOW-7: 头像拍照/相册选择，对标 ShareSheet 桥接模式）
+
+#if os(iOS)
+/// UIImagePickerController 桥接（拍照 + 相册）
+struct ImagePicker: UIViewControllerRepresentable {
+    let sourceType: UIImagePickerController.SourceType
+    let onImagePicked: (UIImage) -> Void
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = sourceType
+        picker.delegate = context.coordinator
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onImagePicked: onImagePicked)
+    }
+    
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onImagePicked: (UIImage) -> Void
+        
+        init(onImagePicked: @escaping (UIImage) -> Void) {
+            self.onImagePicked = onImagePicked
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController,
+                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                onImagePicked(image)
+            }
+            picker.dismiss(animated: true)
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true)
+        }
+    }
+}
+#endif
