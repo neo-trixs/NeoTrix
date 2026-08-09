@@ -414,6 +414,9 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
         format!("{} 生成中 {:.0} tok/s · {}s", app.spinner_char(), app.tokens_per_sec, app.busy_elapsed_secs())
     } else if app.agent_busy {
         format!("{} 思考中 · {}s", app.spinner_char(), app.busy_elapsed_secs())
+    } else if !app.status_text.is_empty() {
+        // 空闲时显示 slash 命令反馈（/context /clear /new 等）
+        app.status_text.clone()
     } else {
         "就绪".to_string()
     };
