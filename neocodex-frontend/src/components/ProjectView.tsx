@@ -195,9 +195,16 @@ export function ProjectView(props: Props) {
           </Show>
           <Show when={!loading && !error() && view()}>
             {tab() === 'tree' ? (
-              <For each={view()!.tree}>
-                {(item) => renderNode(item, 0)}
-              </For>
+              <Show
+                when={view()!.tree.length > 0}
+                fallback={
+                  <div class="p-4 text-xs text-text-muted text-center">项目中没有可浏览的文件</div>
+                }
+              >
+                <For each={view()!.tree}>
+                  {(item) => renderNode(item, 0)}
+                </For>
+              </Show>
             ) : view()!.agents_md ? (
               <pre class="whitespace-pre-wrap break-words text-xs text-text-secondary font-mono p-2">
                 {view()!.agents_md}

@@ -7,8 +7,8 @@ import { clsx } from 'clsx'
 interface SidebarProps {
   collapsed?: boolean
   onToggleCollapse?: () => void
-  activeView?: 'chat' | 'cowork'
-  onSwitchView?: (view: 'chat' | 'cowork') => void
+  activeView?: 'chat' | 'cowork' | 'computer'
+  onSwitchView?: (view: 'chat' | 'cowork' | 'computer') => void
 }
 
 const GROUP_ORDER = ['今天', '昨天', '前7天', '更早'] as const
@@ -27,7 +27,7 @@ function getGroupKey(date: Date): GroupKey {
 export function Sidebar(props: SidebarProps) {
   const collapsed = () => props.collapsed ?? false
   const view = () => props.activeView ?? 'chat'
-  const viewIdx = () => (view() === 'chat' ? 0 : 1)
+  const viewIdx = () => (view() === 'chat' ? 0 : view() === 'cowork' ? 1 : 2)
 
   // 会话搜索（前端过滤）
   const [searchOpen, setSearchOpen] = createSignal(false)
@@ -46,7 +46,7 @@ export function Sidebar(props: SidebarProps) {
     setSettingsOpen(true)
   }
 
-  const switchView = (v: 'chat' | 'cowork') => {
+  const switchView = (v: 'chat' | 'cowork' | 'computer') => {
     props.onSwitchView?.(v)
   }
 
@@ -153,6 +153,21 @@ export function Sidebar(props: SidebarProps) {
               >
                 <svg viewBox="0 0 16 16"><path d="M6 3l1.2 2.8L10 7l-2.8 1.2L6 11l-1.2-2.8L2 7l2.8-1.2z" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round" /><path d="M10 7.5l1.2 2.8L14 11l-2.8 1.2L10 15l-1.2-2.8L6 11l2.8-1.2z" stroke="currentColor" stroke-width="0.8" fill="none" stroke-linejoin="round" opacity="0.45" /></svg>
                 <span class="segb-t">协同</span>
+              </button>
+              <button
+                class={clsx('segb', viewIdx() === 2 && 'on')}
+                onClick={() => switchView('computer')}
+                role="tab"
+                aria-selected={viewIdx() === 2}
+                tabIndex={viewIdx() === 2 ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); switchView(view() === 'computer' ? 'chat' : 'computer') }
+                }}
+                aria-label="电脑控制"
+                title="电脑控制"
+              >
+                <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1" fill="none" /><path d="M6 14h4" stroke="currentColor" stroke-width="1" stroke-linecap="round" /></svg>
+                <span class="segb-t">电脑</span>
               </button>
             </div>
           </div>

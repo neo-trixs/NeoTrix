@@ -66,6 +66,8 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
       await invoke('neocodex_set_provider', { name: providerName })
       await loadConfig()
       setIsOpen(false)
+      // 广播提供商变更，Chat 状态栏 / 其他监听方即时刷新
+      window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name: providerName } }))
     } catch (err) {
       const msg = err instanceof Error ? err.message : '切换提供商失败'
       setError(msg)

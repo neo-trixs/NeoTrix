@@ -125,6 +125,9 @@ export function CostDashboard(props: Props) {
           <Show when={error()}>
             <div class="p-3 text-xs text-red-500 bg-red-500/10 rounded-lg">{error()}</div>
           </Show>
+          <Show when={!loading() && !status() && !error()}>
+            <div class="py-10 text-center text-xs text-text-muted">暂无成本数据</div>
+          </Show>
           <Show when={status()}>
             <div class="grid grid-cols-2 gap-3">
               {renderStat(Wallet, '已花费', formatCost(status()!.cost_spent), 'text-nt-memory-600', `预算 ${formatCost(status()!.cost_budget)}`)}

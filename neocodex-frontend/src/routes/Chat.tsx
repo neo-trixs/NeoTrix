@@ -112,11 +112,11 @@ export function Chat() {
   // 待发送附件（dialog 选择后暂存，随下一条消息发送）
   const [pendingAttachments, setPendingAttachments] = createSignal<NeoCodexAttachmentDto[]>([])
 
-  // 视图切换：chat / cowork（对应侧栏 segmented tabs）
-  const [activeView, setActiveView] = createSignal<'chat' | 'cowork'>('chat')
+  // 视图切换：chat / cowork / computer（对应侧栏 segmented tabs）
+  const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
 
   // 顶部工具栏面板：一次只开一个
-  type PanelId = 'git' | 'project' | 'plugins' | 'tasks' | 'cost' | 'timeline' | 'sidechat' | 'computer'
+  type PanelId = 'git' | 'project' | 'plugins' | 'tasks' | 'cost' | 'timeline' | 'sidechat'
   const [activePanel, setActivePanel] = createSignal<PanelId | null>(null)
   const togglePanel = (id: PanelId) => {
     setActivePanel(activePanel() === id ? null : id)
@@ -133,6 +133,8 @@ export function Chat() {
   const [unlistenEnd, setUnlistenEnd] = createSignal<UnlistenFn | null>(null)
   const [unlistenDone, setUnlistenDone] = createSignal<UnlistenFn | null>(null)
   const [unlistenTool, setUnlistenTool] = createSignal<UnlistenFn | null>(null)
+  // 提供商切换事件 handler（普通变量，避免 signal setter 函数式更新歧义）
+  let providerChangedHandler: (() => void) | null = null
 
   // Current assistant message being streamed
   const [currentAssistantMsgId, setCurrentAssistantMsgId] = createSignal<string | null>(null)
@@ -219,6 +221,15 @@ export function Chat() {
     } catch {
       /* 展示字段，静默失败 */
     }
+
+    // 监听提供商切换事件（SettingsModal / ProviderSelector 广播），同步状态栏模型
+    const onProviderChanged = () => {
+      invoke<{ active_model: string }>('neocodex_provider_config')
+        .then((cfg) => setActiveModel(cfg.active_model || null))
+        .catch(() => {})
+    }
+    window.addEventListener('neotrix:provider-changed', onProviderChanged)
+    providerChangedHandler = onProviderChanged
   })
 
   // Clean up event listeners
@@ -228,6 +239,9 @@ export function Chat() {
     unlistenEnd()?.()
     unlistenDone()?.()
     unlistenTool()?.()
+    if (providerChangedHandler) {
+      window.removeEventListener('neotrix:provider-changed', providerChangedHandler)
+    }
   })
 
   // 消息区自动滚动：新消息/会话切换强制到底，流式期间若在底部则跟随
@@ -254,10 +268,16 @@ export function Chat() {
   }
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    // 面板快捷键：⌘1-⌘8 切换 8 个功能面板，Esc 关闭
+    // 面板快捷键：⌘1-⌘7 切换 7 个功能面板，⌘8 切换电脑控制视图，Esc 关闭
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '8') {
       const idx = Number(e.key) - 1
-      const panels: PanelId[] = ['git', 'project', 'plugins', 'tasks', 'cost', 'timeline', 'sidechat', 'computer']
+      if (idx === 7) {
+        // ⌘8：电脑控制 → 侧栏内嵌视图
+        e.preventDefault()
+        setActiveView(activeView() === 'computer' ? 'chat' : 'computer')
+        return
+      }
+      const panels: PanelId[] = ['git', 'project', 'plugins', 'tasks', 'cost', 'timeline', 'sidechat']
       const target = panels[idx]
       if (target) {
         e.preventDefault()
@@ -563,10 +583,10 @@ export function Chat() {
                 <MessageSquare class="w-4 h-4" />
               </button>
               <button
-                class={clsx('tb-btn', activePanel() === 'computer' && 'on')}
-                onClick={() => togglePanel('computer')}
+                class={clsx('tb-btn', activeView() === 'computer' && 'on')}
+                onClick={() => setActiveView(activeView() === 'computer' ? 'chat' : 'computer')}
                 aria-label="电脑控制"
-                aria-pressed={activePanel() === 'computer'}
+                aria-pressed={activeView() === 'computer'}
                 title="电脑控制 (⌘8)"
               >
                 <Monitor class="w-4 h-4" />
@@ -611,9 +631,6 @@ export function Chat() {
               sessionId={currentSession()?.id ?? null}
               onClose={() => setActivePanel(null)}
             />
-          </Show>
-          <Show when={activePanel() === 'computer'}>
-            <ComputerUse open onClose={() => setActivePanel(null)} />
           </Show>
         </Show>
 
@@ -954,6 +971,11 @@ export function Chat() {
         {/* ===== 协同视图（cowork） ===== */}
         <Show when={activeView() === 'cowork'}>
           <CoworkView />
+        </Show>
+
+        {/* ===== 电脑控制：侧栏内嵌标签页（对标 Claude 侧栏） ===== */}
+        <Show when={activeView() === 'computer'}>
+          <ComputerUse embedded open onClose={() => setActiveView('chat')} />
         </Show>
       </main>
 

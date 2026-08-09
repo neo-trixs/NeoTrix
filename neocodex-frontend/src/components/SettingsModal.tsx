@@ -213,14 +213,14 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
         onClick={props.onClose}
       >
         <div
-          class="w-[560px] max-w-[92vw] h-[420px] max-h-[80vh] rounded-2xl bg-bg-primary shadow-2xl border border-border-primary/50 overflow-hidden flex animate-slide-in"
+          class="w-[720px] max-w-[94vw] h-[560px] max-h-[85vh] rounded-2xl bg-bg-primary shadow-2xl border border-border-primary/50 overflow-hidden flex animate-slide-in"
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-label="设置"
           aria-modal="true"
         >
           {/* ── 左侧分类导航 ── */}
-          <nav ref={setNavRef} class="w-[148px] flex-shrink-0 border-r border-border-primary/40 bg-bg-secondary/60 py-4 px-2 flex flex-col gap-1" role="tablist" aria-label="设置分类">
+          <nav ref={setNavRef} class="w-[168px] flex-shrink-0 border-r border-border-primary/40 bg-bg-secondary/60 py-4 px-2 flex flex-col gap-1" role="tablist" aria-label="设置分类">
             <div class="px-3 pb-3 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">设置</div>
             <For each={SECTIONS}>
               {(s, i) => (
@@ -280,7 +280,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
               </button>
             </header>
 
-            <div class="flex-1 overflow-y-auto px-5 py-4">
+            <div class="flex-1 overflow-y-auto px-6 py-5">
               {/* ── 通用：模型提供商 ── */}
               <Show when={section() === 'general'}>
                 <Show when={loading() && !config()}>

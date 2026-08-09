@@ -39,6 +39,8 @@ interface DisplayInfo {
 interface Props {
   open: boolean
   onClose: () => void
+  /** 内嵌模式：作为侧栏标签页渲染在主区域（无浮层/无滑入动画/无关闭按钮） */
+  embedded?: boolean
 }
 
 export function ComputerUse(props: Props) {
@@ -172,7 +174,7 @@ export function ComputerUse(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class="panel w-[30rem]">
+      <div class={props.embedded ? 'flex-1 h-full flex flex-col min-h-0' : 'panel w-[30rem]'}>
         {/* Header */}
         <div class="panel-head">
           <Monitor class="panel-head-icon text-nt-core-300" />
@@ -186,13 +188,15 @@ export function ComputerUse(props: Props) {
           >
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>
-          <button
-            class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-            onClick={props.onClose}
-            aria-label="关闭"
-          >
-            <X class="w-4 h-4" />
-          </button>
+          <Show when={!props.embedded}>
+            <button
+              class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              onClick={props.onClose}
+              aria-label="关闭"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </Show>
         </div>
 
         {/* Body */}
