@@ -314,11 +314,56 @@ impl BackgroundLoopHandle {
             }
         }
 
-        // ── Phase 3b: EFE 前瞻知识域探索 (R-P79 生产接线) ──
+// ── Phase 3b: EFE 前瞻知识域探索 (R-P79 生产接线) ──
         // Active Inference (arXiv:2401.12917): 用真实 KB 知识域分布做 EFE 动作选择。
         // scale=0 → 纯利用 (强化最强域); scale>1 → 主动探索 (采样最未知域)。
         // 让 NT-CORE 从"响应输入"变为"主动提问/主动探索"。
         if self.config.efe_epistemic_scale > 0.0 {
+            // ── 长周期观察: 上次探索目标命中率 → 自适应校准 scale ──
+            // 读取上次探索决策, 对比该域当前节点数: 节点增长 = 探索有效 (命中)。
+            // 命中率 ≥ 0.5 → 提高 scale (更激进探索); < 0.5 → 降低 scale (收敛利用)。
+            // 数据→决策→验证闭环: 探索有效性反馈到探索强度。
+            if let Some(ref kb) = self.kb {
+                if let Ok(Some(prev_json)) = kb.kv_get("consciousness", "efe_explore") {
+                    if let Ok(prev) = serde_json::from_str::<serde_json::Value>(&prev_json) {
+                        let prev_domain = prev.get("domain").and_then(|d| d.as_str()).unwrap_or("");
+                        let prev_nodes = prev.get("nodes").and_then(|n| n.as_i64()).unwrap_or(0);
+                        if !prev_domain.is_empty() {
+                            if let Ok(stats) = kb.stats() {
+                                let cur_nodes = stats.by_domain.iter()
+                                    .find(|(d, _)| d == prev_domain)
+                                    .map(|(_, c)| *c)
+                                    .unwrap_or(prev_nodes);
+                                let hit = cur_nodes > prev_nodes;
+                                // 自适应校准: 命中 → 探索有效, 提高 scale (上限 3.0);
+                                // 未命中 → 收敛, 降低 scale (下限 0.5)。
+                                let scale = self.config.efe_epistemic_scale;
+                                let new_scale = if hit {
+                                    (scale * 1.2).min(3.0)
+                                } else {
+                                    (scale * 0.8).max(0.5)
+                                };
+                                if (new_scale - scale).abs() > 1e-9 {
+                                    log::info!("[bg] efe: adapt scale {:.2} -> {:.2} (prev_domain='{}' prev={} cur={} hit={})",
+                                        scale, new_scale, prev_domain, prev_nodes, cur_nodes, hit);
+                                }
+                                self.config.efe_epistemic_scale = new_scale;
+                                // 落盘命中率统计 (长周期观察)
+                                let _ = kb.kv_set("consciousness", "efe_stats", &serde_json::json!({
+                                    "prev_domain": prev_domain,
+                                    "prev_nodes": prev_nodes,
+                                    "cur_nodes": cur_nodes,
+                                    "hit": hit,
+                                    "scale": new_scale,
+                                    "timestamp": std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap_or_default().as_secs(),
+                                }).to_string());
+                            }
+                        }
+                    }
+                }
+            }
             if let Some(ref fep_iit) = self.fep_iit_bridge {
                 if let Some(ref kb) = self.kb {
                     if let Ok(stats) = kb.stats() {
