@@ -585,6 +585,7 @@
   }
   .t-dot:hover { filter: brightness(1.25); }
   .t-dot:active { filter: brightness(0.9); }
+  .t-dot:focus-visible { outline: 2px solid #e85454; outline-offset: 2px; }
 
   .t-c { background: #ff5f57; }
   .t-m { background: #febc2e; }
