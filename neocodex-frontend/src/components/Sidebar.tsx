@@ -136,7 +136,7 @@ export function Sidebar(props: SidebarProps) {
                 aria-label="对话"
                 title="对话"
               >
-                <svg viewBox="0 0 16 16"><path d="M8 2l1.8 4.2L14 8l-4.2 1.8L8 14l-1.8-4.2L2 8l4.2-1.8z" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round" /><circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" /></svg>
+                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
                 <span class="segb-t">对话</span>
               </button>
               <button
@@ -151,7 +151,7 @@ export function Sidebar(props: SidebarProps) {
                 aria-label="协同"
                 title="协同"
               >
-                <svg viewBox="0 0 16 16"><path d="M6 3l1.2 2.8L10 7l-2.8 1.2L6 11l-1.2-2.8L2 7l2.8-1.2z" stroke="currentColor" stroke-width="1" fill="none" stroke-linejoin="round" /><path d="M10 7.5l1.2 2.8L14 11l-2.8 1.2L10 15l-1.2-2.8L6 11l2.8-1.2z" stroke="currentColor" stroke-width="0.8" fill="none" stroke-linejoin="round" opacity="0.45" /></svg>
+                <svg viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5.5" r="1.2" stroke="currentColor" stroke-width="1.1" /><line x1="5.5" y1="1.5" x2="5.5" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="5.5" y1="9.5" x2="5.5" y2="10.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1.5" y1="5.5" x2="0.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="9.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="11" cy="11" r="1.2" stroke="currentColor" stroke-width="1.1" opacity="0.55" /><line x1="11" y1="7" x2="11" y2="6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="11" y1="13" x2="11" y2="14" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="7" y1="10" x2="6" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="13" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /></svg>
                 <span class="segb-t">协同</span>
               </button>
               <button
@@ -166,7 +166,7 @@ export function Sidebar(props: SidebarProps) {
                 aria-label="电脑控制"
                 title="电脑控制"
               >
-                <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1" fill="none" /><path d="M6 14h4" stroke="currentColor" stroke-width="1" stroke-linecap="round" /></svg>
+                <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.1" /><path d="M6 14h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="1" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="15" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1" y1="7.5" x2="0.5" y2="7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
                 <span class="segb-t">电脑</span>
               </button>
             </div>

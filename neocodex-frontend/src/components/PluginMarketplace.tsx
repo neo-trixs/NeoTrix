@@ -23,6 +23,8 @@ interface PluginEvent {
 interface Props {
   open: boolean
   onClose: () => void
+  /** 内嵌模式：渲染在设置弹窗内（无浮层/无滑入动画/无关闭按钮） */
+  embedded?: boolean
 }
 
 export function PluginMarketplace(props: Props) {
@@ -116,7 +118,7 @@ export function PluginMarketplace(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class="panel w-[28rem]">
+      <div class={props.embedded ? 'flex-1 h-full flex flex-col min-h-0' : 'panel w-[28rem]'}>
         {/* Header */}
         <div class="panel-head">
           <Puzzle class="panel-head-icon text-nt-mind-600" />
@@ -130,13 +132,15 @@ export function PluginMarketplace(props: Props) {
           >
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>
-          <button
-            class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-            onClick={props.onClose}
-            aria-label="关闭"
-          >
-            <X class="w-4 h-4" />
-          </button>
+          <Show when={!props.embedded}>
+            <button
+              class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              onClick={props.onClose}
+              aria-label="关闭"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </Show>
         </div>
 
         {/* Body */}

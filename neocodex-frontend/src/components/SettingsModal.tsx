@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { clsx } from 'clsx'
+import { PluginMarketplace } from './PluginMarketplace'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v2）
@@ -24,7 +25,7 @@ interface ProviderConfig {
   providers: ProviderEntry[]
 }
 
-type SectionId = 'general' | 'appearance' | 'data' | 'about'
+type SectionId = 'general' | 'appearance' | 'plugins' | 'data' | 'about'
 
 /* ── 外扩线条图标（open/expand 语义，非内敛） ── */
 function ExpandIcon() {
@@ -62,6 +63,19 @@ function InfoIcon() {
   )
 }
 
+function PluginsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none">
+      {/* 拼图块 + 外扩射线（插件扩展语义） */}
+      <path d="M5 3h4v2.5a1.5 1.5 0 010 3V11H5V8.5a1.5 1.5 0 010-3V3z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+      <line x1="8" y1="1" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+      <line x1="8" y1="15" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+      <line x1="1" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+      <line x1="15" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+    </svg>
+  )
+}
+
 function DataIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none">
@@ -88,6 +102,7 @@ function XIcon() {
 const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
   { id: 'general', label: '通用', icon: ExpandIcon },
   { id: 'appearance', label: '外观', icon: PaletteIcon },
+  { id: 'plugins', label: '插件', icon: PluginsIcon },
   { id: 'data', label: '数据', icon: DataIcon },
   { id: 'about', label: '关于', icon: InfoIcon },
 ]
@@ -266,6 +281,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 <div class="text-[11px] text-text-muted">
                   {section() === 'general' && '模型提供商与运行参数'}
                   {section() === 'appearance' && '界面视觉与动效'}
+                  {section() === 'plugins' && '技能插件与扩展'}
                   {section() === 'data' && '记忆与数据管理'}
                   {section() === 'about' && '版本与诊断信息'}
                 </div>
@@ -406,6 +422,11 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     <p class="text-[10.5px] text-text-muted mt-1.5">紧凑模式缩小消息间距与面板内边距，单屏承载更多信息</p>
                   </div>
                 </div>
+              </Show>
+
+              {/* ── 插件：技能插件市场（内嵌，试错/扩展入口） ── */}
+              <Show when={section() === 'plugins'}>
+                <PluginMarketplace embedded open onClose={() => {}} />
               </Show>
 
               {/* ── 数据：记忆统计 + 导出/清空 ── */}

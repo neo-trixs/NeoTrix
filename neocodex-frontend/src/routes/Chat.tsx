@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import {
   Send, Square, RotateCcw, Edit2, Copy, Check, AlertCircle, Highlighter, X,
-  FolderTree, Bug, FlaskConical, GitBranch, FolderOpen, Puzzle, Clock,
+  FolderTree, Bug, FlaskConical, GitBranch, Clock,
   Coins, History, MessageSquare, Monitor, Search, Cpu, Zap,
 } from 'lucide-solid'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
@@ -14,8 +14,6 @@ import { ToolCallCard } from '../components/ToolCallCard'
 import { FilePreview } from '../components/FilePreview'
 import { Markdown } from '../components/Markdown'
 import { GitPanel } from '../components/GitPanel'
-import { ProjectView } from '../components/ProjectView'
-import { PluginMarketplace } from '../components/PluginMarketplace'
 import { ScheduledTasks } from '../components/ScheduledTasks'
 import { CostDashboard } from '../components/CostDashboard'
 import { CheckpointTimeline } from '../components/CheckpointTimeline'
@@ -116,7 +114,7 @@ export function Chat() {
   const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
 
   // 顶部工具栏面板：一次只开一个
-  type PanelId = 'git' | 'project' | 'plugins' | 'tasks' | 'cost' | 'timeline' | 'sidechat'
+  type PanelId = 'git' | 'tasks' | 'cost' | 'timeline' | 'sidechat'
   const [activePanel, setActivePanel] = createSignal<PanelId | null>(null)
   const togglePanel = (id: PanelId) => {
     setActivePanel(activePanel() === id ? null : id)
@@ -268,16 +266,16 @@ export function Chat() {
   }
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    // 面板快捷键：⌘1-⌘7 切换 7 个功能面板，⌘8 切换电脑控制视图，Esc 关闭
+    // 面板快捷键：⌘1-⌘5 切换 5 个功能面板，⌘6 切换电脑控制视图，Esc 关闭
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '8') {
       const idx = Number(e.key) - 1
-      if (idx === 7) {
-        // ⌘8：电脑控制 → 侧栏内嵌视图
+      if (idx === 5) {
+        // ⌘6：电脑控制 → 侧栏内嵌视图
         e.preventDefault()
         setActiveView(activeView() === 'computer' ? 'chat' : 'computer')
         return
       }
-      const panels: PanelId[] = ['git', 'project', 'plugins', 'tasks', 'cost', 'timeline', 'sidechat']
+      const panels: PanelId[] = ['git', 'tasks', 'cost', 'timeline', 'sidechat']
       const target = panels[idx]
       if (target) {
         e.preventDefault()
@@ -529,29 +527,11 @@ export function Chat() {
                 <GitBranch class="w-4 h-4" />
               </button>
               <button
-                class={clsx('tb-btn', activePanel() === 'project' && 'on')}
-                onClick={() => togglePanel('project')}
-                aria-label="项目视图"
-                aria-pressed={activePanel() === 'project'}
-                title="项目视图 (⌘2)"
-              >
-                <FolderOpen class="w-4 h-4" />
-              </button>
-              <button
-                class={clsx('tb-btn', activePanel() === 'plugins' && 'on')}
-                onClick={() => togglePanel('plugins')}
-                aria-label="插件市场"
-                aria-pressed={activePanel() === 'plugins'}
-                title="插件市场 (⌘3)"
-              >
-                <Puzzle class="w-4 h-4" />
-              </button>
-              <button
                 class={clsx('tb-btn', activePanel() === 'tasks' && 'on')}
                 onClick={() => togglePanel('tasks')}
                 aria-label="定时任务"
                 aria-pressed={activePanel() === 'tasks'}
-                title="定时任务 (⌘4)"
+                title="定时任务 (⌘2)"
               >
                 <Clock class="w-4 h-4" />
               </button>
@@ -560,7 +540,7 @@ export function Chat() {
                 onClick={() => togglePanel('cost')}
                 aria-label="成本看板"
                 aria-pressed={activePanel() === 'cost'}
-                title="成本看板 (⌘5)"
+                title="成本看板 (⌘3)"
               >
                 <Coins class="w-4 h-4" />
               </button>
@@ -569,7 +549,7 @@ export function Chat() {
                 onClick={() => togglePanel('timeline')}
                 aria-label="时间线"
                 aria-pressed={activePanel() === 'timeline'}
-                title="时间线 (⌘6)"
+                title="时间线 (⌘4)"
               >
                 <History class="w-4 h-4" />
               </button>
@@ -578,7 +558,7 @@ export function Chat() {
                 onClick={() => togglePanel('sidechat')}
                 aria-label="侧向对话"
                 aria-pressed={activePanel() === 'sidechat'}
-                title="侧向对话 (⌘7)"
+                title="侧向对话 (⌘5)"
               >
                 <MessageSquare class="w-4 h-4" />
               </button>
@@ -587,7 +567,7 @@ export function Chat() {
                 onClick={() => setActiveView(activeView() === 'computer' ? 'chat' : 'computer')}
                 aria-label="电脑控制"
                 aria-pressed={activeView() === 'computer'}
-                title="电脑控制 (⌘8)"
+                title="电脑控制 (⌘6)"
               >
                 <Monitor class="w-4 h-4" />
               </button>
@@ -604,12 +584,6 @@ export function Chat() {
           />
           <Show when={activePanel() === 'git'}>
             <GitPanel open onClose={() => setActivePanel(null)} />
-          </Show>
-          <Show when={activePanel() === 'project'}>
-            <ProjectView open onClose={() => setActivePanel(null)} />
-          </Show>
-          <Show when={activePanel() === 'plugins'}>
-            <PluginMarketplace open onClose={() => setActivePanel(null)} />
           </Show>
           <Show when={activePanel() === 'tasks'}>
             <ScheduledTasks open onClose={() => setActivePanel(null)} />
