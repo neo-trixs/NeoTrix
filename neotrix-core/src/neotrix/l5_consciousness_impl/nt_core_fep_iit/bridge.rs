@@ -451,6 +451,38 @@ impl FEPIITBridge {
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
     }
+
+    /// EFE 前瞻知识域选择 (生产接线, R-P79):
+    /// 候选动作 = KB 真实知识域 (name, node_count); 观测 = 当前最强知识域 (max count)。
+    /// 编码: 斜坡向量 — 前 K 维为 1 (K ∝ count), 其余为 0。
+    ///   cosine(belief, obs) = sqrt(K/DIM) 随 count 单调递增 → FE = 1 - sqrt(K/DIM)。
+    /// 因此:
+    ///   - scale=0 → 纯利用: EFE = 1-sqrt(K/DIM), 选 K 最大 = 最强域 (强化已知)
+    ///   - scale>1 → 主动探索: EFE = (1-scale)(1-sqrt(K/DIM)) 最负, 选 K 最小 = 最未知域
+    /// 返回被选中的域索引; 空输入返回 None。
+    pub fn efe_select_domain(
+        &self,
+        domains: &[(String, i64)],
+        epistemic_scale: f64,
+    ) -> Option<usize> {
+        if domains.is_empty() {
+            return None;
+        }
+        let max_count = domains.iter().map(|(_, c)| *c).max().unwrap_or(0).max(1) as f64;
+        let dim = FepIitHypervector::dim();
+        // 斜坡编码: 前 K 维为 1 (K ∝ count), 其余为 0。
+        let ramp = |count: i64| -> FepIitHypervector {
+            let k = ((count as f64 / max_count) * dim as f64).round() as usize;
+            let mut hv = vec![0.0f32; dim];
+            for i in 0..k.min(dim) {
+                hv[i] = 1.0;
+            }
+            FepIitHypervector { hv }
+        };
+        let beliefs: Vec<FepIitHypervector> = domains.iter().map(|(_, c)| ramp(*c)).collect();
+        let obs = ramp(max_count as i64);
+        self.efe_action_selection(&beliefs, &obs, epistemic_scale)
+    }
 }
 
 impl crate::core::nt_core_self_test::SelfTest for FEPIITBridge {
@@ -533,5 +565,39 @@ mod tests {
         let bridge = FEPIITBridge::new();
         let obs = FepIitHypervector::random_from_seed(1);
         assert!(bridge.efe_action_selection(&[], &obs, 1.0).is_none());
+    }
+
+    #[test]
+    fn test_efe_select_domain_empty_returns_none() {
+        let bridge = FEPIITBridge::new();
+        assert!(bridge.efe_select_domain(&[], 1.0).is_none());
+    }
+
+    #[test]
+    fn test_efe_select_domain_exploitation_picks_max_density() {
+        // 纯利用 (scale=0): 应选密度最接近最强域的域 (max count 自身或最近)。
+        // 观测 = max count 域; 该域 belief == obs → FE=0 → 必选。
+        let bridge = FEPIITBridge::new();
+        let domains = vec![
+            ("code".to_string(), 10),
+            ("docs".to_string(), 500),
+            ("research".to_string(), 50),
+        ];
+        let idx = bridge.efe_select_domain(&domains, 0.0).unwrap();
+        assert_eq!(domains[idx].1, 500, "scale=0 应选知识密度最强的域");
+    }
+
+    #[test]
+    fn test_efe_select_domain_exploration_picks_lowest_density() {
+        // 主动探索 (scale=2): 应选密度离最强域最远的域 (最未知)。
+        // 编码 from_scalar(count, count): count 离 max 越远 → 种子差异越大 → 余弦越低 → EFE 更负。
+        let bridge = FEPIITBridge::new();
+        let domains = vec![
+            ("code".to_string(), 10),
+            ("docs".to_string(), 500),
+            ("research".to_string(), 50),
+        ];
+        let idx = bridge.efe_select_domain(&domains, 2.0).unwrap();
+        assert_eq!(domains[idx].1, 10, "scale>1 应选知识密度最低的域 (最未知)");
     }
 }

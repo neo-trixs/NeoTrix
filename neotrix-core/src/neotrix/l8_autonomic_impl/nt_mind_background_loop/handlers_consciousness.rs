@@ -314,6 +314,48 @@ impl BackgroundLoopHandle {
             }
         }
 
+        // ── Phase 3b: EFE 前瞻知识域探索 (R-P79 生产接线) ──
+        // Active Inference (arXiv:2401.12917): 用真实 KB 知识域分布做 EFE 动作选择。
+        // scale=0 → 纯利用 (强化最强域); scale>1 → 主动探索 (采样最未知域)。
+        // 让 NT-CORE 从"响应输入"变为"主动提问/主动探索"。
+        if self.config.efe_epistemic_scale > 0.0 {
+            if let Some(ref fep_iit) = self.fep_iit_bridge {
+                if let Some(ref kb) = self.kb {
+                    if let Ok(stats) = kb.stats() {
+                        let domains = stats.by_domain;
+                        if !domains.is_empty() {
+                            if let Some(idx) = fep_iit.efe_select_domain(&domains, self.config.efe_epistemic_scale) {
+                                let (domain, count) = &domains[idx];
+                                let max_count = domains.iter().map(|(_, c)| *c).max().unwrap_or(0);
+                                // 探索目标: 非最强域 (count < max) 才值得主动采样
+                                if *count < max_count {
+                                    if let Ok(mut brain) = self.brain.try_write() {
+                                        self.goal_loop.enqueue_goal(
+                                            &mut brain,
+                                            &format!("efe_explore: {} (nodes={}) — 主动探索低密度知识域", domain, count),
+                                            None,
+                                        );
+                                    }
+                                    // 落盘探索决策 → 意识树果实/SEAL 可消费 (闭环)
+                                    let _ = kb.kv_set("consciousness", "efe_explore", &serde_json::json!({
+                                        "domain": domain,
+                                        "nodes": count,
+                                        "max_nodes": max_count,
+                                        "epistemic_scale": self.config.efe_epistemic_scale,
+                                        "timestamp": std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap_or_default().as_secs(),
+                                    }).to_string());
+                                    log::info!("[bg] efe: explore domain '{}' (nodes={}, scale={})",
+                                        domain, count, self.config.efe_epistemic_scale);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // ── Phase 4: ConsciousnessMonitor — self-observation cycle ──
         if let Some(ref mut monitor) = self.awareness {
             monitor.observe();

@@ -53,6 +53,11 @@ pub struct BackgroundConfig {
     /// 消费果实频率为 goal_interval_secs (默认 180s) — 时序错配导致 SEAL 在
     /// 大部分时间消费空果实。改为配置驱动, 与 SEAL 消费节奏对齐。
     pub consciousness_interval_secs: u64,
+    /// EFE 前瞻探索强度 (Active Inference, arXiv:2401.12917)。
+    /// 0.0 = 关闭 (纯利用, 向后兼容); >1.0 = 主动探索未知知识域。
+    /// 意识核心在 consciousness tick 用真实 KB 知识域分布做 EFE 动作选择,
+    /// 从"响应输入"变为"主动提问/主动探索" (R-P79 生产接线)。
+    pub efe_epistemic_scale: f64,
 }
 
 impl Default for BackgroundConfig {
@@ -97,6 +102,7 @@ impl Default for BackgroundConfig {
             workspace_guard_interval_secs: 600,
             kb_backup_interval_secs: 21_600,
             consciousness_interval_secs: 600,
+            efe_epistemic_scale: 0.0,
         }
     }
 }
