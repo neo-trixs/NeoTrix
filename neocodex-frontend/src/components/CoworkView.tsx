@@ -167,7 +167,7 @@ export function CoworkView() {
           <div class="cw-shead">
             <span>会话</span>
             <div class="cw-shead-actions">
-              <button class="cw-add" onClick={() => setShowNew(!showNew())} title="新建会话" aria-label="新建会话">
+              <button class="cw-add" onClick={() => setShowNew(!showNew())} title="新建会话" aria-label="新建会话" aria-expanded={showNew()}>
                 <svg viewBox="0 0 14 14">
                   <line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
                   <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
