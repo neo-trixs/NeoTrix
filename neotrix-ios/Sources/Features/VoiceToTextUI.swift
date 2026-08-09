@@ -134,7 +134,7 @@ public struct VoiceToTextView: View {
             
             Text(manager.isRecording ? "Recording… tap to stop" : "Tap to start recording")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(manager.isRecording ? NeoTrixTheme.Colors.danger : .secondary)
             
             if manager.isTranscribing {
                 ProgressView("Transcribing…")

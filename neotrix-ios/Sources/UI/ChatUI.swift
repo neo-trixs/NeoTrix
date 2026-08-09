@@ -172,6 +172,11 @@ public final class ChatViewModel: ObservableObject {
         }
     }
     
+    /// 停止 AI 生成（对标 Telegram: 发送按钮在 AI 回复时变停止按钮）
+    public func stopGeneration() {
+        isStreaming = false
+    }
+    
     private func generateAIResponse(for text: String) async {
         guard let e8 = core.e8Reasoning else {
             await addAgentMessage("AI not available")
@@ -187,8 +192,11 @@ public final class ChatViewModel: ObservableObject {
             )
             let response = try e8.reason(request: request)
             
+            // 修复: 用户点击停止后不再追加 AI 回复（此前 stop 按钮无功能）
+            guard isStreaming else { return }
             await addAgentMessage(response.conclusion)
         } catch {
+            guard isStreaming else { return }
             await addAgentMessage("Error: \(error.localizedDescription)")
         }
     }
@@ -622,12 +630,19 @@ public struct ChatView: View {
             
             // Input bar
             HStack(spacing: 8) {
-                // 附件菜单（对标 Telegram: 照片/文件/位置/联系人）
+                // 附件菜单（对标 Telegram: 照片/文件/位置/联系人/Sticker）
+                // 修复: Emoji Status 并入菜单（此前挂在 Menu 上 .contextMenu 不会触发 — 手势冲突）
                 Menu {
                     Button {
-                        viewModel.sendMediaMessage(.sticker("😀"))
+                        // 照片附件（真实选择需 ImagePicker；当前以空 Data 演示媒体消息流）
+                        viewModel.sendMediaMessage(.image(Data()))
                     } label: {
-                        Label("Sticker", systemImage: "face.smiling")
+                        Label("Photo or Video", systemImage: "photo.on.rectangle.angled")
+                    }
+                    Button {
+                        viewModel.sendMediaMessage(.document(URL(string: "file:///tmp/report.pdf")!, "report.pdf"))
+                    } label: {
+                        Label("Document", systemImage: "doc.fill")
                     }
                     Button {
                         viewModel.sendMediaMessage(.location(37.7749, -122.4194))
@@ -640,21 +655,20 @@ public struct ChatView: View {
                         Label("Contact", systemImage: "person.crop.circle")
                     }
                     Button {
-                        viewModel.sendMediaMessage(.document(URL(string: "file:///tmp/report.pdf")!, "report.pdf"))
+                        viewModel.sendMediaMessage(.sticker("😀"))
                     } label: {
-                        Label("Document", systemImage: "doc.fill")
+                        Label("Sticker", systemImage: "face.smiling")
                     }
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title2)
-                }
-                .contextMenu {
+                    Divider()
                     // 融合: 动画 Emoji 状态（AnimatedEmoji 接线）
                     Button {
                         showEmojiStatus = true
                     } label: {
                         Label("Emoji Status", systemImage: "sparkles")
                     }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
                 }
                 
                 TextField("Message", text: $viewModel.inputText, axis: .vertical)
@@ -673,9 +687,17 @@ public struct ChatView: View {
                     }
                 }
                 
-                Button(action: sendMessage) {
-                    Image(systemName: viewModel.isStreaming ? "stop.circle" : "arrow.up.circle.fill")
+                Button {
+                    // 修复: isStreaming 时按钮为停止生成（此前恒发送，stop 图标死按钮）
+                    if viewModel.isStreaming {
+                        viewModel.stopGeneration()
+                    } else {
+                        sendMessage()
+                    }
+                } label: {
+                    Image(systemName: viewModel.isStreaming ? "stop.circle.fill" : "arrow.up.circle.fill")
                         .font(.title2)
+                        .foregroundColor(viewModel.isStreaming ? NeoTrixTheme.Colors.danger : NeoTrixTheme.Colors.accent)
                 }
                 .disabled(viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty && !viewModel.isStreaming)
             }

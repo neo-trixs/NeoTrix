@@ -400,6 +400,8 @@ public struct LiveCardView: View {
 public struct LiveFeedDetailView: View {
     let item: LiveFeedItem
     @Environment(\.dismiss) private var dismiss
+    // 修复: 详情页互动栏（对标小红书/TikTok 详情页 — 点赞/分享/不感兴趣）
+    @ObservedObject private var engine = LiveFeedEngine.shared
     
     public init(item: LiveFeedItem) {
         self.item = item
@@ -466,6 +468,38 @@ public struct LiveFeedDetailView: View {
                 }
                 .font(NeoTrixTheme.Fonts.caption)
                 .foregroundColor(NeoTrixTheme.Colors.textSecondary)
+                
+                // 互动操作栏（修复: 此前详情页纯展示无互动 — 对标小红书/TikTok 详情页）
+                HStack(spacing: NeoTrixTheme.Spacing.lg) {
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            engine.like(item)
+                        }
+                    } label: {
+                        Label(engine.likedIDs.contains(item.id) ? "Liked" : "Like",
+                              systemImage: engine.likedIDs.contains(item.id) ? "heart.fill" : "heart")
+                            .foregroundColor(engine.likedIDs.contains(item.id) ? NeoTrixTheme.Colors.danger : NeoTrixTheme.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        engine.share(item)
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button(role: .destructive) {
+                        engine.notInterested(item)
+                    } label: {
+                        Label("Not Interested", systemImage: "hand.thumbsdown")
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Spacer()
+                }
+                .font(NeoTrixTheme.Fonts.subheadline)
+                .padding(.top, NeoTrixTheme.Spacing.xs)
             }
             .padding(NeoTrixTheme.Spacing.lg)
         }

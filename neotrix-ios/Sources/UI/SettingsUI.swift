@@ -438,6 +438,8 @@ struct ProfileView: View {
             }
             Button("Remove Photo", role: .destructive) {
                 avatarImage = nil
+                // 修复: 移除头像同步清理持久化（对标 Telegram: 删除照片跨启动生效）
+                UserDefaults.standard.removeObject(forKey: "profile_avatar")
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -446,6 +448,10 @@ struct ProfileView: View {
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(sourceType: imagePickerSource) { image in
                 avatarImage = image
+                // 修复: 头像持久化（对标 Telegram: 头像跨启动保留）
+                if let data = image.jpegData(compressionQuality: 0.8) {
+                    UserDefaults.standard.set(data, forKey: "profile_avatar")
+                }
             }
         }
         #endif
@@ -453,6 +459,11 @@ struct ProfileView: View {
             // 加载已保存的 About（对标 Telegram: 简介持久化）
             if let saved = UserDefaults.standard.string(forKey: "profile_about") {
                 about = saved
+            }
+            // 修复: 加载已保存的头像（此前头像仅内存，重启丢失）
+            if let data = UserDefaults.standard.data(forKey: "profile_avatar"),
+               let image = UIImage(data: data) {
+                avatarImage = image
             }
         }
     }

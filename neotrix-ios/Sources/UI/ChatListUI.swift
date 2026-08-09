@@ -262,7 +262,11 @@ public struct ChatListView: View {
     public init() {}
     
     /// 当前显示的会话：选中文件夹时按文件夹过滤，否则走分类过滤（FolderEngine 接线）
+    /// 修复: 搜索时全局搜索，不受文件夹限制（对标 Telegram: 搜索跨文件夹）
     private var displayedChats: [ChatListItem] {
+        if !viewModel.searchText.isEmpty {
+            return viewModel.filteredChats
+        }
         guard let folderID = folderEngine.selectedFolderID,
               let folder = folderEngine.folders.first(where: { $0.id == folderID }) else {
             return viewModel.filteredChats
@@ -329,8 +333,17 @@ public struct ChatListView: View {
                 
                 // Chat list
                 List {
-                    // 搜索无匹配 → 空结果态
-                    if !viewModel.searchText.isEmpty && displayedChats.isEmpty {
+                    // 搜索时匹配的联系人/通话（供空态判断与展示复用）
+                    let matchedContacts = viewModel.searchText.isEmpty ? [] : viewModel.contacts.filter {
+                        $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
+                    }
+                    let matchedCalls = viewModel.searchText.isEmpty ? [] : viewModel.calls.filter {
+                        $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
+                    }
+                    
+                    // 搜索无匹配 → 空结果态（修复: 仅当聊天+联系人+通话全部无匹配时显示，
+                    // 此前搜索到联系人但无聊天匹配时误显示空态，隐藏了联系人结果）
+                    if !viewModel.searchText.isEmpty && displayedChats.isEmpty && matchedContacts.isEmpty && matchedCalls.isEmpty {
                         Section {
                             NeoTrixEmptyState(
                                 icon: "magnifyingglass",
@@ -343,65 +356,82 @@ public struct ChatListView: View {
                         }
                     } else {
                         // 融合：联系人 Section（真实模型，替代 Contact N 占位）
-                        if viewModel.searchText.isEmpty {
-                            Section {
-                                ForEach(viewModel.contacts) { contact in
-                                    HStack(spacing: 12) {
-                                        ZStack(alignment: .bottomTrailing) {
-                                            NeoTrixAvatar(
-                                                title: contact.name,
-                                                size: 40,
-                                                gradient: LinearGradient(colors: [contact.avatarColor, contact.avatarColor.opacity(0.7)],
-                                                                         startPoint: .topLeading, endPoint: .bottomTrailing)
-                                            )
-                                            
-                                            if contact.isOnline {
-                                                neoTrixOnlineDot(size: 10)
-                                            }
-                                        }
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            HStack(spacing: 4) {
-                                                Text(contact.name)
-                                                    .font(.body)
-                                                if contact.isPremium {
-                                                    Image(systemName: "star.fill")
-                                                        .font(.caption2)
-                                                        .foregroundColor(NeoTrixTheme.Colors.premium)
+                        // 修复: 对标 Telegram — 联系人/通话仅在搜索时作为搜索结果展示，
+                        // 非搜索时列表只显示聊天（此前非搜索时固定显示在列表顶部 = 布局混乱）
+                        if !viewModel.searchText.isEmpty {
+                            if !matchedContacts.isEmpty {
+                                Section {
+                                    ForEach(matchedContacts) { contact in
+                                        HStack(spacing: 12) {
+                                            ZStack(alignment: .bottomTrailing) {
+                                                NeoTrixAvatar(
+                                                    title: contact.name,
+                                                    size: 40,
+                                                    gradient: LinearGradient(colors: [contact.avatarColor, contact.avatarColor.opacity(0.7)],
+                                                                             startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                )
+                                                
+                                                if contact.isOnline {
+                                                    neoTrixOnlineDot(size: 10)
                                                 }
                                             }
-                                            Text(contact.phone)
+                                            
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                HStack(spacing: 4) {
+                                                    Text(contact.name)
+                                                        .font(.body)
+                                                    if contact.isPremium {
+                                                        Image(systemName: "star.fill")
+                                                            .font(.caption2)
+                                                            .foregroundColor(NeoTrixTheme.Colors.premium)
+                                                    }
+                                                }
+                                                Text(contact.phone)
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                        .padding(.vertical, 2)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            newChatDestination = NewChatDestination(title: contact.name)
+                                        }
+                                    }
+                                } header: {
+                                    Text("Contacts")
+                                }
+                            }
+                            
+                            // 通话记录（搜索时展示，对标 Telegram: 搜索通话）
+                            if !matchedCalls.isEmpty {
+                                Section {
+                                    ForEach(matchedCalls) { call in
+                                        HStack(spacing: 12) {
+                                            Image(systemName: iconForCall(call.direction))
+                                                .font(.body)
+                                                .foregroundColor(colorForCall(call.direction))
+                                                .frame(width: 24)
+                                            
+                                            Text(call.name)
+                                            
+                                            Spacer()
+                                            
+                                            Text(callDurationText(call))
                                                 .font(.caption)
                                                 .foregroundColor(.secondary)
                                         }
+                                        .padding(.vertical, 2)
+                                        .contentShape(Rectangle())
+                                        // 修复: 点击通话记录进入对应会话（对标 Telegram: 通话记录可跳转聊天）
+                                        .onTapGesture {
+                                            if let chat = viewModel.chats.first(where: { $0.title == call.name }) {
+                                                selectedChat = chat
+                                            }
+                                        }
                                     }
-                                    .padding(.vertical, 2)
+                                } header: {
+                                    Text("Recent Calls")
                                 }
-                            } header: {
-                                Text("Contacts")
-                            }
-                            
-                            // 融合：通话记录（真实模型，替代 Call N 占位）
-                            Section {
-                                ForEach(viewModel.calls) { call in
-                                    HStack(spacing: 12) {
-                                        Image(systemName: iconForCall(call.direction))
-                                            .font(.body)
-                                            .foregroundColor(colorForCall(call.direction))
-                                            .frame(width: 24)
-                                        
-                                        Text(call.name)
-                                        
-                                        Spacer()
-                                        
-                                        Text(callDurationText(call))
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding(.vertical, 2)
-                                }
-                            } header: {
-                                Text("Recent Calls")
                             }
                         }
                         

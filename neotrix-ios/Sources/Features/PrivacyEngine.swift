@@ -155,7 +155,7 @@ public struct PrivacySettingsView: View {
                 VStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+                            .stroke(NeoTrixTheme.Colors.separator, lineWidth: 8)
                         Circle()
                             .trim(from: 0, to: CGFloat(engine.privacyScore) / 100)
                             .stroke(scoreColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
