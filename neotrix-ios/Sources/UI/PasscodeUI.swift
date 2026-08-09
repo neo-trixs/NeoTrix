@@ -110,12 +110,13 @@ public final class PasscodeManager: ObservableObject {
 // MARK: - Passcode Lock View
 
 public struct PasscodeLockView: View {
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var manager = PasscodeManager()
+    @EnvironmentObject private var manager: PasscodeManager
     
     @State private var enteredCode = ""
     @State private var showError = false
     @State private var isVerifying = false
+    
+    public init() {}
     
     public var body: some View {
         VStack(spacing: 32) {
@@ -148,9 +149,7 @@ public struct PasscodeLockView: View {
             if manager.isBiometricsEnabled {
                 Button {
                     Task {
-                        if await manager.authenticate() {
-                            dismiss()
-                        }
+                        _ = await manager.authenticate()
                     }
                 } label: {
                     Image(systemName: "faceid")
@@ -176,11 +175,19 @@ public struct PasscodeLockView: View {
                 }
                 
                 HStack(spacing: 12) {
+                    // 左下角: Face ID 快捷入口（对标 Telegram: 指纹/面容在键盘左下）
                     Button {
-                        // Biometric or empty
+                        Task { _ = await manager.authenticate() }
                     } label: {
-                        Color.clear.frame(width: 80, height: 80)
+                        Image(systemName: "faceid")
+                            .font(.title2)
+                            .foregroundColor(manager.isBiometricsEnabled
+                                ? NeoTrixTheme.Colors.accent
+                                : NeoTrixTheme.Colors.separator)
+                            .frame(width: 80, height: 80)
                     }
+                    .disabled(!manager.isBiometricsEnabled)
+                    .buttonStyle(.plain)
                     
                     NumberButton(number: 0) {
                         appendDigit(0)
@@ -217,7 +224,6 @@ public struct PasscodeLockView: View {
         isVerifying = true
         if manager.verifyPasscode(enteredCode) {
             manager.unlock()
-            dismiss()
         } else {
             showError = true
             enteredCode = ""
@@ -310,58 +316,75 @@ struct PasscodeSetupView: View {
     @State private var errorMessage: String?
     
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
-            
-            Text(step == 0 ? "Set Passcode" : "Confirm Passcode")
-                .font(.title2.bold())
-            
-            HStack(spacing: 16) {
-                ForEach(0..<4, id: \.self) { index in
-                    Circle()
-                        .fill(index < currentEntry.count ? NeoTrixTheme.Colors.accent : NeoTrixTheme.Colors.textSecondary)
-                        .frame(width: 20, height: 20)
-                }
-            }
-            
-            if let errorMessage {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-            }
-            
-            Spacer()
-            
-            VStack(spacing: 12) {
-                ForEach(0..<3, id: \.self) { row in
-                    HStack(spacing: 12) {
-                        ForEach(1...3, id: \.self) { col in
-                            let number = row * 3 + col
-                            NumberButton(number: number) {
-                                appendDigit(number)
-                            }
-                        }
+        NavigationStack {
+            VStack(spacing: 32) {
+                Spacer()
+                
+                Text(step == 0 ? "Set Passcode" : "Confirm Passcode")
+                    .font(.title2.bold())
+                
+                HStack(spacing: 16) {
+                    ForEach(0..<4, id: \.self) { index in
+                        Circle()
+                            .fill(index < currentEntry.count ? NeoTrixTheme.Colors.accent : NeoTrixTheme.Colors.textSecondary)
+                            .frame(width: 20, height: 20)
                     }
                 }
                 
-                HStack(spacing: 12) {
-                    Color.clear.frame(width: 80, height: 80)
-                    NumberButton(number: 0) { appendDigit(0) }
-                    Button {
-                        if step == 0 {
-                            if !firstEntry.isEmpty { firstEntry.removeLast() }
-                        } else {
-                            if !secondEntry.isEmpty { secondEntry.removeLast() }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(NeoTrixTheme.Colors.danger)
+                }
+                
+                Spacer()
+                
+                VStack(spacing: 12) {
+                    ForEach(0..<3, id: \.self) { row in
+                        HStack(spacing: 12) {
+                            ForEach(1...3, id: \.self) { col in
+                                let number = row * 3 + col
+                                NumberButton(number: number) {
+                                    appendDigit(number)
+                                }
+                            }
                         }
-                    } label: {
-                        Image(systemName: "delete.left")
-                            .font(.title2)
-                            .frame(width: 80, height: 80)
+                    }
+                    
+                    HStack(spacing: 12) {
+                        Color.clear.frame(width: 80, height: 80)
+                        NumberButton(number: 0) { appendDigit(0) }
+                        Button {
+                            if step == 0 {
+                                if !firstEntry.isEmpty { firstEntry.removeLast() }
+                            } else {
+                                if !secondEntry.isEmpty { secondEntry.removeLast() }
+                            }
+                        } label: {
+                            Image(systemName: "delete.left")
+                                .font(.title2)
+                                .frame(width: 80, height: 80)
+                        }
                     }
                 }
+                .padding(.bottom, 40)
             }
-            .padding(.bottom, 40)
+            .padding()
+            .navigationTitle("Passcode")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                #endif
+            }
         }
-        .padding()
     }
     
     private var currentEntry: String {

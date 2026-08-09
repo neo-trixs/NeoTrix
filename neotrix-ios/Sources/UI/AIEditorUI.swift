@@ -174,15 +174,16 @@ public struct AIEditorView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                // Original
+                // Original（可编辑草稿，修复: 此前 draft 无 TextField 绑定，Edit 永远编辑原文）
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Original")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(original)
+                    TextEditor(text: $draft)
                         .font(.body)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(minHeight: 80)
+                        .padding(8)
+                        .scrollContentBackground(.hidden)
                         .background(NeoTrixTheme.Colors.inputBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }

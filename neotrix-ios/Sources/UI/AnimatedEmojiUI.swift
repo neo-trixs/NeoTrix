@@ -65,29 +65,32 @@ public struct FullScreenEmojiEffect: View {
     }
     
     public var body: some View {
-        ZStack {
-            NeoTrixTheme.Colors.toastBackground.ignoresSafeArea()
-            
-            ForEach(particles) { particle in
-                Text(emoji)
-                    .font(.system(size: particle.size))
-                    .position(particle.position)
-                    .opacity(particle.opacity)
-                    .scaleEffect(isAnimating ? particle.scale : 0.1)
-                    .animation(.easeOut(duration: particle.duration), value: isAnimating)
+        GeometryReader { geo in
+            ZStack {
+                NeoTrixTheme.Colors.toastBackground.ignoresSafeArea()
+                
+                ForEach(particles) { particle in
+                    Text(emoji)
+                        .font(.system(size: particle.size))
+                        .position(particle.position)
+                        .opacity(particle.opacity)
+                        .scaleEffect(isAnimating ? particle.scale : 0.1)
+                        .animation(.easeOut(duration: particle.duration), value: isAnimating)
+                }
             }
-        }
-        .onAppear {
-            generateParticles()
-            isAnimating = true
+            .onAppear {
+                // 修复: 粒子位置随屏幕尺寸生成（此前硬编码 0...400/0...800）
+                generateParticles(in: geo.size)
+                isAnimating = true
+            }
         }
     }
     
-    private func generateParticles() {
+    private func generateParticles(in size: CGSize) {
         particles = (0..<20).map { index in
             Particle(
                 id: index,
-                position: CGPoint(x: CGFloat.random(in: 0...400), y: CGFloat.random(in: 0...800)),
+                position: CGPoint(x: CGFloat.random(in: 0...max(size.width, 1)), y: CGFloat.random(in: 0...max(size.height, 1))),
                 size: CGFloat.random(in: 20...60),
                 duration: Double.random(in: 0.5...1.5),
                 opacity: Double.random(in: 0.6...1.0),

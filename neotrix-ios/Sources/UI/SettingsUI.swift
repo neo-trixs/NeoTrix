@@ -45,7 +45,10 @@ public final class SettingsViewModel: ObservableObject {
         if let savedPhone = UserDefaults.standard.string(forKey: "phone") {
             phoneNumber = savedPhone
         }
-        isPremium = UserDefaults.standard.bool(forKey: "is_premium")
+        // 统一 premium 事实源为 premium_tier（与 PremiumManager 一致）
+        if let tierRaw = UserDefaults.standard.string(forKey: "premium_tier") {
+            isPremium = tierRaw != "free"
+        }
     }
     
     /// 分组对标 Telegram 层级：Account → NeoTrix AI → Appearance → Privacy → Data → About
@@ -55,7 +58,7 @@ public final class SettingsViewModel: ObservableObject {
                 SettingsItem(id: "profile", title: "My Profile", icon: "person.crop.circle", iconColor: .blue, badge: nil, isPremium: false, isDisabled: false),
                 SettingsItem(id: "saved", title: "Saved Messages", icon: "bookmark.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
                 SettingsItem(id: "devices", title: "Devices", icon: "laptopcomputer", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
-                SettingsItem(id: "chat_folders", title: "Chat Folders", icon: "folder.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "chat_folders", title: "Chat Folders", icon: "folder.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: false),
             ]),
             SettingsSection(id: "ai", title: "NeoTrix AI", items: [
                 SettingsItem(id: "ai_editor", title: "AI Editor", icon: "wand.and.stars", iconColor: .purple, badge: nil, isPremium: false, isDisabled: false),
@@ -65,7 +68,7 @@ public final class SettingsViewModel: ObservableObject {
             ]),
             SettingsSection(id: "appearance", title: "Appearance", items: [
                 SettingsItem(id: "theme", title: "Theme", icon: "paintpalette.fill", iconColor: .purple, badge: nil, isPremium: false, isDisabled: false),
-                SettingsItem(id: "wallpapers", title: "Wallpapers", icon: "photo.on.rectangle", iconColor: .cyan, badge: nil, isPremium: false, isDisabled: true),
+                SettingsItem(id: "wallpapers", title: "Wallpapers", icon: "photo.on.rectangle", iconColor: .cyan, badge: nil, isPremium: false, isDisabled: false),
                 SettingsItem(id: "app_icons", title: "App Icons", icon: "app.badge.fill", iconColor: .blue, badge: nil, isPremium: false, isDisabled: true),
             ]),
             SettingsSection(id: "privacy", title: "Privacy & Security", items: [
@@ -201,9 +204,11 @@ public struct SettingsView: View {
         case "filters": showFilters = true
         case "privacy": showPrivacy = true
         case "folders": showFolders = true
+        case "chat_folders": showFolders = true
         case "polls": showPolls = true
         case "voice": showVoiceToText = true
         case "theme": showTheme = true
+        case "wallpapers": showTheme = true
         case "passcode": showPasscode = true
         case "ai_editor": showAIEditor = true
         default: break
@@ -273,6 +278,7 @@ struct ProfileView: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var about = ""
     @State private var isEditingAbout = false
+    @State private var showAvatarMenu = false
     
     var body: some View {
         List {
@@ -299,10 +305,7 @@ struct ProfileView: View {
                     
                     Button {
                         // 头像编辑（对标 Telegram: 拍照/选图/删除照片）
-                        #if os(iOS)
-                        let name = viewModel.username
-                        #endif
-                        print("Edit avatar: \(viewModel.username)")
+                        showAvatarMenu = true
                     } label: {
                         Image(systemName: "camera.fill")
                             .font(.subheadline)
@@ -370,7 +373,10 @@ struct ProfileView: View {
         #if os(iOS)
         .alert("Edit About", isPresented: $isEditingAbout) {
             TextField("About", text: $about)
-            Button("Save") {}
+            Button("Save") {
+                // 修复: 此前 Save 空操作，About 永不保存
+                UserDefaults.standard.set(about, forKey: "profile_about")
+            }
             Button("Cancel", role: .cancel) {}
         }
         #else
@@ -381,13 +387,28 @@ struct ProfileView: View {
                 TextField("About", text: $about)
                     .textFieldStyle(.roundedBorder)
                     .padding(.horizontal)
-                Button("Save") { isEditingAbout = false }
-                    .buttonStyle(.borderedProminent)
+                Button("Save") {
+                    UserDefaults.standard.set(about, forKey: "profile_about")
+                    isEditingAbout = false
+                }
+                .buttonStyle(.borderedProminent)
             }
             .padding()
             .frame(width: 300)
         }
         #endif
+        .confirmationDialog("Change Avatar", isPresented: $showAvatarMenu, titleVisibility: .visible) {
+            Button("Take Photo") {}
+            Button("Choose from Library") {}
+            Button("Remove Photo", role: .destructive) {}
+            Button("Cancel", role: .cancel) {}
+        }
+        .onAppear {
+            // 加载已保存的 About（对标 Telegram: 简介持久化）
+            if let saved = UserDefaults.standard.string(forKey: "profile_about") {
+                about = saved
+            }
+        }
     }
     
     /// 禁用态徽标（对标 Telegram: 未实现项置灰 + "Soon"）

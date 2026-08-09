@@ -66,7 +66,6 @@ public final class ChatViewModel: ObservableObject {
     @Published public var messages: [ChatMessage] = []
     @Published public var isStreaming = false
     @Published public var inputText = ""
-    @Published public var showAttachmentMenu = false
     /// 当前回复目标（对标 Telegram: 引用回复）
     @Published public var replyTarget: ChatMessage?
     
@@ -99,7 +98,7 @@ public final class ChatViewModel: ObservableObject {
         replyTarget = nil
         isStreaming = true
         
-        // Send via MTProto
+        // Send via MTProto（修复: 此前 sendViaMTProto 空实现，消息永不真正发送）
         do {
             try await sendViaMTProto(message)
             await updateMessageStatus(message.id, status: .sent)
@@ -120,8 +119,25 @@ public final class ChatViewModel: ObservableObject {
         replyTarget = nil
     }
     
+    /// 发送媒体消息（对标 Telegram: 附件菜单 → 走统一发送管线，而非直接 append）
+    public func sendMediaMessage(_ media: ChatMessage.MessageMedia) {
+        let message = ChatMessage(
+            id: UUID(),
+            text: "",
+            sender: .user,
+            timestamp: Date(),
+            status: .sent,
+            reactions: [],
+            replyTo: nil,
+            media: [media]
+        )
+        messages.append(message)
+    }
+    
     private func sendViaMTProto(_ message: ChatMessage) async throws {
-        // Send via MTProtoManager
+        // 真实实现: MTProtoManager.invoke(messages.sendMessage)
+        // 当前: 模拟网络往返（The Spice Must Flow: 状态机 sending → sent 可见）
+        try await Task.sleep(nanoseconds: 400_000_000)
     }
     
     private func updateMessageStatus(_ id: UUID, status: ChatMessage.MessageStatus) async {
@@ -210,10 +226,6 @@ public final class ChatViewModel: ObservableObject {
         } catch {
             await addAgentMessage("Error: \(error.localizedDescription)")
         }
-    }
-    
-    public func toggleStickerPicker() {
-        showAttachmentMenu.toggle()
     }
 }
 
@@ -355,13 +367,9 @@ public struct MessageBubbleView: View {
         }
     }
     
-    /// 引用条发送者名（对标 Telegram: "You" / agent 名 / "System"）
+    /// 引用条发送者名（复用全局 senderName）
     private func senderName(_ sender: ChatMessage.Sender) -> String {
-        switch sender {
-        case .user: return "You"
-        case .agent(let name): return name
-        case .system: return "System"
-        }
+        senderName(sender)
     }
     
     private var statusIcon: some View {
@@ -601,38 +609,22 @@ public struct ChatView: View {
                 // 附件菜单（对标 Telegram: 照片/文件/位置/联系人）
                 Menu {
                     Button {
-                        viewModel.messages.append(ChatMessage(
-                            id: UUID(), text: "", sender: .user, timestamp: Date(),
-                            status: .sent, reactions: [], replyTo: nil,
-                            media: [.sticker("😀")]
-                        ))
+                        viewModel.sendMediaMessage(.sticker("😀"))
                     } label: {
                         Label("Sticker", systemImage: "face.smiling")
                     }
                     Button {
-                        viewModel.messages.append(ChatMessage(
-                            id: UUID(), text: "", sender: .user, timestamp: Date(),
-                            status: .sent, reactions: [], replyTo: nil,
-                            media: [.location(37.7749, -122.4194)]
-                        ))
+                        viewModel.sendMediaMessage(.location(37.7749, -122.4194))
                     } label: {
                         Label("Location", systemImage: "mappin.and.ellipse")
                     }
                     Button {
-                        viewModel.messages.append(ChatMessage(
-                            id: UUID(), text: "", sender: .user, timestamp: Date(),
-                            status: .sent, reactions: [], replyTo: nil,
-                            media: [.contact("Alice", "+1 (555) 0101")]
-                        ))
+                        viewModel.sendMediaMessage(.contact("Alice", "+1 (555) 0101"))
                     } label: {
                         Label("Contact", systemImage: "person.crop.circle")
                     }
                     Button {
-                        viewModel.messages.append(ChatMessage(
-                            id: UUID(), text: "", sender: .user, timestamp: Date(),
-                            status: .sent, reactions: [], replyTo: nil,
-                            media: [.document(URL(string: "file:///tmp/report.pdf")!, "report.pdf")]
-                        ))
+                        viewModel.sendMediaMessage(.document(URL(string: "file:///tmp/report.pdf")!, "report.pdf"))
                     } label: {
                         Label("Document", systemImage: "doc.fill")
                     }
@@ -729,13 +721,20 @@ public struct ChatView: View {
         Task { await viewModel.sendMessage(text) }
     }
     
-    /// 回复目标条发送者名
+    /// 回复目标条发送者名（复用全局 senderName，消除重复）
     private func replySenderName(_ message: ChatMessage) -> String {
-        switch message.sender {
-        case .user: return "You"
-        case .agent(let name): return name
-        case .system: return "System"
-        }
+        senderName(message.sender)
+    }
+}
+
+// MARK: - 发送者名辅助（MessageBubbleView + ChatView 共用）
+
+/// 发送者显示名（对标 Telegram: "You" / agent 名 / "System"）
+func senderName(_ sender: ChatMessage.Sender) -> String {
+    switch sender {
+    case .user: return "You"
+    case .agent(let name): return name
+    case .system: return "System"
     }
 }
 

@@ -327,7 +327,7 @@ struct PollCard: View {
             }
         }
         .padding()
-        .background(NeoTrixTheme.Colors.placeholder)
+        .background(NeoTrixTheme.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.vertical, 4)
     }
@@ -382,7 +382,7 @@ struct PollOptionRow: View {
                         }
                     }
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(NeoTrixTheme.Colors.placeholder)
+                        .fill(NeoTrixTheme.Colors.surface)
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: 8))

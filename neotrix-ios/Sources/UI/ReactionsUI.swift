@@ -53,7 +53,10 @@ public final class ReactionManager: ObservableObject {
     }
     
     private func loadPreferences() {
-        isPremium = UserDefaults.standard.bool(forKey: "is_premium")
+        // 统一 premium 事实源为 premium_tier（与 PremiumManager 一致）
+        if let tierRaw = UserDefaults.standard.string(forKey: "premium_tier") {
+            isPremium = tierRaw != "free"
+        }
         if let saved = UserDefaults.standard.array(forKey: "favorite_reactions") as? [String] {
             favoriteReactions = saved
         }
@@ -103,11 +106,9 @@ public struct ReactionPickerView: View {
                 .pickerStyle(.segmented)
                 .padding()
                 
-                // Search
-                if !manager.isPremium {
-                    SearchField(text: $searchText, placeholder: "Search emoji")
-                        .padding(.horizontal)
-                }
+                // Search（修复: 此前 !isPremium 才显示搜索，逻辑反了 — 搜索应对所有用户开放）
+                SearchField(text: $searchText, placeholder: "Search emoji")
+                    .padding(.horizontal)
                 
                 // Reaction grid
                 ScrollView {

@@ -170,7 +170,7 @@ public struct FilterSettingsView: View {
                             engine.toggleRule(rule)
                         } label: {
                             Image(systemName: rule.isEnabled ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(rule.isEnabled ? .blue : .secondary)
+                                .foregroundColor(rule.isEnabled ? NeoTrixTheme.Colors.accent : .secondary)
                         }
                         .buttonStyle(.plain)
                         

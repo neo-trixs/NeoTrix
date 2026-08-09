@@ -105,7 +105,12 @@ public final class ThemeManager: ObservableObject {
     }
     
     private func loadPreferences() {
-        isPremium = UserDefaults.standard.bool(forKey: "is_premium")
+        // 修复: 统一 premium 事实源为 premium_tier（与 PremiumManager 一致），
+        // 此前读 is_premium 键与 PremiumManager 不同步 → 主题解锁状态不一致
+        if let tierRaw = UserDefaults.standard.string(forKey: "premium_tier"),
+           let tier = PremiumTier(rawValue: tierRaw) {
+            isPremium = tier != .free
+        }
         if let themeId = UserDefaults.standard.string(forKey: "theme_id"),
            let theme = ThemeData.themes.first(where: { $0.id == themeId }) {
             currentTheme = theme

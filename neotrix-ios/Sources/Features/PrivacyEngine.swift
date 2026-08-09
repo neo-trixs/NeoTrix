@@ -51,7 +51,7 @@ public final class PrivacyEngine: ObservableObject {
         UserDefaults.standard.set(settings.ghostMode, forKey: "privacy_ghost_mode")
         UserDefaults.standard.set(settings.hideOnlineStatus, forKey: "privacy_hide_online")
         UserDefaults.standard.set(settings.hideReadReceipts, forKey: "privacy_hide_read")
-        UserDefaults.standard.set(settings.smartNotifications, forKey: "privacy_smart_notifications")
+        UserDefaults.standard.set(settings.smartNotifications, forKey: "privacy_smart_notify")
         UserDefaults.standard.set(settings.blockUnknownDMs, forKey: "privacy_block_unknown")
         UserDefaults.standard.set(settings.hidePhoneNumber, forKey: "privacy_hide_phone")
         UserDefaults.standard.set(settings.autoLock, forKey: "privacy_auto_lock")
@@ -132,9 +132,9 @@ public struct PrivacyFinding: Identifiable {
         
         public var color: Color {
             switch self {
-            case .low: return .yellow
-            case .medium: return .orange
-            case .high: return .red
+            case .low: return NeoTrixTheme.Colors.warning
+            case .medium: return NeoTrixTheme.Colors.warning
+            case .high: return NeoTrixTheme.Colors.danger
             }
         }
     }
@@ -223,9 +223,9 @@ public struct PrivacySettingsView: View {
     
     private var scoreColor: Color {
         switch engine.privacyScore {
-        case 80...: return .green
-        case 50..<80: return .orange
-        default: return .red
+        case 80...: return NeoTrixTheme.Colors.success
+        case 50..<80: return NeoTrixTheme.Colors.warning
+        default: return NeoTrixTheme.Colors.danger
         }
     }
 }

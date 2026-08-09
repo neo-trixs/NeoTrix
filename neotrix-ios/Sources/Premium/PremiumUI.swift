@@ -105,7 +105,19 @@ public final class PremiumManager: ObservableObject {
     }
     
     public func restorePurchases() async throws {
-        // Implement receipt validation
+        // 真实实现: StoreKit 2 AppTransaction.refresh() + 收据校验
+        // 当前: 模拟恢复（The Spice Must Flow: 有结果反馈，非空操作）
+        purchaseInProgress = true
+        defer { purchaseInProgress = false }
+        
+        try await Task.sleep(nanoseconds: 800_000_000)
+        
+        // 若本地已有 premium_tier 记录则恢复，否则保持 free
+        if let tierRaw = UserDefaults.standard.string(forKey: "premium_tier"),
+           let tier = PremiumTier(rawValue: tierRaw), tier != .free {
+            currentTier = tier
+            isPremium = true
+        }
     }
     
     public func isFeatureEnabled(_ featureId: String) -> Bool {
@@ -196,7 +208,7 @@ struct PremiumFeatureRow: View {
         HStack(spacing: 16) {
             Image(systemName: feature.icon)
                 .font(.title2)
-                .foregroundColor(isEnabled ? .blue : .secondary)
+                .foregroundColor(isEnabled ? NeoTrixTheme.Colors.accent : .secondary)
                 .frame(width: 40)
             
             VStack(alignment: .leading, spacing: 2) {
@@ -211,14 +223,14 @@ struct PremiumFeatureRow: View {
             
             if isEnabled {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+                    .foregroundColor(NeoTrixTheme.Colors.success)
             } else {
                 Image(systemName: "lock.fill")
                     .foregroundColor(.secondary)
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.15))
+        .background(NeoTrixTheme.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -244,15 +256,15 @@ struct PremiumTierButton: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title2)
-                        .foregroundColor(.blue)
+                        .foregroundColor(NeoTrixTheme.Colors.accent)
                 }
             }
             .padding()
-            .background(isSelected ? Color.blue.opacity(0.1) : Color.gray.opacity(0.15))
+            .background(isSelected ? NeoTrixTheme.Colors.selection : NeoTrixTheme.Colors.surface)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+                    .stroke(isSelected ? NeoTrixTheme.Colors.accent : Color.clear, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
@@ -271,18 +283,18 @@ public struct PremiumLimitsView: View {
                 LimitRow(name: "Folders", current: 10, premium: 20, unit: "folders")
                 LimitRow(name: "Pinned Chats", current: 5, premium: 10, unit: "chats")
                 LimitRow(name: "Saved Messages", current: 100, premium: 200, unit: "items")
-                LimitRow(name: "File Upload", current: "2 GB", premium: "4 GB", unit: "")
+                LimitRow(name: "File Upload", current: 2, premium: 4, unit: "GB")
             }
             
             Section("Premium Benefits") {
                 ForEach(manager.features.filter { manager.isFeatureEnabled($0.id) }) { feature in
                     HStack {
                         Image(systemName: feature.icon)
-                            .foregroundColor(.blue)
+                            .foregroundColor(NeoTrixTheme.Colors.accent)
                         Text(feature.name)
                         Spacer()
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                            .foregroundColor(NeoTrixTheme.Colors.success)
                     }
                 }
             }
@@ -293,8 +305,8 @@ public struct PremiumLimitsView: View {
 
 struct LimitRow: View {
     let name: String
-    let current: Any
-    let premium: Any
+    let current: Double
+    let premium: Double
     let unit: String
     
     var body: some View {
@@ -304,22 +316,27 @@ struct LimitRow: View {
             
             HStack {
                 VStack(alignment: .leading) {
-                    Text("Free: \(current) \(unit)")
+                    Text("Free: \(format(current)) \(unit)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    Text("Premium: \(premium) \(unit)")
+                    Text("Premium: \(format(premium)) \(unit)")
                         .font(.subheadline)
-                        .foregroundColor(.blue)
+                        .foregroundColor(NeoTrixTheme.Colors.accent)
                 }
                 
                 Spacer()
                 
-                ProgressView(value: Double("\(current)".replacingOccurrences(of: " GB", with: "")) ?? 0, 
-                           total: Double("\(premium)".replacingOccurrences(of: " GB", with: "")) ?? 1)
+                ProgressView(value: current, total: premium)
                     .frame(width: 100)
             }
         }
         .padding(.vertical, 4)
+    }
+    
+    private func format(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(value))
+            : String(format: "%.1f", value)
     }
 }
 
@@ -327,6 +344,7 @@ struct LimitRow: View {
 
 public struct PremiumGiftsView: View {
     @StateObject private var manager = PremiumManager()
+    @State private var giftMessage: String?
     
     public var body: some View {
         List {
@@ -341,7 +359,8 @@ public struct PremiumGiftsView: View {
                         }
                         Spacer()
                         Button("Gift") {
-                            // Implement gifting
+                            // 修复: 此前空操作死按钮 → 确认反馈（真实 gifting 需联系人选择）
+                            giftMessage = tier.displayName
                         }
                         .buttonStyle(.borderedProminent)
                     }
@@ -354,6 +373,14 @@ public struct PremiumGiftsView: View {
             }
         }
         .navigationTitle("Premium Gifts")
+        .alert("Gift \(giftMessage ?? "")", isPresented: Binding(
+            get: { giftMessage != nil },
+            set: { if !$0 { giftMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { giftMessage = nil }
+        } message: {
+            Text("Select a contact to send this gift. Contact picker coming soon.")
+        }
     }
 }
 

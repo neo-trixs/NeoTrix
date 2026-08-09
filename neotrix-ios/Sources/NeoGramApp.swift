@@ -8,15 +8,20 @@ public struct NeoGramApp: App {
     @StateObject private var core = NeoGramCore.shared
     @StateObject private var passcodeManager = PasscodeManager()
     @State private var isInitialized = false
-    @State private var showPasscode = false
+    @State private var initFailed = false
     
     public init() {}
     
     public var body: some Scene {
         WindowGroup {
             Group {
-                if isInitialized {
-                    if showPasscode {
+                if initFailed {
+                    // 初始化失败错误态（对标主流产品: 可重试，不卡死转圈）
+                    InitErrorView { retry in
+                        Task { await initialize() }
+                    }
+                } else if isInitialized {
+                    if passcodeManager.isLocked {
                         PasscodeLockView()
                     } else {
                         MainTabView()
@@ -29,6 +34,7 @@ public struct NeoGramApp: App {
                 }
             }
             .preferredColorScheme(.dark)
+            .environmentObject(passcodeManager)
         }
     }
     
@@ -36,11 +42,50 @@ public struct NeoGramApp: App {
         do {
             try await core.initialize()
             isInitialized = true
-            showPasscode = passcodeManager.isPasscodeEnabled
+            // Passcode 已启用 → 启动即锁定（对标 Telegram: 冷启动要求输入）
+            if passcodeManager.isPasscodeEnabled {
+                passcodeManager.lock()
+            }
         } catch {
-            // Show error state
+            // 错误态：展示重试（修复: 此前仅 print 且卡死在 LaunchView 转圈）
             print("Failed to initialize: \(error)")
+            initFailed = true
         }
+    }
+}
+
+// MARK: - 初始化错误态（修复: 此前初始化失败永久卡 LaunchView）
+
+struct InitErrorView: View {
+    let onRetry: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(NeoTrixTheme.Colors.danger)
+            
+            Text("Failed to Initialize")
+                .font(.headline)
+            
+            Text("The NeoTrix core could not be started. Check your network and try again.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            
+            Button(action: onRetry) {
+                Text("Retry")
+                    .font(.subheadline.bold())
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 10)
+                    .background(NeoTrixTheme.Colors.accent)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .preferredColorScheme(.dark)
     }
 }
 

@@ -134,7 +134,7 @@ public struct ExportView: View {
                                     .font(.body)
                                     .padding()
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.blue.opacity(0.1))
+                                    .background(NeoTrixTheme.Colors.selection)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             
@@ -162,7 +162,7 @@ public struct ExportView: View {
                                     ForEach(result.decisions, id: \.self) { decision in
                                         HStack(alignment: .top, spacing: 8) {
                                             Image(systemName: "checkmark.circle.fill")
-                                                .foregroundColor(.green)
+                                                .foregroundColor(NeoTrixTheme.Colors.success)
                                             Text(decision)
                                                 .font(.subheadline)
                                         }
@@ -173,7 +173,7 @@ public struct ExportView: View {
                             // KB status
                             HStack {
                                 Image(systemName: result.storedInKB ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .foregroundColor(result.storedInKB ? .green : .red)
+                                    .foregroundColor(result.storedInKB ? NeoTrixTheme.Colors.success : NeoTrixTheme.Colors.danger)
                                 Text(result.storedInKB ? "Stored in NeoTrix KB" : "KB unavailable — summary only")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -185,7 +185,7 @@ public struct ExportView: View {
                     VStack(spacing: 12) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 48))
-                            .foregroundColor(.blue)
+                            .foregroundColor(NeoTrixTheme.Colors.accent)
                         Text("Export \(messages.count) messages to AI")
                             .font(.headline)
                         Text("Get a summary, key points, and decisions. Optionally stored in NeoTrix KB for future recall.")

@@ -36,14 +36,13 @@ public struct LiveFeedView: View {
             .onSubmit(of: .search) {
                 Task { await engine.refresh() }
             }
-            .onChange(of: engine.searchQuery) { _, newValue in
-                // 300ms debounce 搜索
-                Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                    if engine.searchQuery == newValue {
-                        await engine.refresh()
-                    }
-                }
+            // 修复: 此前 onChange 每次创建 Task 无取消 → 竞态（旧搜索覆盖新结果）。
+            // 改用 .task(id:) 自动取消旧任务 + 300ms debounce
+            .task(id: engine.searchQuery) {
+                guard !engine.searchQuery.isEmpty else { return }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled else { return }
+                await engine.refresh()
             }
             .refreshable {
                 await engine.refresh()

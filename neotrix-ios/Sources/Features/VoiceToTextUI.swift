@@ -78,7 +78,7 @@ public final class VoiceToTextManager: ObservableObject {
         isTranscribing = true
         
         // Note: Full Whisper integration requires the Rust core speech module.
-        // For now, simulate transcription with a placeholder + AI enhancement.
+        // 当前: 本地降级（The Spice Must Flow: 无断流）— 真实转写走 FFI speech 模块
         Task {
             // Placeholder: real transcription would call Whisper via FFI
             transcript = "Voice message transcribed (Whisper integration pending)"
@@ -109,19 +109,19 @@ public struct VoiceToTextView: View {
     
     public var body: some View {
         VStack(spacing: 24) {
-            // Recording indicator
+            // Recording indicator（设计系统: 录制态 danger / 空闲态 accent）
             ZStack {
                 Circle()
-                    .fill(manager.isRecording ? Color.red.opacity(0.15) : Color.blue.opacity(0.1))
+                    .fill(manager.isRecording ? NeoTrixTheme.Colors.danger.opacity(0.15) : NeoTrixTheme.Colors.accent.opacity(0.1))
                     .frame(width: 160, height: 160)
                 
                 Circle()
-                    .stroke(manager.isRecording ? Color.red : Color.blue, lineWidth: 3)
+                    .stroke(manager.isRecording ? NeoTrixTheme.Colors.danger : NeoTrixTheme.Colors.accent, lineWidth: 3)
                     .frame(width: 160, height: 160)
                 
                 Image(systemName: manager.isRecording ? "waveform" : "mic.fill")
                     .font(.system(size: 48))
-                    .foregroundColor(manager.isRecording ? .red : .blue)
+                    .foregroundColor(manager.isRecording ? NeoTrixTheme.Colors.danger : NeoTrixTheme.Colors.accent)
             }
             .overlay(
                 Group {
@@ -149,7 +149,7 @@ public struct VoiceToTextView: View {
                         .font(.body)
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.blue.opacity(0.1))
+                        .background(NeoTrixTheme.Colors.selection)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .padding(.horizontal)
@@ -158,7 +158,7 @@ public struct VoiceToTextView: View {
             if let error = manager.lastError {
                 Text(error)
                     .font(.caption)
-                    .foregroundColor(.red)
+                    .foregroundColor(NeoTrixTheme.Colors.danger)
             }
             
             Spacer()

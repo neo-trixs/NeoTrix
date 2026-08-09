@@ -625,7 +625,7 @@ public final class NeoTrixAPIProvider: ContentSourceProvider {
     public init() {}
     
     public func fetchLatest(limit: Int, category: FeedCategory?) async throws -> [LiveFeedItem] {
-        // 1. 尝试真实 API（score /api/v1/moments/score 需要 submissions，此处用空提交探测服务可用性）
+        // 1. 尝试真实 API（socialStatus → /api/brain/stats 探测服务可用性）
         do {
             let statuses = try await NeoTrixAPIClient.shared.socialStatus()
             return statuses.prefix(limit).map { status in

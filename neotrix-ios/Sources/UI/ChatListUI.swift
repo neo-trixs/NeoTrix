@@ -18,6 +18,15 @@ public struct ChatListItem: Identifiable, Hashable {
     public let avatarColor: Color
     public let isPremium: Bool
     public let isVerified: Bool
+    /// 会话类型（对标 Telegram: peer 类型，替代脆弱的标题 contains 匹配）
+    public let kind: ChatKind
+    
+    public enum ChatKind: Hashable {
+        case personal
+        case group
+        case channel
+        case bot
+    }
 }
 
 /// 联系人（融合原 ContactsView 占位 → 真实模型）
@@ -74,11 +83,11 @@ public final class ChatListViewModel: ObservableObject {
     private func loadChats() {
         // Load from MTProto dialogs
         chats = [
-            ChatListItem(id: 1, title: "NeoTrix AI", lastMessage: "Ready to help!", timestamp: Date(), unreadCount: 2, isPinned: true, isMuted: false, isOnline: true, avatarColor: .purple, isPremium: true, isVerified: true),
-            ChatListItem(id: 2, title: "Family Group", lastMessage: "Mom: Dinner at 7?", timestamp: Date().addingTimeInterval(-300), unreadCount: 0, isPinned: true, isMuted: false, isOnline: false, avatarColor: .green, isPremium: false, isVerified: false),
-            ChatListItem(id: 3, title: "Work", lastMessage: "John: Meeting moved to 3pm", timestamp: Date().addingTimeInterval(-1800), unreadCount: 5, isPinned: false, isMuted: true, isOnline: true, avatarColor: .blue, isPremium: false, isVerified: false),
-            ChatListItem(id: 4, title: "Tech News", lastMessage: "New AI model released", timestamp: Date().addingTimeInterval(-3600), unreadCount: 0, isPinned: false, isMuted: false, isOnline: false, avatarColor: .orange, isPremium: true, isVerified: true),
-            ChatListItem(id: 5, title: "Design Team", lastMessage: "Alice: Updated the mockups", timestamp: Date().addingTimeInterval(-7200), unreadCount: 1, isPinned: false, isMuted: false, isOnline: false, avatarColor: .pink, isPremium: false, isVerified: false),
+            ChatListItem(id: 1, title: "NeoTrix AI", lastMessage: "Ready to help!", timestamp: Date(), unreadCount: 2, isPinned: true, isMuted: false, isOnline: true, avatarColor: .purple, isPremium: true, isVerified: true, kind: .bot),
+            ChatListItem(id: 2, title: "Family Group", lastMessage: "Mom: Dinner at 7?", timestamp: Date().addingTimeInterval(-300), unreadCount: 0, isPinned: true, isMuted: false, isOnline: false, avatarColor: .green, isPremium: false, isVerified: false, kind: .group),
+            ChatListItem(id: 3, title: "Work", lastMessage: "John: Meeting moved to 3pm", timestamp: Date().addingTimeInterval(-1800), unreadCount: 5, isPinned: false, isMuted: true, isOnline: true, avatarColor: .blue, isPremium: false, isVerified: false, kind: .personal),
+            ChatListItem(id: 4, title: "Tech News", lastMessage: "New AI model released", timestamp: Date().addingTimeInterval(-3600), unreadCount: 0, isPinned: false, isMuted: false, isOnline: false, avatarColor: .orange, isPremium: true, isVerified: true, kind: .channel),
+            ChatListItem(id: 5, title: "Design Team", lastMessage: "Alice: Updated the mockups", timestamp: Date().addingTimeInterval(-7200), unreadCount: 1, isPinned: false, isMuted: false, isOnline: false, avatarColor: .pink, isPremium: false, isVerified: false, kind: .group),
         ]
     }
     
@@ -120,20 +129,20 @@ public final class ChatListViewModel: ObservableObject {
             result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
         }
         
-        // Filter by category
+        // Filter by category（对标 Telegram: 按 peer 类型过滤，替代标题 contains 脆弱匹配）
         switch selectedFilter {
         case .all:
             break
         case .unread:
             result = result.filter { $0.unreadCount > 0 }
         case .personal:
-            result = result.filter { !$0.title.contains("Group") && !$0.title.contains("News") }
+            result = result.filter { $0.kind == .personal }
         case .groups:
-            result = result.filter { $0.title.contains("Group") || $0.title.contains("Team") }
+            result = result.filter { $0.kind == .group }
         case .channels:
-            result = result.filter { $0.title.contains("News") }
+            result = result.filter { $0.kind == .channel }
         case .bots:
-            result = result.filter { $0.isPremium }
+            result = result.filter { $0.kind == .bot }
         case .favorites:
             result = result.filter { $0.isPinned }
         }
@@ -378,7 +387,7 @@ private func iconForCall(_ direction: CallRecord.Direction) -> String {
     switch direction {
     case .incoming: return "phone.arrow.down.left.fill"
     case .outgoing: return "phone.arrow.up.right.fill"
-    case .missed: return "phone.arrow.up.right.fill"
+    case .missed: return "phone.arrow.down.left.fill"
     }
 }
 
@@ -418,17 +427,19 @@ struct ChatListRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Avatar（设计系统: 头像 + 在线点）
+            // Avatar（设计系统: 头像 + 在线点 neoTrixOnlineDot）
             ZStack(alignment: .bottomTrailing) {
                 NeoTrixAvatar(title: chat.title, size: 52,
                               gradient: LinearGradient(colors: [chat.avatarColor, chat.avatarColor.opacity(0.7)],
                                                        startPoint: .topLeading, endPoint: .bottomTrailing))
                 
                 if chat.isOnline {
-                    NeoTrixTheme.Colors.online
-                        .frame(width: 14, height: 14)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(NeoTrixTheme.Colors.textPrimary.opacity(0.2), lineWidth: 2))
+                    Color.clear
+                        .frame(width: 16, height: 16)
+                        .overlay(NeoTrixTheme.Colors.online
+                            .frame(width: 14, height: 14)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(NeoTrixTheme.Colors.textPrimary.opacity(0.2), lineWidth: 2)))
                 }
             }
             
