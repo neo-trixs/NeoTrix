@@ -406,24 +406,48 @@ impl BackgroundLoopHandle {
                                     }).to_string());
                                     // 注入意识树果实 → SEAL extract_from_consciousness_tree 自动消费,
                                     // 探索目标进入 SEAL 过程学习 (R-P79 闭环: 决策 → 果实 → 学习)。
+                                    // L7 修复: quality 与 benchmark 由探索命中率驱动, 而非硬编码 0.6。
+                                    // 此前 quality=0.6 但 benchmark=default(0.0) — 果实声称高质量但
+                                    // extract_from_consciousness_tree 用 benchmark.accuracy 标记 step
+                                    // success/reward (process_stage.rs:149-150), 0.0 → 内部 step 全失败,
+                                    // 与 final_quality=0.6 自相矛盾。现在: 上次探索命中 (efe_stats.hit)
+                                    // → 果实质量高 (0.8), 未命中 → 低 (0.3), benchmark.accuracy 同步。
+                                    let mut fruit_quality = 0.5;
+                                    if let Ok(Some(stats_json)) = kb.kv_get("consciousness", "efe_stats") {
+                                        if let Ok(stats_v) = serde_json::from_str::<serde_json::Value>(&stats_json) {
+                                            if let Some(hit) = stats_v.get("hit").and_then(|h| h.as_bool()) {
+                                                fruit_quality = if hit { 0.8 } else { 0.3 };
+                                            }
+                                        }
+                                    }
                                     if let Some(ref mut tree) = self.consciousness_tree {
                                         let fruit = crate::core::nt_core_consciousness_tree::EvolutionFruit {
                                             name: format!("efe-explore-{}-{}", domain, tree.cycle),
                                             source_branch: crate::core::nt_core_consciousness_tree::BranchKind::World,
                                             description: format!("EFE 前瞻探索: 主动采样低密度知识域 '{}' (nodes={}, max={})", domain, count, max_count),
                                             produced_at_cycle: tree.cycle,
-                                            quality: 0.6,
+                                            quality: fruit_quality,
                                             claim: format!("EFE 探索目标: {} (nodes={}) — 主动采样未知知识域", domain, count),
                                             evidence: crate::core::nt_core_consciousness_tree::EvidenceChain::new(
                                                 format!("efe-{}-{}", domain, tree.cycle),
                                                 format!("efe:{}:{}", domain, count),
                                             ),
                                             stop_rule: crate::core::nt_core_consciousness_tree::StopRule::default(),
-                                            benchmark: crate::core::nt_core_consciousness_tree::ProviderBenchmark::default(),
+                                            benchmark: crate::core::nt_core_consciousness_tree::ProviderBenchmark {
+                                                provider: "efe".to_string(),
+                                                model: "efe_select_domain".to_string(),
+                                                accuracy: fruit_quality,
+                                                latency_ms: 0,
+                                                cost_usd: 0.0,
+                                                task_type: "exploration".to_string(),
+                                                timestamp: std::time::SystemTime::now()
+                                                    .duration_since(std::time::UNIX_EPOCH)
+                                                    .unwrap_or_default().as_secs(),
+                                            },
                                             generation: tree.core.generation_counter,
                                         };
                                         tree.fruits.push(fruit);
-                                        log::debug!("[bg] efe: injected exploration fruit for '{}' into consciousness tree", domain);
+                                        log::debug!("[bg] efe: injected exploration fruit for '{}' (quality={:.2}) into consciousness tree", domain, fruit_quality);
                                     }
                                     log::info!("[bg] efe: explore domain '{}' (nodes={}, scale={})",
                                         domain, count, self.config.efe_epistemic_scale);
