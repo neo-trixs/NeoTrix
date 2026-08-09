@@ -70,14 +70,15 @@ export function ProjectView(props: Props) {
     const isOpen = expanded().has(item.path)
     return (
       <div>
-        <div
-          class="flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-bg-tertiary/60 transition-colors text-sm"
+        <button
+          class="flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-bg-tertiary/60 transition-colors text-sm w-full text-left bg-transparent border-none font-inherit focus-visible:ring-2 focus-visible:ring-nt-core-500 focus-visible:outline-none"
           style={{ 'padding-left': `${depth * 14 + 8}px` }}
           onClick={() => {
             if (item.is_dir) toggle(item.path)
             else props.onOpenFile?.(item.path)
           }}
           title={item.path}
+          aria-expanded={item.is_dir ? isOpen : undefined}
         >
           {item.is_dir ? (
             <>
@@ -105,7 +106,7 @@ export function ProjectView(props: Props) {
           <span class={clsx('truncate', item.is_dir ? 'font-medium text-text-primary' : 'text-text-secondary')}>
             {item.name}
           </span>
-        </div>
+        </button>
         <Show when={item.is_dir && isOpen && item.children}>
           <For each={item.children}>
             {(child) => renderNode(child, depth + 1)}
