@@ -213,6 +213,14 @@ pub fn seal_pipeline() -> BrainPipeline {
                 .with_fix_enabled(true)
                 .with_derived_enabled(true)
                 .with_captured_enabled(true)),
+            // L8 接线: 此前未注册但有真实功能的 stage (Dark Forest: 接线或删除)。
+            // 这些 stage 定义了 frequency, 不会每 tick 执行, 接线安全。
+            Box::new(SSMUpdateStage::new()),          // E8 策略学习 (mode 值更新 + ε 衰减)
+            Box::new(HyperCubeOptimizeStage::new()),  // HyperCube 剪枝 (freq 10)
+            Box::new(MetaImprovementStage::new()),    // 元改进 (freq 10)
+            Box::new(OpenSourceCompareStage::new()),  // 开源对比 (freq 5)
+            Box::new(UQCalibrationStage::new()),      // 熵危机校准 (freq 20)
+            Box::new(SleepStage::new()),              // 记忆巩固 (freq 100)
         ],
     }
 }

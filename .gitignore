@@ -51,3 +51,6 @@ src-tauri/frontend/node_modules
 # test artifacts from cargo test cwd
 /neotrix-core/TODO.md
 /neotrix-core/TODO.yml
+
+# Auto-backup dirs (design + neotrix-core snapshots)
+.backup/
