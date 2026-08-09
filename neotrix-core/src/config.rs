@@ -1,8 +1,8 @@
 use crate::neotrix::nt_shield::key_encryption;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[allow(dead_code)]
 pub struct NeoTrixConfig {
     pub default_llm_provider: Option<String>,
@@ -60,6 +60,39 @@ impl NeoTrixConfig {
             }
         } else {
             Self::default()
+        }
+    }
+
+    /// 将指定字段写回配置文件（保留已有字段，缺失的以 None 保存）。
+    pub fn save_field(&self, field: &str, value: &str) {
+        let mut cfg = match Self::load() {
+            c if c.color_mode.is_some() || c.provider.is_some() => c,
+            c => c,
+        };
+        match field {
+            "color_mode" => cfg.color_mode = Some(value.to_string()),
+            "provider" => cfg.provider = Some(value.to_string()),
+            "default_model" => cfg.default_model = Some(value.to_string()),
+            "log_level" => cfg.log_level = Some(value.to_string()),
+            "api_key" => cfg.api_key = Some(value.to_string()),
+            _ => return,
+        }
+        if let Some(dir) = Self::path().parent() {
+            if !dir.exists() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+        }
+        let toml_str = match toml::to_string(&cfg) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[config] serialize error: {}", e);
+                return;
+            }
+        };
+        if let Err(e) = std::fs::write(Self::path(), toml_str) {
+            eprintln!("[config] write error: {}", e);
+        } else {
+            eprintln!("[config] saved {}={} to {}", field, value, Self::path().display());
         }
     }
 }

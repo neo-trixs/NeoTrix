@@ -12,8 +12,9 @@ use crate::cli::cost_tracker::COST_TRACKER;
 
 /// 计算布局：可选左侧会话面板 + 聊天 + 输入 + 状态栏。
 /// `show_sessions` 为 true 时切出左侧 20% 会话列表；否则全宽聊天区。
+/// `input_lines` 为输入区当前行数（多行输入时自适应增高，上限 8 行）。
 /// 返回 `(Option<会话面板>, 聊天区, 输入区, 状态栏)`。
-pub fn compute_layout(area: Rect, show_sessions: bool) -> (Option<Rect>, Rect, Rect, Rect) {
+pub fn compute_layout(area: Rect, show_sessions: bool, input_lines: usize) -> (Option<Rect>, Rect, Rect, Rect) {
     let main = if show_sessions {
         Layout::default()
             .direction(Direction::Horizontal)
@@ -26,11 +27,13 @@ pub fn compute_layout(area: Rect, show_sessions: bool) -> (Option<Rect>, Rect, R
             .split(area)
     };
     let (left, right) = (main[0], main[1]);
+    // 输入区高度：至少 3 行，随内容增长，上限 8 行
+    let input_h = (input_lines.max(1) + 2).clamp(3, 8) as u16;
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(1),
-            Constraint::Length(3),
+            Constraint::Length(input_h),
             Constraint::Length(1),
         ])
         .split(right);
@@ -111,21 +114,24 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
                 ]);
                 lines.push(apply_bg(header, theme.assistant_msg_bg));
 
-                // 工具调用（折叠行）
-                for tc in &msg.tool_calls {
+                // 工具调用（折叠行；x 键展开最后一条的 args）
+                for (tc_idx, tc) in msg.tool_calls.iter().enumerate() {
                     let icon = if tc.success { "✳" } else { "⚠" };
                     let dur = if tc.duration_ms > 0 {
                         format!(" ({}ms)", tc.duration_ms)
                     } else {
                         String::new()
                     };
+                    let tc_key = format!("{}:{}:{}", app.active_session, msg_idx, tc_idx);
+                    let expanded = app.tool_calls_expanded.contains(&tc_key);
+                    let toggle_hint = if expanded { "▼" } else { "▶" };
                     let tool_line = Line::from(vec![
-                        Span::styled(format!("  {} ", icon), Style::default().fg(theme.accent)),
+                        Span::styled(format!("  {} {} ", toggle_hint, icon), Style::default().fg(theme.accent)),
                         Span::styled(tc.name.clone(), Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
                         Span::styled(dur, Style::default().fg(theme.secondary)),
                     ]);
                     lines.push(apply_bg(tool_line, theme.assistant_msg_bg));
-                    if !tc.args.is_empty() {
+                    if expanded && !tc.args.is_empty() {
                         let args_line = Line::from(Span::styled(
                             format!("    {}", tc.args),
                             Style::default().fg(theme.secondary),
@@ -183,7 +189,11 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
                 }
             }
         }
-        lines.push(Line::from(""));
+        // 消息分隔线（opencode 风格，弱化视觉噪音）
+        lines.push(Line::from(Span::styled(
+            "─".repeat(40),
+            Style::default().fg(theme.code_bg),
+        )));
     }
 
     // 流式输出（尚未持久化）——使用增量渲染器预生成的 Lines，避免闪烁
@@ -235,7 +245,15 @@ pub fn render_input_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &T
         let mut first = true;
         for line in app.input.lines() {
             if first {
-                text_lines.push(Line::from(vec![prompt.clone(), Span::raw(line.to_string())]));
+                // slash 命令高亮（opencode 风格）
+                if line.starts_with('/') {
+                    text_lines.push(Line::from(vec![
+                        prompt.clone(),
+                        Span::styled(line.to_string(), Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                    ]));
+                } else {
+                    text_lines.push(Line::from(vec![prompt.clone(), Span::raw(line.to_string())]));
+                }
                 first = false;
             } else {
                 text_lines.push(Line::from(Span::raw(line.to_string())));
@@ -479,7 +497,7 @@ mod tests {
     #[test]
     fn test_compute_layout_returns_three_areas() {
         let area = Rect { x: 0, y: 0, width: 100, height: 50 };
-        let (left, chat, input, status) = compute_layout(area, false);
+        let (left, chat, input, status) = compute_layout(area, false, 0);
         assert!(left.is_none());
         assert_eq!(chat.x, 0);
         assert_eq!(chat.y, 0);
@@ -493,7 +511,7 @@ mod tests {
     #[test]
     fn test_compute_layout_with_sessions_shrinks_chat() {
         let area = Rect { x: 0, y: 0, width: 100, height: 50 };
-        let (left, chat, input, status) = compute_layout(area, true);
+        let (left, chat, input, status) = compute_layout(area, true, 0);
         let left = left.expect("会话面板应为 Some");
         assert_eq!(left.width, 20); // 20%
         assert_eq!(left.height, 50);
@@ -506,13 +524,27 @@ mod tests {
     #[test]
     fn test_compute_layout_all_areas_nonzero() {
         let area = Rect { x: 0, y: 0, width: 80, height: 24 };
-        let (_, chat, input, status) = compute_layout(area, false);
+        let (_, chat, input, status) = compute_layout(area, false, 0);
         assert!(chat.width > 0);
         assert!(chat.height > 0);
         assert!(input.width > 0);
         assert!(input.height > 0);
         assert!(status.width > 0);
         assert!(status.height > 0);
+    }
+
+    #[test]
+    fn test_compute_layout_input_grows_with_lines() {
+        let area = Rect { x: 0, y: 0, width: 100, height: 50 };
+        // 单行输入 → 3 行输入区
+        let (_, _, input1, _) = compute_layout(area, false, 0);
+        assert_eq!(input1.height, 3);
+        // 5 行输入 → 输入区增高
+        let (_, _, input5, _) = compute_layout(area, false, 5);
+        assert!(input5.height > input1.height);
+        // 大量行 → 封顶 8 行
+        let (_, _, input_many, _) = compute_layout(area, false, 50);
+        assert_eq!(input_many.height, 8);
     }
 
     #[test]

@@ -14,6 +14,7 @@ use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 use neotrix::neotrix::nt_io_mention::resolve_mentions;
 
 use neotrix::config::NeoTrixConfig;
+use neotrix::cli::tui::output::StreamingMarkdownRenderer;
 
 mod proxy_cmd;
 mod standalone;
@@ -1790,20 +1791,29 @@ You have tools available; call them when they help. Be concise and evidence-firs
         let _ = terminal.clear();
 
         let mut app = TuiApp::new(false);
+        // 从 config 读取主题偏好（color_mode）——非法值回退 dark
+        {
+            let cfg = neotrix::config::NeoTrixConfig::load();
+            if let Some(mode) = cfg.color_mode {
+                if matches!(mode.as_str(), "dark" | "light" | "gruvbox") {
+                    app.theme_name = mode;
+                }
+            }
+        }
         app.status_text = format!("Ready | model: {}", {
             let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
             guard.model().to_string()
         });
 
         let draw = |terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &TuiApp| {
-            let theme = neotrix::cli::tui::theme_by_name("dark");
+            let theme = neotrix::cli::tui::theme_by_name(&app.theme_name);
             let _ = terminal.draw(|frame| {
                 let area = frame.area();
                 use neotrix::cli::tui::layout::{
                     compute_layout, render_chat_panel, render_input_panel, render_status_bar,
                     render_session_list,
                 };
-                let (left, chat, input_area, status) = compute_layout(area, app.show_sessions);
+                let (left, chat, input_area, status) = compute_layout(area, app.show_sessions, app.input.lines().count());
                 if let Some(left_area) = left {
                     render_session_list(frame, left_area, app, &theme);
                 }
@@ -2039,7 +2049,7 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             }
         }
         "/help" => {
-            app.push_message("system", "命令: /clear /new /save /load /exit /hist /help\n快捷键: Enter提交 Alt+E多行 ↑↓历史 Ctrl+R搜索 Ctrl+L清屏 Ctrl+C取消/退出 Tab补全".into());
+            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\n会话: /new /clear /save <名> /load <名> /hist\n其他: /exit /quit /help".into());
             SlashResult::Handled
         }
         _ => {

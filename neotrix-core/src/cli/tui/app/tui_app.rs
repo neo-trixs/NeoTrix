@@ -44,6 +44,8 @@ pub struct TuiApp {
     pub status_text: String,
     pub diff_viewer: Option<crate::cli::tui::diff_viewer::DiffViewer>,
     pub thinking_expanded: HashSet<String>,
+    /// 已展开的工具调用（key = "session:msg_idx:tool_idx"）
+    pub tool_calls_expanded: HashSet<String>,
     pub streaming_role: String,
     pub streaming_text: String,
     /// 流式输出时的模型名（用于显示）
@@ -62,6 +64,10 @@ pub struct TuiApp {
     pub session_started_at: std::time::Instant,
     /// 是否显示左侧会话列表面板（Ctrl+S 切换，默认隐藏）
     pub show_sessions: bool,
+    /// 当前主题名（dark/light/gruvbox；Alt+T 循环切换）
+    pub theme_name: String,
+    /// 自动滚动到底部（流式输出时跟随最新内容；用户手动滚动后关闭）
+    pub auto_scroll: bool,
     /// 流式开始时记录，用于计算 tokens/sec。
     stream_started_at: Option<std::time::Instant>,
 }
@@ -87,6 +93,7 @@ impl TuiApp {
             status_text: if ephemeral { "Ready".into() } else { "Ready | Provider: not configured".into() },
             diff_viewer: None,
             thinking_expanded: HashSet::new(),
+            tool_calls_expanded: HashSet::new(),
             streaming_role: String::new(),
             streaming_text: String::new(),
             streaming_model: None,
@@ -100,6 +107,8 @@ impl TuiApp {
             tokens_per_sec: 0.0,
             session_started_at: std::time::Instant::now(),
             show_sessions: false,
+            theme_name: "dark".to_string(),
+            auto_scroll: true,
             stream_started_at: None,
         }
     }
@@ -110,12 +119,32 @@ impl TuiApp {
 
     pub fn push_message_with_model(&mut self, role: &str, content: String, model: Option<String>) {
         if let Some(session) = self.sessions.get_mut(self.active_session) {
+            // 会话自动命名：默认名 + 首条 user 消息 → 用内容前 20 字符
+            if role == "user" && session.messages.is_empty() && (session.name.starts_with("Session ") || session.name == "Default Session") {
+                let mut name = content.trim().chars().take(20).collect::<String>();
+                if content.chars().count() > 20 {
+                    name.push('…');
+                }
+                if !name.is_empty() {
+                    session.name = name;
+                }
+            }
             session.messages.push_back(ChatMessage::with_model(role, content, model));
         }
     }
 
     pub fn active_session(&self) -> &Session {
         &self.sessions[self.active_session]
+    }
+
+    /// 循环切换主题：dark → light → gruvbox → dark，并持久化到 config 的 color_mode。
+    pub fn cycle_theme(&mut self) {
+        self.theme_name = match self.theme_name.as_str() {
+            "dark" => "light".to_string(),
+            "light" => "gruvbox".to_string(),
+            _ => "dark".to_string(),
+        };
+        let _ = crate::config::NeoTrixConfig::default().save_field("color_mode", &self.theme_name);
     }
 
     pub fn trim(&self) -> &str {
@@ -160,6 +189,10 @@ impl TuiApp {
         // 增量渲染：喂入 chunk 获取新增 Lines
         let new_lines = self.streaming_renderer.feed(chunk);
         self.streaming_rendered_lines.extend(new_lines);
+        // 自动滚动：跟随最新内容（用户手动滚动后关闭）
+        if self.auto_scroll {
+            self.scroll_offset = 0;
+        }
     }
 
     /// 新会话：当前会话保留，追加一个空会话并切换。
@@ -187,6 +220,37 @@ impl TuiApp {
         self.streaming_text.clear();
         self.input.clear();
         self.cursor = 0;
+    }
+
+    /// 切换最后一条 assistant 消息的 thinking 展开状态（t 键）。
+    pub fn toggle_last_thinking(&mut self) {
+        let session = &self.sessions[self.active_session];
+        let last_assistant = session.messages.iter().rposition(|m| m.role == "assistant");
+        if let Some(idx) = last_assistant {
+            let key = format!("{}:{}", self.active_session, idx);
+            if self.thinking_expanded.contains(&key) {
+                self.thinking_expanded.remove(&key);
+            } else {
+                self.thinking_expanded.insert(key);
+            }
+        }
+    }
+
+    /// 切换指定工具调用的展开状态（x 键，作用于最后一条 assistant 消息）。
+    pub fn toggle_last_tool_call(&mut self) {
+        let session = &self.sessions[self.active_session];
+        let idx = session.messages.iter().rposition(|m| m.role == "assistant");
+        if let Some(msg_idx) = idx {
+            let msg = &session.messages[msg_idx];
+            if let Some(tool_idx) = msg.tool_calls.iter().rposition(|_| true) {
+                let key = format!("{}:{}:{}", self.active_session, msg_idx, tool_idx);
+                if self.tool_calls_expanded.contains(&key) {
+                    self.tool_calls_expanded.remove(&key);
+                } else {
+                    self.tool_calls_expanded.insert(key);
+                }
+            }
+        }
     }
 
     /// 核心键处理。返回动作由 `run()` 执行（提交输入/触发 LLM 轮询等）。
@@ -226,9 +290,11 @@ impl TuiApp {
                 super::super::vim_mode::VimAction::MoveLineEnd => self.cursor = self.input.len(),
                 super::super::vim_mode::VimAction::MovePageUp => {
                     self.scroll_offset = self.scroll_offset.saturating_add(5);
+                    self.auto_scroll = false;
                 }
                 super::super::vim_mode::VimAction::MovePageDown => {
                     self.scroll_offset = self.scroll_offset.saturating_sub(5);
+                    self.auto_scroll = false;
                 }
                 super::super::vim_mode::VimAction::SwitchSession(n) => {
                     if n < self.sessions.len() {
@@ -292,7 +358,10 @@ impl TuiApp {
                 }
             }
             (KeyModifiers::ALT, Char('e')) => { self.multi_line = !self.multi_line; KeyAction::None }
+            (KeyModifiers::ALT, Char('t')) => { self.cycle_theme(); KeyAction::None }
             (KeyModifiers::NONE, Char(' ')) => { self.insert_char(' '); KeyAction::None }
+            (KeyModifiers::CONTROL, Char('t')) => { self.toggle_last_thinking(); KeyAction::None }
+            (KeyModifiers::CONTROL, Char('x')) => { self.toggle_last_tool_call(); KeyAction::None }
             (KeyModifiers::NONE, Char(c)) => { self.insert_char(c); KeyAction::None }
             (KeyModifiers::NONE, Backspace) => { self.delete_char(); KeyAction::None }
             (KeyModifiers::NONE, Delete) => { self.delete_at_cursor(); KeyAction::None }
@@ -320,8 +389,8 @@ impl TuiApp {
                 }
                 KeyAction::None
             }
-            (KeyModifiers::NONE, PageUp) => { self.scroll_offset = self.scroll_offset.saturating_add(5); KeyAction::None }
-            (KeyModifiers::NONE, PageDown) => { self.scroll_offset = self.scroll_offset.saturating_sub(5); KeyAction::None }
+            (KeyModifiers::NONE, PageUp) => { self.scroll_offset = self.scroll_offset.saturating_add(5); self.auto_scroll = false; KeyAction::None }
+            (KeyModifiers::NONE, PageDown) => { self.scroll_offset = self.scroll_offset.saturating_sub(5); self.auto_scroll = false; KeyAction::None }
             (_, Tab) => {
                 if self.input.starts_with('/') && !self.input.contains(' ') {
                     self.complete_slash();
@@ -329,10 +398,18 @@ impl TuiApp {
                 KeyAction::None
             }
             (KeyModifiers::NONE, Esc) => {
-                if self.multi_line {
+                // 流式中 Esc 取消生成（Claude Code 习惯）；否则退出多行模式。
+                if self.streaming {
+                    self.agent_busy = false;
+                    self.streaming = false;
+                    self.status_text = "生成已取消".into();
+                    KeyAction::CancelGeneration
+                } else if self.multi_line {
                     self.multi_line = false;
+                    KeyAction::None
+                } else {
+                    KeyAction::None
                 }
-                KeyAction::None
             }
             _ => KeyAction::None,
         }
@@ -532,6 +609,98 @@ mod tests {
         assert!(!app.agent_busy);
         assert!(!app.streaming);
         assert_eq!(app.token_count, 0);
+    }
+
+    #[test]
+    fn test_theme_cycle_dark_light_gruvbox() {
+        let mut app = TuiApp::new(true);
+        assert_eq!(app.theme_name, "dark");
+        app.cycle_theme();
+        assert_eq!(app.theme_name, "light");
+        app.cycle_theme();
+        assert_eq!(app.theme_name, "gruvbox");
+        app.cycle_theme();
+        assert_eq!(app.theme_name, "dark", "应循环回 dark");
+    }
+
+    #[test]
+    fn test_alt_t_cycles_theme() {
+        let mut app = TuiApp::new(true);
+        app.handle_key(KeyCode::Char('t'), KeyModifiers::ALT);
+        assert_eq!(app.theme_name, "light");
+        app.handle_key(KeyCode::Char('t'), KeyModifiers::ALT);
+        assert_eq!(app.theme_name, "gruvbox");
+    }
+
+    #[test]
+    fn test_ctrl_s_toggles_session_panel() {
+        let mut app = TuiApp::new(true);
+        assert!(!app.show_sessions, "默认隐藏侧栏");
+        app.handle_key(KeyCode::Char('s'), KeyModifiers::CONTROL);
+        assert!(app.show_sessions);
+        app.handle_key(KeyCode::Char('s'), KeyModifiers::CONTROL);
+        assert!(!app.show_sessions);
+    }
+
+    #[test]
+    fn test_auto_scroll_follows_stream_and_disables_on_manual() {
+        let mut app = TuiApp::new(true);
+        assert!(app.auto_scroll, "默认自动滚动");
+        app.scroll_offset = 3;
+        app.feed_stream("chunk\n");
+        assert_eq!(app.scroll_offset, 0, "流式时自动滚动回底部");
+        // 手动 PageUp → 关闭自动滚动
+        app.handle_key(KeyCode::PageUp, KeyModifiers::NONE);
+        assert!(!app.auto_scroll);
+        app.scroll_offset = 0;
+        app.feed_stream("more\n");
+        assert!(app.scroll_offset > 0 || app.scroll_offset == 0);
+    }
+
+    #[test]
+    fn test_esc_cancels_streaming_generation() {
+        let mut app = TuiApp::new(true);
+        app.streaming = true;
+        app.agent_busy = true;
+        let action = app.handle_key(KeyCode::Esc, KeyModifiers::NONE);
+        assert_eq!(action, KeyAction::CancelGeneration);
+        assert!(!app.streaming);
+        assert!(!app.agent_busy);
+    }
+
+    #[test]
+    fn test_t_toggles_last_thinking() {
+        let mut app = TuiApp::new(true);
+        app.push_message("assistant", "正文\n\n<think>思考1</think>\n结束".to_string());
+        app.handle_key(KeyCode::Char('t'), KeyModifiers::CONTROL);
+        assert_eq!(app.thinking_expanded.len(), 1, "Ctrl+T 应展开 thinking");
+        app.handle_key(KeyCode::Char('t'), KeyModifiers::CONTROL);
+        assert!(app.thinking_expanded.is_empty(), "再按 Ctrl+T 应折叠");
+    }
+
+    #[test]
+    fn test_x_toggles_last_tool_call() {
+        let mut app = TuiApp::new(true);
+        app.push_message("assistant", "正文\n\n🛠️ read_file(path=\"a.rs\")\n".to_string());
+        app.handle_key(KeyCode::Char('x'), KeyModifiers::CONTROL);
+        assert_eq!(app.tool_calls_expanded.len(), 1, "Ctrl+X 应展开工具调用");
+        app.handle_key(KeyCode::Char('x'), KeyModifiers::CONTROL);
+        assert!(app.tool_calls_expanded.is_empty());
+    }
+
+    #[test]
+    fn test_session_auto_named_from_first_user_message() {
+        let mut app = TuiApp::new(true);
+        assert_eq!(app.sessions[0].name, "Default Session");
+        app.push_message("user", "帮我实现一个排序算法".to_string());
+        assert_eq!(app.sessions[0].name, "帮我实现一个排序算法");
+        // 超长内容截断到 20 字符 + …
+        app.new_session();
+        let long = "这是一个非常长的第一条用户消息用于测试自动命名截断功能是否正常工作";
+        app.push_message("user", long.to_string());
+        let name = &app.sessions[1].name;
+        assert!(name.chars().count() <= 21, "会话名应截断: {}", name);
+        assert!(name.ends_with('…'));
     }
 
     #[test]
