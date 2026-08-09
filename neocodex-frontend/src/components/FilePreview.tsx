@@ -111,6 +111,7 @@ export function FilePreview(props: Props) {
           <button
             class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text-muted hover:text-text-primary hover:bg-bg-tertiary/50"
             onClick={() => setExpanded(!expanded())}
+            aria-expanded={expanded()}
           >
             {expanded() ? <ChevronUp class="w-3.5 h-3.5" /> : <ChevronDown class="w-3.5 h-3.5" />}
             <span class="font-mono">查看内容 ({formatSize(text.length)})</span>
