@@ -195,31 +195,45 @@ fn check_drift(conn: &Connection, report: &mut SettingConsistencyReport) -> rusq
 /// 便捷函数: 执行检查并打印人类可读报告（对标"每卷设定检查"）
 pub fn check_and_report(conn: &Connection, path: &str) -> rusqlite::Result<SettingConsistencyReport> {
     let report = check(conn)?;
-    println!("=== KB 设定一致性检查 (每卷设定检查) ===");
-    println!("  检查时间: {}", report.checked_at);
-    println!("  扫描节点: {}", report.scanned_nodes);
-    println!(
-        "  发现: {} error / {} warning / {} info",
+    print!("{}", render_report(&report));
+    Ok(report)
+}
+
+/// 便捷函数: 执行检查并写入 String（供 CLI 接线）
+pub fn check_and_report_to_string(conn: &Connection, out: &mut String) -> rusqlite::Result<SettingConsistencyReport> {
+    let report = check(conn)?;
+    out.push_str(&render_report(&report));
+    Ok(report)
+}
+
+/// 渲染人类可读报告
+fn render_report(report: &SettingConsistencyReport) -> String {
+    let mut out = String::new();
+    out.push_str("=== KB 设定一致性检查 (每卷设定检查) ===\n");
+    out.push_str(&format!("  检查时间: {}\n", report.checked_at));
+    out.push_str(&format!("  扫描节点: {}\n", report.scanned_nodes));
+    out.push_str(&format!(
+        "  发现: {} error / {} warning / {} info\n",
         report.count(Severity::Error),
         report.count(Severity::Warning),
         report.count(Severity::Info)
-    );
+    ));
     for issue in &report.issues {
-        println!(
-            "  [{}] {} {} — {} (node: {})",
+        out.push_str(&format!(
+            "  [{}] {} {} — {} (node: {})\n",
             issue.severity.as_str(),
             issue.dimension,
             issue.title.chars().take(40).collect::<String>(),
             issue.description,
             issue.node_id.chars().take(40).collect::<String>(),
-        );
+        ));
     }
     if report.is_clean() {
-        println!("  ✅ 设定一致，无硬伤");
+        out.push_str("  ✅ 设定一致，无硬伤\n");
     } else {
-        println!("  ⚠️ 存在设定问题，建议修复后继续");
+        out.push_str("  ⚠️ 存在设定问题，建议修复后继续\n");
     }
-    Ok(report)
+    out
 }
 
 fn now_ts() -> u64 {

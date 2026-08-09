@@ -95,7 +95,9 @@ impl CliCommand for KbCmd {
                   /kb export <node_id> [--format json|svg]  导出子图\n\
                   /kb import-assets [path]       导入 assets/knowledge_data.json 到 KB\n\
                   /kb import-review [path]      导入 review-findings.json 缺陷记录到 KB\n\
-                  /kb absorb-map [--dry-run] [--limit N] [--types a,b] 全库本源溯源+能力映射 (R-P79)",
+                  /kb absorb-map [--dry-run] [--limit N] [--types a,b] 全库本源溯源+能力映射 (R-P79)\n\
+                  /kb consistency               设定一致性检查 (对标网文每卷设定检查)\n\
+                  /kb axioms                    架构公理推演树 (公理→定律→模块约束)",
             );
         }
 
@@ -115,12 +117,31 @@ impl CliCommand for KbCmd {
             "import-review" => cmd_import_review(rest),
             "absorb-map" => cmd_absorb_map(rest),
             "embed" => cmd_embed(rest),
+            "consistency" => cmd_consistency(rest),
+            "axioms" => cmd_axioms(rest),
             _ => CommandOutput::err(&format!(
-                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed",
+                "未知子命令: {}. 可用: stats, search, explore, find, cluster, central, serve, export, import-assets, import-review, absorb-map, embed, consistency, axioms",
                 sub
             )),
         }
     }
+}
+
+/// /kb consistency — 设定一致性检查 (对标网文每卷设定检查)
+fn cmd_consistency(_args: &[String]) -> CommandOutput {
+    let conn = match open_raw_conn() {
+        Some(c) => c,
+        None => return CommandOutput::err("无法打开知识库 ~/.neotrix/knowledge.db"),
+    };
+    let mut out = String::new();
+    let _ = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_setting_consistency::check_and_report_to_string(&conn, &mut out);
+    CommandOutput::ok(&out)
+}
+
+/// /kb axioms — 架构公理推演树 (公理→定律→模块约束)
+fn cmd_axioms(_args: &[String]) -> CommandOutput {
+    let tree = crate::core::nt_core_axiom_tree::AxiomTree::build();
+    CommandOutput::ok(&tree.render())
 }
 
 fn cmd_embed(_args: &[String]) -> CommandOutput {
