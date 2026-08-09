@@ -119,6 +119,43 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [dataBusy, setDataBusy] = createSignal(false)
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
 
+  // 偏好持久化：localStorage + 根元素 data-* 属性（CSS 属性选择器响应）
+  const applyPrefs = (density: 'comfortable' | 'compact', motion: 'full' | 'reduced') => {
+    const root = document.documentElement
+    root.dataset.density = density
+    root.dataset.motion = motion
+    try {
+      localStorage.setItem('neotrix:prefs', JSON.stringify({ density, motion }))
+    } catch { /* 持久化失败静默 */ }
+  }
+
+  const setDensity = (d: 'comfortable' | 'compact') => {
+    setDensityPref(d)
+    applyPrefs(d, motionPref())
+  }
+
+  const setMotion = (m: 'full' | 'reduced') => {
+    setMotionPref(m)
+    applyPrefs(densityPref(), m)
+  }
+
+  // 启动时恢复偏好
+  createEffect(() => {
+    if (props.open) {
+      try {
+        const raw = localStorage.getItem('neotrix:prefs')
+        if (raw) {
+          const p = JSON.parse(raw)
+          if (p.density) setDensityPref(p.density)
+          if (p.motion) setMotionPref(p.motion)
+          applyPrefs(p.density ?? 'comfortable', p.motion ?? 'full')
+        } else {
+          applyPrefs('comfortable', 'full')
+        }
+      } catch { /* 解析失败用默认 */ }
+    }
+  })
+
   const loadConfig = async () => {
     setLoading(true)
     try {
@@ -377,7 +414,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     <div class="space-y-1.5">
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', motionPref() === 'full' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
-                        onClick={() => setMotionPref('full')}
+                        onClick={() => setMotion('full')}
                         role="radio"
                         aria-checked={motionPref() === 'full'}
                       >
@@ -386,7 +423,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       </button>
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', motionPref() === 'reduced' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
-                        onClick={() => setMotionPref('reduced')}
+                        onClick={() => setMotion('reduced')}
                         role="radio"
                         aria-checked={motionPref() === 'reduced'}
                       >
@@ -402,7 +439,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     <div class="space-y-1.5">
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'comfortable' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
-                        onClick={() => setDensityPref('comfortable')}
+                        onClick={() => setDensity('comfortable')}
                         role="radio"
                         aria-checked={densityPref() === 'comfortable'}
                       >
@@ -411,7 +448,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       </button>
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'compact' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
-                        onClick={() => setDensityPref('compact')}
+                        onClick={() => setDensity('compact')}
                         role="radio"
                         aria-checked={densityPref() === 'compact'}
                       >

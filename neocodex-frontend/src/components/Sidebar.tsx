@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search, X } from 'lucide-solid'
+import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search, X, GitBranch, Clock, Coins, History } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
 import { SettingsModal } from './SettingsModal'
 import { clsx } from 'clsx'
@@ -9,6 +9,9 @@ interface SidebarProps {
   onToggleCollapse?: () => void
   activeView?: 'chat' | 'cowork' | 'computer'
   onSwitchView?: (view: 'chat' | 'cowork' | 'computer') => void
+  /** 功能面板入口（对标 Claude Code 侧栏：功能融合到侧栏，顶部极简） */
+  activePanel?: string | null
+  onTogglePanel?: (id: string) => void
 }
 
 const GROUP_ORDER = ['今天', '昨天', '前7天', '更早'] as const
@@ -170,6 +173,55 @@ export function Sidebar(props: SidebarProps) {
                 <span class="segb-t">电脑</span>
               </button>
             </div>
+          </div>
+
+          {/* 功能入口区（对标 Claude Code 侧栏：Git/任务/成本/时间线/侧向对话 融合到侧栏） */}
+          <div class="px-3 pb-2 flex items-center gap-1" role="toolbar" aria-label="功能面板">
+            <button
+              class={clsx('tb-btn', props.activePanel === 'git' && 'on')}
+              onClick={() => props.onTogglePanel?.('git')}
+              aria-label="Git 变更"
+              aria-pressed={props.activePanel === 'git'}
+              title="Git 变更 (⌘1)"
+            >
+              <GitBranch class="w-4 h-4" />
+            </button>
+            <button
+              class={clsx('tb-btn', props.activePanel === 'tasks' && 'on')}
+              onClick={() => props.onTogglePanel?.('tasks')}
+              aria-label="定时任务"
+              aria-pressed={props.activePanel === 'tasks'}
+              title="定时任务 (⌘2)"
+            >
+              <Clock class="w-4 h-4" />
+            </button>
+            <button
+              class={clsx('tb-btn', props.activePanel === 'cost' && 'on')}
+              onClick={() => props.onTogglePanel?.('cost')}
+              aria-label="成本看板"
+              aria-pressed={props.activePanel === 'cost'}
+              title="成本看板 (⌘3)"
+            >
+              <Coins class="w-4 h-4" />
+            </button>
+            <button
+              class={clsx('tb-btn', props.activePanel === 'timeline' && 'on')}
+              onClick={() => props.onTogglePanel?.('timeline')}
+              aria-label="时间线"
+              aria-pressed={props.activePanel === 'timeline'}
+              title="时间线 (⌘4)"
+            >
+              <History class="w-4 h-4" />
+            </button>
+            <button
+              class={clsx('tb-btn', props.activePanel === 'sidechat' && 'on')}
+              onClick={() => props.onTogglePanel?.('sidechat')}
+              aria-label="侧向对话"
+              aria-pressed={props.activePanel === 'sidechat'}
+              title="侧向对话 (⌘5)"
+            >
+              <MessageSquare class="w-4 h-4" />
+            </button>
           </div>
 
           {/* 搜索 + 新建 */}

@@ -1,8 +1,8 @@
 import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import {
   Send, Square, RotateCcw, Edit2, Copy, Check, AlertCircle, Highlighter, X,
-  FolderTree, Bug, FlaskConical, GitBranch, Clock,
-  Coins, History, MessageSquare, Monitor, Search, Cpu, Zap,
+  FolderTree, Bug, FlaskConical,
+  Search, Cpu, Zap,
 } from 'lucide-solid'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
 import { Sidebar } from '../components/Sidebar'
@@ -501,10 +501,12 @@ export function Chat() {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed())}
         activeView={activeView()}
         onSwitchView={setActiveView}
+        activePanel={activePanel()}
+        onTogglePanel={(id) => togglePanel(id as PanelId)}
       />
 
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative">
-        {/* ===== 头部 ch-top：设计 v2（chat 视图） ===== */}
+        {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅会话标题） ===== */}
         <Show when={activeView() === 'chat'}>
           <header class="ch-top" data-tauri-drag-region>
             <div class="flex items-center gap-2 flex-shrink-0 min-w-0">
@@ -513,64 +515,6 @@ export function Chat() {
                   {currentSession()!.title} · {currentSession()!.messages.length} 条消息
                 </span>
               </Show>
-            </div>
-
-            {/* 顶部工具栏：功能面板入口（对标 Codex Desktop） */}
-            <div class="flex items-center gap-0.5 ml-auto flex-shrink-0">
-              <button
-                class={clsx('tb-btn', activePanel() === 'git' && 'on')}
-                onClick={() => togglePanel('git')}
-                aria-label="Git 变更"
-                aria-pressed={activePanel() === 'git'}
-                title="Git 变更 (⌘1)"
-              >
-                <GitBranch class="w-4 h-4" />
-              </button>
-              <button
-                class={clsx('tb-btn', activePanel() === 'tasks' && 'on')}
-                onClick={() => togglePanel('tasks')}
-                aria-label="定时任务"
-                aria-pressed={activePanel() === 'tasks'}
-                title="定时任务 (⌘2)"
-              >
-                <Clock class="w-4 h-4" />
-              </button>
-              <button
-                class={clsx('tb-btn', activePanel() === 'cost' && 'on')}
-                onClick={() => togglePanel('cost')}
-                aria-label="成本看板"
-                aria-pressed={activePanel() === 'cost'}
-                title="成本看板 (⌘3)"
-              >
-                <Coins class="w-4 h-4" />
-              </button>
-              <button
-                class={clsx('tb-btn', activePanel() === 'timeline' && 'on')}
-                onClick={() => togglePanel('timeline')}
-                aria-label="时间线"
-                aria-pressed={activePanel() === 'timeline'}
-                title="时间线 (⌘4)"
-              >
-                <History class="w-4 h-4" />
-              </button>
-              <button
-                class={clsx('tb-btn', activePanel() === 'sidechat' && 'on')}
-                onClick={() => togglePanel('sidechat')}
-                aria-label="侧向对话"
-                aria-pressed={activePanel() === 'sidechat'}
-                title="侧向对话 (⌘5)"
-              >
-                <MessageSquare class="w-4 h-4" />
-              </button>
-              <button
-                class={clsx('tb-btn', activeView() === 'computer' && 'on')}
-                onClick={() => setActiveView(activeView() === 'computer' ? 'chat' : 'computer')}
-                aria-label="电脑控制"
-                aria-pressed={activeView() === 'computer'}
-                title="电脑控制 (⌘6)"
-              >
-                <Monitor class="w-4 h-4" />
-              </button>
             </div>
           </header>
         </Show>

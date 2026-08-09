@@ -276,6 +276,15 @@
     width: 100%;
   }
 
+  /* —— 紧凑密度：缩小消息间距与内边距（设置→界面密度） —— */
+  [data-density="compact"] .cs {
+    padding: 10px 16px;
+    gap: 8px;
+  }
+  [data-density="compact"] .msg {
+    gap: 6px;
+  }
+
   /* —— 消息行：用户右对齐红色渐变 / 助手左对齐玻璃 —— */
   .msg {
     display: flex;
@@ -1299,4 +1308,11 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* —— 动效克制：设置内「减弱动效」偏好（data-motion=reduced） —— */
+[data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
