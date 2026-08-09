@@ -526,6 +526,8 @@ public struct ChatView: View {
     @StateObject private var viewModel = ChatViewModel()
     @State private var showAIEditor = false
     @State private var showExport = false
+    @State private var showAICompose = false
+    @State private var showAISummary = false
     @State private var reactionTarget: UUID?
     @State private var showReactionPicker = false
     @State private var showEmojiStatus = false
@@ -733,6 +735,16 @@ public struct ChatView: View {
         .sheet(isPresented: $showExport) {
             ExportView(messages: viewModel.messages, chatTitle: externalTitle ?? "Chat")
         }
+        .sheet(isPresented: $showAICompose) {
+            // 融合: AI Compose（对标 Telegram AI 写作助手 — 描述意图生成消息）
+            AIComposeView { composed in
+                viewModel.inputText = composed
+            }
+        }
+        .sheet(isPresented: $showAISummary) {
+            // 融合: AI Summary（sentiment + key points，对标 Telegram Summarize）
+            AISummaryView(messages: viewModel.messages.map(\.text))
+        }
         .sheet(isPresented: $showReactionPicker) {
             // 融合: Reactions 工具栏（长按消息 → 选择 emoji → 应用到目标消息）
             ReactionPickerView { emoji in
@@ -752,7 +764,8 @@ public struct ChatView: View {
             #if os(iOS)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button("Summarize", action: { Task { await viewModel.summarizeChat() } })
+                    Button("AI Compose", action: { showAICompose = true })
+                    Button("Summarize", action: { showAISummary = true })
                     Button("Export to AI", action: { showExport = true })
                     Button("Clear", role: .destructive, action: { viewModel.messages.removeAll() })
                 } label: {
@@ -762,7 +775,8 @@ public struct ChatView: View {
             #else
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button("Summarize", action: { Task { await viewModel.summarizeChat() } })
+                    Button("AI Compose", action: { showAICompose = true })
+                    Button("Summarize", action: { showAISummary = true })
                     Button("Export to AI", action: { showExport = true })
                     Button("Clear", role: .destructive, action: { viewModel.messages.removeAll() })
                 } label: {

@@ -87,8 +87,8 @@ public final class SettingsViewModel: ObservableObject {
             ]),
             SettingsSection(id: "premium", title: "Premium", items: [
                 SettingsItem(id: "premium", title: "NeoGram Premium", icon: "star.circle.fill", iconColor: .yellow, badge: isPremium ? "Active" : nil, isPremium: true, isDisabled: false),
-                SettingsItem(id: "gifts", title: "Premium Gifts", icon: "gift.fill", iconColor: .pink, badge: nil, isPremium: true, isDisabled: true),
-                SettingsItem(id: "boosts", title: "Boost Levels", icon: "bolt.fill", iconColor: .orange, badge: nil, isPremium: true, isDisabled: true),
+                SettingsItem(id: "gifts", title: "Premium Gifts", icon: "gift.fill", iconColor: .pink, badge: nil, isPremium: true, isDisabled: false),
+                SettingsItem(id: "boosts", title: "Boost Levels", icon: "bolt.fill", iconColor: .orange, badge: nil, isPremium: true, isDisabled: false),
             ]),
             SettingsSection(id: "data", title: "Data & Storage", items: [
                 SettingsItem(id: "storage", title: "Storage Usage", icon: "internaldrive.fill", iconColor: .gray, badge: storageUsed, isPremium: false, isDisabled: true),
@@ -118,6 +118,8 @@ public struct SettingsView: View {
     @State private var showTheme = false
     @State private var showPasscode = false
     @State private var showAIEditor = false
+    @State private var showGifts = false
+    @State private var showBoosts = false
     
     public init() {}
     
@@ -195,6 +197,12 @@ public struct SettingsView: View {
             .sheet(isPresented: $showPremium) {
                 PremiumIntroView()
             }
+            .navigationDestination(isPresented: $showGifts) {
+                PremiumGiftsView()
+            }
+            .navigationDestination(isPresented: $showBoosts) {
+                BoostLevelsView()
+            }
         }
     }
     
@@ -213,6 +221,8 @@ public struct SettingsView: View {
         case "wallpapers": showTheme = true
         case "passcode": showPasscode = true
         case "ai_editor": showAIEditor = true
+        case "gifts": showGifts = true
+        case "boosts": showBoosts = true
         default: break
         }
     }

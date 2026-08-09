@@ -250,7 +250,7 @@ public struct AIComposeView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(result.text)
                             .padding()
-                            .background(Color.gray.opacity(0.15))
+                            .background(NeoTrixTheme.Colors.selection)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         
                         // Suggestions
@@ -266,7 +266,7 @@ public struct AIComposeView: View {
                                     Text(suggestion)
                                         .padding()
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(Color.gray.opacity(0.15))
+                                        .background(NeoTrixTheme.Colors.selection)
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
                                 .buttonStyle(.plain)
@@ -344,7 +344,7 @@ public struct AISummaryView: View {
                         Text(summary.summary)
                             .font(.body)
                             .padding()
-                            .background(Color.gray.opacity(0.15))
+                            .background(NeoTrixTheme.Colors.selection)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         
                         // Key points
@@ -393,9 +393,9 @@ public struct AISummaryView: View {
     
     private var sentimentColor: Color {
         switch summary?.sentiment {
-        case .positive: return .green.opacity(0.2)
-        case .negative: return .red.opacity(0.2)
-        default: return .gray.opacity(0.2)
+        case .positive: return NeoTrixTheme.Colors.success.opacity(0.2)
+        case .negative: return NeoTrixTheme.Colors.danger.opacity(0.2)
+        default: return NeoTrixTheme.Colors.selection
         }
     }
 }
