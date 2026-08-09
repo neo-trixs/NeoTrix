@@ -180,6 +180,7 @@ export function Sidebar(props: SidebarProps) {
                   placeholder="搜索会话标题…"
                   value={searchQuery()}
                   onInput={(e) => setSearchQuery(e.currentTarget.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); toggleSearch() } }}
                   autofocus
                 />
                 <button
