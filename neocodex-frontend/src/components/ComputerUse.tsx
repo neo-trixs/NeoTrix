@@ -318,6 +318,7 @@ export function ComputerUse(props: Props) {
                         : 'border-border-primary text-text-muted hover:text-text-primary'
                     )}
                     onClick={() => toggleMod(m)}
+                    aria-pressed={mods().includes(m)}
                   >
                     {m}
                   </button>
