@@ -78,6 +78,8 @@ export function GitPanel(props: Props) {
   }
 
   const apply = async (path: string, action: 'accept' | 'reject') => {
+    // 拒绝 = git restore 丢弃变更，破坏性操作需确认（对标 Codex）
+    if (action === 'reject' && !window.confirm(`确定丢弃 ${path} 的变更？此操作不可撤销。`)) return
     setBusy(`${path}:${action}`)
     setError(null)
     try {
@@ -175,6 +177,7 @@ export function GitPanel(props: Props) {
                         <button
                           class="flex items-center gap-2 flex-1 min-w-0 text-left"
                           onClick={() => toggle(file.path)}
+                          aria-expanded={isOpen()}
                         >
                           {isOpen() ? (
                             <ChevronDown class="w-4 h-4 text-text-muted flex-shrink-0" />
