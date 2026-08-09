@@ -25,10 +25,16 @@ pub struct ChatMessage {
     pub tool_calls: Vec<ToolCall>,
     pub image_data: Option<String>,
     pub image_name: Option<String>,
+    /// 产生该消息的模型名（仅 assistant 角色有效）
+    pub model: Option<String>,
 }
 
 impl ChatMessage {
     pub fn new(role: &str, content: String) -> Self {
+        Self::with_model(role, content, None)
+    }
+
+    pub fn with_model(role: &str, content: String, model: Option<String>) -> Self {
         let (thinking_blocks, clean_content) = extract_thinking(&content);
         let tool_calls = extract_tool_calls(&clean_content);
         Self {
@@ -38,6 +44,7 @@ impl ChatMessage {
             tool_calls,
             image_data: None,
             image_name: None,
+            model,
         }
     }
 

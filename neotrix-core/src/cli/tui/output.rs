@@ -592,3 +592,154 @@ mod tests {
         assert!(!spans.is_empty());
     }
 }
+
+/// 流式 Markdown 渲染器 —— 维护解析状态，避免每个 chunk 重新解析整个文本。
+/// 用法：创建实例 → 反复调用 `feed(chunk)` 获取新增的 Lines → 最后调用 `finish()` 获取剩余。
+#[derive(Debug, Default, Clone)]
+pub struct StreamingMarkdownRenderer {
+    /// 累积的完整文本（用于最终完整渲染对比）
+    full_text: String,
+    /// 上次已渲染的文本长度
+    last_rendered_len: usize,
+    /// 代码块状态
+    in_code_block: bool,
+    code_lang: String,
+    code_buffer: String,
+    /// 行缓冲（用于处理跨 chunk 的行）
+    line_buffer: String,
+}
+
+impl StreamingMarkdownRenderer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 喂入新 chunk，返回新增的 Lines（仅返回增量部分）。
+    /// 策略：按行处理；只有完整行（以 \n 结尾）才渲染；最后一行不完整则缓冲。
+    pub fn feed(&mut self, chunk: &str) -> Vec<Line<'static>> {
+        self.full_text.push_str(chunk);
+        self.line_buffer.push_str(chunk);
+
+        let mut new_lines = Vec::new();
+
+        // 分割完整行（保留 \n）——先取 owned，避免借用 self.line_buffer 后无法 &mut self
+        let lines: Vec<String> = self.line_buffer.split_inclusive('\n').map(String::from).collect();
+        // 最后一段如果不以 \n 结尾，是不完整行，保留在 buffer
+        let complete_lines = if self.line_buffer.ends_with('\n') {
+            lines.len()
+        } else {
+            lines.len().saturating_sub(1)
+        };
+
+        for (i, line) in lines.iter().enumerate() {
+            if i >= complete_lines {
+                break;
+            }
+            let rendered = self.render_line(line);
+            new_lines.extend(rendered);
+        }
+
+        // 更新 buffer：保留不完整的最后一行
+        if complete_lines < lines.len() {
+            self.line_buffer = lines[complete_lines].to_string();
+        } else {
+            self.line_buffer.clear();
+        }
+
+        new_lines
+    }
+
+    /// 结束流式输入，刷新剩余缓冲并返回最终 Lines。
+    pub fn finish(&mut self) -> Vec<Line<'static>> {
+        let mut final_lines = Vec::new();
+        if !self.line_buffer.is_empty() {
+            // mem::take 避免 `&self.line_buffer` 与 `&mut self` 借用冲突
+            let line_buffer = std::mem::take(&mut self.line_buffer);
+            let rendered = self.render_line(&line_buffer);
+            final_lines.extend(rendered);
+        }
+        // 处理未闭合的代码块
+        if self.in_code_block && !self.code_buffer.is_empty() {
+            // mem::take 避免 `&self.code_buffer` 与 `&mut self` 借用冲突
+            let code_buffer = std::mem::take(&mut self.code_buffer);
+            for code_line in code_buffer.lines() {
+                final_lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("  {}", code_line),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                ]));
+            }
+            self.code_buffer.clear();
+            self.in_code_block = false;
+            self.code_lang.clear();
+        }
+        final_lines
+    }
+
+    /// 渲染单行（内部使用，处理代码块、标题、列表等）。
+    fn render_line(&mut self, raw_line: &str) -> Vec<Line<'static>> {
+        let line = raw_line.trim_end();
+        let mut lines = Vec::new();
+
+        if let Some(code_part) = line.strip_prefix("```") {
+            if self.in_code_block {
+                // 代码块结束
+                let lang = self.code_lang.to_lowercase();
+                for code_line in self.code_buffer.lines() {
+                    let spans = if lang.contains("rust") || lang.contains("rs") {
+                        highlight_rust_line(code_line)
+                    } else if lang.contains("python") || lang.contains("py") {
+                        highlight_python_line(code_line)
+                    } else if lang.contains("javascript") || lang.contains("js") || lang.contains("typescript") || lang.contains("ts") {
+                        highlight_javascript_line(code_line)
+                    } else if lang.contains("json") {
+                        highlight_json_line(code_line)
+                    } else if lang.contains("sh") || lang.contains("bash") || lang.contains("zsh") || lang.contains("shell") {
+                        highlight_shell_line(code_line)
+                    } else {
+                        vec![Span::styled(code_line.to_string(), Style::default().fg(Color::Cyan))]
+                    };
+                    let mut line_spans = vec![Span::raw("  ")];
+                    line_spans.extend(spans);
+                    lines.push(Line::from(line_spans));
+                }
+                self.code_buffer.clear();
+                self.in_code_block = false;
+                self.code_lang.clear();
+            } else {
+                // 代码块开始
+                self.in_code_block = true;
+                self.code_lang = code_part.trim().to_string();
+                if !self.code_lang.is_empty() {
+                    lines.push(Line::from(vec![
+                        Span::styled(
+                            format!(" [{}.]", self.code_lang),
+                            Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+                        ),
+                    ]));
+                }
+            }
+            return lines;
+        }
+
+        if self.in_code_block {
+            self.code_buffer.push_str(line);
+            self.code_buffer.push('\n');
+            return lines;
+        }
+
+        if line == "---" || line == "***" || line == "___" {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    "\u{2500}".repeat(50),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+            return lines;
+        }
+
+        lines.push(Line::from(render_inline(line)));
+        lines
+    }
+}

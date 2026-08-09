@@ -1801,8 +1801,12 @@ You have tools available; call them when they help. Be concise and evidence-firs
                 let area = frame.area();
                 use neotrix::cli::tui::layout::{
                     compute_layout, render_chat_panel, render_input_panel, render_status_bar,
+                    render_session_list,
                 };
-                let (chat, input_area, status) = compute_layout(area);
+                let (left, chat, input_area, status) = compute_layout(area, app.show_sessions);
+                if let Some(left_area) = left {
+                    render_session_list(frame, left_area, app, &theme);
+                }
                 render_chat_panel(frame, chat, app, &theme);
                 render_input_panel(frame, input_area, app, &theme);
                 render_status_bar(frame, status, app, &theme);
@@ -1856,7 +1860,12 @@ You have tools available; call them when they help. Be concise and evidence-firs
                             app.agent_busy = true;
                             app.streaming = true;
                             app.streaming_role = "assistant".into();
+                            app.streaming_model = {
+                                let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
+                                Some(guard.model().to_string())
+                            };
                             app.streaming_text.clear();
+                            app.streaming_renderer = StreamingMarkdownRenderer::new();
 
                             use std::sync::mpsc as sync_mpsc;
                             let (chunk_tx, chunk_rx) = sync_mpsc::channel::<String>();
@@ -1942,7 +1951,11 @@ You have tools available; call them when they help. Be concise and evidence-firs
                             }
                             app.agent_busy = false;
                             app.streaming = false;
-                            app.commit_stream("assistant");
+                            let model = {
+                                let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
+                                guard.model().to_string()
+                            };
+                            app.commit_stream_with_model("assistant", Some(model));
                         }
                         KeyAction::None => {}
                     }

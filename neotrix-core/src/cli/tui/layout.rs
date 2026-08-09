@@ -10,19 +10,65 @@ use super::output::{render_markdown, render_thinking_block};
 use super::themes::Theme;
 use crate::cli::cost_tracker::COST_TRACKER;
 
-/// 计算三区布局（聊天 + 输入 + 状态栏）— opencode/Claude Code 风格。
-/// 无左侧会话面板、无边框面板；信息密度优先。
-pub fn compute_layout(area: Rect) -> (Rect, Rect, Rect) {
-    let main = Layout::default()
+/// 计算布局：可选左侧会话面板 + 聊天 + 输入 + 状态栏。
+/// `show_sessions` 为 true 时切出左侧 20% 会话列表；否则全宽聊天区。
+/// 返回 `(Option<会话面板>, 聊天区, 输入区, 状态栏)`。
+pub fn compute_layout(area: Rect, show_sessions: bool) -> (Option<Rect>, Rect, Rect, Rect) {
+    let main = if show_sessions {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
+            .split(area)
+    } else {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Length(0), Constraint::Percentage(100)])
+            .split(area)
+    };
+    let (left, right) = (main[0], main[1]);
+    let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(1),
             Constraint::Length(3),
             Constraint::Length(1),
         ])
-        .split(area);
+        .split(right);
+    let left_opt = if show_sessions { Some(left) } else { None };
+    (left_opt, vertical[0], vertical[1], vertical[2])
+}
 
-    (main[0], main[1], main[2])
+/// 渲染左侧会话列表面板 — 无边框，逐行列出 session 名称与消息数。
+pub fn render_session_list(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from(vec![
+        Span::styled("会话", Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
+        Span::styled("  Ctrl+S 隐藏", Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC)),
+    ]));
+    lines.push(Line::from(""));
+    for (i, session) in app.sessions.iter().enumerate() {
+        let active = i == app.active_session;
+        let marker = if active { "▶ " } else { "  " };
+        let name = if session.name.len() > 18 {
+            format!("{}…", &session.name[..17])
+        } else {
+            session.name.clone()
+        };
+        let line = Line::from(vec![
+            Span::styled(marker, Style::default().fg(theme.accent)),
+            Span::styled(
+                format!("{} ({})", name, session.messages.len()),
+                if active {
+                    Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(theme.primary)
+                },
+            ),
+        ]);
+        lines.push(if active { apply_bg(line, theme.user_msg_bg) } else { line });
+    }
+    let paragraph = Paragraph::new(Text::from(lines));
+    frame.render_widget(paragraph, area);
 }
 
 /// 渲染聊天区 — 无边框消息流（opencode 风格）。
@@ -30,6 +76,15 @@ pub fn compute_layout(area: Rect) -> (Rect, Rect, Rect) {
 /// - assistant: `assistant` 标签 + 工具调用折叠行 + thinking 折叠 + markdown 正文
 /// - system/error: 特殊样式
 /// - 目标状态内联（有 goal 时顶部一行）
+/// 对 Line 的所有 Span 应用背景色（用于消息气泡效果）。
+fn apply_bg(line: Line, bg: Color) -> Line {
+    Line::from(line.spans.into_iter().map(|span| {
+        let mut style = span.style;
+        style = style.bg(bg);
+        Span::styled(span.content, style)
+    }).collect::<Vec<_>>())
+}
+
 pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
     let session = app.active_session();
     let mut lines: Vec<Line> = Vec::new();
@@ -43,15 +98,18 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
     for (msg_idx, msg) in session.messages.iter().enumerate() {
         match msg.role.as_str() {
             "user" => {
-                lines.push(Line::from(vec![
+                let header = Line::from(vec![
                     Span::styled("You: ", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
                     Span::raw(msg.content.clone()),
-                ]));
+                ]);
+                lines.push(apply_bg(header, theme.user_msg_bg));
             }
             "assistant" => {
-                lines.push(Line::from(vec![
-                    Span::styled("assistant", Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
-                ]));
+                let model_suffix = msg.model.as_ref().map(|m| format!(" ({})", m)).unwrap_or_default();
+                let header = Line::from(vec![
+                    Span::styled(format!("assistant{}", model_suffix), Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
+                ]);
+                lines.push(apply_bg(header, theme.assistant_msg_bg));
 
                 // 工具调用（折叠行）
                 for tc in &msg.tool_calls {
@@ -61,25 +119,28 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
                     } else {
                         String::new()
                     };
-                    lines.push(Line::from(vec![
+                    let tool_line = Line::from(vec![
                         Span::styled(format!("  {} ", icon), Style::default().fg(theme.accent)),
                         Span::styled(tc.name.clone(), Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
                         Span::styled(dur, Style::default().fg(theme.secondary)),
-                    ]));
+                    ]);
+                    lines.push(apply_bg(tool_line, theme.assistant_msg_bg));
                     if !tc.args.is_empty() {
-                        lines.push(Line::from(Span::styled(
+                        let args_line = Line::from(Span::styled(
                             format!("    {}", tc.args),
                             Style::default().fg(theme.secondary),
-                        )));
+                        ));
+                        lines.push(apply_bg(args_line, theme.assistant_msg_bg));
                     }
                 }
 
                 // 图片附件指示
                 if let Some(ref img_name) = msg.image_name {
-                    lines.push(Line::from(Span::styled(
+                    let img_line = Line::from(Span::styled(
                         format!("  [📷 {}]", img_name),
                         Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
-                    )));
+                    ));
+                    lines.push(apply_bg(img_line, theme.assistant_msg_bg));
                 }
 
                 // thinking 折叠
@@ -87,17 +148,22 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
                 let expanded = app.thinking_expanded.contains(&key);
                 if !msg.thinking_blocks.is_empty() {
                     let indicator = if expanded { "▼" } else { "▶" };
-                    lines.push(Line::from(Span::styled(
+                    let think_line = Line::from(Span::styled(
                         format!("  {} thinking (t)", indicator),
                         Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC),
-                    )));
+                    ));
+                    lines.push(apply_bg(think_line, theme.assistant_msg_bg));
                     if expanded {
-                        lines.extend(render_thinking_block(&msg.thinking_blocks));
+                        for think_block_line in render_thinking_block(&msg.thinking_blocks) {
+                            lines.push(apply_bg(think_block_line, theme.assistant_msg_bg));
+                        }
                     }
                 }
 
-                // 正文
-                lines.extend(render_markdown(&msg.content));
+                // 正文 - 需要对 render_markdown 返回的每行应用背景
+                for md_line in render_markdown(&msg.content) {
+                    lines.push(apply_bg(md_line, theme.assistant_msg_bg));
+                }
             }
             "system" => {
                 lines.push(Line::from(Span::styled(
@@ -112,22 +178,29 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
                 )));
             }
             _ => {
-                lines.extend(render_markdown(&msg.content));
+                for md_line in render_markdown(&msg.content) {
+                    lines.push(md_line);
+                }
             }
         }
         lines.push(Line::from(""));
     }
 
-    // 流式输出（尚未持久化）
+    // 流式输出（尚未持久化）——使用增量渲染器预生成的 Lines，避免闪烁
     if app.streaming {
-        lines.push(Line::from(vec![
-            Span::styled("assistant", Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
-        ]));
-        lines.extend(render_markdown(&app.streaming_text));
-        lines.push(Line::from(Span::styled(
+        let model_suffix = app.streaming_model.as_ref().map(|m| format!(" ({})", m)).unwrap_or_default();
+        let stream_header = Line::from(vec![
+            Span::styled(format!("assistant{}", model_suffix), Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
+        ]);
+        lines.push(apply_bg(stream_header, theme.assistant_msg_bg));
+        // 使用预渲染的增量 Lines
+        for rendered_line in &app.streaming_rendered_lines {
+            lines.push(apply_bg(rendered_line.clone(), theme.assistant_msg_bg));
+        }
+        lines.push(apply_bg(Line::from(Span::styled(
             " ▌",
             Style::default().fg(theme.highlight).add_modifier(Modifier::SLOW_BLINK),
-        )));
+        )), theme.assistant_msg_bg));
     }
 
     let paragraph = Paragraph::new(Text::from(lines))
@@ -398,13 +471,16 @@ mod tests {
             secondary: Color::Yellow,
             highlight: Color::Cyan,
             code_bg: Color::DarkGray,
+            user_msg_bg: Color::Rgb(0x1A, 0x3A, 0x5C),
+            assistant_msg_bg: Color::Rgb(0x2D, 0x2D, 0x2D),
         }
     }
 
     #[test]
     fn test_compute_layout_returns_three_areas() {
         let area = Rect { x: 0, y: 0, width: 100, height: 50 };
-        let (chat, input, status) = compute_layout(area);
+        let (left, chat, input, status) = compute_layout(area, false);
+        assert!(left.is_none());
         assert_eq!(chat.x, 0);
         assert_eq!(chat.y, 0);
         assert_eq!(chat.width, 100);
@@ -415,9 +491,22 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_layout_with_sessions_shrinks_chat() {
+        let area = Rect { x: 0, y: 0, width: 100, height: 50 };
+        let (left, chat, input, status) = compute_layout(area, true);
+        let left = left.expect("会话面板应为 Some");
+        assert_eq!(left.width, 20); // 20%
+        assert_eq!(left.height, 50);
+        assert_eq!(chat.x, 20);
+        assert_eq!(chat.width, 80);
+        assert_eq!(input.height, 3);
+        assert_eq!(status.height, 1);
+    }
+
+    #[test]
     fn test_compute_layout_all_areas_nonzero() {
         let area = Rect { x: 0, y: 0, width: 80, height: 24 };
-        let (chat, input, status) = compute_layout(area);
+        let (_, chat, input, status) = compute_layout(area, false);
         assert!(chat.width > 0);
         assert!(chat.height > 0);
         assert!(input.width > 0);

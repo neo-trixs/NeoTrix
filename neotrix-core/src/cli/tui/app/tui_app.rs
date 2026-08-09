@@ -10,10 +10,13 @@
 
 use std::collections::{HashSet, VecDeque};
 
+use ratatui::text::Line;
+
 use crate::cli::tui::app::types::{Session, ChatMessage, GoalDisplay};
 use crate::cli::sandbox::SandboxMode;
 use super::super::history::CommandHistory;
 use super::super::vim_mode::VimModeManager;
+use super::super::output::StreamingMarkdownRenderer;
 
 /// 从 `run()` 返回给调用方的事件（供 entry 层收尾）。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +46,12 @@ pub struct TuiApp {
     pub thinking_expanded: HashSet<String>,
     pub streaming_role: String,
     pub streaming_text: String,
+    /// 流式输出时的模型名（用于显示）
+    pub streaming_model: Option<String>,
+    /// 流式 markdown 渲染器（增量渲染，避免闪烁）
+    pub streaming_renderer: StreamingMarkdownRenderer,
+    /// 流式渲染已生成的 Lines（避免每帧重新渲染）
+    pub streaming_rendered_lines: Vec<Line<'static>>,
     pub goal_display: GoalDisplay,
     pub sandbox_mode: SandboxMode,
     pub vim_mode: VimModeManager,
@@ -51,6 +60,8 @@ pub struct TuiApp {
     pub tokens_per_sec: f64,
     /// 会话开始时间戳（用于状态栏时长显示）。
     pub session_started_at: std::time::Instant,
+    /// 是否显示左侧会话列表面板（Ctrl+S 切换，默认隐藏）
+    pub show_sessions: bool,
     /// 流式开始时记录，用于计算 tokens/sec。
     stream_started_at: Option<std::time::Instant>,
 }
@@ -78,6 +89,9 @@ impl TuiApp {
             thinking_expanded: HashSet::new(),
             streaming_role: String::new(),
             streaming_text: String::new(),
+            streaming_model: None,
+            streaming_renderer: StreamingMarkdownRenderer::new(),
+            streaming_rendered_lines: Vec::new(),
             goal_display: GoalDisplay::idle(),
             sandbox_mode: SandboxMode::Disabled,
             vim_mode: VimModeManager::new(),
@@ -85,13 +99,18 @@ impl TuiApp {
             workspace_count: 0,
             tokens_per_sec: 0.0,
             session_started_at: std::time::Instant::now(),
+            show_sessions: false,
             stream_started_at: None,
         }
     }
 
     pub fn push_message(&mut self, role: &str, content: String) {
+        self.push_message_with_model(role, content, None);
+    }
+
+    pub fn push_message_with_model(&mut self, role: &str, content: String, model: Option<String>) {
         if let Some(session) = self.sessions.get_mut(self.active_session) {
-            session.messages.push_back(ChatMessage::new(role, content));
+            session.messages.push_back(ChatMessage::with_model(role, content, model));
         }
     }
 
@@ -105,16 +124,26 @@ impl TuiApp {
 
     /// 把流式文本标记为已持久化消息，并重置流式状态。
     pub fn commit_stream(&mut self, role: &str) {
+        self.commit_stream_with_model(role, None);
+    }
+
+    pub fn commit_stream_with_model(&mut self, role: &str, model: Option<String>) {
         let text = std::mem::take(&mut self.streaming_text);
+        // 完成流式渲染，刷新剩余缓冲
+        let final_lines = self.streaming_renderer.finish();
+        self.streaming_rendered_lines.extend(final_lines);
         if !text.is_empty() {
-            self.push_message(role, text);
+            self.push_message_with_model(role, text, model);
         }
         self.streaming = false;
         self.stream_started_at = None;
         self.tokens_per_sec = 0.0;
+        // 清理渲染状态，准备下一次流式
+        self.streaming_rendered_lines.clear();
+        self.streaming_renderer = StreamingMarkdownRenderer::new();
     }
 
-    /// 记录一个流式 chunk：更新 streaming_text + token 计数 + tokens/sec。
+    /// 记录一个流式 chunk：更新 streaming_text + token 计数 + tokens/sec + 增量渲染。
     pub fn feed_stream(&mut self, chunk: &str) {
         let now = std::time::Instant::now();
         if self.stream_started_at.is_none() {
@@ -128,6 +157,9 @@ impl TuiApp {
                 self.tokens_per_sec = self.token_count as f64 / elapsed;
             }
         }
+        // 增量渲染：喂入 chunk 获取新增 Lines
+        let new_lines = self.streaming_renderer.feed(chunk);
+        self.streaming_rendered_lines.extend(new_lines);
     }
 
     /// 新会话：当前会话保留，追加一个空会话并切换。
@@ -236,6 +268,12 @@ impl TuiApp {
                 }
             }
             (KeyModifiers::CONTROL, Char('l')) => KeyAction::ClearScreen,
+            (KeyModifiers::CONTROL, Char('s')) => {
+                // 切换左侧会话面板显示/隐藏
+                self.show_sessions = !self.show_sessions;
+                self.scroll_offset = 0;
+                KeyAction::None
+            }
             (KeyModifiers::CONTROL, Char('m')) | (KeyModifiers::CONTROL, Char('j')) => {
                 // Ctrl+M / Ctrl+J：多行模式下硬换行，否则提交。
                 if self.multi_line {
