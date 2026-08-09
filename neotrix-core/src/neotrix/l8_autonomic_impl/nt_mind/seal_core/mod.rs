@@ -11,6 +11,7 @@ pub mod lora;
 pub mod model_router;
 pub mod multi_brain;
 pub mod pipeline;
+pub mod backlog;
 pub mod self_edit;
 pub mod self_iterating;
 pub mod stats;
