@@ -122,6 +122,47 @@ impl ConstellationLevel {
             ConstellationLevel::C6EvolutionLoop => None,
         }
     }
+
+    /// 晋级条件 — 对标网文境界体系 (每个境界需满足明确晋级条件)。
+    /// 来源: novel-causal-chain-analysis.md §启发2 (力量体系 = Constellation 阶梯)
+    pub fn promotion_requirement(&self) -> &'static str {
+        match self {
+            ConstellationLevel::C0Compile => "cargo check 0 errors (可编译)",
+            ConstellationLevel::C1UnitTest => "单元测试 ≥3 且全绿",
+            ConstellationLevel::C2IntegrationTest => "集成测试通过 + 生产接线",
+            ConstellationLevel::C3Benchmark => "benchmark 基线建立 + 无回归",
+            ConstellationLevel::C4MainPipeline => "接入 SEAL 主流水线并被消费",
+            ConstellationLevel::C5SelfHealing => "自愈回路闭环 (检测→恢复→验证)",
+            ConstellationLevel::C6EvolutionLoop => "吸收循环闭环 (快照→蒸馏→落盘→反馈)",
+        }
+    }
+
+    /// 晋级代价 — 对标网文"每个境界有代价" (扮演法/献祭/反噬)。
+    /// 规则: 境界越高, 代价越大; 代价是晋升的治理成本。
+    pub fn promotion_cost(&self) -> &'static str {
+        match self {
+            ConstellationLevel::C0Compile => "依赖治理 + 编译时间",
+            ConstellationLevel::C1UnitTest => "测试维护成本",
+            ConstellationLevel::C2IntegrationTest => "集成复杂度 + 跨模块契约",
+            ConstellationLevel::C3Benchmark => "性能分析成本",
+            ConstellationLevel::C4MainPipeline => "故障影响面扩大 (生产路径)",
+            ConstellationLevel::C5SelfHealing => "自愈逻辑复杂度",
+            ConstellationLevel::C6EvolutionLoop => "演化稳定性治理",
+        }
+    }
+
+    /// 能力表现 — 对标网文"每个境界的实力表现" (可视化升级节点)。
+    pub fn capability_manifest(&self) -> &'static str {
+        match self {
+            ConstellationLevel::C0Compile => "模块存在且可编译",
+            ConstellationLevel::C1UnitTest => "核心逻辑可验证",
+            ConstellationLevel::C2IntegrationTest => "跨模块协作可用",
+            ConstellationLevel::C3Benchmark => "性能可度量可对比",
+            ConstellationLevel::C4MainPipeline => "生产路径消费产出",
+            ConstellationLevel::C5SelfHealing => "失败自动恢复",
+            ConstellationLevel::C6EvolutionLoop => "自主演化进化",
+        }
+    }
 }
 
 /// Rune 插槽类型 (5 槽)

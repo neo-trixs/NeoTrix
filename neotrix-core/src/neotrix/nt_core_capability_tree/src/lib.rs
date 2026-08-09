@@ -110,4 +110,56 @@ mod tests {
         // 无现有节点 → Budding 建议
         assert!(matches!(plans[0].actions[0], EvolutionAction::Budding { .. }));
     }
+
+    #[test]
+    fn test_constellation_promotion_metadata() {
+        // P0 (novel-causal-chain 启发2): C0-C6 带晋级条件+代价+能力表现 (对标网文境界体系)
+        let levels = [
+            ConstellationLevel::C0Compile,
+            ConstellationLevel::C1UnitTest,
+            ConstellationLevel::C2IntegrationTest,
+            ConstellationLevel::C3Benchmark,
+            ConstellationLevel::C4MainPipeline,
+            ConstellationLevel::C5SelfHealing,
+            ConstellationLevel::C6EvolutionLoop,
+        ];
+        for lvl in levels {
+            assert!(!lvl.promotion_requirement().is_empty(), "{} req", lvl.as_str());
+            assert!(!lvl.promotion_cost().is_empty(), "{} cost", lvl.as_str());
+            assert!(!lvl.capability_manifest().is_empty(), "{} manifest", lvl.as_str());
+        }
+        // 阶梯语义: 每一级有明确的晋级条件且非空
+        assert_eq!(levels[0].promotion_requirement(), "cargo check 0 errors (可编译)");
+        assert_eq!(levels[6].promotion_requirement(), "吸收循环闭环 (快照→蒸馏→落盘→反馈)");
+        // next() 链完整性: C0→C1→...→C6
+        let mut cur = Some(ConstellationLevel::C0Compile);
+        let mut steps = 0;
+        while let Some(c) = cur {
+            cur = c.next();
+            steps += 1;
+        }
+        assert_eq!(steps, 7, "C0-C6 共 7 级");
+    }
+
+    #[test]
+    fn test_promotion_cost_monotonic() {
+        // 代价随境界递增 (网文"境界越高代价越大"): C0 代价 < C6 代价
+        let cost_c0 = ConstellationLevel::C0Compile.promotion_cost();
+        let cost_c6 = ConstellationLevel::C6EvolutionLoop.promotion_cost();
+        assert_ne!(cost_c0, cost_c6);
+        // 每一级代价文本不同 (可区分性)
+        let costs: std::collections::HashSet<_> = [
+            ConstellationLevel::C0Compile,
+            ConstellationLevel::C1UnitTest,
+            ConstellationLevel::C2IntegrationTest,
+            ConstellationLevel::C3Benchmark,
+            ConstellationLevel::C4MainPipeline,
+            ConstellationLevel::C5SelfHealing,
+            ConstellationLevel::C6EvolutionLoop,
+        ]
+        .iter()
+        .map(|l| l.promotion_cost())
+        .collect();
+        assert_eq!(costs.len(), 7, "7 级代价应互不相同");
+    }
 }
