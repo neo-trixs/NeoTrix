@@ -20,6 +20,8 @@ pub struct PipelineScheduler {
     pub config: PipelineConfig,
     pub state: RwLock<PipelineState>,
     offload: RwLock<OffloadManager>,
+    /// 存稿管理器（对标网文滚动存稿：预计算结果先入存稿，主流水线按需取用）
+    backlog: RwLock<super::backlog::BacklogManager>,
     running: std::sync::atomic::AtomicBool,
 }
 
@@ -29,8 +31,25 @@ impl PipelineScheduler {
             config: PipelineConfig::default(),
             state: RwLock::new(PipelineState::new()),
             offload: RwLock::new(OffloadManager::new(base_path)),
+            backlog: RwLock::new(super::backlog::BacklogManager::default()),
             running: std::sync::atomic::AtomicBool::new(false),
         }
+    }
+
+    /// 预计算结果写入存稿（对标网文"提前写稿"）
+    pub async fn push_backlog(&self, kind: &'static str, content: impl Into<String>) {
+        let mut backlog = self.backlog.write().await;
+        let _ = backlog.push(super::backlog::BacklogEntry::new(kind, content));
+    }
+
+    /// 发布（消费）最旧存稿 — 对标网文"定时放送存稿"
+    pub async fn pop_backlog(&self) -> Option<super::backlog::BacklogEntry> {
+        self.backlog.write().await.pop()
+    }
+
+    /// 存稿状态报告（断更风险检测）
+    pub async fn backlog_report(&self) -> String {
+        self.backlog.read().await.report()
     }
 
     pub fn with_config(mut self, config: PipelineConfig) -> Self {
