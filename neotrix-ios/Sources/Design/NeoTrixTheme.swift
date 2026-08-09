@@ -78,10 +78,16 @@ public enum NeoTrixTheme {
 
     // MARK: Radius
     public enum Radius {
+        public static let xs: CGFloat = 6
         public static let small: CGFloat = 10
         public static let medium: CGFloat = 14
         public static let large: CGFloat = 18
         public static let capsule: CGFloat = 999
+        /// 细分档位（补全: 4/8/12/16 高频值，此前代码大量硬编码导致不一致）
+        public static let tiny: CGFloat = 4
+        public static let s8: CGFloat = 8
+        public static let s12: CGFloat = 12
+        public static let s16: CGFloat = 16
     }
 
     // MARK: Spacing
@@ -97,6 +103,7 @@ public enum NeoTrixTheme {
     public enum Fonts {
         public static let title = Font.title2.bold()
         public static let headline = Font.headline
+        public static let subheadline = Font.subheadline
         public static let body = Font.body
         public static let caption = Font.caption
         public static let caption2 = Font.caption2

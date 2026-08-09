@@ -59,6 +59,12 @@ public enum ChatListFilter: String, CaseIterable {
     case favorites = "Favorites"
 }
 
+/// New chat 导航目标（toolbar → contacts 选择 → 进入会话）
+private struct NewChatDestination: Identifiable {
+    let id = UUID()
+    let title: String
+}
+
 // MARK: - Chat List View Model
 
 @MainActor
@@ -70,6 +76,12 @@ public final class ChatListViewModel: ObservableObject {
     @Published public var searchText = ""
     @Published public var isSearching = false
     
+    // MARK: - 持久化 Keys（chats 用户状态覆盖 mock，首次启动以 mock 播种）
+    private static let mutedKey = "chatlist_muted_ids"
+    private static let pinnedKey = "chatlist_pinned_ids"
+    private static let readKey = "chatlist_read_ids"
+    private static let deletedKey = "chatlist_deleted_ids"
+    
     private let core = NeoGramCore.shared
     private var cancellables = Set<AnyCancellable>()
     
@@ -80,9 +92,53 @@ public final class ChatListViewModel: ObservableObject {
         setupSearch()
     }
     
+    // MARK: - 持久化辅助
+    
+    private func persistedIDs(for key: String) -> Set<Int64> {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([Int64].self, from: data) else {
+            return []
+        }
+        return Set(decoded)
+    }
+    
+    private func persist(_ ids: Set<Int64>, for key: String) {
+        if let data = try? JSONEncoder().encode(ids.sorted()) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+    
     private func loadChats() {
-        // Load from MTProto dialogs
-        chats = [
+        let mock = Self.mockChats
+        let defaults = UserDefaults.standard
+        
+        // 首次启动：以 mock 为准播种持久化状态（保证演示数据存活且后续可覆盖）
+        let seedMuted = Set(mock.filter(\.isMuted).map(\.id))
+        let seedPinned = Set(mock.filter(\.isPinned).map(\.id))
+        let seedRead = Set(mock.filter { $0.unreadCount == 0 }.map(\.id))
+        if defaults.data(forKey: Self.mutedKey) == nil { persist(seedMuted, for: Self.mutedKey) }
+        if defaults.data(forKey: Self.pinnedKey) == nil { persist(seedPinned, for: Self.pinnedKey) }
+        if defaults.data(forKey: Self.readKey) == nil { persist(seedRead, for: Self.readKey) }
+        
+        // 应用持久化覆盖 mock（集合为权威状态：不在集合内即未 mute/未 pin）
+        let muted = persistedIDs(for: Self.mutedKey)
+        let pinned = persistedIDs(for: Self.pinnedKey)
+        let read = persistedIDs(for: Self.readKey)
+        let deleted = persistedIDs(for: Self.deletedKey)
+        
+        chats = mock
+            .filter { !deleted.contains($0.id) }
+            .map { chat in
+                var c = chat
+                c.isMuted = muted.contains(c.id)
+                c.isPinned = pinned.contains(c.id)
+                if read.contains(c.id) { c.unreadCount = 0 }
+                return c
+            }
+    }
+    
+    private static var mockChats: [ChatListItem] {
+        [
             ChatListItem(id: 1, title: "NeoTrix AI", lastMessage: "Ready to help!", timestamp: Date(), unreadCount: 2, isPinned: true, isMuted: false, isOnline: true, avatarColor: .purple, isPremium: true, isVerified: true, kind: .bot),
             ChatListItem(id: 2, title: "Family Group", lastMessage: "Mom: Dinner at 7?", timestamp: Date().addingTimeInterval(-300), unreadCount: 0, isPinned: true, isMuted: false, isOnline: false, avatarColor: .green, isPremium: false, isVerified: false, kind: .group),
             ChatListItem(id: 3, title: "Work", lastMessage: "John: Meeting moved to 3pm", timestamp: Date().addingTimeInterval(-1800), unreadCount: 5, isPinned: false, isMuted: true, isOnline: true, avatarColor: .blue, isPremium: false, isVerified: false, kind: .personal),
@@ -155,21 +211,38 @@ public final class ChatListViewModel: ObservableObject {
     }
     
     public func markAsRead(_ chatId: Int64) {
-        if let index = chats.firstIndex(where: { $0.id == chatId }) {
-            chats[index].unreadCount = 0
-        }
+        guard let index = chats.firstIndex(where: { $0.id == chatId }) else { return }
+        chats[index].unreadCount = 0
+        var read = persistedIDs(for: Self.readKey)
+        read.insert(chatId)
+        persist(read, for: Self.readKey)
     }
     
     public func toggleMute(_ chatId: Int64) {
-        if let index = chats.firstIndex(where: { $0.id == chatId }) {
-            chats[index].isMuted.toggle()
-        }
+        guard let index = chats.firstIndex(where: { $0.id == chatId }) else { return }
+        chats[index].isMuted.toggle()
+        var muted = persistedIDs(for: Self.mutedKey)
+        if chats[index].isMuted { muted.insert(chatId) } else { muted.remove(chatId) }
+        persist(muted, for: Self.mutedKey)
     }
     
     public func togglePin(_ chatId: Int64) {
-        if let index = chats.firstIndex(where: { $0.id == chatId }) {
-            chats[index].isPinned.toggle()
-        }
+        guard let index = chats.firstIndex(where: { $0.id == chatId }) else { return }
+        chats[index].isPinned.toggle()
+        var pinned = persistedIDs(for: Self.pinnedKey)
+        if chats[index].isPinned { pinned.insert(chatId) } else { pinned.remove(chatId) }
+        persist(pinned, for: Self.pinnedKey)
+    }
+    
+    public func deleteChat(_ chatId: Int64) {
+        chats.removeAll { $0.id == chatId }
+        var deleted = persistedIDs(for: Self.deletedKey)
+        deleted.insert(chatId)
+        persist(deleted, for: Self.deletedKey)
+        // 清理其余状态集（已删除会话不再参与排序/过滤）
+        var muted = persistedIDs(for: Self.mutedKey); muted.remove(chatId); persist(muted, for: Self.mutedKey)
+        var pinned = persistedIDs(for: Self.pinnedKey); pinned.remove(chatId); persist(pinned, for: Self.pinnedKey)
+        var read = persistedIDs(for: Self.readKey); read.remove(chatId); persist(read, for: Self.readKey)
     }
 }
 
@@ -178,12 +251,24 @@ public final class ChatListViewModel: ObservableObject {
 public struct ChatListView: View {
     @StateObject private var viewModel = ChatListViewModel()
     @StateObject private var storyViewModel = StoryViewModel()
+    @StateObject private var folderEngine = FolderEngine()
     @State private var selectedChat: ChatListItem?
     @State private var showSettings = false
     @State private var showPremium = false
     @State private var showAI = false
+    @State private var showNewChat = false
+    @State private var newChatDestination: NewChatDestination?
     
     public init() {}
+    
+    /// 当前显示的会话：选中文件夹时按文件夹过滤，否则走分类过滤（FolderEngine 接线）
+    private var displayedChats: [ChatListItem] {
+        guard let folderID = folderEngine.selectedFolderID,
+              let folder = folderEngine.folders.first(where: { $0.id == folderID }) else {
+            return viewModel.filteredChats
+        }
+        return folderEngine.chatsForFolder(folder, allChats: viewModel.filteredChats)
+    }
     
     public var body: some View {
         NavigationStack {
@@ -196,127 +281,166 @@ public struct ChatListView: View {
                            },
                            onSeen: { id in storyViewModel.markAsSeen(id) })
                 
-                // Filter bar
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(ChatListFilter.allCases, id: \.self) { filter in
-                            FilterChip(
-                                title: filter.rawValue,
-                                isSelected: viewModel.selectedFilter == filter
-                            ) {
-                                withAnimation { viewModel.selectedFilter = filter }
+                // Filter bar（分类 Tabs + 文件夹 Tabs，对标 Telegram: filters + folders）
+                VStack(spacing: 0) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(ChatListFilter.allCases, id: \.self) { filter in
+                                FilterChip(
+                                    title: filter.rawValue,
+                                    isSelected: viewModel.selectedFilter == filter && folderEngine.selectedFolderID == nil
+                                ) {
+                                    withAnimation {
+                                        viewModel.selectedFilter = filter
+                                        if folderEngine.selectedFolderID != nil {
+                                            folderEngine.deselectFolder()
+                                        }
+                                    }
+                                }
                             }
                         }
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
+                    
+                    if !folderEngine.visibleFolders.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(folderEngine.visibleFolders) { folder in
+                                    FilterChip(
+                                        title: folder.name,
+                                        isSelected: folderEngine.selectedFolderID == folder.id
+                                    ) {
+                                        withAnimation {
+                                            if folderEngine.selectedFolderID == folder.id {
+                                                folderEngine.deselectFolder()
+                                            } else {
+                                                folderEngine.selectFolder(folder)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 8)
+                        }
+                    }
                 }
                 
                 // Chat list
                 List {
-                    // 融合：联系人 Section（真实模型，替代 Contact N 占位）
-                    if viewModel.searchText.isEmpty {
+                    // 搜索无匹配 → 空结果态
+                    if !viewModel.searchText.isEmpty && displayedChats.isEmpty {
                         Section {
-                            ForEach(viewModel.contacts) { contact in
-                                HStack(spacing: 12) {
-                                    ZStack(alignment: .bottomTrailing) {
-                                        Circle()
-                                            .fill(contact.avatarColor.gradient)
-                                            .frame(width: 40, height: 40)
-                                            .overlay(
-                                                Text(String(contact.name.prefix(1)).uppercased())
-                                                    .font(.subheadline.bold())
-                                                    .foregroundColor(.white)
+                            NeoTrixEmptyState(
+                                icon: "magnifyingglass",
+                                title: "No Results",
+                                message: "No chats match \"\(viewModel.searchText)\""
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 220)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                        }
+                    } else {
+                        // 融合：联系人 Section（真实模型，替代 Contact N 占位）
+                        if viewModel.searchText.isEmpty {
+                            Section {
+                                ForEach(viewModel.contacts) { contact in
+                                    HStack(spacing: 12) {
+                                        ZStack(alignment: .bottomTrailing) {
+                                            NeoTrixAvatar(
+                                                title: contact.name,
+                                                size: 40,
+                                                gradient: LinearGradient(colors: [contact.avatarColor, contact.avatarColor.opacity(0.7)],
+                                                                         startPoint: .topLeading, endPoint: .bottomTrailing)
                                             )
-                                        
-                                        if contact.isOnline {
-                                            Circle()
-                                                .fill(NeoTrixTheme.Colors.online)
-                                                .frame(width: 10, height: 10)
-                                                .overlay(Circle().stroke(NeoTrixTheme.Colors.background, lineWidth: 1.5))
-                                        }
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        HStack(spacing: 4) {
-                                            Text(contact.name)
-                                                .font(.body)
-                                            if contact.isPremium {
-                                                Image(systemName: "star.fill")
-                                                    .font(.caption2)
-                                                    .foregroundColor(NeoTrixTheme.Colors.premium)
+                                            
+                                            if contact.isOnline {
+                                                neoTrixOnlineDot(size: 10)
                                             }
                                         }
-                                        Text(contact.phone)
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            HStack(spacing: 4) {
+                                                Text(contact.name)
+                                                    .font(.body)
+                                                if contact.isPremium {
+                                                    Image(systemName: "star.fill")
+                                                        .font(.caption2)
+                                                        .foregroundColor(NeoTrixTheme.Colors.premium)
+                                                }
+                                            }
+                                            Text(contact.phone)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                            } header: {
+                                Text("Contacts")
+                            }
+                            
+                            // 融合：通话记录（真实模型，替代 Call N 占位）
+                            Section {
+                                ForEach(viewModel.calls) { call in
+                                    HStack(spacing: 12) {
+                                        Image(systemName: iconForCall(call.direction))
+                                            .font(.body)
+                                            .foregroundColor(colorForCall(call.direction))
+                                            .frame(width: 24)
+                                        
+                                        Text(call.name)
+                                        
+                                        Spacer()
+                                        
+                                        Text(callDurationText(call))
                                             .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
+                                    .padding(.vertical, 2)
                                 }
-                                .padding(.vertical, 2)
+                            } header: {
+                                Text("Recent Calls")
                             }
-                        } header: {
-                            Text("Contacts")
                         }
                         
-                        // 融合：通话记录（真实模型，替代 Call N 占位）
-                        Section {
-                            ForEach(viewModel.calls) { call in
-                                HStack(spacing: 12) {
-                                    Image(systemName: iconForCall(call.direction))
-                                        .font(.body)
-                                        .foregroundColor(colorForCall(call.direction))
-                                        .frame(width: 24)
-                                    
-                                    Text(call.name)
-                                    
-                                    Spacer()
-                                    
-                                    Text(callDurationText(call))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                        ForEach(displayedChats) { chat in
+                            ChatListRow(chat: chat)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedChat = chat
                                 }
-                                .padding(.vertical, 2)
-                            }
-                        } header: {
-                            Text("Recent Calls")
-                        }
-                    }
-                    
-                    ForEach(viewModel.filteredChats) { chat in
-                        ChatListRow(chat: chat)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedChat = chat
-                            }
-                            .contextMenu {
-                                Button {
-                                    viewModel.markAsRead(chat.id)
-                                } label: {
-                                    Label("Mark as Read", systemImage: "checkmark.circle")
-                                }
-                                
-                                Button {
-                                    viewModel.toggleMute(chat.id)
-                                } label: {
-                                    Label(chat.isMuted ? "Unmute" : "Mute", systemImage: chat.isMuted ? "speaker.wave.2" : "bell.slash")
-                                }
-                                
-                                Button {
-                                    viewModel.togglePin(chat.id)
-                                } label: {
-                                    Label(chat.isPinned ? "Unpin" : "Pin", systemImage: chat.isPinned ? "pin.slash" : "pin")
-                                }
-                                
-                                Divider()
-                                
-                                Button(role: .destructive) {
-                                    withAnimation {
-                                        viewModel.chats.removeAll { $0.id == chat.id }
+                                .contextMenu {
+                                    Button {
+                                        viewModel.markAsRead(chat.id)
+                                    } label: {
+                                        Label("Mark as Read", systemImage: "checkmark.circle")
                                     }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    
+                                    Button {
+                                        viewModel.toggleMute(chat.id)
+                                    } label: {
+                                        Label(chat.isMuted ? "Unmute" : "Mute", systemImage: chat.isMuted ? "speaker.wave.2" : "bell.slash")
+                                    }
+                                    
+                                    Button {
+                                        viewModel.togglePin(chat.id)
+                                    } label: {
+                                        Label(chat.isPinned ? "Unpin" : "Pin", systemImage: chat.isPinned ? "pin.slash" : "pin")
+                                    }
+                                    
+                                    Divider()
+                                    
+                                    Button(role: .destructive) {
+                                        withAnimation {
+                                            viewModel.deleteChat(chat.id)
+                                        }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
                                 }
-                            }
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -339,13 +463,21 @@ public struct ChatListView: View {
                             showPremium = true
                         } label: {
                             Image(systemName: "star.circle.fill")
-                                .foregroundColor(.yellow)
+                                .foregroundColor(NeoTrixTheme.Colors.premium)
                         }
                         
                         Button {
-                            // New chat
+                            showNewChat = true
                         } label: {
                             Image(systemName: "square.and.pencil")
+                        }
+                        .confirmationDialog("New Chat", isPresented: $showNewChat, titleVisibility: .visible) {
+                            ForEach(viewModel.contacts) { contact in
+                                Button(contact.name) {
+                                    newChatDestination = NewChatDestination(title: contact.name)
+                                }
+                            }
+                            Button("Cancel", role: .cancel) {}
                         }
                     }
                 }
@@ -355,7 +487,7 @@ public struct ChatListView: View {
                         showPremium = true
                     } label: {
                         Image(systemName: "star.circle.fill")
-                            .foregroundColor(.yellow)
+                            .foregroundColor(NeoTrixTheme.Colors.premium)
                     }
                 }
                 #endif
@@ -369,13 +501,14 @@ public struct ChatListView: View {
             .sheet(isPresented: $showAI) {
                 // AI 助手入口（融合: AIHub 中枢）
                 NavigationStack {
-                    ChatView()
-                        .navigationTitle("AI 助手")
+                    ChatView(title: "AI 助手")
                 }
             }
             .navigationDestination(item: $selectedChat) { chat in
-                ChatView()
-                    .navigationTitle(chat.title)
+                ChatView(title: chat.title)
+            }
+            .navigationDestination(item: $newChatDestination) { destination in
+                ChatView(title: destination.title)
             }
         }
     }
@@ -407,6 +540,16 @@ private func callDurationText(_ call: CallRecord) -> String {
     return "\(call.duration)s"
 }
 
+/// 会话时间戳（对标 Telegram: 今天显示时间 / 昨天显示 "Yesterday" / 更早显示日期）
+private func chatTimestampText(_ date: Date) -> String {
+    let calendar = Calendar.current
+    if calendar.isDateInToday(date) {
+        return date.formatted(date: .omitted, time: .shortened)
+    }
+    if calendar.isDateInYesterday(date) { return "Yesterday" }
+    return date.formatted(date: .abbreviated, time: .omitted)
+}
+
 struct FilterChip: View {
     let title: String
     let isSelected: Bool
@@ -415,7 +558,7 @@ struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline)
+                .font(NeoTrixTheme.Fonts.subheadline)
                 .neoTrixCapsule(isSelected: isSelected)
         }
         .buttonStyle(.plain)
@@ -434,12 +577,8 @@ struct ChatListRow: View {
                                                        startPoint: .topLeading, endPoint: .bottomTrailing))
                 
                 if chat.isOnline {
-                    Color.clear
-                        .frame(width: 16, height: 16)
-                        .overlay(NeoTrixTheme.Colors.online
-                            .frame(width: 14, height: 14)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(NeoTrixTheme.Colors.textPrimary.opacity(0.2), lineWidth: 2)))
+                    neoTrixOnlineDot(size: 14)
+                        .padding(1)
                 }
             }
             
@@ -464,7 +603,7 @@ struct ChatListRow: View {
                     
                     Spacer()
                     
-                    Text(chat.timestamp, style: .time)
+                    Text(chatTimestampText(chat.timestamp))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -484,12 +623,7 @@ struct ChatListRow: View {
                     }
                     
                     if chat.unreadCount > 0 {
-                        Text("\(chat.unreadCount)")
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                            .frame(minWidth: 20, minHeight: 20)
-                            .background(NeoTrixTheme.Colors.badge)
-                            .clipShape(Circle())
+                        neoTrixUnreadBadge(chat.unreadCount)
                     }
                 }
             }

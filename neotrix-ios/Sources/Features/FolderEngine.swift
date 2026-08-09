@@ -8,7 +8,7 @@ import SwiftUI
 
 // MARK: - Folder Models
 
-public struct ChatFolder: Identifiable, Equatable {
+public struct ChatFolder: Identifiable, Equatable, Codable {
     public let id: UUID
     public var name: String
     public var icon: String
@@ -48,6 +48,15 @@ public final class FolderEngine: ObservableObject {
     }
     
     private func loadFolders() {
+        // 修复: 从 UserDefaults 恢复用户自建/修改的文件夹（此前每次从 mock 重建，增删/显隐全丢）
+        let defaults = UserDefaults.standard
+        if let data = defaults.data(forKey: "chat_folders"),
+           let saved = try? JSONDecoder().decode([ChatFolder].self, from: data),
+           !saved.isEmpty {
+            folders = saved
+            return
+        }
+        // 首次启动: mock 播种
         folders = [
             ChatFolder(name: "All Chats", icon: "bubble.left.and.bubble.right.fill"),
             ChatFolder(name: "Personal", icon: "person.fill"),
@@ -57,13 +66,24 @@ public final class FolderEngine: ObservableObject {
             ChatFolder(name: "Bots", icon: "cpu.fill"),
             ChatFolder(name: "Favorites", icon: "star.fill"),
         ]
+        saveFolders()
+    }
+    
+    /// 持久化文件夹（修复: 增删/显隐/重命名全部落盘，重启不丢）
+    public func saveFolders() {
+        if let data = try? JSONEncoder().encode(folders) {
+            UserDefaults.standard.set(data, forKey: "chat_folders")
+        }
     }
     
     private func restoreLastFolder() {
         if rememberLastFolder,
            let savedID = UserDefaults.standard.string(forKey: "last_folder_id"),
            let uuid = UUID(uuidString: savedID) {
-            selectedFolderID = uuid
+            // 修复: 持久化文件夹存在性 guard — 被删除的文件夹 id 不恢复选中
+            if folders.contains(where: { $0.id == uuid }) {
+                selectedFolderID = uuid
+            }
         }
     }
     
@@ -74,18 +94,32 @@ public final class FolderEngine: ObservableObject {
         }
     }
     
+    /// 取消选中（修复: 无选中状态支持，避免"选中后无法回到 All"）
+    public func deselectFolder() {
+        selectedFolderID = nil
+        if rememberLastFolder {
+            UserDefaults.standard.removeObject(forKey: "last_folder_id")
+        }
+    }
+    
     public func toggleFolderVisibility(_ folder: ChatFolder) {
         if let index = folders.firstIndex(where: { $0.id == folder.id }) {
             folders[index].isHidden.toggle()
+            saveFolders()
         }
     }
     
     public func createFolder(name: String, icon: String) {
         folders.append(ChatFolder(name: name, icon: icon))
+        saveFolders()
     }
     
     public func deleteFolder(_ folder: ChatFolder) {
         folders.removeAll { $0.id == folder.id }
+        if selectedFolderID == folder.id {
+            selectedFolderID = nil
+        }
+        saveFolders()
     }
     
     // MARK: - AI Auto-Classification
@@ -99,16 +133,19 @@ public final class FolderEngine: ObservableObject {
                 folders[index].chatIDs.insert(chat.id)
             }
         }
+        saveFolders()
     }
     
     private func classifyChat(_ chat: ChatListItem) -> String {
-        // Rule-based fallback (E8 upgrade path)
-        if chat.isPremium && chat.isVerified { return "Bots" }
-        if chat.title.contains("Group") || chat.title.contains("Team") { return "Groups" }
-        if chat.title.contains("News") || chat.title.contains("Channel") { return "Channels" }
-        if chat.isPinned { return "Favorites" }
-        if chat.title.contains("Work") || chat.title.contains("Meeting") { return "Work" }
-        return "Personal"
+        // 修复: 用 ChatKind 语义分类（此前标题 contains 匹配 = ChatListUI 已废弃的脆弱模式复活）
+        switch chat.kind {
+        case .bot: return "Bots"
+        case .channel: return "Channels"
+        case .group: return "Groups"
+        case .personal:
+            if chat.isPinned { return "Favorites" }
+            return "Personal"
+        }
     }
     
     public var visibleFolders: [ChatFolder] {
@@ -117,6 +154,18 @@ public final class FolderEngine: ObservableObject {
     
     public func chatsForFolder(_ folder: ChatFolder, allChats: [ChatListItem]) -> [ChatListItem] {
         if folder.name == "All Chats" { return allChats }
+        // 修复: 默认文件夹无 chatIDs 时按 kind 语义 fallback（此前默认文件夹恒返回空列表）
+        if folder.chatIDs.isEmpty {
+            switch folder.name {
+            case "Personal": return allChats.filter { $0.kind == .personal }
+            case "Work": return allChats.filter { $0.title.localizedCaseInsensitiveContains("work") || $0.kind == .personal }
+            case "Groups": return allChats.filter { $0.kind == .group }
+            case "Channels": return allChats.filter { $0.kind == .channel }
+            case "Bots": return allChats.filter { $0.kind == .bot }
+            case "Favorites": return allChats.filter { $0.isPinned }
+            default: return []
+            }
+        }
         return allChats.filter { folder.chatIDs.contains($0.id) }
     }
 }

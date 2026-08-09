@@ -46,12 +46,6 @@ public enum AIEditAction: String, CaseIterable, Identifiable {
     }
 }
 
-public struct AIEditResult {
-    public let original: String
-    public let edited: String
-    public let action: AIEditAction
-}
-
 // MARK: - AI Editor Manager
 
 @MainActor
@@ -239,26 +233,44 @@ public struct AIEditorView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Edit") {
-                        Task {
-                            result = await manager.edit(draft, action: selectedAction)
+                    if manager.isProcessing {
+                        // 修复: Edit 按钮 loading 态（此前 isProcessing 无 UI 消费，点击后静默等待）
+                        ProgressView()
+                    } else {
+                        Button("Edit") {
+                            Task {
+                                result = await manager.edit(draft, action: selectedAction)
+                            }
                         }
                     }
-                    .disabled(manager.isProcessing)
                 }
                 #else
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Edit") {
-                        Task {
-                            result = await manager.edit(draft, action: selectedAction)
+                    if manager.isProcessing {
+                        ProgressView()
+                    } else {
+                        Button("Edit") {
+                            Task {
+                                result = await manager.edit(draft, action: selectedAction)
+                            }
                         }
                     }
-                    .disabled(manager.isProcessing)
                 }
                 #endif
+            }
+        }
+        // 修复: 草稿持久化（对标 Telegram: 编辑中途退出不丢草稿）
+        .onAppear {
+            if draft.isEmpty, let saved = UserDefaults.standard.string(forKey: "ai_editor_draft") {
+                draft = saved
+            }
+        }
+        .onDisappear {
+            if !draft.isEmpty {
+                UserDefaults.standard.set(draft, forKey: "ai_editor_draft")
             }
         }
     }

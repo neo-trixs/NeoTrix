@@ -14,6 +14,17 @@ public enum PremiumTier: String, CaseIterable, Identifiable {
     
     public var id: String { rawValue }
     
+    /// 层级排序（修复 P0: 此前 isFeatureEnabled 用 rawValue 字典序比较，
+    /// "Biannual" < "Monthly"（B<M）→ 两年订阅者打不开 Monthly 档功能；"Yearly" >= "Biannual"（Y>B）→ 年付错误解锁两年档）
+    public var rank: Int {
+        switch self {
+        case .free: return 0
+        case .monthly: return 1
+        case .yearly: return 2
+        case .biannual: return 3
+        }
+    }
+    
     public var displayName: String {
         switch self {
         case .free: return "Free"
@@ -122,7 +133,8 @@ public final class PremiumManager: ObservableObject {
     
     public func isFeatureEnabled(_ featureId: String) -> Bool {
         guard let feature = features.first(where: { $0.id == featureId }) else { return false }
-        return isPremium && currentTier.rawValue >= feature.tier.rawValue
+        // 修复 P0: 用 rank 语义比较（此前 rawValue 字典序 → tier 比较失效）
+        return isPremium && currentTier.rank >= feature.tier.rank
     }
 }
 
@@ -131,6 +143,9 @@ public final class PremiumManager: ObservableObject {
 public struct PremiumIntroView: View {
     @StateObject private var manager = PremiumManager()
     @Environment(\.dismiss) private var dismiss
+    @State private var showLimits = false
+    @State private var showGifts = false
+    @State private var showBoosts = false
     
     public var body: some View {
         NavigationStack {
@@ -140,7 +155,7 @@ public struct PremiumIntroView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "star.circle.fill")
                             .font(.system(size: 80))
-                            .foregroundStyle(.yellow.gradient)
+                            .foregroundStyle(NeoTrixTheme.Colors.premium.gradient)
                         
                         Text("NeoGram Premium")
                             .font(.largeTitle.bold())
@@ -163,7 +178,11 @@ public struct PremiumIntroView: View {
                     // Tier selection
                     VStack(spacing: 12) {
                         ForEach(PremiumTier.allCases.filter { $0 != .free }) { tier in
-                            PremiumTierButton(tier: tier, isSelected: manager.currentTier == tier) {
+                            PremiumTierButton(
+                                tier: tier,
+                                isSelected: manager.currentTier == tier,
+                                isPurchasing: manager.purchaseInProgress
+                            ) {
                                 Task { try? await manager.purchase(tier) }
                             }
                         }
@@ -177,6 +196,59 @@ public struct PremiumIntroView: View {
                     .font(.footnote)
                     .foregroundColor(.secondary)
                     .padding(.top, 8)
+                    
+                    // 修复: 死视图接线（PremiumLimitsView/GiftsView/BoostLevelsView 此前无任何调用者）
+                    // 对标 Telegram Premium 设置页: Limits / Gifts / Boost 入口
+                    VStack(spacing: 0) {
+                        Divider()
+                        Button {
+                            showLimits = true
+                        } label: {
+                            HStack {
+                                Label("Limits", systemImage: "gauge.with.dots.needle.50percent")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Divider()
+                        Button {
+                            showGifts = true
+                        } label: {
+                            HStack {
+                                Label("Premium Gifts", systemImage: "gift.fill")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Divider()
+                        Button {
+                            showBoosts = true
+                        } label: {
+                            HStack {
+                                Label("Boost Levels", systemImage: "bolt.fill")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal)
+                    .background(NeoTrixTheme.Colors.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal)
                     
                     Spacer(minLength: 40)
                 }
@@ -195,6 +267,15 @@ public struct PremiumIntroView: View {
                     Button("Done") { dismiss() }
                 }
                 #endif
+            }
+            .navigationDestination(isPresented: $showLimits) {
+                PremiumLimitsView()
+            }
+            .navigationDestination(isPresented: $showGifts) {
+                PremiumGiftsView()
+            }
+            .navigationDestination(isPresented: $showBoosts) {
+                BoostLevelsView()
             }
         }
     }
@@ -238,6 +319,7 @@ struct PremiumFeatureRow: View {
 struct PremiumTierButton: View {
     let tier: PremiumTier
     let isSelected: Bool
+    var isPurchasing: Bool = false
     let action: () -> Void
     
     var body: some View {
@@ -253,7 +335,10 @@ struct PremiumTierButton: View {
                 
                 Spacer()
                 
-                if isSelected {
+                if isPurchasing {
+                    // 修复: 购买 loading 态（此前 purchaseInProgress 无 UI 消费，点击后无反馈）
+                    ProgressView()
+                } else if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title2)
                         .foregroundColor(NeoTrixTheme.Colors.accent)
@@ -268,6 +353,7 @@ struct PremiumTierButton: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(isPurchasing)
     }
 }
 

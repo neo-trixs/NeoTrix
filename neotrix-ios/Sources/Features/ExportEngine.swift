@@ -27,15 +27,37 @@ public final class ExportEngine: ObservableObject {
     private let core = NeoGramCore.shared
     private let aiHub = AIHub.shared
     
-    public struct ExportRecord: Identifiable {
-        public let id = UUID()
+    public struct ExportRecord: Identifiable, Codable {
+        public let id: UUID
         public let date: Date
         public let chatTitle: String
         public let messageCount: Int
         public let summary: String
+        
+        public init(id: UUID = UUID(), date: Date, chatTitle: String, messageCount: Int, summary: String) {
+            self.id = id
+            self.date = date
+            self.chatTitle = chatTitle
+            self.messageCount = messageCount
+            self.summary = summary
+        }
     }
     
-    public init() {}
+    private static let historyKey = "export_history"
+    
+    public init() {
+        // 修复: 导出历史持久化（此前 exportHistory 仅内存，重启丢失）
+        if let data = UserDefaults.standard.data(forKey: Self.historyKey),
+           let saved = try? JSONDecoder().decode([ExportRecord].self, from: data) {
+            exportHistory = saved
+        }
+    }
+    
+    private func persistHistory() {
+        if let data = try? JSONEncoder().encode(exportHistory) {
+            UserDefaults.standard.set(data, forKey: Self.historyKey)
+        }
+    }
     
     // MARK: - Export to AI
     
@@ -69,6 +91,7 @@ public final class ExportEngine: ObservableObject {
             messageCount: messages.count,
             summary: summaryResult.text
         ))
+        persistHistory()
         
         return result
     }
@@ -177,6 +200,32 @@ public struct ExportView: View {
                                 Text(result.storedInKB ? "Stored in NeoTrix KB" : "KB unavailable — summary only")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
+                            }
+                            
+                            // 修复: 导出历史展示（此前 exportHistory 无 UI 消费 = 死数据）
+                            if !engine.exportHistory.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Label("Export History", systemImage: "clock.arrow.circlepath")
+                                        .font(.headline)
+                                    ForEach(engine.exportHistory) { record in
+                                        HStack(alignment: .top, spacing: 8) {
+                                            Image(systemName: "doc.text.fill")
+                                                .foregroundColor(NeoTrixTheme.Colors.accent)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(record.chatTitle)
+                                                    .font(.subheadline.bold())
+                                                Text("\(record.messageCount) messages · \(record.date.formatted(date: .abbreviated, time: .shortened))")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                                Text(record.summary)
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                                    .lineLimit(2)
+                                            }
+                                        }
+                                        .padding(.vertical, 4)
+                                    }
+                                }
                             }
                         }
                         .padding()

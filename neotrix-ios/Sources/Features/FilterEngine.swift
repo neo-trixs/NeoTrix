@@ -29,10 +29,22 @@ public struct FilterRule: Identifiable, Equatable, Codable {
     }
 }
 
-public struct BlockedUser: Identifiable, Equatable {
+public struct BlockedUser: Identifiable, Equatable, Codable {
     public let id: Int64
     public let name: String
-    public let avatarColor: Color
+    /// 头像色板索引（持久化索引而非 Color，保证重启动后颜色稳定）
+    public let colorIndex: Int
+    
+    public init(id: Int64, name: String, colorIndex: Int = 0) {
+        self.id = id
+        self.name = name
+        self.colorIndex = colorIndex
+    }
+    
+    /// 头像色（从 FilterEngine 色板映射）
+    public var avatarColor: Color {
+        FilterEngine.avatarPalette[colorIndex % FilterEngine.avatarPalette.count]
+    }
 }
 
 // MARK: - Filter Engine
@@ -41,9 +53,23 @@ public struct BlockedUser: Identifiable, Equatable {
 public final class FilterEngine: ObservableObject {
     @Published public var rules: [FilterRule] = []
     @Published public var blockedUsers: [BlockedUser] = []
-    @Published public var filterChannelAds = true
-    @Published public var filterSpam = true
-    @Published public var useAISemanticFilter = true
+    @Published public var filterChannelAds = true {
+        didSet { saveRules() }
+    }
+    @Published public var filterSpam = true {
+        didSet { saveRules() }
+    }
+    @Published public var useAISemanticFilter = true {
+        didSet { saveRules() }
+    }
+    
+    /// 屏蔽用户头像色板（colorIndex 持久化索引映射，避免 Color 不可 Codable）
+    fileprivate static let avatarPalette: [Color] = [.pink, .blue, .orange, .green, .purple, .teal]
+    
+    private static let blockedUsersKey = "filter_blocked_users"
+    private static let filterChannelAdsKey = "filter_channel_ads"
+    private static let filterSpamKey = "filter_spam"
+    private static let useAISemanticFilterKey = "filter_ai_semantic"
     
     private let aiHub = AIHub.shared
     
@@ -65,11 +91,37 @@ public final class FilterEngine: ObservableObject {
                 FilterRule(keyword: "click here", scope: .all),
             ]
         }
+        
+        // 开关持久化（未设置过时保持默认值 true）
+        if UserDefaults.standard.object(forKey: Self.filterChannelAdsKey) != nil {
+            filterChannelAds = UserDefaults.standard.bool(forKey: Self.filterChannelAdsKey)
+        }
+        if UserDefaults.standard.object(forKey: Self.filterSpamKey) != nil {
+            filterSpam = UserDefaults.standard.bool(forKey: Self.filterSpamKey)
+        }
+        if UserDefaults.standard.object(forKey: Self.useAISemanticFilterKey) != nil {
+            useAISemanticFilter = UserDefaults.standard.bool(forKey: Self.useAISemanticFilterKey)
+        }
+        
+        // 屏蔽用户
+        if let data = UserDefaults.standard.data(forKey: Self.blockedUsersKey),
+           let decoded = try? JSONDecoder().decode([BlockedUser].self, from: data) {
+            blockedUsers = decoded
+        }
     }
     
     private func saveRules() {
         if let data = try? JSONEncoder().encode(rules) {
             UserDefaults.standard.set(data, forKey: "filter_rules")
+        }
+        UserDefaults.standard.set(filterChannelAds, forKey: Self.filterChannelAdsKey)
+        UserDefaults.standard.set(filterSpam, forKey: Self.filterSpamKey)
+        UserDefaults.standard.set(useAISemanticFilter, forKey: Self.useAISemanticFilterKey)
+    }
+    
+    private func saveBlockedUsers() {
+        if let data = try? JSONEncoder().encode(blockedUsers) {
+            UserDefaults.standard.set(data, forKey: Self.blockedUsersKey)
         }
     }
     
@@ -92,10 +144,21 @@ public final class FilterEngine: ObservableObject {
     
     public func blockUser(_ user: BlockedUser) {
         blockedUsers.append(user)
+        saveBlockedUsers()
+    }
+    
+    /// 按用户名屏蔽（屏蔽列表页 "Add User" 入口）
+    public func blockUser(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let id = Int64(Date().timeIntervalSince1970 * 1000)  // 单调递增，避免与 mock 冲突
+        blockedUsers.append(BlockedUser(id: id, name: trimmed, colorIndex: blockedUsers.count % Self.avatarPalette.count))
+        saveBlockedUsers()
     }
     
     public func unblockUser(_ user: BlockedUser) {
         blockedUsers.removeAll { $0.id == user.id }
+        saveBlockedUsers()
     }
     
     // MARK: - Filtering
@@ -142,6 +205,8 @@ public final class FilterEngine: ObservableObject {
 public struct FilterSettingsView: View {
     @StateObject private var engine = FilterEngine()
     @State private var newKeyword = ""
+    @State private var newBlockedUserName = ""
+    @State private var showBlockUserAlert = false
     
     public init() {}
     
@@ -193,6 +258,11 @@ public struct FilterSettingsView: View {
             }
             
             Section("Blocked Users") {
+                Button {
+                    showBlockUserAlert = true
+                } label: {
+                    Label("Add User", systemImage: "person.badge.plus")
+                }
                 if engine.blockedUsers.isEmpty {
                     Text("No blocked users")
                         .foregroundColor(.secondary)
@@ -214,5 +284,13 @@ public struct FilterSettingsView: View {
             }
         }
         .navigationTitle("Message Filter")
+        .alert("Block User", isPresented: $showBlockUserAlert) {
+            TextField("Username", text: $newBlockedUserName)
+            Button("Block") {
+                engine.blockUser(name: newBlockedUserName)
+                newBlockedUserName = ""
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }

@@ -15,6 +15,8 @@ public struct StoryItem: Identifiable {
     public let isCloseFriends: Bool
     public let timestamp: Date
     public let duration: TimeInterval
+    /// Story 内容（text/link/image/video）— StoryViewerView 真实渲染
+    public var content: StoryContent? = nil
 }
 
 public struct StoryContent: Identifiable {
@@ -36,8 +38,6 @@ public struct StoryContent: Identifiable {
 @MainActor
 public final class StoryViewModel: ObservableObject {
     @Published public var stories: [StoryItem] = []
-    @Published public var currentStoryIndex: Int = 0
-    @Published public var isViewing = false
     
     private let core = NeoGramCore.shared
     
@@ -47,10 +47,14 @@ public final class StoryViewModel: ObservableObject {
     
     private func loadStories() {
         stories = [
-            StoryItem(id: 1, authorName: "NeoTrix AI", authorInitial: "N", avatarColor: .purple, isSeen: false, isPremium: true, isCloseFriends: false, timestamp: Date(), duration: 5),
-            StoryItem(id: 2, authorName: "Alice", authorInitial: "A", avatarColor: .pink, isSeen: false, isPremium: false, isCloseFriends: true, timestamp: Date().addingTimeInterval(-600), duration: 8),
-            StoryItem(id: 3, authorName: "Bob", authorInitial: "B", avatarColor: .blue, isSeen: true, isPremium: false, isCloseFriends: false, timestamp: Date().addingTimeInterval(-1800), duration: 5),
-            StoryItem(id: 4, authorName: "Design", authorInitial: "D", avatarColor: .orange, isSeen: false, isPremium: true, isCloseFriends: false, timestamp: Date().addingTimeInterval(-3600), duration: 15),
+            StoryItem(id: 1, authorName: "NeoTrix AI", authorInitial: "N", avatarColor: .purple, isSeen: false, isPremium: true, isCloseFriends: false, timestamp: Date(), duration: 5,
+                      content: StoryContent(id: 1, type: .text("NeoTrix AI — your self-evolving developer toolkit is live. E8, VSA HyperCube, and GWT all working together."), caption: "NeoTrix update", timestamp: Date())),
+            StoryItem(id: 2, authorName: "Alice", authorInitial: "A", avatarColor: .pink, isSeen: false, isPremium: false, isCloseFriends: true, timestamp: Date().addingTimeInterval(-600), duration: 8,
+                      content: StoryContent(id: 2, type: .link("New NeoTrix Release", URL(string: "https://neotrix.dev")!), caption: "What's new", timestamp: Date().addingTimeInterval(-600))),
+            StoryItem(id: 3, authorName: "Bob", authorInitial: "B", avatarColor: .blue, isSeen: true, isPremium: false, isCloseFriends: false, timestamp: Date().addingTimeInterval(-1800), duration: 5,
+                      content: StoryContent(id: 3, type: .image(Data()), caption: "Weekend vibes", timestamp: Date().addingTimeInterval(-1800))),
+            StoryItem(id: 4, authorName: "Design", authorInitial: "D", avatarColor: .orange, isSeen: false, isPremium: true, isCloseFriends: false, timestamp: Date().addingTimeInterval(-3600), duration: 15,
+                      content: StoryContent(id: 4, type: .video(URL(string: "https://neotrix.dev/story.mp4")!), caption: "NeoTrix in 60s", timestamp: Date().addingTimeInterval(-3600))),
         ]
     }
     
@@ -58,25 +62,6 @@ public final class StoryViewModel: ObservableObject {
         if let index = stories.firstIndex(where: { $0.id == storyId }) {
             stories[index].isSeen = true
         }
-    }
-    
-    public func nextStory() {
-        if currentStoryIndex < stories.count - 1 {
-            currentStoryIndex += 1
-        } else {
-            isViewing = false
-        }
-    }
-    
-    public func previousStory() {
-        if currentStoryIndex > 0 {
-            currentStoryIndex -= 1
-        }
-    }
-    
-    public func captureStoryView() {
-        // Premium: stealth mode - capture view without notifying
-        UserDefaults.standard.set(true, forKey: "story_stealth_mode")
     }
     
     /// 发布新 Story（融合: 官方 Stories + AI 摘要）
@@ -90,7 +75,13 @@ public final class StoryViewModel: ObservableObject {
             isPremium: true,
             isCloseFriends: isCloseFriends,
             timestamp: Date(),
-            duration: 5
+            duration: 5,
+            content: StoryContent(
+                id: Int64(Date().timeIntervalSince1970),
+                type: .text(caption),
+                caption: "",
+                timestamp: Date()
+            )
         )
         stories.insert(newStory, at: 0)
     }
@@ -155,16 +146,8 @@ public struct StoryViewerView: View {
             NeoTrixTheme.Colors.background.ignoresSafeArea()
             
             if !stories.isEmpty {
-                // Story content placeholder
-                VStack {
-                    Spacer()
-                    
-                    Text("Story \(currentIndex + 1)")
-                        .font(.largeTitle)
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                }
+                // Story content（真实渲染 StoryContent: text/link/image/video）
+                StoryContentView(content: stories[currentIndex].content, index: currentIndex)
                 
                 // Progress bars
                 VStack {
@@ -260,9 +243,16 @@ public struct StoryViewerView: View {
     private func startTimer() {
         timer?.invalidate()
         progress = 0
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
+        guard currentIndex < stories.count else { return }
+        
+        // 计时步进随 story.duration 计算（此前固定 0.02/0.1s = 恒 5 秒）
+        let tick: TimeInterval = 0.1
+        let duration = max(stories[currentIndex].duration, 0.1)
+        let step = tick / duration
+        
+        timer = Timer.scheduledTimer(withTimeInterval: tick, repeats: true) { timer in
             if !isPaused {
-                progress += 0.02
+                progress += step
                 if progress >= 1 {
                     if currentIndex < stories.count - 1 {
                         currentIndex += 1
@@ -270,6 +260,95 @@ public struct StoryViewerView: View {
                         timer.invalidate()
                     }
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Story Content Renderer
+
+/// 真实渲染 StoryContent（text 显示文本 / link 显示链接按钮 / image、video 用 SF Symbol 占位 + 文案）
+private struct StoryContentView: View {
+    let content: StoryContent?
+    let index: Int
+    
+    var body: some View {
+        VStack {
+            Spacer()
+            
+            Group {
+                if let content {
+                    contentView(for: content)
+                } else {
+                    Text("Story \(index + 1)")
+                        .font(.largeTitle)
+                        .foregroundColor(.white)
+                }
+            }
+            
+            Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    private func contentView(for content: StoryContent) -> some View {
+        VStack(spacing: 16) {
+            switch content.type {
+            case .text(let text):
+                ScrollView {
+                    Text(text)
+                        .font(.title2)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+                
+            case .link(let title, let url):
+                VStack(spacing: 16) {
+                    Image(systemName: "link")
+                        .font(.system(size: 56))
+                        .foregroundColor(.white)
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                    Link(destination: url) {
+                        Label("Open Link", systemImage: "safari")
+                            .font(NeoTrixTheme.Fonts.subheadline.bold())
+                            .padding(.horizontal, NeoTrixTheme.Spacing.lg)
+                            .padding(.vertical, NeoTrixTheme.Spacing.sm)
+                            .background(NeoTrixTheme.Colors.accent)
+                            .foregroundColor(.white)
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 24)
+                
+            case .image:
+                VStack(spacing: 12) {
+                    Image(systemName: "photo.fill")
+                        .font(.system(size: 72))
+                        .foregroundColor(.white.opacity(0.9))
+                    Text("Image story")
+                        .font(NeoTrixTheme.Fonts.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+            case .video:
+                VStack(spacing: 12) {
+                    Image(systemName: "play.rectangle.fill")
+                        .font(.system(size: 72))
+                        .foregroundColor(.white.opacity(0.9))
+                    Text("Video story")
+                        .font(NeoTrixTheme.Fonts.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            }
+            
+            if !content.caption.isEmpty {
+                Text(content.caption)
+                    .font(NeoTrixTheme.Fonts.caption)
+                    .foregroundColor(.white.opacity(0.7))
             }
         }
     }

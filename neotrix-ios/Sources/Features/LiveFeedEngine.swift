@@ -84,6 +84,14 @@ public protocol ContentSourceProvider {
     var activityWeight: Double { get }   // 全球活跃用户指数 (SimilarWeb)
     func fetchLatest(limit: Int, category: FeedCategory?) async throws -> [LiveFeedItem]
     func search(query: String, filter: FeedFilter, limit: Int) async throws -> [LiveFeedItem]
+    /// 分页拉取（分页加载更多；默认退化为 fetchLatest，支持分页的源可覆盖）
+    func fetchPage(page: Int, limit: Int, category: FeedCategory?) async throws -> [LiveFeedItem]
+}
+
+public extension ContentSourceProvider {
+    func fetchPage(page: Int, limit: Int, category: FeedCategory?) async throws -> [LiveFeedItem] {
+        try await fetchLatest(limit: limit, category: category)
+    }
 }
 
 // MARK: - 分类 (顶部横向 Tab)
@@ -172,11 +180,15 @@ public final class LiveFeedEngine: ObservableObject {
     @Published public var hiddenAuthors: Set<String> = []
     @Published public var blockedKeywords: [String] = []
     @Published public var likedIDs: Set<UUID> = []
+    @Published public var isLoadingMore = false
     
     // 配置
     @Published public var useAIFilter = true
     @Published public var filterAds = true
     @Published public var exploreRatio = 0.2   // Exploit 80% / Explore 20%
+    
+    /// 分页游标（"Load More" 页码）
+    private var loadedPage = 1
     
     private let filterEngine = FilterEngine()
     private let core = NeoGramCore.shared
@@ -217,21 +229,29 @@ public final class LiveFeedEngine: ObservableObject {
         defer { isRefreshing = false }
         
         var collected: [LiveFeedItem] = []
+        var providerErrors: [String] = []
         
-        // 1. 并行拉取各内容源
-        await withTaskGroup(of: [LiveFeedItem].self) { group in
+        // 1. 并行拉取各内容源（捕获错误 → 全源失败时暴露 lastError）
+        await withTaskGroup(of: ([LiveFeedItem], String?).self) { group in
             for provider in providers {
                 group.addTask {
                     do {
-                        return try await provider.fetchLatest(limit: 30, category: self.selectedCategory)
+                        return (try await provider.fetchLatest(limit: 30, category: self.selectedCategory), nil)
                     } catch {
-                        return []
+                        return ([], error.localizedDescription)
                     }
                 }
             }
-            for await batch in group {
+            for await (batch, error) in group {
                 collected.append(contentsOf: batch)
+                if let error { providerErrors.append(error) }
             }
+        }
+        
+        if collected.isEmpty && !providerErrors.isEmpty {
+            lastError = providerErrors.first
+        } else {
+            lastError = nil
         }
         
         // 2. 过滤（垃圾/广告/隐藏作者/屏蔽关键词）
@@ -262,22 +282,30 @@ public final class LiveFeedEngine: ObservableObject {
         defer { isSearching = false }
         
         var collected: [LiveFeedItem] = []
+        var providerErrors: [String] = []
         
         // 1. 各内容源搜索（官方接口 / 本地降级）
-        await withTaskGroup(of: [LiveFeedItem].self) { group in
+        await withTaskGroup(of: ([LiveFeedItem], String?).self) { group in
             for provider in providers {
                 group.addTask {
                     do {
-                        return try await provider.search(query: query, filter: .all, limit: 50)
+                        return (try await provider.search(query: query, filter: .all, limit: 50), nil)
                     } catch {
-                        return []
+                        return ([], error.localizedDescription)
                     }
                 }
             }
             
-            for await batch in group {
+            for await (batch, error) in group {
                 collected.append(contentsOf: batch)
+                if let error { providerErrors.append(error) }
             }
+        }
+        
+        if collected.isEmpty && !providerErrors.isEmpty {
+            lastError = providerErrors.first
+        } else {
+            lastError = nil
         }
         
         // 2. 过滤（垃圾/广告）
@@ -293,6 +321,44 @@ public final class LiveFeedEngine: ObservableObject {
         
         // 4. 按类型分组
         items = sortAndGroup(ranked)
+    }
+    
+    /// 分页加载更多（瀑布流底部 "Load More" → fetchPage → 过滤 → 追加，按 id 去重）
+    public func loadMore() async {
+        guard !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        
+        loadedPage += 1
+        var collected: [LiveFeedItem] = []
+        
+        await withTaskGroup(of: [LiveFeedItem].self) { group in
+            for provider in providers {
+                group.addTask {
+                    (try? await provider.fetchPage(page: self.loadedPage, limit: 30, category: self.selectedCategory)) ?? []
+                }
+            }
+            for await batch in group {
+                collected.append(contentsOf: batch)
+            }
+        }
+        
+        var newItems: [LiveFeedItem] = []
+        for item in collected {
+            if !(await shouldFilter(item)) {
+                newItems.append(item)
+            }
+        }
+        
+        // 去重（部分内容源可能返回重复 id）
+        let existingIDs = Set(items.map(\.id))
+        let added = newItems.filter { !existingIDs.contains($0.id) }
+        if added.isEmpty {
+            // 无增量 → 回退页码，下次点击重试
+            loadedPage -= 1
+        } else {
+            items.append(contentsOf: added)
+        }
     }
     
     // MARK: - 过滤管线
@@ -528,6 +594,11 @@ public final class TelegramContentProvider: ContentSourceProvider {
         return Self.mockItems(limit: limit, category: category)
     }
     
+    public func fetchPage(page: Int, limit: Int, category: FeedCategory?) async throws -> [LiveFeedItem] {
+        // 分页: page > 1 生成增量内容（mock 数据源）
+        return Self.mockItems(limit: limit, category: category, page: page)
+    }
+    
     public func search(query: String, filter: FeedFilter, limit: Int) async throws -> [LiveFeedItem] {
         // 真实实现: messages.searchGlobal
         // 当前: 本地 mock 降级
@@ -536,7 +607,7 @@ public final class TelegramContentProvider: ContentSourceProvider {
         }
     }
     
-    static func mockItems(limit: Int, category: FeedCategory?) -> [LiveFeedItem] {
+    static func mockItems(limit: Int, category: FeedCategory?, page: Int = 1) -> [LiveFeedItem] {
         let now = Date()
         let templates: [(String, String, FeedItemType, FeedCategory)] = [
             ("E8 Hexagram 推理引擎升级", "NeoTrix 核心推理引擎完成 64 卦象重构", .text, .tech),
@@ -555,21 +626,36 @@ public final class TelegramContentProvider: ContentSourceProvider {
             ("社区问答直播", "GWT 注意力路由实战答疑", .stream, .live),
         ]
         
+        // 分页增量内容（page > 1 时提供新标题，保证 "Load More" 有真实增量）
+        let pageTemplates: [(String, String, FeedItemType, FeedCategory)] = [
+            ("NeoTrix 开发日志 #\(page)", "持续迭代中的新进展，本周亮点速览", .text, .tech),
+            ("SwiftUI 动画技巧分享", "隐式动画与显式动画的实战取舍", .video, .education),
+            ("本周热帖精选 #\(page)", "社区讨论度最高的十个话题", .image, .news),
+            ("AI 工具链盘点", "2026 年值得关注的开发工具", .text, .tech),
+            ("E8 推理案例研究", "从问题到结论的完整推理链路", .text, .education),
+            ("直播回放: GWT 实战", "注意力路由在大型系统中的应用", .video, .live),
+            ("设计系统更新", "NeoTrixTheme v2 token 全览", .image, .entertainment),
+            ("社区问答精选", "高频问题的集中解答", .text, .education),
+        ]
+        
+        let source = page > 1 ? pageTemplates : templates
+        let offset = (page - 1) * 8  // 时间/互动按页错开，避免与首页重复
+        
         var result: [LiveFeedItem] = []
-        for (i, item) in templates.enumerated() where category == nil || category == .all || item.3 == category {
+        for (i, item) in source.enumerated() where category == nil || category == .all || item.3 == category {
             result.append(LiveFeedItem(
                 platform: "telegram",
                 type: item.2,
                 title: item.0,
                 subtitle: item.1,
                 author: "NeoTrix Channel",
-                timestamp: now.addingTimeInterval(-Double(i) * 3600),
+                timestamp: now.addingTimeInterval(-Double(i + offset) * 3600),
                 engagement: EngagementStats(
-                    views: Int64(1000 + i * 500),
-                    likes: Int64(100 + i * 50),
-                    comments: Int64(20 + i * 5),
-                    shares: Int64(10 + i * 3),
-                    saves: Int64(30 + i * 8)
+                    views: Int64(1000 + (i + offset) * 500),
+                    likes: Int64(100 + (i + offset) * 50),
+                    comments: Int64(20 + (i + offset) * 5),
+                    shares: Int64(10 + (i + offset) * 3),
+                    saves: Int64(30 + (i + offset) * 8)
                 )
             ))
             if result.count >= limit { break }

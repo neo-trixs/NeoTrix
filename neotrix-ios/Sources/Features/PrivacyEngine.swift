@@ -47,7 +47,8 @@ public final class PrivacyEngine: ObservableObject {
         settings.autoLock = UserDefaults.standard.bool(forKey: "privacy_auto_lock")
     }
     
-    private func saveSettings() {
+    /// 保存设置（修复 P0: 此前 private 且仅 applyBestPractices 调用，手动 toggle 不持久化，重启全丢）
+    public func saveSettings() {
         UserDefaults.standard.set(settings.ghostMode, forKey: "privacy_ghost_mode")
         UserDefaults.standard.set(settings.hideOnlineStatus, forKey: "privacy_hide_online")
         UserDefaults.standard.set(settings.hideReadReceipts, forKey: "privacy_hide_read")
@@ -214,11 +215,36 @@ public struct PrivacySettingsView: View {
             }
         }
         .navigationTitle("Privacy & Security")
-        .onChange(of: engine.settings.ghostMode) { _, _ in engine.evaluatePrivacy() }
-        .onChange(of: engine.settings.hideOnlineStatus) { _, _ in engine.evaluatePrivacy() }
-        .onChange(of: engine.settings.hidePhoneNumber) { _, _ in engine.evaluatePrivacy() }
-        .onChange(of: engine.settings.blockUnknownDMs) { _, _ in engine.evaluatePrivacy() }
-        .onChange(of: engine.settings.autoLock) { _, _ in engine.evaluatePrivacy() }
+        // 修复 P0: 每个 toggle 变更都持久化 + 重新评分（此前 saveSettings 无人调用，手动开关重启全丢；
+        // hideReadReceipts/smartNotifications 此前连 onChange 都没有）
+        .onChange(of: engine.settings.ghostMode) { _, _ in
+            engine.saveSettings()
+            engine.evaluatePrivacy()
+        }
+        .onChange(of: engine.settings.hideOnlineStatus) { _, _ in
+            engine.saveSettings()
+            engine.evaluatePrivacy()
+        }
+        .onChange(of: engine.settings.hideReadReceipts) { _, _ in
+            engine.saveSettings()
+            engine.evaluatePrivacy()
+        }
+        .onChange(of: engine.settings.smartNotifications) { _, _ in
+            engine.saveSettings()
+            engine.evaluatePrivacy()
+        }
+        .onChange(of: engine.settings.hidePhoneNumber) { _, _ in
+            engine.saveSettings()
+            engine.evaluatePrivacy()
+        }
+        .onChange(of: engine.settings.blockUnknownDMs) { _, _ in
+            engine.saveSettings()
+            engine.evaluatePrivacy()
+        }
+        .onChange(of: engine.settings.autoLock) { _, _ in
+            engine.saveSettings()
+            engine.evaluatePrivacy()
+        }
     }
     
     private var scoreColor: Color {

@@ -80,6 +80,20 @@ public final class ReactionManager: ObservableObject {
     }
 }
 
+// MARK: - AnimationType → 渲染引擎映射
+// 消费 AnimationType 全部分支: staticImage 无粒子 / animated 粒子 / fullScreen 全屏烟花 / multiLayer 多层粒子
+
+public extension MessageReaction.AnimationType {
+    var emojiEffectStyle: EmojiEffectStyle {
+        switch self {
+        case .staticImage: return .none
+        case .animated: return .confetti
+        case .fullScreen: return .firework
+        case .multiLayer: return .confetti
+        }
+    }
+}
+
 // MARK: - Reaction Picker
 
 public struct ReactionPickerView: View {
@@ -90,6 +104,7 @@ public struct ReactionPickerView: View {
     @State private var searchText = ""
     @State private var selectedTab: Int = 0
     @State private var fullScreenEmoji: String?
+    @State private var fullScreenStyle: EmojiEffectStyle = .confetti
     
     public init(onSelect: @escaping (String) -> Void) {
         self.onSelect = onSelect
@@ -118,7 +133,8 @@ public struct ReactionPickerView: View {
                         ForEach(reactions) { reaction in
                             Button {
                                 if manager.canUse(reaction) {
-                                    // 融合: 全屏动画效果（AnimatedEmoji 接线）
+                                    // 融合: 全屏动画效果（按 animationType 区分渲染风格）
+                                    fullScreenStyle = reaction.animationType.emojiEffectStyle
                                     fullScreenEmoji = reaction.emoji
                                     onSelect(reaction.emoji)
                                     dismiss()
@@ -141,6 +157,22 @@ public struct ReactionPickerView: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(reaction.isPremium && !manager.isPremium)
+                            // 修复: 接线 setFavorite/removeFavorite（此前死 API 无调用者）
+                            .contextMenu {
+                                if manager.favoriteReactions.contains(reaction.emoji) {
+                                    Button {
+                                        manager.removeFavorite(reaction.emoji)
+                                    } label: {
+                                        Label("Remove from Favorites", systemImage: "star.slash")
+                                    }
+                                } else {
+                                    Button {
+                                        manager.setFavorite(reaction.emoji)
+                                    } label: {
+                                        Label("Add to Favorites", systemImage: "star")
+                                    }
+                                }
+                            }
                         }
                     }
                     .padding()
@@ -164,7 +196,7 @@ public struct ReactionPickerView: View {
         }
         .overlay {
             if let emoji = fullScreenEmoji {
-                FullScreenEmojiEffect(emoji: emoji)
+                FullScreenEmojiEffect(emoji: emoji, style: fullScreenStyle)
                     .allowsHitTesting(false)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {

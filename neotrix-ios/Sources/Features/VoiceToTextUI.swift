@@ -103,7 +103,6 @@ public final class VoiceToTextManager: ObservableObject {
 
 public struct VoiceToTextView: View {
     @StateObject private var manager = VoiceToTextManager()
-    @State private var showTranscript = false
     
     public init() {}
     
@@ -141,6 +140,21 @@ public struct VoiceToTextView: View {
                 ProgressView("Transcribing…")
             }
             
+            // Transcript 展示（此前 @Published 发布但 UI 从不渲染 — 转写为占位字符串）
+            if !manager.transcript.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Transcript", systemImage: "waveform")
+                        .font(.headline)
+                    Text(manager.transcript)
+                        .font(.body)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(NeoTrixTheme.Colors.selection)
+                        .clipShape(RoundedRectangle(cornerRadius: NeoTrixTheme.Radius.s12))
+                }
+                .padding(.horizontal)
+            }
+            
             if let summary = manager.summary {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("AI Summary", systemImage: "text.alignleft")
@@ -150,7 +164,7 @@ public struct VoiceToTextView: View {
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(NeoTrixTheme.Colors.selection)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: NeoTrixTheme.Radius.s12))
                 }
                 .padding(.horizontal)
             }
@@ -173,8 +187,6 @@ public struct VoiceToTextView: View {
             }
         }
     }
-    
-    private var secondary: Color { .secondary }
     
     private func formatDuration(_ interval: TimeInterval) -> String {
         let minutes = Int(interval) / 60

@@ -156,6 +156,22 @@ public final class ChatViewModel: ObservableObject {
         }
     }
     
+    /// 重发失败消息（点击失败状态图标 → 重新走发送管线 sending → sent/failed）
+    public func retrySend(_ message: ChatMessage) {
+        guard let index = messages.firstIndex(where: { $0.id == message.id }),
+              case .failed = messages[index].status else { return }
+        messages[index].status = .sending
+        let pending = messages[index]
+        Task {
+            do {
+                try await sendViaMTProto(pending)
+                await updateMessageStatus(message.id, status: .sent)
+            } catch {
+                await updateMessageStatus(message.id, status: .failed(error))
+            }
+        }
+    }
+    
     private func generateAIResponse(for text: String) async {
         guard let e8 = core.e8Reasoning else {
             await addAgentMessage("AI not available")
@@ -248,17 +264,23 @@ public struct MessageBubbleView: View {
     let onReaction: (String) -> Void
     let onLongPress: () -> Void
     let onReplyTap: (() -> Void)?
+    /// 发送失败重试（点击失败图标触发）
+    let onRetry: (() -> Void)?
+    /// 主题（修复 P0: 主题/壁纸真正应用 — 气泡色跟随所选主题）
+    @EnvironmentObject private var themeManager: ThemeManager
     
     public init(message: ChatMessage,
                 replyToMessage: ChatMessage? = nil,
                 onReaction: @escaping (String) -> Void,
                 onLongPress: @escaping () -> Void,
-                onReplyTap: (() -> Void)? = nil) {
+                onReplyTap: (() -> Void)? = nil,
+                onRetry: (() -> Void)? = nil) {
         self.message = message
         self.replyToMessage = replyToMessage
         self.onReaction = onReaction
         self.onLongPress = onLongPress
         self.onReplyTap = onReplyTap
+        self.onRetry = onRetry
     }
     
     public var body: some View {
@@ -363,17 +385,18 @@ public struct MessageBubbleView: View {
     }
     
     private var bubbleColor: Color {
+        // 修复 P0: 跟随所选主题（themeManager 经 environmentObject 注入）
         switch message.sender {
-        case .user: return NeoTrixTheme.Colors.accent
-        case .agent: return NeoTrixTheme.Colors.bubbleIncoming
-        case .system: return NeoTrixTheme.Colors.bubbleSystem
+        case .user: return themeManager.currentTheme.colors.bubbleOutgoing
+        case .agent: return themeManager.currentTheme.colors.bubbleIncoming
+        case .system: return themeManager.currentTheme.colors.bubbleIncoming.opacity(0.6)
         }
     }
     
     private var bubbleTextColor: Color {
         switch message.sender {
-        case .user: return .white
-        default: return .primary
+        case .user: return themeManager.currentTheme.colors.accent
+        default: return themeManager.currentTheme.colors.text
         }
     }
     
@@ -393,7 +416,11 @@ public struct MessageBubbleView: View {
                 case .sent: Image(systemName: "checkmark").foregroundColor(.secondary)
                 case .delivered: Image(systemName: "checkmark.circle.fill").foregroundColor(.secondary)
                 case .read: Image(systemName: "checkmark.circle.fill").foregroundColor(NeoTrixTheme.Colors.accent)
-                case .failed: Image(systemName: "exclamationmark.circle.fill").foregroundColor(NeoTrixTheme.Colors.danger)
+                case .failed:
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundColor(NeoTrixTheme.Colors.danger)
+                        // 点击失败图标 → 重发
+                        .onTapGesture { onRetry?() }
                 }
             }
         }
@@ -491,6 +518,11 @@ struct MessageMediaView: View {
 // MARK: - Chat View
 
 public struct ChatView: View {
+    /// 聊天标题（修复 P0: 此前写死 .navigationTitle("Chat") 覆盖父级传入的聊天标题，
+    /// 所有聊天恒显示 "Chat"。externalTitle 非空时由外部导航栈管理标题）
+    let externalTitle: String?
+    /// 主题/壁纸（修复 P0: 聊天背景跟随所选主题）
+    @EnvironmentObject private var themeManager: ThemeManager
     @StateObject private var viewModel = ChatViewModel()
     @State private var showAIEditor = false
     @State private var showExport = false
@@ -498,7 +530,9 @@ public struct ChatView: View {
     @State private var showReactionPicker = false
     @State private var showEmojiStatus = false
     
-    public init() {}
+    public init(title: String? = nil) {
+        self.externalTitle = title
+    }
     
     public var body: some View {
         VStack(spacing: 0) {
@@ -532,6 +566,9 @@ public struct ChatView: View {
                                     if let replyID = message.replyTo {
                                         withAnimation { proxy.scrollTo(replyID, anchor: .center) }
                                     }
+                                },
+                                onRetry: {
+                                    viewModel.retrySend(message)
                                 }
                             )
                             .id(message.id)
@@ -675,14 +712,26 @@ public struct ChatView: View {
             .padding()
             .background(NeoTrixTheme.Colors.surface)
         }
-        .navigationTitle("Chat")
+        // 修复 P0: 聊天背景跟随主题/壁纸（对标 Telegram: 聊天页背景色 + 可选壁纸）
+        .background(
+            Group {
+                if let wallpaper = themeManager.currentWallpaper {
+                    LinearGradient(colors: wallpaper.gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+                } else {
+                    themeManager.currentTheme.colors.chatBackground
+                }
+            }
+            .ignoresSafeArea()
+        )
+        // 修复 P0: 外部传入标题时不再覆盖父级 navigationTitle
+        .navigationTitle(externalTitle ?? "Chat")
         .sheet(isPresented: $showAIEditor) {
             AIEditorView(original: viewModel.inputText) { edited in
                 viewModel.inputText = edited
             }
         }
         .sheet(isPresented: $showExport) {
-            ExportView(messages: viewModel.messages, chatTitle: "Chat")
+            ExportView(messages: viewModel.messages, chatTitle: externalTitle ?? "Chat")
         }
         .sheet(isPresented: $showReactionPicker) {
             // 融合: Reactions 工具栏（长按消息 → 选择 emoji → 应用到目标消息）

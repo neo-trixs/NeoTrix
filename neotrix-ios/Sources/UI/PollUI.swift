@@ -170,6 +170,8 @@ public struct PollView: View {
                     viewModel.vote(poll.id, optionId: optionId)
                 }, onSuggest: { text in
                     viewModel.suggestOption(poll.id, text: text)
+                }, onClose: {
+                    viewModel.closePoll(poll.id)
                 })
             }
         }
@@ -208,9 +210,17 @@ struct PollCard: View {
     let poll: Poll
     let onVote: (UUID) -> Void
     let onSuggest: (String) -> Void
+    let onClose: () -> Void
     
     @State private var suggestionText = ""
     @State private var showSuggestionField = false
+    
+    init(poll: Poll, onVote: @escaping (UUID) -> Void, onSuggest: @escaping (String) -> Void, onClose: @escaping () -> Void = {}) {
+        self.poll = poll
+        self.onVote = onVote
+        self.onSuggest = onSuggest
+        self.onClose = onClose
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -220,7 +230,7 @@ struct PollCard: View {
                     .font(.caption.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(poll.isQuiz ? NeoTrixTheme.TypeColors.color(for: "video").opacity(0.2) : NeoTrixTheme.Colors.selection)
+                    .background(poll.isQuiz ? NeoTrixTheme.Colors.accentSecondary.opacity(0.2) : NeoTrixTheme.Colors.selection)
                     .clipShape(Capsule())
                 
                 if poll.isAnonymous {
@@ -275,6 +285,7 @@ struct PollCard: View {
                         option: option,
                         totalVotes: poll.totalVotes,
                         showResults: !poll.hideResults || poll.isClosed || poll.isExpired,
+                        showsVoters: !poll.isAnonymous && (!poll.hideResults || poll.isClosed || poll.isExpired),
                         isEnabled: !poll.isClosed && !poll.isExpired
                     ) {
                         onVote(option.id)
@@ -303,6 +314,21 @@ struct PollCard: View {
                         Label("Suggest an option", systemImage: "plus.circle")
                             .font(.caption)
                             .foregroundColor(NeoTrixTheme.Colors.accent)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            
+            // 创建者关闭投票入口（简化版: 无创建者模型，创建者即 Poll 持有者）
+            if !poll.isClosed && !poll.isExpired {
+                HStack {
+                    Spacer()
+                    Button {
+                        onClose()
+                    } label: {
+                        Label("Close Poll", systemImage: "xmark.circle")
+                            .font(.caption)
+                            .foregroundColor(NeoTrixTheme.Colors.danger)
                     }
                     .buttonStyle(.plain)
                 }
@@ -347,27 +373,43 @@ struct PollOptionRow: View {
     let option: PollOption
     let totalVotes: Int
     let showResults: Bool
+    let showsVoters: Bool
     let isEnabled: Bool
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Selection indicator
-                Image(systemName: option.isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(option.isSelected ? NeoTrixTheme.Colors.accent : .secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 12) {
+                    // Selection indicator
+                    Image(systemName: option.isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(option.isSelected ? NeoTrixTheme.Colors.accent : .secondary)
+                    
+                    Text(option.text)
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                    
+                    if showResults {
+                        let percentage = totalVotes > 0 ? Double(option.voteCount) / Double(totalVotes) * 100 : 0
+                        Text("\(Int(percentage))%")
+                            .font(.caption.bold())
+                            .foregroundColor(.secondary)
+                    }
+                }
                 
-                Text(option.text)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                if showResults {
-                    let percentage = totalVotes > 0 ? Double(option.voteCount) / Double(totalVotes) * 100 : 0
-                    Text("\(Int(percentage))%")
-                        .font(.caption.bold())
-                        .foregroundColor(.secondary)
+                // 可见投票者名单（对标 Telegram: 非匿名投票显示投票人）
+                if showsVoters && !option.voters.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 9))
+                        Text(option.voters.joined(separator: ", "))
+                            .font(.caption2)
+                            .lineLimit(1)
+                    }
+                    .foregroundColor(.secondary)
+                    .padding(.leading, 2)
                 }
             }
             .padding(.horizontal, 12)
@@ -432,7 +474,7 @@ public struct PollCreateView: View {
                                     options.remove(at: index)
                                 } label: {
                                     Image(systemName: "minus.circle.fill")
-                                        .foregroundColor(.red)
+                                        .foregroundColor(NeoTrixTheme.Colors.danger)
                                 }
                             }
                         }

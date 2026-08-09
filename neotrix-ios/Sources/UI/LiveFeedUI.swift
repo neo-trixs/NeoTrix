@@ -11,6 +11,7 @@ public struct LiveFeedView: View {
     @StateObject private var engine = LiveFeedEngine.shared
     @State private var pendingKeyword = ""
     @State private var shareItem: LiveFeedItem?
+    @State private var selectedItem: LiveFeedItem?
     @State private var showBlockedAlert = false
     @State private var toastMessage: String?
     
@@ -20,6 +21,11 @@ public struct LiveFeedView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 categoryBar
+                
+                // 错误态（engine.lastError 发布 → 错误条 + 重试）
+                if let error = engine.lastError {
+                    errorBanner(error)
+                }
                 
                 if engine.isSearching {
                     Spacer()
@@ -63,6 +69,12 @@ public struct LiveFeedView: View {
                 Text("Share: \(item.title)")
                 #endif
             }
+            .sheet(item: $selectedItem) { item in
+                // 卡片点击 → 详情页（标题/来源/内容/评分/平台）
+                NavigationStack {
+                    LiveFeedDetailView(item: item)
+                }
+            }
             .overlay(alignment: .bottom) {
                 if toastMessage != nil {
                     toastView
@@ -99,6 +111,11 @@ public struct LiveFeedView: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                 ForEach(engine.items) { item in
                     LiveCardView(item: item, engine: engine)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // 卡片点击 → 详情
+                            selectedItem = item
+                        }
                         .contextMenu {
                             Button {
                                 engine.like(item)
@@ -133,10 +150,56 @@ public struct LiveFeedView: View {
                             }
                         }
                 }
+                
+                // 分页: 底部 "Load More"（engine.loadMore()）
+                Group {
+                    if engine.isLoadingMore {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    } else {
+                        Button {
+                            Task { await engine.loadMore() }
+                        } label: {
+                            Text("Load More")
+                                .font(NeoTrixTheme.Fonts.subheadline)
+                                .frame(maxWidth: .infinity)
+                                .neoTrixCapsule(isSelected: false)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .gridCellColumns(2)
+                .padding(.top, 4)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
+    }
+    
+    // MARK: - 错误条（engine.lastError → 显示 + 重试）
+    
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(NeoTrixTheme.Colors.warning)
+            Text(message)
+                .font(NeoTrixTheme.Fonts.caption)
+                .foregroundColor(NeoTrixTheme.Colors.textSecondary)
+                .lineLimit(2)
+            Spacer()
+            Button {
+                Task { await engine.refresh() }
+            } label: {
+                Text("Retry")
+                    .font(NeoTrixTheme.Fonts.caption.bold())
+                    .foregroundColor(NeoTrixTheme.Colors.accent)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, NeoTrixTheme.Spacing.lg)
+        .padding(.vertical, NeoTrixTheme.Spacing.sm)
+        .background(NeoTrixTheme.Colors.surface)
     }
     
     // MARK: - 空状态
@@ -319,6 +382,131 @@ public struct LiveCardView: View {
     
     private func platformColor(_ p: String) -> Color {
         NeoTrixTheme.PlatformColors.color(for: p)
+    }
+    
+    private func scoreColor(_ s: Double) -> Color {
+        NeoTrixTheme.ScoreColors.color(for: s)
+    }
+    
+    private func formatCount(_ n: Int64) -> String {
+        if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1_000_000) }
+        if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1_000) }
+        return "\(n)"
+    }
+}
+
+// MARK: - Live Feed Detail（卡片点击 → 详情页）
+
+public struct LiveFeedDetailView: View {
+    let item: LiveFeedItem
+    @Environment(\.dismiss) private var dismiss
+    
+    public init(item: LiveFeedItem) {
+        self.item = item
+    }
+    
+    public var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: NeoTrixTheme.Spacing.md) {
+                // 缩略图 / 占位
+                ZStack {
+                    if let url = item.thumbnailURL {
+                        AsyncImage(url: url) { phase in
+                            if case .success(let img) = phase {
+                                img.resizable().aspectRatio(contentMode: .fill)
+                            } else {
+                                placeholder
+                            }
+                        }
+                    } else {
+                        placeholder
+                    }
+                }
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: NeoTrixTheme.Radius.medium))
+                
+                // 标题
+                Text(item.title)
+                    .font(NeoTrixTheme.Fonts.title)
+                    .foregroundColor(NeoTrixTheme.Colors.textPrimary)
+                
+                // 平台 + 类型 + 评分
+                HStack(spacing: 8) {
+                    NeoTrixTypeBadge(title: item.platform.capitalized, color: platformColor(item.platform))
+                    NeoTrixTypeBadge(title: item.type.rawValue.capitalized, color: typeBadgeColor(item.type))
+                    Spacer()
+                    Text(String(format: "%.0f", item.score))
+                        .font(NeoTrixTheme.Fonts.headline)
+                        .foregroundColor(scoreColor(item.score))
+                }
+                
+                // 内容
+                Text(item.subtitle)
+                    .font(NeoTrixTheme.Fonts.body)
+                    .foregroundColor(NeoTrixTheme.Colors.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // 作者 + 时间
+                HStack(spacing: NeoTrixTheme.Spacing.sm) {
+                    if let author = item.author {
+                        Label(author, systemImage: "person.crop.circle")
+                    }
+                    Text(item.timestamp, style: .date)
+                }
+                .font(NeoTrixTheme.Fonts.caption)
+                .foregroundColor(NeoTrixTheme.Colors.textSecondary)
+                
+                // 互动统计
+                HStack(spacing: NeoTrixTheme.Spacing.lg) {
+                    Label(formatCount(item.engagement.likes), systemImage: "heart.fill")
+                        .foregroundColor(.red)
+                    Label(formatCount(item.engagement.comments), systemImage: "bubble.right")
+                    Label(formatCount(item.engagement.views), systemImage: "eye")
+                    Label(formatCount(item.engagement.shares), systemImage: "arrowshape.turn.up.right")
+                }
+                .font(NeoTrixTheme.Fonts.caption)
+                .foregroundColor(NeoTrixTheme.Colors.textSecondary)
+            }
+            .padding(NeoTrixTheme.Spacing.lg)
+        }
+        .background(NeoTrixTheme.Colors.background)
+        .navigationTitle("Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
+            }
+        }
+    }
+    
+    private var placeholder: some View {
+        ZStack {
+            NeoTrixTheme.Colors.placeholder
+            Image(systemName: typeIcon(item.type))
+                .font(.system(size: 48))
+                .foregroundColor(.gray)
+        }
+    }
+    
+    private func platformColor(_ p: String) -> Color {
+        NeoTrixTheme.PlatformColors.color(for: p)
+    }
+    
+    private func typeBadgeColor(_ type: FeedItemType) -> Color {
+        NeoTrixTheme.TypeColors.color(for: type.rawValue)
+    }
+    
+    private func typeIcon(_ type: FeedItemType) -> String {
+        switch type {
+        case .text: return "text.alignleft"
+        case .image: return "photo"
+        case .video: return "play.rectangle"
+        case .document: return "doc"
+        case .chat: return "bubble.left"
+        case .contact: return "person"
+        case .moment: return "sparkles"
+        case .stream: return "dot.radiowaves.left.and.right"
+        }
     }
     
     private func scoreColor(_ s: Double) -> Color {
