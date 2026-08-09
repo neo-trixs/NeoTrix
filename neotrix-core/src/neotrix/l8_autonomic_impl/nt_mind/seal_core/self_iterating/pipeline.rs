@@ -829,11 +829,14 @@ impl BrainStage for SftWrapperStage {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs()).unwrap_or(0);
         let examples: Vec<SupervisedExample> = deltas.iter()
-            .filter(|(_, d)| d.abs() > 0.01)
+            // H2 修复: 只把正向 delta 当监督样本 (能力提升)。此前用 delta.abs()
+            // 方向无关 — 能力下降 (负 delta, 含 HarnessAdapt 抬升假象) 也当正样本
+            // 训练, 形成"自抬能力→自产 delta→自训"奖励黑客循环, 无外部验证。
+            .filter(|(_, d)| *d > 0.01)
             .map(|(name, delta)| SupervisedExample::new(
                 name,
                 current_mode.0,
-                delta.abs().clamp(0.0, 1.0),
+                delta.clamp(0.0, 1.0),
             ).with_timestamp(timestamp))
             .collect();
         let (_result, adjusted_reward) = brain._sft_stage.process(examples.clone(), brain._reward);
@@ -1177,7 +1180,23 @@ impl BrainStage for HarnessAdaptStage {
                     *v = (*v + boost).min(0.3);
                 }
             }
-            log::info!("[harness_adapt] low reward={:.4}, boosted {} weak caps by {:.4}",
+            // H2 修复: 抬升后同步快照, 使保底抬升不产生虚假 delta。
+            // 否则下一 tick compute_capability_deltas 会把 Harness 抬升当真实
+            // 能力提升 → SFT 自产正样本 → "自抬能力→自产 delta→自训"奖励黑客。
+            // 保底抬升是防能力归零的自我修正, 不是真实进化, 不应进入学习信号。
+            let snap = brain._snapshot_capability();
+            let mut new_snap = snap.clone();
+            for (i, v) in new_snap.arr_mut().iter_mut().enumerate() {
+                if *v < 0.2 {
+                    *v = (*v + boost).min(0.3);
+                }
+            }
+            brain._set_snapshot(crate::neotrix::nt_mind::self_iterating::BrainSnapshot {
+                capability: new_snap,
+                learning_rate: brain._snapshot_lr(),
+                score: brain._snapshot_score(),
+            });
+            log::info!("[harness_adapt] low reward={:.4}, boosted {} weak caps by {:.4} (snapshot synced)",
                 reward, weak_count, boost);
         }
         Ok(StageDecision::Continue)
