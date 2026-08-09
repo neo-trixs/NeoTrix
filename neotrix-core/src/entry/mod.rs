@@ -1922,6 +1922,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
 
                             // 主循环：边收 chunk 边渲染，同时仍响应键盘（Ctrl+C 取消）。
                             let mut worker_done = false;
+                            let mut frame_counter = 0u32;
                             while !worker_done {
                                 while let Ok(chunk) = chunk_rx.try_recv() {
                                     if chunk.starts_with("[error]") {
@@ -1930,9 +1931,12 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                         app.feed_stream(&chunk);
                                     }
                                 }
-                                // 每 30ms 都推进 spinner 并重绘（无 chunk 时动画也持续，
-                                // 借鉴 claude-code-local：沉默≠卡死）。
-                                app.tick_spinner();
+                                // 每 3 圈（≈90ms）推进一次 spinner 帧，贴近参考 100ms/帧；
+                                // 无 chunk 时也重绘（借鉴 claude-code-local：沉默≠卡死）。
+                                frame_counter += 1;
+                                if frame_counter % 3 == 0 {
+                                    app.tick_spinner();
+                                }
                                 draw(&mut terminal, &app);
                                 // 处理键盘（Ctrl+C 取消）。
                                 if let Ok(true) = event::poll(Duration::from_millis(30)) {
