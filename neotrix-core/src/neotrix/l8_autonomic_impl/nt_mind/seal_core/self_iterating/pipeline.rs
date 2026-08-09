@@ -613,39 +613,6 @@ impl BrainStage for HyperCubeOptimizeStage {
     }
 }
 
-/// Security stage — scans current task/code context for secrets using SecretScanStage.
-pub struct SecurityStage;
-impl Default for SecurityStage { fn default() -> Self { Self } }
-impl SecurityStage { pub fn new() -> Self { Self } }
-impl BrainStage for SecurityStage {
-    fn name(&self) -> &str { "security_scan" }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let scanner = super::secret_scanner::SecretScanner::new();
-        let findings = scanner.scan_with_context(&brain._current_task, "");
-        if !findings.findings.is_empty() {
-            log::warn!("[security_scan] iter={}: {} secret(s) detected in task context!",
-                brain.iteration, findings.findings.len());
-            for secret in &findings.findings {
-                // 只记录 pattern + line，禁止把完整秘密行 (snippet) 打进日志 (防泄密)
-                let preview: String = secret.snippet.chars().take(8).collect();
-                log::warn!("[security_scan]   pattern={} line={} snippet_prefix={}...",
-                    secret.pattern, secret.line, preview);
-            }
-            // Broadcast alert via GWT
-            if let Some(ref mut engine) = brain.reasoning_engine {
-                if let Some(ref mut gwt) = engine.gwt {
-                    let alert = format!("SECURITY_ALERT: {} secrets detected in task '{}'",
-                        findings.findings.len(), brain._current_task);
-                    gwt.broadcast(&alert);
-                }
-            }
-        } else {
-            log::trace!("[security_scan] iter={}: clean", brain.iteration);
-        }
-        Ok(StageDecision::Continue)
-    }
-}
-
 /// Distillation stage — extracts principles from pipeline trajectory into knowledge distiller
 pub struct DistillationStage;
 impl Default for DistillationStage { fn default() -> Self { Self } }
