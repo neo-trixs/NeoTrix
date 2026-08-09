@@ -319,7 +319,7 @@ public struct LiveCardView: View {
                     }
                 } label: {
                     Image(systemName: engine.likedIDs.contains(item.id) ? "heart.fill" : "heart")
-                        .foregroundColor(engine.likedIDs.contains(item.id) ? .red : .secondary)
+                        .foregroundColor(engine.likedIDs.contains(item.id) ? NeoTrixTheme.Colors.danger : .secondary)
                 }
                 .buttonStyle(.plain)
                 
@@ -354,7 +354,7 @@ public struct LiveCardView: View {
             NeoTrixTheme.Colors.placeholder
             Image(systemName: typeIcon(item.type))
                 .font(.system(size: 32))
-                .foregroundColor(.gray)
+                .foregroundColor(NeoTrixTheme.Colors.textSecondary)
         }
     }
     
@@ -459,7 +459,7 @@ public struct LiveFeedDetailView: View {
                 // 互动统计
                 HStack(spacing: NeoTrixTheme.Spacing.lg) {
                     Label(formatCount(item.engagement.likes), systemImage: "heart.fill")
-                        .foregroundColor(.red)
+                        .foregroundColor(NeoTrixTheme.Colors.danger)
                     Label(formatCount(item.engagement.comments), systemImage: "bubble.right")
                     Label(formatCount(item.engagement.views), systemImage: "eye")
                     Label(formatCount(item.engagement.shares), systemImage: "arrowshape.turn.up.right")
@@ -484,7 +484,7 @@ public struct LiveFeedDetailView: View {
             NeoTrixTheme.Colors.placeholder
             Image(systemName: typeIcon(item.type))
                 .font(.system(size: 48))
-                .foregroundColor(.gray)
+                .foregroundColor(NeoTrixTheme.Colors.textSecondary)
         }
     }
     
