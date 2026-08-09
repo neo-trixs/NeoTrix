@@ -168,6 +168,7 @@ export function ScheduledTasks(props: Props) {
           <button
             class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-nt-repair-500/20 text-nt-repair-300 hover:bg-nt-repair-500/30 transition-colors text-sm font-medium"
             onClick={() => setShowCreate(!showCreate())}
+            aria-expanded={showCreate()}
           >
             <Plus class="w-4 h-4" />
             {showCreate() ? '收起表单' : '新建定时任务'}

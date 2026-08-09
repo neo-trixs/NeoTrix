@@ -195,6 +195,7 @@ export function PluginMarketplace(props: Props) {
                       )}
                       onClick={() => toggleEnabled(p)}
                       disabled={busy() !== null}
+                      aria-pressed={p.enabled}
                     >
                       {busy() === `toggle:${p.id}` ? (
                         <Loader2 class="w-3.5 h-3.5 animate-spin" />
