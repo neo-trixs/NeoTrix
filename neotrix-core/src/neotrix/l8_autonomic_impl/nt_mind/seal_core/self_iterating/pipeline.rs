@@ -991,10 +991,31 @@ impl BrainStage for DpoWrapperStage {
         }
         let (_result, adjusted_reward) = brain._dpo_stage.process(pairs, brain._reward);
         brain._set_reward(adjusted_reward);
+        // H3 修复: DPO 偏好信号真正应用到能力向量。
+        // 此前 DpoStage::process 只算 loss + 调 reward, 从不更新任何权重 —
+        // DPO 是 no-op, smol-course 吸收的 DPO 阶段无学习效果。
+        // 现在: chosen 维度按 margin 提升, rejected 维度按 margin 下降,
+        // 使偏好信号实际改变能力分布 (DPO 梯度方向: 提升 chosen, 压低 rejected)。
+        let beta = brain._dpo_stage.beta;
+        for pair in brain._dpo_stage.buffer.pairs.iter() {
+            if let Some(idx) = parse_cap_index(&pair.task) {
+                let margin = (pair.chosen_reward - pair.rejected_reward).clamp(0.0, 1.0);
+                let step = (beta * margin).min(0.05);
+                let arr = brain.brain.capability.arr_mut();
+                if idx < arr.len() {
+                    arr[idx] = (arr[idx] + step).min(1.0);
+                }
+            }
+        }
         log::trace!("[dpo_preference] reward={:.4} deltas={} updates={}",
             adjusted_reward, deltas.len(), brain._dpo_stage.total_updates);
         Ok(StageDecision::Continue)
     }
+}
+
+/// Parse capability index from "cap_{i}" task name.
+fn parse_cap_index(task: &str) -> Option<usize> {
+    task.strip_prefix("cap_").and_then(|s| s.parse::<usize>().ok())
 }
 
 /// Wraps ConstitutionalSelfCritiqueStage as a BrainStage
