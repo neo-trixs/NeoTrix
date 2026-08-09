@@ -53,7 +53,6 @@ public final class AIHub: ObservableObject {
     @Published public var isEnabled = true
     @Published public var isProcessing = false
     @Published public var lastError: String?
-    @Published public var activeSource: AIHubResult.AISource = .localRule
     
     private let core = NeoGramCore.shared
     private var cancellables = Set<AnyCancellable>()
@@ -306,7 +305,6 @@ public final class AIHub: ObservableObject {
     // MARK: - Degradation
     
     private func degradedResult(_ text: String, original: String) -> AIHubResult {
-        activeSource = .localRule
         return AIHubResult(
             text: text,
             confidence: 0,
