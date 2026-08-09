@@ -137,6 +137,8 @@ impl VimModeManager {
                 self.mode = VimMode::Normal;
                 VimAction::EnterNormalMode
             }
+            KeyCode::Char(c) => VimAction::InsertChar(c),
+            KeyCode::Backspace => VimAction::DeleteChar,
             _ => VimAction::PassThrough,
         }
     }

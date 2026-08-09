@@ -1816,12 +1816,13 @@ You have tools available; call them when they help. Be concise and evidence-firs
                         KeyAction::CancelGeneration => {}
                         KeyAction::Submit => {
                             let input = app.trim().to_string();
+                            app.cursor = 0;
                             if input.is_empty() { continue; }
                             // 斜杠命令
                             if input.starts_with('/') {
                                 match handle_slash_tui(&mut app, &input) {
                                     SlashResult::Quit => { exit = neotrix::cli::tui::app::TuiExit::Quit; break; }
-                                    SlashResult::Handled => { app.input.clear(); continue; }
+                                    SlashResult::Handled => { app.input.clear(); app.cursor = 0; continue; }
                                     SlashResult::NotHandled => {
                                         // 作为普通消息发给 AgentLoop。
                                     }
@@ -1832,6 +1833,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
                             app.push_message("user", text.clone());
                             app.command_history.push(text.clone());
                             app.input.clear();
+                            app.cursor = 0;
                             app.agent_busy = true;
                             app.streaming = true;
                             app.streaming_role = "assistant".into();

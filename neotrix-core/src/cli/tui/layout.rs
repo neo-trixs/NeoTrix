@@ -161,12 +161,55 @@ pub fn render_input_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &T
 
     frame.render_widget(paragraph, area);
 
-    // 光标位置
-    let last_line_len = app.input.lines().last().map(|l: &str| l.len()).unwrap_or(0);
+    // 光标位置：基于 cursor 字节索引 + 显示宽度（CJK 宽字符按 2 列计）。
+    let (cursor_col, cursor_row) = cursor_position(&app.input, app.cursor);
     frame.set_cursor_position((
-        area.x + 1 + last_line_len as u16,
-        area.y + 1 + app.input.lines().count().saturating_sub(1) as u16,
+        area.x + 1 + cursor_col as u16,
+        area.y + 1 + cursor_row as u16,
     ));
+}
+
+/// 计算输入文本中光标 (字节索引) 对应的 (列, 行)，按显示宽度处理 CJK。
+/// 光标落在字符中间字节时，该字符不计入（光标在其之前）。
+fn cursor_position(input: &str, cursor: usize) -> (usize, usize) {
+    let mut col = 0usize;
+    let mut row = 0usize;
+    let mut byte_idx = 0usize;
+    for ch in input.chars() {
+        if byte_idx + ch.len_utf8() > cursor {
+            break;
+        }
+        if ch == '\n' {
+            row += 1;
+            col = 0;
+        } else {
+            col += display_width(ch);
+        }
+        byte_idx += ch.len_utf8();
+    }
+    (col, row)
+}
+
+/// 字符显示宽度：CJK/全角按 2 列，其余按 1 列。
+fn display_width(ch: char) -> usize {
+    if is_wide_char(ch) { 2 } else { 1 }
+}
+
+/// 判断字符是否为 CJK 宽字符（东亚全角）。
+fn is_wide_char(ch: char) -> bool {
+    let c = ch as u32;
+    // CJK Unified Ideographs + Ext A/B + 全角标点 + 假名 + 谚文 + 兼容表意
+    (0x1100..=0x115F).contains(&c)      // Hangul Jamo
+        || (0x2E80..=0x303E).contains(&c) // CJK Radicals..CJK Symbols
+        || (0x3041..=0x33FF).contains(&c) // Hiragana..CJK Compatibility
+        || (0x3400..=0x4DBF).contains(&c) // CJK Ext A
+        || (0x4E00..=0x9FFF).contains(&c) // CJK Unified
+        || (0xA000..=0xA4CF).contains(&c) // Yi
+        || (0xAC00..=0xD7A3).contains(&c) // Hangul Syllables
+        || (0xF900..=0xFAFF).contains(&c) // CJK Compatibility Ideographs
+        || (0xFE30..=0xFE4F).contains(&c) // CJK Compatibility Forms
+        || (0xFF00..=0xFF60).contains(&c) // Fullwidth Forms
+        || (0xFFE0..=0xFFE6).contains(&c) // Fullwidth Signs
 }
 
 /// 渲染 Ctrl+R 历史搜索面板
@@ -422,5 +465,55 @@ mod tests {
         assert_eq!(theme.status_style(true, false).bg, Some(Color::Magenta));
         assert_eq!(theme.status_style(false, true).bg, Some(Color::Yellow));
         assert_eq!(theme.status_style(false, false).bg, Some(Color::Cyan));
+    }
+
+    // ── P0-1: 光标位置计算（CJK 宽字符按 2 列） ──
+
+    #[test]
+    fn test_cursor_position_ascii() {
+        assert_eq!(cursor_position("abc", 0), (0, 0));
+        assert_eq!(cursor_position("abc", 3), (3, 0));
+        assert_eq!(cursor_position("abc", 1), (1, 0));
+    }
+
+    #[test]
+    fn test_cursor_position_cjk_wide() {
+        // "你好" 各占 2 列 → 光标在末尾 = 4 列
+        assert_eq!(cursor_position("你好", 6), (4, 0));
+        // 混合：a + 你 + b → 列 = 1 + 2 + 1 = 4
+        assert_eq!(cursor_position("a你b", 5), (4, 0));
+        // 光标在 CJK 字符中间（字节 1）→ 列 0（该字符尚未计入，光标在其之前）
+        assert_eq!(cursor_position("你好", 1), (0, 0));
+        // 光标在 CJK 字符之后（字节 3）→ 列 2
+        assert_eq!(cursor_position("你好", 3), (2, 0));
+    }
+
+    #[test]
+    fn test_cursor_position_multiline() {
+        // "a\nbc"：光标在末尾 → 第 2 行第 2 列
+        assert_eq!(cursor_position("a\nbc", 4), (2, 1));
+        // 光标在第 1 行末尾（字节 1）→ 第 0 行第 1 列
+        assert_eq!(cursor_position("a\nbc", 1), (1, 0));
+        // 光标在换行符处（字节 2）→ 第 1 行第 0 列
+        assert_eq!(cursor_position("a\nbc", 2), (0, 1));
+    }
+
+    #[test]
+    fn test_cursor_position_cjk_multiline() {
+        // "你\n好" → 光标末尾：第 1 行第 2 列
+        assert_eq!(cursor_position("你\n好", 7), (2, 1));
+    }
+
+    #[test]
+    fn test_is_wide_char_ranges() {
+        assert!(is_wide_char('中'));
+        assert!(is_wide_char('你'));
+        assert!(is_wide_char('好'));
+        assert!(is_wide_char('，')); // 全角逗号
+        assert!(is_wide_char('あ')); // 平假名
+        assert!(!is_wide_char('a'));
+        assert!(!is_wide_char('1'));
+        assert!(!is_wide_char(' '));
+        assert!(!is_wide_char('\n'));
     }
 }
