@@ -346,6 +346,27 @@ impl BackgroundLoopHandle {
                                             .duration_since(std::time::UNIX_EPOCH)
                                             .unwrap_or_default().as_secs(),
                                     }).to_string());
+                                    // 注入意识树果实 → SEAL extract_from_consciousness_tree 自动消费,
+                                    // 探索目标进入 SEAL 过程学习 (R-P79 闭环: 决策 → 果实 → 学习)。
+                                    if let Some(ref mut tree) = self.consciousness_tree {
+                                        let fruit = crate::core::nt_core_consciousness_tree::EvolutionFruit {
+                                            name: format!("efe-explore-{}-{}", domain, tree.cycle),
+                                            source_branch: crate::core::nt_core_consciousness_tree::BranchKind::World,
+                                            description: format!("EFE 前瞻探索: 主动采样低密度知识域 '{}' (nodes={}, max={})", domain, count, max_count),
+                                            produced_at_cycle: tree.cycle,
+                                            quality: 0.6,
+                                            claim: format!("EFE 探索目标: {} (nodes={}) — 主动采样未知知识域", domain, count),
+                                            evidence: crate::core::nt_core_consciousness_tree::EvidenceChain::new(
+                                                format!("efe-{}-{}", domain, tree.cycle),
+                                                format!("efe:{}:{}", domain, count),
+                                            ),
+                                            stop_rule: crate::core::nt_core_consciousness_tree::StopRule::default(),
+                                            benchmark: crate::core::nt_core_consciousness_tree::ProviderBenchmark::default(),
+                                            generation: tree.core.generation_counter,
+                                        };
+                                        tree.fruits.push(fruit);
+                                        log::debug!("[bg] efe: injected exploration fruit for '{}' into consciousness tree", domain);
+                                    }
                                     log::info!("[bg] efe: explore domain '{}' (nodes={}, scale={})",
                                         domain, count, self.config.efe_epistemic_scale);
                                 }
