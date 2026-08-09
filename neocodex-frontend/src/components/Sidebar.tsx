@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search, X, GitBranch, Clock, Coins, History } from 'lucide-solid'
+import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search, X } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
 import { SettingsModal } from './SettingsModal'
 import { clsx } from 'clsx'
@@ -157,21 +157,6 @@ export function Sidebar(props: SidebarProps) {
                 <svg viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5.5" r="1.2" stroke="currentColor" stroke-width="1.1" /><line x1="5.5" y1="1.5" x2="5.5" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="5.5" y1="9.5" x2="5.5" y2="10.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1.5" y1="5.5" x2="0.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="9.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="11" cy="11" r="1.2" stroke="currentColor" stroke-width="1.1" opacity="0.55" /><line x1="11" y1="7" x2="11" y2="6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="11" y1="13" x2="11" y2="14" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="7" y1="10" x2="6" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="13" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /></svg>
                 <span class="segb-t">协同</span>
               </button>
-              <button
-                class={clsx('segb', viewIdx() === 2 && 'on')}
-                onClick={() => switchView('computer')}
-                role="tab"
-                aria-selected={viewIdx() === 2}
-                tabIndex={viewIdx() === 2 ? 0 : -1}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); switchView(view() === 'computer' ? 'chat' : 'computer') }
-                }}
-                aria-label="电脑控制"
-                title="电脑控制"
-              >
-                <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.1" /><path d="M6 14h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="1" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="15" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1" y1="7.5" x2="0.5" y2="7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
-                <span class="segb-t">电脑</span>
-              </button>
             </div>
           </div>
 
@@ -184,7 +169,7 @@ export function Sidebar(props: SidebarProps) {
               aria-pressed={props.activePanel === 'git'}
               title="Git 变更 (⌘1)"
             >
-              <GitBranch class="w-4 h-4" />
+              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
             </button>
             <button
               class={clsx('tb-btn', props.activePanel === 'tasks' && 'on')}
@@ -193,7 +178,7 @@ export function Sidebar(props: SidebarProps) {
               aria-pressed={props.activePanel === 'tasks'}
               title="定时任务 (⌘2)"
             >
-              <Clock class="w-4 h-4" />
+              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="8" cy="8" r="4.2" stroke="currentColor" stroke-width="0.8" opacity="0.45" /></svg>
             </button>
             <button
               class={clsx('tb-btn', props.activePanel === 'cost' && 'on')}
@@ -202,7 +187,7 @@ export function Sidebar(props: SidebarProps) {
               aria-pressed={props.activePanel === 'cost'}
               title="成本看板 (⌘3)"
             >
-              <Coins class="w-4 h-4" />
+              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="8" x2="11.5" y2="4.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" opacity="0.45" /><line x1="8" y1="8" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" opacity="0.45" /></svg>
             </button>
             <button
               class={clsx('tb-btn', props.activePanel === 'timeline' && 'on')}
@@ -211,7 +196,7 @@ export function Sidebar(props: SidebarProps) {
               aria-pressed={props.activePanel === 'timeline'}
               title="时间线 (⌘4)"
             >
-              <History class="w-4 h-4" />
+              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="8" cy="8" r="4.2" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 1.5" opacity="0.45" /></svg>
             </button>
             <button
               class={clsx('tb-btn', props.activePanel === 'sidechat' && 'on')}
@@ -220,7 +205,16 @@ export function Sidebar(props: SidebarProps) {
               aria-pressed={props.activePanel === 'sidechat'}
               title="侧向对话 (⌘5)"
             >
-              <MessageSquare class="w-4 h-4" />
+              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="5" cy="5" r="1" stroke="currentColor" stroke-width="0.8" opacity="0.45" /><circle cx="11" cy="11" r="1" stroke="currentColor" stroke-width="0.8" opacity="0.45" /></svg>
+            </button>
+            <button
+              class={clsx('tb-btn', props.activeView === 'computer' && 'on')}
+              onClick={() => props.onSwitchView?.(props.activeView === 'computer' ? 'chat' : 'computer')}
+              aria-label="电脑控制"
+              aria-pressed={props.activeView === 'computer'}
+              title="电脑控制 (⌘6)"
+            >
+              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.1" /><path d="M6 14h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="1" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="15" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1" y1="7.5" x2="0.5" y2="7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
             </button>
           </div>
 
