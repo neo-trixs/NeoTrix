@@ -279,6 +279,7 @@ export function AnnotatedImage(props: Props) {
           )}
           onClick={() => setTool('box')}
           title="框选区域"
+          aria-pressed={tool() === 'box'}
         >
           <Square class="w-3.5 h-3.5" /> 框选
         </button>
@@ -289,12 +290,13 @@ export function AnnotatedImage(props: Props) {
           )}
           onClick={() => setTool('arrow')}
           title="箭头指向"
+          aria-pressed={tool() === 'arrow'}
         >
           <Move class="w-3.5 h-3.5" /> 箭头
         </button>
         <button
           class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:bg-bg-tertiary transition-colors"
-          onClick={() => setAnnotations([])}
+          onClick={() => { if (annotations().length > 0 && !window.confirm('确定清除所有标注？')) return; setAnnotations([]) }}
           title="清除所有标注"
         >
           <Eraser class="w-3.5 h-3.5" /> 清除
