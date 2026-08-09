@@ -138,6 +138,7 @@ pub mod nt_core_conn;
 pub mod nt_core_epoch;
 pub mod nt_io_cache;
 pub mod nt_core_self_review;
+pub mod nt_core_axiom_tree;
 pub mod nt_core_error_recovery;
 pub mod nt_io_telemetry;
 pub mod nt_core_mcp;
