@@ -925,28 +925,48 @@ impl BrainStage for SearchSkillWrapperStage {
         let exercises: Vec<SearchExercise> = if task.is_empty() {
             Vec::new()
         } else {
-            let grounding = brain._reward.clamp(0.0, 1.0);
+            // H4 修复: 用 KB 真实检索结果作为 grounding 信号, 替代内部 reward 自证。
+            // 此前 grounding/relevance/synthesis 全取 brain._reward (内部自评),
+            // 且三个分数完全相同 — 搜索技能训练完全自同义反复, 无外部验证。
+            // 现在: 从 NT-MEMORY KB 检索任务相关证据, grounding 由真实命中分数
+            // 决定 (FTS/BM25/向量), 无命中则 grounding 低 → 训练信号反映真实
+            // 检索能力而非自我感觉。
+            let kb = brain._nt_memory_kb.as_ref();
+            let kb_hits = kb.and_then(|k| k.search(&task, 5).ok()).unwrap_or_default();
+            let grounding = if kb_hits.is_empty() {
+                0.0
+            } else {
+                kb_hits.iter().map(|r| r.score.clamp(0.0, 1.0)).sum::<f64>()
+                    / kb_hits.len() as f64
+            };
+            let relevance = grounding;
+            let synthesis = grounding * 0.9; // 综合质量略低于 grounding, 反映证据到答案的损耗
+            let raw_results: Vec<SearchResult> = kb_hits.iter().take(5).map(|h| SearchResult {
+                url: h.node.id.clone(),
+                title: h.node.title.clone(),
+                snippet: h.node.summary.clone().unwrap_or_default(),
+                source_type: "kb".to_string(),
+                credibility: h.score.clamp(0.0, 1.0),
+            }).collect();
+            let filtered: Vec<Evidence> = raw_results.iter()
+                .filter(|r| r.credibility > 0.3)
+                .take(3)
+                .map(|r| Evidence {
+                    source_url: r.url.clone(),
+                    claim: r.snippet.clone(),
+                    confidence: r.credibility,
+                    supports_answer: true,
+                }).collect();
             vec![SearchExercise {
                 exercise_id: format!("search-{}", brain.iteration),
                 task_type: SearchTaskType::TechnicalQuery,
                 query: task.clone(),
-                raw_results: vec![SearchResult {
-                    url: "local://task".to_string(),
-                    title: task.clone(),
-                    snippet: String::new(),
-                    source_type: "doc".to_string(),
-                    credibility: grounding,
-                }],
-                filtered_evidence: vec![Evidence {
-                    source_url: "local://task".to_string(),
-                    claim: task.clone(),
-                    confidence: grounding,
-                    supports_answer: true,
-                }],
+                raw_results,
+                filtered_evidence: filtered,
                 synthesized_answer: task.clone(),
                 grounding_score: grounding,
-                relevance_score: grounding,
-                synthesis_quality: grounding,
+                relevance_score: relevance,
+                synthesis_quality: grounding * relevance,
                 latency_ms: 0,
                 timestamp,
             }]
