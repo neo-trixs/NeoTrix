@@ -41,6 +41,8 @@ public struct NeoGramApp: App {
     private func initialize() async {
         do {
             try await core.initialize()
+            // 修复: 重置 initFailed — 此前 Retry 成功后仍停留错误视图（if initFailed 分支优先）
+            initFailed = false
             isInitialized = true
             // Passcode 已启用 → 启动即锁定（对标 Telegram: 冷启动要求输入）
             if passcodeManager.isPasscodeEnabled {

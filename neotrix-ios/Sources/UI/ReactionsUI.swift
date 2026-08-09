@@ -54,8 +54,9 @@ public final class ReactionManager: ObservableObject {
     
     private func loadPreferences() {
         // 统一 premium 事实源为 premium_tier（与 PremiumManager 一致）
+        // 修复: 用 PremiumTier(rawValue:) 解析 — 此前 tierRaw != "free" 与 rawValue "Free" 大小写不匹配，免费用户恒为 premium
         if let tierRaw = UserDefaults.standard.string(forKey: "premium_tier") {
-            isPremium = tierRaw != "free"
+            isPremium = PremiumTier(rawValue: tierRaw) != .free
         }
         if let saved = UserDefaults.standard.array(forKey: "favorite_reactions") as? [String] {
             favoriteReactions = saved

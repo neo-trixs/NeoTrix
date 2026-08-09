@@ -368,9 +368,8 @@ public struct MessageBubbleView: View {
     }
     
     /// 引用条发送者名（复用全局 senderName）
-    private func senderName(_ sender: ChatMessage.Sender) -> String {
-        senderName(sender)
-    }
+    // 修复: 此前私有方法 senderName 遮蔽全局函数，方法体内 senderName(sender) 解析到自身 → 无限递归。
+    // 删除私有方法，调用点直接解析到全局 senderName（:733）。
     
     private var statusIcon: some View {
         Group {
