@@ -1,117 +1,128 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
     style::{Style, Color, Modifier},
     text::{Line, Span, Text},
     Frame,
 };
 use super::app::TuiApp;
-use super::output::{render_markdown, role_style, render_thinking_block};
+use super::output::{render_markdown, render_thinking_block};
 use super::themes::Theme;
 use crate::cli::cost_tracker::COST_TRACKER;
 
-/// 计算五面板布局（含目标状态面板）
-pub fn compute_layout(area: Rect) -> (Rect, Rect, Rect, Rect, Rect) {
+/// 计算三区布局（聊天 + 输入 + 状态栏）— opencode/Claude Code 风格。
+/// 无左侧会话面板、无边框面板；信息密度优先。
+pub fn compute_layout(area: Rect) -> (Rect, Rect, Rect) {
     let main = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(20),
-            Constraint::Percentage(80),
-        ])
-        .split(area);
-
-    let left = main[0];
-    let right = main[1];
-
-    let right_split = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(3),
-            Constraint::Length(6),
+            Constraint::Min(1),
             Constraint::Length(3),
             Constraint::Length(1),
         ])
-        .split(right);
+        .split(area);
 
-    (left, right_split[0], right_split[1], right_split[2], right_split[3])
+    (main[0], main[1], main[2])
 }
 
-/// 渲染左面板 — 会话列表
-pub fn render_session_list(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
-    let items: Vec<ListItem> = app.sessions.iter().enumerate().map(|(i, s)| {
-        let prefix = if i == app.active_session { "▶ " } else { "  " };
-        let n = s.messages.len();
-        ListItem::new(format!("{}{} ({}条)", prefix, s.name, n))
-    }).collect();
-
-    let list = List::new(items)
-        .block(Block::default()
-            .title(format!("会话 {}", app.sessions.len()))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.secondary)))
-        .highlight_style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD))
-        .style(Style::default().fg(theme.primary));
-
-    frame.render_widget(list, area);
-}
-
-/// 渲染右上面板 — 聊天输出（Markdown 渲染 + Thinking 折叠 + 工具调用可视化）
+/// 渲染聊天区 — 无边框消息流（opencode 风格）。
+/// - user: `❯ 内容`（accent 前缀）
+/// - assistant: `assistant` 标签 + 工具调用折叠行 + thinking 折叠 + markdown 正文
+/// - system/error: 特殊样式
+/// - 目标状态内联（有 goal 时顶部一行）
 pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
     let session = app.active_session();
-    let mut lines = Vec::new();
+    let mut lines: Vec<Line> = Vec::new();
 
-    for (msg_idx, msg) in session.messages.iter().enumerate() {
-        let style = role_style(&msg.role);
-        lines.push(Line::from(Span::styled(format!("[{}]", msg.role), style)));
-
-        // Tool calls visualization
-        for tc in &msg.tool_calls {
-            let icon = if tc.success { "🛠️" } else { "⚠️" };
-            let dur = if tc.duration_ms > 0 { format!(" ({}ms)", tc.duration_ms) } else { String::new() };
-            lines.push(Line::from(vec![
-                Span::styled(icon, Style::default().fg(theme.accent)),
-                Span::styled(format!(" {}", tc.name), Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
-                Span::styled(dur, Style::default().fg(theme.secondary)),
-            ]));
-            if !tc.args.is_empty() {
-                lines.push(Line::from(Span::styled(
-                    format!("  └ args: {}", tc.args),
-                    Style::default().fg(theme.secondary),
-                )));
-            }
-        }
-
-        // Image attachment indicator
-        if let Some(ref img_name) = msg.image_name {
-            lines.push(Line::from(Span::styled(
-                format!(" [📷 {}]", img_name),
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
-            )));
-        }
-
-        // Thinking blocks (collapsible)
-        let key = format!("{}:{}", app.active_session, msg_idx);
-        let expanded = app.thinking_expanded.contains(&key);
-        if !msg.thinking_blocks.is_empty() {
-            let indicator = if expanded { "▼" } else { "▶" };
-            lines.push(Line::from(Span::styled(
-                format!(" {} Thinking (press t to toggle)", indicator),
-                Style::default().fg(theme.highlight).add_modifier(Modifier::ITALIC),
-            )));
-            if expanded {
-                lines.extend(render_thinking_block(&msg.thinking_blocks));
-            }
-        }
-
-        // Main content
-        lines.extend(render_markdown(&msg.content));
+    // 目标状态内联（有 goal 时显示一行，无 goal 不占空间）
+    if app.goal_display.has_goal {
+        lines.push(render_goal_line(app, theme));
         lines.push(Line::from(""));
     }
 
-    // 流式输出内容（尚未持久化到消息列表）
+    for (msg_idx, msg) in session.messages.iter().enumerate() {
+        match msg.role.as_str() {
+            "user" => {
+                lines.push(Line::from(vec![
+                    Span::styled("You: ", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                    Span::raw(msg.content.clone()),
+                ]));
+            }
+            "assistant" => {
+                lines.push(Line::from(vec![
+                    Span::styled("assistant", Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
+                ]));
+
+                // 工具调用（折叠行）
+                for tc in &msg.tool_calls {
+                    let icon = if tc.success { "✳" } else { "⚠" };
+                    let dur = if tc.duration_ms > 0 {
+                        format!(" ({}ms)", tc.duration_ms)
+                    } else {
+                        String::new()
+                    };
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {} ", icon), Style::default().fg(theme.accent)),
+                        Span::styled(tc.name.clone(), Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
+                        Span::styled(dur, Style::default().fg(theme.secondary)),
+                    ]));
+                    if !tc.args.is_empty() {
+                        lines.push(Line::from(Span::styled(
+                            format!("    {}", tc.args),
+                            Style::default().fg(theme.secondary),
+                        )));
+                    }
+                }
+
+                // 图片附件指示
+                if let Some(ref img_name) = msg.image_name {
+                    lines.push(Line::from(Span::styled(
+                        format!("  [📷 {}]", img_name),
+                        Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+                    )));
+                }
+
+                // thinking 折叠
+                let key = format!("{}:{}", app.active_session, msg_idx);
+                let expanded = app.thinking_expanded.contains(&key);
+                if !msg.thinking_blocks.is_empty() {
+                    let indicator = if expanded { "▼" } else { "▶" };
+                    lines.push(Line::from(Span::styled(
+                        format!("  {} thinking (t)", indicator),
+                        Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC),
+                    )));
+                    if expanded {
+                        lines.extend(render_thinking_block(&msg.thinking_blocks));
+                    }
+                }
+
+                // 正文
+                lines.extend(render_markdown(&msg.content));
+            }
+            "system" => {
+                lines.push(Line::from(Span::styled(
+                    format!("[system] {}", msg.content),
+                    Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC),
+                )));
+            }
+            "error" => {
+                lines.push(Line::from(Span::styled(
+                    format!("[error] {}", msg.content),
+                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                )));
+            }
+            _ => {
+                lines.extend(render_markdown(&msg.content));
+            }
+        }
+        lines.push(Line::from(""));
+    }
+
+    // 流式输出（尚未持久化）
     if app.streaming {
-        let style = role_style(&app.streaming_role);
-        lines.push(Line::from(Span::styled(format!("[{}]", app.streaming_role), style)));
+        lines.push(Line::from(vec![
+            Span::styled("assistant", Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
+        ]));
         lines.extend(render_markdown(&app.streaming_text));
         lines.push(Line::from(Span::styled(
             " ▌",
@@ -120,53 +131,64 @@ pub fn render_chat_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
     }
 
     let paragraph = Paragraph::new(Text::from(lines))
-        .block(Block::default()
-            .title(if app.agent_busy { "对话 [思考中...]" } else { "对话" })
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.secondary)))
         .wrap(Wrap { trim: false })
         .scroll((app.scroll_offset as u16, 0));
 
     frame.render_widget(paragraph, area);
 }
 
-/// 渲染右下面板 — 输入行（支持多行模式 + 历史搜索）
+/// 渲染输入区 — 无边框，`❯ ` 提示符（opencode 风格）。
+/// 多行输入逐行渲染；历史搜索激活时覆盖为搜索面板。
 pub fn render_input_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
     if app.command_history.search_active {
         render_history_search(frame, area, app, theme);
         return;
     }
 
-    let placeholder = if app.multi_line {
-        "多行模式 (Enter=换行, Ctrl+Enter=发送)"
-    } else {
-        "输入消息... (Tab补全 ↑↓历史 Ctrl+R搜索 Alt+Enter=多行 Ctrl+L=清屏)"
-    };
+    let prompt = Span::styled("❯ ", Style::default().fg(theme.accent).add_modifier(Modifier::BOLD));
+    let mut text_lines: Vec<Line> = Vec::new();
 
-    let text = if app.input.is_empty() {
-        Text::from(Line::from(Span::styled(placeholder, Style::default().fg(theme.secondary))))
+    if app.input.is_empty() {
+        let placeholder = if app.multi_line {
+            "多行模式 (Enter=换行, Ctrl+Enter=发送)"
+        } else {
+            "输入消息... (Enter 发送 | ↑↓ 历史 | Ctrl+R 搜索 | Alt+E 多行 | Ctrl+L 清屏)"
+        };
+        text_lines.push(Line::from(vec![
+            prompt.clone(),
+            Span::styled(placeholder, Style::default().fg(theme.secondary)),
+        ]));
     } else {
-        let lines: Vec<Line> = app.input.lines().map(|l: &str| Line::from(Span::raw(l.to_string()))).collect();
-        Text::from(lines)
-    };
+        let mut first = true;
+        for line in app.input.lines() {
+            if first {
+                text_lines.push(Line::from(vec![prompt.clone(), Span::raw(line.to_string())]));
+                first = false;
+            } else {
+                text_lines.push(Line::from(Span::raw(line.to_string())));
+            }
+        }
+    }
 
-    let hist_indicator = match app.command_history.position {
-        Some(pos) => format!(" (history {}/{})", pos + 1, app.command_history.entries.len()),
-        None => String::new(),
-    };
-    let title = if app.multi_line { format!("输入 [多行]{}", hist_indicator) } else { format!("输入{}", hist_indicator) };
-    let paragraph = Paragraph::new(text)
-        .block(Block::default().title(title).borders(Borders::ALL).border_style(Style::default().fg(theme.secondary)))
+    if app.multi_line {
+        text_lines.push(Line::from(Span::styled(
+            "[多行模式]",
+            Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC),
+        )));
+    }
+
+    let paragraph = Paragraph::new(Text::from(text_lines))
         .style(Style::default().fg(theme.primary));
-
     frame.render_widget(paragraph, area);
 
     // 光标位置：基于 cursor 字节索引 + 显示宽度（CJK 宽字符按 2 列计）。
     let (cursor_col, cursor_row) = cursor_position(&app.input, app.cursor);
-    frame.set_cursor_position((
-        area.x + 1 + cursor_col as u16,
-        area.y + 1 + cursor_row as u16,
-    ));
+    let x = if cursor_row == 0 {
+        area.x + 2 + cursor_col as u16 // "❯ " 前缀 2 列
+    } else {
+        area.x + cursor_col as u16
+    };
+    frame.set_cursor_position((x, area.y + cursor_row as u16));
 }
 
 /// 计算输入文本中光标 (字节索引) 对应的 (列, 行)，按显示宽度处理 CJK。
@@ -212,7 +234,7 @@ fn is_wide_char(ch: char) -> bool {
         || (0xFFE0..=0xFFE6).contains(&c) // Fullwidth Signs
 }
 
-/// 渲染 Ctrl+R 历史搜索面板
+/// 渲染 Ctrl+R 历史搜索面板（无边框，opencode 风格）。
 fn render_history_search(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
     let total = app.command_history.search_results.len();
     let sel = app.command_history.search_selection;
@@ -251,136 +273,80 @@ fn render_history_search(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
     }
 
     let paragraph = Paragraph::new(Text::from(lines))
-        .block(Block::default()
-            .title(" History Search ")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.accent)))
         .style(Style::default().fg(theme.primary));
 
     frame.render_widget(paragraph, area);
 }
 
-/// 渲染目标状态面板 — 显示当前 GoalLoop 状态 + Agent 摘要
-pub fn render_goal_panel(frame: &mut Frame, area: Rect, app: &TuiApp, agent_team_summary: &str, theme: &Theme) {
-    let (mut lines, title) = if app.goal_display.has_goal {
-        let g = &app.goal_display;
-        let pct = if g.max_iterations > 0 {
-            (g.iterations as f64 / g.max_iterations as f64) * 100.0
-        } else {
-            0.0
-        };
-        let mut lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    format!(" {} {} ", g.state_icon, g.state_label),
-                    Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
-                ),
-            ]),
-            Line::from(vec![
-                Span::styled(" Goal: ", Style::default().fg(theme.secondary)),
-                Span::raw(g.description.clone()),
-            ]),
-            Line::from(vec![
-                Span::styled(" Iter: ", Style::default().fg(theme.secondary)),
-                Span::raw(format!("{}/{} ({:.0}%)", g.iterations, g.max_iterations, pct)),
-                Span::styled(" Score: ", Style::default().fg(theme.secondary)),
-                Span::raw(format!("{:.2}→{:.2}", g.score_before, g.score_current)),
-            ]),
-            Line::from(vec![
-                Span::styled(" Stalled: ", Style::default().fg(theme.secondary)),
-                Span::raw(format!("{}x", g.stalled_count)),
-            ]),
-        ];
-        if g.queue_count > 0 || g.completed_count > 0 {
-            let suffix = format!("Q:{} C:{}", g.queue_count, g.completed_count);
-            lines.push(Line::from(Span::styled(
-                format!(" {} ", suffix),
-                Style::default().fg(theme.secondary),
-            )));
-        }
-        (lines, " Goal ")
+/// 目标状态内联行（有 goal 时显示在聊天区顶部）。
+fn render_goal_line(app: &TuiApp, theme: &Theme) -> Line<'static> {
+    let g = &app.goal_display;
+    let pct = if g.max_iterations > 0 {
+        (g.iterations as f64 / g.max_iterations as f64) * 100.0
     } else {
-        let extra = if app.goal_display.queue_count > 0 || app.goal_display.completed_count > 0 {
-            format!(" (Q:{}, C:{})", app.goal_display.queue_count, app.goal_display.completed_count)
-        } else {
-            String::new()
-        };
-        let lines = vec![
-            Line::from(Span::styled(
-                format!(" No active goal.{}. Use /goal <desc> to start.", extra),
-                Style::default().fg(theme.secondary),
-            )),
-        ];
-        (lines, " No Goal ")
+        0.0
     };
-
-    if !agent_team_summary.is_empty() {
-        lines.push(Line::from(vec![
-            Span::styled(" Agents: ", Style::default().fg(theme.secondary)),
-            Span::raw(agent_team_summary),
-        ]));
+    let mut spans = vec![
+        Span::styled(
+            format!(" {} {} ", g.state_icon, g.state_label),
+            Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" Goal: ", Style::default().fg(theme.secondary)),
+        Span::raw(g.description.clone()),
+        Span::styled(
+            format!(" [Iter {}/{} {:.0}%]", g.iterations, g.max_iterations, pct),
+            Style::default().fg(theme.secondary),
+        ),
+        Span::styled(
+            format!(" [Score {:.2}→{:.2}]", g.score_before, g.score_current),
+            Style::default().fg(theme.secondary),
+        ),
+    ];
+    if g.queue_count > 0 || g.completed_count > 0 {
+        spans.push(Span::styled(
+            format!(" [Q:{} C:{}]", g.queue_count, g.completed_count),
+            Style::default().fg(theme.secondary),
+        ));
     }
-
-    let paragraph = Paragraph::new(Text::from(lines))
-        .block(Block::default().title(title).borders(Borders::ALL).border_style(Style::default().fg(theme.secondary)))
-        .wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, area);
+    Line::from(spans)
 }
 
-/// 渲染 diff 查看面板
-pub fn render_diff_viewer(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
-    let dv: &super::diff_viewer::DiffViewer = match &app.diff_viewer {
-        Some(dv) => dv,
-        None => {
-            let paragraph = Paragraph::new("No diff loaded")
-                .block(Block::default()
-                    .title(" Diff Viewer ")
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(theme.secondary)));
-            frame.render_widget(paragraph, area);
-            return;
-        }
+/// 渲染底部状态栏 — 无边框信息行（左状态 + 右信息）。
+pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
+    // 左段：状态
+    let status = if app.streaming {
+        format!("生成中 {:.0} tok/s", app.tokens_per_sec)
+    } else if app.agent_busy {
+        "思考中".to_string()
+    } else {
+        "就绪".to_string()
     };
 
-    let inner_height = (area.height.saturating_sub(2)) as usize;
-    let all_lines = dv.all_rendered_lines();
-    let visible: Vec<Line> = all_lines.iter().skip(dv.scroll_offset).take(inner_height).cloned().collect();
-    let file_count = dv.blocks.len();
+    // vim 模式指示
+    let vim = if app.vim_mode.is_enabled() {
+        format!(" --{}-- ", app.vim_mode.mode.label())
+    } else {
+        String::new()
+    };
 
-    let paragraph = Paragraph::new(Text::from(visible))
-        .block(Block::default()
-            .title(format!(" Diff Viewer — {} file(s) (j/k scroll, q close) ", file_count))
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(theme.accent)))
-        .style(Style::default().fg(theme.primary));
-
-    frame.render_widget(paragraph, area);
-}
-
-/// 渲染底部状态栏（增强版，含费用追踪 + 沙箱指示器）
-pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
-    let sandbox_indicator = {
+    // 沙箱指示
+    let sandbox = {
         let label = app.sandbox_mode.label();
         if label.is_empty() {
             String::new()
         } else {
-            format!(" {} |", label)
+            format!(" | {}", label)
         }
     };
 
-    let vim_prefix = if app.vim_mode.is_enabled() {
-        format!("-- {} -- ", app.vim_mode.mode.label())
-    } else {
-        String::new()
-    };
-    let session_info = format!(" 会话{}/{}", app.active_session + 1, app.sessions.len());
-    let ws_info = format!(" WS:{} ({})", app.workspace_name, app.workspace_count);
-
+    // 右段：会话 / 工作区 / token / 费用
+    let session_info = format!("会话 {}/{}", app.active_session + 1, app.sessions.len());
+    let ws_info = format!("WS:{} ({})", app.workspace_name, app.workspace_count);
     let cost_info = {
         if let Ok(tracker) = COST_TRACKER.lock() {
             let line = tracker.status_line();
-            if line.len() > 60 {
-                format!(" | {}", &line[..57])
+            if line.len() > 40 {
+                format!(" | {}", &line[..37])
             } else {
                 format!(" | {}", line)
             }
@@ -388,25 +354,33 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
             String::new()
         }
     };
+    let tokens = format!("Tokens:{}", app.token_count);
 
-    let status_text = if app.streaming {
-        format!("{}{}{} 生成中... {:.0} tok/s | Tokens: {}{} |{} | {}",
-            sandbox_indicator, vim_prefix, app.status_text, app.tokens_per_sec, app.token_count, cost_info, ws_info, session_info)
-    } else if app.agent_busy {
-        format!("{}{}{} 思考中 | Tokens: {}{} |{} | {}", sandbox_indicator, vim_prefix, app.status_text, app.token_count, cost_info, ws_info, session_info)
+    let left = format!("{}{}{}", status, vim, sandbox);
+    let right = format!("{} | {} | {}{}", session_info, ws_info, tokens, cost_info);
+
+    // 左对齐 + 右对齐
+    let left_len = left.chars().count();
+    let right_len = right.chars().count();
+    let pad = area.width as usize;
+    let text = if left_len + right_len >= pad {
+        format!("{} {}", left, right)
     } else {
-        format!("{}{}{} 就绪 | Tokens: {}{} |{} | {}", sandbox_indicator, vim_prefix, app.status_text, app.token_count, cost_info, ws_info, session_info)
+        format!("{}{}{}", left, " ".repeat(pad - left_len - right_len), right)
     };
 
     let is_sandbox = app.sandbox_mode != crate::cli::sandbox::SandboxMode::Disabled;
-    let status = Paragraph::new(Line::from(Span::raw(status_text)))
-        .style(Style::default()
-            .bg(if app.streaming { theme.accent }
-                else if app.agent_busy { theme.secondary }
-                else if is_sandbox { Color::Red }
-                else { theme.primary })
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD));
+    let bg = if app.streaming {
+        theme.accent
+    } else if app.agent_busy {
+        theme.secondary
+    } else if is_sandbox {
+        Color::Red
+    } else {
+        theme.bg
+    };
+    let status = Paragraph::new(Line::from(Span::raw(text)))
+        .style(Style::default().bg(bg).fg(Color::White));
     frame.render_widget(status, area);
 }
 
@@ -428,35 +402,28 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_layout_returns_five_areas() {
+    fn test_compute_layout_returns_three_areas() {
         let area = Rect { x: 0, y: 0, width: 100, height: 50 };
-        let (left, chat, goal, input, status) = compute_layout(area);
-        assert_eq!(left.x, 0);
-        assert_eq!(left.y, 0);
-        assert_eq!(left.width, 20);
-        assert_eq!(left.height, 50);
-        let right_total_height = chat.height + goal.height + input.height + status.height;
-        assert_eq!(right_total_height, 50);
-    }
-
-    #[test]
-    fn test_compute_layout_left_right_split() {
-        let area = Rect { x: 0, y: 0, width: 80, height: 24 };
-        let (left, _chat, _goal, _input, _status) = compute_layout(area);
-        assert_eq!(left.width, 16);
-        assert_eq!(left.height, 24);
+        let (chat, input, status) = compute_layout(area);
+        assert_eq!(chat.x, 0);
+        assert_eq!(chat.y, 0);
+        assert_eq!(chat.width, 100);
+        let total_height = chat.height + input.height + status.height;
+        assert_eq!(total_height, 50);
+        assert_eq!(status.height, 1);
+        assert_eq!(input.height, 3);
     }
 
     #[test]
     fn test_compute_layout_all_areas_nonzero() {
-        let area = Rect { x: 0, y: 0, width: 100, height: 50 };
-        let (left, chat, _goal, input, status) = compute_layout(area);
-        assert!(left.width > 0);
-        assert!(left.height > 0);
+        let area = Rect { x: 0, y: 0, width: 80, height: 24 };
+        let (chat, input, status) = compute_layout(area);
         assert!(chat.width > 0);
         assert!(chat.height > 0);
         assert!(input.width > 0);
+        assert!(input.height > 0);
         assert!(status.width > 0);
+        assert!(status.height > 0);
     }
 
     #[test]

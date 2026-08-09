@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::core::nt_core_self::evolution_analysis::{analyze_kb_health, store_report_to_kb, print_report};
+use crate::core::nt_core_self::evolution_analysis::{analyze_kb_health, store_report_to_kb};
 
 pub struct SelfAuditCmd;
 

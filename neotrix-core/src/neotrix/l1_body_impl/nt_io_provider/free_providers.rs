@@ -44,7 +44,7 @@ impl GroqProvider {
             "stream": false,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
         body
@@ -127,7 +127,7 @@ impl LlmProvider for GroqProvider {
             "stream": true,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 
@@ -233,7 +233,7 @@ impl LlmProvider for OpenRouterProvider {
             "max_tokens": request.max_tokens,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 
@@ -294,7 +294,7 @@ impl LlmProvider for OpenRouterProvider {
             "stream": true,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 
@@ -395,7 +395,7 @@ impl LlmProvider for PollinationsProvider {
             "referrer": "https://pollinations.ai/",
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 
@@ -447,7 +447,7 @@ impl LlmProvider for PollinationsProvider {
             "referrer": "https://pollinations.ai/",
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 
@@ -544,7 +544,7 @@ impl LlmProvider for CerebrasProvider {
             "max_tokens": request.max_tokens,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 
@@ -596,7 +596,7 @@ impl LlmProvider for CerebrasProvider {
             "stream": true,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 

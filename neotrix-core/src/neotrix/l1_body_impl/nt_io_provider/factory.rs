@@ -586,7 +586,7 @@ pub async fn create_gateway_async() -> GatewayV2 {
     // 代理注入: 本机常为 fake-ip 分流网络 (如 198.18.0.x + 系统代理), 直连会全部超时,
     // 因此统一把 NEOTRIX_PROXY_URL / NEOTRIX_TOR_PROXY 注入每个 keyless provider 客户端。
     let proxy = super::super::nt_io_http_factory::proxy_from_env();
-    let mut keyless_provider = |ptype: LlmProviderType| {
+    let keyless_provider = |ptype: LlmProviderType| {
         let mut p = create_provider_from_type(ptype, None);
         if let Some(proxy_url) = &proxy {
             p.set_proxy(proxy_url);

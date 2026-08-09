@@ -182,7 +182,7 @@ impl SearchSkillStage {
         }).collect();
 
         // 简化证据筛选：取前 3 个高可信度结果
-        let mut filtered: Vec<Evidence> = raw_results.iter()
+        let filtered: Vec<Evidence> = raw_results.iter()
             .filter(|r| r.credibility > 0.6)
             .take(3)
             .map(|r| Evidence {
@@ -226,7 +226,7 @@ impl SearchSkillStage {
         if let Some(ref mut pipeline) = self.synthesis_pipeline {
             // Proposer: 识别搜索类知识缺口
             pipeline.propose(gaps, |gap| {
-                let task_type = match gap.suggested_task_type {
+                let _task_type = match gap.suggested_task_type {
                     super::data_synthesis::DataTaskType::KnowledgeQA => SearchTaskType::FactLookup,
                     super::data_synthesis::DataTaskType::CodeGeneration => SearchTaskType::CodeExample,
                     super::data_synthesis::DataTaskType::Reasoning => SearchTaskType::TechnicalQuery,
@@ -261,7 +261,7 @@ impl SearchSkillStage {
             });
 
             // Finalize: 转为 SearchExercise
-            let stats = pipeline.finalize();
+            let _stats = pipeline.finalize();
             for (proposal, (solution, verification)) in pipeline.proposals.iter()
                 .zip(pipeline.solutions.iter().zip(pipeline.verifications.iter()))
             {

@@ -108,6 +108,19 @@ impl LlmRequest {
         self
     }
 
+    /// 干净的 temperature 值（f64，四舍五入到 2 位小数）。
+    ///
+    /// f32 序列化会产生精度噪声（如 0.7 → 0.699999988079071），
+    /// 部分 provider（Pollinations 实测 2026-08-09）会拒绝非标准采样值。
+    /// 所有 provider 序列化 temperature 时必须用此方法而非 `json!(f32)`。
+    pub fn temperature_clean(&self) -> Option<f64> {
+        self.temperature.map(|t| {
+            // 必须在 f64 域运算：f32 域 round 后仍是 f32 近似值
+            let t64 = t as f64;
+            (t64 * 100.0).round() / 100.0
+        })
+    }
+
     /// Attach a base64 image payload as `image_data` (data URI) for providers
     /// that support vision. `image_b64` is the raw base64 of the image bytes;
     /// the data-URI prefix is inferred as png/jpeg/jpeg by presence of the
@@ -305,5 +318,46 @@ mod tests {
         let req = LlmRequest::new("gpt-4o", "describe").with_image_b64("data:image/webp;base64,UklGRg==");
         let uri = req.image_data.expect("image_data set");
         assert_eq!(uri, "data:image/webp;base64,UklGRg==");
+    }
+
+    #[test]
+    fn test_temperature_clean_removes_f32_noise() {
+        // f32 0.7 序列化为 0.699999988079071，clean 后必须是干净的 0.7
+        let req = LlmRequest::new("openai", "hi");
+        let clean = req.temperature_clean().expect("temperature set");
+        assert_eq!(clean, 0.7, "f32 noise must be removed, got {clean}");
+        // 序列化验证：json!(f64) 输出干净值
+        let json = serde_json::json!(clean);
+        assert_eq!(json.to_string(), "0.7", "json serialization must be clean, got {json}");
+    }
+
+    #[test]
+    fn test_temperature_clean_none_returns_none() {
+        let req = LlmRequest::new("gpt-4o", "describe").with_temperature(None);
+        assert_eq!(req.temperature_clean(), None);
+    }
+
+    #[test]
+    fn test_temperature_clean_preserves_common_values() {
+        // 常见采样值必须原样保留（f64 域四舍五入到 2 位小数）
+        for (input, expected) in [
+            (0.0f32, 0.0f64),
+            (1.0f32, 1.0f64),
+            (0.5f32, 0.5f64),
+            (1.5f32, 1.5f64),
+            (0.25f32, 0.25f64),
+        ] {
+            let req = LlmRequest::new("gpt-4o", "describe").with_temperature(Some(input));
+            let clean = req.temperature_clean().expect("temperature set");
+            assert_eq!(clean, expected, "input {input} -> {clean}, expected {expected}");
+        }
+    }
+
+    #[test]
+    fn test_temperature_clean_rounds_to_two_decimals() {
+        // 超过 2 位小数的值应四舍五入到 2 位
+        let req = LlmRequest::new("gpt-4o", "describe").with_temperature(Some(0.3333f32));
+        let clean = req.temperature_clean().expect("temperature set");
+        assert_eq!(clean, 0.33, "got {clean}");
     }
 }

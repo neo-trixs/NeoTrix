@@ -312,6 +312,18 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
             bg = bg.with_world_consciousness();
         }
         println!("{}", info("[server] all services initialized."));
+        // 并行启动 HTTP API server（独立线程+独立 runtime，避免被 bg.start 阻塞）
+        // 修复: 此前 serve 命令只跑 BackgroundLoop, HTTP server 从未启动（契约断裂）
+        let http_port = parse_http_port(_addr);
+        let http_handle = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .expect("HTTP server runtime");
+            rt.block_on(async {
+                neotrix::neotrix::nt_io_web::server::start_server(http_port).await;
+            });
+        });
         bg.start().await;
         tokio::signal::ctrl_c().await.unwrap_or_default();
         println!("\n{}", info("[server] shutting down..."));
@@ -321,7 +333,17 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
             brain_guard.shutdown_save_e8();
         }
         bg.shutdown().await;
+        // HTTP server thread will be terminated when process exits
+        let _ = http_handle;
     });
+}
+
+/// 从 --addr 参数解析 HTTP 端口（默认 3000）
+fn parse_http_port(addr: &str) -> u16 {
+    addr.rsplit(':')
+        .next()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3000)
 }
 
 /// Resolve the effective prompt from positional arg, file, or stdin.
@@ -1778,13 +1800,10 @@ You have tools available; call them when they help. Be concise and evidence-firs
             let _ = terminal.draw(|frame| {
                 let area = frame.area();
                 use neotrix::cli::tui::layout::{
-                    compute_layout, render_session_list, render_chat_panel,
-                    render_goal_panel, render_input_panel, render_status_bar,
+                    compute_layout, render_chat_panel, render_input_panel, render_status_bar,
                 };
-                let (left, chat, goal, input_area, status) = compute_layout(area);
-                render_session_list(frame, left, app, &theme);
+                let (chat, input_area, status) = compute_layout(area);
                 render_chat_panel(frame, chat, app, &theme);
-                render_goal_panel(frame, goal, app, "", &theme);
                 render_input_panel(frame, input_area, app, &theme);
                 render_status_bar(frame, status, app, &theme);
             });

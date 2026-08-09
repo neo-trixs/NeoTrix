@@ -46,7 +46,7 @@ impl LlmProvider for GeminiProvider {
             }
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["generationConfig"]["temperature"] = serde_json::json!(temp);
         }
 
@@ -98,7 +98,7 @@ impl LlmProvider for GeminiProvider {
         let model_name = request.model.clone();
         let model = model_name.trim_start_matches("gemini-").to_string();
         let url = format!("{}/models/{}:streamGenerateContent?alt=sse&key={}", self.base_url, model, self.api_key);
-        let temperature = request.temperature;
+        let temperature = request.temperature_clean();
         let max_tokens = request.max_tokens;
         let prompt = request.messages.iter()
             .filter(|m| m.role != Role::System)

@@ -88,7 +88,10 @@ enum DuckDuckGoTopic {
 
 pub struct WebSearchEngine {
     api_base_url: String,
-    client: reqwest::blocking::Client,
+    /// 惰性初始化: 避免在 tokio async 上下文创建 blocking client 触发
+    /// "Cannot drop a runtime in a context where blocking is not allowed" panic。
+    /// 首次 search() 调用时才创建（此时通常在 spawn_blocking/同步上下文）。
+    client: std::sync::OnceLock<reqwest::blocking::Client>,
 }
 
 impl Default for WebSearchEngine {
@@ -103,8 +106,16 @@ impl WebSearchEngine {
     pub fn new(api_base_url: &str) -> Self {
         Self {
             api_base_url: api_base_url.trim_end_matches('/').to_string(),
-            client: reqwest::blocking::Client::new(),
+            client: std::sync::OnceLock::new(),
         }
+    }
+
+    fn client(&self) -> &reqwest::blocking::Client {
+        self.client.get_or_init(|| {
+            reqwest::blocking::Client::builder()
+                .build()
+                .unwrap_or_else(|_| reqwest::blocking::Client::new())
+        })
     }
 
     pub fn search(&self, query: &str, count: usize) -> Result<Vec<SearchResult>, String> {
@@ -114,7 +125,8 @@ impl WebSearchEngine {
             self.api_base_url, encoded
         );
 
-        let resp = self.client
+        let resp = self
+            .client()
             .get(&url)
             .send()
             .map_err(|e| format!("Request failed: {}", e))?;
@@ -228,12 +240,23 @@ impl SearchBackend for DuckDuckGoBackend {
 
 /// Wikipedia 后端 (备选) — 免费无 key, 用 search API 兜底。
 pub struct WikipediaBackend {
-    client: reqwest::blocking::Client,
+    /// 惰性初始化: 避免在 tokio async 上下文创建 blocking client 触发 panic
+    client: std::sync::OnceLock<reqwest::blocking::Client>,
 }
 
 impl Default for WikipediaBackend {
     fn default() -> Self {
-        Self { client: reqwest::blocking::Client::new() }
+        Self { client: std::sync::OnceLock::new() }
+    }
+}
+
+impl WikipediaBackend {
+    fn client(&self) -> &reqwest::blocking::Client {
+        self.client.get_or_init(|| {
+            reqwest::blocking::Client::builder()
+                .build()
+                .unwrap_or_else(|_| reqwest::blocking::Client::new())
+        })
     }
 }
 
@@ -267,7 +290,8 @@ impl SearchBackend for WikipediaBackend {
             "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={}&srlimit={}&format=json",
             encoded, count
         );
-        let resp = self.client
+        let resp = self
+            .client()
             .get(&api)
             .send()
             .map_err(|e| format!("Wikipedia request failed: {}", e))?;

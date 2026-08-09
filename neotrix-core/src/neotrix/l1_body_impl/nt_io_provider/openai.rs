@@ -34,7 +34,7 @@ impl OpenAiProvider {
             "stream": stream,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 

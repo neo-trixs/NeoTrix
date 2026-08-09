@@ -59,7 +59,7 @@ impl LlmProvider for OllamaProvider {
             }
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["options"]["temperature"] = serde_json::json!(temp);
         }
 
@@ -102,7 +102,7 @@ impl LlmProvider for OllamaProvider {
             }
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["options"]["temperature"] = serde_json::json!(temp);
         }
         let base_url = self.base_url.clone();

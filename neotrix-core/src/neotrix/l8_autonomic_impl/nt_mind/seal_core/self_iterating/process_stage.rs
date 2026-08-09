@@ -133,7 +133,7 @@ impl ProcessStage {
         let mut traces = Vec::new();
         for fruit in fruits {
             // EvidenceChain.run_id 格式: "cycle-{cycle}-{kind}"
-            if let Some(run_id) = &fruit.evidence.run_id {
+            if let Some(_run_id) = &fruit.evidence.run_id {
                 // 从 run_id 反推 cycle，这里简化：用 fruit 生成的 cycle
                 let trace = ReasoningTrace {
                     trace_id: format!("ct-{}-{}", fruit.produced_at_cycle, fruit.source_branch.label()),

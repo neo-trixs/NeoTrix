@@ -164,6 +164,7 @@ pub fn tor_client(timeout_secs: u64) -> Result<reqwest::Client, String> {
 /// 未提供 proxy 地址时回退到标准构建，保持向后兼容
 pub fn build_async_client_with_proxy(proxy_url: Option<&str>) -> reqwest::Client {
     let mut builder = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
         .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)

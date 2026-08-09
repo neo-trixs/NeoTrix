@@ -50,7 +50,7 @@ impl LlmProvider for AnthropicProvider {
             "max_tokens": request.max_tokens,
         });
 
-        if let Some(temp) = request.temperature {
+        if let Some(temp) = request.temperature_clean() {
             body["temperature"] = serde_json::json!(temp);
         }
 
@@ -135,7 +135,7 @@ impl LlmProvider for AnthropicProvider {
         let model_name = request.model.clone();
         let max_tokens = request.max_tokens;
         let thinking_budget = request.thinking_budget;
-        let temperature = request.temperature;
+        let temperature = request.temperature_clean();
         let provider_params = request.provider_params.clone();
 
         let system = request.messages.iter()

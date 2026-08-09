@@ -276,7 +276,7 @@ impl CommunityDataIngester {
         kb: &crate::neotrix::nt_memory_kb::KnowledgeBase,
     ) -> Result<usize, String> {
         use crate::neotrix::nt_memory_kb::nt_memory_types::{
-            KnowledgeEdge, KnowledgeNode, NodeType, RelationType,
+            KnowledgeNode, NodeType, RelationType,
         };
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

@@ -45,6 +45,13 @@ fn payload_to_provider_config(payload: &ProviderConfigPayload) -> crate::neotrix
         "anthropic" => crate::neotrix::nt_io_provider::LlmProviderType::Anthropic,
         "gemini" => crate::neotrix::nt_io_provider::LlmProviderType::Gemini,
         "ollama" => crate::neotrix::nt_io_provider::LlmProviderType::Ollama,
+        "groq" => crate::neotrix::nt_io_provider::LlmProviderType::Groq,
+        "openrouter" => crate::neotrix::nt_io_provider::LlmProviderType::OpenRouter,
+        "cerebras" => crate::neotrix::nt_io_provider::LlmProviderType::Cerebras,
+        "pollinations" => crate::neotrix::nt_io_provider::LlmProviderType::Pollinations,
+        "freeapi" | "free" => crate::neotrix::nt_io_provider::LlmProviderType::FreeApi,
+        "vllm" => crate::neotrix::nt_io_provider::LlmProviderType::Vllm,
+        "sglang" => crate::neotrix::nt_io_provider::LlmProviderType::Sglang,
         _ => crate::neotrix::nt_io_provider::LlmProviderType::OpenAI,
     };
     crate::neotrix::nt_io_provider::ProviderConfig {
