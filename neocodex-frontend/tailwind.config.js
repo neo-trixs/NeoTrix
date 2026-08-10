@@ -69,16 +69,16 @@ export default {
           900: '#7c2d12',
         },
         'nt-io': {
-          50: '#fdf1f1',
-          100: '#fadfdf',
-          200: '#f5bdbd',
-          300: '#f09a9a',
-          400: '#ec7878',
-          500: '#e85454',  // NT-IO: 界面使徒 - Consciousness Red (--pri)
-          600: '#d04040',  // --pri2
-          700: '#b83333',
-          800: '#8f2626',
-          900: '#661a1a',
+          50: '#fff8f1',
+          100: '#fdeedf',
+          200: '#fbd9b8',
+          300: '#f8c08c',
+          400: '#f5a862',
+          500: '#f0913a',  // NT-IO: 界面使徒 - 浅橙品牌强调 (--pri)
+          600: '#e07f2b',  // --pri2
+          700: '#bd6720',
+          800: '#8f4e19',
+          900: '#663911',
         },
         'nt-shield': {
           50: '#f8fafc',
@@ -92,20 +92,49 @@ export default {
           800: '#1e293b',
           900: '#0f172a',
         },
-        // Semantic colors for UI — 中性灰阶 + 暖奶油 (Consciousness Glass v2)
-        'bg-primary': '#f5f2ec',     // --bg-base (light cream)
-        'bg-secondary': '#ece9e3',   // --glass-L1
-        'bg-tertiary': '#e7e3dc',    // --glass-L0
+        'nt-repair': {
+          50: '#f0fdfa',
+          100: '#ccfbf1',
+          200: '#99f6e4',
+          300: '#5eead4',
+          400: '#2dd4bf',
+          500: '#14b8a6',  // NT-REPAIR: 自愈工程师 - Teal
+          600: '#0d9488',
+          700: '#0f766e',
+          800: '#115e59',
+          900: '#134e4a',
+        },
+        // Semantic colors for UI — 雪域白浅橙 (Snowfield White, 极致单主题)
+        // 纯白为体, 一丝浅橙仅出现在焦点/选中/品牌强调处
+        'bg-primary': '#fbfaf7',     // --bg-base (snowfield white)
+        'bg-secondary': '#f5f3ef',   // --glass-L1
+        'bg-tertiary': '#efedea',    // --glass-L0
         'text-primary': '#1a1a20',   // --tx (gray-900)
         'text-secondary': '#5a5a62', // --tx2 (gray-600)
         'text-muted': '#909098',     // --tx3 (gray-400)
-        'border-primary': '#d4d4d8', // --gray-200
-        'border-focus': '#e85454',   // --pri
+        'border-primary': '#e5e4e0', // --gray-200,暖白描边
+        'border-focus': '#f0913a',   // --pri (浅橙, 一丝)品牌强调
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Noto Sans SC', 'sans-serif'],
         serif: ['Georgia', 'Cambria', 'Noto Serif SC', 'serif'],
         mono: ['SF Mono', 'JetBrains Mono', 'Fira Code', 'Menlo', 'monospace'],
+      },
+      fontSize: {
+        // 微字号统一刻度（9–14.5px 收敛，避免 text-[10px]/[12.5px] 硬编码漂移）
+        '9px': ['9px', '12px'],
+        '10px': ['10px', '13px'],
+        '10.5px': ['10.5px', '13.5px'],
+        '11px': ['11px', '14px'],
+        '12px': ['12px', '15px'],
+        '12.5px': ['12.5px', '16px'],
+        '13.5px': ['13.5px', '17px'],
+        '14.5px': ['14.5px', '18px'],
+      },
+      boxShadow: {
+        'glass-inset': 'inset 0 1px 0 0 rgba(255,255,255,0.45), inset 0 0 0 0.5px rgba(255,255,255,0.25)',
+        'glass-pop': '0 24px 64px rgba(40,30,20,0.18), 0 4px 16px rgba(40,30,20,0.08)',
+        'hover-surface': 'inset 0 0 0 1px rgba(0,0,0,0.04)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
@@ -129,12 +158,12 @@ export default {
           '50%': { opacity: '0.7' },
         },
         pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 12px rgba(232,84,84,0.12)' },
-          '50%': { boxShadow: '0 0 24px rgba(232,84,84,0.25)' },
+          '0%, 100%': { boxShadow: '0 0 12px rgba(240,145,58,0.12)' },
+          '50%': { boxShadow: '0 0 24px rgba(240,145,58,0.25)' },
         },
         heroPulse: {
-          '0%, 100%': { filter: 'drop-shadow(0 0 6px rgba(232,84,84,0.2)) drop-shadow(0 0 12px rgba(232,84,84,0.1))', transform: 'scale(1) rotate(0deg)' },
-          '50%': { filter: 'drop-shadow(0 0 12px rgba(232,84,84,0.35)) drop-shadow(0 0 24px rgba(232,84,84,0.15))', transform: 'scale(1.04) rotate(-8deg)' },
+          '0%, 100%': { filter: 'drop-shadow(0 0 6px rgba(240,145,58,0.2)) drop-shadow(0 0 12px rgba(240,145,58,0.1))', transform: 'scale(1) rotate(0deg)' },
+          '50%': { filter: 'drop-shadow(0 0 12px rgba(240,145,58,0.35)) drop-shadow(0 0 24px rgba(240,145,58,0.15))', transform: 'scale(1.04) rotate(-8deg)' },
         },
         ccw: {
           '0%': { transform: 'rotate(0deg)' },

@@ -1,11 +1,13 @@
 import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import {
-  Send, Square, RotateCcw, Edit2, Copy, Check, AlertCircle, Highlighter, X,
+  Square, RotateCcw, Edit2, Copy, Check, AlertCircle, Highlighter, X,
   FolderTree, Bug, FlaskConical,
   Search, Cpu, Zap,
 } from 'lucide-solid'
+import { NeoSend } from '../components/neo-icons'
 import { chatStore, Message, ToolCallRecord, NeoCodexAttachmentDto } from '../stores/chat'
 import { Sidebar } from '../components/Sidebar'
+import { SettingsModal } from '../components/SettingsModal'
 import { RightBar } from '../components/RightBar'
 import { CoworkView } from '../components/CoworkView'
 import { ProviderSelector } from '../components/ProviderSelector'
@@ -53,6 +55,14 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/* 估算 token 数：CJK 每字符约 1 token，拉丁按 4 字符/token（对标 Claude 输入计数） */
+function estimateTokens(text: string): number {
+  if (!text) return 0
+  const cjk = text.match(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/g)?.length ?? 0
+  const latin = text.length - cjk
+  return Math.ceil(cjk + latin / 4)
 }
 /* —— 设计 v2 图标：E8 六芒星（hero） —— */
 function HeroMark() {
@@ -102,6 +112,7 @@ export function Chat() {
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null)
   const [editContent, setEditContent] = createSignal('')
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
+  const [settingsOpen, setSettingsOpen] = createSignal(false)
   const [streamError, setStreamError] = createSignal<string | null>(null)
   const [copiedId, setCopiedId] = createSignal<string | null>(null)
   const [permissionMode, setPermissionMode] = createSignal<PermissionMode>('auto')
@@ -265,7 +276,46 @@ export function Chat() {
     adjustTextarea()
   }
 
+  /* @ 文件引用：光标处 @ 触发文件选择，插入 @路径 标记（对标 Claude @ 提及） */
+  const handleAtMention = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: false, directory: false })
+      if (!selected) return
+      const path = Array.isArray(selected) ? selected[0] : selected
+      const textarea = textareaRef()
+      const cur = inputValue()
+      const pos = textarea?.selectionStart ?? cur.length
+      const before = cur.slice(0, pos)
+      const after = cur.slice(pos)
+      const stripped = before.replace(/@\s*$/, '')
+      const next = `${stripped}@${path} ${after}`.trimStart()
+      setInputValue(next)
+      requestAnimationFrame(() => {
+        textarea?.focus()
+        const caret = stripped.length + path.length + 2
+        textarea?.setSelectionRange(caret, caret)
+      })
+      adjustTextarea()
+    } catch (e) {
+      console.error('[Chat] @mention failed:', e)
+    }
+  }
+
   const handleKeyDown = (e: KeyboardEvent) => {
+    // @ 文件引用：输入 @ 触发文件选择
+    if (e.key === '@' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+      const textarea = textareaRef()
+      const cur = inputValue()
+      const pos = textarea?.selectionStart ?? cur.length
+      // 仅当 @ 位于行首或空格后（非邮箱/路径中途）
+      const charBefore = cur[pos - 1]
+      if (pos === 0 || charBefore === ' ' || charBefore === '\n') {
+        e.preventDefault()
+        handleAtMention()
+        return
+      }
+    }
     // 面板快捷键：⌘1-⌘5 切换 5 个功能面板，⌘6 切换电脑控制视图，Esc 关闭
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '8') {
       const idx = Number(e.key) - 1
@@ -386,6 +436,33 @@ export function Chat() {
     setPendingAttachments(pendingAttachments().filter((_, i) => i !== idx))
   }
 
+  /* 粘贴图片：剪贴板内若有图片文件 → 转 base64 → 暂存为附件（对标 Claude 图片粘贴） */
+  const handlePasteImage = (e: ClipboardEvent) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (!file) continue
+        e.preventDefault()
+        const reader = new FileReader()
+        reader.onload = () => {
+          const data = typeof reader.result === 'string' ? reader.result.split(',')[1] ?? '' : ''
+          if (!data) return
+          const att: NeoCodexAttachmentDto = {
+            name: file.name || `pasted-image-${Date.now()}.png`,
+            size: file.size,
+            mime_type: item.type,
+            data,
+          }
+          setPendingAttachments([...pendingAttachments(), att])
+        }
+        reader.readAsDataURL(file)
+        break
+      }
+    }
+  }
+
   /* ── 语音输入：MediaRecorder 录音 → voice_get_transcription → 填入输入框 ── */
   const [recording, setRecording] = createSignal(false)
   let mediaRecorder: MediaRecorder | null = null
@@ -495,27 +572,22 @@ export function Chat() {
   }
 
   return (
-    <div class="flex h-screen bg-bg-primary">
+    <div class="flex h-screen bg-transparent overflow-hidden">
       <Sidebar
         collapsed={sidebarCollapsed()}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed())}
+        onOpenSettings={() => setSettingsOpen(true)}
         activeView={activeView()}
         onSwitchView={setActiveView}
         activePanel={activePanel()}
         onTogglePanel={(id) => togglePanel(id as PanelId)}
       />
 
-      <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative">
-        {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅会话标题） ===== */}
+      <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative border-l border-white/20">
+        {/* ===== 头部 ch-top：极简顶栏（对标 Claude Code 桌面，仅作窗口拖拽区） ===== */}
         <Show when={activeView() === 'chat'}>
           <header class="ch-top" data-tauri-drag-region>
-            <div class="flex items-center gap-2 flex-shrink-0 min-w-0">
-              <Show when={currentSession()}>
-                <span class="text-[11px] text-text-muted px-2 py-1 rounded bg-white/50 border border-border-primary/60 flex-shrink-0 truncate max-w-[220px]">
-                  {currentSession()!.title} · {currentSession()!.messages.length} 条消息
-                </span>
-              </Show>
-            </div>
+            <div class="flex items-center gap-2 flex-shrink-0 min-w-0" data-tauri-drag-region />
           </header>
         </Show>
 
@@ -579,6 +651,7 @@ export function Chat() {
                     value={inputValue()}
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}
+                    onPaste={handlePasteImage}
                     ref={setTextareaRef}
                   />
                   <div class="cic-actions">
@@ -592,6 +665,12 @@ export function Chat() {
                       </button>
                     </div>
                     <div class="cic-right">
+                      <Show when={inputValue().trim() || pendingAttachments().length > 0}>
+                        <span class="text-[10px] text-text-muted/70 font-mono mr-2">
+                          ≈{estimateTokens(inputValue())} tok
+                          <Show when={pendingAttachments().length > 0}> · {pendingAttachments().length} 附件</Show>
+                        </span>
+                      </Show>
                       <button
                         class={clsx('vc-btn vc-lang', recording() && 'recording')}
                         onClick={handleVoiceToggle}
@@ -612,7 +691,7 @@ export function Chat() {
                         aria-label={isGenerating() ? '停止生成' : '发送消息'}
                         title={isGenerating() ? '停止生成' : '发送消息'}
                       >
-                        {isGenerating() ? <Square class="w-4 h-4" /> : <Send class="w-4 h-4" />}
+                        {isGenerating() ? <Square class="w-4 h-4" /> : <NeoSend class="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
@@ -647,9 +726,9 @@ export function Chat() {
 
                       <div class="flex-1 min-w-0">
                         {isEditing ? (
-                          <div class="p-2 rounded-lg bg-white/60 border border-nt-io-500/40">
+                          <div class="p-2 rounded-xl bg-white/40 border border-nt-io-500/40 backdrop-blur-sm glass-edit">
                             <textarea
-                              class="w-full min-h-[90px] px-3 py-2 bg-white/70 border border-border-primary rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-io-500 font-mono text-[13px] resize-y"
+                              class="glass-edit-area w-full min-h-[90px] px-3 py-2 bg-white/50 border border-white/40 rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-io-500 font-mono text-[13px] resize-y"
                               value={editContent()}
                               onInput={(e) => setEditContent(e.target.value)}
                               onKeyDown={(e) => {
@@ -782,7 +861,7 @@ export function Chat() {
 
         {/* Stream Error Toast */}
         <Show when={streamError()}>
-          <div class="mx-4 mb-2 p-3 bg-red-50/90 border border-red-600/25 rounded-xl flex items-center gap-2 animate-in flex-shrink-0 shadow-sm backdrop-blur-md">
+          <div class="mx-4 mb-2 p-3 bg-red-50/80 border border-red-600/25 rounded-xl flex items-center gap-2 animate-in flex-shrink-0 shadow-sm backdrop-blur-md">
             <AlertCircle class="w-5 h-5 text-red-600 flex-shrink-0" />
             <span class="text-sm text-red-700">{streamError()}</span>
             <button
@@ -815,7 +894,7 @@ export function Chat() {
           <div class="mx-4 mb-2 flex flex-wrap gap-2 flex-shrink-0">
             <For each={pendingAttachments()}>
               {(att, i) => (
-                <div class="flex items-center gap-2 p-2 bg-white/60 border border-border-primary/60 rounded-lg text-xs text-text-primary">
+                <div class="glass-chip flex items-center gap-2 p-2 bg-white/40 border border-white/40 rounded-lg text-xs text-text-primary backdrop-blur-sm">
                   <span class="max-w-[160px] truncate font-mono">{att.name}</span>
                   <span class="text-text-muted">{formatSize(att.size)}</span>
                   <button
@@ -834,7 +913,7 @@ export function Chat() {
 
         {/* ===== 底部输入区：cic 玻璃（消息流模式下） ===== */}
         <Show when={messages().length > 0}>
-          <div class="flex-shrink-0 border-t border-border-primary/50 bg-white/25 backdrop-blur-xl">
+          <div class="flex-shrink-0 border-t border-border-primary/40 bg-white/10 backdrop-blur-xl">
             <div class="max-w-[640px] mx-auto w-full px-6 pt-3 pb-2">
               <div class="cic">
                 <textarea
@@ -844,6 +923,7 @@ export function Chat() {
                   value={inputValue()}
                   onInput={handleInput}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePasteImage}
                   disabled={isGenerating()}
                   rows={1}
                 />
@@ -858,6 +938,12 @@ export function Chat() {
                     />
                   </div>
                   <div class="cic-right">
+                    <Show when={inputValue().trim() || pendingAttachments().length > 0}>
+                      <span class="text-[10px] text-text-muted/70 font-mono mr-2">
+                        ≈{estimateTokens(inputValue())} tok
+                        <Show when={pendingAttachments().length > 0}> · {pendingAttachments().length} 附件</Show>
+                      </span>
+                    </Show>
                     <button
                       class="vc-btn vc-send"
                       disabled={!inputValue().trim() && !isGenerating()}
@@ -865,7 +951,7 @@ export function Chat() {
                       aria-label={isGenerating() ? '停止生成' : '发送消息'}
                       title={isGenerating() ? '停止生成' : '发送消息'}
                     >
-                      {isGenerating() ? <Square class="w-4 h-4" /> : <Send class="w-4 h-4" />}
+                      {isGenerating() ? <Square class="w-4 h-4" /> : <NeoSend class="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -879,6 +965,16 @@ export function Chat() {
                   </Show>
                   <span>NeoTrix v0.18.0</span>
                   <span class="hidden md:inline">Enter 发送 · Shift+Enter 换行</span>
+                </div>
+                <div class="flex items-center gap-2 text-[10px] text-text-muted/80">
+                  <Show when={inputValue().trim() || pendingAttachments().length > 0}>
+                    <span class="font-mono">
+                      ≈{estimateTokens(inputValue())} tok
+                      <Show when={pendingAttachments().length > 0}>
+                        <span class="ml-1">· {pendingAttachments().length} 附件</span>
+                      </Show>
+                    </span>
+                  </Show>
                 </div>
               </div>
             </div>
@@ -899,6 +995,9 @@ export function Chat() {
 
       {/* ===== 右栏：Artifact Pane + 文件树（设计 v2） ===== */}
       <RightBar />
+
+      {/* ===== 设置弹窗（根级渲染，避免被侧栏 overflow 裁剪 ===== */}
+      <SettingsModal open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }

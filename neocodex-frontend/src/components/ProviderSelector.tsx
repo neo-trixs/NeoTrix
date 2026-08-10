@@ -102,7 +102,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
         class={clsx(
           props.iconOnly
             ? 'w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:text-nt-io-600 hover:bg-nt-io-500/10 transition-all'
-            : 'flex items-center gap-2 px-3 py-2 rounded-lg border border-border-primary bg-bg-secondary text-text-primary hover:bg-bg-tertiary transition-colors min-w-[180px] max-w-[280px]',
+            : 'flex items-center gap-2 px-3 py-2 rounded-lg border border-white/40 bg-white/40 text-text-primary hover:bg-white/60 transition-colors min-w-[180px] max-w-[280px] backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',
           loading() && 'opacity-50 cursor-wait'
         )}
         onClick={() => !loading() && setIsOpen(!isOpen())}
@@ -150,9 +150,9 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
 
       {/* Dropdown Panel */}
       <Show when={isOpen()}>
-        <div class="absolute top-full left-0 right-0 mt-2 bg-bg-secondary border border-border-primary rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[220px] max-w-[320px]">
+        <div class="absolute top-full left-0 right-0 mt-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[220px] max-w-[320px]">
           {/* Header */}
-          <div class="px-3 py-2 border-b border-border-primary flex items-center justify-between">
+          <div class="px-3 py-2 border-b border-white/40 flex items-center justify-between">
             <span class="text-sm font-medium text-text-primary">模型提供商</span>
             <span class="text-xs text-text-muted">{config()?.provider_count || 0} 个可用</span>
           </div>
@@ -166,7 +166,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                   <button
                     class={clsx(
                       'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
-                      'hover:bg-bg-tertiary',
+                      'hover:bg-bg-tertiary focus-visible:bg-bg-tertiary focus-visible:outline-none',
                       isActive && 'bg-nt-io-500/10 text-nt-io-600'
                     )}
                     onClick={() => handleSelectProvider(provider.name)}
@@ -207,7 +207,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
           </div>
 
           {/* Footer */}
-          <div class="px-3 py-2 border-t border-border-primary text-xs text-text-muted">
+          <div class="px-3 py-2 border-t border-white/40 text-xs text-text-muted">
             当前模型: <span class="font-mono text-text-secondary">{config()?.active_model || '—'}</span>
           </div>
         </div>

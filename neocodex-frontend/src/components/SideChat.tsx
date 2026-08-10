@@ -141,7 +141,7 @@ export function SideChat(props: Props) {
               }}
               placeholder="向侧向对话提问..."
               rows={2}
-              class="flex-1 resize-none bg-bg-primary border border-border-primary rounded-xl px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-mind-400/50"
+              class="flex-1 resize-none bg-white/40 border border-white/40 rounded-xl px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-io-500 backdrop-blur-sm"
             />
             <button
               class="p-3 rounded-xl bg-nt-mind-500/20 text-nt-mind-700 hover:bg-nt-mind-500/30 transition-colors disabled:opacity-50"

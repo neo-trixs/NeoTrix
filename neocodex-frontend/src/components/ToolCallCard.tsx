@@ -32,7 +32,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
       {/* 单行头部 */}
       <button
         class={clsx(
-          'w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-white/60 transition-colors',
+          'w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-white/60 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',
           expanded() && 'border-b border-border-primary/60'
         )}
         onClick={() => setExpanded(!expanded())}
@@ -69,7 +69,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
               <div class="flex items-center justify-between mb-1">
                 <span class="text-[10px] font-medium text-text-muted uppercase tracking-wider">args</span>
                 <button
-                  class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70"
+                  class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                   onClick={() => copyText('args', props.call.args)}
                   aria-label="复制参数"
                 >
@@ -88,7 +88,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
               <div class="flex items-center justify-between mb-1">
                 <span class="text-[10px] font-medium text-text-muted uppercase tracking-wider">result</span>
                 <button
-                  class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70"
+                  class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                   onClick={() => copyText('result', props.call.result)}
                   aria-label="复制结果"
                 >

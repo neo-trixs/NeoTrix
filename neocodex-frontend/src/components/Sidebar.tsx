@@ -1,8 +1,8 @@
 import { createSignal, For, Show } from 'solid-js'
-import { MessageSquare, Plus, Trash2, Pencil, ChevronLeft, Settings, Search, X } from 'lucide-solid'
+import { Settings } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
-import { SettingsModal } from './SettingsModal'
 import { clsx } from 'clsx'
+import { NeoPlus, NeoMessage, NeoSearch, NeoChevronRight, NeoTrash, NeoPencil, NeoClose } from './neo-icons'
 
 interface SidebarProps {
   collapsed?: boolean
@@ -12,6 +12,8 @@ interface SidebarProps {
   /** 功能面板入口（对标 Claude Code 侧栏：功能融合到侧栏，顶部极简） */
   activePanel?: string | null
   onTogglePanel?: (id: string) => void
+  /** 打开设置（弹窗由 Chat 根级渲染，避免被侧栏 overflow 裁剪） */
+  onOpenSettings?: () => void
 }
 
 const GROUP_ORDER = ['今天', '昨天', '前7天', '更早'] as const
@@ -35,6 +37,8 @@ export function Sidebar(props: SidebarProps) {
   // 会话搜索（前端过滤）
   const [searchOpen, setSearchOpen] = createSignal(false)
   const [searchQuery, setSearchQuery] = createSignal('')
+  // 分组模式：时间 / 项目（对标 Claude group-by-project）
+  const [groupMode, setGroupMode] = createSignal<'time' | 'project'>('time')
 
   const toggleSearch = () => {
     const next = !searchOpen()
@@ -42,11 +46,9 @@ export function Sidebar(props: SidebarProps) {
     if (!next) setSearchQuery('')
   }
 
-  // 设置弹窗（统一 SettingsModal）
-  const [settingsOpen, setSettingsOpen] = createSignal(false)
-
+  // 设置入口：由 Chat 根级渲染弹窗（避免 aside overflow-hidden 裁剪 fixed 弹窗）
   const openSettings = () => {
-    setSettingsOpen(true)
+    props.onOpenSettings?.()
   }
 
   const switchView = (v: 'chat' | 'cowork' | 'computer') => {
@@ -57,11 +59,22 @@ export function Sidebar(props: SidebarProps) {
   const currentSessionId = chatStore.state.currentSessionId
 
   const groupedSessions = () => {
-    const groups = new Map<GroupKey, typeof sessions>()
-    for (const key of GROUP_ORDER) groups.set(key, [])
     const q = searchQuery().trim().toLowerCase()
-    for (const session of sessions) {
-      if (q && !session.title.toLowerCase().includes(q)) continue
+    const filtered = sessions.filter((s) => !q || s.title.toLowerCase().includes(q))
+    if (groupMode() === 'project') {
+      // 项目分组：按 session.project 归组，未知归「其他」
+      const map = new Map<string, typeof filtered>()
+      for (const s of filtered) {
+        const key = s.project || '其他'
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(s)
+      }
+      const sorted = [...map.entries()].sort((a, b) => b[1].length - a[1].length)
+      return sorted.map(([key, items]) => ({ key, items }))
+    }
+    const groups = new Map<GroupKey, typeof filtered>()
+    for (const key of GROUP_ORDER) groups.set(key, [])
+    for (const session of filtered) {
       const key = getGroupKey(session.updatedAt)
       groups.get(key)?.push(session)
     }
@@ -106,7 +119,7 @@ export function Sidebar(props: SidebarProps) {
 
   return (
     <aside class={clsx(
-      'flex-shrink-0 h-screen bg-bg-primary border-r border-border-primary/60 transition-all duration-300 flex flex-col relative',
+      'flex-shrink-0 glass-side overflow-hidden transition-all duration-300 flex flex-col relative',
       collapsed() ? 'w-16' : 'w-[250px]'
     )}>
       {/* Header: 红绿灯（自绘 TrafficLights 组件，fixed 定位）+ 折叠按钮（设计 v2） */}
@@ -118,7 +131,7 @@ export function Sidebar(props: SidebarProps) {
           aria-label={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
           title={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
         >
-          <ChevronLeft class={clsx('w-4 h-4 transition-transform', collapsed() && 'rotate-180')} />
+          <NeoChevronRight class={clsx('w-4 h-4 transition-transform', !collapsed() && 'rotate-180')} />
         </button>
       </div>
 
@@ -157,65 +170,22 @@ export function Sidebar(props: SidebarProps) {
                 <svg viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5.5" r="1.2" stroke="currentColor" stroke-width="1.1" /><line x1="5.5" y1="1.5" x2="5.5" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="5.5" y1="9.5" x2="5.5" y2="10.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1.5" y1="5.5" x2="0.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="9.5" y1="5.5" x2="10.5" y2="5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="11" cy="11" r="1.2" stroke="currentColor" stroke-width="1.1" opacity="0.55" /><line x1="11" y1="7" x2="11" y2="6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="11" y1="13" x2="11" y2="14" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="7" y1="10" x2="6" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /><line x1="13" y1="10" x2="14" y2="10" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.55" /></svg>
                 <span class="segb-t">协同</span>
               </button>
+              <button
+                class={clsx('segb', viewIdx() === 2 && 'on')}
+                onClick={() => switchView('computer')}
+                role="tab"
+                aria-selected={viewIdx() === 2}
+                tabIndex={viewIdx() === 2 ? 0 : -1}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); switchView(view() === 'cowork' ? 'computer' : 'cowork') }
+                }}
+                aria-label="电脑"
+                title="电脑"
+              >
+                <svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.1" /><line x1="5.5" y1="14.5" x2="10.5" y2="14.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="11.5" x2="8" y2="14.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1.5" y1="7.5" x2="14.5" y2="7.5" stroke="currentColor" stroke-width="1" opacity="0.45" /></svg>
+                <span class="segb-t">电脑</span>
+              </button>
             </div>
-          </div>
-
-          {/* 功能入口区（对标 Claude Code 侧栏：Git/任务/成本/时间线/侧向对话 融合到侧栏） */}
-          <div class="px-3 pb-2 flex items-center gap-1" role="toolbar" aria-label="功能面板">
-            <button
-              class={clsx('tb-btn', props.activePanel === 'git' && 'on')}
-              onClick={() => props.onTogglePanel?.('git')}
-              aria-label="Git 变更"
-              aria-pressed={props.activePanel === 'git'}
-              title="Git 变更 (⌘1)"
-            >
-              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
-            </button>
-            <button
-              class={clsx('tb-btn', props.activePanel === 'tasks' && 'on')}
-              onClick={() => props.onTogglePanel?.('tasks')}
-              aria-label="定时任务"
-              aria-pressed={props.activePanel === 'tasks'}
-              title="定时任务 (⌘2)"
-            >
-              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="8" cy="8" r="4.2" stroke="currentColor" stroke-width="0.8" opacity="0.45" /></svg>
-            </button>
-            <button
-              class={clsx('tb-btn', props.activePanel === 'cost' && 'on')}
-              onClick={() => props.onTogglePanel?.('cost')}
-              aria-label="成本看板"
-              aria-pressed={props.activePanel === 'cost'}
-              title="成本看板 (⌘3)"
-            >
-              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="8" x2="11.5" y2="4.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" opacity="0.45" /><line x1="8" y1="8" x2="11.5" y2="11.5" stroke="currentColor" stroke-width="0.8" stroke-linecap="round" opacity="0.45" /></svg>
-            </button>
-            <button
-              class={clsx('tb-btn', props.activePanel === 'timeline' && 'on')}
-              onClick={() => props.onTogglePanel?.('timeline')}
-              aria-label="时间线"
-              aria-pressed={props.activePanel === 'timeline'}
-              title="时间线 (⌘4)"
-            >
-              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="8" cy="8" r="4.2" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 1.5" opacity="0.45" /></svg>
-            </button>
-            <button
-              class={clsx('tb-btn', props.activePanel === 'sidechat' && 'on')}
-              onClick={() => props.onTogglePanel?.('sidechat')}
-              aria-label="侧向对话"
-              aria-pressed={props.activePanel === 'sidechat'}
-              title="侧向对话 (⌘5)"
-            >
-              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><circle cx="8" cy="8" r="1.3" stroke="currentColor" stroke-width="1.1" /><line x1="8" y1="2.5" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="13.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="2.5" y1="8" x2="0.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="13.5" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><circle cx="5" cy="5" r="1" stroke="currentColor" stroke-width="0.8" opacity="0.45" /><circle cx="11" cy="11" r="1" stroke="currentColor" stroke-width="0.8" opacity="0.45" /></svg>
-            </button>
-            <button
-              class={clsx('tb-btn', props.activeView === 'computer' && 'on')}
-              onClick={() => props.onSwitchView?.(props.activeView === 'computer' ? 'chat' : 'computer')}
-              aria-label="电脑控制"
-              aria-pressed={props.activeView === 'computer'}
-              title="电脑控制 (⌘6)"
-            >
-              <svg viewBox="0 0 16 16" fill="none" class="w-4 h-4"><rect x="2" y="3" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.1" /><path d="M6 14h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="1" x2="8" y2="0.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="8" y1="15" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /><line x1="1" y1="7.5" x2="0.5" y2="7.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" /></svg>
-            </button>
           </div>
 
           {/* 搜索 + 新建 */}
@@ -229,15 +199,15 @@ export function Sidebar(props: SidebarProps) {
                   aria-label="搜索会话"
                   title="搜索会话"
                 >
-                  <Search class="w-3.5 h-3.5" />
-                  <span class="text-[12px]">搜索</span>
+                  <NeoSearch class="w-4 h-4" />
+                  <span class="text-12px">搜索</span>
                 </button>
               }
             >
               <div class="flex-1 flex items-center gap-2 px-2 py-1 rounded-lg border border-nt-io-500/40 bg-white/60">
-                <Search class="w-3.5 h-3.5 text-nt-io-600 flex-shrink-0" />
+                <NeoSearch class="w-4 h-4 text-nt-io-600 flex-shrink-0" />
                 <input
-                  class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-text-primary placeholder-text-muted/60"
+                  class="flex-1 min-w-0 bg-transparent border-none outline-none text-12px text-text-primary placeholder-text-muted/60 focus-visible:ring-0"
                   placeholder="搜索会话标题…"
                   value={searchQuery()}
                   onInput={(e) => setSearchQuery(e.currentTarget.value)}
@@ -250,7 +220,7 @@ export function Sidebar(props: SidebarProps) {
                   aria-label="关闭搜索"
                   title="关闭搜索"
                 >
-                  <X class="w-3.5 h-3.5" />
+                  <NeoClose class="w-4 h-4" />
                 </button>
               </div>
             </Show>
@@ -260,11 +230,39 @@ export function Sidebar(props: SidebarProps) {
               aria-label="新建对话"
               title="新建对话"
             >
-              <Plus class="w-4 h-4" />
+              <NeoPlus class="w-4 h-4" />
             </button>
           </div>
 
-          {/* 会话列表（按时间分组） */}
+          {/* 分组模式：时间 / 项目（对标 Claude group-by-project） */}
+          <div class="px-3 pb-2 flex items-center gap-1" role="group" aria-label="会话分组方式">
+            <button
+              class={clsx(
+                'flex-1 px-2 py-1 rounded-md text-11px transition-colors',
+                groupMode() === 'time'
+                  ? 'bg-white/70 text-text-primary font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]'
+                  : 'text-text-muted hover:text-text-primary hover:bg-white/40'
+              )}
+              onClick={() => setGroupMode('time')}
+              aria-pressed={groupMode() === 'time'}
+            >
+              按时间
+            </button>
+            <button
+              class={clsx(
+                'flex-1 px-2 py-1 rounded-md text-11px transition-colors',
+                groupMode() === 'project'
+                  ? 'bg-white/70 text-text-primary font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]'
+                  : 'text-text-muted hover:text-text-primary hover:bg-white/40'
+              )}
+              onClick={() => setGroupMode('project')}
+              aria-pressed={groupMode() === 'project'}
+            >
+              按项目
+            </button>
+          </div>
+
+          {/* 会话列表（按时间/项目分组） */}
           <div class="flex-1 overflow-y-auto px-3 pb-4">
             <Show
               when={groupedSessions().length > 0}
@@ -275,7 +273,7 @@ export function Sidebar(props: SidebarProps) {
               <For each={groupedSessions()}>
                 {(group) => (
                   <div class="mb-4 last:mb-0">
-                    <div class="re-h px-2 pb-2 pt-2 text-[10px] uppercase tracking-widest text-text-muted/60 font-medium">
+                    <div class="re-h px-2 pb-2 pt-2 text-10px uppercase tracking-widest text-text-muted/60 font-medium">
                       {group.key}
                     </div>
                     <ul class="space-y-1" role="list" aria-label={`${group.key}会话`}>
@@ -296,7 +294,7 @@ export function Sidebar(props: SidebarProps) {
                                   aria-current={active ? 'true' : 'false'}
                                   title={session.title}
                                 >
-                                  <MessageSquare class={clsx(
+                                  <NeoMessage class={clsx(
                                     'w-4 h-4 flex-shrink-0',
                                     active ? 'text-nt-io-600' : 'text-text-muted'
                                   )} />
@@ -306,7 +304,7 @@ export function Sidebar(props: SidebarProps) {
                                   )}>
                                     {session.title}
                                   </span>
-                                  <span class="text-[11px] text-text-muted flex-shrink-0">
+                                  <span class="text-11px text-text-muted flex-shrink-0">
                                     {formatRelativeTime(session.updatedAt)}
                                   </span>
                                 </button>
@@ -317,7 +315,7 @@ export function Sidebar(props: SidebarProps) {
                                     aria-label="重命名会话"
                                     title="重命名"
                                   >
-                                    <Pencil class="w-3.5 h-3.5" />
+                                    <NeoPencil class="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     class="p-1 rounded text-text-muted hover:text-red-600 hover:bg-red-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
@@ -325,13 +323,13 @@ export function Sidebar(props: SidebarProps) {
                                     aria-label="删除会话"
                                     title="删除"
                                   >
-                                    <Trash2 class="w-3.5 h-3.5" />
+                                    <NeoTrash class="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               </div>
                               {/* 当前会话左侧红色指示条 */}
                               {active && (
-                                <div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-nt-io-500 shadow-[0_0_8px_rgba(232,84,84,0.6)]" />
+                                <div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full bg-nt-io-500 shadow-[0_0_8px_rgba(240,145,58,0.6)]" />
                               )}
                             </li>
                           )
@@ -364,7 +362,7 @@ export function Sidebar(props: SidebarProps) {
             aria-label="新建对话"
             title="新建对话"
           >
-            <Plus class="w-4 h-4" />
+            <NeoPlus class="w-4 h-4" />
           </button>
         </div>
       )}
@@ -379,9 +377,6 @@ export function Sidebar(props: SidebarProps) {
           <div class="sa">N</div>
         </button>
       )}
-
-      {/* 设置弹窗（统一设计） */}
-      <SettingsModal open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
     </aside>
   )
 }

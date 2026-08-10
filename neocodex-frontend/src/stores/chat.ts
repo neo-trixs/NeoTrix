@@ -65,6 +65,8 @@ export interface Session {
   createdAt: Date
   updatedAt: Date
   checkpointId?: string
+  /** 项目名（从会话 wire_path 提取，对标 Claude 项目分组） */
+  project?: string
 }
 
 export interface ChatState {
@@ -78,6 +80,16 @@ export interface ChatState {
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+}
+
+/** 从会话 wire_path 提取项目名（取路径中项目目录段；含 neotrix 仓库关键词时取上一级） */
+function projectFromPath(wirePath: string): string | undefined {
+  if (!wirePath) return undefined
+  const segs = wirePath.split('/').filter(Boolean)
+  if (segs.length < 2) return segs[segs.length - 1]
+  const last = segs[segs.length - 1]
+  if (last === 'neotrix' || last === 'NeoTrix') return segs[segs.length - 2]
+  return last
 }
 
 export function convertBackendMessage(item: NeoCodexMessageItem): Message {
@@ -135,6 +147,7 @@ function createChatStore() {
         messages: [],
         createdAt: new Date(s.updated_at * 1000),
         updatedAt: new Date(s.updated_at * 1000),
+        project: projectFromPath(s.wire_path),
       }))
       
       setState('sessions', sessions)

@@ -17,7 +17,8 @@
     "@tauri-apps/plugin-fs": "^2.5.1",
     "clsx": "^2.1.0",
     "lucide-solid": "^1.29.0",
-    "solid-js": "^1.8.15"
+    "solid-js": "^1.8.15",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",
