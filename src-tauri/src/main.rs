@@ -708,12 +708,21 @@ commands::neocodex_set_project,
                     commands::unified_cli_list,
                     commands::unified_cli_lookup,
                     commands::unified_tauri_list,
+                    // Unified Invoke — 极简统一 API 门面
+                    commands::unified_invoke,
+                    commands::unified_invoke_catalog,
                 ])
                 .setup(move |app| {
                     if let Err(e) = neotrix_tauri::setup_tray(app) {
                         log::warn!("failed to setup tray: {}", e);
                     }
                     let _ = neotrix_tauri::setup_menu(app);
+
+                    // Window & Dock 图标: 自定义 NeoTrix 北斗七星图标（dev 模式亦生效）
+                    if let Some(window) = app.get_webview_window("main") {
+                        let icon = tauri::include_image!("icons/icon.png");
+                        let _ = window.set_icon(icon);
+                    }
 
                     if let Err(e) = app.global_shortcut().register("CommandOrControl+Shift+Space") {
                         log::warn!("failed to register global shortcut: {}", e);

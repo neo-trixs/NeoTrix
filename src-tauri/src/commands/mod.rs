@@ -46,8 +46,19 @@ pub use kb_cmds::*;
 pub use plugin_cmds::*;
 pub use marketplace_cmds::*;
 pub use neocodex_cmds::*;
+pub use diff_cmds::*;
+pub use perms_cmds::*;
+pub use mcp_cmds::*;
+pub use provider_cmds::*;
+pub use chat_cmds::*;
+pub use kb_cmds::*;
+pub use plugin_cmds::*;
+pub use marketplace_cmds::*;
+pub use neocodex_cmds::*;
 pub use desktop_cmds::*;
 pub use websearch_cmds::*;
+pub use tool_cmds::{tool_execute, tool_search, ToolResponse, SearchResultItem};
+pub use pet_cmds::get_pet_state;
 
 pub mod computer_cmds;
 pub mod background_cmds;
@@ -121,6 +132,9 @@ pub use unified_session_cmds::*;
 
 pub mod unified_cmds;
 pub use unified_cmds::*;
+
+pub mod unified_invoke_cmds;
+pub use unified_invoke_cmds::*;
 
 // ========== Tests ==========
 
