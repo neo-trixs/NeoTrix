@@ -11,6 +11,7 @@ export interface NeoCodexSessionInfo {
   message_count: number
   wire_path: string
   updated_at: number
+  tags?: string[]
 }
 
 export interface NeoCodexAttachmentDto {
@@ -422,23 +423,53 @@ function createChatStore() {
     return tagsStore.tagsForSession(sessionId)
   }
 
-  /** 给会话打标（自动注册标签；存 localStorage） */
-  const tagSession = (sessionId: string, rawName: string): void => {
+  /** 给会话打标（自动注册标签；本地优先，异步持久化到后端） */
+  const tagSession = async (sessionId: string, rawName: string): Promise<string[]> => {
     tagsStore.addSessionTag(sessionId, rawName)
     // 同步响应式 session.tags（驱动会话行标签展示）
     setState('sessions', produce(s => {
       const sess = s.find(x => x.id === sessionId)
       if (sess) sess.tags = tagsStore.tagsForSession(sessionId)
     }))
+    // 异步持久化到 JSONL SessionMeta（失败不阻断本地体验）
+    try {
+      const info = await invoke<NeoCodexSessionInfo>('neocodex_tag_session', {
+        session_id: sessionId,
+        tag: rawName,
+      })
+      setState('sessions', produce(s => {
+        const sess = s.find(x => x.id === sessionId)
+        if (sess) sess.tags = info.tags ?? []
+      }))
+      return info.tags ?? []
+    } catch (error) {
+      console.error('[chatStore] Failed to persist tag:', error)
+      return tagsStore.tagsForSession(sessionId)
+    }
   }
 
   /** 取消会话标签 */
-  const untagSession = (sessionId: string, name: string): void => {
+  const untagSession = async (sessionId: string, name: string): Promise<string[]> => {
     tagsStore.removeSessionTag(sessionId, name)
     setState('sessions', produce(s => {
       const sess = s.find(x => x.id === sessionId)
       if (sess) sess.tags = tagsStore.tagsForSession(sessionId)
     }))
+    // 异步持久化到后端
+    try {
+      const info = await invoke<NeoCodexSessionInfo>('neocodex_untag_session', {
+        session_id: sessionId,
+        tag: name,
+      })
+      setState('sessions', produce(s => {
+        const sess = s.find(x => x.id === sessionId)
+        if (sess) sess.tags = info.tags ?? []
+      }))
+      return info.tags ?? []
+    } catch (error) {
+      console.error('[chatStore] Failed to persist untag:', error)
+      return tagsStore.tagsForSession(sessionId)
+    }
   }
 
   /** 会话加载后补挂标签（loadSessions 后调用，渲染入口统一） */
