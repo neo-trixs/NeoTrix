@@ -4,6 +4,7 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { clsx } from 'clsx'
 import { PluginMarketplace } from './PluginMarketplace'
+import { TrafficLights } from './TrafficLights'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v2）
@@ -107,6 +108,17 @@ const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
   { id: 'about', label: '关于', icon: InfoIcon },
 ]
 
+/* 分组侧栏导航（对标 osaurus ManagementView 分组结构）：
+   常规 General / 扩展 Extensions / 数据 Data / 系统 System */
+const NAV_GROUPS: { title: string; ids: SectionId[] }[] = [
+  { title: '常规', ids: ['general', 'appearance'] },
+  { title: '扩展', ids: ['plugins'] },
+  { title: '数据', ids: ['data'] },
+  { title: '系统', ids: ['about'] },
+]
+
+const sectionById = (id: SectionId) => SECTIONS.find((s) => s.id === id)!
+
 export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [section, setSection] = createSignal<SectionId>('general')
   const [config, setConfig] = createSignal<ProviderConfig | null>(null)
@@ -115,28 +127,41 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [notice, setNotice] = createSignal<string | null>(null)
   const [motionPref, setMotionPref] = createSignal<'full' | 'reduced'>('full')
   const [densityPref, setDensityPref] = createSignal<'comfortable' | 'compact'>('comfortable')
+  const [themePref] = createSignal<'light'>('light')
+  const [fontSizePref, setFontSizePref] = createSignal<'sm' | 'md' | 'lg'>('md')
   const [memStats, setMemStats] = createSignal<{ total_entries: number; total_categories: number; avg_confidence: number; memory_usage_bytes: number } | null>(null)
   const [dataBusy, setDataBusy] = createSignal(false)
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
+  // API 密钥管理（对标 Claude 设置）
+  const [apiKey, setApiKey] = createSignal('')
+  const [hasKey, setHasKey] = createSignal<boolean | null>(null)
+  const [keyBusy, setKeyBusy] = createSignal(false)
 
   // 偏好持久化：localStorage + 根元素 data-* 属性（CSS 属性选择器响应）
-  const applyPrefs = (density: 'comfortable' | 'compact', motion: 'full' | 'reduced') => {
+  const applyPrefs = (density: 'comfortable' | 'compact', motion: 'full' | 'reduced', fontSize: 'sm' | 'md' | 'lg') => {
     const root = document.documentElement
     root.dataset.density = density
     root.dataset.motion = motion
+    root.dataset.fontSize = fontSize
+    root.dataset.theme = 'light'
     try {
-      localStorage.setItem('neotrix:prefs', JSON.stringify({ density, motion }))
+      localStorage.setItem('neotrix:prefs', JSON.stringify({ density, motion, theme: 'light', fontSize }))
     } catch { /* 持久化失败静默 */ }
   }
 
   const setDensity = (d: 'comfortable' | 'compact') => {
     setDensityPref(d)
-    applyPrefs(d, motionPref())
+    applyPrefs(d, motionPref(), fontSizePref())
   }
 
   const setMotion = (m: 'full' | 'reduced') => {
     setMotionPref(m)
-    applyPrefs(densityPref(), m)
+    applyPrefs(densityPref(), m, fontSizePref())
+  }
+
+  const setFontSize = (s: 'sm' | 'md' | 'lg') => {
+    setFontSizePref(s)
+    applyPrefs(densityPref(), motionPref(), s)
   }
 
   // 启动时恢复偏好
@@ -148,9 +173,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
           const p = JSON.parse(raw)
           if (p.density) setDensityPref(p.density)
           if (p.motion) setMotionPref(p.motion)
-          applyPrefs(p.density ?? 'comfortable', p.motion ?? 'full')
+          if (p.fontSize) setFontSizePref(p.fontSize)
+          applyPrefs(p.density ?? 'comfortable', p.motion ?? 'full', p.fontSize ?? 'md')
         } else {
-          applyPrefs('comfortable', 'full')
+          applyPrefs('comfortable', 'full', 'md')
         }
       } catch { /* 解析失败用默认 */ }
     }
@@ -213,6 +239,44 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     }
   }
 
+  /* API 密钥：读状态 / 保存 / 删除（对标 Claude 设置中的 API 密钥管理） */
+  const loadApiKeyStatus = async () => {
+    try {
+      setHasKey(await invoke<boolean>('has_api_key'))
+    } catch { /* 非关键 */ }
+  }
+
+  const saveApiKey = async () => {
+    const key = apiKey().trim()
+    if (!key) return
+    setKeyBusy(true)
+    setNotice(null)
+    try {
+      await invoke('save_api_key', { key })
+      setApiKey('')
+      await loadApiKeyStatus()
+      setNotice('API 密钥已保存')
+    } catch (e) {
+      setNotice(String(e))
+    } finally {
+      setKeyBusy(false)
+    }
+  }
+
+  const deleteApiKey = async () => {
+    setKeyBusy(true)
+    setNotice(null)
+    try {
+      await invoke('delete_api_key')
+      await loadApiKeyStatus()
+      setNotice('API 密钥已删除')
+    } catch (e) {
+      setNotice(String(e))
+    } finally {
+      setKeyBusy(false)
+    }
+  }
+
   createEffect(() => {
     if (props.open) {
       setSection('general')
@@ -220,6 +284,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       loadConfig()
       loadMemStats()
       loadAppVersion()
+      loadApiKeyStatus()
     }
   })
 
@@ -265,62 +330,87 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
         onClick={props.onClose}
       >
         <div
-          class="w-[720px] max-w-[94vw] h-[560px] max-h-[85vh] rounded-2xl bg-bg-primary shadow-2xl border border-border-primary/50 overflow-hidden flex animate-slide-in"
+          class="w-[780px] max-w-[94vw] h-[620px] max-h-[88vh] rounded-2xl glass-modal border border-white/40 overflow-hidden flex animate-slide-in"
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-label="设置"
           aria-modal="true"
         >
-          {/* ── 左侧分类导航 ── */}
-          <nav ref={setNavRef} class="w-[168px] flex-shrink-0 border-r border-border-primary/40 bg-bg-secondary/60 py-4 px-2 flex flex-col gap-1" role="tablist" aria-label="设置分类">
-            <div class="px-3 pb-3 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">设置</div>
-            <For each={SECTIONS}>
-              {(s, i) => (
-                <button
-                  class={clsx(
-                    'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] transition-colors',
-                    section() === s.id
-                      ? 'bg-white/70 text-text-primary font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-white/40'
-                  )}
-                  onClick={() => setSection(s.id)}
-                  role="tab"
-                  aria-selected={section() === s.id}
-                  tabIndex={section() === s.id ? 0 : -1}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                      e.preventDefault()
-                      const dir = e.key === 'ArrowDown' ? 1 : -1
-                      setSection(SECTIONS[(i() + dir + SECTIONS.length) % SECTIONS.length].id)
-                    } else if (e.key === 'Home') {
-                      e.preventDefault(); setSection(SECTIONS[0].id)
-                    } else if (e.key === 'End') {
-                      e.preventDefault(); setSection(SECTIONS[SECTIONS.length - 1].id)
-                    }
-                  }}
-                >
-                  <span class={clsx('w-4 h-4 flex-shrink-0', section() === s.id ? 'text-nt-io-600' : 'text-text-muted')}>
-                    <s.icon />
-                  </span>
-                  {s.label}
-                </button>
+          {/* ── 左侧分组导航（对标 osaurus ManagementView） ── */}
+          <nav ref={setNavRef} class="w-[190px] flex-shrink-0 border-r border-white/30 bg-white/10 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto" role="tablist" aria-label="设置分类">
+            <div class="px-3 pb-3">
+                <div class="flex items-center gap-2">
+                  <TrafficLights />
+                </div>
+              </div>
+            <For each={NAV_GROUPS}>
+              {(group) => (
+                <div class="mb-2">
+                  <div class="px-3 pb-1.5 pt-2 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">
+                    {group.title}
+                  </div>
+                  <For each={group.ids}>
+                    {(id) => {
+                      const s = sectionById(id)
+                      const isActive = section() === id
+                      return (
+                        <button
+                          class={clsx(
+                            'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] transition-colors',
+                            isActive
+                              ? 'bg-nt-io-500/12 text-nt-io-700 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
+                              : 'text-text-secondary hover:text-text-primary hover:bg-white/40'
+                          )}
+                          role="tab"
+                          aria-selected={isActive}
+                          tabIndex={isActive ? 0 : -1}
+                          onClick={() => setSection(id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                              e.preventDefault()
+                              const flat = NAV_GROUPS.flatMap((g) => g.ids)
+                              const idx = flat.indexOf(id)
+                              const dir = e.key === 'ArrowDown' ? 1 : -1
+                              setSection(flat[(idx + dir + flat.length) % flat.length])
+                            } else if (e.key === 'Home') {
+                              e.preventDefault(); setSection(NAV_GROUPS[0].ids[0])
+                            } else if (e.key === 'End') {
+                              e.preventDefault(); const flat = NAV_GROUPS.flatMap((g) => g.ids); setSection(flat[flat.length - 1])
+                            }
+                          }}
+                        >
+                          <span class={clsx('w-4 h-4 flex-shrink-0', isActive ? 'text-nt-io-600' : 'text-text-muted')}>
+                            <s.icon />
+                          </span>
+                          <span class="flex-1 text-left truncate">{s.label}</span>
+                          {isActive && <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500 flex-shrink-0" />}
+                        </button>
+                      )
+                    }}
+                  </For>
+                </div>
               )}
             </For>
           </nav>
 
           {/* ── 右侧内容 ── */}
           <div class="flex-1 flex flex-col min-w-0">
-            <header class="flex items-center justify-between px-5 py-3.5 border-b border-border-primary/40 flex-shrink-0">
-              <div>
-                <div class="text-[15px] font-semibold text-text-primary">
-                  {SECTIONS.find((s) => s.id === section())?.label}
-                </div>
-                <div class="text-[11px] text-text-muted">
-                  {section() === 'general' && '模型提供商与运行参数'}
-                  {section() === 'appearance' && '界面视觉与动效'}
-                  {section() === 'plugins' && '技能插件与扩展'}
-                  {section() === 'data' && '记忆与数据管理'}
-                  {section() === 'about' && '版本与诊断信息'}
+            <header class="flex items-center justify-between px-6 py-4 border-b border-border-primary/40 flex-shrink-0 bg-white/20">
+              <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center flex-shrink-0">
+                  {sectionById(section()).icon()}
+                </span>
+                <div>
+                  <div class="text-[15px] font-semibold text-text-primary">
+                    {sectionById(section()).label}
+                  </div>
+                  <div class="text-[11px] text-text-muted">
+                    {section() === 'general' && '模型提供商与运行参数'}
+                    {section() === 'appearance' && '界面视觉与动效'}
+                    {section() === 'plugins' && '技能插件与扩展'}
+                    {section() === 'data' && '记忆与数据管理'}
+                    {section() === 'about' && '版本与诊断信息'}
+                  </div>
                 </div>
               </div>
               <button
@@ -341,64 +431,114 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 </Show>
                 <Show when={config()}>
                   {(cfg) => (
-                    <div class="space-y-5">
+                    <div class="space-y-4">
                       {/* 当前激活提供商 */}
-                      <div>
-                        <div class="text-[11px] font-medium text-text-secondary mb-2">当前提供商</div>
-                        <div class="flex items-center justify-between p-3 rounded-xl bg-white/60 border border-border-primary/50">
-                          <div class="flex items-center gap-3">
-                            <span class="w-7 h-7 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-[13px] font-semibold flex-shrink-0">
-                              {activeProvider()?.name.charAt(0).toUpperCase() ?? '?'}
-                            </span>
-                            <div>
-                              <div class="text-[13px] font-medium text-text-primary">{activeProvider()?.name ?? '—'}</div>
-                              <div class="text-[11px] text-text-muted font-mono">{cfg().active_model}</div>
+                      <div class="ss-card">
+                        <div class="ss-card-header">
+                          <ExpandIcon />
+                          当前提供商
+                        </div>
+                        <div class="ss-card-body">
+                          <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                              <span class="w-8 h-8 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-[14px] font-semibold flex-shrink-0">
+                                {activeProvider()?.name.charAt(0).toUpperCase() ?? '?'}
+                              </span>
+                              <div>
+                                <div class="text-[13px] font-medium text-text-primary">{activeProvider()?.name ?? '—'}</div>
+                                <div class="text-[11px] text-text-muted font-mono">{cfg().active_model}</div>
+                              </div>
                             </div>
+                            <span class={clsx('text-[10px] px-2 py-0.5 rounded-full font-medium', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
+                              {cfg().resolvable ? 'API 可达' : 'API 不可达'}
+                            </span>
                           </div>
-                          <span class={clsx('text-[10px] px-2 py-0.5 rounded-full font-medium', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
-                            {cfg().resolvable ? 'API 可达' : 'API 不可达'}
-                          </span>
                         </div>
                       </div>
 
                       {/* 提供商列表 */}
-                      <div>
-                        <div class="text-[11px] font-medium text-text-secondary mb-2">
+                      <div class="ss-card">
+                        <div class="ss-card-header">
+                          <DataIcon />
                           {cfg().provider_count} 个可用提供商
                         </div>
-                        <div class="space-y-1.5">
-                          <For each={cfg().providers}>
-                            {(p) => {
-                              const isActive = p.model === cfg().active_model
-                              return (
-                                <button
-                                  class={clsx(
-                                    'w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors',
-                                    isActive
-                                      ? 'border-nt-io-500/40 bg-nt-io-500/6'
-                                      : 'border-border-primary/50 bg-white/40 hover:bg-white/70'
-                                  )}
-                                  onClick={() => !isActive && switchProvider(p.name)}
-                                  disabled={switching()}
-                                  role="radio"
-                                  aria-checked={isActive}
-                                >
-                                  <div class="flex items-center gap-2.5">
-                                    <span class="text-[12.5px] text-text-primary font-medium">{p.name}</span>
-                                    <span class="text-[10.5px] text-text-muted font-mono">{p.model}</span>
-                                  </div>
-                                  <div class="flex items-center gap-2">
-                                    <Show when={p.resolvable}>
-                                      <span class="text-[9px] text-nt-core-700 bg-nt-core-500/10 px-1.5 py-0.5 rounded-full">可用</span>
-                                    </Show>
-                                    <Show when={isActive}>
-                                      <span class="text-[10px] text-nt-io-600">✓ 当前</span>
-                                    </Show>
-                                  </div>
-                                </button>
-                              )
-                            }}
-                          </For>
+                        <div class="ss-card-body">
+                          <div class="space-y-1.5">
+                            <For each={cfg().providers}>
+                              {(p) => {
+                                const isActive = p.model === cfg().active_model
+                                return (
+                                  <button
+                                    class={clsx(
+                                      'w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors',
+                                      isActive
+                                        ? 'border-nt-io-500/40 bg-nt-io-500/6'
+                                        : 'border-border-primary/50 bg-white/40 hover:bg-white/70'
+                                    )}
+                                    onClick={() => !isActive && switchProvider(p.name)}
+                                    disabled={switching()}
+                                    role="radio"
+                                    aria-checked={isActive}
+                                  >
+                                    <div class="flex items-center gap-2.5">
+                                      <span class="text-[12.5px] text-text-primary font-medium">{p.name}</span>
+                                      <span class="text-[10.5px] text-text-muted font-mono">{p.model}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                      <Show when={p.resolvable}>
+                                        <span class="text-[9px] text-nt-core-700 bg-nt-core-500/10 px-1.5 py-0.5 rounded-full">可用</span>
+                                      </Show>
+                                      <Show when={isActive}>
+                                        <span class="text-[10px] text-nt-io-600">✓ 当前</span>
+                                      </Show>
+                                    </div>
+                                  </button>
+                                )
+                              }}
+                            </For>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* API 密钥管理（对标 Claude 设置） */}
+                      <div class="ss-card">
+                        <div class="ss-card-header">
+                          <InfoIcon />
+                          API 密钥
+                        </div>
+                        <div class="ss-card-body space-y-3">
+                          <div class="flex items-center gap-2">
+                            <input
+                              type="password"
+                              class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                              placeholder={hasKey() === false ? '输入 API 密钥…' : '输入新密钥替换…'}
+                              value={apiKey()}
+                              onInput={(e) => setApiKey(e.currentTarget.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') saveApiKey() }}
+                              aria-label="API 密钥"
+                            />
+                            <button
+                              class="px-3 py-2 rounded-lg bg-nt-io-600 text-white text-[12px] font-medium hover:bg-nt-io-700 disabled:opacity-50 transition-colors flex-shrink-0"
+                              onClick={saveApiKey}
+                              disabled={keyBusy() || !apiKey().trim()}
+                            >
+                              保存
+                            </button>
+                          </div>
+                          <div class="flex items-center justify-between">
+                            <span class={clsx('text-[11px]', hasKey() === true ? 'text-nt-core-700' : 'text-text-muted')}>
+                              {hasKey() === true ? '✓ 已配置 API 密钥' : hasKey() === false ? '未配置 API 密钥' : '检测中…'}
+                            </span>
+                            <Show when={hasKey() === true}>
+                              <button
+                                class="px-2.5 py-1 rounded-lg border border-red-500/30 bg-red-500/5 text-[11px] text-red-500 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                                onClick={deleteApiKey}
+                                disabled={keyBusy()}
+                              >
+                                删除
+                              </button>
+                            </Show>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -406,12 +546,67 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 </Show>
               </Show>
 
-              {/* ── 外观：动效 ── */}
+              {/* ── 外观：主题 / 字号 / 动效 / 密度 ── */}
               <Show when={section() === 'appearance'}>
-                <div class="space-y-5">
-                  <div>
-                    <div class="text-[11px] font-medium text-text-secondary mb-2">动效强度</div>
-                    <div class="space-y-1.5">
+                <div class="space-y-4">
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <PaletteIcon />
+                      主题
+                    </div>
+                    <div class="ss-card-body">
+                      <div class="ss-row">
+                        <div>
+                          <div class="ss-row-label">雪域白 · 浅橙</div>
+                          <div class="ss-row-desc">唯一主题 · 极简 Mac 圆角</div>
+                        </div>
+                        <span class="text-[10px] text-nt-io-600">✓ 当前</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <ExpandIcon />
+                      界面字号
+                    </div>
+                    <div class="ss-card-body space-y-1.5">
+                      <button
+                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', fontSizePref() === 'sm' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        onClick={() => setFontSize('sm')}
+                        role="radio"
+                        aria-checked={fontSizePref() === 'sm'}
+                      >
+                        <div class="text-[12.5px] text-text-primary">小</div>
+                        <Show when={fontSizePref() === 'sm'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+                      </button>
+                      <button
+                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', fontSizePref() === 'md' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        onClick={() => setFontSize('md')}
+                        role="radio"
+                        aria-checked={fontSizePref() === 'md'}
+                      >
+                        <div class="text-[12.5px] text-text-primary">中</div>
+                        <Show when={fontSizePref() === 'md'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+                      </button>
+                      <button
+                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', fontSizePref() === 'lg' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        onClick={() => setFontSize('lg')}
+                        role="radio"
+                        aria-checked={fontSizePref() === 'lg'}
+                      >
+                        <div class="text-[12.5px] text-text-primary">大</div>
+                        <Show when={fontSizePref() === 'lg'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <DataIcon />
+                      动效强度
+                    </div>
+                    <div class="ss-card-body space-y-1.5">
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', motionPref() === 'full' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setMotion('full')}
@@ -431,12 +626,17 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         <Show when={motionPref() === 'reduced'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
                       </button>
                     </div>
-                    <p class="text-[10.5px] text-text-muted mt-1.5">减弱后移除无限循环动画，减少视觉干扰</p>
+                    <div class="px-4 pb-3 -mt-1">
+                      <p class="text-[10.5px] text-text-muted">减弱后移除无限循环动画，减少视觉干扰</p>
+                    </div>
                   </div>
 
-                  <div>
-                    <div class="text-[11px] font-medium text-text-secondary mb-2">界面密度</div>
-                    <div class="space-y-1.5">
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <InfoIcon />
+                      界面密度
+                    </div>
+                    <div class="ss-card-body space-y-1.5">
                       <button
                         class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'comfortable' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setDensity('comfortable')}
@@ -456,7 +656,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         <Show when={densityPref() === 'compact'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
                       </button>
                     </div>
-                    <p class="text-[10.5px] text-text-muted mt-1.5">紧凑模式缩小消息间距与面板内边距，单屏承载更多信息</p>
+                    <div class="px-4 pb-3 -mt-1">
+                      <p class="text-[10.5px] text-text-muted">紧凑模式缩小消息间距与面板内边距，单屏承载更多信息</p>
+                    </div>
                   </div>
                 </div>
               </Show>
@@ -468,36 +670,44 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
 
               {/* ── 数据：记忆统计 + 导出/清空 ── */}
               <Show when={section() === 'data'}>
-                <div class="space-y-5">
-                  <div>
-                    <div class="text-[11px] font-medium text-text-secondary mb-2">记忆统计</div>
-                    <Show when={memStats()} fallback={<div class="text-xs text-text-muted py-2">加载记忆统计…</div>}>
-                      {(ms) => (
-                        <div class="grid grid-cols-2 gap-2">
-                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                            <div class="text-[10px] text-text-muted mb-0.5">记忆条目</div>
-                            <div class="text-[13px] text-text-primary font-medium">{ms().total_entries}</div>
+                <div class="space-y-4">
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <DataIcon />
+                      记忆统计
+                    </div>
+                    <div class="ss-card-body">
+                      <Show when={memStats()} fallback={<div class="text-xs text-text-muted py-2">加载记忆统计…</div>}>
+                        {(ms) => (
+                          <div class="grid grid-cols-2 gap-2">
+                            <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                              <div class="text-[10px] text-text-muted mb-0.5">记忆条目</div>
+                              <div class="text-[13px] text-text-primary font-medium">{ms().total_entries}</div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                              <div class="text-[10px] text-text-muted mb-0.5">分类</div>
+                              <div class="text-[13px] text-text-primary font-medium">{ms().total_categories}</div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                              <div class="text-[10px] text-text-muted mb-0.5">平均置信度</div>
+                              <div class="text-[13px] text-text-primary font-medium">{(ms().avg_confidence * 100).toFixed(0)}%</div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                              <div class="text-[10px] text-text-muted mb-0.5">占用空间</div>
+                              <div class="text-[13px] text-text-primary font-medium">{(ms().memory_usage_bytes / 1024).toFixed(1)} KB</div>
+                            </div>
                           </div>
-                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                            <div class="text-[10px] text-text-muted mb-0.5">分类</div>
-                            <div class="text-[13px] text-text-primary font-medium">{ms().total_categories}</div>
-                          </div>
-                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                            <div class="text-[10px] text-text-muted mb-0.5">平均置信度</div>
-                            <div class="text-[13px] text-text-primary font-medium">{(ms().avg_confidence * 100).toFixed(0)}%</div>
-                          </div>
-                          <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                            <div class="text-[10px] text-text-muted mb-0.5">占用空间</div>
-                            <div class="text-[13px] text-text-primary font-medium">{(ms().memory_usage_bytes / 1024).toFixed(1)} KB</div>
-                          </div>
-                        </div>
-                      )}
-                    </Show>
+                        )}
+                      </Show>
+                    </div>
                   </div>
 
-                  <div>
-                    <div class="text-[11px] font-medium text-text-secondary mb-2">数据操作</div>
-                    <div class="space-y-1.5">
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <ExpandIcon />
+                      数据操作
+                    </div>
+                    <div class="ss-card-body space-y-1.5">
                       <button
                         class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-border-primary/50 bg-white/40 hover:bg-white/70 transition-colors"
                         onClick={exportMemory}
@@ -522,33 +732,49 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
               {/* ── 关于 ── */}
               <Show when={section() === 'about'}>
                 <div class="space-y-4">
-                  <div class="flex items-center gap-4 p-4 rounded-xl bg-white/60 border border-border-primary/50">
-                    <span class="w-12 h-12 rounded-xl bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center flex-shrink-0">
-                      <ExpandIcon />
-                    </span>
-                    <div>
-                      <div class="text-[14px] font-semibold text-text-primary">NeoTrix Desktop</div>
-                      <div class="text-[11px] text-text-muted font-mono">v{appVersion() ?? '0.18.0'} · ai.neotrix.desktop</div>
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <InfoIcon />
+                      NeoTrix Desktop
                     </div>
-                  </div>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                      <div class="text-[10px] text-text-muted mb-0.5">提供商</div>
-                      <div class="text-[12.5px] text-text-primary font-medium">{config()?.provider_count ?? '—'} 个</div>
-                    </div>
-                    <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                      <div class="text-[10px] text-text-muted mb-0.5">API 状态</div>
-                      <div class={clsx('text-[12.5px] font-medium', config()?.resolvable ? 'text-nt-core-700' : 'text-nt-shield-600')}>
-                        {config()?.resolvable ? '可用' : '不可达'}
+                    <div class="ss-card-body">
+                      <div class="flex items-center gap-4">
+                        <span class="w-12 h-12 rounded-xl bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center flex-shrink-0">
+                          <ExpandIcon />
+                        </span>
+                        <div>
+                          <div class="text-[14px] font-semibold text-text-primary">NeoTrix Desktop</div>
+                          <div class="text-[11px] text-text-muted font-mono">v{appVersion() ?? '0.18.0'} · ai.neotrix.desktop</div>
+                        </div>
                       </div>
                     </div>
-                    <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                      <div class="text-[10px] text-text-muted mb-0.5">当前模型</div>
-                      <div class="text-[12.5px] text-text-primary font-mono truncate">{config()?.active_model ?? '—'}</div>
+                  </div>
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <DataIcon />
+                      诊断信息
                     </div>
-                    <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                      <div class="text-[10px] text-text-muted mb-0.5">平台</div>
-                      <div class="text-[12.5px] text-text-primary">macOS</div>
+                    <div class="ss-card-body">
+                      <div class="grid grid-cols-2 gap-2">
+                        <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                          <div class="text-[10px] text-text-muted mb-0.5">提供商</div>
+                          <div class="text-[12.5px] text-text-primary font-medium">{config()?.provider_count ?? '—'} 个</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                          <div class="text-[10px] text-text-muted mb-0.5">API 状态</div>
+                          <div class={clsx('text-[12.5px] font-medium', config()?.resolvable ? 'text-nt-core-700' : 'text-nt-shield-600')}>
+                            {config()?.resolvable ? '可用' : '不可达'}
+                          </div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                          <div class="text-[10px] text-text-muted mb-0.5">当前模型</div>
+                          <div class="text-[12.5px] text-text-primary font-mono truncate">{config()?.active_model ?? '—'}</div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
+                          <div class="text-[10px] text-text-muted mb-0.5">平台</div>
+                          <div class="text-[12.5px] text-text-primary">macOS</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
