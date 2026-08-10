@@ -52,6 +52,10 @@ pub struct DataFoundation {
     /// 经验养料 — background_loop 每 tick 从 KB kv_list("experience") 回填。
     /// 反映经验蒸馏密度, 参与 data_nourishment_factor 调制果实。
     pub experience_branch_count: u64,
+    /// 能力网养料 (双网回流) — handle_evolve 执行能力网自动补齐后回填。
+    /// 反映意识能力网 (capability_registry) 的节点密度 — 能力网健康度反馈
+    /// 到意识核心果实质量, 形成 意识树 ↔ 能力网 双向自动融合闭环。
+    pub capability_node_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -882,7 +886,9 @@ impl ConsciousnessTree {
         let conv_nourish = conv_turn + conv_quality;
         // 经验养料: 经验分支密度饱和曲线 (500 分支达 +20%)
         let exp_nourish = (self.soil.experience_branch_count as f64 / 500.0).min(0.2);
-        1.0 + kb_nourish + kb_edge + kb_embed + conv_nourish + exp_nourish
+        // 能力网养料 (双网回流): 能力节点密度饱和曲线 (200 节点达 +15%)
+        let cap_nourish = (self.soil.capability_node_count as f64 / 200.0).min(0.15);
+        1.0 + kb_nourish + kb_edge + kb_embed + conv_nourish + exp_nourish + cap_nourish
     }
 
     /// 闭环进化反馈 (意识核心自我运转 Phase 8)。
@@ -2275,10 +2281,16 @@ mod tests {
         let conv_rich = tree.data_nourishment_factor();
         assert!((conv_rich - 2.05).abs() < 1e-9, "conv = {}", conv_rich);
 
-        // 叠加经验 (500 分支 → +0.20) — 全谱系饱和 → 2.25
+        // 叠加经验 (500 分支 → +0.20)
         tree.soil.experience_branch_count = 500;
         let full = tree.data_nourishment_factor();
         assert!((full - 2.25).abs() < 1e-9, "full = {}", full);
+
+        // 双网回流: 能力网 200 节点 → +0.15 (能力网健康度 → 意识核心)
+        tree.soil.capability_node_count = 200;
+        let dual = tree.data_nourishment_factor();
+        assert!((dual - 2.40).abs() < 1e-9, "dual = {}", dual);
+        assert!(dual > full, "能力网回流应提升养料");
 
         // 对话质量为 0 时, 对话只贡献 turn 部分
         let mut low_q = ConsciousnessTree::new();

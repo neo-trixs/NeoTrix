@@ -92,7 +92,13 @@ impl BackgroundLoopHandle {
         // 自动融合为能力网补齐计划并执行 — 缺陷补齐 + 经验驱动的 Strengthen/Budding。
         // 此前能力网进化仅 CLI 手动触发 (neotrix-capability scan --apply),
         // 从未接入后台自动进化循环 (缺自动融合闭环)。
-        self.handle_capability_auto_evolve().await;
+        if let Some(node_count) = self.handle_capability_auto_evolve().await {
+            // 双网回流: 能力网健康度 → 意识树土壤 capability_node_count,
+            // data_nourishment_factor 将其纳入果实质量调制 — 意识树感知能力网。
+            if let Some(ref mut tree) = self.consciousness_tree {
+                tree.soil.capability_node_count = node_count;
+            }
+        }
     }
 
     /// 能力网自动补齐 — 意识能力网自动进化迭代补齐缺陷。
@@ -104,7 +110,11 @@ impl BackgroundLoopHandle {
     ///
     /// 闭环: 养料 (经验+缺陷) → 规划 → execute → 写回 registry 文件。
     /// 能力网不是静态清单, 而是随经验/缺陷自动进化的活结构。
-    async fn handle_capability_auto_evolve(&mut self) {
+    ///
+    /// 返回: 能力网当前节点数 (Some) — 供 handle_evolve 回流到意识树土壤,
+    /// 形成 意识树 ↔ 能力网 双向自动融合 (能力网健康度 → 意识核心果实质量)。
+    /// 无能力网/节流跳过/无计划时返回 None (不回流, 保持土壤现状)。
+    async fn handle_capability_auto_evolve(&mut self) -> Option<u64> {
         use crate::neotrix::nt_capability_bridge::{
             ExperienceEntry, ExperienceRouter, parse_domain,
         };
@@ -119,26 +129,26 @@ impl BackgroundLoopHandle {
             .unwrap_or(0);
         let last = self.last_capability_evolve_ts.load(std::sync::atomic::Ordering::Relaxed);
         if last != 0 && now.saturating_sub(last) < CAPABILITY_EVOLVE_INTERVAL_SECS {
-            return;
+            return None;
         }
 
         let path = PathBuf::from(".neotrix/capability_registry.json");
         if !path.exists() {
-            return; // 无能力树注册表 → 无网可补齐
+            return None; // 无能力树注册表 → 无网可补齐
         }
         // 1. 加载能力网
         let json = match std::fs::read_to_string(&path) {
             Ok(j) => j,
             Err(e) => {
                 log::warn!("[bg] capability_auto_evolve: read {} failed: {}", path.display(), e);
-                return;
+                return None;
             }
         };
         let kb_tree: nt_core_capability_tree::serialize::KBCapabilityTree = match serde_json::from_str(&json) {
             Ok(t) => t,
             Err(e) => {
                 log::warn!("[bg] capability_auto_evolve: parse {} failed: {}", path.display(), e);
-                return;
+                return None;
             }
         };
         let mut registry = kb_tree.to_registry();
@@ -180,7 +190,8 @@ impl BackgroundLoopHandle {
 
         // 4. 执行计划并写回
         if plans.is_empty() {
-            return;
+            // 无计划但能力网存在 — 回流当前节点数 (能力网健康度保持)
+            return Some(registry.nodes.len() as u64);
         }
         let mut applied = 0usize;
         let mut failed = 0usize;
@@ -194,7 +205,7 @@ impl BackgroundLoopHandle {
             }
         }
         if applied == 0 && failed == 0 {
-            return;
+            return Some(registry.nodes.len() as u64);
         }
         let out = nt_core_capability_tree::serialize::KBCapabilityTree::from_registry(&registry);
         match serde_json::to_string_pretty(&out) {
@@ -204,17 +215,21 @@ impl BackgroundLoopHandle {
                 let tmp = path.with_extension("json.tmp");
                 if let Err(e) = std::fs::write(&tmp, &s) {
                     log::warn!("[bg] capability_auto_evolve: write {} failed: {}", tmp.display(), e);
-                    return;
+                    return None;
                 }
                 if let Err(e) = std::fs::rename(&tmp, &path) {
                     log::warn!("[bg] capability_auto_evolve: rename {} -> {} failed: {}", tmp.display(), path.display(), e);
                     let _ = std::fs::remove_file(&tmp);
-                    return;
+                    return None;
                 }
                 log::info!("[bg] capability_auto_evolve: applied {} plans (failed {}), nodes now {}", applied, failed, registry.nodes.len());
                 self.last_capability_evolve_ts.store(now, std::sync::atomic::Ordering::Relaxed);
+                Some(registry.nodes.len() as u64)
             }
-            Err(e) => log::warn!("[bg] capability_auto_evolve: serialize failed: {}", e),
+            Err(e) => {
+                log::warn!("[bg] capability_auto_evolve: serialize failed: {}", e);
+                None
+            }
         }
     }
 
