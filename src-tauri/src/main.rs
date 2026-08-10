@@ -252,6 +252,8 @@ fn main() {
                       commands::neocodex_switch_session,
                       commands::neocodex_delete_session,
                       commands::neocodex_rename_session,
+                      commands::neocodex_tag_session,
+                      commands::neocodex_untag_session,
                       commands::neocodex_send_side_chat,
                       commands::neocodex_get_side_chat,
                       commands::neocodex_init_project,
