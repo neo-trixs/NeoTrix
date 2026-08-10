@@ -511,7 +511,7 @@ export function Chat() {
           <header class="ch-top" data-tauri-drag-region>
             <div class="flex items-center gap-2 flex-shrink-0 min-w-0">
               <Show when={currentSession()}>
-                <span class="text-[11px] text-text-muted px-1.5 py-0.5 rounded bg-white/50 border border-border-primary/60 flex-shrink-0 truncate max-w-[220px]">
+                <span class="text-[11px] text-text-muted px-2 py-1 rounded bg-white/50 border border-border-primary/60 flex-shrink-0 truncate max-w-[220px]">
                   {currentSession()!.title} · {currentSession()!.messages.length} 条消息
                 </span>
               </Show>
@@ -619,7 +619,7 @@ export function Chat() {
                 </div>
 
                 {/* 快速问答 */}
-                <div class="qa flex flex-wrap gap-1.5 justify-center">
+                <div class="qa flex flex-wrap gap-2 justify-center">
                   <For each={SUGGESTIONS}>
                     {(s) => (
                       <button class="qa-btn" onClick={() => handleSuggestion(s.text)}>
@@ -663,13 +663,13 @@ export function Chat() {
                             />
                             <div class="flex justify-end gap-2 mt-2">
                               <button
-                                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-bg-tertiary text-text-primary hover:bg-border-primary transition-colors"
+                                class="px-3 py-2 rounded-lg text-xs font-medium bg-bg-tertiary text-text-primary hover:bg-border-primary transition-colors"
                                 onClick={handleCancelEdit}
                               >
                                 取消
                               </button>
                               <button
-                                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-nt-io-600 text-white hover:bg-nt-io-700 transition-colors"
+                                class="px-3 py-2 rounded-lg text-xs font-medium bg-nt-io-500 text-text-primary hover:bg-nt-io-600 transition-colors"
                                 onClick={handleSaveEdit}
                               >
                                 保存并重发
@@ -696,7 +696,7 @@ export function Chat() {
                             )}
 
                             <Show when={message.toolCalls && message.toolCalls.length > 0 && message.role !== 'tool'}>
-                              <div class="mt-1.5 space-y-1">
+                              <div class="mt-2 space-y-1">
                                 <For each={message.toolCalls}>
                                   {(call) => <ToolCallCard call={call} />}
                                 </For>
@@ -704,7 +704,7 @@ export function Chat() {
                             </Show>
 
                             <Show when={message.attachments && message.attachments.length > 0}>
-                              <div class="mt-1.5 space-y-2">
+                              <div class="mt-2 space-y-2">
                                 <For each={message.attachments}>
                                   {(att) => (
                                     <FilePreview
@@ -726,7 +726,7 @@ export function Chat() {
                           'flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity',
                           isEditing && 'opacity-0'
                         )}>
-                          <div class="flex items-center gap-0.5">
+                          <div class="flex items-center gap-1">
                             {message.role === 'assistant' && !message.isStreaming && (
                               <>
                                 <button
@@ -797,7 +797,7 @@ export function Chat() {
 
         {/* Annotation pending hint */}
         <Show when={annotationHint()}>
-          <div class="mx-4 mb-2 p-2.5 bg-nt-core-500/10 border border-nt-core-500/30 rounded-lg flex items-center gap-2 flex-shrink-0">
+          <div class="mx-4 mb-2 p-3 bg-nt-core-500/10 border border-nt-core-500/30 rounded-lg flex items-center gap-2 flex-shrink-0">
             <Highlighter class="w-4 h-4 text-nt-core-600 flex-shrink-0" />
             <span class="text-xs text-nt-core-700 truncate font-mono">{annotationHint()}</span>
             <button
@@ -819,7 +819,7 @@ export function Chat() {
                   <span class="max-w-[160px] truncate font-mono">{att.name}</span>
                   <span class="text-text-muted">{formatSize(att.size)}</span>
                   <button
-                    class="p-0.5 text-text-muted hover:text-nt-core-600"
+                    class="p-1 text-text-muted hover:text-nt-core-600"
                     onClick={() => removeAttachment(i())}
                     aria-label={`移除附件 ${att.name}`}
                     title="移除附件"
@@ -839,7 +839,7 @@ export function Chat() {
               <div class="cic">
                 <textarea
                   ref={setTextareaRef}
-                  class="flex-1 bg-transparent border-none resize-none min-h-[26px] max-h-[160px] py-1.5 text-[13.5px] leading-relaxed text-text-primary placeholder-text-muted/70 focus:outline-none focus:ring-0 focus:border-none"
+                  class="flex-1 bg-transparent border-none resize-none min-h-[26px] max-h-[160px] py-2 text-[13.5px] leading-relaxed text-text-primary placeholder-text-muted/70 focus:outline-none focus:ring-0 focus:border-none"
                   placeholder={isGenerating() ? '正在生成…' : '输入消息… (Enter 发送, Shift+Enter 换行)'}
                   value={inputValue()}
                   onInput={handleInput}

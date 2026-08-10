@@ -103,7 +103,7 @@ export default {
         'border-focus': '#e85454',   // --pri
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Inter', 'Noto Sans SC', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Noto Sans SC', 'sans-serif'],
         serif: ['Georgia', 'Cambria', 'Noto Serif SC', 'serif'],
         mono: ['SF Mono', 'JetBrains Mono', 'Fira Code', 'Menlo', 'monospace'],
       },

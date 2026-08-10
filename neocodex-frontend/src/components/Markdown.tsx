@@ -250,7 +250,7 @@ function renderBlock(block: Block): JSX.Element {
 
     case 'blockquote':
       return (
-        <blockquote class="border-l-2 border-nt-io-500/50 pl-3 py-0.5 text-text-secondary bg-nt-io-500/5 rounded-r-md">
+        <blockquote class="border-l-2 border-nt-io-500/50 pl-3 py-1 text-text-secondary bg-nt-io-500/5 rounded-r-md">
           <For each={block.lines}>
             {(l) => <p class="whitespace-pre-wrap text-[13px] leading-relaxed">{renderInline(l)}</p>}
           </For>
@@ -280,7 +280,7 @@ function renderBlock(block: Block): JSX.Element {
               <tr>
                 <For each={block.header}>
                   {(h) => (
-                    <th class="border-b border-r border-border-primary/60 px-3 py-1.5 text-left font-semibold text-text-primary bg-white/60 last:border-r-0">
+                    <th class="border-b border-r border-border-primary/60 px-3 py-2 text-left font-semibold text-text-primary bg-white/60 last:border-r-0">
                       {renderInline(h)}
                     </th>
                   )}
@@ -293,7 +293,7 @@ function renderBlock(block: Block): JSX.Element {
                   <tr class="odd:bg-white/40">
                     <For each={row}>
                       {(cell) => (
-                        <td class="border-b border-r border-border-primary/40 px-3 py-1.5 text-text-secondary last:border-r-0 last:border-b-0">
+                        <td class="border-b border-r border-border-primary/40 px-3 py-2 text-text-secondary last:border-r-0 last:border-b-0">
                           {renderInline(cell)}
                         </td>
                       )}

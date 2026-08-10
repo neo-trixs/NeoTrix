@@ -97,7 +97,7 @@ export function GitPanel(props: Props) {
     return (
       <div
         class={clsx(
-          'flex items-start gap-2 px-2 py-0.5 text-xs font-mono leading-relaxed',
+          'flex items-start gap-2 px-2 py-1 text-xs font-mono leading-relaxed',
           line.t === 'add' && 'bg-emerald-500/10 text-emerald-300',
           line.t === 'del' && 'bg-red-500/10 text-red-300',
           line.t === 'ctx' && 'text-text-secondary'
@@ -141,7 +141,7 @@ export function GitPanel(props: Props) {
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>
           <button
-            class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+            class="p-2 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
             onClick={props.onClose}
             aria-label="关闭"
           >
@@ -215,7 +215,7 @@ export function GitPanel(props: Props) {
                         <div class="border-t border-border-primary">
                           <For each={file.hunks}>
                             {(hunk) => (
-                              <div class="py-0.5">
+                              <div class="py-1">
                                 <For each={hunk.lines}>
                                   {(line) => renderLine(line)}
                                 </For>

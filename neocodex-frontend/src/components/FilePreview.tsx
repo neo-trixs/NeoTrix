@@ -109,7 +109,7 @@ export function FilePreview(props: Props) {
       return (
         <div class="rounded-md bg-bg-primary/60 border border-border-primary overflow-hidden">
           <button
-            class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text-muted hover:text-text-primary hover:bg-bg-tertiary/50"
+            class="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary hover:bg-bg-tertiary/50"
             onClick={() => setExpanded(!expanded())}
             aria-expanded={expanded()}
           >
@@ -168,7 +168,7 @@ export function FilePreview(props: Props) {
         <Show when={isImage(att().mime_type) && att().data && props.onAnnotate}>
           <button
             class={clsx(
-              'p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors',
+              'p-2 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors',
               annotating() && 'bg-nt-core-500/20 text-nt-core-700'
             )}
             onClick={() => setAnnotating(!annotating())}
@@ -194,7 +194,7 @@ export function FilePreview(props: Props) {
 }
 
 function fileIcon(a: NeoCodexAttachmentDto) {
-  const cls = 'w-8 h-8 p-1.5 rounded-md flex-shrink-0'
+  const cls = 'w-8 h-8 p-2 rounded-md flex-shrink-0'
   if (isImage(a.mime_type)) {
     return <div class={`${cls} bg-nt-io-500/10 text-nt-io-600`}><ImageIcon class="w-5 h-5" /></div>
   }

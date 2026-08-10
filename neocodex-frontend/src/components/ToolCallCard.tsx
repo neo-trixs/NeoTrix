@@ -28,11 +28,11 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
   }
 
   return (
-    <div class={clsx('tool-inline overflow-hidden my-1.5', props.call.success ? '' : 'border-red-600/30')}>
+    <div class={clsx('tool-inline overflow-hidden my-2', props.call.success ? '' : 'border-red-600/30')}>
       {/* 单行头部 */}
       <button
         class={clsx(
-          'w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-white/60 transition-colors',
+          'w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-white/60 transition-colors',
           expanded() && 'border-b border-border-primary/60'
         )}
         onClick={() => setExpanded(!expanded())}
@@ -47,11 +47,11 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
         <span class="text-xs font-medium text-text-primary font-mono truncate">{props.call.name}</span>
 
         {props.call.success ? (
-          <span class="inline-flex items-center gap-0.5 text-emerald-600 flex-shrink-0">
+          <span class="inline-flex items-center gap-1 text-emerald-600 flex-shrink-0">
             <Check class="w-3.5 h-3.5" />
           </span>
         ) : (
-          <span class="inline-flex items-center gap-0.5 text-red-600 flex-shrink-0">
+          <span class="inline-flex items-center gap-1 text-red-600 flex-shrink-0">
             <X class="w-3.5 h-3.5" />
           </span>
         )}
@@ -63,13 +63,13 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
 
       {/* 展开详情 */}
       <Show when={expanded()}>
-        <div class="px-2 py-1.5 space-y-1.5 bg-white/30">
+        <div class="px-2 py-2 space-y-2 bg-white/30">
           <Show when={props.call.args}>
             <div>
-              <div class="flex items-center justify-between mb-0.5">
+              <div class="flex items-center justify-between mb-1">
                 <span class="text-[10px] font-medium text-text-muted uppercase tracking-wider">args</span>
                 <button
-                  class="p-0.5 rounded text-text-muted hover:text-text-primary hover:bg-white/70"
+                  class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70"
                   onClick={() => copyText('args', props.call.args)}
                   aria-label="复制参数"
                 >
@@ -78,17 +78,17 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
                   </Show>
                 </button>
               </div>
-              <pre class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-1.5 overflow-x-auto max-h-40 overflow-y-auto border border-border-primary/50">
+              <pre class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-2 overflow-x-auto max-h-40 overflow-y-auto border border-border-primary/50">
                 {props.call.args}
               </pre>
             </div>
           </Show>
           <Show when={props.call.result}>
             <div>
-              <div class="flex items-center justify-between mb-0.5">
+              <div class="flex items-center justify-between mb-1">
                 <span class="text-[10px] font-medium text-text-muted uppercase tracking-wider">result</span>
                 <button
-                  class="p-0.5 rounded text-text-muted hover:text-text-primary hover:bg-white/70"
+                  class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70"
                   onClick={() => copyText('result', props.call.result)}
                   aria-label="复制结果"
                 >
@@ -97,7 +97,7 @@ export function ToolCallCard(props: { call: ToolCallRecord }) {
                   </Show>
                 </button>
               </div>
-              <pre class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-1.5 overflow-x-auto max-h-48 overflow-y-auto border border-border-primary/50">
+              <pre class="text-[11px] font-mono text-text-secondary bg-white/60 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto border border-border-primary/50">
                 {props.call.result}
               </pre>
             </div>

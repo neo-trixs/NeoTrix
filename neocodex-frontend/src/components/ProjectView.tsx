@@ -71,7 +71,7 @@ export function ProjectView(props: Props) {
     return (
       <div>
         <button
-          class="flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer hover:bg-bg-tertiary/60 transition-colors text-sm w-full text-left bg-transparent border-none font-inherit focus-visible:ring-2 focus-visible:ring-nt-core-500 focus-visible:outline-none"
+          class="flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer hover:bg-bg-tertiary/60 transition-colors text-sm w-full text-left bg-transparent border-none font-inherit focus-visible:ring-2 focus-visible:ring-nt-core-500 focus-visible:outline-none"
           style={{ 'padding-left': `${depth * 14 + 8}px` }}
           onClick={() => {
             if (item.is_dir) toggle(item.path)

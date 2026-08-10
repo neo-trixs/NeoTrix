@@ -144,7 +144,7 @@ export function SideChat(props: Props) {
               class="flex-1 resize-none bg-bg-primary border border-border-primary rounded-xl px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-mind-400/50"
             />
             <button
-              class="p-2.5 rounded-xl bg-nt-mind-500/20 text-nt-mind-700 hover:bg-nt-mind-500/30 transition-colors disabled:opacity-50"
+              class="p-3 rounded-xl bg-nt-mind-500/20 text-nt-mind-700 hover:bg-nt-mind-500/30 transition-colors disabled:opacity-50"
               onClick={send}
               disabled={sending() || !input().trim()}
               aria-label="发送"

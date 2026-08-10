@@ -190,7 +190,7 @@ export function ComputerUse(props: Props) {
           </button>
           <Show when={!props.embedded}>
             <button
-              class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              class="p-2 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
               onClick={props.onClose}
               aria-label="关闭"
             >
@@ -254,15 +254,15 @@ export function ComputerUse(props: Props) {
                 位置: ({mousePos()!.x}, {mousePos()!.y})
               </div>
             </Show>
-            <div class="grid grid-cols-3 gap-1.5">
-              <button class="col-span-3 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-nt-core-500/15 text-nt-core-300 hover:bg-nt-core-500/25 transition-colors text-xs font-medium" onClick={click} disabled={busy() !== null}>
+            <div class="grid grid-cols-3 gap-2">
+              <button class="col-span-3 flex items-center justify-center gap-2 px-2 py-2 rounded-lg bg-nt-core-500/15 text-nt-core-300 hover:bg-nt-core-500/25 transition-colors text-xs font-medium" onClick={click} disabled={busy() !== null}>
                 {busy() === 'click' ? <Loader2 class="w-3.5 h-3.5 animate-spin" /> : <MousePointerClick class="w-3.5 h-3.5" />}
                 点击 (当前位置)
               </button>
               <Show when={mousePos()}>
-                <button class="px-2 py-1.5 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(Math.max(0, mousePos()!.x - 40), mousePos()!.y)} disabled={busy() !== null}>← 左移</button>
-                <button class="px-2 py-1.5 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(mousePos()!.x, Math.max(0, mousePos()!.y - 40))} disabled={busy() !== null}>↑ 上移</button>
-                <button class="px-2 py-1.5 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(Math.min(displays()[0]?.width ?? 1920, mousePos()!.x + 40), mousePos()!.y)} disabled={busy() !== null}>→ 右移</button>
+                <button class="px-2 py-2 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(Math.max(0, mousePos()!.x - 40), mousePos()!.y)} disabled={busy() !== null}>← 左移</button>
+                <button class="px-2 py-2 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(mousePos()!.x, Math.max(0, mousePos()!.y - 40))} disabled={busy() !== null}>↑ 上移</button>
+                <button class="px-2 py-2 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(Math.min(displays()[0]?.width ?? 1920, mousePos()!.x + 40), mousePos()!.y)} disabled={busy() !== null}>→ 右移</button>
               </Show>
             </div>
           </div>
@@ -275,16 +275,16 @@ export function ComputerUse(props: Props) {
             </div>
             <div>
               <label class="text-[10px] text-text-muted uppercase tracking-wider">输入文本</label>
-              <div class="flex gap-1.5 mt-1">
+              <div class="flex gap-2 mt-1">
                 <input
                   value={keyText()}
                   onInput={(e) => setKeyText(e.currentTarget.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); typeText() } }}
                   placeholder="要输入的文本..."
-                  class="flex-1 bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-core-400/50"
+                  class="flex-1 bg-bg-primary border border-border-primary rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-core-400/50"
                 />
                 <button
-                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-nt-core-500/15 text-nt-core-300 hover:bg-nt-core-500/25 transition-colors text-xs font-medium"
+                  class="flex items-center gap-1 px-3 py-2 rounded-lg bg-nt-core-500/15 text-nt-core-300 hover:bg-nt-core-500/25 transition-colors text-xs font-medium"
                   onClick={typeText}
                   disabled={busy() !== null || !keyText()}
                 >
@@ -295,16 +295,16 @@ export function ComputerUse(props: Props) {
             </div>
             <div>
               <label class="text-[10px] text-text-muted uppercase tracking-wider">按键 (key code) + 修饰键</label>
-              <div class="flex gap-1.5 mt-1">
+              <div class="flex gap-2 mt-1">
                 <input
                   value={keyCode()}
                   onInput={(e) => setKeyCode(e.currentTarget.value.replace(/\D/g, ''))}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); pressKey() } }}
                   placeholder="如 36 (回车) / 49 (空格)"
-                  class="flex-1 bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-core-400/50"
+                  class="flex-1 bg-bg-primary border border-border-primary rounded-lg px-3 py-2 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-core-400/50"
                 />
                 <button
-                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-nt-core-500/15 text-nt-core-300 hover:bg-nt-core-500/25 transition-colors text-xs font-medium"
+                  class="flex items-center gap-1 px-3 py-2 rounded-lg bg-nt-core-500/15 text-nt-core-300 hover:bg-nt-core-500/25 transition-colors text-xs font-medium"
                   onClick={pressKey}
                   disabled={busy() !== null || !keyCode()}
                 >
@@ -312,7 +312,7 @@ export function ComputerUse(props: Props) {
                   按下
                 </button>
               </div>
-              <div class="flex gap-1.5 mt-1.5 flex-wrap">
+              <div class="flex gap-2 mt-2 flex-wrap">
                 {['command', 'option', 'control', 'shift'].map((m) => (
                   <button
                     class={clsx(
@@ -343,7 +343,7 @@ export function ComputerUse(props: Props) {
             <div class="space-y-1">
               <For each={windows()}>
                 {(w) => (
-                  <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-bg-primary/40 text-xs">
+                  <div class="flex items-center gap-2 px-2 py-2 rounded-lg bg-bg-primary/40 text-xs">
                     <span class="text-text-muted w-6 h-6 rounded bg-bg-tertiary flex items-center justify-center font-mono text-[10px] flex-shrink-0">
                       {w.pid || '—'}
                     </span>

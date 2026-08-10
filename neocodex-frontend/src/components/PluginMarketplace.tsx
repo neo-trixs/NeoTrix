@@ -134,7 +134,7 @@ export function PluginMarketplace(props: Props) {
           </button>
           <Show when={!props.embedded}>
             <button
-              class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              class="p-2 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
               onClick={props.onClose}
               aria-label="关闭"
             >
@@ -151,7 +151,7 @@ export function PluginMarketplace(props: Props) {
 
           {/* Install button */}
           <button
-            class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-nt-mind-500/20 text-nt-mind-700 hover:bg-nt-mind-500/30 transition-colors text-sm font-medium"
+            class="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-nt-mind-500/20 text-nt-mind-700 hover:bg-nt-mind-500/30 transition-colors text-sm font-medium"
             onClick={install}
             disabled={busy() !== null}
           >

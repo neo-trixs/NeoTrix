@@ -102,7 +102,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
         class={clsx(
           props.iconOnly
             ? 'w-8 h-8 rounded-full flex items-center justify-center text-text-muted hover:text-nt-io-600 hover:bg-nt-io-500/10 transition-all'
-            : 'flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border-primary bg-bg-secondary text-text-primary hover:bg-bg-tertiary transition-colors min-w-[180px] max-w-[280px]',
+            : 'flex items-center gap-2 px-3 py-2 rounded-lg border border-border-primary bg-bg-secondary text-text-primary hover:bg-bg-tertiary transition-colors min-w-[180px] max-w-[280px]',
           loading() && 'opacity-50 cursor-wait'
         )}
         onClick={() => !loading() && setIsOpen(!isOpen())}
@@ -122,7 +122,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
           )
         ) : (
           <>
-            <span class="flex items-center gap-1.5 text-sm truncate">
+            <span class="flex items-center gap-2 text-sm truncate">
               {loading() ? (
                 <Loader2 class="w-4 h-4 animate-spin text-nt-io-500" />
               ) : currentProvider() ? (
@@ -141,16 +141,16 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
 
       {/* Error Toast */}
       {error() && (
-        <div class="absolute top-full left-0 right-0 mt-1 p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-xs text-red-300 flex items-center gap-1.5 animate-in z-10">
+        <div class="absolute top-full left-0 right-0 mt-1 p-2 bg-red-500/20 border border-red-500/30 rounded-lg text-xs text-red-300 flex items-center gap-2 animate-in z-10">
           <AlertCircle class="w-3.5 h-3.5 flex-shrink-0" />
           {error()}
-          <button onClick={() => setError(null)} class="ml-auto p-0.5 hover:bg-red-500/30 rounded">×</button>
+          <button onClick={() => setError(null)} class="ml-auto p-1 hover:bg-red-500/30 rounded">×</button>
         </div>
       )}
 
       {/* Dropdown Panel */}
       <Show when={isOpen()}>
-        <div class="absolute top-full left-0 right-0 mt-1.5 bg-bg-secondary border border-border-primary rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[220px] max-w-[320px]">
+        <div class="absolute top-full left-0 right-0 mt-2 bg-bg-secondary border border-border-primary rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[220px] max-w-[320px]">
           {/* Header */}
           <div class="px-3 py-2 border-b border-border-primary flex items-center justify-between">
             <span class="text-sm font-medium text-text-primary">模型提供商</span>
@@ -165,7 +165,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                 return (
                   <button
                     class={clsx(
-                      'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
+                      'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
                       'hover:bg-bg-tertiary',
                       isActive && 'bg-nt-io-500/10 text-nt-io-600'
                     )}
@@ -187,13 +187,13 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                     }}
                   >
                     {getProviderIcon(provider.name)}
-                    <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <div class="flex-1 min-w-0 flex flex-col gap-1">
                       <span class="font-medium truncate">{formatProviderName(provider.name)}</span>
                       <span class="text-xs text-text-muted truncate">{provider.model}</span>
                     </div>
                     {isActive && <Check class="w-4 h-4 text-nt-io-500 flex-shrink-0" />}
                     {!provider.resolvable && (
-                      <span class="text-xs text-amber-600 px-1.5 py-0.5 rounded bg-amber-500/10">不可用</span>
+                      <span class="text-xs text-amber-600 px-2 py-1 rounded bg-amber-500/10">不可用</span>
                     )}
                   </button>
                 )

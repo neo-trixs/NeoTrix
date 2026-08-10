@@ -337,7 +337,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
           aria-modal="true"
         >
           {/* ── 左侧分组导航（对标 osaurus ManagementView） ── */}
-          <nav ref={setNavRef} class="w-[190px] flex-shrink-0 border-r border-white/30 bg-white/10 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto" role="tablist" aria-label="设置分类">
+          <nav ref={setNavRef} class="w-[190px] flex-shrink-0 border-r border-white/30 bg-white/10 py-4 px-2 flex flex-col gap-1 overflow-y-auto" role="tablist" aria-label="设置分类">
             <div class="px-3 pb-3">
                 <div class="flex items-center gap-2">
                   <TrafficLights />
@@ -346,7 +346,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
             <For each={NAV_GROUPS}>
               {(group) => (
                 <div class="mb-2">
-                  <div class="px-3 pb-1.5 pt-2 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">
+                  <div class="px-3 pb-2 pt-2 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">
                     {group.title}
                   </div>
                   <For each={group.ids}>
@@ -356,7 +356,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       return (
                         <button
                           class={clsx(
-                            'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[12.5px] transition-colors',
+                            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[12.5px] transition-colors',
                             isActive
                               ? 'bg-nt-io-500/12 text-nt-io-700 font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]'
                               : 'text-text-secondary hover:text-text-primary hover:bg-white/40'
@@ -383,7 +383,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                             <s.icon />
                           </span>
                           <span class="flex-1 text-left truncate">{s.label}</span>
-                          {isActive && <span class="w-1.5 h-1.5 rounded-full bg-nt-io-500 flex-shrink-0" />}
+                          {isActive && <span class="w-2 h-2 rounded-full bg-nt-io-500 flex-shrink-0" />}
                         </button>
                       )
                     }}
@@ -414,7 +414,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 </div>
               </div>
               <button
-                class="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+                class="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                 onClick={props.onClose}
                 aria-label="关闭设置"
                 title="关闭设置"
@@ -449,7 +449,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                                 <div class="text-[11px] text-text-muted font-mono">{cfg().active_model}</div>
                               </div>
                             </div>
-                            <span class={clsx('text-[10px] px-2 py-0.5 rounded-full font-medium', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
+                            <span class={clsx('text-[10px] px-2 py-1 rounded-full font-medium', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
                               {cfg().resolvable ? 'API 可达' : 'API 不可达'}
                             </span>
                           </div>
@@ -463,14 +463,14 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                           {cfg().provider_count} 个可用提供商
                         </div>
                         <div class="ss-card-body">
-                          <div class="space-y-1.5">
+                          <div class="space-y-2">
                             <For each={cfg().providers}>
                               {(p) => {
                                 const isActive = p.model === cfg().active_model
                                 return (
                                   <button
                                     class={clsx(
-                                      'w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors',
+                                      'w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors',
                                       isActive
                                         ? 'border-nt-io-500/40 bg-nt-io-500/6'
                                         : 'border-border-primary/50 bg-white/40 hover:bg-white/70'
@@ -480,13 +480,13 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                                     role="radio"
                                     aria-checked={isActive}
                                   >
-                                    <div class="flex items-center gap-2.5">
+                                    <div class="flex items-center gap-3">
                                       <span class="text-[12.5px] text-text-primary font-medium">{p.name}</span>
                                       <span class="text-[10.5px] text-text-muted font-mono">{p.model}</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                       <Show when={p.resolvable}>
-                                        <span class="text-[9px] text-nt-core-700 bg-nt-core-500/10 px-1.5 py-0.5 rounded-full">可用</span>
+                                        <span class="text-[9px] text-nt-core-700 bg-nt-core-500/10 px-2 py-1 rounded-full">可用</span>
                                       </Show>
                                       <Show when={isActive}>
                                         <span class="text-[10px] text-nt-io-600">✓ 当前</span>
@@ -518,7 +518,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                               aria-label="API 密钥"
                             />
                             <button
-                              class="px-3 py-2 rounded-lg bg-nt-io-600 text-white text-[12px] font-medium hover:bg-nt-io-700 disabled:opacity-50 transition-colors flex-shrink-0"
+                              class="px-3 py-2 rounded-lg bg-nt-io-500 text-text-primary text-[12px] font-medium hover:bg-nt-io-600 disabled:opacity-50 transition-colors flex-shrink-0"
                               onClick={saveApiKey}
                               disabled={keyBusy() || !apiKey().trim()}
                             >
@@ -531,7 +531,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                             </span>
                             <Show when={hasKey() === true}>
                               <button
-                                class="px-2.5 py-1 rounded-lg border border-red-500/30 bg-red-500/5 text-[11px] text-red-500 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                                class="px-3 py-1 rounded-lg border border-red-500/30 bg-red-500/5 text-[11px] text-red-500 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
                                 onClick={deleteApiKey}
                                 disabled={keyBusy()}
                               >
@@ -570,9 +570,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <ExpandIcon />
                       界面字号
                     </div>
-                    <div class="ss-card-body space-y-1.5">
+                    <div class="ss-card-body space-y-2">
                       <button
-                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', fontSizePref() === 'sm' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', fontSizePref() === 'sm' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setFontSize('sm')}
                         role="radio"
                         aria-checked={fontSizePref() === 'sm'}
@@ -581,7 +581,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         <Show when={fontSizePref() === 'sm'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
                       </button>
                       <button
-                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', fontSizePref() === 'md' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', fontSizePref() === 'md' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setFontSize('md')}
                         role="radio"
                         aria-checked={fontSizePref() === 'md'}
@@ -590,7 +590,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         <Show when={fontSizePref() === 'md'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
                       </button>
                       <button
-                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', fontSizePref() === 'lg' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', fontSizePref() === 'lg' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setFontSize('lg')}
                         role="radio"
                         aria-checked={fontSizePref() === 'lg'}
@@ -606,9 +606,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <DataIcon />
                       动效强度
                     </div>
-                    <div class="ss-card-body space-y-1.5">
+                    <div class="ss-card-body space-y-2">
                       <button
-                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', motionPref() === 'full' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', motionPref() === 'full' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setMotion('full')}
                         role="radio"
                         aria-checked={motionPref() === 'full'}
@@ -617,7 +617,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         <Show when={motionPref() === 'full'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
                       </button>
                       <button
-                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', motionPref() === 'reduced' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', motionPref() === 'reduced' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setMotion('reduced')}
                         role="radio"
                         aria-checked={motionPref() === 'reduced'}
@@ -636,9 +636,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <InfoIcon />
                       界面密度
                     </div>
-                    <div class="ss-card-body space-y-1.5">
+                    <div class="ss-card-body space-y-2">
                       <button
-                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'comfortable' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', densityPref() === 'comfortable' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setDensity('comfortable')}
                         role="radio"
                         aria-checked={densityPref() === 'comfortable'}
@@ -647,7 +647,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         <Show when={densityPref() === 'comfortable'}><span class="text-[10px] text-nt-io-600">✓ 当前</span></Show>
                       </button>
                       <button
-                        class={clsx('w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors', densityPref() === 'compact' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
+                        class={clsx('w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors', densityPref() === 'compact' ? 'border-nt-io-500/40 bg-nt-io-500/6' : 'border-border-primary/50 bg-white/40')}
                         onClick={() => setDensity('compact')}
                         role="radio"
                         aria-checked={densityPref() === 'compact'}
@@ -681,19 +681,19 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         {(ms) => (
                           <div class="grid grid-cols-2 gap-2">
                             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                              <div class="text-[10px] text-text-muted mb-0.5">记忆条目</div>
+                              <div class="text-[10px] text-text-muted mb-1">记忆条目</div>
                               <div class="text-[13px] text-text-primary font-medium">{ms().total_entries}</div>
                             </div>
                             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                              <div class="text-[10px] text-text-muted mb-0.5">分类</div>
+                              <div class="text-[10px] text-text-muted mb-1">分类</div>
                               <div class="text-[13px] text-text-primary font-medium">{ms().total_categories}</div>
                             </div>
                             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                              <div class="text-[10px] text-text-muted mb-0.5">平均置信度</div>
+                              <div class="text-[10px] text-text-muted mb-1">平均置信度</div>
                               <div class="text-[13px] text-text-primary font-medium">{(ms().avg_confidence * 100).toFixed(0)}%</div>
                             </div>
                             <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                              <div class="text-[10px] text-text-muted mb-0.5">占用空间</div>
+                              <div class="text-[10px] text-text-muted mb-1">占用空间</div>
                               <div class="text-[13px] text-text-primary font-medium">{(ms().memory_usage_bytes / 1024).toFixed(1)} KB</div>
                             </div>
                           </div>
@@ -707,9 +707,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                       <ExpandIcon />
                       数据操作
                     </div>
-                    <div class="ss-card-body space-y-1.5">
+                    <div class="ss-card-body space-y-2">
                       <button
-                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-border-primary/50 bg-white/40 hover:bg-white/70 transition-colors"
+                        class="w-full flex items-center justify-between px-3 py-3 rounded-xl border border-border-primary/50 bg-white/40 hover:bg-white/70 transition-colors"
                         onClick={exportMemory}
                         disabled={dataBusy()}
                       >
@@ -717,7 +717,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                         <span class="text-[10px] text-text-muted">→ 文件</span>
                       </button>
                       <button
-                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+                        class="w-full flex items-center justify-between px-3 py-3 rounded-xl border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 transition-colors"
                         onClick={clearMemory}
                         disabled={dataBusy()}
                       >
@@ -757,21 +757,21 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     <div class="ss-card-body">
                       <div class="grid grid-cols-2 gap-2">
                         <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                          <div class="text-[10px] text-text-muted mb-0.5">提供商</div>
+                          <div class="text-[10px] text-text-muted mb-1">提供商</div>
                           <div class="text-[12.5px] text-text-primary font-medium">{config()?.provider_count ?? '—'} 个</div>
                         </div>
                         <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                          <div class="text-[10px] text-text-muted mb-0.5">API 状态</div>
+                          <div class="text-[10px] text-text-muted mb-1">API 状态</div>
                           <div class={clsx('text-[12.5px] font-medium', config()?.resolvable ? 'text-nt-core-700' : 'text-nt-shield-600')}>
                             {config()?.resolvable ? '可用' : '不可达'}
                           </div>
                         </div>
                         <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                          <div class="text-[10px] text-text-muted mb-0.5">当前模型</div>
+                          <div class="text-[10px] text-text-muted mb-1">当前模型</div>
                           <div class="text-[12.5px] text-text-primary font-mono truncate">{config()?.active_model ?? '—'}</div>
                         </div>
                         <div class="p-3 rounded-xl bg-white/40 border border-border-primary/40">
-                          <div class="text-[10px] text-text-muted mb-0.5">平台</div>
+                          <div class="text-[10px] text-text-muted mb-1">平台</div>
                           <div class="text-[12.5px] text-text-primary">macOS</div>
                         </div>
                       </div>

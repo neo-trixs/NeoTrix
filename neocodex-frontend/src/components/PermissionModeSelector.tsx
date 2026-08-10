@@ -75,7 +75,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
       <div class="relative">
         <button
           class={clsx(
-            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border-primary bg-bg-secondary',
+            'flex items-center gap-2 px-3 py-2 rounded-lg border border-border-primary bg-bg-secondary',
             'text-text-primary hover:bg-bg-tertiary transition-colors',
             'min-w-[120px] max-w-[180px]',
             disabled && 'opacity-50 cursor-not-allowed'
@@ -92,12 +92,12 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
         </button>
 
         <Show when={isOpen()}>
-          <div class="absolute bottom-full left-0 mb-1.5 bg-bg-secondary border border-border-primary rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[180px]" role="listbox" aria-label="权限模式选择">
+          <div class="absolute bottom-full left-0 mb-2 bg-bg-secondary border border-border-primary rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[180px]" role="listbox" aria-label="权限模式选择">
             <For each={PERMISSION_MODES}>
               {(mode: PermissionModeOption, i) => (
                 <button
                   class={clsx(
-                    'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
+                    'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
                     'hover:bg-bg-tertiary',
                     mode.value === value && 'bg-nt-io-500/10'
                   )}
@@ -118,7 +118,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
                   }}
                 >
                   <mode.icon class={clsx('w-4 h-4 flex-shrink-0', mode.color)} />
-                  <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <div class="flex-1 min-w-0 flex flex-col gap-1">
                     <span class="font-medium truncate">{mode.label}</span>
                     <span class="text-xs text-text-muted truncate">{mode.description}</span>
                   </div>
@@ -143,7 +143,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
     <div class="relative w-full">
       <button
         class={clsx(
-          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border-primary bg-bg-secondary',
+          'w-full flex items-center gap-3 px-3 py-3 rounded-lg border border-border-primary bg-bg-secondary',
           'text-text-primary hover:bg-bg-tertiary transition-colors text-left',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
@@ -154,7 +154,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
         aria-haspopup="listbox"
       >
         <currentMode.icon class={clsx('w-5 h-5 flex-shrink-0', currentMode.color)} />
-        <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+        <div class="flex-1 min-w-0 flex flex-col gap-1">
           <span class="font-medium truncate">{currentMode.label}</span>
           <span class="text-xs text-text-muted truncate">{currentMode.description}</span>
         </div>
@@ -162,12 +162,12 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
       </button>
 
       <Show when={isOpen()}>
-        <div class="absolute top-full left-0 right-0 mt-1.5 bg-bg-secondary border border-border-primary rounded-xl shadow-xl overflow-hidden z-50 animate-in">
+        <div class="absolute top-full left-0 right-0 mt-2 bg-bg-secondary border border-border-primary rounded-xl shadow-xl overflow-hidden z-50 animate-in">
           <For each={PERMISSION_MODES}>
             {(mode: PermissionModeOption) => (
               <button
                 class={clsx(
-                  'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
+                  'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
                   'hover:bg-bg-tertiary',
                   mode.value === value && 'bg-nt-io-500/10'
                 )}
@@ -177,7 +177,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
                 aria-selected={mode.value === value}
               >
                 <mode.icon class={clsx('w-5 h-5 flex-shrink-0', mode.color)} />
-                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                <div class="flex-1 min-w-0 flex flex-col gap-1">
                   <span class="font-medium truncate">{mode.label}</span>
                   <span class="text-xs text-text-muted truncate">{mode.description}</span>
                 </div>

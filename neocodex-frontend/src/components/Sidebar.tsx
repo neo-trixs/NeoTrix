@@ -113,7 +113,7 @@ export function Sidebar(props: SidebarProps) {
       <div class="flex items-center justify-between h-14 px-4 pl-[64px]" data-tauri-drag-region>
         <div class="flex-1 min-w-0" data-tauri-drag-region />
         <button
-          class="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+          class="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors flex-shrink-0 focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
           onClick={props.onToggleCollapse}
           aria-label={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
           title={collapsed() ? '展开侧边栏' : '折叠侧边栏'}
@@ -224,7 +224,7 @@ export function Sidebar(props: SidebarProps) {
               when={searchOpen()}
               fallback={
                 <button
-                  class="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors text-left border border-border-primary/40"
+                  class="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/60 transition-colors text-left border border-border-primary/40"
                   onClick={toggleSearch}
                   aria-label="搜索会话"
                   title="搜索会话"
@@ -234,7 +234,7 @@ export function Sidebar(props: SidebarProps) {
                 </button>
               }
             >
-              <div class="flex-1 flex items-center gap-1.5 px-2 py-1 rounded-lg border border-nt-io-500/40 bg-white/60">
+              <div class="flex-1 flex items-center gap-2 px-2 py-1 rounded-lg border border-nt-io-500/40 bg-white/60">
                 <Search class="w-3.5 h-3.5 text-nt-io-600 flex-shrink-0" />
                 <input
                   class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-text-primary placeholder-text-muted/60"
@@ -245,7 +245,7 @@ export function Sidebar(props: SidebarProps) {
                   autofocus
                 />
                 <button
-                  class="p-0.5 text-text-muted hover:text-text-primary flex-shrink-0"
+                  class="p-1 text-text-muted hover:text-text-primary flex-shrink-0"
                   onClick={toggleSearch}
                   aria-label="关闭搜索"
                   title="关闭搜索"
@@ -255,7 +255,7 @@ export function Sidebar(props: SidebarProps) {
               </div>
             </Show>
             <button
-              class="p-1.5 rounded-lg bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+              class="p-2 rounded-lg bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
               onClick={handleNewChat}
               aria-label="新建对话"
               title="新建对话"
@@ -275,10 +275,10 @@ export function Sidebar(props: SidebarProps) {
               <For each={groupedSessions()}>
                 {(group) => (
                   <div class="mb-4 last:mb-0">
-                    <div class="re-h px-2 pb-1.5 pt-2 text-[10px] uppercase tracking-widest text-text-muted/60 font-medium">
+                    <div class="re-h px-2 pb-2 pt-2 text-[10px] uppercase tracking-widest text-text-muted/60 font-medium">
                       {group.key}
                     </div>
-                    <ul class="space-y-0.5" role="list" aria-label={`${group.key}会话`}>
+                    <ul class="space-y-1" role="list" aria-label={`${group.key}会话`}>
                       <For each={group.items}>
                         {(session: { id: string; title: string; updatedAt: Date }) => {
                           const active = currentSessionId === session.id
@@ -310,7 +310,7 @@ export function Sidebar(props: SidebarProps) {
                                     {formatRelativeTime(session.updatedAt)}
                                   </span>
                                 </button>
-                                <div class="flex items-center gap-0.5 pr-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                <div class="flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                                   <button
                                     class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
                                     onClick={(e) => handleRenameSession(e, session.id)}

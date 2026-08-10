@@ -83,7 +83,7 @@ export function CostDashboard(props: Props) {
         {label}
       </div>
       <div class="text-lg font-semibold text-text-primary">{value}</div>
-      {sub && <div class="text-[10px] text-text-muted mt-0.5">{sub}</div>}
+      {sub && <div class="text-[10px] text-text-muted mt-1">{sub}</div>}
     </div>
   )
 
@@ -106,7 +106,7 @@ export function CostDashboard(props: Props) {
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>
           <button
-            class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+            class="p-2 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
             onClick={props.onClose}
             aria-label="关闭"
           >

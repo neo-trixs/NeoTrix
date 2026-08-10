@@ -127,7 +127,7 @@ export function CheckpointTimeline(props: Props) {
                     {/* Timeline dot */}
                     <span
                       class={clsx(
-                        'absolute -left-[21px] top-1.5 w-3.5 h-3.5 rounded-full border-2',
+                        'absolute -left-[21px] top-2 w-3.5 h-3.5 rounded-full border-2',
                         i() === 0 ? 'bg-nt-repair-400 border-bg-secondary' : 'bg-bg-tertiary border-border-primary'
                       )}
                     />
@@ -136,7 +136,7 @@ export function CheckpointTimeline(props: Props) {
                         <div class="text-sm text-text-primary font-medium">
                           {i() === 0 ? '最新快照' : `快照 #${checkpoints().length - i()}`}
                         </div>
-                        <div class="text-xs text-text-muted flex items-center gap-1 mt-0.5">
+                        <div class="text-xs text-text-muted flex items-center gap-1 mt-1">
                           <Clock class="w-3.5 h-3.5" />
                           {formatTs(cp.created_at)} · {cp.message_count} 条
                         </div>

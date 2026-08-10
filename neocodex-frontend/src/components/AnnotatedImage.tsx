@@ -271,10 +271,10 @@ export function AnnotatedImage(props: Props) {
       </div>
 
       {/* Toolbar */}
-      <div class="flex items-center gap-1.5 flex-wrap">
+      <div class="flex items-center gap-2 flex-wrap">
         <button
           class={clsx(
-            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors',
+            'flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors',
             tool() === 'box' ? 'bg-nt-core-500/20 text-nt-core-700' : 'text-text-muted hover:bg-bg-tertiary'
           )}
           onClick={() => setTool('box')}
@@ -285,7 +285,7 @@ export function AnnotatedImage(props: Props) {
         </button>
         <button
           class={clsx(
-            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors',
+            'flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors',
             tool() === 'arrow' ? 'bg-nt-core-500/20 text-nt-core-700' : 'text-text-muted hover:bg-bg-tertiary'
           )}
           onClick={() => setTool('arrow')}
@@ -295,7 +295,7 @@ export function AnnotatedImage(props: Props) {
           <Move class="w-3.5 h-3.5" /> 箭头
         </button>
         <button
-          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:bg-bg-tertiary transition-colors"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-bg-tertiary transition-colors"
           onClick={() => { if (annotations().length > 0 && !window.confirm('确定清除所有标注？')) return; setAnnotations([]) }}
           title="清除所有标注"
         >
@@ -308,14 +308,14 @@ export function AnnotatedImage(props: Props) {
           <span class="text-xs text-text-muted">{annotations().length} 个标注</span>
         </Show>
         <button
-          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:bg-bg-tertiary transition-colors"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-bg-tertiary transition-colors"
           onClick={props.onCancel}
           title="取消"
         >
           <X class="w-3.5 h-3.5" /> 取消
         </button>
         <button
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-nt-io-500 text-white hover:bg-nt-io-600 transition-colors"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs bg-nt-io-500 text-text-primary hover:bg-nt-io-600 transition-colors"
           onClick={confirm}
           title="确认标注并加入消息"
         >
@@ -336,7 +336,7 @@ export function AnnotatedImage(props: Props) {
                     : `#${a.id} 箭头 @ (${(a.x * 100).toFixed(1)}%, ${(a.y * 100).toFixed(1)}%) → (${((a.ex ?? 0) * 100).toFixed(1)}%, ${((a.ey ?? 0) * 100).toFixed(1)}%)`}
                 </span>
                 <button
-                  class="ml-auto p-0.5 rounded text-text-muted hover:text-red-500"
+                  class="ml-auto p-1 rounded text-text-muted hover:text-red-500"
                   onClick={() => setAnnotations(prev => prev.filter(x => x.id !== a.id))}
                   aria-label="删除标注"
                 >

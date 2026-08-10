@@ -150,7 +150,7 @@ export function ScheduledTasks(props: Props) {
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>
           <button
-            class="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+            class="p-2 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
             onClick={props.onClose}
             aria-label="关闭"
           >
@@ -166,7 +166,7 @@ export function ScheduledTasks(props: Props) {
 
           {/* Create button */}
           <button
-            class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-nt-repair-500/20 text-nt-repair-300 hover:bg-nt-repair-500/30 transition-colors text-sm font-medium"
+            class="w-full flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-nt-repair-500/20 text-nt-repair-300 hover:bg-nt-repair-500/30 transition-colors text-sm font-medium"
             onClick={() => setShowCreate(!showCreate())}
             aria-expanded={showCreate()}
           >
@@ -184,7 +184,7 @@ export function ScheduledTasks(props: Props) {
                   onInput={(e) => setName(e.currentTarget.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); create() } }}
                   placeholder="例如：每日代码库巡检"
-                  class="mt-1 w-full bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
+                  class="mt-1 w-full bg-bg-primary border border-border-primary rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
                 />
               </div>
               <div>
@@ -194,12 +194,12 @@ export function ScheduledTasks(props: Props) {
                   onInput={(e) => setPrompt(e.currentTarget.value)}
                   placeholder="任务执行内容..."
                   rows={3}
-                  class="mt-1 w-full resize-none bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
+                  class="mt-1 w-full resize-none bg-bg-primary border border-border-primary rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
                 />
               </div>
               <div>
                 <label class="text-[10px] text-text-muted uppercase tracking-wider">调度（RRULE）</label>
-                <div class="mt-1 flex gap-1.5 flex-wrap">
+                <div class="mt-1 flex gap-2 flex-wrap">
                   <For each={SCHEDULE_PRESETS}>
                     {(p) => (
                       <button
@@ -219,7 +219,7 @@ export function ScheduledTasks(props: Props) {
                 <input
                   value={schedule()}
                   onInput={(e) => setSchedule(e.currentTarget.value)}
-                  class="mt-1.5 w-full bg-bg-primary border border-border-primary rounded-lg px-2.5 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
+                  class="mt-2 w-full bg-bg-primary border border-border-primary rounded-lg px-3 py-2 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
                 />
               </div>
               <button
@@ -255,7 +255,7 @@ export function ScheduledTasks(props: Props) {
                   </div>
                   <div class="mt-1 text-xs text-text-secondary line-clamp-2">{task.prompt}</div>
                   <div class="mt-1 text-[10px] font-mono text-text-muted truncate">{task.schedule}</div>
-                  <div class="mt-2 flex items-center gap-1.5">
+                  <div class="mt-2 flex items-center gap-2">
                     <button
                       class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-nt-core-300 hover:bg-nt-core-500/10 border border-nt-core-500/30 transition-colors"
                       onClick={() => action('run', task.id)}
