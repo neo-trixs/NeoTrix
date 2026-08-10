@@ -12,7 +12,9 @@ use neotrix::neotrix::nt_mind::panorama_pipeline::PanoramaPipeline;
 use neotrix::neotrix::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
 use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 use neotrix::neotrix::nt_io_mention::resolve_mentions;
-use neotrix::neotrix::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
+use neotrix::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
+use neotrix::neotrix::ReasoningKernel;
+use neotrix::core::nt_core_policy::E8Policy;
 
 use neotrix::config::NeoTrixConfig;
 use neotrix::cli::tui::output::StreamingMarkdownRenderer;
@@ -36,6 +38,9 @@ fn err(msg: impl AsRef<str>) -> String {
 }
 fn dim(msg: impl AsRef<str>) -> String {
     msg.as_ref().dimmed().to_string()
+}
+fn info(msg: impl AsRef<str>) -> String {
+    msg.as_ref().cyan().to_string()
 }
 
 /// Create a tokio runtime for the entry layer. Runtime creation failure is
@@ -515,7 +520,7 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     let rt = tokio_runtime();
 
     // Check if task is complex and should use TaskDispatcher
-    let use_dispatcher = is_complex_task(prompt);
+    let use_dispatcher = is_complex_task(&prompt);
 
     if stream {
         // Streaming mode — print tokens as they arrive, no progress bar

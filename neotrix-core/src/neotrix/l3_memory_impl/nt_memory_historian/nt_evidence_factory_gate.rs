@@ -198,6 +198,7 @@ mod tests {
         });
         // Same category, same era, but 10000km away — contradiction
         let rec = make_record("r2", 0.8, 90.0, 0.0, "1000 BP", "tool");
-        assert!(!gate.admit(&rec).unwrap());
+        let admitted = gate.admit(&rec).unwrap();
+        assert!(!admitted);
     }
 }

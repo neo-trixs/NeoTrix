@@ -132,7 +132,7 @@ fn fetch_safe_http_inner(
             .redirect(reqwest::redirect::Policy::none())
             .resolve(&host, addr);
 
-        if !extra_headers.is_empty() {
+if !extra_headers.is_empty() {
             let mut h = reqwest::header::HeaderMap::new();
             for (k, v) in extra_headers {
                 let header_name = k

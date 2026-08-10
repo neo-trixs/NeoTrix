@@ -60,6 +60,55 @@ fn priority_label(priority: u8) -> &'static str {
     }
 }
 
+/// Scan git branches + worktrees in the current repo (dashi-taskboard parity:
+/// branch options are read from the repository, not typed by hand).
+fn scan_git_branches() -> Vec<String> {
+    use std::process::Command;
+    let mut names: Vec<String> = Vec::new();
+    // Local branches
+    if let Ok(out) = Command::new("git").args(["branch", "--format=%(refname:short)"]).output() {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                let l = line.trim();
+                if !l.is_empty() {
+                    names.push(l.to_string());
+                }
+            }
+        }
+    }
+    // Worktrees (each has a path + branch)
+    if let Ok(out) = Command::new("git").args(["worktree", "list", "--porcelain"]).output() {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            let mut in_worktree = false;
+            let mut branch: Option<String> = None;
+            for line in text.lines() {
+                let l = line.trim();
+                if l.is_empty() {
+                    if let Some(b) = branch.take() {
+                        if !names.contains(&b) {
+                            names.push(b);
+                        }
+                    }
+                    in_worktree = false;
+                } else if l.starts_with("worktree ") {
+                    in_worktree = true;
+                    branch = None;
+                } else if in_worktree && l.starts_with("branch ") {
+                    branch = Some(l["branch ".len()..].replace("refs/heads/", ""));
+                }
+            }
+            if let Some(b) = branch.take() {
+                if !names.contains(&b) {
+                    names.push(b);
+                }
+            }
+        }
+    }
+    names
+}
+
 /// Bigram Dice coefficient (difflib.SequenceMatcher.ratio approximation).
 fn dice_similarity(a: &str, b: &str) -> f64 {
     let bigrams = |s: &str| -> std::collections::HashSet<(char, char)> {
@@ -152,6 +201,12 @@ pub struct WorkItem {
     /// Dynamic efficiency score (port of scripts/sync_todos.py calc_efficiency_score).
     #[serde(default)]
     pub efficiency_score: f64,
+    /// Bound git branch / worktree (dashi-taskboard parity). Optional; old JSON loads as None.
+    #[serde(default)]
+    pub git_branch: Option<String>,
+    /// Associated agent session/thread id (dashi-taskboard CODEX_THREAD_ID parity).
+    #[serde(default)]
+    pub thread_id: Option<String>,
 }
 
 impl WorkItem {
@@ -212,6 +267,18 @@ impl KanbanBoard {
     }
 
     pub fn add_item(&mut self, title: &str, description: &str, priority: u8) -> String {
+        self.add_item_full(title, description, priority, None, None)
+    }
+
+    /// Add an item with optional git branch + thread association (dashi parity).
+    pub fn add_item_full(
+        &mut self,
+        title: &str,
+        description: &str,
+        priority: u8,
+        git_branch: Option<String>,
+        thread_id: Option<String>,
+    ) -> String {
         let id = self.next_id();
         let ts = Self::now();
         self.items.push(WorkItem {
@@ -230,6 +297,8 @@ impl KanbanBoard {
             results: Vec::new(),
             blocked_reason: None,
             efficiency_score: 0.0,
+            git_branch,
+            thread_id,
         });
         id
     }
@@ -564,6 +633,8 @@ impl KanbanBoard {
                 results: Vec::new(),
                 blocked_reason: None,
                 efficiency_score: 0.0,
+                git_branch: None,
+                thread_id: None,
             });
         }
     }
@@ -810,6 +881,8 @@ impl BoardCmd {
                 "blocked_reason": i.blocked_reason,
                 "tags": i.tags,
                 "milestone": i.milestone,
+                "git_branch": i.git_branch,
+                "thread_id": i.thread_id,
             })).collect();
             return CommandOutput::ok("").with_json(serde_json::json!({
                 "project": board.project,
@@ -826,13 +899,15 @@ impl BoardCmd {
                 let dep_chain = board.get_dependency_chain(task_id);
                 let ready = board.can_start(task_id);
                 let lines = format!(
-                    "Item: {}\n  Title: {}\n  Description: {}\n  Phase: {}\n  Priority: {}\n  Assignee: {}\n  Dependencies: {}\n    deps: {}\n    depended_by: {}\n    chain: {}\n  Can start: {ready}\n  Tags: {}\n  Milestone: {}\n  Blocked reason: {}\n  Created: {}\n  Updated: {}\n  Results: {}",
+                    "Item: {}\n  Title: {}\n  Description: {}\n  Phase: {}\n  Priority: {}\n  Assignee: {}\n  Branch: {}\n  Thread: {}\n  Dependencies: {}\n    deps: {}\n    depended_by: {}\n    chain: {}\n  Can start: {ready}\n  Tags: {}\n  Milestone: {}\n  Blocked reason: {}\n  Created: {}\n  Updated: {}\n  Results: {}",
                     item.id,
                     item.title,
                     item.description,
                     item.phase,
                     item.priority,
                     item.assignee.as_deref().unwrap_or("unassigned"),
+                    item.git_branch.as_deref().unwrap_or("unbound"),
+                    item.thread_id.as_deref().unwrap_or("none"),
                     item.dependencies.len(),
                     item.dependencies.join(", "),
                     item.depended_by.join(", "),
@@ -975,7 +1050,7 @@ impl CliCommand for BoardCmd {
     fn name(&self) -> &str { "/board" }
     fn aliases(&self) -> Vec<&str> { vec!["/b", "/todo"] }
     fn description(&self) -> &str {
-        "Kanban board: /board list | create <spec> | move <id> [--to <phase>] [--force] | view <id> | dependency <id> add/remove <dep> | block/unblock <id> | assign <id> <agent> | priority <id> <level> | wip <phase> <limit> | ready | save [path] | load [path] | todo import|sync|allocate|status"
+        "Kanban board: /board list | create <spec> [--branch <name>] | move <id> [--to <phase>] [--force] | view <id> | dependency <id> add/remove <dep> | block/unblock <id> | assign <id> <agent> | priority <id> <level> | branch <id> [name] | wip <phase> <limit> | ready | save [path] | load [path] | todo import|sync|allocate|status"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -984,27 +1059,43 @@ impl CliCommand for BoardCmd {
         if args.is_empty() || (args.len() == 1 && args[0] == "--json") {
             let b = board().lock().unwrap_or_else(|e| e.into_inner());
             return CommandOutput::ok(&format!(
-                "Kanban Board: {}\n  Tasks: {}\n\nCommands:\n  create <spec>       — new task\n  list                 — show all\n  move <id> [--force] [--to <phase>]  — advance\n  view <id>            — task detail\n  dependency <id> add/remove <dep>\n  block <id> <reason>\n  unblock <id>\n  assign <id> <agent>\n  priority <id> <level>\n  wip <phase> <limit>\n  ready                — show ready items\n  save [path]          — persist to JSON\n  load [path]          — load from JSON",
+                "Kanban Board: {}\n  Tasks: {}\n\nCommands:\n  create <spec> [--branch <name>]  — new task\n  list                 — show all\n  move <id> [--force] [--to <phase>]  — advance\n  view <id>            — task detail\n  dependency <id> add/remove <dep>\n  block <id> <reason>\n  unblock <id>\n  assign <id> <agent>\n  priority <id> <level>\n  branch <id> [name]   — bind git branch / list options\n  wip <phase> <limit>\n  ready                — show ready items\n  save [path]          — persist to JSON\n  load [path]          — load from JSON",
                 b.project, b.items.len()
             ));
         }
 
         match args[0].as_str() {
             "create" | "new" => {
-                let spec = args[1..].iter()
-                    .filter(|a| *a != "--json")
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                // Parse optional --branch <name> and --thread <id> flags, strip from spec.
+                let mut branch: Option<String> = None;
+                let mut thread: Option<String> = None;
+                let mut spec_parts: Vec<String> = Vec::new();
+                let mut i = 0;
+                let raw: Vec<String> = args[1..].iter().cloned().collect();
+                while i < raw.len() {
+                    match raw[i].as_str() {
+                        "--branch" => {
+                            if i + 1 < raw.len() { branch = Some(raw[i + 1].clone()); i += 2; } else { i += 1; }
+                        }
+                        "--thread" => {
+                            if i + 1 < raw.len() { thread = Some(raw[i + 1].clone()); i += 2; } else { i += 1; }
+                        }
+                        "--json" => { i += 1; }
+                        s => { spec_parts.push(s.to_string()); i += 1; }
+                    }
+                }
+                let spec = spec_parts.join(" ");
                 if spec.is_empty() {
-                    return CommandOutput::err("Usage: /board create <task spec>");
+                    return CommandOutput::err("Usage: /board create <task spec> [--branch <name>] [--thread <id>]");
                 }
                 let mut b = board().lock().unwrap_or_else(|e| e.into_inner());
-                let task_id = b.add_item(&spec, &spec, 3);
-                let msg = format!("Created task {task_id}: {spec}");
+                let task_id = b.add_item_full(&spec, &spec, 3, branch.clone(), thread);
+                let mut msg = format!("Created task {task_id}: {spec}");
+                if let Some(br) = branch.as_deref() { msg.push_str(&format!(" (branch: {br})")); }
                 if want_json {
                     return CommandOutput::ok(&msg).with_json(serde_json::json!({
-                        "task_id": task_id, "spec": spec, "phase": "Backlog"
+                        "task_id": task_id, "spec": spec, "phase": "Backlog",
+                        "git_branch": branch,
                     }));
                 }
                 CommandOutput::ok(&msg)
@@ -1278,11 +1369,57 @@ impl CliCommand for BoardCmd {
                     None => CommandOutput::not_found(&format!("Task {id} not found")),
                 }
             }
+            "branch" | "bind-branch" => {
+                if args.len() < 2 {
+                    return CommandOutput::err("Usage: /board branch <id> [branch-name]");
+                }
+                let id = &args[1];
+                // No branch name given → list scan options from current git repo (dashi parity).
+                let name = args.iter()
+                    .skip(2)
+                    .find(|a| *a != "--json")
+                    .cloned();
+                let mut b = board().lock().unwrap_or_else(|e| e.into_inner());
+                let item_exists = b.get_item_by_id(id).is_some();
+                if !item_exists {
+                    return CommandOutput::not_found(&format!("Task {id} not found"));
+                }
+                let branch_name = match name {
+                    Some(n) => n,
+                    None => {
+                        drop(b);
+                        let branches = scan_git_branches();
+                        if branches.is_empty() {
+                            return CommandOutput::err("No branches found (cwd is not a git repo?). Usage: /board branch <id> <branch-name>");
+                        }
+                        let mut lines = vec![format!("Available branches for task {id}:")];
+                        for (i, br) in branches.iter().enumerate() {
+                            lines.push(format!("  [{}] {}", i + 1, br));
+                        }
+                        lines.push("Usage: /board branch <id> <branch-name>".to_string());
+                        return CommandOutput::ok(&lines.join("\n"));
+                    }
+                };
+                match b.get_item_by_id_mut(id) {
+                    Some(item) => {
+                        item.git_branch = Some(branch_name.clone());
+                        item.updated_at = KanbanBoard::now();
+                        let msg = format!("Bound task {id} to branch {branch_name}");
+                        if want_json {
+                            return CommandOutput::ok(&msg).with_json(serde_json::json!({
+                                "id": id, "git_branch": branch_name,
+                            }));
+                        }
+                        CommandOutput::ok(&msg)
+                    }
+                    None => CommandOutput::not_found(&format!("Task {id} not found")),
+                }
+            }
             "todo" => self.cmd_todo(&args[1..]),
             // /todo <sub> alias resolves to BoardCmd with args[0]=sub; route the
             // todo-only sub-actions here so both `/board todo import` and `/todo import` work.
             "sync" | "import" | "import-todo" | "smart-sync" | "allocate" | "status" => self.cmd_todo(args),
-            _ => CommandOutput::err(&format!("Unknown subcommand: {}. Try: create, list, move, view, dependency, block, unblock, assign, priority, wip, ready, save, load, todo", args[0])),
+            _ => CommandOutput::err(&format!("Unknown subcommand: {}. Try: create, list, move, view, dependency, block, unblock, assign, priority, branch, wip, ready, save, load, todo", args[0])),
         }
     }
 }
@@ -1640,5 +1777,79 @@ mod tests {
         assert!(r.success, "{}", r.message);
         // Leaves TODO.md / TODO.yml in cwd; just assert no panic and report shape
         assert!(r.message.contains("[SMART]") || r.message.contains("分析完成") || r.message.contains("TODO"));
+    }
+
+    #[test]
+    fn test_create_with_branch_flag() {
+        let cmd = BoardCmd;
+        let r = cmd.execute(&["create".into(), "branch task".into(), "--branch".into(), "feat/x".into()], None);
+        assert!(r.success, "{}", r.message);
+        assert!(r.message.contains("branch: feat/x"), "{}", r.message);
+        let b = board().lock().unwrap_or_else(|e| e.into_inner());
+        let item = b.items.last().unwrap();
+        assert_eq!(item.git_branch.as_deref(), Some("feat/x"));
+        drop(b);
+        // cleanup: remove test item so later tests are unaffected
+        let mut b2 = board().lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(i) = b2.items.last().cloned() {
+            if i.title == "branch task" {
+                let _ = b2.remove_item(&i.id);
+            }
+        }
+    }
+
+    #[test]
+    fn test_branch_bind_and_view() {
+        let mut b = KanbanBoard::new("branch-test");
+        let id = b.add_item_full("Branch item", "", 2, Some("feat/x".into()), Some("thread-42".into()));
+        let item = b.get_item_by_id(&id).unwrap();
+        assert_eq!(item.git_branch.as_deref(), Some("feat/x"));
+        assert_eq!(item.thread_id.as_deref(), Some("thread-42"));
+        // view JSON round-trips new fields
+        let json = serde_json::to_value(item).unwrap();
+        assert_eq!(json["git_branch"], "feat/x");
+        assert_eq!(json["thread_id"], "thread-42");
+    }
+
+    #[test]
+    fn test_legacy_json_without_new_fields_loads() {
+        // Boards serialized before git_branch/thread_id existed must deserialize.
+        let legacy = r#"{"project":"old","items":[{"id":"task-1","title":"Old","description":"","phase":"Backlog","priority":3,"assignee":null,"dependencies":[],"depended_by":[],"created_at":0,"updated_at":0,"tags":[],"milestone":null,"results":[],"blocked_reason":null}],"wip_limits":{"Running":3,"Review":3},"conflicts":[],"next_id_counter":1}"#;
+        let board: KanbanBoard = serde_json::from_str(legacy).unwrap();
+        assert_eq!(board.items.len(), 1);
+        assert_eq!(board.items[0].git_branch, None);
+        assert_eq!(board.items[0].thread_id, None);
+    }
+
+    #[test]
+    fn test_branch_cmd_binds_and_lists() {
+        let cmd = BoardCmd;
+        let r = cmd.execute(&["create".into(), "bind me".into()], None);
+        assert!(r.success, "{}", r.message);
+        let b = board().lock().unwrap_or_else(|e| e.into_inner());
+        let id = b.items.last().unwrap().id.clone();
+        drop(b);
+        // bind a branch
+        let r = cmd.execute(&["branch".into(), id.clone().into(), "feat/bound".into()], None);
+        assert!(r.success, "{}", r.message);
+        assert!(r.message.contains("feat/bound"));
+        // no-arg lists options or errors gracefully (cwd may not be a repo in tests)
+        let r = cmd.execute(&["branch".into(), id.clone().into()], None);
+        assert!(r.success || r.message.contains("no git repo") || r.message.contains("Available branches"));
+        // cleanup
+        let mut b2 = board().lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(i) = b2.items.last().cloned() {
+            if i.title == "bind me" {
+                let _ = b2.remove_item(&i.id);
+            }
+        }
+    }
+
+    #[test]
+    fn test_scan_git_branches_in_repo() {
+        // NeoTrix cwd is a git repo in CI/local; at minimum the function must
+        // not panic and return a Vec. In a repo it should include main/master.
+        let branches = scan_git_branches();
+        let _ = branches; // assert no panic; content depends on cwd
     }
 }

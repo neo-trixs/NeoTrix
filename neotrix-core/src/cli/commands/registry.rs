@@ -7,7 +7,7 @@ use crate::cli::commands::acp_cmds::AcpCmd;
 use crate::cli::commands::brain_cmds::E8Cmd;
 use crate::cli::commands::second_brain_cmds::BrainCmd;
 use crate::cli::commands::consciousness_cmds::ConsciousnessCmd;
-use crate::cli::commands::core_cmds::{ClearCmd, CompletionsCmd, ExitCmd, HelpCmd, StatsCmd, VersionCmd, ConfigCmd};
+use crate::cli::commands::core_cmds::{ClearCmd, CompletionsCmd, ExitCmd, HelpCmd, StatsCmd, VersionCmd, ConfigCmd, CatalogCmd};
 use crate::cli::commands::cost_cmds::{CostCmd, ApprovalCmd};
 use crate::cli::commands::budget_cmds::BudgetCmd;
 use crate::cli::commands::file_cmds::{FileCreateCmd, FileDiffCmd, FileEditCmd, FilePatchCmd, FileReadCmd, FileWriteCmd};
@@ -43,6 +43,9 @@ use crate::cli::commands::wiki_cmds::WikiCmd;
 use crate::cli::commands::self_audit_cmds::SelfAuditCmd;
 use crate::cli::commands::osint_cmds::OsintCmd;
 use crate::cli::commands::comm_cmds::CommCmd;
+use crate::cli::commands::chain_cmds::ChainCmd;
+use crate::cli::commands::sources_cmds::SourcesCmd;
+use crate::cli::commands::explore_cmds::ExploreCmd;
 use crate::cli::commands::consolidated_cmds::{
     FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd,
 };
@@ -57,6 +60,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(ClearCmd));
     reg.register(Box::new(VersionCmd));
     reg.register(Box::new(CompletionsCmd));
+    reg.register(Box::new(CatalogCmd));
     reg.register(Box::new(ConfigCmd));
     reg.register(Box::new(DoctorCmd));
     reg.register(Box::new(BenchmarkCmd));
@@ -161,6 +165,14 @@ pub fn default_registry() -> CommandRegistry {
     // L1 capability: NT-SHIELD 通信伪装层观测
     reg.register(Box::new(CommCmd));
 
+    // 链路命令 (Chain) — 端到端工作流编排
+    reg.register(Box::new(ChainCmd));
+
+    // 外部知识源 (Sources) — GitHub/书籍/arXiv/Wiki 定向爬取
+    reg.register(Box::new(SourcesCmd));
+    // 外部探索 (Explore) — URL/GitHub 仓库吸收 + 蒸馏
+    reg.register(Box::new(ExploreCmd));
+
     reg
 }
 
@@ -189,7 +201,9 @@ mod tests {
         assert!(names.contains(&"/board"));
         assert!(names.contains(&"/e8"));
         assert!(names.contains(&"/session-recovery"));
-        assert!(names.len() >= 36, "got {} commands (expected 36+, got {})", names.len(), names.len());
+        assert!(names.contains(&"/catalog"), "catalog should be registered");
+        assert!(names.contains(&"/chain"), "chain should be registered");
+        assert!(names.len() >= 38, "got {} commands (expected 38+, got {})", names.len(), names.len());
     }
 
     #[test]

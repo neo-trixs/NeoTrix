@@ -416,7 +416,7 @@ pub static PROVIDER_CATALOG: &[ProviderInfo] = &[
     },
     ProviderInfo {
         name: "kilo",
-        display_name: "KiloCode (Keyless)",
+        display_name: "KiloCode (Keyless, 端点已死 2026-08)",
         category: ProviderCategory::Cloud,
         base_url: "https://api.kilocode.ai/v1",
         default_model: "nemotron-70b",

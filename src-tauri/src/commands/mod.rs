@@ -94,8 +94,7 @@ pub mod term_tabs_cmds;
 pub mod cowork_cmds;
 
 // Re-exports for frontend registration
-pub use computer_cmds::*;
-pub use background_cmds::*;
+pub use computer_cmds::*;pub use background_cmds::*;
 pub use remote_cmds::*;
 pub use coordinator_cmds::*;
 pub use review_cmds::*;

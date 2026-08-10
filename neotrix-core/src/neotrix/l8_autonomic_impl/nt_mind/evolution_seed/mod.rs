@@ -521,6 +521,16 @@ impl<'a> SeedDriver<'a> {
                     &format!("{:?}", target.domain),
                     &edits,
                     0.8,
+                    // P0-1 反幻觉契约 (DeepZero assessment.j2 吸收):
+                    // 吸收知识结晶时附带可复现验证契约 — "可复现的观察结果" 区分真实能力与幻觉。
+                    Some(crate::core::nt_core_self::skill_crystal::VerificationContract {
+                        observable: format!(
+                            "re-running absorption of {} reproduces the same capability dimensions",
+                            target.url
+                        ),
+                        method: "replay absorption pipeline and compare capability_dims".to_string(),
+                        status: crate::core::nt_core_self::skill_crystal::VerificationStatus::Pending,
+                    }),
                 ) {
                     crystals_created += 1;
                     details.push(format!(
@@ -678,6 +688,7 @@ mod tests {
             &format!("{:?}", target.domain),
             &edits,
             0.8,
+            None,
         );
         assert!(crystal.is_some(), "Should crystallize with reward 0.8");
         let crystal = crystal.unwrap();
@@ -723,6 +734,7 @@ mod tests {
                 domain_label,
                 &edits,
                 0.8,
+                None,
             );
         }
 

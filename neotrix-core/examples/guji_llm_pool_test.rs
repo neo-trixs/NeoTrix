@@ -48,13 +48,22 @@ async fn rag_generate(
     context: &str,
     provider: &str,
 ) -> Result<(bool, u64), String> {
-    // LLM 调用 (走池路由 — model 用注册名的 model_id 部分, 同 gateway.provider_model 逻辑)
+    // LLM 调用 (走池路由 — model 用注册名的 model_id 部分; 无 `/` 的 keyless 注册名
+    // 回退到 catalog 默认模型, 与 gateway.provider_model 逻辑一致, 避免把 `llm7` 当模型名)。
     let model = provider.split('/').next_back().unwrap_or(provider);
+    let model = if model == provider {
+        // 裸注册名 (无 `/`) → 查 catalog 默认模型
+        neotrix::neotrix::l1_body_impl::nt_io_provider::provider_catalog::lookup_provider(provider)
+            .map(|info| info.default_model.to_string())
+            .unwrap_or_else(|| model.to_string())
+    } else {
+        model.to_string()
+    };
     let prompt = format!(
         "你是中国古典文献助手。根据下面的《史记》原文片段，回答：鸿门宴中项羽为什么没有杀刘邦？请引用原文回答。\n\n{}",
         context
     );
-    let request = LlmRequest::new(model, &prompt).with_max_tokens(600);
+    let request = LlmRequest::new(&model, &prompt).with_max_tokens(600);
     let start = Instant::now();
     let profile = CommunicationProfile::Open;
     let resp = gateway
@@ -139,11 +148,11 @@ async fn main() {
     // ── 0.5 标题加权排序验证 (原书应排到引用书前) ──
     println!("\n🏷️ 标题加权排序验证 (search_fts 增强)...");
     for q in ["史记", "论语", "道德经"] {
-        match kb.search(q, 15) {
+        match kb.search(q, 5) {
             Ok(results) => {
-                let titles: Vec<String> = results.iter().take(15)
-                    .map(|r| format!("{}[{:?}][{:.2}]", r.node.title, r.node.node_type, r.score)).collect();
-                println!("  「{}」top15: {}", q, titles.join(" → "));
+                let titles: Vec<String> = results.iter().take(5)
+                    .map(|r| format!("{}[{:.2}]", r.node.title, r.score)).collect();
+                println!("  「{}」top5: {}", q, titles.join(" → "));
             }
             Err(e) => println!("  ❌ 「{}」: {}", q, e),
         }

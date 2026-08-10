@@ -386,6 +386,10 @@ mod tests {
     #[test]
     fn test_keyless_providers_have_unlimited_budget() {
         let pool = FreePool::new();
+        // 预算层契约 (与 gateway 注册解耦): 预算存在 ≠ 端点当前可用。
+        // 2026-08-06 走代理实测: pollinations(匿名层关)/llm7(可用)/kilo(端点死)/
+        // opencode-zen(需key)/ovh+freetheai+modelscope(DNS不可达)。
+        // 保留 budget 使端点恢复时预算就绪; 可用性由 gateway 注册/探测决定。
         for name in &["pollinations", "llm7", "kilo", "opencode-zen", "ovh", "freetheai", "modelscope"] {
             let budget = pool.get_budget(name).unwrap_or_else(|| panic!("{} should have a budget", name));
             assert!(budget.is_keyless, "{} should be keyless", name);

@@ -1,19 +1,22 @@
-//! 配置中心 — 从 ~/.neotrix/config.toml 加载所有可调参数
+//! 配置中心 — 从 ~/.neotrix/config.toml 加载 NT-SHIELD StealthNet 所有可调参数
 //!
 //! 替代散落各处的硬编码常量。
 //! 文件不存在时自动创建默认配置。
+//!
+//! 注意: 本配置为 NT-SHIELD 专属 (`StealthNetConfig`), 与主配置
+//! `crate::config::NeoTrixConfig` (LLM/provider) 是不同事实源, 类型名已区分。
 
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{LazyLock, RwLock, Arc};
 
-// TODO: inject via DI — pass NeoTrixConfig as &Config through subsystem constructors
-pub static INSTANCE: LazyLock<RwLock<Arc<NeoTrixConfig>>> = LazyLock::new(|| {
+// TODO: inject via DI — pass StealthNetConfig as &Config through subsystem constructors
+pub static INSTANCE: LazyLock<RwLock<Arc<StealthNetConfig>>> = LazyLock::new(|| {
     RwLock::new(Arc::new(init_config()))
 });
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NeoTrixConfig {
+pub struct StealthNetConfig {
     pub proxy: ProxyConfig,
     pub rotation: RotationConfig,
     pub tor: TorConfigSection,
@@ -127,7 +130,7 @@ pub struct BrowserConfig {
     pub window_height: u32,
 }
 
-impl Default for NeoTrixConfig {
+impl Default for StealthNetConfig {
     fn default() -> Self {
         Self {
             proxy: ProxyConfig {
@@ -225,11 +228,11 @@ interval_secs = 30
 }
 
 /// 加载配置（惰性初始化）
-pub fn load() -> Arc<NeoTrixConfig> {
+pub fn load() -> Arc<StealthNetConfig> {
     INSTANCE.read().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
-fn init_config() -> NeoTrixConfig {
+fn init_config() -> StealthNetConfig {
     let path = config_path();
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
@@ -237,24 +240,24 @@ fn init_config() -> NeoTrixConfig {
     if !path.exists() {
         let _ = fs::write(&path, default_config_content());
         log::info!("[config] created default at {:?}", path);
-        return NeoTrixConfig::default();
+        return StealthNetConfig::default();
     }
     match fs::read_to_string(&path) {
         Ok(content) => {
-            match toml::from_str::<NeoTrixConfig>(&content) {
+            match toml::from_str::<StealthNetConfig>(&content) {
                 Ok(cfg) => {
                     log::info!("[config] loaded from {:?}", path);
                     cfg
                 }
                 Err(e) => {
                     log::warn!("[config] parse error: {}, using defaults", e);
-                    NeoTrixConfig::default()
+                    StealthNetConfig::default()
                 }
             }
         }
         Err(e) => {
             log::warn!("[config] read error: {}, using defaults", e);
-            NeoTrixConfig::default()
+            StealthNetConfig::default()
         }
     }
 }
@@ -263,7 +266,7 @@ fn init_config() -> NeoTrixConfig {
 pub fn reload() -> Result<(), String> {
     let path = config_path();
     let content = fs::read_to_string(&path).map_err(|e| format!("read error: {}", e))?;
-    let cfg: NeoTrixConfig = toml::from_str(&content).map_err(|e| format!("parse error: {}", e))?;
+    let cfg: StealthNetConfig = toml::from_str(&content).map_err(|e| format!("parse error: {}", e))?;
     *INSTANCE.write().unwrap_or_else(|e| e.into_inner()) = Arc::new(cfg);
     log::info!("[config] hot-reloaded from {:?}", path);
     Ok(())
@@ -281,7 +284,7 @@ mod tests {
     #[test]
     fn test_default_config_valid_toml() {
         let content = default_config_content();
-        let cfg: NeoTrixConfig = toml::from_str(&content).expect("default config should be valid toml");
+        let cfg: StealthNetConfig = toml::from_str(&content).expect("default config should be valid toml");
         assert_eq!(cfg.proxy.local_port, 11080);
         assert_eq!(cfg.rotation.gaussian_mean_secs, 7.5);
         assert_eq!(cfg.pool.min_nodes, 5);
@@ -290,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_config_all_sections_present() {
-        let cfg = NeoTrixConfig::default();
+        let cfg = StealthNetConfig::default();
         assert_eq!(cfg.proxy.local_port, 11080);
         assert_eq!(cfg.rotation.gaussian_std_dev_secs, 2.5);
         assert_eq!(cfg.tor.circuit_rotate_interval, 300);
@@ -320,7 +323,7 @@ mod tests {
         write!(f, "{}", content).expect("failed to write config content");
 
         let read_back = fs::read_to_string(&tmp).expect("failed to read back config file");
-        let cfg: NeoTrixConfig = toml::from_str(&read_back).expect("read config should be valid toml");
+        let cfg: StealthNetConfig = toml::from_str(&read_back).expect("read config should be valid toml");
         assert_eq!(cfg.proxy.local_port, 11080);
         assert_eq!(cfg.pool.min_nodes, 5);
         let _ = fs::remove_file(&tmp);

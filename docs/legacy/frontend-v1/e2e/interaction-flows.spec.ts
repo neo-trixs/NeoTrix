@@ -694,4 +694,35 @@ test.describe("NeoTrix IPC interaction flows (mocked Tauri)", () => {
     await page.locator("#stApiKeyToggle").click();
     await expect(input).toHaveAttribute("type", "password");
   });
+
+  test("unified chain palette executes CLI command via unified_cli_execute", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => (window as any).openChainPalette && (window as any).runChainCli);
+    await page.evaluate(() => {
+      const orig = (window as any).prompt;
+      (window as any).prompt = () => "/chain status";
+      return (window as any).openChainPalette();
+    });
+    await page.waitForFunction(() =>
+      (window as any).__TAURI_INVOKE_CALLS__?.some((c) => c.cmd === "unified_cli_execute" && c.args?.input === "/chain status"),
+    );
+    await page.evaluate(() => { (window as any).prompt = () => null; });
+  });
+
+  test("unified catalog palette loads and lists CLI + NoeCodex commands", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => (window as any).openCatalogPalette);
+    await page.evaluate(() => {
+      const orig = (window as any).prompt;
+      (window as any).prompt = () => null; // suppress follow-up execute prompt
+      const p = (window as any).openCatalogPalette();
+      (window as any).prompt = orig;
+      return p;
+    });
+    await page.waitForFunction(() =>
+      (window as any).__TAURI_INVOKE_CALLS__?.some((c) => c.cmd === "unified_command_catalog"),
+    );
+    const calls = await page.evaluate(() => (window as any).__TAURI_INVOKE_CALLS__ ?? []);
+    expect(calls.some((c) => c.cmd === "unified_command_catalog")).toBe(true);
+  });
 });

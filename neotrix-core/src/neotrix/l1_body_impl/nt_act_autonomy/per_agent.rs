@@ -134,7 +134,7 @@ pub struct ExecutorAgent {
     pub name: String,
     pub execution_count: u64,
     pub last_result: Option<ActionResult>,
-    /// 动作缓存 — 命中免 LLM 推理 (D16 自愈)。
+/// 动作缓存 — 命中免 LLM 推理 (D16 自愈)。
     pub action_cache: ActionCache,
 }
 
@@ -198,6 +198,50 @@ impl Executor for ExecutorAgent {
         self.execution_count += 1;
         let start = now_ms();
 
+        // 缓存签名: step 描述 + 上下文确定性哈希 (排序键值对, 用简单哈希避免 DefaultHasher 随机化)
+        let signature = format!("{}:{}", step.id, step.description);
+        let ctx_hash = {
+            let mut pairs: Vec<_> = context.iter().collect();
+            pairs.sort_by_key(|(k, _)| *k);
+            let mut h = 0u64;
+            for (k, v) in pairs {
+                // 简单 FNV-1a 变体
+                for b in k.as_bytes() {
+                    h ^= *b as u64;
+                    h = h.wrapping_mul(0x100000001b3);
+                }
+                for b in v.as_bytes() {
+                    h ^= *b as u64;
+                    h = h.wrapping_mul(0x100000001b3);
+                }
+            }
+            format!("{:x}", h)
+        };
+        let full_sig = format!("{}#{}", signature, ctx_hash);
+
+        // 缓存命中 → 直接返回缓存结果 (免推理)
+        let cached_action = self.action_cache.lookup(&full_sig).cloned();
+        if let Some(cached) = cached_action {
+            self.action_cache.hit(&full_sig);
+            let cached_result = ActionResult {
+                step_id: step.id.clone(),
+                success: true,
+                artifacts: vec![Artifact {
+                    id: format!("art-cached-{}", Uuid::new_v4().to_string().chars().take(8).collect::<String>()),
+                    content: format!("[CACHED] {}", cached.action),
+                    step_id: step.id.clone(),
+                    timestamp: (now_ms() / 1000) as i64,
+                }],
+                errors: vec![],
+                warnings: vec!["served from action_cache (no re-inference)".into()],
+                duration_ms: 0,
+                summary: format!("Cache hit: {}", cached.action.chars().take(40).collect::<String>()),
+            };
+            self.last_result = Some(cached_result.clone());
+            return cached_result;
+        }
+
+        // 未命中 → 执行 (模拟执行, 实际场景接 LLM/工具)
         let content = format!(
             "Executed step '{}': {}\n  Priority: {}\n  Expected: {}",
             step.id, step.description, step.priority, step.expected_outcome
@@ -222,6 +266,7 @@ impl Executor for ExecutorAgent {
         // 记录成功动作供下次免推理。
         self.action_cache
             .remember(&sig, &result.summary, vec![step.id.clone()]);
+
         self.last_result = Some(result.clone());
         result
     }

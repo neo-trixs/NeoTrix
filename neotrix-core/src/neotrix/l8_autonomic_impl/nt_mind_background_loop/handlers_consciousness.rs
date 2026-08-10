@@ -793,6 +793,9 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(scanner));
         self_tests.register(Box::new(entropy));
         self_tests.register(Box::new(InnerCritic::new()));
+        // ── Consciousness core detection modules (Cycle: SelfTest coverage) ──
+        self_tests.register(Box::new(crate::core::nt_core_consciousness::SpeciousPresent::new(5)));
+        self_tests.register(Box::new(crate::core::nt_core_consciousness::VolitionEngine::new()));
         self_tests.register(Box::new(SelfReviewGate::new(false)));
         self_tests.register(Box::new(meta_auditor));
         self_tests.register(Box::new(arch_lint));

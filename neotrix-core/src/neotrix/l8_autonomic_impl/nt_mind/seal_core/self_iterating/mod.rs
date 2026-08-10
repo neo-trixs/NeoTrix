@@ -69,6 +69,7 @@ pub mod data_synthesis;
 pub mod openspace_evolution;
 pub mod stage_contracts;
 pub use dpo_stage::{DpoStage, DpoBuffer, PreferencePair};
+pub use sft_stage::{SftStage, SftBuffer, SupervisedExample, SftReport};
 pub use constitutional_stage::{ConstitutionalSelfCritiqueStage, ConstitutionalReport, PrincipleEvaluation, Principle};
 pub use safety_stage::{SafetyCheckStage, SafetyCheckDetail, ThreatCategory};
 

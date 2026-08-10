@@ -190,5 +190,12 @@ pub use l1_body_impl::nt_shield_audit::{
 
 pub mod proxy_daemon_wrapper;
 
+// ─── L7 Capability Tree 接入 (经验 → 能力节点迭代目标) ─────────────────────
+// 能力树 crate 作为 workspace 成员, 此处接入主管线 (Dark Forest 合规: 有消费者)
+pub use nt_core_capability_tree::{
+    CapabilityRegistry, CapabilityNode, NodeLayer, ConstellationLevel, Domain as CapabilityDomain,
+    EvolutionEngine, EvolutionPlan, EvolutionAction, EvolutionOp,
+};
+
 
 

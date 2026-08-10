@@ -7,6 +7,9 @@ use crate::neotrix::nt_world_model::TaskType;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
 use crate::neotrix::nt_memory_kb::GraphRagConfig;
 use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus;
+// P0-2 接线 (OpenMontage delivery_promise 吸收): 用 ContractAwareStage 包装
+// 蒸馏阶段, 附加 DeliveryPromiseContract 防静默降级。
+use super::stage_contracts::{ContractAwareStage, DeliveryPromiseContract, DeliveryPromise};
 
 
 // Pre-register all available BrainStage implementations from sibling modules.
@@ -195,7 +198,13 @@ pub fn seal_pipeline() -> BrainPipeline {
             )),
             Box::new(HypothesisAccuracyStage::new()),
             Box::new(PatternExtractionStage::new()),
-            Box::new(DistillationStage::new()),
+            // P0-2 接线 (OpenMontage delivery_promise 吸收):
+            // 蒸馏阶段承诺真实能力提升 — 若 reward 上升但 champion 未动 (表面提升),
+            // DeliveryPromiseContract 报 Error 阻断静默降级。
+            Box::new(ContractAwareStage::new(Box::new(DistillationStage::new()))
+                .with_contract(Box::new(DeliveryPromiseContract {
+                    promise: DeliveryPromise::capability_led(0.02),
+                }))),
             Box::new(ConversationDistillStage::new()),
             Box::new(EpochSlowUpdateStage::new()),
             Box::new(AgingDiagnosisStage::new()),
@@ -807,6 +816,8 @@ impl BrainStage for OpenSourceCompareStage {
 
 /// Wraps SftStage ::process() as a BrainStage.
 /// 监督微调：将能力增量作为监督信号，把当前最优 E8 模式推向目标质量。
+/// SftWrapperStage — 监督微调 (smol-course 吸收: SFT → DPO 两阶段顺序)。
+/// 位于 DpoWrapperStage 之前，将能力增量构建为监督信号，为 DPO 提供 π_ref 基础。
 pub struct SftWrapperStage;
 impl Default for SftWrapperStage { fn default() -> Self { Self } }
 impl SftWrapperStage { pub fn new() -> Self { Self } }

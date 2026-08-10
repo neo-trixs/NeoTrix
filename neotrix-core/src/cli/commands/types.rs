@@ -113,7 +113,7 @@ pub trait CliCommand {
 /// 名称 → 分类映射（无需每个命令单独实现 category()）
 pub fn category_for(name: &str) -> CommandCategory {
     match name.trim_start_matches('/') {
-        "help" | "stats" | "exit" | "clear" | "version" | "completions" | "doctor" | "config" | "bench"
+        "help" | "stats" | "exit" | "clear" | "version" | "completions" | "doctor" | "config" | "bench" | "catalog"
             => CommandCategory::System,
         "read" | "write" | "create" | "edit" | "patch" | "diff" | "file"
             => CommandCategory::File,
@@ -139,7 +139,7 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::Sandbox,
         "connector"
             => CommandCategory::Connector,
-        "approval" | "review" | "plugin" | "profile" | "session-recovery" | "recover" | "snap" | "vc" | "vcs"
+        "approval" | "review" | "plugin" | "profile" | "session-recovery" | "recover" | "snap" | "vc" | "vcs" | "chain"
             => CommandCategory::Other,
         _ => CommandCategory::Other,
     }

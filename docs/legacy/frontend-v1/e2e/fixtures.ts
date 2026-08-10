@@ -45,6 +45,20 @@ const PRELOAD_SCRIPT = `(function() {
     has_api_key: () => false,
     save_api_key: () => null,
     delete_api_key: () => null,
+    unified_cli_execute: (args) => ({
+      success: true,
+      exit_code: "success",
+      message: "[mock unified_cli_execute] " + (args?.input ?? ""),
+      json: null,
+    }),
+    unified_command_catalog: () => [
+      { name: "/chain", backend: "cli", category: "Unified", description: "链路命令: 一次调用完成多步编排" },
+      { name: "/catalog", backend: "cli", category: "System", description: "统一命令目录" },
+      { name: "unified_cli_list", backend: "tauri", category: "Unified", description: "列出 CLI 命令" },
+    ],
+    unified_cli_list: () => [{ name: "/chain", aliases: ["/c", "/flow"], description: "链路命令" }],
+    unified_tauri_list: () => [{ name: "unified_cli_execute", description: "执行 CLI 命令" }],
+    unified_cli_lookup: (args) => ({ name: args?.name ?? "", backend: "cli", description: "lookup" }),
   };
 
   const I = (window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ || {});

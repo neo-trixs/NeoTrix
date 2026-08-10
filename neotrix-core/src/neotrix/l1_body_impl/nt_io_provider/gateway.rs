@@ -383,7 +383,24 @@ impl GatewayV2 {
         request: &LlmRequest,
     ) -> Result<(LlmResponse, CommunicationProfile, String), LlmError> {
         let start = std::time::Instant::now();
-        match self.select_best_for_profile(required).await {
+        // 前缀锁定: request.model 形如 `{provider}/{model_id}` 时优先该 provider
+        // (与 complete_with_selection 前缀路由一致), 避免 llm7/codestral-latest
+        // 被 select_best_for_profile 路由到 composite_score 更高的 pollinations (402/404)。
+        let prefix_provider: Option<String> = request.model.split('/').next()
+            .filter(|p| !p.is_empty())
+            .filter(|p| self.providers.contains_key(*p))
+            .map(|p| p.to_string());
+        // 前缀 provider 的安全画像满足要求才锁定 (如 Open 画像可用所有 provider)
+        let prefix_meets = |p: &str| {
+            super::provider_catalog::lookup_provider(p)
+                .map(|info| info.security_profile.meets(required))
+                .unwrap_or(true)
+        };
+        let selected = match &prefix_provider {
+            Some(p) if prefix_meets(p) => Some(p.clone()),
+            _ => self.select_best_for_profile(required).await,
+        };
+        match selected {
             Some(name) => {
                 log::debug!("[gateway] complete_for_profile({:?}) → {}", required, name);
                 let result = self.call_provider(&name, request).await;
@@ -672,6 +689,54 @@ impl GatewayV2 {
             .map(|(name, _)| name.clone())
     }
 
+    /// 构建候选链 — 从池子**实际注册名**动态排序, 而非硬编码。
+    ///
+    /// 规则 (按优先级):
+    /// 1. 请求 model 含 `{provider}/` 前缀且该 provider 已注册 → 前缀 provider 第一候选
+    ///    (如 `llm7/codestral-latest` → `llm7`; `api-airforce/grok-4.1-mini:free` → 该完整注册名)
+    /// 2. 其余按 free 优先 + is_available 优先 + composite_score 降序
+    /// 3. 去重; 候选全部来自 self.states 实际注册名, 数量上限 `limit`
+    pub fn build_candidate_chain(&self, model: &str, limit: usize) -> Vec<String> {
+        let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+        let mut chain: Vec<String> = Vec::new();
+
+        // 1. 前缀 provider 优先 (完整注册名匹配优先, 再退化到裸 provider 名)
+        if let Some(prefix) = model.split('/').next().filter(|p| !p.is_empty()) {
+            // 完整注册名: `llm7/codestral-latest` 恰好是 catalog 注册名时直接用
+            if states.contains_key(model) && !chain.contains(&model.to_string()) {
+                chain.push(model.to_string());
+            }
+            // 裸 provider 名: `llm7` keyless 注册名
+            if states.contains_key(prefix) && !chain.contains(&prefix.to_string()) {
+                chain.push(prefix.to_string());
+            }
+        }
+
+        // 2. 池子其余注册名按 available + free + 有调用记录 + score 排序
+        //    (有实际调用记录的 provider 优先于从未尝试的 — 后者默认 EMA 0.8 会虚高)
+        let mut rest: Vec<(&String, f64, bool, bool, u64)> = states.iter()
+            .map(|(name, s)| (name, s.composite_score(), s.is_free, s.is_available(), s.total_calls))
+            .collect();
+        rest.sort_by(|a, b| {
+            // available 优先
+            b.3.cmp(&a.3)
+                // free 优先
+                .then(b.2.cmp(&a.2))
+                // 有调用记录优先 (避免未尝试 provider 默认 EMA 虚高)
+                .then((b.4 > 0).cmp(&(a.4 > 0)))
+                // score 降序
+                .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+        });
+        for (name, _, _, _, _) in rest {
+            if chain.len() >= limit { break; }
+            if !chain.contains(name) {
+                chain.push(name.clone());
+            }
+        }
+
+        chain
+    }
+
     async fn call_provider(&self, name: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
         let provider = self.providers.get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
@@ -743,33 +808,13 @@ impl GatewayV2 {
         }
         let mut used_names: Vec<String> = Vec::new();
 
-        // 显式 provider 前缀路由: 请求模型形如 `{provider}/{model_id}` 时优先该 provider
-        // (如 llm7/codestral-latest → llm7)。此前 select_best 无视 model 前缀,
-        // 导致 llm7 模型被路由到 pollinations/api-airforce (402/429)。
-        let prefix_provider: Option<String> = request.model.split('/').next()
-            .filter(|p| !p.is_empty())
-            .map(|p| p.to_string());
+        // 候选链: 从池子实际注册名动态构建 (前缀优先 + free/available/score 排序)
+        let chain = self.build_candidate_chain(&request.model, 8);
 
-        for i in 0..3 {
-            let prefix_sel = if i == 0 {
-                // 第一优先: 显式前缀 provider (若已注册)
-                prefix_provider.as_ref()
-                    .filter(|p| self.providers.contains_key(p.as_str()))
-                    .cloned()
-            } else {
-                None
-            };
-            let best = self.select_best().await;
-            let name = prefix_sel.or(best)
-                .or_else(|| {
-                    let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
-                    states.keys().next().cloned()
-                });
-
-            let name = match name {
-                Some(n) if !used_names.contains(&n) => n,
-                _ => break,
-            };
+        for name in chain {
+            if used_names.contains(&name) {
+                continue;
+            }
             used_names.push(name.clone());
 
             let start = Instant::now();
@@ -1034,32 +1079,13 @@ impl GatewayV2 {
         // Phase 1: Normal retry loop (up to 3 providers, best-first)
         let mut used_names: Vec<String> = Vec::new();
 
-        // 显式 provider 前缀路由: 请求模型形如 `{provider}/{model_id}` 时优先该 provider
-        // (如 llm7/codestral-latest → llm7)。此前 select_best 无视 model 前缀,
-        // 导致 llm7 模型被路由到 pollinations/api-airforce (402/429)。
-        let prefix_provider: Option<String> = request.model.split('/').next()
-            .filter(|p| !p.is_empty())
-            .map(|p| p.to_string());
+        // 候选链: 从池子实际注册名动态构建 (前缀优先 + free/available/score 排序)
+        let chain = self.build_candidate_chain(&request.model, 8);
 
-        for i in 0..3 {
-            let prefix_sel = if i == 0 {
-                // 第一优先: 显式前缀 provider (若已注册)
-                prefix_provider.as_ref()
-                    .filter(|p| self.providers.contains_key(p.as_str()))
-                    .cloned()
-            } else {
-                None
-            };
-            let best = self.select_best().await;
-            let name = prefix_sel.or(best)
-                .or_else(|| {
-                    self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() }).keys().next().cloned()
-                });
-
-            let name = match name {
-                Some(n) if !used_names.contains(&n) => n,
-                _ => break,
-            };
+        for name in chain {
+            if used_names.contains(&name) {
+                continue;
+            }
             used_names.push(name.clone());
 
             // Check rate limit
@@ -1340,6 +1366,17 @@ impl GatewayV2 {
         self.default_name.read()
             .unwrap_or_else(|e| { log::warn!("[gateway] default_name RwLock poisoned: {}", e); e.into_inner() })
             .clone()
+    }
+
+    /// 解析默认模型 — 从池子**实际注册名**选最佳可用者, 而非硬编码。
+    ///
+    /// 当调用方未显式指定模型 (如 `default`) 时, 用候选链第一个可用注册名作为完整
+    /// model 名 (含 `{provider}/{model_id}` 或裸 `{provider}` 格式), 保证整体链路
+    /// 从池子真实状态出发, 而非写死某个 provider。
+    /// 同步版 (async 版见 `resolve_default_model`, 优先 llm7/codestral-latest)。
+    pub fn resolve_default_model_sync(&self) -> String {
+        let chain = self.build_candidate_chain("", 8);
+        chain.first().cloned().unwrap_or_else(|| "default".to_string())
     }
 }
 
@@ -1623,6 +1660,68 @@ mod tests {
         assert_eq!(gw.provider_model("nvidia/meta/llama-3.1-8b-instruct"), Some("llama-3.1-8b-instruct".to_string()));
         assert_eq!(gw.provider_model("openai"), Some("openai".to_string()));
         assert_eq!(gw.provider_model(""), None);
+    }
+
+    // ── 候选链: 从池子实际注册名动态构建 ─────────────────────────
+    #[tokio::test]
+    async fn test_candidate_chain_prefix_first() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider("pollinations", Box::new(MockProvider::new("p")), true);
+        gw.register_provider("llm7", Box::new(MockProvider::new("l")), true);
+        gw.register_provider("api-airforce", Box::new(MockProvider::new("a")), true);
+
+        // 显式前缀 → 前缀 provider 第一候选
+        let chain = gw.build_candidate_chain("llm7/codestral-latest", 8);
+        assert_eq!(chain[0], "llm7", "前缀 provider 应第一候选: {:?}", chain);
+        assert!(chain.contains(&"pollinations".to_string()));
+        assert!(chain.contains(&"api-airforce".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_candidate_chain_prefix_catalog_full_name() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider("pollinations", Box::new(MockProvider::new("p")), true);
+        gw.register_provider("llm7/codestral-latest", Box::new(MockProvider::new("l")), true);
+
+        // catalog 完整注册名 `{provider}/{model}` 精确命中 → 直接用
+        let chain = gw.build_candidate_chain("llm7/codestral-latest", 8);
+        assert_eq!(chain[0], "llm7/codestral-latest", "完整注册名应第一: {:?}", chain);
+    }
+
+    #[tokio::test]
+    async fn test_candidate_chain_free_first_and_dedup() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider("paid-a", Box::new(MockProvider::new("x")), false);
+        gw.register_provider("free-b", Box::new(MockProvider::new("y")), true);
+        gw.register_provider("free-c", Box::new(MockProvider::new("z")), true);
+
+        // 无前缀 → free 优先
+        let chain = gw.build_candidate_chain("", 8);
+        assert!(chain[0].starts_with("free-"), "free 应优先: {:?}", chain);
+        // 无重复
+        let mut sorted = chain.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), chain.len(), "候选链不应重复: {:?}", chain);
+        // limit 生效
+        let limited = gw.build_candidate_chain("", 2);
+        assert_eq!(limited.len(), 2, "limit=2 应截断: {:?}", limited);
+    }
+
+    #[tokio::test]
+    async fn test_candidate_chain_limit_and_resolve_default() {
+        let mut gw = GatewayV2::new();
+        gw.register_provider("a", Box::new(MockProvider::new("x")), true);
+        gw.register_provider("b", Box::new(MockProvider::new("y")), false);
+        gw.register_provider("c", Box::new(MockProvider::new("z")), true);
+
+        // limit 上限控制
+        let chain = gw.build_candidate_chain("", 2);
+        assert!(chain.len() <= 2);
+
+        // resolve_default_model 返回候选链首个 (free 优先)
+        let def = gw.resolve_default_model_sync();
+        assert!(def == "a" || def == "c", "默认应为 free provider: {}", def);
     }
 
     #[tokio::test]
@@ -2126,6 +2225,22 @@ mod tests {
     // ── 真实 LLM 集成验证（本地手动跑，不进 CI）──────────────────
     // 需要网络 + keyless provider（llm7）。运行时:
     //   cargo test -p neotrix --lib -- --ignored test_real_gateway_stream
+    #[tokio::test]
+    #[ignore]
+    async fn test_real_gateway_candidate_chain() {
+        // 真实池子候选链解析 (不调用 LLM): 验证整体链路从实际注册名构建,
+        // resolve_default_model 应选到可用 keyless provider (llm7), 而非硬编码。
+        let gw = crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
+        let chain = gw.build_candidate_chain("llm7/codestral-latest", 8);
+        eprintln!("[chain] prefix chain[0]={:?} full={:?}", chain.first(), chain);
+        let first = chain.first().map(|s| s.as_str()).unwrap_or("");
+        assert!(first == "llm7" || first == "llm7/codestral-latest",
+            "前缀路由应选 llm7, 实际 {:?}", chain.first());
+        let def = gw.resolve_default_model_sync();
+        eprintln!("[chain] resolve_default_model = {}", def);
+        assert!(!def.is_empty() && def != "default", "默认模型应从池子解析: {}", def);
+    }
+
     #[tokio::test]
     #[ignore]
     async fn test_real_gateway_stream() {

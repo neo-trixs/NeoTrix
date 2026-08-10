@@ -102,6 +102,7 @@ pub reasoning_engine: Option<ReasoningEngine>,
     pub nt_world_jepa: Option<JepaWorldModel>,
     pub default_model: String,
     pub(crate) _dpo_stage: DpoStage,
+    /// SFT stage (smol-course 吸收: SFT → DPO 两阶段顺序, π_ref 基础)
     pub(crate) _sft_stage: super::super::sft_stage::SftStage,
     pub(crate) _process_stage: super::super::process_stage::ProcessStage,
     pub(crate) _search_skill_stage: super::super::search_skill_stage::SearchSkillStage,

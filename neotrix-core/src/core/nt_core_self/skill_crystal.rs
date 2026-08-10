@@ -3,6 +3,32 @@ use super::attention_head::AttentionDomain;
 use super::thinking_trace::ThinkingTrace;
 use std::path::Path;
 
+/// 验证状态 — DeepZero assessment.j2 反幻觉协议吸收 (P0-1):
+/// LLM/蒸馏产出的洞察必须带可复现验证字段，未验证 ≠ 有效。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum VerificationStatus {
+    /// 未提供验证契约（默认，反幻觉门标记）
+    Unverified,
+    /// 已提供验证契约但尚未执行验证
+    Pending,
+    /// 验证契约已执行且确认成立
+    Confirmed,
+    /// 验证契约已执行且被推翻
+    Refuted,
+}
+
+/// 可复现验证契约 — 对应 DeepZero `confirms_if` 字段：
+/// 给出"什么可观察结果能区分真实命中与假阳性"，让后续步骤能独立复现。
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct VerificationContract {
+    /// 可观察结果描述（如 "输出缓冲区非零且匹配调用方从未提供的内存"）
+    pub observable: String,
+    /// 验证方法（如 "运行 PoC 检查返回值" / "重放 trace 检查行为改变"）
+    pub method: String,
+    /// 当前验证状态
+    pub status: VerificationStatus,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SkillCrystal {
     pub id: usize,
@@ -16,6 +42,10 @@ pub struct SkillCrystal {
     pub domain: AttentionDomain,
     pub created_at: usize,
     pub last_used: usize,
+    /// 反幻觉验证契约（P0-1 吸收自 DeepZero assessment.j2）。
+    /// `#[serde(default)]` 保证旧序列化数据反序列化时缺字段 → None，不破坏兼容。
+    #[serde(default)]
+    pub verification: Option<VerificationContract>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -53,6 +83,7 @@ impl SkillCrystal {
             domain,
             created_at: iteration,
             last_used: iteration,
+            verification: None,
         }
     }
 }
@@ -150,6 +181,7 @@ impl CrystalRegistry {
             domain: dominant_domain,
             created_at: iteration,
             last_used: iteration,
+            verification: None,
         };
 
         let id = crystal.id;

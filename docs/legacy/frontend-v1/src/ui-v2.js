@@ -3371,8 +3371,10 @@ g.renderStApiKey = renderStApiKey;
     { act: 'hypercube',hint: '◆',  label: '知识库' },
     { act: 'projects', hint: '▤',  label: '活跃项目' },
     { act: 'cowork',   hint: '⌘2', label: '团队 · 协同' },
+    { act: 'chain',    hint: '⇄',  label: '链路命令 /chain' },
+    { act: 'catalog',  hint: '▦',  label: '统一命令目录' },
   ];
-  const PAL_ACT_MAP = { new: createSession, settings: openSettingsModal, diff: () => openOverlay('overlayDiff'), registry: () => { openOverlay('overlayRegistry'); loadRegistry(); }, hypercube: () => openOverlay('overlayHypercube'), projects: () => openOverlay('overlayProjects'), cowork: () => { const b = document.querySelector('.segb[data-view="cowork"]'); if(b) switchView(b, 'cowork'); } };
+  const PAL_ACT_MAP = { new: createSession, settings: openSettingsModal, diff: () => openOverlay('overlayDiff'), registry: () => { openOverlay('overlayRegistry'); loadRegistry(); }, hypercube: () => openOverlay('overlayHypercube'), projects: () => openOverlay('overlayProjects'), cowork: () => { const b = document.querySelector('.segb[data-view="cowork"]'); if(b) switchView(b, 'cowork'); }, chain: () => openChainPalette(), catalog: () => openCatalogPalette() };
   let lastPalQuery = '';
 
   function openPalette(){
@@ -3564,6 +3566,42 @@ g.renderStApiKey = renderStApiKey;
     const fn = PAL_ACT_MAP[act];
     if(fn) fn();
     else if(act) showToast('功能开发中: ' + act);
+  }
+
+  /* ===== 统一命令桥 (CLI ↔ NoeCodex) ===== */
+  async function openChainPalette(){
+    const cmd = window.prompt('链路命令 (一次调用完成多步编排):\n\n/chain absorb <query>  — 知识吸收\n/chain review          — 变更审查\n/chain status          — 系统状态\n/chain goal <desc>     — 目标执行', '/chain status');
+    if(!cmd) return;
+    await runChainCli(cmd);
+  }
+
+  async function openCatalogPalette(){
+    if(!isTauri()){ showToast('统一命令目录需在桌面端使用'); return; }
+    try{
+      const specs = await invoke('unified_command_catalog');
+      const cli = (specs||[]).filter(s => s.backend === 'cli');
+      const tauri = (specs||[]).filter(s => s.backend === 'tauri');
+      const lines = [
+        `━━ 统一命令目录 ━━`,
+        `CLI 命令 (${cli.length}):`,
+        ...cli.slice(0, 40).map(s => `  ${s.name} — ${s.description}`),
+        `NoeCodex 命令 (${tauri.length}):`,
+        ...tauri.slice(0, 40).map(s => `  ${s.name} — ${s.description}`),
+      ].join('\n');
+      showToast(`目录已加载: CLI ${cli.length} / NoeCodex ${tauri.length}`);
+      console.log(lines);
+      const cmd = prompt('统一命令目录已加载到控制台。输入 CLI 命令执行 (如 /kb search xxx):', '/catalog');
+      if(cmd) await runChainCli(cmd);
+    }catch(e){ showToast('加载统一目录失败: ' + e); }
+  }
+
+  async function runChainCli(cmd){
+    if(!isTauri()){ showToast('需 Tauri 环境执行 CLI 命令'); return; }
+    try{
+      const r = await invoke('unified_cli_execute', { input: cmd });
+      if(r && r.success){ showToast(r.message); }
+      else{ showToast((r && r.message) || '命令执行失败'); }
+    }catch(e){ showToast('执行失败: ' + e); }
   }
 
   /* Cmd/Ctrl+K 已在全局 keydown 处理；点击侧栏搜索按钮同开面板 */

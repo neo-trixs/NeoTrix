@@ -261,6 +261,75 @@ impl CliCommand for VersionCmd {
     }
 }
 
+// ====== /catalog ======
+
+/// 统一命令目录 — 融合 CLI + NoeCodex 两侧命令描述
+pub struct CatalogCmd;
+impl CliCommand for CatalogCmd {
+    fn name(&self) -> &str {
+        "/catalog"
+    }
+
+    fn aliases(&self) -> Vec<&str> {
+        vec!["/cmds", "/commands"]
+    }
+
+    fn description(&self) -> &str {
+        "统一命令目录 (CLI + NoeCodex): /catalog [cli|tauri|--json]"
+    }
+
+    fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+        use crate::unified_cmd::{CommandBackend, catalog_by_backend, unified_catalog};
+        let want_json = args.iter().any(|a| a == "--json");
+        let backend_filter = args.iter().find_map(|a| match a.as_str() {
+            "cli" => Some(CommandBackend::Cli),
+            "tauri" | "noecodex" => Some(CommandBackend::Tauri),
+            _ => None,
+        });
+
+        let specs = match backend_filter {
+            Some(b) => catalog_by_backend(b),
+            None => unified_catalog(),
+        };
+
+        if want_json {
+            let arr: serde_json::Value = specs.iter().map(|s| serde_json::json!({
+                "name": s.name,
+                "aliases": s.aliases,
+                "category": s.category,
+                "description": s.description,
+                "backend": s.backend,
+            })).collect();
+            let count = specs.len();
+            return CommandOutput::ok(&format!("{} commands in unified catalog", count)).with_json(arr);
+        }
+
+        // 按 backend + category 分组输出
+        let mut cli_cmds = Vec::new();
+        let mut tauri_cmds = Vec::new();
+        for s in &specs {
+            match s.backend {
+                CommandBackend::Cli => cli_cmds.push(s),
+                CommandBackend::Tauri => tauri_cmds.push(s),
+            }
+        }
+
+        let mut out = String::from("━━ 统一命令目录 (Unified Command Catalog) ━━\n\n");
+        out.push_str(&format!("▸ CLI 命令 ({}):\n", cli_cmds.len()));
+        for s in &cli_cmds {
+            let alias = if s.aliases.is_empty() { String::new() } else { format!(" [{}]", s.aliases.join(", ")) };
+            out.push_str(&format!("  {:<20}{} {}\n", s.name, alias, s.description));
+        }
+        out.push('\n');
+        out.push_str(&format!("▸ NoeCodex 命令 ({}):\n", tauri_cmds.len()));
+        for s in &tauri_cmds {
+            out.push_str(&format!("  {:<40} {}\n", s.name, s.description));
+        }
+        out.push_str("\n使用 /catalog --json 输出机器可读目录, /catalog cli|tauri 过滤后端\n");
+        CommandOutput::ok(&out)
+    }
+}
+
 // ====== /completions ======
 
 pub struct CompletionsCmd;

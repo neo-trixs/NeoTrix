@@ -66,13 +66,29 @@ impl KnowledgeDistiller {
             if principle.confidence < self.min_confidence {
                 continue;
             }
+            let delta = principle.delta * principle.confidence;
             if let Some(idx) = CapabilityVector::index_from_name(&principle.dimension) {
                 if idx < cv.arr.len() {
-                    let delta = principle.delta * principle.confidence;
                     cv.arr[idx] = (cv.arr[idx] + delta).clamp(0.0, 1.0);
                     absorbed += 1;
+                    continue;
                 }
             }
+            // 维度不在 23 固定维度 (如 code_generation/system_design/planning/precision)
+            // -> 写入命名扩展维度, 而非静默丢弃 (缺陷修复: 维度错位导致经验丢失)
+            // 已存在则累加, 否则追加
+            let mut found = false;
+            for (name, val) in cv.extension_mut().iter_mut() {
+                if name == &principle.dimension {
+                    *val = (*val + delta).clamp(0.0, 1.0);
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                cv.extend_named(&[(principle.dimension.clone(), delta.clamp(0.0, 1.0))]);
+            }
+            absorbed += 1;
         }
         absorbed
     }
@@ -379,8 +395,52 @@ mod tests {
     }
 
     #[test]
-    fn test_summary_format() {
-        let d = KnowledgeDistiller::new();
+    fn test_absorb_extension_dim() {
+        // 维度不在 23 固定维度时, 应写入命名扩展维度而非静默丢弃
+        let mut d = KnowledgeDistiller::new();
+        d.principles.push(Principle {
+            id: "p-ext".into(),
+            description: "code gen success".into(),
+            confidence: 1.0,
+            dimension: "code_generation".into(),
+            delta: 0.3,
+            source_session: "s".into(),
+            category: PrincipleCategory::Pattern,
+        });
+        let mut cv = CapabilityVector::default();
+        let absorbed = d.absorb(&mut cv);
+        assert_eq!(absorbed, 1, "extension dim should be absorbed, not dropped");
+        let ext = cv.extension();
+        assert!(ext.iter().any(|(n, v)| n == "code_generation" && (*v - 0.3).abs() < 1e-10),
+            "code_generation should be in extension dims: {:?}", ext);
+    }
+
+    #[test]
+    fn test_absorb_extension_dim_accumulate() {
+        // 同一扩展维度多次吸收应累加
+        let mut d = KnowledgeDistiller::new();
+        for i in 0..2 {
+            d.principles.push(Principle {
+                id: format!("p-{}", i),
+                description: "planning success".into(),
+                confidence: 1.0,
+                dimension: "planning".into(),
+                delta: 0.2,
+                source_session: "s".into(),
+                category: PrincipleCategory::Pattern,
+            });
+        }
+        let mut cv = CapabilityVector::default();
+        let absorbed = d.absorb(&mut cv);
+        assert_eq!(absorbed, 2);
+        let ext = cv.extension();
+        assert_eq!(ext.len(), 1, "should be single accumulated planning dim");
+        let (_, v) = ext.iter().find(|(n, _)| n == "planning").unwrap();
+        assert!((*v - 0.4).abs() < 1e-10, "planning should accumulate to 0.4, got {}", v);
+    }
+
+    #[test]
+    fn test_summary_format() {        let d = KnowledgeDistiller::new();
         let s = d.summary();
         assert!(s.contains("KnowledgeDistiller"));
         assert!(s.contains("min_conf"));

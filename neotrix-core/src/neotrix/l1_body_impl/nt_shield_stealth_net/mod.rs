@@ -61,7 +61,7 @@ pub use geo_proxy::{is_china_ip, domain_resolves_to_china, is_timeout_error};
 pub use local_proxy::{LocalProxy, TorManager, tor_connect};
 pub use rotation_coordinator::{RotationCoordinator, RotationDomain};
 pub use proxy_heartbeat::{ProxyHeartbeatEngine, HeartbeatRecord, HeartbeatSummary};
-pub use config::{load as load_config, config_file_path, NeoTrixConfig, reload as reload_config};
+pub use config::{load as load_config, config_file_path, StealthNetConfig, reload as reload_config};
 pub use proxy_control::{ProxyControl, ProxyClient, DaemonMode};
 pub use proxy_pool::NodeSelectionStrategy;
 pub use firewall::{FirewallManager, FirewallStats, FirewallType, FirewallAction, FirewallRule};

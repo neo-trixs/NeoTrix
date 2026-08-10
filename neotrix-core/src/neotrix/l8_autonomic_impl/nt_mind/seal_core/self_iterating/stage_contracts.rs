@@ -265,6 +265,119 @@ impl StageContract for NoSelfEditContract {
 }
 
 // ============================================================
+// Delivery Promise Contract (P0-2 吸收自 OpenMontage delivery_promise.py)
+// ============================================================
+
+/// 交付承诺类型 — 对应 OpenMontage `PromiseType`。
+/// 阶段执行前声明"承诺交付什么"，执行后验证是否兑现，禁止静默降级。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PromiseType {
+    /// 承诺真实能力提升：champion_score 必须提升（对应 OpenMontage MOTION_LED：
+    /// 只有真实运动算数，动画幻灯片不算）。reward 提升但 champion 未动 = 表面提升。
+    CapabilityLed,
+    /// 承诺过程推进：reward 提升即可，能力可持平（对应 SOURCE_LED/DATA_EXPLAINER）。
+    ProgressLed,
+}
+
+/// 交付承诺 — 在阶段执行前声明，执行后由 `DeliveryPromiseContract` 验证。
+#[derive(Debug, Clone)]
+pub struct DeliveryPromise {
+    pub promise_type: PromiseType,
+    /// 最低可接受质量（对应 OpenMontage `min_motion_ratio`）。
+    /// CapabilityLed 下为 champion_score 最低提升比例；ProgressLed 下为 reward 最低提升比例。
+    pub quality_floor: f64,
+    /// 是否允许静默降级（对应 OpenMontage `still_fallback_allowed`）。
+    /// false = 产出低于承诺必须 Block，不得静默替换。
+    pub fallback_allowed: bool,
+}
+
+impl DeliveryPromise {
+    pub fn capability_led(quality_floor: f64) -> Self {
+        Self { promise_type: PromiseType::CapabilityLed, quality_floor, fallback_allowed: false }
+    }
+
+    pub fn progress_led(quality_floor: f64) -> Self {
+        Self { promise_type: PromiseType::ProgressLed, quality_floor, fallback_allowed: true }
+    }
+}
+
+/// 防降级契约 — 验证阶段产出是否兑现交付承诺。
+/// 对应 OpenMontage `DeliveryPromise.validate_cuts()`：给"禁止静默降级"下可判定定义。
+pub struct DeliveryPromiseContract {
+    pub promise: DeliveryPromise,
+}
+
+impl StageContract for DeliveryPromiseContract {
+    fn name(&self) -> &str { "delivery_promise" }
+    fn pre_check(&self, _brain: &SelfIteratingBrain) -> Vec<ContractViolation> { vec![] }
+
+    fn post_check(&self, brain: &SelfIteratingBrain, before: &StageCheckpoint) -> Vec<ContractViolation> {
+        let mut violations = Vec::new();
+        match self.promise.promise_type {
+            PromiseType::CapabilityLed => {
+                // 真实能力提升：champion_score 必须提升。
+                // reward 提升但 champion 未动 = 表面提升（对应"动画幻灯片不算运动"）。
+                match (before.champion_score, brain.champion.as_ref().map(|c| c.score)) {
+                    (Some(before_score), Some(after_score)) => {
+                        let improvement = if before_score > 0.0 {
+                            (after_score - before_score) / before_score
+                        } else {
+                            after_score - before_score
+                        };
+                        if improvement < self.promise.quality_floor {
+                            let msg = format!(
+                                "delivery_promise (CapabilityLed): champion improvement {:.1}% below floor {:.1}% — reward may have risen but real capability did not (surface improvement, not real motion)",
+                                improvement * 100.0, self.promise.quality_floor * 100.0
+                            );
+                            violations.push(ContractViolation {
+                                stage_name: String::new(),
+                                severity: if self.promise.fallback_allowed { ContractSeverity::Warning } else { ContractSeverity::Error },
+                                message: msg,
+                            });
+                        }
+                    }
+                    (Some(_), None) => {
+                        // champion 丢失 = 能力回退，永远不允许静默降级
+                        violations.push(ContractViolation {
+                            stage_name: String::new(),
+                            severity: ContractSeverity::Error,
+                            message: "delivery_promise (CapabilityLed): champion was lost — capability regression, silent fallback not allowed".to_string(),
+                        });
+                    }
+                    (None, None) => {
+                        // 无 champion 基线：无法验证能力提升，按承诺类型处理
+                        if !self.promise.fallback_allowed {
+                            violations.push(ContractViolation {
+                                stage_name: String::new(),
+                                severity: ContractSeverity::Warning,
+                                message: "delivery_promise (CapabilityLed): no champion baseline to verify against — cannot confirm capability delivery".to_string(),
+                            });
+                        }
+                    }
+                    (None, Some(_)) => {}
+                }
+            }
+            PromiseType::ProgressLed => {
+                // 过程推进：reward 提升即可
+                if brain._reward < before.reward {
+                    violations.push(ContractViolation {
+                        stage_name: String::new(),
+                        severity: ContractSeverity::Warning,
+                        message: format!(
+                            "delivery_promise (ProgressLed): reward regressed from {:.3} to {:.3}",
+                            before.reward, brain._reward
+                        ),
+                    });
+                }
+            }
+        }
+        violations
+    }
+
+    fn invariant_check(&self, _brain: &SelfIteratingBrain) -> Vec<ContractViolation> { vec![] }
+}
+
+// ============================================================
 // Contract Registry
 // ============================================================
 
@@ -443,6 +556,15 @@ pub mod presets {
     pub fn self_modifying() -> Vec<Box<dyn StageContract>> {
         vec![
             Box::new(ResourceBudgetContract { max_tool_calls_per_run: 10 }),
+            Box::new(MonotonicIterationContract),
+        ]
+    }
+
+    /// A stage that promises real capability improvement — silent degradation blocked.
+    /// (P0-2 吸收自 OpenMontage delivery_promise: 防静默降级)
+    pub fn capability_led(quality_floor: f64) -> Vec<Box<dyn StageContract>> {
+        vec![
+            Box::new(DeliveryPromiseContract { promise: DeliveryPromise::capability_led(quality_floor) }),
             Box::new(MonotonicIterationContract),
         ]
     }
@@ -668,5 +790,94 @@ mod tests {
     fn test_presets_safe_mutation_has_three_contracts() {
         let contracts = presets::safe_mutation();
         assert_eq!(contracts.len(), 3);
+    }
+
+    // ── P0-2 防降级契约测试 (OpenMontage delivery_promise 吸收) ──
+
+    #[test]
+    fn test_delivery_promise_capability_led_blocks_surface_improvement() {
+        // 表面提升：reward 上升但 champion 未动 → CapabilityLed 必须报 violation
+        let mut brain = dummy_brain();
+        brain.champion = {
+            let mut snap = crate::neotrix::nt_mind::self_iterating::BrainSnapshot::new(
+                &brain.brain, &crate::neotrix::nt_world_model::TaskType::General
+            );
+            snap.score = 1.0;
+            Some(snap)
+        };
+        let before = StageCheckpoint::capture(&brain);
+        brain._reward += 5.0; // reward 提升
+        // champion 未动 = 表面提升（对应"动画幻灯片不算运动"）
+        let contract = DeliveryPromiseContract { promise: DeliveryPromise::capability_led(0.05) };
+        let violations = contract.post_check(&brain, &before);
+        assert!(!violations.is_empty(), "surface improvement must be flagged");
+        assert_eq!(violations[0].severity, ContractSeverity::Error, "silent fallback must block");
+    }
+
+    #[test]
+    fn test_delivery_promise_capability_led_passes_real_improvement() {
+        let mut brain = dummy_brain();
+        brain.champion = {
+            let mut snap = crate::neotrix::nt_mind::self_iterating::BrainSnapshot::new(
+                &brain.brain, &crate::neotrix::nt_world_model::TaskType::General
+            );
+            snap.score = 1.0;
+            Some(snap)
+        };
+        let before = StageCheckpoint::capture(&brain);
+        if let Some(ref mut c) = brain.champion {
+            c.score = 1.1; // 真实能力提升 10%
+        }
+        let contract = DeliveryPromiseContract { promise: DeliveryPromise::capability_led(0.05) };
+        let violations = contract.post_check(&brain, &before);
+        assert!(violations.is_empty(), "real improvement must pass");
+    }
+
+    #[test]
+    fn test_delivery_promise_champion_loss_always_blocks() {
+        let mut brain = dummy_brain();
+        brain.champion = {
+            let mut snap = crate::neotrix::nt_mind::self_iterating::BrainSnapshot::new(
+                &brain.brain, &crate::neotrix::nt_world_model::TaskType::General
+            );
+            snap.score = 1.0;
+            Some(snap)
+        };
+        let before = StageCheckpoint::capture(&brain);
+        brain.champion = None; // champion 丢失 = 能力回退
+        let contract = DeliveryPromiseContract { promise: DeliveryPromise::capability_led(0.05) };
+        let violations = contract.post_check(&brain, &before);
+        assert!(!violations.is_empty());
+        assert_eq!(violations[0].severity, ContractSeverity::Error);
+    }
+
+    #[test]
+    fn test_delivery_promise_progress_led_warns_on_regression() {
+        let mut brain = dummy_brain();
+        brain._reward = 10.0;
+        let before = StageCheckpoint::capture(&brain);
+        brain._reward = 5.0; // reward 回退
+        let contract = DeliveryPromiseContract { promise: DeliveryPromise::progress_led(0.0) };
+        let violations = contract.post_check(&brain, &before);
+        assert!(!violations.is_empty());
+        assert_eq!(violations[0].severity, ContractSeverity::Warning);
+    }
+
+    #[test]
+    fn test_delivery_promise_progress_led_passes_advance() {
+        let mut brain = dummy_brain();
+        brain._reward = 5.0;
+        let before = StageCheckpoint::capture(&brain);
+        brain._reward = 10.0; // reward 提升
+        let contract = DeliveryPromiseContract { promise: DeliveryPromise::progress_led(0.0) };
+        let violations = contract.post_check(&brain, &before);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn test_presets_capability_led_has_two_contracts() {
+        let contracts = presets::capability_led(0.05);
+        assert_eq!(contracts.len(), 2);
+        assert_eq!(contracts[0].name(), "delivery_promise");
     }
 }

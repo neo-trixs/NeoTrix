@@ -1,7 +1,9 @@
 //! Memory budget tracking with RSS monitoring
-//! 
-//! Uses unsafe code for sysctl calls on macOS — explicitly allowed for this module.
-#![allow(unsafe_code)]
+//!
+//! macOS RSS 读取依赖 `sysctl` FFI（libc），无法避免 unsafe。
+//! 门禁策略: 模块不整体放开 `unsafe_code`，仅在必须调用 FFI 的
+//! 函数上做最小范围 `#[allow(unsafe_code)]`，并逐处注明理由。
+//! 这样 crate 级 `#![deny(unsafe_code)]` (R-P1) 对其它所有代码保持强制。
 
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Instant;
@@ -10,6 +12,9 @@ use std::time::Instant;
 mod rss {
     use libc::{c_int, c_void, sysctl, CTL_KERN, KERN_PROC, KERN_PROC_PID};
 
+    /// macOS-only FFI: 必须调用 sysctl 读取进程 RSS。
+    /// 无法用 safe Rust 表达，故此处最小化放开。
+    #[allow(unsafe_code)]
     pub fn current_rss_bytes() -> u64 {
         let pid = unsafe { libc::getpid() };
         let mut mib: [c_int; 4] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid];
@@ -123,6 +128,9 @@ impl Default for MemoryBudget {
     }
 }
 
+/// macOS-only FFI: 必须调用 sysctl 查询物理内存总量。
+/// 无法用 safe Rust 表达，故此处最小化放开。
+#[allow(unsafe_code)]
 pub fn total_physical_memory() -> u64 {
     #[cfg(target_os = "macos")]
     {

@@ -242,17 +242,23 @@ impl ShieldEnforcer {
             ));
         }
 
-        // 4. PermissionChain (mode chain)
-        match self.perm_chain.check(action, target) {
-            PermissionResult::Allowed => {}
-            PermissionResult::Logged(msg) => {
-                log::info!("{}", msg);
-            }
-            PermissionResult::Blocked(msg) => {
-                return Err(ShieldDecision::Block(msg));
-            }
-            PermissionResult::AuditTrail(msg) => {
-                log::info!("{}", msg);
+        // 4. PermissionChain (mode chain) — only governs write/risky actions.
+        //    Read-only actions (help/stats/catalog/chain, tool reads, ...) always pass,
+        //    mirroring the sandbox branch above. Without this guard, the default
+        //    AcceptEdits profile blocks every CLI command name (which is not in the
+        //    is_safe_action whitelist), rendering the CLI inert.
+        if is_write_action(action) {
+            match self.perm_chain.check(action, target) {
+                PermissionResult::Allowed => {}
+                PermissionResult::Logged(msg) => {
+                    log::info!("{}", msg);
+                }
+                PermissionResult::Blocked(msg) => {
+                    return Err(ShieldDecision::Block(msg));
+                }
+                PermissionResult::AuditTrail(msg) => {
+                    log::info!("{}", msg);
+                }
             }
         }
 
