@@ -241,9 +241,13 @@ impl CapabilityRegistry {
     /// 查询: 过期节点 (C0/C1 超 3 周期无更新)
     pub fn stale_nodes(&self, cycles_threshold: u32) -> Vec<&CapabilityNode> {
         // 简化: 基于 evolution_log 的最后 cycle 判断
+        // 缺陷修复 (R-P42 吸收): 新注册节点 (evolution_log 为空或仅 1 条吸收记录)
+        // 不应被误判为 stale — stale 只针对"已存在多 cycle 但无新演化"的节点。
+        // 判定: 有 >=2 条演化记录 (非吸收期) 且记录数 < 阈值 → stale。
         self.nodes.values()
             .filter(|n| {
-                n.constellation as u8 <= 1 && 
+                n.constellation as u8 <= 1 &&
+                n.evolution_log.len() >= 2 &&
                 n.evolution_log.len() < cycles_threshold as usize
             })
             .collect()

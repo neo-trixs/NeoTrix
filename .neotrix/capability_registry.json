@@ -1325,12 +1325,25 @@
       ],
       "requires": [],
       "rune_sockets": [],
-      "dependents": [],
-      "evolution_log": [],
+      "dependents": [
+        "nt_shanhai_geo::query::export_geojson"
+      ],
+      "evolution_log": [
+        {
+          "cycle": "absorption",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shanhai_geo::query::shanhai_stats",
+          "note": "R-P42 一次性脚本归档: bin/shanhai_*.rs 逻辑融合进 nt_shanhai_geo 库模块",
+          "timestamp": "2026-08-10T11:39:20.045161Z"
+        }
+      ],
       "metadata": {
         "absorbed_from": "bin/shanhai_query.rs",
         "absorption": "R-P42 一次性脚本归档"
       },
+      "created_at": "2026-08-10T11:38:15.196714Z",
+      "updated_at": "2026-08-10T11:38:15.214034Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1348,11 +1361,22 @@
       ],
       "rune_sockets": [],
       "dependents": [],
-      "evolution_log": [],
+      "evolution_log": [
+        {
+          "cycle": "absorption",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shanhai_geo::query::export_geojson",
+          "note": "R-P42 一次性脚本归档: bin/shanhai_*.rs 逻辑融合进 nt_shanhai_geo 库模块",
+          "timestamp": "2026-08-10T11:39:20.045161Z"
+        }
+      ],
       "metadata": {
         "absorbed_from": "bin/shanhai_query.rs",
         "absorption": "R-P42 一次性脚本归档"
       },
+      "created_at": "2026-08-10T11:38:15.196714Z",
+      "updated_at": "2026-08-10T11:38:15.196714Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1369,11 +1393,22 @@
       "requires": [],
       "rune_sockets": [],
       "dependents": [],
-      "evolution_log": [],
+      "evolution_log": [
+        {
+          "cycle": "absorption",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shanhai_geo::linking::infer_shanhai_links",
+          "note": "R-P42 一次性脚本归档: bin/shanhai_*.rs 逻辑融合进 nt_shanhai_geo 库模块",
+          "timestamp": "2026-08-10T11:39:20.045161Z"
+        }
+      ],
       "metadata": {
         "absorbed_from": "bin/shanhai_link.rs",
         "absorption": "R-P42 一次性脚本归档"
       },
+      "created_at": "2026-08-10T11:38:15.196714Z",
+      "updated_at": "2026-08-10T11:38:15.196714Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -1389,11 +1424,22 @@
       "requires": [],
       "rune_sockets": [],
       "dependents": [],
-      "evolution_log": [],
+      "evolution_log": [
+        {
+          "cycle": "absorption",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_shanhai_geo::kb::safe_insert",
+          "note": "R-P42 一次性脚本归档: bin/shanhai_*.rs 逻辑融合进 nt_shanhai_geo 库模块",
+          "timestamp": "2026-08-10T11:39:20.045161Z"
+        }
+      ],
       "metadata": {
         "absorbed_from": "bin/shanhai_*.rs",
         "absorption": "R-P42 一次性脚本归档"
       },
+      "created_at": "2026-08-10T11:38:15.196714Z",
+      "updated_at": "2026-08-10T11:38:15.196714Z",
       "deprecated": false,
       "deprecated_reason": null
     }
