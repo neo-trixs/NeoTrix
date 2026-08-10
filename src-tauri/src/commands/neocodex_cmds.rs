@@ -397,6 +397,7 @@ pub async fn neocodex_list_sessions(project_path: Option<String>) -> Result<Vec<
             let mut name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string();
             let mut mode = "Agent".to_string();
             let mut message_count = 0;
+            let mut tags: Vec<String> = Vec::new();
             let mut updated_at = entry.metadata().map_err(|e| e.to_string())?.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
             
             for line in &lines {
@@ -412,9 +413,12 @@ pub async fn neocodex_list_sessions(project_path: Option<String>) -> Result<Vec<
                         WireEvent::ModeChange { to, .. } => {
                             mode = format!("{:?}", to);
                         }
-                        WireEvent::SessionMeta { name: n, timestamp, .. } => {
+                        WireEvent::SessionMeta { name: n, timestamp, tags: t, .. } => {
                             if !n.is_empty() {
                                 name = n;
+                            }
+                            if !t.is_empty() {
+                                tags = t;
                             }
                             updated_at = timestamp.max(0) as u64;
                         }
@@ -429,6 +433,7 @@ pub async fn neocodex_list_sessions(project_path: Option<String>) -> Result<Vec<
                 message_count,
                 wire_path: path.to_string_lossy().to_string(),
                 updated_at,
+                tags,
             });
         }
     }
@@ -637,6 +642,7 @@ pub async fn neocodex_create_session(name: Option<String>) -> Result<NeoCodexSes
         message_count: 0,
         wire_path: path.to_string_lossy().to_string(),
         updated_at: chrono::Utc::now().timestamp() as u64,
+        tags: Vec::new(),
     })
 }
 
@@ -991,10 +997,12 @@ pub async fn neocodex_rename_session(session_id: String, name: String) -> Result
     } else {
         let mut wire = WireSession::new(&session_id);
         wire.path = path.clone();
+        let existing_tags = read_session_tags_from_path(&path)?;
         wire.record(WireEvent::SessionMeta {
             name: name.trim().to_string(),
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+            tags: existing_tags,
         });
     }
     Ok(NeoCodexSessionInfo {
@@ -1005,6 +1013,143 @@ pub async fn neocodex_rename_session(session_id: String, name: String) -> Result
         wire_path: path.to_string_lossy().to_string(),
         updated_at: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as u64,
+        tags: read_session_tags_from_path(&path)?,
+    })
+}
+
+/// Read persisted tags for a session from its JSONL SessionMeta (last wins).
+fn read_session_tags_from_path(path: &std::path::Path) -> Result<Vec<String>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    for line in content.lines().rev() {
+        if let Ok(ev) = serde_json::from_str::<WireEvent>(line) {
+            if let WireEvent::SessionMeta { tags, .. } = ev {
+                return Ok(tags);
+            }
+        }
+    }
+    Ok(Vec::new())
+}
+
+/// Read the persisted session name from JSONL SessionMeta (last wins).
+fn read_session_name_from_path(path: &std::path::Path) -> Result<String, String> {
+    if !path.exists() {
+        return Ok(path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string());
+    }
+    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    for line in content.lines().rev() {
+        if let Ok(ev) = serde_json::from_str::<WireEvent>(line) {
+            if let WireEvent::SessionMeta { name, .. } = ev {
+                if !name.is_empty() {
+                    return Ok(name);
+                }
+            }
+        }
+    }
+    Ok(path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string())
+}
+
+/// Persist a tag onto a session (JSONL SessionMeta). Returns updated tags.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn neocodex_tag_session(session_id: String, tag: String) -> Result<NeoCodexSessionInfo, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+    let clean = tag.trim().to_lowercase().replace(' ', "-").replace('#', "");
+    if clean.is_empty() {
+        return Err("Empty tag".to_string());
+    }
+
+    {
+        let mut guard = NEOCODEX_AGENT.lock().await;
+        let agent = match guard.as_mut() {
+            Some(a) => a,
+            None => {
+                let mut a = NeoCodexAgent::new("neotrix-tauri");
+                a.provider.ensure_production_provider();
+                *guard = Some(a);
+                guard.as_mut().unwrap()
+            }
+        };
+        if agent.wire.path == path {
+            agent.tag_session(&clean);
+        } else {
+            let mut existing = read_session_tags_from_path(&path)?;
+            if !existing.contains(&clean) {
+                existing.push(clean);
+            }
+            let mut wire = WireSession::new(&session_id);
+            wire.path = path.clone();
+            wire.record(WireEvent::SessionMeta {
+                name: read_session_name_from_path(&path)?,
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                tags: existing,
+            });
+        }
+    }
+
+    let tags = read_session_tags_from_path(&path)?;
+    Ok(NeoCodexSessionInfo {
+        id: session_id,
+        name: read_session_name_from_path(&path)?,
+        mode: "Agent".to_string(),
+        message_count: 0,
+        wire_path: path.to_string_lossy().to_string(),
+        updated_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as u64,
+        tags,
+    })
+}
+
+/// Remove a tag from a session (JSONL SessionMeta). Returns updated tags.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn neocodex_untag_session(session_id: String, tag: String) -> Result<NeoCodexSessionInfo, String> {
+    let path = session_path(&session_id);
+    if !path.exists() {
+        return Err("Session not found".to_string());
+    }
+
+    {
+        let mut guard = NEOCODEX_AGENT.lock().await;
+        let agent = match guard.as_mut() {
+            Some(a) => a,
+            None => {
+                let mut a = NeoCodexAgent::new("neotrix-tauri");
+                a.provider.ensure_production_provider();
+                *guard = Some(a);
+                guard.as_mut().unwrap()
+            }
+        };
+        if agent.wire.path == path {
+            agent.untag_session(&tag);
+        } else {
+            let mut existing = read_session_tags_from_path(&path)?;
+            existing.retain(|t| t != &tag);
+            let mut wire = WireSession::new(&session_id);
+            wire.path = path.clone();
+            wire.record(WireEvent::SessionMeta {
+                name: read_session_name_from_path(&path)?,
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                tags: existing,
+            });
+        }
+    }
+
+    let tags = read_session_tags_from_path(&path)?;
+    Ok(NeoCodexSessionInfo {
+        id: session_id,
+        name: read_session_name_from_path(&path)?,
+        mode: "Agent".to_string(),
+        message_count: 0,
+        wire_path: path.to_string_lossy().to_string(),
+        updated_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as u64,
+        tags,
     })
 }
 
@@ -1248,6 +1393,7 @@ pub async fn neocodex_list_archived() -> Result<Vec<NeoCodexSessionInfo>, String
                 message_count,
                 wire_path: path.to_string_lossy().to_string(),
                 updated_at,
+                tags: read_session_tags_from_path(&path).unwrap_or_default(),
             });
         }
     }
@@ -1263,6 +1409,8 @@ pub struct NeoCodexSessionInfo {
     pub message_count: usize,
     pub wire_path: String,
     pub updated_at: u64,
+    /// 会话标签（JSONL SessionMeta 持久化，对标 Obsidian tag）
+    pub tags: Vec<String>,
 }
 
 #[derive(serde::Serialize)]

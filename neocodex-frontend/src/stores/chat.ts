@@ -1,6 +1,7 @@
 
 import { createStore, produce } from 'solid-js/store'
 import { invoke } from '@tauri-apps/api/core'
+import { tagsStore } from './tags'
 
 // Backend types matching neocodex_cmds.rs
 export interface NeoCodexSessionInfo {
@@ -67,6 +68,8 @@ export interface Session {
   checkpointId?: string
   /** 项目名（从会话 wire_path 提取，对标 Claude 项目分组） */
   project?: string
+  /** 会话标签（本地持久化，对标 Obsidian tag） */
+  tags: string[]
 }
 
 export interface ChatState {
@@ -148,9 +151,11 @@ function createChatStore() {
         createdAt: new Date(s.updated_at * 1000),
         updatedAt: new Date(s.updated_at * 1000),
         project: projectFromPath(s.wire_path),
+        tags: s.tags ?? tagsStore.tagsForSession(s.id),
       }))
       
       setState('sessions', sessions)
+      hydrateSessionTags()
       
       // If no current session, select the first one
       if (!state.currentSessionId && sessions.length > 0) {
@@ -202,6 +207,7 @@ function createChatStore() {
         messages: [],
         createdAt: new Date(backendSession.updated_at * 1000),
         updatedAt: new Date(backendSession.updated_at * 1000),
+        tags: [],
       }
       
       setState('sessions', produce(s => s.unshift(session)))
@@ -216,6 +222,7 @@ function createChatStore() {
         messages: [],
         createdAt: new Date(),
         updatedAt: new Date(),
+        tags: [],
       }
       setState('sessions', produce(s => s.unshift(session)))
       setState('currentSessionId', session.id)
@@ -238,6 +245,9 @@ function createChatStore() {
     if (state.currentSessionId === id) {
       setState('currentSessionId', state.sessions[0]?.id || null)
     }
+
+    // 清理标签映射（localStorage）
+    tagsStore.clearSessionTags(id)
   }
 
   const switchSession = async (id: string): Promise<void> => {
@@ -407,6 +417,39 @@ function createChatStore() {
     console.log('Rewind to checkpoint:', checkpointId)
   }
 
+  /** 从 tags store 同步某会话的标签到响应式 session（渲染层拉取） */
+  const tagsForSession = (sessionId: string): string[] => {
+    return tagsStore.tagsForSession(sessionId)
+  }
+
+  /** 给会话打标（自动注册标签；存 localStorage） */
+  const tagSession = (sessionId: string, rawName: string): void => {
+    tagsStore.addSessionTag(sessionId, rawName)
+    // 同步响应式 session.tags（驱动会话行标签展示）
+    setState('sessions', produce(s => {
+      const sess = s.find(x => x.id === sessionId)
+      if (sess) sess.tags = tagsStore.tagsForSession(sessionId)
+    }))
+  }
+
+  /** 取消会话标签 */
+  const untagSession = (sessionId: string, name: string): void => {
+    tagsStore.removeSessionTag(sessionId, name)
+    setState('sessions', produce(s => {
+      const sess = s.find(x => x.id === sessionId)
+      if (sess) sess.tags = tagsStore.tagsForSession(sessionId)
+    }))
+  }
+
+  /** 会话加载后补挂标签（loadSessions 后调用，渲染入口统一） */
+  const hydrateSessionTags = (): void => {
+    setState('sessions', produce(s => {
+      for (const sess of s) {
+        sess.tags = tagsStore.tagsForSession(sess.id)
+      }
+    }))
+  }
+
   return {
     get state() { return state },
     get currentSession() { return currentSession() },
@@ -432,6 +475,10 @@ function createChatStore() {
     editAndResend,
     createCheckpoint,
     rewindToCheckpoint,
+    tagsForSession,
+    tagSession,
+    untagSession,
+    hydrateSessionTags,
   }
 }
 

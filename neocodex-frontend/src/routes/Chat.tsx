@@ -124,6 +124,15 @@ export function Chat() {
   // 视图切换：chat / cowork / computer（对应侧栏 segmented tabs）
   const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
 
+  // 标签筛选（对标 Obsidian Tag Pane 多选过滤）
+  const [activeTags, setActiveTags] = createSignal<string[]>([])
+  const toggleTag = (name: string) => {
+    setActiveTags((prev) =>
+      prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name]
+    )
+  }
+  const clearTags = () => setActiveTags([])
+
   // 顶部工具栏面板：一次只开一个
   type PanelId = 'git' | 'tasks' | 'cost' | 'timeline' | 'sidechat'
   const [activePanel, setActivePanel] = createSignal<PanelId | null>(null)
@@ -581,6 +590,9 @@ export function Chat() {
         onSwitchView={setActiveView}
         activePanel={activePanel()}
         onTogglePanel={(id) => togglePanel(id as PanelId)}
+        activeTags={activeTags()}
+        onToggleTag={toggleTag}
+        onClearTags={clearTags}
       />
 
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden glass-L1 relative border-l border-white/20">

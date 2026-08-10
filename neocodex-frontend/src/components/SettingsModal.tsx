@@ -5,6 +5,7 @@ import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { clsx } from 'clsx'
 import { PluginMarketplace } from './PluginMarketplace'
 import { TrafficLights } from './TrafficLights'
+import { tagsStore, normalizeTagName, TAG_PALETTE } from '../stores/tags'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v2）
@@ -26,7 +27,7 @@ interface ProviderConfig {
   providers: ProviderEntry[]
 }
 
-type SectionId = 'general' | 'appearance' | 'plugins' | 'data' | 'about'
+type SectionId = 'general' | 'appearance' | 'plugins' | 'data' | 'tags' | 'about'
 
 /* ── 外扩线条图标（open/expand 语义，非内敛） ── */
 function ExpandIcon() {
@@ -100,11 +101,24 @@ function XIcon() {
   )
 }
 
+function TagIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none">
+      {/* 标签签低 + 斜杠孔 + 外扩射线（标签集合语义） */}
+      <path d="M2 3.5h8l4 4.5-6 6L2 9V3.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+      <circle cx="6.4" cy="6.4" r="0.9" fill="currentColor" stroke="none" />
+      <line x1="8" y1="14.5" x2="8" y2="15.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.4" />
+      <line x1="15" y1="7" x2="15.5" y2="7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.4" />
+    </svg>
+  )
+}
+
 const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
   { id: 'general', label: '通用', icon: ExpandIcon },
   { id: 'appearance', label: '外观', icon: PaletteIcon },
   { id: 'plugins', label: '插件', icon: PluginsIcon },
   { id: 'data', label: '数据', icon: DataIcon },
+  { id: 'tags', label: '标签', icon: TagIcon },
   { id: 'about', label: '关于', icon: InfoIcon },
 ]
 
@@ -113,7 +127,7 @@ const SECTIONS: { id: SectionId; label: string; icon: () => any }[] = [
 const NAV_GROUPS: { title: string; ids: SectionId[] }[] = [
   { title: '常规', ids: ['general', 'appearance'] },
   { title: '扩展', ids: ['plugins'] },
-  { title: '数据', ids: ['data'] },
+  { title: '数据', ids: ['data', 'tags'] },
   { title: '系统', ids: ['about'] },
 ]
 
@@ -409,6 +423,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     {section() === 'appearance' && '界面视觉与动效'}
                     {section() === 'plugins' && '技能插件与扩展'}
                     {section() === 'data' && '记忆与数据管理'}
+                    {section() === 'tags' && '标签色板与层级管理'}
                     {section() === 'about' && '版本与诊断信息'}
                   </div>
                 </div>
@@ -729,6 +744,70 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 </div>
               </Show>
 
+              {/* ── 标签：色板/层级/重命名/删除（对标 Obsidian 标签设置） ── */}
+              <Show when={section() === 'tags'}>
+                <div class="space-y-4">
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <TagIcon />
+                      标签管理
+                    </div>
+                    <div class="ss-card-body">
+                      <div class="text-[11px] text-text-muted leading-relaxed pb-3">
+                        标签用于组织会话，支持层级嵌套（如 <span class="nt-tag-hint-inline">design</span> /
+                        <span class="nt-tag-hint-inline">ui</span>）。点击色块可为每个标签单独设置颜色；重命名与删除全局生效。
+                      </div>
+
+                      <Show
+                        when={Object.keys(tagsStore.state.tags).length > 0}
+                        fallback={
+                          <div class="px-3 py-6 text-center text-[11px] text-text-muted border border-dashed border-border-primary/60 rounded-lg">
+                            暂无标签。在侧栏会话上悬停点 <span class="nt-tag-hint-inline">#</span> 创建第一个标签。
+                          </div>
+                        }
+                      >
+                        <ul class="divide-y divide-border-primary/30 rounded-lg border border-border-primary/40 overflow-hidden">
+                          <For each={Object.entries(tagsStore.state.tags).sort((a, b) => a[0].localeCompare(b[0]))}>
+                            {([name, color]) => (
+                              <TagRow
+                                name={name}
+                                color={color}
+                                onColorChange={(c) => tagsStore.setTagColor(name, c)}
+                                onRename={(next) => tagsStore.renameTag(name, next)}
+                                onDelete={() => tagsStore.deleteTag(name)}
+                              />
+                            )}
+                          </For>
+                        </ul>
+                      </Show>
+                    </div>
+                  </div>
+
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <PaletteIcon />
+                      标签色板
+                    </div>
+                    <div class="ss-card-body">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <For each={TAG_PALETTE}>
+                          {(c) => (
+                            <span
+                              class="w-6 h-6 rounded-full border border-white/70 shadow-sm"
+                              style={{ background: c }}
+                              aria-label={`色板 ${c}`}
+                            />
+                          )}
+                        </For>
+                      </div>
+                      <p class="text-[10.5px] text-text-muted mt-2">
+                        新标签自动按名称分配色板颜色，可在上方标签列表手动覆盖。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Show>
+
               {/* ── 关于 ── */}
               <Show when={section() === 'about'}>
                 <div class="space-y-4">
@@ -791,5 +870,130 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
         </div>
       </div>
     </Show>
+  )
+}
+
+/* ════════════════════════════════════════════
+   TagRow — 设置内标签行（对标 Obsidian 标签设置）
+   色点 + 名称 + 色板快捷选色 + 自定义取色 + 重命名/删除
+   ════════════════════════════════════════════ */
+function TagRow(props: {
+  name: string
+  color: string
+  onColorChange: (color: string) => void
+  onRename: (next: string) => void
+  onDelete: () => void
+}) {
+  const [editing, setEditing] = createSignal(false)
+  const [editValue, setEditValue] = createSignal(props.name)
+  const [pickerOpen, setPickerOpen] = createSignal(false)
+
+  const confirmRename = () => {
+    const next = normalizeTagName(editValue())
+    if (next) props.onRename(next)
+    else setEditValue(props.name)
+    setEditing(false)
+  }
+
+  return (
+    <li class="px-3 py-2.5 flex items-center gap-3 bg-white/30 hover:bg-white/55 transition-colors">
+      {/* 色点（点击展开快捷取色） */}
+      <button
+        class="w-5 h-5 rounded-full border border-white/80 shadow-sm flex-shrink-0 cursor-pointer transition-transform hover:scale-110"
+        style={{ background: props.color }}
+        onClick={() => setPickerOpen((v) => !v)}
+        aria-label={`标签 ${props.name} 选色`}
+        title="选择颜色"
+      />
+      <Show when={pickerOpen()}>
+        <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/80 border border-border-primary shadow-sm">
+          <For each={TAG_PALETTE}>
+            {(c) => (
+              <button
+                class="w-4 h-4 rounded-full border border-white/70 transition-transform hover:scale-115"
+                style={{ background: c, 'box-shadow': c === props.color ? '0 0 0 2px #fff, 0 0 0 4px rgba(240,145,58,0.6)' : undefined }}
+                onClick={() => { props.onColorChange(c); setPickerOpen(false) }}
+                aria-label={`设为 ${c}`}
+              />
+            )}
+          </For>
+          <label class="relative flex-shrink-0">
+            <span class="w-4 h-4 rounded-full border border-dashed border-text-muted flex items-center justify-center text-[9px] text-text-muted cursor-pointer" title="自定义颜色">
+              +
+            </span>
+            <input
+              type="color"
+              class="opacity-0 absolute inset-0 w-4 h-4 cursor-pointer"
+              value={props.color}
+              onInput={(e) => props.onColorChange(e.currentTarget.value)}
+              aria-label="自定义颜色"
+            />
+          </label>
+        </div>
+      </Show>
+
+      {/* 名称（编辑 / 展示） */}
+      <Show
+        when={editing()}
+        fallback={
+          <button
+            class="flex-1 min-w-0 text-left group"
+            onClick={() => setEditing(true)}
+            title="重命名"
+          >
+            <span class="inline-flex items-center gap-1 text-[12px] text-text-primary truncate">
+              <span class="font-mono text-text-muted">#</span>
+              <span class="truncate">{props.name}</span>
+            </span>
+          </button>
+        }
+      >
+        <span class="flex-1 min-w-0 flex items-center gap-1.5">
+          <input
+            class="flex-1 min-w-0 px-2 py-1 rounded-md bg-white/80 border border-nt-io-500/50 text-[12px] text-text-primary font-mono focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+            value={editValue()}
+            onInput={(e) => setEditValue(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') confirmRename()
+              else if (e.key === 'Escape') { setEditValue(props.name); setEditing(false) }
+            }}
+            autofocus
+          />
+          <button
+            class="px-2 py-1 rounded-md bg-nt-io-500 text-white text-[10.5px] font-medium hover:bg-nt-io-600 transition-colors flex-shrink-0"
+            onClick={confirmRename}
+          >
+            保存
+          </button>
+        </span>
+      </Show>
+
+      {/* 操作：重命名 / 删除 */}
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <Show when={!editing()}>
+          <button
+            class="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-black/5 transition-colors"
+            onClick={() => { setEditValue(props.name); setEditing(true) }}
+            aria-label={`重命名标签 ${props.name}`}
+            title="重命名"
+          >
+            <svg viewBox="0 0 14 14" fill="none" class="w-3.5 h-3.5">
+              <path d="M3 11l.5-2.5L9 3 11 5l-5.5 5.5L3 11z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <button
+            class="p-1.5 rounded-md text-text-muted hover:text-red-600 hover:bg-red-500/10 transition-colors"
+            onClick={props.onDelete}
+            aria-label={`删除标签 ${props.name}`}
+            title="删除标签"
+          >
+            <svg viewBox="0 0 14 14" fill="none" class="w-3.5 h-3.5">
+              <path d="M3.5 4.5h7v6a1 1 0 01-1 1h-5a1 1 0 01-1-1v-6z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+              <line x1="2.5" y1="4.5" x2="11.5" y2="4.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+            </svg>
+          </button>
+        </Show>
+      </div>
+    </li>
   )
 }

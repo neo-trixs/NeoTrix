@@ -768,6 +768,141 @@
     transform: rotate(-72deg) scale(1.1);
   }
 
+  /* ════════════════════════════════════════════
+     NeoTag — 标签胶囊（对标 Obsidian tag pill）
+     色点 + #name + 计数；层级以斜杠省略 + 缩进展示
+     ════════════════════════════════════════════ */
+  .nt-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    background: rgba(255, 255, 255, 0.55);
+    color: #5a5a62;
+    cursor: default;
+    transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    white-space: nowrap;
+  }
+  .nt-tag[role="button"] {
+    cursor: pointer;
+  }
+  .nt-tag:hover {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #1a1a20;
+  }
+  .nt-tag[role="button"]:focus-visible {
+    outline: 2px solid rgba(240, 145, 58, 0.6);
+    outline-offset: 1px;
+  }
+
+  .nt-tag-sm {
+    padding: 1px 7px 1px 5px;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+  .nt-tag-md {
+    padding: 2px 8px 2px 6px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  /* 色点（标签色） */
+  .nt-tag-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--tag-color, #909098);
+    flex-shrink: 0;
+  }
+  .nt-tag:hover .nt-tag-dot {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--tag-color, #909098) 18%, transparent);
+  }
+
+  .nt-tag-label {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  /* 层级提示：父级斜杠省略（parent/ → 略） */
+  .nt-tag-hint {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0px;
+    color: #b0b0b8;
+    font-weight: 400;
+  }
+  .nt-tag-part {
+    max-width: 3.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nt-tag-slash {
+    color: #cdccc8;
+    margin: 0 1px;
+  }
+  .nt-tag-hint-inline {
+    color: #f0913a;
+    font-weight: 600;
+    font-family: ui-monospace, monospace;
+  }
+
+  /* 计数徽章 */
+  .nt-tag-count {
+    min-width: 14px;
+    text-align: center;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.04);
+    color: #909098;
+    font-size: 9px;
+    font-weight: 600;
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .nt-tag-count-active {
+    background: rgba(255, 255, 255, 0.9);
+    color: #f0913a;
+  }
+
+  /* 选中态（过滤激活） */
+  .nt-tag-active {
+    background: color-mix(in srgb, var(--tag-color, #909098) 14%, white);
+    border-color: color-mix(in srgb, var(--tag-color, #909098) 40%, transparent);
+    color: var(--tag-color, #909098);
+    font-weight: 600;
+  }
+  .nt-tag-active:hover {
+    background: color-mix(in srgb, var(--tag-color, #909098) 20%, white);
+  }
+
+  /* 移除按钮（可移除标签） */
+  .nt-tag-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: #b0b0b8;
+    cursor: pointer;
+    padding: 0;
+    margin-right: -2px;
+    transition: all 0.15s ease;
+  }
+  .nt-tag-x:hover {
+    background: rgba(232, 84, 84, 0.12);
+    color: #e85454;
+  }
+  .nt-tag-x svg {
+    width: 8px;
+    height: 8px;
+  }
+
   /* —— 侧栏用户条 sf · 液态玻璃 —— */
   .sf {
     position: relative;

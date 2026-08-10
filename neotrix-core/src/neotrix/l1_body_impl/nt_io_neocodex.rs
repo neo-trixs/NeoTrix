@@ -539,7 +539,12 @@ pub enum WireEvent {
     SystemEvent { kind: String, detail: String, timestamp: i64 },
     GoalUpdate { id: String, state: String, description: String },
     ModeChange { from: NeoCodexMode, to: NeoCodexMode },
-    SessionMeta { name: String, timestamp: i64 },
+    SessionMeta {
+        name: String,
+        timestamp: i64,
+        #[serde(default)]
+        tags: Vec<String>,
+    },
     // P1-2: side chat now carries a role so the UI can render a real answer
     // bubble; `role` defaults to "user" so pre-fix wire lines stay compatible.
     SideChatMessage {
@@ -1389,9 +1394,63 @@ impl NeoCodexAgent {
     pub fn rename_session(&mut self, name: &str) {
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+        // 保留既有标签（重命名不动 tags；读旧态标签并回写）
+        let tags = self.read_session_tags();
         self.wire.record(WireEvent::SessionMeta {
             name: name.trim().to_string(),
             timestamp: ts,
+            tags,
+        });
+    }
+
+    /// Read the persisted tag set for the current wire session (from last
+    /// SessionMeta). Empty when none recorded yet.
+    fn read_session_tags(&self) -> Vec<String> {
+        self.wire.events.iter().rev()
+            .find(|e| matches!(e, WireEvent::SessionMeta { .. }))
+            .and_then(|e| match e {
+                WireEvent::SessionMeta { tags, .. } => Some(tags.clone()),
+                _ => None,
+            })
+            .unwrap_or_default()
+    }
+
+    /// Persist a tag onto the current session (deduped). Writes a new
+    /// SessionMeta carrying the merged tag set.
+    pub fn tag_session(&mut self, tag: &str) {
+        let mut tags = self.read_session_tags();
+        let clean = tag.trim().to_lowercase().replace(' ', "-");
+        if clean.is_empty() || tags.contains(&clean) {
+            return;
+        }
+        tags.push(clean);
+        self.write_session_tags(tags);
+    }
+
+    /// Remove a tag from the current session. No-op when absent.
+    pub fn untag_session(&mut self, tag: &str) {
+        let mut tags = self.read_session_tags();
+        let before = tags.len();
+        tags.retain(|t| t != tag);
+        if tags.len() != before {
+            self.write_session_tags(tags);
+        }
+    }
+
+    /// Overwrite persisted tags (rename/tag/untag 共用落盘点)。
+    fn write_session_tags(&mut self, tags: Vec<String>) {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+        let meta = self.wire.events.iter().rev()
+            .find(|e| matches!(e, WireEvent::SessionMeta { .. }));
+        let name = meta.and_then(|e| match e {
+            WireEvent::SessionMeta { name, .. } => Some(name.clone()),
+            _ => None,
+        }).unwrap_or_else(|| self.wire.session_id.clone());
+        self.wire.record(WireEvent::SessionMeta {
+            name,
+            timestamp: ts,
+            tags,
         });
     }
 

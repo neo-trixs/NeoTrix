@@ -1,8 +1,11 @@
 import { createSignal, For, Show } from 'solid-js'
 import { Settings } from 'lucide-solid'
 import { chatStore } from '../stores/chat'
+import { tagsStore, normalizeTagName } from '../stores/tags'
 import { clsx } from 'clsx'
 import { NeoPlus, NeoMessage, NeoSearch, NeoChevronRight, NeoTrash, NeoPencil, NeoClose } from './neo-icons'
+import { NeoTag } from './NeoTag'
+import { TagBar } from './TagBar'
 
 interface SidebarProps {
   collapsed?: boolean
@@ -14,6 +17,10 @@ interface SidebarProps {
   onTogglePanel?: (id: string) => void
   /** 打开设置（弹窗由 Chat 根级渲染，避免被侧栏 overflow 裁剪） */
   onOpenSettings?: () => void
+  /** 标签筛选（对标 Obsidian Tag Pane 多选过滤） */
+  activeTags?: string[]
+  onToggleTag?: (name: string) => void
+  onClearTags?: () => void
 }
 
 const GROUP_ORDER = ['今天', '昨天', '前7天', '更早'] as const
@@ -60,7 +67,21 @@ export function Sidebar(props: SidebarProps) {
 
   const groupedSessions = () => {
     const q = searchQuery().trim().toLowerCase()
-    const filtered = sessions.filter((s) => !q || s.title.toLowerCase().includes(q))
+    const activeTags = props.activeTags ?? []
+    // 会话标签（从 tags store 实时读取，非响应式 session.tags 兜底）
+    const sessionTags = (id: string): string[] => chatStore.tagsForSession(id)
+    const filtered = sessions.filter((s) => {
+      if (q && !s.title.toLowerCase().includes(q)) return false
+      if (activeTags.length > 0) {
+        const tags = sessionTags(s.id)
+        // 多选 = AND：命中每个激活标签（标签层级根匹配：激活 root 命中全部子标签）
+        for (const at of activeTags) {
+          const matched = tags.some((t) => t === at || t.startsWith(`${at}/`))
+          if (!matched) return false
+        }
+      }
+      return true
+    })
     if (groupMode() === 'project') {
       // 项目分组：按 session.project 归组，未知归「其他」
       const map = new Map<string, typeof filtered>()
@@ -115,6 +136,57 @@ export function Sidebar(props: SidebarProps) {
     if (hours < 48) return '昨天'
     if (hours < 168) return `${Math.floor(hours / 24)}天前`
     return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+  }
+
+  /* ── 打标交互（对标 Obsidian 标签输入） ── */
+  const [taggingSessionId, setTaggingSessionId] = createSignal<string | null>(null)
+  const [tagInput, setTagInput] = createSignal('')
+  let tagInputRef: HTMLInputElement | undefined
+
+  const handleOpenTagging = (e: Event, id: string) => {
+    e.stopPropagation()
+    if (taggingSessionId() === id) {
+      setTaggingSessionId(null)
+      setTagInput('')
+      return
+    }
+    setTaggingSessionId(id)
+    setTagInput('')
+    requestAnimationFrame(() => tagInputRef?.focus())
+  }
+
+  const handleTagInputKey = (e: KeyboardEvent, id: string) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      const raw = tagInput().trim()
+      if (raw) {
+        chatStore.tagSession(id, raw)
+        setTagInput('')
+        requestAnimationFrame(() => tagInputRef?.focus())
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setTaggingSessionId(null)
+      setTagInput('')
+    }
+  }
+
+  const handleRemoveTag = (e: Event, sessionId: string, tag: string) => {
+    e.stopPropagation()
+    chatStore.untagSession(sessionId, tag)
+  }
+
+  /* 已有标签建议（输入时联想，对标 Obsidian 标签自动补全） */
+  const tagSuggestions = () => {
+    const q = normalizeTagName(tagInput())
+    if (!q) return []
+    return Object.keys(tagsStore.state.tags)
+      .filter((t) => t.includes(q) && t !== q)
+      .slice(0, 5)
+  }
+
+  const handleToggleTag = (name: string) => {
+    props.onToggleTag?.(name)
   }
 
   return (
@@ -262,6 +334,13 @@ export function Sidebar(props: SidebarProps) {
             </button>
           </div>
 
+          {/* 标签区（对标 Obsidian Tag Pane：层级树 + 多选过滤） */}
+          <TagBar
+            activeTags={props.activeTags ?? []}
+            onToggleTag={handleToggleTag}
+            onClearTags={props.onClearTags ?? (() => {})}
+          />
+
           {/* 会话列表（按时间/项目分组） */}
           <div class="flex-1 overflow-y-auto px-3 pb-4">
             <Show
@@ -280,52 +359,127 @@ export function Sidebar(props: SidebarProps) {
                       <For each={group.items}>
                         {(session: { id: string; title: string; updatedAt: Date }) => {
                           const active = currentSessionId === session.id
+                          const sessionTags = () => chatStore.tagsForSession(session.id)
+                          const isTagging = () => taggingSessionId() === session.id
                           return (
                             <li class="group relative">
                               <div class={clsx(
-                                'flex items-center rounded-lg transition-colors',
+                                'rounded-lg transition-colors',
                                 active
                                   ? 'bg-nt-io-500/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
                                   : 'hover:bg-white/40'
                               )}>
-                                <button
-                                  class="flex-1 flex items-center gap-3 px-3 py-2 min-w-0 text-left"
-                                  onClick={() => handleSwitchSession(session.id)}
-                                  aria-current={active ? 'true' : 'false'}
-                                  title={session.title}
-                                >
-                                  <NeoMessage class={clsx(
-                                    'w-4 h-4 flex-shrink-0',
-                                    active ? 'text-nt-io-600' : 'text-text-muted'
-                                  )} />
-                                  <span class={clsx(
-                                    'flex-1 min-w-0 truncate text-[13px]',
-                                    active ? 'text-text-primary font-medium' : 'text-text-secondary'
-                                  )}>
-                                    {session.title}
-                                  </span>
-                                  <span class="text-11px text-text-muted flex-shrink-0">
-                                    {formatRelativeTime(session.updatedAt)}
-                                  </span>
-                                </button>
-                                <div class="flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                {/* 标题行：主按钮 + hover 操作区 */}
+                                <div class="flex items-center">
                                   <button
-                                    class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-                                    onClick={(e) => handleRenameSession(e, session.id)}
-                                    aria-label="重命名会话"
-                                    title="重命名"
+                                    class="flex-1 flex items-center gap-3 px-3 py-2 min-w-0 text-left"
+                                    onClick={() => handleSwitchSession(session.id)}
+                                    aria-current={active ? 'true' : 'false'}
+                                    title={session.title}
                                   >
-                                    <NeoPencil class="w-3.5 h-3.5" />
+                                    <NeoMessage class={clsx(
+                                      'w-4 h-4 flex-shrink-0',
+                                      active ? 'text-nt-io-600' : 'text-text-muted'
+                                    )} />
+                                    <span class={clsx(
+                                      'flex-1 min-w-0 truncate text-[13px]',
+                                      active ? 'text-text-primary font-medium' : 'text-text-secondary'
+                                    )}>
+                                      {session.title}
+                                    </span>
+                                    <span class="text-11px text-text-muted flex-shrink-0">
+                                      {formatRelativeTime(session.updatedAt)}
+                                    </span>
                                   </button>
-                                  <button
-                                    class="p-1 rounded text-text-muted hover:text-red-600 hover:bg-red-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
-                                    onClick={(e) => handleDeleteSession(e, session.id)}
-                                    aria-label="删除会话"
-                                    title="删除"
-                                  >
-                                    <NeoTrash class="w-3.5 h-3.5" />
-                                  </button>
+                                  <div class="flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+                                    <button
+                                      class={clsx(
+                                        'p-1 rounded transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none',
+                                        isTagging()
+                                          ? 'bg-nt-io-500/10 text-nt-io-600'
+                                          : 'text-text-muted hover:text-text-primary hover:bg-white/70'
+                                      )}
+                                      onClick={(e) => handleOpenTagging(e, session.id)}
+                                      aria-label={isTagging() ? '关闭打标' : '打标签'}
+                                      title={isTagging() ? '关闭打标' : '打标签'}
+                                    >
+                                      <svg viewBox="0 0 16 16" fill="none" class="w-3.5 h-3.5">
+                                        <line x1="5.5" y1="2.5" x2="4" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                                        <line x1="10.5" y1="2.5" x2="9" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                                        <line x1="2.5" y1="6" x2="13.5" y2="6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                                        <line x1="2.5" y1="10" x2="13.5" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-white/70 transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
+                                      onClick={(e) => handleRenameSession(e, session.id)}
+                                      aria-label="重命名会话"
+                                      title="重命名"
+                                    >
+                                      <NeoPencil class="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      class="p-1 rounded text-text-muted hover:text-red-600 hover:bg-red-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                                      onClick={(e) => handleDeleteSession(e, session.id)}
+                                      aria-label="删除会话"
+                                      title="删除"
+                                    >
+                                      <NeoTrash class="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
+
+                                {/* 会话标签行（按钮外，避免 button 嵌 button） */}
+                                <Show when={sessionTags().length > 0}>
+                                  <div class="px-3 pb-2 -mt-1">
+                                    <div class="inline-flex flex-wrap gap-1">
+                                      <For each={sessionTags()}>
+                                        {(tag) => (
+                                          <NeoTag
+                                            name={tag}
+                                            color={tagsStore.state.tags[tag] ?? '#909098'}
+                                            size="sm"
+                                            active={(props.activeTags ?? []).includes(tag)}
+                                            onClick={() => handleToggleTag(tag)}
+                                            onRemove={(t) => handleRemoveTag(new Event('click'), session.id, t)}
+                                            showHierarchy
+                                          />
+                                        )}
+                                      </For>
+                                    </div>
+                                  </div>
+                                </Show>
+
+                                {/* 打标输入（inline 展开，含已有标签建议） */}
+                                <Show when={isTagging()}>
+                                  <div class="mx-3 mb-2 px-2 py-1.5 rounded-lg bg-white/70 border border-nt-io-500/30 backdrop-blur-sm">
+                                    <div class="flex items-center gap-1.5">
+                                      <span class="text-nt-io-600 flex-shrink-0 text-[11px] font-mono">#</span>
+                                      <input
+                                        ref={tagInputRef}
+                                        class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-text-primary placeholder-text-muted/60"
+                                        placeholder="输入标签，Enter 添加（支持 父/子 层级）"
+                                        value={tagInput()}
+                                        onInput={(e) => setTagInput(e.currentTarget.value)}
+                                        onKeyDown={(e) => handleTagInputKey(e, session.id)}
+                                      />
+                                    </div>
+                                    <Show when={tagSuggestions().length > 0}>
+                                      <div class="flex flex-wrap gap-1 pt-1">
+                                        <For each={tagSuggestions()}>
+                                          {(sugg) => (
+                                            <button
+                                              class="px-1.5 py-0.5 rounded text-[10px] text-text-muted hover:text-nt-io-600 hover:bg-nt-io-500/10 transition-colors"
+                                              onClick={() => { chatStore.tagSession(session.id, sugg); setTagInput('') }}
+                                            >
+                                              # {sugg}
+                                            </button>
+                                          )}
+                                        </For>
+                                      </div>
+                                    </Show>
+                                  </div>
+                                </Show>
                               </div>
                               {/* 当前会话左侧红色指示条 */}
                               {active && (
