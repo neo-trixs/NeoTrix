@@ -98,7 +98,21 @@ pub use l2_world_impl::nt_world_novel;
 pub use l1_body_impl::nt_io_logging;
 pub use l1_body_impl::nt_io_http_factory;
 pub use l1_body_impl::nt_io_mention;
-pub use l1_body_impl::nt_io_standalone;
+pub use l1_body_impl::nt_io_standalone::{
+    ReasoningKernel, ReasoningMethod, ReasoningOutput,
+    StageInfo, KernelStats, SelfConsistencyResult, verify_answer,
+    text_to_vector, format_kernel_output, EVOLUTION, KERNEL_DIM, Vector,
+};
+
+pub use l1_body_impl::nt_io_provider::types::{
+    LlmProvider, LlmRequest, LlmResponse, LlmError, Message, Role,
+};
+
+pub use crate::core::nt_core_reasoning::{
+    ReasoningTrace, ReasoningStep, TraceSource,
+    MethodRegistry, MethodSpec,
+    default_method_registry, default_context_builder,
+};
 #[cfg(feature = "telemetry")]
 pub use l1_body_impl::nt_io_telemetry;
 pub use l1_body_impl::nt_io_user_avatar;
@@ -167,7 +181,7 @@ pub use l1_body_impl::nt_io_notify::{notify, notify_with_level, notify_task_comp
 pub use l1_body_impl::nt_io_mention::{resolve_mentions, MentionResult};
 pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard::{ConsciousnessGoldStandard, GoldStandardReport, ConsciousnessLevel, DetectionTrend, E8HexagramState};
 pub use l8_autonomic_impl::nt_mind::export_import::ReasoningBankExporter;
-pub use crate::core::nt_core_answer_engine::{AnswerEngine, AnswerEngineConfig, AnswerMode, AnswerResult, AnswerSegment, SearchResult, SourceType, WidgetKind, WidgetProvider, ContextBuilder, ContextSource, PreparedQuery};
+pub use crate::core::nt_core_answer_engine::{AnswerEngine, AnswerEngineConfig, AnswerMode, AnswerResult, AnswerSegment, SearchResult, SourceType, WidgetKind, WidgetProvider, ContextSource, PreparedQuery};
 pub use l2_world_impl::nt_world_scrape::{ScraperConfig, ScrapeResult, BrowserScraper, RequestScraper, AntiDetect};
 pub use l1_body_impl::nt_shield_audit::{
     SecurityAuditor, AuditReport, AuditMode, AuditDimension, VulnDomain, Severity,

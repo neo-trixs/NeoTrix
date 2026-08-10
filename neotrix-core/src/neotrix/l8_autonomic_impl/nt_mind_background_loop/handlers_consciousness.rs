@@ -759,6 +759,24 @@ impl BackgroundLoopHandle {
                 report.ghost_count, report.stale_count, report.orphan_count);
         }
 
+        // ── 星系卫生代码强制 (T3 生产接线): 校验 consciousness 命名空间 ──
+        // 幽灵分支预防 / 星辰沉寂检测 / 星系完整性验证 (star-memory skill 法则)
+        if let Some(ref kb) = self.kb {
+            let hygiene = kb.galaxy_hygiene_check(
+                &crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_galaxy_hygiene::GalaxyHygieneConfig::default(),
+            );
+            if hygiene.is_clean() {
+                log::info!("[bg] galaxy_hygiene: {} hubs clean", hygiene.hub_count);
+            } else {
+                log::warn!("[bg] galaxy_hygiene: {} hubs, {} ghost-branch, {} stale-star, {} missing-hub, {} empty-route",
+                    hygiene.hub_count, hygiene.ghost_branches, hygiene.stale_stars,
+                    hygiene.missing_hubs, hygiene.empty_route_tables);
+                for f in hygiene.findings.iter().take(5) {
+                    log::warn!("[bg] galaxy_hygiene: {}", f);
+                }
+            }
+        }
+
         // ── Inline self-test: types WITHOUT persistent fields use fresh instances (acceptable) ──
         let model = SelfModel::new();
         let scanner = CodeScanner::new(".");

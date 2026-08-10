@@ -5,7 +5,7 @@ pub mod brain_ewc;
 pub mod brain_seal;
 pub mod brain_dgm;
 pub mod brain_impl;
-mod loop_impl;
+pub mod loop_impl;
 mod persist_impl;
 pub mod checkpoint;
 pub mod pipeline;

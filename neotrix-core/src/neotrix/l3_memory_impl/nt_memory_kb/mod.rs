@@ -25,6 +25,7 @@ pub mod nt_memory_curation;
 pub mod nt_memory_skill_cost;
 pub mod nt_memory_ingest;
 pub mod nt_memory_proficiency;
+pub mod nt_memory_primitives;
 pub mod nt_memory_integration;
 pub mod nt_memory_schema;
 pub mod nt_memory_search;
@@ -40,6 +41,7 @@ pub mod nt_memory_wiki;
 pub mod nt_memory_knowledge_assets;
 pub mod nt_memory_commit_tracker;
 pub mod nt_memory_graph_cache;
+pub mod nt_memory_galaxy_hygiene;
 pub mod privacy;
 pub mod user_memory;
 pub mod vector_adapter;
@@ -63,6 +65,7 @@ pub use nt_memory_agent_driven::{AgentMemory, AgentMemoryEntry, MemoryConfig, Me
 pub use nt_memory_agent_session::{AgentSessionManager, AgentSession, AgentSessionEntry};
 pub use nt_memory_svaf_gate::{SvafGate, SvafDecision, SvafEvaluation};
 pub use nt_memory_proficiency::{MemoryProficiency, MemoryAction, MemoryActionRecord, MemoryProficiencyReport};
+pub use nt_memory_primitives::MemoryPrimitives;
 pub use nt_memory_wiki::{WikiSyncReport, WikiNode, WikiEdge, WikiGraph, WikiSearchResult};
 pub use nt_memory_graphrag::{GraphRagStore, GraphRagConfig, EntityGraph, EntityNode, RelationEdge, GraphQueryMode, SubgraphResult, HybridResult, GlobalSummary, Community};
 pub use nt_memory_tech_reserve::{
@@ -715,6 +718,25 @@ impl KnowledgeBase {
             .map_err(|e| format!("upsert_edge: {}", e))
     }
 
+    /// T0.1 类型化边 (metadata 增强版): 承载结构化溯源 (evidence/source/extractor)。
+    /// 来自 39 仓库吸收 — codebase-memory-mcp 类型化边 + semantica PROV-O 溯源:
+    /// edges 应带 source/confidence/extractor 元数据, 而非只塞进 description。
+    pub fn upsert_edge_with_metadata(
+        &self,
+        source_id: &str,
+        target_id: &str,
+        relation_type: RelationType,
+        weight: f64,
+        description: Option<&str>,
+        metadata: Option<serde_json::Value>,
+    ) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_store::upsert_edge_full(
+            &conn, source_id, target_id, relation_type, weight, description, metadata,
+        )
+        .map_err(|e| format!("upsert_edge_with_metadata: {}", e))
+    }
+
     pub fn find_node_by_url(&self, url: &str) -> Result<Option<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_store::find_node_by_url(&conn, url)
@@ -831,9 +853,56 @@ impl KnowledgeBase {
             self.update_node_metadata(&node_id, &meta)?;
         }
 
-        // 3. GraphRAG 派生: 实体/关系从主库内容提取, 落 graphrag_store
+        // 4. SVAF 写入门禁 (validated writeback, T0.4) — 来源: loopx "spend-slot 只在
+        //    validated writeback 后记账" + Awesome-AI-Memory 记忆操作原语。
+        //    评估写入质量并记录决策到 metadata (可审计); Reject/Redundant → 跳过
+        //    graphrag 派生 (不污染语义图), 但基础节点保留 (证据链完整)。
+        let svaf_eval = self.evaluate_write_gate(content, url, domain);
+        let mut svaf_meta = self
+            .get_node(&node_id)?
+            .and_then(|n| n.metadata.clone())
+            .unwrap_or_else(|| serde_json::json!({}));
+        if let Some(obj) = svaf_meta.as_object_mut() {
+            obj.insert(
+                "svaf".to_string(),
+                serde_json::json!({
+                    "decision": format!("{:?}", svaf_eval.decision),
+                    "novelty": svaf_eval.novelty,
+                    "coherence": svaf_eval.coherence,
+                    "relevance": svaf_eval.relevance,
+                    "authority": svaf_eval.authority,
+                    "reason": svaf_eval.reason,
+                }),
+            );
+        }
+        self.update_node_metadata(&node_id, &svaf_meta)?;
+
+        let gate_passed = !matches!(
+            svaf_eval.decision,
+            nt_memory_svaf_gate::SvafDecision::Reject | nt_memory_svaf_gate::SvafDecision::Redundant
+        );
+
+        // 5. 冲突检测 (T0.3) — 来源: semantica "冲突标记而非静默覆盖" + D2 策展接线。
+        //    写后校验: 新节点与既有相似标题节点断言极性相反 → 新者胜出, 旧者
+        //    supersedes 指向新者 (保留证据链)。scoped 检测, 非全库 O(n²)。
+        //    与 SVAF 门禁解耦: 事实一致性独立于质量评估, 无论门禁结果都执行。
+        if let Some(text) = content {
+            if !text.trim().is_empty() {
+                let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+                let conflicts = nt_memory_curation::conflict_detect_for_write(&conn, &node_id, 0.4)
+                    .unwrap_or_default();
+                drop(conn);
+                if !conflicts.is_empty() {
+                    let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+                    let _ = nt_memory_curation::apply_supersede(&conn, &conflicts);
+                }
+            }
+        }
+
+        // 6. GraphRAG 派生: 实体/关系从主库内容提取, 落 graphrag_store。
+        //    门禁未过 (Reject/Redundant) → 跳过派生 (不污染语义图), 基础节点保留。
         let text = content.unwrap_or_default();
-        if !text.is_empty() {
+        if gate_passed && !text.is_empty() {
             // 惰性初始化 graphrag store (首次写入自动建立, 无需前置 init)
             if self.graphrag_store.read().map(|gs| gs.as_ref().is_none()).unwrap_or(false) {
                 let _ = self.init_graphrag(nt_memory_graphrag::GraphRagConfig::default());
@@ -846,8 +915,16 @@ impl KnowledgeBase {
                         &target_title, NodeType::Concept, None, None, domain,
                     ) {
                         let rtype = RelationType::from_str(&rel.relation_type);
-                        let _ = self.upsert_edge(
-                            &node_id, &target_id, rtype, rel.weight, Some(&rel.evidence),
+                        // T0.1 类型化边: 结构化溯源进 metadata (evidence/source/extractor),
+                        // description 保留人类可读证据。
+                        let edge_meta = serde_json::json!({
+                            "evidence": rel.evidence,
+                            "source": domain.unwrap_or("unknown"),
+                            "extractor": "graphrag",
+                        });
+                        let _ = self.upsert_edge_with_metadata(
+                            &node_id, &target_id, rtype, rel.weight,
+                            Some(&rel.evidence), Some(edge_meta),
                         );
                     }
                 }
@@ -856,6 +933,29 @@ impl KnowledgeBase {
         }
 
         Ok(node_id)
+    }
+
+    /// SVAF 写入门禁评估 (T0.4): 从 url/domain 推导 source_type, 走 content-only 门禁
+    /// (廉价, 不触发全库 embedding 扫描)。无内容写入默认 Accept (标题型节点)。
+    fn evaluate_write_gate(
+        &self,
+        content: Option<&str>,
+        url: Option<&str>,
+        domain: Option<&str>,
+    ) -> nt_memory_svaf_gate::SvafEvaluation {
+        let text = content.unwrap_or_default();
+        if text.trim().is_empty() {
+            return nt_memory_svaf_gate::SvafEvaluation {
+                decision: nt_memory_svaf_gate::SvafDecision::Accept,
+                novelty: 0.5,
+                coherence: 0.5,
+                relevance: 0.5,
+                authority: 0.5,
+                reason: "no content, default accept".into(),
+            };
+        }
+        let source_type = derive_source_type(url, domain);
+        self.gate_content_only(text, &source_type)
     }
 
 
@@ -1736,6 +1836,19 @@ impl KnowledgeBase {
         self.kv_list("experience")
     }
 
+    /// 星系卫生代码强制 (T3 生产接线): 校验 consciousness 命名空间的
+    /// 幽灵分支 / 沉寂星辰 / 缺失 hub。由 BackgroundLoop arch_audit 周期调用。
+    pub fn galaxy_hygiene_check(&self, config: &nt_memory_galaxy_hygiene::GalaxyHygieneConfig) -> nt_memory_galaxy_hygiene::GalaxyHygieneReport {
+        match self.conn.lock() {
+            Ok(conn) => nt_memory_galaxy_hygiene::galaxy_hygiene_check(&conn, config),
+            Err(e) => {
+                let mut report = nt_memory_galaxy_hygiene::GalaxyHygieneReport::default();
+                report.findings.push(format!("[error] KB lock failed: {}", e));
+                report
+            }
+        }
+    }
+
     pub fn config_get(&self, section: &str, key: &str) -> Result<Option<String>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_unify::config_get(&conn, section, key)
@@ -2059,6 +2172,27 @@ impl crate::core::nt_core_traits::MemoryProvider for KnowledgeBase {
 }
 
 // ── EvolutionPatternType helper ──
+
+/// 从 url/domain 推导 SVAF source_type (T0.4 validated writeback)。
+/// 优先级: url 域名特征 > domain 字段 > unknown。
+fn derive_source_type(url: Option<&str>, domain: Option<&str>) -> String {
+    if let Some(u) = url {
+        let lower = u.to_lowercase();
+        for (pat, ty) in [
+            ("arxiv", "arxiv"),
+            ("wikipedia", "wikipedia"),
+            ("github", "github"),
+            ("blog", "blog"),
+            ("news", "news"),
+            ("forum", "forum"),
+        ] {
+            if lower.contains(pat) {
+                return ty.to_string();
+            }
+        }
+    }
+    domain.unwrap_or("unknown").to_string()
+}
 
 impl EvolutionPatternType {
     fn from_str(s: &str) -> Self {
@@ -2394,6 +2528,110 @@ mod tests {
         let (pruned2, _) = kb.compact(Some(30)).expect("compact with prune");
         assert_eq!(pruned2, 0, "新节点不应被 30 天 prune 删除");
         let _ = freed; // freed 可能为 0（小库），不强制断言
+    }
+
+    // ── T0.1 / T0.3 / T0.4 接线测试 (39 仓库吸收 Phase 0) ──
+
+    #[test]
+    fn test_upsert_edge_with_metadata_persists() {
+        // T0.1: 类型化边 metadata 透传 — 结构化溯源 (evidence/source/extractor) 落库
+        let kb = test_kb();
+        let src = kb.insert_or_get_node(
+            "Edge Source Node", super::nt_memory_types::NodeType::Concept,
+            None, None, Some("test"),
+        ).expect("src node");
+        let tgt = kb.insert_or_get_node(
+            "Edge Target Node", super::nt_memory_types::NodeType::Concept,
+            None, None, Some("test"),
+        ).expect("tgt node");
+        let meta = serde_json::json!({
+            "evidence": "https://example.com/evidence",
+            "source": "github",
+            "extractor": "graphrag",
+        });
+        kb.upsert_edge_with_metadata(
+            &src, &tgt, super::nt_memory_types::RelationType::RelatedTo,
+            0.8, Some("human readable"), Some(meta),
+        ).expect("upsert with metadata");
+
+        let conn = kb.conn.lock().expect("lock");
+        let stored: Option<String> = conn
+            .query_row(
+                "SELECT metadata FROM edges WHERE source_id=?1 AND target_id=?2",
+                rusqlite::params![src, tgt],
+                |r| r.get(0),
+            )
+            .expect("query edge metadata");
+        drop(conn);
+        let stored = stored.expect("metadata must be non-null");
+        let parsed: serde_json::Value = serde_json::from_str(&stored).expect("valid json");
+        assert_eq!(parsed["source"], "github", "source 元数据应落库");
+        assert_eq!(parsed["extractor"], "graphrag");
+        assert_eq!(parsed["evidence"], "https://example.com/evidence");
+    }
+
+    #[test]
+    fn test_write_memory_entry_records_svaf_gate() {
+        // T0.4: validated writeback — 每次写入记录 svaf 决策到 metadata
+        let kb = test_kb();
+        kb.write_memory_entry(
+            "Svaf Gate Recorded",
+            super::nt_memory_types::NodeType::Concept,
+            Some("A coherent concept about machine learning models and data systems."),
+            Some("https://svaf.example/1"),
+            Some("test"),
+            None,
+        ).expect("write");
+        let node = kb.find_node_by_url("https://svaf.example/1").expect("find")
+            .expect("node exists");
+        let svaf = node.metadata.as_ref().and_then(|m| m.get("svaf"))
+            .expect("svaf decision must be recorded");
+        assert!(svaf.get("decision").is_some(), "decision 字段应存在: {:?}", svaf);
+        assert!(svaf.get("reason").is_some(), "reason 字段应存在");
+    }
+
+    #[test]
+    fn test_write_memory_entry_conflict_supersedes_old() {
+        // T0.3: 写后冲突检测 — 相似标题 + 相反极性 → 新者胜出, 旧者 supersedes
+        let kb = test_kb();
+        let url = "https://conflict.example/policy";
+        kb.write_memory_entry(
+            "Rate limit retry policy",
+            super::nt_memory_types::NodeType::Concept,
+            Some("retry is enabled for provider"),
+            Some(url),
+            Some("test"),
+            None,
+        ).expect("first write (positive)");
+        let old = kb.find_node_by_url(url).expect("find").expect("old node");
+
+        // 同标题相反断言 (新 URL 触发新节点)
+        kb.write_memory_entry(
+            "Rate limit retry policy",
+            super::nt_memory_types::NodeType::Concept,
+            Some("retry is not enabled for provider"),
+            Some("https://conflict.example/policy-v2"),
+            Some("test"),
+            None,
+        ).expect("second write (negative)");
+        let new = kb.find_node_by_url("https://conflict.example/policy-v2").expect("find")
+            .expect("new node");
+
+        // 旧节点应被 supersede 指向新节点
+        let old_after = kb.get_node(&old.id).expect("get").expect("old still exists");
+        assert_eq!(
+            old_after.supersedes.as_deref(),
+            Some(new.id.as_str()),
+            "旧节点应 supersedes 指向新节点 (证据链保留)"
+        );
+        let tier = old_after.metadata.as_ref().and_then(|m| m.get("tier"));
+        let _ = tier; // tier 在独立列, 用 SQL 校验
+        let conn = kb.conn.lock().expect("lock");
+        let tier_col: String = conn
+            .query_row("SELECT tier FROM nodes WHERE id=?1", rusqlite::params![old.id], |r| r.get(0))
+            .expect("tier");
+        drop(conn);
+        assert_eq!(tier_col, "cold", "旧节点应降级 cold");
     }
 }
 

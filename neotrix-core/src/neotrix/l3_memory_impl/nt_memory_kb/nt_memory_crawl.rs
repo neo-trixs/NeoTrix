@@ -45,7 +45,7 @@ pub fn enqueue_seed_urls(conn: &Connection, topic_urls: &[(&str, i64, &str)]) ->
 
 pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, String> {
     let url = format!("https://en.wikipedia.org/api/rest_v1/page/summary/{}", topic);
-    let resp = http_client().get(&url).send().map_err(|e| format!("Wikipedia fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send()).map_err(|e| format!("Wikipedia fetch error: {}", e))?;
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
 
     let title = data["title"].as_str().unwrap_or(topic);
@@ -92,7 +92,7 @@ pub fn ingest_from_wikipedia(conn: &Connection, topic: &str) -> Result<usize, St
 
 pub fn ingest_from_arxiv(conn: &Connection, arxiv_id: &str) -> Result<usize, String> {
     let url = format!("https://export.arxiv.org/api/query?id_list={}", arxiv_id);
-    let resp = http_client().get(&url).send().map_err(|e| format!("arXiv fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send()).map_err(|e| format!("arXiv fetch error: {}", e))?;
     let text = resp.text().map_err(|e| format!("Text error: {}", e))?;
 
     let title = extract_xml_tag(&text, "title").unwrap_or_else(|| "Unknown".into());
@@ -145,7 +145,7 @@ pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
     let ts = now();
     let mut stmt = conn
         .prepare(
-            "SELECT id, url FROM nodes WHERE node_type='Article' AND (content IS NULL OR content = '') AND url LIKE '%openlibrary.org%'",
+            "SELECT id, url FROM nodes WHERE node_type='Article' AND COALESCE(summary, content, '') = '' AND url LIKE '%openlibrary.org%'",
         )
         .map_err(|e| format!("DB prepare: {e}"))?;
 
@@ -176,7 +176,7 @@ pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
                     let clean = text.trim();
                     if !clean.is_empty()
                         && conn.execute(
-                            "UPDATE nodes SET content=?1, updated_at=?2 WHERE id=?3",
+                            "UPDATE nodes SET summary=?1, content=?1, updated_at=?2 WHERE id=?3",
                             rusqlite::params![clean, ts, id],
                         ).is_ok()
                     {
@@ -192,7 +192,7 @@ pub fn ingest_from_openlibrary(conn: &Connection) -> Result<usize, String> {
 
 pub fn ingest_from_github(conn: &Connection, owner: &str, repo: &str) -> Result<usize, String> {
     let api_url = format!("https://api.github.com/repos/{}/{}", owner, repo);
-    let resp = http_client().get(&api_url).send().map_err(|e| format!("GitHub fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| http_client().get(&api_url).send()).map_err(|e| format!("GitHub fetch error: {}", e))?;
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON parse error: {}", e))?;
 
     let default_title = format!("{}/{}", owner, repo);
@@ -510,7 +510,7 @@ pub struct CrawlCycleReport {
 
 pub fn discover_from_seed(conn: &Connection, seed_topic: &str) -> Result<usize, String> {
     let url = format!("https://en.wikipedia.org/api/rest_v1/page/summary/{}", seed_topic);
-    let resp = http_client().get(&url).send().map_err(|e| format!("Fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| http_client().get(&url).send()).map_err(|e| format!("Fetch error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
 
@@ -533,7 +533,7 @@ pub fn discover_from_seed(conn: &Connection, seed_topic: &str) -> Result<usize, 
     let mut count = 1;
 
     let links_url = format!("https://en.wikipedia.org/w/api.php?action=query&prop=links&titles={}&pllimit=50&format=json", title_clean);
-    if let Ok(resp) = http_client().get(&links_url).send() {
+    if let Ok(resp) = super::nt_http::run_blocking(|| http_client().get(&links_url).send()) {
         if let Ok(data) = resp.json::<serde_json::Value>() {
             if let Some(pages) = data["query"]["pages"].as_object() {
                 for page in pages.values() {

@@ -345,8 +345,18 @@ impl GatewayV2 {
     }
 
     /// 解析默认模型名（用于交互模式初始化）。
-    /// 优先返回可用的免费 provider，其次任意可用 provider。
+    /// 优先返回真正匿名可用的免费模型 (llm7/codestral-latest — 实测唯一匿名可用流式端点,
+    /// 见本文件 2123 行注释; api-airforce 需真 key 401, pollinations 429/402),
+    /// 其次走 select_best_for_profile (免费 provider 优先)。
     pub async fn resolve_default_model(&self) -> String {
+        let llm7_ok = self
+            .states
+            .read()
+            .map(|s| s.get("llm7").map(|st| st.is_available()).unwrap_or(false))
+            .unwrap_or(false);
+        if llm7_ok {
+            return "llm7/codestral-latest".to_string();
+        }
         self.select_best_for_profile(CommunicationProfile::Open)
             .await
             .unwrap_or_else(|| "default".to_string())

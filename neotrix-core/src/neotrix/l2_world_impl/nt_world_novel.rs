@@ -354,22 +354,6 @@ fn add_qidian_edge(conn: &Connection, src: &str, tgt: &str, rel: &str, w: f64, d
     .unwrap_or(false)
 }
 
-fn extract_between<'a>(s: &'a str, start: &str, end: &str) -> Option<&'a str> {
-    let s1 = s.find(start)?;
-    let rest = &s[s1 + start.len()..];
-    let end_pos = rest.find(end)?;
-    Some(rest[..end_pos].trim())
-}
-
-fn slugify(s: &str) -> String {
-    s.to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
-        .collect::<String>()
-        .trim_matches('-')
-        .to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

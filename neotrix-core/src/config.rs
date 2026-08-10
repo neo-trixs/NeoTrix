@@ -45,7 +45,9 @@ impl NeoTrixConfig {
                                 }
                             }
                         }
-                        eprintln!("[config] loaded from {}", p.display());
+                        if std::env::var("NEOTRIX_QUIET").is_err() {
+                            eprintln!("[config] loaded from {}", p.display());
+                        }
                         cfg
                     }
                     Err(e) => {

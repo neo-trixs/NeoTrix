@@ -191,10 +191,36 @@ impl CommandRegistry {
     }
 
     pub fn find(&self, name: &str) -> Option<&dyn CliCommand> {
-        self.commands
+        // 1. 精确匹配 (name + aliases)
+        if let Some(cmd) = self
+            .commands
             .iter()
             .find(|cmd| cmd.name() == name || cmd.aliases().contains(&name))
-            .map(|b| b.as_ref())
+        {
+            return Some(cmd.as_ref());
+        }
+        // 2. 前缀匹配 (唯一命中时) — 智能补全
+        let prefix_matches: Vec<&Box<dyn CliCommand>> = self
+            .commands
+            .iter()
+            .filter(|cmd| {
+                cmd.name().starts_with(name)
+                    || cmd.aliases().iter().any(|a| a.starts_with(name))
+            })
+            .collect();
+        if prefix_matches.len() == 1 {
+            return Some(prefix_matches[0].as_ref());
+        }
+        // 3. 编辑距离 ≤2 (唯一命中时) — 智能容错 "did you mean"
+        let fuzzy: Vec<&Box<dyn CliCommand>> = self
+            .commands
+            .iter()
+            .filter(|cmd| levenshtein(cmd.name(), name) <= 2)
+            .collect();
+        if fuzzy.len() == 1 {
+            return Some(fuzzy[0].as_ref());
+        }
+        None
     }
 
     pub fn list(&self) -> Vec<&str> {
@@ -363,6 +389,26 @@ fn check_shield_for_command(name: &str, _args: &[String]) -> Option<CommandOutpu
     }
 }
 
+/// 编辑距离 (Levenshtein) — 用于命令智能容错匹配。
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut curr = vec![0usize; b.len() + 1];
+    for (i, ca) in a.iter().enumerate() {
+        curr[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            curr[j + 1] = if ca == cb {
+                prev[j]
+            } else {
+                1 + prev[j].min(prev[j + 1]).min(curr[j])
+            };
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b.len()]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,5 +477,13 @@ mod tests {
         assert!(reg.list().is_empty());
         assert!(reg.get("/help").is_none());
         assert!(reg.find("/help").is_none());
+    }
+
+    #[test]
+    fn test_levenshtein() {
+        assert_eq!(levenshtein("kitten", "sitting"), 3);
+        assert_eq!(levenshtein("kb", "kb"), 0);
+        assert_eq!(levenshtein("kbl", "kb"), 1);
+        assert_eq!(levenshtein("", "abc"), 3);
     }
 }

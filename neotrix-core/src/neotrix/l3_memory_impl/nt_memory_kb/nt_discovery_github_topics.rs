@@ -10,16 +10,18 @@ use super::nt_memory_types::*;
 
 fn http_client() -> &'static reqwest::blocking::Client {
     static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
-        reqwest::blocking::Client::builder()
-            .user_agent("NeoTrix/0.19 (nt_discovery_github_topics)")
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(15))
-            .no_proxy()
-            .build()
-            .unwrap_or_else(|e| {
-                eprintln!("WARN: HTTP client init failed: {}", e);
-                reqwest::blocking::Client::new()
-            })
+        super::nt_http::run_blocking(|| {
+            reqwest::blocking::Client::builder()
+                .user_agent("NeoTrix/0.19 (nt_discovery_github_topics)")
+                .timeout(Duration::from_secs(30))
+                .connect_timeout(Duration::from_secs(15))
+                .no_proxy()
+                .build()
+                .unwrap_or_else(|e| {
+                    eprintln!("WARN: HTTP client init failed: {}", e);
+                    reqwest::blocking::Client::new()
+                })
+        })
     });
     &CLIENT
 }
@@ -45,7 +47,7 @@ fn api_get(url: &str) -> Result<serde_json::Value, String> {
     } else {
         req
     };
-    let resp = req.send().map_err(|e| format!("HTTP error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| req.send()).map_err(|e| format!("HTTP error: {}", e))?;
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().unwrap_or_default();

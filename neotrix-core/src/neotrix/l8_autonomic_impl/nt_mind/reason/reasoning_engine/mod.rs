@@ -1,7 +1,7 @@
 //! ReasoningEngine — Complete module with all methods needed by submodules
 
 mod cognitive_observer;
-mod engine_core;
+pub mod engine_core;
 
 pub use engine_core::{
     CostRecord, EngineMetrics, ReasoningEngine, ReasoningStats, MAX_COST_LOG, MAX_TRACES,

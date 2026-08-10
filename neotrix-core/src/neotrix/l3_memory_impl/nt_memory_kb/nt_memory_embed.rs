@@ -147,37 +147,42 @@ pub fn embed_text_batch(config: &EmbeddingConfig, texts: &[&str]) -> Result<Vec<
         return Ok(local_embed_texts(texts, config.dimension));
     }
 
-    let client = embedding_client()?;
+    // reqwest::blocking (client 初始化 + send) 在 tokio runtime 上下文内
+    // 会 panic (reason 的 rt.block_on → build_context → kb.search 路径)。
+    // 统一经共享 run_blocking 包裹; 非 runtime 上下文行为不变。
+    super::nt_http::run_blocking(|| {
+        let client = embedding_client()?;
 
-    let input: Vec<&str> = texts.to_vec();
-    let body = serde_json::json!({
-        "input": input,
-        "model": config.model,
-        "dimensions": config.dimension,
-    });
+        let input: Vec<&str> = texts.to_vec();
+        let body = serde_json::json!({
+            "input": input,
+            "model": config.model,
+            "dimensions": config.dimension,
+        });
 
-    let resp = client
-        .post(format!("{}/embeddings", config.base_url))
-        .header("Authorization", format!("Bearer {}", config.api_key))
-        .json(&body)
-        .send()
-        .map_err(|e| format!("Embedding request: {}", e))?;
+        let resp = client
+            .post(format!("{}/embeddings", config.base_url))
+            .header("Authorization", format!("Bearer {}", config.api_key))
+            .json(&body)
+            .send()
+            .map_err(|e| format!("Embedding request: {}", e))?;
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let err_text = resp.text().unwrap_or_default();
-        return Err(format!("Embedding API {}: {}", status, err_text));
-    }
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let err_text = resp.text().unwrap_or_default();
+            return Err(format!("Embedding API {}: {}", status, err_text));
+        }
 
-    let data: EmbeddingResponse = resp.json().map_err(|e| format!("Parse response: {}", e))?;
+        let data: EmbeddingResponse = resp.json().map_err(|e| format!("Parse response: {}", e))?;
 
-    // Sort by index to preserve original order
-    let mut indexed: Vec<(usize, Vec<f32>)> = data.data.into_iter()
-        .map(|d| (d.index, d.embedding))
-        .collect();
-    indexed.sort_by_key(|(idx, _)| *idx);
+        // Sort by index to preserve original order
+        let mut indexed: Vec<(usize, Vec<f32>)> = data.data.into_iter()
+            .map(|d| (d.index, d.embedding))
+            .collect();
+        indexed.sort_by_key(|(idx, _)| *idx);
 
-    Ok(indexed.into_iter().map(|(_, v)| v).collect())
+        Ok(indexed.into_iter().map(|(_, v)| v).collect())
+    })
 }
 
 /// Cosine similarity between two equal-length vectors.

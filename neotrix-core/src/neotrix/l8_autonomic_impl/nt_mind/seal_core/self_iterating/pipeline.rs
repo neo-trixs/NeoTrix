@@ -25,6 +25,7 @@ use super::goal_contract::{
 };
 
 use super::secret_scanner::SecretScanner;
+use super::anti_distillation_stage::AntiDistillationStage;
 use super::openspace_evolution::OpenSpaceEvolveStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
 use super::safety_stage::SafetyCheckStage;
@@ -221,6 +222,7 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(OpenSourceCompareStage::new()),  // 开源对比 (freq 5)
             Box::new(UQCalibrationStage::new()),      // 熵危机校准 (freq 20)
             Box::new(SleepStage::new()),              // 记忆巩固 (freq 100)
+            Box::new(AntiDistillationStage::new()),   // 反蒸馏健康监控 + 自适应水印/分解 (freq 5)
         ],
     }
 }
@@ -526,8 +528,22 @@ impl BrainStage for ScaffoldAwareRLStage {
         );
         let reward = solution_score * stage.compute_staleness_weight(age);
 
-        // GRPO loss
-        let _loss = stage.compute_grpo_loss(reward, old_score, age);
+        // GRPO loss → E8 policy update (修复 no-op):
+        // 原先 loss 被 `let _loss` 丢弃, GRPO 信号从未进入策略学习,
+        // 与 DPO/GRPO 训练闭环断裂 (同 H3 no-op 模式)。现在把
+        // -loss (负 loss = 正 advantage) 作为策略奖励喂给 E8Policy,
+        // 与 SSMUpdateStage 的更新风格一致, 形成真实 GRPO 训练回路。
+        let loss = stage.compute_grpo_loss(reward, old_score, age);
+        let grpo_reward = (-loss).clamp(0.0, 1.0);
+        let policy_mode = brain._e8_policy.best_mode();
+        brain._e8_policy.mode_values[policy_mode.0 as usize] =
+            (brain._e8_policy.mode_values[policy_mode.0 as usize] * 0.9 + grpo_reward * 0.1).min(1.0);
+        brain._e8_policy.mode_counts[policy_mode.0 as usize] += 1;
+        brain._e8_policy.decay_epsilon();
+        log::trace!(
+            "[scaffold_grpo] loss={:.4} grpo_reward={:.4} mode={} age={}",
+            loss, grpo_reward, policy_mode.0, age
+        );
 
         // Record scaffold
         stage.scaffold_history.push_back(ScaffoldRecord {
@@ -915,7 +931,7 @@ impl BrainStage for SearchSkillWrapperStage {
                     / kb_hits.len() as f64
             };
             let relevance = grounding;
-            let synthesis = grounding * 0.9; // 综合质量略低于 grounding, 反映证据到答案的损耗
+            let _synthesis = grounding * 0.9; // 综合质量略低于 grounding, 反映证据到答案的损耗
             let raw_results: Vec<SearchResult> = kb_hits.iter().take(5).map(|h| SearchResult {
                 url: h.node.id.clone(),
                 title: h.node.title.clone(),
@@ -1202,7 +1218,7 @@ impl BrainStage for HarnessAdaptStage {
             // 保底抬升是防能力归零的自我修正, 不是真实进化, 不应进入学习信号。
             let snap = brain._snapshot_capability();
             let mut new_snap = snap.clone();
-            for (i, v) in new_snap.arr_mut().iter_mut().enumerate() {
+            for (_i, v) in new_snap.arr_mut().iter_mut().enumerate() {
                 if *v < 0.2 {
                     *v = (*v + boost).min(0.3);
                 }

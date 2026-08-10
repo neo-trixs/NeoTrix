@@ -11,7 +11,7 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
     // ORDER BY rank DESC: 修正原实现 ASC + score=1.0-rank 的双重反向缺陷
     // 标题加权在 SQL 层: title 与查询词完全相等 → 排最前 (LIMIT 前生效, 防大文档被截断)
     let mut stmt = conn.prepare(
-        "SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
+"SELECT n.id, n.node_type, n.title, n.summary, COALESCE(n.summary, n.content, ''), n.url, n.domain,
                 n.language, n.confidence, n.importance, n.created_at, n.updated_at,
                 n.access_count, n.metadata,
                 rank,
@@ -102,7 +102,7 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
 
 pub fn search_by_type(conn: &Connection, node_type: &NodeType, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language,
+        "SELECT id, node_type, title, summary, COALESCE(summary, content, ''), url, domain, language,
             confidence, importance, created_at, updated_at, access_count, metadata
          FROM nodes
          WHERE node_type=?1
@@ -137,7 +137,7 @@ pub fn search_by_type(conn: &Connection, node_type: &NodeType, limit: usize) -> 
 
 pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>, limit: usize) -> rusqlite::Result<Vec<SearchResult>> {
     let (sql, has_relation) = if let Some(_rt) = relation_type {
-        ("SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
+        ("SELECT n.id, n.node_type, n.title, n.summary, COALESCE(n.summary, n.content, ''), n.url, n.domain,
                 n.language, n.confidence, n.importance, n.created_at, n.updated_at,
                 n.access_count, n.metadata, e.weight as score
              FROM edges e
@@ -146,7 +146,7 @@ pub fn get_related(conn: &Connection, node_id: &str, relation_type: Option<&str>
              ORDER BY e.weight DESC
              LIMIT ?3".to_string(), true)
     } else {
-        ("SELECT n.id, n.node_type, n.title, n.summary, n.content, n.url, n.domain,
+        ("SELECT n.id, n.node_type, n.title, n.summary, COALESCE(n.summary, n.content, ''), n.url, n.domain,
                 n.language, n.confidence, n.importance, n.created_at, n.updated_at,
                 n.access_count, n.metadata, e.weight as score
              FROM edges e
@@ -300,7 +300,7 @@ pub fn hybrid_search(
             .map(|(i, _)| format!("?{}", i + 1))
             .collect();
         let sql = format!(
-            "SELECT id, node_type, title, summary, content, url, domain, language,
+            "SELECT id, node_type, title, summary, COALESCE(summary, content, ''), url, domain, language,
                 confidence, importance, created_at, updated_at, access_count, metadata
              FROM nodes WHERE id IN ({})",
             placeholders.join(",")
@@ -360,7 +360,7 @@ pub fn hybrid_search(
 
     let remaining = limit - results.len();
     let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language,
+        "SELECT id, node_type, title, summary, COALESCE(summary, content, ''), url, domain, language,
             confidence, importance, created_at, updated_at, access_count, metadata
          FROM nodes
          WHERE title LIKE ?1

@@ -98,6 +98,28 @@ fn cn_stop() -> &'static HashSet<char> {
 // ─── value 透明压缩层 (方案 D) ─────────────────────────────────────
 const VALUE_MAGIC: &[u8] = b"NTZ1";
 
+/// UNBP URL 规范化: 去锚点/尾斜杠/域名小写 (用于 absorb-node 去重)
+/// 锚点 (#zh-full/#RealEarth4D) 是视角标记, 非 URL 唯一性的一部分
+fn normalize_url(url: &str) -> String {
+    let mut u = url.trim().to_string();
+    if let Some(idx) = u.find('#') {
+        u.truncate(idx);
+    }
+    u = u.trim_end_matches('/').to_string();
+    // 域名小写 (仅 http/https)
+    if let Some(pos) = u.find("://") {
+        let rest = &u[pos + 3..];
+        if let Some(slash) = rest.find('/') {
+            let (host, path) = rest.split_at(slash);
+            u = format!("{}://{}{}", &u[..pos], host.to_lowercase(), path);
+        } else {
+            let host = rest;
+            u = format!("{}://{}", &u[..pos], host.to_lowercase());
+        }
+    }
+    u
+}
+
 fn now_ts() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -170,11 +192,36 @@ fn kv_get(conn: &Connection, namespace: &str, key: &str) -> Option<String> {
     }
 }
 
+/// 数据库忙时重试写操作: 并发进程 (如 absorb_guji) 持写锁时,
+/// busy_timeout 可能失效或超时不足 (实测 DatabaseBusy panic at experience.rs:178),
+/// 显式指数退避重试 (max 5 次, 总等待 ≤~3s), 仍失败则 panic 保留可见错误。
+fn kv_set_retry(conn: &Connection, sql: &str, params: &[&dyn rusqlite::ToSql]) -> Result<usize, rusqlite::Error> {
+    let mut attempt = 0;
+    loop {
+        match conn.execute(sql, params) {
+            Ok(n) => return Ok(n),
+            Err(rusqlite::Error::SqliteFailure(e, _))
+                if e.code == rusqlite::ErrorCode::DatabaseBusy
+                    || e.code == rusqlite::ErrorCode::DatabaseLocked =>
+            {
+                attempt += 1;
+                if attempt >= 5 {
+                    return Err(rusqlite::Error::SqliteFailure(e, None));
+                }
+                let wait_ms = 100u64 << attempt; // 200,400,800,1600
+                std::thread::sleep(std::time::Duration::from_millis(wait_ms));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
 fn kv_set(conn: &Connection, namespace: &str, key: &str, value: &str) {
     let encoded = value_encode(value);
-    conn.execute(
+    kv_set_retry(
+        conn,
         "INSERT OR REPLACE INTO kv_store (namespace, key, value, updated_at) VALUES (?1, ?2, ?3, ?4)",
-        params![namespace, key, encoded, now_ts()],
+        &[&namespace, &key, &encoded, &now_ts()],
     )
     .expect("kv_set");
 }
@@ -884,12 +931,25 @@ fn cmd_absorb(conn: &mut Connection, session_path: &str) {
             let dim = 2048usize;
             let mut memo: HashMap<String, Vec<f64>> = HashMap::new();
             let (qvec, _) = text_doc_vector(&new_content.to_lowercase(), dim, &mut memo);
+            // 性能优化 (cycle 387 根因): 原实现对全量 branch_ 逐条算 VSA 向量,
+            // 随 KB 增长退化为 O(n²) (1851 条时单次 absorb ≈168s)。
+            // 改为仅同 domain 最近 SIM_COMPARE_MAX 条比对 (保留冗余过滤能力,
+            // 近期重复捕获足够; 跨期重复由幂等 session_id 门禁 + 内容哈希兜底)。
+            const SIM_COMPARE_MAX: usize = 200;
             let mut best_sim = 0.0f64;
-            for (_, value) in scan_values(conn, "branch_") {
+            let mut candidates: Vec<(String, String)> = scan_values(conn, "branch_")
+                .into_iter()
+                .rev() // scan 按 key 升序 (cycle 前缀近似时间序), 取最近
+                .filter(|(_, v)| {
+                    serde_json::from_str::<Value>(v)
+                        .map(|b| b.get("domain").and_then(|d| d.as_str()) == Some(dom))
+                        .unwrap_or(false)
+                })
+                .take(SIM_COMPARE_MAX)
+                .collect();
+            candidates.reverse(); // 恢复时间正序
+            for (_, value) in candidates {
                 let Ok(b) = serde_json::from_str::<Value>(&value) else { continue };
-                if b.get("domain").and_then(|d| d.as_str()) != Some(dom) {
-                    continue;
-                }
                 let bc = b
                     .get("content")
                     .and_then(|c| c.as_str())
@@ -1095,15 +1155,21 @@ fn cmd_absorb_node(conn: &Connection, input: &str, dry_run: bool, apply_capabili
             .and_then(|im| im.as_f64())
             .unwrap_or(0.5);
 
-        // 4. 去重 (URL 唯一键, 幂等)
+        // 4. 去重 (URL 唯一键, 幂等) — UNBP: URL 规范化 (去锚点/尾斜杠/域名小写)
+        //    锚点 (#zh-full/#RealEarth4D) 是视角标记非唯一性, 规范化后去重
+        let norm_url = normalize_url(url);
         let dup: bool = conn
-            .query_row("SELECT 1 FROM nodes WHERE url=?1", params![url], |_| Ok(true))
+            .query_row(
+                "SELECT 1 FROM nodes WHERE url=?1 OR url=?2",
+                params![url, norm_url],
+                |_| Ok(true),
+            )
             .unwrap_or(false);
         if dup {
             duplicated += 1;
             println!(
-                "[absorb-node] duplicate (url already in KB): {} — {}",
-                i, url
+                "[absorb-node] duplicate (url already in KB): {} — {} (norm={})",
+                i, url, norm_url
             );
             continue;
         }

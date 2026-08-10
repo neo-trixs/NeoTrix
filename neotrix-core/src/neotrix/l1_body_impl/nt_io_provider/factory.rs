@@ -660,19 +660,38 @@ pub fn create_gateway() -> GatewayV2 {
             GatewayV2::new()
         })
     };
-    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        handle.block_on(fut)
-    } else {
-        let rt = match tokio::runtime::Runtime::new() {
-            Ok(rt) => rt,
-            Err(e) => {
-                log::error!("[gateway] failed to create tokio runtime: {e}");
-                std::process::exit(1);
-            }
-        };
-        let gateway = rt.block_on(fut);
-        // 泄漏 runtime: 进程生命周期内保持存活, 避免 drop 卡死在 BlockingPool::shutdown。
-        std::mem::forget(rt);
-        gateway
+    // 在 tokio runtime 上下文内 (如 reason/exec 在 rt.block_on 里经
+    // init_reasoning_engine → create_gateway) 时, 直接 Runtime::new() 或
+    // Handle::block_on 都会 panic ("Cannot start a runtime from within a runtime",
+    // tokio 1.52+ 严格检查)。方案: 独立线程执行 — 新线程无 runtime 上下文,
+    // Runtime::new() + block_on 安全, 主线程 rx.recv() 等待结果。
+    if tokio::runtime::Handle::try_current().is_ok() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(rt) => rt,
+                Err(e) => {
+                    log::error!("[gateway] failed to create tokio runtime: {e}");
+                    std::process::exit(1);
+                }
+            };
+            let gateway = rt.block_on(fut);
+            // 泄漏 runtime: 进程生命周期内保持存活, 避免 drop 卡死在 BlockingPool::shutdown。
+            std::mem::forget(rt);
+            let _ = tx.send(gateway);
+        });
+        return rx.recv().unwrap_or_else(|_| GatewayV2::new());
     }
+    // 非 runtime 上下文: 直接新建 runtime。
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            log::error!("[gateway] failed to create tokio runtime: {e}");
+            std::process::exit(1);
+        }
+    };
+    let gateway = rt.block_on(fut);
+    // 泄漏 runtime: 进程生命周期内保持存活, 避免 drop 卡死在 BlockingPool::shutdown。
+    std::mem::forget(rt);
+    gateway
 }

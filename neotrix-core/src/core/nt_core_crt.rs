@@ -3,13 +3,15 @@
 //! Three cosmological time scales mapped to planning horizons:
 //!
 //! | Model | Chinese | Scale | Horizon | Numerics |
-//! |-------|---------|-------|---------|----------|
+//! |-------|---------|-------|----------|----------|
 //! | 盖天 | Gaitian | Tactical | Seconds-minutes | 80,000 li sky dome, 8-ft gnomon, 24h cycle |
 //! | 浑天 | Huntian | Operational | Hours-days | 357,000 li celestial sphere, 365.25° |
 //! | 宣夜 | Xuanye | Strategic | Weeks-years | Infinite void, 129,600-year Shao Yong cycle |
 //!
 //! Each scale inherits from the ancient Chinese cosmological model and
 //! maps to a specific planning horizon in the GoalLoop system.
+
+use serde::{Deserialize, Serialize};
 
 /// The three CRT time scales, ordered from fastest to slowest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
@@ -122,7 +124,7 @@ impl CrtTimeScale {
 }
 
 /// A temporal plan spanning all three CRT scales.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrtPlan {
     pub scale: CrtTimeScale,
     pub time_budget_seconds: f64,

@@ -102,7 +102,8 @@ pub fn update_node_metadata(conn: &Connection, id: &str, metadata: &serde_json::
 pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
-            confidence, importance, created_at, updated_at, access_count, metadata
+            confidence, importance, created_at, updated_at, access_count, metadata,
+            supersedes
          FROM nodes WHERE id=?1",
     )?;
 
@@ -126,7 +127,7 @@ pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowledg
                 access_count: row.get::<_, i64>(12)? + 1,
                 metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
                 temporal: None,
-                supersedes: None,
+                supersedes: row.get(14)?,
                 source_episode: None,
             }))
         }
@@ -137,7 +138,8 @@ pub fn get_node(conn: &Connection, id: &str) -> rusqlite::Result<Option<Knowledg
 pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &NodeType) -> rusqlite::Result<Option<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
-            confidence, importance, created_at, updated_at, access_count, metadata
+            confidence, importance, created_at, updated_at, access_count, metadata,
+            supersedes
          FROM nodes WHERE title=?1 AND node_type=?2 AND url IS NULL LIMIT 1",
     )?;
     let mut rows = stmt.query(params![title, node_type.as_str()])?;
@@ -158,7 +160,7 @@ pub fn find_node_by_title_and_type(conn: &Connection, title: &str, node_type: &N
             access_count: row.get(12)?,
             metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
             temporal: None,
-            supersedes: None,
+            supersedes: row.get(14)?,
             source_episode: None,
         })),
         None => Ok(None),
@@ -213,7 +215,8 @@ pub fn dedup_nodes(conn: &Connection) -> rusqlite::Result<usize> {
 pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option<KnowledgeNode>> {
     let mut stmt = conn.prepare(
         "SELECT id, node_type, title, summary, content, url, domain, language,
-            confidence, importance, created_at, updated_at, access_count, metadata
+            confidence, importance, created_at, updated_at, access_count, metadata,
+            supersedes
          FROM nodes WHERE url=?1 LIMIT 1",
     )?;
     let mut rows = stmt.query(params![url])?;
@@ -234,7 +237,7 @@ pub fn find_node_by_url(conn: &Connection, url: &str) -> rusqlite::Result<Option
             access_count: row.get(12)?,
             metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
             temporal: None,
-            supersedes: None,
+            supersedes: row.get(14)?,
             source_episode: None,
         })),
         None => Ok(None),
@@ -415,7 +418,11 @@ pub fn insert_or_get_node(
         node_type,
         title: title.to_string(),
         summary: summary.map(|s| s.to_string()),
-        content: None,
+        // P0 根治 (content/summary 双列分裂): write_memory_entry 把正文作为
+        // summary 传入, 此前 content 硬编码 None → 所有读 content 列的下游
+        // (conflict_detect / crawl 回填 / absorb_mapper / search 返回) 全部漏掉。
+        // 镜像写入两列, 一处修复覆盖所有下游。
+        content: summary.map(|s| s.to_string()),
         url: url.map(|s| s.to_string()),
         domain: domain.map(|s| s.to_string()),
         language: "en".into(),
@@ -433,13 +440,17 @@ pub fn insert_or_get_node(
     Ok(id)
 }
 
-pub fn upsert_edge(
+/// upsert_edge 的 metadata 增强版 (T0.1 类型化边, 来源: codebase-memory-mcp 类型化边
+/// + semantica PROV-O 溯源)。metadata 承载结构化溯源 (evidence/source/extractor),
+/// 使 edges 具备"证据优先"的机器可查版本, 而非只塞进 description。
+pub fn upsert_edge_full(
     conn: &Connection,
     source_id: &str,
     target_id: &str,
     relation_type: RelationType,
     weight: f64,
     description: Option<&str>,
+    metadata: Option<serde_json::Value>,
 ) -> rusqlite::Result<()> {
     let id = Uuid::new_v4().to_string();
     let edge = KnowledgeEdge {
@@ -450,9 +461,20 @@ pub fn upsert_edge(
         weight,
         description: description.map(|s| s.to_string()),
         created_at: now(),
-        metadata: None,
+        metadata,
     };
     insert_edge(conn, &edge)
+}
+
+pub fn upsert_edge(
+    conn: &Connection,
+    source_id: &str,
+    target_id: &str,
+    relation_type: RelationType,
+    weight: f64,
+    description: Option<&str>,
+) -> rusqlite::Result<()> {
+    upsert_edge_full(conn, source_id, target_id, relation_type, weight, description, None)
 }
 
 pub fn count_nodes(conn: &Connection) -> rusqlite::Result<usize> {
@@ -541,7 +563,7 @@ pub fn get_stale_node_count(conn: &Connection, older_than_days: i64) -> rusqlite
 
 pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata FROM nodes ORDER BY rowid LIMIT ?1 OFFSET ?2"
+        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata, supersedes FROM nodes ORDER BY rowid LIMIT ?1 OFFSET ?2"
     )?;
     let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
         Ok(KnowledgeNode {
@@ -560,7 +582,7 @@ pub fn get_nodes_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
             access_count: row.get(12)?,
             metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
             temporal: None,
-            supersedes: None,
+            supersedes: row.get(14)?,
             source_episode: None,
         })
     })?;
@@ -596,7 +618,7 @@ pub fn get_edges_page(conn: &Connection, offset: usize, limit: usize) -> rusqlit
 
 pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> {
     let mut stmt = conn.prepare(
-        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata FROM nodes"
+        "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count, metadata, supersedes FROM nodes"
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(KnowledgeNode {
@@ -615,7 +637,7 @@ pub fn get_all_nodes(conn: &Connection) -> rusqlite::Result<Vec<KnowledgeNode>> 
             access_count: row.get(12)?,
             metadata: row.get::<_, Option<String>>(13)?.and_then(|m| serde_json::from_str(&m).ok()),
             temporal: None,
-            supersedes: None,
+            supersedes: row.get(14)?,
             source_episode: None,
         })
     })?;

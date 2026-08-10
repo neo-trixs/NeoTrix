@@ -599,8 +599,6 @@ mod tests {
 pub struct StreamingMarkdownRenderer {
     /// 累积的完整文本（用于最终完整渲染对比）
     full_text: String,
-    /// 上次已渲染的文本长度
-    last_rendered_len: usize,
     /// 代码块状态
     in_code_block: bool,
     code_lang: String,

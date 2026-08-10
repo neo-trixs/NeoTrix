@@ -62,7 +62,6 @@ pub fn parse(format: &str, raw: &str) -> ParsedDoc {
 
 /// 极简 HTML 清洗: 去标签、聚合成块。
 fn parse_html(raw: &str) -> ParsedDoc {
-    let mut text = String::new();
     let mut links = Vec::new();
     let mut blocks = Vec::new();
     // 提取 link href
@@ -90,7 +89,7 @@ fn parse_html(raw: &str) -> ParsedDoc {
     });
     let stripped = strip_junk(&in_tag.0);
     let title = stripped.lines().next().unwrap_or("untitled").to_string();
-    text = stripped.clone();
+    let text = stripped.clone();
     for line in stripped.lines().filter(|l| !l.trim().is_empty()) {
         blocks.push(DocBlock { kind: "para".to_string(), text: line.to_string() });
     }

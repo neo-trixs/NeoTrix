@@ -23,6 +23,10 @@ use crate::neotrix::nt_core_signal::SelectiveState;
 use crate::core::nt_core_e8::ewhr_bridge::E8EwhrBridge;
 use std::sync::{Arc, Mutex};
 use crate::cli::shield_enforcer::global_shield;
+use crate::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
+use crate::core::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
+use crate::core::nt_core_reasoning::ContextBuilder;
+use crate::neotrix::l1_body_impl::nt_io_standalone::ReasoningKernel;
 
 
 type BatchTask<'a> = &'a [(String, Option<Vec<f64>>, Option<f64>)];
@@ -769,7 +773,7 @@ impl SelfIteratingBrain {
 
         // 连接 GatewayV2: 统一 LLM 网关 (断路器/限流器/回退策略/提供者池)
         let gateway = std::sync::Arc::new(create_gateway());
-        engine = engine.with_gateway(gateway);
+        engine = engine.with_gateway(gateway.clone());
 
         // 从 self.default_model 设置引擎默认模型（由 entry 层从 config.toml 填充）
         if !self.default_model.is_empty() && self.default_model != "default" {
@@ -817,6 +821,23 @@ impl SelfIteratingBrain {
                 E8PredictionEnsemble::default(),
                 E8MctsPredictor::new(8, 50, 2.0, 0.9),
             ));
+
+        // Phase 2: Initialize Task Dispatcher, CoT Generator, Context Builder, and E8Policy
+        // 配置系统完善: 支持环境变量覆盖 (NEOTRIX_DISPATCH_* / NEOTRIX_COT_*)
+        let dispatcher_config = DispatcherConfig::from_env();
+        let dispatcher = TaskDecomposerDispatcher::new(gateway.clone(), dispatcher_config)
+            .with_kernel(ReasoningKernel::new(self.iteration as usize % 19))
+            .with_e8_policy(E8Policy::default());
+
+        let cot_generator = DefaultCoTGenerator::new(gateway.clone(), CoTConfig::from_env());
+        let context_builder = ContextBuilder::new();
+        let e8_policy = E8Policy::default();
+
+        // Store in SelfIteratingBrain for later use
+        self.task_dispatcher = Some(dispatcher);
+        self.cot_generator = Some(cot_generator);
+        self.context_builder = Some(context_builder);
+        self.e8_policy = Some(e8_policy);
 
         self.reasoning_engine = Some(engine);
         self.load_e8();

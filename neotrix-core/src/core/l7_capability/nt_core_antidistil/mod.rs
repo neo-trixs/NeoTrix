@@ -28,7 +28,7 @@
 mod watermark;
 mod tracer;
 mod detector;
-mod decompose;
+pub mod decompose;
 
 pub use watermark::{
     WatermarkEngine, WatermarkBits, ApostropheVariant, WatermarkConfig,

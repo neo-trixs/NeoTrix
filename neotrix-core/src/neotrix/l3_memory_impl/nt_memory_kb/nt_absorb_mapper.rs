@@ -576,7 +576,7 @@ pub fn map_nodes(
 ) -> rusqlite::Result<(Vec<(String, CapabilityMapping)>, MappingReport)> {
     let pattern = prefix.map(|p| format!("{}%", p)).unwrap_or_else(|| "%".to_string());
     let mut sql = String::from(
-        "SELECT id, node_type, title, content, url, metadata FROM nodes WHERE id LIKE ?1",
+        "SELECT id, node_type, title, COALESCE(summary, content, ''), url, metadata FROM nodes WHERE id LIKE ?1",
     );
     let mut binds: Vec<String> = vec![pattern];
     if let Some(ts) = types {

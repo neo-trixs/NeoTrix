@@ -5,13 +5,31 @@ use entry::*;
 // config 模块由 lib 提供 (neotrix::config), 避免与 lib.rs 重复定义。
 
 #[derive(Parser, Debug)]
-#[command(name = "neotrix", version, about = "NeoTrix — Self-evolving reasoning engine")]
+#[command(
+    name = "neotrix",
+    version,
+    about = "NeoTrix — Self-evolving reasoning engine",
+    after_help = "\
+EXAMPLES:
+  neotrix run \"explain this codebase\"          Interactive / one-shot reasoning
+  neotrix exec --json \"summarize the diff\"    Structured non-interactive execution
+  neotrix reason -f prompt.txt                 Reason from a file
+  neotrix status                               Show brain/daemon status
+  neotrix completions bash > /etc/bash_completion.d/neotrix
+  neotrix search \"rust async runtime\" -n 10   Web search
+  neotrix discover --json                      Scan for NeoTrix agents on LAN
+  neotrix features list                        List runtime feature flags
+"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
     #[arg(global = true, long, value_name = "COLOR", help = "Color mode: auto|always|never")]
     color: Option<String>,
+
+    #[arg(global = true, long, help = "Suppress non-error log output")]
+    quiet: bool,
 
     #[arg(global = true, long, short = 's', help = "Run HTTP server mode (legacy flag)")]
     serve: bool,
@@ -37,6 +55,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    // ── Core: LLM 交互 ──
     #[command(about = "Non-interactive execution with structured output")]
     Exec {
         prompt: Option<String>,
@@ -98,59 +117,10 @@ enum Commands {
         #[arg(long, short = 'S', help = "Stream output in real-time")]
         stream: bool,
     },
-    #[command(name = "bench", about = "Run benchmarks")]
-    Bench { category: Option<String> },
-    #[command(about = "Show brain/daemon status")]
-    Status,
-    #[command(about = "Start background daemon")]
-    Daemon { #[arg(long)] evolve: bool },
-    #[command(about = "Self-update the binary")]
-    Update { #[arg(long)] check_only: bool },
-    #[command(about = "Generate shell completions")]
-    Completions { shell: String },
-    #[command(about = "Browse a URL")]
-    Browse { url: String },
-    #[command(about = "Browser login")]
-    Login { url: String },
-    #[command(about = "Proxy daemon control (status|mode|start|stop|install)")]
-    Proxy { args: Vec<String> },
     #[command(name = "mcp-server", about = "Run as MCP server (stdio JSON-RPC 2.0)")]
     McpServer,
-    #[command(about = "Cloud/Docker sandbox commands")]
-    Sandbox {
-        #[command(subcommand)]
-        command: SandboxCommands,
-    },
-    #[command(about = "Search the web")]
-    Search {
-        query: String,
-        #[arg(long, short = 'n', default_value_t = 5, help = "Number of results")]
-        count: usize,
-    },
-    #[command(about = "Scan network for NeoTrix agents via UDP discovery")]
-    Discover {
-        #[arg(long, short = 'p', default_value_t = 42069, help = "UDP port")]
-        port: u16,
-        #[arg(long, short = 'd', default_value_t = 3000, help = "Scan duration in ms")]
-        duration: u64,
-        #[arg(long, help = "JSON output")]
-        json: bool,
-    },
-    #[command(about = "Manage runtime feature flags")]
-    Features {
-        #[command(subcommand)]
-        command: FeaturesCommands,
-    },
-    #[command(about = "Wallet management (create, import, list, balance)")]
-    Wallet {
-        #[command(subcommand)]
-        command: WalletCommands,
-    },
-    #[command(about = "Manage config file (encrypt/decrypt API keys)")]
-    Config {
-        #[command(subcommand)]
-        command: ConfigCommands,
-    },
+
+    // ── Knowledge & Memory ──
     #[command(name = "evidence", about = "EWHR evidence management (list|get|calibrate|export|stats)")]
     Evidence {
         #[command(subcommand)]
@@ -166,10 +136,67 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    #[command(about = "Search the web")]
+    Search {
+        query: String,
+        #[arg(long, short = 'n', default_value_t = 5, help = "Number of results")]
+        count: usize,
+    },
+
+    // ── System & Ops ──
+    #[command(about = "Run benchmarks")]
+    Bench { category: Option<String> },
+    #[command(about = "Show brain/daemon status")]
+    Status,
+    #[command(about = "Start background daemon")]
+    Daemon { #[arg(long)] evolve: bool },
+    #[command(about = "Self-update the binary")]
+    Update { #[arg(long)] check_only: bool },
+    #[command(about = "Generate shell completions")]
+    Completions { shell: String },
+    #[command(about = "Manage runtime feature flags")]
+    Features {
+        #[command(subcommand)]
+        command: FeaturesCommands,
+    },
+    #[command(about = "Manage config file (encrypt/decrypt API keys)")]
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
     #[command(about = "NeoTrix 系统运维 (统一安装/守护/卸载, 替代分散 sh 脚本): daemons|uninstall|status")]
     Sysops {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
+    },
+
+    // ── Network & Agents ──
+    #[command(about = "Browse a URL")]
+    Browse { url: String },
+    #[command(about = "Browser login")]
+    Login { url: String },
+    #[command(about = "Proxy daemon control (status|mode|start|stop|install)")]
+    Proxy { args: Vec<String> },
+    #[command(about = "Scan network for NeoTrix agents via UDP discovery")]
+    Discover {
+        #[arg(long, short = 'p', default_value_t = 42069, help = "UDP port")]
+        port: u16,
+        #[arg(long, short = 'd', default_value_t = 3000, help = "Scan duration in ms")]
+        duration: u64,
+        #[arg(long, help = "JSON output")]
+        json: bool,
+    },
+    #[command(about = "Cloud/Docker sandbox commands")]
+    Sandbox {
+        #[command(subcommand)]
+        command: SandboxCommands,
+    },
+
+    // ── Finance & Wallet ──
+    #[command(about = "Wallet management (create, import, list, balance)")]
+    Wallet {
+        #[command(subcommand)]
+        command: WalletCommands,
     },
 }
 
@@ -256,14 +283,74 @@ enum WalletCommands {
 }
 
 fn main() {
+    // 智能命令整合: clap 解析失败时, 未知子命令回退到交互式命令注册表
+    // (60+ 命令: /kb /goal /wiki /evidence ...), 使它们可直接从命令行调用。
+    // 注意: try_parse 必须在 init_tracing 之前, 这样回退路径设置的
+    // RUST_LOG 才能在 tracing subscriber 初始化时生效 (抑制 KB 等 INFO 日志)。
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(e) => {
+            if e.kind() == clap::error::ErrorKind::InvalidSubcommand {
+                if let Some(unknown) = extract_unknown_subcommand(&e) {
+                    let reg = neotrix::cli::commands::registry::default_registry();
+                    let lookup = if unknown.starts_with('/') {
+                        unknown.clone()
+                    } else {
+                        format!("/{}", unknown)
+                    };
+                    if reg.find(&lookup).is_some() {
+                        // 对标主流 CLI: 回退命令输出保持干净, 抑制 INFO/WARN 日志
+                        std::env::set_var("RUST_LOG", "neotrix=error");
+                        let raw: Vec<String> = std::env::args().skip(1).collect();
+                        let input = if unknown.starts_with('/') {
+                            raw.join(" ")
+                        } else {
+                            format!("/{}", raw.join(" "))
+                        };
+                        let out = reg.execute(&input, None);
+                        if !out.message.is_empty() {
+                            println!("{}", out.message);
+                        }
+                        std::process::exit(if out.success { 0 } else { 1 });
+                    }
+                }
+            }
+            e.exit()
+        }
+    };
+
     neotrix::neotrix::nt_io_logging::init_tracing();
     let _sentry_guard = neotrix::neotrix::nt_shield_sentry::init_sentry();
-    let cli = Cli::parse();
+
+    // --quiet: 必须在 NeoTrixConfig::load() 之前设置环境变量,
+    // 否则 load() 的 "[config] loaded" 诊断已在 quiet 之前输出。
+    if cli.quiet {
+        std::env::set_var("RUST_LOG", "neotrix=error");
+        std::env::set_var("NEOTRIX_QUIET", "1");
+    }
 
     // First-run provider config wizard (skip for pure ops commands)
+    // 对标主流 CLI: 纯本地命令 (help/status/completions/features/config/wallet/
+    // evidence/wiki/todo/sysops/bench/discover/proxy/sandbox/update/browse/login)
+    // 不依赖 LLM provider, 不应被交互式 wizard 阻塞。
     let is_ops_cmd = matches!(
         cli.command,
-        Some(Commands::Sysops { .. }) | Some(Commands::Status)
+        Some(Commands::Sysops { .. })
+            | Some(Commands::Status)
+            | Some(Commands::Completions { .. })
+            | Some(Commands::Features { .. })
+            | Some(Commands::Config { .. })
+            | Some(Commands::Wallet { .. })
+            | Some(Commands::Evidence { .. })
+            | Some(Commands::Wiki { .. })
+            | Some(Commands::Todo { .. })
+            | Some(Commands::Bench { .. })
+            | Some(Commands::Discover { .. })
+            | Some(Commands::Proxy { .. })
+            | Some(Commands::Sandbox { .. })
+            | Some(Commands::Update { .. })
+            | Some(Commands::Browse { .. })
+            | Some(Commands::Login { .. })
     ) || cli.agent
         || cli.standalone
         || cli.headless;
@@ -283,6 +370,7 @@ fn main() {
     if let Some(level) = &cfg.log_level {
         std::env::set_var("RUST_LOG", format!("neotrix={}", level));
     }
+    // (--quiet 已在 parse 后提前设置, 此处不再重复)
 
     match &cli.command {
         Some(Commands::Exec { prompt, file, pipe, json, output_schema: _, timeout, max_budget_usd, stream }) => {
@@ -291,8 +379,9 @@ fn main() {
             }
             let resolved = resolve_prompt(prompt.as_deref(), file.as_deref(), *pipe);
             if resolved.is_empty() {
-                eprintln!("Error: no prompt provided. Usage: neotrix exec <prompt>");
-                std::process::exit(1);
+                // 用法错误 → 退出码 2 (对标 clap 约定: 0=成功 / 1=运行时错误 / 2=用法错误)
+                eprintln!("error: no prompt provided. Usage: neotrix exec <prompt>");
+                std::process::exit(2);
             }
             run_exec(&resolved, *json, *stream, *timeout);
         }
@@ -410,7 +499,7 @@ fn main() {
         }
         Some(Commands::Evidence { command }) => {
             if let Err(e) = neotrix::cli::commands::evidence_cmds::handle_evidence_command(command) {
-                eprintln!("Error: {}", e);
+                eprintln!("error: {}", e);
                 std::process::exit(1);
             }
         }
@@ -421,7 +510,7 @@ fn main() {
             if out.success {
                 println!("{}", out.message);
             } else {
-                eprintln!("{}", out.message);
+                eprintln!("error: {}", out.message);
                 std::process::exit(1);
             }
         }
@@ -432,7 +521,7 @@ fn main() {
             if out.success {
                 println!("{}", out.message);
             } else {
-                eprintln!("{}", out.message);
+                eprintln!("error: {}", out.message);
                 std::process::exit(1);
             }
         }
@@ -449,10 +538,26 @@ fn main() {
     }
 }
 
+/// 从 clap 错误中提取未知子命令名。
+/// clap 格式: `error: unrecognized subcommand 'xxx'`
+fn extract_unknown_subcommand(e: &clap::Error) -> Option<String> {
+    let msg = e.to_string();
+    let start = msg.find('\'')? + 1;
+    let rest = &msg[start..];
+    let end = rest.find('\'')?;
+    Some(rest[..end].to_string())
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn test_placeholder() {
-        assert!(true);
+    fn test_extract_unknown_subcommand() {
+        let err = clap::Error::raw(
+            clap::error::ErrorKind::InvalidSubcommand,
+            "error: unrecognized subcommand 'kbl'\n\nUsage: neotrix <COMMAND>\n",
+        );
+        assert_eq!(extract_unknown_subcommand(&err).as_deref(), Some("kbl"));
     }
 }

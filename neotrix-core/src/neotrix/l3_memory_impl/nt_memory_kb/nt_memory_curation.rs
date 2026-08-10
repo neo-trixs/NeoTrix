@@ -94,8 +94,9 @@ pub struct CurationHit {
 pub fn conflict_detect(conn: &Connection, title_sim: f64) -> Result<Vec<ConflictHit>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, created_at FROM nodes \
-             WHERE content IS NOT NULL AND length(content) > 0",
+            "SELECT id, title, COALESCE(summary, content, ''), created_at FROM nodes \
+             WHERE COALESCE(summary, content, '') IS NOT NULL \
+             AND length(COALESCE(summary, content, '')) > 0",
         )
         .map_err(|e| e.to_string())?;
     let rows: Vec<(String, String, String, i64)> = stmt
@@ -121,9 +122,19 @@ pub fn conflict_detect(conn: &Connection, title_sim: f64) -> Result<Vec<Conflict
             let pa = polarity(&a.2);
             let pb = polarity(&b.2);
             if pa != 0 && pb != 0 && pa != pb {
-                // older wins as "older" in the pair; if timestamps reversed, swap
-                let (older, newer) = if a.3 <= b.3 { (a, b) } else { (b, a) };
-                let (po, pn) = if a.3 <= b.3 { (pa, pb) } else { (pb, pa) };
+                // 时间戳相等 (秒级精度) 时用 created_at 无法区分先后 → 用 rowid
+                // 语义不明, 此时以 title 字典序作稳定 tie-break, 保证 supersede
+                // 方向确定性 (同一数据每次扫描结果一致)。
+                let (older, newer) = if a.3 < b.3 || (a.3 == b.3 && a.1 < b.1) {
+                    (a, b)
+                } else {
+                    (b, a)
+                };
+                let (po, pn) = if a.3 < b.3 || (a.3 == b.3 && a.1 < b.1) {
+                    (pa, pb)
+                } else {
+                    (pb, pa)
+                };
                 hits.push(ConflictHit {
                     older_id: older.0.clone(),
                     newer_id: newer.0.clone(),
@@ -155,6 +166,91 @@ pub fn apply_supersede(conn: &Connection, hits: &[ConflictHit]) -> Result<usize,
         }
     }
     Ok(n)
+}
+
+/// T0.3 写后冲突检测 (scoped, T0.3 接线): 只对比指定新节点 vs 既有节点,
+/// 避免 write_memory_entry 全库 O(n²) 扫描。
+///
+/// 来源: semantica "冲突标记而非静默覆盖" + 39 仓库吸收 Phase 0 接线纪律。
+/// 流程: 取新节点 → token 预筛 (共享 ≥1 词) → bow_sim + 极性判定 →
+///       按时间序返回 (older/newer), 可直接喂给 apply_supersede。
+pub fn conflict_detect_for_write(
+    conn: &Connection,
+    new_id: &str,
+    title_sim: f64,
+) -> Result<Vec<ConflictHit>, String> {
+    let (new_title, new_content, new_ts): (String, String, i64) = conn
+        .query_row(
+            "SELECT title, COALESCE(summary, content, ''), created_at FROM nodes WHERE id = ?1",
+            params![new_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .map_err(|e| e.to_string())?;
+    if new_content.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let new_polarity = polarity(&new_content);
+    if new_polarity == 0 {
+        return Ok(Vec::new()); // 无极性断言, 不构成冲突候选
+    }
+    // 新标题 token 集 (预筛用)
+    let new_tokens: std::collections::HashSet<String> = new_title
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_lowercase())
+        .collect();
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, COALESCE(summary, content, ''), created_at FROM nodes \
+             WHERE id != ?1 AND (COALESCE(summary, content, '') IS NOT NULL \
+             AND length(COALESCE(summary, content, '')) > 0)",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows: Vec<(String, String, String, i64)> = stmt
+        .query_map(params![new_id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?;
+
+    let mut hits = Vec::new();
+    for (oid, otitle, ocontent, ots) in rows {
+        // token 预筛: 无共享 token 直接跳过 (避免对无关标题跑 bow_sim)
+        let shared = otitle
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .any(|w| new_tokens.contains(&w.to_lowercase()));
+        if !shared {
+            continue;
+        }
+        let sim = bow_sim(&new_title, &otitle);
+        if sim < title_sim {
+            continue;
+        }
+        let op = polarity(&ocontent);
+        if op != 0 && op != new_polarity {
+            // 写路径语义: 新节点是"刚写入"的, 时间戳相等 (秒级精度) 时新节点
+            // 必须胜出 → 仅当 new_ts 严格小于 ots 才把新节点判为 older。
+            let (older_id, older_ts, older_pol, newer_id, newer_ts, newer_pol) = if new_ts < ots {
+                (new_id.to_string(), new_ts, new_polarity, oid, ots, op)
+            } else {
+                (oid, ots, op, new_id.to_string(), new_ts, new_polarity)
+            };
+            hits.push(ConflictHit {
+                older_id,
+                newer_id,
+                title: new_title.clone(),
+                polarity_older: older_pol,
+                polarity_newer: newer_pol,
+                sim,
+            });
+            let _ = older_ts; // 排序语义已由元组体现
+            let _ = newer_ts;
+        }
+    }
+    Ok(hits)
 }
 
 /// D3: 自动遗忘 — access_count=0 且超龄且低重要性的节点降级 cold。
@@ -350,6 +446,29 @@ mod tests {
         seed(&conn, "b", "MMR diversity lambda", "diversify uses lambda 0.7", now + 5, 0, 0.8);
         let hits = conflict_detect(&conn, 0.4).unwrap();
         assert!(hits.is_empty(), "same polarity must not conflict");
+    }
+
+    #[test]
+    fn equal_second_timestamp_tiebreak_deterministic() {
+        // 秒级精度: 同一秒写入的两节点 created_at 相等 → 全量版必须用
+        // title 字典序做稳定 tie-break, 保证 supersede 方向确定性 (幂等)。
+        let conn = mem_conn();
+        let now = now_unix();
+        seed(&conn, "z-node", "Equal ts policy", "rate limit is enabled", now, 0, 0.8);
+        seed(&conn, "a-node", "Equal ts policy", "rate limit is not enabled", now, 0, 0.8);
+        let hits1 = conflict_detect(&conn, 0.4).unwrap();
+        assert_eq!(hits1.len(), 1, "opposite polarity + equal ts must be flagged");
+        assert_eq!(hits1[0].older_id, "a-node", "title tie-break: a-node < z-node");
+        assert_eq!(hits1[0].newer_id, "z-node");
+        // 幂等: 二次扫描结果必须一致 (不依赖行序)
+        let hits2 = conflict_detect(&conn, 0.4).unwrap();
+        assert_eq!(hits1[0].older_id, hits2[0].older_id, "deterministic across runs");
+        let applied = apply_supersede(&conn, &hits1).unwrap();
+        assert_eq!(applied, 1);
+        let supersedes: String = conn
+            .query_row("SELECT supersedes FROM nodes WHERE id='a-node'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(supersedes, "z-node", "older (by title) points to newer");
     }
 
     #[test]

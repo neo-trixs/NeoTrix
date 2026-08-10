@@ -40,7 +40,6 @@ pub struct AgentLoop {
     /// 会话消息历史（含 System 首条）。
     messages: Vec<Message>,
     model: String,
-    system_prompt: String,
     max_tool_rounds: usize,
     max_history: usize,
     /// 本会话已执行的工具调用记录。
@@ -58,7 +57,6 @@ impl AgentLoop {
             tools: Vec::new(),
             messages,
             model: model.to_string(),
-            system_prompt: system_prompt.to_string(),
             max_tool_rounds: 8,
             max_history: 64,
             tool_log: Vec::new(),

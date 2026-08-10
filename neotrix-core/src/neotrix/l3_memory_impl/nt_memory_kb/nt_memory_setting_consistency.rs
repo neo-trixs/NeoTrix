@@ -193,7 +193,7 @@ fn check_drift(conn: &Connection, report: &mut SettingConsistencyReport) -> rusq
 }
 
 /// 便捷函数: 执行检查并打印人类可读报告（对标"每卷设定检查"）
-pub fn check_and_report(conn: &Connection, path: &str) -> rusqlite::Result<SettingConsistencyReport> {
+pub fn check_and_report(conn: &Connection, _path: &str) -> rusqlite::Result<SettingConsistencyReport> {
     let report = check(conn)?;
     print!("{}", render_report(&report));
     Ok(report)

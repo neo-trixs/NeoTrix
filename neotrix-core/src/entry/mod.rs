@@ -12,6 +12,7 @@ use neotrix::neotrix::nt_mind::panorama_pipeline::PanoramaPipeline;
 use neotrix::neotrix::nt_mind::self_iterating::{ReasoningBrain, SelfIteratingBrain};
 use neotrix::neotrix::nt_mind::memory::ReasoningBank;
 use neotrix::neotrix::nt_io_mention::resolve_mentions;
+use neotrix::neotrix::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherConfig};
 
 use neotrix::config::NeoTrixConfig;
 use neotrix::cli::tui::output::StreamingMarkdownRenderer;
@@ -24,10 +25,6 @@ mod sysops;
 
 pub use proxy_cmd::run_proxy_cmd;
 pub use sysops::run_sysops;
-
-fn info(msg: impl AsRef<str>) -> String {
-    msg.as_ref().blue().to_string()
-}
 fn success(msg: impl AsRef<str>) -> String {
     msg.as_ref().green().to_string()
 }
@@ -57,6 +54,17 @@ pub fn check_provider_config() -> bool {
     let cfg = neotrix::config::NeoTrixConfig::load();
     if cfg.provider.is_some() && cfg.api_key.as_ref().is_some_and(|k| !k.is_empty()) {
         return true;
+    }
+    // 免费池子模式: default_model 指向 keyless 免费模型 (llm7/pollinations/:free) 时
+    // 无需 API key — llm7/codestral-latest 是实测唯一匿名可用流式端点。
+    if let Some(ref m) = cfg.default_model {
+        if m.starts_with("llm7/")
+            || m == "llm7"
+            || m.starts_with("pollinations")
+            || m.contains(":free")
+        {
+            return true;
+        }
     }
     false
 }
@@ -380,7 +388,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
             writer.emit_error("Empty prompt", Some("EMPTY_PROMPT"), false);
             writer.emit_finish("", 0, 0, 1);
         } else {
-            eprintln!("Error: empty prompt");
+            eprintln!("error: empty prompt");
         }
         return;
     }
@@ -458,7 +466,7 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
         });
 
         if let Err(e) = result {
-            eprintln!("Error: {}", e);
+            eprintln!("error: {}", e);
         }
     } else {
         // Plain text mode (original behavior)
@@ -485,10 +493,10 @@ pub fn run_exec(prompt: &str, json_output: bool, stream: bool, timeout_secs: u64
                 println!("{}", response);
             }
             Ok(Err(e)) => {
-                eprintln!("Error: {}", e);
+                eprintln!("error: {}", e);
             }
             Err(_timeout) => {
-                eprintln!("Error: execution timed out after {}s", timeout_secs);
+                eprintln!("error: execution timed out after {}s", timeout_secs);
             }
         }
     }
@@ -505,6 +513,9 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
         eprintln!("📎 Resolved {} file mention(s)", mentions.len());
     }
     let rt = tokio_runtime();
+
+    // Check if task is complex and should use TaskDispatcher
+    let use_dispatcher = is_complex_task(prompt);
 
     if stream {
         // Streaming mode — print tokens as they arrive, no progress bar
@@ -543,13 +554,67 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
                 }
                 Ok(())
             };
-
             if let Err(e) = result {
                 if format == Some("json") {
                     let json = serde_json::json!({"success": false, "error": e.to_string()});
                     eprintln!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
                 } else {
                     eprintln!("{}: {}", err("Reasoning error"), e);
+                }
+            }
+            if let Err(e) = agent.brain.save() {
+                eprintln!("{}: {}", err("Failed to save brain state"), e);
+            }
+        });
+    } else if use_dispatcher {
+        // Use TaskDispatcher for complex tasks
+        rt.block_on(async {
+            let mut agent = build_brain(profile);
+            
+            // Extract components from the agent before moving it (single brain instance)
+            let gateway = agent.reasoning_engine.as_ref().and_then(|e| e.gateway.clone());
+            let reasoning_engine = agent.reasoning_engine.take();
+            let kernel = ReasoningKernel::new(3);
+            let e8_policy = E8Policy::default();
+            
+            let mut dispatcher = match (gateway, reasoning_engine) {
+                (Some(gw), Some(re)) => TaskDecomposerDispatcher::new(
+                    gw,
+                    DispatcherConfig::from_env(),
+                )
+                .with_reasoning_engine(re)
+                .with_kernel(kernel)
+                .with_e8_policy(e8_policy),
+                _ => {
+                    eprintln!("{}: missing gateway or reasoning engine", err("Reasoning error"));
+                    return;
+                }
+            };
+
+            let result = dispatcher.decompose_and_execute(&prompt).await;
+            match result {
+                Ok(response) => {
+                    if format == Some("json") {
+                        let json = serde_json::json!({
+                            "success": true,
+                            "response": response,
+                            "prompt": prompt,
+                        });
+                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or(response));
+                    } else {
+                        println!("\n{}", response);
+                    }
+                }
+                Err(e) => {
+                    if format == Some("json") {
+                        let json = serde_json::json!({
+                            "success": false,
+                            "error": e.to_string(),
+                        });
+                        eprintln!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                    } else {
+                        eprintln!("{}: {}", err("Reasoning error"), e);
+                    }
                 }
             }
             if let Err(e) = agent.brain.save() {
@@ -616,6 +681,17 @@ pub fn run_one_shot(prompt: &str, format: Option<&str>, profile: &str, stream: b
     }
 }
 
+/// Check if a task is complex enough to use the TaskDispatcher
+fn is_complex_task(prompt: &str) -> bool {
+    let lower = prompt.to_lowercase();
+    let complex_keywords = [
+        "analyze", "design", "implement", "debug", "refactor", "optimize",
+        "architecture", "plan", "research", "compare", "evaluate",
+        "step by step", "think through", "break down", "decompose",
+    ];
+    complex_keywords.iter().any(|kw| lower.contains(kw)) || prompt.len() > 200
+}
+
 pub fn show_status() {
     let status = neotrix::neotrix::nt_io_proxy_server::ServerProxy::status();
     println!("{}", info("╭─ NeoTrix Status ───────────────────────╮"));
@@ -641,9 +717,10 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
         "zsh" => Shell::Zsh,
         "fish" => Shell::Fish,
         "powershell" => Shell::PowerShell,
+        "elvish" => Shell::Elvish,
         other => {
-            eprintln!("{}: unsupported shell '{}'. Use: bash, zsh, fish, powershell", err("Error"), other);
-            return;
+            eprintln!("error: unsupported shell '{}'. Use: bash, zsh, fish, powershell, elvish", other);
+            std::process::exit(1);
         }
     };
     let mut stdout = std::io::stdout();
@@ -1702,7 +1779,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
                         _ => {}
                     }
                 }
-                Err(e) => { eprintln!("Error: {}", e); break; }
+                Err(e) => { eprintln!("error: {}", e); break; }
             }
         }
     });

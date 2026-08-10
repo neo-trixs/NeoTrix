@@ -29,7 +29,8 @@ fn github_api_get(path: &str) -> Result<serde_json::Value, String> {
     if let Some(token) = github_token() {
         req = req.header("Authorization", format!("Bearer {}", token));
     }
-    let resp = req.send().map_err(|e| format!("GitHub API error: {e}"))?;
+    let resp = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::run_blocking(|| req.send())
+        .map_err(|e| format!("GitHub API error: {e}"))?;
     let status = resp.status();
     if !status.is_success() {
         let body = resp.text().unwrap_or_default();
@@ -40,11 +41,13 @@ fn github_api_get(path: &str) -> Result<serde_json::Value, String> {
 
 fn github_raw(url: &str) -> Result<String, String> {
     let client = http_client().ok_or_else(|| "HTTP client not available".to_string())?;
-    let resp = client
-        .get(url)
-        .timeout(Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("Raw fetch error: {e}"))?;
+    let resp = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_http::run_blocking(|| {
+        client
+            .get(url)
+            .timeout(Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("Raw fetch error: {e}"))?;
     let status = resp.status();
     if !status.is_success() {
         return Err(format!("Raw HTTP {}: {}", status, url));

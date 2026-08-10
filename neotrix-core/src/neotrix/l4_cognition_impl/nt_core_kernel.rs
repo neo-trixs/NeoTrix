@@ -1,129 +1,20 @@
-use serde::{Deserialize, Serialize};
-type Vector = Vec<f64>;
-use std::collections::HashMap;
+//! L4 — Cognition (认知层) — 推理核心。
+//!
+//! 本模块原为独立 `ReasoningKernel` stub（固定返回 Deductive/0.5），与
+//! L1 `nt_io_standalone` 平行重复且零生产消费方（仅 mod 声明 + re-export，
+//! 违反 R-P42 平行适配器 + Dark Forest 孤儿规则）。
+//!
+//! 决策：删除重复 stub，改为 re-export L1 权威实现（`nt_io_standalone`），
+//! 保留公共 API 路径 `neotrix::nt_core_kernel::*` 不变，消除双份漂移。
+//! 真实推理能力（多步状态演化 + 方法选择 + self-consistency + 验证器）
+//! 由 L1 实现提供，L8 生产路径已接线消费。
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum ReasoningMethod {
-    Deductive,
-    Inductive,
-    Abductive,
-    Analogical,
-    FirstPrinciples,
-    Recursive,
-    Compositional,
-    Adversarial,
-    AutoFetch,
-    KnowledgeRetrieval,
-    GradientLearning,
-    ArchitectureSearch,
-    GpuCompute,
-    DistributedConsensus,
-    ExperienceDistill,
-    EmergentAnalysis,
-    SystemIntegration,
-    EnsembleVoting,
-    SelfImprovement,
-    SparseRouting,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningTrace {
-    pub method: ReasoningMethod,
-    pub steps: usize,
-    pub intermediate_states: Vec<Vec<f64>>,
-    pub convergence: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningOutput {
-    pub state_delta: Vec<f64>,
-    pub confidence: f64,
-    pub trace: ReasoningTrace,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct StageInfo {
-    pub label: &'static str,
-    pub description: &'static str,
-}
-
-pub const EVOLUTION: &[StageInfo] = &[
-    StageInfo { label: "Stage 0", description: "Initial" },
-    StageInfo { label: "Stage 1", description: "Pattern Recognition" },
-    StageInfo { label: "Stage 2", description: "Abstraction" },
-    StageInfo { label: "Stage 3", description: "Analogy Engine" },
-    StageInfo { label: "Stage 4", description: "Recursive Reasoner" },
-    StageInfo { label: "Stage 5", description: "Compositional" },
-    StageInfo { label: "Stage 6", description: "Adversarial" },
-    StageInfo { label: "Stage 7", description: "First Principles" },
-    StageInfo { label: "Stage 8", description: "Auto-Fetch" },
-    StageInfo { label: "Stage 9", description: "Knowledge Retrieval" },
-    StageInfo { label: "Stage 10", description: "Gradient Learning" },
-    StageInfo { label: "Stage 11", description: "Architecture Search" },
-    StageInfo { label: "Stage 12", description: "GPU Compute" },
-    StageInfo { label: "Stage 13", description: "Distributed Consensus" },
-    StageInfo { label: "Stage 14", description: "Experience Distill" },
-    StageInfo { label: "Stage 15", description: "Emergent Analysis" },
-    StageInfo { label: "Stage 16", description: "System Integration" },
-    StageInfo { label: "Stage 17", description: "Ensemble Voting" },
-    StageInfo { label: "Stage 18", description: "Self-Improvement" },
-];
-
-pub const KERNEL_DIM: usize = 128;
-
-#[derive(Debug, Clone)]
-pub struct KernelStats {
-    pub stage: usize,
-    pub label: String,
-    pub state_dim: usize,
-    pub total: usize,
-    pub active: Vec<ReasoningMethod>,
-    pub energy: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReasoningKernel {
-    pub stage: usize,
-    pub state: Vector,
-}
-
-impl ReasoningKernel {
-    pub fn new(stage: usize) -> Self {
-        let dim = KERNEL_DIM;
-        Self {
-            stage: stage.min(EVOLUTION.len() - 1),
-            state: vec![0.0; dim],
-        }
-    }
-
-    pub fn reason(&self, _query: &[f64], _context: Option<HashMap<String, Vector>>) -> ReasoningOutput {
-        ReasoningOutput {
-            state_delta: self.state.clone(),
-            confidence: 0.5,
-            trace: ReasoningTrace {
-                method: ReasoningMethod::Deductive,
-                steps: 1,
-                intermediate_states: vec![],
-                convergence: 0.5,
-            },
-        }
-    }
-
-    pub fn evolve_stage(&mut self) {
-        self.stage = (self.stage + 1).min(EVOLUTION.len() - 1);
-    }
-
-    pub fn stats(&self) -> KernelStats {
-        KernelStats {
-            stage: self.stage,
-            label: EVOLUTION[self.stage].label.to_string(),
-            state_dim: self.state.len(),
-            total: 8,
-            active: vec![ReasoningMethod::Deductive],
-            energy: self.state.iter().map(|x| x.abs()).sum::<f64>() / self.state.len().max(1) as f64,
-        }
-    }
-}
+pub use crate::neotrix::l1_body_impl::nt_io_standalone::{
+    EVOLUTION, KERNEL_DIM, ReasoningKernel, ReasoningMethod, ReasoningOutput,
+    StageInfo, KernelStats, SelfConsistencyResult, verify_answer,
+    text_to_vector, format_kernel_output,
+};
+pub use crate::core::nt_core_reasoning::{ReasoningTrace, TraceSource};
 
 #[cfg(test)]
 mod tests {
@@ -157,11 +48,14 @@ mod tests {
     }
 
     #[test]
-    fn test_reasoning_kernel_reason() {
+    fn test_reasoning_kernel_reason_real() {
+        // P0: re-export 的 L1 实现产出真实多步 trace（非固定 0.5 stub）。
         let k = ReasoningKernel::new(3);
         let query = vec![0.5; KERNEL_DIM];
-        let output = k.reason(&query, None);
-        assert!((output.confidence - 0.5).abs() < 1e-9);
+        let output = k.reason(&query, None, None);
+        assert!(output.trace.intermediate_states.len() >= 2, "must evolve multiple steps");
+        assert!(!output.trace.intermediate_states.is_empty());
+        assert!(output.confidence > 0.0 && output.confidence <= 1.0);
     }
 
     #[test]
@@ -182,5 +76,12 @@ mod tests {
     #[test]
     fn test_kernel_dim_constant() {
         assert_eq!(KERNEL_DIM, 128);
+    }
+
+    #[test]
+    fn test_verify_answer_reexport() {
+        // 验证器经 re-export 可用（RLVR 锚）。
+        assert!((verify_answer("42", "42") - 1.0).abs() < 1e-9);
+        assert_eq!(verify_answer("", "42"), 0.0);
     }
 }

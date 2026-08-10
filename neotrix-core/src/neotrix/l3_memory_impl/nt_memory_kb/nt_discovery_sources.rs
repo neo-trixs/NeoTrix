@@ -10,32 +10,36 @@ use super::nt_memory_store as store;
 
 fn http_client() -> &'static reqwest::blocking::Client {
     static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
-        reqwest::blocking::Client::builder()
-            .user_agent("NeoTrix/0.19 (nt_discovery_sources)")
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(15))
-            .no_proxy()
-            .build()
-            .unwrap_or_else(|e| {
-                eprintln!("WARN: HTTP client init failed: {}", e);
-                reqwest::blocking::Client::new()
-            })
+        super::nt_http::run_blocking(|| {
+            reqwest::blocking::Client::builder()
+                .user_agent("NeoTrix/0.19 (nt_discovery_sources)")
+                .timeout(Duration::from_secs(30))
+                .connect_timeout(Duration::from_secs(15))
+                .no_proxy()
+                .build()
+                .unwrap_or_else(|e| {
+                    eprintln!("WARN: HTTP client init failed: {}", e);
+                    reqwest::blocking::Client::new()
+                })
+        })
     });
     &CLIENT
 }
 
 fn browser_client() -> &'static reqwest::blocking::Client {
     static CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
-        reqwest::blocking::Client::builder()
-            .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-            .timeout(Duration::from_secs(30))
-            .connect_timeout(Duration::from_secs(15))
-            .no_proxy()
-            .build()
-            .unwrap_or_else(|e| {
-                eprintln!("WARN: HTTP client init failed: {}", e);
-                reqwest::blocking::Client::new()
-            })
+        super::nt_http::run_blocking(|| {
+            reqwest::blocking::Client::builder()
+                .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .timeout(Duration::from_secs(30))
+                .connect_timeout(Duration::from_secs(15))
+                .no_proxy()
+                .build()
+                .unwrap_or_else(|e| {
+                    eprintln!("WARN: HTTP client init failed: {}", e);
+                    reqwest::blocking::Client::new()
+                })
+        })
     });
     &CLIENT
 }
@@ -60,11 +64,13 @@ pub fn discover_gutenberg(conn: &Connection, query: &str, limit: usize) -> Resul
         urlencoding(query),
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("Gutenberg fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("Gutenberg fetch error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
     let results = data["results"].as_array().ok_or_else(|| "Missing results".to_string())?;
@@ -114,11 +120,13 @@ pub fn discover_semantic_scholar(conn: &Connection, query: &str, limit: usize) -
         limit.min(100)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("Semantic Scholar error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("Semantic Scholar error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
     let papers = data["data"].as_array().ok_or_else(|| "Missing data".to_string())?;
@@ -168,12 +176,14 @@ pub fn discover_historical_sites(conn: &Connection, query: &str, limit: usize) -
         limit.min(100)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .header("Accept", "application/json")
-        .send()
-        .map_err(|e| format!("Pleiades error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .header("Accept", "application/json")
+            .send()
+    })
+    .map_err(|e| format!("Pleiades error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
     let features = data["features"].as_array().ok_or_else(|| "Missing features".to_string())?;
@@ -220,11 +230,13 @@ pub fn discover_europeana(conn: &Connection, query: &str, limit: usize) -> Resul
         limit.min(100)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("Europeana error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("Europeana error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
     let items = data["items"].as_array().ok_or_else(|| "Missing items".to_string())?;
@@ -277,11 +289,13 @@ pub fn discover_inscriptions(conn: &Connection, query: &str, limit: usize) -> Re
         limit.min(50)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("Inscription search error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("Inscription search error: {}", e))?;
 
     if resp.status().is_success() {
         if let Ok(data) = resp.json::<serde_json::Value>() {
@@ -333,10 +347,12 @@ pub fn discover_chinese_ancient(conn: &Connection, query: &str, limit: usize) ->
         limit.min(50)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send();
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    });
 
     if let Ok(resp) = resp {
         if resp.status().is_success() {
@@ -388,11 +404,13 @@ pub fn discover_internet_archive(conn: &Connection, query: &str, limit: usize) -
         limit.min(50)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(30))
-        .send()
-        .map_err(|e| format!("Internet Archive error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(30))
+            .send()
+    })
+    .map_err(|e| format!("Internet Archive error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
     let docs = data["response"]["docs"].as_array().ok_or_else(|| "Missing docs".to_string())?;
@@ -442,11 +460,13 @@ pub fn discover_hathitrust(conn: &Connection, query: &str, limit: usize) -> Resu
         limit.min(50)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("HathiTrust error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("HathiTrust error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
     let records = data["records"].as_array().cloned().unwrap_or_default();
@@ -489,10 +509,12 @@ pub fn discover_open_context(conn: &Connection, query: &str, limit: usize) -> Re
         limit.min(50)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send();
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    });
 
     if let Ok(resp) = resp {
         if resp.status().is_success() {
@@ -557,11 +579,13 @@ pub fn discover_gallica(conn: &Connection, query: &str, limit: usize) -> Result<
         limit.min(50)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("Gallica error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("Gallica error: {}", e))?;
 
     let xml = resp.text().map_err(|e| format!("Read error: {}", e))?;
     stats.queries_executed = 1;
@@ -604,11 +628,13 @@ pub fn discover_books(conn: &Connection, query: &str, limit: usize) -> Result<Ex
         limit.min(100)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(15))
-        .send()
-        .map_err(|e| format!("OpenLibrary fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(15))
+            .send()
+    })
+    .map_err(|e| format!("OpenLibrary fetch error: {}", e))?;
 
     let data: serde_json::Value = resp.json().map_err(|e| format!("JSON error: {}", e))?;
     let docs = data["docs"].as_array().ok_or_else(|| "Missing docs".to_string())?;
@@ -693,11 +719,13 @@ pub fn discover_arxiv_papers(conn: &Connection, query: &str, max_results: usize)
         max_results.min(100)
     );
 
-    let resp = http_client()
-        .get(&url)
-        .timeout(std::time::Duration::from_secs(30))
-        .send()
-        .map_err(|e| format!("ArXiv fetch error: {}", e))?;
+    let resp = super::nt_http::run_blocking(|| {
+        http_client()
+            .get(&url)
+            .timeout(std::time::Duration::from_secs(30))
+            .send()
+    })
+    .map_err(|e| format!("ArXiv fetch error: {}", e))?;
 
     let text = resp.text().map_err(|e| format!("Text error: {}", e))?;
     stats.queries_executed = 1;
@@ -767,10 +795,12 @@ pub fn discover_annas_archive(conn: &Connection, query: &str, limit: usize) -> R
             urlencoding(query),
         );
 
-        match browser_client()
-            .get(&url)
-            .timeout(std::time::Duration::from_secs(15))
-            .send()
+        match super::nt_http::run_blocking(|| {
+            browser_client()
+                .get(&url)
+                .timeout(std::time::Duration::from_secs(15))
+                .send()
+        })
         {
             Ok(resp) => {
                 let html = resp.text().map_err(|e| format!("Read error: {}", e))?;

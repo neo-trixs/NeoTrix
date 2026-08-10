@@ -72,6 +72,9 @@ pub mod nt_core_sae_bridge;
 pub mod nt_core_td;
 pub mod nt_core_crt;
 pub mod nt_core_ttc;
+pub mod nt_core_cot_generator;
+pub mod nt_core_reasoning;
+pub mod nt_core_task_dispatcher;
 pub mod nt_core_trajectory_compress;
 pub mod nt_core_aura;
 pub mod nt_core_plan;
@@ -261,6 +264,12 @@ pub use nt_core_consensus::{
 };
 pub use nt_core_e8::e8_abduction_bridge::{
     E8AbductionBridge, AbductiveTransitionReport,
+};
+
+pub use nt_core_reasoning::{
+    ReasoningTrace, ReasoningStep, TraceSource, ReasoningMethod,
+    MethodRegistry, MethodSpec, ContextBuilder,
+    default_method_registry, default_context_builder,
 };
 
 // --- L5: Consciousness ---
