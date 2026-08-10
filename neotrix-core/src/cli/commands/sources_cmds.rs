@@ -209,6 +209,8 @@ impl CliCommand for SourcesCmd {
                     repos_per_topic: per_page,
                     scan_only_new_topics: false,
                     max_popular_repo_pages: 1,
+                    // 定向爬取: 直接按指定 topic 搜索 (跳过热门仓库主题发现)
+                    target_topics: vec![topic.to_string()],
                 };
                 with_kb(|kb| {
                     let stats = kb.run_github_topics_discovery(&config)?;

@@ -934,6 +934,230 @@
       "promoted_at": 1786084571,
       "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: [蒸馏-NT-CORE] 聚合 3 条经验的模式: smol-course SFT 核心教训：1) 数据质量 > 数据数量（1000 高质量 > 10000 平庸）；2) SFT 只重塑行",
       "signal": 0.76
+    },
+    {
+      "domain": "NT-MEMORY",
+      "capability": "hybrid_retrieval",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-MEMORY] 聚合 9 条经验的模式: 古籍吸收繁简归一缺陷: absorb_guji.py 的 to_simplified(opencc t2s) 仅用于去重键 norm_title, title 字段与 content 正文原样写入(繁体『史記』『黃帝者』)。FTS5 tokenize 按字节索引导致繁简不归一, 简体查询『鸿门宴』『史记』无法命中繁体内容, 反而命中引用书(宋诗钞等)。影响  [关键词: fts, nodes, content, rowid, title, 节点, join, left]' 命中能力标签 'hybrid_retrieval' 于域 Memory, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-WORLD",
+      "capability": "unified_crawler",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-MEMORY] 聚合 3 条经验的模式: 批量吸收纪律(第三轮验证): (1)先查URL占用再抓取, 已占用URL加#zh-full后缀; (2)absorb-node JSON必须用node_type+meta字段名(非type+metadata), 用对则dimension自动写入; (3)落盘后立即验证metadata.dimension; (4)建边用INSERT OR IGNORE防重;  [关键词: absorb, metadata, type, 非type, dimension, full后缀, ignore防重, json必须用node]' 命中能力标签 'unified_crawler' 于域 World, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-MEMORY",
+      "capability": "vector_storage",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-MEMORY] 聚合 3 条经验的模式: 真实地球批次吸收模式 (b26): 24 节点按维度 D1空间×4/D2时间×4/D3文明×4/D4理论×4/D5探险×3/D6生物人文×5 落盘, 每节点 metadata.dimension 用 json_extract 可查; 建边策略 = contains(指向洲/文明纲要/框架节点) + related_to(跨维度语义关联), 53 边全部命中唯 [关键词: related, contains, extract, json, metadata, source, type, 建边策略]' 命中能力标签 'vector_storage' 于域 Memory, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-MEMORY",
+      "capability": "hybrid_retrieval",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-MEMORY] 聚合 7 条经验的模式: 严重缺陷 (PA011 desync): b26/b27/b28 用 Python 直接写 nodes 表绕过 Rust CLI absorb-node 的 nodes/nodes_fts 双写机制, 导致 36 节点有 nodes 无 FTS 行 + 9 升级节点 FTS title 仍是旧英文。正确写入通道必须是 neotrix-experience a [关键词: experience, absorb, fts, insert, neotrix, node, nodes, python]' 命中能力标签 'hybrid_retrieval' 于域 Memory, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-MIND] 聚合 3 条经验的模式: 缺陷3：契约 fulfillment 生产环境永不达成 — verify_contract_fulfillment criterion 3 (vuln 减少>=20%) 首次评估 redu",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-MIND] 聚合 3 条经验的模式: SEAL 意识核心闭环缺陷4：extract_from_consciousness_tree (process_stage.rs:130) 无生产调用者——意识树果实只存于树内，SEAL ",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-MIND] 聚合 4 条经验的模式: 意识核心进化提升完整方法论（cycle 1004+1006 两阶段）：①诊断闭环断点（KB 全表 0 行 + 摄取能力未接线 + 进化开环）→ ②数据养料调制（data_nourishme",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-CORE",
+      "capability": "performance_concurrency",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-META] 聚合 3 条经验的模式: 全量 cargo test --features full 并行跑 6600+ 测试时的 flaky 模式：NT-SHIELD 网络/沙箱测试（proxy_heartbeat/lan_router/sandbox_entry）与 NT-IO 上下文折叠测试单独重跑均通过，仅全量并发时失败 —— 时序/全局资源敏感。判定非回归的准则：失败域与本次改动无依赖 + [关键词: cargo, test, 全量, entry, features, flaky, full, grep]' 命中能力标签 'performance_concurrency' 于域 Core, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: user 打断模型：1591 次 user 打断前 assistant 连续工作消息数 median=5、mean=12、max=180；1 条即断仅占 28.5%，而 ≥9 条长跑占 3",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-REPAIR",
+      "capability": "build_hygiene",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: 纠错与『未验证即交付』强相关：真实纠错消息仅 21 条（人类信号中 correction 1.6%），其中 6/21=29% 的纠错前 agent 的最后一步是 edit/write 且未再运行 test/build（unverified delivery），仅 3/21=14% 纠错前有测试验证足迹。即 agent 在无验证地长链改代码后，遭用户相位纠错的 [关键词: 其中, 条, agent, test, 且, 仅]' 命中能力标签 'build_hygiene' 于域 Repair, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::gwt",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: 生产路径 unwrap 风险分级审计法: 用 Python 行级词法过滤(跳过字符串字面量/注释/#[cfg(test)] mod 区域)统计真实调用, 然后分三级判定: (1)P0 真实",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-CORE] 聚合 150 条经验的模式: Experience-Driven Capability Loop (经验→能力闭环) 操作规则：\n1. 消退蒸馏：neotrix-experience distill [--doma",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-REPAIR",
+      "capability": "failure_recovery",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: GroundedGate 外部接地验证门实现: GroundedCheck(Compile/Test/Lint/ToolOutput) + evaluate→Pass/Revise{feedback}/Fail + run_loop(produce→check→Revise 重试→Pass/Fail)。执行语义 AgentOutput→Gate→[Pass| [关键词: compile, fail, test, cargo, unknown]' 命中能力标签 'failure_recovery' 于域 Repair, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-ACT",
+      "capability": "tool_routing",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 4 条经验的模式: 错误后'停下思考'是最强修复杠杆：52.9% 的 error 后紧接 reasoning（agent 停顿而非立即行动），该路径下下一个工具的即时成功率 94%（无思考仅 60%，n 1203/781）；同目标成功场景中有思考的中位耗时 5.2s（无思考 0.5s，P90 3.4s）——付出约 4.7s 思考代价，换来 +34 个百分点成功率并显著避免后续重 [关键词: error, 的, agent, bash, edit, read, code, completed]' 命中能力标签 'tool_routing' 于域 Act, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: EFE 前瞻知识域探索生产接线: efe_select_domain 用真实 KB by_domain 分布做动作选择。斜坡编码 (前 K 维激活, K∝count) 保证 cosine=",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-CORE] 聚合 4 条经验的模式: 命令以信息消费而非写入为主导, 且以单行短链为主。git 采得 1,004 条: diff 33.3%-37.8%, log/log/status 各约 12%-15%, stash 7.",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-REPAIR",
+      "capability": "root_cause_method",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-IO] 聚合 3 条经验的模式: 缺陷根因：--agent 启动后 TUI 立即退出 = stdin 非 tty（管道/脚本环境）时 crossterm event::read 立即返回 Err，事件循环 break。修复：run_agent_tui 开头 is_terminal() 检查 + event::read 失败打印错误详情。pty 冒烟验证：script 下 TUI 持续运行不崩 [关键词: crossterm, stdin, tty, tui, 非, agent, err, event]' 命中能力标签 'root_cause_method' 于域 Repair, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-ACT",
+      "capability": "tool_routing",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-IO] 聚合 3 条经验的模式: 对标 Claude Code/Codex 的编程助手 UI 模式: 1) 消息流全宽平铺无气泡, 用户消息极淡背景+左边框高亮, 助手透明; 2) 工具调用紧凑内联单行 (icon+名+✓/✗+耗时) 默认折叠, 展开看 args/result; 3) 输入区居中 max-w-3xl + focus glow + 底部状态条 (权限模式/模型名/快捷键);  [关键词: claude, 对标, code, codex, max, settingsmodal]' 命中能力标签 'tool_routing' 于域 Act, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-REPAIR",
+      "capability": "build_hygiene",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-IO] 聚合 4 条经验的模式: 完整 dmg 打包验证流程：cargo tauri build（release 含 bundle）产出 dmg，hdiutil attach 挂载验证安装盘结构（NeoTrix.app + Applications 快捷方式），open /Volumes/NeoTrix/NeoTrix.app 启动冒烟测试，pkill 停止后 detach 卸载。bundl [关键词: build, cargo, tauri, beforebuildcommand, bundle, conf, dmg, hdiutil]' 命中能力标签 'build_hygiene' 于域 Repair, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-IO",
+      "capability": "frontend_ui",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-IO] 聚合 4 条经验的模式: SwiftUI 死按钮模式: ProfileView 头像 confirmationDialog 三个按钮（Take Photo/Choose from Library/Remove Photo）均为空闭包 {}，用户点击无任何反馈。修复: 新增 ImagePicker（UIImagePickerController + UIViewControllerRe [关键词: swiftui, 教训, 修复, chat, chatview, confirmationdialog, imagepicker, profileview]' 命中能力标签 'frontend_ui' 于域 Io, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-IO] 聚合 9 条经验的模式: rules_apple 3.22.0 / rules_swift 3.6.1 / rules_proto 6.0.2 的 WORKSPACE API 已变更：apple_register_to",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-IO",
+      "capability": "frontend_ui",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-IO] 聚合 5 条经验的模式: TUI 界面重构模式（opencode/Claude Code 风格）：五面板（左侧会话列表+聊天+目标+输入+状态栏，每面板带边框标题）→ 三区垂直布局（聊天 Min1 + 输入 Length3 + 状态栏 Length1）。关键设计：全部无边框；输入框用 '❯ ' accent 色加粗提示符 + 灰色 placeholder；用户消息 'You: ' 标 [关键词: claude, code, tui, opencode, input, local, spinner, you]' 命中能力标签 'frontend_ui' 于域 Io, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-ACT",
+      "capability": "tool_routing",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-IO] 聚合 3 条经验的模式: 返回类型契约核对方法论：前端 invoke<T> 的类型定义与后端结构体必须逐字段核对。核对要点：(1) 前端可能调用无前缀命令（list_background_tasks）而后端有两个同名结构体（background_cmds.rs 与 computer_interactive_cmds.rs），需按实际命令路由到正确结构体核对；(2) 动态类型（serd [关键词: invoke, background, cmds, grep, handler, main, 前端]' 命中能力标签 'tool_routing' 于域 Act, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786257956
+    },
+    {
+      "domain": "NT-REPAIR",
+      "capability": "failure_recovery",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: 并行会话工作区守卫验证: 并行 agent 改 nt_io_standalone.rs / engine_core.rs 期间 crate 编译失败 (E0061/E0004/E0609), 我方改动 (main.rs/types.rs/entry/mod.rs) 无编译错误。策略: 用 cargo check 过滤错误归属, 不触碰并行会话文件, 等待其完 [关键词: core, standalone, agent, entry, kernel, mod]' 命中能力标签 'failure_recovery' 于域 Repair, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786274840
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76,
+      "promoted_at": 1786291674
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: [蒸馏-NT-CORE] 聚合 3 条经验的模式: [蒸馏-NT-CORE] 聚合 3 条经验的模式: smol-course SFT 核心教训：1) 数据质量 > 数据数量（1000 高",
+      "signal": 0.76,
+      "promoted_at": 1786291674
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::meta_cognition",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-MEMORY] 聚合 4 条经验的模式: 秒级时间戳精度陷阱: now() 为 Unix 秒, 同一秒内先后写入的两节点 created_at 相等 → conflict_detect_for_write 的 new_ts <",
+      "signal": 0.76,
+      "promoted_at": 1786327059
+    },
+    {
+      "domain": "NT-META",
+      "capability": "consciousness::consciousness_tree",
+      "action": "awakening_note",
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 4 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76,
+      "promoted_at": 1786327636
     }
   ]
 }

@@ -1,5 +1,12 @@
-# NeoGramApp entry point
-load("@rules_swift//swift:swift.bzl", "swift_library")
+# =============================================================================
+# Sources package — Swift modules + FFI C layer.
+# NOTE: All glob() patterns here are relative to this package (Sources/), so
+# they match the flat file layout. Targets living in a separate Bazel package
+# (e.g. //:NeoTrixFFI in the root package) CANNOT glob across package
+# boundaries — that is why every swift_library lives in this package.
+# =============================================================================
+load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+load("@build_bazel_rules_swift//swift:swift_interop_hint.bzl", "swift_interop_hint")
 load("@rules_cc//cc:defs.bzl", "objc_library")
 
 # =============================================================================
@@ -8,25 +15,104 @@ load("@rules_cc//cc:defs.bzl", "objc_library")
 # The generated NeoTrixFFI.swift imports `neotrixFFI` (the C FFI layer defined
 # in neotrixFFI.h + neotrixFFI.modulemap). Expose it as an objc_library so the
 # Swift module can resolve `import neotrixFFI`.
+# 修复: rules_swift 3.6.1 废弃 objc_library.module_map 属性 → 改用
+# swift_interop_hint 声明 module_map + module_name（swift_clang_module_aspect 要求）。
 objc_library(
     name = "neotrix_ffi_c",
     hdrs = [
         "Bridge/NeoTrixFFI/Generated/neotrixFFI.h",
     ],
     includes = ["Bridge/NeoTrixFFI/Generated"],
-    module_map = "Bridge/NeoTrixFFI/Generated/neotrixFFI.modulemap",
+    aspect_hints = [":neotrix_ffi_c_interop"],
     visibility = ["//visibility:public"],
 )
 
+swift_interop_hint(
+    name = "neotrix_ffi_c_interop",
+    module_map = "Bridge/NeoTrixFFI/Generated/neotrixFFI.modulemap",
+    module_name = "neotrixFFI",
+)
+
+# =============================================================================
+# Swift Module: NeoTrixFFI (Generated uniffi bindings)
+# =============================================================================
+swift_library(
+    name = "NeoTrixFFI",
+    srcs = glob(["Bridge/NeoTrixFFI/**/*.swift"]),
+    module_name = "NeoTrixFFI",
+    deps = [
+        ":neotrix_ffi_c",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# Swift Module: Core (coordinator + MTProto)
+# =============================================================================
+swift_library(
+    name = "Core",
+    srcs = glob(["Core/**/*.swift"]),
+    module_name = "NeoGramCore",
+    deps = [
+        ":NeoTrixFFI",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# Swift Module: UI (flat chat/settings/stories/etc. + Design tokens)
+# =============================================================================
+swift_library(
+    name = "UI",
+    srcs = glob(["UI/**/*.swift"]) + glob(["Design/**/*.swift"]),
+    module_name = "NeoGramUI",
+    deps = [
+        ":Core",
+        ":NeoTrixFFI",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# Swift Module: Premium
+# =============================================================================
+swift_library(
+    name = "Premium",
+    srcs = glob(["Premium/**/*.swift"]),
+    module_name = "NeoGramPremium",
+    deps = [
+        ":Core",
+        ":NeoTrixFFI",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# Swift Module: Features (NeoTrix AI integration)
+# =============================================================================
+swift_library(
+    name = "Features",
+    srcs = glob(["Features/**/*.swift"]),
+    module_name = "NeoGramFeatures",
+    deps = [
+        ":Core",
+        ":NeoTrixFFI",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# =============================================================================
+# App entry point
+# =============================================================================
 swift_library(
     name = "NeoGramApp",
     srcs = ["NeoGramApp.swift"],
     module_name = "NeoGramApp",
     deps = [
-        "//:Core",
-        "//:UI",
-        "//:Premium",
-        "//:Features",
+        ":Core",
+        ":UI",
+        ":Premium",
+        ":Features",
     ],
     visibility = ["//visibility:public"],
 )

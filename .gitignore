@@ -54,3 +54,13 @@ src-tauri/frontend/node_modules
 
 # Auto-backup dirs (design + neotrix-core snapshots)
 .backup/
+
+# External GitHub source clones (absorbed repo mirrors, not project code)
+/neotrix-core/huggingface-candle/
+/neotrix-core/huggingface-transformers/
+/neotrix-core/langchain-ai-langchain/
+/neotrix-core/rust-ml-linfa/
+/neotrix-core/sonos-tract/
+/neotrix-core/LaurentMazare-ocaml-torch/
+/huggingface-candle/
+/rust-ml-linfa/

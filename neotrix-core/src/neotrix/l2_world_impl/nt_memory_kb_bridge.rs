@@ -128,6 +128,8 @@ pub struct DiscoveryPipelineConfig {
     pub repos_per_topic: usize,
     pub scan_only_new_topics: bool,
     pub max_popular_repo_pages: usize,
+    /// 定向主题列表 — 非空时跳过热门仓库主题发现, 直接按指定主题搜索
+    pub target_topics: Vec<String>,
 }
 
 impl Default for DiscoveryPipelineConfig {
@@ -137,6 +139,7 @@ impl Default for DiscoveryPipelineConfig {
             repos_per_topic: 10,
             scan_only_new_topics: false,
             max_popular_repo_pages: 5,
+            target_topics: Vec::new(),
         }
     }
 }
@@ -401,6 +404,7 @@ impl KnowledgeBase {
                 repos_per_topic: config.repos_per_topic,
                 scan_only_new_topics: config.scan_only_new_topics,
                 max_popular_repo_pages: config.max_popular_repo_pages,
+                target_topics: config.target_topics.clone(),
             };
         let stats =
             crate::neotrix::l3_memory_impl::nt_memory_kb::nt_discovery_github_topics::run_github_topics_discovery(
