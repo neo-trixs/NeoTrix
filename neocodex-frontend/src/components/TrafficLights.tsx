@@ -1,6 +1,6 @@
 import { createSignal, onCleanup, onMount } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { system } from '../api'
 import { clsx } from 'clsx'
 
 /**
@@ -27,9 +27,9 @@ export function TrafficLights() {
     }
   })
 
-  const minimize = () => invoke('window_minimize')
-  const maximize = () => invoke('window_maximize')
-  const close = () => invoke('window_close')
+  const minimize = () => system.windowMinimize()
+  const maximize = () => system.windowMaximize()
+  const close = () => system.windowClose()
 
   return (
     <div class={clsx('traffic', !focused() && 'blurred')} data-tauri-drag-region>

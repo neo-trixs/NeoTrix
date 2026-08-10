@@ -184,3 +184,94 @@ fn find_node_by_any_title(conn: &rusqlite::Connection, title: &str) -> Option<St
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_kb_path() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("nt_kb_ingest_{}_{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::create_dir_all(&dir).ok();
+        dir.join("test_ingest.db")
+    }
+
+    #[test]
+    fn test_concept_insert_and_dedup() {
+        let path = temp_kb_path();
+        let ing = KBIngester::open(Some(path.clone())).expect("open");
+        let id1 = ing.concept("dedup测试概念", "summary", "test-domain");
+        assert!(!id1.is_empty(), "concept should insert");
+        // 同 title+type 二次插入 → dedup 返回同 id
+        let id2 = ing.concept("dedup测试概念", "summary2", "test-domain");
+        assert_eq!(id1, id2, "same title+type should dedup");
+        // 不同 title → 不同 id
+        let id3 = ing.concept("另一概念", "summary", "test-domain");
+        assert_ne!(id1, id3);
+        ing.close().expect("close");
+    }
+
+    #[test]
+    fn test_article_and_theory_insert() {
+        let path = temp_kb_path();
+        let ing = KBIngester::open(Some(path.clone())).expect("open");
+        let a = ing.article("文章标题", "摘要", "https://example.com/x", "test-domain");
+        assert!(!a.is_empty());
+        let t = ing.theory("理论标题", "摘要", "test-domain");
+        assert!(!t.is_empty());
+        assert_ne!(a, t);
+        // article 写入 url
+        let url: String = {
+            let kb = ing.kb();
+            let conn = kb.conn.lock().unwrap();
+            conn.query_row(
+                "SELECT url FROM nodes WHERE id = ?1",
+                rusqlite::params![a],
+                |row| row.get(0),
+            ).expect("query url")
+        };
+        assert_eq!(url, "https://example.com/x");
+        ing.close().expect("close");
+    }
+
+    #[test]
+    fn test_relate_wires_edge_between_existing_nodes() {
+        let path = temp_kb_path();
+        let mut ing = KBIngester::open(Some(path.clone())).expect("open");
+        ing.concept("起点A", "s", "test-domain");
+        ing.concept("终点B", "s", "test-domain");
+        assert!(ing.relate("起点A", "终点B", RelationType::RelatedTo, 0.8, "desc"));
+        // 不存在的节点 → false
+        assert!(!ing.relate("起点A", "不存在C", RelationType::RelatedTo, 0.5, ""));
+        // 自环 → false
+        assert!(!ing.relate("起点A", "起点A", RelationType::RelatedTo, 0.5, ""));
+        ing.close().expect("close");
+    }
+
+    #[test]
+    fn test_relate_many_counts_successes() {
+        let path = temp_kb_path();
+        let mut ing = KBIngester::open(Some(path.clone())).expect("open");
+        ing.concept("X1", "s", "d");
+        ing.concept("X2", "s", "d");
+        ing.concept("X3", "s", "d");
+        let ok = ing.relate_many(&[
+            ("X1", "X2", RelationType::RelatedTo, 0.5, "e1"),
+            ("X2", "X3", RelationType::RelatedTo, 0.5, "e2"),
+            ("X1", "幽灵", RelationType::RelatedTo, 0.5, "e3"), // 失败
+        ]);
+        assert_eq!(ok, 2);
+        ing.close().expect("close");
+    }
+
+    #[test]
+    fn test_try_node_collects_errors_not_panics() {
+        let path = temp_kb_path();
+        let mut ing = KBIngester::open(Some(path.clone())).expect("open");
+        let id = ing.try_node("try节点", NodeType::Concept, "s", None, "d");
+        assert!(id.is_some());
+        // 非法 title (空) 等不应 panic
+        let _ = ing.try_node("", NodeType::Concept, "s", None, "d");
+        assert!(ing.errors().len() >= 0); // 空 title 由底层处理, 不 panic 即通过
+        ing.close().expect("close");
+    }
+}

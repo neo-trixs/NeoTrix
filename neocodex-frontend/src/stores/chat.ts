@@ -1,49 +1,16 @@
 
 import { createStore, produce } from 'solid-js/store'
-import { invoke } from '@tauri-apps/api/core'
-import { tagsStore } from './tags'
+import { tagsStore, normalizeTagName } from './tags'
+import { neocodex } from '../api'
+import type {
+  NeoCodexAttachmentDto,
+  NeoCodexMessageItem,
+  NeoCodexSessionInfo,
+  ToolCallRecord,
+} from '../api/types'
 
-// Backend types matching neocodex_cmds.rs
-export interface NeoCodexSessionInfo {
-  id: string
-  name: string
-  mode: string
-  message_count: number
-  wire_path: string
-  updated_at: number
-  tags?: string[]
-}
-
-export interface NeoCodexAttachmentDto {
-  name: string
-  size: number
-  mime_type: string
-  data?: string
-}
-
-export interface NeoCodexMessageItem {
-  id: number
-  role: string
-  content: string
-  timestamp: number
-  attachments?: NeoCodexAttachmentDto[]
-  tool_call?: {
-    name: string
-    args: string
-    result: string
-    duration_ms: number
-    success: boolean
-  }
-}
-
-export interface ToolCallRecord {
-  id: string
-  name: string
-  args: string
-  result: string
-  duration_ms: number
-  success: boolean
-}
+// 兼容再导出：旧导入点（routes/Chat, ToolCallCard, FilePreview）逐步迁移到 api/types
+export type { NeoCodexAttachmentDto, NeoCodexMessageItem, NeoCodexSessionInfo, ToolCallRecord } from '../api/types'
 
 export interface Message {
   id: string
@@ -141,9 +108,7 @@ function createChatStore() {
   const loadSessions = async (projectPath?: string): Promise<void> => {
     setState('isLoadingSessions', true)
     try {
-      const backendSessions = await invoke<NeoCodexSessionInfo[]>('neocodex_list_sessions', {
-        project_path: projectPath,
-      })
+      const backendSessions = await neocodex.listSessions(projectPath)
       
       const sessions: Session[] = backendSessions.map(s => ({
         id: s.id,
@@ -154,6 +119,11 @@ function createChatStore() {
         project: projectFromPath(s.wire_path),
         tags: s.tags ?? tagsStore.tagsForSession(s.id),
       }))
+
+      // 后端标签回填 tags store（本地已有则不覆盖），随后同步到 session.tags
+      for (const s of backendSessions) {
+        tagsStore.importSessionTags(s.id, s.tags ?? [])
+      }
       
       setState('sessions', sessions)
       hydrateSessionTags()
@@ -177,9 +147,7 @@ function createChatStore() {
   const loadSessionMessages = async (sessionId: string): Promise<void> => {
     setState('isLoadingMessages', true)
     try {
-      const backendMessages = await invoke<NeoCodexMessageItem[]>('neocodex_get_session_messages', {
-        session_id: sessionId,
-      })
+      const backendMessages = await neocodex.getSessionMessages(sessionId)
       
       const messages = backendMessages.map(convertBackendMessage)
       
@@ -198,9 +166,7 @@ function createChatStore() {
 
   const addSession = async (title = '新对话'): Promise<string> => {
     try {
-      const backendSession = await invoke<NeoCodexSessionInfo>('neocodex_create_session', {
-        name: title,
-      })
+      const backendSession = await neocodex.createSession(title)
       
       const session: Session = {
         id: backendSession.id,
@@ -233,7 +199,7 @@ function createChatStore() {
 
   const deleteSession = async (id: string): Promise<void> => {
     try {
-      await invoke('neocodex_delete_session', { session_id: id })
+      await neocodex.deleteSession(id)
     } catch (error) {
       console.error('[chatStore] Failed to delete session:', error)
     }
@@ -244,7 +210,12 @@ function createChatStore() {
     }))
     
     if (state.currentSessionId === id) {
-      setState('currentSessionId', state.sessions[0]?.id || null)
+      const nextId = state.sessions[0]?.id || null
+      setState('currentSessionId', nextId)
+      // 回退会话需要加载消息，否则消息区为空
+      if (nextId) {
+        await loadSessionMessages(nextId)
+      }
     }
 
     // 清理标签映射（localStorage）
@@ -253,6 +224,16 @@ function createChatStore() {
 
   const switchSession = async (id: string): Promise<void> => {
     if (state.currentSessionId === id) return
+
+    // 若仍在流式生成，先中止后端流，避免旧会话的 token 事件污染新会话
+    if (state.isGenerating) {
+      try {
+        await neocodex.stopStream()
+      } catch (error) {
+        console.error('[chatStore] Failed to stop stream on switch:', error)
+      }
+      setState('isGenerating', false)
+    }
     
     setState('currentSessionId', id)
     
@@ -261,7 +242,7 @@ function createChatStore() {
     
     // Notify backend to switch context
     try {
-      await invoke('neocodex_switch_session', { session_id: id })
+      await neocodex.switchSession(id)
     } catch (error) {
       console.error('[chatStore] Failed to switch session on backend:', error)
     }
@@ -269,7 +250,7 @@ function createChatStore() {
 
   const updateSessionTitle = async (id: string, title: string): Promise<void> => {
     try {
-      await invoke('neocodex_rename_session', { session_id: id, name: title })
+      await neocodex.renameSession(id, title)
     } catch (error) {
       console.error('[chatStore] Failed to rename session:', error)
     }
@@ -433,10 +414,7 @@ function createChatStore() {
     }))
     // 异步持久化到 JSONL SessionMeta（失败不阻断本地体验）
     try {
-      const info = await invoke<NeoCodexSessionInfo>('neocodex_tag_session', {
-        session_id: sessionId,
-        tag: rawName,
-      })
+      const info = await neocodex.tagSession(sessionId, normalizeTagName(rawName))
       setState('sessions', produce(s => {
         const sess = s.find(x => x.id === sessionId)
         if (sess) sess.tags = info.tags ?? []
@@ -457,10 +435,7 @@ function createChatStore() {
     }))
     // 异步持久化到后端
     try {
-      const info = await invoke<NeoCodexSessionInfo>('neocodex_untag_session', {
-        session_id: sessionId,
-        tag: name,
-      })
+      const info = await neocodex.untagSession(sessionId, name)
       setState('sessions', produce(s => {
         const sess = s.find(x => x.id === sessionId)
         if (sess) sess.tags = info.tags ?? []

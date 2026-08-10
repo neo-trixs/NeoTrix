@@ -1,6 +1,7 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { GitBranch, FileCode2, Check, X, Loader2, RefreshCw, ChevronDown, ChevronRight } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { neocodex } from '../api'
+import type { GitStatus } from '../api/types'
 import { clsx } from 'clsx'
 
 interface DiffLine {
@@ -21,11 +22,6 @@ interface DiffFile {
 
 interface DiffResponse {
   files: DiffFile[]
-}
-
-interface GitStatus {
-  branch: string
-  dirty: boolean
 }
 
 interface Props {
@@ -52,8 +48,8 @@ export function GitPanel(props: Props) {
     setError(null)
     try {
       const [st, df] = await Promise.all([
-        invoke<GitStatus | null>('neocodex_git_status'),
-        invoke<DiffResponse>('neocodex_get_diff'),
+        neocodex.gitStatus(),
+        neocodex.getDiff(),
       ])
       setStatus(st)
       setDiff(df)
@@ -83,7 +79,7 @@ export function GitPanel(props: Props) {
     setBusy(`${path}:${action}`)
     setError(null)
     try {
-      await invoke('neocodex_apply_diff', { path, action })
+      await neocodex.applyDiff(path, action)
       await load()
     } catch (e) {
       setError(String(e))

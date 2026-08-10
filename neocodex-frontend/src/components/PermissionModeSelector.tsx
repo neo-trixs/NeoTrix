@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, For } from 'solid-js'
+import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
 import { Shield, MousePointer2, Edit3, FileText, ChevronDown, Check } from 'lucide-solid'
 import { clsx } from 'clsx'
 
@@ -196,9 +196,4 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
       />
     </div>
   )
-}
-
-// Helper component for conditional rendering
-function Show(props: { when: boolean; fallback?: any; children: any }) {
-  return props.when ? props.children : (props.fallback || null)
 }

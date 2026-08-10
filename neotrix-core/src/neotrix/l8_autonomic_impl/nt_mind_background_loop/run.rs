@@ -478,6 +478,7 @@ cognitive_load: self.cognitive_load.take(),
                 std::env::current_dir().unwrap_or_default(),
             ),
             last_consumed_fruit_cycle: 0,
+            last_capability_evolve_ts: std::sync::atomic::AtomicU64::new(0),
         }));
 
         macro_rules! spawn_handler {
@@ -695,6 +696,10 @@ pub struct BackgroundLoopHandle {
     /// 树内 fruits 从不清理, 全量克隆会让历史果实每 tick 重新注入 SEAL,
     /// 同一 trace 反复进 process buffer → 学习被重复污染。只注入比此值新的果实。
     last_consumed_fruit_cycle: u64,
+    /// 能力网自动补齐节流 — 上次执行时间戳 (秒)。auto_scan 全量扫描有开销,
+    /// 用时间门避免每 tick 触发 (handle_evolve 由 evolution_interval_secs 驱动,
+    /// 但能力网补齐独立节流, 默认 3600s 一次)。
+    last_capability_evolve_ts: std::sync::atomic::AtomicU64,
 }
 
 impl BackgroundLoopHandle {

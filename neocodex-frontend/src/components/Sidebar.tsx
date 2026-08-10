@@ -62,10 +62,10 @@ export function Sidebar(props: SidebarProps) {
     props.onSwitchView?.(v)
   }
 
-  const sessions = chatStore.state.sessions
-  const currentSessionId = chatStore.state.currentSessionId
+  const currentSessionId = () => chatStore.state.currentSessionId
 
   const groupedSessions = () => {
+    const sessions = chatStore.state.sessions
     const q = searchQuery().trim().toLowerCase()
     const activeTags = props.activeTags ?? []
     // 会话标签（从 tags store 实时读取，非响应式 session.tags 兜底）
@@ -171,8 +171,7 @@ export function Sidebar(props: SidebarProps) {
     }
   }
 
-  const handleRemoveTag = (e: Event, sessionId: string, tag: string) => {
-    e.stopPropagation()
+  const handleRemoveTag = (sessionId: string, tag: string) => {
     chatStore.untagSession(sessionId, tag)
   }
 
@@ -358,7 +357,7 @@ export function Sidebar(props: SidebarProps) {
                     <ul class="space-y-1" role="list" aria-label={`${group.key}会话`}>
                       <For each={group.items}>
                         {(session: { id: string; title: string; updatedAt: Date }) => {
-                          const active = currentSessionId === session.id
+                          const active = currentSessionId() === session.id
                           const sessionTags = () => chatStore.tagsForSession(session.id)
                           const isTagging = () => taggingSessionId() === session.id
                           return (
@@ -441,7 +440,7 @@ export function Sidebar(props: SidebarProps) {
                                             size="sm"
                                             active={(props.activeTags ?? []).includes(tag)}
                                             onClick={() => handleToggleTag(tag)}
-                                            onRemove={(t) => handleRemoveTag(new Event('click'), session.id, t)}
+                                            onRemove={(t) => handleRemoveTag(session.id, t)}
                                             showHierarchy
                                           />
                                         )}

@@ -169,12 +169,37 @@ impl BackgroundLoopHandle {
             .and_then(|kb| kb.stats().ok())
             .map(|s| (s.total_nodes as u64, s.total_edges as u64, s.crawl_pending as u64))
             .unwrap_or((0, 0, 0));
+        // 记忆知识库养料扩展: embedding 密度 (向量化覆盖) — 独立查询, stats() 不含
+        let kb_embeddings = self.kb.as_ref().map(|kb| kb.embedding_count() as u64).unwrap_or(0);
+        // 对话养料: conversation_records 进化训练数据 — 读回对话 awareness 作为养料源。
+        // 此前对话仅被写入 KB (store_conversation_record), 从未读回调制意识核心进化。
+        // 取最近 200 条记录统计: 平均 effectiveness = 对话质量, 记录数 = turn 密度。
+        let (conv_turns, conv_quality) = self.kb.as_ref()
+            .and_then(|kb| kb.get_evolution_history(200).ok())
+            .map(|recs| {
+                let n = recs.len() as f64;
+                let eff = if n > 0.0 {
+                    recs.iter().map(|r| r.effectiveness.clamp(0.0, 1.0)).sum::<f64>() / n
+                } else { 0.0 };
+                (recs.len() as u64, eff)
+            })
+            .unwrap_or((0, 0.0));
+        // 经验养料: experience namespace 蒸馏分支数 — 经验树落盘量。
+        let exp_branches = self.kb.as_ref()
+            .and_then(|kb| kb.kv_list("experience").ok())
+            .map(|entries| entries.len() as u64)
+            .unwrap_or(0);
 
         // ── Phase 1: ConsciousnessTree Growth Cycle (Soil → Roots → Trunk → Branches → Fruits → Core) ──
         if let Some(ref mut tree) = self.consciousness_tree {
             tree.soil.kb_node_count = kb_nodes;
             tree.soil.kb_edge_count = kb_edges;
             tree.soil.crawl_queue_depth = kb_crawl;
+            tree.soil.embedding_count = kb_embeddings;
+            // 养料融合回填: 对话 + 经验 → soil → data_nourishment_factor 调制果实
+            tree.soil.conversation_turn_count = conv_turns;
+            tree.soil.conversation_quality = conv_quality;
+            tree.soil.experience_branch_count = exp_branches;
             if let Some(ref monitor) = self.awareness {
                 let report = monitor.get_report();
                 tree.trunk.phi = report.phi;

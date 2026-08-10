@@ -18,6 +18,7 @@ static FETCHER_DEFAULT_HEADERS: LazyLock<reqwest::header::HeaderMap> = LazyLock:
 use crate::neotrix::nt_world_scrape::{RequestScraper, ScraperConfig};
 
 use super::config::CrawlStrategy;
+use super::stealth::SessionPool;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FetcherProtocol {
@@ -88,6 +89,7 @@ pub struct FetcherPool {
     http_nt_world_scrape: RequestScraper,
     strategy: CrawlStrategy,
     nt_world_browse_client: Option<Client>,
+    session_pool: Option<SessionPool>,
     errors: Vec<FetchError>,
     total_requests: u64,
     total_success: u64,
@@ -105,6 +107,7 @@ impl FetcherPool {
             http_nt_world_scrape: RequestScraper::new(config.clone()),
             strategy,
             nt_world_browse_client: None,
+            session_pool: None,
             errors: Vec::new(),
             total_requests: 0,
             total_success: 0,
@@ -117,12 +120,51 @@ impl FetcherPool {
         }
     }
 
+    /// crawlee SessionPool 接线: 挂接会话轮换池, fetch 时按会话身份轮换 UA/Cookie。
+    pub fn attach_session_pool(&mut self, pool: SessionPool) {
+        self.session_pool = Some(pool);
+    }
+
+    pub fn session_pool_stats(&self) -> Option<(usize, usize)> {
+        self.session_pool.as_ref().map(|p| (p.active_count(), p.banned_count()))
+    }
+
     pub fn fetch(&mut self, url: &str) -> FetchResult {
         self.total_requests += 1;
         let start = Instant::now();
 
-        let scrape = self.http_nt_world_scrape.get(url);
+        // SessionPool 接线: 获取会话身份 (UA + Cookie), 403/429 时标记封禁
+        let mut active_session_id: Option<u64> = None;
+        let (identity_ua, identity_cookie) = if let Some(pool) = &mut self.session_pool {
+            let session = pool.acquire();
+            active_session_id = Some(session.id);
+            session.use_count += 1;
+            let cookie_str: String = session
+                .cookies
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("; ");
+            (session.fingerprint.user_agent.clone(), cookie_str)
+        } else {
+            (String::new(), String::new())
+        };
+
+        let scrape = if identity_ua.is_empty() {
+            self.http_nt_world_scrape.get(url)
+        } else {
+            self.http_nt_world_scrape.get_with_identity(url, &identity_ua, &identity_cookie)
+        };
         let duration_ms = start.elapsed().as_millis() as u64;
+
+        // 403/429 → 封禁活跃会话 (该身份被站点拉黑, 轮换到其它会话)
+        if scrape.status_code == 403 || scrape.status_code == 429 {
+            if let Some(id) = active_session_id {
+                if let Some(pool) = &mut self.session_pool {
+                    pool.mark_banned(id);
+                }
+            }
+        }
 
         let fetch_result = if let Some(err) = scrape.error {
             let fetch_err = FetchError {
@@ -409,6 +451,25 @@ mod tests {
         let pool = FetcherPool::new(&test_config(), CrawlStrategy::Polite);
         assert_eq!(pool.total_requests, 0);
         assert_eq!(pool.total_success, 0);
+        assert!(pool.session_pool.is_none());
+    }
+
+    #[test]
+    fn test_fetcher_pool_attach_session_pool() {
+        let mut pool = FetcherPool::new(&test_config(), CrawlStrategy::Polite);
+        pool.attach_session_pool(SessionPool::new(3));
+        let stats = pool.session_pool_stats().expect("session pool attached");
+        assert_eq!(stats, (3, 0));
+    }
+
+    #[test]
+    fn test_fetcher_pool_fetch_with_session_pool() {
+        let mut pool = FetcherPool::new(&test_config(), CrawlStrategy::Polite);
+        pool.attach_session_pool(SessionPool::new(2));
+        let result = pool.fetch("https://example.com");
+        // 网络请求可能失败, 但 SessionPool 接线本身不应 panic 且应正确记账
+        assert!(result.duration_ms >= 0);
+        assert_eq!(pool.total_requests, 1);
     }
 
     #[test]

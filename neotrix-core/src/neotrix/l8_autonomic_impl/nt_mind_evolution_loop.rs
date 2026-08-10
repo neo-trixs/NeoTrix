@@ -14,7 +14,7 @@ use crate::neotrix::nt_mind_autofixer::AutoFixer;
 use crate::neotrix::nt_act_code::PipelineAutoFixer;
 use crate::neotrix::nt_mind_self_diagnose::{
     ActionExecutor, CodeUnderlyingIssue, DiagnosticItem, EvolutionLoopProvider,
-    PriorityQueue, PrioritizedIssue, SelfDiagnose,
+    PriorityQueue, PrioritizedIssue, RepairCircuitBreaker, SelfDiagnose,
 };
 pub use crate::neotrix::l1_body_impl::nt_l1_shared_types::IssueType;
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,10 @@ pub const TODO_LEFTOVERS_THRESHOLD: usize = 3;
 
 /// 停滞检测: 连续无改进次数上限
 pub const STAGNATION_LIMIT: u32 = 10;
+
+/// 自愈修复断路器轮次上限 (retry cap, 典型 1-10 次)
+/// 防止 autofix 循环空转烧资源 (Claude Code 事故教训: 无上限导致 25 万 API 调用浪费)
+pub const REPAIR_MAX_ROUNDS: usize = 10;
 
 // ============================================================
 // 问题类型 (re-exported from L1 nt_l1_shared_types via line 20)
@@ -572,15 +576,29 @@ impl EvolutionLoop {
     }
 
     /// 基于诊断结果的自动修复 — 按优先级顺序执行 ActionPlan
+    ///
+    /// 循环断路器接线 (R-P79): 每次 autofix 会话持有一个 RepairCircuitBreaker,
+    /// 逐 item 执行前检查断路器; 跳闸 (轮次超限或连续无进展) 即停止后续修复,
+    /// 防止自愈循环空转 (retry cap / loop detection)。
     pub fn autofix_by_diagnosis(&mut self) -> u32 {
         let (_items, pq) = self.self_diagnose();
         let mut fixes = 0u32;
+        let mut breaker = RepairCircuitBreaker::new(REPAIR_MAX_ROUNDS);
         for item in pq.as_slice() {
             if item.composite_score < 0.3 {
                 continue;
             }
-            if ActionExecutor::execute(&item.action).is_ok() {
-                fixes += 1;
+            if breaker.is_tripped() {
+                log::warn!("[EvolutionLoop] 修复断路器已跳闸, 停止自动修复");
+                break;
+            }
+            match ActionExecutor::execute_with_breaker(&ActionExecutor, &item.action, &mut breaker) {
+                Ok(_) => fixes += 1,
+                Err(e) if breaker.is_tripped() => {
+                    log::warn!("[EvolutionLoop] 修复断路器跳闸: {}", e);
+                    break;
+                }
+                Err(_) => {}
             }
         }
         if fixes > 0 {

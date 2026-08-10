@@ -1,21 +1,8 @@
 import { createSignal, onMount, createEffect, For, Show } from 'solid-js'
 import { Folder, FolderOpen, File, FileText, ChevronRight, ChevronDown, BookOpen, Loader2, X, RefreshCw } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { neocodex } from '../api'
+import type { ProjectTreeItem, ProjectView as ProjectViewData } from '../api/types'
 import { clsx } from 'clsx'
-
-interface TreeItem {
-  name: string
-  path: string
-  is_dir: boolean
-  children?: TreeItem[] | null
-}
-
-interface ProjectView {
-  root: string
-  tree: TreeItem[]
-  agents_md: string | null
-  file_count: number
-}
 
 interface Props {
   open: boolean
@@ -25,7 +12,7 @@ interface Props {
 }
 
 export function ProjectView(props: Props) {
-  const [view, setView] = createSignal<ProjectView | null>(null)
+  const [view, setView] = createSignal<ProjectViewData | null>(null)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
@@ -41,7 +28,7 @@ export function ProjectView(props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const v = await invoke<ProjectView>('neocodex_project_tree')
+      const v = await neocodex.projectTree()
       setView(v)
       // Auto-expand root dirs
       const firstLevel = v.tree.filter(t => t.is_dir).map(t => t.path)
@@ -66,7 +53,7 @@ export function ProjectView(props: Props) {
 
   const baseName = () => view()?.root.split('/').filter(Boolean).pop() || '项目'
 
-  const renderNode = (item: TreeItem, depth: number) => {
+  const renderNode = (item: ProjectTreeItem, depth: number) => {
     const isOpen = expanded().has(item.path)
     return (
       <div>

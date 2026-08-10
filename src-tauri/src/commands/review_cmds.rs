@@ -30,15 +30,6 @@ pub struct ReviewResult {
     pub score: u8,
 }
 
-fn severity_priority(s: &str) -> u8 {
-    match s {
-        "critical" => 3,
-        "warning" => 2,
-        "info" => 1,
-        _ => 0,
-    }
-}
-
 fn check_line_issues(line: &str, line_num: usize) -> Vec<ReviewIssue> {
     let mut issues = Vec::new();
 

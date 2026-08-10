@@ -79,15 +79,6 @@ pub struct VoiceTranscript {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VoiceCommand {
-    pub transcript_id: String,
-    pub raw_text: String,
-    pub interpreted_action: String,
-    pub confidence: f64,
-    pub parameters: HashMap<String, String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceConfig {
     pub enabled: bool,
     pub language: VoiceLanguage,

@@ -1,20 +1,8 @@
 import { createSignal, onMount, createEffect, Show } from 'solid-js'
 import { Coins, X, RefreshCw, Loader2, Cpu, Activity, Wallet, Repeat } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { neocodex } from '../api'
+import type { AgentStatus } from '../api/types'
 import { clsx } from 'clsx'
-
-interface AgentStatus {
-  running: boolean
-  current_task: string | null
-  uptime_secs: number
-  turn_count: number
-  tokens_used: number
-  context_usage: number
-  provider_model: string
-  evolution_iterations: number
-  cost_spent: number
-  cost_budget: number
-}
 
 interface Props {
   open: boolean
@@ -36,7 +24,7 @@ export function CostDashboard(props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const s = await invoke<AgentStatus>('neocodex_agent_status')
+      const s = await neocodex.agentStatus()
       setStatus(s)
     } catch (e) {
       setError(String(e))

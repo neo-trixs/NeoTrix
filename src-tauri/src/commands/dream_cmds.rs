@@ -6,7 +6,6 @@ use std::sync::{LazyLock, Mutex};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
-use tauri::State;
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -54,7 +53,6 @@ struct DreamState {
     config: DreamConfig,
     entries: Vec<DreamMemoryEntry>,
     status: DreamStatus,
-    entry_counter: u64,
     thread_handle: Option<thread::JoinHandle<()>>,
 }
 
@@ -72,7 +70,6 @@ impl DreamState {
                 memories_harvested: 0,
                 contradictions_removed: 0,
             },
-            entry_counter: 0,
             thread_handle: None,
         }
     }

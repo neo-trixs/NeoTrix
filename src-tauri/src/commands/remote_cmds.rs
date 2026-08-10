@@ -1,7 +1,4 @@
 use serde::Serialize;
-use tauri::State;
-use std::sync::Mutex;
-use std::collections::HashMap;
 
 const REMOTE_HOSTS_FILE: &str = ".neotrix/remote-hosts.json";
 
@@ -14,11 +11,6 @@ pub struct RemoteHostConfig {
     pub user: String,
     pub auth_method: String,
     pub key_path: Option<String>,
-}
-
-#[derive(Default)]
-pub struct RemoteHostsState {
-    pub hosts: Vec<RemoteHostConfig>,
 }
 
 fn hosts_path() -> String {

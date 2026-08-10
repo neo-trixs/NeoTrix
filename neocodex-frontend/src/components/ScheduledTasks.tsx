@@ -1,23 +1,8 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { CalendarClock, X, RefreshCw, Loader2, Play, Plus, Trash2, Pause, CirclePlay, History } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { tasks as tasksApi } from '../api'
+import type { BackgroundTask } from '../api/types'
 import { clsx } from 'clsx'
-
-interface TaskRun {
-  timestamp: number
-  summary: string
-}
-
-interface BackgroundTask {
-  id: string
-  name: string
-  prompt: string
-  schedule: string
-  last_run: number | null
-  next_run: number | null
-  status: string
-  runs: TaskRun[]
-}
 
 // 预置调度模板（RRULE 风格速选）
 const SCHEDULE_PRESETS: { label: string; value: string }[] = [
@@ -52,7 +37,7 @@ export function ScheduledTasks(props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const list = await invoke<BackgroundTask[]>('list_background_tasks')
+      const list = await tasksApi.listBackgroundTasks()
       setTasks(list)
     } catch (e) {
       setError(String(e))
@@ -71,7 +56,7 @@ export function ScheduledTasks(props: Props) {
     setBusy('create')
     setError(null)
     try {
-      await invoke('create_background_task', { name: name().trim(), prompt: prompt().trim(), schedule: schedule() })
+      await tasksApi.createBackgroundTask(name().trim(), prompt().trim(), schedule())
       setName('')
       setPrompt('')
       setShowCreate(false)
@@ -89,8 +74,10 @@ export function ScheduledTasks(props: Props) {
     setBusy(`${kind}:${id}`)
     setError(null)
     try {
-      const cmd = kind === 'run' ? 'run_background_task_now' : `${kind}_background_task`
-      await invoke(cmd, { id })
+      if (kind === 'run') await tasksApi.runBackgroundTaskNow(id)
+      else if (kind === 'pause') await tasksApi.pauseBackgroundTask(id)
+      else if (kind === 'resume') await tasksApi.resumeBackgroundTask(id)
+      else await tasksApi.deleteBackgroundTask(id)
       await load()
     } catch (e) {
       setError(String(e))

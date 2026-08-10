@@ -1,20 +1,16 @@
-import { createSignal, onMount, onCleanup, For } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
-import { ChevronDown, Loader2, Check, AlertCircle, Zap, Brain, Globe } from 'lucide-solid'
+import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
+import { ChevronDown, Loader2, Check, AlertCircle } from 'lucide-solid'
 import { clsx } from 'clsx'
+import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
+import { neocodex } from '../api'
+import type { ProviderConfig } from '../api/types'
 
-export interface ProviderEntry {
-  name: string
-  model: string
-  resolvable: boolean
-}
-
-export interface ProviderConfig {
-  provider_count: number
-  resolvable: boolean
-  active_model: string
-  providers: ProviderEntry[]
-}
+/* ════════════════════════════════════════════
+   ProviderSelector — 模型提供商选择器（统一 v2）
+   与 SettingsModal 共用 ProviderIcon/CategoryBadge 视觉语言
+   - 触发按钮：品牌 monogram + 显示名 + 分类徽章
+   - 下拉：分类徽章 + 免费徽章 + 可达性标识
+   ════════════════════════════════════════════ */
 
 export function ProviderSelector(props: { iconOnly?: boolean }) {
   const [config, setConfig] = createSignal<ProviderConfig | null>(null)
@@ -48,7 +44,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
     setLoading(true)
     setError(null)
     try {
-      const result = await invoke<ProviderConfig>('neocodex_provider_config')
+      const result = await neocodex.providerConfig()
       setConfig(result)
     } catch (err) {
       const msg = err instanceof Error ? err.message : '获取提供商配置失败'
@@ -63,7 +59,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
     setLoading(true)
     setError(null)
     try {
-      await invoke('neocodex_set_provider', { name: providerName })
+      await neocodex.setProvider(providerName)
       await loadConfig()
       setIsOpen(false)
       // 广播提供商变更，Chat 状态栏 / 其他监听方即时刷新
@@ -83,18 +79,6 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
     return cfg.providers.find(p => p.model === cfg.active_model) || cfg.providers[0] || null
   }
 
-  const getProviderIcon = (name: string) => {
-    const lower = name.toLowerCase()
-    if (lower.includes('openai') || lower.includes('gpt')) return <Zap class="w-4 h-4" />
-    if (lower.includes('anthropic') || lower.includes('claude')) return <Brain class="w-4 h-4" />
-    if (lower.includes('google') || lower.includes('gemini')) return <Globe class="w-4 h-4" />
-    return <Zap class="w-4 h-4" />
-  }
-
-  const formatProviderName = (name: string) => {
-    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
-  }
-
   return (
     <div class="relative">
       {/* Trigger Button — iconOnly 极简圆形图标 / 完整模式 */}
@@ -110,15 +94,15 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
         aria-label="选择模型提供商"
         aria-expanded={isOpen()}
         aria-haspopup="listbox"
-        title={props.iconOnly ? (currentProvider() ? formatProviderName(currentProvider()!.name) : '选择提供商') : undefined}
+        title={props.iconOnly ? (currentProvider() ? currentProvider()!.display_name : '选择提供商') : undefined}
       >
         {props.iconOnly ? (
           loading() ? (
             <Loader2 class="w-4 h-4 animate-spin text-nt-io-500" />
           ) : currentProvider() ? (
-            getProviderIcon(currentProvider()!.name)
+            <ProviderIcon name={currentProvider()!.name} size="sm" />
           ) : (
-            <Zap class="w-4 h-4" />
+            <span class="w-6 h-6 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-[10px] font-semibold">?</span>
           )
         ) : (
           <>
@@ -127,8 +111,9 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                 <Loader2 class="w-4 h-4 animate-spin text-nt-io-500" />
               ) : currentProvider() ? (
                 <>
-                  {getProviderIcon(currentProvider()!.name)}
-                  <span class="font-medium truncate">{formatProviderName(currentProvider()!.name)}</span>
+                  <ProviderIcon name={currentProvider()!.name} />
+                  <span class="font-medium truncate">{currentProvider()!.display_name}</span>
+                  <CategoryBadge category={currentProvider()!.category} className="hidden md:inline-flex" />
                 </>
               ) : (
                 <span class="text-text-muted">选择提供商</span>
@@ -150,7 +135,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
 
       {/* Dropdown Panel */}
       <Show when={isOpen()}>
-        <div class="absolute top-full left-0 right-0 mt-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[220px] max-w-[320px]">
+        <div class="absolute top-full left-0 right-0 mt-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[240px] max-w-[340px]">
           {/* Header */}
           <div class="px-3 py-2 border-b border-white/40 flex items-center justify-between">
             <span class="text-sm font-medium text-text-primary">模型提供商</span>
@@ -160,7 +145,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
           {/* Provider List */}
           <div class="max-h-64 overflow-y-auto" role="listbox" aria-label="模型提供商列表">
             <For each={config()?.providers || []}>
-              {(provider: ProviderEntry, i) => {
+              {(provider: import('../api/types').ProviderMeta, i) => {
                 const isActive = provider.model === config()?.active_model
                 return (
                   <button
@@ -186,14 +171,20 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                       })
                     }}
                   >
-                    {getProviderIcon(provider.name)}
+                    <ProviderIcon name={provider.name} size="sm" />
                     <div class="flex-1 min-w-0 flex flex-col gap-1">
-                      <span class="font-medium truncate">{formatProviderName(provider.name)}</span>
-                      <span class="text-xs text-text-muted truncate">{provider.model}</span>
+                      <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="font-medium truncate">{provider.display_name}</span>
+                        {provider.is_free && <FreeBadge free />}
+                      </div>
+                      <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="text-xs text-text-muted truncate font-mono">{provider.model}</span>
+                        <CategoryBadge category={provider.category} className="hidden sm:inline-flex" />
+                      </div>
                     </div>
                     {isActive && <Check class="w-4 h-4 text-nt-io-500 flex-shrink-0" />}
                     {!provider.resolvable && (
-                      <span class="text-xs text-amber-600 px-2 py-1 rounded bg-amber-500/10">不可用</span>
+                      <span class="text-xs text-amber-600 px-2 py-1 rounded bg-amber-500/10 flex-shrink-0">不可用</span>
                     )}
                   </button>
                 )
@@ -214,16 +205,11 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
       </Show>
 
       {/* Click outside to close */}
-      <div 
-        class={isOpen() ? 'fixed inset-0 z-40' : 'hidden'} 
+      <div
+        class={isOpen() ? 'fixed inset-0 z-40' : 'hidden'}
         onClick={() => setIsOpen(false)}
         aria-hidden="true"
       />
     </div>
   )
-}
-
-// Helper component for conditional rendering
-function Show(props: { when: boolean; fallback?: any; children: any }) {
-  return props.when ? props.children : (props.fallback || null)
 }

@@ -3,7 +3,7 @@
 //! 补齐前端 lib/api.ts 调用但后端缺失的命令 (审计发现 8 个运行时缺失项)。
 
 use serde::Serialize;
-use tauri::{Manager, Window};
+use tauri::Window;
 
 /// 窗口最小化
 #[tauri::command]

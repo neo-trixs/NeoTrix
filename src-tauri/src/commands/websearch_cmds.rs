@@ -154,7 +154,6 @@ struct AgentSdkState {
     search_config: SearchConfig,
     blueprint_counter: u64,
     instance_counter: u64,
-    result_counter: u64,
 }
 
 impl AgentSdkState {
@@ -170,7 +169,6 @@ impl AgentSdkState {
             },
             blueprint_counter: 0,
             instance_counter: 0,
-            result_counter: 0,
         }
     }
 

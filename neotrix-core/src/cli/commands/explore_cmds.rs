@@ -84,6 +84,98 @@ impl CliCommand for ExploreCmd {
                 }
             }
 
+            "alphaxiv" | "ax" => {
+                let pages = args.get(1).and_then(|s| s.parse::<usize>().ok()).unwrap_or(5);
+                let page_size = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(20);
+                let category = args.get(3).map(|s| s.as_str()).unwrap_or("");
+                match try_open_kb() {
+                    Some(kb) => match kb.ingest_alphaxiv_feed(pages, page_size, category) {
+                        Ok(n) => {
+                            let cat_suffix = if category.is_empty() {
+                                String::new()
+                            } else {
+                                format!(", 分类 {}", category)
+                            };
+                            let msg = format!(
+                                "📄 alphaXiv feed: {} 篇论文入库 ({} 页 × {} 篇/页{})",
+                                n, pages, page_size, cat_suffix
+                            );
+                            CommandOutput::ok(&msg)
+                        }
+                        Err(e) => CommandOutput::err(&format!("alphaXiv 吸收失败: {}", e)),
+                    },
+                    None => CommandOutput::err("无法打开 KB"),
+                }
+            }
+
+            "hf" | "hfdataset" | "hfd" => {
+                let what = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                if what == "queue" {
+                    let max = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(50);
+                    match try_open_kb() {
+                        Some(kb) => match kb.run_hf_queue_batch(max) {
+                            Ok((ok, fail)) => CommandOutput::ok(&format!("🤗 HF 队列消费: {} 成功, {} 失败 (上限 {})", ok, fail, max)),
+                            Err(e) => CommandOutput::err(&format!("HF 队列消费失败: {}", e)),
+                        },
+                        None => CommandOutput::err("无法打开 KB"),
+                    }
+                } else if what.is_empty() {
+                    return CommandOutput::err("用法: /explore hf <owner/name | url>  |  /explore hf queue [max]");
+                } else {
+                    match try_open_kb() {
+                        Some(kb) => match kb.ingest_hf_dataset(what) {
+                            Ok(n) => CommandOutput::ok(&format!("🤗 HF dataset: {} 节点入库 ({})", n, what)),
+                            Err(e) => CommandOutput::err(&format!("HF dataset 吸收失败: {}", e)),
+                        },
+                        None => CommandOutput::err("无法打开 KB"),
+                    }
+                }
+            }
+
+            "wikipedia" | "wiki" => {
+                let topic = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                if topic.is_empty() {
+                    return CommandOutput::err("用法: /explore wikipedia <topic>");
+                }
+                match try_open_kb() {
+                    Some(kb) => match kb.ingest_wikipedia(topic) {
+                        Ok(n) => CommandOutput::ok(&format!("📚 Wikipedia: {} 节点入库 (主题 {})", n, topic)),
+                        Err(e) => CommandOutput::err(&format!("Wikipedia 吸收失败: {}", e)),
+                    },
+                    None => CommandOutput::err("无法打开 KB"),
+                }
+            }
+
+            "arxiv" => {
+                let ids: Vec<&str> = args.iter().skip(1).map(|s| s.as_str()).collect();
+                if ids.is_empty() {
+                    return CommandOutput::err("用法: /explore arxiv <id> [id...]");
+                }
+                match try_open_kb() {
+                    Some(kb) => {
+                        let mut ok = 0;
+                        let mut errs: Vec<String> = Vec::new();
+                        for id in ids {
+                            match kb.ingest_arxiv(id) {
+                                Ok(n) => ok += n,
+                                Err(e) => errs.push(format!("{}: {}", id, e)),
+                            }
+                        }
+                        if errs.is_empty() {
+                            CommandOutput::ok(&format!("📄 arXiv: {} 篇论文入库", ok))
+                        } else {
+                            CommandOutput::ok(&format!(
+                                "📄 arXiv: {} 篇入库, {} 失败: {}",
+                                ok,
+                                errs.len(),
+                                errs.join("; ")
+                            ))
+                        }
+                    }
+                    None => CommandOutput::err("无法打开 KB"),
+                }
+            }
+
             "panorama" | "map" => {
                 let mut pipeline = try_prepare_pipeline();
                 match pipeline.update_panorama() {
@@ -122,6 +214,7 @@ impl CliCommand for ExploreCmd {
                     /explore cycle          执行一次探索循环\n\
                     /explore absorb <url>   吸收 URL 到知识库\n\
                     /explore github <url>   吸收 GitHub 仓库 + 蒸馏\n\
+                    /explore alphaxiv [pages] [page_size] [category]  吸收 alphaXiv 论文 feed (category: ai-ml/q-bio/q-fin)\n\
                     /explore panorama       查看知识全景\n\
                     /explore recent         最近吸收记录"
                 )

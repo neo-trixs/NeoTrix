@@ -2,7 +2,6 @@ use neotrix::neotrix::l1_body_impl::nt_io_neocodex::{
     NeoCodexAgent, NeoCodexHealthReport, NeoCodexMode, WireSession, WireEvent,
 };
 use neotrix::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry;
-use serde::Serialize;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_notification::NotificationExt;
@@ -253,7 +252,12 @@ pub async fn neocodex_agent_status() -> Result<NeoCodexAgentStatus, String> {
 #[derive(serde::Serialize, Clone)]
 pub struct NeoCodexProviderEntry {
     pub name: String,
+    pub display_name: String,
+    pub category: String,
+    pub is_free: bool,
+    pub base_url: String,
     pub model: String,
+    pub models: Vec<String>,
     pub resolvable: bool,
 }
 
@@ -265,6 +269,30 @@ pub struct NeoCodexProviderConfig {
     pub providers: Vec<NeoCodexProviderEntry>,
 }
 
+/// 用真实 nt_io_provider 目录富化条目（display_name/category/is_free/base_url/models）。
+/// 无匹配目录时回退 name 自身 + 空分类，保证 UI 永不缺字段。
+fn enrich_provider_entry(name: &str, model: &str, resolvable: bool) -> NeoCodexProviderEntry {
+    use neotrix::neotrix::nt_io_provider::provider_catalog::{lookup_provider, ProviderCategory};
+    let cat = lookup_provider(name);
+    let category = match cat.map(|c| c.category) {
+        Some(ProviderCategory::Local) => "local".to_string(),
+        Some(ProviderCategory::Proxy) => "proxy".to_string(),
+        Some(ProviderCategory::Cloud) => "cloud".to_string(),
+        None => "unknown".to_string(),
+    };
+    NeoCodexProviderEntry {
+        name: name.to_string(),
+        display_name: cat.map(|c| c.display_name.to_string()).unwrap_or_else(|| name.to_string()),
+        category,
+        is_free: cat.map(|c| c.is_free).unwrap_or(false),
+        base_url: cat.map(|c| c.base_url.to_string()).unwrap_or_default(),
+        model: model.to_string(),
+        models: cat.map(|c| c.models.iter().map(|m| m.to_string()).collect())
+            .unwrap_or_else(|| vec![model.to_string()]),
+        resolvable,
+    }
+}
+
 #[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_provider_config() -> Result<NeoCodexProviderConfig, String> {
     let guard = NEOCODEX_AGENT.lock().await;
@@ -272,11 +300,7 @@ pub async fn neocodex_provider_config() -> Result<NeoCodexProviderConfig, String
         Some(a) => {
             let providers = a.provider.providers
                 .iter()
-                .map(|p| NeoCodexProviderEntry {
-                    name: p.name.clone(),
-                    model: p.model.clone(),
-                    resolvable: a.provider.is_resolvable_for(&p.name),
-                })
+                .map(|p| enrich_provider_entry(&p.name, &p.model, a.provider.is_resolvable_for(&p.name)))
                 .collect();
             Ok(NeoCodexProviderConfig {
                 provider_count: a.provider.providers.len(),
@@ -487,11 +511,6 @@ pub async fn neocodex_search_sessions(query: String) -> Result<Vec<NeoCodexSearc
                     }
                     WireEvent::AgentMessage { content: msg, timestamp } => {
                         push_search_hit(&msg, "assistant", timestamp, &needle, &session_id, &session_name, &mut hits);
-                    }
-                    WireEvent::SessionMeta { name, .. } => {
-                        if !name.is_empty() {
-                            session_name = name;
-                        }
                     }
                     _ => {}
                 }
@@ -1543,7 +1562,7 @@ pub fn neocodex_project_tree() -> Result<ProjectView, String> {
             }
             let path = entry.path();
             let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-            let rel = path.strip_prefix(dir).unwrap_or(&path).to_string_lossy().to_string();
+            let _rel = path.strip_prefix(dir).unwrap_or(&path).to_string_lossy().to_string();
             if is_dir {
                 if *cap == 0 {
                     // 容量已耗尽: 跳过该子目录 (避免 *cap -= 1 下溢 panic)
@@ -1848,7 +1867,6 @@ pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), Strin
         .map_err(|e| format!("更新安装失败: {e}"))?;
     // Relaunch so the new version takes effect (updater staged the bundle).
     app.restart();
-    Ok(())
 }
 
 /// Get per-file diffs for the active neocodex session's working tree.
@@ -2021,46 +2039,6 @@ pub fn neocodex_apply_diff(path: String, action: String) -> Result<(), String> {
     Ok(())
 }
 
-fn parse_neocodex_diff(diff_str: &str) -> Vec<crate::commands::DiffBlock> {
-    let mut blocks = Vec::new();
-    for line in diff_str.lines() {
-        if let Some(stripped) = line.strip_prefix('+') {
-            if !stripped.starts_with('+') {
-                blocks.push(crate::commands::DiffBlock {
-                    r#type: "added".into(),
-                    content: stripped.to_string(),
-                    line_start: 0,
-                });
-                continue;
-            }
-        }
-        if let Some(stripped) = line.strip_prefix('-') {
-            if !stripped.starts_with('-') {
-                blocks.push(crate::commands::DiffBlock {
-                    r#type: "removed".into(),
-                    content: stripped.to_string(),
-                    line_start: 0,
-                });
-                continue;
-            }
-        }
-        if !line.starts_with("diff")
-            && !line.starts_with("index")
-            && !line.starts_with("---")
-            && !line.starts_with("+++")
-            && !line.starts_with("@@")
-            && !line.starts_with("\\ ")
-        {
-            blocks.push(crate::commands::DiffBlock {
-                r#type: "unchanged".into(),
-                content: line.to_string(),
-                line_start: 0,
-            });
-        }
-    }
-    blocks
-}
-
 /// Open a file in the internal editor by dispatching a frontend event.
 #[tauri::command(rename_all = "snake_case")]
 pub fn neocodex_open_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
@@ -2117,33 +2095,86 @@ pub struct GitFileStatus {
     pub status: String,
 }
 
-/// File operations: create file, create folder, delete, rename.
+/// Ensure a path stays within the current project (or the workspace cwd when no
+/// project is set). Blocks traversal to arbitrary user files via IPC. For
+/// creation ops the target may not exist yet; pass allow_missing to resolve the
+/// deepest existing ancestor for the containment check.
+fn resolve_within_project(path: &str, allow_missing: bool) -> Result<std::path::PathBuf, String> {
+    use std::path::Path;
+    let target = Path::new(path);
+    if !target.exists() {
+        if allow_missing {
+            // For creation ops: verify the deepest existing ancestor is inside
+            // the workspace, then return the requested path.
+            let mut probe = target;
+            let mut ancestors: Vec<std::path::PathBuf> = Vec::new();
+            loop {
+                ancestors.push(probe.to_path_buf());
+                match probe.parent() {
+                    Some(p) if !p.as_os_str().is_empty() => probe = p,
+                    _ => break,
+                }
+            }
+            let existing = ancestors.iter().find(|a| a.exists());
+            if let Some(existing) = existing {
+                let canonical = existing.canonicalize().map_err(|e| e.to_string())?;
+                let root = std::env::current_dir().map_err(|e| e.to_string())?;
+                let root_canonical = root.canonicalize().map_err(|e| e.to_string())?;
+                if !canonical.starts_with(&root_canonical) {
+                    return Err(format!(
+                        "Path outside allowed workspace: {} (root: {})",
+                        canonical.display(),
+                        root_canonical.display()
+                    ));
+                }
+            } else {
+                return Err(format!("No existing ancestor for path: {}", path));
+            }
+            return Ok(target.to_path_buf());
+        }
+        return Err(format!("Path does not exist: {}", path));
+    }
+    let canonical = target.canonicalize().map_err(|e| e.to_string())?;
+    let root = std::env::current_dir().map_err(|e| e.to_string())?;
+    let root_canonical = root.canonicalize().map_err(|e| e.to_string())?;
+    if !canonical.starts_with(&root_canonical) {
+        return Err(format!(
+            "Path outside allowed workspace: {} (root: {})",
+            canonical.display(),
+            root_canonical.display()
+        ));
+    }
+    Ok(canonical)
+}
+
+/// File operations: create file, create folder, delete, rename. Paths are
+/// constrained to the current workspace to prevent arbitrary file access via IPC.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_file_operation(op: String, path: String, new_name: Option<String>) -> Result<(), String> {
     use std::fs;
-    use std::path::Path;
-    let p = Path::new(&path);
+    // Creation ops target not-yet-existing paths; the rest must exist.
+    let p = resolve_within_project(&path, op == "new_file" || op == "new_folder")?;
     match op.as_str() {
         "new_file" => {
             if let Some(parent) = p.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
-            fs::File::create(p).map_err(|e| e.to_string())?;
+            fs::File::create(&p).map_err(|e| e.to_string())?;
         }
         "new_folder" => {
-            fs::create_dir_all(p).map_err(|e| e.to_string())?;
+            fs::create_dir_all(&p).map_err(|e| e.to_string())?;
         }
         "delete" => {
             if p.is_dir() {
-                fs::remove_dir_all(p).map_err(|e| e.to_string())?;
+                fs::remove_dir_all(&p).map_err(|e| e.to_string())?;
             } else {
-                fs::remove_file(p).map_err(|e| e.to_string())?;
+                fs::remove_file(&p).map_err(|e| e.to_string())?;
             }
         }
         "rename" => {
             let new_name = new_name.ok_or("new_name required for rename")?;
             let new_path = p.with_file_name(new_name);
-            fs::rename(p, new_path).map_err(|e| e.to_string())?;
+            fs::rename(&p, &new_path).map_err(|e| e.to_string())?;
         }
         _ => return Err(format!("Invalid operation: {}", op)),
     }

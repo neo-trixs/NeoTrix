@@ -1035,6 +1035,19 @@ impl KnowledgeBase {
         nt_memory_store::get_stats(&conn).map_err(|e| format!("stats: {}", e))
     }
 
+    /// 向量化密度养料采集 — 非空 embedding 数量。
+    /// 供 background_loop 意识树土壤喂料 (data_nourishment_factor 调制果实质量)。
+    pub fn embedding_count(&self) -> usize {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
+        conn.query_row(
+            "SELECT COUNT(*) FROM embeddings WHERE embedding IS NOT NULL",
+            [], |row| row.get::<_, usize>(0),
+        ).unwrap_or(0)
+    }
+
     /// 枚举全部知识节点 — 供超立方体/图等内存结构批量灌入。
     pub fn all_nodes(&self) -> Result<Vec<KnowledgeNode>, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
@@ -1786,9 +1799,24 @@ impl KnowledgeBase {
         nt_memory_crawl::ingest_from_arxiv(&conn, id)
     }
 
+    pub fn ingest_alphaxiv_feed(&self, pages: usize, page_size: usize, categories: &str) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_crawl::ingest_from_alphaxiv_feed(&conn, pages, page_size, categories)
+    }
+
     pub fn ingest_github(&self, owner: &str, repo: &str) -> Result<usize, String> {
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         nt_memory_crawl::ingest_from_github(&conn, owner, repo)
+    }
+
+    pub fn ingest_hf_dataset(&self, dataset_ref: &str) -> Result<usize, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_crawl::ingest_from_hf_dataset(&conn, dataset_ref)
+    }
+
+    pub fn run_hf_queue_batch(&self, max_items: usize) -> Result<(usize, usize), String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        nt_memory_crawl::run_hf_queue_batch(&conn, max_items)
     }
 
     // ── Discovery (GitHub Topics / External Sources) ──

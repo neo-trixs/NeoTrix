@@ -1,5 +1,6 @@
 import { createSignal, createEffect, For, Show } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
+import { neocodex, system } from '../api'
+import type { ProjectTreeItem, ProjectView } from '../api/types'
 import { clsx } from 'clsx'
 
 /* ════════════════════════════════════════════
@@ -16,20 +17,6 @@ interface FileNode {
   content?: string
   path?: string
   children?: FileNode[]
-}
-
-interface ProjectTreeItem {
-  name: string
-  path: string
-  is_dir: boolean
-  children: ProjectTreeItem[] | null
-}
-
-interface ProjectView {
-  root: string
-  tree: ProjectTreeItem[]
-  agents_md: string | null
-  file_count: number
 }
 
 /* 后端 ProjectTreeItem → 前端 FileNode */
@@ -157,7 +144,7 @@ export function RightBar() {
     setTreeLoading(true)
     setTreeError(null)
     try {
-      const pv = await invoke<ProjectView>('neocodex_project_tree')
+      const pv = await neocodex.projectTree()
       setTree(pv.tree.map(toFileNode))
       setRootPath(pv.root)
       setFileCount(pv.file_count)
@@ -190,7 +177,7 @@ export function RightBar() {
     if (node.type === 'file' && node.path && !node.content) {
       setFileLoading(true)
       try {
-        const content = await invoke<string>('read_file', { path: node.path })
+        const content = await system.readFile(node.path)
         node.content = content
         setCurrentFile({ ...node, content })
       } catch (e) {

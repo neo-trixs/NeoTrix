@@ -293,6 +293,60 @@ impl SelfDiagnose {
 // 执行器 — 根据 ActionPlan 调用 AutoFixer
 // ============================================================
 
+/// 修复循环断路器 — 防止自愈系统空转烧资源 (retry cap / loop detection)
+///
+/// 背景: Claude Code 事故 (1,279 个 session 各 50+ 次连续 compaction 失败,
+/// 烧掉 25 万 API 调用) 说明所有自动化恢复路径必须有断路器 (典型 1-10 次上限)。
+/// 本断路器提供两层保护:
+///   1. 轮次上限: 修复轮次 ≥ max_repair_rounds 时跳闸, 循环永不空转
+///   2. 语义循环检测: 连续无进展次数 ≥ max_repair_rounds 时跳闸
+///      (对齐 MARIA Self-Healing Runtime 的 Loop Control)
+#[derive(Debug, Clone)]
+pub struct RepairCircuitBreaker {
+    pub max_repair_rounds: usize,
+    pub consecutive_no_progress: usize,
+    pub round: usize,
+    pub tripped: bool,
+}
+
+impl RepairCircuitBreaker {
+    /// 创建断路器, `max_rounds` 同时作为轮次上限与连续无进展阈值
+    pub fn new(max_rounds: usize) -> Self {
+        Self {
+            max_repair_rounds: max_rounds,
+            consecutive_no_progress: 0,
+            round: 0,
+            tripped: false,
+        }
+    }
+
+    /// 每轮修复尝试前调用 — 已跳闸或轮次超限时返回 Err("circuit breaker tripped")
+    pub fn before_round(&mut self) -> Result<(), String> {
+        if self.tripped || self.round >= self.max_repair_rounds {
+            self.tripped = true;
+            return Err("circuit breaker tripped".into());
+        }
+        self.round += 1;
+        Ok(())
+    }
+
+    /// 记录本轮修复是否有进展。连续无进展 ≥ max_repair_rounds 时跳闸。
+    pub fn record_progress(&mut self, made_progress: bool) {
+        if made_progress {
+            self.consecutive_no_progress = 0;
+            return;
+        }
+        self.consecutive_no_progress += 1;
+        if self.consecutive_no_progress >= self.max_repair_rounds {
+            self.tripped = true;
+        }
+    }
+
+    pub fn is_tripped(&self) -> bool {
+        self.tripped
+    }
+}
+
 /// ActionPlan 执行器 — 将诊断计划转化为实际代码修改
 pub struct ActionExecutor;
 
@@ -344,6 +398,37 @@ impl ActionExecutor {
             }
             ActionPlan::NoAction { reason } => {
                 Err(format!("无操作: {}", reason))
+            }
+        }
+    }
+
+    /// 带断路器保护的执行 — 循环调用修复时先检查断路器。
+    ///
+    /// 每轮尝试前调用 `before_round` (跳闸则停止); 成功 → `record_progress(true)`,
+    /// 失败且无进展 → `record_progress(false)`。断路器因连续无进展跳闸时,
+    /// 返回明确错误说明而非原始失败 (self-healing-agent 原则: 无进展 → halt)。
+    /// 保持原 `execute` 签名兼容。
+    pub fn execute_with_breaker(
+        &self,
+        plan: &ActionPlan,
+        breaker: &mut RepairCircuitBreaker,
+    ) -> Result<String, String> {
+        breaker.before_round()?;
+        match Self::execute(plan) {
+            Ok(msg) => {
+                breaker.record_progress(true);
+                Ok(msg)
+            }
+            Err(e) => {
+                breaker.record_progress(false);
+                if breaker.is_tripped() {
+                    Err(format!(
+                        "circuit breaker tripped: 连续 {} 轮无进展, 最近错误: {}",
+                        breaker.consecutive_no_progress, e
+                    ))
+                } else {
+                    Err(e)
+                }
             }
         }
     }
@@ -480,5 +565,68 @@ mod tests {
         let (items, _) = SelfDiagnose::run_diagnosis(&snap, 1);
         let todo = items.iter().filter(|d| matches!(d.underlying_issue.issue_type, IssueType::TodoLeftovers)).count();
         assert_eq!(todo, 0, "TODO 少于阈值时不生成诊断项");
+    }
+
+    // ─── 循环断路器 (RepairCircuitBreaker) ───
+
+    #[test]
+    fn test_breaker_trips_after_max_rounds() {
+        let mut breaker = RepairCircuitBreaker::new(3);
+        assert!(!breaker.is_tripped());
+        // 前 max_repair_rounds 轮允许执行
+        assert!(breaker.before_round().is_ok());
+        assert!(breaker.before_round().is_ok());
+        assert!(breaker.before_round().is_ok());
+        assert_eq!(breaker.round, 3);
+        // 第 4 轮超过上限 → 跳闸
+        let err = breaker.before_round().unwrap_err();
+        assert!(err.contains("circuit breaker tripped"), "got: {}", err);
+        assert!(breaker.is_tripped());
+    }
+
+    #[test]
+    fn test_breaker_never_trips_with_progress() {
+        let mut breaker = RepairCircuitBreaker::new(5);
+        for _ in 0..5 {
+            assert!(breaker.before_round().is_ok());
+            breaker.record_progress(true);
+        }
+        assert!(!breaker.is_tripped());
+        // 有进展 → 连续无进展计数归零
+        breaker.record_progress(false);
+        breaker.record_progress(false);
+        breaker.record_progress(true);
+        assert_eq!(breaker.consecutive_no_progress, 0);
+        assert!(!breaker.is_tripped());
+    }
+
+    #[test]
+    fn test_breaker_trips_on_consecutive_no_progress() {
+        let mut breaker = RepairCircuitBreaker::new(3);
+        breaker.record_progress(true);   // 1 次成功
+        breaker.record_progress(false);  // 1
+        breaker.record_progress(false);  // 2
+        assert!(!breaker.is_tripped());
+        breaker.record_progress(false);  // 3 → 达到连续无进展阈值
+        assert!(breaker.is_tripped());
+        assert!(breaker.before_round().is_err());
+    }
+
+    #[test]
+    fn test_execute_with_breaker_stops_on_persistent_failure() {
+        // HumanDecision 恒为 Err → 连续无进展 → 断路器跳闸并返回明确错误
+        let plan = ActionPlan::HumanDecision {
+            issue_type: IssueType::TodoLeftovers,
+            file: None,
+            reason: "needs human".into(),
+        };
+        let mut breaker = RepairCircuitBreaker::new(3);
+        for _ in 0..3 {
+            let _ = ActionExecutor::execute_with_breaker(&ActionExecutor, &plan, &mut breaker);
+        }
+        assert!(breaker.is_tripped());
+        let err = ActionExecutor::execute_with_breaker(&ActionExecutor, &plan, &mut breaker)
+            .unwrap_err();
+        assert!(err.contains("circuit breaker tripped"), "got: {}", err);
     }
 }

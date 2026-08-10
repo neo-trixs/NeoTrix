@@ -22,8 +22,8 @@ import { CheckpointTimeline } from '../components/CheckpointTimeline'
 import { SideChat } from '../components/SideChat'
 import { ComputerUse } from '../components/ComputerUse'
 import { clsx } from 'clsx'
-import { invoke } from '@tauri-apps/api/core'
-import { listen, UnlistenFn } from '@tauri-apps/api/event'
+import { neocodex, system } from '../api'
+import { subscribeStream, type UnlistenFn } from '../api/events'
 
 const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
   { text: '解释当前项目结构', icon: FolderTree },
@@ -146,11 +146,7 @@ export function Chat() {
   const currentSession = () => chatStore.currentSession
 
   // Event listener cleanup functions
-  const [unlistenStart, setUnlistenStart] = createSignal<UnlistenFn | null>(null)
-  const [unlistenToken, setUnlistenToken] = createSignal<UnlistenFn | null>(null)
-  const [unlistenEnd, setUnlistenEnd] = createSignal<UnlistenFn | null>(null)
-  const [unlistenDone, setUnlistenDone] = createSignal<UnlistenFn | null>(null)
-  const [unlistenTool, setUnlistenTool] = createSignal<UnlistenFn | null>(null)
+  const [unlistenStream, setUnlistenStream] = createSignal<UnlistenFn | null>(null)
   // 提供商切换事件 handler（普通变量，避免 signal setter 函数式更新歧义）
   let providerChangedHandler: (() => void) | null = null
 
@@ -174,67 +170,61 @@ export function Chat() {
     // 启动时加载会话历史（原代码从未调用 loadSessions，侧边栏恒为空）
     chatStore.loadSessions()
 
-    const startUnlisten = await listen<string>('neocodex_stream_start', (event) => {
-      // Stream started - could show user message echo if needed
-      console.log('[Chat] Stream started:', event.payload)
-    })
-    setUnlistenStart(() => startUnlisten)
-
-    const tokenUnlisten = await listen<string>('neocodex_stream_token', (event) => {
-      const msgId = currentAssistantMsgId()
-      if (msgId) {
-        chatStore.appendMessageContent(msgId, event.payload)
-      }
-    })
-    setUnlistenToken(() => tokenUnlisten)
-
-    const endUnlisten = await listen<string>('neocodex_stream_end', (event) => {
-      const msgId = currentAssistantMsgId()
-      if (msgId) {
-        chatStore.updateMessage(msgId, event.payload, false)
-      }
-    })
-    setUnlistenEnd(() => endUnlisten)
-
-    const doneUnlisten = await listen<{ cancelled: boolean; elapsed_ms: number; content: string }>('neocodex_stream_done', (event) => {
-      const msgId = currentAssistantMsgId()
-      const wasCancelled = event.payload.cancelled
-
-      if (msgId) {
-        if (wasCancelled) {
-          // Message already has partial content from tokens, just mark as not streaming
-          chatStore.updateMessage(msgId, event.payload.content, false)
-          setStreamError('生成已停止')
-          setTimeout(() => setStreamError(null), 3000)
-        } else {
-          chatStore.updateMessage(msgId, event.payload.content, false)
+    // 注册流式事件监听（经统一事件层；单个失败不阻断其余）
+    const unlistenStream = await subscribeStream({
+      onStart: () => {
+        console.log('[Chat] Stream started')
+      },
+      onToken: (delta) => {
+        const msgId = currentAssistantMsgId()
+        if (msgId) {
+          chatStore.appendMessageContent(msgId, delta)
         }
-      }
-
-      chatStore.setGenerating(false)
-      setCurrentAssistantMsgId(null)
-    })
-    setUnlistenDone(() => doneUnlisten)
-
-    const toolUnlisten = await listen<{ name: string; args: string; result: string; duration_ms: number; success: boolean }>('neocodex_stream_tool', (event) => {
-      const msgId = currentAssistantMsgId()
-      if (msgId) {
-        const toolCall: ToolCallRecord = {
-          id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          name: event.payload.name,
-          args: event.payload.args,
-          result: event.payload.result,
-          duration_ms: event.payload.duration_ms,
-          success: event.payload.success,
+      },
+      onEnd: (content) => {
+        const msgId = currentAssistantMsgId()
+        if (msgId) {
+          chatStore.updateMessage(msgId, content, false)
         }
-        chatStore.appendToolCall(msgId, toolCall)
-      }
+      },
+      onDone: (payload) => {
+        const msgId = currentAssistantMsgId()
+        const wasCancelled = payload.cancelled
+
+        if (msgId) {
+          if (wasCancelled) {
+            // Message already has partial content from tokens, just mark as not streaming
+            chatStore.updateMessage(msgId, payload.content, false)
+            setStreamError('生成已停止')
+            setTimeout(() => setStreamError(null), 3000)
+          } else {
+            chatStore.updateMessage(msgId, payload.content, false)
+          }
+        }
+
+        chatStore.setGenerating(false)
+        setCurrentAssistantMsgId(null)
+      },
+      onTool: (payload) => {
+        const msgId = currentAssistantMsgId()
+        if (msgId) {
+          const toolCall: ToolCallRecord = {
+            id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: payload.name,
+            args: payload.args,
+            result: payload.result,
+            duration_ms: payload.duration_ms,
+            success: payload.success,
+          }
+          chatStore.appendToolCall(msgId, toolCall)
+        }
+      },
     })
-    setUnlistenTool(() => toolUnlisten)
+    setUnlistenStream(() => unlistenStream)
 
     // 读取当前激活模型（仅用于状态栏展示，只读命令）
     try {
-      const cfg = await invoke<{ active_model: string }>('neocodex_provider_config')
+      const cfg = await neocodex.providerConfig()
       setActiveModel(cfg.active_model || null)
     } catch {
       /* 展示字段，静默失败 */
@@ -242,7 +232,8 @@ export function Chat() {
 
     // 监听提供商切换事件（SettingsModal / ProviderSelector 广播），同步状态栏模型
     const onProviderChanged = () => {
-      invoke<{ active_model: string }>('neocodex_provider_config')
+      neocodex
+        .providerConfig()
         .then((cfg) => setActiveModel(cfg.active_model || null))
         .catch(() => {})
     }
@@ -252,14 +243,16 @@ export function Chat() {
 
   // Clean up event listeners
   onCleanup(() => {
-    unlistenStart()?.()
-    unlistenToken()?.()
-    unlistenEnd()?.()
-    unlistenDone()?.()
-    unlistenTool()?.()
+    unlistenStream()?.()
     if (providerChangedHandler) {
       window.removeEventListener('neotrix:provider-changed', providerChangedHandler)
     }
+    // 释放麦克风资源：卸载时若仍在录音，停止 recorder 并关闭所有 tracks
+    if (recording()) {
+      mediaRecorder?.stop()
+    }
+    audioStream?.getTracks().forEach((t) => t.stop())
+    audioStream = null
   })
 
   // 消息区自动滚动：新消息/会话切换强制到底，流式期间若在底部则跟随
@@ -358,7 +351,7 @@ export function Chat() {
     if (!content || isGenerating()) return
 
     if (!currentSession()) {
-      chatStore.addSession()
+      await chatStore.addSession()
     }
 
     if (!opts?.userMessageAdded) {
@@ -381,10 +374,10 @@ export function Chat() {
     chatStore.setGenerating(true)
 
     try {
-      // Call the real Tauri IPC command for streaming
-      await invoke('neocodex_send_message_stream', {
+      // 流式生成经统一 IPC 层；实际 token 由 neocodex_stream_* 事件推送
+      await neocodex.sendMessageStream({
         content,
-        attachments: atts.length > 0 ? atts : null,
+        attachments: atts.length > 0 ? atts : undefined,
         regenerate: false,
         permission_mode: permissionMode(),
         temperature: 0.7,
@@ -425,7 +418,7 @@ export function Chat() {
       const atts: NeoCodexAttachmentDto[] = []
       for (const p of paths) {
         try {
-          const content = await invoke<string>('read_file', { path: p })
+          const content = await system.readFile(p)
           const name = p.split('/').pop() || p
           const mime = guessMime(name)
           atts.push({ name, size: content.length, mime_type: mime, data: content })
@@ -475,6 +468,7 @@ export function Chat() {
   /* ── 语音输入：MediaRecorder 录音 → voice_get_transcription → 填入输入框 ── */
   const [recording, setRecording] = createSignal(false)
   let mediaRecorder: MediaRecorder | null = null
+  let audioStream: MediaStream | null = null
   let audioChunks: Blob[] = []
 
   const handleVoiceToggle = async () => {
@@ -485,6 +479,7 @@ export function Chat() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      audioStream = stream
       mediaRecorder = new MediaRecorder(stream)
       audioChunks = []
       mediaRecorder.ondataavailable = (e) => {
@@ -497,12 +492,14 @@ export function Chat() {
         if (blob.size === 0) return
         try {
           const buf = await blob.arrayBuffer()
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
-          const tr = await invoke<{ text: string; confidence: number }>('voice_get_transcription', {
-            audioData: base64,
-            language: null,
-            model: null,
-          })
+          const bytes = new Uint8Array(buf)
+          let bin = ''
+          const chunkSize = 0x8000
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            bin += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+          }
+          const base64 = btoa(bin)
+          const tr = await system.voiceGetTranscription(base64)
           if (tr.text) {
             setInputValue((prev) => (prev ? `${prev} ${tr.text}` : tr.text))
             adjustTextarea()
@@ -525,7 +522,7 @@ export function Chat() {
 
   const handleStop = async () => {
     try {
-      await invoke('neocodex_stop_stream')
+      await neocodex.stopStream()
     } catch (error) {
       console.error('[Chat] Stop stream failed:', error)
     }

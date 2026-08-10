@@ -97,11 +97,131 @@ pub struct CrawlResult {
     pub duration_ms: u64,
 }
 
+/// 独立爬取会话: 每会话持有独立 cookies + fingerprint + 使用计数 + 封禁状态。
+/// crawlee SessionPool 技术接线: 多会话轮换, 封禁后丢弃重建, 避免单会话被限速拖垮全站。
+#[derive(Debug, Clone)]
+pub struct CrawlSession {
+    pub id: u64,
+    pub cookies: HashMap<String, String>,
+    pub fingerprint: BrowserFingerprint,
+    pub use_count: u32,
+    pub banned: bool,
+    pub last_used: Instant,
+}
+
+impl CrawlSession {
+    fn new(id: u64, fingerprint: BrowserFingerprint) -> Self {
+        CrawlSession {
+            id,
+            cookies: HashMap::new(),
+            fingerprint,
+            use_count: 0,
+            banned: false,
+            last_used: Instant::now(),
+        }
+    }
+}
+
+/// SessionPool: crawlee-inspired 多会话轮换池。
+/// - round-robin 轮换, 跳过已封禁会话
+/// - 全部封禁时重置最少使用会话 (cookies 清空, 指纹保留)
+/// - 容量固定, 无淘汰 (池满即复用, 封禁即重建)
+#[derive(Debug, Clone)]
+pub struct SessionPool {
+    sessions: Vec<CrawlSession>,
+    next_id: u64,
+    cursor: usize,
+}
+
+impl SessionPool {
+    pub fn new(max_sessions: usize) -> Self {
+        let max = max_sessions.max(1);
+        let mut pool = SessionPool {
+            sessions: Vec::new(),
+            next_id: 0,
+            cursor: 0,
+        };
+        for _ in 0..max {
+            pool.sessions
+                .push(CrawlSession::new(pool.next_id, BrowserFingerprint::default()));
+            pool.next_id += 1;
+        }
+        pool
+    }
+
+    pub fn with_fingerprints(fingerprints: Vec<BrowserFingerprint>) -> Self {
+        let mut pool = SessionPool {
+            sessions: Vec::new(),
+            next_id: 0,
+            cursor: 0,
+        };
+        for fp in fingerprints {
+            pool.sessions.push(CrawlSession::new(pool.next_id, fp));
+            pool.next_id += 1;
+        }
+        pool
+    }
+
+    /// round-robin 获取下一个非封禁会话; 全部封禁时重置最少使用会话。
+    pub fn acquire(&mut self) -> &mut CrawlSession {
+        if self.sessions.is_empty() {
+            self.sessions
+                .push(CrawlSession::new(self.next_id, BrowserFingerprint::default()));
+            self.next_id += 1;
+        }
+        let n = self.sessions.len();
+        for _ in 0..n {
+            let idx = self.cursor;
+            self.cursor = (self.cursor + 1) % n;
+            if !self.sessions[idx].banned {
+                self.sessions[idx].last_used = Instant::now();
+                return &mut self.sessions[idx];
+            }
+        }
+        // 全部封禁: 重置最少使用会话 (cookies 清空, 指纹保留)
+        let idx = self
+            .sessions
+            .iter()
+            .enumerate()
+            .min_by_key(|(_, s)| s.use_count)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        self.sessions[idx].banned = false;
+        self.sessions[idx].cookies.clear();
+        self.sessions[idx].last_used = Instant::now();
+        &mut self.sessions[idx]
+    }
+
+    pub fn mark_banned(&mut self, id: u64) {
+        if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
+            s.banned = true;
+            s.cookies.clear();
+        }
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.sessions.iter().filter(|s| !s.banned).count()
+    }
+
+    pub fn banned_count(&self) -> usize {
+        self.sessions.iter().filter(|s| s.banned).count()
+    }
+
+    pub fn len(&self) -> usize {
+        self.sessions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+}
+
 pub struct StealthCrawler {
     pub config: StealthConfig,
     pub cookies: HashMap<String, String>,
     pub consecutive_failures: u8,
     pub last_bypass_method: BypassMethod,
+    pub session_pool: Option<SessionPool>,
 }
 
 impl StealthCrawler {
@@ -111,6 +231,7 @@ impl StealthCrawler {
             cookies: HashMap::new(),
             consecutive_failures: 0,
             last_bypass_method: BypassMethod::CookieReuse,
+            session_pool: None,
         }
     }
 
@@ -119,6 +240,18 @@ impl StealthCrawler {
             return Err("StealthConfig.bypass_methods is empty".into());
         }
         let start = Instant::now();
+
+        // SessionPool 接线: 获取会话, 合并其 cookies/fingerprint 到本次请求身份
+        let mut active_session_id: Option<u64> = None;
+        if let Some(pool) = &mut self.session_pool {
+            let session = pool.acquire();
+            active_session_id = Some(session.id);
+            session.use_count += 1;
+            for (k, v) in &session.cookies {
+                self.cookies.insert(k.clone(), v.clone());
+            }
+            self.config.fingerprint = session.fingerprint.clone();
+        }
 
         for attempt in 0..=self.config.max_retries as usize {
             let method_idx = attempt % self.config.bypass_methods.len();
@@ -137,11 +270,25 @@ impl StealthCrawler {
                     if matches!(method, BypassMethod::CookieReuse) {
                         self.cookies.insert("session".into(), "mock-session-token".into());
                     }
+                    // 持久化 cookies 回活跃会话
+                    if let Some(id) = active_session_id {
+                        if let Some(pool) = &mut self.session_pool {
+                            if let Some(s) = pool.sessions.iter_mut().find(|s| s.id == id) {
+                                s.cookies = self.cookies.clone();
+                            }
+                        }
+                    }
                     return Ok(cr);
                 }
                 Ok(cr) if cr.status == 403 || cr.status == 429 => {
                     self.consecutive_failures += 1;
                     self.last_bypass_method = method.clone();
+                    // 封禁活跃会话: 403/429 视为该会话被站点拉黑
+                    if let Some(id) = active_session_id {
+                        if let Some(pool) = &mut self.session_pool {
+                            pool.mark_banned(id);
+                        }
+                    }
                     continue;
                 }
                 Ok(cr) => {
@@ -535,6 +682,78 @@ mod tests {
         assert!(
             !c.config.fingerprint.platform.is_empty(),
             "Platform should not be empty after rotation"
+        );
+    }
+
+    #[test]
+    fn test_session_pool_round_robin() {
+        let mut pool = SessionPool::new(3);
+        assert_eq!(pool.acquire().id, 0);
+        assert_eq!(pool.acquire().id, 1);
+        assert_eq!(pool.acquire().id, 2);
+        assert_eq!(pool.acquire().id, 0); // wraps around
+    }
+
+    #[test]
+    fn test_session_pool_skips_banned() {
+        let mut pool = SessionPool::new(3);
+        pool.mark_banned(0);
+        let id = pool.acquire().id;
+        assert_eq!(id, 1);
+    }
+
+    #[test]
+    fn test_session_pool_all_banned_resets_least_used() {
+        let mut pool = SessionPool::new(2);
+        pool.mark_banned(0);
+        pool.mark_banned(1);
+        let id = pool.acquire().id;
+        assert!(id == 0 || id == 1);
+        assert_eq!(pool.banned_count(), 1);
+        assert_eq!(pool.active_count(), 1);
+    }
+
+    #[test]
+    fn test_session_pool_counts() {
+        let mut pool = SessionPool::new(4);
+        assert_eq!(pool.len(), 4);
+        assert_eq!(pool.active_count(), 4);
+        pool.mark_banned(2);
+        assert_eq!(pool.active_count(), 3);
+        assert_eq!(pool.banned_count(), 1);
+    }
+
+    #[test]
+    fn test_session_pool_ban_on_403() {
+        // 403 封禁活跃会话 → 下次 acquire 跳过它
+        let mut pool = SessionPool::new(2);
+        let s1 = pool.acquire().id;
+        pool.mark_banned(s1);
+        let s2 = pool.acquire().id;
+        assert_ne!(s1, s2);
+    }
+
+    #[test]
+    fn test_stealth_crawler_with_session_pool() {
+        let mut c = StealthCrawler::new(test_config());
+        c.session_pool = Some(SessionPool::new(2));
+        let result = c.fetch("https://example.com");
+        assert!(result.is_ok());
+        let cr = result.expect("fetch with session pool should succeed");
+        assert_eq!(cr.status, 200);
+        assert!(cr.body.contains("example.com"));
+    }
+
+    #[test]
+    fn test_stealth_crawler_pool_persists_cookies() {
+        // 预置 cookies 使 CookieReuse 成功, 验证 cookies 持久化回池会话
+        let mut c = make_nt_world_crawl();
+        c.session_pool = Some(SessionPool::new(1));
+        let _ = c.fetch("https://example.com");
+        let pool = c.session_pool.expect("session pool should be present");
+        assert!(
+            pool.sessions[0].cookies.contains_key("session"),
+            "session cookies should persist back into the pool session"
         );
     }
 }

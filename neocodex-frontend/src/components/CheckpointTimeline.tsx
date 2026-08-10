@@ -1,13 +1,8 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { History, RotateCcw, Loader2, X, Clock, RefreshCw } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { neocodex } from '../api'
+import type { Checkpoint } from '../api/types'
 import { clsx } from 'clsx'
-
-interface Checkpoint {
-  id: string
-  created_at: number
-  message_count: number
-}
 
 interface Props {
   open: boolean
@@ -44,9 +39,7 @@ export function CheckpointTimeline(props: Props) {
     setLoading(true)
     setError(null)
     try {
-      const list = await invoke<Checkpoint[]>('neocodex_checkpoint_list', {
-        session_id: props.sessionId,
-      })
+      const list = await neocodex.checkpointList(props.sessionId)
       setCheckpoints(list)
     } catch (e) {
       setError(String(e))
@@ -57,16 +50,20 @@ export function CheckpointTimeline(props: Props) {
 
   onMount(load)
 
+  // 会话切换时重新加载快照时间线
+  createEffect(() => {
+    if (props.open && props.sessionId) {
+      load()
+    }
+  })
+
   const restore = async (cp: Checkpoint) => {
     if (!props.sessionId) return
     if (!window.confirm(`恢复到 ${formatTs(cp.created_at)} 的快照（${cp.message_count} 条消息）？`)) return
     setRestoring(cp.id)
     setError(null)
     try {
-      await invoke('neocodex_checkpoint_restore', {
-        session_id: props.sessionId,
-        checkpoint_id: cp.id,
-      })
+      await neocodex.checkpointRestore(props.sessionId, cp.id)
       props.onRestored?.()
       await load()
     } catch (e) {

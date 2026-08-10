@@ -305,14 +305,24 @@ pub fn upsert_crawl_queue(conn: &Connection, url: &str, depth: i64, domain: &str
     Ok(())
 }
 
+pub fn claim_hf_pending_url(conn: &Connection) -> rusqlite::Result<Option<CrawlQueueItem>> {
+    claim_pending_url_where(conn, "domain='huggingface.co' AND status='pending'")
+}
+
 pub fn claim_next_crawl_url(conn: &Connection) -> rusqlite::Result<Option<CrawlQueueItem>> {
-    let mut stmt = conn.prepare(
+    claim_pending_url_where(conn, "status='pending'")
+}
+
+fn claim_pending_url_where(conn: &Connection, where_clause: &str) -> rusqlite::Result<Option<CrawlQueueItem>> {
+    let sql = format!(
         "SELECT id, url, depth, domain, priority, status, discovered_at, last_attempt, retry_count, error_message
          FROM crawl_queue
-         WHERE status='pending'
+         WHERE {}
          ORDER BY priority DESC, discovered_at ASC
          LIMIT 1",
-    )?;
+        where_clause
+    );
+    let mut stmt = conn.prepare(&sql)?;
     let mut rows = stmt.query([])?;
     match rows.next()? {
         Some(row) => {

@@ -1,5 +1,6 @@
 import { createSignal, createEffect, For, Show } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
+import { cowork as coworkApi } from '../api'
+import type { CoworkAction, CoworkDeliverable, CoworkSession } from '../api/types'
 import { clsx } from 'clsx'
 
 /* ════════════════════════════════════════════
@@ -8,45 +9,6 @@ import { clsx } from 'clsx'
    右栏：任务看板（cw-tlist）← cowork_actions
          + 交付物（cw-deliv）← cowork_list_deliverables
    ════════════════════════════════════════════ */
-
-interface CoworkSession {
-  id: string
-  name: string
-  workspace_path: string
-  status: string
-  files_read: number
-  files_created: number
-  files_modified: number
-  started_at: number
-  last_active_at: number
-  deliverables: string[]
-  description: string
-  tags: string[]
-}
-
-interface CoworkAction {
-  id: string
-  session_id: string
-  action_type: string
-  target_path: string
-  status: string
-  started_at: number
-  completed_at: number | null
-  details: string | null
-  result_summary: string | null
-}
-
-interface CoworkDeliverable {
-  id: string
-  session_id: string
-  name: string
-  path: string
-  kind: string
-  created_at: number
-  size_bytes: number
-  description: string
-  quality_score: number | null
-}
 
 /* 状态 → 语义徽章类（与 badge-success/warn/error 体系一致） */
 function statusBadge(status: string): string {
@@ -78,7 +40,7 @@ export function CoworkView() {
 
   const loadSessions = async () => {
     try {
-      const list = await invoke<CoworkSession[]>('cowork_list')
+      const list = await coworkApi.coworkList()
       setSessions(list)
       if (list.length > 0 && !list.some((s) => s.id === activeId())) {
         setActiveId(list[0].id)
@@ -91,8 +53,8 @@ export function CoworkView() {
   const loadDetail = async (id: string) => {
     try {
       const [acts, dels] = await Promise.all([
-        invoke<CoworkAction[]>('cowork_actions', { sessionId: id }),
-        invoke<CoworkDeliverable[]>('cowork_list_deliverables', { sessionId: id }),
+        coworkApi.coworkActions(id),
+        coworkApi.coworkListDeliverables(id),
       ])
       setActions(acts)
       setDeliverables(dels)
@@ -116,7 +78,7 @@ export function CoworkView() {
     setLoading(true)
     setError(null)
     try {
-      const id = await invoke<string>('cowork_start', {
+      const id = await coworkApi.coworkStart({
         workspacePath: path,
         description: newDesc().trim(),
         name: null,
@@ -137,13 +99,10 @@ export function CoworkView() {
   const controlSession = async (action: 'pause' | 'resume' | 'stop') => {
     const id = active()?.id
     if (!id) return
-    const cmdMap = {
-      pause: 'cowork_pause',
-      resume: 'cowork_resume',
-      stop: 'cowork_stop',
-    } as const
     try {
-      await invoke(cmdMap[action], { sessionId: id })
+      if (action === 'pause') await coworkApi.coworkPause(id)
+      else if (action === 'resume') await coworkApi.coworkResume(id)
+      else await coworkApi.coworkStop(id)
       await loadSessions()
     } catch (e) {
       setError(String(e))
@@ -156,8 +115,6 @@ export function CoworkView() {
     const id = active()?.id
     if (id) await loadDetail(id)
   }
-
-  const a = active()
 
   return (
     <div class="vw-cowork">
@@ -229,7 +186,7 @@ export function CoworkView() {
 
         {/* 右栏：任务详情 + 交付物 */}
         <div class="cw-main">
-          <Show when={a} fallback={<div class="cw-empty-main">选择或新建一个协同会话</div>}>
+          <Show when={active()} fallback={<div class="cw-empty-main">选择或新建一个协同会话</div>}>
             {(s) => (
               <div class="cw-content">
                 <div class="cw-header">

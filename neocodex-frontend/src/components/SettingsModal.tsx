@@ -1,30 +1,31 @@
 import { createSignal, createEffect, For, Show } from 'solid-js'
-import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { clsx } from 'clsx'
 import { PluginMarketplace } from './PluginMarketplace'
 import { TrafficLights } from './TrafficLights'
-import { tagsStore, normalizeTagName, TAG_PALETTE } from '../stores/tags'
+import { tagsStore, normalizeTagName, TAG_PALETTE, RECOMMENDED_TAGS, tagDepth } from '../stores/tags'
+import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
+import { memory, neocodex } from '../api'
+import { listenUpdateEvents } from '../api/system'
+import type { MemoryStats, ProviderConfig, ProviderMeta } from '../api/types'
 
 /* ════════════════════════════════════════════
-   SettingsModal — 统一设置面板（设计 v2）
+   SettingsModal — 统一设置面板（设计 v3）
    对标主流产品（Claude/Cursor）设置结构：
    左侧分类导航（外扩线条图标） + 右侧内容分区
    图标语言：极简线条 · 外扩（open）而非内敛 —— 开阔心态
+   - 通用：提供商统一视觉（ProviderIcon + 分类徽章 + 免费徽章）
+   - 标签：推荐标签一键套用（对标 Linear/GitHub 默认 label）+ 计数 + 层级
    ════════════════════════════════════════════ */
 
-interface ProviderEntry {
-  name: string
-  model: string
-  resolvable: boolean
-}
-
-interface ProviderConfig {
-  provider_count: number
-  resolvable: boolean
-  active_model: string
-  providers: ProviderEntry[]
+/** 提供商分类分组（对标 Claude Desktop 分类设置） */
+const CATEGORY_ORDER = ['local', 'proxy', 'cloud', 'unknown'] as const
+const CATEGORY_TITLE: Record<string, string> = {
+  local: '本地推理 · 数据不出设备',
+  proxy: '自定义代理 · OpenAI 兼容中转',
+  cloud: '云端 API · 需密钥',
+  unknown: '其他',
 }
 
 type SectionId = 'general' | 'appearance' | 'plugins' | 'data' | 'tags' | 'about'
@@ -143,13 +144,20 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [densityPref, setDensityPref] = createSignal<'comfortable' | 'compact'>('comfortable')
   const [themePref] = createSignal<'light'>('light')
   const [fontSizePref, setFontSizePref] = createSignal<'sm' | 'md' | 'lg'>('md')
-  const [memStats, setMemStats] = createSignal<{ total_entries: number; total_categories: number; avg_confidence: number; memory_usage_bytes: number } | null>(null)
+  const [memStats, setMemStats] = createSignal<MemoryStats | null>(null)
   const [dataBusy, setDataBusy] = createSignal(false)
   const [appVersion, setAppVersion] = createSignal<string | null>(null)
+  // 热更新状态（对标 Cursor/Claude 更新流：检查 → 下载进度 → 重启安装）
+  const [updateState, setUpdateState] = createSignal<'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error'>('idle')
+  const [updateInfo, setUpdateInfo] = createSignal<{ current: string; latest: string; error: string | null } | null>(null)
+  const [updateProgress, setUpdateProgress] = createSignal<{ downloaded: number; total: number } | null>(null)
+  let unlistenUpdate: (() => void) | null = null
   // API 密钥管理（对标 Claude 设置）
   const [apiKey, setApiKey] = createSignal('')
   const [hasKey, setHasKey] = createSignal<boolean | null>(null)
   const [keyBusy, setKeyBusy] = createSignal(false)
+  // 标签快速新建
+  const [newTagInput, setNewTagInput] = createSignal('')
 
   // 偏好持久化：localStorage + 根元素 data-* 属性（CSS 属性选择器响应）
   const applyPrefs = (density: 'comfortable' | 'compact', motion: 'full' | 'reduced', fontSize: 'sm' | 'md' | 'lg') => {
@@ -199,7 +207,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const loadConfig = async () => {
     setLoading(true)
     try {
-      setConfig(await invoke<ProviderConfig>('neocodex_provider_config'))
+      setConfig(await neocodex.providerConfig())
     } catch (e) {
       setNotice(String(e))
     } finally {
@@ -209,21 +217,68 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
 
   const loadMemStats = async () => {
     try {
-      setMemStats(await invoke<{ total_entries: number; total_categories: number; avg_confidence: number; memory_usage_bytes: number }>('memory_stats'))
+      setMemStats(await memory.memoryStats())
     } catch { /* 记忆统计非关键 */ }
   }
 
   const loadAppVersion = async () => {
     try {
-      setAppVersion(await invoke<string>('neocodex_app_version'))
+      setAppVersion(await neocodex.appVersion())
     } catch { /* 版本非关键 */ }
+  }
+
+  /* ── 热更新：检查 / 下载 / 进度事件 ── */
+  const checkForUpdate = async () => {
+    setUpdateState('checking')
+    setUpdateInfo(null)
+    try {
+      const result = await neocodex.checkUpdate()
+      setUpdateInfo({ current: result.current, latest: result.latest, error: result.error })
+      if (result.available) {
+        setUpdateState('available')
+      } else {
+        setUpdateState(result.error ? 'error' : 'up-to-date')
+      }
+    } catch (e) {
+      setUpdateInfo({ current: appVersion() ?? '', latest: '', error: String(e) })
+      setUpdateState('error')
+    }
+  }
+
+  const downloadUpdate = async () => {
+    if (!unlistenUpdate) {
+      try {
+        unlistenUpdate = await listenUpdateEvents({
+          onProgress: (p) => {
+            setUpdateProgress(p)
+            setUpdateState('downloading')
+          },
+          onDownloaded: () => {
+            setUpdateState('downloaded')
+            setNotice('新版本已下载，重启应用即可完成安装')
+          },
+        })
+      } catch (e) {
+        console.error('[Settings] Failed to subscribe update events:', e)
+      }
+    }
+    setUpdateState('downloading')
+    setUpdateProgress(null)
+    setNotice(null)
+    try {
+      await neocodex.downloadUpdate()
+      // 下载完成后由 onDownloaded 事件驱动状态；若事件未到达，轮询确认
+    } catch (e) {
+      setNotice(String(e))
+      setUpdateState('error')
+    }
   }
 
   const exportMemory = async () => {
     setDataBusy(true)
     setNotice(null)
     try {
-      const json = await invoke<string>('memory_export', { format: 'json' })
+      const json = await memory.memoryExport('json')
       const path = await save({
         defaultPath: `neotrix-memory-${new Date().toISOString().slice(0, 10)}.json`,
         filters: [{ name: 'JSON', extensions: ['json'] }],
@@ -243,7 +298,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setDataBusy(true)
     setNotice(null)
     try {
-      const n = await invoke<number>('memory_clear', { kind: null })
+      const n = await memory.memoryClear(null)
       setNotice(`已清空 ${n} 条记忆`)
       await loadMemStats()
     } catch (e) {
@@ -256,7 +311,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   /* API 密钥：读状态 / 保存 / 删除（对标 Claude 设置中的 API 密钥管理） */
   const loadApiKeyStatus = async () => {
     try {
-      setHasKey(await invoke<boolean>('has_api_key'))
+      setHasKey(await memory.hasApiKey())
     } catch { /* 非关键 */ }
   }
 
@@ -266,7 +321,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setKeyBusy(true)
     setNotice(null)
     try {
-      await invoke('save_api_key', { key })
+      await memory.saveApiKey(key)
       setApiKey('')
       await loadApiKeyStatus()
       setNotice('API 密钥已保存')
@@ -281,7 +336,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setKeyBusy(true)
     setNotice(null)
     try {
-      await invoke('delete_api_key')
+      await memory.deleteApiKey()
       await loadApiKeyStatus()
       setNotice('API 密钥已删除')
     } catch (e) {
@@ -299,6 +354,12 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       loadMemStats()
       loadAppVersion()
       loadApiKeyStatus()
+    } else {
+      // 关闭时释放更新事件订阅（避免重复监听）
+      if (unlistenUpdate) {
+        unlistenUpdate()
+        unlistenUpdate = null
+      }
     }
   })
 
@@ -306,7 +367,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setSwitching(true)
     setNotice(null)
     try {
-      await invoke('neocodex_set_provider', { name })
+      await neocodex.setProvider(name)
       setNotice(`已切换到 ${name}`)
       await loadConfig()
       // 广播提供商变更，输入区 ProviderSelector 即时刷新
@@ -322,6 +383,43 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     const cfg = config()
     if (!cfg) return null
     return cfg.providers.find((p) => p.model === cfg.active_model) ?? cfg.providers[0] ?? null
+  }
+
+  /* ── 提供商按分类分组（对标 Claude Desktop 分类设置） ── */
+  const providerGroups = () => {
+    const cfg = config()
+    if (!cfg) return []
+    const groups: { category: string; title: string; providers: ProviderMeta[] }[] = []
+    for (const cat of CATEGORY_ORDER) {
+      const list = cfg.providers.filter((p) => (p.category ?? 'unknown') === cat)
+      if (list.length > 0) {
+        groups.push({ category: cat, title: CATEGORY_TITLE[cat] ?? cat, providers: list })
+      }
+    }
+    // 未知分类兜底（目录外 provider 不丢）
+    const rest = cfg.providers.filter((p) => !CATEGORY_ORDER.includes((p.category ?? 'unknown') as (typeof CATEGORY_ORDER)[number]))
+    if (rest.length > 0) groups.push({ category: 'unknown', title: '其他', providers: rest })
+    return groups
+  }
+
+  /* ── 标签：快速新建 / 推荐标签 ── */
+  const addTag = () => {
+    const raw = newTagInput().trim()
+    if (!raw) return
+    const name = tagsStore.registerTag(raw)
+    if (name) {
+      setNotice(`已新建标签 #${name}`)
+      setNewTagInput('')
+    } else {
+      setNotice('标签名无效（需非空，层级用 / 分隔）')
+    }
+  }
+
+  const missingRecommended = () => RECOMMENDED_TAGS.filter(({ name }) => !tagsStore.state.tags[name])
+
+  const seedTags = () => {
+    const n = tagsStore.seedRecommendedTags()
+    setNotice(n > 0 ? `已添加 ${n} 个推荐标签` : '推荐标签已全部就绪')
   }
 
   const [navRef, setNavRef] = createSignal<HTMLElement | null>(null)
@@ -439,7 +537,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
             </header>
 
             <div class="flex-1 overflow-y-auto px-6 py-5">
-              {/* ── 通用：模型提供商 ── */}
+              {/* ── 通用：模型提供商（统一 v3，对标 Claude Desktop 分类） ── */}
               <Show when={section() === 'general'}>
                 <Show when={loading() && !config()}>
                   <div class="text-xs text-text-muted py-6 text-center">加载配置…</div>
@@ -454,74 +552,100 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                           当前提供商
                         </div>
                         <div class="ss-card-body">
-                          <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                              <span class="w-8 h-8 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-[14px] font-semibold flex-shrink-0">
-                                {activeProvider()?.name.charAt(0).toUpperCase() ?? '?'}
-                              </span>
-                              <div>
-                                <div class="text-[13px] font-medium text-text-primary">{activeProvider()?.name ?? '—'}</div>
-                                <div class="text-[11px] text-text-muted font-mono">{cfg().active_model}</div>
-                              </div>
+                          <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                              <Show when={activeProvider()} fallback={<span class="w-8 h-8 rounded-lg bg-nt-io-500/12 text-nt-io-600 flex items-center justify-center text-[14px] font-semibold flex-shrink-0">?</span>}>
+                                {(ap) => (
+                                  <>
+                                    <ProviderIcon name={ap().name} />
+                                    <div class="min-w-0">
+                                      <div class="flex items-center gap-1.5">
+                                        <span class="text-[13px] font-medium text-text-primary truncate">{ap().display_name}</span>
+                                        <CategoryBadge category={ap().category} />
+                                        <Show when={ap().is_free}><FreeBadge free /></Show>
+                                      </div>
+                                      <div class="text-[11px] text-text-muted font-mono truncate mt-0.5">{cfg().active_model}</div>
+                                    </div>
+                                  </>
+                                )}
+                              </Show>
                             </div>
-                            <span class={clsx('text-[10px] px-2 py-1 rounded-full font-medium', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
+                            <span class={clsx('text-[10px] px-2 py-1 rounded-full font-medium flex-shrink-0', cfg().resolvable ? 'bg-nt-core-500/10 text-nt-core-700' : 'bg-nt-shield-500/10 text-nt-shield-600')}>
                               {cfg().resolvable ? 'API 可达' : 'API 不可达'}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* 提供商列表 */}
+                      {/* 提供商列表 — 按分类分组 */}
                       <div class="ss-card">
                         <div class="ss-card-header">
                           <DataIcon />
-                          {cfg().provider_count} 个可用提供商
+                          {cfg().provider_count} 个提供商
                         </div>
-                        <div class="ss-card-body">
-                          <div class="space-y-2">
-                            <For each={cfg().providers}>
-                              {(p) => {
-                                const isActive = p.model === cfg().active_model
-                                return (
-                                  <button
-                                    class={clsx(
-                                      'w-full flex items-center justify-between px-3 py-3 rounded-xl border transition-colors',
-                                      isActive
-                                        ? 'border-nt-io-500/40 bg-nt-io-500/6'
-                                        : 'border-border-primary/50 bg-white/40 hover:bg-white/70'
-                                    )}
-                                    onClick={() => !isActive && switchProvider(p.name)}
-                                    disabled={switching()}
-                                    role="radio"
-                                    aria-checked={isActive}
-                                  >
-                                    <div class="flex items-center gap-3">
-                                      <span class="text-[12.5px] text-text-primary font-medium">{p.name}</span>
-                                      <span class="text-[10.5px] text-text-muted font-mono">{p.model}</span>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                      <Show when={p.resolvable}>
-                                        <span class="text-[9px] text-nt-core-700 bg-nt-core-500/10 px-2 py-1 rounded-full">可用</span>
-                                      </Show>
-                                      <Show when={isActive}>
-                                        <span class="text-[10px] text-nt-io-600">✓ 当前</span>
-                                      </Show>
-                                    </div>
-                                  </button>
-                                )
-                              }}
-                            </For>
-                          </div>
+                        <div class="ss-card-body space-y-4">
+                          <For each={providerGroups()}>
+                            {(group) => (
+                              <div>
+                                <div class="flex items-center gap-2 mb-2">
+                                  <span class="text-[10px] uppercase tracking-[0.1em] text-text-muted/80 font-medium">{group.title}</span>
+                                  <span class="text-[9px] text-text-muted/60 font-mono">{group.providers.length}</span>
+                                </div>
+                                <div class="space-y-2">
+                                  <For each={group.providers}>
+                                    {(p) => {
+                                      const isActive = p.model === cfg().active_model
+                                      return (
+                                        <button
+                                          class={clsx(
+                                            'w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl border transition-colors',
+                                            isActive
+                                              ? 'border-nt-io-500/40 bg-nt-io-500/6'
+                                              : 'border-border-primary/50 bg-white/40 hover:bg-white/70'
+                                          )}
+                                          onClick={() => !isActive && switchProvider(p.name)}
+                                          disabled={switching()}
+                                          role="radio"
+                                          aria-checked={isActive}
+                                        >
+                                          <div class="flex items-center gap-3 min-w-0">
+                                            <ProviderIcon name={p.name} size="sm" />
+                                            <div class="min-w-0">
+                                              <div class="flex items-center gap-1.5">
+                                                <span class="text-[12.5px] text-text-primary font-medium truncate">{p.display_name}</span>
+                                                <Show when={p.is_free}><FreeBadge free /></Show>
+                                              </div>
+                                              <div class="text-[10.5px] text-text-muted font-mono truncate">{p.model}</div>
+                                            </div>
+                                          </div>
+                                          <div class="flex items-center gap-2 flex-shrink-0">
+                                            <CategoryBadge category={p.category} className="hidden sm:inline-flex" />
+                                            <Show when={isActive}>
+                                              <span class="text-[10px] text-nt-io-600 font-medium">✓ 当前</span>
+                                            </Show>
+                                          </div>
+                                        </button>
+                                      )
+                                    }}
+                                  </For>
+                                </div>
+                              </div>
+                            )}
+                          </For>
                         </div>
                       </div>
 
-                      {/* API 密钥管理（对标 Claude 设置） */}
+                      {/* API 密钥管理（明确作用域：ANTHROPIC_API_KEY） */}
                       <div class="ss-card">
                         <div class="ss-card-header">
                           <InfoIcon />
                           API 密钥
                         </div>
                         <div class="ss-card-body space-y-3">
+                          <p class="text-[11px] text-text-muted leading-relaxed -mt-1">
+                            密钥保存在本地 <span class="font-mono text-text-secondary">ANTHROPIC_API_KEY</span>（Claude 网关）。
+                            各云端提供商分别读取自己的环境变量（如 <span class="font-mono">OPENAI_API_KEY</span> / <span class="font-mono">GOOGLE_API_KEY</span>）。
+                          </p>
                           <div class="flex items-center gap-2">
                             <input
                               type="password"
@@ -744,7 +868,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                 </div>
               </Show>
 
-              {/* ── 标签：色板/层级/重命名/删除（对标 Obsidian 标签设置） ── */}
+              {/* ── 标签：快速新建/层级/计数/推荐（对标 Linear+Obsidian） ── */}
               <Show when={section() === 'tags'}>
                 <div class="space-y-4">
                   <div class="ss-card">
@@ -754,15 +878,34 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                     </div>
                     <div class="ss-card-body">
                       <div class="text-[11px] text-text-muted leading-relaxed pb-3">
-                        标签用于组织会话，支持层级嵌套（如 <span class="nt-tag-hint-inline">design</span> /
-                        <span class="nt-tag-hint-inline">ui</span>）。点击色块可为每个标签单独设置颜色；重命名与删除全局生效。
+                        标签用于组织会话，支持层级嵌套（如 <span class="nt-tag-hint-inline">工作/功能</span>）。
+                        点击色块可单独设色；重命名与删除全局生效；计数徽章显示使用该标签的会话数。
+                      </div>
+
+                      {/* 快速新建 */}
+                      <div class="flex items-center gap-2 mb-3">
+                        <input
+                          class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                          placeholder="新建标签，如 工作/功能 或 领域/前端…"
+                          value={newTagInput()}
+                          onInput={(e) => setNewTagInput(e.currentTarget.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') addTag() }}
+                          aria-label="新建标签"
+                        />
+                        <button
+                          class="px-3 py-2 rounded-lg bg-nt-io-500 text-text-primary text-[12px] font-medium hover:bg-nt-io-600 disabled:opacity-50 transition-colors flex-shrink-0"
+                          onClick={addTag}
+                          disabled={!newTagInput().trim()}
+                        >
+                          添加
+                        </button>
                       </div>
 
                       <Show
                         when={Object.keys(tagsStore.state.tags).length > 0}
                         fallback={
                           <div class="px-3 py-6 text-center text-[11px] text-text-muted border border-dashed border-border-primary/60 rounded-lg">
-                            暂无标签。在侧栏会话上悬停点 <span class="nt-tag-hint-inline">#</span> 创建第一个标签。
+                            暂无标签。输入上方名称新建，或从下方<b>推荐标签</b>一键套用。
                           </div>
                         }
                       >
@@ -772,6 +915,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                               <TagRow
                                 name={name}
                                 color={color}
+                                count={tagsStore.tagCounts()[name] ?? 0}
                                 onColorChange={(c) => tagsStore.setTagColor(name, c)}
                                 onRename={(next) => tagsStore.renameTag(name, next)}
                                 onDelete={() => tagsStore.deleteTag(name)}
@@ -779,6 +923,56 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                             )}
                           </For>
                         </ul>
+                      </Show>
+                    </div>
+                  </div>
+
+                  {/* 推荐标签：预置工作流标签（对标 Linear/GitHub 默认 label） */}
+                  <div class="ss-card">
+                    <div class="ss-card-header">
+                      <ExpandIcon />
+                      推荐标签
+                      <Show when={missingRecommended().length === 0}>
+                        <span class="ml-auto text-[10px] font-medium text-nt-core-700 bg-nt-core-500/10 px-2 py-0.5 rounded-full">已全部添加</span>
+                      </Show>
+                    </div>
+                    <div class="ss-card-body">
+                      <p class="text-[11px] text-text-muted leading-relaxed pb-3">
+                        一套面向 AI 开发工作流的预置标签：<b>工作</b> 归类任务类型，<b>领域</b> 归类技术栈。
+                        仅添加缺失项，不会覆盖你已有的标签。
+                      </p>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <For each={RECOMMENDED_TAGS}>
+                          {(r) => {
+                            const exists = () => !!tagsStore.state.tags[r.name]
+                            return (
+                              <button
+                                class={clsx(
+                                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-all',
+                                  exists()
+                                    ? 'border-border-primary/40 bg-white/30 text-text-muted cursor-default'
+                                    : 'border-white/70 bg-white/55 text-text-primary hover:bg-white/85 hover:shadow-sm cursor-pointer'
+                                )}
+                                style={exists() ? undefined : { 'border-color': r.color + '55' }}
+                                onClick={() => { if (!exists()) { tagsStore.setTagColor(r.name, r.color); setNotice(`已添加推荐标签 #${r.name}`) } }}
+                                disabled={exists()}
+                                aria-label={exists() ? `${r.name} 已添加` : `添加推荐标签 ${r.name}`}
+                              >
+                                <span class="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
+                                <span class="font-mono">#{r.name}</span>
+                                {exists() && <span class="text-[9px] text-nt-core-700">✓</span>}
+                              </button>
+                            )
+                          }}
+                        </For>
+                      </div>
+                      <Show when={missingRecommended().length > 0}>
+                        <button
+                          class="mt-3 px-3 py-1.5 rounded-lg bg-nt-io-500 text-white text-[11px] font-medium hover:bg-nt-io-600 transition-colors"
+                          onClick={seedTags}
+                        >
+                          一键添加全部推荐（{missingRecommended().length}）
+                        </button>
                       </Show>
                     </div>
                   </div>
@@ -830,6 +1024,46 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                   </div>
                   <div class="ss-card">
                     <div class="ss-card-header">
+                      <InfoIcon />
+                      检查更新
+                    </div>
+                    <div class="ss-card-body space-y-3">
+                      <div class="flex items-center gap-3">
+                        <div class="text-[11px] text-text-muted flex-1">
+                          {updateState() === 'available' && (
+                            <span>发现新版本 <span class="font-mono text-nt-io-700">{updateInfo()?.latest}</span>（当前 v{updateInfo()?.current ?? appVersion() ?? '0.18.0'}）</span>
+                          )}
+                          {updateState() === 'up-to-date' && <span>当前已是最新版本 ✓</span>}
+                          {updateState() === 'checking' && <span>正在检查更新…</span>}
+                          {updateState() === 'downloading' && (
+                            <span>正在下载更新… {updateProgress() ? `${Math.round((updateProgress()!.downloaded / Math.max(updateProgress()!.total, 1)) * 100)}%` : ''}</span>
+                          )}
+                          {updateState() === 'downloaded' && <span>新版本已下载，重启应用完成安装</span>}
+                          {updateState() === 'error' && <span class="text-nt-shield-600">检查更新失败：{updateInfo()?.error ?? '未知错误'}</span>}
+                          {updateState() === 'idle' && <span>检查是否有可用的新版本</span>}
+                        </div>
+                        <Show when={updateState() === 'idle' || updateState() === 'available' || updateState() === 'error' || updateState() === 'up-to-date'}>
+                          <button
+                            class="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors disabled:opacity-50"
+                            onClick={updateState() === 'available' ? downloadUpdate : checkForUpdate}
+                            disabled={updateState() === 'checking' || updateState() === 'downloading'}
+                          >
+                            {updateState() === 'available' ? '下载并安装' : '检查更新'}
+                          </button>
+                        </Show>
+                      </div>
+                      <Show when={updateState() === 'downloading' && updateProgress() && updateProgress()!.total > 0}>
+                        <div class="h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
+                          <div
+                            class="h-full rounded-full bg-nt-io-500 transition-all duration-200"
+                            style={{ width: `${Math.min((updateProgress()!.downloaded / updateProgress()!.total) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </Show>
+                    </div>
+                  </div>
+                  <div class="ss-card">
+                    <div class="ss-card-header">
                       <DataIcon />
                       诊断信息
                     </div>
@@ -874,12 +1108,13 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
 }
 
 /* ════════════════════════════════════════════
-   TagRow — 设置内标签行（对标 Obsidian 标签设置）
-   色点 + 名称 + 色板快捷选色 + 自定义取色 + 重命名/删除
+   TagRow — 设置内标签行（对标 Obsidian 标签设置 + Linear label row）
+   色点 + 名称(层级缩进) + 使用计数 + 色板快捷选色 + 自定义取色 + 重命名/删除
    ════════════════════════════════════════════ */
 function TagRow(props: {
   name: string
   color: string
+  count?: number
   onColorChange: (color: string) => void
   onRename: (next: string) => void
   onDelete: () => void
@@ -895,8 +1130,17 @@ function TagRow(props: {
     setEditing(false)
   }
 
+  const indent = () => (tagDepth(props.name) - 1) * 16
+
   return (
-    <li class="px-3 py-2.5 flex items-center gap-3 bg-white/30 hover:bg-white/55 transition-colors">
+    <li
+      class="flex items-center gap-3 py-2.5 bg-white/30 hover:bg-white/55 transition-colors"
+      style={{ 'padding-left': `${12 + indent()}px` }}
+    >
+      {/* 层级缩进导轨 */}
+      <Show when={indent() > 0}>
+        <span class="w-px h-6 bg-border-primary/60 flex-shrink-0 -ml-3" aria-hidden="true" />
+      </Show>
       {/* 色点（点击展开快捷取色） */}
       <button
         class="w-5 h-5 rounded-full border border-white/80 shadow-sm flex-shrink-0 cursor-pointer transition-transform hover:scale-110"
@@ -965,6 +1209,16 @@ function TagRow(props: {
           >
             保存
           </button>
+        </span>
+      </Show>
+
+      {/* 使用计数（Obsidian 风格徽章） */}
+      <Show when={!editing() && (props.count ?? 0) > 0}>
+        <span
+          class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full bg-black/4 text-text-muted tabular-nums flex-shrink-0"
+          title={`${props.count} 个会话使用此标签`}
+        >
+          {props.count}
         </span>
       </Show>
 

@@ -8,7 +8,7 @@ import { createStore, produce } from 'solid-js/store'
    持久化：localStorage (neotrix:tags)，与后端 session 并存（前端侧挂载）
    ════════════════════════════════════════════ */
 
-/** 标签色板：8 档离散色（索引色），新标签按 name hash 分配 */
+/** 标签色板：9 档离散色（索引色），新标签按 name hash 分配 */
 export const TAG_PALETTE: string[] = [
   '#e85454', // 红 NT-IO 品牌
   '#f0913a', // 浅橙 NT-ACT
@@ -18,6 +18,23 @@ export const TAG_PALETTE: string[] = [
   '#2563eb', // 蓝 NT-MEMORY
   '#9333ea', // 紫 NT-MIND
   '#db2777', // 玫红
+  '#64748b', // 石板灰（中性，GitHub labels 风格）
+]
+
+/** 推荐标签（对标 Linear/GitHub 默认 label + Obsidian 层级树）
+    2 层级根 → 侧栏天然折叠为工作/领域两棵树。
+    颜色从 TAG_PALETTE 显式指定，保证预置观感统一（而非 hash 乱序）。 */
+export const RECOMMENDED_TAGS: { name: string; color: string }[] = [
+  { name: '工作/功能', color: '#16a34a' },
+  { name: '工作/修复', color: '#e85454' },
+  { name: '工作/重构', color: '#9333ea' },
+  { name: '工作/调研', color: '#2563eb' },
+  { name: '工作/测试', color: '#0d9488' },
+  { name: '工作/文档', color: '#db2777' },
+  { name: '领域/前端', color: '#f0913a' },
+  { name: '领域/后端', color: '#d97706' },
+  { name: '领域/数据', color: '#2563eb' },
+  { name: '领域/devops', color: '#64748b' },
 ]
 
 export interface TagsState {
@@ -123,6 +140,26 @@ function createTagsStore() {
     persist(state)
   }
 
+  /** 从后端合并会话标签：注册表补色；本地缺该会话标签时才回填（不覆盖本地） */
+  const importSessionTags = (sessionId: string, names: string[]): void => {
+    if (!names || names.length === 0) return
+    const normalized = names.map(normalizeTagName).filter(Boolean)
+    setState('tags', produce(t => {
+      for (const n of normalized) {
+        if (!t[n]) t[n] = colorForName(n)
+      }
+    }))
+    setState('sessionTags', produce(st => {
+      const cur = st[sessionId] ?? []
+      const merged = [...cur]
+      for (const n of normalized) {
+        if (!merged.includes(n)) merged.push(n)
+      }
+      st[sessionId] = merged
+    }))
+    persist(state)
+  }
+
   /** 移除会话全部标签（会话删除时调用） */
   const clearSessionTags = (sessionId: string): void => {
     setState('sessionTags', produce(st => { delete st[sessionId] }))
@@ -134,6 +171,30 @@ function createTagsStore() {
     ensureRegistered(name)
     setState('tags', produce(t => { t[name] = color }))
     persist(state)
+  }
+
+  /** 仅注册标签（不绑定会话）—— 设置面板快速新建用。返回规范化名，无效返回 null */
+  const registerTag = (rawName: string): string | null => {
+    const name = normalizeTagName(rawName)
+    if (!name) return null
+    ensureRegistered(name)
+    persist(state)
+    return name
+  }
+
+  /** 一键添加推荐标签（幂等：仅注册缺失项，用推荐色而非 hash）。返回新增数 */
+  const seedRecommendedTags = (): number => {
+    let added = 0
+    setState('tags', produce(t => {
+      for (const { name, color } of RECOMMENDED_TAGS) {
+        if (!t[name]) {
+          t[name] = color
+          added++
+        }
+      }
+    }))
+    if (added > 0) persist(state)
+    return added
   }
 
   /** 重命名标签（含层级改名；同步会话引用） */
@@ -231,7 +292,10 @@ function createTagsStore() {
     addSessionTag,
     removeSessionTag,
     clearSessionTags,
+    importSessionTags,
     setTagColor,
+    registerTag,
+    seedRecommendedTags,
     renameTag,
     deleteTag,
     tagsForSession,

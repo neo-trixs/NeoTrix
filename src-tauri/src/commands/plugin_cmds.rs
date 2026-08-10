@@ -123,11 +123,6 @@ impl PluginState {
 
 static PLUGIN_STATE: LazyLock<Mutex<PluginState>> = LazyLock::new(|| Mutex::new(PluginState::new()));
 
-fn default_plugins_dir() -> String {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
-    format!("{}/.config/neotrix/plugins", home)
-}
-
 #[tauri::command]
 pub fn plugin_list() -> Vec<PluginStatus> {
     let mut state = PLUGIN_STATE.lock().unwrap_or_else(|e| e.into_inner());

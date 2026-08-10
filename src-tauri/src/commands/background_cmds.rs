@@ -1,9 +1,6 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::State;
 
 const TASKS_FILE: &str = ".neotrix/background-tasks.json";
 
@@ -50,28 +47,6 @@ impl std::fmt::Display for TaskStatus {
     }
 }
 
-
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RecurrenceSchedule {
-    pub kind: String,
-    pub interval: u64,
-    pub next_run: u64,
-}
-
-impl RecurrenceSchedule {
-    pub fn new(kind: &str, interval_secs: u64) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        Self {
-            kind: kind.into(),
-            interval: interval_secs,
-            next_run: now + interval_secs,
-        }
-    }
-}
 fn tasks_path() -> String {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     format!("{}/{}", home, TASKS_FILE)

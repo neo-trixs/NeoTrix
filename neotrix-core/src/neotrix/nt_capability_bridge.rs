@@ -370,3 +370,121 @@ pub fn promote_to_file(registry_path: &std::path::Path, dims: &[ExperienceDimens
     }
     written_n
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nt_core_capability_tree::{CapabilityNode, CapabilityRegistry};
+
+    fn sample_registry() -> CapabilityRegistry {
+        let mut reg = CapabilityRegistry::new();
+        let node = CapabilityNode::new_primitive(
+            "test::retrieval".into(),
+            Domain::Memory,
+            vec!["hybrid_retrieval".into()],
+        );
+        reg.register(node).unwrap();
+        reg
+    }
+
+    #[test]
+    fn test_route_batch_splits_dimensions() {
+        // 经验升维: 能力网进化 vs 意识体觉醒 两轴分类
+        let entries = vec![
+            ExperienceEntry {
+                id: "e1".into(),
+                entry_type: "pattern".into(),
+                domain_name: "NT-MEMORY".into(),
+                content: "检索 rrf 融合提升召回率".into(),
+                not: None,
+                confidence: 0.9,
+                importance: 0.8,
+                verified_by: None,
+                verification_status: None,
+            },
+            ExperienceEntry {
+                id: "e2".into(),
+                entry_type: "insight".into(),
+                domain_name: "NT-CORE".into(),
+                content: "意识 gwt 注意力路由优化".into(),
+                not: None,
+                confidence: 0.7,
+                importance: 0.6,
+                verified_by: None,
+                verification_status: None,
+            },
+        ];
+        let (network, awakening) = ExperienceRouter::route_batch(&entries);
+        assert!(!network.is_empty(), "能力网进化维度不应为空");
+        // "意识 gwt" 经验 → 意识体觉醒轴 (意识关键字命中觉醒路由)
+        assert!(!awakening.is_empty(), "意识关键字经验应路由到觉醒维度");
+    }
+
+    #[test]
+    fn test_plan_evolution_strengthens_existing_node() {
+        // 经验养料 → 能力网补齐: 高信号经验命中现有节点 → Strengthen (非新建)
+        let registry = sample_registry();
+        let entry = ExperienceEntry {
+            id: "e1".into(),
+            entry_type: "pattern".into(),
+            domain_name: "NT-MEMORY".into(),
+            content: "混合检索 rrf 融合显著提升效果".into(),
+            not: None,
+            confidence: 0.9,
+            importance: 0.9,
+            verified_by: None,
+            verification_status: None,
+        };
+        let (dims, _) = ExperienceRouter::route_batch(&[entry]);
+        let plans = ExperienceRouter::plan_evolution(&registry, &dims, "cycle-1");
+        assert!(!plans.is_empty(), "应生成补齐计划");
+        let all_strengthen = plans.iter().all(|p| {
+            p.actions.iter().any(|a| matches!(a, nt_core_capability_tree::EvolutionAction::Strengthen { .. }))
+        });
+        assert!(all_strengthen, "命中现有节点应生成 Strengthen 补齐");
+    }
+
+    #[test]
+    fn test_plan_evolution_buds_missing_capability() {
+        // 缺陷补齐: 高信号经验无现有节点 → Budding (能力网自动长出缺失能力)
+        let registry = sample_registry(); // 只有 retrieval, 无 tdd
+        let entry = ExperienceEntry {
+            id: "e2".into(),
+            entry_type: "defect".into(),
+            domain_name: "NT-MIND".into(),
+            content: "测试驱动 tdd 覆盖率不足是主要缺陷".into(),
+            not: None,
+            confidence: 0.85,
+            importance: 0.9,
+            verified_by: None,
+            verification_status: None,
+        };
+        let (dims, _) = ExperienceRouter::route_batch(&[entry]);
+        let plans = ExperienceRouter::plan_evolution(&registry, &dims, "cycle-1");
+        assert!(!plans.is_empty(), "缺陷经验应生成补齐计划");
+        let has_bud = plans.iter().any(|p| {
+            p.actions.iter().any(|a| matches!(a, nt_core_capability_tree::EvolutionAction::Budding { .. }))
+        });
+        assert!(has_bud, "缺失能力应生成 Budding 补齐计划");
+    }
+
+    #[test]
+    fn test_low_signal_experience_skipped() {
+        // 低信号经验不污染能力网 — 只补强高信号 (signal >= 0.7)
+        let registry = sample_registry();
+        let entry = ExperienceEntry {
+            id: "e3".into(),
+            entry_type: "pattern".into(),
+            domain_name: "NT-MEMORY".into(),
+            content: "检索 rrf 融合".into(),
+            not: None,
+            confidence: 0.4, // signal = 0.4*0.6+0.4*0.4 = 0.4 < 0.7
+            importance: 0.4,
+            verified_by: None,
+            verification_status: None,
+        };
+        let (dims, _) = ExperienceRouter::route_batch(&[entry]);
+        let plans = ExperienceRouter::plan_evolution(&registry, &dims, "cycle-1");
+        assert!(plans.is_empty(), "低信号经验不应生成计划");
+    }
+}

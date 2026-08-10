@@ -1097,6 +1097,10 @@ pub fn branch_attention_domains(kind: &BranchKind) -> Vec<AttentionDomain> {
         BranchKind::Act => vec![AttentionDomain::GoalAlignment, AttentionDomain::ToolUse],
         BranchKind::Io => vec![AttentionDomain::Code, AttentionDomain::ToolUse],
         BranchKind::Shield => vec![AttentionDomain::RiskAssessment, AttentionDomain::SelfReflection],
+        BranchKind::Meta => vec![AttentionDomain::SelfReflection, AttentionDomain::Planning],
+        BranchKind::Repair => vec![AttentionDomain::RiskAssessment, AttentionDomain::ToolUse],
+        BranchKind::Governance => vec![AttentionDomain::RiskAssessment, AttentionDomain::GoalAlignment],
+        BranchKind::Nexus => vec![AttentionDomain::Semantic, AttentionDomain::SelfReflection],
     }
 }
 
@@ -2299,6 +2303,26 @@ mod tests {
             };
         }
         // Shield 分支保持默认 (health 0, fog 0.85, C0) → 薄弱 → 应刺激 RiskAssessment。
+        // Nexus 分支默认薄弱且映射 Semantic → 也设为健康, 使断言聚焦"健康分支不刺激"。
+        if let Some(nx) = tree.branches.get_mut(&BranchKind::Nexus) {
+            nx.health = 1.0;
+            nx.fog = crate::core::nt_core_consciousness_tree::FogLevel {
+                wired: true,
+                consumer_count: 3,
+                has_tests: true,
+                level: 0.05,
+            };
+            nx.constellation = crate::core::nt_core_consciousness_tree::Constellation {
+                level: 5,
+                c0_compiles: true,
+                c1_unit_tests: true,
+                c2_integration: true,
+                c3_benchmark: true,
+                c4_pipeline: true,
+                c5_self_healing: true,
+                c6_adaptive: true,
+            };
+        }
         let stimuli = tree_branch_stimuli(&tree);
         assert!(
             stimuli.iter().any(|(d, _)| *d == AttentionDomain::RiskAssessment),

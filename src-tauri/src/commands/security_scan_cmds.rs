@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
-use std::time::Duration;
 
 // ===== Types =====
 
@@ -35,16 +34,6 @@ impl VulnerabilitySeverity {
             _ => None,
         }
     }
-
-    fn score(&self) -> f64 {
-        match self {
-            VulnerabilitySeverity::Critical => 10.0,
-            VulnerabilitySeverity::High => 7.0,
-            VulnerabilitySeverity::Medium => 5.0,
-            VulnerabilitySeverity::Low => 2.0,
-            VulnerabilitySeverity::Info => 0.5,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -57,16 +46,6 @@ pub enum VulnerabilityStatus {
 }
 
 impl VulnerabilityStatus {
-    fn as_str(&self) -> &'static str {
-        match self {
-            VulnerabilityStatus::Open => "open",
-            VulnerabilityStatus::Verified => "verified",
-            VulnerabilityStatus::Fixed => "fixed",
-            VulnerabilityStatus::WontFix => "wontfix",
-            VulnerabilityStatus::FalsePositive => "false_positive",
-        }
-    }
-
     fn from_str(s: &str) -> Option<Self> {
         match s {
             "open" => Some(VulnerabilityStatus::Open),
@@ -337,7 +316,6 @@ struct FindingTemplate {
     confidence: f64,
     remediation: &'static str,
     patch_suggestion: Option<&'static str>,
-    category: &'static str,
 }
 
 const ALL_TEMPLATES: &[FindingTemplate] = &[
@@ -353,7 +331,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.95,
         remediation: "Replace string concatenation with parameterized queries or prepared statements. Use the query builder's bind() method to safely interpolate variables.",
         patch_suggestion: Some("--- a/src/db/query.rs\n+++ b/src/db/query.rs\n@@ -45,7 +45,7 @@\n-    let sql = format!(\"SELECT * FROM users WHERE id = '{}'\", user_input);\n-    conn.query(&sql, []).map_err(...)\n+    let sql = \"SELECT * FROM users WHERE id = ?1\";\n+    conn.query(sql, rusqlite::params![user_input]).map_err(...)"),
-        category: "injection",
     },
     FindingTemplate {
         title: "Hardcoded API Key in Source Code",
@@ -367,7 +344,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.99,
         remediation: "Remove the hardcoded key and load it from an environment variable or a secrets manager at runtime. Rotate the exposed key immediately.",
         patch_suggestion: Some("--- a/src/config/secrets.rs\n+++ b/src/config/secrets.rs\n@@ -12,7 +12,7 @@\n-    const API_SECRET: &str = \"sk-abc123def456ghi789jkl\";\n+    const API_SECRET: &str = std::env::var(\"API_SECRET\").expect(\"API_SECRET must be set\").leak();"),
-        category: "secrets",
     },
     FindingTemplate {
         title: "Command Injection via Shell Argument",
@@ -381,7 +357,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.92,
         remediation: "Never use shell string interpolation. Use Command::new() with separate argument array to avoid shell injection entirely.",
         patch_suggestion: Some("--- a/src/cli/exec.rs\n+++ b/src/cli/exec.rs\n@@ -34,7 +34,7 @@\n-    let output = std::process::Command::new(\"sh\").arg(\"-c\").arg(format!(\"grep {} /var/log/app.log\", user_input)).output()?;\n+    let output = std::process::Command::new(\"grep\").arg(user_input).arg(\"/var/log/app.log\").output()?;"),
-        category: "injection",
     },
     FindingTemplate {
         title: "Unsafe Deserialization from Untrusted Source",
@@ -395,7 +370,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.88,
         remediation: "Validate the serialized data before deserializing. Use a schema-based validator (e.g., JSON Schema) or implement type allowlisting. Consider using a safer serialization format.",
         patch_suggestion: Some("--- a/src/api/handler.rs\n+++ b/src/api/handler.rs\n@@ -78,7 +78,10 @@\n-    let data: IncomingPayload = serde_json::from_str(&raw_body).map_err(|e| ...)?;\n+    let validated: serde_json::Value = serde_json::from_str(&raw_body).map_err(|e| ...)?;\n+    if !validated.is_object() || validated.get(\"type\").and_then(|v| v.as_str()).is_none() {\n+        return Err(\"Invalid payload structure\".into());\n+    }\n+    let data: IncomingPayload = serde_json::from_value(validated).map_err(|e| ...)?;"),
-        category: "deserialization",
     },
     FindingTemplate {
         title: "Path Traversal in File Access",
@@ -409,7 +383,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.91,
         remediation: "Canonicalize the resolved path and verify it stays within the allowed base directory. Reject paths containing '..' sequences or symbolic links pointing outside the sandbox.",
         patch_suggestion: Some("--- a/src/io/file_manager.rs\n+++ b/src/io/file_manager.rs\n@@ -156,7 +156,11 @@\n-    let full_path = format!(\"{}/{}\", base_dir, user_path);\n-    std::fs::read(&full_path)\n+    let base = std::path::Path::new(&base_dir).canonicalize()?;\n+    let resolved = base.join(&user_path).canonicalize()?;\n+    if !resolved.starts_with(&base) {\n+        return Err(\"Path traversal detected\".into());\n+    }\n+    std::fs::read(&resolved)"),
-        category: "access_control",
     },
     FindingTemplate {
         title: "Cross-Site Scripting in HTML Rendering",
@@ -423,7 +396,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.85,
         remediation: "Use a context-aware HTML encoder. Apply output encoding based on where the data appears (HTML body, attribute, JavaScript, CSS, URL). Prefer a template engine with auto-escaping.",
         patch_suggestion: Some("--- a/src/ui/render.rs\n+++ b/src/ui/render.rs\n@@ -203,7 +203,7 @@\n-    format!(\"<div class='message'>{}</div>\", user_content)\n+    format!(\"<div class='message'>{}</div>\", html_escape::encode_text(&user_content))"),
-        category: "xss",
     },
     FindingTemplate {
         title: "Insecure Random Number Generator for Security Token",
@@ -437,7 +409,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.94,
         remediation: "Replace with a cryptographically secure random generator. Use getrandom, rand::rngs::OsRng, or the system's native CSPRNG interface.",
         patch_suggestion: Some("--- a/src/crypto/token.rs\n+++ b/src/crypto/token.rs\n@@ -67,7 +67,7 @@\n-    let token: u64 = rand::thread_rng().gen();\n+    use rand::rngs::OsRng;\n+    let token: u64 = OsRng.gen();"),
-        category: "crypto",
     },
     FindingTemplate {
         title: "Missing Rate Limiting on Public Endpoints",
@@ -451,7 +422,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.80,
         remediation: "Implement rate limiting middleware that tracks request frequency per client IP or API key. Apply graduated backoff: warn at 60% capacity, block at 100%, with configurable windows per endpoint tier.",
         patch_suggestion: None,
-        category: "availability",
     },
     FindingTemplate {
         title: "Deprecated Cryptographic Algorithm Usage",
@@ -465,7 +435,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.97,
         remediation: "Replace with a modern hash algorithm. Use SHA-256 or SHA-3 for hashing, and Argon2id or bcrypt for password storage.",
         patch_suggestion: Some("--- a/src/crypto/hash.rs\n+++ b/src/crypto/hash.rs\n@@ -89,7 +89,7 @@\n-    let hash = md5::compute(input);\n+    use sha2::{Sha256, Digest};\n+    let hash = Sha256::digest(input);"),
-        category: "crypto",
     },
     FindingTemplate {
         title: "Information Disclosure in Error Responses",
@@ -479,7 +448,6 @@ const ALL_TEMPLATES: &[FindingTemplate] = &[
         confidence: 0.82,
         remediation: "Map internal errors to generic user-facing messages. Log full details server-side with structured logging. Return sanitized error codes or correlation IDs to the client.",
         patch_suggestion: Some("--- a/src/error/handler.rs\n+++ b/src/error/handler.rs\n@@ -45,7 +45,10 @@\n-    HttpResponse::InternalServerError().json(json!({\"error\": format!(\"{}\", internal_err)}))\n+    log::error!(\"Internal error (ref {}): {}\", ref_id, internal_err);\n+    HttpResponse::InternalServerError().json(json!({\n+        \"error\": \"An unexpected error occurred\",\n+        \"ref\": ref_id\n+    }))"),
-        category: "information_disclosure",
     },
 ];
 
@@ -639,7 +607,7 @@ pub fn security_scan_list() -> Result<Vec<ScanResult>, String> {
 #[tauri::command]
 pub fn security_scan_findings(scan_id: String, severity: Option<String>) -> Result<Vec<VulnerabilityFinding>, String> {
     let state = STATE.lock().map_err(|e| format!("lock error: {}", e))?;
-    let scan = state.scans.iter()
+    let _scan = state.scans.iter()
         .find(|s| s.scan_id == scan_id)
         .ok_or_else(|| format!("scan {} not found", scan_id))?;
 

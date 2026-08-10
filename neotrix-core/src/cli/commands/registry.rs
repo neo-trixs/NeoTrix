@@ -259,7 +259,7 @@ mod tests {
         assert!(!names.contains(&"/trace"), "trace should be auto-backend");
         assert!(!names.contains(&"/avatar"), "avatar should be auto-backend");
         assert!(names.contains(&"/skills"), "skills now registered as interactive CLI command");
-        assert!(!names.contains(&"/explore"), "explore should be auto-backend");
+        assert!(names.contains(&"/explore"), "explore now registered as interactive CLI command (外部知识探索+alphaXiv)");
         assert!(!names.contains(&"/cleanup"), "cleanup should be auto-backend");
         assert!(!names.contains(&"/automation"), "automation should be auto-backend");
     }

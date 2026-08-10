@@ -7,10 +7,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use clap::Parser;
-use tauri::{Manager, State, Emitter, Listener};
+use tauri::{Manager, State, Emitter};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_mind::{ReasoningBank, ReasoningBrain};
 use neotrix::neotrix::nt_shield::permissions::PermissionManager;

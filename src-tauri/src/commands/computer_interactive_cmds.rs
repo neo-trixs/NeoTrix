@@ -19,13 +19,6 @@ pub struct MousePosition {
     pub y: i32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct KeyEvent {
-    pub key: String,
-    pub action: String,
-    pub modifiers: Vec<String>,
-}
-
 #[derive(Serialize, Clone, Debug)]
 pub struct DisplayInfo {
     pub id: u32,
@@ -726,7 +719,6 @@ pub fn computer_bg_retry(task_id: String) -> Result<(), String> {
     let task_desc = task.description.clone();
     let task_type = task.task_type.clone();
     let task_target = task.target.clone();
-    drop(task);
 
     let new_id = state.generate_id();
     let now = timestamp_nanos();

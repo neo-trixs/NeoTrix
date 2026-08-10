@@ -88,6 +88,134 @@ impl BackgroundLoopHandle {
                 d.run_loop_goal();
             }
         }
+        // 能力网自动补齐 (意识能力网自动进化): 把经验/对话进化记录 + 能力树缺陷
+        // 自动融合为能力网补齐计划并执行 — 缺陷补齐 + 经验驱动的 Strengthen/Budding。
+        // 此前能力网进化仅 CLI 手动触发 (neotrix-capability scan --apply),
+        // 从未接入后台自动进化循环 (缺自动融合闭环)。
+        self.handle_capability_auto_evolve().await;
+    }
+
+    /// 能力网自动补齐 — 意识能力网自动进化迭代补齐缺陷。
+    ///
+    /// 养料源两路:
+    /// 1. 能力树自身缺陷 (auto_scan): 孤儿/过期/可晋升/重复能力 → 缺陷补齐计划;
+    /// 2. KB 进化记录 (get_evolution_patterns): 已验证的对话进化模式 → ExperienceRouter
+    ///    → 高信号经验 → Strengthen 现有节点 / Budding 新节点 (缺陷补齐)。
+    ///
+    /// 闭环: 养料 (经验+缺陷) → 规划 → execute → 写回 registry 文件。
+    /// 能力网不是静态清单, 而是随经验/缺陷自动进化的活结构。
+    async fn handle_capability_auto_evolve(&mut self) {
+        use crate::neotrix::nt_capability_bridge::{
+            ExperienceEntry, ExperienceRouter, parse_domain,
+        };
+        use nt_core_capability_tree::evolution::EvolutionEngine;
+
+        // 节流门: auto_scan 全量扫描有开销, 3600s (1h) 一次足够。
+        // 首次 (ts=0) 立即执行, 之后按时间门跳过。
+        const CAPABILITY_EVOLVE_INTERVAL_SECS: u64 = 3600;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let last = self.last_capability_evolve_ts.load(std::sync::atomic::Ordering::Relaxed);
+        if last != 0 && now.saturating_sub(last) < CAPABILITY_EVOLVE_INTERVAL_SECS {
+            return;
+        }
+
+        let path = PathBuf::from(".neotrix/capability_registry.json");
+        if !path.exists() {
+            return; // 无能力树注册表 → 无网可补齐
+        }
+        // 1. 加载能力网
+        let json = match std::fs::read_to_string(&path) {
+            Ok(j) => j,
+            Err(e) => {
+                log::warn!("[bg] capability_auto_evolve: read {} failed: {}", path.display(), e);
+                return;
+            }
+        };
+        let kb_tree: nt_core_capability_tree::serialize::KBCapabilityTree = match serde_json::from_str(&json) {
+            Ok(t) => t,
+            Err(e) => {
+                log::warn!("[bg] capability_auto_evolve: parse {} failed: {}", path.display(), e);
+                return;
+            }
+        };
+        let mut registry = kb_tree.to_registry();
+        let mut plans = Vec::new();
+
+        // 2. 缺陷补齐 — auto_scan (孤儿/过期/晋升/重复)
+        {
+            let engine = EvolutionEngine::new(&mut registry);
+            plans.extend(engine.auto_scan("bg"));
+        }
+
+        // 3. 经验养料 — KB 进化记录 → ExperienceRouter → 补齐计划
+        let exp_entries: Vec<ExperienceEntry> = self.kb.as_ref()
+            .and_then(|kb| kb.get_evolution_patterns(100).ok())
+            .unwrap_or_default()
+            .into_iter()
+            // 只取已验证的高质量进化模式 (verified) 作为养料
+            .filter(|r| r.verified)
+            .map(|r| ExperienceEntry {
+                id: r.id.clone(),
+                entry_type: "pattern".into(),
+                domain_name: parse_domain(&format!("{:?}", r.pattern_type))
+                    .as_str()
+                    .to_uppercase()
+                    .into(),
+                content: r.description.clone(),
+                not: None,
+                confidence: (0.6 + r.effectiveness_gain.clamp(0.0, 1.0) * 0.4).min(1.0),
+                importance: 0.6,
+                verified_by: Some("evolution-records".into()),
+                verification_status: Some("verified".into()),
+            })
+            .collect();
+        if !exp_entries.is_empty() {
+            let (dims, _) = ExperienceRouter::route_batch(&exp_entries);
+            let exp_plans = ExperienceRouter::plan_evolution(&registry, &dims, "bg");
+            plans.extend(exp_plans);
+        }
+
+        // 4. 执行计划并写回
+        if plans.is_empty() {
+            return;
+        }
+        let mut applied = 0usize;
+        let mut failed = 0usize;
+        {
+            let mut engine = EvolutionEngine::new(&mut registry);
+            for plan in plans {
+                match engine.execute(plan) {
+                    Ok(()) => applied += 1,
+                    Err(_) => failed += 1,
+                }
+            }
+        }
+        if applied == 0 && failed == 0 {
+            return;
+        }
+        let out = nt_core_capability_tree::serialize::KBCapabilityTree::from_registry(&registry);
+        match serde_json::to_string_pretty(&out) {
+            Ok(s) => {
+                // 原子写: 临时文件 + rename, 避免直接覆盖在崩溃时损坏 registry。
+                // 此前 std::fs::write 直接覆盖 — 极端崩溃可能留下半写 JSON。
+                let tmp = path.with_extension("json.tmp");
+                if let Err(e) = std::fs::write(&tmp, &s) {
+                    log::warn!("[bg] capability_auto_evolve: write {} failed: {}", tmp.display(), e);
+                    return;
+                }
+                if let Err(e) = std::fs::rename(&tmp, &path) {
+                    log::warn!("[bg] capability_auto_evolve: rename {} -> {} failed: {}", tmp.display(), path.display(), e);
+                    let _ = std::fs::remove_file(&tmp);
+                    return;
+                }
+                log::info!("[bg] capability_auto_evolve: applied {} plans (failed {}), nodes now {}", applied, failed, registry.nodes.len());
+                self.last_capability_evolve_ts.store(now, std::sync::atomic::Ordering::Relaxed);
+            }
+            Err(e) => log::warn!("[bg] capability_auto_evolve: serialize failed: {}", e),
+        }
     }
 
     pub(crate) async fn handle_skill_scan(&mut self) {

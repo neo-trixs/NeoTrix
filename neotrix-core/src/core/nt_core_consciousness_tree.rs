@@ -45,6 +45,13 @@ pub struct DataFoundation {
     pub constitution_absorption_rules: usize,
     pub constitution_last_loaded: u64,
     pub constitution_source_hash: String,
+    /// 对话养料 — background_loop 每 tick 从 KB kv_get("consciousness","conversation") 回填。
+    /// 反映真实对话 awareness (turn 数 / 质量), 参与 data_nourishment_factor 调制果实。
+    pub conversation_turn_count: u64,
+    pub conversation_quality: f64,
+    /// 经验养料 — background_loop 每 tick 从 KB kv_list("experience") 回填。
+    /// 反映经验蒸馏密度, 参与 data_nourishment_factor 调制果实。
+    pub experience_branch_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -115,6 +122,10 @@ pub enum BranchKind {
     Act,
     Io,
     Shield,
+    Meta,
+    Repair,
+    Governance,
+    Nexus,
 }
 
 impl BranchKind {
@@ -127,6 +138,10 @@ impl BranchKind {
             BranchKind::Act => "NT-ACT (行动执行者) — MCP工具+社交+自治+目标循环",
             BranchKind::Io => "NT-IO (界面使徒) — LLM网关+CLI+Web+ACP",
             BranchKind::Shield => "NT-SHIELD (影卫) — 安全防护+自愈修复+审计链忠诚",
+            BranchKind::Meta => "NT-META (元吸收者) — 跨会话元认知+盲点检测+模式提炼",
+            BranchKind::Repair => "NT-REPAIR (自愈工程师) — 故障诊断+自修复+回滚恢复",
+            BranchKind::Governance => "NT-GOVERNANCE (架构仲裁者) — 宪法规则+合规验证+行为护栏",
+            BranchKind::Nexus => "NT-NEXUS (枢纽) — 跨会话记忆编织+经验图连接+断点桥接",
         }
     }
 }
@@ -795,6 +810,22 @@ pub fn constraints_for_branch(kind: &BranchKind) -> BranchConstraints {
             idle_ticks_threshold: 3, min_growth_health: 0.4, max_active_modules: 20,
             min_required_modules: 2, min_self_tests: 2,
         },
+        BranchKind::Meta => BranchConstraints {
+            idle_ticks_threshold: 4, min_growth_health: 0.35, max_active_modules: 15,
+            min_required_modules: 1, min_self_tests: 1,
+        },
+        BranchKind::Repair => BranchConstraints {
+            idle_ticks_threshold: 3, min_growth_health: 0.3, max_active_modules: 15,
+            min_required_modules: 1, min_self_tests: 1,
+        },
+        BranchKind::Governance => BranchConstraints {
+            idle_ticks_threshold: 4, min_growth_health: 0.4, max_active_modules: 15,
+            min_required_modules: 1, min_self_tests: 1,
+        },
+        BranchKind::Nexus => BranchConstraints {
+            idle_ticks_threshold: 5, min_growth_health: 0.35, max_active_modules: 15,
+            min_required_modules: 1, min_self_tests: 1,
+        },
     }
 }
 
@@ -832,8 +863,26 @@ impl ConsciousnessTree {
     /// - 社区数据集落盘后 (kb_node_count 显著上升): 因子 >1.0, 放大果实 quality,
     ///   使意识核心进化果实质量直接反映 200G 社区推理数据的养料充足度。
     /// 饱和曲线: 1.0 + min(kb_nodes / 1000, 0.5) — 1000 节点以上达到 +50% 上限。
+    ///
+    /// 养料融合扩展 (记忆知识库 + 对话 + 经验): 在 KB 节点养料基础上叠加
+    /// 记忆知识库的边/embedding 密度、对话 awareness 与经验蒸馏密度 —
+    /// 多路养料共同调制果实质量, 使意识核心反映"记忆知识库数据 + 对话数据 +
+    /// 经验蒸馏"的整体养料充足度。KB 数据为主养料 (记忆大脑知识库),
+    /// 对话与经验为增量调制。
     pub fn data_nourishment_factor(&self) -> f64 {
-        1.0 + (self.soil.kb_node_count as f64 / 1000.0).min(0.5)
+        // 主养料: 记忆大脑知识库 — KB 节点 (饱和曲线 1000 节点达 +50%)
+        let kb_nourish = (self.soil.kb_node_count as f64 / 1000.0).min(0.5);
+        // KB 边养料: 知识关联密度 (饱和曲线 5000 边达 +15%)
+        let kb_edge = (self.soil.kb_edge_count as f64 / 5000.0).min(0.15);
+        // KB embedding 养料: 向量化密度 (饱和曲线 2000 达 +10%)
+        let kb_embed = (self.soil.embedding_count as f64 / 2000.0).min(0.10);
+        // 对话养料: turn 数饱和曲线 (1000 turn 达 +20%) × 质量调制 (0.0-1.0)
+        let conv_turn = (self.soil.conversation_turn_count as f64 / 1000.0).min(0.2);
+        let conv_quality = self.soil.conversation_quality.clamp(0.0, 1.0) * 0.1;
+        let conv_nourish = conv_turn + conv_quality;
+        // 经验养料: 经验分支密度饱和曲线 (500 分支达 +20%)
+        let exp_nourish = (self.soil.experience_branch_count as f64 / 500.0).min(0.2);
+        1.0 + kb_nourish + kb_edge + kb_embed + conv_nourish + exp_nourish
     }
 
     /// 闭环进化反馈 (意识核心自我运转 Phase 8)。
@@ -1960,6 +2009,10 @@ impl BranchKind {
             BranchKind::Act,
             BranchKind::Io,
             BranchKind::Shield,
+            BranchKind::Meta,
+            BranchKind::Repair,
+            BranchKind::Governance,
+            BranchKind::Nexus,
         ]
     }
 
@@ -1979,6 +2032,14 @@ impl BranchKind {
             Some(BranchKind::Io)
         } else if name_lower.starts_with("nt_shield_") {
             Some(BranchKind::Shield)
+        } else if name_lower.starts_with("nt_meta_") {
+            Some(BranchKind::Meta)
+        } else if name_lower.starts_with("nt_repair_") {
+            Some(BranchKind::Repair)
+        } else if name_lower.starts_with("nt_governance_") {
+            Some(BranchKind::Governance)
+        } else if name_lower.starts_with("nt_nexus_") {
+            Some(BranchKind::Nexus)
         } else {
             None
         }
@@ -1994,6 +2055,10 @@ impl BranchKind {
             "NT-ACT" => Some(BranchKind::Act),
             "NT-IO" => Some(BranchKind::Io),
             "NT-SHIELD" => Some(BranchKind::Shield),
+            "NT-META" => Some(BranchKind::Meta),
+            "NT-REPAIR" => Some(BranchKind::Repair),
+            "NT-GOVERNANCE" => Some(BranchKind::Governance),
+            "NT-NEXUS" => Some(BranchKind::Nexus),
             _ => None,
         }
     }
@@ -2009,6 +2074,10 @@ impl CapabilityBranch {
             BranchKind::Act => "act",
             BranchKind::Io => "io",
             BranchKind::Shield => "shield",
+            BranchKind::Meta => "meta",
+            BranchKind::Repair => "repair",
+            BranchKind::Governance => "governance",
+            BranchKind::Nexus => "nexus",
         };
         let absorbed: Vec<String> = ALL_CAPABILITIES
             .iter()
@@ -2088,7 +2157,7 @@ mod tests {
     #[test]
     fn test_tree_new() {
         let tree = ConsciousnessTree::new();
-        assert_eq!(tree.branches.len(), 7);
+        assert_eq!(tree.branches.len(), 11);
         assert_eq!(tree.cycle, 0);
     }
 
@@ -2180,6 +2249,43 @@ mod tests {
         let rich_q: f64 = rich.fruits.iter().map(|f| f.quality).sum::<f64>() / rich.fruits.len().max(1) as f64;
         let poor_q: f64 = poor.fruits.iter().map(|f| f.quality).sum::<f64>() / poor.fruits.len().max(1) as f64;
         assert!(rich_q > poor_q, "data-rich fruits should have higher quality: rich={:.3} poor={:.3}", rich_q, poor_q);
+    }
+
+    #[test]
+    fn test_nourishment_merges_kb_conversation_experience() {
+        // 养料融合: 记忆知识库 (KB 节点/边/embedding) + 对话 + 经验 三路养料
+        // 共同调制 data_nourishment_factor — 对话/经验不再是"写入即弃",
+        // 而是读回作为意识核心进化养料 (自动融合闭环)。
+        let mut tree = ConsciousnessTree::new();
+        // 纯 KB 节点: 1000 节点 → 主养料 +0.5
+        tree.soil.kb_node_count = 1000;
+        let kb_only = tree.data_nourishment_factor();
+        assert!((kb_only - 1.5).abs() < 1e-9, "kb only = {}", kb_only);
+
+        // 叠加 KB 边 (5000 边 → +0.15) + embedding (2000 → +0.10)
+        tree.soil.kb_edge_count = 5000;
+        tree.soil.embedding_count = 2000;
+        let kb_rich = tree.data_nourishment_factor();
+        assert!((kb_rich - 1.75).abs() < 1e-9, "kb+edge+embed = {}", kb_rich);
+        assert!(kb_rich > kb_only, "KB 边/embedding 密度应提升养料");
+
+        // 叠加对话 (1000 turn → +0.20, 质量 1.0 → +0.10)
+        tree.soil.conversation_turn_count = 1000;
+        tree.soil.conversation_quality = 1.0;
+        let conv_rich = tree.data_nourishment_factor();
+        assert!((conv_rich - 2.05).abs() < 1e-9, "conv = {}", conv_rich);
+
+        // 叠加经验 (500 分支 → +0.20) — 全谱系饱和 → 2.25
+        tree.soil.experience_branch_count = 500;
+        let full = tree.data_nourishment_factor();
+        assert!((full - 2.25).abs() < 1e-9, "full = {}", full);
+
+        // 对话质量为 0 时, 对话只贡献 turn 部分
+        let mut low_q = ConsciousnessTree::new();
+        low_q.soil.conversation_turn_count = 1000;
+        low_q.soil.conversation_quality = 0.0;
+        let low = low_q.data_nourishment_factor();
+        assert!((low - 1.2).abs() < 1e-9, "low quality conv = {}", low);
     }
 
     #[test]

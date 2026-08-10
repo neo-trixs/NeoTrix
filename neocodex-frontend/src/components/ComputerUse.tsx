@@ -1,40 +1,8 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { Monitor, X, RefreshCw, Loader2, MousePointerClick, Keyboard, AppWindow, Cpu } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { computer as computerApi } from '../api'
+import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInfo } from '../api/types'
 import { clsx } from 'clsx'
-
-interface ScreenCapture {
-  path: string
-  width: number
-  height: number
-  format: string
-  timestamp: number
-}
-
-interface WindowInfo {
-  title: string
-  pid: number
-  app_name: string
-}
-
-interface FrontmostApp {
-  app_name: string
-  title: string
-}
-
-interface MousePosition {
-  x: number
-  y: number
-}
-
-interface DisplayInfo {
-  id: number
-  name: string
-  width: number
-  height: number
-  is_primary: boolean
-  scale_factor: number
-}
 
 interface Props {
   open: boolean
@@ -67,8 +35,8 @@ export function ComputerUse(props: Props) {
     setError(null)
     try {
       const [disp, front] = await Promise.all([
-        invoke<DisplayInfo[]>('computer_screen_list'),
-        invoke<FrontmostApp>('computer_get_frontmost_app').catch(() => null),
+        computerApi.screenList(),
+        computerApi.getFrontmostApp().catch(() => null),
       ])
       setDisplays(disp)
       setFrontmost(front)
@@ -87,7 +55,7 @@ export function ComputerUse(props: Props) {
       // Capture to temp path, then read as data URL
       const ts = Date.now()
       const filePath = `/tmp/neotrix_screen_${ts}.png`
-      await invoke<ScreenCapture>('computer_screenshot_and_save', { path: filePath })
+      await computerApi.screenshotAndSave(filePath)
       // Read file content via tauri fs plugin
       const { readFile } = await import('@tauri-apps/plugin-fs')
       const bytes = await readFile(filePath)
@@ -101,8 +69,8 @@ export function ComputerUse(props: Props) {
       setScreenshotDataUrl(dataUrl)
       // Refresh window list + mouse position
       const [wl, mp] = await Promise.all([
-        invoke<WindowInfo[]>('computer_get_window_list').catch(() => [] as WindowInfo[]),
-        invoke<MousePosition>('computer_mouse_position').catch(() => null),
+        computerApi.getWindowList().catch(() => [] as WindowInfo[]),
+        computerApi.mousePosition().catch(() => null),
       ])
       setWindows(wl)
       setMousePos(mp)
@@ -117,8 +85,8 @@ export function ComputerUse(props: Props) {
     setBusy('move')
     setError(null)
     try {
-      await invoke('computer_mouse_move', { x, y })
-      const mp = await invoke<MousePosition>('computer_mouse_position')
+      await computerApi.mouseMove(x, y)
+      const mp = await computerApi.mousePosition()
       setMousePos(mp)
     } catch (e) {
       setError(String(e))
@@ -131,7 +99,7 @@ export function ComputerUse(props: Props) {
     setBusy('click')
     setError(null)
     try {
-      await invoke('computer_mouse_click', { button: null })
+      await computerApi.mouseClick(null)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -144,7 +112,7 @@ export function ComputerUse(props: Props) {
     setBusy('type')
     setError(null)
     try {
-      await invoke('computer_keyboard_type', { text: keyText() })
+      await computerApi.keyboardType(keyText())
       setKeyText('')
     } catch (e) {
       setError(String(e))
@@ -158,7 +126,7 @@ export function ComputerUse(props: Props) {
     setBusy('press')
     setError(null)
     try {
-      await invoke('computer_keyboard_press', { key: keyCode(), modifiers: mods() })
+      await computerApi.keyboardPress(keyCode(), mods())
     } catch (e) {
       setError(String(e))
     } finally {

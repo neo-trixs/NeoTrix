@@ -114,7 +114,6 @@ impl TeleportState {
 
 static STATE: LazyLock<Mutex<TeleportState>> = LazyLock::new(|| Mutex::new(TeleportState::new()));
 
-const MAX_TELEPORT_SESSIONS: usize = 20;
 const MAX_TEAM_MESSAGES: usize = 500;
 
 // ── Helpers ────────────────────────────────────────────────────────────

@@ -1,13 +1,13 @@
 import { createSignal, Show, For } from 'solid-js'
 import { clsx } from 'clsx'
-import { tagsStore } from '../stores/tags'
+import { tagsStore, RECOMMENDED_TAGS } from '../stores/tags'
 import { NeoTag } from './NeoTag'
 
 /* ════════════════════════════════════════════
    TagBar — 侧栏标签区（对标 Obsidian Tag Pane）
    - 层级树：根标签可折叠，子标签缩进显示
    - 多选过滤：点击根标签筛选全部含该根的会话；再点取消
-   - 空态：无标签时显示引导
+   - 空态：推荐标签一键 seed（对标 Cherry Studio 空态引导）
    ════════════════════════════════════════════ */
 
 export interface TagBarProps {
@@ -30,6 +30,7 @@ function HashIcon(props: { class?: string }) {
 
 export function TagBar(props: TagBarProps) {
   const [collapsedRoots, setCollapsedRoots] = createSignal<Set<string>>(new Set())
+  const [seeded, setSeeded] = createSignal(false)
 
   const tree = () => tagsStore.tagTree()
   const activeCount = () => props.activeTags.length
@@ -46,13 +47,38 @@ export function TagBar(props: TagBarProps) {
   const rootActive = (name: string) => props.activeTags.includes(name)
   const childActive = (name: string) => props.activeTags.includes(name)
 
+  /* 一键套用推荐标签（幂等；seed 后立即显示完整树） */
+  const seedTags = () => {
+    const added = tagsStore.seedRecommendedTags()
+    if (added > 0) setSeeded(true)
+  }
+
   return (
     <div class="px-3 pb-2">
       <Show
         when={tree().length > 0}
         fallback={
-          <div class="px-3 py-2 rounded-lg border border-dashed border-border-primary/60 text-[11px] text-text-muted/70 leading-relaxed">
-            暂无标签。在会话上悬停点 <span class="nt-tag-hint-inline">#</span> 即可打标。
+          <div class="space-y-2 px-3 py-2.5 rounded-lg border border-dashed border-border-primary/60 text-[11px] text-text-muted/70 leading-relaxed">
+            <div>暂无标签。在会话上悬停点 <span class="nt-tag-hint-inline">#</span> 即可打标，或一键套用推荐标签：</div>
+            <div class="flex flex-wrap gap-1">
+              <For each={RECOMMENDED_TAGS.slice(0, 6)}>
+                {(t) => (
+                  <span
+                    class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                    style={{ 'background-color': `${t.color}1a`, color: t.color }}
+                  >
+                    {t.name}
+                  </span>
+                )}
+              </For>
+            </div>
+            <button
+              class="w-full py-1.5 rounded-lg text-[11px] font-medium bg-nt-io-500/10 text-nt-io-600 hover:bg-nt-io-500/20 transition-colors"
+              onClick={seedTags}
+              aria-label="一键添加推荐标签"
+            >
+              {seeded() ? '已添加推荐标签 ✓' : '一键添加推荐标签'}
+            </button>
           </div>
         }
       >

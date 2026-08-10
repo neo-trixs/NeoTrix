@@ -227,6 +227,84 @@ impl RequestScraper {
         self.fetch(url, None)
     }
 
+    /// SessionPool 身份注入抓取: 用指定 UA + Cookie 请求 (crawlee SessionPool 技术接线)。
+    /// 允许 caller 轮换会话身份, 单会话被站点封禁时不影响其它会话。
+    pub fn get_with_identity(&self, url: &str, user_agent: &str, cookie_str: &str) -> ScrapeResult {
+        let client = self.build_client_with_identity(user_agent, cookie_str);
+        match client.get(url).send() {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let headers: HashMap<String, String> = resp
+                    .headers()
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+                    .collect();
+                let text = match resp.text() {
+                    Ok(t) => Some(t),
+                    Err(e) => {
+                        log::warn!("[nt_world_scrape] read body: {}", e);
+                        None
+                    }
+                };
+                let html = text.clone();
+                ScrapeResult {
+                    url: url.to_string(),
+                    status_code: status,
+                    html,
+                    text,
+                    headers,
+                    error: None,
+                }
+            }
+            Err(e) => ScrapeResult {
+                url: url.to_string(),
+                status_code: 0,
+                html: None,
+                text: None,
+                headers: HashMap::new(),
+                error: Some(e.to_string()),
+            },
+        }
+    }
+
+    fn build_client_with_identity(&self, user_agent: &str, cookie_str: &str) -> reqwest::blocking::Client {
+        let mut headers = reqwest::header::HeaderMap::new();
+        if let Ok(h) = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            .parse::<reqwest::header::HeaderValue>() {
+            headers.insert(reqwest::header::ACCEPT, h);
+        }
+        if let Ok(h) = "en-US,en;q=0.9".parse::<reqwest::header::HeaderValue>() {
+            headers.insert(reqwest::header::ACCEPT_LANGUAGE, h);
+        }
+        if let Ok(h) = user_agent.parse::<reqwest::header::HeaderValue>() {
+            headers.insert(reqwest::header::USER_AGENT, h);
+        }
+        if !cookie_str.is_empty() {
+            if let Ok(h) = cookie_str.parse::<reqwest::header::HeaderValue>() {
+                headers.insert(reqwest::header::COOKIE, h);
+            }
+        }
+
+        let mut builder = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(self.config.timeout_secs))
+            .default_headers(headers)
+            .danger_accept_invalid_certs(true);
+
+        if let Some(ref proxy_url) = self.config.proxy {
+            if let Ok(proxy) = reqwest::Proxy::all(proxy_url) {
+                builder = builder.proxy(proxy);
+            }
+        }
+
+        match builder.build() {
+            Ok(client) => client,
+            Err(e) => {
+                log::warn!("[scrape] client build failed: {}. Using default.", e);
+                reqwest::blocking::Client::new()
+            }
+        }
+    }
+
     pub fn google_get(&self, url: &str) -> ScrapeResult {
         self.fetch(url, Some("https://www.google.com/"))
     }

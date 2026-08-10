@@ -6,46 +6,6 @@ use tauri::command;
 
 // ===== Enums =====
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum TaskType {
-    PrInspection,
-    DeployMonitor,
-    CodeScan,
-    Reminder,
-    Custom,
-}
-
-impl TaskType {
-    fn from_str(s: &str) -> Self {
-        match s {
-            "pr_inspection" => TaskType::PrInspection,
-            "deploy_monitor" => TaskType::DeployMonitor,
-            "code_scan" => TaskType::CodeScan,
-            "reminder" => TaskType::Reminder,
-            _ => TaskType::Custom,
-        }
-    }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            TaskType::PrInspection => "pr_inspection",
-            TaskType::DeployMonitor => "deploy_monitor",
-            TaskType::CodeScan => "code_scan",
-            TaskType::Reminder => "reminder",
-            TaskType::Custom => "custom",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ExecutionStatus {
-    Running,
-    Completed,
-    Failed,
-}
-
 // ===== Structs =====
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

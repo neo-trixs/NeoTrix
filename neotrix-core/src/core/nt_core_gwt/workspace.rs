@@ -106,6 +106,16 @@ pub struct GlobalWorkspace {
     /// Phase 9.1 — second-order observer workspace: watches the primary
     /// workspace and registers meta-observations for self-aware inner speech.
     pub meta_workspace: super::meta_workspace::MetaWorkspace,
+    /// 全局广播容量瓶颈 (Theater of Mind / Anthropic GWA 吸收) — 同一时刻
+    /// 工作空间只能容纳有限条全局广播内容。broadcast() 达到容量时拒绝广播
+    /// (返回 false)，模拟真实 GWT 的容量瓶颈而非无界 push。
+    pub broadcast_capacity: usize,
+    /// 当前全局广播槽位 (有界 VecDeque)。broadcast() 成功的内容同时写入
+    /// broadcast_history (审计) 与 active_broadcast (容量受限槽位)。
+    pub active_broadcast: VecDeque<String>,
+    /// 事件驱动信号 (GWA 离散动态系统) — 非轮询：外部触发 signal_event()，
+    /// 消费方 consume_event() 取走事件后执行广播，模拟事件驱动广播循环。
+    pub event_pending: bool,
 }
 
 /// Events that trigger an audit block
@@ -164,7 +174,40 @@ impl GlobalWorkspace {
             cognitive_hub: super::cognitive_hub::CognitiveHub::new(),
             last_sparse_gate: None,
             meta_workspace: super::meta_workspace::MetaWorkspace::new(),
+            broadcast_capacity: 3,
+            active_broadcast: VecDeque::new(),
+            event_pending: false,
         }
+    }
+
+    /// 设置广播容量瓶颈 (默认 3)。容量 = 同一时刻可进入全局广播的条数。
+    pub fn with_broadcast_capacity(mut self, capacity: usize) -> Self {
+        self.broadcast_capacity = capacity.max(1);
+        self
+    }
+
+    /// 事件驱动信号 — 置位 event_pending，表示有外部事件等待广播。
+    pub fn signal_event(&mut self) {
+        self.event_pending = true;
+    }
+
+    /// 消费事件信号 — 取走 pending 状态并返回是否真有事件。用于事件驱动
+    /// 广播循环 (非轮询)：false 表示无事可做，应跳过本轮广播。
+    pub fn consume_event(&mut self) -> bool {
+        let pending = self.event_pending;
+        self.event_pending = false;
+        pending
+    }
+
+    /// 全局广播入口 — 受容量瓶颈约束。成功进入全局广播返回 true；
+    /// 容量已满时拒绝广播并返回 false (不覆盖已有内容，模拟竞争失败)。
+    pub fn broadcast(&mut self, content: &str) -> bool {
+        if self.active_broadcast.len() >= self.broadcast_capacity {
+            return false;
+        }
+        self.active_broadcast.push_back(content.to_string());
+        self.broadcast_history.push(content.to_string());
+        true
     }
 
     /// Inject E8 attention weights [f64; 64] to bias expert selection before resonance.
@@ -193,10 +236,6 @@ impl GlobalWorkspace {
         }
         self.specialists.insert(module.name.clone(), module);
         true
-    }
-
-    pub fn broadcast(&mut self, content: &str) {
-        self.broadcast_history.push(content.to_string());
     }
 
     pub fn specialist_by_type_mut(&mut self, st: &SpecialistType) -> Option<&mut SpecialistModule> {
@@ -808,6 +847,44 @@ mod tests {
             let _ = ws.register(SpecialistModule::new(*st, format!("{:?}", st)));
         }
         ws
+    }
+
+    #[test]
+    fn test_broadcast_capacity_blocks_excess() {
+        let mut ws = GlobalWorkspace::new(0.3).with_broadcast_capacity(2);
+        assert!(ws.broadcast("first"));
+        assert!(ws.broadcast("second"));
+        // 容量已满 → 拒绝第三条广播 (不覆盖已有内容)
+        assert!(!ws.broadcast("third"));
+        assert_eq!(ws.active_broadcast.len(), 2);
+        assert_eq!(ws.active_broadcast.front().map(String::as_str), Some("first"));
+        assert_eq!(ws.active_broadcast.back().map(String::as_str), Some("second"));
+    }
+
+    #[test]
+    fn test_broadcast_under_capacity_passes() {
+        let mut ws = GlobalWorkspace::new(0.3).with_broadcast_capacity(5);
+        for i in 0..5 {
+            assert!(ws.broadcast(&format!("item-{i}")));
+        }
+        assert_eq!(ws.active_broadcast.len(), 5);
+        assert_eq!(ws.broadcast_history.len(), 5);
+    }
+
+    #[test]
+    fn test_event_signal_consume_roundtrip() {
+        let mut ws = GlobalWorkspace::new(0.3);
+        // 初始无事件
+        assert!(!ws.consume_event());
+        // 事件驱动: 外部 signal → 广播循环 consume → 执行广播
+        ws.signal_event();
+        assert!(ws.consume_event());
+        assert!(!ws.consume_event());
+        // 事件信号后广播受容量约束
+        ws.signal_event();
+        assert!(ws.consume_event());
+        assert!(ws.broadcast("event-driven"));
+        assert_eq!(ws.active_broadcast.len(), 1);
     }
 
     #[test]

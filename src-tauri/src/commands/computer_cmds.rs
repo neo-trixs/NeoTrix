@@ -1,5 +1,6 @@
 use std::process::Command;
 use serde::Serialize;
+use base64::Engine;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ScreenCapture {
@@ -47,7 +48,7 @@ pub fn capture_screen() -> Result<ScreenCapture, String> {
     let data = std::fs::read("/tmp/neotrix_screen.png")
         .map_err(|e| format!("Failed to read screenshot: {}", e))?;
 
-    let base64 = base64::encode(&data);
+    let base64 = base64::engine::general_purpose::STANDARD.encode(&data);
 
     Ok(ScreenCapture { image_base64: base64, width: 1920, height: 1080 })
 }

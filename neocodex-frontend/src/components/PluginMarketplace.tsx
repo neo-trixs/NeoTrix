@@ -1,24 +1,8 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { Puzzle, X, RefreshCw, Loader2, Download, Trash2, Power, PowerOff, ListTree, Box } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { plugins as pluginsApi } from '../api'
+import type { PluginEvent, PluginStatus } from '../api/types'
 import { clsx } from 'clsx'
-
-interface PluginStatus {
-  id: string
-  name: string
-  version: string
-  enabled: boolean
-  loaded: boolean
-  load_time_ms: number
-  error: string | null
-}
-
-interface PluginEvent {
-  timestamp: number
-  kind: string
-  plugin_id: string
-  message: string
-}
 
 interface Props {
   open: boolean
@@ -45,8 +29,8 @@ export function PluginMarketplace(props: Props) {
     setError(null)
     try {
       const [pl, ev] = await Promise.all([
-        invoke<PluginStatus[]>('plugin_list'),
-        invoke<PluginEvent[]>('plugin_event_log', { count: 30 }),
+        pluginsApi.pluginList(),
+        pluginsApi.pluginEventLog(30),
       ])
       setPlugins(pl)
       setEvents(ev)
@@ -66,7 +50,7 @@ export function PluginMarketplace(props: Props) {
       const path = await open({ filters: [{ name: 'Plugin Manifest', extensions: ['json'] }] })
       if (typeof path === 'string') {
         setBusy('install')
-        await invoke('plugin_install', { path })
+        await pluginsApi.pluginInstall(path)
         await load()
       }
     } catch (e) {
@@ -82,7 +66,7 @@ export function PluginMarketplace(props: Props) {
     setBusy(`uninstall:${id}`)
     setError(null)
     try {
-      await invoke('plugin_uninstall', { id })
+      await pluginsApi.pluginUninstall(id)
       await load()
     } catch (e) {
       setError(String(e))
@@ -95,8 +79,8 @@ export function PluginMarketplace(props: Props) {
     setBusy(`toggle:${p.id}`)
     setError(null)
     try {
-      if (p.enabled) await invoke('plugin_disable', { id: p.id })
-      else await invoke('plugin_enable', { id: p.id })
+      if (p.enabled) await pluginsApi.pluginDisable(p.id)
+      else await pluginsApi.pluginEnable(p.id)
       await load()
     } catch (e) {
       setError(String(e))

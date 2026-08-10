@@ -324,7 +324,11 @@ impl StageContract for DeliveryPromiseContract {
                         } else {
                             after_score - before_score
                         };
-                        if improvement < self.promise.quality_floor {
+                        // 防"表面提升"：reward 上升但 champion 未动 = 假装进步 (动画幻灯片不算运动)。
+                        // 但 reward 也未动 (无新输入蒸馏) = 正常保持, 不违规。
+                        // 此前把 0 提升也当 Error 阻断, 导致空任务/无输入蒸馏在测试与生产中误报。
+                        let reward_rose = brain._reward > before.reward;
+                        if improvement < self.promise.quality_floor && reward_rose {
                             let msg = format!(
                                 "delivery_promise (CapabilityLed): champion improvement {:.1}% below floor {:.1}% — reward may have risen but real capability did not (surface improvement, not real motion)",
                                 improvement * 100.0, self.promise.quality_floor * 100.0

@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use super::config::{CrawlStrategy, CrawlerConfig, CrawlTopic, SeedEntry};
 use super::frontier::{DualQueueFrontier, UrlEntry, extract_links, extract_domain};
 use super::fetcher::{FetcherPool, FetchError, FetcherProtocol};
+use super::stealth::SessionPool;
 use super::classifier::ContentClassifier;
 use super::mapper::KnowledgeMapper;
 
@@ -107,6 +108,13 @@ impl UnifiedCrawler {
             prefetch: None,
             config,
         }
+    }
+
+    /// crawlee SessionPool 默认接线: 按配置会话数挂接会话轮换池,
+    /// fetch 时自动按会话身份轮换 UA/Cookie, 403/429 自动封禁淘汰。
+    pub fn attach_session_pool(&mut self, max_sessions: usize) {
+        self.fetcher
+            .attach_session_pool(SessionPool::new(max_sessions));
     }
 
     /// 挂接 SQLite KB — 之后每次 run_cycle 的爬取结果都会落 KB（可检索）。

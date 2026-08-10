@@ -26,3 +26,4 @@ pub use fetcher::{FetcherPool, FetchResult, FetchError, FetcherProtocol, Fetcher
 pub use classifier::{ContentClassifier, ClassifiedContent, ClassifierSummary};
 pub use mapper::{KnowledgeMapper, MappedKnowledge, MapperSummary};
 pub use unified::{UnifiedCrawler, CrawlerSummary, CycleResult, HealAction};
+pub use stealth::{StealthCrawler, StealthConfig, CrawlResult, BypassMethod, SessionPool, CrawlSession};

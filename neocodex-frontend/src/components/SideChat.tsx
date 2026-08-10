@@ -1,14 +1,8 @@
 import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
 import { MessageSquare, X, Send, Loader2, RefreshCw } from 'lucide-solid'
-import { invoke } from '@tauri-apps/api/core'
+import { neocodex } from '../api'
+import type { NeoCodexMessageItem } from '../api/types'
 import { clsx } from 'clsx'
-
-interface SideChatMsg {
-  id: number
-  role: string
-  content: string
-  timestamp: number
-}
 
 interface Props {
   open: boolean
@@ -17,7 +11,7 @@ interface Props {
 }
 
 export function SideChat(props: Props) {
-  const [messages, setMessages] = createSignal<SideChatMsg[]>([])
+  const [messages, setMessages] = createSignal<NeoCodexMessageItem[]>([])
   const [input, setInput] = createSignal('')
   const [sending, setSending] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
@@ -32,7 +26,7 @@ export function SideChat(props: Props) {
   const load = async () => {
     if (!props.sessionId) return
     try {
-      const msgs = await invoke<SideChatMsg[]>('neocodex_get_side_chat', { session_id: props.sessionId })
+      const msgs = await neocodex.getSideChat(props.sessionId)
       setMessages(msgs)
       scrollToBottom()
     } catch (e) {
@@ -47,16 +41,20 @@ export function SideChat(props: Props) {
 
   onMount(load)
 
+  // 会话切换时重新加载（面板打开状态 + sessionId 变化）
+  createEffect(() => {
+    if (props.open && props.sessionId) {
+      load()
+    }
+  })
+
   const send = async () => {
     const content = input().trim()
     if (!content || sending() || !props.sessionId) return
     setSending(true)
     setError(null)
     try {
-      const msgs = await invoke<SideChatMsg[]>('neocodex_send_side_chat', {
-        session_id: props.sessionId,
-        content,
-      })
+      const msgs = await neocodex.sendSideChat(props.sessionId, content)
       setMessages(msgs)
       setInput('')
       scrollToBottom()
