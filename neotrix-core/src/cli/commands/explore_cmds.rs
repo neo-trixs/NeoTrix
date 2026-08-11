@@ -194,6 +194,314 @@ impl CliCommand for ExploreCmd {
                 }
             }
 
+            "geo" | "geosync" => {
+                let sub = args.get(1).map(|s| s.as_str()).unwrap_or("sync");
+                match sub {
+                    "cities" | "city" => {
+                        let country = args.get(2).map(|s| s.to_string());
+                        let limit = args.get(3).and_then(|s| s.parse::<usize>().ok()).unwrap_or(5000);
+                        let url = "https://cdn.jsdelivr.net/npm/cities.json@1.1.2/cities.json";
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let mut conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_cities(
+                                    &mut conn, url, country.as_deref(), limit,
+                                ) {
+                                    Ok((nodes, geo)) => CommandOutput::ok(&format!(
+                                        "🌆 城市坐标摄取: {} 节点 + {} geo_index 条 (country={}, limit={})",
+                                        nodes, geo, country.unwrap_or_else(|| "*".into()), limit
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("城市坐标摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "countries" | "country" => {
+                        let url = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_country_boundaries(&conn, url) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🗺️ 国家边界登记: {} 个国家 (world-atlas)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("国家边界登记失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "peaks" | "peak" | "mountains" => {
+                        // GeoNames allCountries dump (TSV) — 本地文件优先, 支持 file:// 前缀
+                        let default_path = format!(
+                            "{}/.neotrix/geo/allCountries.txt",
+                            std::env::var("HOME").unwrap_or_default()
+                        );
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(50000);
+                        let path = args.get(3).cloned().unwrap_or_else(|| {
+                            format!("file://{}", default_path)
+                        });
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let mut conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_peaks(
+                                    &mut conn, &path, limit,
+                                ) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "⛰️ 峰点摄取: {} 条 (GeoNames T 类, limit={})",
+                                        n, limit
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("峰点摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "rivers" | "river" => {
+                        let url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_rivers_lake_centerlines_scale_rank.geojson";
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "river") {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🏞️ 河流摄取: {} 条 (Natural Earth 10m)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("河流摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "lakes" | "lake" => {
+                        let url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_lakes.geojson";
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "lake") {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🌊 湖泊摄取: {} 条 (Natural Earth 10m)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("湖泊摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "coastline" | "coast" => {
+                        let url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_coastline.geojson";
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "coastline") {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🗺️ 海岸线摄取: {} 条 (Natural Earth 10m)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("海岸线摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "glaciers" | "ice" | "glaciated" => {
+                        let url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_glaciated_areas.geojson";
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_vectors(&conn, url, "glacier") {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🏔️ 冰川/冰原摄取: {} 条 (Natural Earth 10m)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("冰川摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "tag" | "taggeo" => {
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(50000);
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_tag_nodes(&conn, limit) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🏷️ 地理标签挂载: {} 个节点 (country keyword match, limit={})",
+                                        n, limit
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("地理标签挂载失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "tagcity" | "citytag" | "tagcities" => {
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(50000);
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_tag_cities(&conn, limit) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🏙️ 城市级地理标签挂载: {} 个节点 (city match, limit={})",
+                                        n, limit
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("城市级地理标签挂载失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "links" | "nodes" | "linked" => {
+                        let place = args.get(2).map(|s| s.as_str()).unwrap_or("");
+                        let limit = args.get(3).and_then(|s| s.parse::<usize>().ok()).unwrap_or(30);
+                        if place.is_empty() {
+                            return CommandOutput::err("用法: /explore geo links <国家或城市> [limit]");
+                        }
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_linked_nodes(&conn, place, limit) {
+                                    Ok(list) => {
+                                        if list.is_empty() {
+                                            return CommandOutput::ok(&format!(
+                                                "🔗 '{}' 暂无关联知识节点 (试试国家名: 中国/美国/日本…)",
+                                                place
+                                            ));
+                                        }
+                                        let mut lines = vec![format!("🔗 '{}' 关联知识节点 ({}):", place, list.len())];
+                                        for (id, title, ntype, lat, lng) in &list {
+                                            lines.push(format!(
+                                                "  [{}{}] {} @ ({:.2}, {:.2})",
+                                                ntype, id, title, lat, lng
+                                            ));
+                                        }
+                                        CommandOutput::ok(&lines.join("\n"))
+                                    }
+                                    Err(e) => CommandOutput::err(&format!("关联查询失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "coverage" | "missing" | "gap" => {
+                        let min = args.get(2).and_then(|s| s.parse::<i64>().ok()).unwrap_or(5);
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_coverage_report(&conn, min) {
+                                    Ok(report) => {
+                                        let mut lines = vec![format!(
+                                            "🗺️ 区域覆盖度报告 (国家知识节点密度, 阈值={}):", min
+                                        )];
+                                        for (country, cnt) in &report {
+                                            let flag = if *cnt < min { "⚠️ 缺失" } else { "✅" };
+                                            lines.push(format!("  {} {}: {} 节点", flag, country, cnt));
+                                        }
+                                        if report.is_empty() {
+                                            lines.push("  (无已挂载国家数据)".to_string());
+                                        }
+                                        CommandOutput::ok(&lines.join("\n"))
+                                    }
+                                    Err(e) => CommandOutput::err(&format!("覆盖度报告失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "elevation" | "elev" | "altitude" => {
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(1000);
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::fetch_elevations(&conn, limit) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "⛰️ 海拔摄取: {} 条 (Open-Meteo, limit={})",
+                                        n, limit
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("海拔摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "weather" | "wx" => {
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(1000);
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::fetch_weather_snapshot(&conn, limit) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🌦️ 气象快照摄取: {} 条 (Open-Meteo, limit={})",
+                                        n, limit
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("气象快照摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    _ => match try_open_kb() {
+                        Some(kb) => {
+                            let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                            match crate::neotrix::nt_shanhai_geo::geo_sync::sync_shanhai_to_geo(&conn) {
+                                Ok(n) => CommandOutput::ok(&format!(
+                                    "🌍 地理索引同步: {} 条坐标入库 (shanhai 山峰+全球映射)",
+                                    n
+                                )),
+                                Err(e) => CommandOutput::err(&format!("地理索引同步失败: {}", e)),
+                            }
+                        }
+                        None => CommandOutput::err("无法打开 KB"),
+                    },
+                }
+            }
+
             "recent" | "last" => {
                 let pipeline = try_prepare_pipeline();
                 let recent = pipeline.recent_sources(10);
@@ -216,7 +524,21 @@ impl CliCommand for ExploreCmd {
                     /explore github <url>   吸收 GitHub 仓库 + 蒸馏\n\
                     /explore alphaxiv [pages] [page_size] [category]  吸收 alphaXiv 论文 feed (category: ai-ml/q-bio/q-fin)\n\
                     /explore panorama       查看知识全景\n\
-                    /explore recent         最近吸收记录"
+                    /explore recent         最近吸收记录\n\
+                    /explore geo            同步 shanhai 坐标到地理索引\n\
+                    /explore geo cities [country] [limit]  摄取全球城市坐标\n\
+                    /explore geo countries  登记国家边界 (world-atlas)\n\
+                    /explore geo peaks [limit] [path]  摄取 GeoNames 峰点 (T 类, 默认 ~/.neotrix/geo/allCountries.txt)\n\
+                    /explore geo rivers     河流摄取 (10m, 4000+条)\n\
+                    /explore geo lakes      湖泊摄取 (10m, 1300+条)\n\
+                    /explore geo coastline  海岸线摄取 (10m, 4100+条)\n\
+                    /explore geo glaciers   冰川/冰原摄取 (10m, 1900+条)\n\
+                    /explore geo tag [limit]       国家关键词挂地理标签
+                    /explore geo tagcity [limit]   城市词典挂地理标签 (精确坐标)
+                    /explore geo coverage [阈值]    区域覆盖度报告 (识别缺失)
+                    /explore geo links <国家/城市> [limit]  反向关联知识节点
+                    /explore geo elevation [limit] 摄取海拔 (Open-Meteo)
+                    /explore geo weather [limit]   摄取气象快照 (Open-Meteo)"
                 )
             }
         }

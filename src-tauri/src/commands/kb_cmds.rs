@@ -361,3 +361,44 @@ pub fn kb_geo_layers() -> Result<Vec<GeoLayerSummary>, NeoTrixError> {
         .map_err(|e| NeoTrixError::Memory(format!("geo layers query: {}", e)))?;
     Ok(rows.filter_map(|r| r.ok()).collect())
 }
+
+/// 海拔点记录 — geo_elevation 表 + geo_index 来源分类，供前端海拔渐变着色。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeoElevationPoint {
+    pub node_id: String,
+    pub lat: f64,
+    pub lng: f64,
+    pub elevation_m: f64,
+    pub source: String,
+}
+
+/// 导出海拔记录 (geo_elevation) — 前端按高度渐变着色。
+/// 排除 geonames-cities 低价值点，返回海拔降序。
+#[command]
+pub fn kb_geo_elevations(limit: Option<usize>) -> Result<Vec<GeoElevationPoint>, NeoTrixError> {
+    let path = kb_path();
+    let conn = rusqlite::Connection::open(&path)
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
+    let limit = (limit.unwrap_or(2000) as i64).clamp(1, 20_000);
+    let mut stmt = conn
+        .prepare(
+            "SELECT e.node_id, e.lat, e.lng, e.elevation_m, g.source
+             FROM geo_elevation e
+             LEFT JOIN geo_index g ON g.node_id = e.node_id
+             ORDER BY e.elevation_m DESC
+             LIMIT ?1",
+        )
+        .map_err(|e| NeoTrixError::Memory(format!("geo elevations prep: {}", e)))?;
+    let rows = stmt
+        .query_map(params![limit], |row| {
+            Ok(GeoElevationPoint {
+                node_id: row.get(0)?,
+                lat: row.get(1)?,
+                lng: row.get(2)?,
+                elevation_m: row.get(3)?,
+                source: row.get(4).unwrap_or_default(),
+            })
+        })
+        .map_err(|e| NeoTrixError::Memory(format!("geo elevations query: {}", e)))?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}

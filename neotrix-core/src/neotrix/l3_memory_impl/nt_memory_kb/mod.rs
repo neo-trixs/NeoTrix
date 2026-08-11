@@ -21,6 +21,7 @@ pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_embed;
 pub mod nt_memory_graph;
+pub mod nt_memory_geo;
 pub mod nt_memory_hierarchical;
 pub mod nt_memory_graphrag;
 pub mod nt_memory_gwtq;
@@ -355,6 +356,11 @@ impl KnowledgeBase {
             pruned, before, after, freed
         );
         Ok((pruned, freed))
+    }
+
+    /// Acquire a locked reference to the underlying SQLite connection
+    pub fn raw_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, String> {
+        self.conn.lock().map_err(|e| format!("KB lock: {}", e))
     }
 
     /// Open a clone connection to the same DB (for sharing across subsystems)

@@ -47,3 +47,17 @@ export function geoStats(): Promise<[number, number]> {
 export function geoLayers(): Promise<GeoLayerSummary[]> {
   return call('kb_geo_layers', {})
 }
+
+/** 海拔点记录 — geo_elevation 表 + geo_index 来源，供海拔渐变着色 */
+export interface GeoElevationPoint {
+  node_id: string
+  lat: number
+  lng: number
+  elevation_m: number
+  source: string
+}
+
+/** 导出海拔记录 (geo_elevation) — 前端按高度渐变着色 */
+export function geoElevations(limit?: number): Promise<GeoElevationPoint[]> {
+  return call('kb_geo_elevations', { limit: limit ?? null })
+}
