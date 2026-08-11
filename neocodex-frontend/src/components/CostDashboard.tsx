@@ -35,6 +35,19 @@ export function CostDashboard(props: Props) {
 
   onMount(load)
 
+  // 成本看板自动刷新：面板打开期间每 5s 轮询（对标 Claude usage 实时面板）
+  createEffect(() => {
+    if (!props.open) return
+    const timer = setInterval(() => {
+      // 静默刷新：不触发全屏 loading（已有数据时）
+      neocodex
+        .agentStatus()
+        .then(setStatus)
+        .catch(() => {})
+    }, 5000)
+    return () => clearInterval(timer)
+  })
+
   const formatTokens = (n: number) => {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
     if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`

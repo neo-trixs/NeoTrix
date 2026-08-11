@@ -143,6 +143,7 @@ export function RightBar() {
   const [treeLoading, setTreeLoading] = createSignal(false)
   const [fileLoading, setFileLoading] = createSignal(false)
   const [treeError, setTreeError] = createSignal<string | null>(null)
+  const [copied, setCopied] = createSignal(false)
 
   /* 加载真实项目树（neocodex_project_tree） */
   const loadTree = async () => {
@@ -209,6 +210,8 @@ export function RightBar() {
     if (f?.content) {
       try {
         await navigator.clipboard.writeText(f.content)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
       } catch { /* ignore */ }
     }
   }
@@ -254,6 +257,18 @@ export function RightBar() {
             onClick={() => setRbTab('files')}
             role="tab"
             aria-selected={rbTab() === 'files'}
+            tabIndex={rbTab() === 'files' ? 0 : -1}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                setRbTab(rbTab() === 'files' ? 'map' : 'files')
+                // 聚焦新选中 tab（roving tabindex）
+                requestAnimationFrame(() => {
+                  const tabs = document.querySelectorAll<HTMLElement>('.rb-tabs [role="tab"]')
+                  tabs[rbTab() === 'files' ? 0 : 1]?.focus()
+                })
+              }
+            }}
           >
             <svg viewBox="0 0 14 14" class="rb-tab-ic">
               <path d="M2 1.5h10v11H2z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" />
@@ -266,6 +281,17 @@ export function RightBar() {
             onClick={() => setRbTab('map')}
             role="tab"
             aria-selected={rbTab() === 'map'}
+            tabIndex={rbTab() === 'map' ? 0 : -1}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                e.preventDefault()
+                setRbTab(rbTab() === 'files' ? 'map' : 'files')
+                requestAnimationFrame(() => {
+                  const tabs = document.querySelectorAll<HTMLElement>('.rb-tabs [role="tab"]')
+                  tabs[rbTab() === 'map' ? 1 : 0]?.focus()
+                })
+              }
+            }}
           >
             <svg viewBox="0 0 14 14" class="rb-tab-ic">
               <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.1" fill="none" />
@@ -363,19 +389,25 @@ export function RightBar() {
 
             {/* ── 操作栏 ── */}
             <div class="ap-footer">
-              <button class="ap-action" onClick={(e) => { e.stopPropagation(); copyPreview() }} title="复制">
-                <svg viewBox="0 0 12 12">
-                  <rect x="3" y="1.5" width="7.5" height="9" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
-                  <path d="M1.5 4v6.5a1 1 0 001 1H9" stroke="currentColor" stroke-width="1.1" fill="none" />
-                </svg>
-                <span>复制</span>
+              <button class="ap-action" onClick={(e) => { e.stopPropagation(); copyPreview() }} title="复制" aria-label="复制">
+                <Show when={copied()} fallback={
+                  <svg viewBox="0 0 12 12">
+                    <rect x="3" y="1.5" width="7.5" height="9" rx="1" stroke="currentColor" stroke-width="1.1" fill="none" />
+                    <path d="M1.5 4v6.5a1 1 0 001 1H9" stroke="currentColor" stroke-width="1.1" fill="none" />
+                  </svg>
+                }>
+                  <svg viewBox="0 0 12 12">
+                    <polyline points="2,6.5 4.5,9 10,3.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </Show>
+                <span>{copied() ? '已复制' : '复制'}</span>
               </button>
-              <button class="ap-action" onClick={(e) => e.stopPropagation()} title="刷新">
+              <button class="ap-action" onClick={(e) => { e.stopPropagation(); loadTree() }} title="刷新" aria-label="刷新">
                 <svg viewBox="0 0 12 12">
                   <path d="M1.5 6A4.5 4.5 0 016 1.5 4.5 4.5 0 0110.5 6" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" />
                   <polyline points="9,4.5 10.5,6 9,7.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                <span>刷新</span>
+                <span>{treeLoading() ? '刷新中…' : '刷新'}</span>
               </button>
               <button class="ap-action" onClick={(e) => { e.stopPropagation(); toggleExpand() }} title="展开">
                 <svg viewBox="0 0 12 12">

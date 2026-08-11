@@ -1,7 +1,8 @@
-import { createSignal, createEffect, For, Show } from 'solid-js'
+import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js'
 import { cowork as coworkApi } from '../api'
 import type { CoworkAction, CoworkDeliverable, CoworkSession } from '../api/types'
 import { clsx } from 'clsx'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 /* ════════════════════════════════════════════
    CoworkView — 协同会话管理（设计 v2，已接线后端）
@@ -35,6 +36,9 @@ export function CoworkView() {
   const [showNew, setShowNew] = createSignal(false)
   const [newPath, setNewPath] = createSignal('')
   const [newDesc, setNewDesc] = createSignal('')
+  // 统一确认模态：停止会话
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
+  const [pendingStopId, setPendingStopId] = createSignal<string | null>(null)
 
   const active = () => sessions().find((s) => s.id === activeId()) ?? sessions()[0]
 
@@ -99,6 +103,21 @@ export function CoworkView() {
   const controlSession = async (action: 'pause' | 'resume' | 'stop') => {
     const id = active()?.id
     if (!id) return
+    // 停止会话 = 终止任务执行，破坏性操作需确认（对标 Codex 任务终止）
+    if (action === 'stop') {
+      setPendingStopId(id)
+      setModalReq({
+        title: '停止协同会话',
+        message: '确定停止该协同会话？正在执行的任务将被终止。',
+        danger: true,
+        confirmLabel: '停止',
+      })
+      return
+    }
+    await doControl(action, id)
+  }
+
+  const doControl = async (action: 'pause' | 'resume' | 'stop', id: string) => {
     try {
       if (action === 'pause') await coworkApi.coworkPause(id)
       else if (action === 'resume') await coworkApi.coworkResume(id)
@@ -260,6 +279,22 @@ export function CoworkView() {
           </Show>
         </div>
       </div>
+
+      {/* 停止会话确认 */}
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={() => {
+          if (pendingStopId()) {
+            void doControl('stop', pendingStopId()!)
+          }
+          setPendingStopId(null)
+          setModalReq(null)
+        }}
+        onClose={() => {
+          setPendingStopId(null)
+          setModalReq(null)
+        }}
+      />
     </div>
   )
 }

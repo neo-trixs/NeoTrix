@@ -1,9 +1,10 @@
-import { createSignal, createEffect, For, Show } from 'solid-js'
+import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { clsx } from 'clsx'
 import { PluginMarketplace } from './PluginMarketplace'
 import { TrafficLights } from './TrafficLights'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 import { tagsStore, normalizeTagName, TAG_PALETTE, RECOMMENDED_TAGS, tagDepth } from '../stores/tags'
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
 import { memory, neocodex } from '../api'
@@ -158,6 +159,27 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [keyBusy, setKeyBusy] = createSignal(false)
   // 标签快速新建
   const [newTagInput, setNewTagInput] = createSignal('')
+  // 统一确认模态：破坏性操作（清空记忆 / 删除密钥 / 删除标签）
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
+  const [pendingDeleteTag, setPendingDeleteTag] = createSignal<string | null>(null)
+  const [pendingClearMem, setPendingClearMem] = createSignal(false)
+  const [pendingDeleteKey, setPendingDeleteKey] = createSignal(false)
+  const closeModal = () => {
+    setModalReq(null)
+    setPendingDeleteTag(null)
+    setPendingClearMem(false)
+    setPendingDeleteKey(false)
+  }
+  // 自动消失的通知：成功/错误提示 8s 后自动清除（对标 toast 规范）
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null
+  const showNotice = (msg: string) => {
+    showNotice(msg)
+    if (noticeTimer) clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => setNotice(null), 8000)
+  }
+  onCleanup(() => {
+    if (noticeTimer) clearTimeout(noticeTimer)
+  })
 
   // 偏好持久化：localStorage + 根元素 data-* 属性（CSS 属性选择器响应）
   const applyPrefs = (density: 'comfortable' | 'compact', motion: 'full' | 'reduced', fontSize: 'sm' | 'md' | 'lg') => {
@@ -209,7 +231,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     try {
       setConfig(await neocodex.providerConfig())
     } catch (e) {
-      setNotice(String(e))
+      showNotice(String(e))
     } finally {
       setLoading(false)
     }
@@ -255,7 +277,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
           },
           onDownloaded: () => {
             setUpdateState('downloaded')
-            setNotice('新版本已下载，重启应用即可完成安装')
+            showNotice('新版本已下载，重启应用即可完成安装')
           },
         })
       } catch (e) {
@@ -269,7 +291,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       await neocodex.downloadUpdate()
       // 下载完成后由 onDownloaded 事件驱动状态；若事件未到达，轮询确认
     } catch (e) {
-      setNotice(String(e))
+      showNotice(String(e))
       setUpdateState('error')
     }
   }
@@ -285,24 +307,36 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       })
       if (path) {
         await writeTextFile(path, json)
-        setNotice(`已导出记忆到 ${path}`)
+        showNotice(`已导出记忆到 ${path}`)
       }
     } catch (e) {
-      setNotice(String(e))
+      showNotice(String(e))
     } finally {
       setDataBusy(false)
     }
   }
 
   const clearMemory = async () => {
+    // 破坏性操作确认（对标 Claude 数据管理）
+    setPendingClearMem(true)
+    setModalReq({
+      title: '清空全部记忆',
+      message: '确定清空全部记忆？此操作不可恢复，会删除所有经验与知识条目。',
+      danger: true,
+      confirmLabel: '清空',
+    })
+  }
+
+  const doClearMemory = async () => {
+    closeModal()
     setDataBusy(true)
     setNotice(null)
     try {
       const n = await memory.memoryClear(null)
-      setNotice(`已清空 ${n} 条记忆`)
+      showNotice(`已清空 ${n} 条记忆`)
       await loadMemStats()
     } catch (e) {
-      setNotice(String(e))
+      showNotice(String(e))
     } finally {
       setDataBusy(false)
     }
@@ -324,23 +358,35 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       await memory.saveApiKey(key)
       setApiKey('')
       await loadApiKeyStatus()
-      setNotice('API 密钥已保存')
+      showNotice('API 密钥已保存')
     } catch (e) {
-      setNotice(String(e))
+      showNotice(String(e))
     } finally {
       setKeyBusy(false)
     }
   }
 
   const deleteApiKey = async () => {
+    // 破坏性操作确认
+    setPendingDeleteKey(true)
+    setModalReq({
+      title: '删除 API 密钥',
+      message: '确定删除本地保存的 ANTHROPIC_API_KEY？删除后需重新配置。',
+      danger: true,
+      confirmLabel: '删除',
+    })
+  }
+
+  const doDeleteApiKey = async () => {
+    closeModal()
     setKeyBusy(true)
     setNotice(null)
     try {
       await memory.deleteApiKey()
       await loadApiKeyStatus()
-      setNotice('API 密钥已删除')
+      showNotice('API 密钥已删除')
     } catch (e) {
-      setNotice(String(e))
+      showNotice(String(e))
     } finally {
       setKeyBusy(false)
     }
@@ -368,12 +414,12 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     setNotice(null)
     try {
       await neocodex.setProvider(name)
-      setNotice(`已切换到 ${name}`)
+      showNotice(`已切换到 ${name}`)
       await loadConfig()
       // 广播提供商变更，输入区 ProviderSelector 即时刷新
       window.dispatchEvent(new CustomEvent('neotrix:provider-changed', { detail: { name } }))
     } catch (e) {
-      setNotice(String(e))
+      showNotice(String(e))
     } finally {
       setSwitching(false)
     }
@@ -408,10 +454,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     if (!raw) return
     const name = tagsStore.registerTag(raw)
     if (name) {
-      setNotice(`已新建标签 #${name}`)
+      showNotice(`已新建标签 #${name}`)
       setNewTagInput('')
     } else {
-      setNotice('标签名无效（需非空，层级用 / 分隔）')
+      showNotice('标签名无效（需非空，层级用 / 分隔）')
     }
   }
 
@@ -419,7 +465,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
 
   const seedTags = () => {
     const n = tagsStore.seedRecommendedTags()
-    setNotice(n > 0 ? `已添加 ${n} 个推荐标签` : '推荐标签已全部就绪')
+    showNotice(n > 0 ? `已添加 ${n} 个推荐标签` : '推荐标签已全部就绪')
   }
 
   const [navRef, setNavRef] = createSignal<HTMLElement | null>(null)
@@ -918,7 +964,16 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                                 count={tagsStore.tagCounts()[name] ?? 0}
                                 onColorChange={(c) => tagsStore.setTagColor(name, c)}
                                 onRename={(next) => tagsStore.renameTag(name, next)}
-                                onDelete={() => tagsStore.deleteTag(name)}
+                                onDelete={() => {
+                                  // 删除标签全局生效，需确认（对标 Obsidian 标签管理）
+                                  setPendingDeleteTag(name)
+                                  setModalReq({
+                                    title: `删除标签 #${name}`,
+                                    message: '删除后该标签将从所有会话移除，此操作不可撤销。',
+                                    danger: true,
+                                    confirmLabel: '删除',
+                                  })
+                                }}
                               />
                             )}
                           </For>
@@ -954,7 +1009,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                                     : 'border-white/70 bg-white/55 text-text-primary hover:bg-white/85 hover:shadow-sm cursor-pointer'
                                 )}
                                 style={exists() ? undefined : { 'border-color': r.color + '55' }}
-                                onClick={() => { if (!exists()) { tagsStore.setTagColor(r.name, r.color); setNotice(`已添加推荐标签 #${r.name}`) } }}
+                                onClick={() => { if (!exists()) { tagsStore.setTagColor(r.name, r.color); showNotice(`已添加推荐标签 #${r.name}`) } }}
                                 disabled={exists()}
                                 aria-label={exists() ? `${r.name} 已添加` : `添加推荐标签 ${r.name}`}
                               >
@@ -1094,15 +1149,41 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
               </Show>
             </div>
 
-            {/* 底部通知条 */}
+            {/* 底部通知条（可手动关闭，8s 自动消失） */}
             <Show when={notice()}>
-              <div class="px-5 py-2 border-t border-border-primary/40 text-[11px] text-text-secondary flex-shrink-0">
-                {notice()}
+              <div class="flex items-center gap-2 px-5 py-2 border-t border-border-primary/40 text-[11px] text-text-secondary flex-shrink-0">
+                <span class="flex-1 min-w-0 truncate">{notice()}</span>
+                <button
+                  class="p-0.5 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors flex-shrink-0"
+                  onClick={() => setNotice(null)}
+                  aria-label="关闭提示"
+                  title="关闭提示"
+                >
+                  <XIcon />
+                </button>
               </div>
             </Show>
           </div>
         </div>
       </div>
+
+      {/* 破坏性操作确认模态 */}
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={() => {
+          if (pendingDeleteTag()) {
+            tagsStore.deleteTag(pendingDeleteTag()!)
+            closeModal()
+          } else if (pendingClearMem()) {
+            void doClearMemory()
+          } else if (pendingDeleteKey()) {
+            void doDeleteApiKey()
+          } else {
+            closeModal()
+          }
+        }}
+        onClose={closeModal}
+      />
     </Show>
   )
 }
