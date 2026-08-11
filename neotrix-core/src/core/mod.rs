@@ -164,7 +164,6 @@ pub mod nt_core_self_test_integration;
 pub mod nt_core_second_brain;
 pub mod nt_core_scoring_substrate;
 pub mod nt_core_state_substrate;
-#[cfg(feature = "research")]
 pub mod nt_core_subagent;
 pub mod nt_core_simulate_engine;
 // Formal verification proof harnesses
@@ -296,7 +295,6 @@ pub use nt_core_self::seal::{
 pub use nt_core_self::skill_crystal::{SkillCrystal, CrystalRegistry};
 pub use nt_core_self::system_identity::{SystemIdentity, CognitiveCapability, ValueConstraint};
 pub use nt_core_self::thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
-pub use nt_core_self::intra_reflection::{PreActionIntrospector, IntraReflection, IntraReflectionReport, PredictedOutcome};
 pub use nt_core_self_constitution::{
     Constitution, DevRule, ExperienceEntry, RuleCategory, ComplianceReport, ComplianceViolation,
     ConstitutionLoader, global_constitution, reload_constitution,

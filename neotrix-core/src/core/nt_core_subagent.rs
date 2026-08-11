@@ -2,12 +2,37 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+/// 计算 agent 的 E8 模式：显式 e8Mode 优先，回落域默认。
+pub fn e8_mode_for(def: &SubAgentDef) -> u8 {
+    def.e8_mode
+        .or_else(|| def.domain.as_deref().and_then(domain_default_e8_mode))
+        .unwrap_or(0) as u8
+}
+
+/// NT 域 → 默认 E8 Hexagram 模式映射。
+/// 与 E8 推理矩阵对齐：域卦位是固定常量 (NT-CORE=63, NT-WORLD=2, ...)。
+pub fn domain_default_e8_mode(domain: &str) -> Option<u32> {
+    match domain {
+        "NT-CORE" => Some(63),
+        "NT-WORLD" => Some(2),
+        "NT-ACT" => Some(31),
+        "NT-MIND" => Some(14),
+        "NT-SHIELD" => Some(37),
+        "NT-MEMORY" => Some(21),
+        "NT-IO" => Some(40),
+        "NT-SCOUT" => Some(11),
+        "NT-META" => Some(50),
+        "NT-REPAIR" => Some(55),
+        _ => None,
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // SubAgentDef — YAML frontmatter agent definition
 // Claude Code `.claude/agents/*.md` compatible format
 // ═══════════════════════════════════════════════════════════════════
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SubAgentDef {
     pub name: String,
     pub description: String,
@@ -23,11 +48,107 @@ pub struct SubAgentDef {
     pub effort: Option<String>,
     pub color: Option<String>,
     pub initial_prompt: Option<String>,
+    // ── NeoTrix 扩展字段 ──
+    /// 所属域全名 (NT-WORLD / NT-ACT / ...)。文件驱动的 NT 域 agent 必填。
+    pub domain: Option<String>,
+    /// E8 Hexagram 模式 (0-63)。NT 域 agent 映射到固定卦位。
+    pub e8_mode: Option<u32>,
+    /// 采样温度。默认 0.2。
+    pub temperature: Option<f64>,
+    /// 动态步骤兜底上限。默认 60。
+    pub steps: Option<usize>,
+    /// 工具权限矩阵 (NT-SHIELD 兼容)。缺省按域默认。
+    pub permission: Option<PermissionMatrix>,
+    /// 嵌套任务白名单 (可委托的子 agent)。
+    pub task: Option<Vec<String>>,
+    /// 触发词（逗号分隔，用于 route() 关键词路由）。
+    pub trigger: Option<String>,
     pub source_path: PathBuf,
     pub body: String,
 }
 
+/// 工具权限矩阵 — 从 frontmatter `permission:` 嵌套 map 解析。
+/// 与 NT-SHIELD ToolPermissionSet 互补：此处是文件驱动的宽松配置面，
+/// 运行时由 NT-SHIELD 做强制校验。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PermissionMatrix {
+    pub edit: Option<ToolPermission>,
+    pub write: Option<ToolPermission>,
+    pub bash: Option<ToolPermission>,
+    pub task: Option<TaskPermission>,
+    pub todowrite: Option<ToolPermission>,
+    pub webfetch: Option<ToolPermission>,
+    pub websearch: Option<ToolPermission>,
+}
+
+/// 单个工具权限 (allow/deny + 可选 pattern 白名单)。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolPermission {
+    pub allow: bool,
+    #[serde(default)]
+    pub patterns: Vec<String>,
+}
+
+/// 任务委托白名单：`"*": deny` 时默认拒绝，列出名称则允许。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskPermission {
+    pub deny: Vec<String>,
+    pub allow: Vec<String>,
+}
+
+impl Default for ToolPermission {
+    fn default() -> Self {
+        Self { allow: false, patterns: Vec::new() }
+    }
+}
+
+impl PermissionMatrix {
+    /// 工具是否允许（供运行时校验；缺省工具视为不允许）。
+    pub fn tool_allowed(&self, tool: &str) -> bool {
+        let p = match tool {
+            "edit" | "Edit" => &self.edit,
+            "write" | "Write" => &self.write,
+            "bash" | "Bash" => &self.bash,
+            "todowrite" | "TodoWrite" => &self.todowrite,
+            "webfetch" | "WebFetch" => &self.webfetch,
+            "websearch" | "WebSearch" => &self.websearch,
+            _ => return false,
+        };
+        p.as_ref().is_some_and(|t| t.allow)
+    }
+
+    /// 生成可读工具串 (供 catalog 展示)。
+    pub fn allowed_tools_string(&self) -> String {
+        let mut out = Vec::new();
+        let mut push = |name: &str, p: &Option<ToolPermission>| {
+            match p {
+                Some(t) if t.allow => out.push(name.to_string()),
+                Some(_) => {}
+                None => out.push(format!("{name}?")),
+            }
+        };
+        push("edit", &self.edit);
+        push("write", &self.write);
+        push("bash", &self.bash);
+        push("todowrite", &self.todowrite);
+        push("webfetch", &self.webfetch);
+        push("websearch", &self.websearch);
+        if out.is_empty() {
+            "read-only".into()
+        } else {
+            out.join(",")
+        }
+    }
+}
+
 impl SubAgentDef {
+    /// 该 agent 的 E8 Hexagram 模式。无显式 e8Mode 时按域默认映射。
+    pub fn e8_mode_for(&self) -> u32 {
+        self.e8_mode
+            .or_else(|| self.domain.as_deref().and_then(domain_default_e8_mode))
+            .unwrap_or(0)
+    }
+
     pub fn display_name(&self) -> &str {
         &self.name
     }
@@ -55,80 +176,83 @@ impl SubAgentDefParser {
         }
         let end = stripped[3..].find("---")?;
         let frontmatter = &stripped[3..3 + end];
-        let body = &stripped[3 + end + 3..];
+        let body = stripped[3 + end + 3..].trim().to_string();
 
-        let mut name = String::new();
-        let mut description = String::new();
-        let mut tools: Option<Vec<String>> = None;
-        let mut disallowed_tools: Option<Vec<String>> = None;
-        let mut model: Option<String> = None;
-        let mut permission_mode: Option<String> = None;
-        let mut max_turns: Option<usize> = None;
-        let mut skills: Option<Vec<String>> = None;
-        let mut memory: Option<String> = None;
-        let mut background: Option<bool> = None;
-        let mut isolation: Option<String> = None;
-        let mut effort: Option<String> = None;
-        let mut color: Option<String> = None;
-        let mut initial_prompt: Option<String> = None;
-
-        for line in frontmatter.lines() {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            if let Some(val) = line.strip_prefix("name:") {
-                name = Self::parse_scalar(val);
-            } else if let Some(val) = line.strip_prefix("description:") {
-                description = Self::parse_scalar(val);
-            } else if let Some(val) = line.strip_prefix("tools:") {
-                tools = Some(Self::parse_list(val));
-            } else if let Some(val) = line.strip_prefix("disallowedTools:") {
-                disallowed_tools = Some(Self::parse_list(val));
-            } else if let Some(val) = line.strip_prefix("model:") {
-                model = Some(Self::parse_scalar(val));
-            } else if let Some(val) = line.strip_prefix("permissionMode:") {
-                permission_mode = Some(Self::parse_scalar(val));
-            } else if let Some(val) = line.strip_prefix("maxTurns:") {
-                max_turns = Self::parse_scalar(val).parse::<usize>().ok();
-            } else if let Some(val) = line.strip_prefix("skills:") {
-                skills = Some(Self::parse_list(val));
-            } else if let Some(val) = line.strip_prefix("memory:") {
-                memory = Some(Self::parse_scalar(val));
-            } else if let Some(val) = line.strip_prefix("background:") {
-                background = Some(Self::parse_scalar(val).as_str() == "true");
-            } else if let Some(val) = line.strip_prefix("isolation:") {
-                isolation = Some(Self::parse_scalar(val));
-            } else if let Some(val) = line.strip_prefix("effort:") {
-                effort = Some(Self::parse_scalar(val));
-            } else if let Some(val) = line.strip_prefix("color:") {
-                color = Some(Self::parse_scalar(val));
-            } else if let Some(val) = line.strip_prefix("initialPrompt:") {
-                initial_prompt = Some(Self::parse_scalar(val));
-            }
+        // 序列化中间表示：Claude Code 兼容字段 + NeoTrix 扩展字段
+        #[derive(Deserialize, Default)]
+        struct RawFrontmatter {
+            name: String,
+            description: String,
+            #[serde(default)]
+            tools: Option<Vec<String>>,
+            #[serde(default, rename = "disallowedTools")]
+            disallowed_tools: Option<Vec<String>>,
+            #[serde(default)]
+            model: Option<String>,
+            #[serde(default, rename = "permissionMode")]
+            permission_mode: Option<String>,
+            #[serde(default, rename = "maxTurns")]
+            max_turns: Option<usize>,
+            #[serde(default)]
+            skills: Option<Vec<String>>,
+            #[serde(default)]
+            memory: Option<String>,
+            #[serde(default)]
+            background: Option<bool>,
+            #[serde(default)]
+            isolation: Option<String>,
+            #[serde(default)]
+            effort: Option<String>,
+            #[serde(default)]
+            color: Option<String>,
+            #[serde(default, rename = "initialPrompt")]
+            initial_prompt: Option<String>,
+            // ── NeoTrix 扩展 ──
+            #[serde(default)]
+            domain: Option<String>,
+            #[serde(default, rename = "e8Mode")]
+            e8_mode: Option<u32>,
+            #[serde(default)]
+            temperature: Option<f64>,
+            #[serde(default)]
+            steps: Option<usize>,
+            #[serde(default)]
+            permission: Option<PermissionMatrix>,
+            #[serde(default)]
+            task: Option<Vec<String>>,
+            #[serde(default)]
+            trigger: Option<String>,
         }
 
-        if name.is_empty() || description.is_empty() {
+        let raw: RawFrontmatter = serde_yaml::from_str(frontmatter).ok()?;
+        if raw.name.is_empty() || raw.description.is_empty() {
             return None;
         }
 
         Some(SubAgentDef {
-            name,
-            description,
-            tools,
-            disallowed_tools,
-            model,
-            permission_mode,
-            max_turns,
-            skills,
-            memory,
-            background,
-            isolation,
-            effort,
-            color,
-            initial_prompt,
+            name: raw.name,
+            description: raw.description,
+            tools: raw.tools,
+            disallowed_tools: raw.disallowed_tools,
+            model: raw.model,
+            permission_mode: raw.permission_mode,
+            max_turns: raw.max_turns,
+            skills: raw.skills,
+            memory: raw.memory,
+            background: raw.background,
+            isolation: raw.isolation,
+            effort: raw.effort,
+            color: raw.color,
+            initial_prompt: raw.initial_prompt,
+            domain: raw.domain,
+            e8_mode: raw.e8_mode,
+            temperature: raw.temperature,
+            steps: raw.steps,
+            permission: raw.permission,
+            task: raw.task,
+            trigger: raw.trigger,
             source_path: path.to_path_buf(),
-            body: body.trim().to_string(),
+            body,
         })
     }
 
@@ -273,6 +397,14 @@ impl SubAgentRegistry {
         self.agents.get(name)
     }
 
+    /// 列出所有 NT 域 agent（name 以 `nt-` 前缀）。
+    pub fn nt_domain_agents(&self) -> Vec<&SubAgentDef> {
+        self.agents
+            .values()
+            .filter(|a| a.name.starts_with("nt-"))
+            .collect()
+    }
+
     pub fn list_all(&self) -> Vec<&SubAgentDef> {
         let mut list: Vec<&SubAgentDef> = self.agents.values().collect();
         list.sort_by(|a, b| a.name.cmp(&b.name));
@@ -339,6 +471,19 @@ impl SubAgentRegistry {
         if let Some(ref color) = def.color {
             frontmatter.push_str(&format!("color: {}\n", color));
         }
+        // ── NeoTrix 扩展字段序列化 ──
+        if let Some(ref domain) = def.domain {
+            frontmatter.push_str(&format!("domain: {}\n", domain));
+        }
+        if let Some(e8) = def.e8_mode {
+            frontmatter.push_str(&format!("e8Mode: {}\n", e8));
+        }
+        if let Some(t) = def.temperature {
+            frontmatter.push_str(&format!("temperature: {}\n", t));
+        }
+        if let Some(s) = def.steps {
+            frontmatter.push_str(&format!("steps: {}\n", s));
+        }
         frontmatter.push_str("---\n\n");
         frontmatter.push_str(&def.body);
 
@@ -378,6 +523,11 @@ pub struct AgentDefConfig {
     pub background: bool,
     pub isolation: String,
     pub effort: String,
+    // ── NeoTrix 扩展 ──
+    pub domain: Option<String>,
+    pub e8_mode: Option<u32>,
+    pub temperature: Option<f64>,
+    pub steps: Option<usize>,
 }
 
 impl From<SubAgentDef> for AgentDefConfig {
@@ -395,6 +545,10 @@ impl From<SubAgentDef> for AgentDefConfig {
             background: def.background.unwrap_or(false),
             isolation: def.isolation.unwrap_or_default(),
             effort: def.effort.unwrap_or_else(|| "medium".to_string()),
+            domain: def.domain,
+            e8_mode: def.e8_mode,
+            temperature: def.temperature,
+            steps: def.steps,
         }
     }
 }
@@ -655,6 +809,10 @@ tools: [Bash, Read]
             background: false,
             isolation: "".into(),
             effort: "medium".into(),
+            domain: None,
+            e8_mode: None,
+            temperature: None,
+            steps: None,
         };
         assert!(!config.is_readonly());
     }
@@ -674,6 +832,10 @@ tools: [Bash, Read]
             background: false,
             isolation: "".into(),
             effort: "medium".into(),
+            domain: None,
+            e8_mode: None,
+            temperature: None,
+            steps: None,
         };
         assert!(config.is_readonly());
     }
@@ -710,6 +872,13 @@ tools: [Bash, Read]
             effort: None,
             color: Some("green".into()),
             initial_prompt: None,
+            domain: Some("NT-WORLD".into()),
+            e8_mode: Some(2),
+            temperature: Some(0.1),
+            steps: Some(30),
+            permission: None,
+            task: None,
+            trigger: None,
             source_path: Path::new("").to_path_buf(),
             body: "You are a test agent.".into(),
         };
@@ -728,7 +897,52 @@ tools: [Bash, Read]
         assert_eq!(reparsed.description, "Test roundtrip");
         assert_eq!(reparsed.tools, Some(vec!["Read".into(), "Grep".into()]));
         assert_eq!(reparsed.model, Some("sonnet".into()));
+        // NeoTrix 扩展字段 roundtrip
+        assert_eq!(reparsed.domain, Some("NT-WORLD".into()));
+        assert_eq!(reparsed.e8_mode, Some(2));
+        assert_eq!(reparsed.temperature, Some(0.1));
+        assert_eq!(reparsed.e8_mode_for(), 2);
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_domain_default_e8_mode() {
+        assert_eq!(domain_default_e8_mode("NT-CORE"), Some(63));
+        assert_eq!(domain_default_e8_mode("NT-WORLD"), Some(2));
+        assert_eq!(domain_default_e8_mode("NT-ACT"), Some(31));
+        assert_eq!(domain_default_e8_mode("NT-SHIELD"), Some(37));
+        assert_eq!(domain_default_e8_mode("UNKNOWN"), None);
+    }
+
+    #[test]
+    fn test_e8_mode_fallback_from_domain() {
+        // 无显式 e8Mode，但有 domain → 用域默认
+        let def = SubAgentDef {
+            name: "nt-act".into(),
+            description: "action".into(),
+            tools: None,
+            disallowed_tools: None,
+            model: None,
+            permission_mode: None,
+            max_turns: None,
+            skills: None,
+            memory: None,
+            background: None,
+            isolation: None,
+            effort: None,
+            color: None,
+            initial_prompt: None,
+            domain: Some("NT-ACT".into()),
+            e8_mode: None,
+            temperature: None,
+            steps: None,
+            permission: None,
+            task: None,
+            trigger: None,
+            source_path: Path::new("").to_path_buf(),
+            body: "".into(),
+        };
+        assert_eq!(def.e8_mode_for(), 31);
     }
 }

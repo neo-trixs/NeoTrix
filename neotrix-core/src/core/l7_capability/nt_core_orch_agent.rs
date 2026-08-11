@@ -413,6 +413,7 @@ pub enum AgentTier {
 }
 
 /// 内置 agent 档案 — 目录里的一条。
+/// 兼容双层语义：`name` 无 `nt-` 前缀 = 旧 5 类（静态），`nt-` 前缀 = NT 域（静态或文件驱动）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentProfile {
     pub name: &'static str,
@@ -429,13 +430,61 @@ impl AgentProfile {
     pub fn allows(&self, perm: ToolPerm) -> bool {
         self.allowed_tools.contains(&perm)
     }
+
+    pub fn is_nt_domain(&self) -> bool {
+        self.name.starts_with("nt-")
+    }
+
+    /// 域归属：`nt-world` → `NT-WORLD`；非 NT → None。
+    pub fn domain_label(&self) -> Option<String> {
+        self.is_nt_domain()
+            .then(|| self.name.trim_start_matches("nt-").to_uppercase().replace('-', "_"))
+    }
 }
 
-/// 内置 agent 目录 — 参照 Claude Code 5 种内置 agent 精简为 5 类。
+/// 运行时物化 agent 档案 — 从文件驱动 SubAgentDef 构建（String 字段，非静态）。
+/// 与 AgentProfile 同构但持有堆数据，用于 `~/.neotrix/agents/*.md` 加载的 NT 域 agent。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeAgentProfile {
+    pub name: String,
+    pub tier: AgentTier,
+    pub e8_mode: u8,
+    pub description: String,
+    pub goal: String,
+    pub capabilities: Vec<CapabilityOp>,
+    pub allowed_tools: Vec<ToolPerm>,
+    pub max_context: usize,
+    pub temperature: Option<f64>,
+    pub steps: Option<usize>,
+    pub domain: Option<String>,
+    pub trigger: Option<String>,
+    pub source_path: String,
+    pub body: String,
+}
+
+impl RuntimeAgentProfile {
+    pub fn allows(&self, perm: ToolPerm) -> bool {
+        self.allowed_tools.contains(&perm)
+    }
+
+    pub fn is_nt_domain(&self) -> bool {
+        self.name.starts_with("nt-")
+    }
+}
+
+/// 内置 agent 目录 — 旧 5 类（精简经济模型）+ 10 个 NT 域 agent（完整域模型）。
+/// NT 域 agent 与 CONTEXT.md 7 域 + 3 扩展域一一对应，route() 优先匹配 NT 域。
 pub struct AgentCatalog;
 
 impl AgentCatalog {
     pub fn builtin() -> Vec<AgentProfile> {
+        let mut profiles = Self::legacy_builtin();
+        profiles.extend(Self::nt_domain_builtin());
+        profiles
+    }
+
+    /// 旧 5 类 — 精简经济模型（Claude Code 5-agent + watcher），保留作兼容兜底。
+    fn legacy_builtin() -> Vec<AgentProfile> {
         vec![
             AgentProfile {
                 name: "explorer",
@@ -505,17 +554,172 @@ impl AgentCatalog {
         ]
     }
 
-    /// 按名称查内置 profile（目录即路由入口）。
+    /// 10 个 NT 域 agent — 与 CONTEXT.md 域模型一一对应（7 域 + NT-SCOUT/NT-META/NT-REPAIR）。
+    /// 静态内嵌作为默认档（首次加载 `~/.neotrix/agents/` 前即有）；文件驱动定义可覆盖同名档。
+    pub fn nt_domain_builtin() -> Vec<AgentProfile> {
+        vec![
+            AgentProfile {
+                name: "nt-core",
+                tier: AgentTier::Trunk,
+                e8_mode: 63,
+                description: "NT-CORE E8引导者：编排架构大脑，路由委托 + 质量门 + 架构决策",
+                goal: "识别任务类型委托给最合适的域 agent；架构决策自己做；双 Ledger 编排",
+                capabilities: vec![CapabilityOp::Reason, CapabilityOp::Plan, CapabilityOp::Execute, CapabilityOp::Communicate, CapabilityOp::Verify],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate, ToolPerm::Inspect],
+                max_context: 32768,
+            },
+            AgentProfile {
+                name: "nt-world",
+                tier: AgentTier::Leaf,
+                e8_mode: 2,
+                description: "NT-WORLD 虚空探索者：代码库语义探索与依赖图分析（只读）",
+                goal: "Glob/Grep 定位、图查询优先、Repository Map 思维，只回答不改",
+                capabilities: vec![CapabilityOp::Search, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "nt-act",
+                tier: AgentTier::Trunk,
+                e8_mode: 31,
+                description: "NT-ACT 行动执行者：多步任务执行与功能实现（可写）",
+                goal: "Spec 驱动实现、TDD 红绿重构、双验证（cargo check + test）、R-P16 持久化校验",
+                capabilities: vec![CapabilityOp::Execute, CapabilityOp::Reason, CapabilityOp::Plan, CapabilityOp::Verify],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate],
+                max_context: 32768,
+            },
+            AgentProfile {
+                name: "nt-mind",
+                tier: AgentTier::Branch,
+                e8_mode: 14,
+                description: "NT-MIND 进化工匠：TDD 实施与技能结晶（可写）",
+                goal: "红绿重构、测试金字塔、回归保护优先、技能结晶走吸收协议",
+                capabilities: vec![CapabilityOp::Plan, CapabilityOp::Verify, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "nt-shield",
+                tier: AgentTier::Branch,
+                e8_mode: 37,
+                description: "NT-SHIELD 影卫：安全审查与代码审计（只读）",
+                goal: "D1-D63 维度审查、OWASP 2026 增量、证据优先、T3 验证接线",
+                capabilities: vec![CapabilityOp::Verify, CapabilityOp::Search, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect, ToolPerm::Execute],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "nt-memory",
+                tier: AgentTier::Branch,
+                e8_mode: 21,
+                description: "NT-MEMORY 知识守护者：KB 经验吸收/检索/会话收尾",
+                goal: "experience-tree 五阶段吸收、指针守恒执行者、neotrix-experience 检索",
+                capabilities: vec![CapabilityOp::Reason, CapabilityOp::Search, CapabilityOp::Monitor],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect, ToolPerm::Execute],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "nt-io",
+                tier: AgentTier::Branch,
+                e8_mode: 40,
+                description: "NT-IO 界面使徒：前端/Tauri UI 与交互实现（可写）",
+                goal: "契约对齐、逐功能接线、vitest/playwright/build 三连、对标拉平",
+                capabilities: vec![CapabilityOp::Execute, CapabilityOp::Communicate, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Communicate],
+                max_context: 32768,
+            },
+            AgentProfile {
+                name: "nt-scout",
+                tier: AgentTier::Branch,
+                e8_mode: 11,
+                description: "NT-SCOUT 虚空探查：外部研究与文献检索（只读）",
+                goal: "多源交叉验证、一手优先、query 变体矩阵、溯源纪律，结论带 URL",
+                capabilities: vec![CapabilityOp::Research, CapabilityOp::Search, CapabilityOp::Reason],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Communicate, ToolPerm::Inspect],
+                max_context: 16384,
+            },
+            AgentProfile {
+                name: "nt-meta",
+                tier: AgentTier::Leaf,
+                e8_mode: 50,
+                description: "NT-META 元吸收者：跨会话元认知与反思（只读）",
+                goal: "实证性反思、量化信号、自欺检测、跨会话模式挖掘",
+                capabilities: vec![CapabilityOp::Monitor, CapabilityOp::Reason, CapabilityOp::Research],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Inspect],
+                max_context: 8192,
+            },
+            AgentProfile {
+                name: "nt-repair",
+                tier: AgentTier::Branch,
+                e8_mode: 55,
+                description: "NT-REPAIR 自愈工程师：问题诊断与恢复（可写）",
+                goal: "先复现再假设、二分定位、缓存头号嫌疑、regression 闭环守卫",
+                capabilities: vec![CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Reason, CapabilityOp::Monitor],
+                allowed_tools: vec![ToolPerm::Read, ToolPerm::Write, ToolPerm::Execute, ToolPerm::Inspect],
+                max_context: 32768,
+            },
+        ]
+    }
+
+    /// 按名称查内置 profile（目录即路由入口）。优先 NT 域，回落旧 5 类。
     pub fn by_name(name: &str) -> Option<AgentProfile> {
         Self::builtin().into_iter().find(|p| p.name == name)
     }
 
-    /// 成本感知路由：轻量任务（只读/探索）→ Leaf，研究型 → Branch，
-    /// 其余 → Trunk 兜底。对应 Codex 的 model gradation 意图。
+    /// 把文件驱动的 SubAgentDef 物化为 RuntimeAgentProfile（NT 域 agent 文件加载路径）。
+    /// 工具权限矩阵从 frontmatter permission 推导；无 permission 时按域默认。
+    pub fn from_subagent_def(
+        def: &crate::core::nt_core_subagent::SubAgentDef,
+    ) -> RuntimeAgentProfile {
+        use crate::core::nt_core_subagent::PermissionMatrix;
+
+        let e8_mode = crate::core::nt_core_subagent::e8_mode_for(def);
+        let (allowed_tools, tier) = runtime_tool_perms(def.permission.as_ref(), &def.name);
+        RuntimeAgentProfile {
+            name: def.name.clone(),
+            tier,
+            e8_mode,
+            description: def.description.clone(),
+            goal: format!("{}: 按域契约执行任务", def.name),
+            capabilities: runtime_capabilities(&def.name, &def.domain),
+            allowed_tools,
+            max_context: def.steps.map(|s| s * 512).unwrap_or(16384),
+            temperature: def.temperature,
+            steps: def.steps,
+            domain: def.domain.clone(),
+            trigger: def.trigger.clone(),
+            source_path: def.source_path.display().to_string(),
+            body: def.body.clone(),
+        }
+    }
+
+    /// 成本感知路由：先匹配 NT 域触发词，命中 → NT 域 profile；未命中回落旧 5 类。
     pub fn route(task_hint: &str) -> AgentProfile {
         let hint = task_hint.to_lowercase();
-        // 研究/搜索/聚合任务 → researcher（统一有序后端，非单点探索）。
-        // 必须在 explorer 之前判断: "research" 含 "search" 子串, 否则被误夺。
+
+        // NT 域优先路由 — 触发词与 .opencode/agents 定义对齐（共享语言 CONTEXT.md）
+        let nt_routes: &[(&str, &[&str])] = &[
+            ("nt-core", &["编排", "路由", "架构决策", "委托", "orchestrat", "dispatch", "architecture decision"]),
+            ("nt-world", &["探索", "定位", "梳理", "盘点", "explore code", "locate", "find file", "代码结构", "依赖图"]),
+            ("nt-act", &["实现", "修复 bug", "重构", "实施", "implement", "fix bug", "refactor", "接线", "落地"]),
+            ("nt-mind", &["tdd", "写测试", "测试驱动", "技能结晶", "test-driven", "regression test", "测试优先"]),
+            ("nt-shield", &["审查", "审计", "安全扫描", "盘点代码", "review", "audit", "security scan", "漏洞"]),
+            ("nt-memory", &["经验", "吸收", "检索", "收尾", "cycle", "知识库", "absorb", "experience", "memory"]),
+            ("nt-io", &["前端", "界面", "ui", "tauri", "对话界面", "交互", "frontend", "桌面端"]),
+            ("nt-scout", &["搜索", "调研", "对标", "文献", "查资料", "竞品", "research paper", "benchmark", "scout"]),
+            ("nt-meta", &["复盘", "反思", "元认知", "自省", "模式提炼", "进化评估", "retrospect", "meta-cognition"]),
+            ("nt-repair", &["报错", "失败", "崩溃", "诊断", "构建失败", "无法启动", "bug fix", "crash", "debug", "diagnos"]),
+        ];
+
+        for (name, triggers) in nt_routes {
+            if triggers.iter().any(|t| hint.contains(t)) {
+                if let Some(p) = Self::by_name(name) {
+                    return p;
+                }
+            }
+        }
+
+        // 回落旧 5 类（兼容既有调用方）
         if hint.contains("research") || hint.contains("研究") || hint.contains("find")
             || hint.contains("aggregate") || hint.contains("synthesize") {
             return Self::by_name("researcher").unwrap_or_else(|| Self::fallback_profile());
@@ -554,10 +758,19 @@ impl AgentCatalog {
         })
     }
 
-    /// 展示目录（供 `/agent catalog` 用）。
+    /// 展示目录（供 `/agent catalog` 用）。NT 域 agent 分组在前，旧 5 类兜底在后。
     pub fn catalog_text() -> String {
         let mut out = String::from("NeoTrix 内置 agent 目录:\n");
-        for p in Self::builtin() {
+        out.push_str("── NT 域 agent（10）──\n");
+        for p in Self::nt_domain_builtin() {
+            let perms = p.allowed_tools.iter()
+                .map(|t| format!("{:?}", t))
+                .collect::<Vec<_>>().join(",");
+            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description));
+        }
+        out.push_str("── 通用兜底（6）──\n");
+        for p in Self::legacy_builtin() {
             let perms = p.allowed_tools.iter()
                 .map(|t| format!("{:?}", t))
                 .collect::<Vec<_>>().join(",");
@@ -586,6 +799,111 @@ impl SubagentManager {
         };
         Ok(self.spawn(config))
     }
+
+    /// 从文件驱动的 RuntimeAgentProfile 物化（NT 域 agent 文件加载路径）。
+    pub fn spawn_from_runtime_profile(&mut self, profile: &RuntimeAgentProfile) -> Result<String, String> {
+        let config = SubagentConfig {
+            name: profile.name.clone(),
+            e8_mode: profile.e8_mode,
+            description: profile.description.clone(),
+            goal: profile.goal.clone(),
+            capabilities: profile.capabilities.iter()
+                .map(|c| format!("{:?}", c))
+                .collect(),
+            max_context: profile.max_context,
+            autostart: true,
+        };
+        Ok(self.spawn(config))
+    }
+}
+
+/// 从文件驱动 permission 矩阵推导 ToolPerm 集合 + tier。
+/// 无 permission 声明时按 NT 域默认（只读域 → Leaf，可写域 → Branch/Trunk）。
+fn runtime_tool_perms(perm: Option<&crate::core::nt_core_subagent::PermissionMatrix>, name: &str) -> (Vec<ToolPerm>, AgentTier) {
+    use crate::core::nt_core_subagent::PermissionMatrix;
+
+    let matrix = perm.cloned().unwrap_or_default();
+    let mut tools = vec![ToolPerm::Read, ToolPerm::Inspect];
+    let mut writable = false;
+
+    if matrix.tool_allowed("bash") {
+        tools.push(ToolPerm::Execute);
+    }
+    if matrix.tool_allowed("write") || matrix.tool_allowed("edit") {
+        tools.push(ToolPerm::Write);
+        writable = true;
+    }
+    if matrix.tool_allowed("webfetch") || matrix.tool_allowed("websearch") {
+        tools.push(ToolPerm::Communicate);
+    }
+
+    // 无显式 permission 时按域默认
+    if tools.len() <= 2 {
+        match name {
+            "nt-act" | "nt-io" | "nt-repair" | "nt-mind" => {
+                tools.push(ToolPerm::Write);
+                tools.push(ToolPerm::Execute);
+                writable = true;
+            }
+            "nt-core" => {
+                tools.push(ToolPerm::Write);
+                tools.push(ToolPerm::Execute);
+                tools.push(ToolPerm::Communicate);
+                writable = true;
+            }
+            "nt-shield" | "nt-memory" => {
+                tools.push(ToolPerm::Execute);
+            }
+            "nt-scout" => {
+                tools.push(ToolPerm::Communicate);
+            }
+            _ => {}
+        }
+    }
+
+    let tier = if writable {
+        match name {
+            "nt-act" | "nt-io" | "nt-repair" | "nt-core" => AgentTier::Trunk,
+            _ => AgentTier::Branch,
+        }
+    } else {
+        match name {
+            "nt-world" | "nt-meta" => AgentTier::Leaf,
+            _ => AgentTier::Branch,
+        }
+    };
+
+    (tools, tier)
+}
+
+/// 从 NT 域 agent 名推导能力算子集合。
+fn runtime_capabilities(name: &str, domain: &Option<String>) -> Vec<CapabilityOp> {
+    let d = domain.as_deref().unwrap_or("").to_uppercase();
+    let mut caps = vec![CapabilityOp::Reason];
+    match name {
+        "nt-world" => caps.extend([CapabilityOp::Search]),
+        "nt-act" => caps.extend([CapabilityOp::Execute, CapabilityOp::Plan, CapabilityOp::Verify]),
+        "nt-mind" => caps.extend([CapabilityOp::Plan, CapabilityOp::Verify]),
+        "nt-shield" => caps.extend([CapabilityOp::Verify, CapabilityOp::Search]),
+        "nt-memory" => caps.extend([CapabilityOp::Search, CapabilityOp::Monitor]),
+        "nt-io" => caps.extend([CapabilityOp::Execute, CapabilityOp::Communicate]),
+        "nt-scout" => caps.extend([CapabilityOp::Research, CapabilityOp::Search]),
+        "nt-meta" => caps.extend([CapabilityOp::Monitor, CapabilityOp::Research]),
+        "nt-repair" => caps.extend([CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Monitor]),
+        "nt-core" => caps.extend([CapabilityOp::Plan, CapabilityOp::Execute, CapabilityOp::Verify, CapabilityOp::Communicate]),
+        _ => {
+            if d.contains("WORLD") { caps.push(CapabilityOp::Search); }
+            else if d.contains("ACT") { caps.extend([CapabilityOp::Execute, CapabilityOp::Plan]); }
+            else if d.contains("SHIELD") { caps.extend([CapabilityOp::Verify, CapabilityOp::Search]); }
+            else if d.contains("SCOUT") { caps.extend([CapabilityOp::Research, CapabilityOp::Search]); }
+            else if d.contains("META") { caps.extend([CapabilityOp::Monitor, CapabilityOp::Research]); }
+            else if d.contains("REPAIR") { caps.extend([CapabilityOp::Execute, CapabilityOp::Verify]); }
+            else if d.contains("MIND") { caps.extend([CapabilityOp::Plan, CapabilityOp::Verify]); }
+            else if d.contains("MEMORY") { caps.extend([CapabilityOp::Search, CapabilityOp::Monitor]); }
+            else if d.contains("IO") { caps.extend([CapabilityOp::Execute, CapabilityOp::Communicate]); }
+        }
+    }
+    caps
 }
 
 #[cfg(test)]
@@ -760,7 +1078,7 @@ mod tests {
     #[test]
     fn test_catalog_has_six_profiles() {
         let profiles = AgentCatalog::builtin();
-        assert_eq!(profiles.len(), 6);
+        assert_eq!(profiles.len(), 16);
         let names: Vec<&str> = profiles.iter().map(|p| p.name).collect();
         assert!(names.contains(&"explorer"));
         assert!(names.contains(&"planner"));
@@ -768,13 +1086,43 @@ mod tests {
         assert!(names.contains(&"generalist"));
         assert!(names.contains(&"verifier"));
         assert!(names.contains(&"watcher"));
+        // NT 域 agent 全量存在
+        for nt in ["nt-core", "nt-world", "nt-act", "nt-mind", "nt-shield",
+                   "nt-memory", "nt-io", "nt-scout", "nt-meta", "nt-repair"] {
+            assert!(names.contains(&nt), "missing {}", nt);
+        }
+    }
+
+    #[test]
+    fn test_catalog_nt_domain_profiles() {
+        let nt = AgentCatalog::nt_domain_builtin();
+        assert_eq!(nt.len(), 10);
+        // NT 域 agent 的 e8_mode 唯一且非零
+        let mut modes: Vec<u8> = nt.iter().map(|p| p.e8_mode).collect();
+        modes.sort();
+        modes.dedup();
+        assert_eq!(modes.len(), 10, "e8_mode must be unique across NT domain");
+        assert!(modes.iter().all(|m| *m > 0));
+        // 只读域（world/meta/scout）不可写
+        let world = AgentCatalog::by_name("nt-world").unwrap();
+        assert!(world.allows(ToolPerm::Read));
+        assert!(!world.allows(ToolPerm::Write));
+        let meta = AgentCatalog::by_name("nt-meta").unwrap();
+        assert!(!meta.allows(ToolPerm::Write));
+        // 可写域（act/io/repair）可写可执行
+        let act = AgentCatalog::by_name("nt-act").unwrap();
+        assert!(act.allows(ToolPerm::Write));
+        assert!(act.allows(ToolPerm::Execute));
     }
 
     #[test]
     fn test_catalog_route_maps_task_to_tier() {
-        assert_eq!(AgentCatalog::route("explore codebase").name, "explorer");
+        // NT 域优先：explore codebase → nt-world（域模型取代旧 5 类）
+        assert_eq!(AgentCatalog::route("explore codebase").name, "nt-world");
+        // 旧 5 类仍可命中（无 NT 域触发词时回落）
         assert_eq!(AgentCatalog::route("设计 架构方案").name, "planner");
-        assert_eq!(AgentCatalog::route("review the diff").name, "verifier");
+        // review 类 → NT 域优先（nt-shield 审查）
+        assert_eq!(AgentCatalog::route("review the diff").name, "nt-shield");
         assert_eq!(AgentCatalog::route("监控系统健康").name, "watcher");
         // 研究/聚合任务 → researcher（统一有序搜索后端）
         assert_eq!(AgentCatalog::route("research the latest papers").name, "researcher");
@@ -797,6 +1145,55 @@ mod tests {
     }
 
     #[test]
+    fn test_catalog_route_nt_domain_priority() {
+        // NT 域触发词优先路由
+        assert_eq!(AgentCatalog::route("探索代码库结构").name, "nt-world");
+        assert_eq!(AgentCatalog::route("实现这个功能").name, "nt-act");
+        assert_eq!(AgentCatalog::route("写测试 TDD").name, "nt-mind");
+        assert_eq!(AgentCatalog::route("审查代码安全").name, "nt-shield");
+        assert_eq!(AgentCatalog::route("吸收经验到知识库").name, "nt-memory");
+        assert_eq!(AgentCatalog::route("前端 UI 界面").name, "nt-io");
+        assert_eq!(AgentCatalog::route("调研竞品对标").name, "nt-scout");
+        assert_eq!(AgentCatalog::route("复盘本次会话").name, "nt-meta");
+        assert_eq!(AgentCatalog::route("构建失败诊断").name, "nt-repair");
+        assert_eq!(AgentCatalog::route("编排委托任务").name, "nt-core");
+    }
+
+    #[test]
+    fn test_catalog_from_subagent_def() {
+        use crate::core::nt_core_subagent::{SubAgentDef, SubAgentDefParser};
+        let content = r#"---
+name: nt-world
+description: NT-WORLD 虚空探索者（只读）
+permission:
+  edit:
+    allow: false
+  write:
+    allow: false
+  bash:
+    allow: false
+    patterns: ["ls *", "git status*"]
+temperature: 0.2
+steps: 60
+domain: NT-WORLD
+trigger: 探索,定位,梳理
+---
+只读探索 agent body
+"#;
+        let def = SubAgentDefParser::parse(std::path::Path::new("nt-world.md"), content).unwrap();
+        let profile = AgentCatalog::from_subagent_def(&def);
+        assert_eq!(profile.name, "nt-world");
+        assert_eq!(profile.e8_mode, 2);
+        assert_eq!(profile.temperature, Some(0.2));
+        assert_eq!(profile.steps, Some(60));
+        assert_eq!(profile.domain.as_deref(), Some("NT-WORLD"));
+        // 只读域 → 无 Write 权限
+        assert!(!profile.allows(ToolPerm::Write));
+        assert!(profile.allows(ToolPerm::Read));
+        assert!(profile.is_nt_domain());
+    }
+
+    #[test]
     fn test_catalog_spawn_from_profile() {
         let mut mgr = SubagentManager::new();
         let id = mgr.spawn_from_profile("explorer").expect("spawn explorer");
@@ -804,5 +1201,38 @@ mod tests {
         assert_eq!(agent.config.e8_mode, 1);
         assert_eq!(agent.config.max_context, 8192);
         assert!(mgr.spawn_from_profile("nonexistent").is_err());
+    }
+
+    #[test]
+    fn test_catalog_spawn_nt_domain() {
+        let mut mgr = SubagentManager::new();
+        let id = mgr.spawn_from_profile("nt-world").expect("spawn nt-world");
+        let agent = mgr.get(&id).unwrap();
+        assert_eq!(agent.config.e8_mode, 2);
+        assert_eq!(agent.config.name, "nt-world");
+    }
+
+    #[test]
+    fn test_catalog_spawn_nt_domain_from_file() {
+        let mut mgr = SubagentManager::new();
+        // 文件驱动物化后 spawn
+        use crate::core::nt_core_subagent::{SubAgentDef, SubAgentDefParser};
+        let content = r#"---
+name: nt-scout
+description: NT-SCOUT 虚空探查（只读）
+permission:
+  edit: {allow: false}
+  write: {allow: false}
+  webfetch: {allow: true}
+  websearch: {allow: true}
+---
+外部调研 agent
+"#;
+        let def = SubAgentDefParser::parse(std::path::Path::new("nt-scout.md"), content).unwrap();
+        let profile = AgentCatalog::from_subagent_def(&def);
+        let id2 = mgr.spawn_from_runtime_profile(&profile).expect("spawn nt-scout");
+        let agent2 = mgr.get(&id2).unwrap();
+        assert_eq!(agent2.config.name, "nt-scout");
+        assert_eq!(agent2.config.e8_mode, 11);
     }
 }
