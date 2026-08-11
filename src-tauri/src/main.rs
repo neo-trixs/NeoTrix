@@ -173,6 +173,7 @@ fn main() {
                     commands::kb_feed,
                     commands::kb_geo_points,
                     commands::kb_geo_stats,
+                    commands::kb_geo_layers,
                     commands::send_notification,
                     commands::get_user_avatar,
                     commands::get_distillation_flow,

@@ -1079,6 +1079,57 @@
     gap: 4px;
   }
 
+  /* ── 右栏标签切换：文件 / 地图 ── */
+  .rb-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.05);
+    flex-shrink: 0;
+  }
+  .rb-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 5px 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #6b6b76;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+  }
+  .rb-tab:hover { color: #1a1a20; background: rgba(255, 255, 255, 0.5); }
+  .rb-tab.on {
+    background: rgba(255, 255, 255, 0.85);
+    color: #1a1a20;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  .rb-tab-ic {
+    width: 13px;
+    height: 13px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ── 地图视图容器 ── */
+  .rb-map {
+    flex: 1;
+    min-height: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .rb-map > div { height: 100%; }
+
   /* ── File Tree ── */
   .ft-item {
     display: flex;

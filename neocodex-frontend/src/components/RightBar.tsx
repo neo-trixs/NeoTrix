@@ -2,13 +2,17 @@ import { createSignal, createEffect, For, Show } from 'solid-js'
 import { neocodex, system } from '../api'
 import type { ProjectTreeItem, ProjectView } from '../api/types'
 import { clsx } from 'clsx'
+import { GlobeView } from './GlobeView'
 
 /* ════════════════════════════════════════════
    RightBar — 右栏（设计 v2，已接线后端）
+   标签切换：文件（Artifact Pane + 文件树） / 地图（shanhai 3D 地球）
    上部：Artifact Pane（预览/代码切换 + 格式 tabs + 内容）
    下部：文件树（真实项目树 ← neocodex_project_tree）
    交互：auto-hide（hover/右侧边缘展开）或 collapsed 固定
    ════════════════════════════════════════════ */
+
+type RbTab = 'files' | 'map'
 
 interface FileNode {
   name: string
@@ -128,6 +132,7 @@ export function RightBar() {
   const [collapsed, setCollapsed] = createSignal(false)
   const [autoHide, setAutoHide] = createSignal(true)
   const [rbHover, setRbHover] = createSignal(false)
+  const [rbTab, setRbTab] = createSignal<RbTab>('files')
   const [previewOpen, setPreviewOpen] = createSignal(false)
   const [currentFile, setCurrentFile] = createSignal<FileNode | null>(null)
   const [previewMode, setPreviewMode] = createSignal<PreviewMode>('rendered')
@@ -242,6 +247,44 @@ export function RightBar() {
       </button>
 
       <div class="rb-content">
+        {/* ── 标签切换：文件 / 地图 ── */}
+        <div class="rb-tabs" role="tablist" aria-label="右栏视图">
+          <button
+            class={clsx('rb-tab', rbTab() === 'files' && 'on')}
+            onClick={() => setRbTab('files')}
+            role="tab"
+            aria-selected={rbTab() === 'files'}
+          >
+            <svg viewBox="0 0 14 14" class="rb-tab-ic">
+              <path d="M2 1.5h10v11H2z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" />
+              <line x1="4.5" y1="4.5" x2="9.5" y2="4.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
+            </svg>
+            文件
+          </button>
+          <button
+            class={clsx('rb-tab', rbTab() === 'map' && 'on')}
+            onClick={() => setRbTab('map')}
+            role="tab"
+            aria-selected={rbTab() === 'map'}
+          >
+            <svg viewBox="0 0 14 14" class="rb-tab-ic">
+              <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.1" fill="none" />
+              <ellipse cx="7" cy="7" rx="2.6" ry="5.5" stroke="currentColor" stroke-width="1.1" fill="none" />
+              <line x1="1.5" y1="7" x2="12.5" y2="7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+            </svg>
+            地图
+          </button>
+        </div>
+
+        {/* ── 地图视图：shanhai 3D 地球 ── */}
+        <Show when={rbTab() === 'map'}>
+          <div class="rb-map">
+            <GlobeView limit={3000} height={420} />
+          </div>
+        </Show>
+
+        {/* ── 文件视图：Artifact Pane + File Tree ── */}
+        <Show when={rbTab() === 'files'}>
         {/* ── Artifact Pane ── */}
         <div class={clsx('ap', !previewOpen() && 'mini')} onClick={toggleExpand}>
           <div class="ap-bar">
@@ -377,6 +420,7 @@ export function RightBar() {
             <div class="ft-loading">读取文件…</div>
           </Show>
         </div>
+        </Show>
       </div>
     </aside>
   )

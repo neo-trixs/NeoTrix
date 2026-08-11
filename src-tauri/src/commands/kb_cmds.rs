@@ -251,3 +251,112 @@ pub fn kb_feed(limit: Option<usize>, offset: Option<usize>, sort: Option<String>
     .collect();
     Ok(results)
 }
+
+/// 地理索引记录 (geo_index 表) — 供前端 3D 地图渲染。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeoPoint {
+    pub node_id: String,
+    pub lat: f64,
+    pub lng: f64,
+    pub country: String,
+    pub region: String,
+    pub city: String,
+    pub tags: String,
+    pub source: String,
+    pub confidence: f64,
+}
+
+/// 导出地理索引点 (geo_index) — 前端地球知识世界仿真数据源。
+/// `source` 可选过滤：如 "shanhai" 只返回 shanhai-peaks + shanhai-mappings，
+/// 供前端把幻境数据分层叠加在真实地图上（真实层取城市点，幻境层取全部 shanhai）。
+#[command]
+pub fn kb_geo_points(limit: Option<usize>, source: Option<String>) -> Result<Vec<GeoPoint>, NeoTrixError> {
+    let path = kb_path();
+    let conn = rusqlite::Connection::open(&path)
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
+    let limit = limit.unwrap_or(5000) as i64;
+    // stmt 提升到 match 外：Rows 借用 stmt，若在分支内创建会在分支末尾 drop
+    let mut stmt = conn
+        .prepare(match source.as_deref() {
+            Some("shanhai") => {
+                "SELECT node_id, lat, lng, country, region, city, tags, source, confidence
+                 FROM geo_index WHERE source IN ('shanhai-peaks', 'shanhai-mappings')
+                 ORDER BY confidence DESC LIMIT ?1"
+            }
+            Some(_) => {
+                "SELECT node_id, lat, lng, country, region, city, tags, source, confidence
+                 FROM geo_index WHERE source = ?1 ORDER BY confidence DESC LIMIT ?2"
+            }
+            None => {
+                "SELECT node_id, lat, lng, country, region, city, tags, source, confidence
+                 FROM geo_index ORDER BY confidence DESC LIMIT ?1"
+            }
+        })
+        .map_err(|e| NeoTrixError::Memory(format!("geo points prep: {}", e)))?;
+    let rows = match source.as_deref() {
+        Some("shanhai") | None => stmt
+            .query_map(params![limit], map_geo_row)
+            .map_err(|e| NeoTrixError::Memory(format!("geo points query: {}", e)))?,
+        Some(s) => stmt
+            .query_map(params![s, limit], map_geo_row)
+            .map_err(|e| NeoTrixError::Memory(format!("geo points query: {}", e)))?,
+    };
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+fn map_geo_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GeoPoint> {
+    Ok(GeoPoint {
+        node_id: row.get(0)?,
+        lat: row.get(1)?,
+        lng: row.get(2)?,
+        country: row.get(3)?,
+        region: row.get(4)?,
+        city: row.get(5)?,
+        tags: row.get(6)?,
+        source: row.get(7)?,
+        confidence: row.get(8)?,
+    })
+}
+
+/// 地理索引统计。
+#[command]
+pub fn kb_geo_stats() -> Result<(i64, i64), NeoTrixError> {
+    let path = kb_path();
+    let conn = rusqlite::Connection::open(&path)
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
+    let total: i64 = conn
+        .query_row("SELECT COUNT(*) FROM geo_index", [], |r| r.get(0))
+        .map_err(|e| NeoTrixError::Memory(format!("geo stats: {}", e)))?;
+    let with_country: i64 = conn
+        .query_row("SELECT COUNT(*) FROM geo_index WHERE country != ''", [], |r| r.get(0))
+        .map_err(|e| NeoTrixError::Memory(format!("geo stats country: {}", e)))?;
+    Ok((total, with_country))
+}
+
+/// 地图分层摘要 — 各数据源计数。前端据此决定加载策略
+/// （幻境层全量拉取，真实层按预算采样），实现前后端分离。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeoLayerSummary {
+    pub source: String,
+    pub count: i64,
+}
+
+/// 返回 geo_index 各 source 的计数（真实层/幻境层分层摘要）。
+#[command]
+pub fn kb_geo_layers() -> Result<Vec<GeoLayerSummary>, NeoTrixError> {
+    let path = kb_path();
+    let conn = rusqlite::Connection::open(&path)
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
+    let mut stmt = conn
+        .prepare("SELECT source, COUNT(*) FROM geo_index GROUP BY source ORDER BY COUNT(*) DESC")
+        .map_err(|e| NeoTrixError::Memory(format!("geo layers prep: {}", e)))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(GeoLayerSummary {
+                source: row.get(0)?,
+                count: row.get(1)?,
+            })
+        })
+        .map_err(|e| NeoTrixError::Memory(format!("geo layers query: {}", e)))?;
+    Ok(rows.filter_map(|r| r.ok()).collect())
+}
