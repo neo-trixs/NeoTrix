@@ -30,6 +30,27 @@ This document defines the precise meaning of domain terms used across NeoTrix. E
 
 NT-META (元吸收者), NT-REPAIR (自愈工程师), NT-GOVERNANCE (架构仲裁者), NT-NEXUS (枢纽) — plus the 7 core domains above.
 
+### Skill Domain 收编 (UCN 命名统一)
+
+外部 `skills` 域技能收编进 NT-* 域，映射为域内"星辰"。单一事实源在 KB `domain_nt_*` namespace（写入函数 `unify_domain_mapping`）。映射为 1:N（一个域可有多颗星辰）。
+
+| skills 域源 | → NT-* 域 | 星辰 | KB namespace |
+|---|---|---|---|
+| `rev/officer` | NT-SHIELD | Rev-明 | `domain_nt_shield` |
+| `dev/implementer` | NT-ACT | Dev-匠 | `domain_nt_act` |
+| `des/architect` | NT-CORE | Des-观 | `domain_nt_core` |
+| `res/scholar` + `methodology/researcher` | NT-MIND | Res-深 | `domain_nt_mind` |
+| `experience-tree` | NT-MEMORY | Exp-藏 | `domain_nt_memory` |
+| `nexus/weaver` | NT-MEMORY | Nexus-梭 | `domain_nt_memory` |
+| `meta/coordinator` | NT-META | Meta-镜 | `domain_nt_meta` |
+| `sg/diagnostician` | NT-META | SG-诊 | `domain_nt_meta` |
+| `repair/healer` | NT-REPAIR | Repair-医 | `domain_nt_repair` |
+| `gov/steward` | NT-GOVERNANCE | Gov-衡 | `domain_nt_governance` |
+| `mil/officer` | NT-SCOUT | Search-觅 | `domain_nt_scout` |
+| `ed/tutor` | NT-IO | Edu-灯 | `domain_nt_io` |
+
+L3 厂商技能（36+）为只读能力分支，不进收编映射表。
+
 ## Architecture Patterns
 
 | Term | Definition | Avoid |

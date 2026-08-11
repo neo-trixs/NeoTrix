@@ -583,6 +583,69 @@ pub fn skill_upsert(conn: &Connection, name: &str, record: &SkillRecord) -> Resu
     Ok(rows > 0)
 }
 
+// ─────────────────────────────────────────────────────────────
+// ── 10b. 技能域收编映射 (UCN Phase 2)
+//     skills 域 → NT-* 域 → 星辰; namespace = domain_nt_<slug>
+//     与 ADR D2 (命名统一) 一致, 写入 KB kv_store。
+// ─────────────────────────────────────────────────────────────
+
+/// 技能域收编映射表: (skills 域源路径, NT-* 域, 星辰名)。
+/// 与 ADR"skills 域 → NT-* 域映射(收编对照)"表保持一致;
+/// L3 厂商技能(36+)为只读能力分支, 不进映射表。
+pub const DOMAIN_SKILL_MAPPING: &[(&str, &str, &str)] = &[
+    ("rev/officer", "NT-SHIELD", "Rev-明"),
+    ("dev/implementer", "NT-ACT", "Dev-匠"),
+    ("des/architect", "NT-CORE", "Des-观"),
+    ("res/scholar", "NT-MIND", "Res-深"),
+    ("methodology/researcher", "NT-MIND", "Res-深"),
+    ("experience-tree", "NT-MEMORY", "Exp-藏"),
+    ("nexus/weaver", "NT-MEMORY", "Nexus-梭"),
+    ("meta/coordinator", "NT-META", "Meta-镜"),
+    ("sg/diagnostician", "NT-META", "SG-诊"),
+    ("repair/healer", "NT-REPAIR", "Repair-医"),
+    ("gov/steward", "NT-GOVERNANCE", "Gov-衡"),
+    ("mil/officer", "NT-SCOUT", "Search-觅"),
+    ("ed/tutor", "NT-IO", "Edu-灯"),
+];
+
+/// domain_nt_<slug>: NT-SHIELD → domain_nt_shield
+pub fn domain_ns(nt_domain: &str) -> String {
+    let slug = nt_domain
+        .strip_prefix("NT-")
+        .unwrap_or(nt_domain)
+        .to_ascii_lowercase()
+        .replace('-', "_");
+    format!("domain_nt_{}", slug)
+}
+
+/// 写入全部技能域映射到 KB (UCN Phase 2)。
+/// 幂等: kv_set ON CONFLICT upsert, 重复调用不产生脏数据。
+/// 返回写入/更新的映射条目数。
+pub fn unify_domain_mapping(conn: &Connection) -> Result<usize, String> {
+    use std::collections::BTreeMap;
+    // (domain, star) → [source 路径...]; BTreeMap 保证稳定顺序
+    let mut groups: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+    for (source, nt_domain, star) in DOMAIN_SKILL_MAPPING {
+        groups
+            .entry((nt_domain.to_string(), star.to_string()))
+            .or_default()
+            .push(source.to_string());
+    }
+    let mut written = 0usize;
+    for ((nt_domain, star), sources) in &groups {
+        let ns = domain_ns(nt_domain);
+        let value = format!("[{}]", sources.iter().map(|s| format!("\"{}\"", s)).collect::<Vec<_>>().join(", "));
+        kv_set(conn, &ns, star, &value)?;
+        written += 1;
+    }
+    Ok(written)
+}
+
+/// 读取某 NT-* 域下的星辰映射: Vec<(星名, 源技能 JSON 数组)>。
+pub fn domain_skills(conn: &Connection, nt_domain: &str) -> Result<Vec<(String, String)>, String> {
+    kv_list(conn, &domain_ns(nt_domain))
+}
+
 pub fn skill_search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SkillRecord>, String> {
     let pattern = format!("%{}%", query);
     let mut stmt = conn
@@ -734,6 +797,7 @@ pub struct MigrationReport {
     pub cookies_migrated: usize,
     pub assets_migrated: usize,
     pub skills_indexed: usize,
+    pub domain_mapping_written: usize,
     pub rkyv_blobs_migrated: usize,
     pub errors: Vec<(String, String)>,
 }
@@ -741,10 +805,10 @@ pub struct MigrationReport {
 impl MigrationReport {
     pub fn summary(&self) -> String {
         format!(
-            "Migration complete:\n  Files migrated: {}\n  KV entries: {}\n  Config entries: {}\n  Secrets: {}\n  Session logs: {}\n  Cookies: {}\n  Assets: {}\n  Skills indexed: {}\n  Rkyv blobs: {}\n  Errors: {}",
+            "Migration complete:\n  Files migrated: {}\n  KV entries: {}\n  Config entries: {}\n  Secrets: {}\n  Session logs: {}\n  Cookies: {}\n  Assets: {}\n  Skills indexed: {}\n  Domain mapping: {}\n  Rkyv blobs: {}\n  Errors: {}",
             self.total_files_migrated, self.kv_entries_created, self.config_entries_created,
             self.secrets_migrated, self.session_logs_migrated, self.cookies_migrated,
-            self.assets_migrated, self.skills_indexed, self.rkyv_blobs_migrated, self.errors.len()
+            self.assets_migrated, self.skills_indexed, self.domain_mapping_written, self.rkyv_blobs_migrated, self.errors.len()
         )
     }
 }
@@ -1050,6 +1114,12 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
     // ── 11. Rkyv blobs ── stay as files (zero-copy requires mmap).
     // ── 12. journal_index.db ── already tracked via kv_store section above.
 
+    // ── 13. 技能域收编映射 (UCN Phase 2) ──
+    match unify_domain_mapping(conn) {
+        Ok(n) => report.domain_mapping_written = n,
+        Err(e) => report.errors.push(("domain_mapping".into(), e)),
+    }
+
     report
 }
 
@@ -1327,6 +1397,57 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "test-skill");
         assert_eq!(results[0].content_hash.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn test_domain_mapping_write_read_idempotent() {
+        let conn = test_conn();
+        // 写入: 映射表 13 条 → 去重后 12 个 (star, domain) 组 (Res-深 双源合并)
+        let written = unify_domain_mapping(&conn).unwrap();
+        assert_eq!(written, 12, "13 源映射去重为 12 个 (domain,star) 组");
+
+        // 读取: NT-SHIELD → Rev-明 指向 rev/officer
+        let shield = domain_skills(&conn, "NT-SHIELD").unwrap();
+        assert_eq!(shield.len(), 1);
+        assert_eq!(shield[0].0, "Rev-明");
+        assert!(shield[0].1.contains("rev/officer"));
+
+        // NT-MIND → Res-深 双源合并
+        let mind = domain_skills(&conn, "NT-MIND").unwrap();
+        assert_eq!(mind.len(), 1);
+        assert_eq!(mind[0].0, "Res-深");
+        assert!(mind[0].1.contains("res/scholar"));
+        assert!(mind[0].1.contains("methodology/researcher"));
+
+        // 幂等: 重复写入不产生脏数据
+        let again = unify_domain_mapping(&conn).unwrap();
+        assert_eq!(again, 12);
+        assert_eq!(domain_skills(&conn, "NT-SHIELD").unwrap().len(), 1);
+        assert_eq!(domain_skills(&conn, "NT-MEMORY").unwrap().len(), 2, "Exp-藏 + Nexus-梭");
+
+        // namespace 命名契约: domain_nt_<slug>
+        assert_eq!(domain_ns("NT-SHIELD"), "domain_nt_shield");
+        assert_eq!(domain_ns("NT-GOVERNANCE"), "domain_nt_governance");
+    }
+
+    #[test]
+    fn test_domain_mapping_full_manifest() {
+        // 契约: ADR 收编对照表全部 13 个源技能必须在映射表中
+        let conn = test_conn();
+        unify_domain_mapping(&conn).unwrap();
+        let mut total = 0usize;
+        for (_, _, _) in DOMAIN_SKILL_MAPPING {
+            total += 1;
+        }
+        assert_eq!(total, 13, "ADR 对照表 13 条源映射");
+        // 11 个域 namespace 全部可读 (11 组, 覆盖 10 个 NT-* 域 + 双星 NT-MEMORY)
+        let mut ns_count = 0;
+        for ns in kv_list_namespaces(&conn).unwrap() {
+            if ns.starts_with("domain_nt_") {
+                ns_count += 1;
+            }
+        }
+        assert_eq!(ns_count, 10, "10 个 NT-* 域各有 1 个 domain_nt_* namespace");
     }
 
     fn dedup_record(hash: &str) -> SkillRecord {
