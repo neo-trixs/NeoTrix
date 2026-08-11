@@ -52,6 +52,10 @@ export function coworkStop(sessionId: string): Promise<CoworkSession> {
   return call('cowork_stop', { sessionId })
 }
 
+export function coworkDelete(sessionId: string): Promise<void> {
+  return call('cowork_delete', { sessionId })
+}
+
 export function coworkReadFile(sessionId: string, path: string): Promise<string> {
   return call('cowork_read_file', { sessionId, path })
 }

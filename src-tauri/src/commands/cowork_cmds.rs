@@ -385,6 +385,18 @@ pub fn cowork_stop(session_id: String) -> Result<CoworkSession, String> {
 }
 
 #[command]
+pub fn cowork_delete(session_id: String) -> Result<(), String> {
+    let mut state = COWORK.lock().map_err(|e| e.to_string())?;
+    if state.sessions.remove(&session_id).is_none() {
+        return Err(format!("Session not found: {}", session_id));
+    }
+    // 级联清理该会话的行动记录与交付物索引
+    state.actions.remove(&session_id);
+    state.deliverables.remove(&session_id);
+    Ok(())
+}
+
+#[command]
 pub fn cowork_scan_files(session_id: String, pattern: Option<String>) -> Result<Vec<CoworkFile>, String> {
     let session = find_session(&session_id)?;
     let mut files = Vec::new();
@@ -794,6 +806,19 @@ mod tests {
         let _ = cowork_start("/tmp".into(), "list test".into(), None, None).unwrap();
         let sessions = cowork_list().unwrap();
         assert!(!sessions.is_empty());
+    }
+
+    #[test]
+    fn test_cowork_delete() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        reset_state();
+        let id = cowork_start("/tmp".into(), "delete test".into(), None, None).unwrap();
+        cowork_delete(id.clone()).unwrap();
+        // 删除后不可再获取，列表为空
+        assert!(cowork_get(id.clone()).is_err());
+        assert!(cowork_list().unwrap().is_empty());
+        // 重复删除报错（幂等保护）
+        assert!(cowork_delete(id.clone()).is_err());
     }
 
     #[test]

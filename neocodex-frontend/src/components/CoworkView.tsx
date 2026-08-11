@@ -36,9 +36,10 @@ export function CoworkView() {
   const [showNew, setShowNew] = createSignal(false)
   const [newPath, setNewPath] = createSignal('')
   const [newDesc, setNewDesc] = createSignal('')
-  // 统一确认模态：停止会话
+  // 统一确认模态：停止/删除会话
   const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
   const [pendingStopId, setPendingStopId] = createSignal<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = createSignal<string | null>(null)
 
   const active = () => sessions().find((s) => s.id === activeId()) ?? sessions()[0]
 
@@ -128,12 +129,46 @@ export function CoworkView() {
     }
   }
 
+  const deleteSession = (id: string) => {
+    setPendingDeleteId(id)
+    setModalReq({
+      title: '删除协同会话',
+      message: '确定删除该协同会话？其行动记录与交付物索引将一并移除，此操作不可恢复。',
+      danger: true,
+      confirmLabel: '删除',
+    })
+  }
+
+  const doDelete = async (id: string) => {
+    try {
+      await coworkApi.coworkDelete(id)
+      // 删除的是当前会话时，选中剩余第一个（或清空）
+      if (active()?.id === id) {
+        const remaining = sessions().filter((s) => s.id !== id)
+        setActiveId(remaining.length > 0 ? remaining[0].id : null)
+      }
+      await loadSessions()
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
   const refresh = async () => {
     setError(null)
     await loadSessions()
     const id = active()?.id
     if (id) await loadDetail(id)
   }
+
+  // 会话/任务状态自动刷新：视图挂载期间每 10s 轮询（对标 Codex 任务实时状态）
+  createEffect(() => {
+    const timer = setInterval(() => {
+      void loadSessions()
+      const id = active()?.id
+      if (id) void loadDetail(id)
+    }, 10000)
+    return () => clearInterval(timer)
+  })
 
   return (
     <div class="vw-cowork">
@@ -226,6 +261,11 @@ export function CoworkView() {
                     <Show when={s().status !== 'stopped' && s().status !== 'completed'}>
                       <button class="cw-ctl" onClick={() => controlSession('stop')} title="停止" aria-label="停止">⏹</button>
                     </Show>
+                    <button class="cw-ctl cw-del" onClick={() => deleteSession(s().id)} title="删除会话" aria-label="删除会话">
+                      <svg viewBox="0 0 14 14" width="13" height="13">
+                        <path d="M2.5 3.5h9M5.5 1.5h3M4 3.5l.5 9h5l.5-9M5.8 6v4M8.2 6v4" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
@@ -280,18 +320,22 @@ export function CoworkView() {
         </div>
       </div>
 
-      {/* 停止会话确认 */}
+      {/* 停止/删除会话确认 */}
       <ConfirmModal
         req={modalReq()}
         onConfirm={() => {
           if (pendingStopId()) {
             void doControl('stop', pendingStopId()!)
+          } else if (pendingDeleteId()) {
+            void doDelete(pendingDeleteId()!)
           }
           setPendingStopId(null)
+          setPendingDeleteId(null)
           setModalReq(null)
         }}
         onClose={() => {
           setPendingStopId(null)
+          setPendingDeleteId(null)
           setModalReq(null)
         }}
       />
