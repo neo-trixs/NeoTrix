@@ -697,7 +697,7 @@ impl AgentCatalog {
     pub fn route(task_hint: &str) -> AgentProfile {
         let hint = task_hint.to_lowercase();
 
-        // NT 域优先路由 — 触发词与 .opencode/agents 定义对齐（共享语言 CONTEXT.md）
+        // NT 域优先路由 — 触发词与 ~/.neotrix/agents 文件定义对齐（共享语言 CONTEXT.md）
         let nt_routes: &[(&str, &[&str])] = &[
             ("nt-core", &["编排", "路由", "架构决策", "委托", "orchestrat", "dispatch", "architecture decision"]),
             ("nt-world", &["探索", "定位", "梳理", "盘点", "explore code", "locate", "find file", "代码结构", "依赖图"]),
