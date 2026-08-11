@@ -865,7 +865,11 @@ tools: [Bash, Read]
 
     #[test]
     fn test_create_agent_file_roundtrip() {
-        let reg = SubAgentRegistry::new();
+        // 显式注册 temp 项目目录，确保 create_agent_file 写入可控位置而非 cwd 相对路径
+        let tmp_root = std::env::temp_dir().join("neotrix-test-roundtrip");
+        let mut reg = SubAgentRegistry::new();
+        reg.add_project_dir(tmp_root.clone());
+
         let def = SubAgentDef {
             name: "roundtrip-test".into(),
             description: "Test roundtrip".into(),
@@ -892,13 +896,15 @@ tools: [Bash, Read]
             body: "You are a test agent.".into(),
         };
 
-        let dir = std::env::temp_dir().join("neotrix-test-roundtrip").join(".neotrix").join("agents");
+        let dir = tmp_root.join(".neotrix").join("agents");
         let _ = std::fs::create_dir_all(&dir);
         let written = reg.create_agent_file("roundtrip-test", &def);
         assert!(written.is_ok());
 
         let file_path = written.unwrap();
         assert!(file_path.exists());
+        // 必须写入注册的 temp 项目目录，绝不落到仓库 cwd 相对路径
+        assert!(file_path.starts_with(&tmp_root), "agent file must be under temp project dir");
 
         let content = std::fs::read_to_string(&file_path).unwrap();
         let reparsed = SubAgentDefParser::parse(&file_path, &content).unwrap();
