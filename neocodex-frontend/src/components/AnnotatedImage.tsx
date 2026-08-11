@@ -1,6 +1,7 @@
 import { createSignal, onMount, onCleanup, Show, For } from 'solid-js'
 import { Square, Move, Eraser, Check, X, MousePointer2 } from 'lucide-solid'
 import { clsx } from 'clsx'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 export interface Annotation {
   id: number
@@ -31,6 +32,8 @@ export function AnnotatedImage(props: Props) {
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement | null>(null)
   const [imgEl, setImgEl] = createSignal<HTMLImageElement | null>(null)
   const [tool, setTool] = createSignal<'box' | 'arrow'>('box')
+  // 统一确认模态（替换原生 confirm）
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
   const [annotations, setAnnotations] = createSignal<Annotation[]>([])
   const [drawing, setDrawing] = createSignal<{ startX: number; startY: number; curX: number; curY: number } | null>(null)
 
@@ -296,7 +299,18 @@ export function AnnotatedImage(props: Props) {
         </button>
         <button
           class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:bg-bg-tertiary transition-colors"
-          onClick={() => { if (annotations().length > 0 && !window.confirm('确定清除所有标注？')) return; setAnnotations([]) }}
+          onClick={() => {
+            if (annotations().length > 0) {
+              setModalReq({
+                title: '清除标注',
+                message: '确定清除所有标注？',
+                danger: true,
+                confirmLabel: '清除',
+              })
+              return
+            }
+            setAnnotations([])
+          }}
           title="清除所有标注"
         >
           <Eraser class="w-3.5 h-3.5" /> 清除
@@ -347,6 +361,15 @@ export function AnnotatedImage(props: Props) {
           </For>
         </div>
       </Show>
+
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={() => {
+          setAnnotations([])
+          setModalReq(null)
+        }}
+        onClose={() => setModalReq(null)}
+      />
     </div>
   )
 }

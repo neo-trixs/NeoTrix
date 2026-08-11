@@ -3,6 +3,7 @@ import { Puzzle, X, RefreshCw, Loader2, Download, Trash2, Power, PowerOff, ListT
 import { plugins as pluginsApi } from '../api'
 import type { PluginEvent, PluginStatus } from '../api/types'
 import { clsx } from 'clsx'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 interface Props {
   open: boolean
@@ -17,6 +18,9 @@ export function PluginMarketplace(props: Props) {
   const [loading, setLoading] = createSignal(false)
   const [busy, setBusy] = createSignal<string | null>(null)
   const [error, setError] = createSignal<string | null>(null)
+  // 统一确认模态（替换原生 confirm）
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
+  const [pendingUninstallId, setPendingUninstallId] = createSignal<string | null>(null)
   let firstBtnRef: HTMLButtonElement | undefined
 
   // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
@@ -61,8 +65,19 @@ export function PluginMarketplace(props: Props) {
   }
 
   const uninstall = async (id: string) => {
-    // 破坏性操作确认（对标 Codex）
-    if (!window.confirm('确定卸载该插件？')) return
+    // 破坏性操作确认（对标 Codex）— 统一模态
+    setPendingUninstallId(id)
+    setModalReq({
+      title: '卸载插件',
+      message: '确定卸载该插件？',
+      danger: true,
+      confirmLabel: '卸载',
+    })
+  }
+
+  const doUninstall = async (id: string) => {
+    setPendingUninstallId(null)
+    setModalReq(null)
     setBusy(`uninstall:${id}`)
     setError(null)
     try {
@@ -232,6 +247,15 @@ export function PluginMarketplace(props: Props) {
           </Show>
         </div>
       </div>
+
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={() => pendingUninstallId() && doUninstall(pendingUninstallId()!)}
+        onClose={() => {
+          setPendingUninstallId(null)
+          setModalReq(null)
+        }}
+      />
     </Show>
   )
 }

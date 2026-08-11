@@ -6,6 +6,7 @@ import { clsx } from 'clsx'
 import { NeoPlus, NeoMessage, NeoSearch, NeoChevronRight, NeoTrash, NeoPencil, NeoClose } from './neo-icons'
 import { NeoTag } from './NeoTag'
 import { TagBar } from './TagBar'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 interface SidebarProps {
   collapsed?: boolean
@@ -112,17 +113,22 @@ export function Sidebar(props: SidebarProps) {
 
   const handleDeleteSession = (e: Event, id: string) => {
     e.stopPropagation()
-    // 破坏性操作确认（对标 Codex）
-    if (!window.confirm('确定删除该会话？此操作不可撤销。')) return
-    chatStore.deleteSession(id)
+    // 破坏性操作确认（对标 Codex）— 统一模态
+    setPendingDeleteId(id)
+    setModalReq({ title: '删除会话', message: '确定删除该会话？此操作不可撤销。', danger: true, confirmLabel: '删除' })
   }
 
   const handleRenameSession = (e: Event, id: string) => {
     e.stopPropagation()
-    const newTitle = prompt('重命名会话:')
-    if (newTitle?.trim()) {
-      chatStore.updateSessionTitle(id, newTitle.trim())
-    }
+    // 统一输入模态（替换原生 prompt）
+    const current = chatStore.state.sessions.find((s) => s.id === id)?.title ?? ''
+    setPendingRenameId(id)
+    setModalReq({
+      title: '重命名会话',
+      inputLabel: '会话名称',
+      initialValue: current,
+      confirmLabel: '保存',
+    })
   }
 
   const formatRelativeTime = (date: Date) => {
@@ -141,6 +147,16 @@ export function Sidebar(props: SidebarProps) {
   /* ── 打标交互（对标 Obsidian 标签输入） ── */
   const [taggingSessionId, setTaggingSessionId] = createSignal<string | null>(null)
   const [tagInput, setTagInput] = createSignal('')
+
+  // 统一确认/输入模态（替换原生 confirm/prompt）
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = createSignal<string | null>(null)
+  const [pendingRenameId, setPendingRenameId] = createSignal<string | null>(null)
+  const closeModal = () => {
+    setModalReq(null)
+    setPendingDeleteId(null)
+    setPendingRenameId(null)
+  }
   let tagInputRef: HTMLInputElement | undefined
 
   const handleOpenTagging = (e: Event, id: string) => {
@@ -530,6 +546,19 @@ export function Sidebar(props: SidebarProps) {
           <div class="sa">N</div>
         </button>
       )}
+
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={(val) => {
+          if (pendingDeleteId()) {
+            chatStore.deleteSession(pendingDeleteId()!)
+          } else if (pendingRenameId() && val?.trim()) {
+            chatStore.updateSessionTitle(pendingRenameId()!, val.trim())
+          }
+          closeModal()
+        }}
+        onClose={closeModal}
+      />
     </aside>
   )
 }

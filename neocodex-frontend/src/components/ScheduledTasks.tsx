@@ -3,6 +3,7 @@ import { CalendarClock, X, RefreshCw, Loader2, Play, Plus, Trash2, Pause, Circle
 import { tasks as tasksApi } from '../api'
 import type { BackgroundTask } from '../api/types'
 import { clsx } from 'clsx'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 // 预置调度模板（RRULE 风格速选）
 const SCHEDULE_PRESETS: { label: string; value: string }[] = [
@@ -22,6 +23,9 @@ export function ScheduledTasks(props: Props) {
   const [loading, setLoading] = createSignal(false)
   const [busy, setBusy] = createSignal<string | null>(null)
   const [error, setError] = createSignal<string | null>(null)
+  // 统一确认模态（替换原生 confirm）
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = createSignal<string | null>(null)
   const [showCreate, setShowCreate] = createSignal(false)
   const [name, setName] = createSignal('')
   const [prompt, setPrompt] = createSignal('')
@@ -69,8 +73,17 @@ export function ScheduledTasks(props: Props) {
   }
 
   const action = async (kind: 'pause' | 'resume' | 'delete' | 'run', id: string) => {
-    // 破坏性操作确认（对标 Codex）
-    if (kind === 'delete' && !window.confirm('确定删除该定时任务？')) return
+    // 破坏性操作确认（对标 Codex）— 统一模态
+    if (kind === 'delete') {
+      setPendingDeleteId(id)
+      setModalReq({
+        title: '删除定时任务',
+        message: '确定删除该定时任务？',
+        danger: true,
+        confirmLabel: '删除',
+      })
+      return
+    }
     setBusy(`${kind}:${id}`)
     setError(null)
     try {
@@ -84,6 +97,12 @@ export function ScheduledTasks(props: Props) {
     } finally {
       setBusy(null)
     }
+  }
+
+  const doDelete = async (id: string) => {
+    setPendingDeleteId(null)
+    setModalReq(null)
+    await action('delete', id)
   }
 
   const formatTime = (ts: number | null) => {
@@ -289,10 +308,19 @@ export function ScheduledTasks(props: Props) {
                   </div>
                 </div>
               )}
-            </For>
+              </For>
+            </div>
           </div>
         </div>
-      </div>
+
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={() => pendingDeleteId() && doDelete(pendingDeleteId()!)}
+        onClose={() => {
+          setPendingDeleteId(null)
+          setModalReq(null)
+        }}
+      />
     </Show>
   )
 }

@@ -3,6 +3,7 @@ import { GitBranch, FileCode2, Check, X, Loader2, RefreshCw, ChevronDown, Chevro
 import { neocodex } from '../api'
 import type { GitStatus } from '../api/types'
 import { clsx } from 'clsx'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 interface DiffLine {
   t: 'add' | 'del' | 'ctx'
@@ -36,6 +37,9 @@ export function GitPanel(props: Props) {
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
   const [busy, setBusy] = createSignal<string | null>(null)
   const [error, setError] = createSignal<string | null>(null)
+  // 统一确认模态（替换原生 confirm）
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
+  const [pendingRejectPath, setPendingRejectPath] = createSignal<string | null>(null)
   let firstBtnRef: HTMLButtonElement | undefined
 
   // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
@@ -73,9 +77,7 @@ export function GitPanel(props: Props) {
     })
   }
 
-  const apply = async (path: string, action: 'accept' | 'reject') => {
-    // 拒绝 = git restore 丢弃变更，破坏性操作需确认（对标 Codex）
-    if (action === 'reject' && !window.confirm(`确定丢弃 ${path} 的变更？此操作不可撤销。`)) return
+  const doApply = async (path: string, action: 'accept' | 'reject') => {
     setBusy(`${path}:${action}`)
     setError(null)
     try {
@@ -86,6 +88,21 @@ export function GitPanel(props: Props) {
     } finally {
       setBusy(null)
     }
+  }
+
+  const apply = async (path: string, action: 'accept' | 'reject') => {
+    // 拒绝 = git restore 丢弃变更，破坏性操作需确认（对标 Codex）
+    if (action === 'reject') {
+      setPendingRejectPath(path)
+      setModalReq({
+        title: '丢弃变更',
+        message: `确定丢弃 ${path} 的变更？此操作不可撤销。`,
+        danger: true,
+        confirmLabel: '丢弃',
+      })
+      return
+    }
+    await doApply(path, action)
   }
 
   const renderLine = (line: DiffLine) => {
@@ -228,6 +245,21 @@ export function GitPanel(props: Props) {
           </Show>
         </div>
       </div>
+
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={() => {
+          if (pendingRejectPath()) {
+            void doApply(pendingRejectPath()!, 'reject')
+          }
+          setPendingRejectPath(null)
+          setModalReq(null)
+        }}
+        onClose={() => {
+          setPendingRejectPath(null)
+          setModalReq(null)
+        }}
+      />
     </Show>
   )
 }

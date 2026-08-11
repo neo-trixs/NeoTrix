@@ -3,6 +3,7 @@ import { History, RotateCcw, Loader2, X, Clock, RefreshCw } from 'lucide-solid'
 import { neocodex } from '../api'
 import type { Checkpoint } from '../api/types'
 import { clsx } from 'clsx'
+import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
 interface Props {
   open: boolean
@@ -27,6 +28,9 @@ export function CheckpointTimeline(props: Props) {
   const [loading, setLoading] = createSignal(false)
   const [restoring, setRestoring] = createSignal<string | null>(null)
   const [error, setError] = createSignal<string | null>(null)
+  // 统一确认模态（替换原生 confirm）
+  const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
+  const [pendingCp, setPendingCp] = createSignal<Checkpoint | null>(null)
   let firstBtnRef: HTMLButtonElement | undefined
 
   // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
@@ -59,11 +63,22 @@ export function CheckpointTimeline(props: Props) {
 
   const restore = async (cp: Checkpoint) => {
     if (!props.sessionId) return
-    if (!window.confirm(`恢复到 ${formatTs(cp.created_at)} 的快照（${cp.message_count} 条消息）？`)) return
+    setPendingCp(cp)
+    setModalReq({
+      title: '恢复快照',
+      message: `恢复到 ${formatTs(cp.created_at)} 的快照（${cp.message_count} 条消息）？`,
+      danger: true,
+      confirmLabel: '恢复',
+    })
+  }
+
+  const doRestore = async (cp: Checkpoint) => {
+    setPendingCp(null)
+    setModalReq(null)
     setRestoring(cp.id)
     setError(null)
     try {
-      await neocodex.checkpointRestore(props.sessionId, cp.id)
+      await neocodex.checkpointRestore(props.sessionId!, cp.id)
       props.onRestored?.()
       await load()
     } catch (e) {
@@ -165,6 +180,15 @@ export function CheckpointTimeline(props: Props) {
           </Show>
         </div>
       </div>
+
+      <ConfirmModal
+        req={modalReq()}
+        onConfirm={() => pendingCp() && doRestore(pendingCp()!)}
+        onClose={() => {
+          setPendingCp(null)
+          setModalReq(null)
+        }}
+      />
     </Show>
   )
 }
