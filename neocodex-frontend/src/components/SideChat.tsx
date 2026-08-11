@@ -3,6 +3,7 @@ import { MessageSquare, X, Send, Loader2, RefreshCw } from 'lucide-solid'
 import { neocodex } from '../api'
 import type { NeoCodexMessageItem } from '../api/types'
 import { clsx } from 'clsx'
+import { Markdown } from './Markdown'
 
 interface Props {
   open: boolean
