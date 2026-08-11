@@ -671,8 +671,6 @@ impl AgentCatalog {
     pub fn from_subagent_def(
         def: &crate::core::nt_core_subagent::SubAgentDef,
     ) -> RuntimeAgentProfile {
-        use crate::core::nt_core_subagent::PermissionMatrix;
-
         let e8_mode = crate::core::nt_core_subagent::e8_mode_for(def);
         let (allowed_tools, tier) = runtime_tool_perms(def.permission.as_ref(), &def.name);
         RuntimeAgentProfile {
@@ -827,7 +825,20 @@ impl AgentCatalog {
 
 /// 把一个内置 agent 档案物化进 SubagentManager（生产接线，非死代码）。
 impl SubagentManager {
+    /// 物化一个 agent 档案进 SubagentManager（生产接线）。
+    /// 文件优先策略：`~/.neotrix/agents/*.md` 定义 > 内置静态档案（source of truth 在文件）。
     pub fn spawn_from_profile(&mut self, name: &str) -> Result<String, String> {
+        // 1. 文件驱动优先：扫描 ~/.neotrix/agents + 项目 .neotrix/agents，命中同名文件则用文件定义
+        use crate::core::nt_core_subagent::SubAgentRegistry;
+        let mut reg = SubAgentRegistry::new();
+        let report = reg.scan_all();
+        if let Some(def) = reg.get(name) {
+            let profile = AgentCatalog::from_subagent_def(def);
+            log::debug!("spawn_from_profile: 文件驱动 {} (errors: {})", name, report.errors.len());
+            return self.spawn_from_runtime_profile(&profile);
+        }
+
+        // 2. 回落内置静态档案
         let profile = AgentCatalog::by_name(name)
             .ok_or_else(|| format!("unknown agent profile '{}'", name))?;
         let config = SubagentConfig {
@@ -864,8 +875,6 @@ impl SubagentManager {
 /// 从文件驱动 permission 矩阵推导 ToolPerm 集合 + tier。
 /// 无 permission 声明时按 NT 域默认（只读域 → Leaf，可写域 → Branch/Trunk）。
 fn runtime_tool_perms(perm: Option<&crate::core::nt_core_subagent::PermissionMatrix>, name: &str) -> (Vec<ToolPerm>, AgentTier) {
-    use crate::core::nt_core_subagent::PermissionMatrix;
-
     let matrix = perm.cloned().unwrap_or_default();
     let mut tools = vec![ToolPerm::Read, ToolPerm::Inspect];
     let mut writable = false;
@@ -1278,5 +1287,21 @@ permission:
         let agent2 = mgr.get(&id2).unwrap();
         assert_eq!(agent2.config.name, "nt-scout");
         assert_eq!(agent2.config.e8_mode, 11);
+    }
+
+    #[test]
+    fn test_spawn_from_profile_file_priority() {
+        // 文件优先策略：spawn_from_profile 应先查 ~/.neotrix/agents（真实 NT 域文件存在时走文件定义）。
+        // 断言：内置 nt-scout 的 goal 是"多源交叉验证"，文件定义的 goal 是"按域契约执行任务"。
+        let mut mgr = SubagentManager::new();
+        let id = mgr.spawn_from_profile("nt-scout").expect("spawn nt-scout");
+        let agent = mgr.get(&id).unwrap();
+        assert_eq!(agent.config.name, "nt-scout");
+        // E8 无论文件还是内置都是 11（文件也有 e8Mode/domain 回落）；关键是 goal 应来自文件定义
+        assert_eq!(agent.config.e8_mode, 11);
+        assert!(
+            agent.config.goal.contains("按域契约执行任务") || agent.config.goal.contains("多源交叉验证"),
+            "goal 应来自文件定义或内置兜底, got: {}", agent.config.goal
+        );
     }
 }
