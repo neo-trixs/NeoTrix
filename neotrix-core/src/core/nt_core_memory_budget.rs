@@ -1,102 +1,11 @@
 //! Memory budget tracking with RSS monitoring
 //!
-//! macOS RSS 读取依赖 `sysctl` FFI（libc），无法避免 unsafe。
-//! 门禁策略: 模块不整体放开 `unsafe_code`，仅在必须调用 FFI 的
-//! 函数上做最小范围 `#[allow(unsafe_code)]`，并逐处注明理由。
-//! 这样 crate 级 `#![deny(unsafe_code)]` (R-P1) 对其它所有代码保持强制。
+//! 进程 RSS / 物理内存总量的平台读取依赖 `sysctl` / procfs FFI，
+//! 已抽离到独立 crate `neotrix-sysctl`（FFI 专用层）。
+//! 本模块只保留纯 Rust 逻辑，crate 级 `#![forbid(unsafe_code)]` (R-P1) 全程生效。
 
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Instant;
-
-#[cfg(target_os = "macos")]
-mod rss {
-    use libc::{c_int, c_void, sysctl, CTL_KERN, KERN_PROC, KERN_PROC_PID};
-
-    /// macOS-only FFI: 必须调用 sysctl 读取进程 RSS。
-    /// 无法用 safe Rust 表达，故此处最小化放开。
-    #[allow(unsafe_code)]
-    pub fn current_rss_bytes() -> u64 {
-        let pid = unsafe { libc::getpid() };
-        let mut mib: [c_int; 4] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid];
-        let mut size: libc::size_t = 0;
-        if unsafe { sysctl(mib.as_mut_ptr(), 4, std::ptr::null_mut(), &mut size, std::ptr::null_mut(), 0) } != 0 {
-            return 0;
-        }
-        let mut proc_info: Vec<u8> = vec![0u8; size];
-        if unsafe { sysctl(mib.as_mut_ptr(), 4, proc_info.as_mut_ptr() as *mut c_void, &mut size, std::ptr::null_mut(), 0) } != 0 {
-            return 0;
-        }
-        #[repr(C)]
-        struct ProcTaskInfo {
-            virtual_size: u64,
-            resident_size: u64,
-            total_user: u64,
-            total_system: u64,
-            threads_count: u32,
-            policy: i32,
-            suspend_count: u32,
-        }
-        #[repr(C)]
-        struct ProcBsdInfo {
-            pbi_flags: u32,
-            pbi_status: u32,
-            pbi_xstatus: u32,
-            pbi_pid: u32,
-            pbi_ppid: u32,
-            pbi_uid: u32,
-            pbi_gid: u32,
-            pbi_ruid: u32,
-            pbi_rgid: u32,
-            pbi_svuid: u32,
-            pbi_svgid: u32,
-            rfu_1: u32,
-            pbi_comm: [u8; 256],
-            pbi_name: [u8; 256],
-            pbi_nfiles: u32,
-            pbi_pgid: u32,
-            pbi_pjobc: u32,
-            e_timer: u32,
-            e_timer_runtime: u64,
-            e_timer_period: u64,
-            e_timer_deprecated: u64,
-            e_timer_interval: u64,
-            e_timer_reserved1: u64,
-            e_timer_reserved2: u64,
-            e_timer_reserved3: u64,
-            e_timer_reserved4: u64,
-            pbi_nice: u32,
-            pbi_start_tvsec: u32,
-            pbi_start_tvusec: u32,
-        }
-        #[repr(C)]
-        struct ProcExeTaskInfo {
-            pbi: ProcBsdInfo,
-            ti: ProcTaskInfo,
-        }
-
-        let info: &ProcExeTaskInfo = unsafe { &*(proc_info.as_ptr() as *const ProcExeTaskInfo) };
-        info.ti.resident_size
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-mod rss {
-    pub fn current_rss_bytes() -> u64 {
-        let file = match std::fs::read_to_string("/proc/self/status") {
-            Ok(f) => f,
-            Err(_) => return 0,
-        };
-        for line in file.lines() {
-            if line.starts_with("VmRSS:") {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if let Some(val) = parts.get(1).and_then(|v| v.parse::<u64>().ok()) {
-                    return val * 1024;
-                }
-            }
-        }
-        0
-    }
-}
 
 pub struct MemoryBudget {
     soft_limit: u64,
@@ -128,28 +37,14 @@ impl Default for MemoryBudget {
     }
 }
 
-/// macOS-only FFI: 必须调用 sysctl 查询物理内存总量。
-/// 无法用 safe Rust 表达，故此处最小化放开。
-#[allow(unsafe_code)]
+/// 系统物理内存总量（字节）。
+/// 平台 FFI 已抽离至 `neotrix-sysctl`（macOS sysctl / 非 macOS 兜底）。
 pub fn total_physical_memory() -> u64 {
-    #[cfg(target_os = "macos")]
-    {
-        let mut mib: [libc::c_int; 2] = [libc::CTL_HW, libc::HW_MEMSIZE];
-        let mut size: u64 = 0;
-        let mut len: libc::size_t = std::mem::size_of::<u64>() as libc::size_t;
-        if unsafe { libc::sysctl(mib.as_mut_ptr(), 2, &mut size as *mut u64 as *mut libc::c_void, &mut len, std::ptr::null_mut(), 0) } == 0 {
-            return size;
-        }
-        16_000_000_000
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        32_000_000_000
-    }
+    neotrix_sysctl::total_physical_memory()
 }
 
 fn current_rss() -> u64 {
-    rss::current_rss_bytes()
+    neotrix_sysctl::current_rss_bytes()
 }
 
 impl MemoryBudget {

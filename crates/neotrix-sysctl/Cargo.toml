@@ -1,0 +1,13 @@
+[package]
+name = "neotrix-sysctl"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "neotrix_sysctl"
+
+[lints]
+workspace = true
+
+[dependencies]
+libc = "0.2"
