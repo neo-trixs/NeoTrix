@@ -136,7 +136,9 @@ impl BackgroundLoopHandle {
         if !path.exists() {
             return None; // 无能力树注册表 → 无网可补齐
         }
-        // 1. 加载能力网
+        // 1. 加载能力网 — RegistryExport 格式 (与 capability_tree CLI load_registry 一致)。
+        //    UCN Phase 4.1 修复: 此前误用 KBCapabilityTree 格式解析 RegistryExport 文件,
+        //    导致后台能力网演化路径解析永远失败 (格式不匹配) — 静默失效。
         let json = match std::fs::read_to_string(&path) {
             Ok(j) => j,
             Err(e) => {
@@ -144,14 +146,26 @@ impl BackgroundLoopHandle {
                 return None;
             }
         };
-        let kb_tree: nt_core_capability_tree::serialize::KBCapabilityTree = match serde_json::from_str(&json) {
+        let export: nt_core_capability_tree::registry::RegistryExport = match serde_json::from_str(&json) {
             Ok(t) => t,
             Err(e) => {
                 log::warn!("[bg] capability_auto_evolve: parse {} failed: {}", path.display(), e);
                 return None;
             }
         };
-        let mut registry = kb_tree.to_registry();
+        let mut registry = nt_core_capability_tree::registry::CapabilityRegistry::new();
+        for node in export.nodes {
+            if let Err(e) = registry.register(node) {
+                log::warn!("[bg] capability_auto_evolve: register failed: {}", e);
+                return None;
+            }
+        }
+        for (from, to) in export.edges {
+            if registry.nodes.contains_key(&from) && registry.nodes.contains_key(&to) {
+                let _ = registry.add_dependency(&from, &to);
+            }
+        }
+        registry.experience_targets = export.experience_targets;
         let mut plans = Vec::new();
 
         // 2. 缺陷补齐 — auto_scan (孤儿/过期/晋升/重复)
@@ -188,7 +202,13 @@ impl BackgroundLoopHandle {
             plans.extend(exp_plans);
         }
 
+        // 3.5 经验目标养料 — distill 写入的 experience_targets → Strengthen/Bud 计划
+        // (断链 #2 修复: 此前 experience_targets 仅 CLI `scan --apply` 手动消费,
+        //  后台从不消费导致 31 条累积; 现后台自动消费, 消费后清空防重复执行)
+        plans.extend(registry.plan_experience_targets("bg"));
+
         // 4. 执行计划并写回
+        let had_targets = !registry.experience_targets.is_empty();
         if plans.is_empty() {
             // 无计划但能力网存在 — 回流当前节点数 (能力网健康度保持)
             return Some(registry.nodes.len() as u64);
@@ -204,10 +224,13 @@ impl BackgroundLoopHandle {
                 }
             }
         }
-        if applied == 0 && failed == 0 {
+        if applied == 0 && failed == 0 && !had_targets {
             return Some(registry.nodes.len() as u64);
         }
-        let out = nt_core_capability_tree::serialize::KBCapabilityTree::from_registry(&registry);
+        // 已消费的经验目标清空 (防重复执行累积)
+        registry.experience_targets.clear();
+        // 写回 RegistryExport 格式 (与读侧/CLI 一致, 消除读写格式分裂)
+        let out = registry.export();
         match serde_json::to_string_pretty(&out) {
             Ok(s) => {
                 // 原子写: 临时文件 + rename, 避免直接覆盖在崩溃时损坏 registry。
@@ -222,7 +245,10 @@ impl BackgroundLoopHandle {
                     let _ = std::fs::remove_file(&tmp);
                     return None;
                 }
-                log::info!("[bg] capability_auto_evolve: applied {} plans (failed {}), nodes now {}", applied, failed, registry.nodes.len());
+                log::info!("[bg] capability_auto_evolve: applied {} plans (failed {}), nodes now {} ({} real modules, {} exp:: virtual)",
+                    applied, failed, registry.nodes.len(),
+                    registry.nodes.len() - registry.nodes.values().filter(|n| n.id.starts_with("exp::")).count(),
+                    registry.nodes.values().filter(|n| n.id.starts_with("exp::")).count());
                 self.last_capability_evolve_ts.store(now, std::sync::atomic::Ordering::Relaxed);
                 Some(registry.nodes.len() as u64)
             }

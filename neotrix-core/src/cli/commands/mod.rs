@@ -20,6 +20,7 @@ pub mod review_cmds;
 pub mod connector_cmds;
 pub mod schedule_cmds;
 pub mod plugin_cmds;
+pub mod guard_cmds;
 pub mod search_cmds;
 pub mod model_cmds;
 pub mod contract_cmds;

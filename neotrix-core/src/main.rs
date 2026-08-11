@@ -170,6 +170,15 @@ enum Commands {
         args: Vec<String>,
     },
 
+    // ── Guard & Compliance ──
+    #[command(about = "AGENTS.md pointer-conservation guard (check structure, ceilings, forbidden sections)")]
+    Guard {
+        #[arg(long, help = "Path to AGENTS.md (default: ./AGENTS.md)")]
+        path: Option<String>,
+        #[arg(long, help = "Exit with non-zero code on violation (for CI/pre-commit)")]
+        strict: bool,
+    },
+
     // ── Network & Agents ──
     #[command(about = "Browse a URL")]
     Browse { url: String },
@@ -336,6 +345,7 @@ fn main() {
     let is_ops_cmd = matches!(
         cli.command,
         Some(Commands::Sysops { .. })
+            | Some(Commands::Guard { .. })
             | Some(Commands::Status)
             | Some(Commands::Completions { .. })
             | Some(Commands::Features { .. })
@@ -527,6 +537,13 @@ fn main() {
         }
         Some(Commands::Sysops { args }) => {
             entry::run_sysops(args);
+        }
+        Some(Commands::Guard { path, strict }) => {
+            let p = path.as_deref().map(std::path::Path::new).unwrap_or_else(|| std::path::Path::new("AGENTS.md"));
+            if let Err(e) = neotrix::cli::commands::guard_cmds::run_guard(p, *strict) {
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
         }
         None => {
             if cli.standalone { run_standalone_mode(cli.stage); }
