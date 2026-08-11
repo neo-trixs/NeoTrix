@@ -13,6 +13,8 @@ mod handlers_consciousness;
 mod handlers_maintenance;
 #[path = "handlers_guard.rs"]
 mod handlers_guard;
+#[path = "handlers_absorption.rs"]
+mod handlers_absorption;
 
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,
@@ -466,6 +468,7 @@ cognitive_load: self.cognitive_load.take(),
             },
             kb,
             emotion_restored: std::sync::atomic::AtomicBool::new(false),
+            absorption_in_progress: std::sync::atomic::AtomicBool::new(false),
             cognitive_mode: 0,
             state: StateSubstrate::new(),
             simulate: SimulateEngine::new(),
@@ -541,6 +544,9 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(cfg.kb_guard_interval_secs, |h| h.handle_kb_guard().await);
         spawn_handler!(cfg.kb_backup_interval_secs, |h| h.handle_kb_backup().await);
         spawn_handler!(cfg.workspace_guard_interval_secs, |h| h.handle_workspace_guard().await);        spawn_handler!(60, |h| h.handle_agent_discovery().await);
+        // ── 意识能力网内化吸收 (cycle 1053): 60s 检查 pending-absorb.json,
+        //    替代原 .opencode/plugins/experience-tree-absorption.js idle 插件。
+        spawn_handler!(60, |h| h.handle_pending_absorption().await);
         spawn_handler!(120, |h| h.handle_always_on().await);
         spawn_handler!(cfg.scheduler_interval_secs, |h| h.handle_scheduler_tick().await);
         spawn_handler!(cfg.evolution_interval_secs, |h| h.handle_evolve().await);
@@ -679,6 +685,8 @@ pub struct BackgroundLoopHandle {
     meta_shell: Option<crate::neotrix::nt_mind::MetaAgentShell>,
     kb: Option<Arc<KnowledgeBase>>,
     emotion_restored: std::sync::atomic::AtomicBool,
+    /// pending-absorb 自动吸收重入标志 (handlers_absorption.rs)。
+    absorption_in_progress: std::sync::atomic::AtomicBool,
     bbrain: crate::neotrix::nt_mind::bbrain_monitor::BMonitor,
     cog_eval: crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator,
     /// 0=Balanced, 1=Deep, 2=Fast — updated by consciousness tick, consumed by batch loops.

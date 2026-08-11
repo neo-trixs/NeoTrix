@@ -4,11 +4,11 @@ NeoTrix is an AI-native developer toolkit with self-evolving reasoning, knowledg
 
 **Preamble**: This session loads `CONTEXT.md` (root) as the shared language prefix. All domain terms used in this project are defined there. Before using any domain term, refer to CONTEXT.md for its precise definition and avoid column.
 
-**统一吸收协议 (MUST)**: 每次会话结束必须自动执行 `experience-tree` 五阶段吸收 (快照→蒸馏→分类→落盘→反馈)。经验统一写入 `~/.neotrix/knowledge.db` 的 `kv_store` `experience` 命名空间; **AGENTS.md 不含任何 per-cycle 增长区** — cycle 指针、摘要、正文全部只存 KB hub。执行: 汇总会话经验 → `~/.neotrix/pending-absorb.json` → 插件 `session.idle` 自动调 `neotrix-experience absorb` + `close --cycle NNN`。协议详见 `~/.agents/skills/experience-tree/SKILL.md`。
+**统一吸收协议 (MUST)**: 每次会话结束必须自动执行 `experience-tree` 五阶段吸收 (快照→蒸馏→分类→落盘→反馈)。经验统一写入 `~/.neotrix/knowledge.db` 的 `kv_store` `experience` 命名空间; **AGENTS.md 不含任何 per-cycle 增长区** — cycle 指针、摘要、正文全部只存 KB hub。执行: 汇总会话经验 → `~/.neotrix/pending-absorb.json` → **NeoTrix 自身后台循环** (`nt_mind_background_loop::handlers_absorption`, 60s tick) 自动调 `neotrix-experience absorb` + `close --cycle NNN`——不再依赖任何 opencode 插件。协议详见 `~/.agents/skills/experience-tree/SKILL.md`。
 
 **指针守恒 (HARD RULE)**: AGENTS.md 是**纯指引文档**，永久禁止追加以下内容：cycle 完整正文、Session 明细表、 Build Baseline 明细、元认知发现清单、吸收细节、**以及任何 per-cycle 增长区（含 Experience Index 指针表）**。所有 cycle 内容（指针+摘要+全文）统一经 `experience-tree` 流程落盘 KB `experience` hub；AGENTS.md 仅允许修订操作规则（Dev Rules/审查维度/共享语言）本身。新内容超过 3 行 → 必须走 KB 吸收流程。违反即回滚。
 
-**写入门禁 (MECHANISM)**: 经验指针与全文统一存 KB `experience` namespace hub，**AGENTS.md 禁止内联任何经验表、cycle 正文或增长区**（手工追加会被门禁拒绝）。指针检索唯一路径：`neotrix-experience hub` 查看 cycle 索引 / `query --kw` 检索全文。AGENTS.md 结构受双门禁保护：opencode 插件 `.opencode/plugins/agents-guard.js` 在 `session.idle` 校验行数、节结构且拒绝任何 Experience Index 区 + git pre-commit hook 拒绝超阈/含索引提交。规则由机制执行，不依赖 agent 自律。
+**写入门禁 (MECHANISM)**: 经验指针与全文统一存 KB `experience` namespace hub，**AGENTS.md 禁止内联任何经验表、cycle 正文或增长区**（手工追加会被门禁拒绝）。指针检索唯一路径：`neotrix-experience hub` 查看 cycle 索引 / `query --kw` 检索全文。AGENTS.md 结构受 git pre-commit hook 保护：拒绝超阈/含索引提交。规则由机制执行，不依赖 agent 自律。
 
 **外部文件惰性加载 (LAZY LOAD)**: 本文件是 L1 常驻层，只含最高信号内容。以下文件**不要预加载**，遇到相关任务时用 Read 按需读取，加载后为强制规则：
 - `@dev-rules.md` — 全量 R-P1-R-P80 (编码/构建/审查/吸收纪律)。处理编码、构建、审查、吸收任务时加载
