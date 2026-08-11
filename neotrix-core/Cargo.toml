@@ -67,6 +67,7 @@ path = "src/bin/geoint.rs"
 
 [dependencies]
 neotrix-types = { path = "../crates/neotrix-types" }
+neotrix-sysctl = { path = "../crates/neotrix-sysctl" }
 nt_core_capability_tree = { path = "src/neotrix/nt_core_capability_tree" }
 thiserror = "1"
 serde = { workspace = true }
@@ -118,7 +119,6 @@ clap = { version = "4", features = ["derive"] }
 colored = "2"
 indicatif = "0.17"
 clap_complete = "4"
-libc = "0.2"
 wasmtime = { version = "42", optional = true }
 aes-gcm = "0.10"
 keyring = { version = "3", optional = true }

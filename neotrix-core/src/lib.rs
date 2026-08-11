@@ -15,7 +15,7 @@
 //!
 //! 统一版本: 0.18.0 — 推理内核 18 stages
 
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 // #![deny(warnings)]
 // // #![deny(dead_code)]

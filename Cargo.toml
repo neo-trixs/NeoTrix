@@ -3,6 +3,7 @@ members = [
     "neotrix-core",
     "src-tauri",
     "crates/neotrix-types",
+    "crates/neotrix-sysctl",
     "guard_core",
     "neotrix-core/src/neotrix/nt_core_capability_tree",
 ]
