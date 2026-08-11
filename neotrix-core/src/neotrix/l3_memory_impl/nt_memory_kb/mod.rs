@@ -6,6 +6,10 @@ pub mod nt_discovery_github_topics;
 pub mod nt_discovery_orchestrator;
 pub mod nt_discovery_sources;
 pub mod nt_memory_adaptive_rag;
+pub mod nt_memory_feedback;
+pub mod nt_memory_gwt_router;
+pub mod nt_memory_e8_agent;
+pub mod nt_memory_vsa_expand;
 pub mod nt_memory_agent_driven;
 pub mod nt_memory_agent_session;
 pub mod nt_memory_api;
@@ -57,6 +61,15 @@ pub use nt_memory_types::*;
 pub use nt_memory_embed::EmbeddingConfig;
 pub use user_memory::UserMemory;
 pub use nt_memory_commitment::EmbeddingCommitmentStore;
+pub use nt_memory_gwt_router::{
+    extract_features, GwtRouter, GwtRouterConfig, QueryFeatures, QueryIntent, RetrievalChannel,
+};
+pub use nt_memory_feedback::{FeedbackSignal, FeedbackStore, StrategyStats};
+pub use nt_memory_e8_agent::{
+    E8AgentConfig, E8AgentLoop, E8AgentResult, E8Phase,
+};
+pub use nt_memory_adaptive_rag::RelevanceGrade;
+pub use nt_memory_vsa_expand::VsaAssociativeExpander;
 pub use nt_memory_confidence::{ConfidenceStore, ConfidenceWeights, DecayConfig, search_with_confidence, UncertainResult, RetrievalStrategy};
 pub use nt_memory_community::{CommunityAwareSearch, CommunityDetector, CommunityQueryMode, CommunityResult};
 pub use privacy::{PrivacyEnforcer, PrivacyConfig, PrivacyMode};
@@ -110,6 +123,9 @@ pub struct KnowledgeBase {
     pub graphrag_store: RwLock<Option<GraphRagStore>>,
     pub tech_reserve: RwLock<TechReserveStore>,
     pub skills_library: RwLock<nt_memory_knowledge_assets::SkillsLibrary>,
+    pub feedback_store: RwLock<FeedbackStore>,
+    pub gwt_router: RwLock<GwtRouter>,
+    pub vsa_expander: RwLock<VsaAssociativeExpander>,
 }
 
 impl std::fmt::Debug for KnowledgeBase {
@@ -158,6 +174,9 @@ impl KnowledgeBase {
             tech_reserve: RwLock::new(TechReserveStore::new()),
             skills_library: RwLock::new(nt_memory_knowledge_assets::SkillsLibrary::new()),
             graph_cache: RwLock::new(nt_memory_graph_cache::GraphCache::empty()),
+            feedback_store: RwLock::new(FeedbackStore::new(0.05)),
+            gwt_router: RwLock::new(GwtRouter::new(GwtRouterConfig::default())),
+            vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         };
         {
             let conn = kb.conn.lock().map_err(|e| format!("Lock: {}", e))?;
@@ -212,6 +231,9 @@ impl KnowledgeBase {
             graphrag_store: RwLock::new(None),
             tech_reserve: RwLock::new(TechReserveStore::new()),
             skills_library: RwLock::new(nt_memory_knowledge_assets::SkillsLibrary::new()),
+            feedback_store: RwLock::new(FeedbackStore::new(0.05)),
+            gwt_router: RwLock::new(GwtRouter::new(GwtRouterConfig::default())),
+            vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
             graph_cache: RwLock::new(cache),
         }
     }
@@ -1074,6 +1096,19 @@ impl KnowledgeBase {
             return Ok(cached);
         }
 
+        // [T3] GWT 意图路由: 决策通道 → 影响 VSA 扩召强度 (AgentLoop/Graph 扩更多)
+        let intent = self.gwt_router.read().map(|r| r.route(query));
+        let vsa_top_k = match intent.as_ref().map(|i| i.channel) {
+            Ok(RetrievalChannel::AgentLoop) | Ok(RetrievalChannel::Graph) => 5,
+            _ => 3,
+        };
+        // [T3] VSA 联想扩召: 有词典时扩展查询词增强召回 (空词典零开销回退原查询)
+        let effective_query = self
+            .vsa_expander
+            .read()
+            .map(|v| v.expand_query(query, vsa_top_k))
+            .unwrap_or_else(|_| query.to_string());
+
         // Try PQ if codebook exists + embedding configured (fast + exact-reranked)
         let has_codebook = {
             let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
@@ -1085,7 +1120,7 @@ impl KnowledgeBase {
         };
         let config = self.embedding_config.read().map_err(|e| format!("embedding_config read: {}", e))?.clone();
         if has_codebook && config.is_some() {
-            if let Ok(results) = self.pq_search(query, limit) {
+            if let Ok(results) = self.pq_search(&effective_query, limit) {
                 let results = self.recency_rerank(results);
                 if let Ok(mut cache) = self.fused_cache.lock() {
                     cache.put(cache_key, results.clone());
@@ -1096,7 +1131,7 @@ impl KnowledgeBase {
 
         // Try semantic if embedding configured (full cosine)
         if config.is_some() {
-            if let Ok(results) = self.semantic_search(query, limit) {
+            if let Ok(results) = self.semantic_search(&effective_query, limit) {
                 let results = self.recency_rerank(results);
                 if let Ok(mut cache) = self.fused_cache.lock() {
                     cache.put(cache_key, results.clone());
@@ -1108,13 +1143,75 @@ impl KnowledgeBase {
         // Fallback: hybrid BM25+FTS
         let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
         let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
-        let results = nt_memory_search::hybrid_search(&conn, query, limit, bm25.as_ref())
+        let results = nt_memory_search::hybrid_search(&conn, &effective_query, limit, bm25.as_ref())
             .map_err(|e| format!("search: {}", e))?;
         let results = self.recency_rerank(results);
         if let Ok(mut cache) = self.fused_cache.lock() {
             cache.put(cache_key, results.clone());
         }
         Ok(results)
+    }
+
+    /// [T3] Agentic 检索: GWT 路由 → E8 卦象状态机 Agent 循环 → SEAL 反馈回流。
+    /// 复杂查询 (多跳/关系/分析) 走 E8 状态机: 需(检索)→明夷(分级)→革(改写)→泰(生成)→既济(收敛)。
+    pub fn search_agentic(&self, query: &str, limit: usize) -> Result<E8AgentResult, String> {
+        let intent = self.gwt_router.read().map(|r| r.route(query));
+        let mut agent = E8AgentLoop::new(E8AgentConfig::default());
+        let result = agent.run(query, |q, k| self.search(q, k).unwrap_or_default());
+        // SEAL 反馈回流: 采纳 (Relevant) / 弃用 (Irrelevant) 信号 → 权重在线学习
+        if let Ok(mut fb) = self.feedback_store.write() {
+            let adopted: Vec<String> = result
+                .graded
+                .iter()
+                .filter(|g| g.relevance == RelevanceGrade::Relevant)
+                .map(|g| g.node_id.clone())
+                .collect();
+            let rejected: Vec<String> = result
+                .graded
+                .iter()
+                .filter(|g| g.relevance == RelevanceGrade::Irrelevant)
+                .map(|g| g.node_id.clone())
+                .collect();
+            let strategy = intent
+                .as_ref()
+                .map(|i| i.channel.as_str().to_string())
+                .unwrap_or_else(|_| "agent_loop".to_string());
+            fb.record(&FeedbackSignal {
+                query_family: format!("agentic:{}", strategy),
+                strategy,
+                adopted_ids: adopted,
+                rejected_ids: rejected,
+                latency_ms: 0,
+            });
+        }
+        Ok(result)
+    }
+
+    /// [T3] 从 KB 节点标题构建 VSA 词典 (上层启动时调用一次, 供联想扩召)。
+    /// 返回词典词条数; 0 表示无数据或失败 (search() 自动回退原查询)。
+    pub fn build_vsa_vocabulary(&self, max_terms: usize) -> usize {
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
+        let titles: Vec<String> = conn
+            .prepare("SELECT title FROM nodes LIMIT ?1")
+            .and_then(|mut stmt| {
+                stmt.query_map([max_terms], |r| r.get::<_, String>(0))
+                    .map(|rows| rows.filter_map(|x| x.ok()).collect())
+            })
+            .unwrap_or_default();
+        drop(conn);
+        if let Ok(mut vsa) = self.vsa_expander.write() {
+            let terms: Vec<String> = titles
+                .iter()
+                .flat_map(|t| t.split_whitespace().map(|w| w.to_string()))
+                .filter(|w| w.len() >= 3)
+                .collect();
+            vsa.insert_terms(terms);
+            return vsa.vocab_size();
+        }
+        0
     }
 
     /// D1: recency 时间衰减重排 (supermemory 参照) — 同相关度新者优先。
@@ -2660,6 +2757,69 @@ mod tests {
             .expect("tier");
         drop(conn);
         assert_eq!(tier_col, "cold", "旧节点应降级 cold");
+    }
+
+    #[test]
+    fn test_t3_vsa_build_vocabulary_and_search_expansion() {
+        let dir = std::env::temp_dir().join(format!("nt_kb_t3vsa_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_vsa.db");
+        let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        // 空词典时 search 走原查询 (零行为变化)
+        let q = "retrieval test";
+        kb.write_memory_entry(
+            q,
+            super::nt_memory_types::NodeType::Concept,
+            Some("vsa expansion test"),
+            None,
+            Some("t3"),
+            None,
+        ).expect("write");
+        let before = kb.search(q, 3).expect("search with empty vocab");
+        assert!(!before.is_empty(), "原始检索应命中");
+
+        // 构建 VSA 词典 → 扩召开
+        kb.build_vsa_vocabulary(200);
+        let n = kb.vsa_expander.read().expect("read").vocab_size();
+        assert!(n > 0, "VSA 词典应非空, got {}", n);
+        let after = kb.search(q, 3).expect("search with vocab");
+        assert!(!after.is_empty(), "扩召检索仍应命中");
+    }
+
+    #[test]
+    fn test_t3_search_agentic_e8_loop_wires_feedback() {
+        let dir = std::env::temp_dir().join(format!("nt_kb_t3ag_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_agentic.db");
+        let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        kb.write_memory_entry(
+            "e8 agentic loop",
+            super::nt_memory_types::NodeType::Concept,
+            Some("state machine driven retrieval"),
+            None,
+            Some("t3"),
+            None,
+        ).expect("write");
+        kb.write_memory_entry(
+            "vsa hypercube associative",
+            super::nt_memory_types::NodeType::Concept,
+            Some("symbolic vectors for recall"),
+            None,
+            Some("t3"),
+            None,
+        ).expect("write");
+
+        let res = kb.search_agentic("state machine", 5).expect("agentic search");
+        // E8 状态机收敛 (既济) 且检索到结果
+        assert_eq!(res.phases.last(), Some(&super::nt_memory_e8_agent::E8Phase::Converge),
+            "E8 状态机应收敛于既济: {:?}", res.phases);
+        assert!(!res.results.is_empty(), "agentic 检索应有结果");
+        // SEAL 反馈回流已记录 (agentic 通道聚合)
+        let fb = kb.feedback_store.read().expect("read");
+        let agg_total: u64 = fb.strategy_stats().iter().map(|s| s.total_count).sum();
+        assert!(agg_total >= 1, "反馈闭环应记录至少 1 次: {}", agg_total);
     }
 }
 
