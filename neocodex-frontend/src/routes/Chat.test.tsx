@@ -24,7 +24,7 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
 
   it('侧栏 seg 有 对话/协同/电脑 三个标签', () => {
     render(() => <Chat />)
-    const tabs = document.querySelectorAll('[role="tab"]')
+    const tabs = document.querySelectorAll('.seg [role="tab"]')
     expect(tabs.length).toBe(3)
     expect(tabs[0].textContent).toContain('对话')
     expect(tabs[1].textContent).toContain('协同')

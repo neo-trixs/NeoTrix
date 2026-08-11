@@ -23,8 +23,20 @@ interface GlobeViewProps {
   height?: number
 }
 
+/* HTML 转义：pointLabel 经 globe.gl innerHTML 渲染，防 KB 数据注入 */
+function escHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export function GlobeView(props: GlobeViewProps) {
   let containerRef: HTMLDivElement | undefined
+  // 卸载守卫：异步数据到达时组件可能已销毁，禁止再 setSignal / 触碰 globe
+  let disposed = false
   const [points, setPoints] = createSignal<GeoPoint[]>([])
   const [layers, setLayers] = createSignal<GeoLayerSummary[]>([])
   const [loading, setLoading] = createSignal(true)
@@ -162,13 +174,15 @@ export function GlobeView(props: GlobeViewProps) {
     window.addEventListener('resize', onResize)
 
     onCleanup(() => {
+      disposed = true
       window.removeEventListener('resize', onResize)
       globe._destructor?.()
     })
   })
 
-  const mirageCount = () => points().filter((p) => isMirage(p)).length
-  const realCount = () => points().length - mirageCount()
+  // 图层计数跟随开关：显示的是当前可见层的数据量
+  const mirageCount = () => (showMirage() ? points().filter((p) => isMirage(p)).length : 0)
+  const realCount = () => (showReal() ? points().filter((p) => !isMirage(p)).length : 0)
 
   return (
     <div class="relative w-full overflow-hidden rounded-xl border border-slate-700/50 bg-[#050a19]">
@@ -200,6 +214,11 @@ export function GlobeView(props: GlobeViewProps) {
           >
             {showMirage() ? '● 山海' : '○ 山海'}
           </button>
+          <span class="hidden lg:inline text-slate-500" title="数据源分布（分层摘要）">
+            {layers()
+              .map((l) => `${l.source.replace(/^shanhai-/, '')}:${l.count}`)
+              .join(' · ')}
+          </span>
         </div>
       </Show>
       <Show when={hovered()}>

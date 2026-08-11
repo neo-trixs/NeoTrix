@@ -507,7 +507,9 @@ pub fn cowork_write_file(session_id: String, path: String, content: String) -> R
     }
     let abs_path = resolve_workspace_path(&session, &path)?;
 
-    let parent = std::path::Path::new(&abs_path).parent().unwrap();
+    let parent = std::path::Path::new(&abs_path)
+        .parent()
+        .ok_or_else(|| format!("Invalid workspace path (no parent): {}", abs_path.display()))?;
     std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
     std::fs::write(&abs_path, &content).map_err(|e| format!("Failed to write file: {}", e))?;
 

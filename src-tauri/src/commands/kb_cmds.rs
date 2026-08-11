@@ -274,7 +274,8 @@ pub fn kb_geo_points(limit: Option<usize>, source: Option<String>) -> Result<Vec
     let path = kb_path();
     let conn = rusqlite::Connection::open(&path)
         .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
-    let limit = limit.unwrap_or(5000) as i64;
+    // limit 硬上限：防止前端误传超大值拉全量 117k 点拖垮 IPC
+    let limit = (limit.unwrap_or(5000) as i64).clamp(1, 20_000);
     // stmt 提升到 match 外：Rows 借用 stmt，若在分支内创建会在分支末尾 drop
     let mut stmt = conn
         .prepare(match source.as_deref() {
