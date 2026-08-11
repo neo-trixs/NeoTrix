@@ -6,9 +6,9 @@ node_modules/
 dist/
 notes/
 sessions/
-.opencode/*
-!.opencode/plugins/
-.opencode/plugins/*.lock
+_archive/opencode/*
+!_archive/opencode/plugins/
+_archive/opencode/plugins/*.lock
 .claude-plugin/
 *.rs.bak.DS_Store
 models/
@@ -27,6 +27,9 @@ src-tauri/frontend/playwright-report/
 # Python bytecode
 __pycache__/
 *.py[cod]
+
+# NeoTrix local capability registry (runtime state, not source)
+.neotrix/capability_registry.json
 
 # Bazel workspace artifacts (neotrix-ios)
 bazel-bin

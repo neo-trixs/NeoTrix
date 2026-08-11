@@ -34,7 +34,7 @@ impl SessionManager {
         let worktree = self.worktree_manager.create(&config.branch, &config.base_branch)?;
         session.worktree_path = Some(worktree.path.to_string_lossy().to_string());
 
-        let cmd = config.agent_command.unwrap_or_else(|| "opencode".to_string());
+        let cmd = config.agent_command.unwrap_or_else(|| "neotrix exec".to_string());
         session.metadata.insert("agent_command".into(), cmd);
         session.metadata.insert("task".into(), config.task_description);
 
