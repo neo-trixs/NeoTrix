@@ -8,7 +8,7 @@
 use uniffi;
 use std::sync::{Arc, RwLock};
 use crate::neotrix::ffi::types::*;
-use crate::neotrix::{CapabilityNode, CapabilityRegistry, NodeLayer};
+use crate::neotrix::{CapabilityRegistry, NodeLayer};
 
 /// capability_tree 注册表路径 (与 nt_core_capability_tree CLI 默认值一致)。
 const REGISTRY_PATH: &str = ".neotrix/capability_registry.json";
