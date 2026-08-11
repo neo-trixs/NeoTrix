@@ -111,14 +111,20 @@ export function SideChat(props: Props) {
               <div class={clsx('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                 <div
                   class={clsx(
-                    'max-w-[85%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words',
+                    'max-w-[85%] px-3 py-2 rounded-2xl text-sm break-words',
                     msg.role === 'user'
-                      ? 'bg-nt-mind-500/20 text-text-primary rounded-br-sm'
+                      ? 'bg-nt-mind-500/20 text-text-primary rounded-br-sm whitespace-pre-wrap'
                       : 'bg-bg-tertiary text-text-primary rounded-bl-sm'
                   )}
                 >
                   <div class="text-[10px] text-text-muted mb-1">{formatTime(msg.timestamp)}</div>
-                  {msg.content}
+                  {/* assistant 回答接入 Markdown 渲染（代码块/列表/链接，XSS 已转义）；
+                      user 输入保持纯文本等宽回显 */}
+                  {msg.role === 'user' ? (
+                    msg.content
+                  ) : (
+                    <Markdown content={msg.content} />
+                  )}
                 </div>
               </div>
             )}
