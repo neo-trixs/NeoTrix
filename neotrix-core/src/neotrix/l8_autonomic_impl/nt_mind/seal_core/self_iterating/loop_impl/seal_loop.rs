@@ -337,6 +337,14 @@ impl SelfIteratingBrain {
         self.pipeline = pipeline;
         let mut reward = self._reward;
 
+        // pi-agent steer (缺陷②): pipeline 返回 Steer 时保留进度, 输出重定向建议,
+        // 不丢弃已产出成果 (区别于 Err 硬失败 — Steer 是"换路线继续"而非"终止")。
+        if let Err(e) = &result {
+            if let NeoTrixError::Steer(msg) = e {
+                println!("[seal] 🧭 steer 重定向建议: {} (cycle {}, 进度保留)", msg, self.iteration);
+            }
+        }
+
         // ── EWHR reasoning pass: analyze trajectory → propose hypotheses ──
         if let Some(ref mut engine) = self.reasoning_engine {
             let task_copy = self._current_task.clone();
@@ -525,6 +533,10 @@ impl SelfIteratingBrain {
         // ── Persist E8 state every 5 iterations for higher-frequency checkpointing ──
         if self.iteration.is_multiple_of(5) {
             self.save_e8();
+            // 缺陷④: 同频落盘证据文件, 失败不致命 (日志记录)
+            if let Err(e) = self.save_evidence() {
+                log::warn!("[seal] evidence 落盘失败: {}", e);
+            }
         }
 
         match result {
@@ -643,6 +655,43 @@ impl SelfIteratingBrain {
             .map_err(|e| NeoTrixError::Serde(format!("cortex序列化失败: {}", e)))?;
         std::fs::write(&path, &data)?;
         Ok(())
+    }
+
+    /// 缺陷④: 证据文件持久化 (slow-process 重规划可见快进程历史)。
+    /// 每 5 轮把跨阶段证据 (升级等级/信念/LR/循环比/洞察计数) 落盘 ~/.neotrix/seal_evidence.json,
+    /// 供 steer/重规划时读取 — 与 save_cortex 分离, 因为这是"当前进程健康证据"而非"认知痕迹"。
+    pub fn save_evidence(&self) -> NeoTrixResult<()> {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let path = std::path::PathBuf::from(&home).join(".neotrix").join("seal_evidence.json");
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| NeoTrixError::Io(format!("创建 .neotrix 目录失败: {}", e)))?;
+        }
+        let (lvl, lvl_name) = self.stagnation.escalation_level();
+        let evidence = serde_json::json!({
+            "iteration": self.iteration,
+            "task": self._current_task,
+            "escalation_streak": lvl,
+            "escalation_level": lvl_name,
+            "validity": self.stagnation.validity(),
+            "loop_ratio": self.stagnation.loop_ratio(),
+            "reward": self._reward,
+        });
+        let data = serde_json::to_string_pretty(&evidence)
+            .map_err(|e| NeoTrixError::Serde(format!("证据序列化失败: {}", e)))?;
+        std::fs::write(&path, &data)?;
+        Ok(())
+    }
+
+    /// 缺陷④: 读取证据文件 — 重规划/steer 时慢进程可见此前各轮留下的证据历史。
+    pub fn load_evidence(&self) -> serde_json::Value {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let path = std::path::PathBuf::from(&home).join(".neotrix").join("seal_evidence.json");
+        if !path.exists() { return serde_json::json!({}); }
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|d| serde_json::from_str(&d).ok())
+            .unwrap_or_else(|| serde_json::json!({}))
     }
 
     pub fn load_cortex(&mut self) {

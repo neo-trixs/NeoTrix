@@ -191,6 +191,23 @@ impl BrainPipeline {
             // 阶段级停滞/循环/死胡同洞察 + 升级等级 + 信念 + loop ratio
             match brain.stagnation.observe_stage(&stage_name, stage_produced) {
                 StageInsight::None => {}
+                // pi-agent steer vs abort (缺陷②): Escalate 洞察 + 升级达 STOP 级 →
+                // 返回 Steer 错误: 信号是"换路线重规划"而非"硬终止"。由 run_seal_loop
+                // 既有 Err 处理决定 (reward<0 + 有外部奖励 → 回滚换路线; 否则保留进度)。
+                // 与 should_abort (ESCALATE+低信念→终止) 构成完整二分:
+                //   STOP 级 → steer (重定向继续) ; ESCALATE 级 → abort (有界停止)。
+                StageInsight::Escalate(m) => {
+                    println!("[SEAL]        ⚠ {}", stage_insight_text(&StageInsight::Escalate(m.clone())));
+                    let (streak, lvl) = brain.stagnation.escalation_level();
+                    // 仅 STOP 级 steer — ESCALATE 级留给下方 should_abort (缺陷③) 硬终止,
+                    // 避免 steer 抢先绕过 abort (ESACALATE+低信念 = 必须停, 不是重定向)。
+                    if lvl == "STOP" {
+                        return Err(NeoTrixError::Steer(format!(
+                            "慢进程重规划建议 (escalation={}({})): {} — 请重定向任务目标/换路线后继续",
+                            streak, lvl, m
+                        )));
+                    }
+                }
                 insight => println!("[SEAL]        ⚠ {}", stage_insight_text(&insight)),
             }
             // 每 6 阶段打印一次控制面状态 (loopx 五问: 证据变化 + 循环继续?)
@@ -200,6 +217,31 @@ impl BrainPipeline {
                     "[SEAL]        📊 控制面: 升级={}({}) 信念={:.2} LR={:.2}",
                     lvl, lvl_name, brain.stagnation.validity(), brain.stagnation.loop_ratio()
                 );
+            }
+
+            // VRR-Stop 有界停止 (缺陷③): ESCALATE + 信念<0.3 → 强制终止 pipeline
+            // (T3: 洞察不再只是打印, 真正影响行为 — 防止慢进程门控失效时无限空转)
+            if brain.stagnation.should_abort() {
+                let (lvl, lvl_name) = brain.stagnation.escalation_level();
+                return Err(NeoTrixError::Brain(format!(
+                    "VRR-Stop 有界停止: 升级={}({}) 信念={:.2} — 持续无产出证据, 终止 pipeline 而非盲目继续",
+                    lvl, lvl_name, brain.stagnation.validity()
+                )));
+            }
+
+            // 动态配额控制 (缺陷①, loopx quota-aware 吸收): remaining_estimate 显示
+            // 产出趋势锐减 (trend≈0) 且已消耗过半 → 提前收敛剩余阶段, 不做无谓空转。
+            // 与 should_abort 的区别: 这里不报错终止, 而是正常跳过剩余阶段 (保留已完成成果),
+            // 仅在证据强烈表明继续无产出时触发。
+            if idx > 0 && idx >= total / 2 {
+                let (_, trend) = brain.stagnation.remaining_estimate(0.0);
+                if trend < 0.2 {
+                    println!(
+                        "[SEAL]        📉 动态配额收敛 (缺陷①): trend={:.2} 产出锐减, 提前结束剩余 {} 阶段",
+                        trend, total - idx - 1
+                    );
+                    break;
+                }
             }
 
             brain._stage_results.push(StageResult::new(&stage_name));

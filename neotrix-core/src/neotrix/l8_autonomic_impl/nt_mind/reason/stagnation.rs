@@ -327,6 +327,36 @@ mod tests {
         assert!(streak >= 6, "escalation streak should be >= 6, got {}", streak);
         assert_eq!(level, "ESCALATE", "6+ hits should be ESCALATE, got {}", level);
     }
+
+    /// VRR-Stop 有界停止 (缺陷③): ESCALATE + 持续无产出 (信念<0.3) → abort;
+    /// 升级达 ESCALATE 但产出正常 (信念高) → 不 abort (防误杀)。
+    #[test]
+    fn test_vrr_stop_bounded_abort() {
+        let mut d = StagnationDetector::new();
+        // 触发 6 轮 Escalate (每轮 5 次无产出) → streak>=6, validity 持续衰减
+        for _ in 0..6 {
+            for i in 0..5 {
+                d.observe_stage(&format!("idle_{}", i), false);
+            }
+        }
+        let (streak, lvl) = d.escalation_level();
+        assert!(streak >= 6, "streak={} 应达 ESCALATE", streak);
+        assert_eq!(lvl, "ESCALATE");
+        assert!(d.validity() < 0.3, "validity={:.3} 应低于 0.3", d.validity());
+        assert!(d.should_abort(), "ESCALATE+低信念应触发有界停止");
+
+        // 对照: ESCALATE 但产出正常 (信念高) → 不 abort
+        let mut d2 = StagnationDetector::new();
+        for _ in 0..6 {
+            for i in 0..5 {
+                d2.observe_stage(&format!("idle_{}", i), false);
+            }
+        }
+        for i in 0..10 {
+            d2.observe_stage(&format!("prod_{}", i), true);
+        }
+        assert!(!d2.should_abort(), "高信念不应 abort");
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -636,7 +666,18 @@ impl StagnationDetector {
         self.committed_validity
     }
 
-    /// step-budget 吸收 (L3 A* 目标距离估计 h(n) = base × trend)。
+    /// VRR-Stop 有界停止 (缺陷③补齐): 升级达 ESCALATE 且信念持续低于阈值 →
+    /// 应强制终止 pipeline 而非仅打印提醒 (T3: 输出必须影响行为)。
+    /// 两个条件同时满足才触发, 避免误杀"偶发升级但产出正常"的 pipeline:
+    ///   - escalation_streak >= 6 (ESCALATE 级)
+    ///   - committed_validity < ABORT_VALIDITY_FLOOR (持续无产出, 证据不信任)
+    /// ABORT_VALIDITY_FLOOR = 0.3: 连续 ~4 次无产出投票后衰减到达 (0.7^4 ≈ 0.24)。
+    pub fn should_abort(&self) -> bool {
+        const ABORT_VALIDITY_FLOOR: f64 = 0.3;
+        self.escalation_streak >= 6 && self.committed_validity < ABORT_VALIDITY_FLOOR
+    }
+
+    /// step-budget 吸收 (L3 A* 目标距离估计 h(n) = base × trend)).
     /// 不数"已走多少步", 而估计"离出口还有几步":
     /// trend = 最近 1/3 段产出率 / 前 2/3 段产出率。trend≥1 → 充裕可深挖;
     /// trend≈0.3 → 收紧优先收敛; trend≈0 → 立即收敛/回溯。

@@ -23,6 +23,9 @@ pub enum NeoTrixError {
     Crypto(String),
     Keyring(String),
     Shield(String),
+    /// pi-agent steer (缺陷②): 慢进程重规划建议 — 保留 brain 进度, 上层可重定向任务。
+    /// 与 Brain(abort) 的区别: Steer 不丢弃已产出成果, 仅请求换路线。
+    Steer(String),
 }
 
 impl fmt::Display for NeoTrixError {
@@ -46,6 +49,7 @@ impl fmt::Display for NeoTrixError {
             NeoTrixError::Crypto(msg) => write!(f, "加密错误: {}", msg),
             NeoTrixError::Keyring(msg) => write!(f, "密钥环错误: {}", msg),
             NeoTrixError::Shield(msg) => write!(f, "护盾拦截: {}", msg),
+            NeoTrixError::Steer(msg) => write!(f, "steer 重定向建议: {}", msg),
 }
     }
 }
@@ -143,5 +147,14 @@ mod tests {
     fn test_result_type_alias() {
         let r: NeoTrixResult<i32> = Ok(1);
         assert!(r.is_ok());
+    }
+
+    #[test]
+    fn test_steer_variant_display() {
+        // pi-agent steer (缺陷②): Steer 变体是可显示的错误, 携带重定向建议。
+        let e = NeoTrixError::Steer("保留进度, 请重定向任务目标".into());
+        let s = e.to_string();
+        assert!(s.contains("steer 重定向"), "display 应含 steer 标记, got: {}", s);
+        assert!(s.contains("重定向任务目标"), "display 应含建议内容, got: {}", s);
     }
 }
