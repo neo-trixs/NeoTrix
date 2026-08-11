@@ -779,6 +779,50 @@ impl AgentCatalog {
         }
         out
     }
+
+    /// 全量目录：内置档案 + 文件驱动的 NT 域 agent（`~/.neotrix/agents/` 扫描）。
+    /// `/agent catalog file` 生产路径；文件定义是 NeoTrix 原生 agent 的 source of truth。
+    pub fn catalog_full_text() -> String {
+        use crate::core::nt_core_subagent::SubAgentRegistry;
+        let mut out = String::from("NeoTrix agent 目录 (内置档案 + 文件定义):\n");
+
+        out.push_str("── 内置 NT 域 agent（10）──\n");
+        for p in Self::nt_domain_builtin() {
+            let perms = p.allowed_tools.iter()
+                .map(|t| format!("{:?}", t))
+                .collect::<Vec<_>>().join(",");
+            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description));
+        }
+        out.push_str("── 通用兜底（6）──\n");
+        for p in Self::legacy_builtin() {
+            let perms = p.allowed_tools.iter()
+                .map(|t| format!("{:?}", t))
+                .collect::<Vec<_>>().join(",");
+            out.push_str(&format!("  {} | tier={:?} | E8:{} | tools=[{}]\n   {}\n",
+                p.name, p.tier, p.e8_mode, perms, p.description));
+        }
+
+        // 文件驱动 NT 域 agent（source of truth；覆盖/扩展同名内置）
+        let mut reg = SubAgentRegistry::new();
+        let report = reg.scan_all();
+        out.push_str(&format!("\n── 文件定义 agent（{} 个, 错误 {} 个）──\n",
+            report.new + report.updated, report.errors.len()));
+        let mut defs: Vec<_> = reg.nt_domain_agents();
+        defs.sort_by(|a, b| a.name.cmp(&b.name));
+        for def in &defs {
+            let domain = def.domain.as_deref().unwrap_or("NT");
+            let tools = def.permission.as_ref()
+                .map(|p| p.allowed_tools_string())
+                .unwrap_or_else(|| "default".into());
+            out.push_str(&format!("  {} | domain={} | E8:{} | temp={} | tools=[{}]\n   {}\n",
+                def.name, domain, def.e8_mode_for(), def.temperature.unwrap_or(0.2), tools, def.description));
+        }
+        for e in &report.errors {
+            out.push_str(&format!("  [错误] {}\n", e));
+        }
+        out
+    }
 }
 
 /// 把一个内置 agent 档案物化进 SubagentManager（生产接线，非死代码）。

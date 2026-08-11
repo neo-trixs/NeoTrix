@@ -2,11 +2,18 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-/// 计算 agent 的 E8 模式：显式 e8Mode 优先，回落域默认。
+/// 计算 agent 的 E8 模式：显式 e8Mode 优先 → domain 字段 → name 前缀（`nt-scout` → `NT-SCOUT`）。
 pub fn e8_mode_for(def: &SubAgentDef) -> u8 {
     def.e8_mode
         .or_else(|| def.domain.as_deref().and_then(domain_default_e8_mode))
+        .or_else(|| domain_from_name(&def.name).and_then(|d| domain_default_e8_mode(&d)))
         .unwrap_or(0) as u8
+}
+
+/// 从 agent 名解析域：`nt-scout` → `NT-SCOUT`；非 `nt-` 前缀返回 None。
+pub fn domain_from_name(name: &str) -> Option<String> {
+    name.strip_prefix("nt-")
+        .map(|s| format!("NT-{}", s.to_uppercase()))
 }
 
 /// NT 域 → 默认 E8 Hexagram 模式映射。
@@ -146,6 +153,7 @@ impl SubAgentDef {
     pub fn e8_mode_for(&self) -> u32 {
         self.e8_mode
             .or_else(|| self.domain.as_deref().and_then(domain_default_e8_mode))
+            .or_else(|| domain_from_name(&self.name).and_then(|d| domain_default_e8_mode(&d)))
             .unwrap_or(0)
     }
 
@@ -747,8 +755,9 @@ body"#;
 
         reg.add_project_dir(tmp_root.clone());
         let report = reg.scan_all();
-        assert_eq!(report.new, 1);
-        assert!(reg.get("code-reviewer").is_some());
+        // 注册的文件必须被扫描到（用户目录 ~/.neotrix/agents/ 可能存在 NT 域文件，不设精确计数）
+        assert!(reg.get("code-reviewer").is_some(), "registered file should be found");
+        assert!(report.new >= 1, "at least the test file must be new");
 
         let _ = std::fs::remove_dir_all(&tmp_root);
     }

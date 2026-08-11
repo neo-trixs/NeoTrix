@@ -48,6 +48,8 @@ impl CliCommand for AgentCmd {
     fn description(&self) -> &str {
         "Subagent管理: /agent spawn <name> <mode> | /agent list | /agent talk <id> <message> | /agent kill <id> | /agent status <id> | /agent background <name> <mode>"
     }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok(
@@ -56,6 +58,10 @@ impl CliCommand for AgentCmd {
         }
         match args[0].as_str() {
             "catalog" => {
+                if args.len() > 1 && args[1] == "file" {
+                    // 文件驱动 agent 目录（~/.neotrix/agents/ + 项目 .neotrix/agents/）
+                    return CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_full_text());
+                }
                 return CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_text());
             }
             "spawn" => {
@@ -204,6 +210,8 @@ impl CliCommand for DiscoverCmd {
     fn name(&self) -> &str { "/discover" }
     fn aliases(&self) -> Vec<&str> { vec!["/scan", "/dsc"] }
     fn description(&self) -> &str { "扫描网络中的 NeoTrix 代理: /discover [--json] [--port <port>] [--duration <ms>]" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let port = args.iter()
@@ -288,6 +296,8 @@ impl CliCommand for McpCmd {
     fn name(&self) -> &str { "/mcp" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "MCP: /mcp list|status|discover|search <q>|publish <name> <cmd>" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         if args.is_empty() || (args.len() == 1 && args[0] == "--json") {
