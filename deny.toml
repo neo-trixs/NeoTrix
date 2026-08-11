@@ -4,6 +4,38 @@ unmaintained = "warn"
 notice = "warn"
 yanked = "warn"
 ignore = [
+    # ── 上游约束豁免（2026-08-10 审计）────────────────────────────
+    # 以下漏洞的 crate 均为第三方传递依赖，上游无修复版本（patched=NONE），
+    # 无法通过 cargo update 解决。逐条记录理由，禁止无理由 ignore。
+    #
+    # wasmtime 41.0.4 — 经 agent-sandbox 0.4.0（最新版）传递，sandbox feature 启用时进入构建图。
+    #   agent-sandbox 上游未升级 wasmtime，13 个 advisory 均无 patched 版本。
+    #   直接声明的 wasmtime 42.0.2 已满足 RUSTSEC-2026-0091（solution >=42.0.2）。
+    "RUSTSEC-2026-0085", "RUSTSEC-2026-0086", "RUSTSEC-2026-0087", "RUSTSEC-2026-0088",
+    "RUSTSEC-2026-0089", "RUSTSEC-2026-0092", "RUSTSEC-2026-0093", "RUSTSEC-2026-0094",
+    "RUSTSEC-2026-0095", "RUSTSEC-2026-0096", "RUSTSEC-2026-0099", "RUSTSEC-2026-0114",
+    "RUSTSEC-2026-0222",
+    # quick-xml 0.37.5 — 经 self_update 0.42（rustls feature）传递，self-update feature 启用时进入。
+    #   self_update 上游未升级 quick-xml（1.0.0-rc.6 仍依赖旧版）；DoS 类漏洞非 RCE。
+    "RUSTSEC-2026-0118", "RUSTSEC-2026-0195",
+    # rustls-webpki 0.101.7 — 经 rustls 0.21（tokio-rustls 0.24 传递）进入，rustls 0.21 已 EOL。
+    "RUSTSEC-2026-0098", "RUSTSEC-2026-0104", "RUSTSEC-2026-0194",
+    # GTK/glib 系 — Tauri 桌面依赖（gtk/gdk/glib 0.18），上游无修复。
+    "RUSTSEC-2024-0411", "RUSTSEC-2024-0412", "RUSTSEC-2024-0413", "RUSTSEC-2024-0414",
+    "RUSTSEC-2024-0415", "RUSTSEC-2024-0416", "RUSTSEC-2024-0417", "RUSTSEC-2024-0418",
+    "RUSTSEC-2024-0419", "RUSTSEC-2024-0420", "RUSTSEC-2025-0098", "RUSTSEC-2025-0141",
+    # unic-* 系 — unicode 工具链传递依赖，上游无修复。
+    "RUSTSEC-2025-0075", "RUSTSEC-2025-0080", "RUSTSEC-2025-0081", "RUSTSEC-2025-0100",
+    "RUSTSEC-2026-0192",
+    # 其他上游约束
+    "RUSTSEC-2024-0370",  # ttf-parser — 字体解析，无修复
+    "RUSTSEC-2024-0384",  # number_prefix — 无修复
+    "RUSTSEC-2024-0429",  # lru — 无修复
+    "RUSTSEC-2024-0436",  # proc-macro-error — 无修复
+    "RUSTSEC-2025-0119",  # paste — 无修复
+    "RUSTSEC-2026-0119",  # hickory-proto — 无修复
+    "RUSTSEC-2026-0002",  # 待确认
+    # ── 历史豁免（保留）──────────────────────────────────────────
     # wasmtime RCE — transitive via cap-std, no direct usage, pending upstream patch
     "RUSTSEC-2024-0370",
     # hickory-proto — transitive via trust-dns-resolver, no direct DNS usage

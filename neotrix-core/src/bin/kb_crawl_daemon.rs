@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use std::time::{Duration, Instant};
 
 use neotrix::neotrix::nt_memory_kb::KnowledgeBase;

@@ -5,6 +5,7 @@
 //!
 //! Usage: cargo run -p neotrix --bin neotrix-shanhai-geo
 
+#![forbid(unsafe_code)]
 use neotrix::neotrix::nt_memory_kb::nt_memory_types::*;
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
 use neotrix::neotrix::nt_shanhai_geo::*;

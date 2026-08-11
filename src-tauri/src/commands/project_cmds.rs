@@ -281,6 +281,43 @@ pub fn project_scan_directory(path: String) -> Result<Project, String> {
 
 use crate::commands::types::{FlatFileNode, ProjectInfo};
 
+/// 路径安全校验：拒绝 `..` 逃逸与根目录/前缀组件，且最终路径必须在用户主目录内。
+/// 与 capabilities 的 fs scope（$HOME/**）保持一致，防止前端任意文件读写。
+fn resolve_safe_path(path: &str) -> Result<std::path::PathBuf, NeoTrixError> {
+    let p = std::path::Path::new(path);
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+    let home_path = std::path::Path::new(&home);
+
+    // 拒绝路径穿越组件
+    for comp in p.components() {
+        if matches!(
+            comp,
+            std::path::Component::ParentDir
+                | std::path::Component::RootDir
+                | std::path::Component::Prefix(_)
+        ) {
+            return Err(NeoTrixError::Brain(format!(
+                "Invalid path (traversal/root not allowed): {}",
+                path
+            )));
+        }
+    }
+    // 相对路径锚定到主目录
+    let abs = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        home_path.join(p)
+    };
+    // 最终路径必须落在主目录内
+    if !abs.starts_with(home_path) {
+        return Err(NeoTrixError::Brain(format!(
+            "Path escapes home directory: {}",
+            path
+        )));
+    }
+    Ok(abs)
+}
+
 #[command]
 pub fn read_dir_recursive(path: String, max_depth: Option<u32>) -> Result<Vec<FlatFileNode>, NeoTrixError> {
     fn read_dir(path: &std::path::Path, depth: u32, max_depth: u32, out: &mut Vec<FlatFileNode>) {
@@ -297,19 +334,22 @@ pub fn read_dir_recursive(path: String, max_depth: Option<u32>) -> Result<Vec<Fl
             }
         }
     }
+    let safe = resolve_safe_path(&path)?;
     let mut out = Vec::new();
-    read_dir(std::path::Path::new(&path), 0, max_depth.unwrap_or(3), &mut out);
+    read_dir(&safe, 0, max_depth.unwrap_or(3), &mut out);
     Ok(out)
 }
 
 #[command]
 pub fn read_file(path: String) -> Result<String, NeoTrixError> {
-    std::fs::read_to_string(&path).map_err(|e| NeoTrixError::Brain(e.to_string()))
+    let safe = resolve_safe_path(&path)?;
+    std::fs::read_to_string(&safe).map_err(|e| NeoTrixError::Brain(e.to_string()))
 }
 
 #[command]
 pub fn write_file(path: String, content: String) -> Result<(), NeoTrixError> {
-    std::fs::write(&path, &content).map_err(|e| NeoTrixError::Brain(e.to_string()))
+    let safe = resolve_safe_path(&path)?;
+    std::fs::write(&safe, &content).map_err(|e| NeoTrixError::Brain(e.to_string()))
 }
 
 #[command]

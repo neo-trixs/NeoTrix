@@ -35,6 +35,7 @@
 //!   cargo run -p neotrix --bin neotrix-experience compress [--all]
 //!   cargo run -p neotrix --bin neotrix-experience gen-index [--out FILE] [--limit N]
 
+#![forbid(unsafe_code)]
 use chrono::TimeZone;
 use clap::{Parser, Subcommand};
 use flate2::read::ZlibDecoder;

@@ -10,6 +10,7 @@
 //!   cargo run -p neotrix --bin neotrix-shanhai-query schools
 //!   cargo run -p neotrix --bin neotrix-shanhai-query export-geojson [path]
 
+#![forbid(unsafe_code)]
 use neotrix::neotrix::nt_memory_kb::nt_memory_schema;
 use neotrix::neotrix::nt_shanhai_geo::{export_geojson, shanhai_evidence, shanhai_mappings, shanhai_peaks, shanhai_schools, shanhai_stats};
 use rusqlite::Connection;

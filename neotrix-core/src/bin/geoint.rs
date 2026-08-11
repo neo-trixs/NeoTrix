@@ -20,6 +20,7 @@
 //!
 //! port of: mil/officer/geoint/pipeline.py (cycle 222 迁移, 零 Python 运行时依赖)
 
+#![forbid(unsafe_code)]
 use clap::Parser;
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;

@@ -5,6 +5,7 @@
 //!
 //! Usage: cargo run -p neotrix --bin neotrix-shanhai-ingest
 
+#![forbid(unsafe_code)]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use neotrix::neotrix::nt_memory_kb::nt_memory_resource_ingest::*;

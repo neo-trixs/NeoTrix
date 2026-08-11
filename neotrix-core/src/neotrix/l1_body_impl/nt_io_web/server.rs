@@ -195,6 +195,11 @@ pub async fn start_server_with(
         })
     });
 
+    // 零信任绑定策略：无 API token 时只绑定回环地址（127.0.0.1），
+    // 防止局域网内未鉴权访问推理/知识库 API。配置 token 后才暴露 0.0.0.0。
+    let has_token = api_token.is_some();
+    let bind_host = if has_token { "0.0.0.0" } else { "127.0.0.1" };
+
     let state = AppState {
         brain: Arc::new(Mutex::new(brain)),
         bank: Arc::new(Mutex::new(bank)),
@@ -229,7 +234,7 @@ pub async fn start_server_with(
         app = app.merge(ewhr_router);
     }
 
-    let addr = format!("0.0.0.0:{}", port);
+    let addr = format!("{}:{}", bind_host, port);
     let listener = match tokio::net::TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
@@ -241,6 +246,9 @@ pub async fn start_server_with(
     println!("╔══════════════════════════════════════════════╗");
     println!("║     NeoTrix Web UI                          ║");
     println!("║     Listening on http://{}               ║", addr);
+    if !has_token {
+        println!("║     ⚠ 无 API token — 仅绑定回环地址            ║");
+    }
     println!("╚══════════════════════════════════════════════╝");
 
     if let Err(e) = axum::serve(listener, app).await {
