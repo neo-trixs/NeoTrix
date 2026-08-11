@@ -2,11 +2,27 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::skill_list_all;
+use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine;
 use crate::neotrix::nt_mind::SelfIteratingBrain;
+
+/// 惰性 KB 单例 — UCN Phase 1 读通: skill list 优先从 skills_index 表读。
+static KB: OnceLock<Arc<KnowledgeBase>> = OnceLock::new();
+
+fn kb() -> Option<Arc<KnowledgeBase>> {
+    let arc = KB.get_or_init(|| {
+        Arc::new(KnowledgeBase::open(None).unwrap_or_else(|_| {
+            // 兜底: 打开默认路径失败时退回临时库, 保持 CLI 可用
+            KnowledgeBase::open(Some(std::env::temp_dir().join("neotrix-kb-fallback.db"))).expect("KB fallback open")
+        }))
+    });
+    Some(Arc::clone(arc))
+}
 
 pub struct SkillCmd;
 
@@ -65,11 +81,45 @@ impl SkillCmd {
     fn engine(&self) -> SkillEngine {
         let dir = Self::skills_dir();
         let mut engine = SkillEngine::new(dir);
+        // UCN Phase 1 写通: 挂接 KB, load_all 末尾自动同步进 skills_index 表
+        if let Some(kb) = kb() {
+            engine = engine.with_kb(kb);
+        }
         engine.load_all();
         engine
     }
 
     fn list_skills(&self) -> CommandOutput {
+        // UCN Phase 1 读通: 优先从 KB skills_index 表读; 表空则回退文件扫描+写通
+        if let Some(kb) = kb() {
+            match kb.raw_conn() {
+                Ok(conn) => match skill_list_all(&conn, 200) {
+                    Ok(recs) if !recs.is_empty() => {
+                        let mut output = format!("Found {} skills (KB index):\n\n", recs.len());
+                        for (i, r) in recs.iter().enumerate() {
+                            let desc = r.description.as_deref().unwrap_or("—");
+                            output.push_str(&format!("{}. {} — {}\n", i + 1, r.name, desc));
+                            if let Some(path) = &r.source_path {
+                                output.push_str(&format!("     source: {}\n", path));
+                            }
+                            if let Some(tags) = &r.tags {
+                                output.push_str(&format!("     tags: {}\n", tags));
+                            }
+                        }
+                        output.push_str("\n(KB skills_index — /skills scan 增量刷新, /skills info <name> 查详情)");
+                        return CommandOutput::ok(&output);
+                    }
+                    Ok(_) => {} // 表空 → 回退文件扫描 (下方)
+                    Err(e) => {
+                        return CommandOutput::err(&format!("KB skills_index 读取失败: {}", e));
+                    }
+                },
+                Err(e) => {
+                    return CommandOutput::err(&format!("KB 连接失败: {}", e));
+                }
+            }
+        }
+        // 回退: 文件系统扫描 (老路径)
         let engine = self.engine();
         let all = engine.list_all();
         if all.is_empty() {
@@ -218,25 +268,40 @@ impl SkillCmd {
     }
 
     fn scan_skills(&self) -> CommandOutput {
-        let legacy = SkillEngine::discover_skills();
+        // UCN Phase 1 写通: 挂接 KB, load_all 自动同步进 skills_index 表
         let dir = Self::skills_dir();
         let mut engine = SkillEngine::new(dir.clone());
+        if let Some(kb) = kb() {
+            engine = engine.with_kb(kb);
+        }
         let loaded = engine.load_all();
+        let sync_note = if let Some(kb) = kb() {
+            match kb.raw_conn() {
+                Ok(conn) => match engine.sync_to_kb_index(&conn) {
+                    Ok(n) => format!("\nKB skills_index 写通: {} 条新写入/更新", n),
+                    Err(e) => format!("\nKB 写通失败: {}", e),
+                },
+                Err(e) => format!("\nKB 连接失败: {}", e),
+            }
+        } else {
+            String::new()
+        };
+        let legacy = SkillEngine::discover_skills();
         let msg = if loaded.is_empty() && legacy.is_empty() {
             "No skills found. Use /skills install <path> to install one.".to_string()
         } else {
-            let mut lines = format!("Scanned and loaded {} skill(s) from {}:\n", loaded.len(), dir.display());
+            let mut lines = format!("Scanned and loaded {} skill(s) from {}:", loaded.len(), dir.display());
             for s in &loaded {
-                lines.push_str(&format!("  {} — {}\n", s.name, s.description));
+                lines.push_str(&format!("\n  {} — {}", s.name, s.description));
             }
             if !legacy.is_empty() {
-                lines.push_str(&format!("\nAlso discovered {} legacy skill(s) outside engine directory:\n", legacy.len()));
+                lines.push_str(&format!("\n\nAlso discovered {} legacy skill(s) outside engine directory:", legacy.len()));
                 for s in &legacy {
-                    lines.push_str(&format!("  {} — {} (at {})\n", s.name, s.description, s.path.display()));
+                    lines.push_str(&format!("\n  {} — {} (at {})", s.name, s.description, s.path.display()));
                 }
             }
             lines
         };
-        CommandOutput::ok(&msg)
+        CommandOutput::ok(&format!("{}{}", msg, sync_note))
     }
 }

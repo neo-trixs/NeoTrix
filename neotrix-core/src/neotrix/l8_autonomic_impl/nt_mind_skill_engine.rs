@@ -12,6 +12,8 @@ use tokio::sync::RwLock;
 
 use crate::core::nt_core_gwt::workspace::GlobalWorkspace;
 use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::ProceduralMemoryRecord;
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::{skill_upsert, SkillRecord};
+use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
 use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, MindHookRegistry, HookContext, HookResult};
 
 /// A single skill entry parsed from a markdown file with YAML frontmatter.
@@ -129,6 +131,9 @@ pub struct SkillEngine {
     hooks: Option<MindHookRegistry>,
     /// Optional GWT for broadcasting activation events
     gwt: Option<Arc<RwLock<GlobalWorkspace>>>,
+    /// Optional KB handle: when attached, load_all() auto-syncs the skill
+    /// index into the KB `skills_index` table (UCN Phase 1 写通).
+    kb: Option<Arc<KnowledgeBase>>,
 }
 
 impl SkillEngine {
@@ -140,7 +145,17 @@ impl SkillEngine {
             e8_index: HashMap::new(),
             hooks: None,
             gwt: None,
+            kb: None,
         }
+    }
+
+    pub fn with_kb(mut self, kb: Arc<KnowledgeBase>) -> Self {
+        self.kb = Some(kb);
+        self
+    }
+
+    pub fn kb(&self) -> Option<&Arc<KnowledgeBase>> {
+        self.kb.as_ref()
     }
 
     pub fn with_hooks(mut self, hooks: MindHookRegistry) -> Self {
@@ -188,7 +203,48 @@ impl SkillEngine {
 
         self.skills = loaded;
         self.build_index();
+        // UCN Phase 1 写通: 若挂接 KB, 扫描后自动把索引同步进 skills_index 表。
+        if let Some(kb) = self.kb.clone() {
+            if let Ok(conn) = kb.raw_conn() {
+                let _ = self.sync_to_kb_index(&conn);
+            }
+        }
         self.skills.clone()
+    }
+
+    /// 把当前内存索引同步到 KB `skills_index` 表 (UCN Phase 1 写通)。
+    /// 返回本次真正写入/更新的条数; 内容未变化 (content_hash 相同) 被去重跳过。
+    pub fn sync_to_kb_index(&self, conn: &rusqlite::Connection) -> Result<usize, String> {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::skill_content_hash;
+        use std::collections::HashSet;
+
+        let mut written = 0usize;
+        let mut seen: HashSet<String> = HashSet::new();
+        for skill in &self.skills {
+            if !seen.insert(skill.name.clone()) {
+                continue;
+            }
+            let record = SkillRecord {
+                id: uuid::Uuid::new_v4().to_string(),
+                name: skill.name.clone(),
+                description: Some(skill.description.clone()),
+                source_path: Some(skill.path.to_string_lossy().to_string()),
+                tags: if skill.triggers.is_empty() {
+                    None
+                } else {
+                    Some(skill.triggers.join(","))
+                },
+                is_builtin: false,
+                last_indexed_at: Some(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::now()),
+                created_at: crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::now(),
+                updated_at: crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::now(),
+                content_hash: Some(skill_content_hash(&skill.content)),
+            };
+            if skill_upsert(conn, &record.name, &record)? {
+                written += 1;
+            }
+        }
+        Ok(written)
     }
 
     /// Build trigger and E8 mode indices.
@@ -1103,5 +1159,74 @@ low"#;
         let skill = loaded.iter().find(|s| s.name == "Installed Procedural Skill");
         assert!(skill.is_some(), "installed skill should be loadable");
         assert_eq!(skill.unwrap().e8_modes, vec![5, 10, 15]);
+    }
+
+    fn kb_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_schema::initialize(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_sync_to_kb_index_write_through_and_dedup() {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::skill_list_all;
+
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        let skill_dir = skills_dir.join("rust-analyzer");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), sample_skill_content()).unwrap();
+
+        let conn = kb_conn();
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+        assert_eq!(engine.list_all().len(), 1);
+
+        // 首次写通: 1 条真正写入
+        assert_eq!(engine.sync_to_kb_index(&conn).unwrap(), 1);
+        // 二次写通: 内容未变化 → 去重, 0 写入
+        assert_eq!(engine.sync_to_kb_index(&conn).unwrap(), 0, "内容未变化必须去重 (避免每命令全量写)");
+
+        let recs = skill_list_all(&conn, 10).unwrap();
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].name, "rust-analyzer");
+        assert!(recs[0].content_hash.is_some(), "写通必须携带 content_hash");
+        assert_eq!(recs[0].tags.as_deref(), Some("rust,cargo,unsafe,lifetime,ownership"));
+
+        // 内容变化 → 再次写入 (同 name 更新)
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            sample_skill_content().replace("priority: 80", "priority: 85"),
+        )
+        .unwrap();
+        engine.load_all();
+        assert_eq!(engine.sync_to_kb_index(&conn).unwrap(), 1, "内容变化应重新写入");
+        let recs = skill_list_all(&conn, 10).unwrap();
+        assert_eq!(recs.len(), 1, "同 name 更新而非新增");
+    }
+
+    #[test]
+    fn test_load_all_auto_syncs_to_kb() {
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::skill_list_all;
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        let skill_dir = skills_dir.join("rust-analyzer");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), sample_skill_content()).unwrap();
+
+        let kb = KnowledgeBase::open(Some(dir.path().join("kb.db"))).expect("KB open");
+        let kb = Arc::new(kb);
+        let mut engine = SkillEngine::new(skills_dir).with_kb(kb.clone());
+        let loaded = engine.load_all();
+        assert_eq!(loaded.len(), 1);
+
+        let conn = kb.conn.lock().unwrap();
+        let recs = skill_list_all(&conn, 10).unwrap();
+        assert_eq!(recs.len(), 1, "load_all 后应自动写通到 skills_index");
+        assert_eq!(recs[0].name, "rust-analyzer");
     }
 }

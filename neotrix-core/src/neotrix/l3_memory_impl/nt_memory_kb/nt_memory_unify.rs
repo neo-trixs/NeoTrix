@@ -19,7 +19,7 @@ pub const NONCE_LEN: usize = 12;
 /// 视为压缩数据: 不尝试解码为明文 (避免乱码), 按无数据跳过, 配合 neotrix-experience 完整解压读取。
 pub const VALUE_COMPRESSED_MAGIC: &[u8] = b"NTZ1";
 
-fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() as i64
 }
 
@@ -549,23 +549,38 @@ pub struct SkillRecord {
     pub last_indexed_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// 技能内容指纹 (sha256 hex)。写通去重依据: 内容未变化则不重复 upsert。
+    pub content_hash: Option<String>,
 }
 
-pub fn skill_upsert(conn: &Connection, name: &str, record: &SkillRecord) -> Result<(), String> {
+/// 计算技能内容 (含 YAML frontmatter 全文) 的 sha256 指纹, 用于写通去重。
+pub fn skill_content_hash(content: &str) -> String {
+    hex::encode(Sha256::digest(content.as_bytes()))
+}
+
+/// Upsert 一条技能记录到 skills_index。
+/// 返回 `true` = 本次真正写入/更新; `false` = 内容未变化被去重跳过
+/// (ON CONFLICT 的 WHERE 条件保证同 hash 不落盘, 避免每命令全量写)。
+pub fn skill_upsert(conn: &Connection, name: &str, record: &SkillRecord) -> Result<bool, String> {
     let ts = now();
-    conn.execute(
-        "INSERT INTO skills_index (id, name, description, source_path, tags, is_builtin, last_indexed_at, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-         ON CONFLICT(name) DO UPDATE SET
-           description=excluded.description, source_path=excluded.source_path,
-           tags=excluded.tags, last_indexed_at=excluded.last_indexed_at, updated_at=excluded.updated_at",
-        rusqlite::params![
-            record.id, name, record.description, record.source_path, record.tags,
-            record.is_builtin as i32, record.last_indexed_at, record.created_at, ts,
-        ],
-    )
-    .map_err(|e| format!("skill_upsert: {}", e))?;
-    Ok(())
+    let rows = conn
+        .execute(
+            "INSERT INTO skills_index (id, name, description, source_path, tags, is_builtin, last_indexed_at, created_at, updated_at, content_hash)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+             ON CONFLICT(name) DO UPDATE SET
+               description=excluded.description, source_path=excluded.source_path,
+               tags=excluded.tags, last_indexed_at=excluded.last_indexed_at,
+               updated_at=excluded.updated_at, content_hash=excluded.content_hash
+             WHERE skills_index.content_hash IS NOT excluded.content_hash
+                OR skills_index.content_hash != excluded.content_hash",
+            rusqlite::params![
+                record.id, name, record.description, record.source_path, record.tags,
+                record.is_builtin as i32, record.last_indexed_at, record.created_at, ts,
+                record.content_hash,
+            ],
+        )
+        .map_err(|e| format!("skill_upsert: {}", e))?;
+    Ok(rows > 0)
 }
 
 pub fn skill_search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<SkillRecord>, String> {
@@ -573,7 +588,7 @@ pub fn skill_search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<
     let mut stmt = conn
         .prepare(
             "SELECT id, name, description, source_path, tags,
-                    is_builtin, last_indexed_at, created_at, updated_at
+                    is_builtin, last_indexed_at, created_at, updated_at, content_hash
              FROM skills_index
              WHERE name LIKE ?1 OR description LIKE ?1 OR tags LIKE ?1
              ORDER BY last_indexed_at DESC NULLS LAST
@@ -592,6 +607,7 @@ pub fn skill_search(conn: &Connection, query: &str, limit: usize) -> Result<Vec<
                 last_indexed_at: row.get(6)?,
                 created_at: row.get(7)?,
                 updated_at: row.get(8)?,
+                content_hash: row.get(9)?,
             })
         })
         .map_err(|e| format!("skill_search query: {}", e))?;
@@ -606,7 +622,7 @@ pub fn skill_list_all(conn: &Connection, limit: usize) -> Result<Vec<SkillRecord
     let mut stmt = conn
         .prepare(
             "SELECT id, name, description, source_path, tags,
-                    is_builtin, last_indexed_at, created_at, updated_at
+                    is_builtin, last_indexed_at, created_at, updated_at, content_hash
              FROM skills_index ORDER BY name LIMIT ?1",
         )
         .map_err(|e| format!("skill_list_all prepare: {}", e))?;
@@ -634,6 +650,7 @@ fn map_skill_row(row: &rusqlite::Row) -> rusqlite::Result<SkillRecord> {
         last_indexed_at: row.get(6)?,
         created_at: row.get(7)?,
         updated_at: row.get(8)?,
+        content_hash: row.get(9)?,
     })
 }
 
@@ -1018,6 +1035,7 @@ pub fn migrate_from_files(conn: &Connection) -> MigrationReport {
                                 last_indexed_at: Some(now()),
                                 created_at: now(),
                                 updated_at: now(),
+                                content_hash: Some(skill_content_hash(&content)),
                             };
                             if skill_upsert(conn, &record.name, &record).is_ok() {
                                 report.skills_indexed += 1;
@@ -1302,11 +1320,70 @@ mod tests {
             last_indexed_at: Some(now()),
             created_at: now(),
             updated_at: now(),
+            content_hash: Some("abc123".into()),
         };
         skill_upsert(&conn, "test-skill", &record).unwrap();
         let results = skill_search(&conn, "test", 10).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "test-skill");
+        assert_eq!(results[0].content_hash.as_deref(), Some("abc123"));
+    }
+
+    fn dedup_record(hash: &str) -> SkillRecord {
+        SkillRecord {
+            id: "id-dedup".into(),
+            name: "dedup-skill".into(),
+            description: Some("desc".into()),
+            source_path: Some("/path".into()),
+            tags: None,
+            is_builtin: false,
+            last_indexed_at: Some(now()),
+            created_at: now(),
+            updated_at: now(),
+            content_hash: Some(hash.into()),
+        }
+    }
+
+    #[test]
+    fn test_skill_upsert_dedup_same_hash_skips() {
+        let conn = test_conn();
+        assert!(skill_upsert(&conn, "dedup-skill", &dedup_record("h1")).unwrap(), "首次插入应写入");
+        assert!(
+            !skill_upsert(&conn, "dedup-skill", &dedup_record("h1")).unwrap(),
+            "内容 hash 未变化时应去重跳过 (避免每命令全量写)"
+        );
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM skills_index WHERE name='dedup-skill'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 1, "去重不得产生重复行");
+        let recs = skill_list_all(&conn, 10).unwrap();
+        assert_eq!(recs.len(), 1);
+        assert_eq!(recs[0].content_hash.as_deref(), Some("h1"));
+    }
+
+    #[test]
+    fn test_skill_upsert_dedup_changed_hash_rewrites() {
+        let conn = test_conn();
+        assert!(skill_upsert(&conn, "dedup-skill", &dedup_record("h1")).unwrap());
+        assert!(
+            skill_upsert(&conn, "dedup-skill", &dedup_record("h2")).unwrap(),
+            "内容 hash 变化时应重新写入"
+        );
+        let recs = skill_list_all(&conn, 10).unwrap();
+        assert_eq!(recs.len(), 1, "同 name 更新而非新增");
+        assert_eq!(recs[0].content_hash.as_deref(), Some("h2"));
+        // 新 hash 后再次同 hash → 去重
+        assert!(!skill_upsert(&conn, "dedup-skill", &dedup_record("h2")).unwrap());
+    }
+
+    #[test]
+    fn test_skill_content_hash_deterministic() {
+        let h1 = skill_content_hash("---\nname: test\n---\nbody");
+        let h2 = skill_content_hash("---\nname: test\n---\nbody");
+        let h3 = skill_content_hash("---\nname: other\n---\nbody");
+        assert_eq!(h1, h2, "同内容 hash 必须稳定");
+        assert_ne!(h1, h3, "不同内容 hash 必须不同");
+        assert_eq!(h1.len(), 64, "sha256 hex 长度为 64");
     }
 
     #[test]
