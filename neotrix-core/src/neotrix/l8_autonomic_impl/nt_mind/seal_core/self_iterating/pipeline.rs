@@ -10,6 +10,18 @@ use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatu
 // P0-2 接线 (OpenMontage delivery_promise 吸收): 用 ContractAwareStage 包装
 // 蒸馏阶段, 附加 DeliveryPromiseContract 防静默降级。
 use super::stage_contracts::{ContractAwareStage, DeliveryPromiseContract, DeliveryPromise};
+use crate::neotrix::l8_autonomic_impl::nt_mind::reason::stagnation::StageInsight;
+
+/// step-budget 吸收: 把 StageInsight 转成可打印的引导文本 (护栏非上限)。
+fn stage_insight_text(insight: &StageInsight) -> String {
+    match insight {
+        StageInsight::None => String::new(),
+        StageInsight::Cyclic(m) => format!("阶段循环: {}", m),
+        StageInsight::DeadEnd(m) => format!("死胡同: {}", m),
+        StageInsight::Stalling(m) => format!("停滞: {}", m),
+        StageInsight::Escalate(m) => format!("升级重规划: {}", m),
+    }
+}
 
 
 // Pre-register all available BrainStage implementations from sibling modules.
@@ -125,22 +137,71 @@ pub struct BrainPipeline {
 }
 
 impl BrainPipeline {
+    /// Execute all stages with visible per-stage progress.
+    ///
+    /// Previously this loop ran 40+ stages with zero output — from the caller's
+    /// perspective the SEAL loop looked frozen ("IO 空转无反馈"). Now each active
+    /// stage prints `[SEAL] [NN%] i/N name` before processing and a completion
+    /// line with elapsed time, so long IO/reasoning steps show liveness. The
+    /// lightweight println (not indicatif) keeps output stable in non-TTY
+    /// contexts (tests, pipes) while still satisfying the progress contract.
     pub fn execute(&self, brain: &mut SelfIteratingBrain) -> NeoTrixResult<()> {
-        for stage in &self.stages {
-            if !brain.iteration.is_multiple_of(stage.frequency() as u64) {
-                continue;
-            }
+        // ── Pre-compute active stages (frequency-gated) for an honest total ──
+        let active: Vec<&Box<dyn BrainStage>> = self
+            .stages
+            .iter()
+            .filter(|s| brain.iteration.is_multiple_of(s.frequency() as u64))
+            .collect();
+        let total = active.len();
+
+        if total == 0 {
+            println!("[SEAL] pipeline: 0 active stages (iteration {}), skip", brain.iteration);
+            return Ok(());
+        }
+        println!("[SEAL] pipeline: {} stages (iteration {})", total, brain.iteration);
+
+        for (idx, stage) in active.iter().enumerate() {
+            let pct = (idx * 100) / total;
             let stage_name = stage.name().to_string();
+
+            // Liveness signal BEFORE the (possibly slow) stage — the core fix.
+            println!("[SEAL] [{:>3}%] {}/{} ▸ {}", pct, idx + 1, total, stage_name);
+
+            let started = std::time::Instant::now();
+            let mut stage_produced = true; // 默认产出; skip/rollback 视为未产出
             match stage.process(brain)? {
                 StageDecision::Continue => {}
-                StageDecision::Skip(_) => {}
+                StageDecision::Skip(reason) => {
+                    stage_produced = false;
+                    println!("[SEAL]        └─ skip: {}", reason);
+                }
                 StageDecision::Promote(champ) => {
                     brain.champion = Some(champ);
+                    println!("[SEAL]        └─ champion promoted");
                 }
                 StageDecision::Rollback(reason) => {
+                    println!("[SEAL]        └─ rollback: {}", reason);
                     return Err(NeoTrixError::Brain(format!("Pipeline rollback: {}", reason)));
                 }
             }
+            let elapsed_ms = started.elapsed().as_millis();
+            println!("[SEAL]        └─ done ({:.1}ms)", elapsed_ms as f64);
+
+            // step-budget 吸收 (L1/L2/L4) + ReflexGrad/VRR-Stop/TIDE 调研吸收:
+            // 阶段级停滞/循环/死胡同洞察 + 升级等级 + 信念 + loop ratio
+            match brain.stagnation.observe_stage(&stage_name, stage_produced) {
+                StageInsight::None => {}
+                insight => println!("[SEAL]        ⚠ {}", stage_insight_text(&insight)),
+            }
+            // 每 6 阶段打印一次控制面状态 (loopx 五问: 证据变化 + 循环继续?)
+            if idx % 6 == 5 {
+                let (lvl, lvl_name) = brain.stagnation.escalation_level();
+                println!(
+                    "[SEAL]        📊 控制面: 升级={}({}) 信念={:.2} LR={:.2}",
+                    lvl, lvl_name, brain.stagnation.validity(), brain.stagnation.loop_ratio()
+                );
+            }
+
             brain._stage_results.push(StageResult::new(&stage_name));
             const MAX_STAGE_RESULTS: usize = 1000;
             if brain._stage_results.len() > MAX_STAGE_RESULTS {

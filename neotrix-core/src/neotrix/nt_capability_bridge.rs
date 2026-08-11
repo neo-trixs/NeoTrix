@@ -184,7 +184,11 @@ impl ExperienceRouter {
 
         // 能力网进化: 静态路由 + 高信号
         if signal >= 0.6 {
-            if let Some((domain, tag)) = static_route(&entry.content) {
+            if let Some((_, tag)) = static_route(&entry.content) {
+                // 域修正: 条目自标域 (蒸馏/原经验权威) 优先于内容关键词暗示的域。
+                // 蒸馏合成内容会带跨域关键词 (如 NT-MIND 的 '双进程路由' 含 '路由'),
+                // 纯内容关键词路由会把经验误归因到它域 (NT-ACT tool_routing)。
+                let domain = parse_domain(&entry.domain_name);
                 return ExperienceDimension::CapabilityNetwork {
                     domain,
                     capability_tag: tag.clone(),
@@ -294,9 +298,18 @@ pub fn summarize(dims: &[ExperienceDimension]) -> String {
 /// experience_targets 区 → `neotrix-capability scan --apply` 消费执行 (bud/graft/strengthen)。
 /// 返回写入的目标数。
 pub fn promote_to_file(registry_path: &std::path::Path, dims: &[ExperienceDimension]) -> usize {
-    let Ok(content) = std::fs::read_to_string(registry_path) else {
-        eprintln!("[capability_bridge] registry 文件不可读: {}", registry_path.display());
-        return 0;
+    // 首次初始化: 文件不存在时生成 RegistryExport 骨架 (nodes/edges/experience_targets),
+    // 而不是报错 — 否则 experience.rs 的 fallback 路径 (两处皆不存在→创建 cwd 文件)
+    // 会在"目录已建、文件未建"时永远告警不可读。
+    let content = match std::fs::read_to_string(registry_path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            serde_json::json!({ "nodes": [], "edges": [], "experience_targets": [] }).to_string()
+        }
+        Err(e) => {
+            eprintln!("[capability_bridge] registry 文件不可读: {} ({})", registry_path.display(), e);
+            return 0;
+        }
     };
     let Ok(mut reg_json) = serde_json::from_str::<serde_json::Value>(&content) else {
         eprintln!("[capability_bridge] registry JSON 解析失败: {}", registry_path.display());
@@ -486,5 +499,103 @@ mod tests {
         let (dims, _) = ExperienceRouter::route_batch(&[entry]);
         let plans = ExperienceRouter::plan_evolution(&registry, &dims, "cycle-1");
         assert!(plans.is_empty(), "低信号经验不应生成计划");
+    }
+
+    #[test]
+    fn test_domain_from_entry_name_not_content_noise() {
+        // 域归因修正: 蒸馏合成经验的 content 含跨域关键词 (如 NT-MIND 的 '双进程路由'
+        // 含 '路由'), 纯内容路由会误归到 NT-ACT tool_routing。修正后域必须来自
+        // entry.domain_name (权威), 关键词只决定 capability_tag。
+        let entry = ExperienceEntry {
+            id: "e4".into(),
+            entry_type: "pattern".into(),
+            domain_name: "NT-MIND".into(),
+            content: "ReflexGrad 双进程路由吸收: 慢进程连续 5 次无产出触发因果重规划".into(),
+            not: None,
+            confidence: 0.9,
+            importance: 0.9,
+            verified_by: None,
+            verification_status: None,
+        };
+        let (dims, _) = ExperienceRouter::route_batch(&[entry]);
+        assert_eq!(dims.len(), 1, "应路由 1 个维度");
+        match &dims[0] {
+            ExperienceDimension::CapabilityNetwork { domain, capability_tag, .. } => {
+                assert_eq!(*domain, Domain::Mind, "域应来自条目自标 NT-MIND, 而非内容关键词");
+                assert!(
+                    matches!(capability_tag.as_str(), "tool_routing"),
+                    "capability_tag 仍由关键词决定: {}",
+                    capability_tag
+                );
+            }
+            other => panic!("应路由到能力网进化, 得到 {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_domain_fallback_to_core_on_unknown() {
+        // 未知域回退: parse_domain 未识别 → Domain::Core (不 panic, 保持既有行为)
+        let entry = ExperienceEntry {
+            id: "e5".into(),
+            entry_type: "pattern".into(),
+            domain_name: "NT-UNKNOWN-DOMAIN".into(),
+            content: "混合检索 rrf 融合显著提升".into(),
+            not: None,
+            confidence: 0.9,
+            importance: 0.9,
+            verified_by: None,
+            verification_status: None,
+        };
+        let (dims, _) = ExperienceRouter::route_batch(&[entry]);
+        match &dims[0] {
+            ExperienceDimension::CapabilityNetwork { domain, .. } => {
+                assert_eq!(*domain, Domain::Core, "未知域应回退 Core");
+            }
+            other => panic!("应路由到能力网进化, 得到 {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_promote_to_file_creates_skeleton_on_first_init() {
+        // 首次初始化修复: registry 文件不存在时, promote_to_file 应生成骨架而非告警返回 0。
+        // 复现 experience.rs fallback 路径 (两处皆不存在 → create_dir_all 后写 cwd 文件)。
+        let dir = std::env::temp_dir().join(format!("nt_cap_bridge_test_{}", std::process::id()));
+        let path = dir.join("capability_registry.json");
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::create_dir_all(&dir);
+
+        // 高信号能力网维度 (signal >= 0.7 才会写入)
+        let dims = vec![ExperienceDimension::CapabilityNetwork {
+            domain: Domain::Mind,
+            capability_tag: "loop-control".into(),
+            action: EvolutionAction::Strengthen {
+                node_id: "stagnation-detector".into(),
+                note: "ReflexGrad 双进程吸收".into(),
+            },
+            rationale: "ReflexGrad 双进程路由吸收".into(),
+            signal: 0.85,
+        }];
+
+        let written = promote_to_file(&path, &dims);
+        assert_eq!(written, 1, "首次初始化应写入 1 条迭代目标, 而非告警返回 0");
+
+        // 骨架 + 目标真实落盘可读
+        let content = std::fs::read_to_string(&path).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(v.get("nodes").is_some(), "骨架应含 nodes");
+        assert!(v.get("edges").is_some(), "骨架应含 edges");
+        let targets = v.get("experience_targets").and_then(|t| t.as_array()).unwrap();
+        assert_eq!(targets.len(), 1, "experience_targets 应含 1 条");
+        assert_eq!(targets[0]["capability"], "loop-control");
+
+        // 幂等: 二次调用追加而非覆盖 (保留历史目标)
+        let written2 = promote_to_file(&path, &dims);
+        assert_eq!(written2, 1, "二次调用应再写 1 条");
+        let content2 = std::fs::read_to_string(&path).unwrap();
+        let v2: serde_json::Value = serde_json::from_str(&content2).unwrap();
+        let targets2 = v2.get("experience_targets").and_then(|t| t.as_array()).unwrap();
+        assert_eq!(targets2.len(), 2, "追加而非覆盖, 应累计 2 条");
+
+        let _ = std::fs::remove_file(&path);
     }
 }
