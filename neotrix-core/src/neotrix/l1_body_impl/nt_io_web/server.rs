@@ -129,8 +129,9 @@ pub fn build_router(state: AppState) -> Router {
         // Frontend + fallback
         .route("/", get(handle_frontend))
         .fallback(not_found_handler)
-        // Auth middleware on API routes
-        .route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
+        // NOTE: auth middleware 不在 build_router 内套用——merge 进来的
+        // KB/EWHR 路由不会继承 base router 的 route_layer（axum 语义）。
+        // 统一在 start_server_with 对合并后的完整 router 套 auth（见下）。
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
         .with_state(state)
 }
@@ -220,7 +221,7 @@ pub async fn start_server_with(
         api_token,
     };
 
-    let mut app = build_router(state);
+    let mut app = build_router(state.clone());
 
     // Merge KB API routes if KnowledgeBase can be opened
     if let Some(kb_state) = crate::neotrix::nt_memory_kb::nt_memory_api::KbApiState::try_open_default() {
@@ -233,6 +234,11 @@ pub async fn start_server_with(
         let ewhr_router = crate::neotrix::nt_memory_historian::build_ewhr_router(ewhr_state);
         app = app.merge(ewhr_router);
     }
+
+    // Auth middleware on ALL API routes (含 merge 进来的 KB/EWHR 路由)。
+    // 必须在 merge 之后套用——axum 的 route_layer 只作用于当前 router 的路由，
+    // 先套再 merge 会导致 KB/EWHR 路由无鉴权（C-1 修复）。
+    app = app.route_layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
 
     let addr = format!("{}:{}", bind_host, port);
     let listener = match tokio::net::TcpListener::bind(&addr).await {

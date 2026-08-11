@@ -315,7 +315,10 @@ fn call_tool(name: &str, args: &serde_json::Value) -> Result<String, String> {
 
 fn tool_read_file(args: &serde_json::Value) -> Result<String, String> {
     let path = args.get("path").and_then(|v| v.as_str()).ok_or("Missing required field: path")?;
-    let content = std::fs::read_to_string(path).map_err(|e| format!("Failed to read '{}': {}", path, e))?;
+    // 路径校验：仅允许主目录内文件（复用 project_cmds 的 resolve_safe_path）
+    let safe = super::project_cmds::resolve_safe_path(path)
+        .map_err(|e| format!("Path rejected: {}", e))?;
+    let content = std::fs::read_to_string(&safe).map_err(|e| format!("Failed to read '{}': {}", safe.display(), e))?;
     let capped: String = content.chars().take(64 * 1024).collect();
     Ok(capped)
 }
@@ -323,17 +326,22 @@ fn tool_read_file(args: &serde_json::Value) -> Result<String, String> {
 fn tool_write_file(args: &serde_json::Value) -> Result<String, String> {
     let path = args.get("path").and_then(|v| v.as_str()).ok_or("Missing required field: path")?;
     let content = args.get("content").and_then(|v| v.as_str()).ok_or("Missing required field: content")?;
-    if let Some(parent) = std::path::Path::new(path).parent() {
+    // 路径校验：仅允许主目录内文件
+    let safe = super::project_cmds::resolve_safe_path(path)
+        .map_err(|e| format!("Path rejected: {}", e))?;
+    if let Some(parent) = safe.parent() {
         if !parent.as_os_str().is_empty() {
             std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent directories: {}", e))?;
         }
     }
-    std::fs::write(path, content).map_err(|e| format!("Failed to write '{}': {}", path, e))?;
-    Ok(format!("Wrote {} bytes to {}", content.len(), path))
+    std::fs::write(&safe, content).map_err(|e| format!("Failed to write '{}': {}", safe.display(), e))?;
+    Ok(format!("Wrote {} bytes to {}", content.len(), safe.display()))
 }
 
 fn tool_execute_terminal_command(args: &serde_json::Value) -> Result<String, String> {
     let command = args.get("command").and_then(|v| v.as_str()).ok_or("Missing required field: command")?;
+    // 命令白名单校验：复用 remote_cmds 的 validate_remote_command
+    super::remote_cmds::validate_remote_command(command)?;
     let output = Command::new("sh")
         .arg("-c")
         .arg(command)

@@ -281,39 +281,38 @@ pub fn project_scan_directory(path: String) -> Result<Project, String> {
 
 use crate::commands::types::{FlatFileNode, ProjectInfo};
 
-/// 路径安全校验：拒绝 `..` 逃逸与根目录/前缀组件，且最终路径必须在用户主目录内。
+/// 路径安全校验：最终路径必须在用户主目录内，且不包含 `..` 逃逸。
 /// 与 capabilities 的 fs scope（$HOME/**）保持一致，防止前端任意文件读写。
-fn resolve_safe_path(path: &str) -> Result<std::path::PathBuf, NeoTrixError> {
+///
+/// 注意：绝对路径（如前端文件对话框返回的 `/Users/neo/...`）是合法的，
+/// 只要其落在主目录内——不能因含 RootDir 组件就整体拒绝（否则功能回归）。
+pub(crate) fn resolve_safe_path(path: &str) -> Result<std::path::PathBuf, NeoTrixError> {
     let p = std::path::Path::new(path);
     let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
     let home_path = std::path::Path::new(&home);
 
-    // 拒绝路径穿越组件
-    for comp in p.components() {
-        if matches!(
-            comp,
-            std::path::Component::ParentDir
-                | std::path::Component::RootDir
-                | std::path::Component::Prefix(_)
-        ) {
-            return Err(NeoTrixError::Brain(format!(
-                "Invalid path (traversal/root not allowed): {}",
-                path
-            )));
-        }
-    }
     // 相对路径锚定到主目录
     let abs = if p.is_absolute() {
         p.to_path_buf()
     } else {
         home_path.join(p)
     };
-    // 最终路径必须落在主目录内
+    // 最终路径必须落在主目录内（词法前缀检查）
     if !abs.starts_with(home_path) {
         return Err(NeoTrixError::Brain(format!(
             "Path escapes home directory: {}",
             path
         )));
+    }
+    // 拒绝路径穿越组件（`..` 逃逸）。RootDir/Prefix 本身合法（绝对路径），
+    // 但 ParentDir 在任何位置都是逃逸信号。
+    for comp in abs.components() {
+        if matches!(comp, std::path::Component::ParentDir) {
+            return Err(NeoTrixError::Brain(format!(
+                "Invalid path (traversal not allowed): {}",
+                path
+            )));
+        }
     }
     Ok(abs)
 }

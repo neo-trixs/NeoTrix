@@ -59,22 +59,3 @@ pub fn send_notification(app: tauri::AppHandle, title: String, body: String) -> 
         .map_err(|e| NeoTrixError::Brain(format!("notification error: {}", e)))?;
     Ok(())
 }
-
-#[command]
-pub async fn execute_terminal_command(command: String) -> Result<String, NeoTrixError> {
-    let output = tokio::process::Command::new("sh")
-        .arg("-c")
-        .arg(&command)
-        .output()
-        .await
-        .map_err(|e| NeoTrixError::Command { cmd: format!("sh -c {}", command), exit_code: None, stderr: e.to_string() })?;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let combined = if stderr.is_empty() { stdout } else { format!("{}\n{}", stdout, stderr) };
-    Ok(combined)
-}
-
-#[command]
-pub async fn cli_command(input: String) -> Result<String, NeoTrixError> {
-    execute_terminal_command(input).await
-}

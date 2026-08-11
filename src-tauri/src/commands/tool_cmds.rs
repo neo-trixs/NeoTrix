@@ -62,6 +62,16 @@ fn dispatch_tool(tool: &str, args: &serde_json::Value) -> ToolResponse {
         }
         "webfetch" | "fetch" => {
             let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
+            // SSRF 防护：仅允许 http/https scheme
+            let scheme_ok = url.starts_with("http://") || url.starts_with("https://");
+            if !scheme_ok {
+                return ToolResponse {
+                    success: false,
+                    output: String::new(),
+                    error: Some(format!("URL scheme not allowed (http/https only): {}", url)),
+                    duration_ms: start.elapsed().as_millis() as u64,
+                };
+            }
             match blocking::get(url) {
                 Ok(response) => {
                     match response.text() {
@@ -89,7 +99,19 @@ fn dispatch_tool(tool: &str, args: &serde_json::Value) -> ToolResponse {
         }
         "read" | "read_file" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-            match std::fs::read_to_string(path) {
+            // 路径校验：仅允许主目录内文件（复用 project_cmds 的 resolve_safe_path）
+            let safe = match super::project_cmds::resolve_safe_path(path) {
+                Ok(p) => p,
+                Err(e) => {
+                    return ToolResponse {
+                        success: false,
+                        output: String::new(),
+                        error: Some(e.to_string()),
+                        duration_ms: start.elapsed().as_millis() as u64,
+                    };
+                }
+            };
+            match std::fs::read_to_string(&safe) {
                 Ok(content) => ToolResponse {
                     success: true,
                     output: content.chars().take(10000).collect(),
@@ -107,10 +129,22 @@ fn dispatch_tool(tool: &str, args: &serde_json::Value) -> ToolResponse {
         "write" | "write_file" => {
             let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
             let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-            match fs::write(path, content) {
+            // 路径校验：仅允许主目录内文件
+            let safe = match super::project_cmds::resolve_safe_path(path) {
+                Ok(p) => p,
+                Err(e) => {
+                    return ToolResponse {
+                        success: false,
+                        output: String::new(),
+                        error: Some(e.to_string()),
+                        duration_ms: start.elapsed().as_millis() as u64,
+                    };
+                }
+            };
+            match fs::write(&safe, content) {
                 Ok(()) => ToolResponse {
                     success: true,
-                    output: format!("Written to {}", path),
+                    output: format!("Written to {}", safe.display()),
                     error: None,
                     duration_ms: start.elapsed().as_millis() as u64,
                 },
@@ -124,6 +158,15 @@ fn dispatch_tool(tool: &str, args: &serde_json::Value) -> ToolResponse {
         }
         "bash" | "shell" => {
             let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+            // 命令白名单校验：复用 remote_cmds 的 validate_remote_command
+            if let Err(e) = super::remote_cmds::validate_remote_command(command) {
+                return ToolResponse {
+                    success: false,
+                    output: String::new(),
+                    error: Some(e),
+                    duration_ms: start.elapsed().as_millis() as u64,
+                };
+            }
             match Command::new("sh").arg("-c").arg(command).output() {
                 Ok(output) => ToolResponse {
                     success: output.status.success(),
@@ -161,7 +204,19 @@ fn dispatch_tool(tool: &str, args: &serde_json::Value) -> ToolResponse {
         "glob" => {
             let pattern = args.get("pattern").and_then(|v| v.as_str()).unwrap_or("*");
             let base = args.get("base").and_then(|v| v.as_str()).unwrap_or(".");
-            let files: Vec<String> = match glob(&format!("{}/{}", base, pattern)) {
+            // base 路径校验：仅允许主目录内
+            let safe_base = match super::project_cmds::resolve_safe_path(base) {
+                Ok(p) => p,
+                Err(e) => {
+                    return ToolResponse {
+                        success: false,
+                        output: String::new(),
+                        error: Some(e.to_string()),
+                        duration_ms: start.elapsed().as_millis() as u64,
+                    };
+                }
+            };
+            let files: Vec<String> = match glob(&format!("{}/{}", safe_base.display(), pattern)) {
                 Ok(entries) => entries.filter_map(|e| e.ok()).map(|p| p.display().to_string()).take(100).collect(),
                 Err(_) => vec![],
             };

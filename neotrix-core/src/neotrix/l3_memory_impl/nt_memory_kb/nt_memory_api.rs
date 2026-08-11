@@ -67,8 +67,9 @@ fn internal_err(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
 pub struct SearchParams {
     q: String,
     limit: Option<usize>,
-    /// Caller clearance. Defaults to Public so sensitive nodes
-    /// (ThinkingTrace/Secret) are filtered from public-facing search.
+    /// 兼容字段：HTTP 公开面强制 Public clearance（C-2 加固），
+    /// 客户端传入的 permission 被忽略——保留字段仅为 serde 兼容旧客户端。
+    #[allow(dead_code)]
     permission: Option<String>,
 }
 
@@ -119,13 +120,10 @@ pub async fn search_handler(
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let kb = state.kb.lock().map_err(|e| internal_err(&format!("Lock: {}", e)))?;
     let limit = params.limit.unwrap_or(10).min(100);
-    // Default to Public clearance for the public HTTP search surface so
-    // sensitive nodes (ThinkingTrace/Secret/DetectionFinding) are filtered out.
-    let permission = params
-        .permission
-        .as_deref()
-        .map(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel::from_str)
-        .unwrap_or(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel::Public);
+    // 安全加固（C-2）：HTTP 公开搜索面强制 Public clearance，
+    // 不接受客户端传入的 permission 参数——否则调用方可自选 "secret"
+    // 读取 ThinkingTrace/Secret 等敏感节点。
+    let permission = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_types::PermissionLevel::Public;
     let results = kb.search_permission_aware(&params.q, limit, permission).map_err(|e| internal_err(&e))?;
     Ok(json_ok(results))
 }

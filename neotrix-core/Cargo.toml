@@ -171,7 +171,9 @@ name = "real_tasks"
 harness = false
 
 [features]
-default = []
+# keyring 纳入 default：API key 加密默认走 OS keychain（macOS Keychain/Linux Secret Service），
+# 避免静默降级到可推导的机器派生密钥（C-3 安全加固）。
+default = ["keyring"]
 office = ["dep:zip", "dep:quick-xml"]
 stealth-net = ["dep:chromiumoxide"]
 sandbox = ["dep:wasmtime", "dep:agent-sandbox"]

@@ -36,10 +36,14 @@ function renderInline(text: string): JSX.Element[] {
     } else if (m[3] !== undefined) {
       nodes.push(<em class="italic">{renderInline(m[3].slice(1, -1))}</em>)
     } else if (m[4] !== undefined) {
+      // XSS 防护（W-3）：仅允许 http/https/mailto scheme，
+      // 拒绝 javascript:/data:/vbscript: 等可执行 scheme。
+      const rawHref = m[6]
+      const safeHref = /^(https?:\/\/|mailto:)/i.test(rawHref) ? rawHref : '#'
       nodes.push(
         <a
           class="text-nt-io-700 underline decoration-nt-io-500/50 underline-offset-2 hover:text-nt-io-800 transition-colors"
-          href={m[6]}
+          href={safeHref}
           target="_blank"
           rel="noopener noreferrer"
         >

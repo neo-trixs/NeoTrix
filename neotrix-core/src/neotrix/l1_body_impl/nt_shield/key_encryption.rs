@@ -78,17 +78,21 @@ pub fn decrypt(encrypted: &str) -> Result<String, String> {
 /// Return a 32-byte AES key.
 ///
 /// Priority:
-/// 1. OS keychain (keyring crate, feature-gated)
+/// 1. OS keychain (keyring crate, feature-gated, 默认启用)
 /// 2. `NEOTRIX_VAULT_KEY` env var (same as `vault.rs`)
-/// 3. Deterministic machine-derived key (SHA-256 of machine-id / home-dir)
+/// 3. Deterministic machine-derived key — **仅显式 opt-in**：
+///    设置 `NEOTRIX_ALLOW_MACHINE_KEY=1` 才使用。机器派生密钥可被
+///    本地知情者推导（machine-id/home 非机密），默认拒绝（C-3 加固）。
 fn get_or_create_key() -> Result<[u8; 32], String> {
-    #[cfg(feature = "keyring")]
+    // 生产环境优先 OS keychain；测试环境禁用（并行测试 keychain 竞争
+    // 会导致 set_password 覆盖、decrypt 用错 key），测试走 env key。
+    #[cfg(all(feature = "keyring", not(test)))]
     {
         match get_keyring_key() {
             Ok(key) => return Ok(key),
             Err(e) => {
                 eprintln!(
-                    "[neotrix] OS keychain unavailable ({}); falling back to machine-derived key",
+                    "[neotrix] OS keychain unavailable ({}); falling back to env/machine key",
                     e
                 );
             }
@@ -110,8 +114,15 @@ fn get_or_create_key() -> Result<[u8; 32], String> {
         return Ok(hash.into());
     }
 
-    // Fallback 2: deterministic machine-derived key
-    derive_machine_key()
+    // Fallback 2: machine-derived key — 显式 opt-in，默认拒绝
+    if std::env::var("NEOTRIX_ALLOW_MACHINE_KEY").as_deref() == Ok("1") {
+        return derive_machine_key();
+    }
+
+    Err("No encryption key available: OS keychain unavailable and NEOTRIX_VAULT_KEY not set. \
+         Set NEOTRIX_VAULT_KEY (32-byte hex) or enable OS keychain. \
+         Machine-derived keys are disabled by default (C-3 security hardening)."
+        .into())
 }
 
 #[cfg(feature = "keyring")]
@@ -194,27 +205,41 @@ fn read_machine_id() -> Option<String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_roundtrip() {
-        let plaintext = "sk-ant-test123456789";
-        let encrypted = encrypt(plaintext).expect("encrypt");
-        assert!(is_encrypted(&encrypted));
-        assert!(encrypted.starts_with("enc:"));
-        let decrypted = decrypt(&encrypted).expect("decrypt");
-        assert_eq!(decrypted, plaintext);
+    /// 测试强制使用确定性 env key（NEOTRIX_VAULT_KEY），避免 keyring
+    /// 在并行测试中的 keychain 竞争（set_password 覆盖导致 decrypt 用错 key）。
+    /// keyring 已是 default feature，测试必须绕开 OS keychain 才能稳定。
+    const TEST_VAULT_KEY: &str = "0123456789abcdef0123456789abcdef";
+
+    fn with_test_key(f: impl FnOnce()) {
+        std::env::set_var("NEOTRIX_VAULT_KEY", TEST_VAULT_KEY);
+        f();
+        // 测试线程独立 env，无需清理（Rust 2021 线程级 env）
     }
 
     #[test]
-    #[ignore = "flaky (keychain race in parallel test execution)"]
+    fn test_roundtrip() {
+        with_test_key(|| {
+            let plaintext = "sk-ant-test123456789";
+            let encrypted = encrypt(plaintext).expect("encrypt");
+            assert!(is_encrypted(&encrypted));
+            assert!(encrypted.starts_with("enc:"));
+            let decrypted = decrypt(&encrypted).expect("decrypt");
+            assert_eq!(decrypted, plaintext);
+        });
+    }
+
+    #[test]
     fn test_double_encryption_produces_different_output() {
-        let plaintext = "sk-test-key";
-        let a = encrypt(plaintext).expect("encrypt a");
-        let b = encrypt(plaintext).expect("encrypt b");
-        assert_ne!(a, b, "nonce must randomize ciphertext");
-        assert_eq!(
-            decrypt(&a).expect("decrypt a"),
-            decrypt(&b).expect("decrypt b")
-        );
+        with_test_key(|| {
+            let plaintext = "sk-test-key";
+            let a = encrypt(plaintext).expect("encrypt a");
+            let b = encrypt(plaintext).expect("encrypt b");
+            assert_ne!(a, b, "nonce must randomize ciphertext");
+            assert_eq!(
+                decrypt(&a).expect("decrypt a"),
+                decrypt(&b).expect("decrypt b")
+            );
+        });
     }
 
     #[test]

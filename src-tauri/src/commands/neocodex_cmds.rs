@@ -2048,12 +2048,16 @@ pub fn neocodex_open_file(app: tauri::AppHandle, path: String) -> Result<(), Str
 /// Open a file in the external editor (OS default).
 #[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_open_external(path: String) -> Result<(), String> {
+    // 输入校验（W-5）：仅允许主目录内的本地文件路径，
+    // 拒绝 URL/任意路径——否则可被用于打开任意文件/URL。
+    let safe = super::project_cmds::resolve_safe_path(&path)
+        .map_err(|e| format!("path rejected: {e}"))?;
     let status = if cfg!(target_os = "windows") {
-        std::process::Command::new("cmd").args(["/C", "start", ""]).arg(&path).status()
+        std::process::Command::new("cmd").args(["/C", "start", ""]).arg(&safe).status()
     } else if cfg!(target_os = "macos") {
-        std::process::Command::new("open").arg(&path).status()
+        std::process::Command::new("open").arg(&safe).status()
     } else {
-        std::process::Command::new("xdg-open").arg(&path).status()
+        std::process::Command::new("xdg-open").arg(&safe).status()
     };
     status.map_err(|e| format!("failed to launch external opener: {e}"))?;
     Ok(())
