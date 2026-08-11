@@ -57,8 +57,10 @@ export function ComputerUse(props: Props) {
       const filePath = `/tmp/neotrix_screen_${ts}.png`
       await computerApi.screenshotAndSave(filePath)
       // Read file content via tauri fs plugin
-      const { readFile } = await import('@tauri-apps/plugin-fs')
+      const { readFile, remove } = await import('@tauri-apps/plugin-fs')
       const bytes = await readFile(filePath)
+      // 清理临时截图，避免 /tmp 垃圾堆积
+      remove(filePath).catch(() => {})
       const blob = new Blob([bytes], { type: 'image/png' })
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -231,6 +233,7 @@ export function ComputerUse(props: Props) {
                 <button class="px-2 py-2 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(Math.max(0, mousePos()!.x - 40), mousePos()!.y)} disabled={busy() !== null}>← 左移</button>
                 <button class="px-2 py-2 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(mousePos()!.x, Math.max(0, mousePos()!.y - 40))} disabled={busy() !== null}>↑ 上移</button>
                 <button class="px-2 py-2 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(Math.min(displays()[0]?.width ?? 1920, mousePos()!.x + 40), mousePos()!.y)} disabled={busy() !== null}>→ 右移</button>
+                <button class="px-2 py-2 rounded-lg bg-bg-tertiary text-xs text-text-secondary hover:text-text-primary transition-colors" onClick={() => moveMouse(mousePos()!.x, Math.min(displays()[0]?.height ?? 1080, mousePos()!.y + 40))} disabled={busy() !== null}>↓ 下移</button>
               </Show>
             </div>
           </div>

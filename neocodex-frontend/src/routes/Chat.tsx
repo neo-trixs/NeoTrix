@@ -21,6 +21,7 @@ import { CostDashboard } from '../components/CostDashboard'
 import { CheckpointTimeline } from '../components/CheckpointTimeline'
 import { SideChat } from '../components/SideChat'
 import { ComputerUse } from '../components/ComputerUse'
+import { SlashMenu, type SlashCommandDef } from '../components/SlashMenu'
 import { clsx } from 'clsx'
 import { neocodex, system } from '../api'
 import { subscribeStream, type UnlistenFn } from '../api/events'
@@ -36,6 +37,14 @@ const SUGGESTIONS: { text: string; icon: typeof FolderTree }[] = [
 
 const actionBtnClass =
   'p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors'
+
+/* —— 斜杠命令（对标 Claude Code / 命令菜单） —— */
+const SLASH_COMMANDS: SlashCommandDef[] = [
+  { id: 'clear', label: '清除会话', desc: '清空当前会话全部消息', keywords: ['clear'] },
+  { id: 'new', label: '新建会话', desc: '开启一段新对话', keywords: ['new'] },
+  { id: 'compact', label: '压缩会话', desc: '精简上下文继续对话', keywords: ['compact'] },
+  { id: 'help', label: '快捷键帮助', desc: '显示常用快捷键说明', keywords: ['help', '?'] },
+]
 
 /* 根据扩展名猜测 MIME（附件预览用） */
 function guessMime(name: string): string {
@@ -118,8 +127,44 @@ export function Chat() {
   const [permissionMode, setPermissionMode] = createSignal<PermissionMode>('auto')
   const [annotationHint, setAnnotationHint] = createSignal<string | null>(null)
   const [activeModel, setActiveModel] = createSignal<string | null>(null)
+  const [appVersion, setAppVersion] = createSignal<string | null>(null)
   // 待发送附件（dialog 选择后暂存，随下一条消息发送）
   const [pendingAttachments, setPendingAttachments] = createSignal<NeoCodexAttachmentDto[]>([])
+
+  // 斜杠命令：当前输入以 / 开头时激活菜单
+  const [slashIdx, setSlashIdx] = createSignal(0)
+  const slashQuery = () => {
+    const v = inputValue()
+    if (!v.startsWith('/')) return null
+    const rest = v.slice(1)
+    // 含空格视为普通文本（命令通常无空格参数）
+    if (rest.includes(' ')) return null
+    return rest
+  }
+  const slashFiltered = () => {
+    const q = slashQuery()
+    if (q === null) return []
+    const lq = q.trim().toLowerCase()
+    if (!lq) return SLASH_COMMANDS
+    return SLASH_COMMANDS.filter(
+      (c) => c.keywords.some((k) => k.includes(lq)) || c.label.includes(lq)
+    )
+  }
+  const runSlash = (cmd: SlashCommandDef) => {
+    setInputValue('')
+    adjustTextarea()
+    if (cmd.id === 'clear') {
+      chatStore.clearMessages()
+    } else if (cmd.id === 'new') {
+      chatStore.addSession()
+    } else if (cmd.id === 'compact') {
+      setStreamError('压缩会话将在后续版本提供')
+      setTimeout(() => setStreamError(null), 3000)
+    } else if (cmd.id === 'help') {
+      setStreamError('快捷键：Enter 发送 · Shift+Enter 换行 · ⌘1-5 功能面板 · ⌘6 电脑视图 · Esc 关闭')
+      setTimeout(() => setStreamError(null), 5000)
+    }
+  }
 
   // 视图切换：chat / cowork / computer（对应侧栏 segmented tabs）
   const [activeView, setActiveView] = createSignal<'chat' | 'cowork' | 'computer'>('chat')
@@ -230,6 +275,13 @@ export function Chat() {
       /* 展示字段，静默失败 */
     }
 
+    // 读取应用版本（底部状态条展示，避免硬编码漂移）
+    try {
+      setAppVersion(await neocodex.appVersion())
+    } catch {
+      /* 版本非关键 */
+    }
+
     // 监听提供商切换事件（SettingsModal / ProviderSelector 广播），同步状态栏模型
     const onProviderChanged = () => {
       neocodex
@@ -317,6 +369,27 @@ export function Chat() {
         handleAtMention()
         return
       }
+    }
+    // 斜杠命令导航：菜单激活时优先处理方向键 / Enter / Esc
+    const slashList = slashFiltered()
+    if (slashQuery() !== null && slashList.length > 0) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const dir = e.key === 'ArrowDown' ? 1 : -1
+        setSlashIdx((prev) => (prev + dir + slashList.length) % slashList.length)
+        return
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        runSlash(slashList[Math.min(slashIdx(), slashList.length - 1)])
+        return
+      }
+      if (e.key === 'Escape') {
+        setInputValue('')
+        return
+      }
+    } else {
+      setSlashIdx(0)
     }
     // 面板快捷键：⌘1-⌘5 切换 5 个功能面板，⌘6 切换电脑控制视图，Esc 关闭
     if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '8') {
@@ -923,17 +996,27 @@ export function Chat() {
         {/* ===== 底部输入区：cic 玻璃（消息流模式下） ===== */}
         <Show when={messages().length > 0}>
           <div class="flex-shrink-0 border-t border-border-primary/40 bg-white/10 backdrop-blur-xl">
+            {/* 斜杠命令菜单（输入以 / 开头时浮层） */}
+            <Show when={slashQuery() !== null && slashFiltered().length > 0}>
+              <div class="relative max-w-[640px] mx-auto px-6 pt-2">
+                <SlashMenu
+                  query={slashQuery() ?? ''}
+                  commands={slashFiltered()}
+                  selectedIdx={Math.min(slashIdx(), slashFiltered().length - 1)}
+                  onSelect={runSlash}
+                />
+              </div>
+            </Show>
             <div class="max-w-[640px] mx-auto w-full px-6 pt-3 pb-2">
               <div class="cic">
                 <textarea
                   ref={setTextareaRef}
                   class="flex-1 bg-transparent border-none resize-none min-h-[26px] max-h-[160px] py-2 text-[13.5px] leading-relaxed text-text-primary placeholder-text-muted/70 focus:outline-none focus:ring-0 focus:border-none"
-                  placeholder={isGenerating() ? '正在生成…' : '输入消息… (Enter 发送, Shift+Enter 换行)'}
+                  placeholder={isGenerating() ? '生成中仍可输入，下一条稍后发送…' : '输入消息… (Enter 发送, Shift+Enter 换行)'}
                   value={inputValue()}
                   onInput={handleInput}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePasteImage}
-                  disabled={isGenerating()}
                   rows={1}
                 />
                 <div class="cic-actions">
@@ -972,7 +1055,7 @@ export function Chat() {
                   <Show when={activeModel()}>
                     <span class="font-mono text-nt-io-700">{activeModel()}</span>
                   </Show>
-                  <span>NeoTrix v0.18.0</span>
+                  <span>NeoTrix v{appVersion() ?? '0.18.0'}</span>
                   <span class="hidden md:inline">Enter 发送 · Shift+Enter 换行</span>
                 </div>
                 <div class="flex items-center gap-2 text-[10px] text-text-muted/80">
