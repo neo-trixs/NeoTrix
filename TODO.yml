@@ -1,6 +1,6 @@
 meta:
-  generated_at: 2026-13-08T12:16:00
-  total_items: 8
+  generated_at: 2026-13-13T08:05:00
+  total_items: 6
   conflicts: 0
 items:
 - id: task-2
@@ -9,9 +9,9 @@ items:
   status: in_progress
   session: null
   session_name: task-2 parent
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
-  subagent: ses_1786018580_4
+  created: 2026-13-13T08:05:00
+  updated: 2026-13-13T08:05:00
+  subagent: ses_1786435494_4
   files: []
   depends_on:
   - task-1
@@ -24,8 +24,8 @@ items:
   status: in_progress
   session: null
   session_name: task-1 blockable
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
+  created: 2026-13-13T08:05:00
+  updated: 2026-13-13T08:05:00
   subagent: null
   files: []
   depends_on: []
@@ -37,8 +37,8 @@ items:
   status: pending
   session: null
   session_name: task-3 child
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
+  created: 2026-13-13T08:05:00
+  updated: 2026-13-13T08:05:00
   subagent: null
   files: []
   depends_on: []
@@ -50,8 +50,8 @@ items:
   status: pending
   session: null
   session_name: task-4 test
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
+  created: 2026-13-13T08:05:00
+  updated: 2026-13-13T08:05:00
   subagent: null
   files: []
   depends_on: []
@@ -63,8 +63,8 @@ items:
   status: pending
   session: null
   session_name: task-5 json_test
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
+  created: 2026-13-13T08:05:00
+  updated: 2026-13-13T08:05:00
   subagent: null
   files: []
   depends_on: []
@@ -76,34 +76,8 @@ items:
   status: pending
   session: null
   session_name: task-6 move_test
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
-  subagent: null
-  files: []
-  depends_on: []
-  blocked_by: []
-  potential_conflict: false
-- id: S-T1
-  title: First
-  priority: medium
-  status: done
-  session: null
-  session_name: S-T1 First
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
-  subagent: null
-  files: []
-  depends_on: []
-  blocked_by: []
-  potential_conflict: false
-- id: S-T2
-  title: Second
-  priority: medium
-  status: pending
-  session: null
-  session_name: S-T2 Second
-  created: 2026-13-08T12:16:00
-  updated: 2026-13-08T12:16:00
+  created: 2026-13-13T08:05:00
+  updated: 2026-13-13T08:05:00
   subagent: null
   files: []
   depends_on: []

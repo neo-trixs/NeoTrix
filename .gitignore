@@ -6,6 +6,7 @@ node_modules/
 dist/
 notes/
 sessions/
+_archive/
 _archive/opencode/*
 !_archive/opencode/plugins/
 _archive/opencode/plugins/*.lock

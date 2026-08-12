@@ -171,6 +171,13 @@
 
 - **R-P101 (新建/升级/删除任何 skill 或资产, 必须登记双表 + 清理引用, 禁单登/留引用)**: 新建或升级任一 L1-L3 skill 或运行资产时, 必须**同时**登记 `~/.agents/skills/registry.md`(所有权 + C 成熟度)与 `~/.agents/skills/CTREE.md`(L1-L3 全量清单); 删除任何资产(如 Python 工具/二进制)必须**先**全库 grep 清理所有引用文档 (RULES / AGENTS / CTREE / registry / profile.yaml / SKILL.md / capability-*.md), 再毁源文件。任一单登或残留引用即视为未接线死代码 (R-P79 门), 记 C0。例: 本轮 mil 在 registry 已登 C4, CTREE L2 表却漏登 → 补登; cyc222 删 pipeline.py 后 profile/geoint-system/capability-tree 残留 6 处引用 → 清理。verify: `grep -rn "已删资产名\|待登 skill" <active docs>` 应零残留。
 
+## 代码质量纪律 (R-P102-R-P105) — 2026-08-12 吸收 Rust 代码质量知识
+
+- **R-P102 (复杂度门禁 — Cognitive Complexity 双阈值)**: 任何新建/编辑函数，Cognitive Complexity >15 须提审查、>30 必须重构拆分，禁止 >100 的 god-method 进入生产。判定法: 逐 fn 数 if/else-if/match-arm/for/while/loop 分支符，嵌套不重复加成 (单层嵌套 +1, 两层 +2)。高 CCN(>20) 但低 Cognitive → switch/match 机械分派, 低优先级; 高 Cognitive 低 CCN → 嵌套驱动, 用 early return 展平; 两者皆高 → 立即调查。修复优先级: complexity errors 无条件优先于 violation 计数 (65 个长参数警告 < 5 个复杂度错误)。
+- **R-P103 (Rust 惯用化 12 维自检)**: 每次实现/修复落地前按 12 维过一遍 (rev-officer D70): ①建模用 enum/newtype/&str/迭代器, 禁松 flag/String/Vec 滥用 ②ownership: 最小作用域 mut、borrow 优于 move、Arc/Mutex 必要才用 ③错误: Result/Option 一致, unwrap/expect 仅测试/原型/确证不变量, lib 用 thiserror edge 用 anyhow ④并发: async 内禁阻塞、.await 期间禁持锁、task 有生命周期/取消 ⑤性能: 热路径无可避免分配/拷贝, 队列有背压 ⑥边界: pub/pub(crate) 最小且有意 ⑦测试: happy/error/edge/regression 四路 ⑧观测: 结构化日志禁 println, 日志不泄密 ⑨可维护: 命名表意图、函数拆分、注释表不变量不清显而易见的 ⑩lints: fmt/clippy/test 三绿, #[expect] 优先于 #[allow] 必带 reason ⑪语法防雷 (Trail of Bits): `a & b == c` 优先级、as_ 截断/溢出/sign-loss → 用 checked、UTF-8 边界 panic、overflow/div-zero ⑫工具门: MSRV 一致、unsafe 上 miri、cargo-hack 特性组合、cargo-udeps/audit。
+- **R-P104 (unsafe 独立审查 pass + cve-rs 意识)**: 任何含 `unsafe` 的改动, 每个块须有 SAFETY 式注释 (前提为何成立、不变式凭什么防重构), 禁复述代码。`forbid(unsafe_code)` 只防不小心的开发者, 防不了恶意作者 — cve-rs 证伪: RUSTSEC-2025-0028 在 100% safe Rust + `deny(unsafe_code)` 下实现 UAF/overflow/transmute。故安全边界的审查仍是读代码: 禁 safe code 走私未检查 unsafety。无 unsafe 的 PR ≠ 安全边界。
+- **R-P105 (合并门禁 — 红灯即滚回)**: PR/合并红线 (rev-officer D72): `cargo fmt --check` / `clippy -- -D warnings` / `test --all-targets` / `cargo audit`+`deny` 任一红 → 阻塞。lint 覆盖用 `#[expect(...)]`+`reason` (触到预期 lint 反而告警, 防陈旧积累), `#[allow]` 仅生成代码/宏。路由: 触碰 unsafe/FFI/Cargo.toml/Cargo.lock/crypto/未信任输入解析 → 必须安全评审人复核。
+
 ## 后续任务梳理 — 意识核心收敛主线 (NT-CORE)
 
 依据本轮"7 项 HIGH 全部修复 + 全量 6984 通过"的收敛态势，后续按第一性原理降序：
