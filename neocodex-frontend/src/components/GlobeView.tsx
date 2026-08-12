@@ -85,6 +85,9 @@ export function GlobeView(props: GlobeViewProps) {
   let containerRef: HTMLDivElement | undefined
   // 卸载守卫：异步数据到达时组件可能已销毁，禁止再 setSignal / 触碰 globe
   let disposed = false
+  // B2 v0: usePack=true 时 7 路地理点走 NT-Pack 高密度文件 (kb_geo_points_pack),
+  // 海拔仍走 SQLite (kb_geo_elevations, 无 pack 版本)。
+  const fetchPts = props.usePack ? geoPointsPack : geoPoints
   const [points, setPoints] = createSignal<GeoPoint[]>([])
   const [layers, setLayers] = createSignal<GeoLayerSummary[]>([])
   const [loading, setLoading] = createSignal(true)
@@ -155,13 +158,13 @@ export function GlobeView(props: GlobeViewProps) {
     let naturalPts: GeoPoint[] = []
     try {
       const [cities, shanhai, geotag, rivers, lakes, coast, glaciers, elevs] = await Promise.all([
-        geoPoints(cityBudget, undefined),
-        geoPoints(5000, 'shanhai'),
-        geoPoints(2000, 'geo-tag:keyword'),
-        geoPoints(200, 'natural-earth-river'),
-        geoPoints(200, 'natural-earth-lake'),
-        geoPoints(200, 'natural-earth-coastline'),
-        geoPoints(200, 'natural-earth-glacier'),
+        fetchPts(cityBudget, undefined),
+        fetchPts(5000, 'shanhai'),
+        fetchPts(2000, 'geo-tag:keyword'),
+        fetchPts(200, 'natural-earth-river'),
+        fetchPts(200, 'natural-earth-lake'),
+        fetchPts(200, 'natural-earth-coastline'),
+        fetchPts(200, 'natural-earth-glacier'),
         geoElevations(4000),
       ])
       if (disposed) return

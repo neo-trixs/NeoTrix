@@ -305,6 +305,14 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     }
   }
 
+  const restartToInstall = async () => {
+    try {
+      await neocodex.restartApp()
+    } catch (e) {
+      showNotice(String(e))
+    }
+  }
+
   const exportMemory = async () => {
     setDataBusy(true)
     setNotice(null)
@@ -1292,7 +1300,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                           {updateState() === 'downloading' && (
                             <span>正在下载更新… {updateProgress() ? `${Math.round((updateProgress()!.downloaded / Math.max(updateProgress()!.total, 1)) * 100)}%` : ''}</span>
                           )}
-                          {updateState() === 'downloaded' && <span>新版本已下载，重启应用完成安装</span>}
+                          {updateState() === 'downloaded' && (
+                            <span>新版本已下载，重启应用完成安装</span>
+                          )}
                           {updateState() === 'error' && <span class="text-nt-shield-600">检查更新失败：{updateInfo()?.error ?? '未知错误'}</span>}
                           {updateState() === 'idle' && <span>检查是否有可用的新版本</span>}
                         </div>
@@ -1303,6 +1313,20 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                             disabled={updateState() === 'checking' || updateState() === 'downloading'}
                           >
                             {updateState() === 'available' ? '下载并安装' : '检查更新'}
+                          </button>
+                        </Show>
+                        <Show when={updateState() === 'downloaded'}>
+                          <button
+                            class="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-nt-io-500 text-white hover:bg-nt-io-600 transition-colors"
+                            onClick={restartToInstall}
+                          >
+                            立即重启
+                          </button>
+                          <button
+                            class="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-bg-tertiary text-text-muted hover:text-text-primary transition-colors"
+                            onClick={() => setUpdateState('up-to-date')}
+                          >
+                            稍后
                           </button>
                         </Show>
                       </div>

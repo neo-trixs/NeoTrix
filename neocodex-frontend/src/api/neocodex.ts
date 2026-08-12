@@ -248,6 +248,10 @@ export function downloadUpdate(): Promise<void> {
   return call('neocodex_download_update', {})
 }
 
+export function restartApp(): Promise<void> {
+  return call('neocodex_restart_app', {})
+}
+
 /* ── MCP ── */
 export function mcpList(): Promise<McpServerInfo[]> {
   return call('neocodex_mcp_list', {})
