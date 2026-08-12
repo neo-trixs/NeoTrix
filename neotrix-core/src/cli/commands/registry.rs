@@ -53,13 +53,17 @@ use crate::cli::commands::consolidated_cmds::{
 pub fn default_registry() -> CommandRegistry {
     let mut reg = CommandRegistry::new().with_session_logging();
 
+    // 动态补全池: /completions 从注册表快照生成候选 (斜杠剥离 + 别名展开 + 去重)
+    let completions_pool: std::sync::Arc<std::sync::Mutex<Vec<String>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+
     // System
     reg.register(Box::new(HelpCmd));
     reg.register(Box::new(StatsCmd));
     reg.register(Box::new(ExitCmd));
     reg.register(Box::new(ClearCmd));
     reg.register(Box::new(VersionCmd));
-    reg.register(Box::new(CompletionsCmd));
+    reg.register(Box::new(CompletionsCmd::new(completions_pool.clone())));
     reg.register(Box::new(CatalogCmd));
     reg.register(Box::new(ConfigCmd));
     reg.register(Box::new(DoctorCmd));
@@ -173,6 +177,30 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(SourcesCmd));
     // 外部探索 (Explore) — URL/GitHub 仓库吸收 + 蒸馏
     reg.register(Box::new(ExploreCmd));
+
+    // 快照: 全部命令名 + 别名 (剥离前导 '/'), 供 /completions 动态生成
+    {
+        let mut names: Vec<String> = Vec::new();
+        for name in reg.list() {
+            let trimmed = name.trim_start_matches('/');
+            if !names.iter().any(|n| n == trimmed) {
+                names.push(trimmed.to_string());
+            }
+        }
+        for name in reg.list() {
+            if let Some(cmd) = reg.get(name) {
+                for alias in cmd.aliases() {
+                    let trimmed = alias.trim_start_matches('/');
+                    if !names.iter().any(|n| n == trimmed) {
+                        names.push(trimmed.to_string());
+                    }
+                }
+            }
+        }
+        if let Ok(mut pool) = completions_pool.lock() {
+            *pool = names;
+        }
+    }
 
     reg
 }

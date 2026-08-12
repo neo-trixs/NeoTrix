@@ -81,22 +81,22 @@ pub enum CommandCategory {
 impl CommandCategory {
     pub fn label(&self) -> &str {
         match self {
-            CommandCategory::System => "系统核心",
-            CommandCategory::File => "文件操作",
-            CommandCategory::Git => "版本控制",
-            CommandCategory::Session => "会话管理",
-            CommandCategory::Brain => "推理进化",
-            CommandCategory::Agent => "子代理/MCP",
-            CommandCategory::Crypto => "加密金融",
-            CommandCategory::Goal => "目标规划",
-            CommandCategory::Explore => "探索摄入",
-            CommandCategory::Memory => "知识记忆",
-            CommandCategory::Automation => "自动化维护",
-            CommandCategory::Ui => "界面布局",
-            CommandCategory::Provider => "提供者模型",
-            CommandCategory::Sandbox => "沙箱安全",
-            CommandCategory::Connector => "连接器",
-            CommandCategory::Other => "其他",
+            CommandCategory::System => "System Core",
+            CommandCategory::File => "File Operations",
+            CommandCategory::Git => "Version Control",
+            CommandCategory::Session => "Session Management",
+            CommandCategory::Brain => "Reasoning & Evolution",
+            CommandCategory::Agent => "Agents / MCP",
+            CommandCategory::Crypto => "Crypto & Finance",
+            CommandCategory::Goal => "Goal Planning",
+            CommandCategory::Explore => "Exploration & Intake",
+            CommandCategory::Memory => "Knowledge & Memory",
+            CommandCategory::Automation => "Automation & Maintenance",
+            CommandCategory::Ui => "UI Layout",
+            CommandCategory::Provider => "Providers & Models",
+            CommandCategory::Sandbox => "Sandbox & Security",
+            CommandCategory::Connector => "Connectors",
+            CommandCategory::Other => "Other",
         }
     }
 }
@@ -288,7 +288,7 @@ impl CommandRegistry {
             }
             out.push('\n');
         }
-        out.push_str("使用 /help <命令名> 查看详细帮助, /help all 查看全部\n");
+        out.push_str("Use /help <command> for details, /help all for full list\n");
         out
     }
 

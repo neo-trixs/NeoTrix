@@ -11,7 +11,7 @@ pub struct ThemeCmd;
 impl CliCommand for ThemeCmd {
     fn name(&self) -> &str { "/theme" }
     fn aliases(&self) -> Vec<&str> { vec!["/t"] }
-    fn description(&self) -> &str { "切换 TUI 主题 (/theme list, /theme <name>, /theme save)" }
+    fn description(&self) -> &str { "Switch TUI theme (/theme list, /theme <name>, /theme save)" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -20,24 +20,31 @@ impl CliCommand for ThemeCmd {
 
         let sub = args.first().map(|s| s.as_str()).unwrap_or("");
 
+        let current_theme = || crate::config::NeoTrixConfig::load()
+            .color_mode
+            .unwrap_or_else(|| "dark".to_string());
+
         match sub {
             "list" | "" => {
-                let msg = format!("可用主题: {}", themes.join(", "));
+                let msg = format!("Available themes: {} (current: {})", themes.join(", "), current_theme());
                 let out = CommandOutput::ok(&msg);
                 if want_json {
-                    out.with_json(serde_json::json!({"action": "list", "themes": themes}))
+                    out.with_json(serde_json::json!({"action": "list", "themes": themes, "current": current_theme()}))
                 } else { out }
             }
             "save" => {
-                let out = CommandOutput::ok("主题偏好已保存");
-                out.with_json(serde_json::json!({"action": "save"}))
+                let current = current_theme();
+                crate::config::NeoTrixConfig::default().save_field("color_mode", &current);
+                let out = CommandOutput::ok(&format!("Theme preference saved: {}", current));
+                out.with_json(serde_json::json!({"action": "save", "theme": current, "persisted": true}))
             }
             name if themes.contains(&name.to_string()) => {
-                let out = CommandOutput::ok(&format!("🎨 切换到 {} 主题", name));
-                out.with_json(serde_json::json!({"theme": name}))
+                crate::config::NeoTrixConfig::default().save_field("color_mode", name);
+                let out = CommandOutput::ok(&format!("🎨 Switched to {} theme (persisted, applies on restart)", name));
+                out.with_json(serde_json::json!({"theme": name, "persisted": true}))
             }
             name => {
-                CommandOutput::err(&format!("未知主题: {}，可用: {}", name, themes.join(", ")))
+                CommandOutput::err(&format!("Unknown theme: {}, available: {}", name, themes.join(", ")))
             }
         }
     }

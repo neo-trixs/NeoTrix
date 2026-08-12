@@ -12,7 +12,7 @@ pub struct PermCmd;
 impl CliCommand for PermCmd {
     fn name(&self) -> &str { "/perm" }
     fn aliases(&self) -> Vec<&str> { vec!["/permission", "/perm-axes"] }
-    fn description(&self) -> &str { "三轴权限状态: /perm | /perm status | /perm check <action>" }
+    fn description(&self) -> &str { "Three-axis permission status: /perm | /perm status | /perm check <action>" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

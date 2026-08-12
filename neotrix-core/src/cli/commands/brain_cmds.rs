@@ -14,7 +14,7 @@ pub struct E8Cmd;
 impl CliCommand for E8Cmd {
     fn name(&self) -> &str { "/e8" }
     fn aliases(&self) -> Vec<&str> { vec!["/hexagram", "/mode"] }
-    fn description(&self) -> &str { "意识核心状态: /e8 [status|set <0-63>|matrix|transition|consciousness]" }
+    fn description(&self) -> &str { "Consciousness Core Status: /e8 [status|set <0-63>|matrix|transition|consciousness]" }
     fn is_primary(&self) -> bool { true }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");

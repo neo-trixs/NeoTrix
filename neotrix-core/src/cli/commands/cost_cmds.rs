@@ -131,7 +131,7 @@ pub struct ApprovalCmd;
 impl CliCommand for ApprovalCmd {
     fn name(&self) -> &str { "/approval" }
     fn aliases(&self) -> Vec<&str> { vec!["/app"] }
-    fn description(&self) -> &str { "审批管理: /approval mode <suggest|auto-edit|full-auto> | status | list | approve <id> | deny <id> | approve-all" }
+    fn description(&self) -> &str { "Approval management: /approval mode <suggest|auto-edit|full-auto> | status | list | approve <id> | deny <id> | approve-all" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

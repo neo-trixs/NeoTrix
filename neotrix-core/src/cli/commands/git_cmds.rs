@@ -198,7 +198,7 @@ pub struct CommitCmd;
 impl CliCommand for CommitCmd {
     fn name(&self) -> &str { "/commit" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "暂存全部并提交: /commit <message>" }
+    fn description(&self) -> &str { "Stage all and commit: /commit <message>" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -251,7 +251,7 @@ pub struct PrCmd;
 impl CliCommand for PrCmd {
     fn name(&self) -> &str { "/pr" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "创建 GitHub PR (使用 gh CLI)" }
+    fn description(&self) -> &str { "Create a GitHub PR (via gh CLI)" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

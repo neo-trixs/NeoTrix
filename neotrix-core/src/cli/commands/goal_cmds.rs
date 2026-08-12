@@ -14,7 +14,7 @@ pub struct GoalCmd;
 impl CliCommand for GoalCmd {
     fn name(&self) -> &str { "/goal" }
     fn aliases(&self) -> Vec<&str> { vec!["/g"] }
-    fn description(&self) -> &str { "24/7 自主目标追求: /goal <desc> | /goal status | /goal list | /goal pause <id> | /goal resume <id> | /goal cancel <id> | /goal history" }
+    fn description(&self) -> &str { "24/7 Autonomous Goal Pursuit: /goal <desc> | /goal status | /goal list | /goal pause <id> | /goal resume <id> | /goal cancel <id> | /goal history" }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
 

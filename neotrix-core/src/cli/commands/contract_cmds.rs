@@ -12,7 +12,7 @@ pub struct ContractCmd;
 impl CliCommand for ContractCmd {
     fn name(&self) -> &str { "/contract" }
     fn aliases(&self) -> Vec<&str> { vec!["/todo"] }
-    fn description(&self) -> &str { "契约管理: /contract list | define <desc> | done <id> | fail <id> | cancel <id> | stats" }
+    fn description(&self) -> &str { "Contract management: /contract list | define <desc> | done <id> | fail <id> | cancel <id> | stats" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

@@ -163,7 +163,7 @@ impl CliCommand for StatsCmd {
     }
 
     fn description(&self) -> &str {
-        "系统状态: /stats | /stats version | /stats --json (含诊断信息)"
+        "System status: /stats | /stats version | /stats --json (includes diagnostics)"
     }
 
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -302,7 +302,7 @@ impl CliCommand for CatalogCmd {
     }
 
     fn description(&self) -> &str {
-        "统一命令目录 (CLI + NoeCodex): /catalog [cli|tauri|--json]"
+        "Unified command catalog (CLI + NoeCodex): /catalog [cli|tauri|--json]"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -341,25 +341,52 @@ impl CliCommand for CatalogCmd {
             }
         }
 
-        let mut out = String::from("━━ 统一命令目录 (Unified Command Catalog) ━━\n\n");
-        out.push_str(&format!("▸ CLI 命令 ({}):\n", cli_cmds.len()));
+        let mut out = String::from("━━ Unified Command Catalog (CLI + NoeCodex) ━━\n\n");
+        out.push_str(&format!("▸ CLI commands ({}):\n", cli_cmds.len()));
         for s in &cli_cmds {
             let alias = if s.aliases.is_empty() { String::new() } else { format!(" [{}]", s.aliases.join(", ")) };
             out.push_str(&format!("  {:<20}{} {}\n", s.name, alias, s.description));
         }
         out.push('\n');
-        out.push_str(&format!("▸ NoeCodex 命令 ({}):\n", tauri_cmds.len()));
+        out.push_str(&format!("▸ NoeCodex commands ({}):\n", tauri_cmds.len()));
         for s in &tauri_cmds {
             out.push_str(&format!("  {:<40} {}\n", s.name, s.description));
         }
-        out.push_str("\n使用 /catalog --json 输出机器可读目录, /catalog cli|tauri 过滤后端\n");
+        out.push_str("\nUse /catalog --json for machine-readable output, /catalog cli|tauri to filter backends\n");
         CommandOutput::ok(&out)
     }
 }
 
 // ====== /completions ======
 
-pub struct CompletionsCmd;
+/// Shell completions generated from the live command registry snapshot.
+pub struct CompletionsCmd {
+    cmds: Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl CompletionsCmd {
+    pub fn new(cmds: Arc<std::sync::Mutex<Vec<String>>>) -> Self {
+        Self { cmds }
+    }
+
+    fn candidates(&self) -> Vec<String> {
+        let mut cmds = self
+            .cmds
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        // entry-layer auto-backend 命令 (不注册 registry) 仍保持补全可用
+        for extra in ["save", "absorb", "evolve", "mem"] {
+            if !cmds.iter().any(|c| c == extra) {
+                cmds.push(extra.to_string());
+            }
+        }
+        cmds.sort();
+        cmds.dedup();
+        cmds
+    }
+}
+
 impl CliCommand for CompletionsCmd {
     fn name(&self) -> &str {
         "/completions"
@@ -376,7 +403,7 @@ impl CliCommand for CompletionsCmd {
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let shell = args.first().map(|s| s.as_str()).unwrap_or("bash");
-        let cmds = vec!["help","stats","save","absorb","evolve","mem","agent","mcp","clear","version","completions","exit"];
+        let cmds = self.candidates();
         match shell {
             "bash" => {
                 let mut s = String::new();

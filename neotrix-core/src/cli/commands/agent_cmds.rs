@@ -215,7 +215,7 @@ pub struct DiscoverCmd;
 impl CliCommand for DiscoverCmd {
     fn name(&self) -> &str { "/discover" }
     fn aliases(&self) -> Vec<&str> { vec!["/scan", "/dsc"] }
-    fn description(&self) -> &str { "扫描网络中的 NeoTrix 代理: /discover [--json] [--port <port>] [--duration <ms>]" }
+    fn description(&self) -> &str { "Scan for NeoTrix agents on the network: /discover [--json] [--port <port>] [--duration <ms>]" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

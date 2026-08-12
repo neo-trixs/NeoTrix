@@ -26,7 +26,7 @@ pub struct FileCmd;
 impl CliCommand for FileCmd {
     fn name(&self) -> &str { "/file" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "文件操作: /file read|write|create|edit|patch|diff <args>" }
+    fn description(&self) -> &str { "File Operations: /file read|write|create|edit|patch|diff <args>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
@@ -52,7 +52,7 @@ pub struct WalletAggCmd;
 impl CliCommand for WalletAggCmd {
     fn name(&self) -> &str { "/crypto" }
     fn aliases(&self) -> Vec<&str> { vec!["/finance"] }
-    fn description(&self) -> &str { "加密金融: /crypto wallet|swap|transfer|approve|cost|budget <sub>" }
+    fn description(&self) -> &str { "Crypto / Finance: /crypto wallet|swap|transfer|approve|cost|budget <sub>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
@@ -78,7 +78,7 @@ pub struct UiAggCmd;
 impl CliCommand for UiAggCmd {
     fn name(&self) -> &str { "/layout" }
     fn aliases(&self) -> Vec<&str> { vec!["/display"] }
-    fn description(&self) -> &str { "界面布局: /layout background|side|router|vim|workspace|theme|route <sub>" }
+    fn description(&self) -> &str { "Interface & Layout: /layout background|side|router|vim|workspace|theme|route <sub>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
@@ -104,7 +104,7 @@ pub struct GitAggCmd;
 impl CliCommand for GitAggCmd {
     fn name(&self) -> &str { "/vc" }
     fn aliases(&self) -> Vec<&str> { vec!["/vcs"] }
-    fn description(&self) -> &str { "版本控制: /vc git|commit|pr <sub>" }
+    fn description(&self) -> &str { "Version Control: /vc git|commit|pr <sub>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
@@ -127,7 +127,7 @@ pub struct SessionAggCmd;
 impl CliCommand for SessionAggCmd {
     fn name(&self) -> &str { "/session-all" }
     fn aliases(&self) -> Vec<&str> { vec!["/sess"] }
-    fn description(&self) -> &str { "会话管理: /session-all session|resume|fork|history|context|compact|distill <sub>" }
+    fn description(&self) -> &str { "Session Management: /session-all session|resume|fork|history|context|compact|distill <sub>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
@@ -154,7 +154,7 @@ pub struct ConsolidatedAgentCmd;
 impl CliCommand for ConsolidatedAgentCmd {
     fn name(&self) -> &str { "/agent-all" }
     fn aliases(&self) -> Vec<&str> { vec!["/agents-all"] }
-    fn description(&self) -> &str { "子代理: /agent-all spawn|list|talk|kill|status|background|tasks|discover|mcp|acp" }
+    fn description(&self) -> &str { "Subagents: /agent-all spawn|list|talk|kill|status|background|tasks|discover|mcp|acp" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
@@ -179,7 +179,7 @@ pub struct MemoryAggCmd;
 impl CliCommand for MemoryAggCmd {
     fn name(&self) -> &str { "/memory" }
     fn aliases(&self) -> Vec<&str> { vec!["/mem-aggr", "/knowledge"] }
-    fn description(&self) -> &str { "记忆知识: /memory evidence|hypothesis|search|board|kb|wiki <sub>" }
+    fn description(&self) -> &str { "Knowledge & Memory: /memory evidence|hypothesis|search|board|kb|wiki <sub>" }
     fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {

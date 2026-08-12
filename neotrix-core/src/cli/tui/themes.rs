@@ -19,7 +19,7 @@ impl Theme {
 }
 
 pub fn theme_list() -> Vec<String> {
-    vec!["default".to_string(), "light".to_string(), "gruvbox".to_string()]
+    vec!["dark".to_string(), "light".to_string(), "gruvbox".to_string(), "default".to_string()]
 }
 
 pub fn theme_by_name(name: &str) -> Theme {

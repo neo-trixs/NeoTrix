@@ -11,7 +11,7 @@ pub struct RedactCmd;
 impl CliCommand for RedactCmd {
     fn name(&self) -> &str { "/redact" }
     fn aliases(&self) -> Vec<&str> { vec!["/scrub", "/mask"] }
-    fn description(&self) -> &str { "隐私脱敏: /redact <text> | /redact check <text> | /redact secrets-only <text>" }
+    fn description(&self) -> &str { "Privacy redaction: /redact <text> | /redact check <text> | /redact secrets-only <text>" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {

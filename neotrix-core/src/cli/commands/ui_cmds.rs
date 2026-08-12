@@ -15,7 +15,7 @@ pub struct SideCmd;
 impl CliCommand for SideCmd {
     fn name(&self) -> &str { "/side" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "快速提问（不干扰主对话）: /side <question> | /side clear" }
+    fn description(&self) -> &str { "Quick question (does not disturb main conversation): /side <question> | /side clear" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -311,7 +311,7 @@ pub struct VimCmd;
 impl CliCommand for VimCmd {
     fn name(&self) -> &str { "/vim" }
     fn aliases(&self) -> Vec<&str> { vec![] }
-    fn description(&self) -> &str { "Vim 模式: /vim toggle | /vim on | /vim off (在 TUI 中生效)" }
+    fn description(&self) -> &str { "Vim mode: /vim toggle | /vim on | /vim off (active in TUI)" }
     fn is_primary(&self) -> bool { false }
 
     fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
