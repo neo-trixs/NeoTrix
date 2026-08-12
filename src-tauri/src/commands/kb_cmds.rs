@@ -1,11 +1,14 @@
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant, SystemTime};
 use tauri::command;
 use rusqlite::params;
 use neotrix::neotrix::nt_core_error::NeoTrixError;
 use neotrix::neotrix::nt_memory_kb::nt_memory_store;
 use neotrix::neotrix::nt_memory_kb::nt_memory_store::{get_all_nodes, get_all_edges};
 use neotrix::neotrix::nt_memory_kb::nt_memory_types::{KnowledgeNode, KnowledgeEdge};
+use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::{self, PackDecoder};
 
 fn kb_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
@@ -328,11 +331,30 @@ fn geo_pack_paths() -> (PathBuf, PathBuf) {
     (dir.join("geo_index.ntpack"), dir)
 }
 
+/// 进程级 NT-Pack 解码缓存 (单槽): key = 解析后路径 + mtime + len + TTL。
+/// 避免 GlobeView 8 路并发各触发一次 7MB 全量 read+decode (约 50-60ms/次)。
+struct GeoPackCache {
+    key_file: PathBuf,
+    key_len: u64,
+    key_mtime: SystemTime,
+    born: Instant,
+    points: std::sync::Arc<Vec<nt_memory_pack::GeoPoint>>,
+}
+
+type GeoPackSlot = Mutex<Option<GeoPackCache>>;
+fn geo_pack_cache() -> &'static GeoPackSlot {
+    static CACHE: OnceLock<GeoPackSlot> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
+
+const GEO_PACK_TTL: Duration = Duration::from_secs(60);
+
 /// B2 v0: 从 NT-Pack 高密度文件直接读地理点 (绕开 SQLite), 前端无感切换。
 ///
 /// 读取全量归档 `~/.neotrix/geo/geo_index.ntpack`; `source` 指定且存在冷层文件
 /// `geo_<source>.ntpack` 时优先冷层 (B1 透明层)。NT-Pack 无 confidence, 补 0.0。
-/// `limit` 硬上限 20k, 语义与 [`kb_geo_points`] 对齐。
+/// `limit` 硬上限 20k, 语义与 [`kb_geo_points`] 对齐。进程级缓存: 同路径+mtime+len
+/// 在 TTL 内命中则只做源过滤 + 取 limit, 避免重复全量解码。
 #[command]
 pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Result<Vec<GeoPoint>, NeoTrixError> {
     let (default_path, cold_dir) = geo_pack_paths();
@@ -341,34 +363,73 @@ pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Resul
         .filter(|p| p.exists())
         .unwrap_or(default_path);
 
+    let limit = (limit.unwrap_or(5000) as usize).clamp(1, 20_000);
+    let filtered = |points: Vec<nt_memory_pack::GeoPoint>, limit: usize| {
+        points
+            .into_iter()
+            .filter(|p| match source.as_deref() {
+                Some("shanhai") => p.source == "shanhai-peaks" || p.source == "shanhai-mappings",
+                Some(s) => p.source == s,
+                None => true,
+            })
+            .map(|p| GeoPoint {
+                node_id: p.node_id,
+                lat: p.lat,
+                lng: p.lng,
+                country: p.country,
+                region: p.region,
+                city: p.city,
+                tags: p.tags,
+                source: p.source,
+                confidence: 0.0,
+            })
+            .take(limit)
+            .collect()
+    };
+
+    // 缓存命中: 路径+mtime+len 相同且未过期 → 只过滤 + clone (≤limit 个)
+    if let Ok(meta) = std::fs::metadata(&path) {
+        let len = meta.len();
+        let mtime = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
+        let mut slot = geo_pack_cache().lock().unwrap();
+        if let Some(c) = slot.as_ref() {
+            if c.key_file == path && c.key_len == len && c.key_mtime == mtime
+                && c.born.elapsed() < GEO_PACK_TTL
+            {
+                let pts: Vec<nt_memory_pack::GeoPoint> = c.points.iter().cloned().collect();
+                return Ok(filtered(pts, limit));
+            }
+        }
+        // 锁内只放解码（慢路径），命中路径零全量 decode
+        let bytes = std::fs::read(&path)
+            .map_err(|e| NeoTrixError::Memory(format!("ntpack 读 {}: {}", path.display(), e)))?;
+        let (dec, points) = PackDecoder::decode(&bytes)
+            .map_err(|e| NeoTrixError::Memory(format!("ntpack decode: {}", e)))?;
+        let _ = dec;
+        *slot = Some(GeoPackCache {
+            key_file: path.clone(),
+            key_len: len,
+            key_mtime: mtime,
+            born: Instant::now(),
+            points: std::sync::Arc::new(points),
+        });
+        let pts: Vec<nt_memory_pack::GeoPoint> = slot
+            .as_ref()
+            .unwrap()
+            .points
+            .iter()
+            .cloned()
+            .collect();
+        return Ok(filtered(pts, limit));
+    }
+
+    // 文件不存在: 回退旧逻辑 (返回空)
     let bytes = std::fs::read(&path)
         .map_err(|e| NeoTrixError::Memory(format!("ntpack 读 {}: {}", path.display(), e)))?;
-    let (dec, points) = neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::PackDecoder::decode(&bytes)
+    let (dec, points) = PackDecoder::decode(&bytes)
         .map_err(|e| NeoTrixError::Memory(format!("ntpack decode: {}", e)))?;
     let _ = dec;
-
-    let limit = (limit.unwrap_or(5000) as usize).clamp(1, 20_000);
-    let filtered: Vec<GeoPoint> = points
-        .into_iter()
-        .filter(|p| match source.as_deref() {
-            Some("shanhai") => p.source == "shanhai-peaks" || p.source == "shanhai-mappings",
-            Some(s) => p.source == s,
-            None => true,
-        })
-        .map(|p| GeoPoint {
-            node_id: p.node_id,
-            lat: p.lat,
-            lng: p.lng,
-            country: p.country,
-            region: p.region,
-            city: p.city,
-            tags: p.tags,
-            source: p.source,
-            confidence: 0.0,
-        })
-        .take(limit)
-        .collect();
-    Ok(filtered)
+    Ok(filtered(points, limit))
 }
 
 /// 地理索引统计。

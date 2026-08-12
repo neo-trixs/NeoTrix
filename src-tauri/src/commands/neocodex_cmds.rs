@@ -1945,9 +1945,21 @@ pub async fn neocodex_feedback(session_id: String, text: String) -> Result<Strin
     Ok("Feedback recorded".to_string())
 }
 
-/// Download and install a pending update. Emits `neocodex_update_progress`
-/// {downloaded_bytes, total_bytes?} as chunks arrive, then triggers the
-/// native relaunch once the new bundle is staged.
+/// Frontend JS error reporter. Forwards browser-side exceptions into the
+/// backend sentry bridge (`nt_shield_sentry`) so desktop errors are captured
+/// alongside backend panics (frontend error-monitoring wiring).
+#[tauri::command(rename_all = "snake_case")]
+pub fn neocodex_report_frontend_error(source: String, message: String, stack: Option<String>) {
+    use neotrix::neotrix::l1_body_impl::nt_shield_sentry;
+    let detail = match &stack {
+        Some(s) if !s.trim().is_empty() => format!("{message}\n{s}"),
+        _ => message.clone(),
+    };
+    nt_shield_sentry::capture_error(&format!("[frontend:{source}] {detail}"));
+    log::error!("[frontend] {source}: {message}");
+}
+/// bundle. Does NOT relaunch — the frontend asks the user for confirmation
+/// and calls `neocodex_restart_app` to apply (restart-confirm UX).
 #[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), String> {
     let updater = app.updater().map_err(|e| e.to_string())?;
@@ -1974,7 +1986,15 @@ pub async fn neocodex_download_update(app: tauri::AppHandle) -> Result<(), Strin
         )
         .await
         .map_err(|e| format!("更新安装失败: {e}"))?;
-    // Relaunch so the new version takes effect (updater staged the bundle).
+    // Do NOT restart here — the staged bundle is applied on `neocodex_restart_app`,
+    // which the frontend invokes only after the user confirms the dialog.
+    Ok(())
+}
+
+/// Relaunch the app so a staged update takes effect. Called by the frontend
+/// after the user confirms the "restart to install" dialog.
+#[tauri::command(rename_all = "snake_case")]
+pub fn neocodex_restart_app(app: tauri::AppHandle) {
     app.restart();
 }
 
