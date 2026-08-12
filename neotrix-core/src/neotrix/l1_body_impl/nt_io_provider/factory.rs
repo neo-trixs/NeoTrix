@@ -4,8 +4,11 @@
 //! - Local (主体): Ollama/LM Studio/llama.cpp 自动探测注册
 //! - Proxy (客体): 自定义 OpenAI 兼容代理通过 NEOTRIX_PROXY_* 注册
 //! - Cloud (客体): 主流 API 通过各自 env var 自动注册
+//!
+//! 2026-08: 网络隔离 (默认阻断) — 非白名单/非本地端点一律返回 DeniedProvider。
+//! 逃生门: NEOTRIX_NETWORK_UNBLOCK=1 显式放行, 或切换 shield profile 为 general。
 
-use super::types::LlmProvider;
+use super::types::{LlmProvider, LlmRequest, LlmResponse, LlmError};
 use super::openai::OpenAiProvider;
 use super::anthropic::AnthropicProvider;
 use super::ollama::OllamaProvider;
@@ -200,21 +203,158 @@ impl ProviderConfig {
     }
 }
 
-pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
-    // ShieldEnforcer governance check for provider access
-    if let Ok(shield) = crate::cli::shield_enforcer::global_shield().lock() {
-        let domain = config.base_url.as_deref().unwrap_or("api.anthropic.com");
-        match shield.policy.decide("network_request") {
-            crate::neotrix::nt_shield::policy::PolicyDecision::Allow => {}
-            crate::neotrix::nt_shield::policy::PolicyDecision::RequireConfirmation => {
-                log::info!("[shield] Provider access requires confirmation for {}", domain);
-            }
-            crate::neotrix::nt_shield::policy::PolicyDecision::Deny => {
-                if !shield.policy.is_domain_allowed(domain) {
-                    log::warn!("[shield] Provider domain '{}' not in allowlist, but allowing (R6 non-blocking)", domain);
-                }
-            }
+/// 网络隔离拒绝型 provider — 默认策略下非白名单端点返回此类, 所有调用立即失败。
+#[derive(Debug, Clone)]
+pub struct DeniedProvider {
+    pub host: String,
+}
+
+#[async_trait::async_trait]
+impl LlmProvider for DeniedProvider {
+    async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+        Err(LlmError::InvalidRequest(format!(
+            "network access to '{}' is blocked by default isolation policy; \
+             allowlist it or set NEOTRIX_NETWORK_UNBLOCK=1 to opt out",
+            self.host
+        )))
+    }
+
+    async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+        Err(LlmError::InvalidRequest(format!(
+            "network access to '{}' is blocked by default isolation policy",
+            self.host
+        )))
+    }
+}
+
+/// 从 base_url 提取主机名 (剥离 scheme/path/port, 兼容 IPv6 括号)。
+pub fn host_of(base_url: &str) -> String {
+    let s = base_url.trim();
+    let after_scheme = s.splitn(2, "://").nth(1).unwrap_or(s);
+    let authority = after_scheme.split(['/', '?', '#']).next().unwrap_or(after_scheme);
+    let authority = authority.trim();
+    if authority.starts_with('[') {
+        if let Some(close) = authority.find(']') {
+            return authority[..=close].to_string();
         }
+        return authority.to_string();
+    }
+    authority.split(':').next().unwrap_or(authority).to_string()
+}
+
+/// 是否为本地/内网回环端点 (Local 主体 provider 直连)。
+pub fn is_local_host(host: &str) -> bool {
+    let h = host.trim().trim_start_matches('[').trim_end_matches(']').to_lowercase();
+    matches!(h.as_str(), "localhost" | "127.0.0.1" | "::1" | "0.0.0.0")
+        || h.starts_with("127.")
+        || h.starts_with("10.")
+        || h.starts_with("192.168.")
+        || h.starts_with("172.1") || h.starts_with("172.2") || h.starts_with("172.3")
+        || h.ends_with(".local")
+}
+
+/// provider 类型无显式 base_url 时的默认端点主机 (用于隔离判定)。
+fn default_host(provider_type: LlmProviderType) -> Option<&'static str> {
+    match provider_type {
+        LlmProviderType::OpenAI => Some("api.openai.com"),
+        LlmProviderType::Anthropic => Some("api.anthropic.com"),
+        LlmProviderType::Gemini => Some("generativelanguage.googleapis.com"),
+        LlmProviderType::Groq => Some("api.groq.com"),
+        LlmProviderType::OpenRouter => Some("api.openrouter.ai"),
+        LlmProviderType::Cerebras => Some("api.cerebras.ai"),
+        LlmProviderType::SambaNova => Some("api.sambanova.ai"),
+        LlmProviderType::Pollinations | LlmProviderType::FreeApi => Some("pollinations.ai"),
+        LlmProviderType::BazaarLink => Some("api.bazaarlink.ai"),
+        LlmProviderType::FreeTheAi => Some("api.freetheai.com"),
+        LlmProviderType::ZeroLimit => Some("api.zerolimit.ai"),
+        LlmProviderType::Cloudflare => Some("api.cloudflare.com"),
+        LlmProviderType::Nvidia => Some("integrate.api.nvidia.com"),
+        LlmProviderType::GitHubModels => Some("models.inference.ai.azure.com"),
+        LlmProviderType::HuggingFace => Some("api-inference.huggingface.co"),
+        LlmProviderType::Cohere => Some("api.cohere.ai"),
+        LlmProviderType::TogetherFree => Some("api.together.xyz"),
+        LlmProviderType::Llm7 => Some("api.llm7.io"),
+        LlmProviderType::Kilo => Some("api.kilocode.ai"),
+        LlmProviderType::SiliconFlow => Some("api.siliconflow.cn"),
+        LlmProviderType::ZAI => Some("open.bigmodel.cn"),
+        LlmProviderType::OpenCodeZen => Some("opencode.ai"),
+        LlmProviderType::Ovh => Some("ai-endpoints.ovh.net"),
+        LlmProviderType::DeepSeekFree => Some("api.deepseek.com"),
+        LlmProviderType::ModelScope => Some("api.modelscope.cn"),
+        LlmProviderType::ApiAirforce => Some("api.airforce"),
+        // 本地主体: Ollama / vLLM / SGLang / 自定义代理默认走 localhost
+        LlmProviderType::Ollama
+        | LlmProviderType::Vllm
+        | LlmProviderType::Sglang
+        | LlmProviderType::CustomProxy => Some("localhost"),
+        _ => None,
+    }
+}
+
+/// 网络隔离判定 — 默认阻断非白名单云端端点。
+///
+/// 放行条件 (任一):
+/// 1. 端点为主机回环/内网/本地域 → 放行
+/// 2. 域名在 shield 网络白名单 → 放行
+/// 3. shield profile 判定 Allow / RequireConfirmation → 放行
+/// 4. 显式逃生门 NEOTRIX_NETWORK_UNBLOCK=1 → 放行 (告警)
+///
+/// 阻断: 其余一律 DeniedProvider。shield 不可用时不静默放行 (安全默认)。
+pub fn network_access_allowed(provider_type: LlmProviderType, base_url: Option<&str>) -> bool {
+    let host = match base_url {
+        Some(url) if !url.trim().is_empty() => host_of(url),
+        _ => match default_host(provider_type) {
+            Some(h) => h.to_string(),
+            None => return true,
+        },
+    };
+    if is_local_host(&host) {
+        return true;
+    }
+    if let Ok(v) = std::env::var("NEOTRIX_NETWORK_UNBLOCK") {
+        let v = v.trim().to_lowercase();
+        if !v.is_empty() && v != "0" && v != "false" && v != "off" {
+            log::warn!(
+                "[network-isolation] NEOTRIX_NETWORK_UNBLOCK set — allowing unrestricted network to '{}'",
+                host
+            );
+            return true;
+        }
+    }
+    match crate::cli::shield_enforcer::global_shield().lock() {
+        Ok(shield) => match shield.policy.evaluate_network(&host) {
+            crate::neotrix::l1_body_impl::nt_shield::policy::PolicyDecision::Allow => true,
+            crate::neotrix::l1_body_impl::nt_shield::policy::PolicyDecision::RequireConfirmation => {
+                log::info!("[network-isolation] provider domain '{}' requires confirmation — allowing", host);
+                true
+            }
+            crate::neotrix::l1_body_impl::nt_shield::policy::PolicyDecision::Deny => {
+                log::warn!("[network-isolation] BLOCKED provider domain '{}' (not in allowlist, default deny)", host);
+                false
+            }
+        },
+        Err(_) => {
+            log::warn!("[network-isolation] shield unavailable — default-deny for '{}'", host);
+            false
+        }
+    }
+}
+
+pub fn create_provider(config: ProviderConfig) -> Box<dyn LlmProvider> {
+    // 网络隔离 (默认阻断): 非白名单/非本地端点 → DeniedProvider (显式逃生门见 network_access_allowed)
+    if !network_access_allowed(config.provider_type, config.base_url.as_deref()) {
+        let host = config
+            .base_url
+            .as_deref()
+            .map(host_of)
+            .or_else(|| default_host(config.provider_type).map(String::from))
+            .unwrap_or_else(|| "unknown".to_string());
+        log::warn!(
+            "[factory] BLOCKED provider {:?}: host '{}' not in network allowlist (default isolation). \
+             Add to allowlist or set NEOTRIX_NETWORK_UNBLOCK=1 to allow.",
+            config.provider_type, host
+        );
+        return Box::new(DeniedProvider { host });
     }
     let mut provider: Box<dyn LlmProvider> = match config.provider_type {
         LlmProviderType::OpenAI => {
@@ -694,4 +834,72 @@ pub fn create_gateway() -> GatewayV2 {
     // 泄漏 runtime: 进程生命周期内保持存活, 避免 drop 卡死在 BlockingPool::shutdown。
     std::mem::forget(rt);
     gateway
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_host_of_strips_scheme_path_port() {
+        assert_eq!(host_of("https://api.openai.com/v1/chat"), "api.openai.com");
+        assert_eq!(host_of("http://localhost:11434/api/tags"), "localhost");
+        assert_eq!(host_of("https://[::1]:8080/v1"), "[::1]");
+        assert_eq!(host_of("https://opencode.ai"), "opencode.ai");
+        assert_eq!(host_of("api.deepseek.com"), "api.deepseek.com");
+    }
+
+    #[test]
+    fn test_is_local_host_detects_loopback_and_private() {
+        assert!(is_local_host("localhost"));
+        assert!(is_local_host("127.0.0.1"));
+        assert!(is_local_host("[::1]"));
+        assert!(is_local_host("192.168.1.5"));
+        assert!(is_local_host("10.0.0.2"));
+        assert!(is_local_host("172.16.0.1"));
+        assert!(is_local_host("dev.local"));
+        assert!(!is_local_host("api.openai.com"));
+        assert!(!is_local_host("pollinations.ai"));
+        assert!(!is_local_host("evil.example.com"));
+    }
+
+    #[test]
+    fn test_default_deny_for_non_allowlisted_cloud_host() {
+        assert!(!network_access_allowed(LlmProviderType::Llm7, Some("https://api.llm7.io/v1")));
+        assert!(!network_access_allowed(LlmProviderType::CustomProxy, Some("https://evil.example.com/v1")));
+        assert!(!network_access_allowed(LlmProviderType::ApiAirforce, Some("https://api.airforce/v1")));
+    }
+
+    #[test]
+    fn test_allowlist_and_local_allowed() {
+        assert!(network_access_allowed(LlmProviderType::Anthropic, None));
+        assert!(network_access_allowed(LlmProviderType::Anthropic, Some("https://api.anthropic.com/v1")));
+        assert!(network_access_allowed(LlmProviderType::OpenAI, Some("https://api.openai.com/v1")));
+        assert!(network_access_allowed(LlmProviderType::Ollama, None));
+        assert!(network_access_allowed(LlmProviderType::Vllm, Some("http://localhost:8000/v1")));
+        assert!(network_access_allowed(LlmProviderType::CustomProxy, Some("http://localhost:3000/v1")));
+    }
+
+    #[test]
+    fn test_denied_provider_errors() {
+        let p = DeniedProvider { host: "evil.example.com".to_string() };
+        let rt = tokio::runtime::Runtime::new().expect("tokio");
+        let err = rt.block_on(p.complete(&LlmRequest::new("gpt-4o", "hi"))).expect_err("must error");
+        assert!(err.to_string().contains("blocked"), "got: {err}");
+    }
+
+    #[test]
+    fn test_create_provider_blocks_unknown_domain() {
+        let provider = create_provider(ProviderConfig {
+            provider_type: LlmProviderType::CustomProxy,
+            api_key: None,
+            base_url: Some("https://evil.example.com/v1".to_string()),
+            model: None,
+            timeout_secs: 10,
+            proxy: None,
+        });
+        let rt = tokio::runtime::Runtime::new().expect("tokio");
+        let err = rt.block_on(provider.complete(&LlmRequest::new("m", "hi"))).expect_err("must error");
+        assert!(err.to_string().contains("blocked"), "got: {err}");
+    }
 }
