@@ -277,3 +277,96 @@ fn test_streaming_toggle() {
     app.streaming = false;
     assert!(!app.streaming);
 }
+
+// ── Slash 补全（registry 动态） ──
+
+#[test]
+fn test_slash_candidates_registry_sourced() {
+    // 前缀 /s 应同时含 TUI 专用命令与 registry 人类控制命令 (命令面精简后控制命令为一级)
+    let cands = crate::cli::tui::app::tui_app::slash_command_candidates("/s");
+    assert!(cands.iter().any(|c| c == "/save"), "TUI 专用 /save 应在候选");
+    assert!(cands.iter().any(|c| c == "/sessions"), "TUI 专用 /sessions 应在候选");
+    assert!(!cands.iter().any(|c| c == "/session-all"), "聚合器 /session-all 是 agent 工具, 不应在人类候选");
+    assert!(!cands.iter().any(|c| c == "/session"), "/session 是 agent 工具, 不应在候选");
+    assert!(cands.iter().any(|c| c == "/stats"), "控制命令 /stats 应在候选");
+}
+
+#[test]
+fn test_slash_candidates_no_match() {
+    let cands = crate::cli::tui::app::tui_app::slash_command_candidates("/zzz_nonexistent");
+    assert!(cands.is_empty());
+}
+
+// ── @ 文件引用补全（私有方法测试在 tui_app.rs 内部 tests） ──
+
+#[test]
+fn test_at_completion_no_crash_when_dir_empty() {
+    let mut app = TuiApp::new(false);
+    app.input = "@".into();
+    app.cursor = 1;
+    app.handle_key(KeyCode::Tab, KeyModifiers::NONE);
+    assert!(app.running);
+}
+
+// ── 会话恢复 picker ──
+
+#[test]
+fn test_session_picker_navigation_and_select() {
+    use crate::cli::tui::app::types::{SessionEntry, SessionPicker};
+    let mut app = TuiApp::new(false);
+    app.session_picker = Some(SessionPicker {
+        entries: vec![
+            SessionEntry { name: "sess-a".into(), updated_at: "2026-01-01T00:00:00+00:00".into(), message_count: 3 },
+            SessionEntry { name: "sess-b".into(), updated_at: "2026-01-02T00:00:00+00:00".into(), message_count: 7 },
+        ],
+        selected: 0,
+    });
+    // ↓ 下移
+    let a = app.handle_key(KeyCode::Down, KeyModifiers::NONE);
+    assert_eq!(a, KeyAction::None);
+    assert_eq!(app.session_picker.as_ref().unwrap().selected, 1);
+    // Enter 选择
+    let a = app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+    assert_eq!(a, KeyAction::SelectSession(1));
+    assert!(app.session_picker.is_none(), "选择后 picker 应关闭");
+}
+
+#[test]
+fn test_session_picker_close_and_delete() {
+    use crate::cli::tui::app::types::{SessionEntry, SessionPicker};
+    let mut app = TuiApp::new(false);
+    app.session_picker = Some(SessionPicker {
+        entries: vec![SessionEntry { name: "sess-a".into(), updated_at: String::new(), message_count: 1 }],
+        selected: 0,
+    });
+    let a = app.handle_key(KeyCode::Esc, KeyModifiers::NONE);
+    assert_eq!(a, KeyAction::ClosePicker);
+    assert!(app.session_picker.is_none());
+}
+
+// ── 审批 Esc 取消 ──
+
+#[test]
+fn test_approval_esc_cancels() {
+    use crate::cli::approval::{ActionType, PendingAction};
+    let mut app = TuiApp::new(false);
+    app.pending_approval = Some(PendingAction {
+        id: "t".into(),
+        action_type: ActionType::ShellCommand { command: "ls".into() },
+        description: "运行 ls".into(),
+        created_at: std::time::Instant::now(),
+    });
+    let a = app.handle_key(KeyCode::Esc, KeyModifiers::NONE);
+    assert_eq!(a, KeyAction::CancelGeneration);
+    assert!(app.pending_approval.is_none());
+}
+
+// ── git 状态检测 ──
+
+#[test]
+fn test_git_detect_no_crash() {
+    let app = TuiApp::new(false);
+    // 当前目录是 git 仓库（本工程）→ branch 应为 Some；即使失败也不 panic
+    let _ = app.git_branch.clone();
+    let _ = app.git_dirty;
+}

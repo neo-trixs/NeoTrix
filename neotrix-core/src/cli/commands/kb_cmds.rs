@@ -75,6 +75,8 @@ impl CliCommand for KbCmd {
     fn description(&self) -> &str {
         "Knowledge base operations: /kb stats | /kb search <query> | /kb explore <node_id> | /kb find <src> <tgt> | /kb cluster | /kb central | /kb serve | /kb export <node_id> | /kb import-assets | /kb absorb-map"
     }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(
         &self,
         args: &[String],

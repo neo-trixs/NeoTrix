@@ -52,6 +52,8 @@ impl CliCommand for SwapCmd {
     fn description(&self) -> &str {
         "Token swap: swap <chain> <token_in> <token_out> <amount>"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(
         &self,
@@ -183,6 +185,8 @@ impl CliCommand for TransferCmd {
     fn description(&self) -> &str {
         "Transfer tokens: transfer <chain> <to> <amount> [token]"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(
         &self,
@@ -313,6 +317,8 @@ impl CliCommand for ApproveCmd {
     fn description(&self) -> &str {
         "Approve token spending: approve <chain> <token> <spender> <amount>"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(
         &self,

@@ -341,6 +341,7 @@ pub fn action_type_to_key(action: &crate::cli::approval::ActionType) -> &'static
         ActionType::FileEdit { .. } => "write_file",
         ActionType::ShellCommand { .. } => "execute_command",
         ActionType::GitOperation { .. } => "git_push",
+        ActionType::Other { .. } => "tool_call",
     }
 }
 

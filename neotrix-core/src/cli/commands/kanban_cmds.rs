@@ -1052,6 +1052,8 @@ impl CliCommand for BoardCmd {
     fn description(&self) -> &str {
         "Kanban board: /board list | create <spec> [--branch <name>] | move <id> [--to <phase>] [--force] | view <id> | dependency <id> add/remove <dep> | block/unblock <id> | assign <id> <agent> | priority <id> <level> | branch <id> [name] | wip <phase> <limit> | ready | save [path] | load [path] | todo import|sync|allocate|status"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");

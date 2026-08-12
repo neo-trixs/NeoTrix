@@ -21,7 +21,10 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use super::nt_io_provider::types::{FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo};
+use super::nt_io_provider::types::{
+    FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo,
+};
+use crate::cli::approval::{ActionType, PendingAction};
 use crate::core::nt_core_traits::{NativeTool, ToolOutput};
 
 /// 一次工具执行的记录（供调用方观测/审计）。
@@ -93,6 +96,15 @@ impl AgentLoop {
 
     pub fn history_len(&self) -> usize {
         self.messages.len()
+    }
+
+    /// P1-5 修复: 重置会话历史(保留 System 首条与已注册工具)。
+    /// TUI 切换/清空会话时调用, 避免新会话沿用旧会话上下文造成语义串台。
+    pub fn reset_history(&mut self, system_prompt: &str) {
+        self.messages.clear();
+        if !system_prompt.is_empty() {
+            self.messages.push(Message::new(Role::System, system_prompt));
+        }
     }
 
     /// 执行一轮对话：用户输入 → (可能的多次工具调用) → 最终回答。
@@ -246,6 +258,165 @@ impl AgentLoop {
         Err(LlmError::Server("AgentLoop: max_tool_rounds exceeded".to_string()))
     }
 
+    /// 流式对话轮（带审批门槛版本，P0 权限审批接线）。
+    ///
+    /// 与 [`turn_stream`] 相同的决策循环，额外支持：
+    ///   - `on_tool_start`：工具执行前回调 `(name, args)`，返回 `false` 取消本轮生成；
+    ///   - `on_tool`：工具执行后回调 `(name, args, result, duration_ms, success)`，
+    ///     返回 `false` 取消本轮生成（参考 nt_io_neocodex.rs `react_loop_stream` 签名）；
+    ///   - `on_approval`：审批回调。`Some(cb)` 时启用审批门槛：每个工具执行前经
+    ///     `crate::cli::approval::global_approval()` 检查，`require_approval` 为 true 则
+    ///     提交 `PendingAction` 并调用 `cb(&PendingAction)` 等待决策（true=approve,
+    ///     false=deny）。deny 时工具被跳过，模型收到明确的 "需审批" 错误。
+    ///     `None` 时同样启用门槛，但无回调可问 → 需审批的工具一律跳过（返回 "需审批" 错误）。
+    ///
+    /// 向后兼容：旧入口 [`turn_stream`] 保持原签名且**不**启用审批门槛（无 on_approval
+    /// 时保持现状），本方法供需要审批交互的调用方（如 TUI）使用。
+    pub async fn turn_stream_with_approval<F, G, H>(
+        &mut self,
+        user_input: &str,
+        mut on_token: F,
+        mut on_tool_start: G,
+        mut on_tool: H,
+        on_approval: Option<Box<dyn Fn(&PendingAction) -> bool + Send>>,
+    ) -> Result<String, LlmError>
+    where
+        F: FnMut(&str) -> bool + Send + Sync,
+        G: FnMut(&str, &str) -> bool + Send + Sync,
+        H: FnMut(&str, &str, &str, u64, bool) -> bool + Send + Sync,
+    {
+        self.messages.push(Message::new(Role::User, user_input));
+        self.trim_history();
+
+        let mut cancelled = false;
+        let mut last_response_content = String::new();
+        for _round in 0..self.max_tool_rounds {
+            let request = self.build_request();
+            let mut rx = self.backend.stream_complete(&request).await?;
+
+            let mut response_content = String::new();
+            let mut response_tool_calls: Vec<ToolCallInfo> = Vec::new();
+            let mut response_finish = FinishReason::Stop;
+
+            while let Some(chunk) = rx.recv().await {
+                match chunk {
+                    Ok(resp) => {
+                        if !resp.content.is_empty() {
+                            response_content.push_str(&resp.content);
+                            if !on_token(&resp.content) {
+                                cancelled = true;
+                                break;
+                            }
+                        }
+                        if let Some(calls) = resp.tool_calls {
+                            response_tool_calls.extend(calls);
+                        }
+                        response_finish = resp.finish_reason;
+                    }
+                    Err(e) => {
+                        // 单 chunk 失败：返回已累积文本 + 错误。
+                        let text = response_content.clone();
+                        if !text.is_empty() {
+                            self.messages.push(Message::new(Role::Assistant, &text));
+                            self.trim_history();
+                        }
+                        return Err(e);
+                    }
+                }
+            }
+            if cancelled {
+                // 用户取消：保留已累积内容作为最终回答。
+                let text = response_content.clone();
+                self.messages.push(Message::new(Role::Assistant, &text));
+                self.trim_history();
+                return Ok(text);
+            }
+            last_response_content = response_content.clone();
+
+            match response_finish {
+                FinishReason::Tool => {
+                    if response_tool_calls.is_empty() {
+                        let text = response_content.clone();
+                        self.messages.push(Message::new(Role::Assistant, &text));
+                        self.trim_history();
+                        return Ok(text);
+                    }
+                    // 回填 assistant tool_calls + 逐个执行工具（含审批门槛）。
+                    let assistant_calls = response_tool_calls.clone();
+                    self.messages.push(Message::assistant_with_calls("", assistant_calls));
+                    for call in &response_tool_calls {
+                        let args: Value =
+                            serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
+                        let name = call.function.name.clone();
+                        let args_str = call.function.arguments.clone();
+
+                        // P0 审批门槛：需审批且被拒绝 → 跳过工具，模型收到明确错误。
+                        if let Err(approval_err) = Self::check_tool_approval(&name, &args, on_approval.as_deref()) {
+                            let content = format!("TOOL_ERROR: {}", approval_err);
+                            on_tool(&name, &args_str, &content, 0, false);
+                            self.tool_log.push(ToolInvocation {
+                                name: name.clone(),
+                                arguments: args_str.clone(),
+                                success: false,
+                                output: content.clone(),
+                            });
+                            self.messages.push(Message::tool(&content, &call.id));
+                            continue;
+                        }
+
+                        if !on_tool_start(&name, &args_str) {
+                            cancelled = true;
+                            break;
+                        }
+                        let started = std::time::Instant::now();
+                        let result = self.call_tool(&name, &args);
+                        let duration_ms = started.elapsed().as_millis() as u64;
+                        let (content, success) = match &result {
+                            Ok(ToolOutput { success, content }) => (
+                                if *success { content.clone() }
+                                else { format!("TOOL_ERROR: {}", content) },
+                                *success,
+                            ),
+                            Err(e) => (format!("TOOL_ERROR: {}", e), false),
+                        };
+                        if !on_tool(&name, &args_str, &content, duration_ms, success) {
+                            cancelled = true;
+                            break;
+                        }
+                        self.tool_log.push(ToolInvocation {
+                            name: name.clone(),
+                            arguments: args_str.clone(),
+                            success,
+                            output: content.clone(),
+                        });
+                        self.messages.push(Message::tool(&content, &call.id));
+                    }
+                    self.trim_history();
+                    if cancelled {
+                        break;
+                    }
+                    continue;
+                }
+                _ => {
+                    let text = response_content.clone();
+                    self.messages.push(Message::new(Role::Assistant, &text));
+                    self.trim_history();
+                    return Ok(text);
+                }
+            }
+        }
+
+        if cancelled {
+            // 工具回调取消：返回本轮已累积文本（通常为空，表示无文本回答）。
+            let text = last_response_content.clone();
+            self.messages.push(Message::new(Role::Assistant, &text));
+            self.trim_history();
+            return Ok(text);
+        }
+
+        Err(LlmError::Server("AgentLoop: max_tool_rounds exceeded".to_string()))
+    }
+
     fn build_request(&self) -> LlmRequest {
         let tools = self.tools.iter().map(|t| {
             let def = t.to_def();
@@ -303,10 +474,93 @@ impl AgentLoop {
     }
 
     fn call_tool(&self, name: &str, args: &Value) -> Result<ToolOutput, String> {
+        // P0-3 pre-tool-use secret 扫描 (吸收 sonarqube-cli 防泄漏模式):
+        // 工具调用前扫描参数, 发现 Critical/High 凭据即阻断 — 防止密钥/令牌
+        // 经工具参数泄漏给外部服务或写入日志。对应 sonarqube-cli
+        // "detect secrets before they leak" 的 pre-tool-use hook 语义。
+        let args_text = args.to_string();
+        let scanner = crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::secret_scanner::SecretScanner::new();
+        let findings = scanner.scan(&args_text);
+        let blocked: Vec<String> = findings
+            .iter()
+            .filter(|f| {
+                f.severity
+                    >= crate::neotrix::l8_autonomic_impl::nt_mind::seal_core::self_iterating::secret_scanner::Severity::High
+            })
+            .map(|f| format!("{}@{}", f.pattern, f.line))
+            .collect();
+        if !blocked.is_empty() {
+            return Err(format!(
+                "[secret-guard] tool '{}' blocked: potential credential leak in args ({})",
+                name,
+                blocked.join(", ")
+            ));
+        }
         self.tools.iter()
             .find(|t| t.id() == name)
             .ok_or_else(|| format!("Unknown tool: {}", name))
             .and_then(|t| t.execute(args))
+    }
+
+    /// 工具名 → 审批动作类型（用于权限门禁分类）。
+    /// 启发式映射: 命令执行→ShellCommand, git→GitOperation, 文件写→FileWrite/FileEdit,
+    /// 其余兜底 Other{tool, args}。
+    fn action_type_for_tool(name: &str, args: &Value) -> ActionType {
+        let n = name.to_lowercase();
+        let args_s = args.to_string();
+        if n.contains("shell") || n.contains("exec") || n.contains("bash") || n.contains("run") || n.contains("command") {
+            ActionType::ShellCommand { command: Self::truncate(&args_s, 120) }
+        } else if n.contains("git") {
+            ActionType::GitOperation { description: Self::truncate(&args_s, 120) }
+        } else if n.contains("write") || n.contains("create") || n.contains("edit") || n.contains("patch") || n.contains("diff") {
+            ActionType::FileEdit { path: name.to_string(), diff: Self::truncate(&args_s, 120) }
+        } else {
+            ActionType::Other { tool: name.to_string(), args: Self::truncate(&args_s, 120) }
+        }
+    }
+
+    /// CJK 安全截断（按字符，不按字节）。
+    fn truncate(s: &str, max_chars: usize) -> String {
+        s.chars().take(max_chars).collect()
+    }
+
+    /// 工具执行前审批门槛。
+    /// - 无回调 (None)：需审批工具一律跳过，返回错误 "需审批"（默认安全）
+    /// - 有回调：回调决策 approve (true) / deny (false)
+    /// 锁纪律：必须在调回调前 drop(guard)（回调可能阻塞等待用户按键），
+    /// 批准后再重新加锁 approve/deny。
+    fn check_tool_approval(
+        name: &str,
+        args: &Value,
+        on_approval: Option<&(dyn Fn(&PendingAction) -> bool + Send)>,
+    ) -> Result<(), String> {
+        let engine = crate::cli::approval::global_approval();
+        let action = Self::action_type_for_tool(name, args);
+        let require = {
+            let guard = engine.lock().map_err(|e| format!("approval lock: {}", e))?;
+            guard.require_approval(&action)
+        };
+        if !require {
+            return Ok(());
+        }
+        let pending = {
+            let mut guard = engine.lock().map_err(|e| format!("approval lock: {}", e))?;
+            guard.submit(action)
+        };
+        let decision = match on_approval {
+            Some(cb) => cb(&pending),
+            None => false,
+        };
+        // 批准后重新加锁 approve；deny 则无需回写（PendingAction 自然过期）
+        if decision {
+            let mut guard = engine.lock().map_err(|e| format!("approval lock: {}", e))?;
+            let _ = guard.approve(&pending.id);
+        }
+        if decision {
+            Ok(())
+        } else {
+            Err(format!("需要审批: {}", pending.description))
+        }
     }
 
     /// 超过 max_history 时裁剪最旧的 user/assistant 消息，保留 System 首条。

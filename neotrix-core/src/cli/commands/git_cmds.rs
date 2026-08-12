@@ -16,6 +16,8 @@ impl CliCommand for GitCmd {
     fn description(&self) -> &str {
         "Git 命令: /git status | /git diff | /git log [--oneline -10] | /git worktree create|list|remove|pr|lock|unlock"
     }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /git <args>\n示例: /git status, /git diff, /git log --oneline -10");
@@ -197,6 +199,8 @@ impl CliCommand for CommitCmd {
     fn name(&self) -> &str { "/commit" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "暂存全部并提交: /commit <message>" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /commit <message>");
@@ -248,6 +252,8 @@ impl CliCommand for PrCmd {
     fn name(&self) -> &str { "/pr" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "创建 GitHub PR (使用 gh CLI)" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let gh_check = Command::new("gh").args(["--version"]).output();
         match gh_check {

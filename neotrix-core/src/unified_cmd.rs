@@ -204,7 +204,7 @@ pub fn cli_catalog() -> Vec<CommandSpec> {
     use crate::cli::commands::types::category_for;
     let reg = crate::cli::commands::registry::default_registry();
     let mut specs = Vec::new();
-    for name in reg.list() {
+    for name in reg.list_primary() {
         if let Some(cmd) = reg.get(name) {
             let aliases = cmd.aliases().into_iter().map(String::from).collect::<Vec<_>>();
             specs.push(CommandSpec {
@@ -253,10 +253,18 @@ mod tests {
         let specs = cli_catalog();
         let names: Vec<&str> = specs.iter().map(|s| s.name.as_str()).collect();
         assert!(names.contains(&"/help"), "cli catalog missing /help");
-        assert!(names.contains(&"/kb"), "cli catalog missing /kb");
-        assert!(names.contains(&"/board"), "cli catalog missing /board");
-        assert!(names.contains(&"/goal"), "cli catalog missing /goal");
-        assert!(names.len() >= 36, "cli catalog too small: {}", names.len());
+        assert!(names.contains(&"/config"), "cli catalog missing /config");
+        assert!(names.contains(&"/plan"), "cli catalog missing /plan");
+        // 命令面精简: 聚合器与领域命令是 agent 工具, 不进人类目录
+        assert!(!names.contains(&"/memory"), "cli catalog 不应含 agent 工具 /memory");
+        assert!(!names.contains(&"/kb"), "cli catalog 不应含 agent 工具 /kb");
+        assert!(!names.contains(&"/board"), "cli catalog 不应含 agent 工具 /board");
+        assert!(!names.contains(&"/goal"), "cli catalog 不应含 agent 工具 /goal");
+        // 控制命令白名单 (命令面精简 12→7: version/doctor→/stats, completions/benchmark 降级, consciousness→/e8)
+        for ctl in ["/help", "/exit", "/clear", "/config", "/stats", "/e8", "/plan"] {
+            assert!(names.contains(&ctl), "cli catalog missing 控制命令 {}", ctl);
+        }
+        assert!(names.len() >= 7, "cli catalog too small: {}", names.len());
     }
 
     #[test]

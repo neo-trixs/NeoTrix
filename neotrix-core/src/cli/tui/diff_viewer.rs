@@ -219,3 +219,106 @@ fn parse_hunk_header(line: &str) -> (u32, u32) {
     let new_start = new_part.split(',').next().unwrap_or("0").parse().unwrap_or(0);
     (old_start, new_start)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::style::Color;
+
+    const SAMPLE: &str = "diff --git a/src/a.rs b/src/a.rs\n\
+index 1234567..89abcde 100644\n\
+--- a/src/a.rs\n\
++++ b/src/a.rs\n\
+@@ -1,4 +1,5 @@\n\
+ fn main() {\n\
+-    println!(\"old\");\n\
++    println!(\"new\");\n\
+     let x = 1;\n\
+ }\n\
+diff --git a/src/b.rs b/src/b.rs\n\
+@@ -10,2 +10,3 @@\n\
+-old b\n\
++new b\n";
+
+    #[test]
+    fn test_parse_diff_blocks_and_hunks() {
+        let viewer = DiffViewer::new(SAMPLE.to_string());
+        assert_eq!(viewer.blocks.len(), 2, "两个文件 → 两个 block");
+        assert_eq!(viewer.blocks[0].hunks.len(), 1);
+        assert_eq!(viewer.blocks[1].hunks.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_diff_line_kinds_and_linenos() {
+        // 用显式构造的字符串 (不用 \ 续行, 避免续行吞行首空格导致 Context 行丢失)
+        let diff = concat!(
+            "diff --git a/src/a.rs b/src/a.rs\n",
+            "index 123..456 100644\n",
+            "--- a/src/a.rs\n",
+            "+++ b/src/a.rs\n",
+            "@@ -1,4 +1,5 @@\n",
+            " fn main() {\n",
+            "-    println!(\"old\");\n",
+            "+    println!(\"new\");\n",
+            "     let x = 1;\n",
+            " }\n",
+            "diff --git a/src/b.rs b/src/b.rs\n",
+            "@@ -10,2 +10,3 @@\n",
+            "-old b\n",
+            "+new b\n",
+        );
+        let viewer = DiffViewer::new(diff.to_string());
+        let hunk = &viewer.blocks[0].hunks[0];
+        let kinds: Vec<DiffLineKind> = hunk.lines.iter().map(|l| l.kind).collect();
+        assert!(kinds.contains(&DiffLineKind::HunkHeader));
+        assert!(kinds.contains(&DiffLineKind::Add));
+        assert!(kinds.contains(&DiffLineKind::Remove));
+        assert!(kinds.contains(&DiffLineKind::Context));
+        // 行号跟踪：@@ -1,4 +1,5 @@ → add 行 new=2，remove 行 old=2
+        let add = hunk.lines.iter().find(|l| l.kind == DiffLineKind::Add).unwrap();
+        assert_eq!(add.new_lineno, Some(2));
+        let remove = hunk.lines.iter().find(|l| l.kind == DiffLineKind::Remove).unwrap();
+        assert_eq!(remove.old_lineno, Some(2));
+    }
+
+    #[test]
+    fn test_parse_diff_empty() {
+        let viewer = DiffViewer::new(String::new());
+        assert!(viewer.is_empty());
+        assert_eq!(viewer.total_rendered_lines(), 0);
+    }
+
+    #[test]
+    fn test_parse_diff_non_diff_text() {
+        let viewer = DiffViewer::new("plain text\nno diff markers\n".to_string());
+        assert!(viewer.is_empty(), "非 diff 文本不应产生 block");
+    }
+
+    #[test]
+    fn test_scroll_bounds() {
+        let mut viewer = DiffViewer::new(SAMPLE.to_string());
+        viewer.scroll_up(100);
+        assert_eq!(viewer.scroll_offset, 0, "上滚不越界");
+        viewer.scroll_down(5);
+        assert_eq!(viewer.scroll_offset, 5);
+    }
+
+    #[test]
+    fn test_all_rendered_lines_styled() {
+        let viewer = DiffViewer::new(SAMPLE.to_string());
+        let lines = viewer.all_rendered_lines();
+        assert!(!lines.is_empty());
+        // 首行是 block header（黄色加粗）
+        assert!(lines[0].spans.iter().any(|s| s.style.fg == Some(Color::Yellow)));
+        // 至少有一行绿色（Add）与红色（Remove）
+        assert!(lines.iter().any(|l| l.spans.iter().any(|s| s.style.fg == Some(Color::Green))));
+        assert!(lines.iter().any(|l| l.spans.iter().any(|s| s.style.fg == Some(Color::Red))));
+    }
+
+    #[test]
+    fn test_parse_hunk_header_edges() {
+        assert_eq!(parse_hunk_header("@@ -1,4 +1,5 @@"), (1, 1));
+        assert_eq!(parse_hunk_header("@@ -0,0 +1,3 @@"), (0, 1));
+        assert_eq!(parse_hunk_header("@@ -10 +11 @@"), (10, 11));
+    }
+}

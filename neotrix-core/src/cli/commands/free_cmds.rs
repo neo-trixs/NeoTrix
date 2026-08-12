@@ -29,6 +29,8 @@ impl CliCommand for FreeCmd {
     fn description(&self) -> &str {
         "免费 AI 提供者管理: /free list | /free budget | /free discover"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(
         &self,

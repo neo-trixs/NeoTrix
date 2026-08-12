@@ -101,6 +101,8 @@ html-escape = "0.2"
 uniffi = { version = "0.28", features = ["cli", "scaffolding-ffi-buffer-fns"], optional = true }
 unicode-normalization = "0.1"
 flate2 = "1"
+zstd = "0.13"
+crc32fast = "1"
 syn = { version = "2", features = ["full", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 walkdir = "2"

@@ -346,10 +346,11 @@ pub const CITY_LATLNG: &[(&str, &str, &str, f64, f64)] = &[
     ("Houston", "休斯顿", "美国", 29.7604, -95.3698),
     ("旧金山", "旧金山", "美国", 37.7749, -122.4194),
     ("San Francisco", "旧金山", "美国", 37.7749, -122.4194),
-    ("Stanford", "旧金山", "美国", 37.4275, -122.1697),
-    ("Palo Alto", "旧金山", "美国", 37.4419, -122.143),
-    ("硅谷", "旧金山", "美国", 37.4275, -122.1697),
-    ("Silicon Valley", "旧金山", "美国", 37.4275, -122.1697),
+    // 湾区子地点统一归入旧金山市中心坐标, 保持 city 字段与坐标一致
+    ("Stanford", "旧金山", "美国", 37.7749, -122.4194),
+    ("Palo Alto", "旧金山", "美国", 37.7749, -122.4194),
+    ("硅谷", "旧金山", "美国", 37.7749, -122.4194),
+    ("Silicon Valley", "旧金山", "美国", 37.7749, -122.4194),
     ("西雅图", "西雅图", "美国", 47.6062, -122.3321),
     ("Seattle", "西雅图", "美国", 47.6062, -122.3321),
     ("波士顿", "波士顿", "美国", 42.3601, -71.0589),
@@ -552,13 +553,19 @@ pub fn geo_tag_nodes(conn: &Connection, limit: usize) -> rusqlite::Result<usize>
 }
 
 /// 在文本中匹配世界城市关键词 (CITY_LATLNG 词典), 返回 (城市名, 国家名, lat, lng)。
-/// 中文关键词用 contains; 英文关键词用词边界正则 (防 "London" 误命中 "Londoner")。
+/// 中文关键词用 contains; 英文关键词用词边界正则 (防 "San" 误命中 "Santa",
+/// "Tokyo" 误命中 "Tokyopop"), 并允许词形派生后缀 (London → Londoner/Londoners/
+/// London-based/Londonian), 使 "A study of Londoner culture" 正确命中伦敦。
 fn match_city_in_text(text: &str) -> Option<(&'static str, &'static str, f64, f64)> {
     for (kw, city, country, lat, lng) in CITY_LATLNG {
         let hits = if kw.chars().any(|c| c.is_ascii_alphabetic()) {
-            // 英文/拼音: 需要词边界, 避免 "San" 命中 "Santa"
+            // 英文/拼音: 词边界 + 常见词形派生后缀 (含空格变体, 如 "London-based")
             let escaped = regex::escape(kw);
-            let re = match regex::Regex::new(&format!(r"(?i)\b{}\b", escaped)) {
+            let pattern = format!(
+                r"(?i)\b{}(?:s|es|er|ers|ese|ian|ians|ite|ites|based|wider|less)?\b",
+                escaped
+            );
+            let re = match regex::Regex::new(&pattern) {
                 Ok(re) => re,
                 Err(_) => continue,
             };
@@ -1079,6 +1086,233 @@ pub fn query_weather(
     Ok(out)
 }
 
+
+/// 摄取全球 Holocene 火山 (Smithsonian GVP WFS, ~1,214 个)。
+/// 数据源: GeoServer WFS GVP-VOTW:E3WebApp_HoloceneVolcanoes (JSON, 2026 更新 v5.4.0)。
+/// 注意: PropertyName 必须限定为 VolcanoNumber,VolcanoName,Country,GeoLocation,
+///      否则服务器对超长 Remarks 字段截断 JSON 响应。
+/// JSON 结构: features[].geometry = Point [lng, lat]; properties = {VolcanoNumber, VolcanoName, Country}。
+/// node_id = geo:volcano:{volcano_number} (GVP 火山编号保证唯一)。
+pub fn ingest_geo_volcanoes(
+    conn: &mut Connection,
+    url_or_path: &str,
+    limit: usize,
+) -> Result<usize, String> {
+    let body = if url_or_path.starts_with("file://") || std::path::Path::new(url_or_path).exists() {
+        let path = url_or_path.strip_prefix("file://").unwrap_or(url_or_path);
+        std::fs::read_to_string(path)
+            .map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
+    } else {
+        let url = format!(
+            "{}&PropertyName=VolcanoNumber,VolcanoName,Country,GeoLocation&maxFeatures={}",
+            url_or_path, limit
+        );
+        let resp = super::nt_http::run_blocking(|| {
+            super::nt_http::shared_blocking_client().get(&url).send()
+        })
+        .map_err(|e| format!("volcanoes fetch error: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {} for {}", resp.status(), url_or_path));
+        }
+        resp.text().map_err(|e| format!("read: {}", e))?
+    };
+
+    let fc: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| format!("GeoJSON 解析失败 (volcanoes): {}", e))?;
+    let features = fc
+        .get("features")
+        .and_then(|f| f.as_array())
+        .ok_or_else(|| "GeoJSON 缺少 features 数组".to_string())?
+        .clone();
+
+    let mut existing: std::collections::HashSet<String> = {
+        let mut stmt = conn
+            .prepare("SELECT node_id FROM geo_index WHERE source='gvp-volcanoes'")
+            .map_err(|e| format!("existing volcanoes prepare: {}", e))?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| format!("existing volcanoes query: {}", e))?;
+        let mut set = std::collections::HashSet::new();
+        for r in rows {
+            set.insert(r.map_err(|e| format!("existing volcano row: {}", e))?);
+        }
+        set
+    };
+
+    let mut tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("tx begin: {}", e))?;
+    let mut count = 0usize;
+    const BATCH: usize = 500;
+
+    for feat in features.iter().take(limit) {
+        let props = feat.get("properties").cloned().unwrap_or(serde_json::Value::Null);
+        let num = props
+            .get("VolcanoNumber")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let name = props
+            .get("VolcanoName")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let country = props
+            .get("Country")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        if num == 0 || name.is_empty() {
+            continue;
+        }
+        let geom = feat.get("geometry").cloned().unwrap_or(serde_json::Value::Null);
+        let coords = geom.get("coordinates").cloned().unwrap_or(serde_json::Value::Null);
+        let lng = coords.as_array().and_then(|a| a.first()).and_then(|v| v.as_f64());
+        let lat = coords.as_array().and_then(|a| a.get(1)).and_then(|v| v.as_f64());
+        let (Some(lat), Some(lng)) = (lat, lng) else {
+            continue;
+        };
+        if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lng) {
+            continue;
+        }
+
+        let node_id = format!("geo:volcano:{}", num);
+        if existing.contains(&node_id) {
+            continue;
+        }
+        existing.insert(node_id.clone());
+
+        let name_clean = name.replace('\'', "''");
+        let country_clean = country.replace('\'', "''");
+        let tags = format!("火山,holocene,{}", country_clean);
+        upsert_geo(
+            &tx,
+            &GeoRecord {
+                node_id,
+                lat,
+                lng,
+                country: country_clean.clone(),
+                region: String::new(),
+                city: name_clean.clone(),
+                tags,
+                source: "gvp-volcanoes".into(),
+                confidence: 1.0,
+            },
+        )
+        .map_err(|e| format!("volcano upsert: {}", e))?;
+        count += 1;
+
+        if count % BATCH == 0 {
+            tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+            tx = conn
+                .unchecked_transaction()
+                .map_err(|e| format!("tx begin: {}", e))?;
+        }
+    }
+    tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+
+    Ok(count)
+}
+
+/// 导出 geo_index 为 NT-Pack 高密度格式文件 (R-P79 接线: NT-Pack 生产消费者)
+///
+/// `source` 过滤来源 (如 "ourairports"), None = 全部; `limit` 上限, 0 = 不限。
+/// 返回 (导出条数, 文件字节数)。
+pub fn export_geo_ntpack(
+    conn: &Connection,
+    source: Option<&str>,
+    limit: usize,
+    path: &str,
+) -> Result<(usize, usize), String> {
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::{GeoPoint, PackEncoder};
+
+    let mut sql = String::from(
+        "SELECT node_id, lat, lng, country, region, city, tags, source FROM geo_index",
+    );
+    let mut params: Vec<String> = Vec::new();
+    if let Some(s) = source {
+        sql.push_str(" WHERE source = ?");
+        params.push(s.to_string());
+    }
+    sql.push_str(" ORDER BY node_id");
+    if limit > 0 {
+        sql.push_str(" LIMIT ?");
+        params.push(limit.to_string());
+    }
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| format!("prepare: {}", e))?;
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(params.iter()), |r| {
+            Ok(GeoPoint {
+                node_id: r.get(0)?,
+                lat: r.get(1)?,
+                lng: r.get(2)?,
+                country: r.get(3)?,
+                region: r.get(4)?,
+                city: r.get(5)?,
+                tags: r.get(6)?,
+                source: r.get(7)?,
+            })
+        })
+        .map_err(|e| format!("query: {}", e))?;
+
+    let points: Vec<GeoPoint> = rows
+        .map(|r| r.map_err(|e| format!("row: {}", e)))
+        .collect::<Result<_, _>>()?;
+    let n = points.len();
+    if n == 0 {
+        return Err("geo_index 无匹配数据".into());
+    }
+
+    // E5 定点 + zstd 熵压缩 (默认配置, 见 nt_memory_pack)
+    let enc = PackEncoder::new(5, true);
+    let bytes = enc.encode(&points);
+
+    std::fs::write(path, &bytes).map_err(|e| format!("写文件 {}: {}", path, e))?;
+    Ok((n, bytes.len()))
+}
+
+/// 从 NT-Pack 文件解码回读 geo_index 数据 (验证/恢复用)
+pub fn import_geo_ntpack(path: &str) -> Result<(usize, Vec<crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::GeoPoint>), String> {
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::PackDecoder;
+    let bytes = std::fs::read(path).map_err(|e| format!("读文件 {}: {}", path, e))?;
+    let (dec, points) = PackDecoder::decode(&bytes)?;
+    Ok((points.len(), points))
+}
+
+/// 从 NT-Pack 文件导入回 KB geo_index (备份恢复/跨机器传输, 幂等 upsert)
+///
+/// 返回导入条数。confidence 默认 0.0 (NT-Pack 不携带该字段)。
+pub fn import_geo_ntpack_to_kb(conn: &Connection, path: &str) -> Result<usize, String> {
+    let (n, points) = import_geo_ntpack(path)?;
+    if n == 0 {
+        return Err("NT-Pack 文件无数据".into());
+    }
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("tx begin: {}", e))?;
+    for p in &points {
+        upsert_geo(
+            &tx,
+            &GeoRecord {
+                node_id: p.node_id.clone(),
+                lat: p.lat,
+                lng: p.lng,
+                country: p.country.clone(),
+                region: p.region.clone(),
+                city: p.city.clone(),
+                tags: p.tags.clone(),
+                source: p.source.clone(),
+                confidence: 0.0,
+            },
+        )
+        .map_err(|e| format!("upsert {}: {}", p.node_id, e))?;
+    }
+    tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+    Ok(n)
+}
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1208,6 +1442,12 @@ mod tests {
         // 词边界: "San" 不应命中 "Santa", "Tokyo" 不应命中 "Tokyopop"
         assert_eq!(match_city_in_text("Santa Monica beach").map(|c| c.0), None);
         assert_eq!(match_city_in_text("量子力学导论").map(|c| c.0), None);
+        // 词形派生: "Londoner"/"London-based" 命中伦敦, "Oxfordian" 命中牛津
+        assert_eq!(match_city_in_text("a London-based firm").map(|c| c.0), Some("伦敦"));
+        assert_eq!(match_city_in_text("Oxfordian scholarship").map(|c| c.0), Some("牛津"));
+        // 子地点归入主城市, 坐标与 city 字段一致 (Stanford/硅谷 → 旧金山市中心)
+        assert_eq!(match_city_in_text("Stanford University research").map(|c| c.0), Some("旧金山"));
+        assert_eq!(match_city_in_text("Stanford University research").map(|c| c.2), Some(37.7749));
     }
 
     #[test]

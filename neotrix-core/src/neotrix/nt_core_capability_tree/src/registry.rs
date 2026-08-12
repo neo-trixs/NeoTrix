@@ -1,11 +1,24 @@
 //! 能力注册表
 
+use crate::evolution::{EvolutionAction, EvolutionPlan};
 use crate::node::{CapabilityNode, Domain, NodeLayer};
 use indexmap::IndexMap;
 use petgraph::visit::EdgeRef;
+use petgraph::Direction;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
+
+/// 最短路径结果 (意识能力网最优解路由)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortestPath {
+    /// 从起点到终点的节点 id 序列 (含两端)
+    pub path: Vec<String>,
+    /// 跳数 (边数)
+    pub hops: usize,
+    /// 加权成本 (成熟度折扣后; 越低越优)
+    pub cost: f64,
+}
 
 #[derive(Debug, Error)]
 pub enum RegistryError {
@@ -187,6 +200,14 @@ impl CapabilityRegistry {
         if let Some(node) = self.nodes.get_mut(to) {
             node.add_dependent(from.into());
         }
+        // 同步 from.requires (LoopX 最优解修复): link 必须同时更新依赖方的
+        // requires 字段, 否则 DAG 有边但 requires 为空 → 算法误判 primitive。
+        // 语义: requires 存节点 ID (与 DAG node_indices 一致)。
+        if let Some(node) = self.nodes.get_mut(from) {
+            if !node.requires.iter().any(|r| r == to) {
+                node.requires.push(to.to_string());
+            }
+        }
 
         Ok(())
     }
@@ -314,6 +335,304 @@ impl CapabilityRegistry {
             experience_targets: self.experience_targets.clone(),
         }
     }
+
+    /// 经验目标 → 演化计划 (断链 #2 修复: 后台自动消费 experience_targets)。
+    ///
+    /// 消费 distill 蒸馏写入的 experience_targets (capability_registry.json),
+    /// 每个 target 映射为 Strengthen (已有节点提供该标签) 或 Budding (新 exp:: 节点)。
+    /// 与 CLI `scan --apply` 的 experience_target_plans 逻辑一致, 抽为注册表公共 API
+    /// 供后台自动进化 (handle_capability_auto_evolve) 复用 — 消除"仅 CLI 手动消费"断链。
+    ///
+    /// 注意: 本方法只生成计划, 不修改 experience_targets; 消费方执行后自行 clear()。
+    pub fn plan_experience_targets(&self, cycle: &str) -> Vec<EvolutionPlan> {
+        let mut plans = Vec::new();
+        let targets = &self.experience_targets;
+        if targets.is_empty() {
+            return plans;
+        }
+        // 去重: 同域同标签只生成一个计划 (防重复 id 注册失败)
+        let mut already_planned: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for t in targets {
+            let Some(domain_s) = t.get("domain").and_then(|d| d.as_str()) else { continue };
+            let Some(signal) = t.get("signal").and_then(|s| s.as_f64()) else { continue };
+            let Some(rationale) = t.get("rationale").and_then(|r| r.as_str()) else { continue };
+            let Some(domain) = Domain::from_str(domain_s) else { continue };
+            let capability_tag = t.get("capability").and_then(|c| c.as_str()).unwrap_or("").to_string();
+            if capability_tag.is_empty() {
+                continue;
+            }
+            // 意识体觉醒目标: 不映射能力节点, 仅记录 (消费在 NT-META 层)
+            if capability_tag.starts_with("consciousness::") {
+                continue;
+            }
+            if !already_planned.insert(format!("{}::{}", domain_s, capability_tag)) {
+                continue;
+            }
+            // 找域内提供该标签的现有节点 → Strengthen; 缺失 → Bud
+            let candidates: Vec<&CapabilityNode> = self
+                .by_domain(domain)
+                .into_iter()
+                .filter(|n| n.provides.iter().any(|p| p == &capability_tag) && !n.deprecated)
+                .collect();
+            if let Some(target) = candidates.first() {
+                plans.push(EvolutionPlan {
+                    cycle: cycle.to_string(),
+                    actions: vec![EvolutionAction::Strengthen {
+                        node_id: target.id.clone(),
+                        note: format!("{} | signal={:.2}", rationale, signal),
+                    }],
+                    rationale: format!("经验驱动: 强化 {} | {}", capability_tag, rationale),
+                });
+            } else {
+                plans.push(EvolutionPlan {
+                    cycle: cycle.to_string(),
+                    actions: vec![EvolutionAction::Budding {
+                        new_node_id: format!("exp::{}::{}", domain.as_str().to_lowercase(), capability_tag),
+                        domain,
+                        provides: vec![capability_tag.clone()],
+                        layer: NodeLayer::L0Primitive,
+                        note: format!("经验驱动新节点: {}", rationale),
+                    }],
+                    rationale: format!("经验驱动: 新建 {} | {}", capability_tag, rationale),
+                });
+            }
+        }
+        plans
+    }
+
+    /// exp:: 虚拟节点老化回收 (断链 #3 修复: exp:: 节点只增不灭)。
+    ///
+    /// 经验蒸馏 Bud 的 exp:: 虚拟节点是临时载体; 超过 `days` 天无任何演化活动
+    /// (evolution_log 最新时间戳距今超过阈值) 说明该经验已不再被强化,
+    /// 返回其 id 列表供 auto_scan 标记 deprecated / prune。
+    /// 真实模块节点 (非 exp:: 前缀) 永不回收 — 回收只针对经验虚拟节点。
+    pub fn aged_exp_nodes(&self, days: u64) -> Vec<String> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(days as i64);
+        self.nodes
+            .values()
+            .filter(|n| n.id.starts_with("exp::"))
+            .filter(|n| {
+                // 无演化日志 → 视为从未活动, 直接老化
+                let last = n.evolution_log.iter().map(|e| e.timestamp).max();
+                match last {
+                    Some(ts) => ts < cutoff,
+                    None => true,
+                }
+            })
+            .map(|n| n.id.clone())
+            .collect()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 最短路径智能算法 (意识能力网最优解路由)
+    // ─────────────────────────────────────────────────────────────
+
+    /// 节点成熟度权重: C0=1.0, C1=0.85, C2=0.7, C3=0.55, C4=0.4, C5=0.3, C6=0.2
+    /// 越成熟 (高 C) 成本越低 → 算法倾向走已验证路径。
+    fn maturity_weight(constellation: u8) -> f64 {
+        match constellation {
+            0 => 1.0,
+            1 => 0.85,
+            2 => 0.70,
+            3 => 0.55,
+            4 => 0.40,
+            5 => 0.30,
+            _ => 0.20,
+        }
+    }
+
+    /// 多维最优解成本 (LoopX 吸收: maturity + evidence + gates)。
+    ///
+    /// 成本 = 成熟度权重 + evidence 修正 + deprecated 门禁惩罚。
+    /// - maturity: 越成熟成本越低 (已验证路径)
+    /// - evidence: evolution_log 条数 ≥3 → 有充分证据, −0.1; =0 → 无证据, +0.1
+    /// - gates: deprecated 节点 → +5.0 (几乎不可选, 但允许兜底而非硬排除)
+    fn node_cost(&self, node: &CapabilityNode) -> f64 {
+        let mut cost = Self::maturity_weight(node.constellation as u8);
+        let evidence = node.evolution_log.len();
+        if evidence >= 3 {
+            cost -= 0.1;
+        } else if evidence == 0 {
+            cost += 0.1;
+        }
+        if node.deprecated {
+            cost += 5.0;
+        }
+        cost.max(0.05)
+    }
+
+    /// 路径总成本: 路径上所有节点 cost 之和。
+    fn path_cost(&self, path: &[String]) -> f64 {
+        path.iter()
+            .map(|id| self.nodes.get(id).map(|n| self.node_cost(n)).unwrap_or(1.0))
+            .sum()
+    }
+
+    /// BFS 最短依赖链: 从目标节点沿依赖边走到最近的 primitive (L0)。
+    /// 返回跳数最少的路径 (无权最短路径)。
+    pub fn shortest_path_to_primitive(&self, target: &str) -> Option<ShortestPath> {
+        let target_idx = *self.node_indices.get(target)?;
+        let mut prev: HashMap<petgraph::graph::NodeIndex, petgraph::graph::NodeIndex> = HashMap::new();
+        let mut dist: HashMap<petgraph::graph::NodeIndex, usize> = HashMap::new();
+        let mut queue: VecDeque<petgraph::graph::NodeIndex> = VecDeque::new();
+        dist.insert(target_idx, 0);
+        queue.push_back(target_idx);
+
+        let mut found: Option<petgraph::graph::NodeIndex> = None;
+        while let Some(cur) = queue.pop_front() {
+            let cur_dist = dist[&cur];
+            // 到达 primitive (无 requires) → 最短路径终点
+            if self.nodes.get(&self.dag[cur]).map(|n| n.requires.is_empty()).unwrap_or(false) {
+                found = Some(cur);
+                break;
+            }
+            // 沿依赖边 (cur -> requires) 扩展
+            for edge in self.dag.edges_directed(cur, Direction::Outgoing) {
+                let next = edge.target();
+                if !dist.contains_key(&next) {
+                    dist.insert(next, cur_dist + 1);
+                    prev.insert(next, cur);
+                    queue.push_back(next);
+                }
+            }
+        }
+
+        let end = found?;
+        // 回溯路径
+        let mut path = vec![self.dag[end].clone()];
+        let mut cur = end;
+        while let Some(&p) = prev.get(&cur) {
+            path.push(self.dag[p].clone());
+            cur = p;
+        }
+        path.reverse();
+        let hops = path.len().saturating_sub(1);
+        let cost = self.path_cost(&path);
+        Some(ShortestPath { path, hops, cost })
+    }
+
+    /// 加权最优路径: 从 `from` 到 `to` 的 Dijkstra 最短路径。
+    /// cost 语义: 路径上所有节点成本之和 (含两端, 与 BFS path_cost 一致)。
+    /// 返回 None 表示不可达。
+    pub fn optimal_path_between(&self, from: &str, to: &str) -> Option<ShortestPath> {
+        let from_idx = *self.node_indices.get(from)?;
+        let to_idx = *self.node_indices.get(to)?;
+        if from_idx == to_idx {
+            let cost = self.nodes.get(from).map(|n| self.node_cost(n)).unwrap_or(0.0);
+            return Some(ShortestPath { path: vec![from.to_string()], hops: 0, cost });
+        }
+
+        // Dijkstra (手动维护距离表); dist[from] 含起点成本 (统一 cost 语义)
+        let start_cost = self.nodes.get(from).map(|n| self.node_cost(n)).unwrap_or(0.0);
+        let mut dist: HashMap<petgraph::graph::NodeIndex, f64> = HashMap::new();
+        let mut prev: HashMap<petgraph::graph::NodeIndex, petgraph::graph::NodeIndex> = HashMap::new();
+        let mut visited: std::collections::HashSet<petgraph::graph::NodeIndex> = std::collections::HashSet::new();
+        dist.insert(from_idx, start_cost);
+
+        loop {
+            // 选未访问最小距离节点
+            let cur = dist.iter()
+                .filter(|(k, _)| !visited.contains(k))
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(k, _)| *k);
+            let Some(cur) = cur else { break };
+            if cur == to_idx { break; }
+            visited.insert(cur);
+            let cur_dist = dist[&cur];
+
+            // 沿依赖边扩展 (cur -> requires)
+            for edge in self.dag.edges_directed(cur, Direction::Outgoing) {
+                let next = edge.target();
+                if visited.contains(&next) { continue; }
+                let w = self.nodes.get(&self.dag[next])
+                    .map(|n| self.node_cost(n))
+                    .unwrap_or(1.0);
+                let nd = cur_dist + w;
+                if nd < *dist.get(&next).unwrap_or(&f64::INFINITY) {
+                    dist.insert(next, nd);
+                    prev.insert(next, cur);
+                }
+            }
+        }
+
+        if !prev.contains_key(&to_idx) {
+            return None;
+        }
+        // 回溯
+        let mut path = vec![self.dag[to_idx].clone()];
+        let mut cur = to_idx;
+        while let Some(&p) = prev.get(&cur) {
+            path.push(self.dag[p].clone());
+            cur = p;
+        }
+        path.reverse();
+        let hops = path.len().saturating_sub(1);
+        let cost = dist.get(&to_idx).copied().unwrap_or(0.0);
+        Some(ShortestPath { path, hops, cost })
+    }
+
+    /// 最优解路由: 给定目标能力 tag, 返回所有提供该能力的节点中
+    /// 加权成本最低者 (LoopX 吸收: 多维最优解, 非单纯最短跳数)。
+    pub fn optimal_provider(&self, capability_tag: &str) -> Option<ShortestPath> {
+        let providers = self.by_provides(capability_tag);
+        providers.iter()
+            // 对每个 provider 计算"最优依赖链" (Dijkstra 加权),
+            // 而非 BFS 最短跳数 — 成熟度 + evidence + gates 全部参与选优。
+            .filter_map(|n| self.optimal_path_to_primitive(&n.id))
+            .min_by(|a, b| a.cost.partial_cmp(&b.cost).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// 最优依赖链 (Dijkstra 加权): 从目标节点到最近 primitive 的
+    /// 加权成本最低路径。与 BFS `shortest_path_to_primitive` 的区别:
+    /// 使用多维 cost (成熟度 + evidence + deprecated 门禁) 而非跳数。
+    pub fn optimal_path_to_primitive(&self, target: &str) -> Option<ShortestPath> {
+        let target_idx = *self.node_indices.get(target)?;
+        let mut dist: HashMap<petgraph::graph::NodeIndex, f64> = HashMap::new();
+        let mut prev: HashMap<petgraph::graph::NodeIndex, petgraph::graph::NodeIndex> = HashMap::new();
+        let mut visited: std::collections::HashSet<petgraph::graph::NodeIndex> = std::collections::HashSet::new();
+        dist.insert(target_idx, 0.0);
+
+        let mut found: Option<petgraph::graph::NodeIndex> = None;
+        loop {
+            let cur = dist.iter()
+                .filter(|(k, _)| !visited.contains(k))
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(k, _)| *k);
+            let Some(cur) = cur else { break };
+            visited.insert(cur);
+            let cur_dist = dist[&cur];
+            // 到达 primitive (无 requires) → 最优路径终点 (贪心: 首个弹出的必为最优)
+            if self.nodes.get(&self.dag[cur]).map(|n| n.requires.is_empty()).unwrap_or(false) {
+                found = Some(cur);
+                break;
+            }
+            for edge in self.dag.edges_directed(cur, Direction::Outgoing) {
+                let next = edge.target();
+                if visited.contains(&next) { continue; }
+                let w = self.nodes.get(&self.dag[next])
+                    .map(|n| self.node_cost(n))
+                    .unwrap_or(1.0);
+                let nd = cur_dist + w;
+                if nd < *dist.get(&next).unwrap_or(&f64::INFINITY) {
+                    dist.insert(next, nd);
+                    prev.insert(next, cur);
+                }
+            }
+        }
+
+        let end = found?;
+        // 回溯路径
+        let mut path = vec![self.dag[end].clone()];
+        let mut cur = end;
+        while let Some(&p) = prev.get(&cur) {
+            path.push(self.dag[p].clone());
+            cur = p;
+        }
+        path.reverse();
+        let hops = path.len().saturating_sub(1);
+        let cost = dist.get(&end).copied().unwrap_or(0.0);
+        Some(ShortestPath { path, hops, cost })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -334,4 +653,101 @@ pub struct RegistryStats {
     pub by_constellation: HashMap<String, usize>,
     pub deprecated_count: usize,
     pub primitive_count: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::CapabilityNode;
+
+    fn build_test_registry() -> CapabilityRegistry {
+        let mut reg = CapabilityRegistry::new();
+        // L0 primitives
+        reg.register(CapabilityNode::new_primitive("p1".into(), Domain::Core, vec!["read".into()])).unwrap();
+        reg.register(CapabilityNode::new_primitive("p2".into(), Domain::Core, vec!["bash".into()])).unwrap();
+        // L1 composite: c1 requires p1
+        let mut c1 = CapabilityNode::new_primitive("c1".into(), Domain::Core, vec!["grep".into()]);
+        c1.requires = vec!["p1".into()];
+        reg.register(c1).unwrap();
+        // L2 composite: c2 requires c1 + p2
+        let mut c2 = CapabilityNode::new_primitive("c2".into(), Domain::Core, vec!["websearch".into()]);
+        c2.requires = vec!["c1".into(), "p2".into()];
+        reg.register(c2).unwrap();
+        // L3 composite: c3 requires c2 (longer path)
+        let mut c3 = CapabilityNode::new_primitive("c3".into(), Domain::Core, vec!["websearch".into()]);
+        c3.requires = vec!["c2".into()];
+        reg.register(c3).unwrap();
+        reg
+    }
+
+    #[test]
+    fn test_shortest_path_to_primitive() {
+        let reg = build_test_registry();
+        let sp = reg.shortest_path_to_primitive("c2").expect("c2 reachable");
+        // c2 -> c1 -> p1 (2 hops) 或 c2 -> p2 (1 hop); BFS 应选最短: c2 -> p2
+        assert_eq!(sp.hops, 1, "BFS must pick shortest: {:?}", sp.path);
+        assert_eq!(sp.path, vec!["c2".to_string(), "p2".to_string()]);
+    }
+
+    #[test]
+    fn test_optimal_path_between() {
+        let reg = build_test_registry();
+        let sp = reg.optimal_path_between("c2", "p1").expect("reachable");
+        assert_eq!(sp.path, vec!["c2".to_string(), "c1".to_string(), "p1".to_string()]);
+        assert_eq!(sp.hops, 2);
+    }
+
+    #[test]
+    fn test_optimal_provider_picks_cheapest() {
+        let reg = build_test_registry();
+        // websearch 由 c2 (2 依赖) 和 c3 (3 依赖) 提供 → 应选 c2
+        let sp = reg.optimal_provider("websearch").expect("provider exists");
+        assert_eq!(sp.path[0], "c2", "must pick cheapest provider: {:?}", sp.path);
+    }
+
+    #[test]
+    fn test_unreachable_returns_none() {
+        let reg = build_test_registry();
+        assert!(reg.shortest_path_to_primitive("ghost").is_none());
+        assert!(reg.optimal_path_between("c2", "ghost").is_none());
+    }
+
+    /// 多维最优解: deprecated 节点 (gates) 应被避开 — Dijkstra 加权路由。
+    #[test]
+    fn test_optimal_avoids_deprecated() {
+        let mut reg = build_test_registry();
+        // 把 p2 标记 deprecated → optimal_path_to_primitive("c2") 应走 c2->c1->p1
+        let p2 = reg.get_mut("p2").unwrap();
+        p2.deprecated = true;
+        p2.deprecated_reason = Some("test".into());
+        let sp = reg.optimal_path_to_primitive("c2").expect("c2 reachable");
+        assert_eq!(sp.path[1], "c1", "must avoid deprecated p2: {:?}", sp.path);
+        assert_eq!(sp.hops, 2);
+    }
+
+    /// 多维最优解: evidence (evolution_log ≥3) 降低成本。
+    #[test]
+    fn test_evidence_reduces_cost() {
+        let reg = build_test_registry();
+        // p1 无证据 (+0.1), p2 无证据 (+0.1) → 两 primitive 同成本
+        let sp_p1 = reg.shortest_path_to_primitive("c1").unwrap();
+        // c1 -> p1: cost(c1) + cost(p1)
+        let cost_before = sp_p1.cost;
+
+        // 给 p1 加 3 条 evolution_log → 证据充分 −0.1
+        let mut reg2 = build_test_registry();
+        let node = CapabilityNode::new_primitive("extra".into(), Domain::Core, vec!["x".into()]);
+        let entry = crate::node::EvolutionLogEntry {
+            cycle: "c1".into(),
+            op: crate::node::EvolutionOp::Strengthen,
+            from_nodes: vec![],
+            to_node: None,
+            note: "evidence".into(),
+            timestamp: chrono::Utc::now(),
+        };
+        // 直接构造带证据的 p1
+        reg2.get_mut("p1").unwrap().evolution_log = vec![entry.clone(), entry.clone(), entry];
+        let sp_p1_ev = reg2.shortest_path_to_primitive("c1").unwrap();
+        assert!(sp_p1_ev.cost < cost_before, "evidence must reduce cost: {} < {}", sp_p1_ev.cost, cost_before);
+    }
 }

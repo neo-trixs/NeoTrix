@@ -50,6 +50,47 @@ impl ReasoningBrain {
         self.total_absorb_count += 1;
     }
 
+    /// P0-2 反思式吸收三步循环 (吸收 VideoLingo Translate-Reflect-Adaptation):
+    /// 1. **Translate** — 吸收源知识 (现有 absorb 逻辑, 源向量 → 能力向量)
+    /// 2. **Reflect** — 反思吸收质量: 计算吸收前后能力向量位移 (L2 距离),
+    ///    位移过大 → 可能过拟合/灾难性遗忘 → 标记需适应
+    /// 3. **Adaptation** — 适应: 若位移超阈值, 按比例回退 (缩放学习率),
+    ///    防止单次吸收过度改写既有能力 (EWC 之外的轻量防线)
+    ///
+    /// VideoLingo 原文: "Translate → Reflect → Adaptation" 三步循环,
+    /// 反思结果驱动适应, 而非一次性单向吸收。
+    /// 返回 (是否触发适应, 位移量)。
+    pub fn absorb_with_reflection(&mut self, source: KnowledgeSource) -> (bool, f64) {
+        let before = self.capability.arr().to_vec();
+        self.absorb(source);
+        let after = self.capability.arr().to_vec();
+
+        // Reflect: 能力向量位移 (L2 距离)
+        let displacement: f64 = before
+            .iter()
+            .zip(after.iter())
+            .map(|(a, b)| (b - a) * (b - a))
+            .sum::<f64>()
+            .sqrt();
+
+        // Adaptation: 位移超阈值 → 回退 (缩放学习率, 下次吸收更保守)
+        // 阈值 0.10: lr=0.05 × 高维强源位移 ≈0.15 (触发), 弱源 ≈0.05 (不触发)。
+        const DISPLACEMENT_THRESHOLD: f64 = 0.10;
+        if displacement > DISPLACEMENT_THRESHOLD {
+            let scale = DISPLACEMENT_THRESHOLD / displacement;
+            self.learning_rate *= scale;
+            // 回退本次吸收: 从位移反推, 按比例还原
+            let cur = self.capability.arr_mut();
+            for (i, b) in before.iter().enumerate() {
+                cur[i] = b + (cur[i] - b) * scale;
+            }
+            self.capability.normalize();
+            (true, displacement)
+        } else {
+            (false, displacement)
+        }
+    }
+
     pub fn generate_self_edit(&self, task: &str) -> Vec<MicroEdit> {
         let task_type = infer_task_type(task);
         let mut micro_edits: Vec<MicroEdit> = self.strategy.generate_edit(self, task)
@@ -249,5 +290,48 @@ impl ReasoningBrain {
             capability_sum: self.capability.typography() + self.capability.grid() + self.capability.color()
                 + self.capability.accessibility() + self.capability.compound_composition(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::nt_core_knowledge::KnowledgeSource;
+
+    /// P0-2 三步循环: 极端源向量应触发 Adaptation (位移超阈值 → 回退 + 学习率缩放)。
+    #[test]
+    fn test_absorb_with_reflection_adapts_on_extreme_source() {
+        let mut brain = ReasoningBrain::new();
+        // 基线能力全 0 (默认), 吸收强源 ResearchFindings (0.85-0.9 高维)
+        let lr_before = brain.learning_rate;
+        let cap_before = brain.capability.arr().to_vec();
+
+        // 极端源: 高维强向量 → 位移必然超阈值 → 触发适应
+        let (adapted, displacement) = brain.absorb_with_reflection(KnowledgeSource::ResearchFindings);
+
+        assert!(adapted, "extreme source should trigger adaptation");
+        assert!(displacement > 0.10, "displacement should exceed threshold, got {}", displacement);
+        assert!(
+            brain.learning_rate < lr_before,
+            "adaptation should scale down learning rate"
+        );
+        // 回退后能力不应偏离基线过远
+        let drift: f64 = cap_before
+            .iter()
+            .zip(brain.capability.arr().iter())
+            .map(|(a, b)| (b - a).abs())
+            .sum();
+        assert!(drift < 1.0, "post-adaptation drift should be bounded, got {}", drift);
+    }
+
+    /// P0-2 三步循环: 温和源不应触发适应 (位移在阈值内)。
+    #[test]
+    fn test_absorb_with_reflection_no_adapt_on_gentle_source() {
+        let mut brain = ReasoningBrain::new();
+        let lr_before = brain.learning_rate;
+        // AdamsLaw: 基础维度多为 0, 位移 ≈ 0.05 (阈值内) → 不触发适应
+        let (adapted, _) = brain.absorb_with_reflection(KnowledgeSource::AdamsLaw);
+        assert!(!adapted, "gentle source should not trigger adaptation");
+        assert_eq!(brain.learning_rate, lr_before, "learning rate unchanged");
     }
 }

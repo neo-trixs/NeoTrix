@@ -27,6 +27,7 @@ use crate::core::nt_core_task_dispatcher::{TaskDecomposerDispatcher, DispatcherC
 use crate::core::nt_core_cot_generator::{DefaultCoTGenerator, CoTConfig};
 use crate::core::nt_core_reasoning::ContextBuilder;
 use crate::neotrix::l1_body_impl::nt_io_standalone::ReasoningKernel;
+use crate::neotrix::nt_core_parallel::{IntentIsolator, AtomicDecomposer};
 
 
 type BatchTask<'a> = &'a [(String, Option<Vec<f64>>, Option<f64>)];
@@ -55,6 +56,28 @@ impl SelfIteratingBrain {
         self._external_reward = external_reward;
         self._reward = 0.0;
         self._reward_source = RewardSource::Internal;
+
+        // ── 意图隔离 + 原子拆解观测点 (nt_core_parallel::isolation, 生产接线 R-P79) ──
+        // 语义: SEAL 内部任务保持原样 (内部推理不剥离); 此处仅做 need-to-know 观测 —
+        // 若任务含可剥离意图 (exposure_ratio < 1.0), 记录暴露面信息, 并把拆解计划
+        // (TaskKind + 单元数) 作为结构化摘要注入任务上下文, 供 pipeline 内对外
+        // LLM 调用边界 (task_dispatcher / gateway) 按需使用。
+        let isolation_guard = IntentIsolator::with_default_markers();
+        let iso = isolation_guard.isolate(task);
+        if iso.exposure_ratio < 1.0 {
+            log::info!(
+                "[intent-isolation] 检测到可剥离意图: 暴露面 {:.2}, 剥离片段 {} 个 — 对外调用应使用暴露上下文",
+                iso.exposure_ratio, iso.withheld_intent.len()
+            );
+            let kind = AtomicDecomposer::route_kind(task);
+            let plan = AtomicDecomposer::new().decompose(task, kind);
+            let n_units = plan.parallel.len() + plan.sequential.len();
+            let structure = format!(
+                "\n[task-structure] kind={:?} units={} (parallel={}, sequential={})",
+                kind, n_units, plan.parallel.len(), plan.sequential.len()
+            );
+            self._current_task = format!("{}{}", self._current_task, structure);
+        }
 
         let pipeline = std::mem::take(&mut self.pipeline);
         let result = pipeline.execute(self);

@@ -2,9 +2,7 @@ pub mod archive;
 pub mod attention_head;
 pub mod context_window;
 pub mod emotion_state;
-pub mod intra_reflection;
 pub mod intrinsic_motivation;
-pub mod meta_calibrate;
 pub mod metacognitive_evaluator;
 pub mod reasoning_strategy;
 pub mod self_referential;
@@ -36,8 +34,3 @@ pub use system_identity::{SystemIdentity, CognitiveCapability, ValueConstraint};
 pub use self_model::{SelfModel, SelfState};
 pub use thinking_trace::{ThinkingTrace, ThinkingStep, ReflectionGrade};
 pub use evolution_analysis::{KbDefect, KbHealthReport, analyze_kb_health, store_report_to_kb, print_report, record_meta_cognition_defect};
-pub use intra_reflection::{PreActionIntrospector, IntraReflection, IntraReflectionReport, PredictedOutcome};
-pub use meta_calibrate::{
-    CalibrationReport, CalibrationSignal, CalibrationState, CalibrationTarget,
-    MetaCalibrator, MetaCalibratorConfig,
-};

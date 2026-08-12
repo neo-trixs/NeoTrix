@@ -320,6 +320,61 @@ impl SecurityAudit {
         all_findings
     }
 
+    /// 扫描目录下 .md 文档做引用真实性审计 (P1-16: academic-research-skills)
+    /// 文档含 "## References/参考文献" 段时，正文引用号/URL 需能在参考列表验证；
+    /// 未验证占比跌破让步阈值 → 产出 citation-audit finding。
+    pub fn scan_documents(&self, root: &str) -> Vec<SecurityFinding> {
+        let mut findings = Vec::new();
+        let root_path = Path::new(root);
+
+        if !root_path.exists() || !root_path.is_dir() {
+            return findings;
+        }
+
+        let citation_audit = CitationAudit::new();
+        if let Ok(entries) = std::fs::read_dir(root_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().is_some_and(|e| e == "md") {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let (body, refs) = Self::split_references(&content);
+                        let report = citation_audit.audit_citations(&body, &refs);
+                        if !report.trusted && report.total_citations > 0 {
+                            findings.push(SecurityFinding {
+                                file: path.clone(),
+                                line: 0,
+                                severity: "medium".to_string(),
+                                rule: "citation-audit".to_string(),
+                                description: format!(
+                                    "引用真实性审计未通过: verified_ratio={:.2} (verified {} / total {})",
+                                    report.verified_ratio, report.verified, report.total_citations
+                                ),
+                                fix: "补充可验证引用 (URL/DOI) 或删除无法考证的引用".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        findings
+    }
+
+    /// 从文档中分离正文与参考列表（"## References" / "## 参考文献" 之后为参考条目）
+    fn split_references(content: &str) -> (String, Vec<String>) {
+        for marker in ["## References", "## 参考文献", "## Reference", "# References"] {
+            if let Some(idx) = content.find(marker) {
+                let body = content[..idx].to_string();
+                let refs: Vec<String> = content[idx..].lines()
+                    .filter(|l| l.trim().len() > 3 && !l.trim().starts_with('#'))
+                    .map(|l| l.trim().to_string())
+                    .collect();
+                return (body, refs);
+            }
+        }
+        (content.to_string(), Vec::new())
+    }
+
     // ========== 供应链漏洞扫描 (S-CR-15) ==========
 
     /// 运行 cargo-audit 扫描供应链漏洞
@@ -460,6 +515,204 @@ impl SecurityAudit {
     }
 }
 
+// ========== 引用真实性审计 (P1-16: academic-research-skills 让步阈值协议) ==========
+
+use std::collections::HashSet;
+
+/// 引用问题类型
+#[derive(Debug, Clone, PartialEq)]
+pub enum CitationIssue {
+    /// 内联引用 [n] 无对应参考文献条目
+    MissingReference,
+    /// URL 格式非法 / 非 https / 无域名
+    MalformedUrl,
+    /// 高幻觉风险引用（缺作者/年份等可验证元数据）
+    Suspicious,
+    /// 文档整体可信度跌破让步阈值（未验证引用占比过高）
+    BelowConcessionThreshold,
+}
+
+/// 引用审计发现
+#[derive(Debug, Clone)]
+pub struct CitationFinding {
+    pub citation: String,
+    pub issue: CitationIssue,
+    pub line: usize,
+    pub detail: String,
+}
+
+/// 引用审计报告
+#[derive(Debug, Clone)]
+pub struct CitationReport {
+    pub findings: Vec<CitationFinding>,
+    pub total_citations: usize,
+    pub verified: usize,
+    pub unverified: usize,
+    pub verified_ratio: f64,
+    /// verified_ratio >= 1 - concession_threshold
+    pub trusted: bool,
+}
+
+/// 引用真实性审计器 — 对标 academic-research-skills:
+/// 数字引用号必须能在参考列表中找到; URL 必须 https + 有域名;
+/// 作者-年份引用必须含可验证元数据; 全文档让步阈值把关 (未验证 >25% → 不可信)。
+pub struct CitationAudit {
+    /// 让步阈值: 未验证引用占比上限 (默认 0.25)
+    pub concession_threshold: f64,
+}
+
+impl Default for CitationAudit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CitationAudit {
+    pub fn new() -> Self {
+        Self {
+            concession_threshold: 0.25,
+        }
+    }
+
+    /// 提取一行内所有数字引用号 "[12]" / "[12, 13]"
+    fn extract_cite_nums(line: &str) -> Vec<u32> {
+        let mut nums = Vec::new();
+        let re = regex::Regex::new(r"\[(\d+(?:\s*,\s*\d+)*)\]").expect("cite regex");
+        for caps in re.captures_iter(line) {
+            if let Some(inner) = caps.get(1) {
+                for part in inner.as_str().split(',') {
+                    if let Ok(n) = part.trim().parse::<u32>() {
+                        nums.push(n);
+                    }
+                }
+            }
+        }
+        nums
+    }
+
+    /// 提取一行内所有 URL
+    fn extract_urls(line: &str) -> Vec<&str> {
+        let re = regex::Regex::new(r"https?://[^\s\)\]\}]+").expect("url regex");
+        re.find_iter(line).map(|m| m.as_str()).collect()
+    }
+
+    /// 判断一行是否为作者-年份引用 "(Author, 2024)" 形态
+    fn has_author_year(line: &str) -> bool {
+        regex::Regex::new(r"\([A-Z][A-Za-z&' -]+,\s*(19|20)\d{2}\)").expect("ay regex")
+            .is_match(line)
+    }
+
+    /// 判断字符串是否含可验证元数据（年份 + 域名或 DOI）
+    fn has_verifiable_metadata(s: &str) -> bool {
+        let has_year = regex::Regex::new(r"(19|20)\d{2}").expect("year regex").is_match(s);
+        let has_anchor = regex::Regex::new(r"(https?://|doi\.org|arXiv|arXiv:|github\.com)").expect("anchor regex")
+            .is_match(s);
+        has_year && has_anchor
+    }
+
+    /// 审计文档引用真实性
+    /// document: 正文; references: 参考列表条目（"12. Title, Author, Year, URL"）
+    pub fn audit_citations(&self, document: &str, references: &[String]) -> CitationReport {
+        let mut findings = Vec::new();
+        let mut total = 0usize;
+        let mut verified = 0usize;
+        let mut unverified = 0usize;
+
+        // 1. 参考列表集合
+        let ref_nums: HashSet<u32> = references.iter().filter_map(|r| {
+            let t = r.trim();
+            let head = t.split(['.', ']']).next().unwrap_or("")
+                .trim().trim_start_matches('[');
+            head.parse::<u32>().ok()
+        }).collect();
+        let ref_urls: HashSet<String> = references.iter()
+            .flat_map(|r| Self::extract_urls(r).into_iter().map(|u| u.to_string()))
+            .collect();
+
+        // 2. 逐行扫描正文
+        for (i, line) in document.lines().enumerate() {
+            // 2a. 数字引用
+            let nums = Self::extract_cite_nums(line);
+            for n in &nums {
+                total += 1;
+                if ref_nums.contains(n) {
+                    verified += 1;
+                } else {
+                    unverified += 1;
+                    findings.push(CitationFinding {
+                        citation: format!("[{}]", n),
+                        issue: CitationIssue::MissingReference,
+                        line: i + 1,
+                        detail: format!("引用 [{}] 在参考列表 ({} 条) 中不存在", n, ref_nums.len()),
+                    });
+                }
+            }
+
+            // 2b. URL
+            for url in Self::extract_urls(line) {
+                let u = url.to_string();
+                let malformed = !url.starts_with("https://")
+                    || url.trim_start_matches("https://").chars().next()
+                        .map(|c| !(c.is_ascii_alphanumeric() || c == 'w')).unwrap_or(true);
+                if malformed {
+                    findings.push(CitationFinding {
+                        citation: u.clone(),
+                        issue: CitationIssue::MalformedUrl,
+                        line: i + 1,
+                        detail: "URL 非 https 或缺少域名".to_string(),
+                    });
+                } else if !ref_urls.contains(&u) && ref_urls.len() > 0 {
+                    // URL 未出现在参考列表 → 计入未验证
+                    total += 1;
+                    unverified += 1;
+                }
+            }
+
+            // 2c. 作者-年份引用
+            if Self::has_author_year(line) {
+                total += 1;
+                // 该行若本身含 URL/DOI 可交叉验证
+                let line_has_anchor = Self::has_verifiable_metadata(line);
+                if line_has_anchor {
+                    verified += 1;
+                } else {
+                    unverified += 1;
+                    findings.push(CitationFinding {
+                        citation: line.trim().chars().take(60).collect(),
+                        issue: CitationIssue::Suspicious,
+                        line: i + 1,
+                        detail: "作者-年份引用无 URL/DOI 佐证，存在幻觉风险".to_string(),
+                    });
+                }
+            }
+        }
+
+        // 3. 让步阈值判定
+        let verified_ratio = if total == 0 { 1.0 } else { verified as f64 / total as f64 };
+        let trusted = verified_ratio >= 1.0 - self.concession_threshold;
+        if !trusted && total > 0 {
+            findings.push(CitationFinding {
+                citation: "<document>".to_string(),
+                issue: CitationIssue::BelowConcessionThreshold,
+                line: 0,
+                detail: format!(
+                    "verified_ratio={:.2} 低于让步阈值 1-{:.2}，文档整体不可信 (verified {} / total {})",
+                    verified_ratio, self.concession_threshold, verified, total
+                ),
+            });
+        }
+
+        CitationReport {
+            findings,
+            total_citations: total,
+            verified,
+            unverified,
+            verified_ratio,
+            trusted,
+        }
+    }
+}
+
 impl Default for SecurityAudit {
     fn default() -> Self {
         Self::new()
@@ -514,5 +767,114 @@ unstable-dep = { git = "https://github.com/evil/repo" }
         let audit = SecurityAudit::new();
         let score = audit.supply_chain_score(&[]);
         assert_eq!(score, 100);
+    }
+
+    // ========== P1-16 引用真实性审计测试 ==========
+
+    #[test]
+    fn test_citation_audit_all_verified_trusted() {
+        let audit = CitationAudit::new();
+        // 作者-年份引用行需自带 URL/DOI 锚点才算可验证
+        let doc = "本文提出方法 [1]。\n(Foo, 2023) 证明了该结论，见 https://arxiv.org/abs/2401.00123";
+        let refs: Vec<String> = vec![
+            "1. Neural Methods, Foo, 2023, https://arxiv.org/abs/2401.00123".to_string(),
+        ];
+        let report = audit.audit_citations(doc, &refs);
+        assert!(report.trusted, "全部引用可验证应可信");
+        assert_eq!(report.unverified, 0);
+        assert!(report.verified >= 1);
+    }
+
+    #[test]
+    fn test_citation_audit_missing_reference_detected() {
+        let audit = CitationAudit::new();
+        let doc = "引用幽灵文献 [99]。";
+        let refs: Vec<String> = vec!["1. Real paper, 2024".to_string()];
+        let report = audit.audit_citations(doc, &refs);
+        assert!(!report.trusted, "引用号缺失应跌破让步阈值");
+        assert!(report.findings.iter()
+            .any(|f| f.issue == CitationIssue::MissingReference));
+    }
+
+    #[test]
+    fn test_citation_audit_malformed_url_detected() {
+        let audit = CitationAudit::new();
+        let doc = "数据源: http://insecure.example.com/data 以及 https://ok.example.com/x";
+        let refs: Vec<String> = vec![
+            "1. Data source, 2024, https://ok.example.com/x".to_string(),
+        ];
+        let report = audit.audit_citations(doc, &refs);
+        assert!(report.findings.iter()
+            .any(|f| f.issue == CitationIssue::MalformedUrl
+                && f.citation.starts_with("http://")));
+    }
+
+    #[test]
+    fn test_citation_audit_suspicious_author_year_no_anchor() {
+        let audit = CitationAudit::new();
+        // 作者-年份引用但整行无 URL/DOI → Suspicious
+        let doc = "有人声称 (Ghost, 2024) 存在此现象，但无处考证。";
+        let refs: Vec<String> = vec![];
+        let report = audit.audit_citations(doc, &refs);
+        assert!(report.findings.iter()
+            .any(|f| f.issue == CitationIssue::Suspicious));
+    }
+
+    #[test]
+    fn test_citation_audit_concession_threshold_gate() {
+        let audit = CitationAudit::new();
+        // 大量未验证引用 → 整体可信度跌破阈值
+        let doc = "引用 [1] 和 [2] 和 [3] 和 [4] 和 [5]。";
+        let refs: Vec<String> = vec!["1. Only one real ref, 2024".to_string()];
+        let report = audit.audit_citations(doc, &refs);
+        assert!(!report.trusted);
+        assert!(report.findings.iter()
+            .any(|f| f.issue == CitationIssue::BelowConcessionThreshold));
+        assert_eq!(report.total_citations, 5);
+        assert_eq!(report.verified, 1);
+    }
+
+    #[test]
+    fn test_citation_audit_empty_doc_is_trusted() {
+        let audit = CitationAudit::new();
+        let report = audit.audit_citations("", &[]);
+        assert!(report.trusted, "无引用文档默认可信");
+        assert_eq!(report.total_citations, 0);
+    }
+
+    #[test]
+    fn test_split_references_separates_body_and_refs() {
+        let doc = "正文引用 [1] 说明。\n\n## References\n\n1. Real paper, 2024, https://example.com/a\n2. Another, 2023";
+        let (body, refs) = SecurityAudit::split_references(doc);
+        assert!(body.contains("正文引用"));
+        assert!(!body.contains("## References"));
+        assert_eq!(refs.len(), 2);
+        assert!(refs[0].starts_with("1. Real paper"));
+    }
+
+    #[test]
+    fn test_split_references_no_section_keeps_body() {
+        let (body, refs) = SecurityAudit::split_references("没有参考列表的文档");
+        assert_eq!(refs.len(), 0);
+        assert!(body.contains("没有参考列表"));
+    }
+
+    #[test]
+    fn test_scan_documents_flags_ghost_citation() {
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("neotrix_cit_audit_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let doc_path = dir.join("ghost.md");
+        let doc = "方法见 [42]。\n\n## References\n\n1. Real paper, 2024";
+        let mut f = std::fs::File::create(&doc_path).expect("create doc");
+        f.write_all(doc.as_bytes()).expect("write doc");
+        drop(f);
+
+        let audit = SecurityAudit::new();
+        let findings = audit.scan_documents(dir.to_str().unwrap());
+        assert!(findings.iter().any(|ft| ft.rule == "citation-audit"),
+            "幽灵引用文档应产出 citation-audit finding: {:?}", findings);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

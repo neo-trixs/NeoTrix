@@ -268,6 +268,122 @@ impl CliCommand for ExploreCmd {
                             None => CommandOutput::err("无法打开 KB"),
                         }
                     }
+                    "airports" | "airport" => {
+                        // OurAirports CSV (Public Domain) — 本地文件优先, 支持 file:// 前缀
+                        let default_path = format!(
+                            "{}/.neotrix/geo/airports.csv",
+                            std::env::var("HOME").unwrap_or_default()
+                        );
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(40000);
+                        let path = args.get(3).cloned().unwrap_or_else(|| {
+                            format!("file://{}", default_path)
+                        });
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let mut conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_airports(
+                                    &mut conn, &path, limit,
+                                ) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "✈️ 机场摄取: {} 条 (OurAirports, limit={})",
+                                        n, limit
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("机场摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "admin0" | "boundaries" => {
+                        // NE Admin 0 国家边界 (Public Domain)
+                        let default_path = format!(
+                            "{}/.neotrix/geo/ne_10m_admin_0_countries.geojson",
+                            std::env::var("HOME").unwrap_or_default()
+                        );
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(300);
+                        let path = args.get(3).cloned().unwrap_or_else(|| {
+                            format!("file://{}", default_path)
+                        });
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let mut conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_boundaries(
+                                    &mut conn, &path, "admin0", limit,
+                                ) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🗺️ 国家边界摄取: {} 条 (NE Admin 0)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("国家边界摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "admin1" | "provinces" | "states" => {
+                        // NE Admin 1 省级边界 (Public Domain)
+                        let default_path = format!(
+                            "{}/.neotrix/geo/ne_10m_admin_1_states_provinces.geojson",
+                            std::env::var("HOME").unwrap_or_default()
+                        );
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(5000);
+                        let path = args.get(3).cloned().unwrap_or_else(|| {
+                            format!("file://{}", default_path)
+                        });
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let mut conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_crawl::ingest_geo_boundaries(
+                                    &mut conn, &path, "admin1", limit,
+                                ) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🏛️ 省级边界摄取: {} 条 (NE Admin 1)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("省级边界摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "volcanoes" | "volcano" => {
+                        // Smithsonian GVP Holocene 火山 (WFS JSON, 官方数据库)
+                        let default_path = format!(
+                            "{}/.neotrix/geo/gvp_holocene_volcanoes.json",
+                            std::env::var("HOME").unwrap_or_default()
+                        );
+                        let limit = args.get(2).and_then(|s| s.parse::<usize>().ok()).unwrap_or(2000);
+                        let path = args.get(3).cloned().unwrap_or_else(|| {
+                            format!("file://{}", default_path)
+                        });
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let mut conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::ingest_geo_volcanoes(
+                                    &mut conn, &path, limit,
+                                ) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "🌋 火山摄取: {} 条 (Smithsonian GVP Holocene)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("火山摄取失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
                     "rivers" | "river" => {
                         let url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_rivers_lake_centerlines_scale_rank.geojson";
                         match try_open_kb() {
@@ -483,6 +599,60 @@ impl CliCommand for ExploreCmd {
                             None => CommandOutput::err("无法打开 KB"),
                         }
                     }
+                    "export" | "pack" => {
+                        // NT-Pack 高密度导出 (R-P79 接线: nt_memory_pack 生产消费者)
+                        // 用法: /explore geo export [source] [limit] [path]
+                        let source = args.get(2).map(|s| s.to_string());
+                        let limit = args.get(3).and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+                        let default_path = format!(
+                            "{}/.neotrix/geo/geo_index.ntpack",
+                            std::env::var("HOME").unwrap_or_else(|_| ".".into())
+                        );
+                        let path = args.get(4).cloned().unwrap_or(default_path);
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::export_geo_ntpack(
+                                    &conn, source.as_deref(), limit, &path,
+                                ) {
+                                    Ok((n, bytes)) => CommandOutput::ok(&format!(
+                                        "📦 NT-Pack 导出: {} 条 -> {} ({} bytes, {:.1} B/记录)",
+                                        n, path, bytes, bytes as f64 / n as f64
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("NT-Pack 导出失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "import" | "restore" => {
+                        // NT-Pack 导入回 KB (备份恢复/跨机器传输)
+                        // 用法: /explore geo import <path>
+                        let Some(path) = args.get(2).cloned() else {
+                            return CommandOutput::err("用法: /explore geo import <path>");
+                        };
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::import_geo_ntpack_to_kb(
+                                    &conn, &path,
+                                ) {
+                                    Ok(n) => CommandOutput::ok(&format!(
+                                        "📥 NT-Pack 导入: {} 条 -> geo_index (幂等 upsert)",
+                                        n
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("NT-Pack 导入失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
                     _ => match try_open_kb() {
                         Some(kb) => {
                             let conn = match kb.conn.lock() {
@@ -529,6 +699,10 @@ impl CliCommand for ExploreCmd {
                     /explore geo cities [country] [limit]  摄取全球城市坐标\n\
                     /explore geo countries  登记国家边界 (world-atlas)\n\
                     /explore geo peaks [limit] [path]  摄取 GeoNames 峰点 (T 类, 默认 ~/.neotrix/geo/allCountries.txt)\n\
+                    /explore geo airports [limit] [path]  摄取全球机场 (OurAirports, Public Domain)\n\
+                    /explore geo admin0 [limit] [path]    摄取国家边界 (NE Admin 0 GeoJSON)\n\
+                    /explore geo admin1 [limit] [path]    摄取省级边界 (NE Admin 1 GeoJSON)\n\
+                    /explore geo volcanoes [limit] [path] 摄取火山 (Smithsonian GVP, ~1200座)\n\
                     /explore geo rivers     河流摄取 (10m, 4000+条)\n\
                     /explore geo lakes      湖泊摄取 (10m, 1300+条)\n\
                     /explore geo coastline  海岸线摄取 (10m, 4100+条)\n\
@@ -538,7 +712,7 @@ impl CliCommand for ExploreCmd {
                     /explore geo coverage [阈值]    区域覆盖度报告 (识别缺失)
                     /explore geo links <国家/城市> [limit]  反向关联知识节点
                     /explore geo elevation [limit] 摄取海拔 (Open-Meteo)
-                    /explore geo weather [limit]   摄取气象快照 (Open-Meteo)"
+                    /explore geo weather [limit]   摄取气象快照 (Open-Meteo)\n                    /explore geo export [source] [limit] [path]  导出 NT-Pack 高密度格式 (默认 ~/.neotrix/geo/geo_index.ntpack)\n                    /explore geo import <path>  从 NT-Pack 文件导入回 geo_index (备份恢复)"
                 )
             }
         }

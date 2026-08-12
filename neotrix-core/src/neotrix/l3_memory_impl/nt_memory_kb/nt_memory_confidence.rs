@@ -1155,6 +1155,17 @@ mod tests {
             skills_library: std::sync::RwLock::new(
                 crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_knowledge_assets::SkillsLibrary::new(),
             ),
+            feedback_store: std::sync::RwLock::new(
+                crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_feedback::FeedbackStore::new(0.1),
+            ),
+            gwt_router: std::sync::RwLock::new(
+                crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_gwt_router::GwtRouter::new(
+                    crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_gwt_router::GwtRouterConfig::default(),
+                ),
+            ),
+            vsa_expander: std::sync::RwLock::new(
+                crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_vsa_expand::VsaAssociativeExpander::default(),
+            ),
         };
 
         let high_conf_id = Uuid::new_v4();

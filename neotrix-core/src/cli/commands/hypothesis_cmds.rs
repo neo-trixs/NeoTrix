@@ -11,6 +11,8 @@ impl CliCommand for HypothesisCmd {
     fn name(&self) -> &str { "/hypothesis" }
     fn aliases(&self) -> Vec<&str> { vec!["/hyp", "/hnet"] }
     fn description(&self) -> &str { "Manage EWHR hypothesis network: list, propose <id> <title> <prior>, status <id>, strongest" }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {

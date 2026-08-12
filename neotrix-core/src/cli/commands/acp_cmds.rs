@@ -20,6 +20,8 @@ impl CliCommand for AcpCmd {
     fn description(&self) -> &str {
         "ACP Server: /acp run — start JSON-RPC stdio server for editor integration"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let sub = args.first().map(|s| s.as_str()).unwrap_or("run");

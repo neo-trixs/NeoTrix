@@ -7,6 +7,7 @@ pub mod executor;
 pub mod coordinator;
 pub mod hands;
 pub mod contract;
+pub mod isolation;
 #[cfg(test)]
 pub mod tests;
 
@@ -16,3 +17,4 @@ pub use executor::{ExecMode, ParallelExecutor, OptimalTaskAllocator};
 pub use coordinator::MultiAgentCoordinator;
 pub use hands::{HandType, Hand, HandsController};
 pub use contract::{TaskContract, TaskContractWarden, ContractState, ContractStats};
+pub use isolation::{IntentIsolator, AtomicDecomposer, IsolatedContext, DecompositionPlan, AtomicUnit, OutputContract, OutputFormat, TaskKind};

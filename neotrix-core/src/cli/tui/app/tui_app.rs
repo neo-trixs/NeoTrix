@@ -13,6 +13,7 @@ use std::collections::{HashSet, VecDeque};
 use ratatui::text::Line;
 
 use crate::cli::tui::app::types::{Session, ChatMessage, GoalDisplay};
+use crate::cli::tui::diff_viewer::DiffViewer;
 use crate::cli::sandbox::SandboxMode;
 use super::super::history::CommandHistory;
 use super::super::vim_mode::VimModeManager;
@@ -47,8 +48,10 @@ pub struct TuiApp {
     pub agent_busy: bool,
     pub streaming: bool,
     pub token_count: usize,
+    /// P1-5 修复: 会话切换/清空后请求重置 AgentLoop 历史 (事件循环消费后清回 false)。
+    pub needs_agent_reset: bool,
     pub status_text: String,
-    pub diff_viewer: Option<crate::cli::tui::diff_viewer::DiffViewer>,
+    pub diff_viewer: Option<DiffViewer>,
     pub thinking_expanded: HashSet<String>,
     /// 已展开的工具调用（key = "session:msg_idx:tool_idx"）
     pub tool_calls_expanded: HashSet<String>,
@@ -56,6 +59,10 @@ pub struct TuiApp {
     pub streaming_text: String,
     /// 流式输出时的模型名（用于显示）
     pub streaming_model: Option<String>,
+    /// 流式工具调用可视化（task B）：工具名 → 状态（running/done/error）
+    pub streaming_tool_calls: Vec<crate::cli::tui::app::types::ToolCall>,
+    /// 待审批动作（task A）：渲染在状态栏上方，a=允许 / d=拒绝
+    pub pending_approval: Option<crate::cli::approval::PendingAction>,
     /// 流式 markdown 渲染器（增量渲染，避免闪烁）
     pub streaming_renderer: StreamingMarkdownRenderer,
     /// 流式渲染已生成的 Lines（避免每帧重新渲染）
@@ -78,6 +85,12 @@ pub struct TuiApp {
     stream_started_at: Option<std::time::Instant>,
     /// Spinner 动画帧索引（事件循环每 tick 推进一次）。
     pub spinner_frame: usize,
+    /// 当前 git 分支（无 git 仓库或检测失败为 None）。
+    pub git_branch: Option<String>,
+    /// git 工作区是否有未提交改动（dirty 指示）。
+    pub git_dirty: bool,
+    /// 会话恢复 picker（/sessions 打开；None = 未激活）。
+    pub session_picker: Option<crate::cli::tui::app::types::SessionPicker>,
 }
 
 impl TuiApp {
@@ -98,6 +111,7 @@ impl TuiApp {
             agent_busy: false,
             streaming: false,
             token_count: 0,
+            needs_agent_reset: false,
             status_text: if ephemeral { "Ready".into() } else { "Ready | Provider: not configured".into() },
             diff_viewer: None,
             thinking_expanded: HashSet::new(),
@@ -105,6 +119,8 @@ impl TuiApp {
             streaming_role: String::new(),
             streaming_text: String::new(),
             streaming_model: None,
+            streaming_tool_calls: Vec::new(),
+            pending_approval: None,
             streaming_renderer: StreamingMarkdownRenderer::new(),
             streaming_rendered_lines: Vec::new(),
             goal_display: GoalDisplay::idle(),
@@ -119,6 +135,30 @@ impl TuiApp {
             auto_scroll: true,
             stream_started_at: None,
             spinner_frame: 0,
+            git_branch: Self::detect_git_branch(),
+            git_dirty: Self::detect_git_dirty(),
+            session_picker: None,
+        }
+    }
+
+    /// 检测当前 git 分支（best-effort：非 git 仓库返回 None）。
+    fn detect_git_branch() -> Option<String> {
+        let out = std::process::Command::new("git")
+            .args(["branch", "--show-current"])
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if s.is_empty() { None } else { Some(s) }
+    }
+
+    /// 检测工作区是否有未提交改动（git status --porcelain 非空 → dirty）。
+    fn detect_git_dirty() -> bool {
+        match std::process::Command::new("git").args(["status", "--porcelain"]).output() {
+            Ok(out) => !out.status.success() || !String::from_utf8_lossy(&out.stdout).trim().is_empty(),
+            Err(_) => false,
         }
     }
 
@@ -204,6 +244,49 @@ impl TuiApp {
         }
     }
 
+    /// 流式工具调用开始（task B）：记录工具名，状态 running。
+    pub fn start_streaming_tool(&mut self, name: &str, args: &str) {
+        // 若同工具重入，更新 args 而不是追加。
+        if let Some(tc) = self.streaming_tool_calls.last_mut() {
+            if tc.status == "running" && tc.name == name {
+                tc.args = args.chars().take(500).collect();
+                return;
+            }
+        }
+        self.streaming_tool_calls.push(crate::cli::tui::app::types::ToolCall {
+            name: name.to_string(),
+            args: args.chars().take(500).collect(),
+            duration_ms: 0,
+            success: false,
+            status: "running".into(),
+            result: String::new(),
+        });
+        // 工具执行期间暂停自动滚动，让用户看到工具区。
+        self.auto_scroll = false;
+    }
+
+    /// 流式工具调用结束（task B）：更新状态与结果摘要。
+    pub fn finish_streaming_tool(&mut self, name: &str, duration_ms: u64, success: bool, result: &str) {
+        let mut all_done = true;
+        if let Some(tc) = self.streaming_tool_calls.iter_mut().rev().find(|tc| tc.name == name) {
+            tc.status = if success { "done".into() } else { "error".into() };
+            tc.success = success;
+            tc.duration_ms = duration_ms;
+            tc.result = result.chars().take(300).collect();
+        }
+        // P2 修复: 工具结束后无其他 running 工具 → 恢复自动滚动 (避免会话卡住不跟随)。
+        all_done = self.streaming_tool_calls.iter().all(|tc| tc.status != "running");
+        if all_done {
+            self.auto_scroll = true;
+        }
+    }
+
+    /// 清除全部流式工具（本轮结束/开始时调用）。
+    pub fn clear_streaming_tools(&mut self) {
+        self.streaming_tool_calls.clear();
+        self.auto_scroll = true;
+    }
+
     /// 推进 spinner 动画帧（事件循环每 tick 调用一次，驱动状态栏动画）。
     pub fn tick_spinner(&mut self) {
         self.spinner_frame = (self.spinner_frame + 1) % SPINNER_FRAMES.len();
@@ -254,6 +337,103 @@ impl TuiApp {
         self.cursor = 0;
     }
 
+    // ── Diff 查看模式 ──
+
+    /// 打开 diff 查看模式：解析内容并进入 diff 面板。
+    /// 内容可来自 `/git diff` 命令输出、tool 调用的 edit 结果或任意文本。
+    pub fn open_diff(&mut self, content: String) {
+        self.diff_viewer = Some(DiffViewer::new(content));
+        self.status_text = "Diff 查看模式 (↑↓ 滚动 · q/Esc 退出)".into();
+    }
+
+    /// 关闭 diff 查看模式。
+    pub fn close_diff(&mut self) {
+        self.diff_viewer = None;
+    }
+
+    /// diff 查看模式是否激活。
+    pub fn diff_active(&self) -> bool {
+        self.diff_viewer.is_some()
+    }
+
+    /// diff 查看模式的键处理：↑↓/k/j 滚动，PageUp/PageDown 翻页，q/Esc 退出，Ctrl+C 关闭。
+    fn handle_diff_key(&mut self, key: crossterm::event::KeyCode, modifiers: crossterm::event::KeyModifiers) -> KeyAction {
+        use crossterm::event::{KeyCode::*, KeyModifiers};
+        match (modifiers, key) {
+            (KeyModifiers::NONE, Up) | (KeyModifiers::NONE, Char('k')) => {
+                if let Some(v) = self.diff_viewer.as_mut() {
+                    v.scroll_up(1);
+                }
+                KeyAction::None
+            }
+            (KeyModifiers::NONE, Down) | (KeyModifiers::NONE, Char('j')) => {
+                if let Some(v) = self.diff_viewer.as_mut() {
+                    v.scroll_down(1);
+                }
+                KeyAction::None
+            }
+            (KeyModifiers::NONE, PageUp) => {
+                if let Some(v) = self.diff_viewer.as_mut() {
+                    v.scroll_up(10);
+                }
+                KeyAction::None
+            }
+            (KeyModifiers::NONE, PageDown) => {
+                if let Some(v) = self.diff_viewer.as_mut() {
+                    v.scroll_down(10);
+                }
+                KeyAction::None
+            }
+            (KeyModifiers::NONE, Char('q')) | (KeyModifiers::NONE, Esc) => {
+                self.close_diff();
+                KeyAction::None
+            }
+            (KeyModifiers::CONTROL, Char('c')) => {
+                self.close_diff();
+                KeyAction::None
+            }
+            _ => KeyAction::None,
+        }
+    }
+
+    // ── 会话自动恢复 ──
+
+    /// 从 SessionStore（KB session_logs）加载最近会话历史到 sessions 列表。
+    /// 返回恢复的消息数；无历史时返回 0 并保留默认空会话。
+    pub fn restore_sessions(&mut self) -> usize {
+        self.restore_sessions_from_base(None)
+    }
+
+    /// 指定 base 目录的恢复（测试/隔离环境用）。
+    pub fn restore_sessions_from_base(&mut self, base: Option<std::path::PathBuf>) -> usize {
+        use crate::cli::tui::session_store::SessionStore;
+        let store = match base {
+            Some(b) => SessionStore::with_base(b),
+            None => SessionStore::new(),
+        };
+        let Some(last) = store.get_last_session() else { return 0 };
+        let Ok(data) = store.load_session(&last) else { return 0 };
+        let mut session = Session {
+            id: data.id.clone(),
+            name: data.name.clone(),
+            messages: VecDeque::new(),
+        };
+        for line in &data.messages {
+            let (role, content) = parse_role_line(line);
+            session.messages.push_back(ChatMessage::new(role, content));
+        }
+        if session.messages.is_empty() {
+            return 0;
+        }
+        let count = session.messages.len();
+        self.sessions.clear();
+        self.sessions.push(session);
+        self.active_session = 0;
+        self.scroll_offset = 0;
+        self.thinking_expanded.clear();
+        count
+    }
+
     /// 切换最后一条 assistant 消息的 thinking 展开状态（t 键）。
     pub fn toggle_last_thinking(&mut self) {
         let session = &self.sessions[self.active_session];
@@ -288,6 +468,66 @@ impl TuiApp {
     /// 核心键处理。返回动作由 `run()` 执行（提交输入/触发 LLM 轮询等）。
     pub fn handle_key(&mut self, key: crossterm::event::KeyCode, modifiers: crossterm::event::KeyModifiers) -> KeyAction {
         use crossterm::event::{KeyCode::*, KeyModifiers};
+
+        // diff 查看模式：模态拦截（↑↓/k/j 滚动，PageUp/Down 翻页，q/Esc 退出，Ctrl+C 关闭）。
+        if self.diff_viewer.is_some() {
+            return self.handle_diff_key(key, modifiers);
+        }
+
+        // 审批模式：模态拦截（a=允许，d=拒绝，Esc/Ctrl+C 拒绝并取消生成）。
+        if self.pending_approval.is_some() {
+            if modifiers == KeyModifiers::CONTROL && key == Char('c')
+                || (modifiers == KeyModifiers::NONE && key == Esc) {
+                self.pending_approval = None;
+                return KeyAction::CancelGeneration;
+            }
+            match key {
+                Char('a') | Char('A') => {
+                    self.pending_approval = None;
+                    return KeyAction::ApprovePending;
+                }
+                Char('d') | Char('D') | Char('n') | Char('N') => {
+                    self.pending_approval = None;
+                    return KeyAction::DenyPending;
+                }
+                _ => return KeyAction::None,
+            }
+        }
+
+        // 会话 picker 模式：模态拦截（↑↓/j/k 选择，Enter 加载，d 删除，Esc/q 关闭）。
+        if let Some(picker) = &self.session_picker {
+            if picker.entries.is_empty() {
+                self.session_picker = None;
+                return KeyAction::ClosePicker;
+            }
+            let sel = picker.selected;
+            let action = match key {
+                Char('j') | Down => {
+                    if let Some(p) = &mut self.session_picker {
+                        p.selected = (p.selected + 1).min(p.entries.len() - 1);
+                    }
+                    KeyAction::None
+                }
+                Char('k') | Up => {
+                    if let Some(p) = &mut self.session_picker {
+                        p.selected = p.selected.saturating_sub(1);
+                    }
+                    KeyAction::None
+                }
+                Enter => {
+                    self.session_picker = None;
+                    KeyAction::SelectSession(sel)
+                }
+                Char('d') | Char('D') | Delete => KeyAction::DeleteSession(sel),
+                Esc | Char('q') | Char('Q') => {
+                    self.session_picker = None;
+                    KeyAction::ClosePicker
+                }
+                _ => KeyAction::None,
+            };
+            // 会话 picker 模态下不落入其他处理（Esc/q 已覆盖退出，Ctrl+C 语义一致）。
+            return action;
+        }
 
         // Ctrl+R 历史搜索（任何模式优先）
         if modifiers == KeyModifiers::CONTROL && key == Char('r') {
@@ -426,6 +666,8 @@ impl TuiApp {
             (_, Tab) => {
                 if self.input.starts_with('/') && !self.input.contains(' ') {
                     self.complete_slash();
+                } else if self.has_at_reference() {
+                    self.complete_at_reference();
                 }
                 KeyAction::None
             }
@@ -452,6 +694,14 @@ impl TuiApp {
         if self.cursor <= self.input.len() {
             self.input.insert(self.cursor, c);
             self.cursor += c.len_utf8();
+        }
+    }
+
+    /// P1-2: 粘贴文本批量插入光标处（char-safe，保留换行/多行）。
+    /// 由 `Event::Paste` 调用，避免逐 \n 触发 Enter/Submit。
+    pub fn insert_text(&mut self, text: &str) {
+        for c in text.chars() {
+            self.insert_char(c);
         }
     }
 
@@ -600,19 +850,107 @@ impl TuiApp {
     }
 
     /// 斜杠命令补全：把当前前缀匹配到的第一个命令补全。
+    /// 命令源 = registry 全量（90+）∪ TUI 专用命令，动态获取（对标 claude-code 的
+    /// 全量命令补全）。前缀匹配取第一个；无匹配则不动作。
     fn complete_slash(&mut self) {
-        const SLASH_COMMANDS: &[&str] = &[
-            "/clear", "/compact", "/context", "/exit", "/help", "/hist", "/model",
-            "/new", "/quit", "/q", "/sessions", "/tools", "/undo", "/usage",
-        ];
         let prefix = self.input.as_str();
-        for cmd in SLASH_COMMANDS {
-            if cmd.starts_with(prefix) && cmd.len() > prefix.len() {
-                self.input = cmd.to_string();
-                return;
-            }
+        let matches = slash_command_candidates(prefix);
+        if let Some(cmd) = matches.first() {
+            self.input = cmd.clone();
         }
     }
+    /// 输入中是否含未完成的 `@` 文件引用（@ 之后还有路径片段，光标在 @ 之后）。
+    /// 对标 claude-code 的 `@file` 路径引用（Tab 补全当前目录）。
+    fn has_at_reference(&self) -> bool {
+        let Some(at) = self.input.rfind('@') else { return false };
+        // @ 之前的字符必须是空白或行首（避免误判邮箱 / 用户名）
+        if at > 0 {
+            let prev = self.input.as_bytes()[at - 1];
+            if !prev.is_ascii_whitespace() && prev != b'\n' {
+                return false;
+            }
+        }
+        // 光标必须位于 @ 之后（正在输入引用片段）
+        self.cursor > at
+    }
+
+    /// 补全 `@` 后的路径前缀：列出当前目录匹配项，补全第一个（目录加 `/`）。
+    fn complete_at_reference(&mut self) {
+        let Some(at) = self.input.rfind('@') else { return };
+        let prefix: String = self.input[at + 1..].chars().take(200).collect();
+        let dir = std::path::Path::new(".");
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        let mut matches: Vec<String> = Vec::new();
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&prefix) {
+                let is_dir = entry.path().is_dir();
+                matches.push(if is_dir { format!("{}/", name) } else { name });
+            }
+        }
+        matches.sort();
+        if matches.is_empty() {
+            return;
+        }
+        // 只有一个匹配 → 直接补全；多个 → 补全到最长公共前缀
+        if matches.len() == 1 {
+            self.input = format!("{}@{}", &self.input[..at], matches[0]);
+            self.cursor = self.input.len();
+            return;
+        }
+        let common = longest_common_prefix(&matches);
+        if common.len() > prefix.len() {
+            self.input = format!("{}@{}", &self.input[..at], common);
+            self.cursor = self.input.len();
+        } else {
+            // 多个候选无公共前缀 → 把候选列表展示到状态栏
+            self.status_text = format!("@ 候选: {}", matches.join(" "));
+        }
+    }
+}
+
+/// 多个字符串的最长公共前缀。
+fn longest_common_prefix(strs: &[String]) -> String {
+    if strs.is_empty() {
+        return String::new();
+    }
+    let first = strs[0].as_bytes();
+    let mut len = first.len();
+    for s in &strs[1..] {
+        let bytes = s.as_bytes();
+        let mut i = 0;
+        while i < len && i < bytes.len() && bytes[i] == first[i] {
+            i += 1;
+        }
+        len = i;
+    }
+    strs[0].chars().take(len).collect()
+}
+/// 用 OnceLock 缓存 registry 命令名（registry 构造含 session logging，避免每 Tab 重建；
+/// Command::name 非 'static，故缓存 String）。
+static SLASH_CANDIDATES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+
+/// 返回匹配前缀的全部命令（顺序：TUI 专用在前，registry 在后）。
+pub fn slash_command_candidates(prefix: &str) -> Vec<String> {
+    const TUI_ONLY: &[&str] = &[
+        "/save", "/load", "/resume", "/sessions", "/hist",
+    ];
+    let reg_names: &Vec<String> = SLASH_CANDIDATES.get_or_init(|| {
+        let reg = crate::cli::commands::registry::default_registry();
+        reg.list_primary().into_iter().map(|s| s.to_string()).collect()
+    });
+    let mut out: Vec<String> = Vec::new();
+    for cmd in TUI_ONLY {
+        if cmd.starts_with(prefix) && cmd.len() > prefix.len() {
+            out.push(cmd.to_string());
+        }
+    }
+    for cmd in reg_names {
+        if cmd.starts_with(prefix) && cmd.len() > prefix.len() && !out.contains(cmd) {
+            out.push(cmd.clone());
+        }
+    }
+    out
 }
 
 /// 键处理返回的动作，供事件循环执行。
@@ -623,6 +961,28 @@ pub enum KeyAction {
     Submit,
     ClearScreen,
     CancelGeneration,
+    ApprovePending,
+    DenyPending,
+    /// 会话 picker 选中项（/sessions）：加载对应会话。
+    SelectSession(usize),
+    /// 会话 picker 关闭（Esc/q）。
+    ClosePicker,
+    /// 会话 picker 删除选中项（d）。
+    DeleteSession(usize),
+}
+
+/// 解析 SessionStore 消息行 "[role] content" → (role, content)。
+/// 未匹配已知角色时按 system 处理。
+fn parse_role_line(line: &str) -> (&str, String) {
+    if let Some(c) = line.strip_prefix("[user] ") {
+        ("user", c.to_string())
+    } else if let Some(c) = line.strip_prefix("[assistant] ") {
+        ("assistant", c.to_string())
+    } else if let Some(c) = line.strip_prefix("[system] ") {
+        ("system", c.to_string())
+    } else {
+        ("system", line.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -670,8 +1030,7 @@ mod tests {
 
     #[test]
     fn test_busy_elapsed_secs_zero_when_idle() {
-        let app = TuiApp::new(true);
-        assert_eq!(app.busy_elapsed_secs(), 0, "空闲时无计时");
+        let app = TuiApp::new(true);        assert_eq!(app.busy_elapsed_secs(), 0, "空闲时无计时");
     }
 
     #[test]
@@ -718,6 +1077,15 @@ mod tests {
         app.scroll_offset = 0;
         app.feed_stream("more\n");
         assert!(app.scroll_offset > 0 || app.scroll_offset == 0);
+    }
+
+    #[test]
+    fn test_auto_scroll_reenabled_after_tools_done() {
+        let mut app = TuiApp::new(true);
+        app.start_streaming_tool("mcp_search", "{}");
+        assert!(!app.auto_scroll, "工具 running 时暂停自动滚动");
+        app.finish_streaming_tool("mcp_search", 10, true, "ok");
+        assert!(app.auto_scroll, "工具完成后恢复自动滚动");
     }
 
     #[test]
@@ -1150,5 +1518,201 @@ mod tests {
         assert_eq!(app.cursor, 0, "vim gg 应到行首");
         app.handle_key(KeyCode::Char('G'), KeyModifiers::NONE);
         assert_eq!(app.cursor, 3, "vim G 应到行尾");
+    }
+
+    // ── Diff 查看模式 ──
+
+    #[test]
+    fn test_open_diff_parses_and_navigates() {
+        let mut app = TuiApp::new(true);
+        let diff = "diff --git a/a.rs b/a.rs\nindex 123..456 100644\n--- a/a.rs\n+++ b/a.rs\n@@ -1,2 +1,3 @@\n-old line\n+new line\n context\n";
+        app.open_diff(diff.to_string());
+        assert!(app.diff_active());
+        let viewer = app.diff_viewer.as_ref().unwrap();
+        assert_eq!(viewer.blocks.len(), 1, "应解析出一个 diff block");
+        assert_eq!(viewer.blocks[0].hunks.len(), 1, "应解析出一个 hunk");
+        assert_eq!(viewer.scroll_offset, 0);
+        // 顶部再上滚不越界
+        app.handle_key(KeyCode::Up, KeyModifiers::NONE);
+        assert_eq!(app.diff_viewer.as_ref().unwrap().scroll_offset, 0);
+        // ↓ 滚动
+        app.handle_key(KeyCode::Down, KeyModifiers::NONE);
+        assert_eq!(app.diff_viewer.as_ref().unwrap().scroll_offset, 1);
+        // k/j 滚动
+        app.handle_key(KeyCode::Char('k'), KeyModifiers::NONE);
+        assert_eq!(app.diff_viewer.as_ref().unwrap().scroll_offset, 0);
+        app.handle_key(KeyCode::Char('j'), KeyModifiers::NONE);
+        assert_eq!(app.diff_viewer.as_ref().unwrap().scroll_offset, 1);
+        // PageDown 翻页
+        app.handle_key(KeyCode::PageDown, KeyModifiers::NONE);
+        assert_eq!(app.diff_viewer.as_ref().unwrap().scroll_offset, 11);
+        // PageUp 翻回
+        app.handle_key(KeyCode::PageUp, KeyModifiers::NONE);
+        assert_eq!(app.diff_viewer.as_ref().unwrap().scroll_offset, 1);
+        // q 退出
+        app.handle_key(KeyCode::Char('q'), KeyModifiers::NONE);
+        assert!(!app.diff_active());
+    }
+
+    #[test]
+    fn test_diff_mode_intercepts_typing() {
+        let mut app = TuiApp::new(true);
+        app.open_diff("diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b\n".to_string());
+        app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
+        assert_eq!(app.input, "", "diff 模式下输入不应进入输入框");
+        // Esc 退出
+        app.handle_key(KeyCode::Esc, KeyModifiers::NONE);
+        assert!(!app.diff_active());
+        // 退出后可正常输入
+        app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
+        assert_eq!(app.input, "a");
+    }
+
+    #[test]
+    fn test_diff_mode_ctrl_c_closes_not_quits() {
+        let mut app = TuiApp::new(true);
+        app.open_diff("diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b\n".to_string());
+        let action = app.handle_key(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        assert_eq!(action, KeyAction::None, "diff 模式下 Ctrl+C 不应退出");
+        assert!(!app.diff_active(), "Ctrl+C 应关闭 diff 面板");
+    }
+
+    #[test]
+    fn test_slash_completion_includes_diff() {
+        // 命令面精简: 人类 Tab 补全只含控制命令白名单; 聚合器与领域命令由 agent 后端自我调度
+        let mut app = TuiApp::new(true);
+        app.input = "/he".into();
+        app.complete_slash();
+        assert!(app.input.starts_with("/help"), "/he Tab 应补全为控制命令 /help, got: {}", app.input);
+        // 聚合器/领域命令不再出现在人类补全候选
+        let cands = slash_command_candidates("/f");
+        assert!(!cands.iter().any(|c| c == "/file"), "/file 是 agent 工具, 不应出现在人类补全候选");
+        let cands2 = slash_command_candidates("/di");
+        assert!(!cands2.iter().any(|c| c == "/diff"), "/diff 被 /file 覆盖, 不应出现在补全候选");
+    }
+
+    // ── 会话自动恢复 ──
+
+    #[test]
+    fn test_restore_sessions_from_base() {
+        use crate::cli::tui::session_store::{SessionData, SessionStore};
+        let tmp = std::env::temp_dir().join(format!("nt-tui-restore-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).expect("create tmp");
+        let mut store = SessionStore::with_base(tmp.clone());
+        let now = chrono::Utc::now().to_rfc3339();
+        let data = SessionData {
+            id: "s-1".into(),
+            name: "recovered".into(),
+            messages: vec![
+                "[user] 上次的问题".into(),
+                "[assistant] 上次的回答".into(),
+            ],
+            created_at: now.clone(),
+            updated_at: now,
+        };
+        store.save_session("recovered", &data).expect("save");
+
+        let mut app = TuiApp::new(true);
+        let restored = app.restore_sessions_from_base(Some(tmp.clone()));
+        assert_eq!(restored, 2, "应恢复 2 条消息");
+        assert_eq!(app.sessions.len(), 1, "恢复后应替换默认空会话");
+        assert_eq!(app.sessions[0].name, "recovered");
+        assert_eq!(app.sessions[0].messages[0].role, "user");
+        assert_eq!(app.sessions[0].messages[0].content, "上次的问题");
+        assert_eq!(app.sessions[0].messages[1].role, "assistant");
+        assert_eq!(app.sessions[0].messages[1].content, "上次的回答");
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_restore_sessions_empty_when_no_history() {
+        let tmp = std::env::temp_dir().join(format!("nt-tui-restore-empty-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).expect("create tmp");
+        let mut app = TuiApp::new(true);
+        let restored = app.restore_sessions_from_base(Some(tmp.clone()));
+        assert_eq!(restored, 0, "无历史时返回 0");
+        assert_eq!(app.sessions.len(), 1, "保留默认空会话");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_parse_role_line_variants() {
+        assert_eq!(parse_role_line("[user] hi"), ("user", "hi".to_string()));
+        assert_eq!(parse_role_line("[assistant] hello"), ("assistant", "hello".to_string()));
+        assert_eq!(parse_role_line("[system] note"), ("system", "note".to_string()));
+        assert_eq!(parse_role_line("raw line"), ("system", "raw line".to_string()));
+    }
+
+    // ── @ 文件引用补全（私有方法，需在 impl 内测试） ──
+
+    #[test]
+    fn test_at_reference_detection() {
+        let mut app = TuiApp::new(true);
+        app.input = "看看 @".into();
+        app.cursor = app.input.len();
+        assert!(app.has_at_reference(), "@ 后无内容且光标在末尾应判定为引用");
+        app.input = "email@example.com".into();
+        app.cursor = app.input.len();
+        assert!(!app.has_at_reference(), "邮箱不应误判");
+        app.input = "见 @src".into();
+        app.cursor = app.input.len();
+        assert!(app.has_at_reference(), "@ 后路径片段应判定为引用");
+        app.input = "见 @src".into();
+        app.cursor = 0; // 光标在 @ 之前 → 不应补全
+        assert!(!app.has_at_reference());
+    }
+
+    #[test]
+    fn test_longest_common_prefix_basic() {
+        assert_eq!(longest_common_prefix(&["src/a.rs".into(), "src/b.rs".into(), "src/c.rs".into()]), "src/");
+        assert_eq!(longest_common_prefix(&["abc".into(), "abd".into()]), "ab");
+        assert_eq!(longest_common_prefix(&["abc".into()]), "abc");
+        assert_eq!(longest_common_prefix(&[]), "");
+    }
+
+    #[test]
+    fn test_at_completion_in_known_dir() {
+        // 用临时目录保证确定性（不依赖测试进程 cwd 指向的仓库结构）。
+        let tmp = std::env::temp_dir().join(format!("nt-tui-at-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("src")).unwrap();
+        std::fs::write(tmp.join("src").join("main.rs"), "").unwrap();
+        std::fs::write(tmp.join("Cargo.toml"), "").unwrap();
+        let orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&tmp).unwrap();
+
+        let mut app = TuiApp::new(true);
+        // 目录补全：@src → @src/
+        app.input = "读 @src".into();
+        app.cursor = app.input.len();
+        app.complete_at_reference();
+        assert_eq!(app.input, "读 @src/", "目录应补全尾斜杠: {}", app.input);
+
+        // 文件补全：@Cargo → @Cargo.toml
+        app.input = "读 @Cargo".into();
+        app.cursor = app.input.len();
+        app.complete_at_reference();
+        assert_eq!(app.input, "读 @Cargo.toml", "文件应精确补全: {}", app.input);
+
+        // 无匹配：输入不变
+        app.input = "读 @zzz".into();
+        app.cursor = app.input.len();
+        app.complete_at_reference();
+        assert_eq!(app.input, "读 @zzz", "无匹配不应改动");
+
+        std::env::set_current_dir(&orig).unwrap();
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_slash_completion_uses_registry_dynamic() {
+        let mut app = TuiApp::new(true);
+        app.input = "/co".into();
+        app.complete_slash();
+        assert!(app.input.starts_with("/config"),
+            "应补全 registry 控制命令 (completions 已降级): {}", app.input);
     }
 }

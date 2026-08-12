@@ -182,6 +182,18 @@ pub enum Commands {
 
     /// 验证注册表 (检查循环依赖、层级跨度等)
     Validate,
+
+    /// 最短路径路由: 计算目标能力的最优依赖链 (LoopX 吸收: 流程节点最优解)
+    Route {
+        /// 目标能力标签 (如 websearch) 或节点 ID
+        target: String,
+        /// 指定起点节点 ID (默认: 自动找最近 primitive)
+        #[arg(long)]
+        from: Option<String>,
+        /// 指定终点节点 ID (默认: 目标能力的最优 provider)
+        #[arg(long)]
+        to: Option<String>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -247,6 +259,9 @@ impl CapabilityCli {
             }
             Commands::Validate => {
                 self.cmd_validate(&registry)?;
+            }
+            Commands::Route { target, from, to } => {
+                self.cmd_route(&registry, target, from.as_deref(), to.as_deref())?;
             }
         }
 
@@ -767,6 +782,63 @@ impl CapabilityCli {
 
         if errors == 0 {
             println!("Validation passed.");
+        }
+        Ok(())
+    }
+
+    /// 最短路径路由 (LoopX 吸收: 流程节点最优解)。
+    /// 目标可以是能力标签 (自动选最优 provider) 或节点 ID。
+    fn cmd_route(
+        &self,
+        registry: &CapabilityRegistry,
+        target: &str,
+        from: Option<&str>,
+        to: Option<&str>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // 目标解析: 若 target 是能力标签 → 找最优 provider; 否则视为节点 ID
+        let target_node = if registry.get(target).is_some() {
+            target.to_string()
+        } else {
+            match registry.optimal_provider(target) {
+                Some(sp) => {
+                    println!("[route] capability '{}' → optimal provider: {}", target, sp.path[0]);
+                    println!("[route]   path: {} (hops={}, cost={:.2})", sp.path.join(" → "), sp.hops, sp.cost);
+                    sp.path[0].clone()
+                }
+                None => {
+                    eprintln!("ERROR: target '{}' is neither a node nor a provided capability", target);
+                    return Ok(());
+                }
+            }
+        };
+
+        // 显式 from/to 路由
+        match (from, to) {
+            (Some(f), Some(t)) => {
+                match registry.optimal_path_between(f, t) {
+                    Some(sp) => {
+                        println!("[route] {} → {}: {} (hops={}, cost={:.2})", f, t, sp.path.join(" → "), sp.hops, sp.cost);
+                    }
+                    None => eprintln!("ERROR: no path from '{}' to '{}'", f, t),
+                }
+            }
+            (Some(f), None) => {
+                match registry.optimal_path_between(f, &target_node) {
+                    Some(sp) => {
+                        println!("[route] {} → {}: {} (hops={}, cost={:.2})", f, target_node, sp.path.join(" → "), sp.hops, sp.cost);
+                    }
+                    None => eprintln!("ERROR: no path from '{}' to '{}'", f, target_node),
+                }
+            }
+            _ => {
+                // 默认: 目标到最近 primitive 的最优依赖链
+                match registry.shortest_path_to_primitive(&target_node) {
+                    Some(sp) => {
+                        println!("[route] {} → primitive: {} (hops={}, cost={:.2})", target_node, sp.path.join(" → "), sp.hops, sp.cost);
+                    }
+                    None => eprintln!("ERROR: '{}' has no path to any primitive", target_node),
+                }
+            }
         }
         Ok(())
     }

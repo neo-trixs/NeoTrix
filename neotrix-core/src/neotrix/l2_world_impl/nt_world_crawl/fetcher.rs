@@ -99,6 +99,12 @@ pub struct FetcherPool {
     last_network_check: Option<Instant>,
     network_available: bool,
     network_check_interval_secs: u64,
+    /// P1-18 cache-first 响应缓存 (吸收 city-roads cache-first + fallback 双路径):
+    /// url → (body, text)。命中直接返回 (不重复抓取), 未命中抓取后写入。
+    /// 网络不可用时缓存兜底 (fallback 语义)。
+    response_cache: std::collections::HashMap<String, (String, Option<String>)>,
+    /// 缓存命中数 (telemetry)
+    pub cache_hits: u64,
 }
 
 impl FetcherPool {
@@ -117,6 +123,8 @@ impl FetcherPool {
             last_network_check: None,
             network_available: true,
             network_check_interval_secs: 30,
+            response_cache: std::collections::HashMap::new(),
+            cache_hits: 0,
         }
     }
 
@@ -130,6 +138,21 @@ impl FetcherPool {
     }
 
     pub fn fetch(&mut self, url: &str) -> FetchResult {
+        // P1-18 cache-first (city-roads 模式): 命中缓存直接返回, 不重复抓取。
+        if let Some((body, text)) = self.response_cache.get(url).cloned() {
+            self.cache_hits += 1;
+            let text_len = text.as_ref().map_or(0, |t| t.len());
+            return FetchResult {
+                url: url.to_string(),
+                status_code: 200,
+                body: Some(body),
+                text,
+                content_length: text_len,
+                duration_ms: 0,
+                protocol: FetcherProtocol::Http,
+                error: None,
+            };
+        }
         self.total_requests += 1;
         let start = Instant::now();
 
@@ -166,6 +189,35 @@ impl FetcherPool {
             }
         }
 
+        // P1-8 有序后端降级 (吸收 Agent-Reach 首选+备选后端模式):
+        // HTTP 后端失败 (网络错误/超时/5xx/封禁) 且 Browser 后端可用时,
+        // 自动降级到 Browser (nt_world_browse) 重试一次 — 首选后端失败不放弃,
+        // 有序尝试备选。对应 Agent-Reach "ordered backends with real probing"。
+        let http_failed = scrape.error.is_some()
+            || scrape.status_code >= 500
+            || scrape.status_code == 403
+            || scrape.status_code == 429
+            || scrape.status_code == 0;
+        if http_failed && self.nt_world_browse_client.is_some() {
+            let browser_body = self.try_browser_fallback(url);
+            if let Some((body, text)) = browser_body {
+                self.total_success += 1;
+                let text_len = text.as_ref().map_or(0, |t| t.len());
+                self.total_bytes += text_len as u64;
+                self.response_cache.insert(url.to_string(), (body.clone(), text.clone()));
+                return FetchResult {
+                    url: url.to_string(),
+                    status_code: 200,
+                    body: Some(body),
+                    text,
+                    content_length: text_len,
+                    duration_ms: start.elapsed().as_millis() as u64,
+                    protocol: FetcherProtocol::Browser,
+                    error: None,
+                };
+            }
+        }
+
         let fetch_result = if let Some(err) = scrape.error {
             let fetch_err = FetchError {
                 url: url.to_string(),
@@ -196,6 +248,7 @@ impl FetcherPool {
             let text_len = scrape.text.as_ref().map_or(0, |t| t.len());
             self.total_success += 1;
             self.total_bytes += text_len as u64;
+            self.response_cache.insert(url.to_string(), (scrape.html.clone().unwrap_or_default(), scrape.text.clone()));
             FetchResult {
                 url: url.to_string(),
                 status_code: scrape.status_code,
@@ -253,6 +306,17 @@ impl FetcherPool {
                     Client::new()
                 })
         })
+    }
+
+    /// P1-8 有序后端降级辅助 (Agent-Reach 模式): HTTP 后端失败时尝试 Browser 后端。
+    /// 成功 → Some((body, text)), 失败 → None (调用方保留 HTTP 原始错误)。
+    fn try_browser_fallback(&mut self, url: &str) -> Option<(String, Option<String>)> {
+        let result = self.fetch_nt_world_browse_mode(url);
+        if result.is_success() {
+            Some((result.body.unwrap_or_default(), result.text))
+        } else {
+            None
+        }
     }
 
     pub fn fetch_nt_world_browse_mode(&mut self, url: &str) -> FetchResult {

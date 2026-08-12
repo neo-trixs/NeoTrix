@@ -14,6 +14,7 @@ impl CliCommand for BenchmarkCmd {
     fn name(&self) -> &str {
         "/benchmark"
     }
+    fn is_primary(&self) -> bool { false }
 
     fn aliases(&self) -> Vec<&str> {
         vec!["/bench"]

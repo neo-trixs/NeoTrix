@@ -13,13 +13,12 @@ fn now() -> i64 {
         .as_secs() as i64
 }
 
-pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
+/// 无事务的 nodes+nodes_fts 双写核心。调用方必须自管事务 (批量路径复用)。
+pub fn insert_node_rows(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
     let temporal_json = node.temporal.as_ref().map(|t| {
         serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
     });
-    // 事务：nodes + nodes_fts 双写保持一致性，crash 不残留孤立 FTS 行
-    let tx = conn.unchecked_transaction()?;
-    tx.execute(
+    conn.execute(
         "INSERT INTO nodes (id, node_type, title, summary, content, url, domain, language,
             confidence, importance, created_at, updated_at, access_count, metadata,
             data_tier, temporal, supersedes, source_episode, tier)
@@ -50,12 +49,63 @@ pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<
     let summary = node.summary.as_deref().unwrap_or("");
     let content = node.content.as_deref().unwrap_or("");
     let domain = node.domain.as_deref().unwrap_or("");
-    tx.execute(
+    conn.execute(
         "INSERT INTO nodes_fts (rowid, title, summary, content, domain)
          VALUES (last_insert_rowid(), ?1, ?2, ?3, ?4)",
         params![node.title, summary, content, domain],
     )?;
+    Ok(())
+}
 
+/// 无事务的 insert-or-get: 批量摄取路径复用 (外层事务由调用方负责)。
+pub fn insert_or_get_node_rows(
+    conn: &Connection,
+    title: &str,
+    node_type: NodeType,
+    summary: Option<&str>,
+    url: Option<&str>,
+    domain: Option<&str>,
+) -> rusqlite::Result<String> {
+    if let Some(url) = url {
+        if let Some(existing) = find_node_by_url(conn, url)? {
+            return Ok(existing.id);
+        }
+    } else if let Some(existing) = find_node_by_title_and_type(conn, title, &node_type)? {
+        return Ok(existing.id);
+    }
+
+    let id = Uuid::new_v4().to_string();
+    let ts = now();
+    let node = KnowledgeNode {
+        id: id.clone(),
+        node_type,
+        title: title.to_string(),
+        summary: summary.map(|s| s.to_string()),
+        content: summary.map(|s| s.to_string()),
+        url: url.map(|s| s.to_string()),
+        domain: domain.map(|s| s.to_string()),
+        language: "en".into(),
+        confidence: 1.0,
+        importance: 0.5,
+        created_at: ts,
+        updated_at: ts,
+        access_count: 0,
+        metadata: None,
+        temporal: None,
+        supersedes: None,
+        source_episode: None,
+    };
+    insert_node_rows(conn, &node)?;
+    Ok(id)
+}
+
+pub fn insert_node(conn: &Connection, node: &KnowledgeNode) -> rusqlite::Result<()> {
+    let _temporal_json = node.temporal.as_ref().map(|t| {
+        serde_json::to_string(t).unwrap_or_else(|_| "{}".to_string())
+    });
+    // 事务：nodes + nodes_fts 双写保持一致性，crash 不残留孤立 FTS 行
+    let tx = conn.unchecked_transaction()?;
+    insert_node_rows(&tx, node)?;
     tx.commit()
 }
 

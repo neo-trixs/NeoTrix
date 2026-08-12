@@ -7,6 +7,7 @@ pub mod nt_l1_shared_types;
 
 // IO
 pub mod nt_io_agent_loop;
+pub mod nt_io_awareness_core;
 pub mod nt_io_avatar_channel;
 pub mod nt_io_hotreload;
 pub mod nt_io_http_factory;

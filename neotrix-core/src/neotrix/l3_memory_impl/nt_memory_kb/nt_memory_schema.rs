@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 
-pub const SCHEMA_VERSION: i32 = 7;
+pub const SCHEMA_VERSION: i32 = 8;
 
 pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
@@ -273,7 +273,8 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
             is_builtin INTEGER DEFAULT 0,
             last_indexed_at INTEGER,
             created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
+            updated_at INTEGER NOT NULL,
+            content_hash TEXT
         );
 
         CREATE TABLE IF NOT EXISTS rkyv_blobs (
@@ -284,6 +285,22 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
             created_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_rkyv_blobs_ns ON rkyv_blobs(namespace);
+
+        CREATE TABLE IF NOT EXISTS geo_index (
+            node_id TEXT PRIMARY KEY,
+            lat REAL NOT NULL,
+            lng REAL NOT NULL,
+            country TEXT DEFAULT '',
+            region TEXT DEFAULT '',
+            city TEXT DEFAULT '',
+            tags TEXT DEFAULT '',
+            source TEXT DEFAULT '',
+            confidence REAL DEFAULT 0.0,
+            updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_geo_index_lat ON geo_index(lat);
+        CREATE INDEX IF NOT EXISTS idx_geo_index_lng ON geo_index(lng);
+        CREATE INDEX IF NOT EXISTS idx_geo_index_country ON geo_index(country);
 
         CREATE TABLE IF NOT EXISTS agent_sessions (
             id TEXT PRIMARY KEY,
@@ -317,6 +334,13 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
         .unwrap_or(0);
 
     if version < SCHEMA_VERSION {
+        // ── Migration v8 (UCN Phase 1): skills_index.content_hash ──
+        // 写通去重需要内容指纹列。列可能已存在 (新库由上方 CREATE TABLE 直接建列,
+        // 或旧 Python 迁移遗留) → 必须先查列存在性, 不得盲 ALTER (R-P20 schema 漂移防护)。
+        if version < 8 && !table_column_exists(conn, "skills_index", "content_hash")? {
+            conn.execute_batch("ALTER TABLE skills_index ADD COLUMN content_hash TEXT")?;
+        }
+
         conn.execute(
             "INSERT OR REPLACE INTO schema_version (version) VALUES (?1)",
             [SCHEMA_VERSION],
@@ -324,4 +348,17 @@ pub fn initialize(conn: &Connection) -> rusqlite::Result<()> {
     }
 
     Ok(())
+}
+
+/// 查询表是否已包含某列 (migration 前置守卫)。
+fn table_column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    let sql = format!("PRAGMA table_info({})", table);
+    let mut stmt = conn.prepare(&sql)?;
+    let cols = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    for col in cols {
+        if col? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

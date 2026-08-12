@@ -15,6 +15,12 @@ pub struct ToolCall {
     pub args: String,
     pub duration_ms: u64,
     pub success: bool,
+    /// 状态流转: "running" → "done"/"error" (流式工具可视化, task B)
+    #[serde(default)]
+    pub status: String,
+    /// 工具执行结果 (截断后存, 折叠展示)
+    #[serde(default)]
+    pub result: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,6 +106,22 @@ pub struct SideMessage {
     pub timestamp: Instant,
 }
 
+/// 会话恢复 picker 的单条记录（/sessions 面板；对标 claude-code /resume picker）。
+#[derive(Debug, Clone)]
+pub struct SessionEntry {
+    pub name: String,
+    pub updated_at: String,
+    pub message_count: usize,
+}
+
+/// 会话恢复 picker 状态：entries 为已保存会话列表，selected 为当前高亮项。
+/// 模态渲染在屏幕中央 overlay（见 layout::render_session_picker）。
+#[derive(Debug, Clone)]
+pub struct SessionPicker {
+    pub entries: Vec<SessionEntry>,
+    pub selected: usize,
+}
+
 pub fn extract_thinking(content: &str) -> (Vec<String>, String) {
     let mut blocks = Vec::new();
     let mut result = String::new();
@@ -136,9 +158,9 @@ pub fn extract_tool_calls(content: &str) -> Vec<ToolCall> {
             if let Some(paren) = inner.find('(') {
                 let name = inner[..paren].trim().to_string();
                 let args = inner[paren..].trim_end_matches(')').trim_start_matches('(').to_string();
-                calls.push(ToolCall { name, args, duration_ms: 0, success: true });
+                calls.push(ToolCall { name, args, duration_ms: 0, success: true, status: "done".into(), result: String::new() });
             } else {
-                calls.push(ToolCall { name: inner.to_string(), args: String::new(), duration_ms: 0, success: true });
+                calls.push(ToolCall { name: inner.to_string(), args: String::new(), duration_ms: 0, success: true, status: "done".into(), result: String::new() });
             }
         }
     }

@@ -15,7 +15,16 @@ impl BackgroundLoopHandle {
                 r.deletable_count, r.estimated_bytes as f64 / 1_048_576.0);
         }
 
-        // 2. 清理 .DS_Store
+        // 2. 命令式系统服务清理 (dry-run 报告; brew cleanup 低危自动, TM/Docker 需确认)
+        //    (mac-janitor/PureMac 吸收接线: brew cleanup / docker prune / tmutil 快照)
+        engine.dry_run_default = true;
+        let svc = engine.clean(CleanupKind::SystemServices);
+        if svc.deletable_count > 0 || !svc.pattern_matches.is_empty() {
+            log::info!("[bg] cleanup services: {} executed (dry-run 报告): {:?}",
+                svc.deletable_count, svc.pattern_matches);
+        }
+
+        // 3. 清理 .DS_Store
         if let Ok(entries) = std::fs::read_dir(".") {
             let mut count = 0u32;
             for entry in entries.flatten() {
@@ -29,7 +38,7 @@ impl BackgroundLoopHandle {
             }
         }
 
-        // 3. 整理旧快照
+        // 4. 整理旧快照
         let snapshots = CleanupEngine::prune_brain_snapshots(20);
         if snapshots > 0 {
             log::info!("[bg] cleanup: pruned {} old brain snapshots", snapshots);

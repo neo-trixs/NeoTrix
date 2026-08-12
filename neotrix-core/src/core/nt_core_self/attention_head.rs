@@ -30,6 +30,34 @@ impl AttentionDomain {
         ]
     }
 
+    /// P1-13 确定性路由索引 (吸收 PrismSystem skills.json 六字段索引模式):
+    /// 关键词 → 域 的确定性映射表, 供任务路由稳定分类 (不依赖 LLM 每次输出漂移)。
+    /// PrismSystem 原文: "Router classifier + skills.json six-field index"。
+    /// 返回匹配的域 (首个命中) 或 None。
+    pub fn from_keywords(task: &str) -> Option<AttentionDomain> {
+        let t = task.to_lowercase();
+        // 有序: 越具体越靠前 (先匹配精确语义, 再匹配宽泛词)
+        const ROUTES: &[(&[&str], AttentionDomain)] = &[
+            (&["refactor", "code_review", "code review", "audit", "lint"], AttentionDomain::Code),
+            (&["implement", "fix", "bug", "feature", "write code", "build"], AttentionDomain::Code),
+            (&["search", "retrieve", "query", "find", "lookup", "explore"], AttentionDomain::Semantic),
+            (&["plan", "architect", "design", "roadmap", "strategy"], AttentionDomain::Planning),
+            (&["reflect", "review", "retro", "self", "meta"], AttentionDomain::SelfReflection),
+            (&["tool", "mcp", "api", "call", "execute", "run"], AttentionDomain::ToolUse),
+            (&["risk", "security", "threat", "danger", "guard"], AttentionDomain::RiskAssessment),
+            (&["goal", "objective", "align", "priority"], AttentionDomain::GoalAlignment),
+            (&["pattern", "match", "similar", "analogy", "reuse"], AttentionDomain::PatternMatch),
+            (&["time", "schedule", "deadline", "history", "temporal"], AttentionDomain::Temporal),
+            (&["creative", "novel", "generate", "imagine", "brainstorm"], AttentionDomain::Creativity),
+        ];
+        for (keywords, domain) in ROUTES {
+            if keywords.iter().any(|k| t.contains(k)) {
+                return Some(*domain);
+            }
+        }
+        None
+    }
+
     pub fn label(&self) -> &str {
         match self {
             AttentionDomain::PatternMatch => "pattern_match",

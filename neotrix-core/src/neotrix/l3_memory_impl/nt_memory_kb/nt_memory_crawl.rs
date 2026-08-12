@@ -1322,6 +1322,345 @@ pub fn ingest_geo_vectors(conn: &Connection, url: &str, kind: &str) -> Result<us
     Ok(count)
 }
 
+/// 摄取全球机场 (OurAirports CSV, Public Domain)。
+/// 数据源: airports.csv (davidmegginson/ourairports-data, 每日更新, 40,000+ 机场)。
+/// CSV 列索引: 0=id, 1=ident, 2=type, 3=name, 4=latitude_deg, 5=longitude_deg,
+///             6=elevation_ft, 7=continent, 8=iso_country, 9=iso_region,
+///             10=municipality, 12=icao_code, 13=iata_code
+/// 过滤 type: large_airport / medium_airport / small_airport (排除 heliport/seaplane/closed)。
+/// node_id = geo:airport:{ident} (ident 如 KLAX, 保证唯一)。
+pub fn ingest_geo_airports(
+    conn: &mut Connection,
+    url_or_path: &str,
+    limit: usize,
+) -> Result<usize, String> {
+    let body = if url_or_path.starts_with("file://") || std::path::Path::new(url_or_path).exists() {
+        let path = url_or_path.strip_prefix("file://").unwrap_or(url_or_path);
+        std::fs::read_to_string(path)
+            .map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
+    } else {
+        let resp = super::nt_http::run_blocking(|| http_client().get(url_or_path).send())
+            .map_err(|e| format!("airports fetch error: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {} for {}", resp.status(), url_or_path));
+        }
+        resp.text().map_err(|e| format!("read: {}", e))?
+    };
+
+    // 预加载已存在 ident → 幂等重跑安全
+    let mut existing: std::collections::HashSet<String> = {
+        let mut stmt = conn
+            .prepare("SELECT node_id FROM geo_index WHERE source='ourairports'")
+            .map_err(|e| format!("existing airports prepare: {}", e))?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| format!("existing airports query: {}", e))?;
+        let mut set = std::collections::HashSet::new();
+        for r in rows {
+            set.insert(r.map_err(|e| format!("existing airport row: {}", e))?);
+        }
+        set
+    };
+
+    // 简单 CSV 解析 (带引号, 逗号字段) — 按逗号分割并剥引号
+    fn split_csv(line: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut cur = String::new();
+        let mut in_quotes = false;
+        for ch in line.chars() {
+            match ch {
+                '"' => in_quotes = !in_quotes,
+                ',' if !in_quotes => {
+                    out.push(cur.trim().to_string());
+                    cur = String::new();
+                }
+                _ => cur.push(ch),
+            }
+        }
+        out.push(cur.trim().to_string());
+        out
+    }
+
+    const BATCH: usize = 5000;
+    let mut count = 0usize;
+    let mut tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("tx begin: {}", e))?;
+    for (idx, line) in body.lines().enumerate() {
+        if count >= limit {
+            break;
+        }
+        if idx == 0 {
+            continue; // header
+        }
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let cols = split_csv(line);
+        if cols.len() < 14 {
+            continue;
+        }
+        let atype = cols[2].as_str();
+        if atype != "large_airport" && atype != "medium_airport" && atype != "small_airport" {
+            continue;
+        }
+        let ident = cols[1].trim();
+        let name = cols[3].trim();
+        if ident.is_empty() || name.is_empty() {
+            continue;
+        }
+        let lat: f64 = cols[4].parse().unwrap_or(0.0);
+        let lng: f64 = cols[5].parse().unwrap_or(0.0);
+        if lat == 0.0 && lng == 0.0 {
+            continue;
+        }
+        let elev_ft = cols[6].parse::<f64>().unwrap_or(0.0);
+        let country = cols[8].trim();
+        let region = cols[9].trim();
+        let city = cols[10].trim();
+        let icao = cols[12].trim();
+        let iata = cols[13].trim();
+
+        let node_id = format!("geo:airport:{}", ident);
+        if existing.contains(&node_id) {
+            continue;
+        }
+        let title = format!("{} ({})", name, ident);
+        let elev_m = if elev_ft != 0.0 { (elev_ft * 0.3048) as i64 } else { 0 };
+        store::insert_or_get_node_rows(
+            &tx,
+            &title,
+            NodeType::Resource,
+            Some(&format!(
+                "OurAirports 机场: {}m (ICAO={} IATA={} {})",
+                elev_m, icao, iata, atype
+            )),
+            None,
+            Some("ourairports.org"),
+        )
+        .map_err(|e| format!("DB error: {}", e))?;
+        existing.insert(node_id.clone());
+
+        let mut tags = format!("机场,{}", atype);
+        if !icao.is_empty() {
+            tags.push_str(&format!(",{}", icao));
+        }
+        if !iata.is_empty() {
+            tags.push_str(&format!(",{}", iata));
+        }
+        super::nt_memory_geo::upsert_geo(
+            &tx,
+            &super::nt_memory_geo::GeoRecord {
+                node_id,
+                lat,
+                lng,
+                country: country.to_string(),
+                region: region.to_string(),
+                city: if city.is_empty() { name.to_string() } else { city.to_string() },
+                tags,
+                source: "ourairports".into(),
+                confidence: 1.0,
+            },
+        )
+        .map_err(|e| format!("geo upsert error: {}", e))?;
+        count += 1;
+
+        if count % BATCH == 0 {
+            tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+            tx = conn
+                .unchecked_transaction()
+                .map_err(|e| format!("tx begin: {}", e))?;
+        }
+    }
+    tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+
+    Ok(count)
+}
+
+/// 摄取国家/省级行政边界 (Natural Earth Admin 0/1 GeoJSON, Public Domain)。
+/// 数据源: ne_10m_admin_0_countries.geojson (258 国) / ne_10m_admin_1_states_provinces.geojson (4,500+ 省级)。
+/// 用每个 feature 的质心 (Polygon/MultiPolygon 首环平均) 写入 geo_index。
+/// node_id = geo:boundary:{adm0_a3}/{name} — 保证国家/省唯一。
+pub fn ingest_geo_boundaries(
+    conn: &mut Connection,
+    url_or_path: &str,
+    level: &str, // "admin0" | "admin1"
+    limit: usize,
+) -> Result<usize, String> {
+    let body = if url_or_path.starts_with("file://") || std::path::Path::new(url_or_path).exists() {
+        let path = url_or_path.strip_prefix("file://").unwrap_or(url_or_path);
+        std::fs::read_to_string(path)
+            .map_err(|e| format!("读取本地文件失败: {} ({})", e, path))?
+    } else {
+        let resp = super::nt_http::run_blocking(|| http_client().get(url_or_path).send())
+            .map_err(|e| format!("boundaries fetch error: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {} for {}", resp.status(), url_or_path));
+        }
+        resp.text().map_err(|e| format!("read: {}", e))?
+    };
+
+    let source = if level == "admin1" {
+        "natural-earth-admin1"
+    } else {
+        "natural-earth-admin0"
+    };
+    let mut existing: std::collections::HashSet<String> = {
+        let mut stmt = conn
+            .prepare(&format!("SELECT node_id FROM geo_index WHERE source='{}'", source))
+            .map_err(|e| format!("existing {} prepare: {}", e, source))?;
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| format!("existing {} query: {}", e, source))?;
+        let mut set = std::collections::HashSet::new();
+        for r in rows {
+            set.insert(r.map_err(|e| format!("existing row: {}", e))?);
+        }
+        set
+    };
+
+    let fc: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| format!("GeoJSON parse: {}", e))?;
+    let features = fc
+        .get("features")
+        .and_then(|f| f.as_array())
+        .ok_or_else(|| "GeoJSON 缺少 features".to_string())?;
+
+    const BATCH: usize = 1000;
+    let mut count = 0usize;
+    let mut tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("tx begin: {}", e))?;
+
+    for feat in features {
+        if count >= limit {
+            break;
+        }
+        let props = feat.get("properties").cloned().unwrap_or(serde_json::Value::Null);
+        let name = props
+            .get(if level == "admin1" { "name" } else { "NAME" })
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if name.is_empty() {
+            continue;
+        }
+        let adm0 = props
+            .get(if level == "admin1" { "adm0_a3" } else { "ADM0_A3" })
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let iso = props
+            .get(if level == "admin1" { "iso_3166_2" } else { "ISO_A2" })
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let pop: i64 = props
+            .get(if level == "admin1" { "pop_est" } else { "POP_EST" })
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let _continent = props
+            .get("CONTINENT")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        // 质心: 取 geometry 所有坐标的平均 (粗略但足够 geo_index 点模型)
+        let geom = feat.get("geometry").cloned().unwrap_or(serde_json::Value::Null);
+        let coords = geom.get("coordinates").cloned().unwrap_or(serde_json::Value::Null);
+        let mut lat_sum = 0.0f64;
+        let mut lng_sum = 0.0f64;
+        let mut n_pts = 0usize;
+        fn collect_coords(v: &serde_json::Value, lat: &mut f64, lng: &mut f64, n: &mut usize) {
+            if let Some(arr) = v.as_array() {
+                if arr.len() >= 2
+                    && arr[0].is_number()
+                    && arr[1].is_number()
+                {
+                    let x = arr[0].as_f64().unwrap_or(0.0);
+                    let y = arr[1].as_f64().unwrap_or(0.0);
+                    *lng += x;
+                    *lat += y;
+                    *n += 1;
+                } else {
+                    for item in arr {
+                        collect_coords(item, lat, lng, n);
+                    }
+                }
+            }
+        }
+        collect_coords(&coords, &mut lat_sum, &mut lng_sum, &mut n_pts);
+        if n_pts == 0 {
+            continue;
+        }
+        let lat = lat_sum / n_pts as f64;
+        let lng = lng_sum / n_pts as f64;
+
+        let node_id = format!(
+            "geo:boundary:{}/{}",
+            if adm0.is_empty() { "?" } else { &adm0 },
+            name
+        );
+        if existing.contains(&node_id) {
+            continue;
+        }
+        let title = format!(
+            "{} {}",
+            if level == "admin1" { "省/州" } else { "国家" },
+            name
+        );
+        store::insert_or_get_node_rows(
+            &tx,
+            &title,
+            NodeType::Resource,
+            Some(&format!(
+                "Natural Earth {} 行政边界: iso={} pop={}",
+                level, iso, pop
+            )),
+            None,
+            Some("natural-earth"),
+        )
+        .map_err(|e| format!("DB error: {}", e))?;
+        existing.insert(node_id.clone());
+
+        let mut tags = format!("边界,{}", level);
+        if !iso.is_empty() {
+            tags.push_str(&format!(",{}", iso));
+        }
+        if pop > 0 {
+            tags.push_str(&format!(",pop:{}", pop));
+        }
+        super::nt_memory_geo::upsert_geo(
+            &tx,
+            &super::nt_memory_geo::GeoRecord {
+                node_id,
+                lat,
+                lng,
+                country: if level == "admin1" { adm0.clone() } else { name.clone() },
+                region: if level == "admin1" { name.clone() } else { String::new() },
+                city: String::new(),
+                tags,
+                source: source.into(),
+                confidence: 1.0,
+            },
+        )
+        .map_err(|e| format!("geo upsert error: {}", e))?;
+        count += 1;
+
+        if count % BATCH == 0 {
+            tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+            tx = conn
+                .unchecked_transaction()
+                .map_err(|e| format!("tx begin: {}", e))?;
+        }
+    }
+    tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+
+    Ok(count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::is_safe_fetch_url;

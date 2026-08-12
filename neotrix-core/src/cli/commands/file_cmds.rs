@@ -55,6 +55,8 @@ impl CliCommand for FileReadCmd {
     fn name(&self) -> &str { "/read" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "读取并显示文件内容: /read <path>" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /read <path>");
@@ -88,6 +90,8 @@ impl CliCommand for FileWriteCmd {
     fn name(&self) -> &str { "/write" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "写入文件: /write <path> <content> [--yes]" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法:\n  /write <path> <content>  覆盖写入内容\n  /write --yes <path> <content>  跳过审批\n  /write <path>             在 TUI 外通过 stdin 写入");
@@ -130,6 +134,8 @@ impl CliCommand for FileCreateCmd {
     fn name(&self) -> &str { "/create" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "创建新文件: /create <path> [content] [--yes]" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /create <path> [content] [--yes]");
@@ -167,6 +173,8 @@ impl CliCommand for FileEditCmd {
     fn name(&self) -> &str { "/edit" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "编辑文件: /edit <path> [<行号>:<新内容>] [--yes]" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /edit <path> [<行号>:<新内容>] [--yes]");
@@ -231,6 +239,8 @@ impl CliCommand for FilePatchCmd {
     fn name(&self) -> &str { "/patch" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "应用 unified diff 补丁: /patch <path> (需要从 stdin 传入)" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /patch <path> (从 stdin 读取 patch, 在 TUI 中不可用)");
@@ -249,6 +259,8 @@ impl CliCommand for FileDiffCmd {
     fn name(&self) -> &str { "/diff" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "显示文件 git diff: /diff <path>" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::err("用法: /diff <path>");

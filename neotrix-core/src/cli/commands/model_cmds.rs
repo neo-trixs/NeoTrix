@@ -49,6 +49,8 @@ impl CliCommand for ModelCmd {
     fn description(&self) -> &str {
         "Switch model/provider: /model list | /model set <provider> [model] | /model current"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let sub = args.first().map(|s| s.as_str()).unwrap_or("");

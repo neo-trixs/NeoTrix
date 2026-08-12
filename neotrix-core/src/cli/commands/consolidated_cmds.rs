@@ -27,6 +27,7 @@ impl CliCommand for FileCmd {
     fn name(&self) -> &str { "/file" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "文件操作: /file read|write|create|edit|patch|diff <args>" }
+    fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok("文件操作:\n  /file read <path>       读取文件\n  /file write <path> <c>  写入文件\n  /file create <path>     创建文件\n  /file edit <path> <e>   编辑文件\n  /file patch <path> <p>  应用补丁\n  /file diff <a> <b>      文件差异");
@@ -52,6 +53,7 @@ impl CliCommand for WalletAggCmd {
     fn name(&self) -> &str { "/crypto" }
     fn aliases(&self) -> Vec<&str> { vec!["/finance"] }
     fn description(&self) -> &str { "加密金融: /crypto wallet|swap|transfer|approve|cost|budget <sub>" }
+    fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok("加密金融:\n  /crypto wallet <sub>      钱包管理\n  /crypto swap <sub>        DEX 交换\n  /crypto transfer <sub>    转账\n  /crypto approve <sub>     Token 授权\n  /crypto cost [detail|budget|reset]  费用追踪\n  /crypto budget <sub>      预算管理");
@@ -76,17 +78,18 @@ pub struct UiAggCmd;
 impl CliCommand for UiAggCmd {
     fn name(&self) -> &str { "/layout" }
     fn aliases(&self) -> Vec<&str> { vec!["/display"] }
-    fn description(&self) -> &str { "界面布局: /layout background|side|router|vim|workspace|theme <sub>" }
+    fn description(&self) -> &str { "界面布局: /layout background|side|router|vim|workspace|theme|route <sub>" }
+    fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("界面布局:\n  /layout background <sub>  后台任务\n  /layout side <question>   侧边提问\n  /layout router            路由状态\n  /layout vim               Vim 模式\n  /layout workspace <sub>   工作区\n  /layout theme <name>      主题切换");
+            return CommandOutput::ok("界面布局:\n  /layout background <sub>  后台任务\n  /layout side <question>   侧边提问\n  /layout router            路由状态\n  /layout route <sub>       智能路由\n  /layout vim               Vim 模式\n  /layout workspace <sub>   工作区\n  /layout theme <name>      主题切换");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
         match sub {
             "background" | "bg" => delegate!("/background", &rest, brain),
             "side" => delegate!("/side", &rest, brain),
-            "router" => delegate!("/router", &rest, brain),
+            "router" | "route" => delegate!("/route", &rest, brain),
             "vim" => delegate!("/vim", &rest, brain),
             "workspace" => delegate!("/workspace", &rest, brain),
             "theme" => delegate!("/theme", &rest, brain),
@@ -102,6 +105,7 @@ impl CliCommand for GitAggCmd {
     fn name(&self) -> &str { "/vc" }
     fn aliases(&self) -> Vec<&str> { vec!["/vcs"] }
     fn description(&self) -> &str { "版本控制: /vc git|commit|pr <sub>" }
+    fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok("版本控制:\n  /vc git <sub>   Git 操作\n  /vc commit      提交\n  /vc pr          Pull Request");
@@ -123,10 +127,11 @@ pub struct SessionAggCmd;
 impl CliCommand for SessionAggCmd {
     fn name(&self) -> &str { "/session-all" }
     fn aliases(&self) -> Vec<&str> { vec!["/sess"] }
-    fn description(&self) -> &str { "会话管理: /session-all session|resume|fork|history|context|compact <sub>" }
+    fn description(&self) -> &str { "会话管理: /session-all session|resume|fork|history|context|compact|distill <sub>" }
+    fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("会话管理:\n  /session-all session <sub>    会话管理\n  /session-all resume <id>      恢复会话\n  /session-all fork             分支会话\n  /session-all history           历史\n  /session-all context <sub>     上下文管理\n  /session-all compact [now]     压缩");
+            return CommandOutput::ok("会话管理:\n  /session-all session <sub>    会话管理\n  /session-all resume <id>      恢复会话\n  /session-all fork             分支会话\n  /session-all history           历史\n  /session-all context <sub>     上下文管理\n  /session-all compact [now]     压缩\n  /session-all distill           经验蒸馏");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
@@ -137,7 +142,8 @@ impl CliCommand for SessionAggCmd {
             "history" => delegate!("/history", &rest, brain),
             "context" | "ctx" => delegate!("/context", &rest, brain),
             "compact" => delegate!("/compact", &rest, brain),
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: session, resume, fork, history, context, compact", sub)),
+            "distill" => delegate!("/distill", &rest, brain),
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: session, resume, fork, history, context, compact, distill", sub)),
         }
     }
 }
@@ -148,10 +154,11 @@ pub struct ConsolidatedAgentCmd;
 impl CliCommand for ConsolidatedAgentCmd {
     fn name(&self) -> &str { "/agent-all" }
     fn aliases(&self) -> Vec<&str> { vec!["/agents-all"] }
-    fn description(&self) -> &str { "子代理: /agent-all spawn|list|talk|kill|status|background|tasks|discover|mcp" }
+    fn description(&self) -> &str { "子代理: /agent-all spawn|list|talk|kill|status|background|tasks|discover|mcp|acp" }
+    fn is_primary(&self) -> bool { false }
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
-            return CommandOutput::ok("子代理:\n  /agent-all spawn|list|talk|kill|status|background|tasks\n  /agent-all discover [--port] [--duration]\n  /agent-all mcp list|status|discover|search|publish");
+            return CommandOutput::ok("子代理:\n  /agent-all spawn|list|talk|kill|status|background|tasks\n  /agent-all discover [--port] [--duration]\n  /agent-all mcp list|status|discover|search|publish\n  /agent-all acp <sub>   ACP (Agent Client Protocol) 会话");
         }
         let sub = args[0].as_str();
         let rest: Vec<String> = args[1..].to_vec();
@@ -160,7 +167,34 @@ impl CliCommand for ConsolidatedAgentCmd {
                 delegate!("/agent", args, brain),
             "discover" | "scan" => delegate!("/discover", &rest, brain),
             "mcp" => delegate!("/mcp", &rest, brain),
-            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: spawn, list, talk, kill, status, background, tasks, discover, mcp", sub)),
+            "acp" => delegate!("/acp", &rest, brain),
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: spawn, list, talk, kill, status, background, tasks, discover, mcp, acp", sub)),
+        }
+    }
+}
+
+// ====== /memory (聚合: /evidence /hypothesis /search /board /kb /wiki) ======
+
+pub struct MemoryAggCmd;
+impl CliCommand for MemoryAggCmd {
+    fn name(&self) -> &str { "/memory" }
+    fn aliases(&self) -> Vec<&str> { vec!["/mem-aggr", "/knowledge"] }
+    fn description(&self) -> &str { "记忆知识: /memory evidence|hypothesis|search|board|kb|wiki <sub>" }
+    fn is_primary(&self) -> bool { false }
+    fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
+        if args.is_empty() {
+            return CommandOutput::ok("记忆知识库:\n  /memory evidence <sub>     证据管理\n  /memory hypothesis <sub>   假设管理\n  /memory search <q>         KB 检索\n  /memory board [sub]        看板任务\n  /memory kb [sub]           KB 管理\n  /memory wiki [sub]         知识库维基");
+        }
+        let sub = args[0].as_str();
+        let rest: Vec<String> = args[1..].to_vec();
+        match sub {
+            "evidence" => delegate!("/evidence", &rest, brain),
+            "hypothesis" | "hyp" => delegate!("/hypothesis", &rest, brain),
+            "search" => delegate!("/search", &rest, brain),
+            "board" | "kanban" => delegate!("/board", &rest, brain),
+            "kb" => delegate!("/kb", &rest, brain),
+            "wiki" => delegate!("/wiki", &rest, brain),
+            _ => CommandOutput::err(&format!("未知子命令: {}. 可用: evidence, hypothesis, search, board, kb, wiki", sub)),
         }
     }
 }

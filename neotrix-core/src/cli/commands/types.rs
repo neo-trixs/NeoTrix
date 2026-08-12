@@ -108,6 +108,15 @@ pub trait CliCommand {
     }
     fn description(&self) -> &str;
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput;
+    /// 是否为人类一级入口命令（展示在 /help 与 Tab 补全）。
+    /// 人类交互用不着大量命令 — 领域操作由 agent 后端自我调度（MCP 工具面），
+    /// 因此默认 false；仅显式白名单的控制命令（help/exit/clear/version/
+    /// config/completions/stats/doctor/e8/plan/consciousness/bench）为 true。
+    /// 所有命令仍可被 CommandRegistry::execute 直接执行（agent 调度通道），
+    /// 只是不占据人类一级认知面。
+    fn is_primary(&self) -> bool {
+        false
+    }
 }
 
 /// 名称 → 分类映射（无需每个命令单独实现 category()）
@@ -119,7 +128,7 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::File,
         "git" | "commit" | "pr"
             => CommandCategory::Git,
-        "session" | "resume" | "fork" | "history" | "context" | "compact" | "session-all" | "sess"
+        "session" | "resume" | "fork" | "history" | "context" | "compact" | "distill" | "session-all" | "sess"
             => CommandCategory::Session,
         "e8"
             => CommandCategory::System,
@@ -129,11 +138,11 @@ pub fn category_for(name: &str) -> CommandCategory {
             => CommandCategory::Crypto,
         "goal" | "plan" | "schedule"
             => CommandCategory::Goal,
-        "evidence" | "hypothesis" | "search" | "board" | "kb" | "knowledge" | "knowledge-base"
+        "evidence" | "hypothesis" | "search" | "board" | "kb" | "knowledge" | "knowledge-base" | "memory" | "mem-aggr"
             => CommandCategory::Memory,
-        "background" | "side" | "router" | "vim" | "workspace" | "theme" | "layout" | "display"
+        "background" | "side" | "router" | "route" | "vim" | "workspace" | "theme" | "layout" | "display"
             => CommandCategory::Ui,
-        "provider" | "model"
+        "provider" | "model" | "free" | "contract" | "perm" | "redact"
             => CommandCategory::Provider,
         "sandbox"
             => CommandCategory::Sandbox,
@@ -227,18 +236,31 @@ impl CommandRegistry {
         self.commands.iter().map(|cmd| cmd.name()).collect()
     }
 
+    /// 仅一级入口命令列表（命令收敛: 被聚合器覆盖的独立命令不在此列）
+    pub fn list_primary(&self) -> Vec<&str> {
+        self.commands
+            .iter()
+            .filter(|cmd| cmd.is_primary())
+            .map(|cmd| cmd.name())
+            .collect()
+    }
+
     pub fn complete(&self, prefix: &str) -> Vec<String> {
         self.commands
             .iter()
+            .filter(|cmd| cmd.is_primary()) // 命令收敛: 补全只提示一级入口
             .map(|cmd| cmd.name().to_string())
             .filter(|n| n.starts_with(prefix))
             .collect()
     }
 
-    /// 按分类列出命令
+    /// 按分类列出命令（仅一级入口命令，is_primary()==true）
     pub fn list_by_category(&self) -> std::collections::BTreeMap<CommandCategory, Vec<&str>> {
         let mut map: std::collections::BTreeMap<CommandCategory, Vec<&str>> = std::collections::BTreeMap::new();
         for cmd in &self.commands {
+            if !cmd.is_primary() {
+                continue; // 命令收敛: 独立命令被聚合器覆盖, 不占一级认知面
+            }
             let cat = category_for(cmd.name());
             map.entry(cat).or_default().push(cmd.name());
         }

@@ -82,6 +82,8 @@ impl SessionStore {
     }
 
     pub fn save_session(&mut self, _name: &str, data: &SessionData) -> Result<(), String> {
+        // P1-4 修复: 先删除旧记录再重写 → 幂等 (重复 save 不累积双份消息)。
+        let _ = self.kb.session_log_delete(_name);
         let meta = serde_json::json!({ "name": data.name, "created_at": data.created_at, "updated_at": data.updated_at });
         self.kb.session_log_append(&data.name, "", "session_header", Some(&meta))?;
         for msg in &data.messages {
@@ -89,7 +91,15 @@ impl SessionStore {
         }
         // 同步写 session-logs/*.md 供 SessionDistiller 蒸馏
         std::fs::create_dir_all(self.logs_dir()).map_err(|e| format!("mkdir session-logs: {}", e))?;
-        let md_path = self.logs_dir().join(format!("{}.md", data.name));
+        // P1-4 修复: 文件名消毒 — 只保留安全字符, 防 `../` 路径穿越写出 session-logs 目录。
+        let safe_name: String = _name.chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .collect::<String>()
+            .trim_start_matches('_')
+            .chars()
+            .take(80)
+            .collect();
+        let md_path = self.logs_dir().join(format!("{}.md", safe_name));
         let mut content = format!("# Session {}\n\n", data.name);
         content.push_str(&format!("> created: {}\n> updated: {}\n\n", data.created_at, data.updated_at));
         for msg in &data.messages {
@@ -132,7 +142,10 @@ impl SessionStore {
 
     pub fn delete_session(&mut self, _name: &str) -> Result<(), String> {
         self.kb.session_log_delete(_name)?;
-        let md_path = self.logs_dir().join(format!("{}.md", _name));
+        let safe_name: String = _name.chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .collect();
+        let md_path = self.logs_dir().join(format!("{}.md", safe_name));
         if md_path.exists() {
             let _ = std::fs::remove_file(&md_path);
         }

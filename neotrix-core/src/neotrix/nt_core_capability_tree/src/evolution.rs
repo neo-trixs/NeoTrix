@@ -261,6 +261,16 @@ impl<'a> EvolutionEngine<'a> {
             ));
         }
 
+        // 2.5 老化 exp:: 虚拟节点回收 (断链 #3: exp:: 节点只增不灭 → 90 天无演化活动即回收)
+        // 经验虚拟节点是经验蒸馏的临时载体; 90 天无新演化活动 (Strengthen/Budding) 说明
+        // 该经验已不再被强化, 标记 deprecated 进入回收候选 (真实模块节点不受影响)。
+        for node_id in self.registry.aged_exp_nodes(90) {
+            plans.push(self.plan_prune(
+                node_id.clone(),
+                format!("Aged exp:: virtual node, no evolution activity for 90+ days"),
+            ));
+        }
+
         // 3. 发现可晋升节点
         for node in self.registry.promotable_nodes() {
             // 简化: 所有 dependents 都在生产即可晋升

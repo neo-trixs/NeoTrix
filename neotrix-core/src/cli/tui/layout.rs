@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    widgets::{Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
     style::{Style, Color, Modifier},
     text::{Line, Span, Text},
     Frame,
@@ -52,11 +52,7 @@ pub fn render_session_list(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &
     for (i, session) in app.sessions.iter().enumerate() {
         let active = i == app.active_session;
         let marker = if active { "▶ " } else { "  " };
-        let name = if session.name.len() > 18 {
-            format!("{}…", &session.name[..17])
-        } else {
-            session.name.clone()
-        };
+        let name = truncate_str(&session.name, 18);
         let line = Line::from(vec![
             Span::styled(marker, Style::default().fg(theme.accent)),
             Span::styled(
@@ -405,12 +401,47 @@ fn render_goal_line(app: &TuiApp, theme: &Theme) -> Line<'static> {
     Line::from(spans)
 }
 
+/// 渲染 diff 查看面板 — 复用 DiffViewer 的渲染函数（解析/着色/滚动）。
+/// 顶部固定标题 + 统计行，下方为 diff 内容（按 viewer.scroll_offset 滚动）。
+pub fn render_diff_panel(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::from(vec![
+        Span::styled("Diff Viewer", Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)),
+        Span::styled("  ↑↓ 滚动 · PageUp/Down 翻页 · q/Esc 退出", Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC)),
+    ]));
+
+    let (diff_lines, scroll, total) = match &app.diff_viewer {
+        Some(viewer) => (viewer.all_rendered_lines(), viewer.scroll_offset, viewer.total_rendered_lines()),
+        None => (Vec::new(), 0, 0),
+    };
+    lines.push(Line::from(Span::styled(
+        format!("  {} 行 · 已滚动 {} 行", total, scroll),
+        Style::default().fg(theme.secondary),
+    )));
+    lines.push(Line::from(""));
+    if diff_lines.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "无 diff 内容 — 使用 /diff 或 open_diff() 打开",
+            Style::default().fg(theme.secondary),
+        )));
+    } else {
+        lines.extend(diff_lines);
+    }
+
+    let paragraph = Paragraph::new(Text::from(lines))
+        .wrap(Wrap { trim: false })
+        .scroll((scroll as u16, 0));
+    frame.render_widget(paragraph, area);
+}
+
 /// 渲染底部状态栏 — 无边框信息行（左状态 + 右信息）。
 /// 借鉴 claude-code-local：流式/思考时显示 spinner 帧 + 计时（"沉默≠卡死"），
 /// 右段显示 context 用量百分比（≥90% 红 / ≥70% 黄 / 其余默认）。
 pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
     // 左段：状态（spinner 帧 + label + 计时）
-    let status = if app.streaming {
+    let status = if app.diff_viewer.is_some() {
+        "Diff 查看模式 (↑↓ 滚动 · q/Esc 退出)".to_string()
+    } else if app.streaming {
         format!("{} 生成中 {:.0} tok/s · {}s", app.spinner_char(), app.tokens_per_sec, app.busy_elapsed_secs())
     } else if app.agent_busy {
         format!("{} 思考中 · {}s", app.spinner_char(), app.busy_elapsed_secs())
@@ -447,6 +478,12 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
             .unwrap_or_else(|| "model".to_string()));
     let session_info = format!("会话 {}/{}", app.active_session + 1, app.sessions.len());
     let ws_info = format!("WS:{} ({})", app.workspace_name, app.workspace_count);
+    // git 分支 + dirty 指示（对标 claude-code 状态栏的 git branch + dirty 徽标）
+    let git_info = match (&app.git_branch, app.git_dirty) {
+        (Some(b), true) => format!("git:{}*", b),
+        (Some(b), false) => format!("git:{}", b),
+        (None, _) => String::new(),
+    };
     let cost_info = {
         if let Ok(tracker) = COST_TRACKER.lock() {
             let line = tracker.status_line();
@@ -465,7 +502,8 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
 
     let left = format!("{}{}{}", status, vim, sandbox);
     // 右段整体文本（用于宽度计算）
-    let right = format!("{} | {} | {} | {} | {}{}", model_info, session_info, ws_info, tokens, ctx_info, cost_info);
+    let git_seg = if git_info.is_empty() { String::new() } else { format!(" | {}", git_info) };
+    let right = format!("{} | {} | {} | {} | {}{}{}", model_info, session_info, ws_info, tokens, ctx_info, git_seg, cost_info);
 
     // 左对齐 + 右对齐
     let left_len = left.chars().count();
@@ -514,6 +552,203 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
     let status = Paragraph::new(Line::from(spans))
         .style(Style::default().bg(bg));
     frame.render_widget(status, area);
+}
+
+/// 渲染审批提示条 — 有待审批动作时显示一行警示条，否则区域留空。
+/// 格式: `⚠ 工具审批: {类型} | {描述}  [a]允许 [d]拒绝`
+/// 对标 claude-code 的 permission 请求行（阻塞式审批提示，输入区上方）。
+/// 注意: approval.rs 的 `describe_action` 为私有函数，无法在此调用；
+/// 但 `PendingAction.description` 在 `ApprovalEngine::submit()` 中已由
+/// `describe_action(&action)` 预计算填充，直接复用该字段（等价于调用结果）。
+pub fn render_approval_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
+    let Some(pending) = &app.pending_approval else {
+        frame.render_widget(Paragraph::new("").style(Style::default().bg(theme.bg)), area);
+        return;
+    };
+
+    let description = if pending.description.is_empty() {
+        // 兜底：description 为空时用 ActionType 的 Debug 格式化
+        format!("{:?}", pending.action_type)
+    } else {
+        pending.description.clone()
+    };
+
+    let line = Line::from(vec![
+        Span::styled("⚠ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            format!("工具审批: {}", action_type_label(&pending.action_type)),
+            Style::default().fg(Color::Black).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!(" | {}", description), Style::default().fg(Color::Black)),
+        Span::styled("  [a]允许 [d]拒绝", Style::default().fg(Color::Black).add_modifier(Modifier::BOLD)),
+    ]);
+
+    let paragraph = Paragraph::new(line)
+        .style(Style::default().bg(Color::LightYellow));
+    frame.render_widget(paragraph, area);
+}
+
+/// ActionType 的紧凑中文标签（Debug 输出含结构体字段，UI 上过于冗长）。
+fn action_type_label(action: &crate::cli::approval::ActionType) -> &'static str {
+    match action {
+        crate::cli::approval::ActionType::FileWrite { .. } => "文件写入",
+        crate::cli::approval::ActionType::FileCreate { .. } => "文件创建",
+        crate::cli::approval::ActionType::FileEdit { .. } => "文件编辑",
+        crate::cli::approval::ActionType::ShellCommand { .. } => "Shell 命令",
+        crate::cli::approval::ActionType::GitOperation { .. } => "Git 操作",
+        crate::cli::approval::ActionType::Other { .. } => "工具调用",
+    }
+}
+
+/// 渲染流式工具调用面板 — 最多显示最近 5 个工具，每行 `[状态] 工具名 args摘要`。
+/// status 映射: running→"▶"(theme.accent) / done→"✓"(绿) / error→"✗"(红)。
+/// done 且 result 非空时，缩进展示结果摘要（前 120 字符）。
+/// 对标 claude-code / codex 的流式工具调用行（工具执行过程实时可见）。
+pub fn render_streaming_tools(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
+    if app.streaming_tool_calls.is_empty() {
+        frame.render_widget(Paragraph::new("").style(Style::default().bg(theme.bg)), area);
+        return;
+    }
+
+    let mut lines: Vec<Line> = Vec::new();
+    // 取最近 5 个（保留时间顺序：旧的在前）
+    let recent: Vec<_> = app.streaming_tool_calls.iter().rev().take(5).collect();
+    for tc in recent.iter().rev() {
+        let (marker, marker_style) = match tc.status.as_str() {
+            "done" => ("✓", Color::Green),
+            "error" => ("✗", Color::Red),
+            _ => ("▶", theme.accent), // running 或未知状态 → spinner 占位
+        };
+        let name_style = if tc.status == "error" {
+            Style::default().fg(Color::Red)
+        } else {
+            Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)
+        };
+        let args_summary = truncate_str(&tc.args, 60);
+        let args_span = if args_summary.is_empty() {
+            Span::raw("")
+        } else {
+            Span::styled(format!(" {}", args_summary), Style::default().fg(theme.secondary))
+        };
+        // 耗时显示（对标 cursor CLI 的 shell 时长分:秒；>999ms 显示秒）
+        let duration_span = if tc.duration_ms > 0 {
+            if tc.duration_ms >= 1000 {
+                Span::styled(
+                    format!(" {:.1}s", tc.duration_ms as f64 / 1000.0),
+                    Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC),
+                )
+            } else {
+                Span::styled(
+                    format!(" {}ms", tc.duration_ms),
+                    Style::default().fg(theme.secondary).add_modifier(Modifier::ITALIC),
+                )
+            }
+        } else {
+            Span::raw("")
+        };
+        lines.push(Line::from(vec![
+            Span::styled(format!(" [{}]", marker), Style::default().fg(marker_style).add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" {}", tc.name), name_style),
+            args_span,
+            duration_span,
+        ]));
+
+        // done 且有结果 → 缩进结果摘要（前 120 字符）
+        if tc.status == "done" && !tc.result.is_empty() {
+            lines.push(Line::from(Span::styled(
+                format!("    ↳ {}", truncate_str(&tc.result, 120)),
+                Style::default().fg(theme.secondary),
+            )));
+        }
+    }
+
+    let paragraph = Paragraph::new(Text::from(lines))
+        .wrap(Wrap { trim: false });
+    frame.render_widget(paragraph, area);
+}
+
+/// 按 char 边界截断字符串并追加省略号（避免切到 UTF-8 中间字节）。
+fn truncate_str(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_string();
+    }
+    let mut end = s.len();
+    let mut count = 0usize;
+    for (idx, _) in s.char_indices() {
+        if count == max_chars {
+            end = idx;
+            break;
+        }
+        count += 1;
+    }
+    format!("{}…", &s[..end])
+}
+
+/// 渲染会话恢复 picker — 屏幕中央 overlay 列表（/sessions /resume 打开）。
+/// 对标 claude-code /resume picker：↑↓ 选择、Enter 加载、d 删除、Esc 关闭。
+pub fn render_session_picker(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Theme) {
+    let Some(picker) = &app.session_picker else { return };
+    let popup = centered_rect(62, 72, area);
+    if popup.width < 10 || popup.height < 3 {
+        return;
+    }
+    let total = picker.entries.len();
+    let sel = picker.selected.min(total.saturating_sub(1));
+    // 可见窗口：选中项尽量居中（最多 10 行）
+    let win_start = sel.saturating_sub(5);
+    let win_end = (win_start + 10).min(total);
+    let mut lines: Vec<Line> = Vec::new();
+    for i in win_start..win_end {
+        let e = &picker.entries[i];
+        let active = i == sel;
+        let marker = if active { "▶ " } else { "  " };
+        // updated_at 为 RFC3339，取前 10 字符（日期）
+        let date = e.updated_at.chars().take(10).collect::<String>();
+        let time = if date.is_empty() { String::new() } else { format!("  {}", date) };
+        let line = Line::from(vec![
+            Span::styled(marker, Style::default().fg(theme.accent)),
+            Span::styled(
+                format!("{}{}  [{} 条]", e.name, time, e.message_count),
+                if active {
+                    Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(theme.primary)
+                },
+            ),
+        ]);
+        lines.push(if active { apply_bg(line, theme.user_msg_bg) } else { line });
+    }
+    let title = format!(
+        " 会话恢复 ({}/{})  ↑↓ 选择 · Enter 加载 · d 删除 · Esc 关闭 ",
+        sel + 1, total
+    );
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme.accent))
+        .title(title)
+        .title_style(Style::default().fg(theme.highlight).add_modifier(Modifier::BOLD));
+    let para = Paragraph::new(Text::from(lines)).block(block);
+    frame.render_widget(para, popup);
+}
+
+/// 居中矩形（ratatui 惯用 helper）：占区域 percent_x × percent_y。
+fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(area);
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(vertical[1])[1]
 }
 
 #[cfg(test)]

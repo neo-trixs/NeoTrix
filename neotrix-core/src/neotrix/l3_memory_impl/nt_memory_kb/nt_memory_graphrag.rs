@@ -651,6 +651,45 @@ impl GraphRagStore {
             .push((rel_type, source, id));
     }
 
+    /// P1-11 graph-reviewer (吸收 Understand-Anything 双轨图 + graph-reviewer 模式):
+    /// 图构建后一致性校验 — 检测悬空关系 (引用不存在的实体)、孤立实体 (无任何关系)、
+    /// 重复关系 (同源同目标同类型)。返回发现列表, 供调用方修复或记录。
+    /// Understand-Anything 原文: "deterministic parsing + LLM semantic dual-track
+    /// graph construction + graph-reviewer"。
+    pub fn review_graph(&self) -> Vec<String> {
+        let mut findings = Vec::new();
+        // 1) 悬空关系: 关系引用的实体不在图中
+        for rel in self.graph.relations.values() {
+            if !self.graph.entities.contains_key(&rel.source_entity) {
+                findings.push(format!("dangling relation {}: source '{}' missing", rel.id, rel.source_entity));
+            }
+            if !self.graph.entities.contains_key(&rel.target_entity) {
+                findings.push(format!("dangling relation {}: target '{}' missing", rel.id, rel.target_entity));
+            }
+        }
+        // 2) 孤立实体: 无任何关系
+        let connected: std::collections::HashSet<&str> = self
+            .graph
+            .relations
+            .values()
+            .flat_map(|r| [r.source_entity.as_str(), r.target_entity.as_str()])
+            .collect();
+        for entity in self.graph.entities.keys() {
+            if !connected.contains(entity.as_str()) {
+                findings.push(format!("orphan entity: '{}' has no relations", entity));
+            }
+        }
+        // 3) 重复关系: 同源同目标同类型
+        let mut seen: std::collections::HashSet<(String, String, String)> = std::collections::HashSet::new();
+        for rel in self.graph.relations.values() {
+            let key = (rel.source_entity.clone(), rel.target_entity.clone(), rel.relation_type.clone());
+            if !seen.insert(key) {
+                findings.push(format!("duplicate relation: {} -> {} ({})", rel.source_entity, rel.target_entity, rel.relation_type));
+            }
+        }
+        findings
+    }
+
     // ── Remove Entity ──────────────────────────────────────────────
 
     pub fn remove_entity(&mut self, entity_id: &str) -> bool {
@@ -1483,6 +1522,56 @@ fn split_sentences(text: &str) -> Vec<String> {
     }
 
     sentences
+}
+
+/// P1-12 稳定切片重建 (吸收 GEOFlow 模式):
+/// LLM 只规划边界, 切片从原文稳定重建 — 不依赖 LLM 每次输出漂移。
+/// 实现: 按段落 (空行) + 标题 (Markdown #) 规划边界, 从原文逐段重建切片,
+/// 保证同一文档多次切片结果一致 (确定性)。
+/// GEOFlow 原文: "LLM only plans boundaries; slices are stably rebuilt
+/// from the original text"。
+///
+/// 返回 (切片列表, 边界规划)。边界规划可被 LLM 覆盖 (外部传入), 但默认确定性。
+pub fn stable_slice_document(text: &str, max_chars: usize) -> (Vec<String>, Vec<usize>) {
+    // 1) 边界规划: 段落边界 (空行) + 标题边界 (Markdown # 开头)
+    let mut boundaries: Vec<usize> = Vec::new();
+    let mut current_len = 0usize;
+    for (idx, line) in text.lines().enumerate() {
+        let line_len = line.chars().count() + 1; // +1 换行
+        let is_heading = line.trim_start().starts_with('#');
+        let is_para_break = line.trim().is_empty();
+        if (is_heading || is_para_break) && idx > 0 && current_len > 0 {
+            boundaries.push(idx);
+            current_len = 0;
+        }
+        current_len += line_len;
+        if current_len >= max_chars {
+            boundaries.push(idx);
+            current_len = 0;
+        }
+    }
+
+    // 2) 原文重建: 按边界切分, 保证切片内容与原文逐字一致
+    let lines: Vec<&str> = text.lines().collect();
+    let mut slices = Vec::new();
+    let mut start = 0usize;
+    for &b in &boundaries {
+        if b > start {
+            let slice = lines[start..b].join("\n");
+            if !slice.trim().is_empty() {
+                slices.push(slice);
+            }
+        }
+        start = b;
+    }
+    if start < lines.len() {
+        let slice = lines[start..].join("\n");
+        if !slice.trim().is_empty() {
+            slices.push(slice);
+        }
+    }
+
+    (slices, boundaries)
 }
 
 fn extract_capitalized_terms(sentence: &str, _source_id: &str) -> Vec<String> {

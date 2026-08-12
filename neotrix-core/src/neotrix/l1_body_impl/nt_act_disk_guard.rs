@@ -16,6 +16,42 @@ pub enum DiskVerdict {
     Blocked(String),
 }
 
+/// P1-19 三級风险分类 (吸收 macos-disk-cleanup SAFE/CONFIRM/DANGER 模式):
+/// 破坏性操作按目标类型分级 — 而非一刀切放行/拦截。
+/// macos-disk-cleanup 原文: "three-level safety classification
+/// (SAFE / CONFIRM / DANGER) for destructive operations"。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RiskLevel {
+    /// 安全: 直接放行 (临时文件/缓存/日志)
+    Safe,
+    /// 需确认: 用户确认后放行 (用户数据/配置文件)
+    Confirm,
+    /// 危险: 拦截 (系统目录/根路径/源码树)
+    Danger,
+}
+
+impl RiskLevel {
+    /// 按目标路径特征判定风险级 (确定性启发式)。
+    pub fn classify(target: &Path) -> RiskLevel {
+        let s = target.to_string_lossy().to_lowercase();
+        // Danger: 系统/根/源码树关键路径
+        if s == "/" || s.starts_with("/etc") || s.starts_with("/usr") || s.starts_with("/bin")
+            || s.starts_with("/sbin") || s.starts_with("/System") || s.starts_with("/Library")
+            || s.starts_with("/Applications") || s.contains("/.git/") || s.contains("/node_modules/")
+        {
+            return RiskLevel::Danger;
+        }
+        // Safe: 明确临时/缓存/日志
+        if s.contains("/tmp/") || s.contains("/cache/") || s.contains("/logs/")
+            || s.contains(".log") || s.contains(".tmp") || s.contains(".cache")
+        {
+            return RiskLevel::Safe;
+        }
+        // 其余: 用户数据 → 需确认
+        RiskLevel::Confirm
+    }
+}
+
 /// 磁盘守卫 — 维护任务的工作目录 allowlist。
 #[derive(Debug, Clone, Default)]
 pub struct DiskGuard {
@@ -64,6 +100,37 @@ impl DiskGuard {
             .filter(|t| !matches!(self.check(operation, t), DiskVerdict::Allowed))
             .cloned()
             .collect()
+    }
+
+    /// P1-19 三級风险检查 (macos-disk-cleanup 模式):
+    /// 越界 → Blocked; 界内按 RiskLevel 分级:
+    /// - Safe → Allowed (直接放行)
+    /// - Confirm → 需确认 (返回 Blocked 带 confirm 标记, 调用方决定是否二次确认)
+    /// - Danger → Blocked (拦截)
+    /// 返回 (verdict, risk_level)。
+    pub fn check_risk(&mut self, operation: &str, target: &Path) -> (DiskVerdict, RiskLevel) {
+        if !self.is_within(target) {
+            self.blocked_count += 1;
+            return (
+                DiskVerdict::Blocked(format!("{} 越界: {} 不在任务 allowlist", operation, target.display())),
+                RiskLevel::Danger,
+            );
+        }
+        let risk = RiskLevel::classify(target);
+        match risk {
+            RiskLevel::Safe => {
+                self.allowed_count += 1;
+                (DiskVerdict::Allowed, risk)
+            }
+            RiskLevel::Confirm => {
+                // 界内但需确认: 不计数为 blocked (留给调用方二次确认), 返回 confirm 语义
+                (DiskVerdict::Blocked(format!("{} 需确认: {}", operation, target.display())), risk)
+            }
+            RiskLevel::Danger => {
+                self.blocked_count += 1;
+                (DiskVerdict::Blocked(format!("{} 危险操作拦截: {}", operation, target.display())), risk)
+            }
+        }
     }
 
     pub fn allowlist(&self) -> &[PathBuf] {

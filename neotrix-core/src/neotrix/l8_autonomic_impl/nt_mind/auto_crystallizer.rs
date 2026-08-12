@@ -18,6 +18,21 @@ pub struct AutoCrystallizer {
     pub unverified_crystallized: u64,
     /// 反幻觉门开关：true 时无验证契约的结晶标记为 Unverified 并计数。
     pub anti_hallucination_gate: bool,
+    /// P0-4 Hallucination Bin (吸收 bullyingllms 模式):
+    /// 被门禁拒绝的结晶进幻觉桶 — 可审计、可追溯、可复查,
+    /// 而非仅计数丢弃。bullyingllms 原文: "findings go into a
+    /// hallucination bin before passing the gate"。
+    pub hallucination_bin: Vec<HallucinationEntry>,
+}
+
+/// 幻觉桶条目 — 记录被反幻觉门拒绝的结晶候选及其拒绝原因。
+#[derive(Debug, Clone)]
+pub struct HallucinationEntry {
+    pub source_name: String,
+    pub domain: String,
+    pub reward: f64,
+    pub reason: String,
+    pub timestamp: u64,
 }
 
 impl AutoCrystallizer {
@@ -29,6 +44,7 @@ impl AutoCrystallizer {
             total_crystallized: 0,
             unverified_crystallized: 0,
             anti_hallucination_gate: true,
+            hallucination_bin: Vec::new(),
         }
     }
 
@@ -49,6 +65,27 @@ impl AutoCrystallizer {
         }
     }
 
+    /// P0-4 幻觉桶入桶 (bullyingllms 模式): 无验证契约的结晶候选
+    /// 记录到 hallucination_bin, 供审计/复查 — 拒绝可追溯而非静默丢弃。
+    pub fn bin_hallucination(&mut self, source_name: &str, domain: &str, reward: f64, reason: &str) {
+        if !self.anti_hallucination_gate {
+            return;
+        }
+        let now = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_diversity::now_unix_secs() as u64;
+        self.hallucination_bin.push(HallucinationEntry {
+            source_name: source_name.to_string(),
+            domain: domain.to_string(),
+            reward,
+            reason: reason.to_string(),
+            timestamp: now,
+        });
+    }
+
+    /// 幻觉桶审计: 返回当前桶内条目数 (供监控/复盘)。
+    pub fn hallucination_bin_len(&self) -> usize {
+        self.hallucination_bin.len()
+    }
+
     pub fn crystallize_from_absorption(
         &mut self,
         _brain: &mut ReasoningBrain,
@@ -65,6 +102,15 @@ impl AutoCrystallizer {
         }
 
         let verification = self.apply_verification_gate(verification);
+        // P0-4: 无验证契约 → 入幻觉桶 (可审计), 同时仍结晶但标记 Unverified。
+        if verification.is_none() {
+            self.bin_hallucination(
+                source_name,
+                domain,
+                reward,
+                "no verification contract (anti-hallucination gate)",
+            );
+        }
         let description = format!("Auto-crystallized from {} ({})", source_name, domain);
         let crystal_id = self.registry.next_id;
         let pattern = edits.iter().map(|e| format!("{:?}", e)).collect::<Vec<_>>().join(", ");
@@ -153,6 +199,182 @@ impl AutoCrystallizer {
             self.unverified_crystallized,
             self.anti_hallucination_gate,
         )
+    }
+}
+
+// ========== P1-17 book-to-skill 蒸馏五件套 (吸收 book-to-skill 模式) ==========
+// 大知识源 (书/长文) 蒸馏为: SKILL.md + 章节 + glossary + patterns + cheatsheet。
+// 落盘格式强化 — external-absorption 产物从"单条结晶"升级为"可复用技能套件"。
+
+/// 蒸馏章节
+#[derive(Debug, Clone)]
+pub struct DistilledChapter {
+    pub title: String,
+    pub body: String,
+}
+
+/// 术语表条目
+#[derive(Debug, Clone)]
+pub struct GlossaryTerm {
+    pub term: String,
+    pub definition: String,
+}
+
+/// 模式条目
+#[derive(Debug, Clone)]
+pub struct PatternEntry {
+    pub name: String,
+    pub description: String,
+}
+
+/// book-to-skill 蒸馏五件套
+#[derive(Debug, Clone)]
+pub struct DistillationSuite {
+    /// SKILL.md 主文件 — 技能入口 (标题 + 摘要 + 章节索引)
+    pub skill_md: String,
+    /// 章节 — 按 markdown 标题切分
+    pub chapters: Vec<DistilledChapter>,
+    /// glossary — 术语表 (**term**: definition 或 - term: definition)
+    pub glossary: Vec<GlossaryTerm>,
+    /// patterns — 模式库 (Pattern:/模式: 前缀行)
+    pub patterns: Vec<PatternEntry>,
+    /// cheatsheet — 速查条目 (列表项/代码块)
+    pub cheatsheet: Vec<String>,
+}
+
+impl DistillationSuite {
+    /// 从原始 markdown 知识源蒸馏五件套。
+    /// 解析规则:
+    ///   - `#`/`##` 标题 → 章节
+    ///   - `**term**: def` 或 `- term: def` → glossary
+    ///   - `Pattern:` / `模式:` 前缀 → patterns
+    ///   - `- ` 列表项 / ``` 代码块 → cheatsheet
+    pub fn distill(source_title: &str, raw: &str) -> Self {
+        let mut chapters = Vec::new();
+        let mut glossary = Vec::new();
+        let mut patterns = Vec::new();
+        let mut cheatsheet = Vec::new();
+
+        let mut cur_title = String::new();
+        let mut cur_body = String::new();
+        let mut in_code = false;
+
+        let flush = |cur_title: &mut String, cur_body: &mut String, chapters: &mut Vec<DistilledChapter>| {
+            // 章节只要有标题就入册 — 正文可能仅含术语/模式/速查行
+            // (这些行被 continue 掉, 不累积进 body), body 空不等于章节不存在。
+            if !cur_title.is_empty() {
+                chapters.push(DistilledChapter {
+                    title: std::mem::take(cur_title),
+                    body: std::mem::take(cur_body),
+                });
+            } else {
+                cur_title.clear();
+                cur_body.clear();
+            }
+        };
+
+        for line in raw.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("```") {
+                in_code = !in_code;
+                if in_code {
+                    cheatsheet.push(format!("```{}", &trimmed[3..]));
+                } else {
+                    cheatsheet.push("```".to_string());
+                }
+                continue;
+            }
+            if in_code {
+                cheatsheet.push(line.to_string());
+                continue;
+            }
+
+            // 章节: `##` 及以上 (二级标题) — 一级 `#` 视为文档标题, 不入章节。
+            if trimmed.starts_with("##") {
+                flush(&mut cur_title, &mut cur_body, &mut chapters);
+                cur_title = trimmed.trim_start_matches('#').trim().to_string();
+                continue;
+            }
+            if trimmed.starts_with('#') {
+                // 一级标题: 文档主标题 — 作为分隔但自身不入章节。
+                flush(&mut cur_title, &mut cur_body, &mut chapters);
+                continue;
+            }
+
+            // glossary: **term**: definition
+            if let Some(rest) = trimmed.strip_prefix("**") {
+                if let Some(eq) = rest.find("**:") {
+                    let term = rest[..eq].trim().to_string();
+                    let definition = rest[eq + 3..].trim().to_string();
+                    if !term.is_empty() && !definition.is_empty() {
+                        glossary.push(GlossaryTerm { term, definition });
+                        continue;
+                    }
+                }
+            }
+            // glossary: - term: definition
+            if let Some(rest) = trimmed.strip_prefix("- ") {
+                if let Some(eq) = rest.find(':') {
+                    let term = rest[..eq].trim().to_string();
+                    let definition = rest[eq + 1..].trim().to_string();
+                    if !term.is_empty() && !definition.is_empty()
+                        && !term.starts_with("Pattern") && !term.starts_with("模式") {
+                        glossary.push(GlossaryTerm { term, definition });
+                        continue;
+                    }
+                }
+            }
+            // patterns: Pattern: / 模式: 前缀
+            if let Some(rest) = trimmed.strip_prefix("Pattern:") {
+                patterns.push(PatternEntry {
+                    name: rest.trim().to_string(),
+                    description: String::new(),
+                });
+                continue;
+            }
+            if let Some(rest) = trimmed.strip_prefix("模式:") {
+                patterns.push(PatternEntry {
+                    name: rest.trim().to_string(),
+                    description: String::new(),
+                });
+                continue;
+            }
+            // cheatsheet: 列表项
+            if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+                cheatsheet.push(trimmed.to_string());
+                continue;
+            }
+
+            if !cur_title.is_empty() {
+                cur_body.push_str(line);
+                cur_body.push('\n');
+            }
+        }
+        flush(&mut cur_title, &mut cur_body, &mut chapters);
+
+        // SKILL.md 主文件: 标题 + 摘要 + 章节索引 + 术语/模式/速查计数
+        let mut skill_md = format!("# {}\n\n> 蒸馏自外部知识源 (book-to-skill 五件套)\n\n## Chapters\n\n", source_title);
+        for (i, ch) in chapters.iter().enumerate() {
+            skill_md.push_str(&format!("{}. {}\n", i + 1, ch.title));
+        }
+        skill_md.push_str(&format!(
+            "\n## Stats\n\n- chapters: {}\n- glossary: {}\n- patterns: {}\n- cheatsheet: {}\n",
+            chapters.len(), glossary.len(), patterns.len(), cheatsheet.len()
+        ));
+
+        Self {
+            skill_md,
+            chapters,
+            glossary,
+            patterns,
+            cheatsheet,
+        }
+    }
+
+    /// 五件套完整性检查 — 空套件不可用 (Dark Forest: 无产出即删除)
+    pub fn is_usable(&self) -> bool {
+        !self.chapters.is_empty() || !self.glossary.is_empty()
+            || !self.patterns.is_empty() || !self.cheatsheet.is_empty()
     }
 }
 
@@ -293,5 +515,36 @@ mod tests {
         let json = serde_json::to_string(&contract).unwrap();
         let back: VerificationContract = serde_json::from_str(&json).unwrap();
         assert_eq!(back.status, VerificationStatus::Confirmed);
+    }
+
+    // ── P1-17 book-to-skill 蒸馏五件套测试 ──
+
+    #[test]
+    fn test_distill_extracts_all_five_parts() {
+        let raw = "# Agent Design\n\n## Isolation\n\n**Agent**: 独立执行单元\n**Reward**: 反馈信号\n\nPattern: isolate agents per task\n\n- use sandbox per agent\n- cap retries at 3\n\n## Memory\n\n**KB**: 知识库\n\n模式: snapshot before mutation\n";
+        let suite = DistillationSuite::distill("Agent Design", raw);
+        assert!(suite.is_usable());
+        assert_eq!(suite.chapters.len(), 2, "两个章节: {:?}", suite.chapters.iter().map(|c| &c.title).collect::<Vec<_>>());
+        assert_eq!(suite.glossary.len(), 3, "三个术语: {:?}", suite.glossary);
+        assert_eq!(suite.patterns.len(), 2, "两个模式");
+        assert!(suite.cheatsheet.len() >= 2, "速查条目");
+        assert!(suite.skill_md.contains("## Chapters"));
+        assert!(suite.skill_md.contains("1. Isolation"));
+        assert!(suite.skill_md.contains("2. Memory"));
+    }
+
+    #[test]
+    fn test_distill_empty_source_not_usable() {
+        let suite = DistillationSuite::distill("Empty", "");
+        assert!(!suite.is_usable(), "空源不可用 (Dark Forest)");
+        assert!(suite.chapters.is_empty());
+    }
+
+    #[test]
+    fn test_distill_code_block_goes_to_cheatsheet() {
+        let raw = "# Tool\n\n## Usage\n\n```rust\nlet x = 1;\n```\n";
+        let suite = DistillationSuite::distill("Tool", raw);
+        assert!(suite.cheatsheet.iter().any(|c| c.contains("let x = 1")),
+            "代码块应入 cheatsheet: {:?}", suite.cheatsheet);
     }
 }

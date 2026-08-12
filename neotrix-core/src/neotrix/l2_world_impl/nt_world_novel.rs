@@ -450,7 +450,7 @@ mod tests {
 
     #[test]
     fn test_classify_unanalyzed_books() {
-        let mut conn = Connection::open_in_memory().unwrap();
+        let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(NODES_EDGES).unwrap();
         conn.execute(
             "INSERT INTO nodes (id,node_type,title,summary,content,domain,language,confidence,importance,created_at,updated_at)

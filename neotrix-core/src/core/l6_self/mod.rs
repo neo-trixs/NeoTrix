@@ -38,13 +38,6 @@ pub use crate::core::nt_core_self::metacognitive_evaluator::{
 pub use crate::core::nt_core_self::self_referential::{
     SelfReferentialMonitor, PlanRecord, ThresholdAdjustment,
 };
-pub use crate::core::nt_core_self::intra_reflection::{
-    PreActionIntrospector, IntraReflection, IntraReflectionReport, PredictedOutcome,
-};
-pub use crate::core::nt_core_self::meta_calibrate::{
-    CalibrationReport, CalibrationSignal, CalibrationState, CalibrationTarget,
-    MetaCalibrator, MetaCalibratorConfig,
-};
 pub use crate::core::nt_core_self::skill_crystal::{
     SkillCrystal, CrystalRegistry,
 };

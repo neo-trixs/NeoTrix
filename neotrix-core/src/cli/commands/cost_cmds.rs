@@ -17,6 +17,8 @@ impl CliCommand for CostCmd {
     fn description(&self) -> &str {
         "费用追踪: /cost | /cost detail | /cost budget <amount> [daily|weekly|monthly] | /cost reset"
     }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let plain_args: Vec<&str> = args.iter().map(|s| s.as_str()).filter(|a| *a != "--json").collect();
@@ -130,6 +132,8 @@ impl CliCommand for ApprovalCmd {
     fn name(&self) -> &str { "/approval" }
     fn aliases(&self) -> Vec<&str> { vec!["/app"] }
     fn description(&self) -> &str { "审批管理: /approval mode <suggest|auto-edit|full-auto> | status | list | approve <id> | deny <id> | approve-all" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
 

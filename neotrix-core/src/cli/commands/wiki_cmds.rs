@@ -18,6 +18,8 @@ impl CliCommand for WikiCmd {
     fn description(&self) -> &str {
         "Wiki: generate AGENTS.md | sync docs to KB | graph | search"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(
         &self,

@@ -47,7 +47,7 @@ use crate::cli::commands::chain_cmds::ChainCmd;
 use crate::cli::commands::sources_cmds::SourcesCmd;
 use crate::cli::commands::explore_cmds::ExploreCmd;
 use crate::cli::commands::consolidated_cmds::{
-    FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd,
+    FileCmd, WalletAggCmd, UiAggCmd, GitAggCmd, SessionAggCmd, ConsolidatedAgentCmd, MemoryAggCmd,
 };
 
 pub fn default_registry() -> CommandRegistry {
@@ -121,6 +121,7 @@ pub fn default_registry() -> CommandRegistry {
     reg.register(Box::new(BoardCmd));
     reg.register(Box::new(KbCmd));
     reg.register(Box::new(WikiCmd));
+    reg.register(Box::new(MemoryAggCmd));
 
     // UI/Layout
     reg.register(Box::new(UiAggCmd));
@@ -262,5 +263,80 @@ mod tests {
         assert!(names.contains(&"/explore"), "explore now registered as interactive CLI command (外部知识探索+alphaXiv)");
         assert!(!names.contains(&"/cleanup"), "cleanup should be auto-backend");
         assert!(!names.contains(&"/automation"), "automation should be auto-backend");
+    }
+
+    #[test]
+    fn test_command_consolidation_primary_filter() {
+        // 命令面精简: 人类只用基础控制命令; 聚合器与领域命令由 agent 后端自我调度
+        let reg = default_registry();
+        // 聚合器存在 (可被 agent 调度, 但不在人类一级面)
+        for agg in ["/file", "/crypto", "/layout", "/vc", "/session-all", "/agent-all", "/memory"] {
+            assert!(reg.find(agg).is_some(), "聚合器 {} 应已注册", agg);
+        }
+        // 独立命令仍可执行 (find 兼容)
+        for sub in ["/read", "/write", "/wallet", "/swap", "/kb", "/wiki", "/search", "/evidence",
+                    "/board", "/provider", "/model", "/free", "/git", "/commit", "/session",
+                    "/resume", "/history", "/context", "/compact", "/distill", "/discover", "/mcp",
+                    "/background", "/side", "/route", "/vim", "/workspace", "/theme", "/cost", "/budget"] {
+            assert!(reg.find(sub).is_some(), "独立命令 {} 应仍可执行 (兼容)", sub);
+        }
+        // 人类一级入口 (help/补全) 只含控制命令白名单, 不含聚合器与领域命令
+        let primary: Vec<&str> = reg.list_primary();
+        for hidden in ["/read", "/write", "/wallet", "/swap", "/kb", "/wiki", "/search", "/evidence",
+                       "/board", "/provider", "/model", "/free", "/git", "/commit", "/session",
+                       "/resume", "/history", "/context", "/compact", "/distill", "/discover", "/mcp",
+                       "/background", "/side", "/route", "/vim", "/workspace", "/theme", "/cost", "/budget",
+                       "/file", "/crypto", "/layout", "/vc", "/session-all", "/agent-all", "/memory"] {
+            assert!(!primary.contains(&hidden), "{} 是 agent 工具, 不应出现在人类一级入口", hidden);
+        }
+        // 控制命令白名单应在人类一级入口 (命令面精简 12→7)
+        for ctl in ["/help", "/exit", "/clear", "/config", "/stats", "/e8", "/plan"] {
+            assert!(primary.contains(&ctl), "控制命令 {} 应在人类一级入口", ctl);
+        }
+        // 降级命令: 功能合并进 /stats 与 /e8, 仍是 agent 工具但不在人类一级面
+        for dg in ["/version", "/doctor", "/completions", "/benchmark", "/consciousness"] {
+            assert!(!primary.contains(&dg), "降级命令 {} 不应在人类一级入口", dg);
+        }
+        // 合并验证: /stats 接收 version|doctor, /e8 接收 consciousness 子命令
+        assert_eq!(reg.execute("/stats version", None).success, true, "/stats version 应可执行");
+        assert_eq!(reg.execute("/stats doctor", None).success, true, "/stats doctor 应可执行");
+        assert_eq!(reg.execute("/e8 consciousness", None).success, false, "/e8 consciousness 无 brain 时应报错 (意识状态需要 Brain)");
+        // complete 同样收敛: 被隐藏的命令不参与补全, 控制命令参与
+        assert!(reg.complete("/read").is_empty(), "/read 是 agent 工具, 不应参与人类补全");
+        assert!(reg.complete("/help").iter().any(|c| c == "/help"), "/help 控制命令应参与补全");
+    }
+
+    #[test]
+    fn test_memory_aggregator_delegates() {
+        // /memory 聚合器子命令委派验证
+        let reg = default_registry();
+        let out = reg.execute("/memory", None);
+        assert!(out.message.contains("evidence") && out.message.contains("wiki"),
+            "/memory 无参应列出子命令, got: {}", out.message);
+        // 未知子命令 → err
+        let bad = reg.execute("/memory nonexistent_xyz", None);
+        assert!(!bad.success && bad.message.contains("未知子命令"),
+            "未知子命令应报错, got: {}", bad.message);
+    }
+
+    #[test]
+    fn test_session_aggregator_covers_distill() {
+        let reg = default_registry();
+        let out = reg.execute("/session-all", None);
+        assert!(out.message.contains("distill"), "/session-all 应覆盖 distill 子命令");
+    }
+
+    #[test]
+    fn test_layout_aggregator_covers_route() {
+        let reg = default_registry();
+        let out = reg.execute("/layout", None);
+        assert!(out.message.contains("route"), "/layout 应覆盖 route 子命令");
+    }
+
+    #[test]
+    fn test_agent_aggregator_covers_acp() {
+        let reg = default_registry();
+        let out = reg.execute("/agent-all", None);
+        assert!(out.message.contains("acp"), "/agent-all 应覆盖 acp 子命令");
     }
 }

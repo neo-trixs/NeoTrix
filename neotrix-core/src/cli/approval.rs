@@ -28,6 +28,8 @@ pub enum ActionType {
     FileEdit { path: String, diff: String },
     ShellCommand { command: String },
     GitOperation { description: String },
+    /// 未映射到具体类别的工具调用（AgentLoop 工具审批兜底）。
+    Other { tool: String, args: String },
 }
 
 #[derive(Debug, Clone)]
@@ -72,7 +74,13 @@ impl ApprovalEngine {
         match self.mode {
             ApprovalMode::Suggest => true,
             ApprovalMode::AutoEdit => {
-                matches!(action, ActionType::ShellCommand { .. } | ActionType::GitOperation { .. })
+                // AutoEdit 白名单: 文件类免审批; 命令/git/未分类工具 (Other) 需审批
+                matches!(
+                    action,
+                    ActionType::ShellCommand { .. }
+                        | ActionType::GitOperation { .. }
+                        | ActionType::Other { .. }
+                )
             }
             ApprovalMode::FullAuto => false,
         }
@@ -164,6 +172,7 @@ fn describe_action(action: &ActionType) -> String {
         }
         ActionType::ShellCommand { command } => format!("💻 Run: {}", command),
         ActionType::GitOperation { description } => format!("🔧 Git: {}", description),
+        ActionType::Other { tool, args } => format!("🔧 Tool {}: {}", tool, args),
     }
 }
 
@@ -271,5 +280,20 @@ mod tests {
         let list = engine.pending_actions();
         assert_eq!(list.len(), 1);
         assert!(list[0].description.contains("Write"));
+    }
+
+    #[test]
+    fn test_other_action_type() {
+        // Other 兜底：Suggest 下需审批，AutoEdit 下也需审批（非文件/非命令白名单）。
+        let engine = ApprovalEngine::new(ApprovalMode::Suggest);
+        assert!(engine.require_approval(&ActionType::Other { tool: "web_search".into(), args: "q=rust".into() }));
+        let engine = ApprovalEngine::new(ApprovalMode::AutoEdit);
+        assert!(engine.require_approval(&ActionType::Other { tool: "web_search".into(), args: "q=rust".into() }));
+        let engine = ApprovalEngine::new(ApprovalMode::FullAuto);
+        assert!(!engine.require_approval(&ActionType::Other { tool: "web_search".into(), args: "q=rust".into() }));
+        // describe_action 不 panic 且包含工具名。
+        let pa = ApprovalEngine::new(ApprovalMode::Suggest)
+            .submit(ActionType::Other { tool: "web_search".into(), args: "q=rust".into() });
+        assert!(pa.description.contains("web_search"));
     }
 }

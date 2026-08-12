@@ -13,6 +13,14 @@ pub struct GuardrailConfig {
     pub allowed_domains: Vec<String>,  // allowed network domains
     pub blocked_domains: Vec<String>,  // blocked network domains
     pub require_confirmation: Vec<ToolPermission>, // permissions needing user ok
+    /// P1-9 三层策略预算 (吸收 omnigent server/agent/session 三层叠加策略引擎):
+    /// server 层全局上限 / agent 层每 agent 上限 / session 层每会话上限。
+    /// 三层叠加: 任一层的 cap 被突破即拦截 (最严格者生效)。
+    /// omnigent 原文: "three-layer stacked policy engine (server/agent/session)
+    /// with approve/cap/budget"。
+    pub server_tool_cap: usize,
+    pub agent_tool_cap: usize,
+    pub session_tool_cap: usize,
 }
 
 impl Default for GuardrailConfig {
@@ -26,6 +34,9 @@ impl Default for GuardrailConfig {
             allowed_domains: vec![],
             blocked_domains: vec!["localhost".into(), "127.0.0.1".into()],
             require_confirmation: vec![ToolPermission::Shell, ToolPermission::SystemConfig],
+            server_tool_cap: 10_000,
+            agent_tool_cap: 2_000,
+            session_tool_cap: 500,
         }
     }
 }
@@ -119,6 +130,43 @@ impl InputGuardrail {
                 passed: true,
                 violations: vec![],
             }
+        }
+    }
+
+    /// P1-9 三层预算检查 (omnigent 模式): server/agent/session 三层叠加,
+    /// 任一 cap 突破即拦截 (最严格者生效)。
+    /// 返回 (passed, 违规列表)。
+    pub fn check_three_layer_budget(
+        &self,
+        server_calls: usize,
+        agent_calls: usize,
+        session_calls: usize,
+    ) -> GuardrailResult {
+        let mut violations = Vec::new();
+        if server_calls > self.config.server_tool_cap {
+            violations.push(GuardrailViolation {
+                rule: "server_tool_cap".into(),
+                detail: format!("Server tool calls {} exceed cap {}", server_calls, self.config.server_tool_cap),
+                severity: ViolationSeverity::Critical,
+            });
+        }
+        if agent_calls > self.config.agent_tool_cap {
+            violations.push(GuardrailViolation {
+                rule: "agent_tool_cap".into(),
+                detail: format!("Agent tool calls {} exceed cap {}", agent_calls, self.config.agent_tool_cap),
+                severity: ViolationSeverity::Critical,
+            });
+        }
+        if session_calls > self.config.session_tool_cap {
+            violations.push(GuardrailViolation {
+                rule: "session_tool_cap".into(),
+                detail: format!("Session tool calls {} exceed cap {}", session_calls, self.config.session_tool_cap),
+                severity: ViolationSeverity::Critical,
+            });
+        }
+        GuardrailResult {
+            passed: violations.is_empty(),
+            violations,
         }
     }
 }

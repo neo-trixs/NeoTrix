@@ -18,6 +18,8 @@ impl CliCommand for BudgetCmd {
     fn description(&self) -> &str {
         "Budget management: set session|daily|monthly <amount> | status | reset | action warn|pause|stop | enable | disable"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");

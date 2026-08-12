@@ -10,6 +10,7 @@ pub mod nt_memory_feedback;
 pub mod nt_memory_gwt_router;
 pub mod nt_memory_e8_agent;
 pub mod nt_memory_vsa_expand;
+pub mod nt_memory_decompose;
 pub mod nt_memory_agent_driven;
 pub mod nt_memory_agent_session;
 pub mod nt_memory_api;
@@ -17,6 +18,7 @@ pub mod nt_memory_commitment;
 pub mod nt_memory_community;
 pub mod nt_memory_confidence;
 pub mod nt_memory_crawl;
+pub mod nt_memory_pack;
 pub mod nt_http;
 pub mod nt_memory_resource_ingest;
 pub mod nt_memory_embed;
@@ -71,6 +73,7 @@ pub use nt_memory_e8_agent::{
 };
 pub use nt_memory_adaptive_rag::RelevanceGrade;
 pub use nt_memory_vsa_expand::VsaAssociativeExpander;
+pub use nt_memory_decompose::{Decomposition, decompose_query, merge_results};
 pub use nt_memory_confidence::{ConfidenceStore, ConfidenceWeights, DecayConfig, search_with_confidence, UncertainResult, RetrievalStrategy};
 pub use nt_memory_community::{CommunityAwareSearch, CommunityDetector, CommunityQueryMode, CommunityResult};
 pub use privacy::{PrivacyEnforcer, PrivacyConfig, PrivacyMode};
@@ -91,7 +94,7 @@ pub use knowledge_storage::{KnowledgeStorage, migrate_from_json};
 pub use nt_absorb_mapper::{map_all_nodes, map_batch_nodes, map_nodes, apply_mappings, map_node, map_source_core, CapabilityMapping, MappingReport};
 
 use rusqlite::Connection;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -364,8 +367,7 @@ impl KnowledgeBase {
     }
 
     /// Open a clone connection to the same DB (for sharing across subsystems)
-    pub fn clone_connection(&self) -> Self {
-        Self::open(Some(self.db_path.clone())).unwrap_or_else(|e| {
+    pub fn clone_connection(&self) -> Self {        Self::open(Some(self.db_path.clone())).unwrap_or_else(|e| {
             eprintln!("[neotrix] WARNING: clone_connection: KB::open({}) failed: {}. Trying default path.", self.db_path.display(), e);
             Self::open(None).unwrap_or_else(|e| {
                 eprintln!("[neotrix] WARNING: clone_connection: default path also failed: {}. Creating in-memory KB.", e);
@@ -1127,22 +1129,14 @@ impl KnowledgeBase {
         let config = self.embedding_config.read().map_err(|e| format!("embedding_config read: {}", e))?.clone();
         if has_codebook && config.is_some() {
             if let Ok(results) = self.pq_search(&effective_query, limit) {
-                let results = self.recency_rerank(results);
-                if let Ok(mut cache) = self.fused_cache.lock() {
-                    cache.put(cache_key, results.clone());
-                }
-                return Ok(results);
+                return self.finalize_search(&effective_query, &cache_key, results, limit);
             }
         }
 
         // Try semantic if embedding configured (full cosine)
         if config.is_some() {
             if let Ok(results) = self.semantic_search(&effective_query, limit) {
-                let results = self.recency_rerank(results);
-                if let Ok(mut cache) = self.fused_cache.lock() {
-                    cache.put(cache_key, results.clone());
-                }
-                return Ok(results);
+                return self.finalize_search(&effective_query, &cache_key, results, limit);
             }
         }
 
@@ -1151,21 +1145,126 @@ impl KnowledgeBase {
         let bm25 = self.bm25.read().ok().and_then(|b| b.clone());
         let results = nt_memory_search::hybrid_search(&conn, &effective_query, limit, bm25.as_ref())
             .map_err(|e| format!("search: {}", e))?;
+        self.finalize_search(&effective_query, &cache_key, results, limit)
+    }
+
+    /// [C3] 统一检索收尾: recency 重排 → Graph 信号融合 → 缓存。
+    /// Graph 信号接入 (B3 闭合): graphrag_store 存在时, 用 search_local 子图实体
+    /// 对结果加分 (实体命中 +0.15) 并补捞实体指向的 KB 节点, 使社区/子图信号
+    /// 进入 unified entry, 不再闲置。
+    fn finalize_search(
+        &self,
+        query: &str,
+        cache_key: &str,
+        results: Vec<SearchResult>,
+        limit: usize,
+    ) -> Result<Vec<SearchResult>, String> {
         let results = self.recency_rerank(results);
+        let results = self.graph_signal_augment(query, results, limit);
         if let Ok(mut cache) = self.fused_cache.lock() {
-            cache.put(cache_key, results.clone());
+            cache.put(cache_key.to_string(), results.clone());
         }
         Ok(results)
     }
 
+    /// [C3] Graph 实体信号融合: search_local 提取实体 source_node_id → 命中加分 + 补捞。
+    fn graph_signal_augment(
+        &self,
+        query: &str,
+        mut results: Vec<SearchResult>,
+        limit: usize,
+    ) -> Vec<SearchResult> {
+        const GRAPH_BOOST: f64 = 0.15;
+        // guard 作用域内取子图结果 (owned), 避免借用逃逸 RwLock guard
+        let subs = match self.graphrag_store.read() {
+            Ok(g) => match g.as_ref() {
+                Some(gs) => gs.search_local(query, 8),
+                None => return results,
+            },
+            Err(_) => return results,
+        };
+        if subs.is_empty() {
+            return results;
+        }
+        // 收集实体 source_node_id → 加分
+        let mut entity_scores: HashMap<String, f64> = HashMap::new();
+        for sub in &subs {
+            for e in &sub.entities {
+                if !e.source_node_id.is_empty() {
+                    *entity_scores.entry(e.source_node_id.clone()).or_insert(0.0) += GRAPH_BOOST;
+                }
+            }
+        }
+        if entity_scores.is_empty() {
+            return results;
+        }
+        // 1. 现有结果命中实体 → 加分 (score 影响排序)
+        for r in &mut results {
+            if let Some(add) = entity_scores.get(&r.node.id) {
+                r.score += add;
+            }
+        }
+        // 2. 实体指向的节点不在结果 → 从 nodes 表补捞 (带 graph 加分)
+        let existing_ids: HashSet<String> = results.iter().map(|r| r.node.id.clone()).collect();
+        let conn = match self.conn.lock() {
+            Ok(c) => c,
+            Err(_) => return results,
+        };
+        for (nid, add) in &entity_scores {
+            if existing_ids.contains(nid) {
+                continue;
+            }
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT id, node_type, title, summary, content, url, domain, language, confidence, importance, created_at, updated_at, access_count FROM nodes WHERE id=?1",
+            ) {
+                let row = stmt.query_row([nid], |row| {
+                    Ok(SearchResult {
+                        node: KnowledgeNode {
+                            id: row.get(0)?,
+                            node_type: NodeType::from_str(&row.get::<_, String>(1)?),
+                            title: row.get(2)?,
+                            summary: row.get(3)?,
+                            content: row.get(4)?,
+                            url: row.get(5)?,
+                            domain: row.get(6)?,
+                            language: row.get(7)?,
+                            confidence: row.get(8)?,
+                            importance: row.get(9)?,
+                            created_at: row.get(10)?,
+                            updated_at: row.get(11)?,
+                            access_count: row.get(12)?,
+                            metadata: None,
+                            temporal: None,
+                            supersedes: None,
+                            source_episode: None,
+                        },
+                        score: *add,
+                        matched_on: vec![SearchMatchType::GraphRelation],
+                        signals: None,
+                    })
+                });
+                if let Ok(sr) = row {
+                    results.push(sr);
+                }
+            }
+        }
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(limit);
+        results
+    }
+
     /// [T3] Agentic 检索: GWT 路由 → E8 卦象状态机 Agent 循环 → SEAL 反馈回流。
     /// 复杂查询 (多跳/关系/分析) 走 E8 状态机: 需(检索)→明夷(分级)→革(改写)→泰(生成)→既济(收敛)。
-    pub fn search_agentic(&self, query: &str, limit: usize) -> Result<E8AgentResult, String> {
+    pub fn search_agentic(&self, query: &str, _limit: usize) -> Result<E8AgentResult, String> {
         let intent = self.gwt_router.read().map(|r| r.route(query));
         let mut agent = E8AgentLoop::new(E8AgentConfig::default());
         let result = agent.run(query, |q, k| self.search(q, k).unwrap_or_default());
         // SEAL 反馈回流: 采纳 (Relevant) / 弃用 (Irrelevant) 信号 → 权重在线学习
-        if let Ok(mut fb) = self.feedback_store.write() {
+        if let Ok(fb) = self.feedback_store.write() {
             let adopted: Vec<String> = result
                 .graded
                 .iter()
@@ -2791,6 +2890,140 @@ mod tests {
         assert!(n > 0, "VSA 词典应非空, got {}", n);
         let after = kb.search(q, 3).expect("search with vocab");
         assert!(!after.is_empty(), "扩召检索仍应命中");
+    }
+
+    #[test]
+    fn test_c3_graph_signal_augment_boosts_and_fills() {
+        let dir = std::env::temp_dir().join(format!("nt_kb_c3g_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_c3g.db");
+        let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        // 两个节点: id_a 会被 graph 实体引用; id_b 不会被引用 (补捞目标)
+        let id_a = kb
+            .write_memory_entry(
+                "graph boost target",
+                super::nt_memory_types::NodeType::Concept,
+                Some("graph signal test"),
+                None,
+                Some("c3"),
+                None,
+            )
+            .expect("write a");
+        kb.write_memory_entry(
+            "fill candidate node",
+            super::nt_memory_types::NodeType::Concept,
+            Some("should be pulled by graph entity"),
+            None,
+            Some("c3"),
+            None,
+        )
+        .expect("write b");
+
+        // graphrag_store: 实体 e1 → id_a, 实体 e2 → 补捞目标 (id_b)
+        let id_b = kb
+            .search("fill candidate", 1)
+            .expect("find b")
+            .into_iter()
+            .next()
+            .map(|r| r.node.id)
+            .expect("id_b");
+        let mut gs = super::nt_memory_graphrag::GraphRagStore::new(
+            super::nt_memory_graphrag::GraphRagConfig::default(),
+        );
+        let mut props = std::collections::HashMap::new();
+        props.insert("tier".to_string(), "graph".to_string());
+        gs.add_entity(super::nt_memory_graphrag::EntityNode {
+            id: "e1".into(),
+            name: "graph boost target".into(),
+            entity_type: "concept".into(),
+            source_node_id: id_a.clone(),
+            confidence: 0.9,
+            properties: props.clone(),
+            created_at: 0,
+        });
+        gs.add_entity(super::nt_memory_graphrag::EntityNode {
+            id: "e2".into(),
+            name: "fill candidate node".into(),
+            entity_type: "concept".into(),
+            source_node_id: id_b.clone(),
+            confidence: 0.8,
+            properties: props,
+            created_at: 0,
+        });
+        *kb.graphrag_store.write().expect("graph write") = Some(gs);
+
+        // 基础结果: 只含 id_a (score 0.5) — id_b 不在, 应被补捞
+        let base = vec![super::nt_memory_types::SearchResult {
+            node: kb.get_node(&id_a).expect("get a").expect("node a"),
+            score: 0.5,
+            matched_on: vec![],
+            signals: None,
+        }];
+        let augmented = kb.graph_signal_augment("graph boost fill", base, 5);
+        assert!(!augmented.is_empty(), "graph 增强不应清空结果");
+        assert!(
+            augmented[0].score > 0.5,
+            "实体命中应加分: {}",
+            augmented[0].score
+        );
+        assert!(
+            augmented.iter().any(|r| r.node.id == id_b),
+            "实体指向的未命中节点应被补捞: {:?}",
+            augmented.iter().map(|r| r.node.id.as_str()).collect::<Vec<_>>()
+        );
+        // 补捞节点带 graph 信号标注
+        let filled = augmented.iter().find(|r| r.node.id == id_b).expect("filled");
+        assert_eq!(
+            filled.matched_on,
+            vec![super::nt_memory_types::SearchMatchType::GraphRelation],
+            "补捞节点应标注 GraphRelation"
+        );
+    }
+
+    #[test]
+    fn test_c2_decompose_pipeline_hard_map_reduce() {
+        let dir = std::env::temp_dir().join(format!("nt_kb_c2d_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_c2d.db");
+        let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        // 两个主题节点, 对比查询应分解为两个子查询分别命中
+        kb.write_memory_entry(
+            "E8 reasoning engine",
+            super::nt_memory_types::NodeType::Concept,
+            Some("hexagram state space"),
+            None,
+            Some("c2"),
+            None,
+        )
+        .expect("write E8");
+        kb.write_memory_entry(
+            "GWT attention routing",
+            super::nt_memory_types::NodeType::Concept,
+            Some("global workspace broadcast"),
+            None,
+            Some("c2"),
+            None,
+        )
+        .expect("write GWT");
+
+        let ar = super::nt_memory_adaptive_rag::AdaptiveRetrieval::new(
+            super::nt_memory_adaptive_rag::AdaptiveRagConfig::default(),
+        );
+        let res = ar.execute_pipeline(&kb, "what is the difference between E8 and GWT");
+        // 分解后子查询检索应命中两个主题节点 (map-reduce 覆盖)
+        let titles: Vec<String> = res.results.iter().map(|r| r.node.title.clone()).collect();
+        assert!(
+            titles.iter().any(|t| t.contains("E8")),
+            "子查询应命中 E8: {:?}",
+            titles
+        );
+        assert!(
+            titles.iter().any(|t| t.contains("GWT")),
+            "子查询应命中 GWT: {:?}",
+            titles
+        );
     }
 
     #[test]

@@ -19,6 +19,8 @@ impl CliCommand for SearchCmd {
     fn description(&self) -> &str {
         "Search the web: /search <query> [-n <count>]"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {

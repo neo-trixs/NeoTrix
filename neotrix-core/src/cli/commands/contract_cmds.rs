@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
-use crate::neotrix::nt_core_parallel::{TaskContractWarden, ContractState};
+use crate::neotrix::nt_core_parallel::{TaskContractWarden, ContractState, AtomicDecomposer};
 
 pub struct ContractCmd;
 
@@ -13,6 +13,8 @@ impl CliCommand for ContractCmd {
     fn name(&self) -> &str { "/contract" }
     fn aliases(&self) -> Vec<&str> { vec!["/todo"] }
     fn description(&self) -> &str { "契约管理: /contract list | define <desc> | done <id> | fail <id> | cancel <id> | stats" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let mut warden = TaskContractWarden::new();
         if args.is_empty() {
@@ -39,8 +41,32 @@ impl CliCommand for ContractCmd {
                 let task_type = args.iter().position(|a| a == "--type")
                     .and_then(|i| args.get(i + 1).cloned())
                     .unwrap_or_else(|| "generic".to_string());
+                // 意图路由 + 原子拆解 (nt_core_parallel::AtomicDecomposer):
+                // 生产接线 R-P79 — define 即触发 "类型路由 → 原子单元 → 输出契约" (C2 拆解)
+                let kind = AtomicDecomposer::route_kind(&desc);
+                let plan = AtomicDecomposer::new().decompose(&desc, kind);
+                let subtasks: Vec<String> = plan.all_units()
+                    .iter()
+                    .map(|u| u.instruction.clone())
+                    .collect();
                 let id = warden.define(&desc, &task_type, 0);
-                CommandOutput::ok(&format!("📌 契约已定义 [{}] {} (C1 Defined)", id.get(..8).unwrap_or(&id), desc))
+                if let Some(contract) = warden.get(&id) {
+                    // 自动 C2 accept: 拆解单元作为契约子步骤 (TaskContract::accept)
+                    warden.record(&contract.accept(subtasks));
+                }
+                CommandOutput::ok(&format!(
+                    "📌 契约已定义 [{}] {} (C1 Defined → C2 Accepted)\n  TaskKind: {:?}, 原子单元: {} (并行 {}, 串行 {})\n  子步骤:\n{}",
+                    id.get(..8).unwrap_or(&id),
+                    desc,
+                    kind,
+                    plan.parallel.len() + plan.sequential.len(),
+                    plan.parallel.len(),
+                    plan.sequential.len(),
+                    plan.all_units().iter().enumerate()
+                        .map(|(i, u)| format!("    {}. {}", i + 1, u.instruction))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ))
             }
             "done" | "complete" => {
                 if args.len() < 2 {

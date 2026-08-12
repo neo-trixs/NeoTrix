@@ -120,14 +120,14 @@ impl AdaptiveRetrieval {
         }
     }
 
-    /// Naïve entity counter: count capitalized multi-word sequences
+    /// Naïve entity counter: count capitalized words (含短字母数字混合词如 E8/GPT-4)
     fn count_entities(&self, query: &str) -> usize {
         query.split_whitespace()
             .filter(|w| {
                 w.starts_with(|c: char| c.is_uppercase())
-                    && w.len() > 2
                     && !["The", "This", "That", "What", "Why", "How", "When", "Where"]
                         .contains(w)
+                    && (w.len() > 2 || w.chars().any(|c| c.is_ascii_digit()))
             })
             .count()
     }
@@ -202,9 +202,22 @@ impl AdaptiveRetrieval {
         // Initial retrieval
         let initial_results = match complexity {
             QueryComplexity::Hard => {
+                // C2: map-reduce 分解 — 对比/枚举 → 并行子检索 merge; 顺序 → 链式; 原子 → 保留迭代
                 let mut results = Vec::new();
-                let _ = iterative_retrieval(kb, query, &self.config, &mut results);
-                results
+                match super::nt_memory_decompose::decompose_query(query) {
+                    super::nt_memory_decompose::Decomposition::Flat(subs)
+                    | super::nt_memory_decompose::Decomposition::Sequential(subs) => {
+                        for sub in subs {
+                            let r = kb.hybrid_rerank_search(&sub, 5).unwrap_or_default();
+                            results = super::nt_memory_decompose::merge_results(results, r, 10);
+                        }
+                        results
+                    }
+                    super::nt_memory_decompose::Decomposition::Atomic(_) => {
+                        let _ = iterative_retrieval(kb, query, &self.config, &mut results);
+                        results
+                    }
+                }
             }
             _ => kb.hybrid_rerank_search(query, 5).unwrap_or_default(),
         };
@@ -390,7 +403,8 @@ mod tests {
     #[test]
     fn test_classify_medium() {
         let ar = AdaptiveRetrieval::new(AdaptiveRagConfig::default());
-        let (comp, _) = ar.classify_query("what is the difference between the E8 and GWT architectures");
+        // 小写对比查询 (无大写实体) → Medium; 带实体对比 (E8 vs GWT) 升级为 Hard 走 decompose
+        let (comp, _) = ar.classify_query("what is the difference between functional and object-oriented programming");
         assert_eq!(comp, QueryComplexity::Medium);
     }
 

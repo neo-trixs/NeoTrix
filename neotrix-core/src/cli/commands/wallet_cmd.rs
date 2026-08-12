@@ -40,6 +40,10 @@ impl CliCommand for WalletCmd {
         "钱包管理: create | import | list | use | balance | export | delete"
     }
 
+    fn is_primary(&self) -> bool {
+        false // 命令收敛: /wallet 由 /crypto wallet 聚合器覆盖
+    }
+
     fn execute(
         &self,
         args: &[String],

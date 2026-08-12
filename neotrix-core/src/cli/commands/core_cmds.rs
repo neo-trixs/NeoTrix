@@ -14,7 +14,7 @@ impl CliCommand for ConfigCmd {
     fn name(&self) -> &str {
         "/config"
     }
-
+    fn is_primary(&self) -> bool { true }
     fn aliases(&self) -> Vec<&str> {
         vec!["/cfg", "/conf"]
     }
@@ -110,6 +110,7 @@ impl CliCommand for HelpCmd {
     fn name(&self) -> &str {
         "/help"
     }
+    fn is_primary(&self) -> bool { true }
 
     fn aliases(&self) -> Vec<&str> {
         vec!["/h", "/?"]
@@ -155,17 +156,40 @@ impl CliCommand for StatsCmd {
     fn name(&self) -> &str {
         "/stats"
     }
+    fn is_primary(&self) -> bool { true }
 
     fn aliases(&self) -> Vec<&str> {
         vec!["/st"]
     }
 
     fn description(&self) -> &str {
-        "Show reasoning stats: capabilities, iterations, memory"
+        "系统状态: /stats | /stats version | /stats --json (含诊断信息)"
     }
 
     fn execute(&self, args: &[String], brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
+        // 子命令 version: 合并 /version — 版本信息进系统状态面
+        if args.iter().any(|a| a == "version" || a == "v") {
+            let version_str = format!(
+                "NeoTrix v{} | V2 85% | OS {} ({})",
+                env!("CARGO_PKG_VERSION"),
+                std::env::consts::OS,
+                std::env::consts::ARCH,
+            );
+            let out = CommandOutput::ok(&version_str);
+            return if want_json {
+                out.with_json(serde_json::json!({
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "v2_progress": 0.85,
+                    "os": std::env::consts::OS,
+                    "arch": std::env::consts::ARCH,
+                }))
+            } else { out };
+        }
+        // 子命令 doctor: 合并 /doctor — 环境诊断进系统状态面
+        if args.iter().any(|a| a == "doctor" || a == "diag") {
+            return crate::cli::commands::doctor_cmds::run_doctor();
+        }
         if let Some(b) = brain {
             let a = b.blocking_read();
             let stats = a.brain.get_statistics();
@@ -199,6 +223,7 @@ impl CliCommand for ExitCmd {
     fn name(&self) -> &str {
         "/exit"
     }
+    fn is_primary(&self) -> bool { true }
 
     fn aliases(&self) -> Vec<&str> {
         vec!["/q", "/quit"]
@@ -220,6 +245,7 @@ impl CliCommand for ClearCmd {
     fn name(&self) -> &str {
         "/clear"
     }
+    fn is_primary(&self) -> bool { true }
 
     fn aliases(&self) -> Vec<&str> {
         vec![]
@@ -241,6 +267,7 @@ impl CliCommand for VersionCmd {
     fn name(&self) -> &str {
         "/version"
     }
+    fn is_primary(&self) -> bool { false }
 
     fn aliases(&self) -> Vec<&str> {
         vec!["/v"]
@@ -337,6 +364,7 @@ impl CliCommand for CompletionsCmd {
     fn name(&self) -> &str {
         "/completions"
     }
+    fn is_primary(&self) -> bool { false }
 
     fn aliases(&self) -> Vec<&str> {
         vec![]

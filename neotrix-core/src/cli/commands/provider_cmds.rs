@@ -28,6 +28,8 @@ impl CliCommand for ProviderCmd {
     fn description(&self) -> &str {
         "Provider 管理: /provider list | /provider info <name>"
     }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let sub = args.first().map(|s| s.as_str()).unwrap_or("list");

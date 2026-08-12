@@ -42,6 +42,8 @@ impl CliCommand for EvidenceCmd {
     fn description(&self) -> &str {
         "EWHR evidence management: list|get|calibrate|export|stats"
     }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() {
             return CommandOutput::ok("Usage: /evidence <list|get|calibrate|export|stats> [options]");

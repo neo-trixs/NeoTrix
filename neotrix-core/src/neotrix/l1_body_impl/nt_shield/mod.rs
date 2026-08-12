@@ -164,7 +164,10 @@ impl SecurityManager {
     }
 
     pub fn audit_project(&self, path: &str) -> Vec<audit::SecurityFinding> {
-        self.audit.scan_directory(path)
+        // .rs 安全规则扫描 + .md 引用真实性审计 (P1-16: academic-research-skills)
+        let mut findings = self.audit.scan_directory(path);
+        findings.extend(self.audit.scan_documents(path));
+        findings
     }
 }
 

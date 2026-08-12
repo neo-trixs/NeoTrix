@@ -123,6 +123,7 @@ pub fn scan_orphan_files<P: AsRef<Path>>(root: P) -> Vec<AuditFinding> {
     for path in &all_rs {
         if !declared.contains(path)
             && !path.to_string_lossy().contains("target/")
+            && !path.to_string_lossy().contains("/_archived/")
             && path.file_name().and_then(|n| n.to_str()) != Some("lib.rs")
             && path.file_name().and_then(|n| n.to_str()) != Some("main.rs")
             && !path.to_string_lossy().contains("/bin/")
@@ -451,6 +452,7 @@ mod tests {
                     !f.file.contains("/bin/")
                     && !f.file.contains("/tests.")
                     && !f.file.contains("target/")
+                    && !f.file.contains("/_archived/")
                     && f.file != "mod.rs"
                 })
                 .collect();

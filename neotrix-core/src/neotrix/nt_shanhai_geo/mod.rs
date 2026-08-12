@@ -5,6 +5,7 @@ pub mod mappings;
 pub mod kb;
 pub mod query;
 pub mod linking;
+pub mod geo_sync;
 
 pub use types::*;
 pub use schools::all_schools;
@@ -16,3 +17,4 @@ pub use query::{
     export_geojson, MappingRecord,
 };
 pub use linking::{infer_shanhai_links, shanhai_edge_count};
+pub use geo_sync::sync_shanhai_to_geo;

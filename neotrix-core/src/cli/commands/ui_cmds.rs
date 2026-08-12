@@ -16,6 +16,8 @@ impl CliCommand for SideCmd {
     fn name(&self) -> &str { "/side" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "快速提问（不干扰主对话）: /side <question> | /side clear" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         if args.is_empty() || args[0] == "--json" {
             return CommandOutput::ok("用法:\n  /side <question>    快速提问，结果以 [Side] 前缀显示\n  /side clear         清除侧边会话历史");
@@ -36,6 +38,8 @@ impl CliCommand for WorkSpaceCmd {
     fn description(&self) -> &str {
         "WorkSpace 管理: /workspace create <name> [--path <dir>] [--desc <text>] | /workspace list | /workspace switch <id> | /workspace delete <id> | /workspace rename <id> <new_name> | /workspace status"
     }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let clean_args: Vec<&str> = args.iter().map(|s| s.as_str()).filter(|a| *a != "--json").collect();
@@ -171,6 +175,8 @@ impl CliCommand for RouterCmd {
     fn description(&self) -> &str {
         "智能路由: /route status | enable | disable | reset | set <complexity> <provider> <model> [cost_in cost_out] | classify <text>"
     }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
         let plain_args: Vec<&str> = args.iter().map(|s| s.as_str()).filter(|a| *a != "--json").collect();
@@ -306,6 +312,8 @@ impl CliCommand for VimCmd {
     fn name(&self) -> &str { "/vim" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str { "Vim 模式: /vim toggle | /vim on | /vim off (在 TUI 中生效)" }
+    fn is_primary(&self) -> bool { false }
+
     fn execute(&self, _args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         CommandOutput::ok("Vim 模式 — 在 TUI 中使用 /vim toggle 切换。\n  /vim toggle  切换开关\n  /vim on      启用\n  /vim off     禁用")
     }
@@ -318,6 +326,8 @@ impl CliCommand for BackgroundCommand {
     fn name(&self) -> &str { "/background" }
     fn aliases(&self) -> Vec<&str> { vec!["/bg"] }
     fn description(&self) -> &str { "Manage always-on background engine: start|stop|status|task|cycle" }
+    fn is_primary(&self) -> bool { false }
+
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let subcmd = args.first().map(|s| s.as_str()).unwrap_or("status");
