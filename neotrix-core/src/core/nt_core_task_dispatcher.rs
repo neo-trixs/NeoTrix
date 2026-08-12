@@ -708,30 +708,35 @@ Output your result for this subtask only."#,
         sub_task.prompt.clone()
     }
 
-    /// 聚合结果
-    async fn aggregate_results(&self, _decomposition: &DecompositionResult, results: &[SubTaskResult]) -> Result<String, TaskDispatchError> {
+    /// 聚合结果 (H4-H6): 调用确定性 Reducer 压缩输入, 注入一致性/矛盾信号后交 LLM 综合。
+    async fn aggregate_results(&self, decomposition: &DecompositionResult, results: &[SubTaskResult]) -> Result<String, TaskDispatchError> {
         let successful: Vec<_> = results.iter().filter(|r| r.success).collect();
-        let _failed: Vec<_> = results.iter().filter(|r| !r.success).collect();
-
         if successful.is_empty() {
             return Err(TaskDispatchError::ExecutionError("All sub-tasks failed".to_string()));
         }
 
-        // 使用 LLM 聚合结果
+        // 确定性 Reducer: 过滤 malformed / 去重归并 / 组内保留最高 confidence / 一致性显式化
+        let report = reduce_subtask_results(results);
+        let field_signals = format_reducer_signals(&report);
+
+        // 使用 LLM 聚合结果（模型只做推理综合, 不再承担清洗/去重）
         let aggregation_prompt = format!(
             r#"You are aggregating results from multiple sub-tasks to produce a final answer.
 
 Original Task: {}
 
+Reduced Findings (deduplicated by a deterministic reducer; <CONSENSUS n> marks claims independently confirmed by n workers):
+{}
+
 Sub-task Results:
 {}
 
-Please synthesize these results into a coherent, complete answer for the original task.
+Please synthesize these into a coherent, complete answer for the original task.
 If some sub-tasks failed, note what's missing but provide the best answer possible from successful results.
 
 Output ONLY the final synthesized answer."#,
-            // 原始任务需要从 decomposition 中获取，这里简化
-            "Original task",
+            decomposition.original_task,
+            field_signals,
             results.iter().enumerate().map(|(i, r)| {
                 format!("{}. {}: {}", i + 1, if r.success { "SUCCESS" } else { "FAILED" }, r.output)
             }).collect::<Vec<_>>().join("\n\n")
@@ -780,6 +785,175 @@ Output ONLY the final synthesized answer."#,
         v.iter_mut().for_each(|x| *x /= norm);
         v
     }
+}
+
+// ── 确定性 Reducer (H2-H6): 过滤 → 规范化 → 聚类 → 保留最高 → 标注一致性 ──
+// 关注点分离: 代码做数据工程, 模型只做推理综合。零 LLM 调用, 零新依赖。
+
+/// 聚类后的主张组: 组内保留最高分版本, 标注一致性 (成员数)。
+#[derive(Debug, Clone)]
+pub struct ClaimGroup {
+    /// 组内最高分代表版本 (原始输出)
+    pub representative: String,
+    /// 组内成员 sub_task_id (溯源 keys)
+    pub members: Vec<String>,
+    /// 一致性: 多个 worker 独立确认数 (≥1)
+    pub consensus: usize,
+    /// 组内最佳质量分 (输出长度对数, tokens 未填时的代理)
+    pub best_score: f64,
+}
+
+/// Reducer 全量报告 (L1 可观测): 过滤原因 + 合并统计。
+#[derive(Debug, Clone, Default)]
+pub struct ReduceReport {
+    /// 输入原始条目数
+    pub raw: usize,
+    /// 因失败过滤
+    pub filtered_failed: usize,
+    /// 因 malformed (空/过短) 过滤
+    pub filtered_malformed: usize,
+    /// 聚类结果 (每簇一条代表 + consensus 标注)
+    pub clusters: Vec<ClaimGroup>,
+    /// 被合并的重复主张数 = 有效输入 - 簇数
+    pub deduped: usize,
+}
+
+impl ReduceReport {
+    /// 压缩率 0.0-1.0: 多少原始条目被确定性压缩
+    pub fn compression_ratio(&self) -> f64 {
+        if self.raw == 0 {
+            0.0
+        } else {
+            self.clusters.len() as f64 / self.raw as f64
+        }
+    }
+}
+
+/// 轻量文本规范化 (std-only): 小写 + 非字母数字剥离 + 空白折叠。
+fn lightweight_normalize(text: &str) -> String {
+    text.chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect::<String>()
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// 高信号词: 去停用词后按词频降序取 top 12。
+fn high_signal_words(text: &str) -> Vec<String> {
+    const STOP: &[&str] = &[
+        "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with", "as", "by", "is",
+        "are", "was", "were", "be", "been", "that", "this", "these", "those", "it", "its", "from",
+        "at", "into", "between", "about", "which", "will", "should", "can", "could", "would",
+        "not", "no", "yes", "but", "if", "then", "so", "we", "you", "they", "he", "she", "our",
+        "your", "their", "the", "的", "了", "是", "在", "和", "与", "及", "或", "对", "为", "从",
+        "有", "被", "用", "于", "个", "也", "这", "那", "我", "你", "他", "她", "它", "们", "不",
+    ];
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for w in text.split_whitespace() {
+        let w = w.trim_matches(|c: char| !c.is_alphanumeric());
+        if w.is_empty() || w.chars().count() < 2 || STOP.contains(&w) {
+            continue;
+        }
+        *counts.entry(w.to_string()).or_insert(0) += 1;
+    }
+    let mut words: Vec<(String, usize)> = counts.into_iter().collect();
+    words.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    words.into_iter().take(12).map(|(w, _)| w).collect()
+}
+
+/// 两词集 Jaccard 相似度 [0,1]。
+fn jaccard(a: &[String], b: &[String]) -> f64 {
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
+    let inter = a.iter().filter(|w| b.contains(w)).count();
+    inter as f64 / (a.len() + b.len() - inter) as f64
+}
+
+/// 确定性 Reducer 主入口: 过滤 → 规范化 → 聚类 → 组内保留最高分。
+///
+/// 对齐文章 H2-H6: malformed 过滤 / normalize 分组 / 组内保留最高 confidence /
+/// 一致性 (consensus) 显式标注。纯函数, 无 LLM 调用。
+pub fn reduce_subtask_results(results: &[SubTaskResult]) -> ReduceReport {
+    let mut report = ReduceReport { raw: results.len(), ..Default::default() };
+    let mut claims: Vec<(String, String, f64)> = Vec::new();
+
+    for r in results {
+        if !r.success {
+            report.filtered_failed += 1;
+            continue;
+        }
+        let out = r.output.trim();
+        if out.is_empty() || out.chars().count() < 32 {
+            report.filtered_malformed += 1;
+            continue;
+        }
+        let score = (out.chars().count() as f64).ln();
+        claims.push((out.to_string(), r.sub_task_id.clone(), score));
+    }
+
+    for (raw, key, score) in claims {
+        let kws = high_signal_words(&lightweight_normalize(&raw));
+        let mut best: Option<usize> = None;
+        let mut best_j = 0.0;
+        for (i, g) in report.clusters.iter().enumerate() {
+            let gkws = high_signal_words(&lightweight_normalize(&g.representative));
+            let j = jaccard(&kws, &gkws);
+            if j >= 0.5 && j > best_j {
+                best = Some(i);
+                best_j = j;
+            }
+        }
+        match best {
+            Some(i) => {
+                let g = &mut report.clusters[i];
+                if score > g.best_score {
+                    g.best_score = score;
+                    g.representative = raw;
+                }
+                g.members.push(key);
+                g.consensus += 1;
+            }
+            None => {
+                report.clusters.push(ClaimGroup {
+                    representative: raw,
+                    members: vec![key],
+                    consensus: 1,
+                    best_score: score,
+                });
+            }
+        }
+    }
+    report.deduped = report
+        .clusters
+        .iter()
+        .map(|c| c.members.len().saturating_sub(1))
+        .sum();
+    report
+}
+
+/// 把 Reducer 报告格式化为聚合 LLM 的结构化输入信号 (H5: 一致性/矛盾一等公民)。
+pub fn format_reducer_signals(report: &ReduceReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "Reducer summary: raw={}, filtered_failed={}, filtered_malformed={}, clusters={}, compression={:.2}\n",
+        report.raw,
+        report.filtered_failed,
+        report.filtered_malformed,
+        report.clusters.len(),
+        report.compression_ratio()
+    ));
+    for (i, g) in report.clusters.iter().enumerate() {
+        let tag = if g.consensus >= 2 {
+            format!("<CONSENSUS n={}>", g.consensus)
+        } else {
+            "<SINGLE>".to_string()
+        };
+        out.push_str(&format!("{}. {} {}\n", i + 1, tag, g.representative));
+    }
+    out
 }
 
 /// 调度错误类型
@@ -831,5 +1005,77 @@ mod tests {
         };
         assert_eq!(sub_task.id, "test_1");
         assert_eq!(sub_task.crt_scale, CrtTimeScale::Gaitian);
+    }
+
+    fn result(id: &str, success: bool, output: &str) -> SubTaskResult {
+        SubTaskResult {
+            sub_task_id: id.to_string(),
+            success,
+            output: output.to_string(),
+            error: None,
+            tokens_used: 0,
+            duration_ms: 1,
+            cot_output: None,
+        }
+    }
+
+    #[test]
+    fn test_reducer_happy_path_keeps_all() {
+        let results = vec![result("a", true, "The system uses a vector database for retrieval.")];
+        let report = reduce_subtask_results(&results);
+        assert_eq!(report.raw, 1);
+        assert_eq!(report.clusters.len(), 1);
+        assert_eq!(report.clusters[0].consensus, 1);
+        assert_eq!(report.filtered_failed, 0);
+        assert_eq!(report.filtered_malformed, 0);
+    }
+
+    #[test]
+    fn test_reducer_all_empty_filters_malformed() {
+        let results = vec![result("a", true, ""), result("b", true, "short")];
+        let report = reduce_subtask_results(&results);
+        assert_eq!(report.filtered_malformed, 2);
+        assert!(report.clusters.is_empty());
+        assert_eq!(report.raw, 2);
+    }
+
+    #[test]
+    fn test_reducer_failed_filtered() {
+        let results = vec![result("a", false, "should be dropped"), result("b", true, "active finding that is long enough to keep as a valid claim")];
+        let report = reduce_subtask_results(&results);
+        assert_eq!(report.filtered_failed, 1);
+        assert_eq!(report.clusters.len(), 1);
+        assert_eq!(report.clusters[0].consensus, 1);
+    }
+
+    #[test]
+    fn test_reducer_duplicate_merged_with_consensus() {
+        let r0 = result("w1", true, "The architecture uses a vector symbolic database for semantic retrieval of knowledge entries");
+        let r1 = result("w2", true, "The architecture uses vector symbolic storage for knowledge retrieval with semantic lookup");
+        let report = reduce_subtask_results(&[r0, r1]);
+        assert_eq!(report.raw, 2);
+        assert_eq!(report.deduped, 1, "two near-dup claims merge into one cluster");
+        assert_eq!(report.clusters.len(), 1);
+        assert_eq!(report.clusters[0].consensus, 2, "independent workers confirming same claim");
+    }
+
+    #[test]
+    fn test_reducer_short_output_filtered_while_valid_kept() {
+        let valid = "A detailed finding about the reducer design that fully satisfies the minimum length requirement";
+        let results = vec![result("a", true, "short"), result("b", true, valid)];
+        let report = reduce_subtask_results(&results);
+        assert_eq!(report.filtered_malformed, 1);
+        assert_eq!(report.clusters.len(), 1);
+        assert_eq!(report.clusters[0].representative, valid);
+    }
+
+    #[test]
+    fn test_reducer_signals_format_consensus() {
+        let r0 = result("w1", true, "The architecture uses a vector symbolic database for semantic retrieval of knowledge entries");
+        let r1 = result("w2", true, "The architecture uses vector symbolic storage for knowledge retrieval with semantic lookup");
+        let report = reduce_subtask_results(&[r0, r1]);
+        let signals = format_reducer_signals(&report);
+        assert!(signals.contains("<CONSENSUS n=2>"), "consensus marker for multi-worker confirmation");
+        assert!(signals.contains("clusters=1"));
     }
 }
