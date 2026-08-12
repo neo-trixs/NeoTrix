@@ -37,6 +37,7 @@ export default defineConfig({
             { text: 'CLI Reference', link: '/guide/cli' },
             { text: 'Desktop App', link: '/guide/desktop' },
             { text: 'Configuration', link: '/guide/configuration' },
+            { text: 'Upgrading', link: '/guide/upgrading' },
             { text: 'Development', link: '/guide/development' },
           ],
         },

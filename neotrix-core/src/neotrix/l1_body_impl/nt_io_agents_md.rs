@@ -157,7 +157,12 @@ impl AgentsMdReader {
     /// 获取指定章节内容
     pub fn get_section(&self, name: &str) -> Option<String> {
         let cwd = std::env::current_dir().ok()?;
-        let rules = self.load_project_rules(&cwd).ok()?;
+        self.get_section_at(&cwd, name)
+    }
+
+    /// 带显式目录的 get_section (测试用, 避免改全局 cwd 引起并行测试竞态)
+    fn get_section_at(&self, dir: &std::path::Path, name: &str) -> Option<String> {
+        let rules = self.load_project_rules(dir).ok()?;
         rules.sections.get(name).cloned()
     }
 
@@ -506,14 +511,14 @@ mod tests {
         drop(f);
 
         let orig_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
 
         let reader = AgentsMdReader::new();
-        let build_section = reader.get_section("Build");
+        // 用带目录版本, 不 set_current_dir → 无并行测试 cwd 竞态
+        let build_section = reader.get_section_at(&dir, "Build");
         assert!(build_section.is_some());
         assert!(build_section.unwrap().contains("npm run build"));
 
-        std::env::set_current_dir(orig_dir).unwrap();
+        let _ = orig_dir;
         let _ = fs::remove_dir_all(&dir);
     }
 

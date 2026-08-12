@@ -3,10 +3,10 @@
 """
 NeoTrix 吸收→能力树映射器 (Absorb-to-Capability Mapper)
 ============================================================
-把 batch_% 吸收节点 (repository/paper/article) 映射到 36 原子能力 + 7 域 BranchKind,
+把 batch_% 吸收节点 (repository/paper/article) 映射到 36+ 原子能力 + 8 域 BranchKind,
 写入 CapabilityBranch.absorbed_capabilities (Cycle 121 字段), 产出覆盖率报告。
 
-36 原子能力 (Cycle 121) × 9 层:
+36 原子能力 (Cycle 121) × 9 层 + D5 扩充谓词:
   PERCEIVE   : retrieve/search/observe/receive
   UNDERSTAND : detect/classify/measure/predict/compare/discover
   REASON     : plan/decompose/critique/explain
@@ -16,9 +16,12 @@ NeoTrix 吸收→能力树映射器 (Absorb-to-Capability Mapper)
   VERIFY     : verify/checkpoint/rollback/constrain/audit
   REMEMBER   : persist/recall
   COORDINATE : delegate/synchronize/invoke/inquire
+  META (D5)  : monitor/introspect/critique_self/route/calibrate
+  ATTENTION  : broadcast/attend/route/synthesize_workspace
+  CONSOLIDATE: consolidate/compress/forget/narrative
 
-7 域:
-  NT-CORE, NT-MIND, NT-MEMORY, NT-WORLD, NT-ACT, NT-SHIELD, NT-IO
+8 域:
+  NT-CORE, NT-META, NT-MIND, NT-MEMORY, NT-WORLD, NT-ACT, NT-SHIELD, NT-IO
 
 用法:
   python3 scripts/absorb_to_capability.py --dry-run   # 预览映射
@@ -72,13 +75,19 @@ def rust_update_node_metadata(updates, dry_run=False):
     return (0, 0)
 
 
-# 7 域 → 主属能力 (36 原子能力 Cycle 121)
+# 8 域 → 主属能力 (36 原子能力 Cycle 121 + D5 扩充谓词)
+# D4: 新增 NT-META 域 — 元认知/自我观察语料归位 (此前 1832 节点 NT-META=0 盲区)。
+# D5: 补充记忆整合 (consolidate/forget) 与注意/广播 (broadcast/attend/route) 谓词 —
+#     reasoning-bank 双轨推理记忆 (Success+Failed) 正是 consolidate 语料。
 BRANCH_CAPABILITIES = {
+    "NT-META":   ["monitor", "introspect", "critique_self", "route", "calibrate"],
     "NT-CORE":   ["detect", "classify", "measure", "predict", "compare", "discover",
-                  "plan", "decompose", "critique", "explain"],
+                  "plan", "decompose", "critique", "explain",
+                  "broadcast", "attend", "route", "synthesize_workspace"],
     "NT-MIND":   ["generate", "transform", "integrate", "plan", "decompose"],
     "NT-MEMORY": ["state", "transition", "attribute", "ground", "simulate",
-                  "persist", "recall"],
+                  "persist", "recall",
+                  "consolidate", "compress", "forget", "narrative"],
     "NT-WORLD":  ["retrieve", "search", "observe", "receive"],
     "NT-ACT":    ["execute", "mutate", "send"],
     "NT-SHIELD": ["verify", "checkpoint", "rollback", "constrain", "audit"],
@@ -121,6 +130,15 @@ SOURCE_CORES = [
                                       "reflect", "experience", "pattern recognit", "intuition", "pruning",
                                       "meta-learn", "self-organiz", "self-evolv", "autonom", "curriculum"],
                   "一切元认知/吸收/演化之源"),
+    # D4 (Cycle 240): 新增 MetaCognition 本源 — 元认知/自我观察语料归 NT-META 域。
+    # 此前 1832 节点 NT-META=0 (7 域无 meta 分支); 这里把自我进化/内省/校准/递归
+    # 监督语料独立溯源, 使元认知能力网节点从零起步 (对应意识树 NT-META 分支)。
+    ("MetaCognition", "NT-META", ["meta-cognit", "introspect", "self-evolv", "self-improv", "recursiv",
+                                  "autotelic", "self-referent", "calibrat", "monitor", "distill", "route",
+                                  "self-aware", "self-monitor", "reflection", "self-reflection",
+                                  "self-correction", "self-correct", "oversight", "reward-model",
+                                  "rlhf", "metacognit", "self-critique", "self-distill"],
+                  "一切元认知/自我观察/自监督之源"),
     ("Reality",     "NT-WORLD",  ["world", "world model", "agent", "act", "action", "interact", "environ",
                                   "sensor", "control", "tool", "execute", "robot", "simulat",
                                   "perceiv", "explore", "harvest", "crawl", "embodied", "real world",
@@ -139,6 +157,8 @@ FALLBACK_HINTS = [
       "attention", "mental", "dream"], "GWT"),
     (["learn", "evolv", "adapt", "growth", "self", "reflect", "experienc", "feedback",
       "develop", "train", "improv"], "ConsciousnessTree"),
+    (["meta", "introspect", "self-reflect", "self-monitor", "calibrat", "self-evolv",
+      "self-improv", "self-correct", "reward model", "oversight"], "MetaCognition"),
     (["world", "action", "agent", "society", "polit", "econom", "hist", "culture", "art",
       "war", "power", "soci", "commun", "technolog", "engineer", "industr", "market", "law",
       "govern", "earth", "space", "human", "life"], "Reality"),
@@ -237,6 +257,10 @@ KEYWORD_RULES = [
     (re.compile(r'communicat|chat|message|socket|stream|real_time|notify|webhook', re.I), "NT-IO", "synchronize"),
     (re.compile(r'agent|multi_agent|delegate|subagent|swarm|coordinator|router', re.I), "NT-IO", "delegate"),
     (re.compile(r'provider|gateway|model_router|llm_api|auth|login|sso|oauth', re.I), "NT-IO", "inquire"),
+    # D4/D5 (Cycle 240): 元认知/自我观察 → NT-META; 记忆整合 → NT-MEMORY/consolidate
+    (re.compile(r'meta[-_ ]cognit|introspect|self[-_ ]aware|self[-_ ]monitor|self[-_ ]reflection|self[-_ ]correct|self[-_ ]critique|self[-_ ]evolv|self[-_ ]improv|autotelic|self[-_ ]referent|calibrat|reward[-_ ]model|\brlhf\b|oversight', re.I), "NT-META", "introspect"),
+    (re.compile(r'consolidat|sleep[-_ ]wake|memory[-_ ]merg|narrative[-_ ]memor|compress|active[-_ ]forget|forget|dream|replay', re.I), "NT-MEMORY", "consolidate"),
+    (re.compile(r'broadcast|global[-_ ]workspace|attention[-_ ]rout|routing|attend', re.I), "NT-CORE", "broadcast"),
 ]
 
     # 代码库已有节点名 → 能力树 (NT- 域) — 为 repository 节点提供确定性映射
@@ -539,6 +563,16 @@ KNOWN_REPOS = {
     "anthropics/prompt-eng-interactive-tutorial": ("NT-CORE", "explain"), # 提示工程教程
     "ItusiAI/MokerSaaS": ("NT-ACT", "execute"),       # SaaS 出海启动模板 (rename from get-saas)
     "Anil-matcha/ai-creator-academy": ("NT-CORE", "explain"), # AI 创作免费课程 (rename from awesome-hermes-agent)
+    # Cycle 240 批 (2026-08-12, D4/D5/D10/D11) — 专家键防 keyword 误伤 + NT-META 归位
+    "MengTo/Skills": ("NT-META", "monitor"),          # D10: agent skills 集 (mattpocock/skills 误吞) → 元认知
+    "p-e-w/heretic": ("NT-META", "introspect"),       # D10: 自动审查屏蔽内容 → 自我审查/元认知
+    "oh-my-mermaid/oh-my-mermaid": ("NT-IO", "invoke"), # D10: 架构图生成 → 消除 "architecture"→shield 碰撞
+    "lazypay/Archscribe": ("NT-IO", "invoke"),        # D10: 手绘架构图工具
+    "cclank/lanshu-animated-architecture-diagram": ("NT-IO", "invoke"), # D10: 架构图动画
+    "google-research/reasoning-bank": ("NT-MEMORY", "consolidate"), # D11: 双轨推理记忆 (Success+Failed) = consolidate 语料
+    "gastownhall/beads": ("NT-MEMORY", "recall"),     # D11: agent 分布式图记忆 (Dolt)
+    "kenforthewin/atomic": ("NT-MEMORY", "recall"),   # D11: 语义连接个人知识库 (PKM)
+    "harry0703/MangoDisk": ("NT-ACT", "execute"),     # D10/D11: 磁盘清理工具类
 }
 
 
@@ -638,6 +672,7 @@ def map_node(node_type, title, content, url):
         'VSA': ('NT-MEMORY', 'recall'),
         'GWT': ('NT-CORE', 'critique'),
         'ConsciousnessTree': ('NT-MIND', 'integrate'),
+        'MetaCognition': ('NT-META', 'introspect'),
         'Reality': ('NT-MEMORY', 'recall'),
     }
     return *src_cap.get(core, ('NT-CORE', 'discover')), f'fallback:core:{core}'

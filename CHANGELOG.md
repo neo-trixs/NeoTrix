@@ -1,5 +1,34 @@
 # Changelog
 
+> This changelog is a wrapper around the git-cliff pipeline. Regenerate the
+> `[Unreleased]` body with:
+> `git cliff -u` (pipelines defined in `cliff.toml`; used by
+> `.github/workflows/release.yml` to emit release notes).
+
+## [Unreleased] — 并行工作批次 + 网络隔离 + 地理瓦片
+
+> git-cliff: `git cliff --unreleased` regenerates the grouped body from
+> conventional commits.
+
+### Features
+- **nt-core**: CLI 并行批次 — 命令全英文描述 + 动态补全池 + 主题持久化 + shield 写操作 ToolSpec 单一事实源。
+- **nt-shield**: 网络隔离默认阻断 — `DeniedProvider` + 本地回环放行 + `NEOTRIX_NETWORK_UNBLOCK` 逃生门。
+- **nt-io**: B3 地理瓦片服务 + `/openapi` 端点 — 瓦片路由 + 构建期嵌入 openapi.yaml。
+- **nt-mind**: 蜕皮机制融入意识能力网 + C5 自愈养分闭环。
+- **nt-core**: 意识核心子代理定义 (`opencode agent nt-core.md`) 与 `status/tick/health/branches` CLI 通道。
+- **tauri**: NT-Pack 进程级缓存 + 桌面命令/catalog/gate 演进 + 重启安装更新。
+- **frontend**: 代码分包/懒加载 + Globe NT-Pack + CommandPalette/TaskList/LivePreview + 错误监控、更新重启 UX。
+- **Capability registry**: 去硬编码读 capability_tree DAG + `neotrix guard` 门禁 + 能力网健康度回流。
+
+### Bug Fixes
+- **nt-shield**: `keyvault --features full` 编译修复。
+- **nt-core**: 迷雾治理 — 真实 SelfTest 分支健康持久化到 `consciousness/core` 快照。
+- **nt-core**: types 测试断言质量 — `unwrap`→`expect` / `len>0`→`is_empty`。
+
+### Chores
+- **arch**: 蜕皮归档 — 移除旧躯壳 (frontend-v1/session-log/anchor) 到 `_archive/`，代码树只留最新态。
+- **docs/config**: capability registry 重构 + `.gitignore _archive` + progress/docs。
+
 ## [Unreleased] — 独立项目进化链路 (G1-G4)
 
 ### Project Evolve (G1+G2)

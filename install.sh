@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 #
 # NeoTrix Installer
-#   curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash -s -- --version 0.18.0
+#   Canonical entrypoint (recommended):
+#     curl -fsSL https://neotrix.ai/install | bash
+#   Raw mirror:
+#     curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash
+#   With options:
+#     curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash -s -- --version 0.18.0
+#   Platforms: macOS / Linux (x86_64, aarch64). Windows: use the MSI/NSIS
+#   installer from the GitHub release, see docs/4-GUIDES/getting-started.md.
 #
 set -euo pipefail
 
@@ -41,9 +47,10 @@ while [[ $# -gt 0 ]]; do
     --version) VERSION="$2"; shift 2 ;;
     --version=*) VERSION="${1#*=}"; shift ;;
     --help)
-      echo "Usage: curl -fsSL ${RAW_BASE}/install.sh | bash"
-      echo "       curl -fsSL ${RAW_BASE}/install.sh | bash -s -- --version 0.18.0"
-      echo "       curl -fsSL ${RAW_BASE}/install.sh | bash -s -- --no-modify-path"
+      echo "Usage: curl -fsSL https://neotrix.ai/install | bash"
+      echo "       curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash"
+      echo "       curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash -s -- --version 0.18.0"
+      echo "       curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash -s -- --no-modify-path"
       exit 0
       ;;
     *) shift ;;

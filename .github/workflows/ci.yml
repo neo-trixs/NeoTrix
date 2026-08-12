@@ -50,7 +50,7 @@ jobs:
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
       - name: Generate coverage
-        run: cargo llvm-cov --lcov --output-path lcov.info --lib -p neotrix
+        run: cargo llvm-cov --lcov --output-path lcov.info --lib -p neotrix -p neotrix-types
       - name: Upload coverage to artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -87,29 +87,51 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src-tauri/frontend
+        working-directory: neocodex-frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: src-tauri/frontend/package-lock.json
+          cache-dependency-path: neocodex-frontend/package-lock.json
       - run: npm ci
       - run: npm test
+
+  frontend-coverage:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: neocodex-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: neocodex-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run coverage
+      - name: Upload frontend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: neocodex-frontend/coverage
+          retention-days: 14
+          if-no-files-found: ignore
 
   frontend-build:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src-tauri/frontend
+        working-directory: neocodex-frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: src-tauri/frontend/package-lock.json
+          cache-dependency-path: neocodex-frontend/package-lock.json
       - run: npm ci
       - run: npm run build
 

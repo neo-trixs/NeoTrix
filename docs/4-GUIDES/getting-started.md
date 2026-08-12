@@ -2,11 +2,42 @@
 
 ## Installation
 
+### macOS / Linux (supported by `install.sh`)
+
+One-liner (canonical endpoint):
+
+```bash
+curl -fsSL https://neotrix.ai/install | bash
+```
+
+Raw mirror, with options (`--version`, `--no-modify-path`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/neotrix/neotrix/main/install.sh | bash -s -- --version 0.18.0
+```
+
+`install.sh` auto-detects OS (macOS/Linux) and architecture (x86_64 / aarch64),
+then installs via the first available method, in order: Homebrew → cargo →
+pre-built binary → build from source. The binary lands in `~/.neotrix/bin` and
+PATH is updated for `bash`/`zsh`/`fish`.
+
+- **macOS** (Apple Silicon `arm64`, Intel `x86_64`): supported. Alternative:
+  `brew install neotrix-desktop` for the Desktop app (see below).
+- **Linux** (`x86_64`, `aarch64`): supported.
+- **Windows**: `install.sh` requires bash — use the MSI/NSIS installer from
+  the [releases page](https://github.com/neotrix/neotrix/releases) instead.
+
+### Windows
+
+Download and run the `neotrix-...-x64.msi` (or `.exe` NSIS) from the
+[releases page](https://github.com/neotrix/neotrix/releases).
+
 ### Homebrew (macOS / Linux)
 
 ```bash
 brew tap neotrix/neotrix
-brew install neotrix
+brew install neotrix            # CLI
+brew install --cask neotrix-desktop   # Desktop app (once cask is published)
 ```
 
 ### Cargo (from source)
