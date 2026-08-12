@@ -120,6 +120,30 @@ enum Commands {
     #[command(name = "mcp-server", about = "Run as MCP server (stdio JSON-RPC 2.0)")]
     McpServer,
 
+    // ── Consciousness Core (意识核心 — opencode agent 通道) ──
+    #[command(name = "consciousness", about = "意识核心状态/运行: status|tick|health|branches [--json] [--cycles N]")]
+    Consciousness {
+        #[arg(help = "子命令: status (默认) | tick | health | branches")]
+        sub: Option<String>,
+        #[arg(long, help = "JSON 输出 (machine-readable, opencode 友好)")]
+        json: bool,
+        #[arg(long, default_value_t = 1, help = "tick 时运行的生长周期数")]
+        cycles: usize,
+    },
+
+    // ── Project Evolution (独立项目进化 — 第三方 CLI 集成入口) ──
+    #[command(name = "project-evolve", about = "对任意目标项目运行进化链路 (scan→detect→score→report); 第三方 CLI 可集成")]
+    ProjectEvolve {
+        #[arg(help = "目标项目目录 (默认当前目录)")]
+        target: Option<String>,
+        #[arg(long, help = "自动修复 auto_fixable 问题")]
+        autofix: bool,
+        #[arg(long, help = "JSON 输出 (machine-readable)")]
+        json: bool,
+        #[arg(long, help = "修复断路器最大轮次", default_value_t = 10)]
+        max_rounds: usize,
+    },
+
     // ── Knowledge & Memory ──
     #[command(name = "evidence", about = "EWHR evidence management (list|get|calibrate|export|stats)")]
     Evidence {
@@ -465,6 +489,15 @@ fn main() {
             run_discover(*port, *duration, *json);
         }
         Some(Commands::McpServer) => entry::run_mcp_server(),
+        Some(Commands::Consciousness { sub, json, cycles }) => {
+            entry::run_consciousness_core(sub.as_deref(), *json, *cycles);
+        }
+        Some(Commands::ProjectEvolve { target, autofix, json, max_rounds }) => {
+            if let Err(e) = entry::run_project_evolve(target.as_deref(), *autofix, *json, *max_rounds) {
+                eprintln!("error: {}", e);
+                std::process::exit(1);
+            }
+        }
         Some(Commands::Features { command }) => {
             match command {
                 FeaturesCommands::Enable { name } => {

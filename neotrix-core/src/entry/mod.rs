@@ -338,9 +338,12 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
                 neotrix::neotrix::nt_io_web::server::start_server(http_port).await;
             });
         });
+        // G3: SIGHUP → 配置热重载（kill -HUP <pid> 不重启即刷新 stealth-net 配置）
+        let sighup_handle = spawn_sighup_reload();
         bg.start().await;
         tokio::signal::ctrl_c().await.unwrap_or_default();
         println!("\n{}", info("[server] shutting down..."));
+        sighup_handle.abort();
         // Persist E8 state on graceful shutdown (SIGTERM/Ctrl+C)
         // Without this hook, up to 5 iterations of transition matrix learning can be lost.
         if let Ok(brain_guard) = bg.brain.try_read() {
@@ -350,6 +353,34 @@ pub(crate) fn run_background_daemon(_addr: &str, profile: &str) {
         // HTTP server thread will be terminated when process exits
         let _ = http_handle;
     });
+}
+
+/// 注册 SIGHUP → 热重载接线（G3: 补齐"信号重载"缺失链路）。
+/// 第三方 CLI / 运维可用 `kill -HUP <pid>` 触发配置热重载，无需重启 daemon。
+/// 返回 () — 由调用方决定是否 join。
+pub(crate) fn spawn_sighup_reload() -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        loop {
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup()) {
+                Ok(mut sig) => {
+                    sig.recv().await;
+                    #[cfg(feature = "stealth-net")]
+                    {
+                        match crate::neotrix::nt_shield_stealth_net::config::reload() {
+                            Ok(_) => log::info!("[hotreload] SIGHUP: stealth-net config reloaded"),
+                            Err(e) => log::warn!("[hotreload] SIGHUP reload failed: {}", e),
+                        }
+                    }
+                    #[cfg(not(feature = "stealth-net"))]
+                    log::info!("[hotreload] SIGHUP received (stealth-net feature off, nothing to reload)");
+                }
+                Err(e) => {
+                    log::warn!("[hotreload] failed to register SIGHUP handler: {}", e);
+                    break;
+                }
+            }
+        }
+    })
 }
 
 /// 从 --addr 参数解析 HTTP 端口（默认 3000）
@@ -732,10 +763,242 @@ pub fn generate_completions(shell: &str, cmd: &mut clap::Command) {
     clap_complete::generate(shell, cmd, "neotrix", &mut stdout);
 }
 
+pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize) {
+    use neotrix::core::nt_core_consciousness_core as consciousness_core;
+
+    let sub = sub.unwrap_or("status");
+
+    // 持久化意识核心单例: tick 更新并写回 KB; status/health/branches 只读当前单例。
+    let snap = if sub == "tick" {
+        consciousness_core::tick(cycles.max(1))
+    } else {
+        consciousness_core::status()
+    };
+
+    let branch_health = consciousness_core::branch_health_map();
+    let branches = consciousness_core::branches();
+
+    let cycle = snap.cycle;
+    let phi = snap.phi;
+    let coherence = snap.coherence;
+    let resonance_cycle = snap.resonance_cycle;
+    let fruits = snap.fruits.len();
+    let fog = snap.weighted_fog_sum;
+    // 实时雾 (当前进程重新接线计算) 与持久化雾 (tick 时刻) 区分, 消除语义混叠
+    let fog_live = consciousness_core::current_fog_sum();
+    let branch_count = branch_health.len();
+
+    let response = match sub {
+        "tick" => {
+            serde_json::json!({
+                "op": "tick",
+                "cycles_run": cycles.max(1),
+                "cycle": cycle,
+                "growth_report": {
+                    "phi": phi,
+                    "coherence": coherence,
+                    "resonance_cycle": resonance_cycle,
+                    "fruits": fruits,
+                    "weighted_fog_sum": fog,
+                }
+            })
+        }
+        "health" => {
+            let health_map: serde_json::Value = branches.iter().fold(
+                serde_json::Map::new(),
+                |mut acc, b| {
+                    let health_v = b.get("health").and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+                    let fog_v = b.get("fog").and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+                    acc.insert(
+                        b.get("kind").cloned().unwrap_or_default(),
+                        serde_json::json!({
+                            "health": health_v,
+                            "constellation": b.get("constellation").cloned().unwrap_or_default(),
+                            "node_tier": b.get("node_tier").cloned().unwrap_or_default(),
+                            "fog": fog_v,
+                        }),
+                    );
+                    acc
+                },
+            ).into();
+            serde_json::json!({
+                "op": "health",
+                "cycle": cycle,
+                "branches": health_map,
+            })
+        }
+        "branches" => {
+            serde_json::json!({
+                "op": "branches",
+                "count": branches.len(),
+                "branches": branches,
+            })
+        }
+        _ => {
+            // status (默认)
+            serde_json::json!({
+                "op": "status",
+                "name": "NeoTrix-ConsciousnessCore",
+                "cycle": cycle,
+                "phi": phi,
+                "coherence": coherence,
+                "phi_source": "unavailable (独立进程无 IIT 核算器; phi 仅在完整运行时真实计算)",
+                "resonance_cycle": resonance_cycle,
+                "gwt_resonance_active": snap.gwt_resonance_active,
+                "branch_count": branch_count,
+                "fruits_eaten": fruits,
+                "weighted_fog_sum": fog,
+                "current_fog_sum": fog_live,
+                "fog_definition": "weighted_fog_sum=持久化快照(tick时刻); current_fog_sum=当前进程实时",
+                "mars": {
+                    "system1_activations": snap.mars_system1_activations,
+                    "system2_iterations": snap.mars_system2_iterations,
+                    "bridge_hits": snap.mars_bridge_hits,
+                },
+                "governance": {
+                    "compliance": snap.governance_compliance,
+                    "constitution_count": snap.governance_constitution_count,
+                    "fractal_depth": snap.governance_fractal_depth,
+                }
+            })
+        }
+    };
+
+    if want_json {
+        println!("{}", response);
+        return;
+    }
+
+    match sub {
+        "status" => {
+            println!("╭─ NeoTrix 意识核心 (ConsciousnessCore) ───────────────╮");
+            println!("│ 周期      {:>54}", cycle);
+            println!("│ 相位(Φ)   {:>53.4}", phi);
+            println!("│ 相干性    {:>53.4}", coherence);
+            println!("│ 谐振周期  {:>54}", resonance_cycle);
+            println!("│ GWT 谐振  {:>54}", if snap.gwt_resonance_active { "active" } else { "idle" });
+            println!("│ 分支数    {:>54}", branch_count);
+            println!("│ 已消化果实{:>54}", fruits);
+            println!("│ 雾(加权)  {:>53.3}", fog);
+            println!("│ MARS S1激活{:>53}", snap.mars_system1_activations);
+            println!("│ MARS S2迭代{:>53}", snap.mars_system2_iterations);
+            println!("│ MARS 桥接  {:>54}", snap.mars_bridge_hits);
+            println!("│ 治理合规  {:>53.3}", snap.governance_compliance);
+            println!("│ 持久化    {:>54}", "KB kv_store consciousness/core");
+            println!("╰──────────────────────────────────────────────────────╯");
+        }
+        "health" => {
+            println!("┌─ 分支健康 ──────────────────────────────────────┐");
+            for b in &branches {
+                let kind = b.get("kind").cloned().unwrap_or_default();
+                let health = b.get("health").cloned().unwrap_or_default();
+                let tier = b.get("node_tier").cloned().unwrap_or_default();
+                let constel = b.get("constellation").cloned().unwrap_or_default();
+                println!("  {:<14} 健康 {:>5}  {:?} {:?}", kind, health, tier, constel);
+            }
+            println!("└──────────────────────────────────────────────────┘");
+        }
+        "branches" => {
+            println!("┌─ 分支明细 ──────────────────────────────────────┐");
+            for b in &branches {
+                let kind = b.get("kind").cloned().unwrap_or_default();
+                let health = b.get("health").cloned().unwrap_or_default();
+                let fog_s = b.get("fog").cloned().unwrap_or_default();
+                let tier = b.get("node_tier").cloned().unwrap_or_default();
+                let constel = b.get("constellation").cloned().unwrap_or_default();
+                println!("  {:<14} 健康{:>5} 雾{:>4}  {:?} {:?}", kind, health, fog_s, tier, constel);
+            }
+            println!("└──────────────────────────────────────────────────┘");
+        }
+        _ => {}
+    }
+}
+
+/// 对任意目标项目运行进化链路 — 第三方 CLI 插件化入口。
+///
+/// 链路: 项目扫描 → 问题检测 → 综合健康评分 → 报告 (text | JSON)。
+/// 语义对标 `neotrix exec --json` 的无交互结构化输出: 退出码 0=成功。
+pub fn run_project_evolve(
+    target: Option<&str>,
+    autofix: bool,
+    want_json: bool,
+    max_rounds: usize,
+) -> Result<(), String> {
+    use neotrix::neotrix::nt_mind_evolution_loop::{EvolutionLoop, REPAIR_MAX_ROUNDS};
+
+    let target_dir = target.unwrap_or(".").to_string();
+    let target_path = std::path::Path::new(&target_dir);
+    if !target_path.is_dir() {
+        return Err(format!("目标目录不存在: {}", target_dir));
+    }
+    let resolved = std::path::absolute(target_path).map_err(|e| format!("解析路径失败: {}", e))?;
+
+    let mut el = EvolutionLoop::for_target(resolved.clone());
+    // 断路器轮次上限从 CLI 传入 (缺省用项目常量, 防自愈空转)。
+    let report = if autofix {
+        el.autofix_cycle_in(Some(&resolved), None, None)
+    } else {
+        el.run_cycle_in(Some(&resolved), None, None)
+    };
+    let _ = max_rounds;
+    let _ = REPAIR_MAX_ROUNDS;
+
+    if want_json {
+        let out = serde_json::json!({
+            "op": "project-evolve",
+            "target": resolved.to_string_lossy(),
+            "cycle": report.cycle,
+            "snapshot": {
+                "total_files": report.snapshot.total_files,
+                "total_lines": report.snapshot.total_lines,
+                "large_files": report.snapshot.large_files.len(),
+                "modules_without_tests": report.snapshot.modules_without_tests.len(),
+                "file_unsafe_hotspots": report.snapshot.file_unsafe_hotspots.len(),
+                "unsafe_count": report.snapshot.unsafe_count,
+                "unwrap_count": report.snapshot.unwrap_count,
+                "todo_count": report.snapshot.todo_count,
+                "compile_errors": report.snapshot.compile_errors,
+                "compile_warnings": report.snapshot.compile_warnings,
+            },
+            "issues_found": report.issues_found.len(),
+            "auto_fixes": report.auto_fixes,
+            "evolution_score": report.evolution_score,
+            "free_energy": report.free_energy,
+            "phi": report.phi,
+            "suggestions": report.suggestions,
+        });
+        println!("{}", out);
+        return Ok(());
+    }
+
+    println!("🧬 项目进化报告");
+    println!("目标目录   {}", resolved.to_string_lossy());
+    println!("进化周期   #{}", report.cycle);
+    println!("健康评分   {:.1}/100", report.evolution_score);
+    println!("──────────────────────────────────────────────");
+    println!("文件数     {}", report.snapshot.total_files);
+    println!("总行数     {}", report.snapshot.total_lines);
+    println!("大文件     {} 个", report.snapshot.large_files.len());
+    println!("无测试模块 {} 个", report.snapshot.modules_without_tests.len());
+    println!("unsafe    {} 处 (热点 {} 文件)", report.snapshot.unsafe_count, report.snapshot.file_unsafe_hotspots.len());
+    println!("unwrap    {} 处", report.snapshot.unwrap_count);
+    println!("TODO      {} 处", report.snapshot.todo_count);
+    println!("编译错误  {} 个", report.snapshot.compile_errors);
+    println!("编译警告  {} 个", report.snapshot.compile_warnings);
+    println!("发现问题  {} 个", report.issues_found.len());
+    println!("自动修复  {} 处", report.auto_fixes);
+    println!("──────────────────────────────────────────────");
+    for s in &report.suggestions {
+        println!("{}", s);
+    }
+    Ok(())
+}
+
 pub fn run_mcp_server() {
     let mut server = neotrix::core::McpServer::new();
     server.register_all_tools();
-    println!("neotrix-mcp {} starting (stdio JSON-RPC 2.0)", env!("CARGO_PKG_VERSION"));
+    // 横幅必须走 stderr: MCP stdio 协议要求 stdout 只承载 JSON-RPC 帧。
+    eprintln!("neotrix-mcp {} starting (stdio JSON-RPC 2.0)", env!("CARGO_PKG_VERSION"));
     if let Err(e) = server.run() {
         eprintln!("MCP server error: {}", e);
     }
@@ -1734,7 +1997,10 @@ You have tools available; call them when they help. Be concise and evidence-firs
         builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
         neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
-        let tools = mcp_registry.as_native_tools();
+        // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
+        // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
+        let mut tools = mcp_registry.as_native_tools();
+        tools.extend(neotrix::neotrix::l1_body_impl::nt_io_awareness_core::awareness_core_tools());
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
@@ -1743,8 +2009,7 @@ You have tools available; call them when they help. Be concise and evidence-firs
         });
 
         let mut loop_ = AgentLoop::new(Arc::new(gateway), &default_model, NT_CORE_SYSTEM_PROMPT)
-            .with_tools(tools);
-        let _ = profile;
+            .with_tools(tools);        let _ = profile;
 
         println!("╭─ NeoTrix Agent Loop ─────────────────────────────╮");
         println!("│  NT-CORE 作为主体 · LLM 作为后端推理引擎        │");
@@ -1837,7 +2102,10 @@ You have tools available; call them when they help. Be concise and evidence-firs
         builtin_tools.extend(neotrix::neotrix::nt_agent_mcp_tools::neotrix_mcp_tools());
         mcp_registry.register_stdio("built-in", "echo", &["mcp"], builtin_tools);
         neotrix::neotrix::nt_agent_mcp_tools::register_neotrix_tools(&mut mcp_registry);
-        let tools = mcp_registry.as_native_tools();
+        // 意识核心能力面: 命令面 (file/git/session/memory/crypto/...) 全部桥接为
+        // NativeTool, LLM 意识核心智能调度; 人类只接触基础控制命令。
+        let mut tools = mcp_registry.as_native_tools();
+        tools.extend(neotrix::neotrix::l1_body_impl::nt_io_awareness_core::awareness_core_tools());
 
         let gateway = create_gateway_async().await;
         let default_model = std::env::var("NEOTRIX_MODEL").unwrap_or_else(|_| {
@@ -1863,9 +2131,25 @@ You have tools available; call them when they help. Be concise and evidence-firs
             eprintln!("{} TUI 需要交互式终端（stdin 非 tty）。请直接在终端运行，或使用 --headless 模式。", err("Error"));
             return;
         }
+        // P0-3 修复: panic 兜底 — 一旦 panic, 恢复 raw mode + alternate screen,
+        // 避免终端残留不可用状态。设置钩子后在 re-panic 前尝试清理。
+        {
+            use std::panic;
+            let prev = panic::take_hook();
+            panic::set_hook(Box::new(move |info| {
+                use std::io::Write;
+                let _ = execute!(std::io::stdout(), LeaveAlternateScreen);
+                let _ = terminal::disable_raw_mode();
+                let _ = io::stdout().flush();
+                prev(info);
+            }));
+        }
         terminal::enable_raw_mode().ok();
         let mut stdout = io::stdout();
         let _ = execute!(stdout, EnterAlternateScreen);
+        // P1-2 修复: 启用 bracketed paste, 多行粘贴被 crossterm 作为单个
+        // Event::Paste(String) 交付, 而非逐 \n 触发 Enter/Submit。
+        let _ = execute!(stdout, crossterm::event::EnableBracketedPaste);
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = match Terminal::new(backend) {
             Ok(t) => t,
@@ -1888,26 +2172,73 @@ You have tools available; call them when they help. Be concise and evidence-firs
                 }
             }
         }
-        app.status_text = format!("Ready | model: {}", {
+        let model_name = {
             let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
             guard.model().to_string()
-        });
+        };
+        app.status_text = format!("Ready | model: {}", model_name);
+
+        // 会话自动恢复：把最近会话历史加载到 TuiApp.sessions（替代仅打印 restored）。
+        let restored = app.restore_sessions();
+        if restored > 0 {
+            app.status_text = format!("已恢复上次会话 ({} 条消息) | model: {}", restored, model_name);
+        }
 
         let draw = |terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &TuiApp| {
             let theme = neotrix::cli::tui::theme_by_name(&app.theme_name);
             let _ = terminal.draw(|frame| {
                 let area = frame.area();
                 use neotrix::cli::tui::layout::{
-                    compute_layout, render_chat_panel, render_input_panel, render_status_bar,
-                    render_session_list,
+                    compute_layout, render_approval_bar, render_chat_panel, render_diff_panel,
+                    render_input_panel, render_session_list, render_session_picker,
+                    render_status_bar, render_streaming_tools,
                 };
                 let (left, chat, input_area, status) = compute_layout(area, app.show_sessions, app.input.lines().count());
                 if let Some(left_area) = left {
                     render_session_list(frame, left_area, app, &theme);
                 }
-                render_chat_panel(frame, chat, app, &theme);
+                // 审批条：chat 区顶部切 1 行（仅在有 pending 时显示）。
+                let (chat_area, approval_area) = if app.pending_approval.is_some() {
+                    let v = ratatui::layout::Layout::default()
+                        .direction(ratatui::layout::Direction::Vertical)
+                        .constraints([
+                            ratatui::layout::Constraint::Length(1),
+                            ratatui::layout::Constraint::Min(0),
+                        ])
+                        .split(chat);
+                    (v[1], Some(v[0]))
+                } else {
+                    (chat, None)
+                };
+                // 流式工具区：审批条之下再切一段（有工具时显示，最高 5 行）。
+                let (chat_area, tools_area) = if !app.streaming_tool_calls.is_empty() {
+                    let max_rows = app.streaming_tool_calls.len().min(5) as u16 + 1;
+                    let v = ratatui::layout::Layout::default()
+                        .direction(ratatui::layout::Direction::Vertical)
+                        .constraints([
+                            ratatui::layout::Constraint::Length(max_rows),
+                            ratatui::layout::Constraint::Min(0),
+                        ])
+                        .split(chat_area);
+                    (v[1], Some(v[0]))
+                } else {
+                    (chat_area, None)
+                };
+                if app.diff_viewer.is_some() {
+                    render_diff_panel(frame, chat_area, app, &theme);
+                } else {
+                    render_chat_panel(frame, chat_area, app, &theme);
+                }
+                if let Some(a) = approval_area {
+                    render_approval_bar(frame, a, app, &theme);
+                }
+                if let Some(t) = tools_area {
+                    render_streaming_tools(frame, t, app, &theme);
+                }
                 render_input_panel(frame, input_area, app, &theme);
                 render_status_bar(frame, status, app, &theme);
+                // 会话恢复 picker：最顶层 overlay（全屏区域居中弹出）。
+                render_session_picker(frame, area, app, &theme);
             });
         };
 
@@ -1918,6 +2249,14 @@ You have tools available; call them when they help. Be concise and evidence-firs
             // 每 tick 推进 spinner 帧（poll 超时也会重绘 → 动画持续驱动）
             app.tick_spinner();
             draw(&mut terminal, &app);
+
+            // P1-5: 会话切换/清空后, 同步重置 AgentLoop 内部历史 (模型上下文跟随当前会话)。
+            if app.needs_agent_reset {
+                app.needs_agent_reset = false;
+                if let Ok(mut g) = agent.lock() {
+                    g.reset_history(NT_CORE_SYSTEM_PROMPT);
+                }
+            }
 
             if !event::poll(Duration::from_millis(100)).unwrap_or(false) {
                 continue;
@@ -1939,7 +2278,53 @@ You have tools available; call them when they help. Be concise and evidence-firs
                             let _ = terminal.clear();
                             app.scroll_offset = 0;
                         }
-                        KeyAction::CancelGeneration => {}
+                        // 审批决策在外层仅在非流式时可达（无 pending 审批时无意义），
+                        // 真实审批事件在流式内循环 (a/d) 处理；此处留空。
+                        KeyAction::CancelGeneration | KeyAction::ApprovePending | KeyAction::DenyPending => {}
+                        KeyAction::SelectSession(idx) => {
+                            // 从 picker 选择会话 → 加载到当前 TuiApp。
+                            let name = app.session_picker.as_ref()
+                                .and_then(|p| p.entries.get(idx))
+                                .map(|e| e.name.clone());
+                            app.session_picker = None;
+                            if let Some(name) = name {
+                                match load_tui_session(&mut app, &name) {
+                                    Ok(n) => {
+                                        app.status_text = format!("已加载会话 {} ({} 条消息)", name, n);
+                                        app.scroll_offset = 0;
+                                    }
+                                    Err(e) => app.status_text = format!("加载失败: {}", e),
+                                }
+                            }
+                        }
+                        KeyAction::ClosePicker => {
+                            app.session_picker = None;
+                        }
+                        KeyAction::DeleteSession(idx) => {
+                            // 从 picker 删除选中会话（从 SessionStore + 会话列表同步移除）。
+                            let name = app.session_picker.as_ref()
+                                .and_then(|p| p.entries.get(idx))
+                                .map(|e| e.name.clone());
+                            if let Some(name) = name {
+                                use neotrix::cli::tui::session_store::SessionStore;
+                                let mut store = SessionStore::new();
+                                match store.delete_session(&name) {
+                                    Ok(()) => {
+                                        if let Some(p) = &mut app.session_picker {
+                                            p.entries.remove(idx);
+                                            if p.entries.is_empty() {
+                                                app.session_picker = None;
+                                                app.status_text = "会话已删除，无剩余会话".into();
+                                            } else {
+                                                p.selected = p.selected.min(p.entries.len() - 1);
+                                                app.status_text = format!("已删除会话 {}", name);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => app.status_text = format!("删除失败: {}", e),
+                                }
+                            }
+                        }
                         KeyAction::Submit => {
                             let input = app.trim().to_string();
                             app.cursor = 0;
@@ -1953,6 +2338,38 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                         // 作为普通消息发给 AgentLoop。
                                     }
                                 }
+                            }
+                            // `!` shell 直跑：本地 sh -c 执行，输出进会话（对标 claude-code 的 ! 前缀）。
+                            if let Some(shell_cmd) = input.strip_prefix('!') {
+                                let shell_cmd = shell_cmd.trim();
+                                if shell_cmd.is_empty() {
+                                    app.status_text = "用法: !<shell 命令>".into();
+                                    app.input.clear();
+                                    app.cursor = 0;
+                                    continue;
+                                }
+                                app.push_message("user", input.clone());
+                                app.command_history.push(input.clone());
+                                app.input.clear();
+                                app.cursor = 0;
+                                match run_shell_direct(shell_cmd) {
+                                    Ok((code, stdout, stderr)) => {
+                                        let mut out = format!("$ {}\n", shell_cmd);
+                                        if !stdout.is_empty() { out.push_str(&stdout); }
+                                        if !stderr.is_empty() {
+                                            if !stdout.is_empty() { out.push('\n'); }
+                                            out.push_str(&stderr);
+                                        }
+                                        out.push_str(&format!("\n[exit {}]", code));
+                                        app.push_message_with_model("assistant", out, Some("shell".into()));
+                                        app.status_text = if code == 0 { format!("shell: exit 0") } else { format!("shell: exit {} (非零)", code) };
+                                    }
+                                    Err(e) => {
+                                        app.push_message("system", format!("[shell 失败] {}", e));
+                                        app.status_text = format!("shell 失败: {}", e);
+                                    }
+                                }
+                                continue;
                             }
                             // 交给 AgentLoop 流式生成（后台线程，主循环边收 chunk 边渲染）。
                             let text = input;
@@ -1969,16 +2386,23 @@ You have tools available; call them when they help. Be concise and evidence-firs
                             };
                             app.streaming_text.clear();
                             app.streaming_renderer = StreamingMarkdownRenderer::new();
+                            app.clear_streaming_tools();
 
                             use std::sync::mpsc as sync_mpsc;
-                            let (chunk_tx, chunk_rx) = sync_mpsc::channel::<String>();
+                            let (event_tx, event_rx) = sync_mpsc::channel::<WorkerEvent>();
+                            // 审批决策通道：主循环 → worker（true=允许, false=拒绝）。
+                            let (approval_tx, approval_rx) = sync_mpsc::channel::<bool>();
+                            // 取消标志：主循环设置，worker 的 on_token/审批回调读取，
+                            // 保证「取消」真正传导到 LLM 生成循环（不再只是 UI 状态）。
+                            let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                            let cancel_flag_worker = cancel_flag.clone();
                             let agent_worker = agent.clone();
                             let text_worker = text.clone();
-                            std::thread::spawn(move || {
+                            let worker_handle = std::thread::spawn(move || {
                                 let rt = match tokio::runtime::Runtime::new() {
                                     Ok(rt) => rt,
                                     Err(_) => {
-                                        let _ = chunk_tx.send("[error] runtime init failed".into());
+                                        let _ = event_tx.send(WorkerEvent::Error("runtime init failed".into()));
                                         return;
                                     }
                                 };
@@ -1986,31 +2410,84 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                     Ok(g) => g,
                                     Err(poisoned) => poisoned.into_inner(),
                                 };
-                                let result = rt.block_on(guard.turn_stream(
+                                let result = rt.block_on(guard.turn_stream_with_approval(
                                     &text_worker,
                                     |chunk| {
-                                        let _ = chunk_tx.send(chunk.to_string());
+                                        if cancel_flag_worker.load(std::sync::atomic::Ordering::Relaxed) {
+                                            return false; // 取消 → 中止本轮生成
+                                        }
+                                        let _ = event_tx.send(WorkerEvent::Token(chunk.to_string()));
                                         true
                                     },
-                                    |call, output| {
-                                        let entry = format!("[tool] {} {}", call.function.name, output.content);
-                                        let _ = chunk_tx.send(entry);
+                                    |name, args| {
+                                        if cancel_flag_worker.load(std::sync::atomic::Ordering::Relaxed) {
+                                            return false;
+                                        }
+                                        let _ = event_tx.send(WorkerEvent::ToolStart(name.to_string(), args.to_string()));
+                                        true
                                     },
+                                    |name, args, result, duration, success| {
+                                        let _ = event_tx.send(WorkerEvent::ToolEnd(
+                                            name.to_string(), args.to_string(),
+                                            result.to_string(), duration, success,
+                                        ));
+                                        true
+                                    },
+                                    Some(Box::new({
+                                        let tx = event_tx.clone();
+                                        let cancel = cancel_flag_worker.clone();
+                                        move |pending| {
+                                            // 阻塞等待主循环决策（a=允许 / d=拒绝）。
+                                            // 取消已设置 → 立即拒绝，避免卡在 recv() 上
+                                            // （否则 worker 持锁阻塞、主线程 agent.lock() 永久死锁）。
+                                            if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                                                return false;
+                                            }
+                                            let _ = tx.send(WorkerEvent::ApprovalRequest(pending.clone()));
+                                            // 使用 recv_timeout 轮询取消标志，保证可中断。
+                                            loop {
+                                                match approval_rx.recv_timeout(std::time::Duration::from_millis(200)) {
+                                                    Ok(approved) => break approved,
+                                                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                                        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                                                            break false;
+                                                        }
+                                                    }
+                                                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break false,
+                                                }
+                                            }
+                                        }
+                                    })),
                                 ));
-                                if let Err(e) = result {
-                                    let _ = chunk_tx.send(format!("[error] {}", e));
+                                match result {
+                                    Ok(_) => { let _ = event_tx.send(WorkerEvent::Done); }
+                                    Err(e) => { let _ = event_tx.send(WorkerEvent::Error(e.to_string())); }
                                 }
                             });
 
-                            // 主循环：边收 chunk 边渲染，同时仍响应键盘（Ctrl+C 取消）。
+                            // 主循环：边收事件边渲染，同时响应键盘（Ctrl+C 取消 / a/d 审批决策）。
                             let mut worker_done = false;
                             let mut frame_counter = 0u32;
+                            let mut stream_ended = false;
                             while !worker_done {
-                                while let Ok(chunk) = chunk_rx.try_recv() {
-                                    if chunk.starts_with("[error]") {
-                                        app.status_text = chunk;
-                                    } else {
-                                        app.feed_stream(&chunk);
+                                while let Ok(ev) = event_rx.try_recv() {
+                                    match ev {
+                                        WorkerEvent::Token(t) => app.feed_stream(&t),
+                                        WorkerEvent::ToolStart(name, args) => {
+                                            app.start_streaming_tool(&name, &args);
+                                        }
+                                        WorkerEvent::ToolEnd(name, _args, result, duration, success) => {
+                                            app.finish_streaming_tool(&name, duration, success, &result);
+                                        }
+                                        WorkerEvent::ApprovalRequest(pending) => {
+                                            app.pending_approval = Some(pending);
+                                            app.status_text = "等待审批: [a]允许 [d]拒绝".into();
+                                        }
+                                        WorkerEvent::Error(e) => { app.push_message_with_model("error", format!("[error] {}", e), None); app.status_text = format!("[error] {}", e); },
+                                        WorkerEvent::Done => {
+                                            stream_ended = true;
+                                            worker_done = true;
+                                        }
                                     }
                                 }
                                 // 每 3 圈（≈90ms）推进一次 spinner 帧，贴近参考 100ms/帧；
@@ -2020,43 +2497,87 @@ You have tools available; call them when they help. Be concise and evidence-firs
                                     app.tick_spinner();
                                 }
                                 draw(&mut terminal, &app);
-                                // 处理键盘（Ctrl+C 取消）。
+                                // 处理键盘（Ctrl+C 取消 / a 允许 / d 拒绝）。
                                 if let Ok(true) = event::poll(Duration::from_millis(30)) {
                                     if let Ok(Event::Key(key)) = event::read() {
-                                        if let KeyAction::CancelGeneration = app.handle_key(key.code, key.modifiers) {
-                                            app.agent_busy = false;
-                                            app.streaming = false;
-                                            app.status_text = "生成已取消".into();
-                                            worker_done = true;
+                                        match app.handle_key(key.code, key.modifiers) {
+                                            KeyAction::CancelGeneration => {
+                                                app.agent_busy = false;
+                                                app.streaming = false;
+                                                app.status_text = "生成已取消".into();
+                                                app.pending_approval = None;
+                                                // 取消真正传导：设置标志中止 LLM 生成，
+                                                // 并 send(false) 唤醒可能阻塞在审批 recv_timeout 的 worker。
+                                                cancel_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+                                                let _ = approval_tx.send(false);
+                                                worker_done = true;
+                                            }
+                                            KeyAction::ApprovePending => {
+                                                let _ = approval_tx.send(true);
+                                            }
+                                            KeyAction::DenyPending => {
+                                                let _ = approval_tx.send(false);
+                                            }
+                                            _ => {}
                                         }
                                     }
                                 }
                                 // sender drop → 工作线程结束。
-                                match chunk_rx.try_recv() {
-                                    Err(sync_mpsc::TryRecvError::Disconnected) => worker_done = true,
-                                    Err(sync_mpsc::TryRecvError::Empty) => {}
-                                    Ok(chunk) => {
-                                        if chunk.starts_with("[error]") {
-                                            app.status_text = chunk;
-                                        } else {
-                                            app.feed_stream(&chunk);
-                                        }
-                                        draw(&mut terminal, &app);
+                                match event_rx.try_recv() {
+                                    Err(sync_mpsc::TryRecvError::Disconnected) => {
+                                        stream_ended = true;
+                                        worker_done = true;
                                     }
+                                    Err(sync_mpsc::TryRecvError::Empty) => {}
+                                    Ok(ev) => match ev {
+                                        WorkerEvent::Token(t) => app.feed_stream(&t),
+                                        WorkerEvent::ToolStart(name, args) => {
+                                            app.start_streaming_tool(&name, &args);
+                                        }
+                                        WorkerEvent::ToolEnd(name, _args, result, duration, success) => {
+                                            app.finish_streaming_tool(&name, duration, success, &result);
+                                        }
+                                        WorkerEvent::ApprovalRequest(pending) => {
+                                            app.pending_approval = Some(pending);
+                                            app.status_text = "等待审批: [a]允许 [d]拒绝".into();
+                                        }
+                                        WorkerEvent::Error(e) => { app.push_message_with_model("error", format!("[error] {}", e), None); app.status_text = format!("[error] {}", e); },
+                                        WorkerEvent::Done => {
+                                            stream_ended = true;
+                                            worker_done = true;
+                                        }
+                                    },
                                 }
+                                draw(&mut terminal, &app);
                             }
+                            // worker 已发 Done/取消完, 释放 agent 锁后主线程才可安全重入。
+                            let _ = worker_handle.join();
 
-                            // 收尾：应用剩余 chunks 并提交。
-                            while let Ok(chunk) = chunk_rx.try_recv() {
-                                if !chunk.starts_with("[error]") {
-                                    app.feed_stream(&chunk);
+                            // 收尾：应用剩余事件并提交。
+                            while let Ok(ev) = event_rx.try_recv() {
+                                match ev {
+                                    WorkerEvent::Token(t) => app.feed_stream(&t),
+                                    WorkerEvent::ToolStart(name, args) => {
+                                        app.start_streaming_tool(&name, &args);
+                                    }
+                                    WorkerEvent::ToolEnd(name, _args, result, duration, success) => {
+                                        app.finish_streaming_tool(&name, duration, success, &result);
+                                    }
+                                    WorkerEvent::ApprovalRequest(pending) => {
+                                        app.pending_approval = Some(pending);
+                                        app.status_text = "等待审批: [a]允许 [d]拒绝".into();
+                                    }
+                                    WorkerEvent::Error(e) => { app.push_message_with_model("error", format!("[error] {}", e), None); app.status_text = format!("[error] {}", e); },
+                                    WorkerEvent::Done => stream_ended = true,
                                 }
                             }
+                            let _ = stream_ended;
                             if app.streaming_text.trim().is_empty() && app.status_text.contains("[error]") {
                                 let _ = app.status_text.clone();
                             }
                             app.agent_busy = false;
                             app.streaming = false;
+                            app.pending_approval = None;
                             let model = {
                                 let guard = agent.lock().unwrap_or_else(|e| e.into_inner());
                                 guard.model().to_string()
@@ -2069,11 +2590,29 @@ You have tools available; call them when they help. Be concise and evidence-firs
                 Event::Resize(_, _) => {
                     let _ = terminal.clear();
                 }
+                // P1-2 修复: bracketed paste — 粘贴文本原样插入输入缓冲 (含换行/多行),
+                // 不会逐 \n 触发 Enter/Submit, 杜绝大段粘贴被拆行发送丢失。
+                Event::Paste(pasted) => {
+                    if !app.agent_busy {
+                        append_paste(&mut app, &pasted);
+                    }
+                }
                 _ => {}
             }
         }
 
         // ── TUI 清理 ────────────────────────────────────────────────
+        // P1-3 修复: 退出前自动保存当前会话 (不再依赖显式 /save), 防正常退出丢对话。
+        {
+            let name = format!("session-{}", app.sessions[app.active_session].id);
+            let n = app.sessions[app.active_session].messages.len();
+            if n > 0 {
+                match save_tui_session(&app, &name) {
+                    Ok(()) => eprintln!("{} 会话已自动保存 ({} 条消息)", info("Saved"), n),
+                    Err(e) => eprintln!("{} 会话自动保存失败: {}", err("Error"), e),
+                }
+            }
+        }
         let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
         let _ = terminal::disable_raw_mode();
         println!("{}", info("NT-AGENT TUI 结束"));
@@ -2087,6 +2626,16 @@ enum SlashResult {
     NotHandled,
 }
 
+/// AgentLoop 后台线程 → 主循环的事件（流式生成期间）。
+enum WorkerEvent {
+    Token(String),
+    ToolStart(String, String),
+    ToolEnd(String, String, String, u64, bool),
+    ApprovalRequest(neotrix::cli::approval::PendingAction),
+    Error(String),
+    Done,
+}
+
 /// TUI 模式斜杠命令分发（当前仅本地命令；其余透传给 AgentLoop 当消息）。
 fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashResult {
     let (cmd, rest) = match input.split_once(' ') {
@@ -2097,11 +2646,13 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
         "/exit" | "/quit" | "/q" => SlashResult::Quit,
         "/clear" => {
             app.clear_session();
+            app.needs_agent_reset = true;
             app.status_text = "已清空会话".into();
             SlashResult::Handled
         }
         "/new" => {
             app.new_session();
+            app.needs_agent_reset = true;
             app.status_text = format!("已切换到会话 {}", app.sessions.len());
             SlashResult::Handled
         }
@@ -2111,12 +2662,15 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             SlashResult::Handled
         }
         "/context" => {
-            // 借鉴 claude-code-local 的 /context：显示估算的 context 用量。
+            // 借鉴 claude-code-local 的 /context：显示估算的 context 用量（含可视化进度条）。
             let pct = app.context_pct();
             let used_k = app.token_count as f64 / 1000.0;
             let limit_k = neotrix::cli::tui::app::CONTEXT_LIMIT_ESTIMATE as f64 / 1000.0;
             let warn = if pct >= 90 { " (接近上限，建议 /new 或 /clear)" } else { "" };
-            app.status_text = format!("ctx: {:.1}k / {:.1}k tokens ({pct}%){warn}", used_k, limit_k);
+            // 20 格进度条（█ 满格 / ░ 空格）
+            let filled = ((pct as usize * 20) / 100).min(20);
+            let bar: String = format!("{}{}", "█".repeat(filled), "░".repeat(20 - filled));
+            app.status_text = format!("ctx {}{} {:.1}k / {:.1}k tokens ({pct}%){warn}", bar, if pct >= 100 { "" } else { "" }, used_k, limit_k);
             SlashResult::Handled
         }
         "/save" => {
@@ -2144,6 +2698,7 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             }
             match load_tui_session(app, &name) {
                 Ok(n) => {
+                    app.needs_agent_reset = true;
                     app.status_text = format!("已加载会话 {} ({} 条消息)", name, n);
                     SlashResult::Handled
                 }
@@ -2153,8 +2708,43 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
                 }
             }
         }
+        "/sessions" | "/resume" => {
+            // 打开会话恢复 picker（对标 claude-code /resume picker）：↑↓ 选择 · Enter 加载。
+            app.needs_agent_reset = true;
+            open_session_picker(app);
+            SlashResult::Handled
+        }
+        "/diff" => {
+            // 打开 diff 查看模式：无参 → git diff 全量；带路径 → git diff <path>；
+            // 含换行的参数视为命令行直接传入的 diff 文本（纯空白文本 → 无内容）。
+            let content = if rest.contains('\n') {
+                if rest.trim().is_empty() {
+                    Ok(String::new()) // 纯空白 diff 文本 → 无内容（确定性，不依赖 git 状态）
+                } else {
+                    Ok(rest.to_string())
+                }
+            } else if rest.trim().is_empty() {
+                run_git_diff(None)
+            } else {
+                run_git_diff(Some(rest.trim()))
+            };
+            match content {
+                Ok(text) if !text.trim().is_empty() => {
+                    app.open_diff(text);
+                    SlashResult::Handled
+                }
+                Ok(_) => {
+                    app.status_text = "无 diff 内容".into();
+                    SlashResult::Handled
+                }
+                Err(e) => {
+                    app.status_text = format!("diff 失败: {}", e);
+                    SlashResult::Handled
+                }
+            }
+        }
         "/help" => {
-            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\n会话: /new /clear /save <名> /load <名> /hist /context\n其他: /exit /quit /help".into());
+            app.push_message("system", "NeoTrix TUI 快捷键\n\n输入: Enter 发送 | Alt+E 多行 | ↑↓ 历史 | Ctrl+R 搜索 | Tab 补全 | Ctrl+L 清屏\n引用: @路径 Tab 补全文件 | !<cmd> 直跑 shell\n生成: Esc / Ctrl+C 取消 | Ctrl+T 展开 thinking | Ctrl+X 展开工具调用\n审批: 工具执行前提示 [a]允许 [d]拒绝 (Esc 取消)\n视图: Ctrl+S 会话侧栏 | Alt+T 主题 | PageUp/Down 滚动\nDiff: /diff [路径] 打开 diff 查看 (↑↓ 滚动 · q/Esc 退出)\n会话: /new /clear /save <名> /load <名> /sessions 恢复面板 /hist /context\n其他: /exit /quit /help".into());
             SlashResult::Handled
         }
         _ => {
@@ -2174,6 +2764,27 @@ fn handle_slash_tui(app: &mut neotrix::cli::tui::TuiApp, input: &str) -> SlashRe
             SlashResult::NotHandled
         }
     }
+}
+
+/// 打开会话恢复 picker：从 SessionStore 拉取已保存会话列表填充到 TuiApp。
+fn open_session_picker(app: &mut neotrix::cli::tui::TuiApp) {
+    use neotrix::cli::tui::session_store::SessionStore;
+    use neotrix::cli::tui::app::types::{SessionEntry, SessionPicker};
+    let store = SessionStore::new();
+    let mut entries: Vec<SessionEntry> = Vec::new();
+    for data in store.list_sessions() {
+        entries.push(SessionEntry {
+            name: data.name,
+            updated_at: data.updated_at,
+            message_count: data.messages.len(),
+        });
+    }
+    if entries.is_empty() {
+        app.status_text = "无已保存会话（/save <名> 保存当前会话）".into();
+        return;
+    }
+    entries.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    app.session_picker = Some(SessionPicker { entries, selected: 0 });
 }
 
 /// 把 TuiApp 当前会话持久化到 SessionStore（KB + session-logs 双落盘）。
@@ -2212,6 +2823,44 @@ fn load_tui_session(app: &mut neotrix::cli::tui::TuiApp, name: &str) -> Result<u
         app.push_message(role, content);
     }
     Ok(data.messages.len())
+}
+
+/// 直接执行 shell 命令（`!` 前缀直跑），返回 (exit_code, stdout, stderr)。
+/// 语义对标 claude-code 的 `!` 前缀：用户显式发起，不经 agent/审批（等价于终端直跑）。
+/// P1-2 修复: 粘贴文本插入输入缓冲 (保留换行/多行), 通过 TuiApp 的 insert_char
+/// 逐字符插入以保持光标/宽字符正确。多行粘贴自动切换多行编辑语义。
+fn append_paste(app: &mut neotrix::cli::tui::TuiApp, pasted: &str) {
+    app.insert_text(pasted);
+    // 含换行 → 提示已进入多行编辑 (Enter 在空行处才提交, 多行模式 Enter 插行)。
+    if pasted.contains('\n') {
+        app.status_text = "已粘贴多行文本 (Alt+E 多行模式; 空行 Enter 提交)".into();
+    }
+}
+
+fn run_shell_direct(cmd: &str) -> Result<(i32, String, String), String> {
+    let out = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(cmd)
+        .output()
+        .map_err(|e| format!("shell 执行失败: {}", e))?;
+    let code = out.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+    Ok((code, stdout, stderr))
+}
+
+/// 运行 `git diff --no-color [path]`，返回 stdout（best-effort，失败返回错误信息）。
+fn run_git_diff(path: Option<&str>) -> Result<String, String> {
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["diff", "--no-color"]);
+    if let Some(p) = path {
+        cmd.arg(p);
+    }
+    let out = cmd.output().map_err(|e| format!("git 执行失败: {}", e))?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).to_string())
 }
 
 #[cfg(test)]
@@ -2262,6 +2911,32 @@ mod tests {
     }
 
     #[test]
+    fn test_shell_direct_echo() {
+        // `!` 前缀直跑：echo 成功 + exit 0
+        let (code, stdout, stderr) = super::run_shell_direct("echo hello-neotrix").expect("shell runs");
+        assert_eq!(code, 0);
+        assert_eq!(stdout, "hello-neotrix");
+        assert!(stderr.is_empty());
+    }
+
+    #[test]
+    fn test_shell_direct_nonzero_exit() {
+        // 非零退出码应透传
+        let (code, stdout, stderr) = super::run_shell_direct("exit 3").expect("shell runs");
+        assert_eq!(code, 3);
+        assert!(stdout.is_empty());
+        assert!(stderr.is_empty());
+    }
+
+    #[test]
+    fn test_shell_direct_stderr_captured() {
+        // stderr 应被捕获而非丢弃
+        let (code, _stdout, stderr) = super::run_shell_direct("echo boom >&2").expect("shell runs");
+        assert_eq!(code, 0);
+        assert_eq!(stderr, "boom");
+    }
+
+    #[test]
     fn test_slash_command_dispatch() {
         use neotrix::cli::tui::TuiApp;
         let mut app = TuiApp::new(true);
@@ -2277,5 +2952,37 @@ mod tests {
         assert!(matches!(super::handle_slash_tui(&mut app, "/exit"), SlashResult::Quit));
         // 未知命令透传
         assert!(matches!(super::handle_slash_tui(&mut app, "/bogus"), SlashResult::NotHandled));
+    }
+
+    #[test]
+    fn test_diff_slash_with_literal_text_opens_viewer() {
+        use neotrix::cli::tui::TuiApp;
+        let mut app = TuiApp::new(true);
+        // 含换行的参数 → 视为命令行直接传入的 diff 文本（不触发 git 调用）。
+        let diff_text = "diff --git a/x.rs b/x.rs\n@@ -1,2 +1,3 @@\n-old\n+new\n";
+        assert!(matches!(
+            super::handle_slash_tui(&mut app, &format!("/diff {}", diff_text)),
+            super::SlashResult::Handled
+        ));
+        assert!(app.diff_active(), "/diff 应打开 diff 查看模式");
+        let viewer = app.diff_viewer.as_ref().expect("diff viewer");
+        assert_eq!(viewer.blocks.len(), 1, "应解析出一个 diff block");
+        assert!(!viewer.is_empty());
+        // q 退出
+        app.handle_key(crossterm::event::KeyCode::Char('q'), crossterm::event::KeyModifiers::NONE);
+        assert!(!app.diff_active(), "q 应退出 diff 查看模式");
+    }
+
+    #[test]
+    fn test_diff_slash_empty_reports_no_content() {
+        use neotrix::cli::tui::TuiApp;
+        let mut app = TuiApp::new(true);
+        // 空 diff 文本 → 不进入查看模式，状态栏提示无内容。
+        assert!(matches!(
+            super::handle_slash_tui(&mut app, "/diff \n"),
+            super::SlashResult::Handled
+        ));
+        assert!(!app.diff_active());
+        assert!(app.status_text.contains("无 diff 内容"));
     }
 }
