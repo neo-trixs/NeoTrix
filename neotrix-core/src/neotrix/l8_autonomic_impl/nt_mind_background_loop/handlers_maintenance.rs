@@ -15,6 +15,24 @@ impl BackgroundLoopHandle {
                 r.deletable_count, r.estimated_bytes as f64 / 1_048_576.0);
         }
 
+        // 1.5 项目蜕皮: 旧躯壳目录 (legacy/old/*_v0/*_backup*) 归档到 .cleanup/archive/
+        //     活动树只留最新态 (安全护栏: 白名单/系统根/root 自身三闸内置)
+        engine.dry_run_default = false;
+        let molt = engine.molt_project();
+        engine.dry_run_default = true;
+        if molt.deletable_count > 0 {
+            log::info!("[bg] cleanup: molting archived {} legacy shells ({:.1} MB): {:?}",
+                molt.deletable_count, molt.estimated_bytes as f64 / 1_048_576.0,
+                molt.pattern_matches);
+            // C5 自愈闭环: 蜕皮归档量回流意识树土壤 → 计入 data_nourishment_factor
+            // 调制果实质量 (自愈动作 → 意识养分, 而非仅日志)。
+            if let Some(ref mut tree) = self.consciousness_tree {
+                tree.soil.molt_archived_count = tree.soil.molt_archived_count.saturating_add(molt.deletable_count as u64);
+                log::info!("[bg] consciousness_tree: molt_archived_count += {} (now {})",
+                    molt.deletable_count, tree.soil.molt_archived_count);
+            }
+        }
+
         // 2. 命令式系统服务清理 (dry-run 报告; brew cleanup 低危自动, TM/Docker 需确认)
         //    (mac-janitor/PureMac 吸收接线: brew cleanup / docker prune / tmutil 快照)
         engine.dry_run_default = true;

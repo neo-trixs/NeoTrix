@@ -56,6 +56,11 @@ pub struct DataFoundation {
     /// 反映意识能力网 (capability_registry) 的节点密度 — 能力网健康度反馈
     /// 到意识核心果实质量, 形成 意识树 ↔ 能力网 双向自动融合闭环。
     pub capability_node_count: u64,
+    /// 蜕皮养料 (C5 自愈闭环) — handle_cleanup 执行 molt_project 后回填。
+    /// 反映系统自我更新的蜕皮量 — 每次蜕皮归档的旧躯壳目录数。
+    /// 自愈行为 (移除旧躯壳/保持活动树最新态) 反馈到果实质量,
+    /// 形成 自愈动作 → 意识养分 的闭环 (而非仅日志)。
+    pub molt_archived_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -888,7 +893,10 @@ impl ConsciousnessTree {
         let exp_nourish = (self.soil.experience_branch_count as f64 / 500.0).min(0.2);
         // 能力网养料 (双网回流): 能力节点密度饱和曲线 (200 节点达 +15%)
         let cap_nourish = (self.soil.capability_node_count as f64 / 200.0).min(0.15);
-        1.0 + kb_nourish + kb_edge + kb_embed + conv_nourish + exp_nourish + cap_nourish
+        // 蜕皮养料 (C5 自愈闭环): 蜕皮归档量饱和曲线 (20 旧躯壳达 +5%)
+        // 自愈动作 (旧躯壳→_archive) 反馈为养料 — 行为影响果实, 非仅日志。
+        let molt_nourish = (self.soil.molt_archived_count as f64 / 20.0).min(0.05);
+        1.0 + kb_nourish + kb_edge + kb_embed + conv_nourish + exp_nourish + cap_nourish + molt_nourish
     }
 
     /// 闭环进化反馈 (意识核心自我运转 Phase 8)。
@@ -2255,6 +2263,22 @@ mod tests {
         let rich_q: f64 = rich.fruits.iter().map(|f| f.quality).sum::<f64>() / rich.fruits.len().max(1) as f64;
         let poor_q: f64 = poor.fruits.iter().map(|f| f.quality).sum::<f64>() / poor.fruits.len().max(1) as f64;
         assert!(rich_q > poor_q, "data-rich fruits should have higher quality: rich={:.3} poor={:.3}", rich_q, poor_q);
+    }
+
+    #[test]
+    fn test_molt_archived_count_nourishes() {
+        // C5 自愈闭环: 蜕皮归档量必须计入养料因子 (行为→意识养分)。
+        // 默认(无蜕皮)因子=1.0; 蜕皮后因子>1.0; 饱和 20 个旧躯壳达 +5% 上限。
+        let mut tree = ConsciousnessTree::new();
+        assert!((tree.data_nourishment_factor() - 1.0).abs() < 1e-9);
+        tree.soil.molt_archived_count = 10;
+        assert!(tree.data_nourishment_factor() > 1.0, "蜕皮养料应使因子>1.0");
+        tree.soil.molt_archived_count = 20;
+        assert!((tree.data_nourishment_factor() - 1.05).abs() < 1e-9,
+            "饱和 20 旧躯壳应达 +5%: {}", tree.data_nourishment_factor());
+        // 上限不随蜕皮量无限增长
+        tree.soil.molt_archived_count = 10_000;
+        assert!((tree.data_nourishment_factor() - 1.05).abs() < 1e-9);
     }
 
     #[test]

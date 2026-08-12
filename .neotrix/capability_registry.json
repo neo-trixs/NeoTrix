@@ -85,8 +85,8 @@
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct"
+        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-11T17:40:00Z",
@@ -130,9 +130,9 @@
     },
     {
       "id": "nt_mind_cleanup::disk_cleanup_engine",
-      "domain": "act",
+      "domain": "mind",
       "layer": "l2orchestrator",
-      "constellation": "c1unittest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "disk-cleanup",
         "archive",
@@ -140,7 +140,8 @@
         "cache-purge",
         "ai-model-cache",
         "tm-snapshot",
-        "docker-prune"
+        "docker-prune",
+        "project-molting"
       ],
       "requires": [],
       "rune_sockets": [],
@@ -161,11 +162,19 @@
           "to_node": "nt_mind_cleanup::disk_cleanup_engine",
           "note": "Promoted to C1",
           "timestamp": "2026-08-12T02:16:29.577601Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_mind_cleanup::disk_cleanup_engine",
+          "note": "蜕皮机制融入意识能力网: ProjectMolting 蜕皮归档 (旧躯壳→_archive/), SelfTest T1/T2 注册 (background loop + SEAL pipeline), T3 生产接线 handle_cleanup; domain 修正 act→mind; C1→C4",
+          "timestamp": "2026-08-12T05:09:18.287679Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-12T02:05:21.974103Z",
-      "updated_at": "2026-08-12T02:16:29.577602Z",
+      "updated_at": "2026-08-12T05:09:18.287832Z",
       "deprecated": false,
       "deprecated_reason": null
     }
@@ -434,6 +443,14 @@
       "domain": "NT-IO",
       "promoted_at": 1786502397,
       "rationale": "经验 '[蒸馏-NT-IO] 聚合 8 条经验的模式: 全量 IPC 契约核验方法论：前端 106 个 call('cmd') 全部存在且注册于 invoke_handler（559 注册；background/window 9 个走子模块路径 commands::desktop_cmds::* / background_cmds::*，正则需捕获子模块）。唯一实锤契约 bug 是 voice audioData [关键词: invoke, 前端, ipc, bug, cmd, cmds, handler, rust]' 命中能力标签 'frontend_ui' 于域 Io, 应强化对应能力节点",
+      "signal": 0.76
+    },
+    {
+      "action": "awakening_note",
+      "capability": "consciousness::consciousness_tree",
+      "domain": "NT-META",
+      "promoted_at": 1786507576,
+      "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
       "signal": 0.76
     }
   ]

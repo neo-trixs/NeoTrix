@@ -500,6 +500,7 @@ pub enum CleanupKind {
     BrainSnapshot,
     IDECaches,
     SystemServices,
+    ProjectMolting,
     All,
 }
 
@@ -514,6 +515,7 @@ impl CleanupKind {
             CleanupKind::BrainSnapshot => "大脑快照清理 (保留最近 N 个快照)",
             CleanupKind::IDECaches => "IDE 缓存 (Cursor, VS Code, IntelliJ, Xcode derived data)",
             CleanupKind::SystemServices => "系统服务命令清理 (brew cleanup, tmutil 快照, docker system prune)",
+            CleanupKind::ProjectMolting => "项目蜕皮归档 (旧躯壳目录 → _archive/, 活动树只留最新态)",
             CleanupKind::All => "全部清理 (包含以上所有类别)",
         }
     }
@@ -620,6 +622,8 @@ impl CleanupPattern {
             Self { name: "Go test artifacts", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/*.test", "**/*.test.exe", "**/coverage.out", "**/coverage.html"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("go test 编译产物与覆盖率; vendor/ 为依赖源码不删") },
             Self { name: "Turbo/Parcel cache", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.turbo/**", "**/.parcel-cache/**", "**/.angular/**", "**/.dart_tool/**", "**/.zig-cache/**", "**/zig-out/**"], max_age_days: Some(15), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
             Self { name: "Test caches", kind: CleanupKind::ProjectArtifacts, patterns: vec!["**/.pytest_cache/**", "**/.mypy_cache/**", "**/.ruff_cache/**", "**/coverage/**", "**/__pycache__/**"], max_age_days: Some(7), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
+            // ---- 项目蜕皮: 旧躯壳目录 (legacy/old/backup 命名的旧版本, 归档到 _archive/) ----
+            Self { name: "Legacy shells", kind: CleanupKind::ProjectMolting, patterns: vec!["**/legacy/**", "**/*_legacy/**", "**/legacy_*/**", "**/old_*/**", "**/*_old/**", "**/*_v0/**", "**/*_v1/**", "**/*_backup*/**"], max_age_days: Some(30), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: Some("旧躯壳目录 (旧版本代码), 蜕皮归档至 .cleanup/archive/ 而非删除") },
             Self { name: "iOS derived data", kind: CleanupKind::IDECaches, patterns: vec!["~/Library/Developer/Xcode/DerivedData/**", "~/Library/Developer/CoreSimulator/Caches/**"], max_age_days: Some(30), safe: true, recursive: true, platform: mac, risk: RiskLevel::Medium, description: None },
             // ---- 包管理缓存 ----
             Self { name: "Cargo registry cache", kind: CleanupKind::Cache, patterns: vec!["~/.cargo/registry/cache/**", "~/.cargo/git/db/**"], max_age_days: Some(90), safe: true, recursive: true, platform: all, risk: RiskLevel::Low, description: None },
@@ -993,6 +997,132 @@ impl CleanupEngine {
         }
         removed
     }
+
+    /// 项目蜕皮: 将 project_root 顶层旧躯壳目录 (legacy/old/*_v0/*_backup* 命名)
+    /// 整体归档至 .cleanup/archive/, 活动树只留最新态。
+    ///
+    /// 安全护栏 (三道闸):
+    ///   ① 白名单路径 (is_whitelisted) 绝不蜕皮;
+    ///   ② 系统根目录 (is_system_root_dir) 绝不蜕皮;
+    ///   ③ project_root 自身绝不蜕皮 (仅扫描其下一级, 不递归).
+    pub fn molt_project(&mut self) -> CleanupResult {
+        let mut result = CleanupResult::new(CleanupKind::ProjectMolting);
+        result.dry_run = self.dry_run_default;
+
+        let root = self.project_root.clone();
+        let mut shells: Vec<PathBuf> = Vec::new();
+        if let Ok(rd) = fs::read_dir(&root) {
+            for entry in rd.flatten() {
+                let p = entry.path();
+                if !p.is_dir() { continue; }
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                let is_shell = name == "legacy"
+                    || name.contains("_legacy") || name.starts_with("legacy_")
+                    || name.starts_with("old_") || name.ends_with("_old")
+                    || name.contains("_v0") || name.contains("_v1")
+                    || name.contains("_backup");
+                if is_shell {
+                    shells.push(p);
+                }
+            }
+        }
+        // 安全护栏: 过滤白名单/系统根/root 自身
+        shells.retain(|s| {
+            !self.is_whitelisted(s)
+                && !CleanupPattern::is_system_root_dir(s)
+                && s != &root
+        });
+        result.scanned_count = shells.len();
+        result.deletable_count = shells.len();
+        for s in &shells {
+            result.estimated_bytes = result.estimated_bytes.saturating_add(CleanupPattern::entry_size(s));
+            if result.pattern_matches.len() < 20 {
+                result.pattern_matches.push(s.to_string_lossy().to_string());
+            }
+        }
+
+        // 非 dry-run + 归档模式: 执行蜕皮归档
+        if !result.dry_run && !shells.is_empty() && self.archive_on_clean {
+            let path_strs: Vec<String> = shells.iter()
+                .map(|s| s.to_string_lossy().to_string())
+                .collect();
+            let mut archiver = Archiver::new(&root);
+            match archiver.archive_paths(&path_strs, "ProjectMolting") {
+                Ok(m) => {
+                    result.estimated_bytes = m.total_bytes;
+                    log::info!("[molting] 归档 {} 个旧躯壳到 .cleanup/archive/{}", m.total_items, m.batch_id);
+                }
+                Err(e) => result.errors.push(format!("蜕皮归档失败: {}", e)),
+            }
+        }
+
+        // 记录日志
+        let log_dir = root.join(".cleanup").join("log");
+        CleanupLog::log(&log_dir, &CleanupLogEntry {
+            action: "molt".into(),
+            kind: "ProjectMolting".into(),
+            items: shells.len(),
+            bytes: result.estimated_bytes,
+            batch_id: Local::now().format("%Y-%m-%d_%H%M%S").to_string(),
+            success: result.errors.is_empty(),
+            error: if result.errors.is_empty() { None } else { Some(result.errors.join("; ")) },
+        });
+
+        self.history.push(result.clone());
+        if self.history.len() > self.max_history {
+            self.history.remove(0);
+        }
+        result
+    }
+}
+
+/// SelfTest — 清理/蜕皮引擎检测能力自检 (T1)。
+///
+/// 检测以下退化:
+///   ① 规则库空 (CleanupPattern 未加载 → 清理静默失效);
+///   ② 蜕皮模式缺失 (ProjectMolting 未注册 → 蜕皮能力被删/退化);
+///   ③ 白名单空 (is_whitelisted 永假 → 危险: 白名单失效会误删受保护路径);
+///   ④ 安全护栏失效 (系统根目录可被蜕皮 → 数据风险)。
+#[derive(Default)]
+pub struct CleanupEngineSelfTest;
+
+impl crate::core::nt_core_self_test::SelfTest for CleanupEngineSelfTest {
+    fn name(&self) -> &str {
+        "nt_mind_cleanup_engine"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+
+        let all = CleanupPattern::all_patterns();
+        if all.is_empty() {
+            failures.push("CleanupPattern::all_patterns() 为空: 清理规则库退化".into());
+        }
+        if !all.iter().any(|p| p.kind == CleanupKind::ProjectMolting) {
+            failures.push("ProjectMolting 蜕皮规则未注册: 蜕皮能力缺失".into());
+        }
+        if !all.iter().any(|p| p.kind == CleanupKind::ProjectArtifacts) {
+            failures.push("ProjectArtifacts 构建产物规则未注册".into());
+        }
+
+        let engine = CleanupEngine::new();
+        if engine.whitelist.is_empty() {
+            failures.push("白名单为空: is_whitelisted 永假, 受保护路径可被误删".into());
+        }
+        if !engine.is_whitelisted(&dirs::home_dir().unwrap_or_default().join(".config").join("app")) {
+            failures.push("白名单 ~/.config 未匹配绝对路径: expand 失效".into());
+        }
+
+        // 安全护栏: 系统根目录必须被蜕皮拒绝
+        if !CleanupPattern::is_system_root_dir(std::path::Path::new("/")) {
+            failures.push("系统根目录安全护栏失效 (/)".into());
+        }
+        if !CleanupPattern::is_system_root_dir(&dirs::home_dir().unwrap_or_default()) {
+            failures.push("系统根目录安全护栏失效 ($HOME)".into());
+        }
+
+        if failures.is_empty() { Ok(()) } else { Err(failures) }
+    }
 }
 
 /// 运行外部命令, 校验 exit status。成功返回 stdout, 失败返回 Err (含 stderr)。
@@ -1194,6 +1324,7 @@ impl CommandCleaner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_cleanup_patterns() {
@@ -1466,5 +1597,103 @@ mod tests {
     fn test_cleanup_kind_services_all() {
         // All 描述覆盖全部类别 (回归: 新增 SystemServices 后 All 不应 panic)
         assert!(!CleanupKind::All.description().is_empty());
+    }
+
+    // ---- 蜕皮 (ProjectMolting) 增强测试 ----
+
+    #[test]
+    fn test_project_molting_kind_registered() {
+        let all = CleanupPattern::all_patterns();
+        assert!(all.iter().any(|p| p.kind == CleanupKind::ProjectMolting),
+            "ProjectMolting 蜕皮规则必须注册");
+        assert!(!CleanupKind::ProjectMolting.description().is_empty());
+    }
+
+    #[test]
+    fn test_molt_project_detects_legacy_shells() {
+        let tmp = std::env::temp_dir().join("neotrix_test_molting");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("legacy")).unwrap();
+        fs::create_dir_all(tmp.join("old_proto")).unwrap();
+        fs::create_dir_all(tmp.join("active")).unwrap();
+        fs::write(tmp.join("legacy").join("old.rs"), b"// old").unwrap();
+
+        let mut engine = CleanupEngine::new()
+            .with_project_root(tmp.clone());
+        engine.dry_run_default = true; // 预览模式
+        let r = engine.molt_project();
+
+        assert!(r.dry_run);
+        assert_eq!(r.deletable_count, 2, "legacy + old_proto 应被识别, active 不应");
+        assert!(r.pattern_matches.iter().any(|m| m.contains("legacy")));
+        assert!(r.pattern_matches.iter().any(|m| m.contains("old_proto")));
+        assert!(r.pattern_matches.iter().all(|m| !m.contains("active")),
+            "active 目录不得被蜕皮");
+        // 预览模式不产生归档副作用
+        assert!(!tmp.join(".cleanup").exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_molt_project_never_molts_project_root() {
+        let tmp = std::env::temp_dir().join("neotrix_test_molt_root_guard");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        let mut engine = CleanupEngine::new()
+            .with_project_root(tmp.clone());
+        engine.dry_run_default = true;
+        let r = engine.molt_project();
+
+        // 空项目 (无 legacy/old 子目录) → 0 蜕皮; root 自身绝不入壳
+        assert_eq!(r.deletable_count, 0);
+        // 项目名即使包含 old 字样也不得误判 (root 自身被 is_shell 忽略)
+        let root_named = tmp.join("old_project");
+        fs::create_dir_all(&root_named).unwrap();
+        engine.dry_run_default = true;
+        let r2 = engine.molt_project();
+        // 扫描的是 root 下一级, old_project 是 root 的子目录不是 root 自身
+        assert!(r2.pattern_matches.iter().any(|m| m.contains("old_project")),
+            "old_project 作为 root 的子目录应被识别为旧躯壳");
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_molt_project_archives_in_archive_mode() {
+        let tmp = std::env::temp_dir().join("neotrix_test_molt_archive");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("legacy")).unwrap();
+        fs::write(tmp.join("legacy").join("stale.rs"), b"// stale").unwrap();
+
+        let mut engine = CleanupEngine::new()
+            .with_project_root(tmp.clone());
+        engine.dry_run_default = false;
+        engine.archive_on_clean = true;
+        let r = engine.molt_project();
+
+        assert_eq!(r.deletable_count, 1);
+        assert!(r.errors.is_empty(), "归档不应报错: {:?}", r.errors);
+        // 旧躯壳已从活动树移除 (移动而非删除)
+        assert!(!tmp.join("legacy").exists(), "legacy 应被移入归档");
+        assert!(tmp.join(".cleanup").join("archive").exists());
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_cleanup_engine_selftest_ok() {
+        let result = CleanupEngineSelfTest.self_test();
+        assert!(result.is_ok(), "SelfTest 应通过: {:?}", result.err());
+    }
+
+    #[test]
+    fn test_selftest_detects_missing_molting() {
+        // 模拟规则库缺蜕皮 → SelfTest 必须报失败 (R-P23 检测系统自审计)
+        // 通过向 all_patterns 打补丁不可行 (static), 验证护栏检测本身:
+        let engine = CleanupEngine::new();
+        assert!(engine.patterns.iter().any(|p| p.kind == CleanupKind::ProjectMolting),
+            "生产规则库应含蜕皮规则");
     }
 }

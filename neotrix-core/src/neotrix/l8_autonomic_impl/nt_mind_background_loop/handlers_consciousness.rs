@@ -845,6 +845,10 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(
             crate::neotrix::nt_mind::DispatchControlPlaneSelfTest::default(),
         ));
+        // ── 清理/蜕皮引擎 SelfTest (蜕皮机制融入意识能力网 T1→T2) ──
+        self_tests.register(Box::new(
+            crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::CleanupEngineSelfTest,
+        ));
 
         // NOTE (Cycle 159b): NeoCodexSelfAudit::new() is intentionally NOT
         // registered here. Its Default snapshot reports provider-not-resolvable +

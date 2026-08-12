@@ -2128,6 +2128,7 @@ impl BrainStage for SelfTestStage {
         registry.register(Box::new(crate::core::nt_core_state_substrate::StateSubstrate::new()));
         registry.register(Box::new(crate::core::nt_core_simulate_engine::SimulateEngine::new()));
         registry.register(Box::new(crate::core::nt_core_second_brain::SecondBrain::new()));
+        registry.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::CleanupEngineSelfTest));
         let results = registry.run_all();
         let passed = results.iter().filter(|r| r.passed).count();
         let total = results.len();
