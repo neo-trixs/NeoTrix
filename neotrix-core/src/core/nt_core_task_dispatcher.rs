@@ -201,10 +201,14 @@ impl TaskDecomposerDispatcher {
         // 1. 拆解任务
         let decomposition = self.decompose_task(task).await?;
 
-        // 2. 执行子任务
+        // 2. 分级调度计划显式化 (H7 打标 + H10 可观测)
+        let dispatch_plan = format_dispatch_plan(&decomposition);
+        log::debug!("[dispatcher] {}", dispatch_plan);
+
+        // 3. 执行子任务 (H8: 确定性走代码, 推理走 LLM)
         let results = self.execute_sub_tasks(&decomposition).await?;
 
-        // 3. 聚合结果
+        // 4. 聚合结果
         let final_answer = self.aggregate_results(&decomposition, &results).await?;
 
         Ok(final_answer)
@@ -569,8 +573,12 @@ Output your result for this subtask only."#,
     async fn execute_single_sub_task(&mut self, sub_task: &SubTask, context: &HashMap<String, String>) -> Result<SubTaskResult, TaskDispatchError> {
         let start = SystemTime::now();
 
-        // 选择执行策略
-        let result = if self.config.enable_cot && self.cot_generator.is_some() {
+        // 选择执行策略 (H8: 确定性任务走代码/kernel 快路径, 推理任务走 LLM 链)
+        let class = classify_sub_task(sub_task);
+        let result = if class == SubTaskClass::Deterministic && self.kernel.is_some() {
+            // 确定性: kernel 结构化执行, 不耗费 LLM 推理预算
+            self.execute_with_kernel(sub_task, context).await
+        } else if self.config.enable_cot && self.cot_generator.is_some() {
             // 使用 CoT 生成器
             self.execute_with_cot(sub_task, context).await
         } else if self.reasoning_engine.is_some() {
@@ -956,6 +964,65 @@ pub fn format_reducer_signals(report: &ReduceReport) -> String {
     out
 }
 
+// ── 调度头分级 (H7-H9): 拆解打标 scalar → 确定性走代码, 推理走 LLM ──
+
+/// 子任务分级: 确定性 (可结构化处理) vs 需要智能推理。
+/// 由 `required_capabilities` 与 prompt 特征派生, 不改 SubTask schema。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubTaskClass {
+    /// 确定性任务: 走 kernel/代码路径, 不耗费 LLM 推理预算
+    Deterministic,
+    /// 需要智能推理: 走 CoT/ReasoningEngine/LLM 链
+    Reasoning,
+}
+
+/// 从子任务派生分级 (H7 打标)。
+/// 推理特征: 深度分析/设计/写作/研究/代码生成 能力, 或长 prompt 隐含复杂度。
+/// 确定性特征: 结构化/机械化能力 (testing/verification) + 短 prompt。
+pub fn classify_sub_task(sub_task: &SubTask) -> SubTaskClass {
+    use crate::core::nt_core_crt::CrtTimeScale::*;
+    let caps: Vec<&str> = sub_task.required_capabilities.iter().map(|s| s.as_str()).collect();
+    let reasoning_caps = ["code_generation", "design", "analysis", "research", "writing"];
+    let deterministic_caps = ["testing", "verification"];
+
+    if caps.iter().any(|c| reasoning_caps.contains(c)) {
+        return SubTaskClass::Reasoning;
+    }
+    if caps.iter().any(|c| deterministic_caps.contains(c)) && sub_task.prompt.len() < 200 {
+        return SubTaskClass::Deterministic;
+    }
+    // 兜底: 长 prompt / 战略尺度 = 推理
+    if sub_task.prompt.len() > 300 || matches!(sub_task.crt_scale, Xuanye) {
+        SubTaskClass::Reasoning
+    } else {
+        SubTaskClass::Deterministic
+    }
+}
+
+/// 格式化拆解计划 (含每子任务分级), 供调度报告消费 (H7 显式化 + H10 可观测)。
+pub fn format_dispatch_plan(decomposition: &DecompositionResult) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "Dispatch plan: {} subtasks, order=[{}]\n",
+        decomposition.sub_tasks.len(),
+        decomposition.execution_order.join(",")
+    ));
+    for st in &decomposition.sub_tasks {
+        let class = match classify_sub_task(st) {
+            SubTaskClass::Deterministic => "DET",
+            SubTaskClass::Reasoning => "RES",
+        };
+        out.push_str(&format!(
+            "  [{}] {} (caps={}) deps=[{}]\n",
+            class,
+            st.title,
+            st.required_capabilities.join("+"),
+            st.dependencies.join(",")
+        ));
+    }
+    out
+}
+
 /// 调度错误类型
 #[derive(Debug, thiserror::Error)]
 pub enum TaskDispatchError {
@@ -1077,5 +1144,65 @@ mod tests {
         let signals = format_reducer_signals(&report);
         assert!(signals.contains("<CONSENSUS n=2>"), "consensus marker for multi-worker confirmation");
         assert!(signals.contains("clusters=1"));
+    }
+
+    fn sub_task(id: &str, title: &str, caps: Vec<&str>, prompt_len: usize) -> SubTask {
+        SubTask {
+            id: id.to_string(),
+            title: title.to_string(),
+            description: String::new(),
+            prompt: "x".repeat(prompt_len),
+            context: HashMap::new(),
+            priority: 5,
+            estimated_complexity: 0.5,
+            required_capabilities: caps.into_iter().map(|s| s.to_string()).collect(),
+            dependencies: Vec::new(),
+            crt_scale: CrtTimeScale::Gaitian,
+            hexagram_bias: Some(3),
+        }
+    }
+
+    #[test]
+    fn test_classify_reasoning_capability() {
+        let st = sub_task("s1", "Design the system architecture", vec!["design"], 80);
+        assert_eq!(classify_sub_task(&st), SubTaskClass::Reasoning);
+    }
+
+    #[test]
+    fn test_classify_deterministic_verification() {
+        let st = sub_task("s2", "Verify output passes format check", vec!["testing"], 100);
+        assert_eq!(classify_sub_task(&st), SubTaskClass::Deterministic);
+    }
+
+    #[test]
+    fn test_classify_long_prompt_falls_back_reasoning() {
+        let st = sub_task("s3", "Generic task", vec!["general"], 350);
+        assert_eq!(classify_sub_task(&st), SubTaskClass::Reasoning);
+    }
+
+    #[test]
+    fn test_classify_default_deterministic() {
+        let st = sub_task("s4", "Generic task", vec!["general"], 50);
+        assert_eq!(classify_sub_task(&st), SubTaskClass::Deterministic);
+    }
+
+    #[test]
+    fn test_format_dispatch_plan_report() {
+        let order = vec!["s2".to_string(), "s1".to_string()];
+        let plan = DecompositionResult {
+            original_task: "Build a system".to_string(),
+            sub_tasks: vec![
+                sub_task("s2", "Verify output", vec!["testing"], 100),
+                sub_task("s1", "Design architecture", vec!["design"], 80),
+            ],
+            execution_order: order,
+            crt_plan: CrtPlan::new(CrtTimeScale::Huntian, 120.0),
+            estimated_total_time: 60.0,
+            confidence: 0.7,
+        };
+        let report = format_dispatch_plan(&plan);
+        assert!(report.contains("DET"), "deterministic subtask tagged");
+        assert!(report.contains("RES"), "reasoning subtask tagged");
+        assert!(report.contains("order=[s2,s1]"));
     }
 }
