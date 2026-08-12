@@ -139,6 +139,17 @@ pub fn tick(cycles: usize) -> CoreSnapshot {
         .unwrap_or_default()
 }
 
+/// 将真实 SelfTest 结果合并进意识核心单例树, 重算各域分支健康并持久化。
+/// 后台循环 (handlers_consciousness) 在跑完注册器 SelfTest 后调用, 使基于真实
+/// 检测的分支健康流入跨会话快照 — 修复此前独立 tree 实例计算后即丢弃、
+/// `consciousness/core` 快照分支健康恒 0 的断链 (迷雾治理)。
+pub fn apply_branch_health_from_self_tests(results: &[crate::core::nt_core_self_test::SelfTestResult]) {
+    let mut h = CORE.write().unwrap_or_else(|e| e.into_inner());
+    h.tree.set_branch_health_from_self_tests(results);
+    h.snapshot = core_snapshot_from_tree(&h.tree);
+    let _ = persist_snapshot(&h.snapshot);
+}
+
 /// 每分支以上实时雾加权和 (只读) — 反映当前进程接线状态, 非持久化快照。
 pub fn current_fog_sum() -> f64 {
     CORE.read()
@@ -396,6 +407,25 @@ mod tests {
         let back: CoreSnapshot = serde_json::from_str(&json).unwrap();
         assert_eq!(back.fruits[0].name, "test-fruit");
         assert_eq!(back.fruits[0].source_branch, "Mind");
+    }
+
+    #[test]
+    fn apply_branch_health_from_self_tests_populates_branch_health() {
+        // 迷雾治理修复验证: 真实 SelfTest 结果经 apply_* 后,
+        // CORE 单例分支健康应非 0 且快照持久化 (供 MCP/CLI status 读取)。
+        isolate_home_once();
+        let results = vec![
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_consciousness_monitor"),
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency"),
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry"),
+        ];
+        crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+        let snap = crate::core::nt_core_consciousness_core::status();
+        assert!(
+            snap.branch_health.values().any(|h| *h > 0.0),
+            "apply_branch_health_from_self_tests 后至少一个分支健康应非 0, got {:?}",
+            snap.branch_health
+        );
     }
 
     #[test]

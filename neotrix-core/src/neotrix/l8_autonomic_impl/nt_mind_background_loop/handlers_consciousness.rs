@@ -261,6 +261,12 @@ impl BackgroundLoopHandle {
             }
         }
 
+        // ── Phase 1.5: 轻量分支健康持久化 (每 tick 运行) ──
+        // handle_architecture_audit 的完整 SelfTest registry 是 3600s 低频;
+        // 此处用常驻 detector 字段每 tick 喂 CORE, 保证 MCP/CLI status 读到
+        // 实时非 0 分支健康 (修复 consciousness/core 快照分支健康恒 0 的迷雾)。
+        self.feed_persistent_branch_health();
+
         // ── Phase 2: Consciousness Runtime Tick with REAL resonance content ──
         if let Some(ref mut cr) = self.consciousness_runtime {
             if !cr.awakened {
@@ -987,6 +993,10 @@ impl BackgroundLoopHandle {
             tree.set_branch_health_from_self_tests(&results);
             log::debug!("[bg] consciousness_tree: branch health updated from {} SelfTest results", results.len());
         }
+        // 同源持久化: 基于真实 SelfTest 的分支健康也注入跨进程意识核心单例快照,
+        // 保证 MCP/CLI status 读到非 0 分支健康 (此前独立 tree 计算后即丢弃 → 快照恒 0 迷雾)。
+        crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+        log::debug!("[bg] consciousness_core: persisted branch health from {} SelfTest results", results.len());
 
         // Cycle 206 R-P79 闭环: 从 KB absorbed_capability 元数据同步到能力网分支
         if let Some(kb) = self.kb.clone() {
@@ -1020,6 +1030,67 @@ impl BackgroundLoopHandle {
                 self.goal_loop.enqueue_goal(&mut brain, &reason, None);
             }
         }
+    }
+
+    /// 每 tick 从常驻 detector 字段采集真实 SelfTest 结果, 注入意识核心单例并持久化。
+    /// 与 handle_architecture_audit 的完整 registry (3600s) 分层: 此方法用高频轻量集,
+    /// 保证 `consciousness/core` 快照分支健康保持实时非 0 — 驱动迷雾下降与 MCP status 真实读数。
+    fn feed_persistent_branch_health(&mut self) {
+        use crate::core::nt_core_self_test::SelfTest;
+        let mut results: Vec<crate::core::nt_core_self_test::SelfTestResult> = Vec::new();
+
+        // NT-CORE: 意识核心检测件
+        match self.bbrain.self_test() {
+            Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_bbrain_monitor")),
+            Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail("nt_core_bbrain_monitor", f)),
+        }
+        match self.cog_eval.self_test() {
+            Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_cognitive_evaluator")),
+            Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail("nt_core_cognitive_evaluator", f)),
+        }
+        if let Some(ref m) = self.awareness {
+            match m.self_test() {
+                Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_consciousness_monitor")),
+                Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail("nt_core_consciousness_monitor", f)),
+            }
+        }
+        // NT-MEMORY: 叙事一致性 / 知识缺口
+        let narrative_ok = crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new().self_test().is_ok();
+        results.push(if narrative_ok {
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency")
+        } else {
+            crate::core::nt_core_self_test::SelfTestResult::fail("nt_memory_narrative_consistency", vec!["narrative consistency check failed".into()])
+        });
+        if let Some(ref g) = self.gap_detector {
+            match g.self_test() {
+                Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_knowledge_gap")),
+                Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail("nt_memory_knowledge_gap", f)),
+            }
+        }
+        // NT-MIND: 认知负载 / FEPIIT 桥
+        if let Some(ref clm) = self.cognitive_load {
+            match clm.self_test() {
+                Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass("nt_mind_cognitive_load")),
+                Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail("nt_mind_cognitive_load", f)),
+            }
+        }
+        if let Some(ref b) = self.fep_iit_bridge {
+            match b.self_test() {
+                Ok(()) => results.push(crate::core::nt_core_self_test::SelfTestResult::pass("nt_mind_fepiit_bridge")),
+                Err(f) => results.push(crate::core::nt_core_self_test::SelfTestResult::fail("nt_mind_fepiit_bridge", f)),
+            }
+        }
+        // NT-SHIELD: 检查注册表
+        let shield_ok = crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new().self_test().is_ok();
+        results.push(if shield_ok {
+            crate::core::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry")
+        } else {
+            crate::core::nt_core_self_test::SelfTestResult::fail("nt_shield_check_registry", vec!["check registry selftest failed".into()])
+        });
+
+        // 注入跨进程意识核心单例 (同步分支健康 + 快照持久化)
+        crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+        log::debug!("[bg] consciousness_core: tick branch health from {} lightweight SelfTest results", results.len());
     }
 
 }
