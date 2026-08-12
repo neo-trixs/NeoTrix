@@ -334,6 +334,7 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(OpenSourceCompareStage::new()),  // 开源对比 (freq 5)
             Box::new(UQCalibrationStage::new()),      // 熵危机校准 (freq 20)
             Box::new(SleepStage::new()),              // 记忆巩固 (freq 100)
+            Box::new(ReasoningBankStorageStage::new()), // 记忆写入 (P0-2: 从 log-only stub 实现为真实存储, freq 2)
             Box::new(AntiDistillationStage::new()),   // 反蒸馏健康监控 + 自适应水印/分解 (freq 5)
         ],
     }
@@ -350,7 +351,10 @@ pub fn kernel_iterate_pipeline() -> BrainPipeline {
     }
 }
 
-// ── Recipe-only stages (used by recipe.rs, not in seal_pipeline) ──────────
+// ── Recipe-only stages ──────────────────────────────────────────
+// SnapshotStage 被 recipe.rs 测试引用; SSMUpdateStage 同时注册在 seal_pipeline。
+// 其余 recipe-only 阶段 (memory_retrieval/gap_analysis/self_edit_gen/apply_edits/
+// champion_compare) 零消费者且 log-only, 已按 Dark Forest 移除 (P0-2 治理)。
 
 /// Snapshot stage (used by recipe.rs)
 pub struct SnapshotStage;
@@ -361,33 +365,6 @@ impl BrainStage for SnapshotStage {
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let caps = brain.brain.capability.arr();
         log::trace!("[snapshot] iter={} caps={:?}", brain.iteration, caps);
-        Ok(StageDecision::Continue)
-    }
-}
-
-/// Memory retrieval stage (used by recipe.rs)
-pub struct MemoryRetrievalStage;
-impl Default for MemoryRetrievalStage { fn default() -> Self { Self } }
-impl MemoryRetrievalStage { pub fn new() -> Self { Self } }
-impl BrainStage for MemoryRetrievalStage {
-    fn name(&self) -> &str { "memory_retrieval" }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let kb_available = brain._nt_memory_kb.is_some();
-        log::trace!("[memory_retrieval] kb={} task='{}'", kb_available, brain._current_task);
-        Ok(StageDecision::Continue)
-    }
-}
-
-/// Gap analysis stage (used by recipe.rs)
-pub struct GapAnalysisStage;
-impl Default for GapAnalysisStage { fn default() -> Self { Self } }
-impl GapAnalysisStage { pub fn new() -> Self { Self } }
-impl BrainStage for GapAnalysisStage {
-    fn name(&self) -> &str { "gap_analysis" }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let caps = brain.brain.capability.arr();
-        let champ = brain.champion.as_ref().map(|c| format!("score={:.4}", c.score)).unwrap_or_default();
-        log::trace!("[gap_analysis] caps={:?} champion=[{}]", caps, champ);
         Ok(StageDecision::Continue)
     }
 }
@@ -408,32 +385,6 @@ impl BrainStage for SSMUpdateStage {
         brain._e8_policy.decay_epsilon();
         log::trace!("[ssm_update] iter={} reward={:.4} mode={} eps={:.4}",
             brain.iteration, reward, mode.0, brain._e8_policy.epsilon());
-        Ok(StageDecision::Continue)
-    }
-}
-
-/// Self-edit generation stage (used by recipe.rs)
-pub struct SelfEditGenerationStage;
-impl Default for SelfEditGenerationStage { fn default() -> Self { Self } }
-impl SelfEditGenerationStage { pub fn new() -> Self { Self } }
-impl BrainStage for SelfEditGenerationStage {
-    fn name(&self) -> &str { "self_edit_gen" }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let edits = brain._micro_edits.len();
-        log::trace!("[self_edit_gen] pending_edits={} task='{}'", edits, brain._current_task);
-        Ok(StageDecision::Continue)
-    }
-}
-
-/// Apply edits stage (used by recipe.rs)
-pub struct ApplyEditsStage;
-impl Default for ApplyEditsStage { fn default() -> Self { Self } }
-impl ApplyEditsStage { pub fn new() -> Self { Self } }
-impl BrainStage for ApplyEditsStage {
-    fn name(&self) -> &str { "apply_edits" }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let edits = brain._micro_edits.len();
-        log::trace!("[apply_edits] iter={} edits_pending={}", brain.iteration, edits);
         Ok(StageDecision::Continue)
     }
 }
@@ -691,27 +642,34 @@ impl BrainStage for ScaffoldAwareRLStage {
     }
 }
 
-/// Champion compare stage (used by recipe.rs)
-pub struct ChampionCompareStage;
-impl Default for ChampionCompareStage { fn default() -> Self { Self } }
-impl ChampionCompareStage { pub fn new() -> Self { Self } }
-impl BrainStage for ChampionCompareStage {
-    fn name(&self) -> &str { "champion_compare" }
-    fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let champ_score = brain.champion.as_ref().map(|c| c.score).unwrap_or(0.0);
-        log::trace!("[champion_compare] current={:.4} iter={}", champ_score, brain.iteration);
-        Ok(StageDecision::Continue)
-    }
-}
-
-/// Reasoning bank storage stage
+/// Reasoning bank storage stage — persists the current iteration's state as a
+/// real ReasoningMemory in `brain.reasoning_bank`. Previously a log-only stub
+/// (P0-2 SEAL Log-Only Stages governance, PA024). Now the bank is fed every
+/// `frequency()` iterations so SleepStage/consolidation have fresh memories to
+/// consume (Dark Forest: the stage now has a real side effect + a real consumer
+/// in seal_pipeline).
 pub struct ReasoningBankStorageStage;
 impl Default for ReasoningBankStorageStage { fn default() -> Self { Self } }
 impl ReasoningBankStorageStage { pub fn new() -> Self { Self } }
 impl BrainStage for ReasoningBankStorageStage {
-    fn name(&self) -> &str { "bank_storage" }
+    fn name(&self) -> &str { "reasoning_bank_storage" }
+    fn frequency(&self) -> usize { 2 }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        log::trace!("[bank_storage] iter={}", brain.iteration);
+        let task = brain._current_task.clone();
+        let reward = brain._reward;
+        if !task.is_empty() {
+            let task_type = brain._current_task_type;
+            let edits = brain._micro_edits.clone();
+            let memory = crate::core::nt_core_bank::ReasoningMemory::new(
+                &task, task_type, &edits, reward.clamp(0.0, 1.0),
+            );
+            brain.reasoning_bank.store(memory);
+        }
+        let stats = brain.reasoning_bank.stats();
+        log::trace!(
+            "[reasoning_bank_storage] iter={} memories={} success_rate={:.3} task='{}' reward={:.4}",
+            brain.iteration, stats.total_memories, stats.success_rate, task, reward,
+        );
         Ok(StageDecision::Continue)
     }
 }

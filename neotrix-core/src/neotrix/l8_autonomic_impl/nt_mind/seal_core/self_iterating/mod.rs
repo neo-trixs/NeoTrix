@@ -147,9 +147,10 @@ mod tests {
         // 验证迭代次数
         assert_eq!(brain.iteration, 3);
 
-        // 验证 ReasoningBank 有记录
+        // 验证 ReasoningBank 有记录 — WS-C P0-2 治理: ReasoningBankStorageStage
+        // 真实写入记忆 (freq=2, 3 次迭代至少 1 次命中), SleepStage 消费。
         let stats = brain.reasoning_bank.stats();
-        assert_eq!(stats.total_memories, 0);
+        assert!(stats.total_memories > 0, "SEAL 3-task 批跑后记忆应已落 bank, got {}", stats.total_memories);
     }
 
     #[test]
@@ -253,7 +254,11 @@ mod tests {
         }
 
         let stats = brain.reasoning_bank.stats();
-        assert_eq!(stats.total_memories, 0);
+        assert!(
+            stats.total_memories > 0,
+            "两次 SEAL 循环后记忆应已落 bank (ReasoningBankStorageStage freq=2), got {}",
+            stats.total_memories
+        );
         println!("ReasoningBank 成功率: {:.2}%", stats.success_rate * 100.0);
     }
 
@@ -289,7 +294,11 @@ mod tests {
 
         // 验证基本期望
         assert_eq!(brain.iteration, 4);
-        assert_eq!(brain.reasoning_bank.stats().total_memories, 0);
+        assert!(
+            brain.reasoning_bank.stats().total_memories > 0,
+            "4-task 批跑后记忆应已落 bank (ReasoningBankStorageStage), got {}",
+            brain.reasoning_bank.stats().total_memories
+        );
     }
 
     #[test]

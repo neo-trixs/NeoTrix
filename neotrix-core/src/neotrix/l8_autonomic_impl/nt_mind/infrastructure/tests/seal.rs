@@ -59,7 +59,11 @@ mod tests {
         }
 
         let stats = system.reasoning_bank.stats();
-        assert_eq!(stats.total_memories, 0);
+        assert!(
+            stats.total_memories > 0,
+            "3-task SEAL 循环后记忆应已落 bank (ReasoningBankStorageStage freq=2), got {}",
+            stats.total_memories
+        );
     }
 
     #[test]
@@ -135,15 +139,30 @@ mod tests {
         let _ = system.run_seal_loop("design a UI component with accessibility", None, None);
 
         let stats_before = system.reasoning_bank.stats();
-        assert_eq!(stats_before.total_memories, 0);
 
         let _ = system.run_seal_loop("improve UI accessibility", None, None);
 
         let stats_after = system.reasoning_bank.stats();
-        assert_eq!(stats_after.total_memories, 0);
+        assert!(
+            stats_after.total_memories >= stats_before.total_memories,
+            "第二次循环后记忆只增不减, before={} after={}",
+            stats_before.total_memories,
+            stats_after.total_memories
+        );
+
+        // 显式写入一条记忆验证检索路径 (ReasoningBankStorageStage 按 freq=2 触发,
+        // 单次循环可能 0 次迭代命中, 不依赖时序)。
+        use crate::neotrix::nt_mind::ReasoningMemory;
+        use crate::neotrix::nt_world_model::TaskType;
+        system
+            .reasoning_bank
+            .store(ReasoningMemory::new("improve UI accessibility", TaskType::UIDesign, &[], 0.8));
 
         let memories = system.reasoning_bank.retrieve_relevant("accessibility", None, 5);
-        assert!(memories.is_empty());
+        assert!(
+            !memories.is_empty(),
+            "写入的记忆应能被语义检索命中文案 'accessibility'"
+        );
     }
 
     #[test]
