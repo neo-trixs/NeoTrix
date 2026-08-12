@@ -93,11 +93,11 @@ mod tests {
         let mut reg = HookRegistry::new();
         reg.register(move |ev| {
             if let LifecycleEvent::ToolCalled(name) = ev {
-                *t.lock().unwrap() = name.clone();
+                *t.lock().expect("test mutex poisoned") = name.clone();
             }
         });
         reg.dispatch(&LifecycleEvent::ToolCalled("git".into()));
-        assert_eq!(*last_tool.lock().unwrap(), "git");
+        assert_eq!(*last_tool.lock().expect("test mutex poisoned"), "git");
     }
 
     #[test]
@@ -107,11 +107,11 @@ mod tests {
         let mut reg = HookRegistry::new();
         reg.register(move |ev| {
             if let LifecycleEvent::ToolCompleted(_, dur) = ev {
-                *d.lock().unwrap() = *dur;
+                *d.lock().expect("test mutex poisoned") = *dur;
             }
         });
         reg.dispatch(&LifecycleEvent::ToolCompleted("test".into(), Duration::from_secs(5)));
-        assert_eq!(last_dur.lock().unwrap().as_secs(), 5);
+        assert_eq!(last_dur.lock().expect("test mutex poisoned").as_secs(), 5);
     }
 
     #[test]
@@ -121,11 +121,11 @@ mod tests {
         let mut reg = HookRegistry::new();
         reg.register(move |ev| {
             if let LifecycleEvent::Error(msg) = ev {
-                *e.lock().unwrap() = msg.clone();
+                *e.lock().expect("test mutex poisoned") = msg.clone();
             }
         });
         reg.dispatch(&LifecycleEvent::Error("something failed".into()));
-        assert_eq!(*last_err.lock().unwrap(), "something failed");
+        assert_eq!(*last_err.lock().expect("test mutex poisoned"), "something failed");
     }
 
     #[test]

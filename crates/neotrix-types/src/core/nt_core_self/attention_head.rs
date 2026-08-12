@@ -246,7 +246,7 @@ mod tests {
         let mut mgr = AttentionManager::new(0.3);
         mgr.stimulate_domain(AttentionDomain::Code, 0.9);
         mgr.stimulate_domain(AttentionDomain::Planning, 0.7);
-        assert!(mgr.active_heads().len() > 0);
+        assert!(!mgr.active_heads().is_empty());
         mgr.reset();
         assert_eq!(mgr.active_heads().len(), 0);
     }

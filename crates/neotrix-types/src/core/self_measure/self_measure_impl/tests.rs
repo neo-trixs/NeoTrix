@@ -3,8 +3,9 @@ use super::*;
 fn make_test_snapshot(
     mood: [f64; 6], persona: [f64; 5], social: [f64; 3],
     reflection: [f64; 2], conversation: [f64; 2],
-    behavioral: f64, law: f64, t: i64,
+    scalars: [f64; 2], t: i64,
 ) -> SystemSnapshot {
+    let [behavioral, law] = scalars;
     SystemSnapshot { timestamp: t, mood, persona, social, reflection, conversation, behavioral, law }
 }
 
@@ -22,8 +23,7 @@ fn synthetic_trajectory(n: usize) -> SelfMeasure {
             [(t as f64 * 0.02).min(1.0), (t as f64).ln() / 10.0, 0.5 + 0.1 * (phase * 0.5).sin()],
             [(1.0 - (-(t as f64) * 0.05).exp()), (t as f64 * 0.005).min(1.0)],
             [(t as f64 * 0.01).min(1.0), 0.5 + 0.2 * (phase * 0.3).sin()],
-            (t as f64 * 0.008).min(1.0),
-            (t as f64 * 0.006).min(1.0),
+            [(t as f64 * 0.008).min(1.0), (t as f64 * 0.006).min(1.0)],
             t as i64,
         );
         sm.snapshot(snap);
@@ -83,7 +83,7 @@ fn test_awakening_speed() {
         let snap = make_test_snapshot(
             [0.5 + 0.3 * phase.sin(), 0.2, 0.1, 0.1, 0.3, 0.5],
             [0.5 + coupling * phase.sin(), 0.6, 0.5, 0.5, 0.3],
-            [0.5, 0.5, 0.5], [0.5, 0.3], [0.5, 0.5], 0.5, 0.5, t as i64,
+            [0.5, 0.5, 0.5], [0.5, 0.3], [0.5, 0.5], [0.5, 0.5], t as i64,
         );
         sm.snapshot(snap);
     }
@@ -93,9 +93,9 @@ fn test_awakening_speed() {
 #[test]
 fn test_eigenvector_centrality() {
     let mut corr = [[0.0; NUM_SUBSYSTEMS]; NUM_SUBSYSTEMS];
-    for i in 0..NUM_SUBSYSTEMS {
-        for j in 0..NUM_SUBSYSTEMS {
-            corr[i][j] = 0.5_f64.powi((i as i32 - j as i32).abs());
+    for (i, row) in corr.iter_mut().enumerate() {
+        for (j, cell) in row.iter_mut().enumerate() {
+            *cell = 0.5_f64.powi((i as i32 - j as i32).abs());
         }
     }
     let cent = eigenvector_centrality(&corr, NUM_SUBSYSTEMS, 20);
@@ -129,7 +129,7 @@ fn test_full_pipeline_no_panic() {
     let snap = make_test_snapshot(
         [0.5, 0.2, 0.1, 0.1, 0.3, 0.5],
         [0.7, 0.6, 0.5, 0.5, 0.3],
-        [0.5, 0.5, 0.5], [0.5, 0.3], [0.5, 0.5], 0.5, 0.5, 0,
+        [0.5, 0.5, 0.5], [0.5, 0.3], [0.5, 0.5], [0.5, 0.5], 0,
     );
     sm.snapshot(snap);
     assert_eq!(sm.tick_count(), 1);

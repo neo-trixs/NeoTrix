@@ -399,13 +399,13 @@ mod tests {
     fn test_from_array_wrong_size() {
         let arr_22 = vec![0.0; 22];
         let result = CapabilityVector::from_array(&arr_22);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Expected 23 dimensions"));
+        let err = result.expect_err("22-element array should be rejected");
+        assert!(err.contains("Expected 23 dimensions"));
 
         let arr_24 = vec![0.0; 24];
         let result = CapabilityVector::from_array(&arr_24);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Expected 23 dimensions"));
+        let err = result.expect_err("24-element array should be rejected");
+        assert!(err.contains("Expected 23 dimensions"));
 
         let arr_23 = vec![0.5; 23];
         let result = CapabilityVector::from_array(&arr_23);

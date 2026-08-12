@@ -276,7 +276,7 @@ mod tests {
         let matrix = ResonanceMatrix::from_states(&states);
         let resonators = matrix.resonators(0);
         // Module 0 (PatternMatcher) should have at least one resonator
-        assert!(resonators.len() > 0);
+        assert!(!resonators.is_empty());
     }
 
     #[test]

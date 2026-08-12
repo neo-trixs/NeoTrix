@@ -129,8 +129,8 @@ mod tests {
     fn test_future_schema_rejected() {
         let future = r#"{"format":"neotrix-store-v1","schema_version":99,"data":[1]}"#;
         let result: Result<Vec<i32>, String> = read_envelope(Path::new(""), future.as_bytes());
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("upgrade required"));
+        let err = result.expect_err("future schema should be rejected");
+        assert!(err.contains("upgrade required"));
     }
 
     #[test]

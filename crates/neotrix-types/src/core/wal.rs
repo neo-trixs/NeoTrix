@@ -170,7 +170,7 @@ mod tests {
 
     fn test_wal_path() -> PathBuf {
         let n = TEST_COUNTER.fetch_add(1, Ordering::SeqCst);
-        PathBuf::from(std::env::temp_dir()).join(format!("test_wal_{}.json", n))
+        std::env::temp_dir().join(format!("test_wal_{}.json", n))
     }
 
     #[test]

@@ -374,7 +374,7 @@ mod tests {
             assert!(gv < 24);
         }
         for &hv in h {
-            assert!(hv >= 24 && hv < 48);
+            assert!((24..48).contains(&hv));
         }
         for &xv in x {
             assert!(xv >= 48);

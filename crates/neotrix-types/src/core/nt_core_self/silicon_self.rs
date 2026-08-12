@@ -291,7 +291,7 @@ mod tests {
         let mut ss = SiliconSelfModel::new();
         ss.observe("test");
         ss.attention_manager.stimulate_domain(AttentionDomain::Code, 0.9);
-        assert!(ss.attention_manager.active_heads().len() > 0);
+        assert!(!ss.attention_manager.active_heads().is_empty());
         ss.reset_session();
         assert_eq!(ss.attention_manager.active_heads().len(), 0);
     }
