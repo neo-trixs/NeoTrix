@@ -147,3 +147,33 @@
 - 模拟低基数场景: E5 21.0 / E5+zstd **13.6 B/记录** (vs JSON 182.6 → **13.4x**)
 - 编码 5,000 条 < 1ms, 解码 < 1.6ms — 适合实时加载
 - 模糊测试: 100 轮 × 4 组合 (E5/E6 × zstd/no-zstd) 随机数据 roundtrip **全部无损**
+
+## 压缩级别调优 (v1.0.3+ 实测)
+
+生产压缩级别 3 → **9** (2026-08): level 9 比 3 省 4.5% (整文件 18.70 → 17.86 B/记录, 机场单来源),
+解码速度与级别无关; level 19 再省 14% 但编码慢 10-50x, 不予采用。
+zstd 预训练字典 (CDict) 评估: 大块数据 (1.7MB) 下 zstd 已利用内部冗余, 无显著收益 → 推迟。
+
+| zstd level | 整文件 B/记录 | vs level 3 |
+|------|------|--------|
+| 3 | 18.70 | — |
+| 9 | **17.86** | -4.5% |
+| 19 | 16.09 | -14% |
+
+## 冷存储分层 (B1, 2026-08)
+
+- 命令: `/explore geo archive <source> [path]` (归档) + `/explore geo cold` (枚举) + `/explore geo import <path>` (恢复)
+- 命名约定: 冷层文件 `geo_<source>.ntpack` 于 `~/.neotrix/geo/`, 供 `geo_cold_layers` / `geo_layer_inventory` 枚举
+- 归档流程: 导出 source → 文件落盘 → 事务 DELETE 热表行; 崩溃窗口数据双在, 不丢
+- 幂等: 热表无该 source 时返回 Err, 拒绝重复归档
+- 恢复: import 幂等 upsert (BATCH 500 分批提交, 避免单事务长写锁)
+- 层感知: `geo_layer_inventory` 冷热合并, 归档不扭曲前端层计数
+- 透明读路径: `query_bbox_with_cold` / `query_by_place_with_cold` — 热表结果不足 limit 时惰性解码
+  冷层 (`~/.neotrix/geo`) 兜底补充, 返回 `(records, cold_hits)`; 冷层 confidence=0.0 排末。
+  归档后热查询仍可透明见冷数据 (B1 闭环)
+
+## 追加模式 (A4, 2026-08)
+
+- `append_geo_ntpack(path, new_points)` — merge-append: 读旧文件 → 按 node_id 合并 (新覆盖旧) → 全量重编
+- **不支持原地追加**: LCP 字典重叠 + 坐标 delta 尾态 + 尾部 CRC 都随新数据改变; 需避免全量重编时上 A5 分块格式
+- 当前规模 (50k 条 encode <1s) merge-append 开销可接受; 语义幂等 (同名 node_id 后者覆盖)

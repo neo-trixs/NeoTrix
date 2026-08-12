@@ -191,7 +191,7 @@ impl KeyringStore {
     fn delete(&self, key: &str) -> L1Result<()> {
         let entry = keyring::Entry::new(&self.service_name, key)
             .map_err(|e| L1Error::Keyring(format!("Keyring entry error: {}", e)))?;
-        entry.delete_password()
+        entry.delete_credential()
             .map_err(|e| L1Error::Keyring(format!("Keyring delete failed: {}", e)))?;
         Ok(())
     }
@@ -204,7 +204,7 @@ pub struct KeyVault {
 }
 
 impl KeyVault {
-    pub fn new(_service_name: &str) -> L1Result<Self> {
+    pub fn new(service_name: &str) -> L1Result<Self> {
         let local_store = LocalStore::new()?;
         Ok(Self {
             local_store,

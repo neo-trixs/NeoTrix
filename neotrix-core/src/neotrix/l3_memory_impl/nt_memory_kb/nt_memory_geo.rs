@@ -1279,18 +1279,59 @@ pub fn import_geo_ntpack(path: &str) -> Result<(usize, Vec<crate::neotrix::l3_me
     Ok((points.len(), points))
 }
 
+/// **A4 追加模式** — 向 NT-Pack 归档文件增量合并写入 (幂等)。
+///
+/// NT-Pack 是"LCP 字典 + 坐标 delta 链 + zstd 整块 + 尾部 CRC" 的紧凑格式,
+/// **不支持原地追加**: 字典重叠、delta 尾态、checksum 都会随新数据改变。
+/// 因此追加采用 merge-append: 读旧文件 → 按 node_id 合并 (新覆盖旧) → 全量重编。
+/// 当前规模 (50k 条 encode <1s) 下开销可接受; 若需避免全量重编, 需切分块格式 (A5)。
+///
+/// `path` 不存在时等价于新建; 返回 (写入后总条数, 文件字节)。
+pub fn append_geo_ntpack(
+    path: &str,
+    new_points: &[crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::GeoPoint],
+) -> Result<(usize, usize), String> {
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::{GeoPoint, PackEncoder};
+    use std::collections::HashMap;
+
+    let mut merged: HashMap<String, GeoPoint> = HashMap::new();
+    match import_geo_ntpack(path) {
+        Ok((_, existing)) => {
+            for p in existing {
+                merged.insert(p.node_id.clone(), p);
+            }
+        }
+        Err(e) if !std::path::Path::new(path).exists() => {
+            // 新文件: 无既有数据
+        }
+        Err(e) => return Err(format!("读既有归档 {}: {}", path, e)),
+    }
+    for p in new_points {
+        merged.insert(p.node_id.clone(), p.clone());
+    }
+
+    let mut pts: Vec<GeoPoint> = merged.into_values().collect();
+    pts.sort_by(|a, b| a.node_id.cmp(&b.node_id));
+    let enc = PackEncoder::new(5, true);
+    let bytes = enc.encode(&pts);
+    std::fs::write(path, &bytes).map_err(|e| format!("写 {}: {}", path, e))?;
+    Ok((pts.len(), bytes.len()))
+}
+
 /// 从 NT-Pack 文件导入回 KB geo_index (备份恢复/跨机器传输, 幂等 upsert)
 ///
 /// 返回导入条数。confidence 默认 0.0 (NT-Pack 不携带该字段)。
+/// 采用 BATCH 分批提交, 避免单事务持写锁过久 (B1 冷恢复大文件场景)。
 pub fn import_geo_ntpack_to_kb(conn: &Connection, path: &str) -> Result<usize, String> {
+    const BATCH: usize = 500;
     let (n, points) = import_geo_ntpack(path)?;
     if n == 0 {
         return Err("NT-Pack 文件无数据".into());
     }
-    let tx = conn
+    let mut tx = conn
         .unchecked_transaction()
         .map_err(|e| format!("tx begin: {}", e))?;
-    for p in &points {
+    for (i, p) in points.iter().enumerate() {
         upsert_geo(
             &tx,
             &GeoRecord {
@@ -1306,9 +1347,245 @@ pub fn import_geo_ntpack_to_kb(conn: &Connection, path: &str) -> Result<usize, S
             },
         )
         .map_err(|e| format!("upsert {}: {}", p.node_id, e))?;
+        if (i + 1) % BATCH == 0 {
+            tx.commit().map_err(|e| format!("tx commit: {}", e))?;
+            tx = conn
+                .unchecked_transaction()
+                .map_err(|e| format!("tx begin: {}", e))?;
+        }
     }
     tx.commit().map_err(|e| format!("tx commit: {}", e))?;
     Ok(n)
+}
+
+/// B1 冷存储: 将指定 source 的 geo_index 数据归档为 NT-Pack 冷层文件并从热表删除。
+///
+/// 流程: 导出该 source → 文件落盘 → 事务内 DELETE 热表行 → 返回 (归档条数, 字节)。
+/// 命名约定 `geo_<source>.ntpack` 供 [`geo_cold_layers`] 枚举。幂等: 若该 source
+/// 已全部归档 (热表无数据) 则返回 Err, 不会重复导出空文件。
+///
+/// 崩溃窗口: 文件已写而 DELETE 未提交时数据双在 (文件 + 热表), 可安全重跑或导入恢复;
+/// DELETE 先于写文件不会发生 (顺序保证), 不丢数据。
+pub fn archive_geo_cold(
+    conn: &Connection,
+    source: &str,
+    path: &str,
+) -> Result<(usize, usize), String> {
+    let n: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM geo_index WHERE source = ?",
+            params![source],
+            |r| r.get(0),
+        )
+        .map_err(|e| format!("count geo source: {}", e))?;
+    if n == 0 {
+        return Err(format!(
+            "geo source '{}' 热表无数据 (可能已归档, 幂等拒绝重复归档)",
+            source
+        ));
+    }
+
+    let (exported, bytes) = export_geo_ntpack(conn, Some(source), 0, path)?;
+    if exported == 0 {
+        return Err("导出 0 条, 取消归档".into());
+    }
+
+    // 文件已落盘, 现在从热表删除该 source (事务保证原子)
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("archive tx begin: {}", e))?;
+    tx.execute("DELETE FROM geo_index WHERE source = ?", params![source])
+        .map_err(|e| format!("archive delete: {}", e))?;
+    tx.commit().map_err(|e| format!("archive tx commit: {}", e))?;
+
+    Ok((exported, bytes))
+}
+
+/// B1 冷存储: 枚举冷层目录中 `geo_*.ntpack` 归档文件。
+///
+/// 返回 Vec<(source, 路径, 文件字节数)>, 供恢复/前端层感知使用。
+pub fn geo_cold_layers(dir: &str) -> Result<Vec<(String, String, u64)>, String> {
+    let mut out = Vec::new();
+    let rd = std::fs::read_dir(dir).map_err(|e| format!("读冷层目录 {}: {}", dir, e))?;
+    for entry in rd.flatten() {
+        let fname = entry.file_name().to_string_lossy().to_string();
+        // 全量导出文件 (geo_index.ntpack) 是 export/import 的整库镜像, 非单个 source 冷层
+        if fname == "geo_index.ntpack" {
+            continue;
+        }
+        let Some(rest) = fname.strip_prefix("geo_").map(|s| s.to_string()) else {
+            continue;
+        };
+        if !rest.ends_with(".ntpack") {
+            continue;
+        }
+        let source = rest.trim_end_matches(".ntpack").to_string();
+        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+        out.push((source, entry.path().to_string_lossy().to_string(), size));
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(out)
+}
+
+/// 冷层数据源枚举 + 解码: 该目录下所有 `geo_<source>.ntpack` 记录合并。
+///
+/// 供透明读路径 (B1) 使用 — 归档后热表已删, 查询须兜底解码冷层。
+/// 返回 (source, 解码出的 GeoRecord 列表)。confidence 默认 0.0 (NT-Pack 不携带)。
+fn cold_layers_records(dir: &str) -> Vec<(String, Vec<GeoRecord>)> {
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::PackDecoder;
+    let mut out = Vec::new();
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return out;
+    };
+    for entry in rd.flatten() {
+        let fname = entry.file_name().to_string_lossy().to_string();
+        if fname == "geo_index.ntpack" {
+            continue; // 全量镜像非冷层
+        }
+        let Some(rest) = fname.strip_prefix("geo_") else {
+            continue;
+        };
+        if !rest.ends_with(".ntpack") {
+            continue;
+        }
+        let source = rest.trim_end_matches(".ntpack").to_string();
+        let Ok(bytes) = std::fs::read(entry.path()) else {
+            continue;
+        };
+        let Ok((_, pts)) = PackDecoder::decode(&bytes) else {
+            continue;
+        };
+        let recs: Vec<GeoRecord> = pts
+            .into_iter()
+            .map(|p| GeoRecord {
+                node_id: p.node_id,
+                lat: p.lat,
+                lng: p.lng,
+                country: p.country,
+                region: p.region,
+                city: p.city,
+                tags: p.tags,
+                source: p.source,
+                confidence: 0.0,
+            })
+            .collect();
+        out.push((source, recs));
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
+/// B1 透明读路径: 包围盒查询 + 冷层兜底。
+///
+/// 语义 = [`query_bbox`] 但 hot 结果不足 `limit` 时, 惰性解码冷层目录
+/// (`~/.neotrix/geo`) 补充命中记录 (按 confidence 降序, 冷层置信 0.0 → 排末)。返回
+/// `(records, cold_hits)` 其中 cold_hits 为冷层补充条数。
+pub fn query_bbox_with_cold(
+    conn: &Connection,
+    min_lat: f64,
+    min_lng: f64,
+    max_lat: f64,
+    max_lng: f64,
+    limit: usize,
+    cold_dir: &str,
+) -> Result<(Vec<GeoRecord>, usize), String> {
+    let hot = query_bbox(conn, min_lat, min_lng, max_lat, max_lng, limit)
+        .map_err(|e| format!("hot bbox: {}", e))?;
+    if hot.len() >= limit {
+        return Ok((hot, 0));
+    }
+
+    let mut seen: std::collections::HashSet<String> = hot.iter().map(|r| r.node_id.clone()).collect();
+    let mut cold_hits = Vec::new();
+    let quota = limit - hot.len();
+    for (_, recs) in cold_layers_records(cold_dir) {
+        for r in recs {
+            if cold_hits.len() >= quota {
+                break;
+            }
+            if r.lat >= min_lat && r.lat <= max_lat && r.lng >= min_lng && r.lng <= max_lng {
+                if seen.insert(r.node_id.clone()) {
+                    cold_hits.push(r);
+                }
+            }
+        }
+    }
+    let cold_count = cold_hits.len();
+    let mut all = hot;
+    all.append(&mut cold_hits);
+    // hot 已按 confidence DESC; 冷层 0.0 一律排后, 保持总体降序
+    Ok((all, cold_count))
+}
+
+/// B1 透明读路径: 国家/区域/城市查询 + 冷层兜底 (同 [`query_bbox_with_cold`])。
+pub fn query_by_place_with_cold(
+    conn: &Connection,
+    country: &str,
+    region: &str,
+    city: &str,
+    limit: usize,
+    cold_dir: &str,
+) -> Result<(Vec<GeoRecord>, usize), String> {
+    let hot = query_by_place(conn, country, region, city, limit)
+        .map_err(|e| format!("hot by_place: {}", e))?;
+    if hot.len() >= limit {
+        return Ok((hot, 0));
+    }
+
+    let mut seen: std::collections::HashSet<String> = hot.iter().map(|r| r.node_id.clone()).collect();
+    let mut cold_added = 0usize;
+    let quota = limit - hot.len();
+    let mut out = hot;
+    for (_, recs) in cold_layers_records(cold_dir) {
+        for r in recs {
+            if cold_added >= quota {
+                break;
+            }
+            if (country.is_empty() || r.country == country)
+                && (region.is_empty() || r.region == region)
+                && (city.is_empty() || r.city == city)
+            {
+                if seen.insert(r.node_id.clone()) {
+                    out.push(r);
+                    cold_added += 1;
+                }
+            }
+        }
+    }
+    Ok((out, cold_added))
+}
+///
+/// 修调研发现的"前端层计数突变"风险 — 归档后 `kb_geo_layers` 只统计热表,
+/// 层计数会骤减; 本函数冷热合并, 让层感知不被归档扭曲。返回
+/// Vec<(source, warm_count, cold_bytes, 冷层路径?)>。
+pub fn geo_layer_inventory(conn: &Connection, cold_dir: &str) -> Result<Vec<(String, i64, Option<(String, u64)>)>, String> {
+    let mut stmt = conn
+        .prepare("SELECT source, COUNT(*) FROM geo_index GROUP BY source ORDER BY source")
+        .map_err(|e| format!("inventory query: {}", e))?;
+    let warm: Vec<(String, i64)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .map_err(|e| format!("inventory map: {}", e))?
+        .map(|r| r.map_err(|e| format!("inventory row: {}", e)))
+        .collect::<Result<_, _>>()?;
+
+    let cold: Vec<(String, String, u64)> = geo_cold_layers(cold_dir)?;
+
+    // 合并: warm 优先, cold 仅附加冷层信息 (若该 source 既热又冷, 仍保留冷层标记)
+    let mut out: Vec<(String, i64, Option<(String, u64)>)> =
+        warm.into_iter().map(|(s, c)| (s, c, None)).collect();
+    let cold_map: std::collections::HashMap<String, (String, u64)> = cold
+        .into_iter()
+        .map(|(s, p, b)| (s, (p, b)))
+        .collect();
+    for (s, (p, b)) in &cold_map {
+        if let Some(entry) = out.iter_mut().find(|(src, _, _)| src == s) {
+            entry.2 = Some((p.clone(), *b));
+        } else {
+            out.push((s.clone(), 0, Some((p.clone(), *b))));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(out)
 }
 
 
@@ -1558,5 +1835,184 @@ mod tests {
 
         let coverage = geo_coverage_report(&conn, 0).unwrap();
         assert!(coverage.iter().any(|(c, _)| c == "中国"));
+    }
+
+    #[test]
+    fn test_archive_geo_cold_roundtrip() {
+        let conn = test_conn();
+        let tmp = std::env::temp_dir().join(format!("ntpack_b1_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        // 两个 source 各 2 条
+        for (src, i) in [("ourairports", 0), ("ourairports", 1), ("gvp-volcanoes", 0), ("gvp-volcanoes", 1)] {
+            upsert_geo(
+                &conn,
+                &GeoRecord {
+                    node_id: format!("{}:{}", src, i),
+                    lat: 30.0 + i as f64,
+                    lng: 110.0 + i as f64,
+                    country: "CN".into(),
+                    region: "华东".into(),
+                    city: "".into(),
+                    tags: "test".into(),
+                    source: src.into(),
+                    confidence: 0.9,
+                },
+            )
+            .unwrap();
+        }
+
+        // 归档 ourairports → 热表删除, 文件生成
+        let path = tmp.join("geo_ourairports.ntpack");
+        let (n, bytes) = archive_geo_cold(&conn, "ourairports", path.to_str().unwrap()).unwrap();
+        assert_eq!(n, 2);
+        assert!(bytes > 0);
+        assert_eq!(geo_stats(&conn).unwrap(), (2, 2)); // 只剩火山 2 条
+
+        // 幂等: 重复归档已空 source → Err
+        assert!(archive_geo_cold(&conn, "ourairports", path.to_str().unwrap()).is_err());
+
+        // 冷层枚举可见
+        let layers = geo_cold_layers(tmp.to_str().unwrap()).unwrap();
+        assert_eq!(layers.len(), 1);
+        assert_eq!(layers[0].0, "ourairports");
+
+        // 恢复: 导入回 KB → 幂等 upsert, 总数回到 4
+        let restored = import_geo_ntpack_to_kb(&conn, path.to_str().unwrap()).unwrap();
+        assert_eq!(restored, 2);
+        assert_eq!(geo_stats(&conn).unwrap(), (4, 4));
+
+        // 冷热层 inventory: 恢复后 warm=4, 冷层文件仍可见 (源双在)
+        let inv = geo_layer_inventory(&conn, tmp.to_str().unwrap()).unwrap();
+        let oa = inv.iter().find(|(s, _, _)| s == "ourairports").unwrap();
+        assert_eq!(oa.1, 2); // warm 2 条
+        assert!(oa.2.is_some()); // 冷层仍有归档文件
+        let gv = inv.iter().find(|(s, _, _)| s == "gvp-volcanoes").unwrap();
+        assert_eq!(gv.1, 2);
+        assert!(gv.2.is_none()); // 从未归档
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_import_batch_commit_large() {
+        // B1 修复回归: 单事务长写锁 → BATCH 分批提交, 大量记录不卡死
+        let conn = test_conn();
+        let tmp = std::env::temp_dir().join(format!("ntpack_b1b_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("geo_big.ntpack");
+
+        // 用 export 先构造 1200 条 (> 500 BATCH) 的 NT-Pack 文件
+        let mut pts = Vec::new();
+        for i in 0..1200 {
+            pts.push(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::GeoPoint {
+                node_id: format!("bulk:{}", i),
+                lat: (i as f64 % 90.0),
+                lng: (i as f64 % 180.0),
+                country: "CN".into(),
+                region: String::new(),
+                city: String::new(),
+                tags: String::new(),
+                source: "bulk".into(),
+            });
+        }
+        let enc = crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::PackEncoder::new(5, true);
+        let bytes = enc.encode(&pts);
+        std::fs::write(&path, &bytes).unwrap();
+
+        let n = import_geo_ntpack_to_kb(&conn, path.to_str().unwrap()).unwrap();
+        assert_eq!(n, 1200);
+        assert_eq!(geo_stats(&conn).unwrap(), (1200, 1200));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_append_merge_semantics() {
+        // A4: 追加模式 — 新覆盖旧, 文件可重读
+        use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::GeoPoint;
+        let tmp = std::env::temp_dir().join(format!("ntpack_a4_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let path = tmp.join("geo_append.ntpack").to_str().unwrap().to_string();
+
+        let mk = |id: &str, lat: f64, src: &str| GeoPoint {
+            node_id: id.into(), lat, lng: 100.0,
+            country: "CN".into(), region: String::new(), city: String::new(),
+            tags: String::new(), source: src.into(),
+        };
+
+        // 第一批 3 条
+        let (n, b) = append_geo_ntpack(&path, &[mk("a", 1.0, "src1"), mk("b", 2.0, "src1"), mk("c", 3.0, "src2")]).unwrap();
+        assert_eq!(n, 3);
+        assert!(b > 0);
+
+        // 追加: a 覆盖 (新 lat), d 新增 → 总数 4, a 的 lat 更新
+        let (n2, _) = append_geo_ntpack(&path, &[mk("a", 99.0, "src1"), mk("d", 4.0, "src2")]).unwrap();
+        assert_eq!(n2, 4);
+
+        let (dec_n, pts) = import_geo_ntpack(&path).unwrap();
+        assert_eq!(dec_n, 4);
+        let a = pts.iter().find(|p| p.node_id == "a").unwrap();
+        assert_eq!(a.lat, 99.0); // 新覆盖旧
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_cold_layers_excludes_full_export() {
+        // 全量导出 geo_index.ntpack 不应被当作单个 source 冷层计入
+        let tmp = std::env::temp_dir().join(format!("ntpack_cold_excl_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        std::fs::write(tmp.join("geo_index.ntpack"), b"full mirror").unwrap();
+        std::fs::write(tmp.join("geo_ourairports.ntpack"), b"cold").unwrap();
+
+        let layers = geo_cold_layers(tmp.to_str().unwrap()).unwrap();
+        assert_eq!(layers.len(), 1);
+        assert_eq!(layers[0].0, "ourairports");
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_transparent_query_cold_fallback() {
+        // B1 透明读路径: 归档 source 后, 热查询仍能经冷层兜底见数据
+        let conn = test_conn();
+        let tmp = std::env::temp_dir().join(format!("ntpack_tr_{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        // 两个 source: cold (归档) + hot (留热表)
+        upsert_geo(&conn, &GeoRecord {
+            node_id: "cold:1".into(), lat: 30.0, lng: 110.0, country: "CN".into(),
+            region: "华东".into(), city: "上海".into(), tags: String::new(),
+            source: "cold-src".into(), confidence: 0.9,
+        }).unwrap();
+        upsert_geo(&conn, &GeoRecord {
+            node_id: "hot:1".into(), lat: 30.1, lng: 110.1, country: "CN".into(),
+            region: "华东".into(), city: "上海".into(), tags: String::new(),
+            source: "hot-src".into(), confidence: 0.8,
+        }).unwrap();
+
+        // 归档 cold-src → 热表只剩 hot
+        let cold_path = tmp.join("geo_cold-src.ntpack");
+        let (n, _) = archive_geo_cold(&conn, "cold-src", cold_path.to_str().unwrap()).unwrap();
+        assert_eq!(n, 1);
+
+        // 透明 bbox: 热表命中 1 (hot), 冷层兜底 1 (cold) → 2 条
+        let (recs, cold_hits) = query_bbox_with_cold(&conn, 29.0, 109.0, 31.0, 111.0, 10, tmp.to_str().unwrap()).unwrap();
+        assert_eq!(recs.len(), 2);
+        assert_eq!(cold_hits, 1);
+        let cold_rec = recs.iter().find(|r| r.node_id == "cold:1").unwrap();
+        assert_eq!(cold_rec.confidence, 0.0); // NT-Pack 无 confidence
+
+        // 透明 by_place: 中国全部 → 2 条 (hot + cold)
+        let (recs2, cold2) = query_by_place_with_cold(&conn, "CN", "", "", 10, tmp.to_str().unwrap()).unwrap();
+        assert_eq!(recs2.len(), 2);
+        assert_eq!(cold2, 1);
+
+        // 非透明语义回归: 纯热表只剩 1
+        let hot_only = query_bbox(&conn, 29.0, 109.0, 31.0, 111.0, 10).unwrap();
+        assert_eq!(hot_only.len(), 1);
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

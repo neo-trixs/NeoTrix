@@ -653,6 +653,59 @@ impl CliCommand for ExploreCmd {
                             None => CommandOutput::err("无法打开 KB"),
                         }
                     }
+                    "archive" => {
+                        // B1 冷存储: 将指定 source 归档为 NT-Pack 冷层并从热表删除
+                        // 用法: /explore geo archive <source> [path]
+                        let Some(source) = args.get(2).cloned() else {
+                            return CommandOutput::err("用法: /explore geo archive <source> [path]");
+                        };
+                        let default_path = format!(
+                            "{}/.neotrix/geo/geo_{}.ntpack",
+                            std::env::var("HOME").unwrap_or_else(|_| ".".into()),
+                            source
+                        );
+                        let path = args.get(3).cloned().unwrap_or(default_path);
+                        match try_open_kb() {
+                            Some(kb) => {
+                                let conn = match kb.conn.lock() {
+                                    Ok(c) => c,
+                                    Err(e) => return CommandOutput::err(&format!("KB 锁失败: {}", e)),
+                                };
+                                match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::archive_geo_cold(
+                                    &conn, &source, &path,
+                                ) {
+                                    Ok((n, bytes)) => CommandOutput::ok(&format!(
+                                        "❄️ 冷归档: {} 条 -> {} ({} bytes, {:.1} B/记录), 已从热表删除",
+                                        n, path, bytes, bytes as f64 / n as f64
+                                    )),
+                                    Err(e) => CommandOutput::err(&format!("冷归档失败: {}", e)),
+                                }
+                            }
+                            None => CommandOutput::err("无法打开 KB"),
+                        }
+                    }
+                    "cold" => {
+                        // B1 冷存储: 枚举冷层归档文件
+                        // 用法: /explore geo cold
+                        let dir = format!(
+                            "{}/.neotrix/geo",
+                            std::env::var("HOME").unwrap_or_else(|_| ".".into())
+                        );
+                        match crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::geo_cold_layers(&dir) {
+                            Ok(layers) => {
+                                if layers.is_empty() {
+                                    CommandOutput::ok("冷层为空 (无 geo_*.ntpack 归档)")
+                                } else {
+                                    let lines: Vec<String> = layers
+                                        .iter()
+                                        .map(|(s, p, b)| format!("  {}: {} bytes @ {}", s, b, p))
+                                        .collect();
+                                    CommandOutput::ok(&format!("❄️ 冷层 ({}):\n{}", layers.len(), lines.join("\n")))
+                                }
+                            }
+                            Err(e) => CommandOutput::err(&format!("枚举冷层失败: {}", e)),
+                        }
+                    }
                     _ => match try_open_kb() {
                         Some(kb) => {
                             let conn = match kb.conn.lock() {
@@ -712,7 +765,10 @@ impl CliCommand for ExploreCmd {
                     /explore geo coverage [阈值]    区域覆盖度报告 (识别缺失)
                     /explore geo links <国家/城市> [limit]  反向关联知识节点
                     /explore geo elevation [limit] 摄取海拔 (Open-Meteo)
-                    /explore geo weather [limit]   摄取气象快照 (Open-Meteo)\n                    /explore geo export [source] [limit] [path]  导出 NT-Pack 高密度格式 (默认 ~/.neotrix/geo/geo_index.ntpack)\n                    /explore geo import <path>  从 NT-Pack 文件导入回 geo_index (备份恢复)"
+                    /explore geo weather [limit]   摄取气象快照 (Open-Meteo)\n                    /explore geo export [source] [limit] [path]  导出 NT-Pack 高密度格式 (默认 ~/.neotrix/geo/geo_index.ntpack)\n\
+                    /explore geo import <path>  从 NT-Pack 文件导入回 geo_index (备份恢复)\n\
+                    /explore geo archive <source> [path]  冷归档 source 为 NT-Pack 并从热表删除\n\
+                    /explore geo cold  枚举冷层 geo_*.ntpack 归档"
                 )
             }
         }

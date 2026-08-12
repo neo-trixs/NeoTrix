@@ -319,6 +319,58 @@ fn map_geo_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GeoPoint> {
     })
 }
 
+/// NT-Pack 数据源路径: 全量归档 + 冷层归档。
+/// 偏好 `~/.neotrix/geo/geo_index.ntpack` (全量) ; source 有冷层文件时优先冷层。
+fn geo_pack_paths() -> (PathBuf, PathBuf) {
+    let dir = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+        .join(".neotrix")
+        .join("geo");
+    (dir.join("geo_index.ntpack"), dir)
+}
+
+/// B2 v0: 从 NT-Pack 高密度文件直接读地理点 (绕开 SQLite), 前端无感切换。
+///
+/// 读取全量归档 `~/.neotrix/geo/geo_index.ntpack`; `source` 指定且存在冷层文件
+/// `geo_<source>.ntpack` 时优先冷层 (B1 透明层)。NT-Pack 无 confidence, 补 0.0。
+/// `limit` 硬上限 20k, 语义与 [`kb_geo_points`] 对齐。
+#[command]
+pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Result<Vec<GeoPoint>, NeoTrixError> {
+    let (default_path, cold_dir) = geo_pack_paths();
+    // 冷层优先: source 指定且地理目录有对应归档文件
+    let path = source.as_ref().map(|s| cold_dir.join(format!("geo_{}.ntpack", s)))
+        .filter(|p| p.exists())
+        .unwrap_or(default_path);
+
+    let bytes = std::fs::read(&path)
+        .map_err(|e| NeoTrixError::Memory(format!("ntpack 读 {}: {}", path.display(), e)))?;
+    let (dec, points) = neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::PackDecoder::decode(&bytes)
+        .map_err(|e| NeoTrixError::Memory(format!("ntpack decode: {}", e)))?;
+    let _ = dec;
+
+    let limit = (limit.unwrap_or(5000) as usize).clamp(1, 20_000);
+    let filtered: Vec<GeoPoint> = points
+        .into_iter()
+        .filter(|p| match source.as_deref() {
+            Some("shanhai") => p.source == "shanhai-peaks" || p.source == "shanhai-mappings",
+            Some(s) => p.source == s,
+            None => true,
+        })
+        .map(|p| GeoPoint {
+            node_id: p.node_id,
+            lat: p.lat,
+            lng: p.lng,
+            country: p.country,
+            region: p.region,
+            city: p.city,
+            tags: p.tags,
+            source: p.source,
+            confidence: 0.0,
+        })
+        .take(limit)
+        .collect();
+    Ok(filtered)
+}
+
 /// 地理索引统计。
 #[command]
 pub fn kb_geo_stats() -> Result<(i64, i64), NeoTrixError> {
@@ -343,23 +395,52 @@ pub struct GeoLayerSummary {
 }
 
 /// 返回 geo_index 各 source 的计数（真实层/幻境层分层摘要）。
+///
+/// 冷层感知 (B1): 合并 `~/.neotrix/geo/geo_*.ntpack` 冷层归档计数 —
+/// 归档后热表行被删, 若不计冷层, 层计数骤减会扭曲前端加载策略
+/// (GeoLayerSummary 契约不变, 前端零改动)。
 #[command]
 pub fn kb_geo_layers() -> Result<Vec<GeoLayerSummary>, NeoTrixError> {
     let path = kb_path();
     let conn = rusqlite::Connection::open(&path)
         .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
     let mut stmt = conn
-        .prepare("SELECT source, COUNT(*) FROM geo_index GROUP BY source ORDER BY COUNT(*) DESC")
+        .prepare("SELECT source, COUNT(*) FROM geo_index GROUP BY source")
         .map_err(|e| NeoTrixError::Memory(format!("geo layers prep: {}", e)))?;
     let rows = stmt
         .query_map([], |row| {
-            Ok(GeoLayerSummary {
-                source: row.get(0)?,
-                count: row.get(1)?,
-            })
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
         })
         .map_err(|e| NeoTrixError::Memory(format!("geo layers query: {}", e)))?;
-    Ok(rows.filter_map(|r| r.ok()).collect())
+    // HashMap: source → count (热表)
+    let mut counts: std::collections::HashMap<String, i64> = rows
+        .filter_map(|r| r.ok())
+        .collect();
+
+    // 合并冷层计数: 枚举 geo_*.ntpack, decode 取条数 (冷层为少量小文件, 成本可忽略)
+    let dir = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+        .join(".neotrix").join("geo");
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for entry in rd.flatten() {
+            let fname = entry.file_name().to_string_lossy().to_string();
+            if fname == "geo_index.ntpack" { continue } // 全量文件非冷层
+            let Some(rest) = fname.strip_prefix("geo_").map(|s| s.to_owned()) else { continue };
+            if !rest.ends_with(".ntpack") { continue }
+            let source = rest.trim_end_matches(".ntpack").to_string();
+            if let Ok(bytes) = std::fs::read(entry.path()) {
+                if let Ok((_, pts)) = neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::PackDecoder::decode(&bytes) {
+                    *counts.entry(source).or_insert(0) += pts.len() as i64;
+                }
+            }
+        }
+    }
+
+    let mut out: Vec<GeoLayerSummary> = counts
+        .into_iter()
+        .map(|(source, count)| GeoLayerSummary { source, count })
+        .collect();
+    out.sort_by(|a, b| b.count.cmp(&a.count));
+    Ok(out)
 }
 
 /// 海拔点记录 — geo_elevation 表 + geo_index 来源分类，供前端海拔渐变着色。

@@ -2,6 +2,7 @@ import { onMount, onCleanup, createSignal, createEffect, Show } from 'solid-js'
 import Globe from 'globe.gl'
 import {
   geoPoints,
+  geoPointsPack,
   geoLayers,
   geoElevations,
   isMirage,
@@ -29,6 +30,8 @@ import {
 interface GlobeViewProps {
   limit?: number
   height?: number
+  /** B2 v0: true 时数据源走 NT-Pack 高密度文件 (kb_geo_points_pack, 绕 SQLite) */
+  usePack?: boolean
 }
 
 /* HTML 转义：pointLabel 经 globe.gl innerHTML 渲染，防 KB 数据注入 */

@@ -38,6 +38,12 @@ export function geoPoints(limit?: number, source?: string): Promise<GeoPoint[]> 
   return call('kb_geo_points', { limit: limit ?? null, source: source ?? null })
 }
 
+/** B2 v0: 从 NT-Pack 高密度文件读地理点（绕 SQLite，冷层文件优先）。
+ *  IPC 契约同 `geoPoints`，前端无感切换。默认仍走 SQLite，需显式开启 pack 源。 */
+export function geoPointsPack(limit?: number, source?: string): Promise<GeoPoint[]> {
+  return call('kb_geo_points_pack', { limit: limit ?? null, source: source ?? null })
+}
+
 /** 地理索引统计 (总数, 有国家数) */
 export function geoStats(): Promise<[number, number]> {
   return call('kb_geo_stats', {})
