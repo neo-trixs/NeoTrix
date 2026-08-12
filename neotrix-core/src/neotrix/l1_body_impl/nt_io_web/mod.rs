@@ -1,6 +1,7 @@
 pub mod api;
 pub mod server;
 pub mod share;
+pub mod tiles;
 pub mod ws;
 
 use serde::{Deserialize, Serialize};

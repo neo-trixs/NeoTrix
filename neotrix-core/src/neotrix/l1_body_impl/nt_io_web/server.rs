@@ -14,8 +14,27 @@ use super::AppState;
 
 const FRONTEND_HTML: &str = include_str!("frontend.html");
 
+/// OpenAPI 3.0 规范 — 单一事实源在 docs/6-REFERENCE/openapi.yaml (R-P83),
+/// 构建期嵌入, 服务端 /openapi.yaml 直接提供 (不再只有静态文档)。
+const OPENAPI_YAML: &str = include_str!("../../../../../docs/6-REFERENCE/openapi.yaml");
+
 pub async fn handle_frontend() -> impl IntoResponse {
     Html(FRONTEND_HTML)
+}
+
+/// 服务端提供 OpenAPI 规范 (YAML, 与 docs 单一事实源同源嵌入)。
+/// 对应 release-checklist "5.3 API 参考" 缺口: 此前无 /openapi.json 或 Swagger UI。
+pub async fn handle_openapi() -> impl IntoResponse {
+    axum::response::Response::builder()
+        .header("Content-Type", "application/yaml; charset=utf-8")
+        .header("Cache-Control", "no-cache")
+        .body(axum::body::Body::from(OPENAPI_YAML))
+        .unwrap_or_else(|e| {
+            axum::response::Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(axum::body::Body::from(format!("failed to serve spec: {e}")))
+                .unwrap()
+        })
 }
 
 pub async fn not_found_handler() -> impl IntoResponse {
@@ -126,8 +145,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/chat", get(api::h5_page))
         // WebSocket echo (从 server/http.rs ws_handler 融合)
         .route("/ws", get(ws_echo_handler))
+        // B3 瓦片服务: NT-Pack 冷层 bbox 查询 (R-P42 强化 NT-IO 节点)
+        .route("/api/geo/tiles", get(super::tiles::geo_tiles_handler))
         // Frontend + fallback
         .route("/", get(handle_frontend))
+        .route("/openapi.yaml", get(handle_openapi))
+        .route("/openapi.json", get(handle_openapi))
         .fallback(not_found_handler)
         // NOTE: auth middleware 不在 build_router 内套用——merge 进来的
         // KB/EWHR 路由不会继承 base router 的 route_layer（axum 语义）。
