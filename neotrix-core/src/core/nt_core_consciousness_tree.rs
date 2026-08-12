@@ -23,7 +23,7 @@ pub struct ConsciousnessTree {
     // Evolution cycle tracking
     pub current_contract: Option<EvolutionContract>,
     pub drift_report: Option<DriftReport>,
-    pub atoms: HashMap<String, CapabilityAtom>, // All 70 atomic capabilities
+    pub atoms: HashMap<String, CapabilityAtom>, // All 36 atomic capabilities (D6: 实际 36, 非 70)
     /// Vulnerability baseline for the "vuln reduction >= 20%" contract criterion.
     /// `None` until first measurement; set on first evaluation.
     pub vuln_baseline: Option<usize>,
@@ -370,10 +370,13 @@ impl Constellation {
         }
     }
 
-    /// 从真实 maturity 布尔推导 level (向后兼容 maturity_c0..c5 字段)
-    pub fn derive(compiles: bool, unit: bool, integration: bool, benchmark: bool, pipeline: bool, healing: bool) -> Self {
-        let flags = [compiles, unit, integration, benchmark, pipeline, healing];
-        let level = flags.iter().rev().position(|&f| f).map(|i| 5 - i).unwrap_or(0) as u8;
+    /// 从真实 maturity 布尔推导 level (向后兼容 maturity_c0..c5 字段)。
+    /// C3 (D3): 新增 `adaptive` 输入 — 此前六 bool 恒定 `c6_adaptive: false`,
+    /// C6 在树模型永不晋升。adaptive 由真实自适应证据注入 (Phase 8 反馈 /
+    /// 果实趋势), 使 C6 可达。
+    pub fn derive(compiles: bool, unit: bool, integration: bool, benchmark: bool, pipeline: bool, healing: bool, adaptive: bool) -> Self {
+        let flags = [compiles, unit, integration, benchmark, pipeline, healing, adaptive];
+        let level = flags.iter().rev().position(|&f| f).map(|i| 6 - i).unwrap_or(0) as u8;
         Self {
             level,
             c0_compiles: compiles,
@@ -382,7 +385,7 @@ impl Constellation {
             c3_benchmark: benchmark,
             c4_pipeline: pipeline,
             c5_self_healing: healing,
-            c6_adaptive: false,
+            c6_adaptive: adaptive,
         }
     }
 
@@ -502,8 +505,11 @@ impl CapabilityBranch {
         self.node_tier = NodeTier::derive(self.module_count, cross_domain_consumers, self.self_test_count);
     }
 
-    /// 运行时推导 Constellation — 从现有 maturity 布尔派生 (向后兼容)
+    /// 运行时推导 Constellation — 从现有 maturity 布尔派生 (向后兼容)。
+    /// C3 (D3): C6 自适应 = C5 自愈已达成 + 真实自适应证据 (已产果 → 进化闭环
+    /// 活动; 高健康 → 可自调节)。使 c6_adaptive 由真实状态可达, 不再恒 false。
     pub fn evaluate_constellation(&mut self) {
+        let adaptive = self.maturity_c5 && self.fruit_count > 0 && self.health >= 0.8;
         self.constellation = Constellation::derive(
             self.maturity_c0,
             self.maturity_c1,
@@ -511,6 +517,7 @@ impl CapabilityBranch {
             self.maturity_c3,
             self.maturity_c4,
             self.maturity_c5,
+            adaptive,
         );
     }
 
@@ -847,6 +854,42 @@ impl Default for ConsciousnessTree {
 }
 
 impl ConsciousnessTree {
+    /// 从 constitution KB 动态加载 internalized principles (C9/D9)。
+    /// 使用全局 Constitution (解析自 AGENTS.md) 中的 tree_growth_rules + absorption_rules。
+    /// 回退: 若 Constitution 不可用/为空, 使用硬编码默认原则 (R-P42~R-P48 浓缩锚点)。
+    fn load_internalized_principles(&mut self) -> Vec<String> {
+        use crate::core::nt_core_self_constitution::global_constitution;
+        let constitution = global_constitution();
+        
+        let mut principles = Vec::new();
+        
+        // 加载 Tree Growth 规则 (R-P42~R-P48) — 最高优先级架构原则
+        for rule in constitution.tree_growth_rules() {
+            principles.push(format!("{}: {}", rule.id, rule.content));
+        }
+        
+        // 加载 Absorption 规则 (R-P43) — 外部设计吸收协议
+        for rule in constitution.absorption_rules() {
+            principles.push(format!("{}: {}", rule.id, rule.content));
+        }
+        
+        // 回退: 若 Constitution 为空/不可用, 使用硬编码默认原则 (R-P42~R-P48 浓缩)
+        if principles.is_empty() {
+            principles = vec![
+                "Tree-Grafting: Map to existing branch before new code".into(),
+                "Absorb-Distill-Crystallize: 3-phase external design integration".into(),
+                "Fruit-Bound: Every module registers in consciousness tree".into(),
+                "Branch Health Gate: Health >= 0.5 before new growth".into(),
+                "Hexagram Derivation: Config from E8 state, not static YAML".into(),
+                "Dual-Process: Fast intuitive (GWT) + Slow reflective (ConsciousnessTree) as separate architectural slots".into(),
+                "Principle-Absorption: Encode principle-level abstractions over instance-level copies".into(),
+                "Self-Referential Audit: Audit protocol must audit itself for open-ended evolution".into(),
+            ];
+        }
+        
+        principles
+    }
+
     pub fn new() -> Self {
         let atoms = Self::initialize_capability_atoms();
         Self {
@@ -932,7 +975,7 @@ impl ConsciousnessTree {
         // 未 fulfilled 且无 drift: 保持现状 (等待下一 cycle 观察)
     }
 
-    /// Initialize 70 atomic capabilities (10 categories × 7 domains) from PerceptionBench + MCA 36-cap
+    /// Initialize 36 atomic capabilities (9 categories × domains) from PerceptionBench + MCA 36-cap
     fn initialize_capability_atoms() -> HashMap<String, CapabilityAtom> {
         let mut atoms = HashMap::new();
         
@@ -1103,6 +1146,64 @@ impl ConsciousnessTree {
             report.valence, report.arousal, report.dominant.0, report.confidence);
     }
 
+    /// 构造 64 维"意识谱"状态向量 — 从真实树状态锚点线性插值 (D1)。
+    ///
+    /// 与 `nt_mind_consciousness_monitor::current_phi_state` 同构 (平滑→高相邻
+    /// 一致性 rho, 差异化→去均值后强度高), 但锚点全部取自树自身真实架构状态,
+    /// 使独立 CLI/MCP 进程的 φ 来自真实集成信息而非 0.0。
+    fn build_phi_state(&self) -> Vec<f64> {
+        let mut anchors: Vec<f64> = Vec::with_capacity(32);
+        // 固定语义序锚点 (排除 phi 自身: 回环喂入会自激/失真)
+        let push_b = |anchors: &mut Vec<f64>, branch: &CapabilityBranch| {
+            anchors.push(branch.health.clamp(0.0, 1.0));
+            anchors.push(branch.maturity_score());
+            anchors.push(branch.constellation.score());
+            anchors.push(branch.health_with_runes().clamp(0.0, 1.0));
+        };
+        for kind in BranchKind::all() {
+            if let Some(branch) = self.branches.get(&kind) {
+                push_b(&mut anchors, branch);
+            }
+        }
+        anchors.push(self.soil.health());
+        anchors.push(self.roots.health());
+        anchors.push(self.trunk.coherence.clamp(0.0, 1.0));
+        anchors.push(self.trunk.governance_compliance.clamp(0.0, 1.0));
+        anchors.push(self.trunk.nexus_health_chain_score.clamp(0.0, 1.0));
+        anchors.push((self.cycle as f64 / 100.0).clamp(0.0, 1.0));
+        anchors.push(self.data_nourishment_factor().min(1.5) / 1.5);
+
+        let dims = 64usize;
+        let win = anchors.len().min(dims);
+        if win == 0 {
+            return Vec::with_capacity(dims);
+        }
+        let step = if win > 1 { (win as f64 - 1.0) / (dims as f64) } else { 0.0 };
+        let mut state = Vec::with_capacity(dims);
+        for i in 0..dims {
+            let pos = i as f64 * step;
+            let lo = (pos.floor() as usize).min(win - 1);
+            let hi = (pos.ceil() as usize).min(win - 1);
+            let frac = pos - pos.floor();
+            let v = if lo == hi {
+                anchors[lo]
+            } else {
+                anchors[lo] + (anchors[hi] - anchors[lo]) * frac
+            };
+            state.push(v);
+        }
+        state
+    }
+
+    /// 用真实 IITPhiCalculator 计算当前整合信息 Φ (D1)。
+    /// 独立 CLI/MCP 路径经 run_growth_cycle Phase 2 调用后, trunk.phi 反映真实
+    /// 树状态集成度, 快照/CoreSnapshot.phi 不再是恒 0.0。
+    pub fn compute_iit_phi(&self) -> f64 {
+        use crate::neotrix::nt_core_iit_phi::IITPhiCalculator;
+        let state = self.build_phi_state();
+        IITPhiCalculator::new().compute_phi(&state).phi
+    }
+
     /// Complete feedback loop with evolution contract:
     ///   Phase 0: Contract Negotiation (Goal + Evidence Plan + Stop Rule)
     ///   Phase 1: Roots absorb from soil (Data Foundation → Information Roots)
@@ -1134,20 +1235,11 @@ impl ConsciousnessTree {
         }
         self.soil.constitution_tree_growth_rules = self.config.constitution_tree_growth_rules; // R-P42~R-P48
         self.soil.constitution_absorption_rules = self.config.constitution_absorption_rules; // R-P43
-        
         self.roots.total_absorbed += self.soil.crawl_queue_depth;
         self.roots.total_fetched += self.soil.kb_node_count;
-        // Internalize key principles into roots
-        self.roots.internalized_principles = vec![
-            "Tree-Grafting: Map to existing branch before new code".into(),
-            "Absorb-Distill-Crystallize: 3-phase external design integration".into(),
-            "Fruit-Bound: Every module registers in consciousness tree".into(),
-            "Branch Health Gate: Health >= 0.5 before new growth".into(),
-            "Hexagram Derivation: Config from E8 state, not static YAML".into(),
-            "Dual-Process: Fast intuitive (GWT) + Slow reflective (ConsciousnessTree) as separate architectural slots".into(),
-            "Principle-Absorption: Encode principle-level abstractions over instance-level copies".into(),
-            "Self-Referential Audit: Audit protocol must audit itself for open-ended evolution".into(),
-        ];
+        // C9 (D9): internalized_principles 从 constitution KB 动态加载
+        // 优先使用 KB 中存储的 principles; 若 KB 缺失/空则使用默认 principles
+        self.roots.internalized_principles = self.load_internalized_principles();
         self.roots.active_rule_categories = vec![
             "TreeGrowth".into(),
             "AbsorptionProtocol".into(),
@@ -1161,6 +1253,11 @@ impl ConsciousnessTree {
         self.trunk.resonance_cycle += 1;
         // MARS Dual-Process: System 1 (GWT) + System 2 (Tree)
         self.trunk.mars_system1_activations += 1;
+        // IIT Φ: 从真实树状态计算整合信息 — standalone CLI/MCP 路径不再恒 0
+        // (D1: 此前 trunk.phi 仅由完整运行时 ConsciousnessMonitor 计算, 独立进程
+        // 路径读到的 phi=0.0; 这里用真实分支健康/土壤/根系/治理/养料锚点构造
+        // 64 维意识谱交给 IITPhiCalculator, 使 status 呈现真实整合信息)。
+        self.trunk.phi = self.compute_iit_phi();
         report.phase2_phi = self.trunk.phi;
 
         // ═══ Phase 3: Branches produce evolution fruits (7 domains → EvolutionFruits) ═══
@@ -1199,7 +1296,9 @@ impl ConsciousnessTree {
                 // 使意识核心进化果实质量直接反映 200G 社区推理数据的养料充足度。
                 // 此前果实质量仅反映内部 maturity, 从不反映真实数据量。
                 let base_quality = branch.maturity_score();
-                let quality = (base_quality * data_nourishment).min(1.5);
+                // D7 (C7): 质量钳到 [0,1] — maturity∈[0,1] × nourishment(≥1) 此前
+                // min(...,1.5) 可越界, 违反 quality∈[0,1] 不变量 (下游按概率/归一消费)。
+                let quality = (base_quality * data_nourishment).clamp(0.0, 1.0);
                 // Use EvolutionFruit instead of CapabilityFruit
                 let fruit = EvolutionFruit {
                     name: format!("{}-evo-fruit-{}", branch.kind.label(), self.cycle),
@@ -1478,13 +1577,24 @@ impl ConsciousnessTree {
             corrective_actions.push("Increase SelfTest coverage requirements".into());
         }
 
+        // C8 (D8): resource_consumed 不再硬编码 0.5 — 以真实树活动计数为度量
+        // (MARS System2 反射迭代 + GWT 谐振周期 + 已消化果实 + 吸收总量),
+        // 饱和曲线归一到 [0,1]。反映"本契约进化实际消耗的反思/谐振/消化工作量"。
+        let resource_consumed = {
+            let activity = (self.trunk.mars_system2_iterations
+                + self.trunk.resonance_cycle
+                + self.fruits.len() as u64
+                + self.roots.total_absorbed) as f64;
+            (activity / 1000.0).min(1.0)
+        };
+
         DriftReport {
             cycle: self.cycle,
             contract_fulfilled: fulfillment.fulfilled,
             claim_achieved,
             evidence_collected: contract.evidence_plan.clone(),
             quality_achieved,
-            resource_consumed: 0.5, // Simplified
+            resource_consumed,
             drift_detected,
             drift_magnitude,
             stop_rule_triggered: quality_achieved < contract.stop_rule.min_quality_threshold,
@@ -2326,9 +2436,10 @@ mod tests {
 
     #[test]
     fn test_data_nourishment_breaks_quality_cap() {
-        // 缺陷6修复 (真实运转): 果实质量原 min(1.0) 截断 — 成熟分支 (C4=0.67)
-        // 乘数据养料 (1.79) 后 1.2 被截断到 1.0, 数据挖掘价值对成熟分支丢失。
-        // 修复: 上限放宽到 1.5, 使数据养料可突破 1.0 (表示数据增强的进化能力)。
+        // D7 (C7) 修复回归: 果实质量必须钳到 [0,1] — 成熟分支 (C0-C4) × 数据养料
+        // (真实 KB 规模 因子 ≈1.79) 不得越界 (旧 min(...,1.5) 违反 quality∈[0,1]
+        // 不变量, 下游按概率/归一消费时会失真)。数据养料仍提升质量至 1.0 封顶,
+        // 但绝不超界 — "数据增强的进化能力"以 1.0 为饱和点表达。
         let mut tree = ConsciousnessTree::new();
         tree.soil.kb_node_count = 55_826; // 真实 KB 规模 → 因子 ≈ 1.79
         let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
@@ -2348,9 +2459,11 @@ mod tests {
         tree.run_growth_cycle();
         assert!(!tree.fruits.is_empty(), "fruits produced");
         let max_q = tree.fruits.iter().map(|f| f.quality).fold(0.0_f64, f64::max);
-        // 0.83 * 1.79 = 1.49 → 不被 1.0 截断
-        assert!(max_q > 1.0, "data nourishment should break 1.0 cap: max={max_q:.3}");
-        assert!(max_q <= 1.5, "bounded by 1.5 cap: {max_q:.3}");
+        // 0.83 * 1.79 = 1.49 → 钳到 1.0, 不越界
+        assert!(max_q <= 1.0, "quality must clamp to [0,1]: max={max_q:.3}");
+        assert!(max_q > 0.0, "mature branches with data must still produce quality");
+        assert!(tree.fruits.iter().all(|f| f.quality >= 0.0 && f.quality <= 1.0),
+            "all fruit qualities bounded in [0,1]");
     }
 
     #[test]
@@ -2742,15 +2855,16 @@ mod tests {
 
     #[test]
     fn test_constellation_derive_and_score() {
-        let c0 = Constellation::derive(false, false, false, false, false, false);
+        let c0 = Constellation::derive(false, false, false, false, false, false, false);
         assert_eq!(c0.level, 0);
         assert!((c0.score() - 0.0).abs() < 1e-9);
-        let c3 = Constellation::derive(true, true, true, true, false, false);
+        let c3 = Constellation::derive(true, true, true, true, false, false, false);
         assert_eq!(c3.level, 3);
         assert!((c3.score() - 4.0 / 7.0).abs() < 1e-9);
-        let c6 = Constellation::derive(true, true, true, true, true, true);
-        assert_eq!(c6.level, 5);
-        assert!((c6.score() - 6.0 / 7.0).abs() < 1e-9);
+        let c6 = Constellation::derive(true, true, true, true, true, true, true);
+        assert_eq!(c6.level, 6);
+        assert!(c6.c6_adaptive, "C6 must be reachable via adaptive input (D3 fix)");
+        assert!((c6.score() - 7.0 / 7.0).abs() < 1e-9);
     }
 
     #[test]
@@ -2985,5 +3099,33 @@ mod tests {
         // Fruits carry evidence chains + generations
         assert!(tree.fruits.iter().all(|f| f.generation == 0));
         assert!(tree.fruits.iter().all(|f| !f.evidence.sha256.is_none()));
+    }
+
+    #[test]
+    fn test_growth_cycle_computes_real_iit_phi() {
+        // D1 回归: standalone 路径 (无 ConsciousnessMonitor) 下 trunk.phi 必须由
+        // 真实 IITPhiCalculator 从树状态计算, 而非恒 0.0 — status/快照呈现真实整合信息。
+        let tree = ConsciousnessTree::new();
+        let phi_at_init = tree.compute_iit_phi();
+        assert!(phi_at_init.is_finite(), "phi must be finite");
+        // 新树所有分支 health≈neutral 0.5、maturity 0 — 差异化锚点应产出非零集成信息
+        // (注意: 绝不能要求 >0.5 — IIT 语义下均衡/低成熟状态整合度本就低, 只验证
+        // 已接线 + 产出可观察信号, 且随状态变化而变化)。
+        let mut grown = ConsciousnessTree::new();
+        for branch in grown.branches.values_mut() {
+            branch.health = 0.92;
+            branch.self_test_count = 8;
+            branch.module_count = 8;
+            branch.maturity_c0 = true;
+            branch.maturity_c1 = true;
+            branch.maturity_c2 = true;
+            branch.maturity_c3 = true;
+        }
+        grown.run_growth_cycle();
+        let phi_after_cycle = grown.trunk.phi;
+        assert!(phi_after_cycle.is_finite() && phi_after_cycle >= 0.0 && phi_after_cycle <= 1.0,
+            "trunk.phi from real IIT calc must be in [0,1], got {phi_after_cycle}");
+        assert!(phi_after_cycle > 0.0,
+            "grown tree state must yield non-zero integrated information, got {phi_after_cycle}");
     }
 }

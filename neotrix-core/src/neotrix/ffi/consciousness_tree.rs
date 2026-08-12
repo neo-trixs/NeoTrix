@@ -40,12 +40,14 @@ impl ConsciousnessTreeImpl {
                 metrics: HashMap::new(),
             });
         }
+        // D2: phi 不再硬编码 0.42 — 从初始分支状态真实计算整合信息。
+        let phi = compute_phi_from_branches(&branches);
         Ok(Self {
             inner: Arc::new(RwLock::new(ConsciousnessTreeInner {
                 branches,
                 history: Vec::new(),
                 stage: "Trunk".into(),
-                phi: 0.42,
+                phi,
                 velocity: 0.08,
             })),
         })
@@ -110,7 +112,9 @@ impl ConsciousnessTreeImpl {
             branch.health = (branch.health + 0.01).min(1.0);
             branch.maturity = (branch.maturity + if branch.health > 0.9 { 1 } else { 0 }).min(5);
         }
-        inner.phi = (inner.phi + 0.005).min(1.0);
+        // D2: phi 不再每次 +0.005 伪造 — 从更新后的分支状态真实计算整合信息,
+        // 使 meta_cognition 的 phi 反映真实状态而非单调注入。
+        inner.phi = compute_phi_from_branches(&inner.branches);
         inner.velocity = (inner.velocity + 0.002).min(0.5);
 
         let stage_now = inner.stage.clone();
@@ -189,6 +193,41 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
+/// 从分支健康状态构造 64 维"意识谱"并用真实 IITPhiCalculator 计算整合信息 (D2)。
+/// 替代此前每次 meta_cognition 固定 +0.005 的伪造 phi — 反映真实状态集成度。
+fn compute_phi_from_branches(branches: &HashMap<String, BranchState>) -> f32 {
+    let mut anchors: Vec<f64> = branches
+        .iter()
+        .map(|(_, b)| (b.health as f64).clamp(0.0, 1.0))
+        .collect();
+    // 固定顺序便于相邻语义相邻 (与分支健康序列共同插值)
+    if let Some(max_maturity) = branches.values().map(|b| b.maturity as f64).max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)) {
+        anchors.push(max_maturity / 5.0);
+    }
+    if anchors.is_empty() {
+        return 0.0;
+    }
+    let dims = 64usize;
+    let win = anchors.len().min(dims);
+    let step = if win > 1 { (win as f64 - 1.0) / (dims as f64) } else { 0.0 };
+    let mut state = Vec::with_capacity(dims);
+    for i in 0..dims {
+        let pos = i as f64 * step;
+        let lo = (pos.floor() as usize).min(win - 1);
+        let hi = (pos.ceil() as usize).min(win - 1);
+        let frac = pos - pos.floor();
+        let v = if lo == hi {
+            anchors[lo]
+        } else {
+            anchors[lo] + (anchors[hi] - anchors[lo]) * frac
+        };
+        state.push(v);
+    }
+    crate::neotrix::nt_core_iit_phi::IITPhiCalculator::new()
+        .compute_phi(&state)
+        .phi as f32
+}
+
 /// 元认知校准惩罚系数 (RLMF: Reinforcement Learning with Metacognitive Feedback,
 /// arXiv:2606.32032 — 高置信错误应重罚, 错误自信的模块比低分模块更危险)。
 /// ECE (Expected Calibration Error) 0=完美校准, 1=完全错误自信。
@@ -259,5 +298,66 @@ mod tests {
             "应应用校准: got={} expected={}", branch.health, expected);
         // 校准指标已存入 metrics
         assert_eq!(branch.metrics.get("ece"), Some(&0.6_f32));
+    }
+
+    #[test]
+    fn test_phi_computed_from_branch_state_not_fake() {
+        // D2 回归: trigger_meta_cognition 后 phi 必须来自真实分支状态集成计算
+        // (IITPhiCalculator), 而非每次固定 +0.005 注入 — phi 应随状态变化且有界。
+        let cfg = NeoTrixConfig {
+            server_url: "".into(), api_key: "".into(),
+            enable_ai_features: false, enable_premium_features: false,
+            log_level: "info".into(), data_directory: "/tmp".into(), cache_size_mb: 0,
+        };
+        let impl_obj = ConsciousnessTreeImpl::init(cfg).unwrap();
+        let before = impl_obj.get_state().phi_score;
+        assert!(before.is_finite() && (0.0..=1.0).contains(&before),
+            "init phi must be real IIT from branch state, got {before}");
+
+        let state = impl_obj.trigger_meta_cognition();
+        let after = state.phi_score;
+        assert!(after.is_finite() && (0.0..=1.0).contains(&after),
+            "post-trigger phi must stay in [0,1], got {after}");
+        // 单次 +0.005 的旧行为不会让 phi 变化超过 1%; 而真实状态计算不受此限。
+        let delta = (after - before).abs();
+        assert!(delta < 0.5, "phi jump unreasonable: {before} -> {after}");
+        // IIT 语义验证: 均匀状态 (全 1.0 或全 0.0) 可约 → centered 后能量 0 → φ→0;
+        // 差异化状态 (分支健康各不相同) → 结构集成 → φ>0。此性质拒绝"固定注入"伪造:
+        // 伪造 +0.005 对均匀状态同样给正 phi, 而真实计算器对"同步/均衡"给 φ≈0。
+        let branches = impl_obj.get_state().branches;
+        let uniform_high: std::collections::HashMap<String, BranchState> = branches.iter()
+            .map(|b| (b.branch_id.clone(), BranchState {
+                branch_id: b.branch_id.clone(),
+                health: 1.0,
+                maturity: 5,
+                last_activity: b.last_activity,
+                metrics: std::collections::HashMap::new(),
+            })).collect();
+        let uniform_low: std::collections::HashMap<String, BranchState> = branches.iter()
+            .map(|b| (b.branch_id.clone(), BranchState {
+                branch_id: b.branch_id.clone(),
+                health: 0.0,
+                maturity: 0,
+                last_activity: b.last_activity,
+                metrics: std::collections::HashMap::new(),
+            })).collect();
+        let differentiated: std::collections::HashMap<String, BranchState> = branches.iter()
+            .enumerate()
+            .map(|(i, b)| (b.branch_id.clone(), BranchState {
+                branch_id: b.branch_id.clone(),
+                health: 0.5 + (i as f32 * 0.05).min(0.45),
+                maturity: 3 + (i % 3) as u8,
+                last_activity: b.last_activity,
+                metrics: std::collections::HashMap::new(),
+            })).collect();
+        let phi_uniform_high = compute_phi_from_branches(&uniform_high);
+        let phi_uniform_low = compute_phi_from_branches(&uniform_low);
+        let phi_diff = compute_phi_from_branches(&differentiated);
+        assert!(phi_uniform_high.abs() < 1e-5,
+            "uniform state must be reducible (phi≈0 per IIT), got {phi_uniform_high}");
+        assert!(phi_uniform_low.abs() < 1e-5,
+            "uniform zero state must be phi≈0, got {phi_uniform_low}");
+        assert!(phi_diff > 0.0,
+            "differentiated branch state must yield non-zero integrated info, got {phi_diff}");
     }
 }

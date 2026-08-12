@@ -9,6 +9,10 @@ use super::module_def::{SpecialistModule, SpecialistType};
 /// - Logical: 形式化/符号推理 (formal reasoning)
 /// - Knowledge: 检索与知识整合 (retrieval & integration)
 /// - Social: 交互与安全防护 (interaction & security)
+///
+/// 注 (D6 对齐): SpecialistType 共 15 种, 而 resonance 的 hexagram 状态数组是
+/// `[ReasoningHexagram; MODULE_COUNT]` (14 个) — Orchestrator 无专属 hexagram
+/// (由认知类型/编排层路由), 不参与 E8 共振状态索引。此为设计而非缺陷。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CognitiveType {
     /// 语言型: PatternMatcher, CreativityGenerator, ReflectionEngine, Orchestrator

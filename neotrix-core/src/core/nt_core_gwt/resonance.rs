@@ -39,7 +39,7 @@ pub const RESONANCE_THRESHOLD: u32 = 2;
 /// Number of specialist modules.
 pub const MODULE_COUNT: usize = 14;
 
-/// Pre-computed resonance matrix: 12×12 pairwise resonance strengths.
+/// Pre-computed resonance matrix: 14×14 pairwise resonance strengths (D6: 12×12 → MODULE_COUNT=14 对齐)。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResonanceMatrix {
     /// resonance[i][j] = resonance strength between module i and j (0-6).

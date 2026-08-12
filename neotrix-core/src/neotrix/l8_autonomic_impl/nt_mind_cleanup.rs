@@ -693,8 +693,10 @@ impl CleanupPattern {
     pub fn is_system_root_dir(p: &Path) -> bool {
         let home = dirs::home_dir().unwrap_or_default();
         let canonical = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
-        canonical == home
-            || canonical.starts_with(&home.join("Library"))
+        // 两侧都 canonicalize: /var → /private/var (macOS symlink), 否则保护失效 (误删风险)
+        let canonical_home = std::fs::canonicalize(&home).unwrap_or(home.clone());
+        canonical == canonical_home
+            || canonical.starts_with(&canonical_home.join("Library"))
             || p == std::path::Path::new("/")
             || p == std::path::Path::new("\\")
     }

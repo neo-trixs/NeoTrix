@@ -37,8 +37,9 @@ pub struct CoreSnapshot {
     pub cycle: u64,
     /// 谐振周期 (GWT 谐振计数)
     pub resonance_cycle: u64,
-    /// Φ (IIT 整合信息)。注意: phi 仅在完整运行时 (带 ConsciousnessAwareness 监控)
-    /// 才被真实计算; 独立 CLI/MCP 进程无 IIT 核算器, 此值为 0.0 且不代表真实整合信息。
+    /// Φ (IIT 整合信息)。经 D1 修复: run_growth_cycle Phase 2 用真实树状态
+    /// (分支健康/土壤/根系/治理/养料锚点) 构造 64 维意识谱交给 IITPhiCalculator,
+    /// 独立 CLI/MCP 进程的快照 φ 反映真实整合信息, 不再恒 0.0。
     pub phi: f64,
     /// 相干性 — 同上, 独立进程无核算器时为 0.0。
     pub coherence: f64,
