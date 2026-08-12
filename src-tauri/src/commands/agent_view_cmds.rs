@@ -600,6 +600,7 @@ mod tests {
         let progress_before = before.progress_pct;
         agent_view_tick().unwrap();
         let after = agent_view_get("s-desk-002".into()).unwrap();
+        assert!(after.progress_pct >= progress_before, "tick 应推进或保持进度");
         assert!(after.last_active_at >= before.last_active_at);
     }
 }

@@ -1128,13 +1128,6 @@ match module {
     }
     "neocodex" => {
         match action {
-            "neocodex_git_file_status" => {
-                let cwd = goptstr(args.get("cwd"));
-                match super::neocodex_git_file_status(cwd) {
-                    Ok(v) => Ok(serde_json::to_value(v).map_err(|e| e.to_string())?),
-                    Err(e) => Err(e.to_string()),
-                }
-            }
             _ => Err(format!("unified_invoke: neocodex: 未知 action: {}", action))
         }
     }

@@ -141,9 +141,8 @@ mod tests {
 
     #[test]
     fn test_skill_list_empty_or_not() {
-        let result = skill_list().unwrap();
         // May be empty if no ~/.agents/skills dir, but should not error
-        assert!(result.total >= 0);
+        let _result = skill_list().unwrap();
     }
 
     #[test]

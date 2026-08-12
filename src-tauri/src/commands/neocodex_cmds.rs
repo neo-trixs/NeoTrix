@@ -2,6 +2,7 @@ use neotrix::neotrix::l1_body_impl::nt_io_neocodex::{
     NeoCodexAgent, NeoCodexHealthReport, NeoCodexMode, WireSession, WireEvent,
 };
 use neotrix::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry;
+use base64::Engine;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_notification::NotificationExt;
@@ -28,6 +29,98 @@ pub struct NeoCodexAttachmentPayload {
     pub mime_type: String,
     #[serde(default)]
     pub data: Option<String>,
+}
+
+/// Per-attachment cap for text injected into the LLM user turn. Deliberately
+/// small: attachments are supplementary context, not the message body.
+const MAX_ATTACHMENT_TEXT_BYTES: usize = 8 * 1024;
+const TRUNCATION_MARK: &str = "…[截断]";
+
+/// Text-like attachment extensions (matched on `name`, lower-cased). Covers
+/// docs/data formats plus the common code languages; mime `text/*` is treated
+/// as text regardless of extension.
+const TEXT_ATTACHMENT_EXTS: &[&str] = &[
+    // docs / data
+    "txt", "md", "markdown", "json", "yaml", "yml", "toml", "xml", "csv", "tsv",
+    "log", "ini", "conf", "cfg", "env", "sql",
+    // code
+    "rs", "ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "rb", "go", "java", "kt",
+    "kts", "swift", "c", "h", "cpp", "cc", "hpp", "cs", "php", "sh", "bash", "zsh",
+    "html", "css", "scss", "vue", "svelte", "proto", "gradle", "lua", "pl", "r", "dart",
+];
+
+fn is_text_attachment(a: &NeoCodexAttachmentPayload) -> bool {
+    if a.mime_type.starts_with("text/") {
+        return true;
+    }
+    let ext = std::path::Path::new(&a.name)
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase());
+    match ext.as_deref() {
+        Some(e) => TEXT_ATTACHMENT_EXTS.contains(&e),
+        None => false,
+    }
+}
+
+/// Build the attachment block appended to the LLM user turn before the message
+/// reaches the model.
+///
+/// Product rule (NOT a full base64 dump — payloads can be multi-MB):
+///  - text-like attachments (mime `text/*` or a known text extension):
+///    base64 → UTF-8, capped at [`MAX_ATTACHMENT_TEXT_BYTES`] per attachment
+///    (char-boundary safe), overflow marked with [`TRUNCATION_MARK`];
+///  - binary / image / anything else: metadata line only
+///    (name, size, mime, data availability).
+///
+/// The wire keeps the full payloads for the frontend — nothing here replaces
+/// the `UserMessage` wire record.
+fn attachment_context_block(atts: Option<&[NeoCodexAttachmentPayload]>) -> String {
+    let Some(atts) = atts else { return String::new(); };
+    if atts.is_empty() {
+        return String::new();
+    }
+    let mut block = String::new();
+    for (i, a) in atts.iter().enumerate() {
+        // Consistent with the wire mapping: attachments without a name are dropped.
+        if a.name.is_empty() {
+            continue;
+        }
+        let size_desc = if a.size > 0 {
+            format!("{} bytes", a.size)
+        } else {
+            "unknown size".to_string()
+        };
+        let header = format!("[附件{}: {} ({}, {})]", i + 1, a.name, a.mime_type, size_desc);
+        if is_text_attachment(a) {
+            if let Some(text) = a.data.as_deref()
+                .and_then(|b64| base64::engine::general_purpose::STANDARD.decode(b64).ok())
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+            {
+                // Char-boundary-safe truncation: never split a multi-byte char.
+                let mut kept = String::new();
+                for ch in text.chars() {
+                    if kept.len() + ch.len_utf8() > MAX_ATTACHMENT_TEXT_BYTES {
+                        break;
+                    }
+                    kept.push(ch);
+                }
+                block.push_str(&header);
+                block.push('\n');
+                block.push_str(&kept);
+                if kept.len() < text.len() {
+                    block.push_str(TRUNCATION_MARK);
+                }
+                block.push('\n');
+                continue;
+            }
+            // text-typed but no decodable payload → fall through to metadata
+        }
+        let data_state = if a.data.is_some() { "数据可用" } else { "无数据" };
+        block.push_str(&format!(
+            "{header} — 二进制/非文本附件，内容未注入模型（{data_state}）\n"
+        ));
+    }
+    block
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -62,6 +155,22 @@ pub async fn neocodex_send_message_stream(
     agent.set_permission_mode(&mode);
 
     let is_regenerate = regenerate.unwrap_or(false);
+    // Attachment → LLM context injection. Built BEFORE `attachments` is
+    // consumed by the wire mapping below (fresh turns only — regenerated turns
+    // replay the existing context and never carry new attachments). The block
+    // is appended to the user content that reaches the model (context push AND
+    // react_loop_stream use the same `send_content`, so `build_messages` keeps
+    // its dedup of the trailing user turn). The wire record below stays
+    // unchanged: it keeps the original text + full payloads for the UI.
+    let attachment_block = if is_regenerate {
+        String::new()
+    } else {
+        attachment_context_block(attachments.as_deref())
+    };
+    let mut send_content = content.clone();
+    if !attachment_block.is_empty() {
+        send_content.push_str(&attachment_block);
+    }
     if !is_regenerate {
         // Persist the user message (fixes streaming-not-persisted gap) with any
         // attachments, keeping the wire + in-memory mirror in sync.
@@ -86,8 +195,8 @@ pub async fn neocodex_send_message_stream(
             timestamp: ts,
             attachments: core_atts,
         });
-        let est = content.len() / 4;
-        agent.context.push("user", content.clone(), est);
+        let est = send_content.len() / 4;
+        agent.context.push("user", send_content.clone(), est);
         agent.state.tokens_used += est;
         agent.state.turn_count += 1;
     }
@@ -97,7 +206,7 @@ pub async fn neocodex_send_message_stream(
 
     STREAM_CANCELLED.store(false, std::sync::atomic::Ordering::Relaxed);
     let started = std::time::Instant::now();
-    let result = agent.react_loop_stream(&content, 4, |token| {
+    let result = agent.react_loop_stream(&send_content, 4, |token| {
         let _ = app.emit("neocodex_stream_token", token);
         !STREAM_CANCELLED.load(std::sync::atomic::Ordering::Relaxed)
     }, |name, args, result, duration_ms, success| {
@@ -2063,40 +2172,143 @@ pub async fn neocodex_open_external(path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Get git status for all files in the repo (porcelain format).
+/// Commit the currently staged changes (frontend "accept" = git add, so this
+/// only commits what the user staged in the panel). Errors surface stderr
+/// (plus stdout, since git writes e.g. "nothing to commit" there).
 #[tauri::command(rename_all = "snake_case")]
-pub fn neocodex_git_file_status(cwd: Option<String>) -> Result<Vec<GitFileStatus>, String> {
+pub fn neocodex_git_commit(message: String) -> Result<(), String> {
     use std::process::Command;
-    let cwd = cwd.unwrap_or_else(|| std::env::current_dir().unwrap_or_default().to_string_lossy().to_string());
+    let message = message.trim().to_string();
+    if message.is_empty() {
+        return Err("commit message 不能为空".to_string());
+    }
     let out = Command::new("git")
-        .args(["status", "--porcelain"])
-        .current_dir(&cwd)
+        .args(["commit", "-m", &message])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let msg = format!("{}{}", stdout.trim(), stderr.trim());
+        return Err(if msg.is_empty() { "git commit failed".to_string() } else { msg });
+    }
+    Ok(())
+}
+
+/// Push the current branch to its upstream remote. Returns the remote output
+/// summary (may include progress / "Everything up-to-date" hints); when the
+/// branch has no upstream the stderr hint ("no upstream branch" / "set-upstream")
+/// is surfaced in the error.
+#[tauri::command(rename_all = "snake_case")]
+pub fn neocodex_git_push() -> Result<String, String> {
+    use std::process::Command;
+    let out = Command::new("git")
+        .args(["push"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let summary = format!("{}{}", stdout.trim(), stderr.trim());
+    if !out.status.success() {
+        return Err(if summary.is_empty() { "git push failed".to_string() } else { summary });
+    }
+    Ok(if summary.is_empty() {
+        "Push 完成".to_string()
+    } else {
+        summary
+    })
+}
+
+/// List local git branches (short ref names via `%(refname:short)`, e.g. `main`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn neocodex_git_branch() -> Result<Vec<String>, String> {
+    use std::process::Command;
+    let out = Command::new("git")
+        .args(["branch", "--format=%(refname:short)"])
         .output()
         .map_err(|e| e.to_string())?;
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr);
         return Err(stderr.trim().to_string());
     }
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let mut statuses = Vec::new();
-    for line in stdout.lines() {
-        if line.len() < 3 {
-            continue;
-        }
-        let status = &line[0..2];
-        let path = line[3..].trim().to_string();
-        statuses.push(GitFileStatus {
-            path,
-            status: status.to_string(),
-        });
-    }
-    Ok(statuses)
+    let branches: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    Ok(branches)
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct GitFileStatus {
-    pub path: String,
-    pub status: String,
+/// Checkout the given local branch. Runs in the process cwd (same convention as
+/// the other `neocodex_git_*` commands). The branch name is validated before it
+/// reaches git: non-empty, no whitespace, no shell metacharacters, and no
+/// leading dash (option injection like `--orphan`). It is then passed via
+/// `Command::arg`, so no shell parsing ever happens — git itself rejects
+/// malformed ref names as a second line of defense. Returns the now-current
+/// branch name (`git branch --show-current`).
+#[tauri::command(rename_all = "snake_case")]
+pub fn neocodex_git_checkout(branch: String) -> Result<String, String> {
+    use std::process::Command;
+    let branch = branch.trim().to_string();
+    if branch.is_empty() {
+        return Err("branch 不能为空".to_string());
+    }
+    // Injection guard: reject anything that could escape the argument boundary
+    // if the value were ever shell-expanded, plus git option injection (a
+    // leading '-' would be parsed as a flag instead of a ref name).
+    const FORBIDDEN_CHARS: &[char] = &[
+        ' ', '\t', '\n', '\r', ';', '&', '|', '`', '$', '<', '>', '"', '\'',
+        '\\', '(', ')', '{', '}', '*', '?', '[', ']', ':', '~', '!', '#', '@', '%',
+    ];
+    if branch.starts_with('-') {
+        return Err(format!("branch 名不能以 '-' 开头: {}", branch));
+    }
+    if branch.chars().any(|c| FORBIDDEN_CHARS.contains(&c)) {
+        return Err(format!("branch 名包含非法字符（不允许空格/shell 元字符）: {}", branch));
+    }
+    let out = Command::new("git")
+        .args(["checkout", &branch])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let msg = format!("{}{}", stdout.trim(), stderr.trim());
+        return Err(if msg.is_empty() { "git checkout failed".to_string() } else { msg });
+    }
+    // Resolve the current branch post-checkout (empty when detached HEAD).
+    let cur = Command::new("git")
+        .args(["branch", "--show-current"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    let current = String::from_utf8_lossy(&cur.stdout).trim().to_string();
+    Ok(if current.is_empty() {
+        "detached HEAD".to_string()
+    } else {
+        current
+    })
+}
+
+/// List files currently staged in the index (`git diff --cached --name-only`).
+/// Powers the frontend's staged badge from real backend state instead of
+/// session-local memory.
+#[tauri::command(rename_all = "snake_case")]
+pub fn neocodex_git_staged_files() -> Result<Vec<String>, String> {
+    use std::process::Command;
+    let out = Command::new("git")
+        .args(["diff", "--cached", "--name-only"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err(stderr.trim().to_string());
+    }
+    let files: Vec<String> = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    Ok(files)
 }
 
 /// Ensure a path stays within the current project (or the workspace cwd when no
@@ -2221,6 +2433,83 @@ mod tests {
         } else {
             // 测试 cwd 可能不在仓库根（如 src-tauri/），此时 AGENTS.md 不存在属正常
             assert!(pv.agents_md.is_none(), "no AGENTS.md in cwd -> agents_md should be None");
+        }
+    }
+
+    /// 文本附件应解码 base64 为 UTF-8 注入上下文块，而非落到二进制元数据分支。
+    #[test]
+    fn attachment_block_injects_decoded_text() {
+        let b64 = base64::engine::general_purpose::STANDARD.encode("fn main() {}");
+        let atts = vec![NeoCodexAttachmentPayload {
+            name: "main.rs".to_string(),
+            size: 14,
+            mime_type: "text/x-rust".to_string(),
+            data: Some(b64),
+        }];
+        let block = attachment_context_block(Some(&atts));
+        assert!(block.contains("main.rs"), "header should carry the file name");
+        assert!(block.contains("fn main() {}"), "decoded text should be injected");
+        assert!(!block.contains("未注入"), "text attachment must not be metadata-only");
+    }
+
+    /// 图片/二进制附件只注入元数据行，绝不下发 base64 内容。
+    #[test]
+    fn attachment_block_metadata_only_for_binary() {
+        let atts = vec![NeoCodexAttachmentPayload {
+            name: "shot.png".to_string(),
+            size: 2048,
+            mime_type: "image/png".to_string(),
+            data: Some("QUFBQQ==".to_string()),
+        }];
+        let block = attachment_context_block(Some(&atts));
+        assert!(block.contains("shot.png"));
+        assert!(block.contains("未注入"), "binary attachment must be metadata-only");
+        assert!(!block.contains("QUFBQQ=="), "base64 payload must never reach the block");
+    }
+
+    /// 文本附件超 8KB 时按 char 边界截断并追加截断标记。
+    #[test]
+    fn attachment_block_truncates_long_text() {
+        let long = "x".repeat(10_000);
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&long);
+        let atts = vec![NeoCodexAttachmentPayload {
+            name: "big.log".to_string(),
+            size: long.len() as u64,
+            mime_type: "text/plain".to_string(),
+            data: Some(b64),
+        }];
+        let block = attachment_context_block(Some(&atts));
+        assert!(block.contains(TRUNCATION_MARK), "overflow must be marked truncated");
+        // kept text ≤ 8KB + header/mark slack; well under the cap + overhead
+        assert!(block.len() <= MAX_ATTACHMENT_TEXT_BYTES + 256);
+    }
+
+    /// 无附件/空列表/空 name 时不应产生任何注入块。
+    #[test]
+    fn attachment_block_empty_when_no_payload() {
+        assert!(attachment_context_block(None).is_empty());
+        assert!(attachment_context_block(Some(&[])).is_empty());
+        let atts = vec![NeoCodexAttachmentPayload {
+            name: String::new(),
+            size: 0,
+            mime_type: String::new(),
+            data: None,
+        }];
+        assert!(attachment_context_block(Some(&atts)).is_empty(), "empty-name attachment is dropped");
+    }
+
+    /// git_checkout 注入防护：空、含空白、含 shell 元字符、以 '-' 开头的分支名一律拒绝。
+    #[test]
+    fn git_checkout_rejects_unsafe_branch_names() {
+        for bad in [
+            "", "   ", "a b", "a;b", "a&b", "a|b", "a`b", "$x", "a\"b", "a'b",
+            "-orphan", "--orphan", "a<b", "a>b", "a(b)", "a*b", "a?b", "a[b]", "a\\b",
+        ] {
+            assert!(
+                neocodex_git_checkout(bad.to_string()).is_err(),
+                "branch name should be rejected: {:?}",
+                bad
+            );
         }
     }
 }

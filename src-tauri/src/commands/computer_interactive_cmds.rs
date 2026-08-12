@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+use base64::Engine;
 
 // ── Data Types ──
 
@@ -11,6 +12,9 @@ pub struct ScreenCapture {
     pub height: u64,
     pub format: String,
     pub timestamp: u64,
+    /// 内存内联返回：capture 后不落盘给前端，直接 base64（None 保留纯路径语义）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_base64: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -105,6 +109,7 @@ pub fn computer_screen_capture(path: Option<String>) -> Result<ScreenCapture, St
         height: 0,
         format: "png".into(),
         timestamp: ts,
+        data_base64: None,
     })
 }
 
@@ -361,9 +366,16 @@ pub fn computer_keyboard_press(key: String, modifiers: Option<Vec<String>>) -> R
 }
 
 #[tauri::command]
-pub fn computer_screenshot_and_save(path: String) -> Result<ScreenCapture, String> {
+pub fn computer_screenshot_and_save(path: Option<String>) -> Result<ScreenCapture, String> {
+    // 无显式 path：内部临时文件捕获 → 读入内存 base64 → 删除临时文件，全程不落盘给前端
+    // （消除前端 readFile/remove 二次磁盘往返；mactlm screencapture 仅能写文件，生命周期留在后端）
+    let internal = path.is_none();
+    let output_path = path
+        .or_else(|| Some(format!("{}/neotrix_screen_{}.png", std::env::temp_dir().display(), timestamp_nanos())));
+
+    let capture_path = output_path.as_deref().unwrap_or_default();
     let output = Command::new("screencapture")
-        .args(["-x", &path])
+        .args(["-x", capture_path])
         .output()
         .map_err(|e| format!("Failed to run screencapture: {}", e))?;
 
@@ -374,15 +386,26 @@ pub fn computer_screenshot_and_save(path: String) -> Result<ScreenCapture, Strin
         ));
     }
 
-    let _meta = std::fs::metadata(&path)
+    let _meta = std::fs::metadata(capture_path)
         .map_err(|e| format!("Failed to read screenshot file: {}", e))?;
 
+    let data_base64 = if internal {
+        // 内存传递：读入 base64 后立即删除临时文件
+        let data = std::fs::read(capture_path)
+            .map_err(|e| format!("Failed to read screenshot: {}", e))?;
+        let _ = std::fs::remove_file(capture_path);
+        Some(base64::engine::general_purpose::STANDARD.encode(&data))
+    } else {
+        None
+    };
+
     Ok(ScreenCapture {
-        path: path.clone(),
+        path: output_path.unwrap_or_default(),
         width: 0,
         height: 0,
         format: "png".into(),
         timestamp: timestamp_nanos(),
+        data_base64,
     })
 }
 

@@ -151,7 +151,6 @@ vec![
     json!{{"module": "mcp_host", "action": "mcp_host_status"}},
     json!{{"module": "mcp_host", "action": "mcp_host_stop"}},
     json!{{"module": "mcp_host", "action": "mcp_host_unregister_endpoint"}},
-    json!{{"module": "neocodex", "action": "neocodex_git_file_status"}},
     json!{{"module": "pet", "action": "get_pet_state"}},
     json!{{"module": "plugin", "action": "plugin_config"}},
     json!{{"module": "plugin", "action": "plugin_get"}},
