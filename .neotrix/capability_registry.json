@@ -85,8 +85,8 @@
         }
       ],
       "metadata": {
-        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
-        "tests": "17 passed (nt_core_parallel::isolation)"
+        "tests": "17 passed (nt_core_parallel::isolation)",
+        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-11T17:40:00Z",
@@ -120,8 +120,8 @@
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
+        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-11T17:40:00Z",
@@ -454,28 +454,28 @@
       "signal": 0.76
     },
     {
-      "domain": "NT-META",
+      "action": "awakening_note",
       "capability": "consciousness::meta_cognition",
-      "action": "awakening_note",
-      "rationale": "[蒸馏-NT-MEMORY] 聚合 3 条经验的模式: geo_index 数据完善管线: OurAirports CSV (46,278 机场) + NE Admin0/Admin1 GeoJSON (258 国 + 4,536 省级) ",
-      "signal": 0.76,
-      "promoted_at": 1786513988
-    },
-    {
-      "domain": "NT-CORE",
-      "capability": "tool_routing",
-      "action": "strengthen_or_bud",
-      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: git-smart-commit.sh 智能提交提取工具: 从 git diff 自动提取 type(基于路径+内容特征: 小修改≤3行且增删相当→fix, 删除占比>70%→fix/remove, 文档→docs, 配置小改→chore) + scope(路径推断, 优先核心实现模块非cli包装层) + 摘要(优先中文//注释→函数签名→文件名) + 要点 [关键词: commit, diff, git, add]' 命中能力标签 'tool_routing' 于域 Core, 应强化对应能力节点",
-      "signal": 0.76,
-      "promoted_at": 1786515529
-    },
-    {
       "domain": "NT-META",
-      "capability": "consciousness::consciousness_tree",
+      "promoted_at": 1786513988,
+      "rationale": "[蒸馏-NT-MEMORY] 聚合 3 条经验的模式: geo_index 数据完善管线: OurAirports CSV (46,278 机场) + NE Admin0/Admin1 GeoJSON (258 国 + 4,536 省级) ",
+      "signal": 0.76
+    },
+    {
+      "action": "strengthen_or_bud",
+      "capability": "tool_routing",
+      "domain": "NT-CORE",
+      "promoted_at": 1786515529,
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: git-smart-commit.sh 智能提交提取工具: 从 git diff 自动提取 type(基于路径+内容特征: 小修改≤3行且增删相当→fix, 删除占比>70%→fix/remove, 文档→docs, 配置小改→chore) + scope(路径推断, 优先核心实现模块非cli包装层) + 摘要(优先中文//注释→函数签名→文件名) + 要点 [关键词: commit, diff, git, add]' 命中能力标签 'tool_routing' 于域 Core, 应强化对应能力节点",
+      "signal": 0.76
+    },
+    {
       "action": "awakening_note",
+      "capability": "consciousness::consciousness_tree",
+      "domain": "NT-META",
+      "promoted_at": 1786515529,
       "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
-      "signal": 0.76,
-      "promoted_at": 1786515529
+      "signal": 0.76
     }
   ]
 }
