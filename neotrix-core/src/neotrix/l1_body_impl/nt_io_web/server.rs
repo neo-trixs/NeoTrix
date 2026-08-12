@@ -9,8 +9,7 @@ use axum::{
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
-use super::api;
-use super::AppState;
+use super::{api, AppState, RateWindow};
 
 const FRONTEND_HTML: &str = include_str!("frontend.html");
 
@@ -44,22 +43,50 @@ pub async fn not_found_handler() -> impl IntoResponse {
     }))
 }
 
+/// API Token 认证中间件 (F1)。
+/// 只保护 `/api/*` 路径 — `/` (前端 UI)、`/openapi.yaml`、`/chat`、`/ws` 保持公开。
+/// 未配置 NEOTRIX_API_TOKEN 时直接放行 (本地开发默认开放, 不破坏现有 API 消费者)。
 async fn auth_middleware(
     axum::extract::State(state): axum::extract::State<AppState>,
     req: Request,
     next: Next,
 ) -> Response {
-    if let Some(expected) = &state.api_token {
-        let auth_header = req
-            .headers()
-            .get("Authorization")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        let provided = auth_header.strip_prefix("Bearer ").unwrap_or("");
-        if provided != expected {
-            return (StatusCode::UNAUTHORIZED, axum::response::Json(serde_json::json!({
-                "error": "unauthorized",
-                "message": "Invalid or missing API token. Provide via Authorization: Bearer <token>"
+    if req.uri().path().starts_with("/api/") {
+        if let Some(expected) = &state.api_token {
+            let auth_header = req
+                .headers()
+                .get("Authorization")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            let provided = auth_header.strip_prefix("Bearer ").unwrap_or("");
+            if provided != expected {
+                return (StatusCode::UNAUTHORIZED, axum::response::Json(serde_json::json!({
+                    "error": "unauthorized",
+                    "message": "Invalid or missing API token. Provide via Authorization: Bearer <token>"
+                }))).into_response();
+            }
+        }
+    }
+    next.run(req).await
+}
+
+/// 全局固定窗口限流中间件 (F2, release-checklist 8.6)。
+/// 只对 `/api/*` 计数, 超出 `NEOTRIX_RATE_LIMIT_PER_MIN` (默认 60) 返回 429。
+async fn rate_limit_middleware(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if req.uri().path().starts_with("/api/") {
+        let allowed = state
+            .rate_limiter
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .allow();
+        if !allowed {
+            return (StatusCode::TOO_MANY_REQUESTS, axum::response::Json(serde_json::json!({
+                "error": "rate_limited",
+                "message": "Too many requests, please retry later"
             }))).into_response();
         }
     }
@@ -242,6 +269,7 @@ pub async fn start_server_with(
         })),
         agent_start_time: Arc::new(Mutex::new(None)),
         api_token,
+        rate_limiter: Arc::new(Mutex::new(super::RateWindow::new(300))),
     };
 
     let mut app = build_router(state.clone());

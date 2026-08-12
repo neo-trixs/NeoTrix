@@ -78,6 +78,43 @@ pub struct ProviderConfigPayload {
     pub learning_rate: f64,
 }
 
+/// 全局固定窗口限流器 (F2: HTTP API rate limiting, release-checklist 8.6)。
+/// `per_minute` = 每分钟允许请求数, 0 表示不限制。
+#[derive(Debug, Clone)]
+pub struct RateWindow {
+    per_minute: u64,
+    window_start: std::time::Instant,
+    count: u64,
+}
+
+impl RateWindow {
+    pub fn new(per_minute: u64) -> Self {
+        Self {
+            per_minute,
+            window_start: std::time::Instant::now(),
+            count: 0,
+        }
+    }
+
+    /// 若请求数未超限则计数并放行; 否则拒绝。
+    /// 窗口每 60s 重置 (固定窗口, 简单全局限流)。
+    pub fn allow(&mut self) -> bool {
+        if self.per_minute == 0 {
+            return true;
+        }
+        if self.window_start.elapsed().as_secs() >= 60 {
+            self.window_start = std::time::Instant::now();
+            self.count = 0;
+        }
+        if self.count < self.per_minute {
+            self.count += 1;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub brain: Arc<Mutex<Box<dyn crate::core::nt_core_traits::BrainProvider>>>,
@@ -88,4 +125,5 @@ pub struct AppState {
     pub agent_running: Arc<Mutex<AgentStatus>>,
     pub agent_start_time: Arc<Mutex<Option<std::time::Instant>>>,
     pub api_token: Option<String>,
+    pub rate_limiter: Arc<Mutex<RateWindow>>,
 }
