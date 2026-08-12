@@ -65,7 +65,7 @@ CI/CD: 7 workflows · 14 scripts · 1 Dockerfile · 1 Homebrew formula
 |---|------|------|--------|
 | 5.1 | 用户文档站 | ❌ 无。只有 README + 散落的 .md | 3-5d |
 | 5.2 | 安装教程 | `install.sh` 有但缺少分平台详细说明 | 0.5d |
-| 5.3 | API 参考 | HTTP API 无 `/openapi.json` 或 Swagger UI | 1d |
+| 5.3 | API 参考 | ✅ `/openapi.json` + `/openapi.yaml` 由 server.rs 嵌入 docs/6-REFERENCE/openapi.yaml 提供 (nt_io_web 构建期 include_str!) | done |
 | 5.4 | 迁移/升级指南 | 无 breaking change 说明 | 0.5d |
 
 ---
