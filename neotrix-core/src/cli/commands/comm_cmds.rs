@@ -72,7 +72,7 @@ impl CommCmd {
 
 impl CliCommand for CommCmd {
     fn name(&self) -> &str { "/comm" }
-    fn aliases(&self) -> Vec<&str> { vec!["/persona", "/mask"] }
+    fn aliases(&self) -> Vec<&str> { vec!["/persona", "/disguise"] }
     fn description(&self) -> &str {
         "NT-SHIELD 通信伪装层观测: personas|pool|fetch <url> [persona_key]"
     }

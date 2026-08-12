@@ -10,6 +10,18 @@ use crate::neotrix::nt_shield::key_encryption;
 // ====== /config ======
 
 pub struct ConfigCmd;
+
+/// `NeoTrixConfig` 展示字段序 (与 config.rs 字段一一对应)。
+const CONFIG_FIELDS: [&str; 7] = [
+    "default_llm_provider",
+    "provider",
+    "api_key",
+    "default_model",
+    "custom_endpoint",
+    "color_mode",
+    "log_level",
+];
+
 impl CliCommand for ConfigCmd {
     fn name(&self) -> &str {
         "/config"
@@ -20,41 +32,66 @@ impl CliCommand for ConfigCmd {
     }
 
     fn description(&self) -> &str {
-        "Config management: /config show | /config set <key> <value>"
+        "Config management: /config [show] | /config list | /config set <key> <value>"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
+        let operands: Vec<&str> = args.iter().filter(|a| a.as_str() != "--json").map(|s| s.as_str()).collect();
+        let sub = operands.first().copied().unwrap_or("show");
         let config_path = crate::config::NeoTrixConfig::path();
 
-        if args.is_empty() || (args.len() == 1 && args[0] == "--json") {
-            let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
-            let msg = if config_str.is_empty() {
-                format!("Usage:\n  /config show              Show current configuration\n  /config set <key> <value>  Set a config key\n  /config --json             Output as JSON\n(no config file found at {})", config_path.display())
-            } else {
-                format!("Config at {}:\n{}", config_path.display(), config_str)
-            };
-            let out = CommandOutput::ok(&msg);
-            return if want_json {
-                let parsed: serde_json::Value = config_str.parse().unwrap_or(serde_json::json!({"note": "parse failed"}));
-                out.with_json(parsed)
-            } else { out };
-        }
-
-        let sub = args[0].as_str();
         match sub {
-            "show" => {
-                let config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
-                if config_str.is_empty() {
-                    CommandOutput::ok("No config file found. Defaults will be used.")
-                } else {
-                    CommandOutput::ok(&format!("Config at {}:\n{}", config_path.display(), config_str))
+            "show" | "list" | "ls" => {
+                let cfg = crate::config::NeoTrixConfig::load();
+                let mut lines = format!("Config at {}:\n", config_path.display());
+                let mut json_map = serde_json::Map::new();
+                for name in CONFIG_FIELDS {
+                    let val = match name {
+                        "default_llm_provider" => cfg.default_llm_provider.as_deref(),
+                        "provider" => cfg.provider.as_deref(),
+                        "api_key" => cfg.api_key.as_deref(),
+                        "default_model" => cfg.default_model.as_deref(),
+                        "custom_endpoint" => cfg.custom_endpoint.as_deref(),
+                        "color_mode" => cfg.color_mode.as_deref(),
+                        "log_level" => cfg.log_level.as_deref(),
+                        _ => None,
+                    };
+                    let display = match (name, val) {
+                        // 敏感字段脱敏: 不落盘/不打印明文
+                        ("api_key", Some(_)) => "(set, redacted)".to_string(),
+                        (_, Some(v)) => v.to_string(),
+                        (_, None) => "(unset)".to_string(),
+                    };
+                    lines.push_str(&format!("  {:<22} {}\n", name, display));
+                    if name != "api_key" {
+                        if let Some(v) = val { json_map.insert(name.to_string(), serde_json::json!(v)); }
+                    }
                 }
+                if cfg.default_model.is_none() && cfg.provider.is_none() && cfg.color_mode.is_none() {
+                    lines.push_str("\n(no fields set — defaults are in use)\n");
+                }
+                if sub == "list" || sub == "ls" {
+                    lines.push_str(&format!("\nSettable keys: {}\n", CONFIG_FIELDS.join(", ")));
+                    lines.push_str("Set: /config set <key> <value>\n");
+                }
+                let out = CommandOutput::ok(lines.trim_end());
+                if want_json {
+                    out.with_json(serde_json::Value::Object(json_map))
+                } else { out }
             }
             "set" => {
-                if args.len() < 3 { return CommandOutput::err("Usage: /config set <key> <value>"); }
-                let key = &args[1];
-                let mut raw_value = args[2].clone();
+                if operands.len() < 3 {
+                    return CommandOutput::err("Usage: /config set <key> <value>");
+                }
+                let key = operands[1];
+                if !CONFIG_FIELDS.contains(&key) {
+                    return CommandOutput::err(&format!(
+                        "Unknown config key: {}. Available: {}",
+                        key, CONFIG_FIELDS.join(", ")
+                    ));
+                }
+                let mut raw_value = operands[2].to_string();
                 // Auto-encrypt api_key before persisting
                 if key == "api_key" && !raw_value.is_empty() && !key_encryption::is_encrypted(&raw_value) {
                     match key_encryption::encrypt(&raw_value) {
@@ -64,41 +101,25 @@ impl CliCommand for ConfigCmd {
                         }
                     }
                 }
-                // Read existing, update key, write back
-                let mut config_str = std::fs::read_to_string(&config_path).unwrap_or_default();
-                let key_line = format!("{} = ", key);
-                if config_str.lines().any(|l| l.trim().starts_with(&key_line)) {
-                    // Replace existing
-                    let mut new_lines: Vec<String> = config_str.lines().map(|l| {
-                        if l.trim().starts_with(&key_line) {
-                            if raw_value.contains(' ') || raw_value.contains('#') {
-                                format!("{} = \"{}\"", key, raw_value)
-                            } else {
-                                format!("{} = {}", key, raw_value)
-                            }
-                        } else { l.to_string() }
-                    }).collect();
-                    if !config_str.ends_with('\n') { new_lines.push(String::new()); }
-                    config_str = new_lines.join("\n");
+                let cfg = crate::config::NeoTrixConfig::load();
+                if cfg.save_field(key, &raw_value) {
+                    let display_value = if key == "api_key" { "(encrypted)" } else { &raw_value };
+                    let out = CommandOutput::ok(&format!(
+                        "Set {} = {} (saved to {})",
+                        key, display_value, config_path.display()
+                    ));
+                    if want_json {
+                        out.with_json(serde_json::json!({
+                            "key": key, "value": display_value, "path": config_path.display().to_string()
+                        }))
+                    } else { out }
                 } else {
-                    if !config_str.ends_with('\n') { config_str.push('\n'); }
-                    if raw_value.contains(' ') || raw_value.contains('#') {
-                        config_str.push_str(&format!("{} = \"{}\"\n", key, raw_value));
-                    } else {
-                        config_str.push_str(&format!("{} = {}\n", key, raw_value));
-                    }
-                }
-                if let Some(dir) = config_path.parent() {
-                    let _ = std::fs::create_dir_all(dir);
-                }
-                let display_key = if key == "api_key" { "api_key" } else { key };
-                let display_value = if key == "api_key" { "(encrypted)" } else { &raw_value };
-                match std::fs::write(&config_path, &config_str) {
-                    Ok(()) => CommandOutput::ok(&format!("Set {} = {} (saved to {})", display_key, display_value, config_path.display())),
-                    Err(e) => CommandOutput::err(&format!("Failed to write config: {}", e)),
+                    CommandOutput::err(&format!("Failed to persist key: {}", key))
                 }
             }
-            _ => CommandOutput::err(&format!("Unknown subcommand: {}. Available: show, set", sub)),
+            _ => CommandOutput::err(&format!(
+                "Unknown subcommand: {}. Available: show, list, set", sub
+            )),
         }
     }
 }
@@ -117,34 +138,59 @@ impl CliCommand for HelpCmd {
     }
 
     fn description(&self) -> &str {
-        "Show help: /help [command]"
+        "Show help: /help [command] | /help all"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
         let want_json = args.iter().any(|a| a == "--json");
-
-        // Per-command detail — delegate to the command's own description
-        if !args.is_empty() && args[0] != "--json" && args[0] != "all" {
-            let reg = crate::cli::commands::registry::default_registry();
-            let lookup = format!("/{}", args[0].trim_start_matches('/'));
-            return match reg.find(&lookup) {
-                Some(cmd) => CommandOutput::ok(&format!("{} — {}", cmd.name(), cmd.description())),
-                None => CommandOutput::err(&format!("No help available for '{}'", args[0])),
-            };
-        }
-
-        // Categorized full help
+        let operands: Vec<&str> = args.iter().filter(|a| a.as_str() != "--json").map(|s| s.as_str()).collect();
         let reg = crate::cli::commands::registry::default_registry();
-        let s = reg.help_by_category();
-        let out = CommandOutput::ok(&s);
-        if want_json {
-            let by_cat = reg.list_by_category();
-            let json_cmds: serde_json::Value = by_cat.into_iter().map(|(cat, names)| {
-                (cat.label().to_string(), serde_json::json!(names))
-            }).collect();
-            out.with_json(json_cmds)
-        } else {
-            out
+
+        // `/help all` — 全部已注册命令 + 分类 (含 agent 后端调度命令)
+        if operands.first().copied() == Some("all") {
+            let s = reg.help_all_by_category();
+            let out = CommandOutput::ok(&s);
+            if want_json {
+                let by_cat = reg.list_all_by_category();
+                let json_cmds: serde_json::Value = by_cat.into_iter().map(|(cat, names)| {
+                    (cat.label().to_string(), serde_json::json!(names))
+                }).collect();
+                out.with_json(json_cmds)
+            } else {
+                out
+            }
+        }
+        // `/help <cmd>` — 单命令详细帮助 (名称+别名+子命令说明)
+        else if let Some(cmd_name) = operands.first() {
+            let lookup = format!("/{}", cmd_name.trim_start_matches('/'));
+            match reg.help_for(&lookup) {
+                Some(detail) => {
+                    let out = CommandOutput::ok(&detail);
+                    if want_json {
+                        let cmd = reg.find(&lookup).expect("help_for found it");
+                        out.with_json(serde_json::json!({
+                            "command": cmd.name(),
+                            "aliases": cmd.aliases(),
+                            "description": cmd.description(),
+                        }))
+                    } else { out }
+                }
+                None => CommandOutput::err(&format!("No help available for '{}'", cmd_name)),
+            }
+        }
+        // 裸 `/help` — 一级入口分类帮助 (命令收敛面)
+        else {
+            let s = reg.help_by_category();
+            let out = CommandOutput::ok(&s);
+            if want_json {
+                let by_cat = reg.list_by_category();
+                let json_cmds: serde_json::Value = by_cat.into_iter().map(|(cat, names)| {
+                    (cat.label().to_string(), serde_json::json!(names))
+                }).collect();
+                out.with_json(json_cmds)
+            } else {
+                out
+            }
         }
     }
 }

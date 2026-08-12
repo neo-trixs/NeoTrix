@@ -267,6 +267,53 @@ impl CommandRegistry {
         map
     }
 
+    /// 按分类列出全部已注册命令 (含非 primary, 供 `/help all` 完整盘点)
+    pub fn list_all_by_category(&self) -> std::collections::BTreeMap<CommandCategory, Vec<&str>> {
+        let mut map: std::collections::BTreeMap<CommandCategory, Vec<&str>> = std::collections::BTreeMap::new();
+        for cmd in &self.commands {
+            let cat = category_for(cmd.name());
+            map.entry(cat).or_default().push(cmd.name());
+        }
+        map
+    }
+
+    /// 全量命令分类帮助 (所有已注册命令, 含非 primary)
+    pub fn help_all_by_category(&self) -> String {
+        let by_cat = self.list_all_by_category();
+        let mut out = String::from("━━ NeoTrix 全部命令分类 (含 agent 后端调度) ━━\n\n");
+        for (cat, cmds) in &by_cat {
+            out.push_str(&format!("▸ {} ({}):\n", cat.label(), cmds.len()));
+            for name in cmds {
+                if let Some(cmd) = self.get(name) {
+                    let aliases = cmd.aliases();
+                    let alias_str = if aliases.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" [{}]", aliases.join(", "))
+                    };
+                    let desc = cmd.description();
+                    let first_line = desc.lines().next().unwrap_or(desc);
+                    out.push_str(&format!("  {:<20}{} {}\n", name, alias_str, first_line));
+                }
+            }
+            out.push('\n');
+        }
+        out.push_str("Use /help <command> for details, /help for the primary command surface\n");
+        out
+    }
+
+    /// 单命令详细帮助: 名称 + 别名 + 完整描述 (含子命令说明)
+    pub fn help_for(&self, name: &str) -> Option<String> {
+        let cmd = self.find(name)?;
+        let aliases = cmd.aliases();
+        let alias_str = if aliases.is_empty() {
+            String::new()
+        } else {
+            format!("\n  Aliases: {}", aliases.join(", "))
+        };
+        Some(format!("{} — {}{}", cmd.name(), cmd.description(), alias_str))
+    }
+
     /// 生成分类帮助文本
     pub fn help_by_category(&self) -> String {
         let by_cat = self.list_by_category();

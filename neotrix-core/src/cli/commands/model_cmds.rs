@@ -9,26 +9,16 @@ fn config_path() -> PathBuf {
     crate::config::NeoTrixConfig::path()
 }
 
-fn read_config_toml() -> toml::Value {
-    let path = config_path();
-    if path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(cfg) = content.parse::<toml::Value>() {
-                return cfg;
-            }
-        }
-    }
-    toml::Value::Table(toml::value::Table::new())
-}
-
-fn write_config_toml(cfg: &toml::Value) -> Result<(), String> {
-    let path = config_path();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create config dir: {}", e))?;
-    }
-    let output = toml::to_string_pretty(cfg).map_err(|e| format!("Serialization error: {}", e))?;
-    std::fs::write(&path, output).map_err(|e| format!("Write error: {}", e))?;
-    Ok(())
+/// 读取当前 provider / default_model (config 优先, env 兜底)。
+fn current_provider_model() -> (String, String) {
+    let cfg = crate::config::NeoTrixConfig::load();
+    let provider = cfg.provider
+        .or_else(|| std::env::var("NEOTRIX_PROVIDER").ok())
+        .unwrap_or_else(|| "auto".to_string());
+    let model = cfg.default_model
+        .or_else(|| std::env::var("NEOTRIX_MODEL").ok())
+        .unwrap_or_else(|| "(not set)".to_string());
+    (provider, model)
 }
 
 fn set_env_var(name: &str, val: &str) {
@@ -47,7 +37,7 @@ impl CliCommand for ModelCmd {
     }
 
     fn description(&self) -> &str {
-        "Switch model/provider: /model list | /model set <provider> [model] | /model current"
+        "Set default model/provider (persisted): /model <name> | /model set <provider> [model] | /model list | /model current"
     }
     fn is_primary(&self) -> bool { false }
 
@@ -71,11 +61,9 @@ impl CliCommand for ModelCmd {
                         msg.push_str(&format!("    - {}\n", m));
                     }
                 }
-                msg.push_str("\nSet: /model set <provider> [model]");
+                msg.push_str("\nSet: /model set <provider> [model] | /model <model-name>");
 
-                let cfg = read_config_toml();
-                let current_provider = cfg.get("provider").and_then(|v| v.as_str()).unwrap_or("(not set)");
-                let current_model = cfg.get("model").and_then(|v| v.as_str()).unwrap_or("default");
+                let (current_provider, current_model) = current_provider_model();
                 msg.push_str(&format!("\nCurrent: {} / {}\n", current_provider, current_model));
                 CommandOutput::ok(&msg)
             }
@@ -83,43 +71,56 @@ impl CliCommand for ModelCmd {
                 let provider = &args[1];
                 let model = args.get(2).map(|s| s.as_str()).unwrap_or("default");
 
+                // 运行时生效 (env)
                 set_env_var("NEOTRIX_PROVIDER", provider);
                 if model != "default" {
                     set_env_var("NEOTRIX_MODEL", model);
                 }
 
-                let mut cfg = read_config_toml();
-                if let Some(table) = cfg.as_table_mut() {
-                    table.insert("provider".to_string(), toml::Value::String(provider.to_string()));
-                    if model != "default" {
-                        table.insert("model".to_string(), toml::Value::String(model.to_string()));
-                    }
+                // 持久化 (config.toml)
+                let cfg = crate::config::NeoTrixConfig::load();
+                if !cfg.save_field("provider", provider) {
+                    return CommandOutput::err(&format!("Failed to persist provider to {}", config_path().display()));
                 }
-                match write_config_toml(&cfg) {
-                    Ok(()) => {
-                        let mut msg = format!("✅ Provider set to: {}\n", provider);
-                        if model != "default" {
-                            msg.push_str(&format!("   Model set to: {}\n", model));
-                        }
-                        msg.push_str(&format!("   Written to: {}", config_path().display()));
-                        CommandOutput::ok(&msg)
+                let mut msg = format!("✅ Provider set to: {}\n", provider);
+                if model != "default" {
+                    if !cfg.save_field("default_model", model) {
+                        return CommandOutput::err(&format!("Failed to persist model to {}", config_path().display()));
                     }
-                    Err(e) => CommandOutput::err(&format!("Failed to write config: {}", e)),
+                    msg.push_str(&format!("   Model set to: {}\n", model));
                 }
+                msg.push_str(&format!("   Saved to: {}", config_path().display()));
+                CommandOutput::ok(&msg)
             }
             "current" | "status" => {
-                let cfg = read_config_toml();
-                let provider = cfg.get("provider").and_then(|v| v.as_str()).unwrap_or("(not set)");
-                let model = cfg.get("model").and_then(|v| v.as_str()).unwrap_or("(not set)");
-                let base_url = cfg.get("base_url").and_then(|v| v.as_str()).unwrap_or("(not set)");
+                let (provider, model) = current_provider_model();
+                let base_url = crate::config::NeoTrixConfig::load()
+                    .custom_endpoint
+                    .unwrap_or_else(|| "(not set)".to_string());
                 CommandOutput::ok(&format!(
-                    "Current LLM config:\n  Provider: {}\n  Model:    {}\n  Base URL: {}\n  Config:   {}\n",
+                    "Current LLM config:\n  Provider:    {}\n  Model:       {}\n  Base URL:    {}\n  Config file: {}\n",
                     provider, model, base_url,
                     config_path().display()
                 ))
             }
-            _ => {
-                CommandOutput::err("Usage:\n  /model list                       List available models\n  /model set <provider> [model]     Set provider/model (persisted)\n  /model current                    Show current config")
+            // 裸参数: /model <name> — 持久化默认模型名
+            "" | "help" | "h" | "usage" => {
+                CommandOutput::err("Usage:\n  /model <name>                   Set default model (persisted)\n  /model list                       List available models\n  /model set <provider> [model]     Set provider/model (persisted)\n  /model current                    Show current config")
+            }
+            name => {
+                if name.starts_with('/') {
+                    return CommandOutput::err(&format!("Unknown /model subcommand: {}", name));
+                }
+                let cfg = crate::config::NeoTrixConfig::load();
+                if cfg.save_field("default_model", name) {
+                    set_env_var("NEOTRIX_MODEL", name);
+                    CommandOutput::ok(&format!(
+                        "✅ Default model set to: {}\n   Saved to: {}",
+                        name, config_path().display()
+                    ))
+                } else {
+                    CommandOutput::err(&format!("Failed to persist model to {}", config_path().display()))
+                }
             }
         }
     }

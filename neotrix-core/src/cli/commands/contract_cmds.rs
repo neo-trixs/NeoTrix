@@ -11,7 +11,7 @@ pub struct ContractCmd;
 
 impl CliCommand for ContractCmd {
     fn name(&self) -> &str { "/contract" }
-    fn aliases(&self) -> Vec<&str> { vec!["/todo"] }
+    fn aliases(&self) -> Vec<&str> { vec!["/tc"] }
     fn description(&self) -> &str { "Contract management: /contract list | define <desc> | done <id> | fail <id> | cancel <id> | stats" }
     fn is_primary(&self) -> bool { false }
 

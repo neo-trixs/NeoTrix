@@ -66,18 +66,18 @@ impl NeoTrixConfig {
     }
 
     /// 将指定字段写回配置文件（保留已有字段，缺失的以 None 保存）。
-    pub fn save_field(&self, field: &str, value: &str) {
-        let mut cfg = match Self::load() {
-            c if c.color_mode.is_some() || c.provider.is_some() => c,
-            c => c,
-        };
+    /// 支持全部 `NeoTrixConfig` 字段；未知 key 返回 false。
+    pub fn save_field(&self, field: &str, value: &str) -> bool {
+        let mut cfg = Self::load();
         match field {
-            "color_mode" => cfg.color_mode = Some(value.to_string()),
+            "default_llm_provider" => cfg.default_llm_provider = Some(value.to_string()),
             "provider" => cfg.provider = Some(value.to_string()),
-            "default_model" => cfg.default_model = Some(value.to_string()),
-            "log_level" => cfg.log_level = Some(value.to_string()),
             "api_key" => cfg.api_key = Some(value.to_string()),
-            _ => return,
+            "default_model" => cfg.default_model = Some(value.to_string()),
+            "custom_endpoint" => cfg.custom_endpoint = Some(value.to_string()),
+            "color_mode" => cfg.color_mode = Some(value.to_string()),
+            "log_level" => cfg.log_level = Some(value.to_string()),
+            _ => return false,
         }
         if let Some(dir) = Self::path().parent() {
             if !dir.exists() {
@@ -88,13 +88,15 @@ impl NeoTrixConfig {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("[config] serialize error: {}", e);
-                return;
+                return false;
             }
         };
         if let Err(e) = std::fs::write(Self::path(), toml_str) {
             eprintln!("[config] write error: {}", e);
+            false
         } else {
             eprintln!("[config] saved {}={} to {}", field, value, Self::path().display());
+            true
         }
     }
 }

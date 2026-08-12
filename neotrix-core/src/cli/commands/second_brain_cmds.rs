@@ -12,7 +12,7 @@ pub struct BrainCmd;
 
 impl CliCommand for BrainCmd {
     fn name(&self) -> &str { "/brain" }
-    fn aliases(&self) -> Vec<&str> { vec!["/sb", "/second-brain"] }
+    fn aliases(&self) -> Vec<&str> { vec!["/br", "/second-brain"] }
     fn description(&self) -> &str {
         "Second Brain — unified memory graph:\n  /brain status          Show KB snapshot (nodes/edges/emotion)\n  /brain graph <file>    Generate D3.js force-directed graph HTML\n  /brain query <q>       Search all memory (wiki+notes+emotion)\n  /brain link <src> <dst> <relation>  Link two nodes\n  /brain save <note>     Save a session note\n  /brain emotion         Show current emotion state\n  /brain dimensions      Show dimension scores"
     }
@@ -171,6 +171,7 @@ mod tests {
     fn test_brain_cmd_basic() {
         let cmd = BrainCmd;
         assert_eq!(cmd.name(), "/brain");
-        assert!(cmd.aliases().contains(&"/sb"));
+        assert!(cmd.aliases().contains(&"/br"));
+        assert!(!cmd.aliases().contains(&"/sb"), "/sb 属于 /sandbox, /brain 不得占用");
     }
 }
