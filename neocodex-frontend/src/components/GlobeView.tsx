@@ -6,8 +6,12 @@ import {
   geoLayers,
   geoElevations,
   isMirage,
+  trajectoryAdd,
+  trajectoryQuery,
+  geoOfflinePack,
   type GeoPoint,
   type GeoLayerSummary,
+  type TrajectoryRecord,
 } from '../api/geo'
 
 /* ════════════════════════════════════════════
@@ -105,6 +109,14 @@ export function GlobeView(props: GlobeViewProps) {
   const [shanhaiPts, setShanhaiPts] = createSignal<GeoPoint[]>([])
   // 海拔表：node_id → 海拔米（着色用）
   const [elevMap, setElevMap] = createSignal<Map<string, number>>(new Map())
+
+  // C1/C2 状态：轨迹记录 + 离线包
+  const [trajName, setTrajName] = createSignal('我的路线')
+  const [trajKind, setTrajKind] = createSignal('route')
+  const [trajRecording, setTrajRecording] = createSignal(false)
+  const [trajPoints, setTrajPoints] = createSignal<GeoPoint[]>([])
+  const [offlineName, setOfflineName] = createSignal('offline-pack')
+  const [offlinePacks, setOfflinePacks] = createSignal<TrajectoryRecord[]>([])
 
   // 图层开关：真实层 / 幻境层 / 自然层 / 海拔层（响应式，顶层 effect）
   createEffect(() => {
@@ -286,6 +298,67 @@ export function GlobeView(props: GlobeViewProps) {
   const naturalCount = () => (showNatural() ? points().filter((p) => p.source.startsWith('natural-earth')).length : 0)
   const elevCount = () => elevMap().size
 
+  // C1 轨迹记录：开始/停止/保存
+  function startTrajRecording() {
+    setTrajRecording(true)
+    setTrajPoints([])
+  }
+  function saveTraj() {
+    if (trajPoints().length < 2) return
+    const id = `traj-${Date.now()}`
+    // 提取 lat/lng 序列
+    const pts = trajPoints().flatMap(p => [p.lat, p.lng])
+    // 计算 bbox
+    const lats = trajPoints().map(p => p.lat)
+    const lngs = trajPoints().map(p => p.lng)
+    const west = Math.min(...lngs)
+    const east = Math.max(...lngs)
+    const south = Math.min(...lats)
+    const north = Math.max(...lats)
+    // 简单距离估算
+    let dist = 0
+    for (let i = 1; i < trajPoints().length; i++) {
+      const p1 = trajPoints()[i - 1]
+      const p2 = trajPoints()[i]
+      dist += haversine(p1.lat, p1.lng, p2.lat, p2.lng)
+    }
+    trajectoryAdd(id, trajName(), trajKind(), pts, [west, south, east, north], dist)
+      .then(() => {
+        setTrajRecording(false)
+        setTrajPoints([])
+      })
+      .catch((e: Error) => console.error('保存轨迹失败:', e))
+  }
+
+  // C2 离线包导出
+  function exportOfflinePack() {
+    if (!offlineName()) return
+    // 使用当前视口 bbox (简化：用全球 bbox)
+    const bbox: [number, number, number, number] = [-180, -90, 180, 90]
+    geoOfflinePack(bbox, offlineName())
+      .then((res: { path: string; count: number; bytes: number }) => {
+        console.log('离线包导出:', res)
+        alert(`离线包已导出: ${res.path} (${res.count} 点, ${res.bytes} bytes)`)
+      })
+      .catch((e: Error) => console.error('导出离线包失败:', e))
+  }
+
+  // 列出离线包（简化：查询 trajectory 表中 kind='offline_pack' 的记录）
+  function listOfflinePacks() {
+    trajectoryQuery()
+      .then((list: TrajectoryRecord[]) => setOfflinePacks(list))
+      .catch((e: Error) => console.error('列出离线包失败:', e))
+  }
+
+  // Haversine 距离 (km)
+  function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+    return 2 * R * Math.asin(Math.sqrt(a))
+  }
+
   return (
     <div class="relative w-full overflow-hidden rounded-xl border border-slate-700/50 bg-[#050a19]">
       <div ref={containerRef} class="w-full" style={{ height: `${props.height ?? 600}px` }} />
@@ -337,6 +410,64 @@ export function GlobeView(props: GlobeViewProps) {
           </span>
         </div>
       </Show>
+      {/* C1/C2 usePack 扩展面板：轨迹记录 + 离线地图包 */}
+      {props.usePack && !loading() && !error() && (
+        <div class="absolute top-3 right-3 flex flex-col items-end gap-2">
+          {/* 轨迹记录 */}
+          <div class="flex items-center gap-2 rounded bg-slate-900/70 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
+            <span>🗺️</span>
+            <input
+              type="text"
+              placeholder="轨迹名称"
+              onInput={(e) => setTrajName(e.currentTarget.value)}
+              class="rounded bg-slate-800 px-2 py-1 text-white w-40 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            />
+            <input
+              type="text"
+              placeholder="类型 (route/flight/ship)"
+              onInput={(e) => setTrajKind(e.currentTarget.value)}
+              class="rounded bg-slate-800 px-2 py-1 text-white w-32 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            />
+            <button
+              onClick={() => startTrajRecording()}
+              class="px-2 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white"
+              disabled={trajRecording()}
+            >
+              {trajRecording() ? '⏺ 记录中' : '▶ 开始记录'}
+            </button>
+            <button
+              onClick={() => saveTraj()}
+              class="px-2 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white"
+              disabled={!trajRecording() || trajPoints().length < 2}
+            >
+              💾 保存轨迹
+            </button>
+          </div>
+          {/* 离线包 */}
+          <div class="flex items-center gap-2 rounded bg-slate-900/70 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
+            <span>📦</span>
+            <input
+              type="text"
+              placeholder="离线包名称"
+              onInput={(e) => setOfflineName(e.currentTarget.value)}
+              class="rounded bg-slate-800 px-2 py-1 text-white w-40 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            />
+            <button
+              onClick={() => exportOfflinePack()}
+              class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white"
+              disabled={!offlineName()}
+            >
+              📦 导出离线包
+            </button>
+            <button
+              onClick={() => listOfflinePacks()}
+              class="px-2 py-1 rounded bg-slate-600 hover:bg-slate-500 text-white"
+            >
+              📋 列表
+            </button>
+          </div>
+        </div>
+      )}
       <Show when={hovered()}>
         <div class="absolute bottom-3 left-3 rounded bg-slate-900/80 px-3 py-1.5 text-xs text-slate-200 backdrop-blur">
           {isMirage(hovered()!) ? '✨ ' : ''}{hovered()?.city || hovered()?.tags} · {hovered()?.country}

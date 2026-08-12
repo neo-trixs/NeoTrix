@@ -67,3 +67,38 @@ export interface GeoElevationPoint {
 export function geoElevations(limit?: number): Promise<GeoElevationPoint[]> {
   return call('kb_geo_elevations', { limit: limit ?? null })
 }
+
+/** B1 轨迹存储 */
+export interface TrajectoryRecord {
+  id: string
+  name: string
+  kind?: string
+  bbox: [number, number, number, number] // [west, south, east, north]
+  distance_km: number
+  created_at: number
+}
+
+/** 写入轨迹 (GeoJSON LineString 交替 lat/lng) */
+export function trajectoryAdd(
+  id: string,
+  name: string,
+  kind: string | undefined,
+  points: number[], // 交替 lat/lng
+  bbox: [number, number, number, number],
+  distance_km: number
+): Promise<void> {
+  return call('kb_trajectory_add', { id, name, kind, points, west: bbox[0], south: bbox[1], east: bbox[2], north: bbox[3], distance_km })
+}
+
+/** 查询所有轨迹 */
+export function trajectoryQuery(): Promise<TrajectoryRecord[]> {
+  return call('kb_trajectory_query', {})
+}
+
+/** C2 离线地图包: 导出 bbox 区域为 NT-Pack 文件 */
+export function geoOfflinePack(
+  bbox: [number, number, number, number],
+  name: string
+): Promise<{ path: string; count: number; bytes: number }> {
+  return call('kb_geo_offline_pack', { bbox, name })
+}

@@ -175,5 +175,44 @@ zstd 预训练字典 (CDict) 评估: 大块数据 (1.7MB) 下 zstd 已利用内�
 ## 追加模式 (A4, 2026-08)
 
 - `append_geo_ntpack(path, new_points)` — merge-append: 读旧文件 → 按 node_id 合并 (新覆盖旧) → 全量重编
-- **不支持原地追加**: LCP 字典重叠 + 坐标 delta 尾态 + 尾部 CRC 都随新数据改变; 需避免全量重编时上 A5 分块格式
+- **v1 不支持原地追加**: LCP 字典重叠 + 坐标 delta 尾态 + 尾部 CRC 都随新数据改变
 - 当前规模 (50k 条 encode <1s) merge-append 开销可接受; 语义幂等 (同名 node_id 后者覆盖)
+- A4 产物已切 v2 分块 (见 A5), 追加写出的新归档天然支持随机访问
+
+## 分块格式 (A5, v2, 2026-08)
+
+**v1 架构级限制** → v2 (VERSION=2, FLAG_CHUNKED) 解决随机访问:
+
+```
+[魔数 8][版本 2][flags 2][总记录数 4]
+[列描述段 (同 v1)]
+[全局 StringTable (跨块共享字典)]      ← 压缩率不损失
+[全局 node_id LCP 前缀 (明文)]         ← 解码恢复必需
+[块表: [块数] + [offset|clen|count]*]
+[数据区: 每块 [clen][zstd 块列数据]]   ← 块列数据 = v1 数据区格式, 坐标 delta 块首重置
+[文件尾 CRC32]
+```
+
+- **全局字典共享** (块间复用字符串), 每块独立 zstd + 独立 delta 基线 → 单块可独立解码
+- API: `encode_chunked` / `parse_chunked_header` / `decode_one_chunk` (单块随机访问 ~1.2ms release)
+  / `decode_chunked` (全量) / `append_chunked`
+- **兼容**: v1 `PackDecoder::decode` 检测 FLAG_CHUNKED 自动路由 v2 → 生产调用点零改动读新格式
+- 实现: `nt_memory_pack_chunked.rs` (独立模块, v1 编解码器零改动, 12 测试不动)
+
+### 实测 (release, 183,125 条真实 geo_index)
+
+| 指标 | v1 | v2 (chunk=4096) |
+|------|-----|-----|
+| 文件体积 | 7,050,949 B (38.5 B/记录) | 7,559,963 B (41.3 B/记录, **-7% 体积代价**) |
+| 全量解码 | ~50ms | ~60ms |
+| 单块随机访问 | 不可用 (需全量) | **~1.2ms/块 (4096 条)** |
+| parse header (含 CRC) | — | ~8ms (明文, 秒读) |
+
+- **-7% 体积** = 分块固有代价: 每块独立 zstd 无法利用跨块冗余 + 块首 delta 重置。
+  换取随机访问能力, 对"按 bbox/zoom 瓦片"场景收益 >> 体积差 (见 B3 瓦片服务)。
+- 块大小 4096 ≈ 150KB/块 (38.5B/记录), 平衡访问粒度与块表开销 (183k→45 块)。
+- 单块访问先 `parse_chunked_header` (8ms) 后可多次随机访问各块, 无需重读。
+- 校验: 6 测试 (roundtrip/随机访问/checksum/v1拒绝/兼容/fuzz 60轮×随机块界) 全过;
+  真实 183k 条 v1→v2→v1 兼容回读无损。
+- 未做 (deferred): 真正 O(chunk) 原地追加需**后置块表** (块表在文件末尾) = v3 格式。
+  v2 的追加仍是 merge (O(n)), 与 A4 语义一致; 价值定位 = 随机访问。

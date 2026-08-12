@@ -255,7 +255,7 @@ pub fn kb_feed(limit: Option<usize>, offset: Option<usize>, sort: Option<String>
     Ok(results)
 }
 
-/// 地理索引记录 (geo_index 表) — 供前端 3D 地图渲染。
+/// 地理索引记录 (geo_index 表) — 供前端 3D 地图渲染.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeoPoint {
     pub node_id: String,
@@ -269,9 +269,9 @@ pub struct GeoPoint {
     pub confidence: f64,
 }
 
-/// 导出地理索引点 (geo_index) — 前端地球知识世界仿真数据源。
+/// 导出地理索引点 (geo_index) — 前端地球知识世界仿真数据源.
 /// `source` 可选过滤：如 "shanhai" 只返回 shanhai-peaks + shanhai-mappings，
-/// 供前端把幻境数据分层叠加在真实地图上（真实层取城市点，幻境层取全部 shanhai）。
+/// 供前端把幻境数据分层叠加在真实地图上（真实层取城市点，幻境层取全部 shanhai）.
 #[command]
 pub fn kb_geo_points(limit: Option<usize>, source: Option<String>) -> Result<Vec<GeoPoint>, NeoTrixError> {
     let path = kb_path();
@@ -322,8 +322,8 @@ fn map_geo_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GeoPoint> {
     })
 }
 
-/// NT-Pack 数据源路径: 全量归档 + 冷层归档。
-/// 偏好 `~/.neotrix/geo/geo_index.ntpack` (全量) ; source 有冷层文件时优先冷层。
+/// NT-Pack 数据源路径: 全量归档 + 冷层归档.
+/// 偏好 `~/.neotrix/geo/geo_index.ntpack` (全量) ; source 有冷层文件时优先冷层.
 fn geo_pack_paths() -> (PathBuf, PathBuf) {
     let dir = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
         .join(".neotrix")
@@ -331,8 +331,8 @@ fn geo_pack_paths() -> (PathBuf, PathBuf) {
     (dir.join("geo_index.ntpack"), dir)
 }
 
-/// 进程级 NT-Pack 解码缓存 (单槽): key = 解析后路径 + mtime + len + TTL。
-/// 避免 GlobeView 8 路并发各触发一次 7MB 全量 read+decode (约 50-60ms/次)。
+/// 进程级 NT-Pack 解码缓存 (单槽): key = 解析后路径 + mtime + len + TTL.
+/// 避免 GlobeView 8 路并发各触发一次 7MB 全量 read+decode (约 50-60ms/次).
 struct GeoPackCache {
     key_file: PathBuf,
     key_len: u64,
@@ -349,12 +349,12 @@ fn geo_pack_cache() -> &'static GeoPackSlot {
 
 const GEO_PACK_TTL: Duration = Duration::from_secs(60);
 
-/// B2 v0: 从 NT-Pack 高密度文件直接读地理点 (绕开 SQLite), 前端无感切换。
+/// B2 v0: 从 NT-Pack 高密度文件直接读地理点 (绕开 SQLite), 前端无感切换.
 ///
 /// 读取全量归档 `~/.neotrix/geo/geo_index.ntpack`; `source` 指定且存在冷层文件
-/// `geo_<source>.ntpack` 时优先冷层 (B1 透明层)。NT-Pack 无 confidence, 补 0.0。
-/// `limit` 硬上限 20k, 语义与 [`kb_geo_points`] 对齐。进程级缓存: 同路径+mtime+len
-/// 在 TTL 内命中则只做源过滤 + 取 limit, 避免重复全量解码。
+/// `geo_<source>.ntpack` 时优先冷层 (B1 透明层).NT-Pack 无 confidence, 补 0.0.
+/// `limit` 硬上限 20k, 语义与 [`kb_geo_points`] 对齐.进程级缓存: 同路径+mtime+len
+/// 在 TTL 内命中则只做源过滤 + 取 limit, 避免重复全量解码.
 #[command]
 pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Result<Vec<GeoPoint>, NeoTrixError> {
     let (default_path, cold_dir) = geo_pack_paths();
@@ -432,7 +432,7 @@ pub fn kb_geo_points_pack(limit: Option<usize>, source: Option<String>) -> Resul
     Ok(filtered(points, limit))
 }
 
-/// 地理索引统计。
+/// 地理索引统计.
 #[command]
 pub fn kb_geo_stats() -> Result<(i64, i64), NeoTrixError> {
     let path = kb_path();
@@ -447,19 +447,19 @@ pub fn kb_geo_stats() -> Result<(i64, i64), NeoTrixError> {
     Ok((total, with_country))
 }
 
-/// 地图分层摘要 — 各数据源计数。前端据此决定加载策略
-/// （幻境层全量拉取，真实层按预算采样），实现前后端分离。
+/// 地图分层摘要 — 各数据源计数.前端据此决定加载策略
+/// （幻境层全量拉取，真实层按预算采样），实现前后端分离.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeoLayerSummary {
     pub source: String,
     pub count: i64,
 }
 
-/// 返回 geo_index 各 source 的计数（真实层/幻境层分层摘要）。
+/// 返回 geo_index 各 source 的计数（真实层/幻境层分层摘要）.
 ///
 /// 冷层感知 (B1): 合并 `~/.neotrix/geo/geo_*.ntpack` 冷层归档计数 —
 /// 归档后热表行被删, 若不计冷层, 层计数骤减会扭曲前端加载策略
-/// (GeoLayerSummary 契约不变, 前端零改动)。
+/// (GeoLayerSummary 契约不变, 前端零改动).
 #[command]
 pub fn kb_geo_layers() -> Result<Vec<GeoLayerSummary>, NeoTrixError> {
     let path = kb_path();
@@ -504,7 +504,7 @@ pub fn kb_geo_layers() -> Result<Vec<GeoLayerSummary>, NeoTrixError> {
     Ok(out)
 }
 
-/// 海拔点记录 — geo_elevation 表 + geo_index 来源分类，供前端海拔渐变着色。
+/// 海拔点记录 — geo_elevation 表 + geo_index 来源分类，供前端海拔渐变着色.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeoElevationPoint {
     pub node_id: String,
@@ -514,8 +514,8 @@ pub struct GeoElevationPoint {
     pub source: String,
 }
 
-/// 导出海拔记录 (geo_elevation) — 前端按高度渐变着色。
-/// 排除 geonames-cities 低价值点，返回海拔降序。
+/// 导出海拔记录 (geo_elevation) — 前端按高度渐变着色.
+/// 排除 geonames-cities 低价值点，返回海拔降序.
 #[command]
 pub fn kb_geo_elevations(limit: Option<usize>) -> Result<Vec<GeoElevationPoint>, NeoTrixError> {
     let path = kb_path();
@@ -543,4 +543,99 @@ pub fn kb_geo_elevations(limit: Option<usize>) -> Result<Vec<GeoElevationPoint>,
         })
         .map_err(|e| NeoTrixError::Memory(format!("geo elevations query: {}", e)))?;
     Ok(rows.filter_map(|r| r.ok()).collect())
+}
+
+/// B1 Trajectory storage: 写入/查询轨迹记录 (GeoJSON LineString 坐标序列).
+#[command]
+pub fn kb_trajectory_add(
+    id: String,
+    name: String,
+    kind: Option<String>,
+    points: Vec<f64>, // 交替 lat/lng 数组
+    west: f64,
+    south: f64,
+    east: f64,
+    north: f64,
+    distance_km: f64,
+) -> Result<(), NeoTrixError> {
+    use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::insert_trajectory;
+    let conn = kb_path();
+    let conn = rusqlite::Connection::open(&conn)
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
+    insert_trajectory(&conn, &id, &name, kind.as_deref(), &points, (west, south, east, north), distance_km)
+        .map_err(|e| NeoTrixError::Memory(format!("insert_trajectory: {}", e)))?;
+    Ok(())
+}
+
+/// B1 Trajectory storage: 查询所有轨迹记录.
+#[command]
+pub fn kb_trajectory_query() -> Result<Vec<serde_json::Value>, NeoTrixError> {
+    use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::query_trajectories;
+    let conn = kb_path();
+    let conn = rusqlite::Connection::open(&conn)
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
+    let rows = query_trajectories(&conn).map_err(|e| NeoTrixError::Memory(format!("query_trajectories: {}", e)))?;
+    let vals: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|r| {
+            serde_json::json!({
+                "id": r.id,
+                "name": r.name,
+                "kind": r.kind,
+                "bbox": [r.bbox_west, r.bbox_south, r.bbox_east, r.bbox_north],
+                "distance_km": r.distance_km,
+                "created_at": r.created_at,
+            })
+        })
+        .collect();
+    Ok(vals)
+}
+
+/// C2 离线地图包: 导出 bbox 区域为 NT-Pack (v2 chunked 格式).
+#[command]
+pub fn kb_geo_offline_pack(
+    bbox: [f64; 4], // [west, south, east, north]
+    name: String,
+) -> Result<serde_json::Value, NeoTrixError> {
+    use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_geo::query_bbox_with_cold;
+    use neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack_chunked::{encode_chunked, CHUNK_SIZE};
+    use std::env;
+
+    let conn = kb_path();
+    let conn = rusqlite::Connection::open(&conn)
+        .map_err(|e| NeoTrixError::Memory(format!("Open DB: {}", e)))?;
+
+    let [west, south, east, north] = bbox;
+    let (records, cold_hits) = query_bbox_with_cold(&conn, south, west, north, east, 20000, &cold_dir())?;
+
+    // 转换为 pack crate 的 GeoPoint
+    let points: Vec<neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::GeoPoint> = records
+        .into_iter()
+        .map(|r| neotrix::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::GeoPoint {
+            node_id: r.node_id,
+            lat: r.lat,
+            lng: r.lng,
+            country: r.country,
+            region: r.region,
+            city: r.city,
+            tags: r.tags,
+            source: r.source,
+        })
+        .collect();
+
+    let path = format!("{}/.neotrix/geo/{}.ntpack", env::var("HOME").unwrap_or(".".into()), name);
+    let bytes = encode_chunked(&points, CHUNK_SIZE);
+    std::fs::write(&path, &bytes).map_err(|e| NeoTrixError::Memory(format!("Write pack: {}", e)))?;
+
+    Ok(serde_json::json!({
+        "path": path,
+        "count": points.len(),
+        "bytes": bytes.len(),
+        "cold_hits": cold_hits,
+    }))
+}
+
+fn cold_dir() -> String {
+    let home = std::env::var("HOME").unwrap_or(".".to_string());
+    format!("{}/.neotrix/geo", home)
 }
