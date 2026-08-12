@@ -159,6 +159,55 @@ impl McpServer {
             }),
             schema_version: None,
         });
+        // 命令面精简: 人类只用基础控制命令 (/help /exit /clear /version /config ...),
+        // 领域操作 (file/git/session/agent/memory/crypto/...) 由 agent 后端自我调度。
+        // 桥接: agent 通过本工具调用 CommandRegistry 进程内执行任意命令。
+        self.register_tool(McpTool {
+            name: "neotrix_command".into(),
+            description: "Execute a NeoTrix CLI command in-process (agent 后端自我调度通道). \
+                         command 为完整命令文本, 如 'file read src/main.rs' 或 '/memory search kb'. \
+                         返回命令输出; 人类无需输入这些命令, 由 agent 按需调度。".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "NeoTrix command text (with or without leading '/'), e.g. 'file read path' or '/git status'"
+                    }
+                },
+                "required": ["command"]
+            }),
+            schema_version: None,
+        });
+        // ── 意识核心 (ConsciousnessCore) — opencode agent 专用工具 ──
+        self.register_tool(McpTool {
+            name: "consciousness_status".into(),
+            description: "读取意识核心当前状态: cycle/phi/coherence/GWT谐振/MARS双过程/治理合规/迷雾。\
+                          agent 可据此判断系统健康度, 决定是否推进进化或启动自愈。".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {},
+                "required": []
+            }),
+            schema_version: None,
+        });
+        self.register_tool(McpTool {
+            name: "consciousness_tick".into(),
+            description: "驱动意识核心运行 N 个生长周期 (run_growth_cycle): 土壤→根→树干→分支→果实→核心 \
+                          六阶段闭环, 生产进化果实与治理反馈。返回生长报告 (phase 摘要)。".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "cycles": {
+                        "type": "integer",
+                        "description": "运行周期数 (default 1, 建议 <=3)",
+                        "default": 1
+                    }
+                },
+                "required": []
+            }),
+            schema_version: None,
+        });
     }
 
     pub fn register_tool(&mut self, tool: McpTool) {
@@ -254,6 +303,13 @@ impl McpServer {
                     .unwrap_or(serde_json::Value::Null);
                 self.handle_call_tool(request.id, name, &args)
             }
+            // exit 无需响应体: run() 循环在写入响应后检测 method=="exit" 并 break。
+            "exit" => McpResponse {
+                jsonrpc: "2.0".into(),
+                id: request.id,
+                result: Some(serde_json::json!({ "ok": true })),
+                error: None,
+            },
             _ => McpResponse {
                 jsonrpc: "2.0".into(),
                 id: request.id,
@@ -319,6 +375,9 @@ impl McpServer {
             "search_code" => call_search_code(args),
             "git_diff" => call_git_diff(args),
             "execute_command" => call_execute_command(args),
+            "neotrix_command" => call_neotrix_command(args),
+            "consciousness_status" => call_consciousness_status(),
+            "consciousness_tick" => call_consciousness_tick(args),
             other => Err(format!("Unknown tool: {}", other)),
         };
 
@@ -361,6 +420,45 @@ fn call_read_file(args: &serde_json::Value) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|e| format!("Failed to read '{}': {}", path, e))
 }
 
+/// 词法归一化绝对路径 (消解 . / .., 不要求文件存在)。
+fn lexically_normalize(path: &std::path::Path) -> std::path::PathBuf {
+    let mut out = std::path::PathBuf::new();
+    for comp in path.components() {
+        match comp {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !out.pop() {
+                    out.push("..");
+                }
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
+/// 沙箱: 写操作仅允许项目工作区内 (MCP server 由项目拉起, cwd=项目根)。
+/// 阻止 agent 通过 write/edit 工具改写 ~/.config、系统路径等敏感位置。
+fn check_workspace_write(path: &str) -> Result<(), String> {
+    let cwd = std::env::current_dir().map_err(|e| format!("cwd: {}", e))?;
+    let norm_cwd = lexically_normalize(&cwd);
+    let abs = std::path::Path::new(path).canonicalize().unwrap_or_else(|_| {
+        let p = std::path::Path::new(path);
+        if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            norm_cwd.join(p)
+        }
+    });
+    let abs = lexically_normalize(&abs);
+    if !abs.starts_with(&norm_cwd) {
+        return Err(format!(
+            "Sandbox: 写路径 {} 超出项目工作区 {}", abs.display(), norm_cwd.display()
+        ));
+    }
+    Ok(())
+}
+
 fn call_write_file(args: &serde_json::Value) -> Result<String, String> {
     let path = args
         .get("path")
@@ -371,6 +469,7 @@ fn call_write_file(args: &serde_json::Value) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing required field: content".to_string())?;
 
+    check_workspace_write(path)?;
     if let Some(parent) = std::path::Path::new(path).parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create parent directories: {}", e))?;
@@ -393,6 +492,7 @@ fn call_edit_file(args: &serde_json::Value) -> Result<String, String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing required field: new_string".to_string())?;
 
+    check_workspace_write(path)?;
     let content = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read '{}': {}", path, e))?;
 
@@ -499,12 +599,41 @@ fn call_git_diff(args: &serde_json::Value) -> Result<String, String> {
     }
 }
 
+/// 命令沙箱 (execute_command): 拒绝高危 shell 原语与工作区外写操作。
+/// agent 仍可执行项目内构建/测试/git 等正常开发命令, 但不能 `rm -rf /`、
+/// sudo 提权、下载即执行、磁盘覆写等逃逸操作。
+fn check_command_sandbox(command: &str) -> Result<(), String> {
+    let low = command.to_lowercase();
+    // 高危原语: 冒烟检查即可覆盖最常见逃逸, 不做完整解析器 (shell 语法本就该由用户把关)
+    let dangerous = [
+        "rm -rf /", "rm -rf ~", "sudo ", ":(){", "mkfs", "dd if=", "> /dev/sd",
+        "chmod 777 /", "mv / ", "chown", "git push --force", "git reset --hard",
+    ];
+    for pattern in dangerous {
+        if low.contains(pattern) {
+            return Err(format!("Sandbox: 命令含高危原语 '{}', 已拒绝", pattern));
+        }
+    }
+    // curl/wget 下载即执行 (管道进 sh/bash/zsh)
+    if (low.contains("curl ") || low.contains("wget ")) && low.contains("| sh") {
+        return Err("Sandbox: 命令为下载即执行 (curl|sh), 已拒绝".to_string());
+    }
+    // 命令内若显式使用系统绝对路径写入, 拒绝; 其余放行由受信 agent 把关
+    for banned in [" /etc/", " /usr/", " /var/", " /bin/", "/dev/"] {
+        if low.contains(banned) {
+            return Err(format!("Sandbox: 命令引用系统绝对路径 '{}', 已拒绝", banned));
+        }
+    }
+    Ok(())
+}
+
 fn call_execute_command(args: &serde_json::Value) -> Result<String, String> {
     let command = args
         .get("command")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "Missing required field: command".to_string())?;
 
+    check_command_sandbox(command)?;
     let output = std::process::Command::new("sh")
         .arg("-c")
         .arg(command)
@@ -526,6 +655,145 @@ fn call_execute_command(args: &serde_json::Value) -> Result<String, String> {
     }
 
     Ok(result)
+}
+
+/// 命令级沙箱 (call_neotrix_command): 进程内 registry 是 agent 调度通道,
+/// 但部分命令会触发不可逆副作用或资金操作, 必须拒绝 agent 越权执行。
+///
+/// 黑名单: 资金操作 / 交互退出 / 私钥敏感面。白名单子命令: 文件写与 git
+/// commit 经项目工作区校验后放行 (NT-ACT 开发任务需要), 其余读命令放行。
+fn check_neotrix_command_sandbox(input: &str) -> Result<(), String> {
+    let trimmed = input.trim().trim_start_matches('/');
+    if trimmed.is_empty() {
+        return Err("Empty command".to_string());
+    }
+    let mut parts = trimmed.split_whitespace();
+    let cmd = parts.next().unwrap_or("").to_lowercase();
+    let rest = parts.collect::<Vec<_>>();
+    let sub = rest.first().copied().unwrap_or("").to_lowercase();
+
+    // 顶层命令黑名单: 资金/退出/交互/敏感面
+    let top_blacklist = [
+        "wallet", "w", "swap", "approve", "transfer", "budget", "cost", "exit", "quit",
+        "clear", "acp",
+    ];
+    if top_blacklist.contains(&cmd.as_str()) {
+        return Err(format!("Sandbox: 命令 /{} 涉及资金/退出/敏感操作, agent 通道拒绝", cmd));
+    }
+
+    // 资金子命令 (聚合器 /crypto /finance 下的转移面)
+    if (cmd == "crypto" || cmd == "finance") && ["transfer", "swap", "approve", "send"].contains(&sub.as_str()) {
+        return Err(format!("Sandbox: /{} {} 为资金操作, agent 通道拒绝", cmd, sub));
+    }
+
+    // 文件写类: 路径必须在项目工作区内
+    let write_cmds = ["write", "create", "edit", "patch"];
+    if write_cmds.contains(&cmd.as_str()) {
+        let path = rest.first().copied().unwrap_or("");
+        if path.is_empty() {
+            return Err("Sandbox: 文件写命令缺少路径参数".to_string());
+        }
+        let path = path.trim_matches('"').trim_matches('\'');
+        check_workspace_write(path)?;
+    }
+
+    // git commit/pr: 允许 (NT-ACT 版本管理是开发任务), 但拒绝 force 推
+    if cmd == "git" || cmd == "commit" {
+        let has_force = rest.iter().any(|a| a.contains("--force") || *a == "-f");
+        if has_force {
+            return Err("Sandbox: 强制推送/重置被拒".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+/// 进程内执行 NeoTrix 命令 (agent 后端自我调度通道)。
+/// 命令面精简后, 领域操作 (file/git/session/agent/memory/crypto/...) 不占人类一级认知面,
+/// 但 agent 通过 MCP 本工具在进程内调用 CommandRegistry 执行任意命令并返回输出。
+fn call_neotrix_command(args: &serde_json::Value) -> Result<String, String> {
+    let command = args
+        .get("command")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Missing required field: command".to_string())?;
+
+    let trimmed = command.trim();
+    if trimmed.is_empty() {
+        return Err("Empty command".to_string());
+    }
+    // 兼容带/不带前导斜杠两种写法: '/file read x' 或 'file read x'
+    let input = if trimmed.starts_with('/') {
+        trimmed.to_string()
+    } else {
+        format!("/{}", trimmed)
+    };
+
+    check_neotrix_command_sandbox(&input)?;
+
+    let reg = crate::cli::commands::registry::default_registry();
+    let out = reg.execute(&input, None);
+
+    let mut result = String::new();
+    if out.success {
+        result.push_str(&out.message);
+    } else {
+        result.push_str(&format!("Error: {}", out.message));
+    }
+    if let Some(json) = &out.json {
+        if let Ok(s) = serde_json::to_string(json) {
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str(&s);
+        }
+    }
+    Ok(result)
+}
+
+fn call_consciousness_status() -> Result<String, String> {
+    let snap = crate::core::nt_core_consciousness_core::status();
+    let data = serde_json::json!({
+        "name": "NeoTrix-ConsciousnessCore",
+        "cycle": snap.cycle,
+        "phi": snap.phi,
+        "coherence": snap.coherence,
+        "phi_source": "unavailable (独立进程无 IIT 核算器; phi 仅在完整运行时真实计算)",
+        "resonance_cycle": snap.resonance_cycle,
+        "gwt_resonance_active": snap.gwt_resonance_active,
+        "branch_count": snap.branch_health.len(),
+        "fruits_eaten": snap.fruits.len(),
+        "weighted_fog_sum": snap.weighted_fog_sum,
+        "current_fog_sum": crate::core::nt_core_consciousness_core::current_fog_sum(),
+        "fog_definition": "weighted_fog_sum=持久化快照(tick时刻); current_fog_sum=当前进程实时",
+        "mars": {
+            "system1_activations": snap.mars_system1_activations,
+            "system2_iterations": snap.mars_system2_iterations,
+            "bridge_hits": snap.mars_bridge_hits,
+        },
+        "governance": {
+            "compliance": snap.governance_compliance,
+            "constitution_count": snap.governance_constitution_count,
+            "fractal_depth": snap.governance_fractal_depth,
+        }
+    });
+    serde_json::to_string_pretty(&data).map_err(|e| format!("Serialize error: {}", e))
+}
+
+fn call_consciousness_tick(args: &serde_json::Value) -> Result<String, String> {
+    let cycles = args.get("cycles").and_then(|v| v.as_u64()).unwrap_or(1).max(1).min(10) as usize;
+    let snap = crate::core::nt_core_consciousness_core::tick(cycles);
+    let data = serde_json::json!({
+        "op": "tick",
+        "cycles_run": cycles,
+        "cycle": snap.cycle,
+        "phi": snap.phi,
+        "coherence": snap.coherence,
+        "resonance_cycle": snap.resonance_cycle,
+        "fruits": snap.fruits.len(),
+        "weighted_fog_sum": snap.weighted_fog_sum,
+        "governance_compliance": snap.governance_compliance,
+    });
+    serde_json::to_string_pretty(&data).map_err(|e| format!("Serialize error: {}", e))
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -723,7 +991,7 @@ mod tests {
     fn test_register_all_tools() {
         let mut server = McpServer::new();
         server.register_all_tools();
-        assert_eq!(server.tools.len(), 6);
+        assert_eq!(server.tools.len(), 9);
         let names: Vec<&str> = server.tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -731,6 +999,7 @@ mod tests {
         assert!(names.contains(&"search_code"));
         assert!(names.contains(&"git_diff"));
         assert!(names.contains(&"execute_command"));
+        assert!(names.contains(&"neotrix_command"));
     }
 
     #[test]
@@ -741,7 +1010,57 @@ mod tests {
         assert!(resp.error.is_none());
         let result = resp.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 9);
+    }
+
+    #[test]
+    fn test_call_neotrix_command() {
+        // 命令面精简桥接: agent 通过 MCP 进程内执行命令
+        // 带前导斜杠
+        let args = serde_json::json!({"command": "/help"});
+        let out = call_neotrix_command(&args).unwrap();
+        assert!(out.contains("help") || out.contains("命令"), "help 输出异常: {}", out);
+        // 不带前导斜杠 (自动补 /)
+        let args2 = serde_json::json!({"command": "help"});
+        let out2 = call_neotrix_command(&args2).unwrap();
+        assert!(!out2.is_empty(), "无前导斜杠命令应可执行");
+        // 缺字段 → err
+        let bad = call_neotrix_command(&serde_json::json!({}));
+        assert!(bad.is_err(), "缺 command 字段应报错");
+        // 空命令 → err
+        let empty = call_neotrix_command(&serde_json::json!({"command": "  "}));
+        assert!(empty.is_err(), "空命令应报错");
+        // 领域命令 (agent 工具) 仍可经桥接执行
+        let agg = call_neotrix_command(&serde_json::json!({"command": "/memory"}));
+        assert!(agg.unwrap().contains("evidence"), "/memory 聚合器应可被 agent 调度");
+    }
+
+        #[test]
+    fn test_neotrix_command_sandbox_blocks_finance_and_exit() {
+        // 资金/退出/交互命令: agent 通道必须拒绝
+        assert!(check_neotrix_command_sandbox("/wallet transfer 0x1 1 ETH").is_err(), "/wallet 应被拒");
+        assert!(check_neotrix_command_sandbox("/wallet approve").is_err(), "/wallet approve 应被拒");
+        assert!(check_neotrix_command_sandbox("/swap").is_err(), "/swap 应被拒");
+        assert!(check_neotrix_command_sandbox("/exit").is_err(), "/exit 应被拒");
+        assert!(check_neotrix_command_sandbox("/crypto transfer").is_err(), "聚合器资金子命令应被拒");
+        assert!(check_neotrix_command_sandbox("/clear").is_err(), "/clear 应被拒");
+        // 只读/开发命令放行
+        assert!(check_neotrix_command_sandbox("/help").is_ok(), "/help 应放行");
+        assert!(check_neotrix_command_sandbox("/read target/x.rs").is_ok(), "/read 应放行");
+        assert!(check_neotrix_command_sandbox("/git status").is_ok(), "/git status 应放行");
+        assert!(check_neotrix_command_sandbox("/memory").is_ok(), "/memory 应放行");
+    }
+
+    #[test]
+    fn test_neotrix_command_sandbox_workspace_file_write() {
+        // 文件写类命令路径必须在工作区内
+        assert!(check_neotrix_command_sandbox("/write target/ok.txt content").is_ok(), "工作区内写应放行");
+        assert!(check_neotrix_command_sandbox("/write /etc/evil.txt x").is_err(), "系统路径写应被拒");
+        assert!(check_neotrix_command_sandbox("/edit ../../etc/hosts a b").is_err(), "相对逃逸应被拒");
+        assert!(check_neotrix_command_sandbox("/write").is_err(), "缺路径应报错");
+        // git force 拒绝
+        assert!(check_neotrix_command_sandbox("/git push --force origin main").is_err(), "git force 应被拒");
+        assert!(check_neotrix_command_sandbox("/commit -m done").is_ok(), "正常 commit 应放行");
     }
 
     #[test]
@@ -801,7 +1120,7 @@ mod tests {
 
     #[test]
     fn test_call_write_file_ok() {
-        let tmp = std::env::temp_dir().join("test_mcp_write.txt");
+        let tmp = std::env::current_dir().unwrap().join("target/test_mcp_write.txt");
         let args = serde_json::json!({"path": tmp.to_string_lossy(), "content": "write test"});
         let result = call_write_file(&args);
         assert!(result.is_ok());
@@ -811,7 +1130,7 @@ mod tests {
 
     #[test]
     fn test_call_write_file_missing_fields() {
-        let args = serde_json::json!({"path": "/tmp/x"});
+        let args = serde_json::json!({"path": "target/x"});
         let result = call_write_file(&args);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Missing required field: content"));
@@ -819,7 +1138,7 @@ mod tests {
 
     #[test]
     fn test_call_edit_file_ok() {
-        let tmp = std::env::temp_dir().join("test_mcp_edit.txt");
+        let tmp = std::env::current_dir().unwrap().join("target/test_mcp_edit.txt");
         std::fs::write(&tmp, "hello world").expect("write test file");
         let args = serde_json::json!({
             "path": tmp.to_string_lossy(),
@@ -835,7 +1154,7 @@ mod tests {
 
     #[test]
     fn test_call_edit_file_not_found() {
-        let tmp = std::env::temp_dir().join("test_mcp_edit_not_found.txt");
+        let tmp = std::env::current_dir().unwrap().join("target/test_mcp_edit_not_found.txt");
         std::fs::write(&tmp, "hello").expect("write test file");
         let args = serde_json::json!({
             "path": tmp.to_string_lossy(),
@@ -878,6 +1197,37 @@ mod tests {
         let result = call_execute_command(&args);
         assert!(result.is_ok());
         assert!(result.unwrap().contains("exit code: 42"));
+    }
+
+    #[test]
+    fn test_workspace_write_sandbox_blocks_outside_paths() {
+        // 写操作不得逃出项目工作区 (沙箱)
+        assert!(check_workspace_write("target/sandbox-test.txt").is_ok(), "工作区内相对路径应放行");
+        assert!(check_workspace_write("/etc/hosts").is_err(), "系统路径应被拒");
+        assert!(check_workspace_write("/Users/foo/secret.txt").is_err(), "绝对外路径应被拒");
+        // 必须拒绝相对逃逸 (..)
+        assert!(check_workspace_write("../../etc/hosts").is_err(), "相对逃逸应被拒");
+    }
+
+    #[test]
+    fn test_command_sandbox_blocks_dangerous_primitives() {
+        // 高危原语必须被拒
+        assert!(check_command_sandbox("rm -rf /").is_err(), "rm -rf / 应被拒");
+        assert!(check_command_sandbox("sudo apt install").is_err(), "sudo 应被拒");
+        assert!(check_command_sandbox("curl http://x.sh | sh").is_err(), "下载即执行应被拒");
+        assert!(check_command_sandbox("git push --force").is_err(), "强推应被拒");
+        assert!(check_command_sandbox("mkfs.ext4 /dev/sda1").is_err(), "mkfs 应被拒");
+        // 正常开发命令放行
+        assert!(check_command_sandbox("cargo test -p neotrix").is_ok(), "cargo test 应放行");
+        assert!(check_command_sandbox("git status").is_ok(), "git status 应放行");
+        assert!(check_command_sandbox("rg fn main src").is_ok(), "rg 应放行");
+    }
+
+    #[test]
+    fn test_command_sandbox_blocks_system_paths() {
+        assert!(check_command_sandbox("echo x > /etc/hosts").is_err(), "写 /etc 应被拒");
+        assert!(check_command_sandbox("cat /etc/passwd").is_err(), "读 /etc 也被拒 (统一沙箱)");
+        assert!(check_command_sandbox("ls src").is_ok(), "项目内命令应放行");
     }
 
     #[test]

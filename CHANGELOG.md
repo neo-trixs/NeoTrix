@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased] — 独立项目进化链路 (G1-G4)
+
+### Project Evolve (G1+G2)
+- **`project-evolve` 命令**: 对任意第三方目标项目运行进化链路 (`scan→detect→score→report`), 支持 `--json`/`--autofix`/`--max-rounds`; CLI 插件化入口。
+- **EvolutionLoop 目标参数化**: `for_target()`/`scan_project_in()`/`run_cycle_in()`/`autofix_cycle_in()`; `target_dir` 字段 (None=旧行为)。
+- **扫描排除非源码目录**: 跳过 `target/.git/.backup/node_modules/_archive` (此前 `.backup/` 被误扫为源码)。
+
+### Autofix 端到端修复
+- **修复 `EvolutionLoopProvider::self_diagnose` file=None bug**: `underlying_issue.file` 此前被硬编码为 `None` 丢弃文件路径 → pipeline 对 `AddTestStub`/`SplitLargeFile` 等写空文件路径 `"unknown"` 全部失败。端到端验证 `auto_fixes` 0→1, 测试 stub 真实落盘且编译通过。
+
+### Free_Energy / Phi 接线
+- **project-evolve 输出不再恒 0**: `world_fe`/`world_phi` 为 None 时由 `derive_free_energy_phi()` 从项目快照派生 — `free_energy` 接 `ActiveInferenceEngine` (风险密度×精度 + E8 熵), `phi` 接 `IITPhiCalculator` (健康维度共振整合度)。
+- 新增单测: 显式值透传 / 派生值有限 / 脏项目自由能高于干净项目。
+
 ## [0.19.1] - 2026-07-01 — Cycle 4 Phase 2: 编译全线漂绿
 
 ### Compilation & Linting

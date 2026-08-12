@@ -11,7 +11,7 @@ impl CliCommand for PluginCmd {
     fn name(&self) -> &str { "/plugin" }
     fn aliases(&self) -> Vec<&str> { vec![] }
     fn description(&self) -> &str {
-        "Plugin management: /plugin list | /plugin load <path> | /plugin unload <name> | /plugin info <name>"
+        "Plugin management: /plugin list | /plugin load <path> | /plugin unload <name> | /plugin info <name> | /plugin watch <dir>"
     }
 
     fn execute(&self, args: &[String], _brain: Option<&Arc<RwLock<SelfIteratingBrain>>>) -> CommandOutput {
@@ -22,7 +22,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = PluginRegistry::new();
+                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
                 let plugins = rt.block_on(registry.list());
                 if plugins.is_empty() {
                     return CommandOutput::ok("No plugins registered. Use /plugin load <path> to load from a directory.");
@@ -43,7 +43,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = PluginRegistry::new();
+                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
                 match rt.block_on(registry.load_from_dir(&dir)) {
                     Ok(loaded) => {
                         let count: usize = loaded.len();
@@ -61,7 +61,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = PluginRegistry::new();
+                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
                 match rt.block_on(registry.unregister(name)) {
                     Ok(()) => CommandOutput::ok(&format!("Plugin '{}' unregistered.", name)),
                     Err(e) => CommandOutput::err(&format!("Failed to unregister '{}': {}", name, e)),
@@ -76,7 +76,7 @@ impl CliCommand for PluginCmd {
                     Ok(rt) => rt,
                     Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
                 };
-                let registry = PluginRegistry::new();
+                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
                 let plugins = rt.block_on(registry.list());
                 match plugins.iter().find(|p| p.name == name) {
                     Some(p) => {
@@ -88,8 +88,24 @@ impl CliCommand for PluginCmd {
                     None => CommandOutput::err(&format!("Plugin '{}' not found.", name)),
                 }
             }
+            "watch" => {
+                let path = args.get(1).map(|s| s.as_str()).unwrap_or("");
+                if path.is_empty() {
+                    return CommandOutput::err("Usage: /plugin watch <dir>");
+                }
+                let dir = PathBuf::from(path);
+                let rt = match tokio::runtime::Runtime::new() {
+                    Ok(rt) => rt,
+                    Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
+                };
+                let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
+                match registry.watch_dir(dir.clone()) {
+                    Ok(_handle) => CommandOutput::ok(&format!("Hot-plug watching: {} (新增插件自动 load, 删除自动 unregister)", dir.display())),
+                    Err(e) => CommandOutput::err(&format!("Failed to watch {}: {}", path, e)),
+                }
+            }
             _ => {
-                CommandOutput::err("Usage:\n  /plugin list               List registered plugins\n  /plugin load <path>        Scan directory for plugins\n  /plugin unload <name>      Unregister a plugin\n  /plugin info <name>        Show plugin details")
+                CommandOutput::err("Usage:\n  /plugin list               List registered plugins\n  /plugin load <path>        Scan directory for plugins\n  /plugin unload <name>      Unregister a plugin\n  /plugin info <name>        Show plugin details\n  /plugin watch <dir>        Hot-plug monitor a plugin directory")
             }
         }
     }

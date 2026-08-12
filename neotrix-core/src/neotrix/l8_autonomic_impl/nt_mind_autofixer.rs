@@ -23,8 +23,17 @@ impl AutoFixer {
 
     /// 运行 cargo check 获取实时编译状态
     pub fn cargo_check() -> Result<(usize, usize), String> {
-        let output = std::process::Command::new("cargo")
-            .args(["check", "--lib"])
+        Self::cargo_check_in(None)
+    }
+
+    /// 在指定工作目录运行 cargo check（target_dir=None 时使用进程当前目录）
+    pub fn cargo_check_in(target_dir: Option<&std::path::Path>) -> Result<(usize, usize), String> {
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args(["check", "--lib"]);
+        if let Some(dir) = target_dir {
+            cmd.current_dir(dir);
+        }
+        let output = cmd
             .output()
             .map_err(|e| format!("cargo check 调用失败: {}", e))?;
         let stderr = String::from_utf8_lossy(&output.stderr);

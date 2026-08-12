@@ -16,6 +16,8 @@ use crate::neotrix::nt_mind_self_diagnose::{
     ActionExecutor, CodeUnderlyingIssue, DiagnosticItem, EvolutionLoopProvider,
     PriorityQueue, PrioritizedIssue, RepairCircuitBreaker, SelfDiagnose,
 };
+use crate::neotrix::nt_core_iit_phi::IITPhiCalculator;
+use crate::neotrix::nt_world_infer::ActiveInferenceEngine;
 pub use crate::neotrix::l1_body_impl::nt_l1_shared_types::IssueType;
 use serde::{Deserialize, Serialize};
 
@@ -135,6 +137,9 @@ pub struct EvolutionLoop {
     pub fixed_history: Vec<u32>,
     pub enabled: bool,
 
+    /// 被进化的目标项目目录（None = 自身/Cargo 项目根，保持旧行为）
+    pub target_dir: Option<std::path::PathBuf>,
+
     // 上次扫描结果缓存
     last_snapshot: Option<ProjectSnapshot>,
 }
@@ -153,13 +158,31 @@ impl EvolutionLoop {
             consecutive_stagnant: 0,
             fixed_history: Vec::new(),
             enabled: true,
+            target_dir: None,
             last_snapshot: None,
         }
+    }
+
+    /// 创建针对任意目标项目的进化循环
+    pub fn for_target(target_dir: impl Into<std::path::PathBuf>) -> Self {
+        let mut el = Self::new();
+        el.target_dir = Some(target_dir.into());
+        el
     }
 
     /// 运行一次完整进化周期
     pub fn run_cycle(
         &mut self,
+        world_fe: Option<f64>,
+        world_phi: Option<f64>,
+    ) -> EvolutionReport {
+        self.run_cycle_in(None, world_fe, world_phi)
+    }
+
+    /// 对指定目标目录运行一次完整进化周期（target=None 回落到自身路径）
+    pub fn run_cycle_in(
+        &mut self,
+        target: Option<&std::path::Path>,
         world_fe: Option<f64>,
         world_phi: Option<f64>,
     ) -> EvolutionReport {
@@ -169,7 +192,7 @@ impl EvolutionLoop {
         let mut new_patterns = Vec::new();
 
         // 1. 项目扫描
-        let snapshot = self.scan_project();
+        let snapshot = self.scan_project_in(target);
 
         // 2. 问题检测
         self.detect_large_files(&snapshot, &mut issues);
@@ -180,8 +203,12 @@ impl EvolutionLoop {
         self.detect_compile_issues(&snapshot, &mut issues);
 
         // 3. 世界模型感知的问题检测
-        let free_energy = world_fe.unwrap_or(0.0);
-        let phi = world_phi.unwrap_or(0.0);
+        //    显式 world_fe/world_phi 优先 (接 ActiveInference/IIT 的真实世界状态);
+        //    None 时从项目快照派生 (让 project-evolve 对任意目标项目也产出非零语义值)。
+        let (free_energy, phi) = match (world_fe, world_phi) {
+            (Some(fe), Some(phi)) => (fe, phi),
+            _ => Self::derive_free_energy_phi(&snapshot),
+        };
 
         if free_energy > 2.0 {
             issues.push(Issue {
@@ -268,13 +295,23 @@ impl EvolutionLoop {
         world_fe: Option<f64>,
         world_phi: Option<f64>,
     ) -> EvolutionReport {
-        let initial_report = self.run_cycle(world_fe, world_phi);
+        self.autofix_cycle_in(None, world_fe, world_phi)
+    }
+
+    /// 对指定目标目录执行自动修复周期
+    pub fn autofix_cycle_in(
+        &mut self,
+        target: Option<&std::path::Path>,
+        world_fe: Option<f64>,
+        world_phi: Option<f64>,
+    ) -> EvolutionReport {
+        let initial_report = self.run_cycle_in(target, world_fe, world_phi);
 
         // 使用 PipelineAutoFixer 管线处理所有 auto_fixable 问题
         let pipeline_result = PipelineAutoFixer::new().run_pipeline(self);
         let fixes_applied = pipeline_result.auto_applied as u32;
 
-        let final_report = self.run_cycle(Some(initial_report.free_energy), Some(initial_report.phi));
+        let final_report = self.run_cycle_in(target, Some(initial_report.free_energy), Some(initial_report.phi));
 
         EvolutionReport {
             cycle: final_report.cycle,
@@ -290,11 +327,26 @@ impl EvolutionLoop {
         }
     }
 
-    /// 项目扫描 (基于文件系统)
+    /// 项目扫描 (基于文件系统, 当前 Cargo 项目)
     pub fn scan_project(&self) -> ProjectSnapshot {
-        // 使用相对于 manifest 目录的路径，适配测试和运行时
-        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let src_dir = manifest_dir.join("src");
+        self.scan_project_in(None)
+    }
+
+    /// 项目扫描 — 对指定目标目录扫描（target=None 回落自身；target 为非 Rust 项目时仍扫描 .rs 文件并做 cargo check）
+    pub fn scan_project_in(&self, target: Option<&std::path::Path>) -> ProjectSnapshot {
+        // 目标目录解析: 显式 target > self.target_dir > 自身 Cargo 项目根
+        let root = match target {
+            Some(t) => t.to_path_buf(),
+            None => match &self.target_dir {
+                Some(t) => t.clone(),
+                None => std::path::Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf(),
+            },
+        };
+        let src_dir = if root.join("src").is_dir() {
+            root.join("src")
+        } else {
+            root.clone()
+        };
         let mut total_files = 0usize;
         let mut total_lines = 0usize;
         let mut large_files = Vec::new();
@@ -364,7 +416,7 @@ impl EvolutionLoop {
         let (compile_errs, compile_warns) = if cfg!(test) {
             (0, 0)
         } else {
-            match AutoFixer::cargo_check() {
+            match AutoFixer::cargo_check_in(Some(&root)) {
                 Ok((e, w)) => (e, w),
                 Err(_) => (0, 0),
             }
@@ -387,14 +439,19 @@ impl EvolutionLoop {
 
     /// 递归搜索 Rust 源文件
     fn walk_rust_files(dir: &std::path::Path) -> std::io::Result<Vec<std::path::PathBuf>> {
+        const SKIP_DIRS: [&str; 5] = ["target", ".git", ".backup", "node_modules", "_archive"];
         let mut files = Vec::new();
         if dir.is_dir() {
             for entry in std::fs::read_dir(dir)? {
                 let entry = entry?;
                 let path = entry.path();
                 if path.is_dir() {
-                    // 跳过 target 目录
-                    if path.file_name().map(|n| n != "target").unwrap_or(true) {
+                    // 跳过 target/.git/.backup/node_modules 等非源码目录
+                    if path
+                        .file_name()
+                        .map(|n| !SKIP_DIRS.contains(&n.to_str().unwrap_or("")))
+                        .unwrap_or(true)
+                    {
                         files.extend(Self::walk_rust_files(&path)?);
                     }
                 } else if path.extension().map(|e| e == "rs").unwrap_or(false) {
@@ -502,6 +559,55 @@ impl EvolutionLoop {
         }
     }
 
+    /// 从项目快照派生 free_energy / phi (供无世界模型上下文的调用方使用)。
+    ///
+    /// 语义:
+    /// - `free_energy`: ActiveInference 预测误差 — 项目风险维度 (issue 密度/unsafe/unwrap/
+    ///   TODO/大文件/编译警告) 越高, 自由能越高。
+    /// - `phi`: IIT 集成信息 — 将健康维度构成状态向量, 度量各健康维度间的
+    ///   共振整合度; 纯噪声/均衡态 → 低 Φ, 结构化分化 → 高 Φ。
+    fn derive_free_energy_phi(snap: &ProjectSnapshot) -> (f64, f64) {
+        let file_n = snap.total_files.max(1) as f64;
+
+        // 项目风险密度 (每文件归一化)
+        let issue_density = (snap.large_files.len() as f64 + snap.modules_without_tests.len() as f64) / file_n;
+        let unsafe_density = snap.unsafe_count as f64 / file_n;
+        let unwrap_density = snap.unwrap_count as f64 / file_n;
+        let todo_density = snap.todo_count as f64 / file_n;
+        let warning_density = snap.compile_warnings as f64 / file_n;
+
+        // ActiveInference 变分自由能: F = β·E_JEPA - H(E8)/T + γ·|∇E8|
+        //   jepa_energy(预测能量)   = 风险密度 (项目越脏, 世界模型预测误差越大)
+        //   e8_entropy(E8 状态熵)   = 结构复杂度 (文件量级信息)
+        //   e8_energy_gradient      = 0 (单次扫描无时间演化)
+        let jepa_energy = issue_density + unsafe_density + unwrap_density + todo_density + warning_density;
+        let e8_entropy = (1.0 + snap.total_lines as f64).ln();
+        let free_energy = ActiveInferenceEngine::new()
+            .compute_free_energy(jepa_energy, e8_entropy, 0.0)
+            .variational_fe;
+
+        // IIT Φ: 健康维度状态向量 → 共振集成度
+        //   state = [health_ratio, large_file_ratio, no_test_ratio, unsafe_ratio,
+        //            unwrap_ratio, todo_ratio, warning_ratio] (0..1 归一)
+        let (large_ratio, test_ratio, unsafe_ratio) = (
+            snap.large_files.len() as f64 / file_n,
+            snap.modules_without_tests.len() as f64 / file_n,
+            snap.unsafe_count as f64 / file_n,
+        );
+        let state = vec![
+            1.0 - (jepa_energy / 4.0).min(1.0), // 健康度 (逆风险密度)
+            large_ratio,
+            test_ratio,
+            unsafe_ratio,
+            unwrap_density / 4.0,
+            todo_density / 2.0,
+            warning_density,
+        ];
+        let phi = IITPhiCalculator::new().compute_phi(&state).phi;
+
+        (free_energy, phi)
+    }
+
     /// 综合健康评分 (0-100)
     fn compute_evolution_score(&self, snap: &ProjectSnapshot, _issues: &[Issue]) -> f64 {
         let mut score = 100.0;
@@ -571,7 +677,7 @@ impl EvolutionLoop {
 
     /// 自我诊断入口 — 零 LLM 依赖, 基于扫描数据 + 历史 + 能力向量排序
     pub fn self_diagnose(&self) -> (Vec<DiagnosticItem>, PriorityQueue) {
-        let snapshot = self.scan_project();
+        let snapshot = self.scan_project_in(None);
         SelfDiagnose::run_diagnosis(&snapshot, self.cycle)
     }
 
@@ -616,7 +722,7 @@ impl EvolutionLoopProvider for EvolutionLoop {
                 action: di.action,
                 composite_score: di.composite_score,
                 underlying_issue: CodeUnderlyingIssue {
-                    file: None,
+                    file: di.underlying_issue.file.clone(),
                     issue_type: format!("{:?}", di.underlying_issue.issue_type),
                 },
             }
@@ -748,5 +854,104 @@ mod tests {
         let db = el.dashboard(&report);
         assert!(db.contains("#"));
         assert!(db.contains("评分"));
+    }
+
+    #[test]
+    fn test_for_target_sets_target_dir() {
+        let el = EvolutionLoop::for_target("/tmp/mock-project");
+        assert!(el.target_dir.is_some());
+        assert_eq!(el.target_dir.as_deref().unwrap(), std::path::Path::new("/tmp/mock-project"));
+    }
+
+    #[test]
+    fn test_scan_project_in_arbitrary_dir() {
+        // 构造一个临时 mock Rust 项目目录
+        let dir = std::env::temp_dir().join(format!("nt-evolve-mock-{}", std::process::id()));
+        let src = dir.join("src");
+        std::fs::create_dir_all(&src).expect("create mock src");
+        std::fs::write(src.join("main.rs"), "// TODO: fix me\nfn main() { let x = 1; }\n").expect("write mock main");
+        std::fs::write(src.join("hot.rs"), "unsafe { }\nunsafe { }\nunsafe { }\nunsafe { }\nunsafe { }\nunsafe { }\n").expect("write mock hot");
+
+        let el = EvolutionLoop::new();
+        let snap = el.scan_project_in(Some(&dir));
+        assert!(snap.total_files >= 2, "expected >=2 files, got {}", snap.total_files);
+        assert!(snap.todo_count >= 1, "expected TODO detected, got {}", snap.todo_count);
+        assert!(snap.file_unsafe_hotspots.len() >= 1, "expected unsafe hotspot");
+        assert!(snap.unsafe_count >= 6, "expected >=6 unsafe, got {}", snap.unsafe_count);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_run_cycle_in_target_reports_target_snapshot() {
+        let dir = std::env::temp_dir().join(format!("nt-evolve-cycle-{}", std::process::id()));
+        let src = dir.join("src");
+        std::fs::create_dir_all(&src).expect("create mock src");
+        std::fs::write(src.join("lib.rs"), "// TODO x\n").expect("write mock lib");
+
+        let mut el = EvolutionLoop::new();
+        let report = el.run_cycle_in(Some(&dir), None, None);
+        assert_eq!(report.cycle, 1);
+        assert!(report.snapshot.todo_count >= 1, "expected TODO in target, got {}", report.snapshot.todo_count);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_derive_free_energy_phi_non_finite_or_zero() {
+        // 显式接世界模型值时应原样透传 (旧语义不被破坏)
+        let dir = std::env::temp_dir().join(format!("nt-evolve-fe-{}", std::process::id()));
+        let src = dir.join("src");
+        std::fs::create_dir_all(&src).expect("create mock src");
+        std::fs::write(src.join("lib.rs"), "pub fn f() {}\n").expect("write mock lib");
+
+        let mut el = EvolutionLoop::new();
+        let report = el.run_cycle_in(Some(&dir), Some(0.5), Some(0.3));
+        assert_eq!(report.free_energy, 0.5);
+        assert_eq!(report.phi, 0.3);
+
+        // None 时从快照派生 (不崩溃, 值为有限数)
+        let report2 = el.run_cycle_in(Some(&dir), None, None);
+        assert!(report2.free_energy.is_finite(), "free_energy must be finite, got {}", report2.free_energy);
+        assert!(report2.phi.is_finite(), "phi must be finite, got {}", report2.phi);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_derive_free_energy_phi_dirty_vs_clean() {
+        // 脏项目 (多问题) 自由能应高于干净项目 (风险驱动)
+        let clean = ProjectSnapshot {
+            total_files: 10,
+            total_lines: 1000,
+            large_files: vec![],
+            modules_without_tests: vec![],
+            file_unsafe_hotspots: vec![],
+            unsafe_count: 0,
+            unwrap_count: 1,
+            todo_count: 1,
+            test_count: 20,
+            test_failures: 0,
+            compile_errors: 0,
+            compile_warnings: 0,
+        };
+        let dirty = ProjectSnapshot {
+            total_files: 10,
+            total_lines: 1000,
+            large_files: vec!["big.rs".into()],
+            modules_without_tests: vec!["m.rs".into()],
+            file_unsafe_hotspots: vec!["u.rs".into()],
+            unsafe_count: 8,
+            unwrap_count: 40,
+            todo_count: 6,
+            test_count: 2,
+            test_failures: 1,
+            compile_errors: 0,
+            compile_warnings: 5,
+        };
+        let (fe_clean, phi_clean) = EvolutionLoop::derive_free_energy_phi(&clean);
+        let (fe_dirty, phi_dirty) = EvolutionLoop::derive_free_energy_phi(&dirty);
+        assert!(fe_dirty > fe_clean, "dirty FE ({}) must exceed clean FE ({})", fe_dirty, fe_clean);
+        assert!(fe_dirty.is_finite() && phi_dirty.is_finite());
     }
 }

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -68,6 +68,14 @@ impl InnerRegistry {
 #[derive(Clone, Default)]
 pub struct PluginRegistry {
     inner: Arc<RwLock<InnerRegistry>>,
+}
+
+/// 全局共享注册表 — CLI 命令与后台循环/第三方 CLI 调用共享同一实例，
+/// 保证热插拔 (load/unload) 真实作用于运行中的注册表（R-P42: 拒绝平行适配器）。
+pub fn global_registry() -> PluginRegistry {
+    use std::sync::OnceLock;
+    static GLOBAL: OnceLock<PluginRegistry> = OnceLock::new();
+    GLOBAL.get_or_init(PluginRegistry::new).clone()
 }
 
 impl PluginRegistry {
@@ -146,5 +154,79 @@ impl PluginRegistry {
             }
         }
         Ok(loaded)
+    }
+
+    /// 目录热插拔监视 — 监听插件目录:
+    /// - 新增 `.wasm`/`.dylib`/`.so`/`.dll` 文件 → 异步 load_from_dir
+    /// - 删除文件 → 尝试按文件名去掉扩展名 unregister 对应插件
+    ///
+    /// 纯安全实现（R-P1: forbid unsafe_code），基于 notify 文件事件。
+    /// 返回 JoinHandle；drop/abort 即停止监视。
+    pub fn watch_dir(&self, path: PathBuf) -> Result<tokio::task::JoinHandle<()>, String> {
+        if !path.is_dir() {
+            return Err(format!("not a directory: {}", path.display()));
+        }
+        use notify::{RecommendedWatcher, Watcher, RecursiveMode};
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<notify::Result<notify::Event>>();
+        let mut watcher = RecommendedWatcher::new(
+            move |res: notify::Result<notify::Event>| {
+                let _ = tx.send(res);
+            },
+            notify::Config::default(),
+        )
+        .map_err(|e| format!("notify init failed: {}", e))?;
+        watcher
+            .watch(&path, RecursiveMode::NonRecursive)
+            .map_err(|e| format!("watch failed: {}", e))?;
+
+        let registry = self.clone();
+        let dir = path.to_path_buf();
+        let handle = tokio::spawn(async move {
+            let _watcher = watcher;
+            while let Some(ev) = rx.recv().await {
+                let ev = match ev {
+                    Ok(ev) => ev,
+                    Err(e) => {
+                        log::warn!("[plugin] watch event error: {}", e);
+                        continue;
+                    }
+                };
+                // 只关心文件增删（Create/Remove），忽略内容改写。
+                let is_create = matches!(ev.kind, notify::EventKind::Create(_));
+                let is_remove = matches!(ev.kind, notify::EventKind::Remove(_));
+                if !is_create && !is_remove {
+                    continue;
+                }
+                let ext_ok = |p: &Path| {
+                    ["wasm", "dylib", "so", "dll"]
+                        .iter()
+                        .any(|e| p.extension().map(|x| x == *e).unwrap_or(false))
+                };
+                for p in ev.paths.iter().filter(|p| ext_ok(p)) {
+                    if is_create {
+                        match registry.load_from_dir(&dir).await {
+                            Ok(_) => log::info!("[plugin] hot-plug: rescanned {}", dir.display()),
+                            Err(e) => log::warn!("[plugin] hot-plug rescan failed: {}", e),
+                        }
+                        // load_from_dir 已扫描整个目录，避免逐文件重复处理。
+                        break;
+                    }
+                    if is_remove {
+                        let name = p
+                            .file_stem()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        if !name.is_empty() {
+                            match registry.unregister(&name).await {
+                                Ok(()) => log::info!("[plugin] hot-unplug: unregistered {}", name),
+                                Err(_) => log::debug!("[plugin] {} not registered, skip unplug", name),
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        log::info!("[plugin] watching dir {} for hot-plug", path.display());
+        Ok(handle)
     }
 }
