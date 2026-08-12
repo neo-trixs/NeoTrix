@@ -4,6 +4,11 @@ import { computer as computerApi } from '../api'
 import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInfo } from '../api/types'
 import { clsx } from 'clsx'
 
+// 截图+窗口枚举节流：时间戳提升到模块级，跨组件重挂载（切视图重挂载触发 onMount）仍生效，
+// 5s 内重复进入复用上次结果，避免完整截图/枚举 IPC 风暴；手动「重新捕获」不经 load 不受限。
+let lastSnapshotAt = 0
+const SNAPSHOT_THROTTLE_MS = 5000
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -24,13 +29,40 @@ export function ComputerUse(props: Props) {
   const [keyCode, setKeyCode] = createSignal('')
   const [mods, setMods] = createSignal<string[]>([])
   let firstBtnRef: HTMLButtonElement | undefined
+  let closeBtnRef: HTMLButtonElement | undefined
+  let panelRef: HTMLDivElement | undefined
+  // 打开面板时的触发元素（浮层模式还原焦点用；embedded 模式由 ⌘6/侧栏触发，可能为 body）
+  let lastFocusedEl: HTMLElement | null = null
 
-  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范），并记录触发元素；
+  // 关闭时（Esc/关闭按钮/视图切换触发卸载）经 effect 清理还原焦点
   createEffect(() => {
-    if (props.open && firstBtnRef) firstBtnRef.focus()
+    if (!props.open) return
+    lastFocusedEl = document.activeElement as HTMLElement | null
+    const raf = requestAnimationFrame(() => {
+      if (firstBtnRef) firstBtnRef.focus()
+      else panelRef?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
+    }
   })
 
+  const close = () => {
+    // 焦点还原：优先触发元素（工具栏按钮仍存活），拿不到则还原到面板关闭按钮
+    if (lastFocusedEl && lastFocusedEl.isConnected) {
+      lastFocusedEl.focus()
+    } else if (!props.embedded && closeBtnRef) {
+      closeBtnRef.focus()
+    }
+    props.onClose()
+  }
+
   const load = async () => {
+    const now = Date.now()
+    if (now - lastSnapshotAt < SNAPSHOT_THROTTLE_MS) return
+    lastSnapshotAt = now
     setLoading(true)
     setError(null)
     try {
@@ -52,23 +84,10 @@ export function ComputerUse(props: Props) {
     setBusy('capture')
     setError(null)
     try {
-      // Capture to temp path, then read as data URL
-      const ts = Date.now()
-      const filePath = `/tmp/neotrix_screen_${ts}.png`
-      await computerApi.screenshotAndSave(filePath)
-      // Read file content via tauri fs plugin
-      const { readFile, remove } = await import('@tauri-apps/plugin-fs')
-      const bytes = await readFile(filePath)
-      // 清理临时截图，避免 /tmp 垃圾堆积
-      remove(filePath).catch(() => {})
-      const blob = new Blob([bytes], { type: 'image/png' })
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(String(reader.result))
-        reader.onerror = () => reject(new Error('read blob failed'))
-        reader.readAsDataURL(blob)
-      })
-      setScreenshotDataUrl(dataUrl)
+      // 内存内联截图：后端捕获→base64→返回并自清理临时文件，前端不再 readFile/remove
+      const shot = await computerApi.screenshotAndSave()
+      if (!shot.data_base64) throw new Error('截图未返回内存数据')
+      setScreenshotDataUrl(`data:image/png;base64,${shot.data_base64}`)
       // Refresh window list + mouse position
       const [wl, mp] = await Promise.all([
         computerApi.getWindowList().catch(() => [] as WindowInfo[]),
@@ -144,7 +163,37 @@ export function ComputerUse(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class={props.embedded ? 'flex-1 h-full flex flex-col min-h-0' : 'panel w-[30rem]'}>
+      <div
+        ref={panelRef}
+        class={props.embedded ? 'flex-1 h-full flex flex-col min-h-0' : 'panel w-[30rem]'}
+        role="dialog"
+        aria-label="电脑控制"
+        aria-modal={props.embedded ? undefined : 'true'}
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            close()
+            return
+          }
+          if (e.key === 'Tab' && panelRef) {
+            const focusables = panelRef.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+            if (focusables.length === 0) return
+            const first = focusables[0]
+            const last = focusables[focusables.length - 1]
+            const active = document.activeElement
+            if (e.shiftKey && (active === first || active === panelRef)) {
+              e.preventDefault()
+              last.focus()
+            } else if (!e.shiftKey && active === last) {
+              e.preventDefault()
+              first.focus()
+            }
+          }
+        }}
+      >
         {/* Header */}
         <div class="panel-head">
           <Monitor class="panel-head-icon text-nt-core-300" />
@@ -160,8 +209,9 @@ export function ComputerUse(props: Props) {
           </button>
           <Show when={!props.embedded}>
             <button
+              ref={closeBtnRef}
               class="p-2 rounded text-text-muted hover:text-text-primary hover:bg-bg-tertiary transition-colors focus-visible:ring-2 focus-visible:ring-nt-io-500 focus-visible:outline-none"
-              onClick={props.onClose}
+              onClick={close}
               aria-label="关闭"
             >
               <X class="w-4 h-4" />

@@ -1,7 +1,7 @@
-import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
+import { createSignal, createEffect, onCleanup, Show, For } from 'solid-js'
 import { History, RotateCcw, Loader2, X, Clock, RefreshCw } from 'lucide-solid'
 import { neocodex } from '../api'
-import type { Checkpoint } from '../api/types'
+import type { Checkpoint, NeoCodexMessageItem } from '../api/types'
 import { clsx } from 'clsx'
 import { ConfirmModal, type ModalReq } from './ConfirmModal'
 
@@ -9,8 +9,8 @@ interface Props {
   open: boolean
   sessionId: string | null
   onClose: () => void
-  /** Called after a successful restore so the app can reload messages. */
-  onRestored?: () => void
+  /** Called after a successful restore with the restored messages so the app can reload/rehydrate. */
+  onRestored?: (msgs: NeoCodexMessageItem[]) => void
 }
 
 function formatTs(ms: number): string {
@@ -31,11 +31,51 @@ export function CheckpointTimeline(props: Props) {
   // 统一确认模态（替换原生 confirm）
   const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
   const [pendingCp, setPendingCp] = createSignal<Checkpoint | null>(null)
+  // 恢复成功就地反馈：顶部成功提示条 + 列表内短暂高亮
+  const [restoreMsg, setRestoreMsg] = createSignal<string | null>(null)
+  const [highlightedId, setHighlightedId] = createSignal<string | null>(null)
+  let restoreMsgTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(restoreMsgTimer))
+  // 打开确认框前的触发元素（恢复按钮），关闭后还原焦点
+  let lastTriggerEl: HTMLElement | null = null
   let firstBtnRef: HTMLButtonElement | undefined
+  let panelRef: HTMLDivElement | undefined
+  // 打开面板前的触发元素，关闭后还原焦点
+  let lastFocusedEl: HTMLElement | null = null
 
-  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范），并记录触发元素；
+  // 关闭时（Esc/关闭按钮/遮罩点击触发卸载）经 effect 清理还原焦点
   createEffect(() => {
-    if (props.open && firstBtnRef) firstBtnRef.focus()
+    if (!props.open) return
+    lastFocusedEl = document.activeElement as HTMLElement | null
+    const raf = requestAnimationFrame(() => {
+      if (firstBtnRef) firstBtnRef.focus()
+      else panelRef?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
+    }
+  })
+
+  // ConfirmModal 仅在有输入框时处理 Esc；纯确认模式在此补全局 Esc + 焦点迁入 dialog
+  createEffect(() => {
+    if (!modalReq()) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      closeModal()
+    }
+    document.addEventListener('keydown', onKey, true)
+    // 焦点迁入 dialog（无 input 时 ConfirmModal 无 autofocus）
+    const raf = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.glass-modal button:last-child')?.focus()
+    })
+    return () => {
+      document.removeEventListener('keydown', onKey, true)
+      cancelAnimationFrame(raf)
+    }
   })
 
   const load = async () => {
@@ -52,17 +92,23 @@ export function CheckpointTimeline(props: Props) {
     }
   }
 
-  onMount(load)
-
-  // 会话切换时重新加载快照时间线
+  // 会话切换时重新加载快照时间线（组件随面板打开挂载，首轮即覆盖打开加载，
+  // 故不再 onMount(load) 避免同一 sessionId 触发两次请求）
   createEffect(() => {
     if (props.open && props.sessionId) {
       load()
     }
   })
 
+  const closeModal = () => {
+    setPendingCp(null)
+    setModalReq(null)
+    if (lastTriggerEl?.isConnected) lastTriggerEl.focus()
+  }
+
   const restore = async (cp: Checkpoint) => {
     if (!props.sessionId) return
+    lastTriggerEl = document.activeElement as HTMLElement | null
     setPendingCp(cp)
     setModalReq({
       title: '恢复快照',
@@ -78,9 +124,18 @@ export function CheckpointTimeline(props: Props) {
     setRestoring(cp.id)
     setError(null)
     try {
-      await neocodex.checkpointRestore(props.sessionId!, cp.id)
-      props.onRestored?.()
+      const restored = await neocodex.checkpointRestore(props.sessionId!, cp.id)
+      props.onRestored?.(restored)
       await load()
+      // 就地反馈：成功提示条 + 恢复的快照短暂高亮
+      const msg = `已恢复 ${formatTs(cp.created_at)} 的快照`
+      setRestoreMsg(msg)
+      setHighlightedId(cp.id)
+      clearTimeout(restoreMsgTimer)
+      restoreMsgTimer = setTimeout(() => {
+        setRestoreMsg(null)
+        setHighlightedId(null)
+      }, 3000)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -90,7 +145,37 @@ export function CheckpointTimeline(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class="panel w-80">
+      <div
+        ref={panelRef}
+        class="panel w-80"
+        role="dialog"
+        aria-modal="true"
+        aria-label="检查点"
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            props.onClose()
+            return
+          }
+          if (e.key === 'Tab' && panelRef) {
+            const focusables = panelRef.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+            if (focusables.length === 0) return
+            const first = focusables[0]
+            const last = focusables[focusables.length - 1]
+            const active = document.activeElement
+            if (e.shiftKey && (active === first || active === panelRef)) {
+              e.preventDefault()
+              last.focus()
+            } else if (!e.shiftKey && active === last) {
+              e.preventDefault()
+              first.focus()
+            }
+          }
+        }}
+      >
         {/* Header */}
         <div class="panel-head">
           <History class="panel-head-icon text-nt-repair-600" />
@@ -125,6 +210,11 @@ export function CheckpointTimeline(props: Props) {
           <Show when={error()}>
             <div class="p-3 text-xs text-red-500 bg-red-500/10 rounded-lg mb-2">{error()}</div>
           </Show>
+          <Show when={restoreMsg()}>
+            <div class="p-3 text-xs text-emerald-600 bg-emerald-500/10 rounded-lg mb-2" role="status">
+              {restoreMsg()}
+            </div>
+          </Show>
           <Show when={!loading && checkpoints().length === 0 && !error()}>
             <div class="py-10 text-center text-xs text-text-muted">
               暂无快照<br />
@@ -135,7 +225,12 @@ export function CheckpointTimeline(props: Props) {
             <div class="relative pl-5 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-border-primary">
               <For each={checkpoints()}>
                 {(cp, i) => (
-                  <div class="relative pb-4">
+                  <div
+                    class={clsx(
+                      'relative pb-4',
+                      highlightedId() === cp.id && 'rounded-lg bg-nt-repair-500/10 ring-1 ring-nt-repair-500/50'
+                    )}
+                  >
                     {/* Timeline dot */}
                     <span
                       class={clsx(
@@ -184,10 +279,7 @@ export function CheckpointTimeline(props: Props) {
       <ConfirmModal
         req={modalReq()}
         onConfirm={() => pendingCp() && doRestore(pendingCp()!)}
-        onClose={() => {
-          setPendingCp(null)
-          setModalReq(null)
-        }}
+        onClose={closeModal}
       />
     </Show>
   )

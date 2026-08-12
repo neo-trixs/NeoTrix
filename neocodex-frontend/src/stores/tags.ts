@@ -197,10 +197,13 @@ function createTagsStore() {
     return added
   }
 
-  /** 重命名标签（含层级改名；同步会话引用） */
-  const renameTag = (oldName: string, newName: string): void => {
+  /** 重命名标签（含层级改名；同步会话引用）。
+      目标名已存在 → 返回冲突错误且不覆盖（避免覆盖合并丢数据）；成功返回 null */
+  const renameTag = (oldName: string, newName: string): string | null => {
     const target = normalizeTagName(newName)
-    if (!target || target === oldName) return
+    if (!target || target === oldName) return null
+    // 重名冲突防护：目标标签已注册则拒绝重命名（不覆盖不合并）
+    if (state.tags[target]) return `标签 #${target} 已存在，请改用其他名称`
     // 迁移注册表
     const color = state.tags[oldName] ?? colorForName(target)
     setState('tags', produce(t => {
@@ -217,6 +220,7 @@ function createTagsStore() {
       }
     }))
     persist(state)
+    return null
   }
 
   /** 删除标签（全局：注册表 + 所有会话引用） */

@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
+import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { Shield, MousePointer2, Edit3, FileText, ChevronDown, Check } from 'lucide-solid'
 import { clsx } from 'clsx'
 
@@ -63,11 +63,40 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
 
   const currentMode = PERMISSION_MODES.find(m => m.value === value) || PERMISSION_MODES[0]
 
+  // 下拉面板 ref：焦点管理 / 方向键导航均限定在本面板内（避免多 listbox 全局串扰）
+  let panelRef: HTMLDivElement | undefined
+
+  // 打开后焦点移入列表并高亮当前项（对标 Codex 下拉规范）
+  createEffect(() => {
+    if (!isOpen()) return
+    requestAnimationFrame(() => {
+      const opts = Array.from(panelRef?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])
+      if (opts.length === 0) return
+      const active = opts.find(o => o.getAttribute('aria-selected') === 'true')
+      const target = active && !active.hasAttribute('disabled')
+        ? active
+        : opts.find(o => !o.hasAttribute('disabled'))
+      target?.focus()
+    })
+  })
+
   const handleSelect = (mode: PermissionMode) => {
     if (!disabled) {
       onChange(mode)
       setIsOpen(false)
     }
+  }
+
+  // 方向键 roving 导航（compact / 完整版共用；限定本面板内）
+  const handleOptionKeyDown = (e: KeyboardEvent, i: number) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    e.preventDefault()
+    const dir = e.key === 'ArrowDown' ? 1 : -1
+    // roving tabindex：聚焦下一选项（高亮跟随焦点）
+    requestAnimationFrame(() => {
+      const opts = Array.from(panelRef?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])
+      opts[(i + dir + PERMISSION_MODES.length) % PERMISSION_MODES.length]?.focus?.()
+    })
   }
 
   if (compact) {
@@ -92,7 +121,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
         </button>
 
         <Show when={isOpen()}>
-          <div class="absolute bottom-full left-0 mb-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[180px]" role="listbox" aria-label="权限模式选择">
+          <div ref={panelRef} class="absolute bottom-full left-0 mb-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[180px]" role="listbox" aria-label="权限模式选择">
             <For each={PERMISSION_MODES}>
               {(mode: PermissionModeOption, i) => (
                 <button
@@ -105,17 +134,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
                   disabled={disabled}
                   role="option"
                   aria-selected={mode.value === value}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-                    e.preventDefault()
-                    const dir = e.key === 'ArrowDown' ? 1 : -1
-                    const next = PERMISSION_MODES[(i() + dir + PERMISSION_MODES.length) % PERMISSION_MODES.length]
-                    // roving tabindex：聚焦下一选项（高亮跟随焦点）
-                    requestAnimationFrame(() => {
-                      const opts = Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]'))
-                      opts[(i() + dir + PERMISSION_MODES.length) % PERMISSION_MODES.length]?.focus?.()
-                    })
-                  }}
+                  onKeyDown={(e) => handleOptionKeyDown(e, i())}
                 >
                   <mode.icon class={clsx('w-4 h-4 flex-shrink-0', mode.color)} />
                   <div class="flex-1 min-w-0 flex flex-col gap-1">
@@ -163,9 +182,9 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
       </button>
 
       <Show when={isOpen()}>
-        <div class="absolute top-full left-0 right-0 mt-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in">
+        <div ref={panelRef} class="absolute top-full left-0 right-0 mt-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in" role="listbox" aria-label="权限模式选择">
           <For each={PERMISSION_MODES}>
-            {(mode: PermissionModeOption) => (
+            {(mode: PermissionModeOption, i) => (
               <button
                 class={clsx(
                   'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
@@ -176,6 +195,7 @@ export function PermissionModeSelector(props: PermissionModeSelectorProps) {
                 disabled={disabled}
                 role="option"
                 aria-selected={mode.value === value}
+                onKeyDown={(e) => handleOptionKeyDown(e, i())}
               >
                 <mode.icon class={clsx('w-4 h-4 flex-shrink-0', mode.color)} />
                 <div class="flex-1 min-w-0 flex flex-col gap-1">

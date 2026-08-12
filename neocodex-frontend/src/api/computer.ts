@@ -6,8 +6,10 @@ import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInf
    对应 computer_cmds.rs / computer_interactive_cmds.rs
    ════════════════════════════════════════════ */
 
-export function screenshotAndSave(path: string): Promise<ScreenCapture> {
-  return call('computer_screenshot_and_save', { path })
+/** 截图（内存内联返回 data_base64）：默认走后端临时文件生命周期，前端零磁盘往返。
+ *  传 path 则沿旧语义写盘（data_base64=None）。 */
+export function screenshotAndSave(path?: string | null): Promise<ScreenCapture> {
+  return call('computer_screenshot_and_save', { path: path ?? null })
 }
 
 export function screenCapture(path?: string): Promise<ScreenCapture> {

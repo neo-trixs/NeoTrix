@@ -31,6 +31,13 @@ function isTable(mime: string, name: string): boolean {
   return mime.includes('csv') || mime.includes('excel') || name.toLowerCase().endsWith('.csv')
 }
 
+// base64 → UTF-8 文本：atob 直接产出 Latin-1 字符串，中文等 UTF-8 内容必须
+// 先转 Uint8Array 再经 TextDecoder('utf-8') 解码，否则必然乱码。
+function decodeBase64Utf8(data: string): string {
+  const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0))
+  return new TextDecoder('utf-8').decode(bytes)
+}
+
 function toDataUrl(mime: string, data: string): string {
   // data may already be a full data URL (e.g. from capture); if raw base64, wrap it.
   if (data.startsWith('data:')) return data
@@ -101,7 +108,7 @@ export function FilePreview(props: Props) {
     if (isCode(a.mime_type, a.name) && a.data) {
       const text = (() => {
         try {
-          return atob(a.data!)
+          return decodeBase64Utf8(a.data!)
         } catch {
           return a.data!
         }
@@ -129,7 +136,7 @@ export function FilePreview(props: Props) {
     if (isTable(a.mime_type, a.name) && a.data) {
       const rows = (() => {
         try {
-          const text = atob(a.data!)
+          const text = decodeBase64Utf8(a.data!)
           return text.split('\n').filter(l => l.trim()).slice(0, 30).map(l => l.split(','))
         } catch {
           return []

@@ -1,4 +1,5 @@
-import { createSignal, createEffect, onCleanup, For, Show } from 'solid-js'
+import { createSignal, createEffect, For, Show } from 'solid-js'
+import { Loader2 } from 'lucide-solid'
 import { cowork as coworkApi } from '../api'
 import type { CoworkAction, CoworkDeliverable, CoworkSession } from '../api/types'
 import { clsx } from 'clsx'
@@ -32,6 +33,7 @@ export function CoworkView() {
   const [deliverables, setDeliverables] = createSignal<CoworkDeliverable[]>([])
   const [activeId, setActiveId] = createSignal<string | null>(null)
   const [loading, setLoading] = createSignal(false)
+  const [detailLoading, setDetailLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [showNew, setShowNew] = createSignal(false)
   const [newPath, setNewPath] = createSignal('')
@@ -44,6 +46,8 @@ export function CoworkView() {
   const active = () => sessions().find((s) => s.id === activeId()) ?? sessions()[0]
 
   const loadSessions = async () => {
+    setLoading(true)
+    setError(null)
     try {
       const list = await coworkApi.coworkList()
       setSessions(list)
@@ -52,25 +56,40 @@ export function CoworkView() {
       }
     } catch (e) {
       setError(String(e))
+    } finally {
+      setLoading(false)
     }
   }
 
-  const loadDetail = async (id: string) => {
+  // detail 请求序号：切换会话时旧响应必须丢弃（并发守卫，防 stale flash）
+  let detailSeq = 0
+  const loadDetail = async (id: string, opts?: { clear?: boolean }) => {
+    const seq = ++detailSeq
+    if (opts?.clear) {
+      // 切换会话：先清空旧 detail 并显示骨架，避免短暂展示上一个会话的内容
+      setActions([])
+      setDeliverables([])
+      setDetailLoading(true)
+    }
     try {
       const [acts, dels] = await Promise.all([
         coworkApi.coworkActions(id),
         coworkApi.coworkListDeliverables(id),
       ])
+      if (seq !== detailSeq) return // 已被更新的请求取代，丢弃旧响应
       setActions(acts)
       setDeliverables(dels)
     } catch (e) {
+      if (seq !== detailSeq) return
       setError(String(e))
+    } finally {
+      if (seq === detailSeq) setDetailLoading(false)
     }
   }
 
   createEffect(() => {
     const id = activeId()
-    if (id) loadDetail(id)
+    if (id) loadDetail(id, { clear: true })
   })
 
   // 初始加载
@@ -160,12 +179,20 @@ export function CoworkView() {
     if (id) await loadDetail(id)
   }
 
-  // 会话/任务状态自动刷新：视图挂载期间每 10s 轮询（对标 Codex 任务实时状态）
+  // 会话/任务状态自动刷新：视图挂载期间每 10s 轮询（对标 Codex 任务实时状态）。
+  // 守卫：in-flight 去重（轮询重叠时跳过）+ 页面不可见时不轮询（document.visibilityState）。
+  let polling = false
   createEffect(() => {
     const timer = setInterval(() => {
-      void loadSessions()
+      if (polling || document.visibilityState === 'hidden') return
+      polling = true
       const id = active()?.id
-      if (id) void loadDetail(id)
+      Promise.all([
+        loadSessions(),
+        id ? loadDetail(id) : Promise.resolve(),
+      ]).finally(() => {
+        polling = false
+      })
     }, 10000)
     return () => clearInterval(timer)
   })
@@ -281,16 +308,23 @@ export function CoworkView() {
                   行动
                 </div>
                 <div class="cw-tlist">
-                  <For each={actions()} fallback={<div class="cw-empty">暂无行动</div>}>
-                    {(act) => (
-                      <div class="cw-task">
-                        <span class={clsx('dot', act.status === 'completed' && 'done', (act.status === 'failed' || act.status === 'error') && 'fail')} />
-                        <span class="tname">{act.action_type}</span>
-                        <span class="tpath">{act.target_path}</span>
-                        <span class="tstat">{statusLabel(act.status)}</span>
-                      </div>
-                    )}
-                  </For>
+                  <Show when={detailLoading()} fallback={
+                    <For each={actions()} fallback={<div class="cw-empty">暂无行动</div>}>
+                      {(act) => (
+                        <div class="cw-task">
+                          <span class={clsx('dot', act.status === 'completed' && 'done', (act.status === 'failed' || act.status === 'error') && 'fail')} />
+                          <span class="tname">{act.action_type}</span>
+                          <span class="tpath">{act.target_path}</span>
+                          <span class="tstat">{statusLabel(act.status)}</span>
+                        </div>
+                      )}
+                    </For>
+                  }>
+                    <div class="cw-empty flex items-center justify-center gap-2">
+                      <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                      加载中…
+                    </div>
+                  </Show>
                 </div>
 
                 <div class="cw-section-title">
@@ -301,18 +335,25 @@ export function CoworkView() {
                   交付物
                 </div>
                 <div class="cw-deliverables">
-                  <For each={deliverables()} fallback={<div class="cw-empty">暂无交付物</div>}>
-                    {(d) => (
-                      <div class="cw-deliverable">
-                        <span class="dname">{d.name}</span>
-                        <span class="dkind">{d.kind}</span>
-                        <span class="dpath">{d.path}</span>
-                        <Show when={d.quality_score != null}>
-                          <span class="dscore">{d.quality_score}/100</span>
-                        </Show>
-                      </div>
-                    )}
-                  </For>
+                  <Show when={detailLoading()} fallback={
+                    <For each={deliverables()} fallback={<div class="cw-empty">暂无交付物</div>}>
+                      {(d) => (
+                        <div class="cw-deliverable">
+                          <span class="dname">{d.name}</span>
+                          <span class="dkind">{d.kind}</span>
+                          <span class="dpath">{d.path}</span>
+                          <Show when={d.quality_score != null}>
+                            <span class="dscore">{d.quality_score}/100</span>
+                          </Show>
+                        </div>
+                      )}
+                    </For>
+                  }>
+                    <div class="cw-empty flex items-center justify-center gap-2">
+                      <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                      加载中…
+                    </div>
+                  </Show>
                 </div>
               </div>
             )}

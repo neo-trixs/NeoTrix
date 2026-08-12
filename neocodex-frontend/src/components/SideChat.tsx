@@ -1,4 +1,4 @@
-import { createSignal, onMount, createEffect, Show, For } from 'solid-js'
+import { createSignal, createEffect, Show, For } from 'solid-js'
 import { MessageSquare, X, Send, Loader2, RefreshCw } from 'lucide-solid'
 import { neocodex } from '../api'
 import type { NeoCodexMessageItem } from '../api/types'
@@ -15,23 +15,41 @@ export function SideChat(props: Props) {
   const [messages, setMessages] = createSignal<NeoCodexMessageItem[]>([])
   const [input, setInput] = createSignal('')
   const [sending, setSending] = createSignal(false)
+  const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
   const [bodyRef, setBodyRef] = createSignal<HTMLDivElement | null>(null)
   let inputRef: HTMLTextAreaElement | undefined
+  let panelRef: HTMLDivElement | undefined
+  // 打开面板前的触发元素，关闭后还原焦点
+  let lastFocusedEl: HTMLElement | null = null
 
-  // 面板打开时聚焦输入框（对标 Codex 面板聚焦规范）
+  // 面板打开时聚焦输入框（对标 Codex 面板聚焦规范），并记录触发元素；
+  // 关闭时（Esc/关闭按钮/遮罩点击触发卸载）经 effect 清理还原焦点
   createEffect(() => {
-    if (props.open && inputRef) inputRef.focus()
+    if (!props.open) return
+    lastFocusedEl = document.activeElement as HTMLElement | null
+    const raf = requestAnimationFrame(() => {
+      if (inputRef) inputRef.focus()
+      else panelRef?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
+    }
   })
 
   const load = async () => {
     if (!props.sessionId) return
+    setLoading(true)
+    setError(null)
     try {
       const msgs = await neocodex.getSideChat(props.sessionId)
       setMessages(msgs)
       scrollToBottom()
     } catch (e) {
       setError(String(e))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -40,9 +58,9 @@ export function SideChat(props: Props) {
     if (el) el.scrollTop = el.scrollHeight
   }
 
-  onMount(load)
-
-  // 会话切换时重新加载（面板打开状态 + sessionId 变化）
+  // 会话切换时重新加载（面板打开状态 + sessionId 变化）。
+  // 组件在面板打开时挂载（见 Chat.tsx Show when=activePanel），createEffect 首轮即覆盖
+  // 打开加载，故不再单独 onMount(load)，避免同一 sessionId 触发两次请求。
   createEffect(() => {
     if (props.open && props.sessionId) {
       load()
@@ -73,7 +91,37 @@ export function SideChat(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class="panel w-[24rem]">
+      <div
+        ref={panelRef}
+        class="panel w-[24rem]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="侧聊"
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            props.onClose()
+            return
+          }
+          if (e.key === 'Tab' && panelRef) {
+            const focusables = panelRef.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+            if (focusables.length === 0) return
+            const first = focusables[0]
+            const last = focusables[focusables.length - 1]
+            const active = document.activeElement
+            if (e.shiftKey && (active === first || active === panelRef)) {
+              e.preventDefault()
+              last.focus()
+            } else if (!e.shiftKey && active === last) {
+              e.preventDefault()
+              first.focus()
+            }
+          }
+        }}
+      >
         {/* Header */}
         <div class="panel-head">
           <MessageSquare class="panel-head-icon text-nt-mind-600" />
@@ -85,7 +133,7 @@ export function SideChat(props: Props) {
             aria-label="刷新"
             title="刷新"
           >
-            <RefreshCw class="w-4 h-4" />
+            <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>
           <button
             class="panel-close"
@@ -97,7 +145,7 @@ export function SideChat(props: Props) {
         </div>
 
         {/* Messages */}
-        <div ref={setBodyRef} class="flex-1 overflow-y-auto p-3 space-y-3">
+        <div ref={setBodyRef} class="flex-1 overflow-y-auto p-3 space-y-3" aria-live="polite">
           <Show when={messages().length === 0 && !error()}>
             <div class="py-10 text-center text-xs text-text-muted">
               侧向对话与主上下文隔离，适合提问、澄清、探索而不污染主线程
@@ -129,6 +177,15 @@ export function SideChat(props: Props) {
               </div>
             )}
           </For>
+          {/* 发送中占位：请求未返回时显示「思考中…」气泡，避免无任何进行中反馈 */}
+          <Show when={sending()}>
+            <div class="flex justify-start" role="status">
+              <div class="max-w-[85%] px-3 py-2 rounded-2xl text-sm bg-bg-tertiary text-text-muted rounded-bl-sm flex items-center gap-2">
+                <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                思考中…
+              </div>
+            </div>
+          </Show>
         </div>
 
         {/* Input */}
@@ -139,6 +196,8 @@ export function SideChat(props: Props) {
               value={input()}
               onInput={(e) => setInput(e.currentTarget.value)}
               onKeyDown={(e) => {
+                // 中文 IME 组合态（候选词上屏）按 Enter 不发送，避免半截拼音误发
+                if (e.isComposing || e.keyCode === 229) return
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   send()

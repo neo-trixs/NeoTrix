@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, For, Show } from 'solid-js'
+import { createSignal, createEffect, onMount, onCleanup, For, Show } from 'solid-js'
 import { ChevronDown, Loader2, Check, AlertCircle } from 'lucide-solid'
 import { clsx } from 'clsx'
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
@@ -79,6 +79,24 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
     return cfg.providers.find(p => p.model === cfg.active_model) || cfg.providers[0] || null
   }
 
+  // 下拉面板 ref：焦点管理 / 方向键导航均限定在本面板内（避免多 listbox 全局串扰）
+  let panelRef: HTMLDivElement | undefined
+
+  // 打开后焦点移入列表并高亮当前项（对标 Codex 下拉规范）：优先聚焦当前激活项，
+  // 激活项 disabled（不可再选）时回退到首个可用项
+  createEffect(() => {
+    if (!isOpen() || loading()) return
+    requestAnimationFrame(() => {
+      const opts = Array.from(panelRef?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])
+      if (opts.length === 0) return
+      const active = opts.find(o => o.getAttribute('aria-selected') === 'true')
+      const target = active && !active.hasAttribute('disabled')
+        ? active
+        : opts.find(o => !o.hasAttribute('disabled'))
+      target?.focus()
+    })
+  })
+
   return (
     <div class="relative">
       {/* Trigger Button — iconOnly 极简圆形图标 / 完整模式 */}
@@ -135,7 +153,7 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
 
       {/* Dropdown Panel */}
       <Show when={isOpen()}>
-        <div class="absolute top-full left-0 right-0 mt-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[240px] max-w-[340px]">
+        <div ref={panelRef} class="absolute top-full left-0 right-0 mt-2 glass-pop border border-white/50 rounded-xl shadow-xl overflow-hidden z-50 animate-in min-w-[240px] max-w-[340px]">
           {/* Header */}
           <div class="px-3 py-2 border-b border-white/40 flex items-center justify-between">
             <span class="text-sm font-medium text-text-primary">模型提供商</span>
@@ -164,9 +182,9 @@ export function ProviderSelector(props: { iconOnly?: boolean }) {
                       const dir = e.key === 'ArrowDown' ? 1 : -1
                       const list = config()?.providers || []
                       if (list.length === 0) return
-                      // roving tabindex：聚焦下一选项
+                      // roving tabindex：聚焦下一选项（限定本面板内）
                       requestAnimationFrame(() => {
-                        const opts = Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]'))
+                        const opts = Array.from(panelRef?.querySelectorAll<HTMLElement>('[role="option"]') ?? [])
                         opts[(i() + dir + list.length) % list.length]?.focus?.()
                       })
                     }}

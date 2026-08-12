@@ -217,6 +217,8 @@ export interface ScreenCapture {
   height: number
   format: string
   timestamp: number
+  /** 内存内联截图（base64 PNG，无临时文件）；仅截图命令内联返回时存在 */
+  data_base64?: string
 }
 
 export interface WindowInfo {
@@ -262,4 +264,18 @@ export interface VoiceTranscript {
 export interface GitStatus {
   branch: string
   dirty: boolean
+}
+
+/* ── MCP ── */
+export interface McpServerInfo {
+  name: string
+  transport: string
+  tool_count: number
+  healthy: boolean
+}
+
+export interface McpToolInfo {
+  name: string
+  description: string
+  server: string
 }

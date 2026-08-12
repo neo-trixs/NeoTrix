@@ -53,6 +53,9 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
 
+/** 新会话默认标题（首条用户消息前占位；自动命名后替换，对标 Claude） */
+const DEFAULT_SESSION_TITLE = '新对话'
+
 /** 从会话 wire_path 提取项目名（取路径中项目目录段；含 neotrix 仓库关键词时取上一级） */
 function projectFromPath(wirePath: string): string | undefined {
   if (!wirePath) return undefined
@@ -164,7 +167,7 @@ function createChatStore() {
     }
   }
 
-  const addSession = async (title = '新对话'): Promise<string> => {
+  const addSession = async (title = DEFAULT_SESSION_TITLE): Promise<string> => {
     try {
       const backendSession = await neocodex.createSession(title)
       
@@ -222,6 +225,53 @@ function createChatStore() {
     tagsStore.clearSessionTags(id)
   }
 
+  /** 归档会话（对标 Claude Code Archive）：后端移入 archived/ 并从活跃列表移除 */
+  const archiveSession = async (id: string): Promise<void> => {
+    try {
+      await neocodex.archiveSession(id)
+    } catch (error) {
+      console.error('[chatStore] Failed to archive session:', error)
+      return
+    }
+    setState('sessions', produce(s => {
+      const idx = s.findIndex(sess => sess.id === id)
+      if (idx !== -1) s.splice(idx, 1)
+    }))
+    // 当前会话被归档时切到相邻会话（回退需加载消息，否则消息区为空）
+    if (state.currentSessionId === id) {
+      const nextId = state.sessions[0]?.id || null
+      setState('currentSessionId', nextId)
+      if (nextId) {
+        await loadSessionMessages(nextId)
+      }
+    }
+  }
+
+  /** 恢复归档会话：后端移回活跃列表，重新拉取列表并切入该会话 */
+  const restoreSession = async (id: string): Promise<void> => {
+    try {
+      await neocodex.restoreSession(id)
+    } catch (error) {
+      console.error('[chatStore] Failed to restore session:', error)
+      return
+    }
+    // 重新拉取活跃列表（含恢复的会话）
+    await loadSessions()
+    if (state.sessions.some(sess => sess.id === id)) {
+      await switchSession(id)
+    }
+  }
+
+  /** 列出归档会话（只读查询；渲染层拉取，失败返回空列表） */
+  const listArchived = async (): Promise<NeoCodexSessionInfo[]> => {
+    try {
+      return await neocodex.listArchived()
+    } catch (error) {
+      console.error('[chatStore] Failed to list archived sessions:', error)
+      return []
+    }
+  }
+
   const switchSession = async (id: string): Promise<void> => {
     if (state.currentSessionId === id) return
 
@@ -267,13 +317,31 @@ function createChatStore() {
       id: generateId(),
       timestamp: new Date(),
     }
+    let autoTitle: string | null = null
     setState('sessions', produce(s => {
       const sess = s.find(sess => sess.id === state.currentSessionId)
       if (sess) {
+        // 自动命名（对标 Claude）：标题仍为默认占位（「新对话」/空）且收到首条
+        // 用户消息时，用首条消息前 24 字命名（超出加 …）。未发消息前保持空态占位。
+        const isDefaultTitle = sess.title === DEFAULT_SESSION_TITLE || sess.title.trim() === ''
+        const hasUserMsg = sess.messages.some(m => m.role === 'user')
+        if (message.role === 'user' && isDefaultTitle && !hasUserMsg) {
+          const trimmed = message.content.trim()
+          if (trimmed) {
+            autoTitle = trimmed.length > 24 ? `${trimmed.slice(0, 24)}…` : trimmed
+            sess.title = autoTitle
+          }
+        }
         sess.messages.push(msg)
         sess.updatedAt = new Date()
       }
     }))
+    // 自动命名异步持久化到后端（失败不阻断发送）
+    if (autoTitle !== null && state.currentSessionId) {
+      neocodex.renameSession(state.currentSessionId, autoTitle).catch((error) => {
+        console.error('[chatStore] Failed to persist auto-title:', error)
+      })
+    }
     return msg.id
   }
 
@@ -288,6 +356,23 @@ function createChatStore() {
         }
       }
     }))
+  }
+
+  /** 结束流式消息：保留内容，仅清除 streaming 标记（停止/取消兜底路径，供 Chat 本地复位） */
+  const finishMessage = (id: string): void => {
+    setState('sessions', produce(s => {
+      const sess = s.find(sess => sess.id === state.currentSessionId)
+      if (sess) {
+        const msg = sess.messages.find(m => m.id === id)
+        if (msg) msg.isStreaming = false
+      }
+    }))
+  }
+
+  const messageContent = (id: string): string | null => {
+    const sess = currentSession()
+    if (!sess) return null
+    return sess.messages.find(m => m.id === id)?.content ?? null
   }
 
   const appendMessageContent = (id: string, delta: string): void => {
@@ -350,16 +435,23 @@ function createChatStore() {
     setState('abortController', null)
   }
 
-  const regenerateLast = (): string => {
+  /** 按目标消息定位重生成轮：截断被点 assistant 消息及之后全部消息，返回其所在轮的 user 内容 */
+  const regenerateFrom = (messageId: string): string => {
     const messages = currentMessages()
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-    const lastAssistantMsg = [...messages].reverse().find(m => m.role === 'assistant')
-    
-    if (lastAssistantMsg) {
-      deleteMessage(lastAssistantMsg.id)
+    const idx = messages.findIndex(m => m.id === messageId)
+    if (idx === -1 || messages[idx]?.role !== 'assistant') return ''
+    // 定位被点消息所在轮：其之前最近的一条用户消息
+    let userIdx = -1
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') { userIdx = i; break }
     }
-    
-    return lastUserMsg?.content || ''
+    if (userIdx === -1) return ''
+    // 截断该条助手消息及之后全部消息（该轮重生成，后续消息一并移除）
+    setState('sessions', produce(s => {
+      const sess = s.find(sess => sess.id === state.currentSessionId)
+      if (sess) sess.messages = sess.messages.slice(0, idx)
+    }))
+    return messages[userIdx].content
   }
 
   const editAndResend = (messageId: string, newContent: string): boolean => {
@@ -467,17 +559,22 @@ function createChatStore() {
     loadSessionMessages,
     addSession,
     deleteSession,
+    archiveSession,
+    restoreSession,
+    listArchived,
     switchSession,
     updateSessionTitle,
     addMessage,
     updateMessage,
+    finishMessage,
     appendMessageContent,
+    messageContent,
     appendToolCall,
     deleteMessage,
     clearMessages,
     setGenerating,
     abortGeneration,
-    regenerateLast,
+    regenerateFrom,
     editAndResend,
     createCheckpoint,
     rewindToCheckpoint,

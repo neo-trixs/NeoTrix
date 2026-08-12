@@ -9,7 +9,7 @@ import { tagsStore, normalizeTagName, TAG_PALETTE, RECOMMENDED_TAGS, tagDepth } 
 import { ProviderIcon, CategoryBadge, FreeBadge } from './ProviderIcon'
 import { memory, neocodex } from '../api'
 import { listenUpdateEvents } from '../api/system'
-import type { MemoryStats, ProviderConfig, ProviderMeta } from '../api/types'
+import type { MemoryStats, ProviderConfig, ProviderMeta, McpServerInfo, McpToolInfo } from '../api/types'
 
 /* ════════════════════════════════════════════
    SettingsModal — 统一设置面板（设计 v3）
@@ -159,6 +159,15 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   const [keyBusy, setKeyBusy] = createSignal(false)
   // 标签快速新建
   const [newTagInput, setNewTagInput] = createSignal('')
+  // MCP 服务器管理（stdio 注册，会话内生效；对标 Claude Desktop MCP 配置）
+  const [mcpServers, setMcpServers] = createSignal<McpServerInfo[]>([])
+  const [mcpToolList, setMcpToolList] = createSignal<McpToolInfo[]>([])
+  const [mcpLoading, setMcpLoading] = createSignal(false)
+  const [mcpBusy, setMcpBusy] = createSignal(false)
+  const [showMcpTools, setShowMcpTools] = createSignal(false)
+  const [mcpName, setMcpName] = createSignal('')
+  const [mcpCommand, setMcpCommand] = createSignal('')
+  const [mcpArgs, setMcpArgs] = createSignal('')
   // 统一确认模态：破坏性操作（清空记忆 / 删除密钥 / 删除标签）
   const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
   const [pendingDeleteTag, setPendingDeleteTag] = createSignal<string | null>(null)
@@ -173,7 +182,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   // 自动消失的通知：成功/错误提示 8s 后自动清除（对标 toast 规范）
   let noticeTimer: ReturnType<typeof setTimeout> | null = null
   const showNotice = (msg: string) => {
-    showNotice(msg)
+    setNotice(msg)
     if (noticeTimer) clearTimeout(noticeTimer)
     noticeTimer = setTimeout(() => setNotice(null), 8000)
   }
@@ -349,6 +358,44 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     } catch { /* 非关键 */ }
   }
 
+  const loadMcp = async () => {
+    setMcpLoading(true)
+    try {
+      const [servers, tools] = await Promise.all([neocodex.mcpList(), neocodex.mcpTools()])
+      setMcpServers(servers)
+      setMcpToolList(tools)
+    } catch (e) {
+      showNotice(String(e))
+    } finally {
+      setMcpLoading(false)
+    }
+  }
+
+  const registerMcp = async () => {
+    const name = mcpName().trim()
+    const command = mcpCommand().trim()
+    if (!name || !command) {
+      showNotice('服务器名称与启动命令不能为空')
+      return
+    }
+    const args = mcpArgs().split(',').map(s => s.trim()).filter(Boolean)
+    setMcpBusy(true)
+    setNotice(null)
+    try {
+      const servers = await neocodex.mcpRegister(name, command, args)
+      setMcpServers(servers)
+      setMcpName('')
+      setMcpCommand('')
+      setMcpArgs('')
+      showNotice(`已注册 MCP 服务器 ${name}`)
+      void loadMcp()
+    } catch (e) {
+      showNotice(String(e))
+    } finally {
+      setMcpBusy(false)
+    }
+  }
+
   const saveApiKey = async () => {
     const key = apiKey().trim()
     if (!key) return
@@ -400,6 +447,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
       loadMemStats()
       loadAppVersion()
       loadApiKeyStatus()
+      loadMcp()
     } else {
       // 关闭时释放更新事件订阅（避免重复监听）
       if (unlistenUpdate) {
@@ -469,16 +517,55 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
   }
 
   const [navRef, setNavRef] = createSignal<HTMLElement | null>(null)
+  const [dialogEl, setDialogEl] = createSignal<HTMLDivElement | null>(null)
+  // 打开前触发元素：关闭后还原焦点（对标 Claude/Cursor 弹窗规范）
+  let restoreFocusEl: HTMLElement | null = null
 
-  // 弹窗键盘：Esc 关闭 + 打开聚焦（对标 Claude/Cursor 弹窗规范）
+  // 弹窗键盘：Esc 关闭 + 打开聚焦 + Tab 焦点循环 + 关闭还原焦点
   createEffect(() => {
     if (!props.open) return
+    restoreFocusEl = document.activeElement as HTMLElement | null
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') props.onClose()
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        // 确认框优先：确认框打开时 Esc 仅关闭确认框，不关整个设置弹窗
+        if (modalReq()) {
+          closeModal()
+          return
+        }
+        props.onClose()
+        return
+      }
+      // 确认框打开时不劫持 Tab（焦点循环由 ConfirmModal 自管理，避免双陷阱冲突）
+      if (e.key !== 'Tab' || modalReq()) return
+      const root = dialogEl()
+      if (!root) return
+      const focusables = root.querySelectorAll<HTMLElement>('button, input, [href], [tabindex]:not([tabindex="-1"])')
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      // 焦点在弹窗外（背景/body）：Tab 拉回弹窗内
+      if (!active || !root.contains(active)) {
+        e.preventDefault()
+        if (e.shiftKey) last.focus()
+        else first.focus()
+        return
+      }
+      if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     navRef()?.querySelector<HTMLButtonElement>('button')?.focus()
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      if (restoreFocusEl?.isConnected) restoreFocusEl.focus()
+    }
   })
 
   return (
@@ -488,6 +575,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
         onClick={props.onClose}
       >
         <div
+          ref={setDialogEl}
           class="w-[780px] max-w-[94vw] h-[620px] max-h-[88vh] rounded-2xl glass-modal border border-white/40 overflow-hidden flex animate-slide-in"
           onClick={(e) => e.stopPropagation()}
           role="dialog"
@@ -496,15 +584,16 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
         >
           {/* ── 左侧分组导航（对标 osaurus ManagementView） ── */}
           <nav ref={setNavRef} class="w-[190px] flex-shrink-0 border-r border-white/30 bg-white/10 py-4 px-2 flex flex-col gap-1 overflow-y-auto" role="tablist" aria-label="设置分类">
-            <div class="px-3 pb-3">
+            {/* tablist 仅允许 tab / presentation 子节点：非 tab 结构用 presentation 去掉 tab 语义 */}
+            <div class="px-3 pb-3" role="presentation">
                 <div class="flex items-center gap-2">
                   <TrafficLights />
                 </div>
               </div>
             <For each={NAV_GROUPS}>
               {(group) => (
-                <div class="mb-2">
-                  <div class="px-3 pb-2 pt-2 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium">
+                <div class="mb-2" role="presentation">
+                  <div class="px-3 pb-2 pt-2 text-[10px] uppercase tracking-[0.14em] text-text-muted/70 font-medium" role="presentation">
                     {group.title}
                   </div>
                   <For each={group.ids}>
@@ -520,7 +609,9 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                               : 'text-text-secondary hover:text-text-primary hover:bg-white/40'
                           )}
                           role="tab"
+                          id={`settings-tab-${id}`}
                           aria-selected={isActive}
+                          aria-controls="settings-tabpanel"
                           tabIndex={isActive ? 0 : -1}
                           onClick={() => setSection(id)}
                           onKeyDown={(e) => {
@@ -582,7 +673,7 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
               </button>
             </header>
 
-            <div class="flex-1 overflow-y-auto px-6 py-5">
+            <div class="flex-1 overflow-y-auto px-6 py-5" role="tabpanel" id="settings-tabpanel" aria-labelledby={`settings-tab-${section()}`}>
               {/* ── 通用：模型提供商（统一 v3，对标 Claude Desktop 分类） ── */}
               <Show when={section() === 'general'}>
                 <Show when={loading() && !config()}>
@@ -723,6 +814,109 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                                 删除
                               </button>
                             </Show>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* MCP 服务器（stdio 注册；对标 Claude Desktop MCP 配置） */}
+                      <div class="ss-card">
+                        <div class="ss-card-header">
+                          <DataIcon />
+                          MCP 服务器
+                          <span class="ml-auto text-[10px] text-text-muted font-mono">{mcpServers().length} 个</span>
+                        </div>
+                        <div class="ss-card-body space-y-3">
+                          <p class="text-[11px] text-text-muted leading-relaxed -mt-1">
+                            注册本地 stdio MCP 服务器，为代理附加外部工具（如文件系统 / 数据库 / 浏览器）。
+                            当前会话内生效，重启后重新注册。
+                          </p>
+
+                          {/* 服务器列表 */}
+                          <Show when={mcpLoading() && mcpServers().length === 0}>
+                            <div class="text-xs text-text-muted py-2 text-center">加载 MCP 服务器…</div>
+                          </Show>
+                          <Show when={!mcpLoading() && mcpServers().length === 0}>
+                            <div class="text-[11px] text-text-muted py-3 text-center border border-dashed border-border-primary/60 rounded-lg">
+                              暂无 MCP 服务器，填写下方表单注册
+                            </div>
+                          </Show>
+                          <div class="space-y-1.5">
+                            <For each={mcpServers()}>
+                              {(srv) => (
+                                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-border-primary/40 bg-white/40">
+                                  <span class={clsx('w-2 h-2 rounded-full flex-shrink-0', srv.healthy ? 'bg-emerald-500' : 'bg-red-500')} />
+                                  <span class="text-[12px] text-text-primary font-medium truncate flex-1">{srv.name}</span>
+                                  <span class="text-[10px] text-text-muted font-mono flex-shrink-0">{srv.transport}</span>
+                                  <span class="text-[10px] text-text-muted font-mono flex-shrink-0">{srv.tool_count} 工具</span>
+                                  <span class={clsx('text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0', srv.healthy ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500')}>
+                                    {srv.healthy ? '健康' : '异常'}
+                                  </span>
+                                </div>
+                              )}
+                            </For>
+                          </div>
+
+                          {/* 工具一览（可折叠） */}
+                          <Show when={mcpToolList().length > 0}>
+                            <button
+                              class="flex items-center gap-1 text-[11px] text-nt-io-600 hover:text-nt-io-700"
+                              onClick={() => setShowMcpTools(!showMcpTools())}
+                              aria-expanded={showMcpTools()}
+                            >
+                              {showMcpTools() ? '▾' : '▸'} 查看工具（{mcpToolList().length}）
+                            </button>
+                            <Show when={showMcpTools()}>
+                              <div class="space-y-1 max-h-40 overflow-y-auto">
+                                <For each={mcpToolList()}>
+                                  {(tool) => (
+                                    <div class="px-2 py-1 rounded bg-bg-primary/40 text-[11px] font-mono break-all">
+                                      <span class="text-nt-io-600">{tool.server}.</span>
+                                      <span class="text-text-primary">{tool.name}</span>
+                                      <span class="text-text-muted"> — {tool.description}</span>
+                                    </div>
+                                  )}
+                                </For>
+                              </div>
+                            </Show>
+                          </Show>
+
+                          {/* 添加表单 */}
+                          <div class="border-t border-border-primary/40 pt-3 space-y-2">
+                            <div class="grid grid-cols-[1fr_1fr] gap-2">
+                              <input
+                                class="px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                                placeholder="服务器名称（如 filesystem）"
+                                value={mcpName()}
+                                onInput={(e) => setMcpName(e.currentTarget.value)}
+                                aria-label="MCP 服务器名称"
+                              />
+                              <input
+                                class="px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500"
+                                placeholder="启动命令（如 npx）"
+                                value={mcpCommand()}
+                                onInput={(e) => setMcpCommand(e.currentTarget.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') registerMcp() }}
+                                aria-label="MCP 启动命令"
+                              />
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <input
+                                class="flex-1 min-w-0 px-3 py-2 rounded-lg bg-white/70 border border-border-primary text-[12.5px] text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-1 focus:ring-nt-io-500 font-mono"
+                                placeholder="参数（逗号分隔，如 @modelcontextprotocol/server-filesystem, /tmp）"
+                                value={mcpArgs()}
+                                onInput={(e) => setMcpArgs(e.currentTarget.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') registerMcp() }}
+                                aria-label="MCP 启动参数"
+                              />
+                              <button
+                                class="px-3 py-2 rounded-lg bg-nt-io-500 text-text-primary text-[12px] font-medium hover:bg-nt-io-600 disabled:opacity-50 transition-colors flex-shrink-0"
+                                onClick={registerMcp}
+                                disabled={mcpBusy()}
+                                aria-label="注册 MCP 服务器"
+                              >
+                                {mcpBusy() ? '注册中…' : '注册'}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -963,7 +1157,12 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                                 color={color}
                                 count={tagsStore.tagCounts()[name] ?? 0}
                                 onColorChange={(c) => tagsStore.setTagColor(name, c)}
-                                onRename={(next) => tagsStore.renameTag(name, next)}
+                                onRename={(next) => {
+                                  // renameTag 重名冲突返回错误串（不覆盖不合并），冲突时提示用户
+                                  const err = tagsStore.renameTag(name, next)
+                                  if (err) showNotice(err)
+                                  else showNotice(`已重命名标签 #${next}`)
+                                }}
                                 onDelete={() => {
                                   // 删除标签全局生效，需确认（对标 Obsidian 标签管理）
                                   setPendingDeleteTag(name)

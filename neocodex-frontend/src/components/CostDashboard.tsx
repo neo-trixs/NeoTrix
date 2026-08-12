@@ -13,11 +13,40 @@ export function CostDashboard(props: Props) {
   const [status, setStatus] = createSignal<AgentStatus | null>(null)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
+  // 轮询连续失败提示（静默吞错修复：失败达阈值时给轻量提示）
+  const [pollError, setPollError] = createSignal<string | null>(null)
+  let pollFailures = 0
   let firstBtnRef: HTMLButtonElement | undefined
+  let panelRef: HTMLDivElement | undefined
+  // 打开面板前的触发元素，关闭后还原焦点
+  let lastFocusedEl: HTMLElement | null = null
 
-  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范），并记录触发元素；
+  // 关闭时（Esc/关闭按钮/遮罩点击触发卸载）经 effect 清理还原焦点
   createEffect(() => {
-    if (props.open && firstBtnRef) firstBtnRef.focus()
+    if (!props.open) return
+    lastFocusedEl = document.activeElement as HTMLElement | null
+    const raf = requestAnimationFrame(() => {
+      if (firstBtnRef) firstBtnRef.focus()
+      else panelRef?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
+    }
+  })
+
+  // Esc 关闭（参照 SettingsModal 浮层关闭模式：window keydown + 打开时挂载；
+  // 焦点在面板内时由容器 onKeyDown 兜底处理）
+  createEffect(() => {
+    if (!props.open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      props.onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   })
 
   const load = async () => {
@@ -35,15 +64,22 @@ export function CostDashboard(props: Props) {
 
   onMount(load)
 
-  // 成本看板自动刷新：面板打开期间每 5s 轮询（对标 Claude usage 实时面板）
+  // 成本看板自动刷新：面板打开期间每 5s 轮询（对标 Claude usage 实时面板）。
+  // 连续失败不再静默：达 2 次时显示轻量提示；单次失败不影响已有数据。
   createEffect(() => {
     if (!props.open) return
     const timer = setInterval(() => {
-      // 静默刷新：不触发全屏 loading（已有数据时）
       neocodex
         .agentStatus()
-        .then(setStatus)
-        .catch(() => {})
+        .then((s) => {
+          pollFailures = 0
+          setPollError(null)
+          setStatus(s)
+        })
+        .catch(() => {
+          pollFailures += 1
+          if (pollFailures >= 2) setPollError('自动刷新失败，数据可能已过期')
+        })
     }, 5000)
     return () => clearInterval(timer)
   })
@@ -54,7 +90,12 @@ export function CostDashboard(props: Props) {
     return String(n)
   }
 
-  const formatCost = (n: number) => `$${n.toFixed(4)}`
+  const formatCost = (n: number) => {
+    if (n === 0) return '$0'
+    // 极小金额固定 4 位小数会退化为 $0.0000：改用科学计数保留有效信息
+    if (n < 0.0001) return `$${n.toExponential(2)}`
+    return `$${n.toFixed(4)}`
+  }
 
   const budgetPct = () => {
     const s = status()
@@ -90,7 +131,37 @@ export function CostDashboard(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class="panel w-[26rem]">
+      <div
+        ref={panelRef}
+        class="panel w-[26rem]"
+        role="dialog"
+        aria-label="成本 / Token 看板"
+        aria-modal="true"
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            props.onClose()
+            return
+          }
+          if (e.key === 'Tab' && panelRef) {
+            const focusables = panelRef.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+            if (focusables.length === 0) return
+            const first = focusables[0]
+            const last = focusables[focusables.length - 1]
+            const active = document.activeElement
+            if (e.shiftKey && (active === first || active === panelRef)) {
+              e.preventDefault()
+              last.focus()
+            } else if (!e.shiftKey && active === last) {
+              e.preventDefault()
+              first.focus()
+            }
+          }
+        }}
+      >
         {/* Header */}
         <div class="panel-head">
           <Coins class="panel-head-icon text-nt-memory-600" />
@@ -125,6 +196,9 @@ export function CostDashboard(props: Props) {
           </Show>
           <Show when={error()}>
             <div class="p-3 text-xs text-red-500 bg-red-500/10 rounded-lg">{error()}</div>
+          </Show>
+          <Show when={pollError()}>
+            <div class="p-2 text-xs text-amber-600 bg-amber-500/10 rounded-lg" role="status">{pollError()}</div>
           </Show>
           <Show when={!loading() && !status() && !error()}>
             <div class="py-10 text-center text-xs text-text-muted">暂无成本数据</div>

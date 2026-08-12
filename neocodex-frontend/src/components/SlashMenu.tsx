@@ -22,6 +22,8 @@ interface Props {
   commands: SlashCommandDef[]
   selectedIdx: number
   onSelect: (cmd: SlashCommandDef) => void
+  /** 悬停同步选中索引到父级（键盘/鼠标选择态一致；父级不实现则悬停无高亮跟随） */
+  onHover?: (idx: number) => void
 }
 
 export function SlashMenu(props: Props) {
@@ -43,7 +45,7 @@ export function SlashMenu(props: Props) {
               aria-selected={i() === props.selectedIdx}
               class={clsx('slash-item', i() === props.selectedIdx && 'on')}
               onClick={() => props.onSelect(cmd)}
-              onMouseEnter={() => i() /* 悬停由父级同步索引（可选） */}
+              onMouseEnter={() => props.onHover?.(i())}
             >
               <span class="slash-kbd">/</span>
               <span class="slash-label">{cmd.label}</span>

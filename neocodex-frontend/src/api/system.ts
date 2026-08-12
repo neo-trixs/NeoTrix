@@ -32,7 +32,7 @@ export function readFile(path: string): Promise<string> {
 /* ── 语音 ── */
 export function voiceGetTranscription(audioData: string, language?: string, model?: string): Promise<VoiceTranscript> {
   return call('voice_get_transcription', {
-    audioData,
+    audio_data: audioData,
     language: language ?? null,
     model: model ?? null,
   })

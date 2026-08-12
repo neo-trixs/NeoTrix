@@ -30,11 +30,42 @@ export function ScheduledTasks(props: Props) {
   const [name, setName] = createSignal('')
   const [prompt, setPrompt] = createSignal('')
   const [schedule, setSchedule] = createSignal(SCHEDULE_PRESETS[0].value)
+  // RRULE 自由输入校验：非法规则给友好错误，不裸 throw
+  const [scheduleError, setScheduleError] = createSignal<string | null>(null)
   let firstBtnRef: HTMLButtonElement | undefined
+  let panelRef: HTMLDivElement | undefined
+  // 打开面板前的触发元素，关闭后还原焦点
+  let lastFocusedEl: HTMLElement | null = null
 
-  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
+  // 轻量 RRULE 校验（仅防呆，不做完整 RFC 5545 解析）
+  const validateRRule = (rrule: string): string | null => {
+    const s = rrule.trim().toUpperCase()
+    if (!s) return '调度规则不能为空'
+    const freq = /(?:^|;)FREQ=([A-Z0-9]+)/.exec(s)?.[1]
+    if (!freq) return '调度规则需包含 FREQ=（如 FREQ=DAILY;INTERVAL=1）'
+    const allowed = ['SECONDLY', 'MINUTELY', 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']
+    if (!allowed.includes(freq)) return `不支持的 FREQ=${freq}（支持 ${allowed.join('/')}）`
+    return null
+  }
+
+  // 自由输入实时校验
   createEffect(() => {
-    if (props.open && firstBtnRef) firstBtnRef.focus()
+    setScheduleError(validateRRule(schedule()))
+  })
+
+  // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范），并记录触发元素；
+  // 关闭时（Esc/关闭按钮/遮罩点击触发卸载）经 effect 清理还原焦点
+  createEffect(() => {
+    if (!props.open) return
+    lastFocusedEl = document.activeElement as HTMLElement | null
+    const raf = requestAnimationFrame(() => {
+      if (firstBtnRef) firstBtnRef.focus()
+      else panelRef?.focus()
+    })
+    return () => {
+      cancelAnimationFrame(raf)
+      if (lastFocusedEl?.isConnected) lastFocusedEl.focus()
+    }
   })
 
   const load = async () => {
@@ -52,9 +83,31 @@ export function ScheduledTasks(props: Props) {
 
   onMount(load)
 
+  // 任务状态实时刷新：面板打开期间每 10s 轮询。
+  // 守卫：in-flight 去重 + 页面不可见时不轮询。
+  let polling = false
+  createEffect(() => {
+    if (!props.open) return
+    const timer = setInterval(async () => {
+      if (polling || document.visibilityState === 'hidden') return
+      polling = true
+      try {
+        await load()
+      } finally {
+        polling = false
+      }
+    }, 10000)
+    return () => clearInterval(timer)
+  })
+
   const create = async () => {
     if (!name().trim() || !prompt().trim()) {
       setError('任务名和提示词不能为空')
+      return
+    }
+    const rruleErr = validateRRule(schedule())
+    if (rruleErr) {
+      setError(rruleErr)
       return
     }
     setBusy('create')
@@ -90,7 +143,6 @@ export function ScheduledTasks(props: Props) {
       if (kind === 'run') await tasksApi.runBackgroundTaskNow(id)
       else if (kind === 'pause') await tasksApi.pauseBackgroundTask(id)
       else if (kind === 'resume') await tasksApi.resumeBackgroundTask(id)
-      else await tasksApi.deleteBackgroundTask(id)
       await load()
     } catch (e) {
       setError(String(e))
@@ -100,9 +152,19 @@ export function ScheduledTasks(props: Props) {
   }
 
   const doDelete = async (id: string) => {
+    // 确认后真正删除：关闭模态一次 → 调用 API → 失败时提示错误（不再重开确认框）
     setPendingDeleteId(null)
     setModalReq(null)
-    await action('delete', id)
+    setBusy(`delete:${id}`)
+    setError(null)
+    try {
+      await tasksApi.deleteBackgroundTask(id)
+      await load()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(null)
+    }
   }
 
   const formatTime = (ts: number | null) => {
@@ -141,7 +203,37 @@ export function ScheduledTasks(props: Props) {
 
   return (
     <Show when={props.open}>
-      <div class="panel w-[28rem]">
+      <div
+        ref={panelRef}
+        class="panel w-[28rem]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="定时任务"
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            props.onClose()
+            return
+          }
+          if (e.key === 'Tab' && panelRef) {
+            const focusables = panelRef.querySelectorAll<HTMLElement>(
+              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+            if (focusables.length === 0) return
+            const first = focusables[0]
+            const last = focusables[focusables.length - 1]
+            const active = document.activeElement
+            if (e.shiftKey && (active === first || active === panelRef)) {
+              e.preventDefault()
+              last.focus()
+            } else if (!e.shiftKey && active === last) {
+              e.preventDefault()
+              first.focus()
+            }
+          }
+        }}
+      >
         {/* Header */}
         <div class="panel-head">
           <CalendarClock class="panel-head-icon text-nt-repair-300" />
@@ -227,6 +319,9 @@ export function ScheduledTasks(props: Props) {
                   onInput={(e) => setSchedule(e.currentTarget.value)}
                   class="mt-2 w-full bg-bg-primary border border-border-primary rounded-lg px-3 py-2 text-xs font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-nt-repair-400/50"
                 />
+                <Show when={scheduleError()}>
+                  <div class="mt-1 text-[11px] text-amber-600">{scheduleError()}</div>
+                </Show>
               </div>
               <button
                 class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-nt-repair-500/30 text-nt-repair-200 hover:bg-nt-repair-500/40 transition-colors text-sm font-medium"
@@ -299,8 +394,9 @@ export function ScheduledTasks(props: Props) {
                       删除
                     </button>
                   </div>
-                  <div class="mt-2 pt-2 border-t border-border-primary/50 flex items-center justify-between text-[10px] text-text-muted">
+                  <div class="mt-2 pt-2 border-t border-border-primary/50 flex items-center justify-between gap-2 text-[10px] text-text-muted">
                     <span>上次: {formatTime(task.last_run)}</span>
+                    <span>下次: {formatTime(task.next_run)}</span>
                     <span class="flex items-center gap-1">
                       <History class="w-3.5 h-3.5" />
                       {task.runs.length} 次执行

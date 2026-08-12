@@ -42,6 +42,7 @@ export function NeoTag(props: NeoTagProps) {
       style={{ '--tag-color': color(), '--tag-indent': `${(depth() - 1) * 8}px` }}
       role={props.onClick ? 'button' : undefined}
       tabIndex={props.onClick ? 0 : undefined}
+      aria-pressed={props.onClick ? (props.active ? 'true' : 'false') : undefined}
       onClick={(e) => { e.stopPropagation(); props.onClick?.(props.name) }}
       onKeyDown={(e) => { if (props.onClick && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); props.onClick(props.name) } }}
       title={`#${props.name}`}
@@ -59,7 +60,12 @@ export function NeoTag(props: NeoTagProps) {
           </For>
         </span>
       </Show>
-      <span class="nt-tag-label">{last()}</span>
+      <span
+        class="nt-tag-label"
+        style={{ 'max-width': '11em', 'overflow': 'hidden', 'text-overflow': 'ellipsis', 'white-space': 'nowrap' }}
+      >
+        {last()}
+      </span>
       <Show when={props.count !== undefined}>
         <span class={clsx('nt-tag-count', props.active && 'nt-tag-count-active')}>{props.count}</span>
       </Show>

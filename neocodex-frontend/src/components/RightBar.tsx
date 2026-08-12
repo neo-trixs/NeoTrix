@@ -3,16 +3,19 @@ import { neocodex, system } from '../api'
 import type { ProjectTreeItem, ProjectView } from '../api/types'
 import { clsx } from 'clsx'
 import { GlobeView } from './GlobeView'
+import { ProjectView as ProjectViewPanel } from './ProjectView'
 
 /* ════════════════════════════════════════════
    RightBar — 右栏（设计 v2，已接线后端）
-   标签切换：文件（Artifact Pane + 文件树） / 地图（shanhai 3D 地球）
+   标签切换：文件（Artifact Pane + 文件树） / 地图（shanhai 3D 地球） / 项目（ProjectView）
    上部：Artifact Pane（预览/代码切换 + 格式 tabs + 内容）
    下部：文件树（真实项目树 ← neocodex_project_tree）
    交互：auto-hide（hover/右侧边缘展开）或 collapsed 固定
    ════════════════════════════════════════════ */
 
-type RbTab = 'files' | 'map'
+type RbTab = 'files' | 'map' | 'project'
+
+const RB_TABS: RbTab[] = ['files', 'map', 'project']
 
 interface FileNode {
   name: string
@@ -37,10 +40,6 @@ function toFileNode(item: ProjectTreeItem): FileNode {
 const PREVIEW_FORMATS = [
   { id: 'raw', label: 'Raw' },
   { id: 'rendered', label: 'Rendered' },
-  { id: 'wechat', label: 'WeChat' },
-  { id: 'zhihu', label: 'Zhihu' },
-  { id: 'juejin', label: 'Juejin' },
-  { id: 'web', label: 'Web' },
 ] as const
 
 type PreviewMode = (typeof PREVIEW_FORMATS)[number]['id']
@@ -51,15 +50,21 @@ function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-/* 轻量 MD → 安全 HTML（仅用于 artifact 预览） */
+/* 轻量 MD → 安全 HTML（仅用于 artifact 预览）
+   顺序：先提取代码围栏为占位符 → 转义 → 行内语法 → 还原围栏
+   避免代码块内的 # / ** / ` 被误转成 HTML 标签 */
 function renderMd(text: string): string {
-  return text
+  const fences: string[] = []
+  let t = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_m, _lang, code) => {
+    fences.push(escHtml(code))
+    return `\u0000F${fences.length - 1}\u0000`
+  })
+  t = t
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/^#### (.+)$/gm, '<h4>$1</h4>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => `<pre><code>${escHtml(code)}</code></pre>`)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/^- (.+)$/gm, '<li>$1</li>')
@@ -68,6 +73,7 @@ function renderMd(text: string): string {
     .replace(/\n\n/g, '</p><p>')
     .replace(/^(?!<[hpl]|<[uo]l|<pre|<bl|$)/gm, '<p>')
     .replace(/<\/p>\s*<p>/g, '</p><p>')
+  return t.replace(/\u0000F(\d+)\u0000/g, (_m, i) => `<pre><code>${fences[+i]}</code></pre>`)
 }
 
 function FileTree(props: {
@@ -75,53 +81,81 @@ function FileTree(props: {
   depth?: number
   onOpenFile: (node: FileNode) => void
   activeFile: string | null
+  activePath: string | null
+  hasActive: boolean
   onToggleDir: (node: FileNode) => void
+  onActivate: (node: FileNode) => void
+  onMoveFocus: (dir: 1 | -1) => void
 }) {
+  const rowKey = (n: FileNode) => n.path ?? n.name
+  /* roving tabindex：活动节点 0，其余 -1；无活动节点时首行 0（Tab 可达） */
+  const rowTab = (n: FileNode) =>
+    props.activePath === rowKey(n) || (!props.hasActive && (props.depth ?? 0) === 0 && props.nodes[0] === n) ? 0 : -1
+
+  const onRowKeyDown = (e: KeyboardEvent, n: FileNode) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); props.onMoveFocus(1) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); props.onMoveFocus(-1) }
+    else if (e.key === 'ArrowRight') {
+      if (n.type === 'dir' && !n.open) { e.preventDefault(); props.onToggleDir(n) }
+    } else if (e.key === 'ArrowLeft') {
+      if (n.type === 'dir' && n.open) { e.preventDefault(); props.onToggleDir(n) }
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      if (n.type === 'dir') props.onToggleDir(n)
+      else props.onOpenFile(n)
+    }
+  }
+
   return (
     <For each={props.nodes}>
       {(n) => (
         <>
-          {n.type === 'dir' ? (
-            <>
-              <div
-                class="ft-item"
-                style={{ 'padding-left': `${(props.depth ?? 0) * 14 + 4}px` }}
-                onClick={() => props.onToggleDir(n)}
-              >
-                <svg class={clsx('chev', n.open && 'open')} viewBox="0 0 9 9">
-                  <line x1="3" y1="2.5" x2="6" y2="4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-                  <line x1="3" y1="6.5" x2="6" y2="4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
-                </svg>
-                <svg class="fic" viewBox="0 0 14 14">
-                  <path d="M1.5 4.5h3.5l1-1.5h6a1 1 0 011 1v6a1 1 0 01-1 1h-10a1 1 0 01-1-1v-5.5z" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-                {n.name}
-              </div>
-              <div class={clsx('ft-children', n.open && 'open')}>
-                <Show when={n.open}>
-                  <FileTree
-                    nodes={n.children ?? []}
-                    depth={(props.depth ?? 0) + 1}
-                    onOpenFile={props.onOpenFile}
-                    activeFile={props.activeFile}
-                    onToggleDir={props.onToggleDir}
-                  />
-                </Show>
-              </div>
-            </>
-          ) : (
-            <div
-              class={clsx('ft-item ft-file', props.activeFile === n.name && 'ft-active')}
-              style={{ 'padding-left': `${(props.depth ?? 0) * 14 + 4}px` }}
-              onClick={() => props.onOpenFile(n)}
-            >
+          <div
+            class={clsx('ft-item', n.open && 'open', props.activeFile === rowKey(n) && 'ft-active')}
+            style={{ 'padding-left': `${(props.depth ?? 0) * 14 + 4}px` }}
+            role="treeitem"
+            aria-expanded={n.type === 'dir' ? n.open : undefined}
+            aria-current={props.activeFile === rowKey(n) ? 'true' : undefined}
+            tabIndex={rowTab(n)}
+            onClick={() => (n.type === 'dir' ? props.onToggleDir(n) : props.onOpenFile(n))}
+            onFocus={() => props.onActivate(n)}
+            onKeyDown={(e) => onRowKeyDown(e, n)}
+          >
+            {n.type === 'dir' ? (
+              <svg class={clsx('chev', n.open && 'open')} viewBox="0 0 9 9">
+                <line x1="3" y1="2.5" x2="6" y2="4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                <line x1="3" y1="6.5" x2="6" y2="4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+              </svg>
+            ) : null}
+            {n.type === 'dir' ? (
+              <svg class="fic" viewBox="0 0 14 14">
+                <path d="M1.5 4.5h3.5l1-1.5h6a1 1 0 011 1v6a1 1 0 01-1 1h-10a1 1 0 01-1-1v-5.5z" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            ) : (
               <svg class="fic" viewBox="0 0 14 14">
                 <path d="M2 1.5h10v11H2z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" />
                 <line x1="4.5" y1="4.5" x2="9.5" y2="4.5" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
               </svg>
-              {n.name}
+            )}
+            {n.name}
+          </div>
+          <Show when={n.type === 'dir'}>
+            <div class={clsx('ft-children', n.open && 'open')} role="group">
+              <Show when={n.open}>
+                <FileTree
+                  nodes={n.children ?? []}
+                  depth={(props.depth ?? 0) + 1}
+                  onOpenFile={props.onOpenFile}
+                  activeFile={props.activeFile}
+                  activePath={props.activePath}
+                  hasActive={props.hasActive}
+                  onToggleDir={props.onToggleDir}
+                  onActivate={props.onActivate}
+                  onMoveFocus={props.onMoveFocus}
+                />
+              </Show>
             </div>
-          )}
+          </Show>
         </>
       )}
     </For>
@@ -144,20 +178,49 @@ export function RightBar() {
   const [fileLoading, setFileLoading] = createSignal(false)
   const [treeError, setTreeError] = createSignal<string | null>(null)
   const [copied, setCopied] = createSignal(false)
+  const [activePath, setActivePath] = createSignal<string | null>(null)
 
+  /* ── 展开状态保持：收集当前展开目录 → 新树重新应用 ── */
+  const collectOpenPaths = (nodes: FileNode[], acc: Set<string> = new Set()): Set<string> => {
+    for (const n of nodes) {
+      if (n.type === 'dir' && n.open) {
+        acc.add(n.path ?? n.name)
+        collectOpenPaths(n.children ?? [], acc)
+      }
+    }
+    return acc
+  }
+  const applyOpen = (nodes: FileNode[], openPaths: Set<string>) => {
+    for (const n of nodes) {
+      if (n.type === 'dir') {
+        n.open = openPaths.has(n.path ?? n.name)
+        applyOpen(n.children ?? [], openPaths)
+      }
+    }
+  }
+
+  let treeReqSeq = 0
   /* 加载真实项目树（neocodex_project_tree） */
   const loadTree = async () => {
+    const seq = ++treeReqSeq
+    const prevOpen = collectOpenPaths(tree())
     setTreeLoading(true)
     setTreeError(null)
     try {
       const pv = await neocodex.projectTree()
-      setTree(pv.tree.map(toFileNode))
+      if (seq !== treeReqSeq) return
+      const nodes = pv.tree.map(toFileNode)
+      /* 刷新保留用户展开状态；首次加载用默认展开（toFileNode 已处理） */
+      if (prevOpen.size > 0) applyOpen(nodes, prevOpen)
+      setTree(nodes)
       setRootPath(pv.root)
       setFileCount(pv.file_count)
+      if (!activePath()) setActivePath(nodes[0]?.path ?? null)
     } catch (e) {
+      if (seq !== treeReqSeq) return
       setTreeError(String(e))
     } finally {
-      setTreeLoading(false)
+      if (seq === treeReqSeq) setTreeLoading(false)
     }
   }
 
@@ -196,8 +259,47 @@ export function RightBar() {
   }
 
   const toggleDir = (node: FileNode) => {
-    node.open = !node.open
-    setTree([...tree()])
+    /* 不可变更新：沿路径重建对象，避免直接 mutate signal 内对象 */
+    setTree((t) => {
+      const flip = (nodes: FileNode[]): FileNode[] =>
+        nodes.map((n) =>
+          n === node
+            ? { ...n, open: !n.open }
+            : n.type === 'dir' && n.children
+              ? { ...n, children: flip(n.children) }
+              : n,
+        )
+      return flip(t)
+    })
+  }
+
+  /* ProjectView onOpenFile → 复用 Artifact Pane 预览 */
+  const openPath = (path: string) => {
+    const name = path.split('/').pop() ?? path
+    openPreview({ name, path, type: 'file' })
+  }
+
+  /* 树键盘导航：↑/↓ 在可见 treeitem 间移动焦点 */
+  const activateNode = (node: FileNode) => setActivePath(node.path ?? node.name)
+  const moveTreeFocus = (dir: 1 | -1) => {
+    const items = Array.from(document.querySelectorAll<HTMLElement>('.ft [role="treeitem"]'))
+    const idx = items.findIndex((el) => el === document.activeElement)
+    const target = idx === -1 ? (dir === 1 ? items[0] : items[items.length - 1]) : items[idx + dir]
+    target?.focus()
+  }
+
+  /* 右栏标签方向键切换（roving tabindex，← 后退 / → 前进，环绕） */
+  const moveRbTab = (dir: 1 | -1) => {
+    setRbTab((cur) => RB_TABS[(RB_TABS.indexOf(cur) + dir + RB_TABS.length) % RB_TABS.length])
+  }
+  const tabKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    e.preventDefault()
+    moveRbTab(e.key === 'ArrowRight' ? 1 : -1)
+    requestAnimationFrame(() => {
+      const tabs = document.querySelectorAll<HTMLElement>('.rb-tabs [role="tab"]')
+      tabs[RB_TABS.indexOf(rbTab())]?.focus()
+    })
   }
 
   const closePreview = () => {
@@ -225,13 +327,21 @@ export function RightBar() {
     const f = currentFile()
     const text = f?.content ?? '// 点击文件预览'
     if (artifactView() === 'code' || previewMode() === 'raw') {
-      let html = escHtml(text)
-      RUST_KEYWORDS.forEach((k) => {
-        html = html.replace(new RegExp(`\\b${k}\\b`, 'g'), `<span class="kw">${k}</span>`)
-      })
-      html = html.replace(/\/\/.*/g, (m) => `<span class="cm">${escHtml(m)}</span>`)
-      html = html.replace(/\b[A-Z]\w+(?=\s*(?:[({<]|::))/g, (m) => `<span class="fn">${m}</span>`)
-      return html
+      /* 逐行处理：注释行整体着色（不再被关键字 span 二次转义），非注释行才高亮关键字 */
+      return text
+        .split('\n')
+        .map((line) => {
+          if (line.trimStart().startsWith('//')) {
+            return `<span class="cm">${escHtml(line)}</span>`
+          }
+          let l = escHtml(line)
+          RUST_KEYWORDS.forEach((k) => {
+            l = l.replace(new RegExp(`\\b${k}\\b`, 'g'), `<span class="kw">${k}</span>`)
+          })
+          l = l.replace(/\b[A-Z]\w+(?=\s*(?:[({<]|::))/g, (m) => `<span class="fn">${m}</span>`)
+          return l
+        })
+        .join('\n')
     }
     return renderMd(text)
   }
@@ -250,7 +360,7 @@ export function RightBar() {
       </button>
 
       <div class="rb-content">
-        {/* ── 标签切换：文件 / 地图 ── */}
+        {/* ── 标签切换：文件 / 地图 / 项目 ── */}
         <div class="rb-tabs" role="tablist" aria-label="右栏视图">
           <button
             class={clsx('rb-tab', rbTab() === 'files' && 'on')}
@@ -258,17 +368,7 @@ export function RightBar() {
             role="tab"
             aria-selected={rbTab() === 'files'}
             tabIndex={rbTab() === 'files' ? 0 : -1}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                e.preventDefault()
-                setRbTab(rbTab() === 'files' ? 'map' : 'files')
-                // 聚焦新选中 tab（roving tabindex）
-                requestAnimationFrame(() => {
-                  const tabs = document.querySelectorAll<HTMLElement>('.rb-tabs [role="tab"]')
-                  tabs[rbTab() === 'files' ? 0 : 1]?.focus()
-                })
-              }
-            }}
+            onKeyDown={tabKeyDown}
           >
             <svg viewBox="0 0 14 14" class="rb-tab-ic">
               <path d="M2 1.5h10v11H2z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" />
@@ -282,16 +382,7 @@ export function RightBar() {
             role="tab"
             aria-selected={rbTab() === 'map'}
             tabIndex={rbTab() === 'map' ? 0 : -1}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                e.preventDefault()
-                setRbTab(rbTab() === 'files' ? 'map' : 'files')
-                requestAnimationFrame(() => {
-                  const tabs = document.querySelectorAll<HTMLElement>('.rb-tabs [role="tab"]')
-                  tabs[rbTab() === 'map' ? 1 : 0]?.focus()
-                })
-              }
-            }}
+            onKeyDown={tabKeyDown}
           >
             <svg viewBox="0 0 14 14" class="rb-tab-ic">
               <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.1" fill="none" />
@@ -300,12 +391,33 @@ export function RightBar() {
             </svg>
             地图
           </button>
+          <button
+            class={clsx('rb-tab', rbTab() === 'project' && 'on')}
+            onClick={() => setRbTab('project')}
+            role="tab"
+            aria-selected={rbTab() === 'project'}
+            tabIndex={rbTab() === 'project' ? 0 : -1}
+            onKeyDown={tabKeyDown}
+          >
+            <svg viewBox="0 0 14 14" class="rb-tab-ic">
+              <path d="M1.5 2.5h4.5a1.5 1.5 0 011.5 1.5v7.5a1.5 1.5 0 00-1.5-1.5H1.5z" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linejoin="round" />
+              <path d="M12.5 2.5H8a1.5 1.5 0 00-1.5 1.5v7.5a1.5 1.5 0 011.5-1.5h4.5z" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linejoin="round" />
+            </svg>
+            项目
+          </button>
         </div>
 
         {/* ── 地图视图：shanhai 3D 地球 ── */}
         <Show when={rbTab() === 'map'}>
           <div class="rb-map">
             <GlobeView limit={3000} height={420} />
+          </div>
+        </Show>
+
+        {/* ── 项目视图：ProjectView（AGENTS.md 阅读器 + 目录树） ── */}
+        <Show when={rbTab() === 'project'}>
+          <div class="rb-project flex-1 min-h-0 overflow-hidden flex flex-col">
+            <ProjectViewPanel open onClose={() => setRbTab('files')} onOpenFile={openPath} />
           </div>
         </Show>
 
@@ -445,8 +557,12 @@ export function RightBar() {
           <FileTree
             nodes={tree()}
             onOpenFile={openPreview}
-            activeFile={currentFile()?.name ?? null}
+            activeFile={currentFile()?.path ?? null}
+            activePath={activePath()}
+            hasActive={activePath() !== null}
             onToggleDir={toggleDir}
+            onActivate={activateNode}
+            onMoveFocus={moveTreeFocus}
           />
           <Show when={fileLoading()}>
             <div class="ft-loading">读取文件…</div>

@@ -32,6 +32,9 @@ export function TagBar(props: TagBarProps) {
   const [collapsedRoots, setCollapsedRoots] = createSignal<Set<string>>(new Set())
   const [seeded, setSeeded] = createSignal(false)
 
+  // 子标签列表的稳定 id（aria-controls 指向，折叠展开语义连通）
+  const childrenListId = (name: string) => `tag-children-${name.replace(/[^A-Za-z0-9_-]/g, '-')}`
+
   const tree = () => tagsStore.tagTree()
   const activeCount = () => props.activeTags.length
 
@@ -117,6 +120,7 @@ export function TagBar(props: TagBarProps) {
                       onClick={() => toggleRoot(root.name)}
                       aria-label={isCollapsed() ? `展开 ${root.name}` : `折叠 ${root.name}`}
                       aria-expanded={!isCollapsed()}
+                      aria-controls={root.children.length > 0 ? childrenListId(root.name) : undefined}
                       style={{ visibility: root.children.length > 0 ? 'visible' : 'hidden' }}
                     >
                       <svg viewBox="0 0 10 10" fill="none" class="w-2.5 h-2.5 transition-transform">
@@ -135,7 +139,7 @@ export function TagBar(props: TagBarProps) {
 
                   {/* 子标签（缩进） */}
                   <Show when={!isCollapsed() && root.children.length > 0}>
-                    <ul class="ml-4 mt-0.5 space-y-0.5 border-l border-border-primary/50 pl-1.5">
+                    <ul id={childrenListId(root.name)} class="ml-4 mt-0.5 space-y-0.5 border-l border-border-primary/50 pl-1.5">
                       <For each={root.children}>
                         {(child) => (
                           <li>

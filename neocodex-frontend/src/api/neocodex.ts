@@ -4,6 +4,8 @@ import type {
   Checkpoint,
   GitStatus,
   HealthReport,
+  McpServerInfo,
+  McpToolInfo,
   NeoCodexMessageItem,
   NeoCodexSearchHit,
   NeoCodexSessionInfo,
@@ -190,6 +192,31 @@ export function applyDiff(path: string, action: string): Promise<void> {
   return call('neocodex_apply_diff', { path, action })
 }
 
+/** 提交已暂存内容（对应面板 accept = git add 后的 commit）。 */
+export function gitCommit(message: string): Promise<void> {
+  return call('neocodex_git_commit', { message })
+}
+
+/** 推送当前分支到远程，返回远程输出摘要（无上游时错误内含提示）。 */
+export function gitPush(): Promise<string> {
+  return call('neocodex_git_push', {})
+}
+
+/** 列出本地分支（short ref names，如 main）。 */
+export function listBranches(): Promise<string[]> {
+  return call('neocodex_git_branch', {})
+}
+
+/** 返回当前已暂存文件列表（git diff --cached --name-only）。 */
+export function gitStagedFiles(): Promise<string[]> {
+  return call('neocodex_git_staged_files', {})
+}
+
+/** 切换分支（git checkout），返回切换后的分支名。 */
+export function gitCheckout(branch: string): Promise<string> {
+  return call('neocodex_git_checkout', { branch })
+}
+
 /* ── 检查点 ── */
 export function checkpointList(sessionId: string): Promise<Checkpoint[]> {
   return call('neocodex_checkpoint_list', { session_id: sessionId })
@@ -222,12 +249,17 @@ export function downloadUpdate(): Promise<void> {
 }
 
 /* ── MCP ── */
-export function mcpList(): Promise<unknown[]> {
+export function mcpList(): Promise<McpServerInfo[]> {
   return call('neocodex_mcp_list', {})
 }
 
-export function mcpTools(): Promise<unknown[]> {
+export function mcpTools(): Promise<McpToolInfo[]> {
   return call('neocodex_mcp_tools', {})
+}
+
+/** 注册本地 stdio MCP 服务器（name/command/args），返回注册后的服务器列表。 */
+export function mcpRegister(name: string, command: string, args?: string[]): Promise<McpServerInfo[]> {
+  return call('neocodex_mcp_register', { name, command, args: args ?? null })
 }
 
 /* ── 反馈 ── */

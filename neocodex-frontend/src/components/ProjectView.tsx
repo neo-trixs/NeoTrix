@@ -18,6 +18,7 @@ export function ProjectView(props: Props) {
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
   const [tab, setTab] = createSignal<'tree' | 'agents'>('tree')
   let firstBtnRef: HTMLButtonElement | undefined
+  let firstLoad = true
 
   // 面板打开时聚焦首个按钮（对标 Codex 面板聚焦规范）
   createEffect(() => {
@@ -30,9 +31,12 @@ export function ProjectView(props: Props) {
     try {
       const v = await neocodex.projectTree()
       setView(v)
-      // Auto-expand root dirs
-      const firstLevel = v.tree.filter(t => t.is_dir).map(t => t.path)
-      setExpanded(new Set(firstLevel))
+      // 仅首次加载自动展开根目录；刷新保留用户展开状态
+      if (firstLoad) {
+        const firstLevel = v.tree.filter(t => t.is_dir).map(t => t.path)
+        setExpanded(new Set(firstLevel))
+        firstLoad = false
+      }
     } catch (e) {
       setError(String(e))
     } finally {
@@ -171,7 +175,8 @@ export function ProjectView(props: Props) {
 
         {/* Body */}
         <div class="flex-1 overflow-y-auto p-2">
-          <Show when={loading}>
+          {/* 首次加载才显示整屏 spinner；刷新时保留已加载树 */}
+          <Show when={loading() && !view()}>
             <div class="flex items-center justify-center gap-2 py-8 text-text-muted text-sm">
               <Loader2 class="w-4 h-4 animate-spin" />
               加载项目...
@@ -180,7 +185,7 @@ export function ProjectView(props: Props) {
           <Show when={error()}>
             <div class="p-3 text-xs text-red-500 bg-red-500/10 rounded-lg">{error()}</div>
           </Show>
-          <Show when={!loading && !error() && view()}>
+          <Show when={!error() && view()}>
             {tab() === 'tree' ? (
               <Show
                 when={view()!.tree.length > 0}

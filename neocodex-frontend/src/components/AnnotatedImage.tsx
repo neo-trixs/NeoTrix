@@ -35,6 +35,7 @@ export function AnnotatedImage(props: Props) {
   // 统一确认模态（替换原生 confirm）
   const [modalReq, setModalReq] = createSignal<ModalReq | null>(null)
   const [annotations, setAnnotations] = createSignal<Annotation[]>([])
+  // 当前拖拽形状；坐标为 normalized 值（相对图像 [0,1]）
   const [drawing, setDrawing] = createSignal<{ startX: number; startY: number; curX: number; curY: number } | null>(null)
 
   let imgLoaded = false
@@ -53,35 +54,6 @@ export function AnnotatedImage(props: Props) {
     const dh = c.height
     ctx.clearRect(0, 0, dw, dh)
 
-    // In-progress drawing
-    const d = drawing()
-    if (d) {
-      if (tool() === 'box') {
-        ctx.strokeStyle = '#6366f1'
-        ctx.lineWidth = 2
-        ctx.setLineDash([6, 4])
-        ctx.strokeRect(d.startX, d.startY, d.curX - d.startX, d.curY - d.startY)
-        ctx.setLineDash([])
-      } else {
-        ctx.strokeStyle = '#ef4444'
-        ctx.lineWidth = 2
-        ctx.setLineDash([6, 4])
-        ctx.beginPath()
-        ctx.moveTo(d.startX, d.startY)
-        ctx.lineTo(d.curX, d.curY)
-        ctx.stroke()
-        ctx.setLineDash([])
-        // arrow head
-        const ang = Math.atan2(d.curY - d.startY, d.curX - d.startX)
-        ctx.beginPath()
-        ctx.moveTo(d.curX, d.curY)
-        ctx.lineTo(d.curX - 12 * Math.cos(ang - 0.4), d.curY - 12 * Math.sin(ang - 0.4))
-        ctx.moveTo(d.curX, d.curY)
-        ctx.lineTo(d.curX - 12 * Math.cos(ang + 0.4), d.curY - 12 * Math.sin(ang + 0.4))
-        ctx.stroke()
-      }
-    }
-
     // Completed annotations (normalized -> pixel)
     for (const a of annotations()) {
       const px = a.x * dw
@@ -94,13 +66,14 @@ export function AnnotatedImage(props: Props) {
         ctx.strokeRect(px, py, pw, ph)
         ctx.fillStyle = 'rgba(99, 102, 241, 0.12)'
         ctx.fillRect(px, py, pw, ph)
-        // number badge
+        // number badge — clamp to canvas top so top-edge boxes stay fully visible
         ctx.fillStyle = '#6366f1'
         const label = String(a.id)
         ctx.font = 'bold 12px monospace'
-        ctx.fillRect(px, py - 18, ctx.measureText(label).width + 8, 16)
+        const badgeTop = Math.max(0, py - 18)
+        ctx.fillRect(px, badgeTop, ctx.measureText(label).width + 8, 16)
         ctx.fillStyle = '#fff'
-        ctx.fillText(label, px + 4, py - 6)
+        ctx.fillText(label, px + 4, badgeTop + 12)
       } else if (a.ex !== undefined && a.ey !== undefined) {
         ctx.strokeStyle = '#ef4444'
         ctx.lineWidth = 2
@@ -114,6 +87,39 @@ export function AnnotatedImage(props: Props) {
         ctx.lineTo(a.ex * dw - 12 * Math.cos(ang - 0.4), a.ey * dh - 12 * Math.sin(ang - 0.4))
         ctx.moveTo(a.ex * dw, a.ey * dh)
         ctx.lineTo(a.ex * dw - 12 * Math.cos(ang + 0.4), a.ey * dh - 12 * Math.sin(ang + 0.4))
+        ctx.stroke()
+      }
+    }
+
+    // In-progress drawing (normalized -> pixel), layered on top of completed ones
+    const d = drawing()
+    if (d) {
+      const sx = d.startX * dw
+      const sy = d.startY * dh
+      const ex = d.curX * dw
+      const ey = d.curY * dh
+      if (tool() === 'box') {
+        ctx.strokeStyle = '#6366f1'
+        ctx.lineWidth = 2
+        ctx.setLineDash([6, 4])
+        ctx.strokeRect(sx, sy, ex - sx, ey - sy)
+        ctx.setLineDash([])
+      } else {
+        ctx.strokeStyle = '#ef4444'
+        ctx.lineWidth = 2
+        ctx.setLineDash([6, 4])
+        ctx.beginPath()
+        ctx.moveTo(sx, sy)
+        ctx.lineTo(ex, ey)
+        ctx.stroke()
+        ctx.setLineDash([])
+        // arrow head
+        const ang = Math.atan2(ey - sy, ex - sx)
+        ctx.beginPath()
+        ctx.moveTo(ex, ey)
+        ctx.lineTo(ex - 12 * Math.cos(ang - 0.4), ey - 12 * Math.sin(ang - 0.4))
+        ctx.moveTo(ex, ey)
+        ctx.lineTo(ex - 12 * Math.cos(ang + 0.4), ey - 12 * Math.sin(ang + 0.4))
         ctx.stroke()
       }
     }
@@ -148,67 +154,39 @@ export function AnnotatedImage(props: Props) {
     const img = imgEl()
     if (!c || !img) return { nx: 0, ny: 0 }
     const rect = c.getBoundingClientRect()
+    // rect 是 CSS 显示尺寸（受 max-h-80 / max-w-full 缩放影响），
+    // 归一化必须除以 CSS 尺寸而非 canvas 自然像素，否则缩放后落点偏差数倍。
+    // 渲染侧（drawAll）再用 normalized × c.width/height 映射回自然像素，两条路径换算一致。
     const px = clientX - rect.left
     const py = clientY - rect.top
     return {
-      nx: Math.min(1, Math.max(0, px / c.width)),
-      ny: Math.min(1, Math.max(0, py / c.height)),
+      nx: Math.min(1, Math.max(0, px / rect.width)),
+      ny: Math.min(1, Math.max(0, py / rect.height)),
     }
   }
 
   const onMouseDown = (e: MouseEvent) => {
     const { nx, ny } = toNormalized(e.clientX, e.clientY)
-    setDrawing({ startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY })
-    // store normalized start
-    ;(e.currentTarget as HTMLElement).dataset.nx = String(nx)
-    ;(e.currentTarget as HTMLElement).dataset.ny = String(ny)
+    // 拖拽起始/结束坐标统一走 toNormalized（CSS 尺寸归一化），保证预览与最终标注一致
+    setDrawing({ startX: nx, startY: ny, curX: nx, curY: ny })
   }
 
   const onMouseMove = (e: MouseEvent) => {
     const d = drawing()
     if (!d) return
-    setDrawing({ ...d, curX: e.clientX, curY: e.clientY })
-    // redraw with temp normalized
     const { nx, ny } = toNormalized(e.clientX, e.clientY)
-    const c = canvas()
-    const img = imgEl()
-    if (!c || !img) return
-    const ctx = c.getContext('2d')
-    if (!ctx) return
-    ctx.clearRect(0, 0, c.width, c.height)
-    // re-render base + in-progress
-    const startNx = Number((e.currentTarget as HTMLElement).dataset.nx || 0)
-    const startNy = Number((e.currentTarget as HTMLElement).dataset.ny || 0)
-    const sx = startNx * c.width
-    const sy = startNy * c.height
-    const ex = nx * c.width
-    const ey = ny * c.height
-    if (tool() === 'box') {
-      ctx.strokeStyle = '#6366f1'
-      ctx.lineWidth = 2
-      ctx.setLineDash([6, 4])
-      ctx.strokeRect(sx, sy, ex - sx, ey - sy)
-      ctx.setLineDash([])
-    } else {
-      ctx.strokeStyle = '#ef4444'
-      ctx.lineWidth = 2
-      ctx.setLineDash([6, 4])
-      ctx.beginPath()
-      ctx.moveTo(sx, sy)
-      ctx.lineTo(ex, ey)
-      ctx.stroke()
-      ctx.setLineDash([])
-    }
+    setDrawing({ ...d, curX: nx, curY: ny })
+    // 完整重绘：已完成标注 + 当前拖拽形状叠加，避免拖拽期间已完成标注闪烁消失
+    drawAll()
   }
 
   const onMouseUp = (e: MouseEvent) => {
-    const el = e.currentTarget as HTMLElement
-    const startNx = Number(el.dataset.nx || 0)
-    const startNy = Number(el.dataset.ny || 0)
-    const { nx, ny } = toNormalized(e.clientX, e.clientY)
     const d = drawing()
     setDrawing(null)
     if (!d) return
+    const { nx, ny } = toNormalized(e.clientX, e.clientY)
+    const startNx = d.startX
+    const startNy = d.startY
 
     const id = nextId()
     if (tool() === 'box') {
@@ -238,7 +216,7 @@ export function AnnotatedImage(props: Props) {
         }])
       }
     }
-    requestAnimationFrame(drawAll)
+    drawAll()
   }
 
   const confirm = () => {
@@ -268,7 +246,10 @@ export function AnnotatedImage(props: Props) {
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
-            onMouseLeave={() => setDrawing(null)}
+            onMouseLeave={() => {
+              setDrawing(null)
+              drawAll()
+            }}
           />
         </div>
       </div>
@@ -310,6 +291,7 @@ export function AnnotatedImage(props: Props) {
               return
             }
             setAnnotations([])
+            drawAll()
           }}
           title="清除所有标注"
         >
@@ -351,7 +333,10 @@ export function AnnotatedImage(props: Props) {
                 </span>
                 <button
                   class="ml-auto p-1 rounded text-text-muted hover:text-red-500"
-                  onClick={() => setAnnotations(prev => prev.filter(x => x.id !== a.id))}
+                  onClick={() => {
+                    setAnnotations(prev => prev.filter(x => x.id !== a.id))
+                    drawAll()
+                  }}
                   aria-label="删除标注"
                 >
                   <X class="w-3.5 h-3.5" />
@@ -367,6 +352,7 @@ export function AnnotatedImage(props: Props) {
         onConfirm={() => {
           setAnnotations([])
           setModalReq(null)
+          drawAll()
         }}
         onClose={() => setModalReq(null)}
       />

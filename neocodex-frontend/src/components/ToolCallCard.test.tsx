@@ -21,6 +21,26 @@ const failedCall: ToolCallRecord = {
   success: false,
 }
 
+/* 0 时长完成事件：审批拒绝/exit_code=0 等瞬时完成，后端仍发完成事件。
+   此前按 duration_ms===0 判"执行中"，会永久显示转圈。 */
+const zeroDurationSuccess: ToolCallRecord = {
+  id: 't3',
+  name: 'shell',
+  args: '{"cmd":"true"}',
+  result: '',
+  duration_ms: 0,
+  success: true,
+}
+
+const zeroDurationFailure: ToolCallRecord = {
+  id: 't4',
+  name: 'write_file',
+  args: '{"path":"x"}',
+  result: 'TOOL_ERROR: 审批被拒绝',
+  duration_ms: 0,
+  success: false,
+}
+
 describe('ToolCallCard', () => {
   beforeEach(() => {
     // jsdom lacks clipboard by default
@@ -39,6 +59,19 @@ describe('ToolCallCard', () => {
     render(() => <ToolCallCard call={failedCall} />)
     expect(screen.getByText('grep')).toBeTruthy()
     expect(screen.getByText('3.0s')).toBeTruthy()
+  })
+
+  it('treats 0-duration success as completed (not running)', () => {
+    render(() => <ToolCallCard call={zeroDurationSuccess} />)
+    expect(screen.queryByText('执行中…')).toBeNull()
+    expect(screen.getByRole('status', { name: '工具调用成功' })).toBeTruthy()
+  })
+
+  it('treats 0-duration failure as completed and surfaces reason', () => {
+    render(() => <ToolCallCard call={zeroDurationFailure} />)
+    expect(screen.queryByText('执行中…')).toBeNull()
+    expect(screen.getByRole('status', { name: '工具调用失败' })).toBeTruthy()
+    expect(screen.getByText('TOOL_ERROR: 审批被拒绝')).toBeTruthy()
   })
 
   it('reveals args and result after expanding', async () => {

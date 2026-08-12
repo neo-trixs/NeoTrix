@@ -45,4 +45,42 @@ describe('Sidebar 标签交互（对标 Codex tablist 规范）', () => {
     fireEvent.keyDown(tabs[0], { key: 'ArrowRight' })
     expect(currentView).toBe('cowork')
   })
+
+  it('功能面板入口：6 个面板按钮渲染，点击触发 onTogglePanel', () => {
+    let toggled: string | null = null
+    render(() => (
+      <Sidebar
+        activeView="chat"
+        activePanel={null}
+        onTogglePanel={(id) => { toggled = id }}
+      />
+    ))
+    const group = document.querySelector('[role="group"][aria-label="功能面板"]')
+    expect(group).toBeTruthy()
+    const btns = group!.querySelectorAll('button')
+    expect(btns.length).toBe(6)
+    // Git 按钮点击触发 onTogglePanel('git')
+    const gitBtn = [...btns].find(b => b.getAttribute('aria-label') === 'Git')!
+    fireEvent.click(gitBtn)
+    expect(toggled).toBe('git')
+    // Live Preview 入口存在（批次5）
+    const previewBtn = [...btns].find(b => b.getAttribute('aria-label') === '预览')!
+    expect(previewBtn).toBeTruthy()
+  })
+
+  it('功能面板入口：激活面板高亮（aria-pressed），未激活不高亮', () => {
+    render(() => (
+      <Sidebar
+        activeView="chat"
+        activePanel="cost"
+        onTogglePanel={() => {}}
+      />
+    ))
+    const group = document.querySelector('[role="group"][aria-label="功能面板"]')
+    const btns = group!.querySelectorAll('button')
+    const costBtn = [...btns].find(b => b.getAttribute('aria-label') === '成本')!
+    const gitBtn = [...btns].find(b => b.getAttribute('aria-label') === 'Git')!
+    expect(costBtn.getAttribute('aria-pressed')).toBe('true')
+    expect(gitBtn.getAttribute('aria-pressed')).toBe('false')
+  })
 })

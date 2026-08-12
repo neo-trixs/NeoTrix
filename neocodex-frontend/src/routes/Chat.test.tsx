@@ -61,4 +61,38 @@ describe('Chat 主界面全 UI 冒烟测试（对标 Claude Code 布局）', () 
     fireEvent.click(pluginTab!)
     expect(document.querySelector('.panel-title')?.textContent).toContain('插件市场')
   })
+
+  it('权限模式选择器在空态 hero 输入区渲染（对标 Claude 权限模式可见性），可点击切换', () => {
+    render(() => <Chat />)
+    const selector = document.querySelector('[aria-label="权限模式"]') as HTMLElement | null
+    expect(selector).toBeTruthy()
+    fireEvent.click(selector!)
+    const opts = document.querySelectorAll('[role="option"]')
+    expect(opts.length).toBeGreaterThan(0)
+  })
+
+  it('功能面板入口存在且点击可打开面板（对标 Claude Code 侧栏）', () => {
+    render(() => <Chat />)
+    const group = document.querySelector('[role="group"][aria-label="功能面板"]')
+    expect(group).toBeTruthy()
+    // 点击 Git 面板入口应渲染 GitPanel（role=dialog aria-label=Git 面板）
+    const gitBtn = [...group!.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Git')!
+    fireEvent.click(gitBtn)
+    const panel = document.querySelector('[role="dialog"][aria-label="Git 面板"]')
+    expect(panel).toBeTruthy()
+  })
+
+  it('面板打开后按 Esc 关闭（全局 Esc 层级：面板→菜单→设置）', async () => {
+    render(() => <Chat />)
+    // 打开 Git 面板
+    const group = document.querySelector('[role="group"][aria-label="功能面板"]')
+    const gitBtn = [...group!.querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Git')!
+    fireEvent.click(gitBtn)
+    expect(document.querySelector('[role="dialog"][aria-label="Git 面板"]')).toBeTruthy()
+    // 等待 onMount 注册全局 keydown 监听
+    await new Promise((r) => setTimeout(r, 0))
+    // 按 Esc 关闭面板（全局 window keydown 监听）
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(document.querySelector('[role="dialog"][aria-label="Git 面板"]')).toBeNull()
+  })
 })

@@ -29,11 +29,63 @@ interface Props {
 
 export function ConfirmModal(props: Props) {
   const [inputVal, setInputVal] = createSignal('')
+  let dialogRef: HTMLDivElement | undefined
+  let confirmBtnRef: HTMLButtonElement | undefined
+  // 打开前触发元素：关闭后还原焦点（对标 Codex 弹窗焦点规范）
+  let restoreFocusEl: HTMLElement | null = null
 
-  // 每次 req 切换（打开/换内容）同步输入初值
+  // 每次 req 切换（打开/换内容）同步输入初值 + 打开时聚焦首可聚焦元素
   createEffect(() => {
     const r = props.req
     setInputVal(r?.initialValue ?? '')
+    if (r) {
+      restoreFocusEl = document.activeElement as HTMLElement | null
+      requestAnimationFrame(() => {
+        if (r.inputLabel) {
+          dialogRef?.querySelector<HTMLElement>('input')?.focus()
+        } else {
+          confirmBtnRef?.focus()
+        }
+      })
+    } else {
+      // 关闭后焦点还原到触发元素
+      if (restoreFocusEl?.isConnected) restoreFocusEl.focus()
+      restoreFocusEl = null
+    }
+  })
+
+  // 键盘：Esc 关闭 + Tab 轻量焦点循环（限制在弹窗内，不外泄到背景）
+  createEffect(() => {
+    if (!props.req) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        props.onClose()
+        return
+      }
+      if (e.key !== 'Tab' || !dialogRef) return
+      const focusables = dialogRef.querySelectorAll<HTMLElement>('button, input, [href], [tabindex]:not([tabindex="-1"])')
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement as HTMLElement | null
+      // 焦点在弹窗外（背景/body）：Tab 拉回弹窗内
+      if (!active || !dialogRef.contains(active)) {
+        e.preventDefault()
+        if (e.shiftKey) last.focus()
+        else first.focus()
+        return
+      }
+      if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   })
 
   const submit = () => props.onConfirm(inputVal())
@@ -44,6 +96,7 @@ export function ConfirmModal(props: Props) {
         <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div class="absolute inset-0 bg-black/20" onClick={props.onClose} />
           <div
+            ref={dialogRef}
             class="glass-modal relative w-full max-w-sm rounded-2xl p-5"
             role="dialog"
             aria-modal="true"
@@ -62,11 +115,9 @@ export function ConfirmModal(props: Props) {
                 value={inputVal()}
                 onInput={(e) => setInputVal((e.target as HTMLInputElement).value)}
                 placeholder={r().placeholder ?? ''}
-                autofocus
                 class="w-full px-3 py-2 rounded-lg border border-border-primary bg-white/70 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-nt-io-500"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') submit()
-                  if (e.key === 'Escape') props.onClose()
                 }}
               />
             </Show>
@@ -79,6 +130,7 @@ export function ConfirmModal(props: Props) {
                 {r().cancelLabel ?? '取消'}
               </button>
               <button
+                ref={confirmBtnRef}
                 class={clsx(
                   'px-3 py-1.5 rounded-lg text-[13px] font-medium text-white transition-colors',
                   r().danger
