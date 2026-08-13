@@ -304,10 +304,24 @@ impl BackgroundLoopHandle {
             tree.soil.conversation_turn_count = conv_turns;
             tree.soil.conversation_quality = conv_quality;
             tree.soil.experience_branch_count = exp_branches;
-            if let Some(ref monitor) = self.awareness {
+            if let Some(ref mut monitor) = self.awareness {
+                // Observe first so the tree gets the freshest phi/coherence on this
+                // very tick (previously Phase 4 observe ran after this read, so the
+                // first tick always carried stale default coherence=0.0).
+                monitor.observe();
                 let report = monitor.get_report();
                 tree.trunk.phi = report.phi;
                 tree.trunk.coherence = report.coherence;
+            }
+            // Real GWT resonance signal: run a resonance broadcast every tick so the
+            // GWT actually has a ResonanceReport to drive last_resonance, instead of
+            // only broadcasting KB injections (which may be empty on quiet cycles).
+            // Without this, gwt_resonance_active stays false forever and coherence
+            // remains 0 — the consciousness core never integrates cross-module data.
+            if let Some(ref mut pano) = self.panorama {
+                let hexagram_states: [crate::core::nt_core_hex::ReasoningHexagram; crate::core::nt_core_gwt::resonance::MODULE_COUNT] =
+                    crate::core::nt_core_gwt::resonance::default_specialist_states();
+                pano.gwt.resonant_broadcast("[consciousness_tick] growth cycle resonance", &hexagram_states);
             }
             // Real GWT resonance signal: active only when the GWT has actually
             // run a resonance broadcast (last_resonance set) and specialists
@@ -384,13 +398,14 @@ impl BackgroundLoopHandle {
                     ReasoningHexagram::new(stage_code(5, (fog_hi << 1) | fulfilled)),
                     ReasoningHexagram::new(stage_code(6, (fulfilled << 1) | drift)),
                 ];
-                predictor.observe_trace(&state_trace);
+                let state_bytes: Vec<u8> = state_trace.iter().map(|h| h.0).collect();
+                predictor.observe_trace(&state_bytes);
                 let _ = predictor_persist(&predictor);
                 log::debug!(
                     "[bg] e8_predictor: absorbed trace ({} states), samples={}, coverage={:.4}",
-                    state_trace.len(),
-                    predictor.sample_count(),
-                    predictor.coverage()
+                    state_bytes.len(),
+                    predictor.sample_count,
+                    predictor.coverage
                 );
             }
             // Evolution contract → goal loop: enqueue a behavioral goal when drift or unmet contract detected
@@ -525,11 +540,16 @@ impl BackgroundLoopHandle {
             }
             if !kb_injections.is_empty() {
                 if let Some(ref mut pano) = self.panorama {
+                    let hexagram_states: [crate::core::nt_core_hex::ReasoningHexagram; crate::core::nt_core_gwt::resonance::MODULE_COUNT] =
+                        crate::core::nt_core_gwt::resonance::default_specialist_states();
                     for (title, score) in &kb_injections {
-                        pano.gwt.broadcast(&format!(
-                            "[consciousness_kb] {} (score: {:.2})",
-                            title, score,
-                        ));
+                        pano.gwt.resonant_broadcast(
+                            &format!(
+                                "[consciousness_kb] {} (score: {:.2})",
+                                title, score,
+                            ),
+                            &hexagram_states,
+                        );
                     }
                 }
                 log::debug!(

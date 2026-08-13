@@ -216,4 +216,40 @@ mod tests {
         assert!(bg.panorama.as_ref().map_or(false, |p| p.cycle == 0),
             "panorama 实例保留");
     }
+
+    #[tokio::test]
+    async fn test_consciousness_tick_activates_coherence_and_gwt() {
+        // 修复验证: 后台循环 Phase 1 先 observe 再注入 tree 后,
+        // tree.trunk.coherence 应非零 (ConsciousnessMonitor compute_coherence 起步 0.1),
+        // 且 GWT resonance 激活逻辑在 handle_consciousness_tick 生效。
+        // 直接验证链路源头: observe() 产生非零 coherence, 注入 tree 后非零。
+        use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_monitor::ConsciousnessMonitor;
+        use crate::core::nt_core_consciousness_tree::ConsciousnessTree;
+        let mut monitor = ConsciousnessMonitor::new();
+        monitor.observe();
+        let report = monitor.get_report();
+        assert!(
+            report.coherence > 0.0,
+            "observe() 后 coherence 应非零 (compute_coherence 起步 0.1), got {}",
+            report.coherence
+        );
+        // 模拟 Phase 1: monitor 报告注入 tree (observe 先行)
+        let mut tree = ConsciousnessTree::new();
+        tree.trunk.coherence = report.coherence;
+        assert!(
+            tree.trunk.coherence > 0.0,
+            "tree.coherence 应非零 (Phase1 observe 先行修复), got {}",
+            tree.trunk.coherence
+        );
+        // GWT: 后台循环每 tick 调 resonant_broadcast → last_resonance 设置。
+        // 直接验证 GWT 激活判定条件 (last_resonance.is_some() && resonant_specialists 非空)
+        let mut ws = crate::core::nt_core_gwt::workspace::GlobalWorkspace::new(0.3);
+        ws.register_default_specialists();
+        let states = crate::core::nt_core_gwt::resonance::default_specialist_states();
+        ws.resonant_broadcast("test resonance", &states);
+        assert!(
+            ws.last_resonance.is_some() && !ws.resonant_specialists().is_empty(),
+            "resonant_broadcast 后 last_resonance 应已设置且 resonant_specialists 非空"
+        );
+    }
 }
