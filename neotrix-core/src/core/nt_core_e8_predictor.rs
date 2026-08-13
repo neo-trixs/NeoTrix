@@ -184,18 +184,26 @@ pub fn safe_u8(value: i32) -> u8 {
 mod tests {
     use super::*;
 
-    /// 测试隔离: 将 HOME 重定向到临时目录, 避免污染生产 KB (~/.neotrix/knowledge.db)。
+    /// 测试隔离: 为每个调用分配唯一临时 HOME 目录,
+    /// 避免污染生产 KB 且测试间状态互不干扰。
     fn isolate_home() {
-        let tmp = std::env::temp_dir().join(format!("neotrix-e8p-tests-{}", std::process::id()));
+        static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let tmp = std::env::temp_dir().join(format!("neotrix-e8p-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&tmp).ok();
         std::env::set_var("HOME", &tmp);
     }
 
     /// 串行化所有触碰隔离 DB 的测试: 共享同库下并行写会互相覆盖基线,
     /// 使 roundtrip 断言不可判定。用锁保证一次仅一个测试持有 DB。
+    /// 抗中毒: 前一测试 panic 时锁标记中毒, 用 into_inner 恢复继续。
     fn with_kb_lock<T>(f: impl FnOnce() -> T) -> T {
         static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _guard = LOCK.lock().unwrap();
+        let guard = match LOCK.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(), // 前一测试 panic 污染: 恢复锁
+        };
+        let _guard = guard;
         f()
     }
 
@@ -254,6 +262,7 @@ mod tests {
 
     #[test]
     fn test_predict_next_after_observations() {
+        isolate_home();
         let mut p = load();
         // 建立一致转移: 1 → 2 出现 4 次 (>= 保守阈值, 达满置信)
         p.observe_trace(&[1, 2]);
@@ -267,6 +276,7 @@ mod tests {
 
     #[test]
     fn test_predict_next_sparse_conservative() {
+        isolate_home();
         let mut p = load();
         // 仅 1 次观测: 置信度被保守压低 (< 1.0)
         p.observe_trace(&[1, 2]);
@@ -278,6 +288,7 @@ mod tests {
 
     #[test]
     fn test_predict_next_no_data() {
+        isolate_home();
         let p = load();
         let (next, conf) = p.predict_next(5);
         assert_eq!(next, 5); // 无观测时返回当前态
