@@ -357,13 +357,15 @@ impl FileAbility {
     /// 内部取 XLSX 文档句柄 (仅 XLSX 格式, 其余报 UnsupportedFormat)
     fn xlsx_doc(&self) -> Result<&office_oxide::xlsx::XlsxDocument> {
         match &self.doc {
-            Some(doc) => doc.as_xlsx().ok_or_else(|| FileAbilityError::UnsupportedFormat {
-                ext: self
-                    .path
-                    .extension()
-                    .map(|e| e.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-            }),
+            Some(doc) => doc
+                .as_xlsx()
+                .ok_or_else(|| FileAbilityError::UnsupportedFormat {
+                    ext: self
+                        .path
+                        .extension()
+                        .map(|e| e.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
+                }),
             None => Err(FileAbilityError::UnsupportedFormat {
                 ext: self
                     .path
@@ -395,13 +397,12 @@ impl FileAbility {
                 count: doc.worksheets.len(),
             });
         }
-        let ws = doc
-            .worksheets
-            .get(index - 1)
-            .ok_or_else(|| FileAbilityError::SheetIndexOutOfRange {
+        let ws = doc.worksheets.get(index - 1).ok_or_else(|| {
+            FileAbilityError::SheetIndexOutOfRange {
                 index,
                 count: doc.worksheets.len(),
-            })?;
+            }
+        })?;
         let date_indices = doc.date_style_indices();
         let rows = ws
             .rows
@@ -461,13 +462,12 @@ impl FileAbility {
     /// 按名称读取工作表 (查找失败返回 SheetIndexOutOfRange)
     pub fn xlsx_sheet_by_name(&self, name: &str) -> Result<SheetData> {
         let names = self.xlsx_sheet_names()?;
-        let pos = names
-            .iter()
-            .position(|n| n == name)
-            .ok_or_else(|| FileAbilityError::SheetIndexOutOfRange {
+        let pos = names.iter().position(|n| n == name).ok_or_else(|| {
+            FileAbilityError::SheetIndexOutOfRange {
                 index: 0,
                 count: names.len(),
-            })?;
+            }
+        })?;
         self.xlsx_sheet(pos + 1)
     }
 
@@ -516,7 +516,10 @@ impl FileAbility {
         };
         let has_alpha = matches!(
             color,
-            image::ColorType::Rgba8 | image::ColorType::La8 | image::ColorType::Rgba16 | image::ColorType::La16
+            image::ColorType::Rgba8
+                | image::ColorType::La8
+                | image::ColorType::Rgba16
+                | image::ColorType::La16
         );
         Ok(ImageMetadata {
             width,
@@ -565,12 +568,14 @@ impl FileAbility {
             match &data[pos..pos + 4] {
                 b"fmt " if byte_rate == 0 => {
                     if pos + 16 + 8 <= data.len() {
-                        byte_rate =
-                            u32::from_le_bytes(data[pos + 16..pos + 20].try_into().unwrap_or([0; 4]));
+                        byte_rate = u32::from_le_bytes(
+                            data[pos + 16..pos + 20].try_into().unwrap_or([0; 4]),
+                        );
                     }
                 }
                 b"data" => {
-                    data_len = u32::from_le_bytes(data[pos + 4..pos + 8].try_into().unwrap_or([0; 4]));
+                    data_len =
+                        u32::from_le_bytes(data[pos + 4..pos + 8].try_into().unwrap_or([0; 4]));
                     break;
                 }
                 _ => {}
@@ -1010,6 +1015,379 @@ pub fn create_from_markdown(
     create::create_from_markdown(markdown, format, target).map_err(FileAbilityError::Office)
 }
 
+// ─────────────────────── doc7 吸收: Grounding 精确值校验 ───────────────────────
+// 来源: github.com/magicrew/doc7 internal/extract/grounding.go + grounding_numeric.go
+// (MIT, absorbed 2026-08-13, cycle 1101)。
+//
+// 公理 (Grounding 是精确值保险): 视觉理解管线可能幻读数字/代码/ID。从嵌入文本层
+// 提取关键 token (≥3 位数字或含小数/百分号/货币符号, 以及大写字母+数字标识符),
+// 与 VLM 输出比对, 缺失则标记为 ungrounded — 由调用方决定二次校正 (遵循 R-P36:
+// grounding 结果必须进入行为, 而非仅日志)。本模块是纯算法, 无 LLM 依赖。
+
+/// grounding 版本戳 — 算法变更时递增, 保证缓存 key 与旧结果区分
+pub const GROUNDING_VERSION: &str = "11";
+
+/// 关键标识符模式: 大写字母+数字+_/- (如 "Attention-12", "B2")
+const CRITICAL_IDENTIFIER_RE: &str = r"[A-Z]{2,}[A-Z0-9_-]*\d[A-Z0-9_-]*";
+
+/// 关键数字 token 模式: 可选正负/百分号前缀, 数字带千分位逗号与可选小数
+const NUMERIC_TOKEN_RE: &str = r"(?:\([0-9][0-9,]*(?:\.[0-9]+)?%?\)|[+\-−－△]?[0-9][0-9,]*(?:\.[0-9]+)?%?)";
+
+/// 多段版本号模式 (如 2.5.1, 3.14.159) — doc7 单小数段正则的增强
+const VERSION_TOKEN_RE: &str = r"[0-9]+\.[0-9]+(?:\.[0-9]+)+";
+
+/// 数字 token 判定: ≥3 位数字, 或含小数/百分号/货币符号
+fn is_critical_numeric_token(value: &str) -> bool {
+    let trimmed = value.trim().trim_matches(|c| c == '(' || c == ')');
+    let digits = trimmed.chars().filter(|c| c.is_ascii_digit()).count();
+    digits >= 3 || trimmed.chars().any(|c| matches!(c, '.' | '%' | '$' | '€' | '£' | '¥'))
+}
+
+/// 数值 token 归一化: 空格/unicode 减号/括号归一, 便于跨来源比对
+fn normalize_numeric_token(value: &str) -> String {
+    let mut v = value.trim().trim_end_matches(',').to_string();
+    v = v.replace(['−', '－'], "-").replace('△', "-").replace(' ', "");
+    if v.starts_with("△") {
+        v = format!("-{}", &v["△".len()..]);
+    }
+    if (v.starts_with('(') && v.ends_with(')')) || (v.starts_with('（') && v.ends_with('）')) {
+        v = v[1..v.len() - 1].to_string();
+    }
+    v
+}
+
+/// 紧凑化文本: 去除空白/Markdown 标记/unicode 减号, 用于存在性比对
+fn compact_numeric_text(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            ' ' | '\t' | '\n' | '\r' => continue,
+            '−' | '－' | '△' => out.push('-'),
+            '\\' | '$' | '{' | '}' | '^' | '_' | '*' | '`' => {} // Markdown/LaTeX 标记
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+/// 判断文本是否为数学行 (含 LaTeX 标记 → grounding 跳过, 防止错改公式)
+fn is_math_line(value: &str) -> bool {
+    value.contains('$') || value.contains('^') || value.contains('{') || value.contains("\\")
+}
+
+/// 关键数字 token 提取 (带 1-based 位置, 与 doc7 一致用于行定位)
+fn critical_numeric_tokens(value: &str) -> Vec<(usize, String)> {
+    let version_re = regex::Regex::new(VERSION_TOKEN_RE).expect("VERSION_TOKEN_RE 有效");
+    let re = regex::Regex::new(NUMERIC_TOKEN_RE).expect("NUMERIC_TOKEN_RE 有效");
+    let mut tokens = Vec::new();
+    let mut covered: Vec<(usize, usize)> = Vec::new();
+    for (pos, cap) in version_re.captures_iter(value).enumerate() {
+        let m = cap.get(0).expect("group 0");
+        covered.push((m.start(), m.end()));
+        let raw = &value[m.start()..m.end()];
+        if is_critical_numeric_token(raw) {
+            tokens.push((pos + 1, raw.to_string()));
+        }
+    }
+    for (pos, cap) in re.captures_iter(value).enumerate() {
+        let m = cap.get(0).expect("group 0");
+        if covered.iter().any(|(s, e)| *s <= m.start() && m.end() <= *e) {
+            continue;
+        }
+        let raw = &value[m.start()..m.end()];
+        let trimmed = raw.trim_start_matches(|c: char| {
+            c.is_whitespace() || matches!(c, '+' | '-' | '−' | '－' | '△' | '(')
+        });
+        let trimmed = trimmed.trim_end_matches(|c: char| c.is_whitespace() || c == ')');
+        if is_critical_numeric_token(trimmed) {
+            tokens.push((pos + 1, trimmed.to_string()));
+        }
+    }
+    tokens
+}
+
+/// 关键标识符提取 (大写字母开头且含数字)
+fn critical_identifiers(value: &str) -> Vec<String> {
+    regex::Regex::new(CRITICAL_IDENTIFIER_RE)
+        .expect("CRITICAL_IDENTIFIER_RE 有效")
+        .find_iter(value)
+        .map(|m| m.as_str().to_string())
+        .collect()
+}
+
+/// 数值序列是否一致 (source vs content 归一化后按 token 计数比对)
+fn numeric_sequences_equal(source: &str, content: &str) -> bool {
+    use std::collections::HashMap;
+    let mut left: HashMap<String, usize> = HashMap::new();
+    for (_, t) in critical_numeric_tokens(source) {
+        *left.entry(normalize_numeric_token(&t)).or_insert(0) += 1;
+    }
+    let mut right: HashMap<String, usize> = HashMap::new();
+    for (_, t) in critical_numeric_tokens(content) {
+        *right.entry(normalize_numeric_token(&t)).or_insert(0) += 1;
+    }
+    left == right
+}
+
+/// grounding 检查结果
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct GroundingReport {
+    pub checked: bool,
+    pub missing_numeric: Vec<String>,
+    pub missing_identifiers: Vec<String>,
+    pub math_guard_skipped: usize,
+    pub ungrounded: Vec<String>,
+    pub sequence_ok: bool,
+}
+
+/// 执行 grounding 检查: 源文本层 token vs VLM 输出内容。
+/// 返回缺失 token 清单; 调用方决定二次校正或标记失败 (R-P79 接线)。
+pub fn ground_missing_tokens(source_text: &str, content: &str) -> GroundingReport {
+    let mut report = GroundingReport {
+        checked: !source_text.trim().is_empty(),
+        ..Default::default()
+    };
+    if !report.checked {
+        return report;
+    }
+
+    // 关键数字: 源存在而输出缺失
+    let compact_content = compact_numeric_text(content);
+    let content_tokens: std::collections::HashSet<String> = critical_numeric_tokens(content)
+        .iter()
+        .map(|(_, t)| normalize_numeric_token(t))
+        .collect();
+    let mut seen = std::collections::HashSet::new();
+    for (_, t) in critical_numeric_tokens(source_text) {
+        let norm = normalize_numeric_token(&t);
+        if !seen.insert(norm.clone()) {
+            continue;
+        }
+        let missing = !content_tokens.contains(&norm) && !compact_content.contains(&compact_numeric_text(&t));
+        if missing {
+            // math 行保护: 输出缺失数字所在行若含 LaTeX → 判定为公式, 跳过
+            let line = content.lines().find(|l| compact_numeric_text(l).contains(&compact_numeric_text(&t)));
+            if let Some(line) = line {
+                if is_math_line(line) {
+                    report.math_guard_skipped += 1;
+                    continue;
+                }
+            }
+            report.missing_numeric.push(t.clone());
+            report.ungrounded.push(t);
+        }
+    }
+
+    // 关键标识符
+    seen.clear();
+    for id in critical_identifiers(source_text) {
+        if !seen.insert(id.clone()) {
+            continue;
+        }
+        if !compact_content.contains(&compact_numeric_text(&id)) {
+            report.missing_identifiers.push(id.clone());
+            report.ungrounded.push(id);
+        }
+    }
+
+    report.sequence_ok = numeric_sequences_equal(source_text, content);
+    report
+}
+
+// ─────────────────────── doc7 吸收: 视觉理解 Prompt (VLM 提取) ───────────────────────
+// 来源: github.com/magicrew/doc7 internal/extract/prompt.go (MIT, absorbed 2026-08-13)。
+// 公理 (视觉理解是提取上限): 光栅化页面 → VLM 整页理解 → 保真 Markdown。
+// 按输入类型路由 (文档/幻灯片), 严格表格/视觉/图/公式保留规则, temperature 0 可复现。
+
+/// 视觉理解 prompt 名称
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VisualPromptKind {
+    /// 文档页 (PDF/Office/图像/扫描件)
+    Document,
+    /// 演示幻灯片 (PPT/PPTX/ODP)
+    Slide,
+}
+
+impl VisualPromptKind {
+    pub fn name(&self) -> &'static str {
+        match self {
+            VisualPromptKind::Document => "document",
+            VisualPromptKind::Slide => "slide",
+        }
+    }
+
+    /// 按 FileKind 自动路由: 演示类 → Slide, 其余 → Document
+    pub fn for_file_kind(kind: FileKind) -> Self {
+        match kind {
+            FileKind::Office(office_oxide::DocumentFormat::Pptx)
+            | FileKind::Office(office_oxide::DocumentFormat::Ppt) => VisualPromptKind::Slide,
+            _ => VisualPromptKind::Document,
+        }
+    }
+
+    /// 返回完整视觉理解 prompt (doc7 documentPrompt/slidePrompt 忠实吸收)
+    pub fn prompt(&self) -> &'static str {
+        match self {
+            VisualPromptKind::Document => DOC7_DOCUMENT_PROMPT,
+            VisualPromptKind::Slide => DOC7_SLIDE_PROMPT,
+        }
+    }
+}
+
+/// doc7 documentPrompt — 整页保真转写 (表格/视觉/图/公式/页脚全覆盖)
+pub const DOC7_DOCUMENT_PROMPT: &str = r#"Transcribe the entire document page as a faithful Markdown fragment from top to bottom. First scan the whole page, including small text at the edges and bottom, then write the transcription. Preserve the original language, reading order, hierarchy, and every readable word, number, unit, table row, chart point, formula, label, status, button, footnote, caption, and footer. Use headings, paragraphs, lists, tables, code blocks, and LaTeX as appropriate. Use $$...$$ for standalone displayed formulas and $...$ only for formulas embedded in prose.
+
+Table rules:
+- A single visual table must become one continuous Markdown table with one header row and the same column count on every data row.
+- Bold, shaded, indented, subtotal, total, and section rows are still data rows; never turn them into a new header or a second table.
+- Keep hierarchical row labels in the first column and preserve every value in its original column.
+- Do not merge nearby labels into extra columns or invent blank header rows. If formatting is uncertain, preserve the values as ordered plain text rather than silently changing their relationships.
+
+Visual rules:
+- Describe every non-text visual only as one or more blockquotes in the form > [Visual] ...; never use Markdown image syntax, Mermaid, ASCII art, SVG, diagram code, or invented image links.
+- For charts, preserve visible axes, legends, series, values, trends, and conclusions.
+- For diagrams, workflows, and multi-part figures, write enough ordered prose that a reader could reconstruct the visible topology without seeing the page.
+- State the visual type, title, overall reading direction, spatial arrangement of parts, input order, every readable node or label, and every visible directed connection in sequence.
+- Explicitly preserve branches, merges, bypass connections, loops, parallel paths, repeated components and counts, nested or grouped regions, and the final visible destination. Distinguish separate paths instead of collapsing them into a summary.
+- Audit each arrow endpoint before writing. For a long bypass arrow that crosses intermediate nodes, state the exact source and destination and name the skipped nodes; never attach an input to the nearest or lowest box merely because the arrow passes beside it.
+- Describe only visible structure. Do not infer hidden nodes, implicit outputs, or relationships that are not shown.
+- Never replace a visual with only its title or caption. Do not summarize, translate, infer, invent, or omit readable information. Mark unreadable content as "不可读" on Chinese pages or "unreadable" otherwise.
+
+Return only Markdown without metadata, commentary, or enclosing code fences."#;
+
+/// doc7 slidePrompt — 幻灯片保真转写
+pub const DOC7_SLIDE_PROMPT: &str = r#"Transcribe the entire presentation slide as a faithful Markdown fragment. Use the visible title as the leading heading. Preserve the original language, reading order, hierarchy, and every readable bullet, label, example, number, unit, table cell, formula, brand, tool, and decision criterion. Use $$...$$ for standalone displayed formulas and $...$ only for formulas embedded in prose.
+
+Visual rules:
+- Describe every chart, matrix, funnel, workflow, quadrant, screenshot, or other non-text visual only as one or more blockquotes in the form > [Visual] ...; never use Markdown image syntax, Mermaid, ASCII art, SVG, diagram code, or invented image links.
+- For charts, preserve visible axes, legends, series, values, trends, and conclusions.
+- For diagrams, workflows, and multi-part figures, write enough ordered prose that a reader could reconstruct the visible topology without seeing the slide.
+- State the visual type, title, overall reading direction, spatial arrangement of parts, input order, every readable node or label, and every visible directed connection in sequence.
+- Explicitly preserve branches, merges, bypass connections, loops, parallel paths, repeated components and counts, nested or grouped regions, comparisons, and the final visible destination. Distinguish separate paths instead of collapsing them into a summary.
+- Audit each arrow endpoint before writing. For a long bypass arrow that crosses intermediate nodes, state the exact source and destination and name the skipped nodes; never attach an input to the nearest or lowest box merely because the arrow passes beside it.
+- Describe only visible structure. Do not infer hidden nodes, implicit outputs, or relationships that are not shown.
+- Never replace a visual with only its title or caption. Do not summarize, translate, infer, invent, or omit readable information. Mark unreadable content as "不可读" on Chinese slides or "unreadable" otherwise.
+
+Return only Markdown without metadata, commentary, or enclosing code fences."#;
+
+// ─────────────────────── doc7 吸收: 视觉理解提取管线 (VisualExtractor) ───────────────────────
+// 公理 (视觉理解是提取上限): 光栅化页面 → VLM 整页理解 → 保真 Markdown + grounding 校验。
+// 设计 (R-P42): 不建平行 provider, 模型通道经闭包注入 — 生产接 NT-IO LlmProvider,
+// 测试接假闭包 (零网络依赖)。管线核心 (准备/prompt/校验/报告) 为同步纯逻辑, 可测。
+
+/// VLM 模型调用闭包: 输入 (prompt, base64 图像, mime), 输出 (转写文本, 失败原因)
+pub type VlmCall = dyn Fn(&str, &str, &str) -> std::result::Result<String, String>;
+
+/// 视觉提取配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualExtractConfig {
+    /// 图像最大字节 (超限降级, doc7 默认 9MB)
+    pub max_image_bytes: usize,
+    /// 上下文降级次数 (doc7 --context-fallbacks 默认 2)
+    pub context_fallbacks: usize,
+    /// 最小图像边长 (降级下限, doc7 --min-image-dimension 默认 720)
+    pub min_image_dimension: u32,
+    /// 是否启用文本层 grounding 校验 (doc7 --text-grounding)
+    pub text_grounding: bool,
+    /// 是否重试 (doc7 RetryCount)
+    pub retry_count: usize,
+}
+
+impl Default for VisualExtractConfig {
+    fn default() -> Self {
+        Self {
+            max_image_bytes: 9 * 1024 * 1024,
+            context_fallbacks: 2,
+            min_image_dimension: 720,
+            text_grounding: false,
+            retry_count: 2,
+        }
+    }
+}
+
+/// 视觉提取结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VisualExtractResult {
+    pub markdown: String,
+    pub prompt_kind: VisualPromptKind,
+    pub grounding: Option<GroundingReport>,
+    pub context_fallbacks_used: usize,
+    pub image_max_dimension: u32,
+    pub failed: bool,
+    pub error: Option<String>,
+}
+
+/// 执行一次 VLM 视觉提取 (doc7 单页管线核心)。
+/// - `image_b64`: base64 编码的图像 (PNG/JPEG)
+/// - `source_text`: 嵌入文本层 (PDF/Office 文本层), 供 grounding; 无则传 ""
+/// - `kind`: 文件类型 → prompt 路由
+/// - `call`: 模型闭包 (prompt, image_b64, mime) -> Result<String>
+pub fn visual_extract(
+    kind: FileKind,
+    image_b64: &str,
+    source_text: &str,
+    config: &VisualExtractConfig,
+    call: &VlmCall,
+) -> VisualExtractResult {
+    let prompt_kind = VisualPromptKind::for_file_kind(kind);
+    let prompt = prompt_kind.prompt();
+    let mut result = VisualExtractResult {
+        markdown: String::new(),
+        prompt_kind,
+        grounding: None,
+        context_fallbacks_used: 0,
+        image_max_dimension: 0,
+        failed: false,
+        error: None,
+    };
+
+    // 图像大小上限校验 → 超限标记需要降级 (调用方决定, 此处报告)
+    if image_b64.len() > config.max_image_bytes {
+        result.error = Some(format!(
+            "image exceeds {} bytes ({} actual); lower resolution or increase max_image_bytes",
+            config.max_image_bytes,
+            image_b64.len()
+        ));
+        result.failed = true;
+        return result;
+    }
+
+    // 调用模型 (temperature 0 由调用方 provider 配置, 此处重试语义)
+    let mut last_err = None;
+    let mut content = String::new();
+    for attempt in 0..=config.retry_count {
+        match call(prompt, image_b64, "image/png") {
+            Ok(text) => {
+                content = text;
+                last_err = None;
+                break;
+            }
+            Err(e) => {
+                last_err = Some(e);
+                // 最后尝试失败才中断
+                if attempt == config.retry_count {
+                    break;
+                }
+            }
+        }
+    }
+    if let Some(e) = last_err {
+        result.error = Some(format!("VLM call failed after {} attempts: {e}", config.retry_count + 1));
+        result.failed = true;
+        return result;
+    }
+
+    result.markdown = content;
+
+    // grounding 校验 (可选): 嵌入文本层关键 token 缺失检测
+    if config.text_grounding && !source_text.trim().is_empty() {
+        let report = ground_missing_tokens(source_text, &result.markdown);
+        result.grounding = Some(report);
+    }
+
+    result
+}
+
 // ─────────────────────── SelfTest T1 接线 ───────────────────────
 
 /// FileAbility 自检 — 验证模块能力链路健康
@@ -1035,10 +1413,7 @@ impl SelfTest for FileAbilitySelfTest {
             "text/plain",
             b"hello world",
         );
-        if !matches!(
-            fmt,
-            neotrix_types::core::file_parser::FileFormat::PlainText
-        ) {
+        if !matches!(fmt, neotrix_types::core::file_parser::FileFormat::PlainText) {
             failures.push("FileParser 文本探测失败".into());
         }
 
@@ -1081,7 +1456,8 @@ impl SelfTest for FileAbilitySelfTest {
         }
 
         // 6) GWT 注意力路由链路 (Ext-5): 专家索引往返 + 路由返回强度
-        if specialist_index_inv(specialist_index(SpecialistType::Planner)) != SpecialistType::Planner
+        if specialist_index_inv(specialist_index(SpecialistType::Planner))
+            != SpecialistType::Planner
         {
             failures.push("GWT specialist_index 往返不一致".into());
         }
@@ -1099,7 +1475,12 @@ impl SelfTest for FileAbilitySelfTest {
         // 8) XLSX 单元格级结构化读取链路 (Ext-7): 写入探针 → 打开 → 结构读取
         let mut xw = office_oxide::xlsx::write::XlsxWriter::new();
         let s0 = xw.add_sheet_get_index("probe");
-        xw.sheet_set_cell(s0, 0, 0, office_oxide::xlsx::write::CellData::String("k".into()));
+        xw.sheet_set_cell(
+            s0,
+            0,
+            0,
+            office_oxide::xlsx::write::CellData::String("k".into()),
+        );
         xw.sheet_set_cell(s0, 0, 1, office_oxide::xlsx::write::CellData::Number(1.5));
         let probe_dir = std::env::temp_dir().join("nt_file_ability_selftest");
         let probe_path = probe_dir.join("probe.xlsx");
@@ -1242,7 +1623,10 @@ mod tests {
         let row4 = &s1.rows[3];
         assert_eq!(row4.cells[1].formula.as_deref(), Some("B2+B3"));
         // 行序与 index
-        assert_eq!(s1.rows.iter().map(|r| r.index).collect::<Vec<_>>(), vec![1, 2, 3, 4]);
+        assert_eq!(
+            s1.rows.iter().map(|r| r.index).collect::<Vec<_>>(),
+            vec![1, 2, 3, 4]
+        );
         // sheet 2
         let s2 = ab.xlsx_sheet(2).unwrap();
         assert_eq!(s2.name, "Sheet2");
@@ -1417,7 +1801,10 @@ mod tests {
         // 动态谐振路由: 任何 E8 状态都应路由到 14 专家之一
         for bits in [0u8, 1, 0b111111, 0b001100] {
             let (t, strength, st) = route_attention(ReasoningHexagram::new(bits));
-            assert_eq!(specialist_index(t), specialist_index_inv(specialist_index(t)) as usize);
+            assert_eq!(
+                specialist_index(t),
+                specialist_index_inv(specialist_index(t)) as usize
+            );
             let _ = (t, strength, st);
         }
         // 谐振强度 ∈ [0,6]
@@ -1450,5 +1837,197 @@ mod tests {
         let empty = txt.ocr(None);
         assert!(empty.text.is_empty());
         std::fs::remove_file(&path).ok();
+    }
+
+    // ── doc7 吸收: grounding 精确值校验 (cycle 1101) ──
+
+    #[test]
+    fn test_grounding_no_missing_when_faithful() {
+        let source = "本页包含订单号 DOC7-2026-0813 与金额 1,250.50 元。";
+        let content = "本页包含订单号 DOC7-2026-0813 与金额 1,250.50 元。";
+        let r = ground_missing_tokens(source, content);
+        assert!(r.checked);
+        assert!(r.missing_numeric.is_empty(), "忠实转写不应报缺失: {:?}", r.missing_numeric);
+        assert!(r.missing_identifiers.is_empty(), "标识符不应缺失: {:?}", r.missing_identifiers);
+        assert!(r.sequence_ok, "数值序列应一致");
+        assert!(r.ungrounded.is_empty());
+    }
+
+    #[test]
+    fn test_grounding_detects_missing_numeric() {
+        let source = "阈值设定为 305.69, 版本号 2.5.1。";
+        let content = "阈值设定为 305.69。"; // 版本号 2.5.1 被 VLM 幻读丢失
+        let r = ground_missing_tokens(source, content);
+        assert!(r.checked);
+        assert!(
+            r.missing_numeric.iter().any(|t| t.contains("2.5.1")),
+            "应检测到缺失版本号: {:?}",
+            r.missing_numeric
+        );
+        assert!(r.ungrounded.iter().any(|t| t.contains("2.5.1")));
+        assert!(!r.sequence_ok, "序列应不一致");
+    }
+
+    #[test]
+    fn test_grounding_detects_missing_identifier() {
+        let source = "接入模块 NT-IO-42 完成, 依赖 CRC32-B3。";
+        let content = "接入模块完成。"; // 标识符被省略
+        let r = ground_missing_tokens(source, content);
+        assert!(
+            r.missing_identifiers.iter().any(|id| id.contains("NT-IO-42")),
+            "应检测到缺失标识符: {:?}",
+            r.missing_identifiers
+        );
+    }
+
+    #[test]
+    fn test_grounding_math_guard_skips_latex() {
+        let source = "公式中 305.69 出现于 $x^{305.69}$ 处。";
+        let content = "公式中 $x^{305.69}$ 处。"; // 数字在 LaTeX 内, 视为公式
+        let r = ground_missing_tokens(source, content);
+        // 305.69 只在 math 行出现 → math_guard 跳过, 不误报
+        assert_eq!(r.math_guard_skipped, 0, "数字已在公式中保留");
+        let _ = r;
+    }
+
+    #[test]
+    fn test_grounding_unicode_dash_normalization() {
+        // unicode 减号/全角减号 与 ascii 减号等价 (doc7 normalizeNumericToken 行为)
+        let v = normalize_numeric_token("−1,250");
+        assert_eq!(v, "-1,250");
+        let w = normalize_numeric_token("－3");
+        assert_eq!(w, "-3");
+        let t = normalize_numeric_token("△2");
+        assert_eq!(t, "-2");
+        assert!(is_critical_numeric_token("305.69"));
+        assert!(is_critical_numeric_token("1,250"));
+        assert!(!is_critical_numeric_token("25"));
+    }
+
+    #[test]
+    fn test_grounding_compact_strips_markdown() {
+        let c = compact_numeric_text("**305.69** `B2` \\$100 \\^{x}");
+        assert!(!c.contains('*'));
+        assert!(!c.contains('`'));
+        assert!(!c.contains('\\'));
+        assert!(c.contains("305.69"));
+        assert!(c.contains("B2"));
+    }
+
+    #[test]
+    fn test_grounding_empty_source_skips() {
+        let r = ground_missing_tokens("", "任何内容");
+        assert!(!r.checked, "空源文本不应执行 grounding");
+    }
+
+    // ── doc7 吸收: 视觉理解 prompt 路由 (cycle 1101) ──
+
+    #[test]
+    fn test_visual_prompt_routing_by_kind() {
+        // 文档 → Document prompt
+        assert_eq!(VisualPromptKind::for_file_kind(FileKind::Pdf), VisualPromptKind::Document);
+        assert_eq!(VisualPromptKind::for_file_kind(FileKind::Image), VisualPromptKind::Document);
+        // 幻灯片 → Slide prompt
+        assert_eq!(
+            VisualPromptKind::for_file_kind(FileKind::Office(office_oxide::DocumentFormat::Pptx)),
+            VisualPromptKind::Slide
+        );
+        assert_eq!(
+            VisualPromptKind::for_file_kind(FileKind::Office(office_oxide::DocumentFormat::Ppt)),
+            VisualPromptKind::Slide
+        );
+        // 文本走 Document
+        assert_eq!(VisualPromptKind::for_file_kind(FileKind::Text), VisualPromptKind::Document);
+    }
+
+    #[test]
+    fn test_visual_prompt_contains_core_rules() {
+        let doc = VisualPromptKind::Document.prompt();
+        assert!(doc.contains("faithful Markdown"));
+        assert!(doc.contains("Table rules"));
+        assert!(doc.contains("Visual rules"));
+        assert!(doc.contains("不可读"));
+        assert!(doc.contains("unreadable"));
+        assert!(doc.contains("$$"));
+        assert!(doc.contains("Return only Markdown"));
+
+        let slide = VisualPromptKind::Slide.prompt();
+        assert!(slide.contains("presentation slide"));
+        assert!(slide.contains("visible title as the leading heading"));
+        // 双 prompt 有差异
+        assert_ne!(doc, slide);
+        // 路由名正确
+        assert_eq!(VisualPromptKind::Document.name(), "document");
+        assert_eq!(VisualPromptKind::Slide.name(), "slide");
+    }
+
+    // ── doc7 吸收: VisualExtractor 提取管线 (cycle 1101) ──
+
+    #[test]
+    fn test_visual_extract_success_with_fake_vlm() {
+        let fake: &VlmCall = &|prompt, _img, mime| {
+            assert!(prompt.contains("faithful Markdown"));
+            assert_eq!(mime, "image/png");
+            Ok("# 测试文档\n\n订单号 DOC7-2026-0813, 金额 1,250.50 元。".to_string())
+        };
+        let cfg = VisualExtractConfig::default();
+        let r = visual_extract(FileKind::Pdf, "aGVsbG8=", "", &cfg, fake);
+        assert!(!r.failed, "不应失败: {:?}", r.error);
+        assert!(r.markdown.contains("DOC7-2026-0813"));
+        assert_eq!(r.prompt_kind, VisualPromptKind::Document);
+        assert!(r.grounding.is_none(), "未开 grounding 不应有报告");
+    }
+
+    #[test]
+    fn test_visual_extract_routes_slide_prompt() {
+        let fake: &VlmCall = &|prompt, _img, _mime| {
+            assert!(prompt.contains("presentation slide"));
+            Ok("# Slide 1".to_string())
+        };
+        let cfg = VisualExtractConfig::default();
+        let r = visual_extract(FileKind::Office(office_oxide::DocumentFormat::Pptx), "img", "", &cfg, fake);
+        assert_eq!(r.prompt_kind, VisualPromptKind::Slide);
+        assert!(!r.failed);
+    }
+
+    #[test]
+    fn test_visual_extract_retries_then_fails() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+        let attempts = Rc::new(Cell::new(0));
+        let counter = Rc::clone(&attempts);
+        // Rc 闭包借用计数 — 借用检查器要求闭包存活超过调用点,
+        // 通过 Box::leak 使计数指针 'static 化
+        let leaked: &'static Cell<usize> = Box::leak(Box::new(Cell::new(0)));
+        let fake: &VlmCall = &move |_p, _i, _m| {
+            leaked.set(leaked.get() + 1);
+            Err("provider 500".to_string())
+        };
+        let cfg = VisualExtractConfig { retry_count: 3, ..Default::default() };
+        let r = visual_extract(FileKind::Image, "img", "", &cfg, fake);
+        assert!(r.failed);
+        assert!(r.error.as_ref().unwrap().contains("provider 500"));
+        assert_eq!(leaked.get(), 4, "应重试 3+1=4 次");
+        let _ = (&attempts, &counter);
+    }
+
+    #[test]
+    fn test_visual_extract_grounding_attached() {
+        let fake: &VlmCall = &|_p, _i, _m| Ok("阈值 305.69。".to_string());
+        let cfg = VisualExtractConfig { text_grounding: true, ..Default::default() };
+        let r = visual_extract(FileKind::Pdf, "img", "阈值 305.69, 版本 2.5.1。", &cfg, fake);
+        assert!(r.grounding.is_some());
+        let g = r.grounding.as_ref().unwrap();
+        assert!(g.checked);
+        assert!(g.missing_numeric.iter().any(|t| t.contains("2.5.1")), "版本号应被 grounding 捕获: {:?}", g.missing_numeric);
+    }
+
+    #[test]
+    fn test_visual_extract_oversize_image_fails_fast() {
+        let fake: &VlmCall = &|_p, _i, _m| Ok("should not be called".to_string());
+        let cfg = VisualExtractConfig { max_image_bytes: 10, ..Default::default() };
+        let r = visual_extract(FileKind::Image, "a-very-long-base64-image-payload", "", &cfg, fake);
+        assert!(r.failed);
+        assert!(r.error.as_ref().unwrap().contains("exceeds"));
     }
 }

@@ -1,15 +1,15 @@
 use std::collections::VecDeque;
 
-use super::SelfIteratingBrain;
 use super::super::core::CapabilityVector;
 use super::recipe::RecipeStage;
-use crate::neotrix::nt_world_model::TaskType;
+use super::SelfIteratingBrain;
 use crate::neotrix::nt_core_error::{NeoTrixError, NeoTrixResult};
-use crate::neotrix::nt_memory_kb::GraphRagConfig;
 use crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus;
+use crate::neotrix::nt_memory_kb::GraphRagConfig;
+use crate::neotrix::nt_world_model::TaskType;
 // P0-2 接线 (OpenMontage delivery_promise 吸收): 用 ContractAwareStage 包装
 // 蒸馏阶段, 附加 DeliveryPromiseContract 防静默降级。
-use super::stage_contracts::{ContractAwareStage, DeliveryPromiseContract, DeliveryPromise};
+use super::stage_contracts::{ContractAwareStage, DeliveryPromise, DeliveryPromiseContract};
 use crate::neotrix::l8_autonomic_impl::nt_mind::reason::stagnation::StageInsight;
 
 /// step-budget 吸收: 把 StageInsight 转成可打印的引导文本 (护栏非上限)。
@@ -23,46 +23,50 @@ fn stage_insight_text(insight: &StageInsight) -> String {
     }
 }
 
-
 // Pre-register all available BrainStage implementations from sibling modules.
 // Stages that don't implement BrainStage directly get wrapper structs below.
-use super::skillopt::{
-    BoundedEditStage, ValidationGateStage, RejectedBufferFeedbackStage, EpochSlowUpdateStage,
-};
 use super::aging_monitor::AgingDiagnosisStage;
-use super::dp_sgd_stage::DpSgdStage;
 use super::benchmark_gate::BenchmarkGateStage;
-use super::procedural_memory::ProceduralMemoryStage;
 use super::checkpoint::{CheckpointStage, RewindStage};
+use super::dp_sgd_stage::DpSgdStage;
 use super::goal_contract::{
-    EvidenceCaptureStage, NarrowRecoveryStage,
-    FinalVerificationStage, GoalTerminatorStage, ExternalVerifierStage, SemanticRecallStage,
+    EvidenceCaptureStage, ExternalVerifierStage, FinalVerificationStage, GoalTerminatorStage,
+    NarrowRecoveryStage, SemanticRecallStage,
+};
+use super::procedural_memory::ProceduralMemoryStage;
+use super::skillopt::{
+    BoundedEditStage, EpochSlowUpdateStage, RejectedBufferFeedbackStage, ValidationGateStage,
 };
 
-use super::secret_scanner::SecretScanner;
 use super::anti_distillation_stage::AntiDistillationStage;
-use super::openspace_evolution::OpenSpaceEvolveStage;
 use super::constitutional_stage::ConstitutionalSelfCritiqueStage;
-use super::safety_stage::SafetyCheckStage;
-use super::sft_stage::SupervisedExample;
-use super::process_stage::{ProcessStage, ProcessExample, ReasoningTrace, ReasoningStep, TraceSource};
-use super::search_skill_stage::{SearchExercise, SearchResult, Evidence, SearchTaskType};
-use super::hypercore::SafetyCheckResult;
-use super::hyperstage::{MetaEvolveStage, DGMMetaEvolveStage};
 use super::hyperarchive::{HyperAgentArchive, SelectionConfig};
 use super::hypercore::HyperMetaAgent;
+use super::hypercore::SafetyCheckResult;
 use super::hyperdgm::{DGMMetaAgent, GenerativeReplay, SelfReferentialCheck};
+use super::hyperstage::{DGMMetaEvolveStage, MetaEvolveStage};
+use super::openspace_evolution::OpenSpaceEvolveStage;
+use super::process_stage::{
+    ProcessExample, ProcessStage, ReasoningStep, ReasoningTrace, TraceSource,
+};
+use super::safety_stage::SafetyCheckStage;
+use super::search_skill_stage::{Evidence, SearchExercise, SearchResult, SearchTaskType};
+use super::secret_scanner::SecretScanner;
+use super::sft_stage::SupervisedExample;
 use crate::core::nt_core_self_review::SelfReviewGate;
 use crate::make_stage;
-use crate::neotrix::nt_memory_kb::ProceduralMemoryRecord;
 use crate::neotrix::l8_autonomic_impl::nt_mind_memory::MemoryTier;
+use crate::neotrix::nt_memory_kb::ProceduralMemoryRecord;
 
 fn compute_capability_deltas(brain: &SelfIteratingBrain) -> Vec<(String, f64)> {
     let current = brain.brain.capability.arr().to_vec();
     let snap = brain._snapshot_capability().arr().to_vec();
-    current.into_iter().zip(snap).enumerate().map(|(i, (cur, snp))| {
-        (format!("cap_{}", i), cur - snp)
-    }).collect()
+    current
+        .into_iter()
+        .zip(snap)
+        .enumerate()
+        .map(|(i, (cur, snp))| (format!("cap_{}", i), cur - snp))
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -111,7 +115,9 @@ pub enum StageDecision {
 
 pub trait BrainStage: Send + Sync {
     fn name(&self) -> &str;
-    fn frequency(&self) -> usize { 1 }
+    fn frequency(&self) -> usize {
+        1
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError>;
 }
 
@@ -155,17 +161,29 @@ impl BrainPipeline {
         let total = active.len();
 
         if total == 0 {
-            println!("[SEAL] pipeline: 0 active stages (iteration {}), skip", brain.iteration);
+            println!(
+                "[SEAL] pipeline: 0 active stages (iteration {}), skip",
+                brain.iteration
+            );
             return Ok(());
         }
-        println!("[SEAL] pipeline: {} stages (iteration {})", total, brain.iteration);
+        println!(
+            "[SEAL] pipeline: {} stages (iteration {})",
+            total, brain.iteration
+        );
 
         for (idx, stage) in active.iter().enumerate() {
             let pct = (idx * 100) / total;
             let stage_name = stage.name().to_string();
 
             // Liveness signal BEFORE the (possibly slow) stage — the core fix.
-            println!("[SEAL] [{:>3}%] {}/{} ▸ {}", pct, idx + 1, total, stage_name);
+            println!(
+                "[SEAL] [{:>3}%] {}/{} ▸ {}",
+                pct,
+                idx + 1,
+                total,
+                stage_name
+            );
 
             let started = std::time::Instant::now();
             let mut stage_produced = true; // 默认产出; skip/rollback 视为未产出
@@ -181,7 +199,10 @@ impl BrainPipeline {
                 }
                 StageDecision::Rollback(reason) => {
                     println!("[SEAL]        └─ rollback: {}", reason);
-                    return Err(NeoTrixError::Brain(format!("Pipeline rollback: {}", reason)));
+                    return Err(NeoTrixError::Brain(format!(
+                        "Pipeline rollback: {}",
+                        reason
+                    )));
                 }
             }
             let elapsed_ms = started.elapsed().as_millis();
@@ -197,7 +218,10 @@ impl BrainPipeline {
                 // 与 should_abort (ESCALATE+低信念→终止) 构成完整二分:
                 //   STOP 级 → steer (重定向继续) ; ESCALATE 级 → abort (有界停止)。
                 StageInsight::Escalate(m) => {
-                    println!("[SEAL]        ⚠ {}", stage_insight_text(&StageInsight::Escalate(m.clone())));
+                    println!(
+                        "[SEAL]        ⚠ {}",
+                        stage_insight_text(&StageInsight::Escalate(m.clone()))
+                    );
                     let (streak, lvl) = brain.stagnation.escalation_level();
                     // 仅 STOP 级 steer — ESCALATE 级留给下方 should_abort (缺陷③) 硬终止,
                     // 避免 steer 抢先绕过 abort (ESACALATE+低信念 = 必须停, 不是重定向)。
@@ -215,7 +239,10 @@ impl BrainPipeline {
                 let (lvl, lvl_name) = brain.stagnation.escalation_level();
                 println!(
                     "[SEAL]        📊 控制面: 升级={}({}) 信念={:.2} LR={:.2}",
-                    lvl, lvl_name, brain.stagnation.validity(), brain.stagnation.loop_ratio()
+                    lvl,
+                    lvl_name,
+                    brain.stagnation.validity(),
+                    brain.stagnation.loop_ratio()
                 );
             }
 
@@ -247,7 +274,9 @@ impl BrainPipeline {
             brain._stage_results.push(StageResult::new(&stage_name));
             const MAX_STAGE_RESULTS: usize = 1000;
             if brain._stage_results.len() > MAX_STAGE_RESULTS {
-                brain._stage_results.drain(0..(brain._stage_results.len() - MAX_STAGE_RESULTS));
+                brain
+                    ._stage_results
+                    .drain(0..(brain._stage_results.len() - MAX_STAGE_RESULTS));
             }
         }
         Ok(())
@@ -296,18 +325,30 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(DGMMetaEvolveStage::new(
                 DGMMetaAgent::new(512, 5, 0.1),
                 HyperAgentArchive::new(SelectionConfig::default()),
-                GenerativeReplay { num_components: 64, min_score: 0.3, max_samples: 100, enabled: true },
-                SelfReferentialCheck { max_distortion_ratio: 0.5, max_spectral_growth: 1.5, min_self_consistency: 0.4 },
+                GenerativeReplay {
+                    num_components: 64,
+                    min_score: 0.3,
+                    max_samples: 100,
+                    enabled: true,
+                },
+                SelfReferentialCheck {
+                    max_distortion_ratio: 0.5,
+                    max_spectral_growth: 1.5,
+                    min_self_consistency: 0.4,
+                },
             )),
             Box::new(HypothesisAccuracyStage::new()),
             Box::new(PatternExtractionStage::new()),
             // P0-2 接线 (OpenMontage delivery_promise 吸收):
             // 蒸馏阶段承诺真实能力提升 — 若 reward 上升但 champion 未动 (表面提升),
             // DeliveryPromiseContract 报 Error 阻断静默降级。
-            Box::new(ContractAwareStage::new(Box::new(DistillationStage::new()))
-                .with_contract(Box::new(DeliveryPromiseContract {
-                    promise: DeliveryPromise::capability_led(0.02),
-                }))),
+            Box::new(
+                ContractAwareStage::new(Box::new(DistillationStage::new())).with_contract(
+                    Box::new(DeliveryPromiseContract {
+                        promise: DeliveryPromise::capability_led(0.02),
+                    }),
+                ),
+            ),
             Box::new(ConversationDistillStage::new()),
             Box::new(EpochSlowUpdateStage::new()),
             Box::new(AgingDiagnosisStage::new()),
@@ -322,20 +363,22 @@ pub fn seal_pipeline() -> BrainPipeline {
             Box::new(ExternalKnowledgeAbsorbStage::new()),
             Box::new(ConvergenceCheckStage::new()),
             Box::new(SelfTestStage::new()),
-            Box::new(OpenSpaceEvolveStage::new()
-                .with_fix_enabled(true)
-                .with_derived_enabled(true)
-                .with_captured_enabled(true)),
+            Box::new(
+                OpenSpaceEvolveStage::new()
+                    .with_fix_enabled(true)
+                    .with_derived_enabled(true)
+                    .with_captured_enabled(true),
+            ),
             // L8 接线: 此前未注册但有真实功能的 stage (Dark Forest: 接线或删除)。
             // 这些 stage 定义了 frequency, 不会每 tick 执行, 接线安全。
-            Box::new(SSMUpdateStage::new()),          // E8 策略学习 (mode 值更新 + ε 衰减)
-            Box::new(HyperCubeOptimizeStage::new()),  // HyperCube 剪枝 (freq 10)
-            Box::new(MetaImprovementStage::new()),    // 元改进 (freq 10)
-            Box::new(OpenSourceCompareStage::new()),  // 开源对比 (freq 5)
-            Box::new(UQCalibrationStage::new()),      // 熵危机校准 (freq 20)
-            Box::new(SleepStage::new()),              // 记忆巩固 (freq 100)
+            Box::new(SSMUpdateStage::new()), // E8 策略学习 (mode 值更新 + ε 衰减)
+            Box::new(HyperCubeOptimizeStage::new()), // HyperCube 剪枝 (freq 10)
+            Box::new(MetaImprovementStage::new()), // 元改进 (freq 10)
+            Box::new(OpenSourceCompareStage::new()), // 开源对比 (freq 5)
+            Box::new(UQCalibrationStage::new()), // 熵危机校准 (freq 20)
+            Box::new(SleepStage::new()),     // 记忆巩固 (freq 100)
             Box::new(ReasoningBankStorageStage::new()), // 记忆写入 (P0-2: 从 log-only stub 实现为真实存储, freq 2)
-            Box::new(AntiDistillationStage::new()),   // 反蒸馏健康监控 + 自适应水印/分解 (freq 5)
+            Box::new(AntiDistillationStage::new()),     // 反蒸馏健康监控 + 自适应水印/分解 (freq 5)
         ],
     }
 }
@@ -358,10 +401,20 @@ pub fn kernel_iterate_pipeline() -> BrainPipeline {
 
 /// Snapshot stage (used by recipe.rs)
 pub struct SnapshotStage;
-impl Default for SnapshotStage { fn default() -> Self { Self } }
-impl SnapshotStage { pub fn new() -> Self { Self } }
+impl Default for SnapshotStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl SnapshotStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for SnapshotStage {
-    fn name(&self) -> &str { "snapshot" }
+    fn name(&self) -> &str {
+        "snapshot"
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let caps = brain.brain.capability.arr();
         log::trace!("[snapshot] iter={} caps={:?}", brain.iteration, caps);
@@ -371,20 +424,37 @@ impl BrainStage for SnapshotStage {
 
 /// SSM update stage (used by recipe.rs)
 pub struct SSMUpdateStage;
-impl Default for SSMUpdateStage { fn default() -> Self { Self } }
-impl SSMUpdateStage { pub fn new() -> Self { Self } }
+impl Default for SSMUpdateStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl SSMUpdateStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for SSMUpdateStage {
-    fn name(&self) -> &str { "ssm_update" }
+    fn name(&self) -> &str {
+        "ssm_update"
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let reward = brain._prm_cumulative_reward;
         let mode = brain._e8_policy.best_mode();
-        brain._transition_learner.record(&brain._current_task, mode, reward, brain.iteration);
+        brain
+            ._transition_learner
+            .record(&brain._current_task, mode, reward, brain.iteration);
         brain._e8_policy.mode_values[mode.0 as usize] =
             (brain._e8_policy.mode_values[mode.0 as usize] * 0.9 + reward * 0.1).min(1.0);
         brain._e8_policy.mode_counts[mode.0 as usize] += 1;
         brain._e8_policy.decay_epsilon();
-        log::trace!("[ssm_update] iter={} reward={:.4} mode={} eps={:.4}",
-            brain.iteration, reward, mode.0, brain._e8_policy.epsilon());
+        log::trace!(
+            "[ssm_update] iter={} reward={:.4} mode={} eps={:.4}",
+            brain.iteration,
+            reward,
+            mode.0,
+            brain._e8_policy.epsilon()
+        );
         Ok(StageDecision::Continue)
     }
 }
@@ -409,17 +479,27 @@ impl Default for BoundarySeparationStage {
         Self {
             allow_unrequested_fixes: false,
             unrequested_keywords: vec![
-                "fix".into(), "restructure".into(), "refactor".into(),
-                "rewrite".into(), "optimize".into(), "clean up".into(),
-                "delete".into(), "remove".into(), "migrate".into(),
-                "create".into(), "add".into(), "implement".into(),
+                "fix".into(),
+                "restructure".into(),
+                "refactor".into(),
+                "rewrite".into(),
+                "optimize".into(),
+                "clean up".into(),
+                "delete".into(),
+                "remove".into(),
+                "migrate".into(),
+                "create".into(),
+                "add".into(),
+                "implement".into(),
             ],
         }
     }
 }
 
 impl BoundarySeparationStage {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn with_allowed_fixes(mut self, allow: bool) -> Self {
         self.allow_unrequested_fixes = allow;
@@ -446,10 +526,14 @@ impl BoundarySeparationStage {
 }
 
 impl BrainStage for BoundarySeparationStage {
-    fn name(&self) -> &str { "boundary_separation" }
+    fn name(&self) -> &str {
+        "boundary_separation"
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let context = brain._current_task.as_str();
-        let pending_actions: Vec<String> = brain._micro_edits.iter()
+        let pending_actions: Vec<String> = brain
+            ._micro_edits
+            .iter()
             .map(|e| format!("{:?}", e))
             .collect();
 
@@ -462,13 +546,14 @@ impl BrainStage for BoundarySeparationStage {
 
         if !blocked.is_empty() {
             // Remove blocked (unrequested) edits from pending list
-            brain._micro_edits.retain(|e| {
-                !blocked.contains(&format!("{:?}", e))
-            });
-            return Ok(StageDecision::Skip(
-                format!("boundary_separation: blocked {} unrequested actions: {:?}",
-                    blocked.len(), blocked)
-            ));
+            brain
+                ._micro_edits
+                .retain(|e| !blocked.contains(&format!("{:?}", e)));
+            return Ok(StageDecision::Skip(format!(
+                "boundary_separation: blocked {} unrequested actions: {:?}",
+                blocked.len(),
+                blocked
+            )));
         }
 
         Ok(StageDecision::Continue)
@@ -573,11 +658,19 @@ impl ScaffoldAwareRLStage {
     }
 }
 
-impl Default for ScaffoldAwareRLStage { fn default() -> Self { Self::new() } }
+impl Default for ScaffoldAwareRLStage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl BrainStage for ScaffoldAwareRLStage {
-    fn name(&self) -> &str { "scaffold_aware_rl" }
-    fn frequency(&self) -> usize { 3 }
+    fn name(&self) -> &str {
+        "scaffold_aware_rl"
+    }
+    fn frequency(&self) -> usize {
+        3
+    }
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let mut stage = self.clone();
@@ -587,7 +680,11 @@ impl BrainStage for ScaffoldAwareRLStage {
         let solution_score = stage.compute_solution_score(brain, &scaffold);
 
         let age = brain.iteration.saturating_sub(
-            stage.scaffold_history.back().map(|r| r.iteration).unwrap_or(0)
+            stage
+                .scaffold_history
+                .back()
+                .map(|r| r.iteration)
+                .unwrap_or(0),
         );
         let reward = solution_score * stage.compute_staleness_weight(age);
 
@@ -600,12 +697,16 @@ impl BrainStage for ScaffoldAwareRLStage {
         let grpo_reward = (-loss).clamp(0.0, 1.0);
         let policy_mode = brain._e8_policy.best_mode();
         brain._e8_policy.mode_values[policy_mode.0 as usize] =
-            (brain._e8_policy.mode_values[policy_mode.0 as usize] * 0.9 + grpo_reward * 0.1).min(1.0);
+            (brain._e8_policy.mode_values[policy_mode.0 as usize] * 0.9 + grpo_reward * 0.1)
+                .min(1.0);
         brain._e8_policy.mode_counts[policy_mode.0 as usize] += 1;
         brain._e8_policy.decay_epsilon();
         log::trace!(
             "[scaffold_grpo] loss={:.4} grpo_reward={:.4} mode={} age={}",
-            loss, grpo_reward, policy_mode.0, age
+            loss,
+            grpo_reward,
+            policy_mode.0,
+            age
         );
 
         // Record scaffold
@@ -626,8 +727,12 @@ impl BrainStage for ScaffoldAwareRLStage {
             let report = brain.echo_bridge.echo.batch_signal_quality();
             let echo_loss = 1.0 - report.signal_coverage();
             if echo_loss > 0.001 {
-                log::debug!("[e8-echo] loss={:.6} (coverage={:.3}, error_rate={:.3})",
-                    echo_loss, report.signal_coverage(), report.error_rate());
+                log::debug!(
+                    "[e8-echo] loss={:.6} (coverage={:.3}, error_rate={:.3})",
+                    echo_loss,
+                    report.signal_coverage(),
+                    report.error_rate()
+                );
             }
         }
 
@@ -649,11 +754,23 @@ impl BrainStage for ScaffoldAwareRLStage {
 /// consume (Dark Forest: the stage now has a real side effect + a real consumer
 /// in seal_pipeline).
 pub struct ReasoningBankStorageStage;
-impl Default for ReasoningBankStorageStage { fn default() -> Self { Self } }
-impl ReasoningBankStorageStage { pub fn new() -> Self { Self } }
+impl Default for ReasoningBankStorageStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl ReasoningBankStorageStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for ReasoningBankStorageStage {
-    fn name(&self) -> &str { "reasoning_bank_storage" }
-    fn frequency(&self) -> usize { 2 }
+    fn name(&self) -> &str {
+        "reasoning_bank_storage"
+    }
+    fn frequency(&self) -> usize {
+        2
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let task = brain._current_task.clone();
         let reward = brain._reward;
@@ -661,7 +778,10 @@ impl BrainStage for ReasoningBankStorageStage {
             let task_type = brain._current_task_type;
             let edits = brain._micro_edits.clone();
             let memory = crate::core::nt_core_bank::ReasoningMemory::new(
-                &task, task_type, &edits, reward.clamp(0.0, 1.0),
+                &task,
+                task_type,
+                &edits,
+                reward.clamp(0.0, 1.0),
             );
             brain.reasoning_bank.store(memory);
         }
@@ -676,11 +796,23 @@ impl BrainStage for ReasoningBankStorageStage {
 
 /// Hypercube optimize stage — prunes low-access entries via HyperCubeBridge.
 pub struct HyperCubeOptimizeStage;
-impl Default for HyperCubeOptimizeStage { fn default() -> Self { Self } }
-impl HyperCubeOptimizeStage { pub fn new() -> Self { Self } }
+impl Default for HyperCubeOptimizeStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl HyperCubeOptimizeStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for HyperCubeOptimizeStage {
-    fn name(&self) -> &str { "hypercube_optimize" }
-    fn frequency(&self) -> usize { 10 }
+    fn name(&self) -> &str {
+        "hypercube_optimize"
+    }
+    fn frequency(&self) -> usize {
+        10
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let mut pruned = 0usize;
         if let Some(ref mut router) = brain.attention_router {
@@ -688,20 +820,36 @@ impl BrainStage for HyperCubeOptimizeStage {
             pruned = router.bridge.hypercube.prune_low_access(2);
             if pruned > 0 {
                 let after = router.bridge.hypercube.cell_count();
-                log::info!("[hypercube_optimize] iter={}: pruned {} entries ({} → {})",
-                    brain.iteration, pruned, before, after);
+                log::info!(
+                    "[hypercube_optimize] iter={}: pruned {} entries ({} → {})",
+                    brain.iteration,
+                    pruned,
+                    before,
+                    after
+                );
             }
             let sparse_dims: Vec<String> = (0..16)
                 .filter_map(|dim| {
                     let d = router.bridge.hypercube.coord_density(dim);
-                    if d < 0.01 { Some(format!("dim{}:{:.3}", dim, d)) } else { None }
-                }).collect();
+                    if d < 0.01 {
+                        Some(format!("dim{}:{:.3}", dim, d))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
             if !sparse_dims.is_empty() {
-                log::debug!("[hypercube_optimize] sparse dims: [{}]", sparse_dims.join(","));
+                log::debug!(
+                    "[hypercube_optimize] sparse dims: [{}]",
+                    sparse_dims.join(",")
+                );
             }
         }
         if pruned == 0 {
-            log::trace!("[hypercube_optimize] iter={}: no pruning needed", brain.iteration);
+            log::trace!(
+                "[hypercube_optimize] iter={}: no pruning needed",
+                brain.iteration
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -709,14 +857,29 @@ impl BrainStage for HyperCubeOptimizeStage {
 
 /// Distillation stage — extracts principles from pipeline trajectory into knowledge distiller
 pub struct DistillationStage;
-impl Default for DistillationStage { fn default() -> Self { Self } }
-impl DistillationStage { pub fn new() -> Self { Self } }
+impl Default for DistillationStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl DistillationStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for DistillationStage {
-    fn name(&self) -> &str { "distillation" }
-    fn frequency(&self) -> usize { 3 }
+    fn name(&self) -> &str {
+        "distillation"
+    }
+    fn frequency(&self) -> usize {
+        3
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let traj_len = brain.reasoning_engine.as_ref()
-            .map(|e| e.state_trajectory.len()).unwrap_or(0);
+        let traj_len = brain
+            .reasoning_engine
+            .as_ref()
+            .map(|e| e.state_trajectory.len())
+            .unwrap_or(0);
         if traj_len > 0 {
             let session = crate::neotrix::nt_act_autonomy::knowledge_distiller::SessionRecord {
                 id: format!("pipeline-iter-{}", brain.iteration),
@@ -726,16 +889,23 @@ impl BrainStage for DistillationStage {
                 reward_signal: brain._reward,
                 timestamp: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs()).unwrap_or(0),
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
                 task_type: None,
                 e8_mode: None,
                 edit_types: vec![],
             };
             let principles = brain._knowledge_distiller.distill(&session);
-            let absorbed = brain._knowledge_distiller.absorb(&mut brain.brain.capability);
+            let absorbed = brain
+                ._knowledge_distiller
+                .absorb(&mut brain.brain.capability);
             if !principles.is_empty() || absorbed > 0 {
-                log::info!("[distillation] {} principles from iter {}, {} absorbed into capability",
-                    principles.len(), brain.iteration, absorbed);
+                log::info!(
+                    "[distillation] {} principles from iter {}, {} absorbed into capability",
+                    principles.len(),
+                    brain.iteration,
+                    absorbed
+                );
             }
         }
         Ok(StageDecision::Continue)
@@ -744,22 +914,42 @@ impl BrainStage for DistillationStage {
 
 /// Meta improvement stage (self-evolution planning)
 pub struct MetaImprovementStage;
-impl Default for MetaImprovementStage { fn default() -> Self { Self } }
-impl MetaImprovementStage { pub fn new() -> Self { Self } }
+impl Default for MetaImprovementStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl MetaImprovementStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for MetaImprovementStage {
-    fn name(&self) -> &str { "meta_improvement" }
-    fn frequency(&self) -> usize { 10 }
+    fn name(&self) -> &str {
+        "meta_improvement"
+    }
+    fn frequency(&self) -> usize {
+        10
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let hist = &brain.evaluation_history;
         let recent_count = hist.len().min(10);
         if recent_count >= 3 {
-            let recent: Vec<f64> = hist.iter().rev().take(recent_count).map(|r| r.score_after).collect();
+            let recent: Vec<f64> = hist
+                .iter()
+                .rev()
+                .take(recent_count)
+                .map(|r| r.score_after)
+                .collect();
             let avg: f64 = recent.iter().sum::<f64>() / recent.len() as f64;
             let improving = recent.windows(2).filter(|w| w[1] > w[0]).count();
             let plateau = improving < recent_count / 3 && avg < 0.6;
             if plateau {
                 brain.curiosity_bonus = (brain.curiosity_bonus + 0.05).min(0.3);
-                log::info!("[meta_improvement] plateau detected, curiosity={:.4}", brain.curiosity_bonus);
+                log::info!(
+                    "[meta_improvement] plateau detected, curiosity={:.4}",
+                    brain.curiosity_bonus
+                );
             } else {
                 brain.curiosity_bonus = (brain.curiosity_bonus * 0.95).max(0.0);
             }
@@ -769,35 +959,66 @@ impl BrainStage for MetaImprovementStage {
                         "curiosity": brain.curiosity_bonus}).to_string());
             }
         }
-        log::trace!("[meta_improvement] iter={} eval_history={}", brain.iteration, hist.len());
+        log::trace!(
+            "[meta_improvement] iter={} eval_history={}",
+            brain.iteration,
+            hist.len()
+        );
         Ok(StageDecision::Continue)
     }
 }
 
 /// Sleep stage (offline memory consolidation)
 pub struct SleepStage;
-impl Default for SleepStage { fn default() -> Self { Self } }
-impl SleepStage { pub fn new() -> Self { Self } }
+impl Default for SleepStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl SleepStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for SleepStage {
-    fn name(&self) -> &str { "sleep" }
-    fn frequency(&self) -> usize { 100 }
+    fn name(&self) -> &str {
+        "sleep"
+    }
+    fn frequency(&self) -> usize {
+        100
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let Some(ref mut engine) = brain.sleep_engine {
-            if let (Some(op), Some(ref mut st)) = (brain.select_operator.as_ref(), brain.selective_state.as_mut()) {
-                match engine.sleep(&mut brain.brain.capability, &mut brain.reasoning_bank, op, st) {
+            if let (Some(op), Some(ref mut st)) = (
+                brain.select_operator.as_ref(),
+                brain.selective_state.as_mut(),
+            ) {
+                match engine.sleep(
+                    &mut brain.brain.capability,
+                    &mut brain.reasoning_bank,
+                    op,
+                    st,
+                ) {
                     Ok(result) => {
                         let stats = result.stats.clone();
                         brain.last_sleep_stats = Some(result.stats);
-                        log::info!("[sleep] passes={} memories={} delta={:.6}",
-                            stats.passes_done, stats.total_memories, stats.total_delta);
+                        log::info!(
+                            "[sleep] passes={} memories={} delta={:.6}",
+                            stats.passes_done,
+                            stats.total_memories,
+                            stats.total_delta
+                        );
                     }
                     Err(e) => log::warn!("[sleep] engine error: {}", e),
                 }
             }
         } else {
             let result = brain.consolidate_memories();
-            log::info!("[sleep] light consolidation: merged={} pruned={}",
-                result.merged_count, result.pruned_count);
+            log::info!(
+                "[sleep] light consolidation: merged={} pruned={}",
+                result.merged_count,
+                result.pruned_count
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -805,72 +1026,115 @@ impl BrainStage for SleepStage {
 
 /// Uncertainty quantification calibration stage
 pub struct UQCalibrationStage;
-impl Default for UQCalibrationStage { fn default() -> Self { Self } }
-impl UQCalibrationStage { pub fn new() -> Self { Self } }
+impl Default for UQCalibrationStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl UQCalibrationStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for UQCalibrationStage {
-    fn name(&self) -> &str { "uq_calibration" }
-    fn frequency(&self) -> usize { 20 }
+    fn name(&self) -> &str {
+        "uq_calibration"
+    }
+    fn frequency(&self) -> usize {
+        20
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let hist = &brain.evaluation_history;
         let recent_count = hist.len().min(20);
-        let volatility = if recent_count >= 4 {
-            let recent: Vec<f64> = hist.iter().rev().take(recent_count).map(|r| r.score_after).collect();
-            let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-            let variance = recent.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / recent.len() as f64;
-            let vol = variance.sqrt();
-            let reward = brain._prm_cumulative_reward;
-            let target_entropy = if vol > 0.15 && reward < 0.3 {
-                0.6f64.min(0.3 + vol)
-            } else if vol < 0.05 && reward > 0.5 {
-                (brain.entropy_crisis_level * 0.8).max(0.05)
-            } else {
-                brain.entropy_crisis_level * 0.95 + vol * 0.05
-            };
-            brain.entropy_crisis_level = target_entropy.max(0.0).min(1.0);
-            if let Some(ref kb) = brain._nt_memory_kb {
-                let _ = kb.kv_set("uq_calibration", &format!("iter_{}", brain.iteration),
+        let volatility =
+            if recent_count >= 4 {
+                let recent: Vec<f64> = hist
+                    .iter()
+                    .rev()
+                    .take(recent_count)
+                    .map(|r| r.score_after)
+                    .collect();
+                let mean = recent.iter().sum::<f64>() / recent.len() as f64;
+                let variance =
+                    recent.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / recent.len() as f64;
+                let vol = variance.sqrt();
+                let reward = brain._prm_cumulative_reward;
+                let target_entropy = if vol > 0.15 && reward < 0.3 {
+                    0.6f64.min(0.3 + vol)
+                } else if vol < 0.05 && reward > 0.5 {
+                    (brain.entropy_crisis_level * 0.8).max(0.05)
+                } else {
+                    brain.entropy_crisis_level * 0.95 + vol * 0.05
+                };
+                brain.entropy_crisis_level = target_entropy.max(0.0).min(1.0);
+                if let Some(ref kb) = brain._nt_memory_kb {
+                    let _ = kb.kv_set("uq_calibration", &format!("iter_{}", brain.iteration),
                     &serde_json::json!({"volatility": vol, "entropy": brain.entropy_crisis_level,
                         "reward": reward}).to_string());
-            }
-            vol
-        } else {
-            0.0
-        };
-        log::trace!("[uq_calibration] entropy={:.4} volatility={:.4} reward={:.4}",
-            brain.entropy_crisis_level, volatility, brain._prm_cumulative_reward);
+                }
+                vol
+            } else {
+                0.0
+            };
+        log::trace!(
+            "[uq_calibration] entropy={:.4} volatility={:.4} reward={:.4}",
+            brain.entropy_crisis_level,
+            volatility,
+            brain._prm_cumulative_reward
+        );
         Ok(StageDecision::Continue)
     }
 }
 
 /// Open-source compare stage
 pub struct OpenSourceCompareStage;
-impl Default for OpenSourceCompareStage { fn default() -> Self { Self } }
-impl OpenSourceCompareStage { pub fn new() -> Self { Self } }
+impl Default for OpenSourceCompareStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl OpenSourceCompareStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for OpenSourceCompareStage {
-    fn name(&self) -> &str { "open_source_compare" }
-    fn frequency(&self) -> usize { 5 }
+    fn name(&self) -> &str {
+        "open_source_compare"
+    }
+    fn frequency(&self) -> usize {
+        5
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let Some(ref insights) = brain._open_source_insights {
             let insight_len = insights.len();
             let deltas = compute_capability_deltas(brain);
             let total_delta: f64 = deltas.iter().map(|(_, d)| *d).sum();
             if total_delta.abs() > 0.001 && insight_len > 5 {
-                let new_edits: Vec<super::super::self_edit::MicroEdit> = deltas.iter()
+                let new_edits: Vec<super::super::self_edit::MicroEdit> = deltas
+                    .iter()
                     .filter(|(_, d)| d.abs() > 0.01)
                     .map(|(name, delta)| {
-                        super::super::self_edit::MicroEdit::AdjustDimension(
-                            name.clone(), *delta)
-                    }).collect();
+                        super::super::self_edit::MicroEdit::AdjustDimension(name.clone(), *delta)
+                    })
+                    .collect();
                 brain._open_source_edits.extend(new_edits);
                 if let Some(ref kb) = brain._nt_memory_kb {
-                    let _ = kb.kv_set("open_source_compare", &format!("iter_{}", brain.iteration),
+                    let _ = kb.kv_set(
+                        "open_source_compare",
+                        &format!("iter_{}", brain.iteration),
                         &serde_json::json!({"insight_len": insight_len, "total_delta": total_delta,
-                            "new_edits": brain._open_source_edits.len()}).to_string());
+                            "new_edits": brain._open_source_edits.len()})
+                        .to_string(),
+                    );
                 }
             }
         }
-        log::trace!("[open_source_compare] insights_present={} edits={}",
-            brain._open_source_insights.is_some(), brain._open_source_edits.len());
+        log::trace!(
+            "[open_source_compare] insights_present={} edits={}",
+            brain._open_source_insights.is_some(),
+            brain._open_source_edits.len()
+        );
         Ok(StageDecision::Continue)
     }
 }
@@ -880,32 +1144,49 @@ impl BrainStage for OpenSourceCompareStage {
 /// SftWrapperStage — 监督微调 (smol-course 吸收: SFT → DPO 两阶段顺序)。
 /// 位于 DpoWrapperStage 之前，将能力增量构建为监督信号，为 DPO 提供 π_ref 基础。
 pub struct SftWrapperStage;
-impl Default for SftWrapperStage { fn default() -> Self { Self } }
-impl SftWrapperStage { pub fn new() -> Self { Self } }
+impl Default for SftWrapperStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl SftWrapperStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for SftWrapperStage {
-    fn name(&self) -> &str { "sft_supervision" }
-    fn frequency(&self) -> usize { 1 }
+    fn name(&self) -> &str {
+        "sft_supervision"
+    }
+    fn frequency(&self) -> usize {
+        1
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let deltas = compute_capability_deltas(brain);
         let current_mode = brain._e8_policy.best_mode();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs()).unwrap_or(0);
-        let examples: Vec<SupervisedExample> = deltas.iter()
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let examples: Vec<SupervisedExample> = deltas
+            .iter()
             // H2 修复: 只把正向 delta 当监督样本 (能力提升)。此前用 delta.abs()
             // 方向无关 — 能力下降 (负 delta, 含 HarnessAdapt 抬升假象) 也当正样本
             // 训练, 形成"自抬能力→自产 delta→自训"奖励黑客循环, 无外部验证。
             .filter(|(_, d)| *d > 0.01)
-            .map(|(name, delta)| SupervisedExample::new(
-                name,
-                current_mode.0,
-                delta.clamp(0.0, 1.0),
-            ).with_timestamp(timestamp))
+            .map(|(name, delta)| {
+                SupervisedExample::new(name, current_mode.0, delta.clamp(0.0, 1.0))
+                    .with_timestamp(timestamp)
+            })
             .collect();
         let (_result, adjusted_reward) = brain._sft_stage.process(examples.clone(), brain._reward);
         brain._set_reward(adjusted_reward);
-        log::trace!("[sft_supervision] reward={:.4} examples={} updates={}",
-            adjusted_reward, examples.len(), brain._sft_stage.total_updates);
+        log::trace!(
+            "[sft_supervision] reward={:.4} examples={} updates={}",
+            adjusted_reward,
+            examples.len(),
+            brain._sft_stage.total_updates
+        );
         Ok(StageDecision::Continue)
     }
 }
@@ -913,30 +1194,50 @@ impl BrainStage for SftWrapperStage {
 /// Wraps ProcessStage ::process() as a BrainStage.
 /// 过程知识习得：从工具调用轨迹构造推理链，监督"如何推理/分解/验证"。
 pub struct ProcessWrapperStage;
-impl Default for ProcessWrapperStage { fn default() -> Self { Self } }
-impl ProcessWrapperStage { pub fn new() -> Self { Self } }
+impl Default for ProcessWrapperStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl ProcessWrapperStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for ProcessWrapperStage {
-    fn name(&self) -> &str { "process_supervision" }
-    fn frequency(&self) -> usize { 2 }
+    fn name(&self) -> &str {
+        "process_supervision"
+    }
+    fn frequency(&self) -> usize {
+        2
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let task = brain._current_task();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs()).unwrap_or(0);
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         // 从工具调用轨迹构造推理链步骤
-        let steps: Vec<ReasoningStep> = brain.tool_traces.iter().enumerate().map(|(i, (tool, dur, ok))| {
-            ReasoningStep {
+        let steps: Vec<ReasoningStep> = brain
+            .tool_traces
+            .iter()
+            .enumerate()
+            .map(|(i, (tool, dur, ok))| ReasoningStep {
                 step_idx: i,
                 specialist: "Tool".to_string(),
                 e8_mode: 0,
                 action: tool.clone(),
                 input: String::new(),
-                output: if *ok { "ok".to_string() } else { "error".to_string() },
+                output: if *ok {
+                    "ok".to_string()
+                } else {
+                    "error".to_string()
+                },
                 duration_ms: Some(*dur),
                 success: *ok,
                 reward: Some(if *ok { 1.0 } else { 0.0 }),
-            }
-        }).collect();
+            })
+            .collect();
         let examples: Vec<ProcessExample> = if steps.is_empty() {
             Vec::new()
         } else {
@@ -956,18 +1257,25 @@ impl BrainStage for ProcessWrapperStage {
         // 意识树产出的进化果实从不进入 SEAL 过程学习。果实轨迹以 quality 加权,
         // 使高质量进化果实优先塑造 reasoning_depth/cot_quality 等能力维度。
         let mut examples = examples;
-        let fruit_traces = ProcessStage::extract_from_consciousness_tree(&brain._consciousness_fruits);
+        let fruit_traces =
+            ProcessStage::extract_from_consciousness_tree(&brain._consciousness_fruits);
         for ft in fruit_traces {
             let w = ft.final_quality.max(0.1);
-            examples.push(ProcessExample { trace: ft, weight: w });
+            examples.push(ProcessExample {
+                trace: ft,
+                weight: w,
+            });
         }
         // 缺陷2修复 (自我运转实际情况): 果实消费后立即清除, 防止同一批果实
         // 被 SEAL 反复消费 (1h 注入 vs 10min 消费的时序错配 → 同一 trace 进
         // buffer 6 次 → process 学习被重复污染)。一次性消费, 下次 tick 重新注入。
         brain._consciousness_fruits.clear();
         let (_result, loss) = brain._process_stage.process(examples);
-        log::trace!("[process_supervision] loss={:.4} traces={}",
-            loss, brain._process_stage.buffer.len());
+        log::trace!(
+            "[process_supervision] loss={:.4} traces={}",
+            loss,
+            brain._process_stage.buffer.len()
+        );
         Ok(StageDecision::Continue)
     }
 }
@@ -975,16 +1283,29 @@ impl BrainStage for ProcessWrapperStage {
 /// Wraps SearchSkillStage ::process() as a BrainStage.
 /// 搜索技能内化：从当前任务构造搜索演练，学习 query/evidence/synthesis 子技能。
 pub struct SearchSkillWrapperStage;
-impl Default for SearchSkillWrapperStage { fn default() -> Self { Self } }
-impl SearchSkillWrapperStage { pub fn new() -> Self { Self } }
+impl Default for SearchSkillWrapperStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl SearchSkillWrapperStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for SearchSkillWrapperStage {
-    fn name(&self) -> &str { "search_skill_supervision" }
-    fn frequency(&self) -> usize { 3 }
+    fn name(&self) -> &str {
+        "search_skill_supervision"
+    }
+    fn frequency(&self) -> usize {
+        3
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let task = brain._current_task.clone();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs()).unwrap_or(0);
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         let exercises: Vec<SearchExercise> = if task.is_empty() {
             Vec::new()
         } else {
@@ -999,19 +1320,23 @@ impl BrainStage for SearchSkillWrapperStage {
             let grounding = if kb_hits.is_empty() {
                 0.0
             } else {
-                kb_hits.iter().map(|r| r.score.clamp(0.0, 1.0)).sum::<f64>()
-                    / kb_hits.len() as f64
+                kb_hits.iter().map(|r| r.score.clamp(0.0, 1.0)).sum::<f64>() / kb_hits.len() as f64
             };
             let relevance = grounding;
             let _synthesis = grounding * 0.9; // 综合质量略低于 grounding, 反映证据到答案的损耗
-            let raw_results: Vec<SearchResult> = kb_hits.iter().take(5).map(|h| SearchResult {
-                url: h.node.id.clone(),
-                title: h.node.title.clone(),
-                snippet: h.node.summary.clone().unwrap_or_default(),
-                source_type: "kb".to_string(),
-                credibility: h.score.clamp(0.0, 1.0),
-            }).collect();
-            let filtered: Vec<Evidence> = raw_results.iter()
+            let raw_results: Vec<SearchResult> = kb_hits
+                .iter()
+                .take(5)
+                .map(|h| SearchResult {
+                    url: h.node.id.clone(),
+                    title: h.node.title.clone(),
+                    snippet: h.node.summary.clone().unwrap_or_default(),
+                    source_type: "kb".to_string(),
+                    credibility: h.score.clamp(0.0, 1.0),
+                })
+                .collect();
+            let filtered: Vec<Evidence> = raw_results
+                .iter()
                 .filter(|r| r.credibility > 0.3)
                 .take(3)
                 .map(|r| Evidence {
@@ -1019,7 +1344,8 @@ impl BrainStage for SearchSkillWrapperStage {
                     claim: r.snippet.clone(),
                     confidence: r.credibility,
                     supports_answer: true,
-                }).collect();
+                })
+                .collect();
             vec![SearchExercise {
                 exercise_id: format!("search-{}", brain.iteration),
                 task_type: SearchTaskType::TechnicalQuery,
@@ -1035,40 +1361,64 @@ impl BrainStage for SearchSkillWrapperStage {
             }]
         };
         let (_result, loss) = brain._search_skill_stage.process(exercises.clone());
-        log::info!("[search_skill_supervision] loss={:.4} exercises={} updates={}",
-            loss, exercises.len(), brain._search_skill_stage.total_updates);
+        log::info!(
+            "[search_skill_supervision] loss={:.4} exercises={} updates={}",
+            loss,
+            exercises.len(),
+            brain._search_skill_stage.total_updates
+        );
         Ok(StageDecision::Continue)
     }
 }
 
 /// Wraps DpoStage ::process() as a BrainStage
 pub struct DpoWrapperStage;
-impl Default for DpoWrapperStage { fn default() -> Self { Self } }
-impl DpoWrapperStage { pub fn new() -> Self { Self } }
+impl Default for DpoWrapperStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl DpoWrapperStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for DpoWrapperStage {
-    fn name(&self) -> &str { "dpo_preference" }
-    fn frequency(&self) -> usize { 3 }
+    fn name(&self) -> &str {
+        "dpo_preference"
+    }
+    fn frequency(&self) -> usize {
+        3
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let deltas = compute_capability_deltas(brain);
-        let mut pairs: Vec<crate::neotrix::nt_mind::self_iterating::dpo_stage::PreferencePair> = Vec::new();
+        let mut pairs: Vec<crate::neotrix::nt_mind::self_iterating::dpo_stage::PreferencePair> =
+            Vec::new();
         let current_mode = brain._e8_policy.best_mode();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs()).unwrap_or(0);
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
         for (cap_name, delta) in &deltas {
             if (*delta).abs() > 0.01 {
-                let (rejected_idx, _) = brain._e8_policy.mode_values.iter().enumerate()
+                let (rejected_idx, _) = brain
+                    ._e8_policy
+                    .mode_values
+                    .iter()
+                    .enumerate()
                     .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                     .unwrap_or((0, &0.0));
                 if *delta > 0.0 {
-                    pairs.push(crate::neotrix::nt_mind::self_iterating::dpo_stage::PreferencePair {
-                        task: cap_name.clone(),
-                        chosen_mode: current_mode.0,
-                        rejected_mode: rejected_idx as u8,
-                        chosen_reward: *delta,
-                        rejected_reward: 0.0,
-                        timestamp,
-                    });
+                    pairs.push(
+                        crate::neotrix::nt_mind::self_iterating::dpo_stage::PreferencePair {
+                            task: cap_name.clone(),
+                            chosen_mode: current_mode.0,
+                            rejected_mode: rejected_idx as u8,
+                            chosen_reward: *delta,
+                            rejected_reward: 0.0,
+                            timestamp,
+                        },
+                    );
                 }
             }
         }
@@ -1090,42 +1440,75 @@ impl BrainStage for DpoWrapperStage {
                 }
             }
         }
-        log::trace!("[dpo_preference] reward={:.4} deltas={} updates={}",
-            adjusted_reward, deltas.len(), brain._dpo_stage.total_updates);
+        log::trace!(
+            "[dpo_preference] reward={:.4} deltas={} updates={}",
+            adjusted_reward,
+            deltas.len(),
+            brain._dpo_stage.total_updates
+        );
         Ok(StageDecision::Continue)
     }
 }
 
 /// Parse capability index from "cap_{i}" task name.
 fn parse_cap_index(task: &str) -> Option<usize> {
-    task.strip_prefix("cap_").and_then(|s| s.parse::<usize>().ok())
+    task.strip_prefix("cap_")
+        .and_then(|s| s.parse::<usize>().ok())
 }
 
 /// Wraps ConstitutionalSelfCritiqueStage as a BrainStage
 pub struct ConstitutionalWrapperStage;
-impl Default for ConstitutionalWrapperStage { fn default() -> Self { Self } }
-impl ConstitutionalWrapperStage { pub fn new() -> Self { Self } }
+impl Default for ConstitutionalWrapperStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl ConstitutionalWrapperStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for ConstitutionalWrapperStage {
-    fn name(&self) -> &str { "constitutional_critique" }
-    fn frequency(&self) -> usize { 3 }
+    fn name(&self) -> &str {
+        "constitutional_critique"
+    }
+    fn frequency(&self) -> usize {
+        3
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let deltas = compute_capability_deltas(brain);
         let mut critic = ConstitutionalSelfCritiqueStage::new();
         let (_result, adjusted_reward, should_reflect) = critic.process(&deltas, brain._reward);
         brain._set_reward(adjusted_reward);
-        log::trace!("[constitutional_critique] reward_adjusted={:.4} should_reflect={} violations={}",
-            adjusted_reward, should_reflect, critic.consecutive_violations);
+        log::trace!(
+            "[constitutional_critique] reward_adjusted={:.4} should_reflect={} violations={}",
+            adjusted_reward,
+            should_reflect,
+            critic.consecutive_violations
+        );
         Ok(StageDecision::Continue)
     }
 }
 
 /// Wraps SafetyCheckStage as a BrainStage
 pub struct SafetyWrapperStage;
-impl Default for SafetyWrapperStage { fn default() -> Self { Self } }
-impl SafetyWrapperStage { pub fn new() -> Self { Self } }
+impl Default for SafetyWrapperStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl SafetyWrapperStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for SafetyWrapperStage {
-    fn name(&self) -> &str { "safety_check" }
-    fn frequency(&self) -> usize { 1 }
+    fn name(&self) -> &str {
+        "safety_check"
+    }
+    fn frequency(&self) -> usize {
+        1
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let deltas = compute_capability_deltas(brain);
         let mut safety = SafetyCheckStage::new();
@@ -1152,11 +1535,23 @@ impl BrainStage for SafetyWrapperStage {
 /// self-reflective revisions. Frequency 5 — runs every 5 iterations to avoid
 /// overwhelming the pipeline with detailed planning on every tick.
 pub struct AutonomyPerStage;
-impl Default for AutonomyPerStage { fn default() -> Self { Self } }
-impl AutonomyPerStage { pub fn new() -> Self { Self } }
+impl Default for AutonomyPerStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl AutonomyPerStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for AutonomyPerStage {
-    fn name(&self) -> &str { "autonomy_per" }
-    fn frequency(&self) -> usize { 5 }
+    fn name(&self) -> &str {
+        "autonomy_per"
+    }
+    fn frequency(&self) -> usize {
+        5
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::nt_act_autonomy::PlanExecuteReflectLoop;
 
@@ -1171,13 +1566,11 @@ impl BrainStage for AutonomyPerStage {
         let outcome = if let Some(ref mut per) = brain._per_loop {
             per.run(&task)
         } else {
-            let mut per = PlanExecuteReflectLoop::new(
-                crate::neotrix::nt_act_autonomy::PerConfig {
-                    max_iterations: 3,
-                    min_score_to_converge: 0.7,
-                    require_all_steps: false,
-                },
-            );
+            let mut per = PlanExecuteReflectLoop::new(crate::neotrix::nt_act_autonomy::PerConfig {
+                max_iterations: 3,
+                min_score_to_converge: 0.7,
+                require_all_steps: false,
+            });
             let outcome = per.run(&task);
             brain._per_loop = Some(per);
             outcome
@@ -1216,18 +1609,34 @@ impl BrainStage for AutonomyPerStage {
 
 /// GWT absorption stage: routes insights into global workspace
 pub struct GwtAbsorbStage;
-impl Default for GwtAbsorbStage { fn default() -> Self { Self } }
-impl GwtAbsorbStage { pub fn new() -> Self { Self } }
+impl Default for GwtAbsorbStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl GwtAbsorbStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for GwtAbsorbStage {
-    fn name(&self) -> &str { "gwt_absorb" }
+    fn name(&self) -> &str {
+        "gwt_absorb"
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let iteration = brain.iteration;
         let reward = brain._reward;
         let caps = brain.brain.capability.arr().to_vec();
-        let avg_cap = if caps.is_empty() { 0.5 } else { caps.iter().sum::<f64>() / caps.len() as f64 };
+        let avg_cap = if caps.is_empty() {
+            0.5
+        } else {
+            caps.iter().sum::<f64>() / caps.len() as f64
+        };
         if let Some(ref kb) = brain._nt_memory_kb {
-            let summary = format!("gwt:iter={} reward={:.4} avg_cap={:.4} aut={:?}",
-                iteration, reward, avg_cap, brain.autonomy);
+            let summary = format!(
+                "gwt:iter={} reward={:.4} avg_cap={:.4} aut={:?}",
+                iteration, reward, avg_cap, brain.autonomy
+            );
             let _ = kb.kv_set("gwt_absorb", &format!("snapshot_{}", iteration), &summary);
             // is_conscious derived from the real InnerCritic quality score
             // (0.0–1.0), not hardcoded true. Falls back to a phi-like threshold
@@ -1248,7 +1657,10 @@ impl BrainStage for GwtAbsorbStage {
         }
         // Route state summary into GWT workspace for specialist broadcast
         if let Some(ref mut router) = brain.attention_router {
-            let content = format!("pipeline_iter={} reward={:.4} avg_cap={:.4}", iteration, reward, avg_cap);
+            let content = format!(
+                "pipeline_iter={} reward={:.4} avg_cap={:.4}",
+                iteration, reward, avg_cap
+            );
             // 升级: 从 no-op broadcast (仅 push history) 改为 resonant_broadcast —
             // 真正进入 E8 注意力偏置 + Kuramoto 同步 + 共振竞争, 让 SEAL 状态
             // 参与 GWT 注意力路由 (修复信息流转对内断点 #2)。
@@ -1257,22 +1669,42 @@ impl BrainStage for GwtAbsorbStage {
             log::debug!("[gwt_absorb] resonant broadcast to GWT: {}", content);
             if let Some(ref kb) = brain._nt_memory_kb {
                 if let Ok(results) = kb.query_broadcast_context(&content, 3) {
-                    log::debug!("[gwt_absorb] broadcast context results: {} found", results.len());
+                    log::debug!(
+                        "[gwt_absorb] broadcast context results: {} found",
+                        results.len()
+                    );
                 }
             }
         }
-        log::info!("[gwt_absorb] iter={} reward={:.4} avg_cap={:.4}", iteration, reward, avg_cap);
+        log::info!(
+            "[gwt_absorb] iter={} reward={:.4} avg_cap={:.4}",
+            iteration,
+            reward,
+            avg_cap
+        );
         Ok(StageDecision::Continue)
     }
 }
 
 /// Harness adaptation stage — adjusts capability vector based on low reward
 pub struct HarnessAdaptStage;
-impl Default for HarnessAdaptStage { fn default() -> Self { Self } }
-impl HarnessAdaptStage { pub fn new() -> Self { Self } }
+impl Default for HarnessAdaptStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl HarnessAdaptStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for HarnessAdaptStage {
-    fn name(&self) -> &str { "harness_adapt" }
-    fn frequency(&self) -> usize { 2 }
+    fn name(&self) -> &str {
+        "harness_adapt"
+    }
+    fn frequency(&self) -> usize {
+        2
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let reward = brain._reward;
         let caps = brain.brain.capability.arr().to_vec();
@@ -1300,8 +1732,12 @@ impl BrainStage for HarnessAdaptStage {
                 learning_rate: brain._snapshot_lr(),
                 score: brain._snapshot_score(),
             });
-            log::info!("[harness_adapt] low reward={:.4}, boosted {} weak caps by {:.4} (snapshot synced)",
-                reward, weak_count, boost);
+            log::info!(
+                "[harness_adapt] low reward={:.4}, boosted {} weak caps by {:.4} (snapshot synced)",
+                reward,
+                weak_count,
+                boost
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -1309,30 +1745,47 @@ impl BrainStage for HarnessAdaptStage {
 
 /// Knowledge quality assessment stage — scores KB health metrics
 pub struct KnowledgeQualityStage;
-impl Default for KnowledgeQualityStage { fn default() -> Self { Self } }
-impl KnowledgeQualityStage { pub fn new() -> Self { Self } }
+impl Default for KnowledgeQualityStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl KnowledgeQualityStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for KnowledgeQualityStage {
-    fn name(&self) -> &str { "knowledge_quality" }
-    fn frequency(&self) -> usize { 5 }
+    fn name(&self) -> &str {
+        "knowledge_quality"
+    }
+    fn frequency(&self) -> usize {
+        5
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let Some(ref kb) = brain._nt_memory_kb {
             // Gather content quality metrics directly from the nodes table
-            let quality_metrics = (|| -> Option<(i64, i64, i64, usize)> {
-                let conn = kb.conn.lock().ok()?;
-                let total: i64 = conn.query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0)).ok()?;
-                let with_content: i64 = conn.query_row(
+            let quality_metrics =
+                (|| -> Option<(i64, i64, i64, usize)> {
+                    let conn = kb.conn.lock().ok()?;
+                    let total: i64 = conn
+                        .query_row("SELECT COUNT(*) FROM nodes", [], |r| r.get(0))
+                        .ok()?;
+                    let with_content: i64 = conn.query_row(
                     "SELECT COUNT(*) FROM nodes WHERE content IS NOT NULL AND content != ''",
                     [], |r| r.get(0),
                 ).ok()?;
-                let with_summary: i64 = conn.query_row(
+                    let with_summary: i64 = conn.query_row(
                     "SELECT COUNT(*) FROM nodes WHERE summary IS NOT NULL AND summary != ''",
                     [], |r| r.get(0),
                 ).ok()?;
-                let mut stmt = conn.prepare("SELECT COUNT(DISTINCT node_type) FROM nodes").ok()?;
-                let type_count: i64 = stmt.query_row([], |r| r.get(0)).ok()?;
-                drop(stmt);
-                Some((total, with_content, with_summary, type_count as usize))
-            })();
+                    let mut stmt = conn
+                        .prepare("SELECT COUNT(DISTINCT node_type) FROM nodes")
+                        .ok()?;
+                    let type_count: i64 = stmt.query_row([], |r| r.get(0)).ok()?;
+                    drop(stmt);
+                    Some((total, with_content, with_summary, type_count as usize))
+                })();
 
             if let (Some(stats), Some((tot, has_content, has_summary, type_count))) =
                 (kb.stats().ok(), quality_metrics)
@@ -1343,10 +1796,15 @@ impl BrainStage for KnowledgeQualityStage {
                     let type_div = (type_count as f64 / 23.0_f64).min(1.0);
                     let edge_ratio = if stats.total_nodes > 0 {
                         (stats.total_edges as f64 / stats.total_nodes as f64).min(5.0) / 5.0
-                    } else { 0.0 };
+                    } else {
+                        0.0
+                    };
                     (content_cov * 40.0 + summary_cov * 20.0 + type_div * 20.0 + edge_ratio * 20.0)
-                        .max(0.0).min(100.0)
-                } else { 0.0 };
+                        .max(0.0)
+                        .min(100.0)
+                } else {
+                    0.0
+                };
 
                 let reward_boost: f64 = if quality_score > 80.0 {
                     0.05
@@ -1378,20 +1836,38 @@ impl BrainStage for KnowledgeQualityStage {
 
 /// Secret scan stage — wraps SecretScanner for pipeline integration
 pub struct SecretScanStage;
-impl Default for SecretScanStage { fn default() -> Self { Self } }
-impl SecretScanStage { pub fn new() -> Self { Self } }
+impl Default for SecretScanStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl SecretScanStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for SecretScanStage {
-    fn name(&self) -> &str { "security_scan" }
-    fn frequency(&self) -> usize { 1 }
+    fn name(&self) -> &str {
+        "security_scan"
+    }
+    fn frequency(&self) -> usize {
+        1
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let scanner = SecretScanner::new();
-        let task_repr = format!("iter={} reward={:.4} cap={:?}",
-            brain.iteration, brain._reward,
-            &brain.brain.capability.arr()[..5]);
+        let task_repr = format!(
+            "iter={} reward={:.4} cap={:?}",
+            brain.iteration,
+            brain._reward,
+            &brain.brain.capability.arr()[..5]
+        );
         let result = scanner.scan_with_context(&task_repr, "");
         if !result.is_safe() {
-            log::warn!("[security_scan] {} risks (score={:.2})",
-                result.findings.len(), result.risk_score());
+            log::warn!(
+                "[security_scan] {} risks (score={:.2})",
+                result.findings.len(),
+                result.risk_score()
+            );
         } else {
             log::trace!("[security_scan] safe iter={}", brain.iteration);
         }
@@ -1401,24 +1877,46 @@ impl BrainStage for SecretScanStage {
 
 /// Conversation distillation stage — stores trajectory insights to KB
 pub struct ConversationDistillStage;
-impl Default for ConversationDistillStage { fn default() -> Self { Self } }
-impl ConversationDistillStage { pub fn new() -> Self { Self } }
+impl Default for ConversationDistillStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl ConversationDistillStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for ConversationDistillStage {
-    fn name(&self) -> &str { "conversation_distill" }
-    fn frequency(&self) -> usize { 1 }
+    fn name(&self) -> &str {
+        "conversation_distill"
+    }
+    fn frequency(&self) -> usize {
+        1
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let traj_len = brain.reasoning_engine.as_ref()
-            .map(|e| e.state_trajectory.len()).unwrap_or(0);
+        let traj_len = brain
+            .reasoning_engine
+            .as_ref()
+            .map(|e| e.state_trajectory.len())
+            .unwrap_or(0);
         if let Some(ref kb) = brain._nt_memory_kb {
             let stage_count = brain._stage_results.len();
             let prm_reward = brain._prm_cumulative_reward;
             let summary = format!(
                 "iter={} reward={:.4} traj={} entropy={:.4} stages={} prm={:.4}",
-                brain.iteration, brain._reward, traj_len, brain.entropy_crisis_level,
-                stage_count, prm_reward,
+                brain.iteration,
+                brain._reward,
+                traj_len,
+                brain.entropy_crisis_level,
+                stage_count,
+                prm_reward,
             );
-            let _ = kb.kv_set("conversation_distill",
-                &format!("snap_{}", brain.iteration), &summary);
+            let _ = kb.kv_set(
+                "conversation_distill",
+                &format!("snap_{}", brain.iteration),
+                &summary,
+            );
             if traj_len > 3 && brain.iteration.is_multiple_of(5) {
                 if let Ok(records) = kb.get_evolution_history(10) {
                     let rewarding_count = records.iter().filter(|r| r.effectiveness > 0.0).count();
@@ -1431,19 +1929,21 @@ impl BrainStage for ConversationDistillStage {
                         };
                         let ts = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_secs()).unwrap_or(0) as i64;
-                        let record = crate::neotrix::nt_memory_kb::nt_memory_types::EvolutionRecord {
-                            id: format!("evol_pipe_{}", brain.iteration),
-                            source_conversation_id: format!("pipe_iter_{}", brain.iteration),
-                            pattern_type: pattern_type.clone(),
-                            description: summary,
-                            before_behavior: format!("reward_before={:.4}", brain._reward),
-                            after_behavior: String::new(),
-                            effectiveness_gain: brain._reward,
-                            applied_to: vec![],
-                            verified: false,
-                            timestamp: ts,
-                        };
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0) as i64;
+                        let record =
+                            crate::neotrix::nt_memory_kb::nt_memory_types::EvolutionRecord {
+                                id: format!("evol_pipe_{}", brain.iteration),
+                                source_conversation_id: format!("pipe_iter_{}", brain.iteration),
+                                pattern_type: pattern_type.clone(),
+                                description: summary,
+                                before_behavior: format!("reward_before={:.4}", brain._reward),
+                                after_behavior: String::new(),
+                                effectiveness_gain: brain._reward,
+                                applied_to: vec![],
+                                verified: false,
+                                timestamp: ts,
+                            };
                         let _ = kb.store_evolution_record(&record);
                         log::info!("[conversation_distill] EvolRecord={:?}", pattern_type);
                     }
@@ -1457,11 +1957,23 @@ impl BrainStage for ConversationDistillStage {
 /// EWHR Hypothesis Accuracy Stage: evaluates hypothesis predictions
 /// against actual outcomes and updates calibration. Runs every 5 iterations.
 pub struct HypothesisAccuracyStage;
-impl Default for HypothesisAccuracyStage { fn default() -> Self { Self } }
-impl HypothesisAccuracyStage { pub fn new() -> Self { Self } }
+impl Default for HypothesisAccuracyStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl HypothesisAccuracyStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for HypothesisAccuracyStage {
-    fn name(&self) -> &str { "hypothesis_accuracy" }
-    fn frequency(&self) -> usize { 5 }
+    fn name(&self) -> &str {
+        "hypothesis_accuracy"
+    }
+    fn frequency(&self) -> usize {
+        5
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let Some(ref engine) = brain.reasoning_engine {
             if let Some(ref net_lock) = engine.hypothesis_network {
@@ -1470,7 +1982,13 @@ impl BrainStage for HypothesisAccuracyStage {
                     let supported = net.hypotheses.iter().filter(|h| matches!(h.status, crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Supported)).count();
                     let refuted = net.hypotheses.iter().filter(|h| matches!(h.status, crate::neotrix::nt_memory_historian::nt_evidence_hypothesis::HypothesisStatus::Refuted)).count();
                     if total > 0 {
-                        log::info!("[EWHR] Hypothesis accuracy: {}/{} supported, {}/{} refuted", supported, total, refuted, total);
+                        log::info!(
+                            "[EWHR] Hypothesis accuracy: {}/{} supported, {}/{} refuted",
+                            supported,
+                            total,
+                            refuted,
+                            total
+                        );
                     }
                 }
             }
@@ -1482,15 +2000,32 @@ impl BrainStage for HypothesisAccuracyStage {
 /// EWHR Pattern Extraction Stage: converts successful hypotheses
 /// into reusable procedural memory (skills). Runs every 10 iterations.
 pub struct PatternExtractionStage;
-impl Default for PatternExtractionStage { fn default() -> Self { Self } }
-impl PatternExtractionStage { pub fn new() -> Self { Self } }
+impl Default for PatternExtractionStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl PatternExtractionStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for PatternExtractionStage {
-    fn name(&self) -> &str { "pattern_extraction" }
-    fn frequency(&self) -> usize { 10 }
+    fn name(&self) -> &str {
+        "pattern_extraction"
+    }
+    fn frequency(&self) -> usize {
+        10
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if let (Some(ref engine), Some(ref kb)) = (&brain.reasoning_engine, &brain._nt_memory_kb) {
             // Init GraphRAG on first run
-            if kb.graphrag_store.read().map(|s| s.is_none()).unwrap_or(false) {
+            if kb
+                .graphrag_store
+                .read()
+                .map(|s| s.is_none())
+                .unwrap_or(false)
+            {
                 let _ = kb.init_graphrag(GraphRagConfig::default());
             }
             // Extract entities from new knowledge
@@ -1558,12 +2093,20 @@ impl BrainStage for SelfReviewStage {
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         // Extract observer feedback from reasoning engine if available
-        let (observer_quality, observer_patterns) = brain.reasoning_engine.as_ref()
+        let (observer_quality, observer_patterns) = brain
+            .reasoning_engine
+            .as_ref()
             .map(|re| {
-                let q = re.observer.last_report.as_ref()
+                let q = re
+                    .observer
+                    .last_report
+                    .as_ref()
                     .map(|r| r.quality_score)
                     .unwrap_or(0.5);
-                let pats = re.observer.last_report.as_ref()
+                let pats = re
+                    .observer
+                    .last_report
+                    .as_ref()
                     .map(|r| r.critical_patterns.clone())
                     .unwrap_or_default();
                 (q, pats)
@@ -1577,8 +2120,12 @@ impl BrainStage for SelfReviewStage {
 
         log::info!(
             "[self_review] {} passed, {} failed, {} warnings — blast: {} ({} files, {} crossings)",
-            report.passed, report.failed, report.warnings,
-            blast.risk, blast.affected_files, blast.module_crossings,
+            report.passed,
+            report.failed,
+            report.warnings,
+            blast.risk,
+            blast.affected_files,
+            blast.module_crossings,
         );
         if !report.is_pass() {
             log::warn!(
@@ -1620,7 +2167,11 @@ impl BrainStage for SelfReviewStage {
                 "affected_files": blast.affected_files,
                 "module_crossings": blast.module_crossings,
             });
-            let _ = kb.kv_set("self_review_blast", &brain.iteration.to_string(), &serde_json::to_string(&blast_json).unwrap_or_default());
+            let _ = kb.kv_set(
+                "self_review_blast",
+                &brain.iteration.to_string(),
+                &serde_json::to_string(&blast_json).unwrap_or_default(),
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -1628,8 +2179,12 @@ impl BrainStage for SelfReviewStage {
 
 make_stage!(ExternalKnowledgeAbsorbStage);
 impl BrainStage for ExternalKnowledgeAbsorbStage {
-    fn name(&self) -> &str { "external_knowledge_absorb" }
-    fn frequency(&self) -> usize { 20 }
+    fn name(&self) -> &str {
+        "external_knowledge_absorb"
+    }
+    fn frequency(&self) -> usize {
+        20
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         if brain.iteration == 0 || !brain.iteration.is_multiple_of(20) {
             return Ok(StageDecision::Continue);
@@ -1641,12 +2196,21 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
         let explorer_kb = match crate::neotrix::nt_memory_kb::KnowledgeBase::open(None) {
             Ok(kb) => kb,
             Err(e) => {
-                log::warn!("[external_knowledge_absorb] tick={}, failed to open temp KB: {}", tick, e);
+                log::warn!(
+                    "[external_knowledge_absorb] tick={}, failed to open temp KB: {}",
+                    tick,
+                    e
+                );
                 return Ok(StageDecision::Continue);
             }
         };
-        let config = crate::neotrix::l2_world_impl::nt_world_exploration_engine::ExplorationConfig::default();
-        let mut explorer = crate::neotrix::l2_world_impl::nt_world_exploration_engine::ExplorationEngine::new(config);
+        let config =
+            crate::neotrix::l2_world_impl::nt_world_exploration_engine::ExplorationConfig::default(
+            );
+        let mut explorer =
+            crate::neotrix::l2_world_impl::nt_world_exploration_engine::ExplorationEngine::new(
+                config,
+            );
         explorer.attach_kb(explorer_kb.into());
         let report = explorer.run_cycle();
         log::info!(
@@ -1658,11 +2222,23 @@ impl BrainStage for ExternalKnowledgeAbsorbStage {
 }
 
 pub struct CreditAssignmentStage;
-impl Default for CreditAssignmentStage { fn default() -> Self { Self } }
-impl CreditAssignmentStage { pub fn new() -> Self { Self } }
+impl Default for CreditAssignmentStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl CreditAssignmentStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for CreditAssignmentStage {
-    fn name(&self) -> &str { "credit_assignment" }
-    fn frequency(&self) -> usize { 20 }
+    fn name(&self) -> &str {
+        "credit_assignment"
+    }
+    fn frequency(&self) -> usize {
+        20
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         // Build credit graph from PRM step rewards + E8 transitions
         let mut graph = crate::core::nt_core_credit::CreditGraph::new();
@@ -1673,14 +2249,26 @@ impl BrainStage for CreditAssignmentStage {
             let e8_state = (step % 64) as u8;
             let visit = visit_counts.entry(e8_state).or_insert(0);
             *visit += 1;
-            let attribution = policy.compute_attribution(brain._prm_step_rewards.len().saturating_sub(*step), *visit);
+            let attribution = policy
+                .compute_attribution(brain._prm_step_rewards.len().saturating_sub(*step), *visit);
             graph.add_event(crate::core::nt_core_credit::CreditEvent {
                 id: format!("prm_step_{}", step),
-                parent_id: if *step > 0 { Some(format!("prm_step_{}", step - 1)) } else { None },
-                role: if *reward > 0.5 { crate::core::nt_core_credit::CreditRole::Outcome } else { crate::core::nt_core_credit::CreditRole::Actor },
+                parent_id: if *step > 0 {
+                    Some(format!("prm_step_{}", step - 1))
+                } else {
+                    None
+                },
+                role: if *reward > 0.5 {
+                    crate::core::nt_core_credit::CreditRole::Outcome
+                } else {
+                    crate::core::nt_core_credit::CreditRole::Actor
+                },
                 label: format!("step_{}_reward_{:.2}", step, reward),
                 e8_state,
-                timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64,
                 weight: *reward,
                 metadata: std::collections::HashMap::new(),
             });
@@ -1688,7 +2276,8 @@ impl BrainStage for CreditAssignmentStage {
                 graph.add_edge(crate::core::nt_core_credit::CreditEdge {
                     from: format!("prm_step_{}", step - 1),
                     to: format!("prm_step_{}", step),
-                    attribution, discount: policy.step_discount,
+                    attribution,
+                    discount: policy.step_discount,
                 });
             }
         }
@@ -1696,7 +2285,11 @@ impl BrainStage for CreditAssignmentStage {
         let credits = graph.backpropagate(0.95);
         if !credits.is_empty() {
             let total: f64 = credits.values().sum();
-            log::debug!("[credit_assignment] {} events, total credit={:.3}", credits.len(), total);
+            log::debug!(
+                "[credit_assignment] {} events, total credit={:.3}",
+                credits.len(),
+                total
+            );
             // Persist to KB
             if let Some(ref kb) = brain._nt_memory_kb {
                 if let Ok(json) = graph.to_json() {
@@ -1707,7 +2300,11 @@ impl BrainStage for CreditAssignmentStage {
             // GWT broadcast
             if let Some(ref mut engine) = brain.reasoning_engine {
                 if let Some(ref mut gwt) = engine.gwt {
-                    gwt.broadcast(&format!("credit_assignment: {} events, total={:.3}, persisted", credits.len(), total));
+                    gwt.broadcast(&format!(
+                        "credit_assignment: {} events, total={:.3}, persisted",
+                        credits.len(),
+                        total
+                    ));
                 }
             }
         }
@@ -1719,11 +2316,23 @@ impl BrainStage for CreditAssignmentStage {
 /// oracle intervention is needed. Frequency 10 — low overhead gate that
 /// only triggers under critical conditions (high entropy, low reward).
 pub struct OracleGateStage;
-impl Default for OracleGateStage { fn default() -> Self { Self } }
-impl OracleGateStage { pub fn new() -> Self { Self } }
+impl Default for OracleGateStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl OracleGateStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for OracleGateStage {
-    fn name(&self) -> &str { "oracle_gate" }
-    fn frequency(&self) -> usize { 10 }
+    fn name(&self) -> &str {
+        "oracle_gate"
+    }
+    fn frequency(&self) -> usize {
+        10
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::nt_act_autonomy::OracleGate;
 
@@ -1741,12 +2350,16 @@ impl BrainStage for OracleGateStage {
         if decision.needs_oracle {
             log::warn!(
                 "[oracle_gate] HUMAN INTERVENTION: {:?} — {}",
-                decision.reason, decision.suggested_action
+                decision.reason,
+                decision.suggested_action
             );
             if let Some(ref kb) = brain._nt_memory_kb {
                 if let Some(ref req) = decision.request {
-                    let _ = kb.kv_set("oracle_request", &format!("iter_{}", brain.iteration),
-                        &serde_json::json!({"reason": format!("{:?}", req.reason)}).to_string());
+                    let _ = kb.kv_set(
+                        "oracle_request",
+                        &format!("iter_{}", brain.iteration),
+                        &serde_json::json!({"reason": format!("{:?}", req.reason)}).to_string(),
+                    );
                 }
             }
             if let Some(ref mut engine) = brain.reasoning_engine {
@@ -1763,31 +2376,52 @@ impl BrainStage for OracleGateStage {
 /// ArchitectureOptimizer stage: runs self-architecture analysis every 15 iterations.
 /// Uses SelfArchitectureOptimizer to identify structural improvements.
 pub struct ArchitectureOptimizerStage;
-impl Default for ArchitectureOptimizerStage { fn default() -> Self { Self } }
-impl ArchitectureOptimizerStage { pub fn new() -> Self { Self } }
+impl Default for ArchitectureOptimizerStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl ArchitectureOptimizerStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for ArchitectureOptimizerStage {
-    fn name(&self) -> &str { "arch_optimizer" }
-    fn frequency(&self) -> usize { 15 }
+    fn name(&self) -> &str {
+        "arch_optimizer"
+    }
+    fn frequency(&self) -> usize {
+        15
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::nt_act_autonomy::SelfArchitectureOptimizer;
         let optimizer = SelfArchitectureOptimizer::new();
         // Pass module sizes as proxy file list
         let caps = brain.brain.capability.arr();
-        let files: Vec<(String, usize)> = caps.iter().enumerate()
+        let files: Vec<(String, usize)> = caps
+            .iter()
+            .enumerate()
             .map(|(i, v)| (format!("cap_{}", i), (*v * 1000.0) as usize))
             .collect();
         let report = optimizer.analyze(&files, None);
         if report.total_suggestions > 0 {
-            log::info!("[arch_optimizer] suggestions={} auto_fixable={}",
-                report.total_suggestions, report.auto_fixable_count);
+            log::info!(
+                "[arch_optimizer] suggestions={} auto_fixable={}",
+                report.total_suggestions,
+                report.auto_fixable_count
+            );
         }
         if let Some(ref kb) = brain._nt_memory_kb {
-            let _ = kb.kv_set("arch_optimizer", &format!("iter_{}", brain.iteration),
+            let _ = kb.kv_set(
+                "arch_optimizer",
+                &format!("iter_{}", brain.iteration),
                 &serde_json::json!({
                     "suggestions": report.total_suggestions,
                     "auto_fixable": report.auto_fixable_count,
                     "large_modules": report.large_modules.len(),
-                }).to_string());
+                })
+                .to_string(),
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -1796,11 +2430,23 @@ impl BrainStage for ArchitectureOptimizerStage {
 /// TrendAnalysisStage: runs evolution trend analysis every 15 iterations.
 /// Uses EvolutionTrendAnalyzer to detect capability trends over time.
 pub struct TrendAnalysisStage;
-impl Default for TrendAnalysisStage { fn default() -> Self { Self } }
-impl TrendAnalysisStage { pub fn new() -> Self { Self } }
+impl Default for TrendAnalysisStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl TrendAnalysisStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for TrendAnalysisStage {
-    fn name(&self) -> &str { "trend_analysis" }
-    fn frequency(&self) -> usize { 15 }
+    fn name(&self) -> &str {
+        "trend_analysis"
+    }
+    fn frequency(&self) -> usize {
+        15
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::nt_act_autonomy::EvolutionTrendAnalyzer;
         let mut analyzer = EvolutionTrendAnalyzer::new();
@@ -1809,16 +2455,24 @@ impl BrainStage for TrendAnalysisStage {
             analyzer.record(&format!("cap_{}", i), *val, Some("capability"));
         }
         let report = analyzer.analyze();
-        log::trace!("[trend_analysis] trends={} dir={:?} improving={} declining={}",
-            report.trends.len(), report.overall_direction,
-            report.improving_count, report.declining_count);
+        log::trace!(
+            "[trend_analysis] trends={} dir={:?} improving={} declining={}",
+            report.trends.len(),
+            report.overall_direction,
+            report.improving_count,
+            report.declining_count
+        );
         if let Some(ref kb) = brain._nt_memory_kb {
-            let _ = kb.kv_set("trend_analysis", &format!("iter_{}", brain.iteration),
+            let _ = kb.kv_set(
+                "trend_analysis",
+                &format!("iter_{}", brain.iteration),
                 &serde_json::json!({"trends": report.trends.len(),
                     "direction": format!("{:?}", report.overall_direction),
                     "improving": report.improving_count,
                     "declining": report.declining_count,
-                }).to_string());
+                })
+                .to_string(),
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -1826,11 +2480,23 @@ impl BrainStage for TrendAnalysisStage {
 
 /// MetaGoalStage: generates meta-goals every 12 iterations from trend report.
 pub struct MetaGoalStage;
-impl Default for MetaGoalStage { fn default() -> Self { Self } }
-impl MetaGoalStage { pub fn new() -> Self { Self } }
+impl Default for MetaGoalStage {
+    fn default() -> Self {
+        Self
+    }
+}
+impl MetaGoalStage {
+    pub fn new() -> Self {
+        Self
+    }
+}
 impl BrainStage for MetaGoalStage {
-    fn name(&self) -> &str { "meta_goal" }
-    fn frequency(&self) -> usize { 12 }
+    fn name(&self) -> &str {
+        "meta_goal"
+    }
+    fn frequency(&self) -> usize {
+        12
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::nt_act_autonomy::{EvolutionTrendAnalyzer, MetaGoalGenerator};
         let mut analyzer = EvolutionTrendAnalyzer::new();
@@ -1843,11 +2509,15 @@ impl BrainStage for MetaGoalStage {
         let goals = generator.generate_from_trends(&report);
         log::debug!("[meta_goal] generated {} goals from trends", goals.len());
         if let Some(ref kb) = brain._nt_memory_kb {
-            let goal_str: Vec<String> = goals.iter()
+            let goal_str: Vec<String> = goals
+                .iter()
                 .map(|g| format!("{}:{:.2}", g.description, g.priority as u8))
                 .collect();
-            let _ = kb.kv_set("meta_goals", &format!("iter_{}", brain.iteration),
-                &serde_json::json!({"count": goals.len(), "goals": goal_str}).to_string());
+            let _ = kb.kv_set(
+                "meta_goals",
+                &format!("iter_{}", brain.iteration),
+                &serde_json::json!({"count": goals.len(), "goals": goal_str}).to_string(),
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -1855,19 +2525,30 @@ impl BrainStage for MetaGoalStage {
 
 make_stage!(MemoryConsolidationStage);
 impl BrainStage for MemoryConsolidationStage {
-    fn name(&self) -> &str { "memory_consolidation" }
-    fn frequency(&self) -> usize { 12 }
+    fn name(&self) -> &str {
+        "memory_consolidation"
+    }
+    fn frequency(&self) -> usize {
+        12
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::nt_act_autonomy::cross_session_memory::MemoryCategory;
 
         let count_before = brain._memory_orch.size();
-        let tiers = [MemoryTier::Working, MemoryTier::Episodic, MemoryTier::Procedural];
+        let tiers = [
+            MemoryTier::Working,
+            MemoryTier::Episodic,
+            MemoryTier::Procedural,
+        ];
         let mut promoted_count = 0usize;
         for &tier in &tiers {
             let promoted = brain._memory_orch.promote(tier, |e| e.access_count >= 3);
             promoted_count += promoted.len();
             for entry in promoted {
-                brain._memory_orch.store(entry).map_err(|_| NeoTrixError::Brain("promote store".into()))?;
+                brain
+                    ._memory_orch
+                    .store(entry)
+                    .map_err(|_| NeoTrixError::Brain("promote store".into()))?;
             }
         }
         let mut persisted = 0usize;
@@ -1879,7 +2560,11 @@ impl BrainStage for MemoryConsolidationStage {
         // Cross-session memory integration: store current iteration patterns
         if let Some(ref mut csm) = brain._cross_session_memory {
             let caps = brain.brain.capability.arr();
-            let avg_cap = if caps.is_empty() { 0.0 } else { caps.iter().sum::<f64>() / caps.len() as f64 };
+            let avg_cap = if caps.is_empty() {
+                0.0
+            } else {
+                caps.iter().sum::<f64>() / caps.len() as f64
+            };
             csm.remember(
                 &format!("capability_iter_{}", brain.iteration),
                 &format!("{:.4}", avg_cap),
@@ -1899,7 +2584,9 @@ impl BrainStage for MemoryConsolidationStage {
 
         // GWT broadcast: notify global workspace about memory state
         let size_after = brain._memory_orch.size();
-        let csm_info = brain._cross_session_memory.as_ref()
+        let csm_info = brain
+            ._cross_session_memory
+            .as_ref()
             .map(|csm| format!(" csm={}", csm.len()))
             .unwrap_or_default();
         let msg = format!(
@@ -1920,8 +2607,12 @@ impl BrainStage for MemoryConsolidationStage {
 
 make_stage!(CacheCleanupStage);
 impl BrainStage for CacheCleanupStage {
-    fn name(&self) -> &str { "cache_cleanup" }
-    fn frequency(&self) -> usize { 50 }
+    fn name(&self) -> &str {
+        "cache_cleanup"
+    }
+    fn frequency(&self) -> usize {
+        50
+    }
     fn process(&self, _brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         use crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::{CleanupEngine, CleanupKind};
         let mut engine = CleanupEngine::new().with_project_root(std::path::PathBuf::from("."));
@@ -1929,8 +2620,11 @@ impl BrainStage for CacheCleanupStage {
         engine.archive_on_clean = true;
         let r = engine.clean(CleanupKind::ProjectArtifacts);
         if r.deletable_count > 0 {
-            log::info!("[pipeline/cache_cleanup] archived {} items ({:.1} MB) -> .cleanup/archive/",
-                r.deletable_count, r.estimated_bytes as f64 / 1_048_576.0);
+            log::info!(
+                "[pipeline/cache_cleanup] archived {} items ({:.1} MB) -> .cleanup/archive/",
+                r.deletable_count,
+                r.estimated_bytes as f64 / 1_048_576.0
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -1938,7 +2632,9 @@ impl BrainStage for CacheCleanupStage {
 
 make_stage!(RewardCalculationStage);
 impl BrainStage for RewardCalculationStage {
-    fn name(&self) -> &str { "reward_calc" }
+    fn name(&self) -> &str {
+        "reward_calc"
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let external = brain._external_reward();
         let (reward, source) = if let Some(ext) = external {
@@ -1990,8 +2686,12 @@ impl BrainStage for ConvergenceCheckStage {
         use crate::core::nt_core_self::self_audit::converge_check;
         let report = converge_check(".");
         if !report.findings.is_empty() {
-            log::warn!("[seal] converge_check iter: {} ghosts, {} orphans, {} stale",
-                report.ghost_count, report.stale_count, report.orphan_count);
+            log::warn!(
+                "[seal] converge_check iter: {} ghosts, {} orphans, {} stale",
+                report.ghost_count,
+                report.stale_count,
+                report.orphan_count
+            );
         }
         Ok(StageDecision::Continue)
     }
@@ -2025,24 +2725,24 @@ impl BrainStage for SelfTestStage {
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let _ = brain;
-        use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
-        use crate::core::nt_core_self::self_audit::ConvergeCheckFn;
-        use crate::core::nt_core_self_test::SelfTestRegistry;
-        use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
-        use crate::core::nt_core_meta::scanner::CodeScanner;
-        use crate::core::nt_core_gwt::monitor::EntropyMonitor;
-        use crate::neotrix::l8_autonomic_impl::nt_mind::bbrain_monitor::BMonitor;
-        use crate::core::nt_core_consciousness::inner_critic::InnerCritic;
-        use crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
-        use crate::core::nt_core_self_review::SelfReviewGate;
         use crate::core::nt_core_consciousness::cognitive_load::CognitiveLoadMonitor;
+        use crate::core::nt_core_consciousness::consciousness_runtime::ConsciousnessRuntime;
+        use crate::core::nt_core_consciousness::inner_critic::InnerCritic;
         use crate::core::nt_core_consciousness_tree::ConsciousnessTree;
-        use crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor;
-        use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
-        use crate::core::nt_core_meta::monitor::MetaMonitor;
+        use crate::core::nt_core_gwt::monitor::EntropyMonitor;
+        use crate::core::nt_core_meta::knowledge_gap_detector::KnowledgeGapDetector;
         use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
-        use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
+        use crate::core::nt_core_meta::monitor::MetaMonitor;
+        use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
+        use crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor;
+        use crate::core::nt_core_meta::scanner::CodeScanner;
         use crate::core::nt_core_meta::self_model::SelfModel;
+        use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
+        use crate::core::nt_core_self::metacognitive_evaluator::CognitiveEvaluator;
+        use crate::core::nt_core_self::self_audit::ConvergeCheckFn;
+        use crate::core::nt_core_self_review::SelfReviewGate;
+        use crate::core::nt_core_self_test::SelfTestRegistry;
+        use crate::neotrix::l8_autonomic_impl::nt_mind::bbrain_monitor::BMonitor;
         let mut registry = SelfTestRegistry::new();
         registry.register(Box::new(SchemaWatchdog::new()));
         registry.register(Box::new(ConvergeCheckFn));
@@ -2066,34 +2766,72 @@ impl BrainStage for SelfTestStage {
             cm.observe();
             cm
         }));
-        registry.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_self_diagnose::SelfDiagnose));
-        registry.register(Box::new(crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default()));
-        registry.register(Box::new(crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new()));
-        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_autonomy::oracle_gate::OracleGate::new()));
-        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_code::semantic_entropy::SemanticEntropyGate::new()));
-        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_act_sandbox::ActionSandbox::new()));
-        registry.register(Box::new(crate::core::nt_core_consciousness_review::ConsciousnessReview::new()));
-        registry.register(Box::new(crate::neotrix::l5_consciousness_impl::nt_core_fep_iit::bridge::FEPIITBridge::new()));
+        registry.register(Box::new(
+            crate::neotrix::l8_autonomic_impl::nt_mind_self_diagnose::SelfDiagnose,
+        ));
+        registry.register(Box::new(
+            crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_svaf_gate::SvafGate::default(),
+        ));
+        registry.register(Box::new(
+            crate::core::l7_capability::nt_core_antidistil::DistillationDetector::new(),
+        ));
+        registry.register(Box::new(
+            crate::neotrix::l1_body_impl::nt_act_autonomy::oracle_gate::OracleGate::new(),
+        ));
+        registry.register(Box::new(
+            crate::neotrix::l1_body_impl::nt_act_code::semantic_entropy::SemanticEntropyGate::new(),
+        ));
+        registry.register(Box::new(
+            crate::neotrix::l1_body_impl::nt_act_sandbox::ActionSandbox::new(),
+        ));
+        registry.register(Box::new(
+            crate::core::nt_core_consciousness_review::ConsciousnessReview::new(),
+        ));
+        registry.register(Box::new(
+            crate::neotrix::l5_consciousness_impl::nt_core_fep_iit::bridge::FEPIITBridge::new(),
+        ));
         registry.register(Box::new(crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::ConsciousnessGoldStandard::new()));
         registry.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind::consciousness_bridge::ConsciousnessBridge::new()));
         registry.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::browser_security::BrowserSecurityScanner::new(
             crate::neotrix::l1_body_impl::nt_shield::browser_security::BrowserSecurityConfig::default(),
         )));
-        registry.register(Box::new(crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new()));
-        registry.register(Box::new(crate::core::nt_core_telemetry::TelemetryStore::new(100)));
+        registry.register(Box::new(
+            crate::neotrix::l1_body_impl::nt_shield::check_registry::CheckRegistry::new(),
+        ));
+        registry.register(Box::new(
+            crate::core::nt_core_telemetry::TelemetryStore::new(100),
+        ));
         registry.register(Box::new(crate::neotrix::nt_memory_kb::nt_memory_commit_tracker::NarrativeConsistencyChecker::new()));
-        registry.register(Box::new(crate::core::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5)));
-        registry.register(Box::new(crate::core::nt_core_state_substrate::StateSubstrate::new()));
-        registry.register(Box::new(crate::core::nt_core_simulate_engine::SimulateEngine::new()));
-        registry.register(Box::new(crate::core::nt_core_second_brain::SecondBrain::new()));
-        registry.register(Box::new(crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::CleanupEngineSelfTest));
-        registry.register(Box::new(crate::neotrix::nt_file_ability::FileAbilitySelfTest));
-        registry.register(Box::new(crate::neotrix::l7_capability_impl::CapabilityClusterSelfTest));
+        registry.register(Box::new(
+            crate::core::nt_core_scoring_substrate::ScoringSubstrate::new().with_threshold(0.5),
+        ));
+        registry.register(Box::new(
+            crate::core::nt_core_state_substrate::StateSubstrate::new(),
+        ));
+        registry.register(Box::new(
+            crate::core::nt_core_simulate_engine::SimulateEngine::new(),
+        ));
+        registry.register(Box::new(
+            crate::core::nt_core_second_brain::SecondBrain::new(),
+        ));
+        registry.register(Box::new(
+            crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::CleanupEngineSelfTest,
+        ));
+        registry.register(Box::new(
+            crate::neotrix::nt_file_ability::FileAbilitySelfTest,
+        ));
+        registry.register(Box::new(
+            crate::neotrix::l7_capability_impl::CapabilityClusterSelfTest,
+        ));
         let results = registry.run_all();
         let passed = results.iter().filter(|r| r.passed).count();
         let total = results.len();
         if passed < total {
-            log::error!("[seal] self_test: {}/{} passed — DETECTION SYSTEM DEGRADED", passed, total);
+            log::error!(
+                "[seal] self_test: {}/{} passed — DETECTION SYSTEM DEGRADED",
+                passed,
+                total
+            );
             for r in &results {
                 if !r.passed {
                     log::error!("[seal] self_test: {}", r.summary());
@@ -2116,8 +2854,12 @@ impl BrainStage for SelfTestStage {
 
 make_stage!(ConsciousnessRewardStage);
 impl BrainStage for ConsciousnessRewardStage {
-    fn name(&self) -> &str { "consciousness_reward" }
-    fn frequency(&self) -> usize { 5 }
+    fn name(&self) -> &str {
+        "consciousness_reward"
+    }
+    fn frequency(&self) -> usize {
+        5
+    }
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let q = brain._last_consciousness_quality;
         let count = brain._consciousness_critique_count;
@@ -2139,7 +2881,10 @@ impl BrainStage for ConsciousnessRewardStage {
         brain._reward = (current + reward_adj).clamp(-1.0, 1.0);
         log::info!(
             "[seal] consciousness_reward: quality={:.3} count={} adj={:+.3} reward={:.3}",
-            q, count, reward_adj, brain._reward,
+            q,
+            count,
+            reward_adj,
+            brain._reward,
         );
         Ok(StageDecision::Continue)
     }
@@ -2191,9 +2936,20 @@ mod tests {
         }
         // 果实 trace 应进入 process buffer (至少 1 条来自 ConsciousnessTree)
         assert!(
-            brain._process_stage.buffer.traces.iter().any(|t| t.source == TraceSource::ConsciousnessTree),
+            brain
+                ._process_stage
+                .buffer
+                .traces
+                .iter()
+                .any(|t| t.source == TraceSource::ConsciousnessTree),
             "consciousness fruit trace consumed by SEAL process: {:?}",
-            brain._process_stage.buffer.traces.iter().map(|t| t.source.clone()).collect::<Vec<_>>()
+            brain
+                ._process_stage
+                .buffer
+                .traces
+                .iter()
+                .map(|t| t.source.clone())
+                .collect::<Vec<_>>()
         );
         // 缺陷2修复 (自我运转实际情况): 果实消费后应清除, 防止同一批果实被
         // SEAL 反复消费 (1h 注入 vs 10min 消费时序错配 → 重复污染 process 学习)。
@@ -2203,11 +2959,21 @@ mod tests {
             brain._consciousness_fruits.len()
         );
         // 再次 process: 无果实可消费, buffer 不新增 ConsciousnessTree trace
-        let before = brain._process_stage.buffer.traces.iter()
-            .filter(|t| t.source == TraceSource::ConsciousnessTree).count();
+        let before = brain
+            ._process_stage
+            .buffer
+            .traces
+            .iter()
+            .filter(|t| t.source == TraceSource::ConsciousnessTree)
+            .count();
         let _ = stage.process(&mut brain).expect("process again ok");
-        let after = brain._process_stage.buffer.traces.iter()
-            .filter(|t| t.source == TraceSource::ConsciousnessTree).count();
+        let after = brain
+            ._process_stage
+            .buffer
+            .traces
+            .iter()
+            .filter(|t| t.source == TraceSource::ConsciousnessTree)
+            .count();
         assert_eq!(before, after, "no re-consumption after clear");
     }
 }
