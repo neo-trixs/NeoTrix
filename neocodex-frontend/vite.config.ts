@@ -28,11 +28,36 @@ export default defineConfig({
           ) {
             return 'vendor-ui'
           }
+          // three 核心（尾部带 / 仅匹配 three 本体，不误吞 three-* 子包）
+          if (id.includes('node_modules/three/')) {
+            return 'vendor-three'
+          }
+          // three-globe 生态：球体渲染与几何辅助
           if (
-            id.includes('node_modules/three') ||
-            id.includes('node_modules/globe.gl') ||
-            id.includes('node_modules/topojson-client')
+            id.includes('node_modules/three-globe') ||
+            id.includes('node_modules/three-render-objects') ||
+            id.includes('node_modules/three-slippy-map-globe') ||
+            id.includes('node_modules/three-conic-polygon-geometry') ||
+            id.includes('node_modules/three-geojson-geometry') ||
+            id.includes('node_modules/h3-js') ||
+            id.includes('node_modules/tinycolor2') ||
+            id.includes('node_modules/data-bind-mapper') ||
+            id.includes('node_modules/frame-ticker') ||
+            id.includes('node_modules/index-array-by')
           ) {
+            return 'vendor-three-globe'
+          }
+          // d3 生态（地理投影/网格/刻度）与其他 globe 支撑库
+          if (
+            id.includes('node_modules/d3-') ||
+            id.includes('node_modules/@tweenjs') ||
+            id.includes('node_modules/accessor-fn') ||
+            id.includes('node_modules/kapsule')
+          ) {
+            return 'vendor-globe-d3'
+          }
+          // 剩余 globe 外壳与按需加载的 topojson
+          if (id.includes('node_modules/globe.gl') || id.includes('node_modules/topojson-client')) {
             return 'vendor-globe'
           }
           return undefined

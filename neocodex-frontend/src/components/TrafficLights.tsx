@@ -31,6 +31,31 @@ export function TrafficLights() {
   const maximize = () => system.windowMaximize()
   const close = () => system.windowClose()
 
+  // 双击防抖：window_maximize 是 toggle 语义，双击会触发 click+click+dblclick 共 3 次 toggle，
+  // 净效果正确但产生闪烁。改用标准 click-timer：单击延迟 250ms 判断是否双击，
+  // 250ms 内无第二次点击才执行 toggle；双击则取消待执行的单击并在第二次点击时只 toggle 一次。
+  let maxTimer: ReturnType<typeof setTimeout> | null = null
+
+  const handleMaximizeClick = () => {
+    if (maxTimer !== null) {
+      clearTimeout(maxTimer)
+      maxTimer = null
+      maximize()
+      return
+    }
+    maxTimer = setTimeout(() => {
+      maxTimer = null
+      maximize()
+    }, 250)
+  }
+
+  onCleanup(() => {
+    if (maxTimer !== null) {
+      clearTimeout(maxTimer)
+      maxTimer = null
+    }
+  })
+
   return (
     <div class={clsx('traffic', !focused() && 'blurred')} data-tauri-drag-region>
       <button
@@ -56,8 +81,8 @@ export function TrafficLights() {
       </button>
       <button
         class="t-dot t-x"
-        onDblClick={(e) => { e.preventDefault(); maximize() }}
-        onClick={maximize}
+        onDblClick={(e) => e.preventDefault()}
+        onClick={handleMaximizeClick}
         aria-label="最大化"
         title="最大化"
       >
