@@ -85,8 +85,8 @@
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct"
+        "absorbed_from": "chAng-L19/codex-redteam-mode, MDX-Tom/gpt-5.6-instruct",
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-11T17:40:00Z",
@@ -175,6 +175,51 @@
       "metadata": {},
       "created_at": "2026-08-12T02:05:21.974103Z",
       "updated_at": "2026-08-12T05:09:18.287832Z",
+      "deprecated": false,
+      "deprecated_reason": null
+    },
+    {
+      "id": "nt_file_ability::unified_file_ops",
+      "domain": "io",
+      "layer": "l1composite",
+      "constellation": "c1unittest",
+      "provides": [
+        "file_read",
+        "file_write",
+        "file_edit",
+        "office_parse",
+        "text_extract",
+        "pdf_parse",
+        "xlsx_parse",
+        "visual_extract",
+        "grounding_check",
+        "vsa_embed",
+        "content_similarity"
+      ],
+      "requires": [],
+      "rune_sockets": [],
+      "dependents": [],
+      "evolution_log": [
+        {
+          "cycle": "pending",
+          "op": "budding",
+          "from_nodes": [],
+          "to_node": "nt_file_ability::unified_file_ops",
+          "note": "doc7 吸收落地: 三公理代码化 (提取上限 extraction_bound_ok + grounding 可靠性评分 reliability_score + resume 审计管线经 experience-tree)",
+          "timestamp": "2026-08-13T13:02:47.046876Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_file_ability::unified_file_ops",
+          "note": "Promoted to C1",
+          "timestamp": "2026-08-13T13:03:01.490094Z"
+        }
+      ],
+      "metadata": {},
+      "created_at": "2026-08-13T13:02:47.046875Z",
+      "updated_at": "2026-08-13T13:03:01.490095Z",
       "deprecated": false,
       "deprecated_reason": null
     }
@@ -476,6 +521,14 @@
       "promoted_at": 1786515529,
       "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
       "signal": 0.76
+    },
+    {
+      "domain": "NT-CORE",
+      "capability": "performance_concurrency",
+      "action": "strengthen_or_bud",
+      "rationale": "经验 '[蒸馏-NT-CORE] 聚合 3 条经验的模式: 并发 session 修改共享工作区 (R-P94) 会污染 cargo check/test 判定：并发 session 正在修改 nt_core_task_dispatcher.rs/vlm_provider.rs 等文件时，我的 check 报 18 errors (非我的文件)，但并发提交后重跑即 0 errors。判定规则：grep '-->' 确 [关键词: core, dispatcher, fail, harness, task]' 命中能力标签 'performance_concurrency' 于域 Core, 应强化对应能力节点",
+      "signal": 0.76,
+      "promoted_at": 1786626573
     }
   ]
 }
