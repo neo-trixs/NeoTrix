@@ -1,6 +1,35 @@
-# NeoTrix Evolution TODO — 2026-07-06 Cycle 30
+# NeoTrix Evolution TODO — 2026-08-13 Cycle 241+ (P1 治理合规 + warning 清零)
 
-## Build Baseline
+## Build Baseline (2026-08-13)
+
+| Check | Result |
+|-------|--------|
+| `cargo check --lib -p neotrix` | ✅ 0 errors / 11 warnings (9 对方新模块 metadata + 2 nt_file_ability) |
+| `cargo check --features full --lib -p neotrix` | ✅ 0 errors / 15 warnings |
+| `cargo test -p neotrix --lib` | ✅ 6811 passed / 2 failed(修复后待重跑) / 12 ignored |
+| warning 清理 | 🟢 43 → 11 (无效断言/死代码/未使用变量 + rate_limit_middleware 接线) |
+
+---
+
+## ✅ Completed Cycle 241+ (蜕变迭代)
+
+| Commit | 交付项 | 说明 |
+|--------|--------|------|
+| `b35aa23` | P1 治理合规审计接线 | run_governance_audit 真实评估 80 条宪法规则, compliance 从硬编码 1.0 → 0.27→0.5 路径; GLOBAL_CONSTITUTION 优先 dev-rules.md |
+| `bb93680` | warning 清理 43→11 | 9 处无意义 `assert!(x>=0)` / 死代码 parse_scalar/fetch_elevation_single / 未使用变量 + rate_limit_middleware 接线 (F2) |
+| `6f6eb6f` | 断言语义修正 | 修正 warning 清理引入的 2 个错误断言 (health_report 镜像 state / volition 候选真实计数) |
+| `bf7f51a` | 治理生产路径测试 | tick → Phase 4.6 审计消费真实 next_actions, fractal_depth=1 断言 + with_kb_lock 签名修复 |
+
+### D1 (蓝图) 状态: 已完成 (并发会话)
+- `run_growth_cycle` Phase 2 用 `build_phi_state()` 构造 64 维意识谱 → `IITPhiCalculator::compute_phi`
+- `core_snapshot_from_tree` 持久化真实 `tree.trunk.phi`, status 读取真实整合信息
+- 测试覆盖: `test_growth_cycle_computes_real_iit_phi` + iit_phi 11 tests 全绿
+
+---
+
+## Cycle 30 历史 (2026-07-06)
+
+## Build Baseline (cycle 30)
 
 | Check | Result |
 |-------|--------|
