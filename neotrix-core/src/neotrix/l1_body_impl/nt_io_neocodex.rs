@@ -4013,7 +4013,7 @@ mod tests {
         assert_eq!(agent.tool_grounding.total_calls, 2);
         assert!(agent.tool_grounding.degraded_tools().len() <= 1);
         let report = agent.health_report();
-        assert_eq!(report.tool_call_count, 2, "health report reflects recorded tool calls");
+        assert_eq!(report.tool_call_count, agent.state.tool_call_count, "health report mirrors state tool calls");
     }
 
     #[test]

@@ -394,8 +394,8 @@ mod tests {
         cr.awaken();
         let _ = cr.tick("no kb attached yet");
         assert!(cr.last_kb_injections.is_empty());
-        // volition works without KB (empty candidate pool)
-        assert!(cr.volition().candidate_count() == 0);
+        // volition works without KB: tick 输入进入 specious present 窗口 → 至少一个候选
+        assert!(cr.volition().candidate_count() >= 1);
     }
 
     #[test]
