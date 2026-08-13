@@ -256,7 +256,7 @@ impl Constitution {
         }
     }
 
-    fn check_violation(&self, rule: &DevRule, action_desc: &str) -> bool {
+    pub(crate) fn check_violation(&self, rule: &DevRule, action_desc: &str) -> bool {
         let desc_lower = action_desc.to_lowercase();
         match rule.id.as_str() {
             "R-P42" => desc_lower.contains("new module") && !desc_lower.contains("branch") && !desc_lower.contains("extend"),
@@ -342,26 +342,35 @@ impl ConstitutionLoader {
             .or_else(|| Self::find_section(content, "Dev Rules", "## "))
             .ok_or("Dev Rules section not found")?;
 
-        // Pattern: - **R-Pxx (Title)**: content
-        let rule_regex = regex::Regex::new(r"(?m)^\s*-\s*\*\*R-P(\d+)\s*\(([^)]+)\)\*\*:\s*(.+)$")
-            .map_err(|e| format!("Regex error: {}", e))?;
+        // 兼容格式:
+        //   1. `- **R-Pxx (Title)**: content` (AGENTS.md 历史格式)
+        //   2. `- **R-Pxx**: content` (dev-rules.md 现行格式, 无 Title 括号)
+        //   3. `- **R-P42 / R-P47 (Title)**: content` (组合 ID, 双规则共用正文)
+        let rule_regex = regex::Regex::new(
+            r"(?m)^\s*-\s*\*\*R-P(\d+)(?:\s*/\s*R-P(\d+))?(?:\s*\(([^)]+)\))?\*\*:\s*(.+)$",
+        )
+        .map_err(|e| format!("Regex error: {}", e))?;
 
         for cap in rule_regex.captures_iter(dev_rules_section) {
-            let num = &cap[1];
-            let title = cap[2].trim().to_string();
-            let content_text = cap[3].trim().to_string();
-            let id = format!("R-P{}", num);
-
-            let category = RuleCategory::from_rule_id(&id);
-            let rule = DevRule {
-                id: id.clone(),
-                title,
-                content: content_text,
-                category: category.clone(),
-                source_cycle: Self::extract_cycle_for_rule(dev_rules_section, &id).unwrap_or(0),
-                vector: None,
-            };
-            rules.insert(id, rule);
+            let title = cap.get(3).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
+            let content_text = cap[4].trim().to_string();
+            // 主规则 + 可选组合规则 (R-P42 / R-P47 → 两条规则共享正文)
+            let mut ids = vec![format!("R-P{}", &cap[1])];
+            if let Some(second) = cap.get(2) {
+                ids.push(format!("R-P{}", second.as_str()));
+            }
+            for id in ids {
+                let category = RuleCategory::from_rule_id(&id);
+                let rule = DevRule {
+                    id: id.clone(),
+                    title: title.clone(),
+                    content: content_text.clone(),
+                    category: category.clone(),
+                    source_cycle: Self::extract_cycle_for_rule(dev_rules_section, &id).unwrap_or(0),
+                    vector: None,
+                };
+                rules.insert(id, rule);
+            }
         }
 
         // Also catch rules in "Dev Rules Added (R-Px to R-Py)" format
@@ -383,7 +392,7 @@ impl ConstitutionLoader {
 
         // Find Experience Tree sections (uses look-ahead which clippy's parser doesn't support)
         let exp_regex = regex::Regex::new(
-            r"(?ms)## Experience Tree\s*[—-]\s*(\d{4}-\d{2}-\d{2})\s*Cycle\s*(\d+)\s*\((.*?)\)\n(.*?)(?=\n## |\z)"
+            r"(?ms)## Experience Tree\s*[—-]\s*(\d{4}-\d{2}-\d{2})\s*Cycle\s*(\d+)\s*\((.*?)\)\n(.*?)(?:\n## |\z)"
         ).map_err(|e| format!("Regex error: {}", e))?;
 
         for cap in exp_regex.captures_iter(content) {
@@ -519,11 +528,30 @@ fn encode_text_to_fhrr(text: &str) -> FhrrVector {
 
 /// Global constitution instance (loaded at startup)
 static GLOBAL_CONSTITUTION: LazyLock<Constitution> = LazyLock::new(|| {
-    let path = Path::new("AGENTS.md");
-    ConstitutionLoader::load_from_file(path).unwrap_or_else(|e| {
-        eprintln!("Failed to load constitution: {}", e);
-        Constitution::new()
-    })
+    // 优先加载全量规则文件 dev-rules.md (R-P1~R-P101), 回退 AGENTS.md。
+    // 两者都向上查找以兼容任意 CWD (测试 crate 根 / 仓库根 / 子目录)。
+    // dev-rules.md 是规则单一事实源 (R-P101: 两处修订必须同步)。
+    let candidates = ["dev-rules.md", "AGENTS.md"];
+    for candidate in candidates {
+        let mut search_path = std::path::PathBuf::from(candidate);
+        for _depth in 0..4 {
+            if search_path.exists() {
+                match ConstitutionLoader::load_from_file(&search_path) {
+                    Ok(c) => {
+                        if !c.rules.is_empty() {
+                            return c;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to load constitution from {}: {}", search_path.display(), e);
+                    }
+                }
+            }
+            search_path = std::path::Path::new("..").join(search_path);
+        }
+    }
+    eprintln!("Failed to load constitution: dev-rules.md and AGENTS.md not found (CWD and parents)");
+    Constitution::new()
 });
 
 /// Close Constitution impl block
