@@ -1430,6 +1430,11 @@ pub async fn neocodex_checkpoint_list(session_id: String) -> Result<Vec<serde_js
 /// Rewind a session to a checkpoint: replaces the active wire file with the
 /// snapshot and rebuilds the agent context so the next turn continues from
 /// that point (Claude `/rewind` parity, code + conversation).
+///
+/// Absorption (DSCode checkpoint.ts 语义): 恢复前先把当前 wire 存为反向
+/// undo 快照 (checkpoints/undo-{session}-{ts}.jsonl)，使恢复本身可回滚 —
+/// dscode 的 "every successful patch creates a durable checkpoint" 在对话级
+/// 的等价物。恢复后若需撤销恢复，将该 undo 快照 copy 回 wire 即可。
 #[tauri::command(rename_all = "snake_case")]
 pub async fn neocodex_checkpoint_restore(session_id: String, checkpoint_id: String) -> Result<Vec<NeoCodexMessageItem>, String> {
     // Anti-traversal: checkpoint_id must match our generated naming.
@@ -1444,6 +1449,17 @@ pub async fn neocodex_checkpoint_restore(session_id: String, checkpoint_id: Stri
         return Err("Checkpoint not found".to_string());
     }
     let path = session_path(&session_id);
+    // 反向 undo 快照：恢复会覆盖当前 wire，先留存当前状态（若 wire 存在且有内容）。
+    if path.exists() {
+        if let Ok(meta) = std::fs::metadata(&path) {
+            if meta.len() > 0 {
+                let dir = checkpoints_dir();
+                let ts = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+                let _ = std::fs::copy(&path, dir.join(format!("undo-{}-{}.jsonl", session_id, ts)));
+            }
+        }
+    }
     std::fs::copy(&src, &path).map_err(|e| e.to_string())?;
     let mut guard = NEOCODEX_AGENT.lock().await;
     rebuild_agent_for(&path, &mut guard);
