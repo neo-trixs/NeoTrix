@@ -10,6 +10,31 @@ use crate::core::nt_core_bank::{ReasoningMemory, ReasoningBankStats};
 
 pub use neotrix_types::core::nt_core_traits::{NativeTool, ToolDef, ToolOutput, ToolProvider};
 
+pub use crate::core::nt_core_self_test::SelfTest;
+
+/// Rune Socket — 每模块 5 色符文槽位配置 (数据/变换/缓存/错误恢复/监控)。
+/// 定义在 `nt_core_capability_tree` (node.rs), 此处 re-export 供 core 层引用。
+pub use nt_core_capability_tree::RuneSocket;
+
+/// CapabilityNode — 能力树节点抽象 trait。
+/// 实现者声明自身在能力树中的坐标 (provides/requires)、符文槽位与星座成熟度。
+/// 注意: `nt_core_capability_tree::CapabilityNode` 是注册表数据 struct,
+/// 此 trait 是能力节点实现方 (l8/l9/l10) 向 core 层声明节点契约的接口。
+pub trait CapabilityNode: Send + Sync {
+    /// 节点唯一标识 (域::模块::实例路径)
+    fn node_id(&self) -> &str;
+    /// 该节点提供的能力标识符列表
+    fn provides(&self) -> Vec<String>;
+    /// 该节点运行所需的上游能力标识符列表
+    fn requires(&self) -> Vec<String>;
+    /// 符文槽位配置 (模块级 rune socketing)
+    fn rune_sockets(&self) -> Vec<RuneSocket> { Vec::new() }
+    /// 星座成熟度 (C0-C6, 返回 0-6)
+    fn constellation_level(&self) -> u8 { 0 }
+    /// 尝试晋升星座成熟度一级
+    fn promote_constellation(&mut self) -> bool { false }
+}
+
 /// L0 共享专型枚举：GWT 专家模块类型 / SEAL 阶段路由 / PRM 过程奖励评分。
 /// 定义在 L0 以防止 L4→L5 反向依赖。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

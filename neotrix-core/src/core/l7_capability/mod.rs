@@ -24,6 +24,7 @@ pub mod nt_cap_media;
 pub mod nt_cap_geo;
 pub mod nt_core_orch_agent;
 pub mod nt_core_grounded_gate;
+pub mod cluster_self_test;
 
 pub use registry::*;
 pub use protocol::*;
@@ -46,3 +47,4 @@ pub use nt_core_orch_agent::{
 pub use nt_core_grounded_gate::{
     GroundedCheck, GroundedGate, GroundedDecision, AgentContract, Field, FieldType, Domain,
 };
+pub use cluster_self_test::CapabilityClusterSelfTest;

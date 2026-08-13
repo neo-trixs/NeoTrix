@@ -26,6 +26,18 @@ pub enum NeoTrixError {
     /// pi-agent steer (缺陷②): 慢进程重规划建议 — 保留 brain 进度, 上层可重定向任务。
     /// 与 Brain(abort) 的区别: Steer 不丢弃已产出成果, 仅请求换路线。
     Steer(String),
+    /// 资源/实体未找到
+    NotFound(String),
+    /// 输入参数非法
+    InvalidInput(String),
+    /// 系统状态非法 (前置条件未满足)
+    InvalidState(String),
+    /// 操作尚未实现
+    NotImplemented(String),
+    /// 通用操作失败
+    OperationFailed(String),
+    /// 安全策略违规 (NT-SHIELD)
+    SafetyViolation(String),
 }
 
 impl fmt::Display for NeoTrixError {
@@ -50,6 +62,12 @@ impl fmt::Display for NeoTrixError {
             NeoTrixError::Keyring(msg) => write!(f, "密钥环错误: {}", msg),
             NeoTrixError::Shield(msg) => write!(f, "护盾拦截: {}", msg),
             NeoTrixError::Steer(msg) => write!(f, "steer 重定向建议: {}", msg),
+            NeoTrixError::NotFound(msg) => write!(f, "未找到: {}", msg),
+            NeoTrixError::InvalidInput(msg) => write!(f, "非法输入: {}", msg),
+            NeoTrixError::InvalidState(msg) => write!(f, "非法状态: {}", msg),
+            NeoTrixError::NotImplemented(msg) => write!(f, "未实现: {}", msg),
+            NeoTrixError::OperationFailed(msg) => write!(f, "操作失败: {}", msg),
+            NeoTrixError::SafetyViolation(msg) => write!(f, "安全违规: {}", msg),
 }
     }
 }
