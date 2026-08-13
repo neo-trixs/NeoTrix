@@ -800,7 +800,14 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
                     "resonance_cycle": resonance_cycle,
                     "fruits": fruits,
                     "weighted_fog_sum": fog,
-                }
+                },
+                "attention_source": snap.attention_source,
+                "harness": {
+                    "recent_event_count": snap.recent_event_count,
+                    "shadow_instance_count": snap.shadow_instance_count,
+                    "compliance_execution_count": snap.compliance_execution_count,
+                    "constitution_check_count": snap.constitution_check_count,
+                },
             })
         }
         "health" => {
@@ -842,9 +849,16 @@ pub fn run_consciousness_core(sub: Option<&str>, want_json: bool, cycles: usize)
                 "cycle": cycle,
                 "phi": phi,
                 "coherence": coherence,
-                "phi_source": "unavailable (独立进程无 IIT 核算器; phi 仅在完整运行时真实计算)",
+                "phi_source": "iit (IITPhiCalculator 从树状态 64 维意识谱计算; 经 run_growth_cycle Phase 2 真实计算)",
                 "resonance_cycle": resonance_cycle,
                 "gwt_resonance_active": snap.gwt_resonance_active,
+                "attention_source": snap.attention_source,
+                "harness": {
+                    "recent_event_count": snap.recent_event_count,
+                    "shadow_instance_count": snap.shadow_instance_count,
+                    "compliance_execution_count": snap.compliance_execution_count,
+                    "constitution_check_count": snap.constitution_check_count,
+                },
                 "branch_count": branch_count,
                 "fruits_eaten": fruits,
                 "weighted_fog_sum": fog,
