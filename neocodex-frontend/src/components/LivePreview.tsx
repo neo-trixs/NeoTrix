@@ -181,7 +181,10 @@ export function LivePreview(props: Props) {
             <iframe
               src={frameSrc()}
               class="w-full h-full border-0"
-              sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
+              // 🟡 修复：移除 allow-same-origin —— 与 allow-scripts 组合是已知沙箱逃逸
+              //（iframe 内脚本可移除自身 sandbox 并访问宿主文档/API Key）。预览站点
+              // 以 opaque origin 运行：脚本受限但页面渲染/表单/弹窗不受影响，预览目的达标。
+              sandbox="allow-scripts allow-forms allow-popups"
               title="Live Preview"
             />
           </Show>

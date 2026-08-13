@@ -52,6 +52,8 @@ export function CommandPalette(props: Props) {
     const list = filtered()
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault()
+      // 🔵 修复：空列表时 `% 0` 产生 NaN，污染 selectedIdx（Enter 有 guard 但状态已坏）
+      if (list.length === 0) return
       const dir = e.key === 'ArrowDown' ? 1 : -1
       setSelectedIdx((p) => (p + dir + list.length) % list.length)
     } else if (e.key === 'Enter' && !e.shiftKey) {

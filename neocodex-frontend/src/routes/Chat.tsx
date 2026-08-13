@@ -874,8 +874,32 @@ export function Chat() {
   }
 
   const handleRegenerate = (message: Message) => {
+    // 持久化对齐：先计算可见索引再截断——regenerateFrom 会先移除该 assistant 消息，
+    // 若在其后读 currentMessages 已找不到 message.id。可见索引 = 前端数组中
+    // user/assistant 消息计数（tool/system 不计数，与后端 visible_message_indices 对齐）。
+    const sid = chatStore.state.currentSessionId
+    let visibleIdx = -1
+    if (sid) {
+      const msgs = chatStore.currentMessages
+      const idx = msgs.findIndex(m => m.id === message.id)
+      if (idx >= 0) {
+        visibleIdx = msgs
+          .slice(0, idx + 1)
+          .filter(m => m.role === 'user' || m.role === 'assistant').length - 1
+      }
+    }
     const userContent = chatStore.regenerateFrom(message.id)
     if (userContent) {
+      // 🟡 修复：regenerateFrom 仅截断本地 store——wire 中旧回复仍在，重载会话后
+      // 复活且 agent 上下文未重建。此处同步调后端 neocodex_regenerate 截断 wire
+      // 并重建上下文（R-P79：功能接线到生产路径，不留死代码）。
+      if (sid && visibleIdx >= 0) {
+        neocodex.regenerate(sid, visibleIdx).catch((e: Error) => {
+          console.error('[Chat] 持久化重新生成失败（本地已截断，重载后可能回退）:', e)
+          setStreamError(e.message ?? '重新生成失败')
+          setTimeout(() => setStreamError(null), 3000)
+        })
+      }
       // regenerateFrom 已截断被点消息所在轮（及之后），用户消息保留，跳过重复添加
       sendMessage(userContent, { userMessageAdded: true })
     }
@@ -890,10 +914,29 @@ export function Chat() {
     const content = editContent().trim()
     const msgId = editingMessageId()
     if (msgId && content) {
+      // 🟡 修复：与 handleRegenerate 同款持久化对齐——editAndResend 仅截断本地 store，
+      // wire 中旧消息仍在（重载复活）。先算被编辑消息的可见索引，同步截断后端 wire。
+      const sid = chatStore.state.currentSessionId
+      let editVisibleIdx = -1
+      if (sid) {
+        const msgs = chatStore.currentMessages
+        const idx = msgs.findIndex(m => m.id === msgId)
+        if (idx >= 0) {
+          // 截断点 = 被编辑消息自身（本地 slice(0, msgIndex) 将其一并移除）
+          editVisibleIdx = msgs
+            .slice(0, idx)
+            .filter(m => m.role === 'user' || m.role === 'assistant').length
+        }
+      }
       // editAndResend 已截断并添加新用户消息，跳过重复添加
       chatStore.editAndResend(msgId, content)
       setEditingMessageId(null)
       setEditContent('')
+      if (sid && editVisibleIdx >= 0) {
+        neocodex.regenerate(sid, editVisibleIdx).catch((e: Error) => {
+          console.error('[Chat] 持久化编辑失败（本地已截断，重载后可能回退）:', e)
+        })
+      }
       sendMessage(content, { userMessageAdded: true })
     }
   }

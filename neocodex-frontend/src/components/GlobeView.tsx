@@ -274,6 +274,18 @@ export function GlobeView(props: GlobeViewProps) {
         </div>`
       })
       .onPointHover((d: object | null) => setHovered(d ? (d as GeoPoint) : null))
+      // 🟡 修复：轨迹记录接线。此前 trajPoints 无任何采集路径——「开始记录」后点击
+      // 地球不产生任何轨迹点，保存按钮因 length<2 永久禁用（功能坏死）。
+      // 现在录制状态下点按任意城市/地理点即将其加入轨迹序列（相邻同坐标去重）。
+      .onPointClick((d: object | null) => {
+        if (!d || !trajRecording()) return
+        const p = d as GeoPoint
+        setTrajPoints(prev => {
+          const last = prev[prev.length - 1]
+          if (last && last.lat === p.lat && last.lng === p.lng) return prev
+          return [...prev, p]
+        })
+      })
 
     // 6) 幻境层：shanhai 扩散光环 (rings 动画) + 高亮大点叠加
     globe

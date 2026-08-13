@@ -54,12 +54,17 @@ export function ConfirmModal(props: Props) {
     }
   })
 
-  // 键盘：Esc 关闭 + Tab 轻量焦点循环（限制在弹窗内，不外泄到背景）
+  // 键盘：Esc 关闭 + Tab 轻量焦点循环（限制在弹窗内，不外泄到背景）。
+  // 🔴 修复（双重关闭）：捕获阶段监听 + stopImmediatePropagation。
+  // 此前冒泡阶段监听器与外层弹窗（SettingsModal 的 window 监听）或面板容器
+  // （GitPanel 等容器级 onKeyDown）都会消费同一次 Esc —— 一次按键同时关掉
+  // 确认框和整个弹窗/面板。捕获阶段让确认框最先看到按键并独占处理。
   createEffect(() => {
     if (!props.req) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
+        e.stopImmediatePropagation()
         props.onClose()
         return
       }
@@ -84,8 +89,8 @@ export function ConfirmModal(props: Props) {
         first.focus()
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   })
 
   const submit = () => props.onConfirm(inputVal())

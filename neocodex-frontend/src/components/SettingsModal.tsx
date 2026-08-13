@@ -235,14 +235,22 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     }
   })
 
+  // 🟡 修复：loadConfig 请求序号守卫——switchProvider 内 await loadConfig() 与
+  // 打开弹窗时 createEffect 触发的 loadConfig() 可并发，先发（切换前）的迟到响应
+  // 会覆盖新配置，状态栏短暂显示旧模型。序号丢弃过期响应。
+  let cfgReqSeq = 0
   const loadConfig = async () => {
+    const seq = ++cfgReqSeq
     setLoading(true)
     try {
-      setConfig(await neocodex.providerConfig())
+      const cfg = await neocodex.providerConfig()
+      if (seq !== cfgReqSeq) return
+      setConfig(cfg)
     } catch (e) {
+      if (seq !== cfgReqSeq) return
       showNotice(String(e))
     } finally {
-      setLoading(false)
+      if (seq === cfgReqSeq) setLoading(false)
     }
   }
 
@@ -451,6 +459,10 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
     if (props.open) {
       setSection('general')
       setNotice(null)
+      // 🟡 修复：热更新状态随弹窗打开复位——上次「已下载/下载中」等残留状态
+      // 不得在下次打开时原样呈现；进度条同步清空。
+      setUpdateState('idle')
+      setUpdateProgress(null)
       loadConfig()
       loadMemStats()
       loadAppVersion()
@@ -628,11 +640,17 @@ export function SettingsModal(props: { open: boolean; onClose: () => void }) {
                               const flat = NAV_GROUPS.flatMap((g) => g.ids)
                               const idx = flat.indexOf(id)
                               const dir = e.key === 'ArrowDown' ? 1 : -1
-                              setSection(flat[(idx + dir + flat.length) % flat.length])
+                              const next = flat[(idx + dir + flat.length) % flat.length]
+                              setSection(next)
+                              // 🟡 修复：切换 section 后同步移动焦点到目标 tab 按钮，
+                              // 否则方向键只改状态、焦点仍留在原按钮（连续按键失能）。
+                              document.getElementById(`settings-tab-${next}`)?.focus()
                             } else if (e.key === 'Home') {
                               e.preventDefault(); setSection(NAV_GROUPS[0].ids[0])
+                              document.getElementById(`settings-tab-${NAV_GROUPS[0].ids[0]}`)?.focus()
                             } else if (e.key === 'End') {
-                              e.preventDefault(); const flat = NAV_GROUPS.flatMap((g) => g.ids); setSection(flat[flat.length - 1])
+                              e.preventDefault(); const flat = NAV_GROUPS.flatMap((g) => g.ids); const last = flat[flat.length - 1]; setSection(last)
+                              document.getElementById(`settings-tab-${last}`)?.focus()
                             }
                           }}
                         >

@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show } from 'solid-js'
+import { createSignal, onMount, For, Show } from 'solid-js'
 import { neocodex, system } from '../api'
 import type { ProjectTreeItem, ProjectView } from '../api/types'
 import { clsx } from 'clsx'
@@ -224,9 +224,11 @@ export function RightBar() {
     }
   }
 
-  createEffect(() => {
-    loadTree()
-  })
+  /* 🔴 修复：loadTree 读取 tree() 信号并在完成后 setTree（新数组引用），
+   * createEffect 会因依赖自写信号陷入「setTree → 重跑 → 再 setTree」无限循环，
+   * 对后端 neocodex_project_tree IPC 持续轰炸。改为 onMount 单次加载 +
+   * 显式刷新按钮（ap-footer「刷新」已复用 loadTree）。 */
+  onMount(loadTree)
 
   const toggleRb = () => {
     if (autoHide()) {

@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, createEffect, For, Show } from 'solid-js'
 import { CheckSquare, Square, ListTodo } from 'lucide-solid'
 import { clsx } from 'clsx'
 
@@ -51,6 +51,21 @@ export function TaskList(props: { content: string; messageId: string }) {
   const [done, setDone] = createSignal<boolean[]>(
     loadTodoState(props.messageId, items().length) ?? items().map(i => i.done)
   )
+
+  // 🟡 修复：assistant 消息流式追加内容时 items 长度增长，done 数组必须同步扩容。
+  // 此前 done 仅在首次按初始长度初始化：流式期间 toggle 会写入越界稀疏数组，
+  // 且 loadTodoState 长度校验失败导致持久化/恢复失效。
+  createEffect(() => {
+    const n = items().length
+    const persisted = loadTodoState(props.messageId, n)
+    setDone(prev => {
+      if (persisted) return persisted
+      if (prev.length === n) return prev
+      const next = prev.slice(0, n)
+      while (next.length < n) next.push(items()[next.length].done)
+      return next
+    })
+  })
 
   const toggle = (idx: number) => {
     setDone(prev => {

@@ -76,8 +76,11 @@ export function GitPanel(props: Props) {
   // 仅首次加载自动展开第一个文件；刷新/操作后重载不重置用户当前的展开状态
   let firstLoad = true
 
-  const load = async () => {
-    setLoading(true)
+  // 🟡 修复：silent 静默刷新 —— accept/reject 后刷新若再置 loading，整个 body 被
+  //「加载变更...」spinner 替换重渲染，diff 展开/滚动位置全部丢失。操作后刷新不闪
+  // loading（后台对齐），仅首次加载/手动刷新按钮显示 spinner。
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const [st, df, stagedFiles, branches] = await Promise.all([
@@ -101,7 +104,7 @@ export function GitPanel(props: Props) {
     } catch (e) {
       setError(errText(e))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -144,7 +147,8 @@ export function GitPanel(props: Props) {
         return next
       })
       void refreshStaged()
-      await load()
+      // 静默刷新：避免全面板 spinner 闪烁 + diff 展开/滚动丢失
+      await load(true)
     } catch (e) {
       setError(errText(e))
     } finally {
@@ -210,6 +214,9 @@ export function GitPanel(props: Props) {
       showToast('提交成功')
       await load()
     } catch (e) {
+      // 🟡 修复：提交失败（hook 拒绝/冲突等）后必须复位审阅关卡，否则本会话内
+      // 后续提交会静默跳过「未审阅变更」知情关卡
+      setCommitGateBypassed(false)
       setError(errText(e))
     } finally {
       setBusy(null)
@@ -326,7 +333,7 @@ export function GitPanel(props: Props) {
           <button
             ref={firstBtnRef}
             class="panel-close"
-            onClick={load}
+            onClick={() => void load()}
             aria-label="刷新"
             title="刷新"
           >

@@ -5,9 +5,13 @@ import type { DisplayInfo, FrontmostApp, MousePosition, ScreenCapture, WindowInf
 import { clsx } from 'clsx'
 
 // 截图+窗口枚举节流：时间戳提升到模块级，跨组件重挂载（切视图重挂载触发 onMount）仍生效，
-// 5s 内重复进入复用上次结果，避免完整截图/枚举 IPC 风暴；手动「重新捕获」不经 load 不受限。
+// 5s 内重复进入复用上次结果，避免完整截图/枚举 IPC 风暴；手动「重新捕获」/头部刷新不受限。
 let lastSnapshotAt = 0
 const SNAPSHOT_THROTTLE_MS = 5000
+// 🟡 修复：模块级缓存最近一次截图。切走再切回（<5s）触发重挂载，onMount 自动加载被
+// 节流跳过时恢复缓存，避免面板显示「点击重新捕获获取截图」空态误导；头部刷新按钮
+// 传 force 直接绕过节流（与「手动不受限」注释一致）。
+let lastSnapshotDataUrl: string | null = null
 
 interface Props {
   open: boolean
@@ -59,9 +63,13 @@ export function ComputerUse(props: Props) {
     props.onClose()
   }
 
-  const load = async () => {
+  const load = async (force = false) => {
     const now = Date.now()
-    if (now - lastSnapshotAt < SNAPSHOT_THROTTLE_MS) return
+    if (now - lastSnapshotAt < SNAPSHOT_THROTTLE_MS && !force) {
+      // 节流命中：恢复最近截图（若有），不打断已有内容
+      if (lastSnapshotDataUrl) setScreenshotDataUrl(lastSnapshotDataUrl)
+      return
+    }
     lastSnapshotAt = now
     setLoading(true)
     setError(null)
@@ -87,7 +95,8 @@ export function ComputerUse(props: Props) {
       // 内存内联截图：后端捕获→base64→返回并自清理临时文件，前端不再 readFile/remove
       const shot = await computerApi.screenshotAndSave()
       if (!shot.data_base64) throw new Error('截图未返回内存数据')
-      setScreenshotDataUrl(`data:image/png;base64,${shot.data_base64}`)
+      lastSnapshotDataUrl = `data:image/png;base64,${shot.data_base64}`
+      setScreenshotDataUrl(lastSnapshotDataUrl)
       // Refresh window list + mouse position
       const [wl, mp] = await Promise.all([
         computerApi.getWindowList().catch(() => [] as WindowInfo[]),
@@ -202,8 +211,9 @@ export function ComputerUse(props: Props) {
           <button
             ref={firstBtnRef}
             class="panel-close"
-            onClick={load}
+            onClick={() => load(true)}
             aria-label="刷新"
+            title="刷新（绕过 5s 节流）"
           >
             <RefreshCw class={clsx('w-4 h-4', loading() && 'animate-spin')} />
           </button>

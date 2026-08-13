@@ -5,6 +5,7 @@
 
 export * as computer from './computer'
 export * as cowork from './cowork'
+export * as geo from './geo'
 export * as memory from './memory'
 export * as neocodex from './neocodex'
 export * as plugins from './plugins'

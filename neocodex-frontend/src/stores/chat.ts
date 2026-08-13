@@ -146,14 +146,21 @@ function createChatStore() {
     }
   }
 
+  // 请求序号守卫：快速切换会话时，旧会话的迟到响应不得覆盖新会话消息（🟡 修复）
+  let loadMsgsSeq = 0
+
   // Load messages for a specific session
   const loadSessionMessages = async (sessionId: string): Promise<void> => {
+    const seq = ++loadMsgsSeq
     setState('isLoadingMessages', true)
     try {
       const backendMessages = await neocodex.getSessionMessages(sessionId)
-      
+
+      // 过期响应丢弃（新请求已发出）
+      if (seq !== loadMsgsSeq) return
+
       const messages = backendMessages.map(convertBackendMessage)
-      
+
       setState('sessions', produce(s => {
         const sess = s.find(sess => sess.id === sessionId)
         if (sess) {
@@ -161,9 +168,10 @@ function createChatStore() {
         }
       }))
     } catch (error) {
+      if (seq !== loadMsgsSeq) return
       console.error('[chatStore] Failed to load session messages:', error)
     } finally {
-      setState('isLoadingMessages', false)
+      if (seq === loadMsgsSeq) setState('isLoadingMessages', false)
     }
   }
 
@@ -205,6 +213,9 @@ function createChatStore() {
       await neocodex.deleteSession(id)
     } catch (error) {
       console.error('[chatStore] Failed to delete session:', error)
+      // 🟡 修复：后端删除失败时保留本地会话（对齐 archiveSession 语义），
+      // 避免 UI 已消失而后端仍在、重载后会话复活且标签映射已丢失的状态分叉
+      return
     }
     
     setState('sessions', produce(s => {
@@ -487,9 +498,8 @@ function createChatStore() {
     return null
   }
 
-  const rewindToCheckpoint = (checkpointId: string): void => {
-    console.log('Rewind to checkpoint:', checkpointId)
-  }
+  // 无 UI 调用方（CheckpointTimeline 直接走后端 checkpointList/checkpointRestore），
+  // 已按 Dark Forest 规则移除 rewindToCheckpoint 空桩
 
   /** 从 tags store 同步某会话的标签到响应式 session（渲染层拉取） */
   const tagsForSession = (sessionId: string): string[] => {
@@ -577,7 +587,6 @@ function createChatStore() {
     regenerateFrom,
     editAndResend,
     createCheckpoint,
-    rewindToCheckpoint,
     tagsForSession,
     tagSession,
     untagSession,
