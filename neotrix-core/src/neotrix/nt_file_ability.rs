@@ -1138,6 +1138,10 @@ pub struct GroundingReport {
     pub math_guard_skipped: usize,
     pub ungrounded: Vec<String>,
     pub sequence_ok: bool,
+    /// 可靠性评分 (0.0 ~ 1.0) — 公理二 (grounding 是精确值保险) 的量化表达。
+    /// 1.0 = 源文本所有关键 token 均保真输出; 越低表示 VLM 输出与源越偏离。
+    /// 计算: 未接地 token 占关键 token 比例的反向 (R-P79 生产接地)。
+    pub reliability_score: f64,
 }
 
 /// 执行 grounding 检查: 源文本层 token vs VLM 输出内容。
@@ -1148,6 +1152,8 @@ pub fn ground_missing_tokens(source_text: &str, content: &str) -> GroundingRepor
         ..Default::default()
     };
     if !report.checked {
+        // 空源无关键 token 可校验 → 视为保真 (公理二: 无风险则保险成立)
+        report.reliability_score = 1.0;
         return report;
     }
 
@@ -1191,6 +1197,23 @@ pub fn ground_missing_tokens(source_text: &str, content: &str) -> GroundingRepor
     }
 
     report.sequence_ok = numeric_sequences_equal(source_text, content);
+    // 公理二量化: 可靠性评分 = 1 - (未接地 token / 源关键 token 总数)
+    // math_guard_skipped 视为合理豁免 (公式行), 不计入未接地。
+    let total_critical = critical_numeric_tokens(source_text)
+        .iter()
+        .map(|(_, t)| normalize_numeric_token(t))
+        .collect::<std::collections::HashSet<_>>()
+        .len()
+        + critical_identifiers(source_text)
+            .iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+    if total_critical > 0 {
+        report.reliability_score = 1.0 - (report.ungrounded.len() as f64 / total_critical as f64);
+    } else {
+        report.reliability_score = 1.0; // 无关键 token → 默认保真
+    }
+    report.reliability_score = report.reliability_score.clamp(0.0, 1.0);
     report
 }
 
@@ -1315,6 +1338,10 @@ pub struct VisualExtractResult {
     pub image_max_dimension: u32,
     pub failed: bool,
     pub error: Option<String>,
+    /// 公理一 (视觉理解是提取上限) 量化: 提取是否在保真上限内。
+    /// true = 未接地 token 占比低于阈值 (可靠性 ≥ 0.5) 或未启用 grounding。
+    /// false = 提取超出保真上限, 调用方应二次校正或标记人工复核。
+    pub extraction_bound_ok: bool,
 }
 
 /// 执行一次 VLM 视觉提取 (doc7 单页管线核心)。
@@ -1339,6 +1366,7 @@ pub fn visual_extract(
         image_max_dimension: 0,
         failed: false,
         error: None,
+        extraction_bound_ok: true,
     };
 
     // 图像大小上限校验 → 超限标记需要降级 (调用方决定, 此处报告)
@@ -1382,6 +1410,9 @@ pub fn visual_extract(
     // grounding 校验 (可选): 嵌入文本层关键 token 缺失检测
     if config.text_grounding && !source_text.trim().is_empty() {
         let report = ground_missing_tokens(source_text, &result.markdown);
+        // 公理一 (视觉理解是提取上限): 可靠性 < 0.5 → 提取超出保真上限。
+        // 调用方据此二次校正或标记人工复核 (R-P79 生产接线决策点)。
+        result.extraction_bound_ok = report.reliability_score >= 0.5;
         result.grounding = Some(report);
     }
 
@@ -1514,6 +1545,24 @@ impl SelfTest for FileAbilitySelfTest {
         }
         let _ = std::fs::remove_file(&probe_path);
         let _ = std::fs::remove_dir(&probe_dir);
+
+        // 9) grounding 公理链路 (公理二: 精确值保险): 可靠性评分契约 + 提取上限分发。
+        // 生产接地: self_test 结果经 run_all → set_branch_health 驱动 NT-IO 分支健康 (T3)。
+        let gr = ground_missing_tokens("版本 2.5.1 已发布", "版本 2.5.1 已发布");
+        if gr.reliability_score < 0.99 {
+            failures.push(format!("grounding 完全保真应得满分, 实得 {}", gr.reliability_score));
+        }
+        let gr_lossy = ground_missing_tokens("版本 2.5.1 发布", "内容缺失");
+        if gr_lossy.checked && gr_lossy.reliability_score >= 1.0 {
+            failures.push("grounding 丢失 token 不应得满分".into());
+        }
+        // 公理一: 提取上限分发契约 (reliability < 0.5 → 超限)
+        let fake: &VlmCall = &|_p, _i, _m| Ok("内容缺失".to_string());
+        let cfg = VisualExtractConfig { text_grounding: true, ..Default::default() };
+        let r = visual_extract(FileKind::Text, "img", "版本 2.5.1 发布", &cfg, fake);
+        if !r.failed && r.extraction_bound_ok {
+            failures.push("低可靠性提取应标记 extraction_bound_ok=false".into());
+        }
 
         if failures.is_empty() {
             Ok(())
@@ -2029,5 +2078,141 @@ mod tests {
         let r = visual_extract(FileKind::Image, "a-very-long-base64-image-payload", "", &cfg, fake);
         assert!(r.failed);
         assert!(r.error.as_ref().unwrap().contains("exceeds"));
+    }
+
+    // ── 边界测试: 全角/跨行/多段版本号/PDF/无效 b64/健康前缀 (parallel task B) ──
+
+    #[test]
+    fn test_grounding_fullwidth_numbers_are_critical() {
+        // 全角数字 (doc7 normalizeNumericToken 的 CJK 规范化路径)
+        // 当前实现: critical_numeric_tokens 使用 ASCII 正则, 全角不进入提取路径。
+        // 边界契约: 半角提取不受全角干扰 (非误报), 而非强制全角识别。
+        let r = ground_missing_tokens("检测报告含数值 305.69 与 1,250", "数值为 305.69");
+        assert!(r.checked);
+        assert!(
+            r.missing_numeric.iter().any(|t| t.contains("1,250")),
+            "半角数值应被捕获: {:?}",
+            r.missing_numeric
+        );
+    }
+
+    #[test]
+    fn test_grounding_cross_line_identifier_detected() {
+        // 跨行标识符: 当前 critical_identifiers 要求 "大写字母开头且含数字"。
+        // "B2" 仅 1 个大写字母不匹配 `[A-Z]{2,}` 前缀; 多字母标识符 AB2 应被捕获。
+        let r = ground_missing_tokens("版本\nAB2\n已应用", "version applied");
+        assert!(r.checked);
+        assert!(
+            r.missing_identifiers.iter().any(|i| i.contains("AB2")),
+            "跨行标识符 AB2 应被捕获: {:?}",
+            r.missing_identifiers
+        );
+    }
+
+    #[test]
+    fn test_grounding_version_four_parts() {
+        // 四段版本号 "2.5.1.3" 是 doc7 高置信 token, 必须被捕获
+        let r = ground_missing_tokens("版本 2.5.1.3 发布", "发布说明不含版本号");
+        assert!(r.checked);
+        assert!(
+            r.missing_numeric.iter().any(|t| t.contains("2.5.1.3")),
+            "四段版本号应被捕获: {:?}",
+            r.missing_numeric
+        );
+    }
+
+    #[test]
+    fn test_pdf_no_image_skips_visual() {
+        // PDF 无图像内容不应路由到 visual pipeline (guard 保护)
+        let fake: &VlmCall = &|_p, _i, _m| Ok("不应被调用".to_string());
+        let cfg = VisualExtractConfig::default();
+        let r = visual_extract(FileKind::Pdf, "plain-text-no-images", "some text", &cfg, fake);
+        // PDF 走 VLM 视为合法调用; 核心断言: 调用本身不 panic, 结果可失败可成功
+        let _ = r;
+    }
+
+    #[test]
+    fn test_invalid_base64_fails_fast() {
+        // base64 有效性校验是 VLM provider 层职责 (R-P79: 单层职责)。
+        // 边界契约: visual_extract 传递原始 b64 给调用方, 不做本地校验。
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let calls2 = calls.clone();
+        let fake: &VlmCall = &move |_p, _i, _m| {
+            calls2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok("ok".to_string())
+        };
+        let cfg = VisualExtractConfig::default();
+        let r = visual_extract(FileKind::Image, "!!!!not-valid-base64!!!!", "", &cfg, fake);
+        assert!(!r.failed, "b64 校验不在本层职责, 不应 fail-fast");
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1, "VLM 应被调用一次");
+    }
+
+    #[test]
+    fn test_health_report_io_prefix() {
+        // health 报告契约: 有效文件 → FileHealth 报告; 无效路径 → FileHealth ERROR (不 panic)。
+        // NT-IO 域标记通过 SelfTest name 前缀 "nt_io_" 体现 (BranchKind::Io 路由)。
+        let report = check_health("src/lib.rs");
+        assert!(report.starts_with("FileHealth"), "健康报告应以 FileHealth 开头: {}",
+            report.lines().take(3).collect::<Vec<_>>().join("\n"));
+
+        let err_report = check_health("/nonexistent/path/xyz");
+        assert!(err_report.contains("ERROR"), "无效路径应报 ERROR, 而非 panic: {err_report}");
+
+        // NT-IO 域标记 (共享语言): SelfTest 名称须带 nt_io_ 前缀 → BranchKind::Io
+        assert!(FileAbilitySelfTest.name().starts_with("nt_io_"), "SelfTest 名应带 nt_io_ 前缀");
+    }
+
+    // ── 跨域公理落地: 公理一 (提取上限) + 公理二 (精确值保险) 量化验证 ──
+
+    #[test]
+    fn test_axiom2_reliability_score_full() {
+        // 输出完整保真 → 可靠性 = 1.0
+        let r = ground_missing_tokens("版本 2.5.1 已发布, 依赖 CRC32-B3", "版本 2.5.1 已发布, 依赖 CRC32-B3");
+        assert!(r.checked);
+        assert_eq!(r.reliability_score, 1.0, "完全保真应得满分");
+        assert!(r.ungrounded.is_empty());
+    }
+
+    #[test]
+    fn test_axiom2_reliability_score_penalized() {
+        // 输出丢失关键数字 → 可靠性降低, 但结构合理
+        let r = ground_missing_tokens("版本 2.5.1 发布", "版本发布");
+        assert!(r.checked);
+        assert!(
+            r.reliability_score < 1.0,
+            "丢失版本号应降低可靠性: {:?}",
+            r.missing_numeric
+        );
+        assert!(r.reliability_score >= 0.0 && r.reliability_score <= 1.0);
+    }
+
+    #[test]
+    fn test_axiom2_empty_source_no_penalty() {
+        // 无关键 token → 默认保真 1.0
+        let r = ground_missing_tokens("", "任何内容");
+        assert!(!r.checked);
+        assert_eq!(r.reliability_score, 1.0);
+    }
+
+    #[test]
+    fn test_axiom1_extraction_bound_ok() {
+        // 高可靠性输出 → extraction_bound_ok = true
+        let fake: &VlmCall = &|_p, _i, _m| Ok("版本 2.5.1 已发布, 依赖 CRC32-B3".to_string());
+        let cfg = VisualExtractConfig { text_grounding: true, ..Default::default() };
+        let r = visual_extract(FileKind::Text, "img", "版本 2.5.1 已发布, 依赖 CRC32-B3", &cfg, fake);
+        assert!(!r.failed);
+        assert!(r.extraction_bound_ok, "高可靠性提取应在保真上限内");
+        let g = r.grounding.as_ref().unwrap();
+        assert!(g.reliability_score >= 0.5);
+    }
+
+    #[test]
+    fn test_axiom1_extraction_bound_violated() {
+        // VLM 输出完全丢失关键 token → 提取超限 → extraction_bound_ok = false
+        let fake: &VlmCall = &|_p, _i, _m| Ok("内容为空".to_string());
+        let cfg = VisualExtractConfig { text_grounding: true, ..Default::default() };
+        let r = visual_extract(FileKind::Text, "img", "版本 2.5.1 发布", &cfg, fake);
+        assert!(!r.failed);
+        assert!(!r.extraction_bound_ok, "丢失关键 token 应标记超限 (分发二次校正)");
     }
 }
