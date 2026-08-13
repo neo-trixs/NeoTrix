@@ -474,8 +474,7 @@ pub fn decode_chunk_range(
 ) -> Result<Vec<GeoPoint>, String> {
     let mut out = Vec::with_capacity(end.saturating_sub(start));
     for idx in 0..meta.nchunks {
-        let (_, _, cnt) = meta.tables[idx];
-        let cnt = cnt as usize;
+        let (_, _, _cnt) = meta.tables[idx];
         let blk_lo = start.max(out.len()); // 全局累计已产出
         // 简化: 逐块全量解码后截取 (块内无需二次索引; 收益在"只解命中块")
         let pts = decode_one_chunk(bytes, meta, idx)?;

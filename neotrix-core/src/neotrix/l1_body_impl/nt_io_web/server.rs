@@ -9,7 +9,7 @@ use axum::{
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
-use super::{api, AppState, RateWindow};
+use super::{api, AppState};
 
 const FRONTEND_HTML: &str = include_str!("frontend.html");
 
@@ -183,6 +183,10 @@ pub fn build_router(state: AppState) -> Router {
         // KB/EWHR 路由不会继承 base router 的 route_layer（axum 语义）。
         // 统一在 start_server_with 对合并后的完整 router 套 auth（见下）。
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit_middleware,
+        ))
         .with_state(state)
 }
 

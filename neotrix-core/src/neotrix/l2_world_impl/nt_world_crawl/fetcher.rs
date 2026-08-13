@@ -530,9 +530,8 @@ mod tests {
     fn test_fetcher_pool_fetch_with_session_pool() {
         let mut pool = FetcherPool::new(&test_config(), CrawlStrategy::Polite);
         pool.attach_session_pool(SessionPool::new(2));
-        let result = pool.fetch("https://example.com");
         // 网络请求可能失败, 但 SessionPool 接线本身不应 panic 且应正确记账
-        assert!(result.duration_ms >= 0);
+        let _result = pool.fetch("https://example.com");
         assert_eq!(pool.total_requests, 1);
     }
 

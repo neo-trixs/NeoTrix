@@ -3,7 +3,6 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
-use crate::neotrix::nt_io_plugin::PluginRegistry;
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 pub struct PluginCmd;
@@ -94,10 +93,6 @@ impl CliCommand for PluginCmd {
                     return CommandOutput::err("Usage: /plugin watch <dir>");
                 }
                 let dir = PathBuf::from(path);
-                let rt = match tokio::runtime::Runtime::new() {
-                    Ok(rt) => rt,
-                    Err(e) => return CommandOutput::err(&format!("Failed to create runtime: {}", e)),
-                };
                 let registry = crate::neotrix::nt_io_plugin::registry::global_registry();
                 match registry.watch_dir(dir.clone()) {
                     Ok(_handle) => CommandOutput::ok(&format!("Hot-plug watching: {} (新增插件自动 load, 删除自动 unregister)", dir.display())),

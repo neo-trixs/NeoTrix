@@ -263,28 +263,6 @@ impl SubAgentDefParser {
             body,
         })
     }
-
-    fn parse_scalar(val: &str) -> String {
-        val.trim().trim_matches('"').trim_matches('\'').to_string()
-    }
-
-    fn parse_list(val: &str) -> Vec<String> {
-        let trimmed = val.trim();
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            let inner = &trimmed[1..trimmed.len() - 1];
-            inner
-                .split(',')
-                .map(|s| s.trim().trim_matches('"').trim_matches('\'').to_string())
-                .filter(|s| !s.is_empty())
-                .collect()
-        } else {
-            trimmed
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect()
-        }
-    }
 }
 
 // ═══════════════════════════════════════════════════════════════════

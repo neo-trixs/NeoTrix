@@ -218,7 +218,6 @@ mod tests {
         // 不依赖真实环境, 验证分类逻辑的纯函数路径不可测, 这里只断言模块可实例化
         let c = SecretCollector::new();
         let report = c.collect(None);
-        assert!(report.total >= 0);
         assert!(c.scan_env().len() == report.hits.len() || report.hits.len() >= c.scan_env().len());
     }
 }

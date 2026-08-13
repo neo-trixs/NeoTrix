@@ -287,7 +287,6 @@ fn default_host(provider_type: LlmProviderType) -> Option<&'static str> {
         | LlmProviderType::Vllm
         | LlmProviderType::Sglang
         | LlmProviderType::CustomProxy => Some("localhost"),
-        _ => None,
     }
 }
 

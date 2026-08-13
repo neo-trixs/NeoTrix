@@ -709,30 +709,6 @@ pub fn ensure_elevation_table(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// 查询单个坐标的海拔 (Open-Meteo API)。失败返回 Err, 不含缓存。
-fn fetch_elevation_single(lat: f64, lng: f64) -> Result<Option<f64>, String> {
-    let url = format!(
-        "https://api.open-meteo.com/v1/elevation?latitude={}&longitude={}",
-        lat, lng
-    );
-    let resp = super::nt_http::run_blocking(|| {
-        super::nt_http::shared_blocking_client().get(&url).send()
-    })
-    .map_err(|e| format!("elevation fetch error: {}", e))?;
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {} for elevation", resp.status()));
-    }
-    let body = resp.text().map_err(|e| format!("elevation read: {}", e))?;
-    let v: serde_json::Value =
-        serde_json::from_str(&body).map_err(|e| format!("elevation parse: {}", e))?;
-    let elev = v
-        .get("elevation")
-        .and_then(|a| a.as_array())
-        .and_then(|a| a.first())
-        .and_then(|n| n.as_f64());
-    Ok(elev)
-}
-
 /// 为 geo_index 中无海拔记录的高置信度节点批量补海拔。
 ///
 /// 策略: 优先 shanhai 山峰 + geo-tag 节点 + natural-earth 要素 (数量少, 高价值),
@@ -881,38 +857,6 @@ pub fn ensure_weather_table(conn: &Connection) -> rusqlite::Result<()> {
         );",
     )?;
     Ok(())
-}
-
-/// 单个坐标的实时气象快照 (Open-Meteo forecast API)。
-/// 返回值: (temp_c, pressure_msl_hpa, wind_kmh, precip_mm, elevation_m)。
-fn fetch_weather_single(lat: f64, lng: f64) -> Result<Option<(f64, f64, f64, f64, f64)>, String> {
-    let url = format!(
-        "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&current=temperature_2m,pressure_msl,wind_speed_10m,precipitation&forecast_days=1",
-        lat, lng
-    );
-    let resp = super::nt_http::run_blocking(|| {
-        super::nt_http::shared_blocking_client().get(&url).send()
-    })
-    .map_err(|e| format!("weather fetch error: {}", e))?;
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {} for weather", resp.status()));
-    }
-    let body = resp.text().map_err(|e| format!("weather read: {}", e))?;
-    let v: serde_json::Value =
-        serde_json::from_str(&body).map_err(|e| format!("weather parse: {}", e))?;
-    let cur = match v.get("current") {
-        Some(c) => c,
-        None => return Ok(None),
-    };
-    let temp = cur.get("temperature_2m").and_then(|n| n.as_f64());
-    let pressure = cur.get("pressure_msl").and_then(|n| n.as_f64());
-    let wind = cur.get("wind_speed_10m").and_then(|n| n.as_f64());
-    let precip = cur.get("precipitation").and_then(|n| n.as_f64());
-    let elev = v.get("elevation").and_then(|n| n.as_f64());
-    match (temp, pressure, wind, precip) {
-        (Some(t), Some(p), Some(w), Some(pr)) => Ok(Some((t, p, w, pr, elev.unwrap_or(0.0)))),
-        _ => Ok(None),
-    }
 }
 
 /// 为 geo_index 节点批量摄取实时气象快照 (Open-Meteo forecast API)。
@@ -1370,7 +1314,7 @@ pub fn export_geo_ntpack(
 pub fn import_geo_ntpack(path: &str) -> Result<(usize, Vec<crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::GeoPoint>), String> {
     use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_pack::PackDecoder;
     let bytes = std::fs::read(path).map_err(|e| format!("读文件 {}: {}", path, e))?;
-    let (dec, points) = PackDecoder::decode(&bytes)?;
+    let (_dec, points) = PackDecoder::decode(&bytes)?;
     Ok((points.len(), points))
 }
 
@@ -1396,7 +1340,7 @@ pub fn append_geo_ntpack(
                 merged.insert(p.node_id.clone(), p);
             }
         }
-        Err(e) if !std::path::Path::new(path).exists() => {
+        Err(_e) if !std::path::Path::new(path).exists() => {
             // 新文件: 无既有数据
         }
         Err(e) => return Err(format!("读既有归档 {}: {}", path, e)),

@@ -331,8 +331,7 @@ mod tests {
             Some(std::path::PathBuf::from(":memory:")),
         ).expect("open memory kb");
         let mut bridge = HyperCubeBridge::new();
-        let count = bridge.ingest_from_kb(&kb);
-        assert!(count >= 0);
+        let _count = bridge.ingest_from_kb(&kb);
     }
 
     #[test]

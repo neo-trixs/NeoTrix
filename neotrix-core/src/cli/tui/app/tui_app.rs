@@ -267,7 +267,6 @@ impl TuiApp {
 
     /// 流式工具调用结束（task B）：更新状态与结果摘要。
     pub fn finish_streaming_tool(&mut self, name: &str, duration_ms: u64, success: bool, result: &str) {
-        let mut all_done = true;
         if let Some(tc) = self.streaming_tool_calls.iter_mut().rev().find(|tc| tc.name == name) {
             tc.status = if success { "done".into() } else { "error".into() };
             tc.success = success;
@@ -275,7 +274,7 @@ impl TuiApp {
             tc.result = result.chars().take(300).collect();
         }
         // P2 修复: 工具结束后无其他 running 工具 → 恢复自动滚动 (避免会话卡住不跟随)。
-        all_done = self.streaming_tool_calls.iter().all(|tc| tc.status != "running");
+        let all_done = self.streaming_tool_calls.iter().all(|tc| tc.status != "running");
         if all_done {
             self.auto_scroll = true;
         }

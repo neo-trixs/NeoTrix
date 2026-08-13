@@ -1063,7 +1063,7 @@ mod tests {
         assert!((0.0..=1.0).contains(&r1.score_before));
         assert!((0.0..=1.0).contains(&r1.score_after));
         assert_eq!(brain.evaluation_history.len(), 1);
-        assert!(r1.absorbed_count >= 0);
+        assert_eq!(r1.absorbed_count, 0, "single general iteration absorbs no candidates");
 
         let r2 = brain.iterate(TaskType::General);
         assert_eq!(r2.iteration, 2);

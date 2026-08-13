@@ -140,8 +140,6 @@ mod tests {
                 None,
             )
             .expect("write");
-        let (pruned, freed) = kb.mem_compress(Some(0)).expect("compress");
-        assert!(pruned >= 0);
-        assert!(freed >= 0);
+        let (_pruned, _freed) = kb.mem_compress(Some(0)).expect("compress");
     }
 }

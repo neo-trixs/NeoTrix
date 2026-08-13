@@ -394,8 +394,8 @@ mod tests {
         cr.awaken();
         let _ = cr.tick("no kb attached yet");
         assert!(cr.last_kb_injections.is_empty());
-        // volition still works without KB
-        assert!(cr.volition().candidate_count() >= 0);
+        // volition works without KB (empty candidate pool)
+        assert!(cr.volition().candidate_count() == 0);
     }
 
     #[test]

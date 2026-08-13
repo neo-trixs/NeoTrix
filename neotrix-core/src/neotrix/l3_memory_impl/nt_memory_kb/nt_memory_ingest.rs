@@ -271,7 +271,6 @@ mod tests {
         assert!(id.is_some());
         // 非法 title (空) 等不应 panic
         let _ = ing.try_node("", NodeType::Concept, "s", None, "d");
-        assert!(ing.errors().len() >= 0); // 空 title 由底层处理, 不 panic 即通过
         ing.close().expect("close");
     }
 }

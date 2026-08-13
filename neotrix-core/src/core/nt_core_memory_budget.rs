@@ -175,7 +175,6 @@ mod tests {
         if rss == 0 {
             println!("[warn] RSS returned 0 — sysctl may be restricted in this environment");
         }
-        assert!(rss >= 0);
     }
 
     #[test]
