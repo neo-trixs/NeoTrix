@@ -855,6 +855,14 @@ impl BackgroundLoopHandle {
         self_tests.register(Box::new(
             crate::neotrix::l8_autonomic_impl::nt_mind_cleanup::CleanupEngineSelfTest,
         ));
+        // ── 因果链追踪引擎 SelfTest (witr 方法论吸收 2026-08-13, T1→T2) ──
+        // T3: results 流入 set_branch_health_from_self_tests (见下) 驱动分支健康。
+        self_tests.register(Box::new(
+            crate::neotrix::l8_autonomic_impl::nt_repair_causal_trace::CausalTraceSelfTest,
+        ));
+        // ── 统一文件能力 SelfTest (nt_file_ability 救活接线, T1→T2) ──
+        // T3: results 流入 set_branch_health_from_self_tests (见下) 驱动分支健康。
+        self_tests.register(Box::new(crate::neotrix::nt_file_ability::FileAbilitySelfTest));
 
         // NOTE (Cycle 159b): NeoCodexSelfAudit::new() is intentionally NOT
         // registered here. Its Default snapshot reports provider-not-resolvable +

@@ -1,15 +1,18 @@
 //! # NeoTrix 核心模块
 //!
-//! 9-Layer Architecture:
-//!   L9 Transcendent — L8 Autonomic — L7 Capability — L6 Self —
+//! 10-Layer Architecture:
+//!   L10 Transcendent — L9 Transcendent — L8 Autonomic — L7 Capability — L6 Self —
 //!   L5 Consciousness — L4 Cognition — L3 Memory — L2 Perception —
 //!   L1 Body — L0 Substrate
 //!
 //! 统一版本: 0.18.0
 
 // ─── Implementation layer directories ─────────────────────────────────────
+pub mod l10_transcendent_impl;
 pub mod l9_transcendent_impl;
+pub mod l9_capability_impl;
 pub mod l8_autonomic_impl;
+pub mod l8_capability_impl;
 pub mod l7_capability_impl;
 pub mod l6_self_impl;
 pub mod l5_consciousness_impl;
@@ -31,6 +34,14 @@ pub mod ffi;
 pub use l9_transcendent_impl::nt_mind_consciousness_gold_standard;
 pub use l9_transcendent_impl::nt_mind_consciousness_monitor;
 
+// L10 — Transcendent (超越层) — 观察观察者, 意识↔能力网共振
+pub use l10_transcendent_impl::meta_observer::{MetaObserver, MetaObservationReport};
+pub use l10_transcendent_impl::consonance_orchestrator::{
+    ConsonanceOrchestrator, ConsonanceConfig, ConsonanceReport, CapabilityResonance,
+    CapabilityNodeInfo,
+};
+pub use l10_transcendent_impl::transcendent_loop::{TranscendentLoop, LoopReport, LoopConfig, EvolutionSuggestion};
+
 // L8 — Autonomic (自主神经层) — 自我进化
 pub use l8_autonomic_impl::nt_mind;
 pub use l8_autonomic_impl::nt_mind_background_loop;
@@ -46,6 +57,7 @@ pub use l8_autonomic_impl::nt_mind_knowledge_pipeline;
 pub use l8_autonomic_impl::nt_mind_hook;
 pub use l8_autonomic_impl::nt_mind_skill_engine;
 pub use l8_autonomic_impl::nt_mind_memory;
+pub use l8_autonomic_impl::nt_repair_causal_trace;
 
 // L7 — Capability (能力层) — 统一路由
 pub use l7_capability_impl::SkillDoc;
@@ -189,12 +201,25 @@ pub use l1_body_impl::nt_shield_audit::{
 };
 
 pub mod proxy_daemon_wrapper;
+mod nt_file_ability;
 
-// ─── L7 Capability Tree 接入 (经验 → 能力节点迭代目标) ─────────────────────
+// ─── Unified File Ability (统一文件能力) — 文件读写编辑统一入口 ────────────────
+// office_oxide (Office 6 格式) + neotrix-types FileParser (通用文本/PDF/图像/音频/视频)
+// + image crate (图像元数据)。复用 ConstellationLevel 成熟度 + SelfTest T1-T3 接线。
+// Dark Forest 合规: 模块需有消费者方可存活，每次编辑后需 register_consumer
+pub use nt_file_ability::{
+    FileAbility, FileAbilityError, FileKind, ContentSnapshot, ImageMetadata,
+    FileAbilitySelfTest, FileOperation, extract_text, to_markdown, replace_placeholder,
+    save_edited, check_health, create_from_markdown, embed_text, content_similarity,
+    route_attention, specialist_index, OcrEngine, OcrResult, RuleBasedOcr,
+    SheetData, SheetRowData, SheetCellData, SheetCellValueType,
+};
+
+// ─── L7 Capability Tree 採入 (经验 → 能力节点迭代目标) ─────────────────────
 // 能力树 crate 作为 workspace 成员, 此处接入主管线 (Dark Forest 合规: 有消费者)
 pub use nt_core_capability_tree::{
     CapabilityRegistry, CapabilityNode, NodeLayer, ConstellationLevel, Domain as CapabilityDomain,
-    EvolutionEngine, EvolutionPlan, EvolutionAction, EvolutionOp,
+    RuneSocket, EvolutionEngine, EvolutionPlan, EvolutionAction, EvolutionOp,
 };
 
 
