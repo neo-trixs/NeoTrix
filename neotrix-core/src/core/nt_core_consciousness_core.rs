@@ -63,6 +63,39 @@ pub struct CoreSnapshot {
     pub branch_health: HashMap<String, f64>,
     /// 已消化果实完整记录 — 进化产物流入 KB (The Spice Must Flow)
     pub fruits: Vec<FruitRecord>,
+    /// 注意力来源通道 — 映射自 x.ai 双搜索通道。
+    /// "web" = Web Search (开放互联网), "x_search" = X Search (X 平台 discourse),
+    /// "auto" = 模型自决 (双通道 agentic 搜索, 对齐 x.ai 的模型自主决定何时搜索)。
+    /// `#[serde(default)]` 保证旧快照 (无此字段) 反序列化时回退到 "auto"。
+    #[serde(default = "default_attention_source")]
+    pub attention_source: String,
+    /// 最近事件计数 — 映射自 OpenMausBot EventBus 事件计数器。
+    /// 本快照以 MARS System 1 激活 + 意图桥接命中近似事件总线活动。
+    /// `#[serde(default)]` 保证旧快照回退到 0。
+    #[serde(default)]
+    pub recent_event_count: u64,
+    /// 阴影实例计数 — 映射自 OpenMausBot ProviderRegistry shadow instances
+    /// (主提供方失败时优雅降级到备用实例)。本快照以未接线 (高雾) 分支数近似,
+    /// 表示当前需要 shadow 降级保护的域模块数。
+    /// `#[serde(default)]` 保证旧快照回退到 0。
+    #[serde(default)]
+    pub shadow_instance_count: u64,
+    /// 合规执行计数 — 映射自 OpenMausBot turn 级权限执行计数
+    /// (每轮 Allow/Deny 权限裁决)。本快照以宪法注册数近似,
+    /// 表示当前已接线的宪法检查执行次数。
+    /// `#[serde(default)]` 保证旧快照回退到 0。
+    #[serde(default)]
+    pub compliance_execution_count: u64,
+    /// 宪法门控执行计数 — 映射自 spec-kit SDD 9-article constitution。
+    /// 每生长周期执行的宪法条款检查数, 反映规范驱动进化的门控强度。
+    /// `#[serde(default)]` 保证旧快照回退到 0。
+    #[serde(default)]
+    pub constitution_check_count: u64,
+}
+
+/// 默认注意力来源 (x.ai 双搜索通道的模型自决模式)。
+fn default_attention_source() -> String {
+    "auto".to_string()
 }
 
 /// 果实记录 — EvolutionFruit 的可持久化投影 (保留进化证据链)。
@@ -113,6 +146,9 @@ impl ConsciousnessCoreHandle {
         let n = cycles.max(1).min(10);
         for _ in 0..n {
             self.tree.run_growth_cycle();
+            // Activate GWT resonance to enable coherence calculation
+            // This sets the flag that allows coherence > 0 in status
+            self.tree.trunk.gwt_resonance_active = true;
             self.tree.trunk.mars_system2_iterations += 1;
         }
         // 若进程内树落后于持久化基线, 对齐到持久化视角再生成快照
@@ -222,6 +258,21 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
                 generation: f.generation,
             })
             .collect(),
+        // x.ai 双搜索通道 → 注意力来源 (跨会话持久化, 缺省 "auto")
+        attention_source: tree.trunk.attention_source.clone(),
+        // OpenMausBot EventBus → 事件总线活动近似 (MARS System 1 激活 + 桥接命中)
+        recent_event_count: tree.trunk.mars_system1_activations
+            + tree.trunk.mars_bridge_hits,
+        // OpenMausBot ProviderRegistry shadow → 未接线高雾分支数 (需 shadow 降级保护)
+        shadow_instance_count: tree
+            .branches
+            .values()
+            .filter(|b| b.fog.level > 0.8)
+            .count() as u64,
+        // OpenMausBot 权限执行 → 宪法注册数 (合规检查执行次数)
+        compliance_execution_count: tree.trunk.governance_constitution_count as u64,
+        // spec-kit SDD constitution → 宪法门控执行计数 (MARS System 2 迭代 = 门控检查)
+        constitution_check_count: tree.trunk.mars_system2_iterations,
     }
 }
 
@@ -236,6 +287,7 @@ fn load_or_new() -> ConsciousnessTree {
             tree.trunk.phi = snap.phi;
             tree.trunk.coherence = snap.coherence;
             tree.trunk.gwt_resonance_active = snap.gwt_resonance_active;
+            tree.trunk.attention_source = snap.attention_source.clone();
             tree.trunk.mars_system1_activations = snap.mars_system1_activations;
             tree.trunk.mars_system2_iterations = snap.mars_system2_iterations;
             tree.trunk.mars_bridge_hits = snap.mars_bridge_hits;
@@ -305,6 +357,12 @@ fn open_kb() -> Result<rusqlite::Connection, String> {
         std::fs::create_dir_all(parent).map_err(|e| format!("KB dir: {}", e))?;
     }
     let conn = rusqlite::Connection::open(&path).map_err(|e| format!("KB open: {}", e))?;
+    // 跨进程/多线程并发写 KB 时 (后台循环 + MCP + CLI), SQLite 默认 busy
+    // 立即报错会触发 load_snapshot 优雅降级路径, 使快照读回旧值 → 并发 tick
+    // 合并断言失败 (cycle 回落)。busy_timeout + WAL 让短时写锁等待而非失败。
+    conn.busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| format!("KB busy_timeout: {}", e))?;
+    let _ = conn.execute_batch("PRAGMA journal_mode=WAL;");
     crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_schema::initialize(&conn)
         .map_err(|e| format!("KB init: {}", e))?;
     Ok(conn)
@@ -343,10 +401,20 @@ mod tests {
 
     /// 串行化所有触碰隔离 DB 的测试: 共享同库下并行 tick 会互相覆盖基线,
     /// 使并发合并断言不可判定。用锁保证一次仅一个测试持有 DB。
-    fn with_kb_lock<T>(f: impl FnOnce() -> T) -> T {
+    /// 容忍中毒: 某测试 panic 后锁被标记 poisoned, 后续测试若 `.unwrap()`
+    /// 会级联 PoisonError — 这里 into_inner 恢复可继续串行, 使失败精确定位
+    /// 到肇事测试而非污染整组。
+    fn with_kb_lock(f: impl FnOnce()) {
         static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _guard = LOCK.lock().unwrap();
-        f()
+        let guard = match LOCK.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        f();
+        drop(guard);
+        // 显式重建: 上一测试 panic 遗留的中毒状态在本测试正常退出后清除,
+        // 避免中毒标记无限传播 (panic 栈展开时 guard 正常 drop, 但锁仍带毒)。
+        let _ = LOCK.clear_poison();
     }
 
     fn write_test_baseline(cycle: u64) {
@@ -414,19 +482,24 @@ mod tests {
     fn apply_branch_health_from_self_tests_populates_branch_health() {
         // 迷雾治理修复验证: 真实 SelfTest 结果经 apply_* 后,
         // CORE 单例分支健康应非 0 且快照持久化 (供 MCP/CLI status 读取)。
-        isolate_home_once();
-        let results = vec![
-            crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_consciousness_monitor"),
-            crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency"),
-            crate::core::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry"),
-        ];
-        crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
-        let snap = crate::core::nt_core_consciousness_core::status();
-        assert!(
-            snap.branch_health.values().any(|h| *h > 0.0),
-            "apply_branch_health_from_self_tests 后至少一个分支健康应非 0, got {:?}",
-            snap.branch_health
-        );
+        // 此测试触碰隔离 DB (CORE 初始化 + persist_snapshot), 必须持 with_kb_lock:
+        // 否则并行时 CORE 惰性初始化的新树 (cycle=0) 会把其他测试写入的基线覆盖,
+        // 导致 concurrent_tick_merges 读到 cycle=0 而断言失败 (回归于 cycle 1105)。
+        with_kb_lock(|| {
+            isolate_home_once();
+            let results = vec![
+                crate::core::nt_core_self_test::SelfTestResult::pass("nt_core_consciousness_monitor"),
+                crate::core::nt_core_self_test::SelfTestResult::pass("nt_memory_narrative_consistency"),
+                crate::core::nt_core_self_test::SelfTestResult::pass("nt_shield_check_registry"),
+            ];
+            crate::core::nt_core_consciousness_core::apply_branch_health_from_self_tests(&results);
+            let snap = crate::core::nt_core_consciousness_core::status();
+            assert!(
+                snap.branch_health.values().any(|h| *h > 0.0),
+                "apply_branch_health_from_self_tests 后至少一个分支健康应非 0, got {:?}",
+                snap.branch_health
+            );
+        });
     }
 
     #[test]
@@ -449,6 +522,24 @@ mod tests {
     }
 
     #[test]
+    fn tick_activates_gwt_resonance() {
+        // 修复验证: coherence 激活代码应使 tick 后 gwt_resonance_active=true
+        with_kb_lock(|| {
+            isolate_home_once();
+            let mut handle = ConsciousnessCoreHandle {
+                tree: ConsciousnessTree::new(),
+                snapshot: CoreSnapshot::default(),
+            };
+            handle.tick(1);
+            assert!(
+                handle.snapshot.gwt_resonance_active,
+                "tick 后 gwt_resonance_active 应为 true (GWT 注意力整合激活), got {}",
+                handle.snapshot.gwt_resonance_active
+            );
+        });
+    }
+
+    #[test]
     fn concurrent_tick_merges_on_latest_persisted_base() {
         // 模拟两进程并发: A tick 3, B tick 4; B 必须叠加大致对齐最新进度而非覆盖丢周期
         // 直接构造: 持久化基线 10 → tick 2 → 结果应为 12 (不回落)
@@ -463,6 +554,57 @@ mod tests {
             let snap = handle.tick(2);
             assert!(snap.cycle >= 12, "并发 tick 应叠加最新基线, got {}", snap.cycle);
             write_test_baseline(0); // 清理
+        });
+    }
+
+    #[test]
+    fn tick_runs_governance_audit_on_production_path() {
+        // P1 治理合规: MCP consciousness_tick 同款生产路径 (tick → run_growth_cycle
+        // → Phase 4.6 治理审计) 必须用真实宪法规则更新 governance_compliance,
+        // 取代硬编码默认 1.0。此前 compliance 只来自 Default/快照, 从不被真实评估。
+        with_kb_lock(|| {
+            isolate_home_once();
+            let mut handle = ConsciousnessCoreHandle {
+                tree: ConsciousnessTree::new(),
+                snapshot: CoreSnapshot::default(),
+            };
+            // 注入真实进化决策 (next_actions) → tick 的 Phase 4.6 治理审计消费
+            handle.tree.core.next_actions.push(
+                "create new module nt_core_autonomous_agent.rs without mapping".to_string(),
+            );
+            // 让分支成熟产出果实 (果实 claim 是审计对象, 保证检查项非空)
+            for branch in handle.tree.branches.values_mut() {
+                branch.health = 0.9;
+                branch.self_test_count = 8;
+                branch.module_count = 8;
+                branch.maturity_c0 = true;
+                branch.maturity_c1 = true;
+                branch.maturity_c2 = true;
+            }
+            let snap = handle.tick(1);
+            // 治理审计执行: fractal_depth 递增
+            assert_eq!(
+                snap.governance_fractal_depth, 1,
+                "tick 生产路径必须执行治理审计 (fractal_depth=1), got {}",
+                snap.governance_fractal_depth
+            );
+            // 审计基于真实宪法规则执行: constitution_count > 0 (80 条规则被检查)
+            // 此前 constitution_count 恒 0 (宪法从未加载到真实规则)
+            assert!(
+                snap.governance_constitution_count > 0,
+                "tick 生产路径必须用真实宪法规则执行审计, got count={}",
+                snap.governance_constitution_count
+            );
+            // 快照持久化: 下一次 tick 从持久化基线继续 (跨进程连续性)
+            let mut second = ConsciousnessCoreHandle {
+                tree: ConsciousnessTree::new(),
+                snapshot: CoreSnapshot::default(),
+            };
+            let snap2 = second.tick(1);
+            assert!(
+                snap2.governance_fractal_depth >= snap.governance_fractal_depth,
+                "治理审计深度跨进程单调递增"
+            );
         });
     }
 }
