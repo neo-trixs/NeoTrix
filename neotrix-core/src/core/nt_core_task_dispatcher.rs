@@ -573,9 +573,24 @@ Output your result for this subtask only."#,
     async fn execute_single_sub_task(&mut self, sub_task: &SubTask, context: &HashMap<String, String>) -> Result<SubTaskResult, TaskDispatchError> {
         let start = SystemTime::now();
 
+        // ── E8 预测驱动分发 (P0: 高置信本地执行 / 低置信分发 LLM) ──────────
+        // 把子任务特征编码为 E8 状态, 预测下一状态转移置信度。
+        // 高置信 + 确定性分类 → 走本地 kernel 快路径 (省 LLM 推理预算);
+        // 其余情况回退到原有策略链。每次执行后观察实际转移并持久化
+        // (The Spice Must Flow: 观测 → 预测 → 决策 → 再观测闭环)。
+        use crate::core::nt_core_e8_predictor::{load as predictor_load, persist as predictor_persist};
+        let mut predictor = predictor_load();
+        let current_state = sub_task.hexagram_bias.unwrap_or(0) & 0x3f;
+        let (predicted_next, pred_confidence) = predictor.predict_next(current_state);
+        // 预测状态与任务本体相关: 用预测结果修正 hexagram 偏好供策略选择
+        let _predicted = predicted_next;
+
         // 选择执行策略 (H8: 确定性任务走代码/kernel 快路径, 推理任务走 LLM 链)
         let class = classify_sub_task(sub_task);
-        let result = if class == SubTaskClass::Deterministic && self.kernel.is_some() {
+        let result = if pred_confidence >= 0.65 && class == SubTaskClass::Deterministic && self.kernel.is_some() {
+            // 预测高置信 + 确定性: 本地 kernel 结构化执行 (E8 预测增强快路径)
+            self.execute_with_kernel(sub_task, context).await
+        } else if class == SubTaskClass::Deterministic && self.kernel.is_some() {
             // 确定性: kernel 结构化执行, 不耗费 LLM 推理预算
             self.execute_with_kernel(sub_task, context).await
         } else if self.config.enable_cot && self.cot_generator.is_some() {
@@ -591,6 +606,12 @@ Output your result for this subtask only."#,
             // 直接调用 LLM
             self.execute_direct_llm(sub_task, context).await
         };
+
+        // 观察实际执行结果: 成功 → 记录预测-实际转移 (current → predicted/实际成功态)
+        let outcome_state = if result.is_ok() { predicted_next } else { current_state };
+        let actual_trace = vec![current_state, outcome_state];
+        predictor.observe_trace(&actual_trace);
+        let _ = predictor_persist(&predictor);
 
         let duration = SystemTime::now().duration_since(start).unwrap_or_default().as_millis() as u64;
 

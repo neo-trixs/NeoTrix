@@ -10,6 +10,7 @@
 /// E8 预测器实体
 /// - 跨周期累积观测样本 (The Spice Must Flow)
 /// - 提供 observe_trace / sample_count / coverage 用于闭环反馈
+/// - 提供 predict_next 用于任务分发决策 (高置信本地执行 / 低置信分发 LLM)
 #[derive(Debug, Clone)]
 pub struct E8Predictor {
     /// 观测的状态序列轨迹
@@ -18,8 +19,8 @@ pub struct E8Predictor {
     pub sample_count: usize,
     /// 覆盖度指标 (0.0 ~ 1.0)
     pub coverage: f64,
-    /// 相位转移矩阵 (用于相进预测)
-    pub phase_transitions: [[u8; 64]; 6],
+    /// 64 态马尔可夫转移计数矩阵 [from][to] (E8 状态子空间)
+    pub transition_counts: [[u64; 64]; 64],
 }
 
 impl E8Predictor {
@@ -29,20 +30,55 @@ impl E8Predictor {
             state_traces: Vec::new(),
             sample_count: 0,
             coverage: 0.0,
-            // 简单的占位转移矩阵，实际训练时会被填充
-            phase_transitions: [[0u8; 64]; 6],
+            transition_counts: [[0u64; 64]; 64],
         }
     }
 
     /// 记录一条状态轨迹观测 (对应 handlers_consciousness.rs 中的 observe_trace)
+    ///
+    /// 同时累积转移计数: 轨迹内相邻状态对 (from,to) 记入转移矩阵,
+    /// 使预测器随观测增长获得可用的预测能力 (The Spice Must Flow)。
     pub fn observe_trace(&mut self, trace: &[u8]) {
+        for pair in trace.windows(2) {
+            let from = (pair[0] & 0x3f) as usize;
+            let to = (pair[1] & 0x3f) as usize;
+            self.transition_counts[from][to] += 1;
+        }
         self.state_traces.push(trace.to_vec());
         self.sample_count += 1;
-        // 根据累积样本重新计算覆盖度
-        if self.sample_count > 0 {
-            let unique = self.state_traces.iter().collect::<std::collections::HashSet<&Vec<u8>>>().len();
-            self.coverage = (unique as f64) / (self.sample_count as f64).max(1.0);
+        // 根据累积样本重新计算覆盖度 (观测态数 / 样本数, 平滑防除零)
+        let unique = self.state_traces.iter().collect::<std::collections::HashSet<&Vec<u8>>>().len();
+        self.coverage = (unique as f64) / (self.sample_count as f64).max(1.0);
+    }
+
+    /// 预测从给定 E8 状态出发的最可能下一状态。
+    ///
+    /// 返回 `(next_state, confidence)`：
+    /// - `next_state`: 转移计数最高的后继态 (无观测时返回当前态)
+    /// - `confidence`: 该转移概率 (0.0 ~ 1.0)；样本不足时保守压低
+    ///
+    /// 供任务调度器做分发决策: 高置信 → 本地执行, 低置信 → 分发 LLM。
+    pub fn predict_next(&self, current: u8) -> (u8, f64) {
+        let idx = (current & 0x3f) as usize;
+        let row = &self.transition_counts[idx];
+        let total: u64 = row.iter().sum();
+        if total == 0 {
+            return (current, 0.0);
         }
+        let mut best = 0usize;
+        let mut best_count = 0u64;
+        for (to, &count) in row.iter().enumerate() {
+            if count > best_count {
+                best_count = count;
+                best = to;
+            }
+        }
+        let mut conf = (best_count as f64) / (total as f64);
+        // 样本不足时保守压低置信度, 避免过早信任稀疏转移
+        if self.sample_count < 4 {
+            conf *= self.sample_count as f64 / 4.0;
+        }
+        (best as u8, conf.clamp(0.0, 1.0))
     }
 
     /// 当前累积样本数 (对齐 handlers_consciousness.rs 的方法调用)
@@ -127,6 +163,38 @@ mod tests {
     fn test_persist_no_panic() {
         let p = load();
         persist(&p); // 不应 panic
+    }
+
+    #[test]
+    fn test_predict_next_after_observations() {
+        let mut p = load();
+        // 建立一致转移: 1 → 2 出现 4 次 (>= 保守阈值, 达满置信)
+        p.observe_trace(&[1, 2]);
+        p.observe_trace(&[1, 2]);
+        p.observe_trace(&[1, 2]);
+        p.observe_trace(&[1, 2]);
+        let (next, conf) = p.predict_next(1);
+        assert_eq!(next, 2);
+        assert!(conf > 0.9);
+    }
+
+    #[test]
+    fn test_predict_next_sparse_conservative() {
+        let mut p = load();
+        // 仅 1 次观测: 置信度被保守压低 (< 1.0)
+        p.observe_trace(&[1, 2]);
+        let (next, conf) = p.predict_next(1);
+        assert_eq!(next, 2);
+        assert!(conf < 0.5);
+        assert!(conf > 0.0);
+    }
+
+    #[test]
+    fn test_predict_next_no_data() {
+        let p = load();
+        let (next, conf) = p.predict_next(5);
+        assert_eq!(next, 5); // 无观测时返回当前态
+        assert_eq!(conf, 0.0); // 零置信
     }
 
     #[test]
