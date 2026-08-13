@@ -5,9 +5,9 @@ use std::sync::{Arc, OnceLock};
 use std::time::Instant;
 use tokio::sync::Mutex;
 
-use base64::Engine as _;
 use crate::neotrix::nt_io_provider::factory::create_gateway;
 use crate::neotrix::nt_io_provider::types::{LlmProvider, LlmRequest, Message, Role, Tool};
+use base64::Engine as _;
 
 // ── Mode System (from Kimi Code: Agent + Shell dual-mode) ──
 
@@ -82,7 +82,8 @@ impl ProviderCatalog {
     }
 
     pub fn has_capability(&self, cap: ModelCapability) -> bool {
-        self.providers.get(self.active)
+        self.providers
+            .get(self.active)
             .map(|p| p.capabilities.contains(&cap))
             .unwrap_or(false)
     }
@@ -96,19 +97,27 @@ impl ProviderCatalog {
         use crate::neotrix::nt_io_provider::provider_catalog;
         self.providers.clear();
         for entry in provider_catalog::PROVIDER_CATALOG.iter() {
-            let is_code = entry.models.iter().any(|m| {
-                m.to_lowercase().contains("code") || m.to_lowercase().contains("coder")
-            });
+            let is_code = entry
+                .models
+                .iter()
+                .any(|m| m.to_lowercase().contains("code") || m.to_lowercase().contains("coder"));
             let mut capabilities = vec![ModelCapability::Reasoning];
             if is_code {
                 capabilities.push(ModelCapability::Code);
             }
-            if entry.models.iter().any(|m| m.to_lowercase().contains("vision")
-                || m.to_lowercase().contains("vl") || m.to_lowercase().contains("4o")) {
+            if entry.models.iter().any(|m| {
+                m.to_lowercase().contains("vision")
+                    || m.to_lowercase().contains("vl")
+                    || m.to_lowercase().contains("4o")
+            }) {
                 capabilities.push(ModelCapability::Vision);
             }
             if entry.default_model.to_lowercase().contains("thinking")
-                || entry.models.iter().any(|m| m.to_lowercase().contains("think")) {
+                || entry
+                    .models
+                    .iter()
+                    .any(|m| m.to_lowercase().contains("think"))
+            {
                 capabilities.push(ModelCapability::Thinking);
             }
             capabilities.push(ModelCapability::FunctionCalling);
@@ -131,7 +140,9 @@ impl ProviderCatalog {
     fn provider_type_of(name: &str) -> Option<crate::neotrix::nt_io_provider::LlmProviderType> {
         match name {
             "openai" | "gpt" => Some(crate::neotrix::nt_io_provider::LlmProviderType::OpenAI),
-            "anthropic" | "claude" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Anthropic),
+            "anthropic" | "claude" => {
+                Some(crate::neotrix::nt_io_provider::LlmProviderType::Anthropic)
+            }
             "gemini" | "google" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Gemini),
             "ollama" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Ollama),
             "openrouter" => Some(crate::neotrix::nt_io_provider::LlmProviderType::OpenRouter),
@@ -141,12 +152,20 @@ impl ProviderCatalog {
             "pollinations" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Pollinations),
             "bazaarlink" => Some(crate::neotrix::nt_io_provider::LlmProviderType::BazaarLink),
             "nvidia" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Nvidia),
-            "github-models" | "github_models" => Some(crate::neotrix::nt_io_provider::LlmProviderType::GitHubModels),
-            "huggingface" | "hf" => Some(crate::neotrix::nt_io_provider::LlmProviderType::HuggingFace),
+            "github-models" | "github_models" => {
+                Some(crate::neotrix::nt_io_provider::LlmProviderType::GitHubModels)
+            }
+            "huggingface" | "hf" => {
+                Some(crate::neotrix::nt_io_provider::LlmProviderType::HuggingFace)
+            }
             "cohere" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Cohere),
             "siliconflow" => Some(crate::neotrix::nt_io_provider::LlmProviderType::SiliconFlow),
-            "deepseek-free" | "deepseek_free" => Some(crate::neotrix::nt_io_provider::LlmProviderType::DeepSeekFree),
-            "lm-studio" | "llamacpp" | "local" => Some(crate::neotrix::nt_io_provider::LlmProviderType::Ollama),
+            "deepseek-free" | "deepseek_free" => {
+                Some(crate::neotrix::nt_io_provider::LlmProviderType::DeepSeekFree)
+            }
+            "lm-studio" | "llamacpp" | "local" => {
+                Some(crate::neotrix::nt_io_provider::LlmProviderType::Ollama)
+            }
             _ => None,
         }
     }
@@ -198,7 +217,11 @@ impl ProviderCatalog {
         // Restore the user's last provider choice (persisted by set_active_provider).
         self.load_persisted();
         if !self.is_resolvable() {
-            if let Some(idx) = self.providers.iter().position(|p| Self::provider_type_of(&p.name).is_some()) {
+            if let Some(idx) = self
+                .providers
+                .iter()
+                .position(|p| Self::provider_type_of(&p.name).is_some())
+            {
                 self.active = idx;
             }
         }
@@ -274,12 +297,32 @@ pub struct StreamingMarkdown {
 #[derive(Debug, Clone)]
 pub enum MarkdownChunk {
     Text(String),
-    CodeBlock { language: Option<String>, content: String, complete: bool },
-    Heading { level: u8, text: String },
-    ListItem { depth: u8, text: String },
-    Table { headers: Vec<String>, rows: Vec<Vec<String>>, complete: bool },
-    Image { alt: String, url: String },
-    Link { text: String, url: String },
+    CodeBlock {
+        language: Option<String>,
+        content: String,
+        complete: bool,
+    },
+    Heading {
+        level: u8,
+        text: String,
+    },
+    ListItem {
+        depth: u8,
+        text: String,
+    },
+    Table {
+        headers: Vec<String>,
+        rows: Vec<Vec<String>>,
+        complete: bool,
+    },
+    Image {
+        alt: String,
+        url: String,
+    },
+    Link {
+        text: String,
+        url: String,
+    },
     BlockQuote(String),
     HorizontalRule,
 }
@@ -292,7 +335,12 @@ impl Default for StreamingMarkdown {
 
 impl StreamingMarkdown {
     pub fn new() -> Self {
-        Self { buffer: String::new(), chunks: Vec::new(), code_fence_open: None, list_stack: Vec::new() }
+        Self {
+            buffer: String::new(),
+            chunks: Vec::new(),
+            code_fence_open: None,
+            list_stack: Vec::new(),
+        }
     }
 
     pub fn push(&mut self, text: &str) {
@@ -315,35 +363,54 @@ impl StreamingMarkdown {
                 if let Some(close_pos) = remaining.find("```") {
                     let code = remaining[..close_pos].to_string();
                     self.chunks.push(MarkdownChunk::CodeBlock {
-                        language: lang, content: code, complete: true,
+                        language: lang,
+                        content: code,
+                        complete: true,
                     });
                     i = code_start + close_pos + 3;
                 } else {
                     self.chunks.push(MarkdownChunk::CodeBlock {
-                        language: lang, content: remaining.to_string(), complete: false,
+                        language: lang,
+                        content: remaining.to_string(),
+                        complete: false,
                     });
                     break;
                 }
             } else if content[i..].starts_with("## ") {
-                let end = content[i..].find('\n').map(|p| i + p).unwrap_or(content.len());
+                let end = content[i..]
+                    .find('\n')
+                    .map(|p| i + p)
+                    .unwrap_or(content.len());
                 self.chunks.push(MarkdownChunk::Heading {
-                    level: 2, text: content[i + 3..end].trim().to_string(),
+                    level: 2,
+                    text: content[i + 3..end].trim().to_string(),
                 });
                 i = end + 1;
             } else if content[i..].starts_with("# ") {
-                let end = content[i..].find('\n').map(|p| i + p).unwrap_or(content.len());
+                let end = content[i..]
+                    .find('\n')
+                    .map(|p| i + p)
+                    .unwrap_or(content.len());
                 self.chunks.push(MarkdownChunk::Heading {
-                    level: 1, text: content[i + 2..end].trim().to_string(),
+                    level: 1,
+                    text: content[i + 2..end].trim().to_string(),
                 });
                 i = end + 1;
             } else if content[i..].starts_with("- ") || content[i..].starts_with("* ") {
-                let end = content[i..].find('\n').map(|p| i + p).unwrap_or(content.len());
+                let end = content[i..]
+                    .find('\n')
+                    .map(|p| i + p)
+                    .unwrap_or(content.len());
                 self.chunks.push(MarkdownChunk::ListItem {
-                    depth: 0, text: content[i + 2..end].trim().to_string(),
+                    depth: 0,
+                    text: content[i + 2..end].trim().to_string(),
                 });
                 i = end + 1;
             } else if content[i..].starts_with("> ") {
-                let end = content[i..].find('\n').map(|p| i + p).unwrap_or(content.len());
+                let end = content[i..]
+                    .find('\n')
+                    .map(|p| i + p)
+                    .unwrap_or(content.len());
                 self.chunks.push(MarkdownChunk::BlockQuote(
                     content[i + 2..end].trim().to_string(),
                 ));
@@ -352,7 +419,10 @@ impl StreamingMarkdown {
                 self.chunks.push(MarkdownChunk::HorizontalRule);
                 i += 3;
             } else {
-                let end = content[i..].find('\n').map(|p| i + p + 1).unwrap_or(content.len());
+                let end = content[i..]
+                    .find('\n')
+                    .map(|p| i + p + 1)
+                    .unwrap_or(content.len());
                 let text = content[i..end].trim().to_string();
                 if !text.is_empty() {
                     self.chunks.push(MarkdownChunk::Text(text));
@@ -377,10 +447,7 @@ impl StreamingMarkdown {
 /// (e.g. offline first-run). The BPE is built once per process.
 pub fn count_tokens(text: &str) -> usize {
     static BPE: std::sync::OnceLock<Option<tiktoken_rs::CoreBPE>> = std::sync::OnceLock::new();
-    let bpe = BPE.get_or_init(|| {
-        tiktoken_rs::cl100k_base()
-            .ok()
-    });
+    let bpe = BPE.get_or_init(|| tiktoken_rs::cl100k_base().ok());
     match bpe {
         Some(bpe) => bpe.encode_with_special_tokens(text).len(),
         None => text.len() / 4,
@@ -460,33 +527,49 @@ impl ContextPipeline {
                     kept,
                     turn.content.len().saturating_sub(kept.len())
                 );
-                turn.token_count = if self.use_tiktoken { count_tokens(&turn.content) } else { kept.len() / 4 };
+                turn.token_count = if self.use_tiktoken {
+                    count_tokens(&turn.content)
+                } else {
+                    kept.len() / 4
+                };
             }
         }
 
-        if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize { return; }
+        if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize {
+            return;
+        }
 
         // Layer 2: Snip — reduce temporal depth (keep newest)
         while self.turns.len() > 50 {
             self.turns.pop_front();
         }
 
-        if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize { return; }
+        if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize {
+            return;
+        }
 
         // Layer 3: Microcompact — squeeze low-priority turns. Char-safe: the old
         // String::truncate(200) panicked when byte 200 landed mid-UTF-8-char
         // (any non-ASCII tool output now hits this path via tool priority 1).
         let mut i = 0;
-        while i < self.turns.len() && self.total_tokens() > (self.max_tokens as f64 * self.budget_low) as usize {
+        while i < self.turns.len()
+            && self.total_tokens() > (self.max_tokens as f64 * self.budget_low) as usize
+        {
             if self.turns[i].priority < 2 {
                 let kept = self.turns[i].content.chars().take(200).collect::<String>();
                 self.turns[i].content = format!("{}...", kept);
-                self.turns[i].token_count = if self.use_tiktoken { count_tokens(&self.turns[i].content) } else { kept.len() / 4 };
+                self.turns[i].token_count = if self.use_tiktoken {
+                    count_tokens(&self.turns[i].content)
+                } else {
+                    kept.len() / 4
+                };
             }
             i += 1;
         }
 
-        if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize { return; }
+        if self.total_tokens() < (self.max_tokens as f64 * self.budget_low) as usize {
+            return;
+        }
 
         // Layer 4: Context collapse — distill evicted turns into a single
         // capped summary. Real condensation (preserves role + first line per
@@ -507,7 +590,11 @@ impl ContextPipeline {
             ));
         }
         if !distilled.is_empty() {
-            let distilled_tokens = if self.use_tiktoken { count_tokens(&distilled) } else { distilled.len() / 4 };
+            let distilled_tokens = if self.use_tiktoken {
+                count_tokens(&distilled)
+            } else {
+                distilled.len() / 4
+            };
             self.turns.push_front(ContextTurn {
                 role: "summary".into(),
                 content: distilled,
@@ -518,7 +605,9 @@ impl ContextPipeline {
 
         // Layer 5: Auto-compact — hard cap
         while self.total_tokens() > self.max_tokens {
-            if self.turns.len() <= 2 { break; }
+            if self.turns.len() <= 2 {
+                break;
+            }
             self.turns.pop_front();
         }
     }
@@ -535,11 +624,31 @@ pub enum WireEvent {
         #[serde(default)]
         attachments: Option<Vec<NeoCodexAttachment>>,
     },
-    AgentMessage { content: String, timestamp: i64 },
-    ToolCall { name: String, args: String, result: String, duration_ms: u64, success: bool },
-    SystemEvent { kind: String, detail: String, timestamp: i64 },
-    GoalUpdate { id: String, state: String, description: String },
-    ModeChange { from: NeoCodexMode, to: NeoCodexMode },
+    AgentMessage {
+        content: String,
+        timestamp: i64,
+    },
+    ToolCall {
+        name: String,
+        args: String,
+        result: String,
+        duration_ms: u64,
+        success: bool,
+    },
+    SystemEvent {
+        kind: String,
+        detail: String,
+        timestamp: i64,
+    },
+    GoalUpdate {
+        id: String,
+        state: String,
+        description: String,
+    },
+    ModeChange {
+        from: NeoCodexMode,
+        to: NeoCodexMode,
+    },
     SessionMeta {
         name: String,
         timestamp: i64,
@@ -576,7 +685,8 @@ impl WireSession {
     pub fn new(session_id: &str) -> Self {
         let base = dirs::data_dir()
             .unwrap_or_else(|| std::path::PathBuf::from(".neocodex"))
-            .join("neocodex").join("sessions");
+            .join("neocodex")
+            .join("sessions");
         Self {
             session_id: session_id.to_string(),
             events: Vec::new(),
@@ -600,7 +710,9 @@ impl WireSession {
         }
         if let Ok(line) = serde_json::to_string(&event) {
             let _ = std::fs::OpenOptions::new()
-                .create(true).append(true).open(&self.path)
+                .create(true)
+                .append(true)
+                .open(&self.path)
                 .and_then(|f| {
                     use std::io::Write;
                     writeln!(&f, "{}", line)
@@ -610,7 +722,8 @@ impl WireSession {
 
     pub fn replay(path: &std::path::Path) -> Vec<WireEvent> {
         let content = std::fs::read_to_string(path).unwrap_or_default();
-        content.lines()
+        content
+            .lines()
             .filter_map(|l| serde_json::from_str::<WireEvent>(l).ok())
             .collect()
     }
@@ -628,7 +741,13 @@ impl WireSession {
 // ── Goal System (from Kimi Code: chained goals) ──
 
 #[derive(Debug, Clone)]
-pub enum GoalState { Active, Paused, Completed, Blocked, Cancelled }
+pub enum GoalState {
+    Active,
+    Paused,
+    Completed,
+    Blocked,
+    Cancelled,
+}
 
 #[derive(Debug, Clone)]
 pub struct Goal {
@@ -655,7 +774,12 @@ impl Default for GoalQueue {
 
 impl GoalQueue {
     pub fn new() -> Self {
-        Self { goals: VecDeque::new(), active: None, completed: Vec::new(), next_id: 0 }
+        Self {
+            goals: VecDeque::new(),
+            active: None,
+            completed: Vec::new(),
+            next_id: 0,
+        }
     }
 
     pub fn add(&mut self, description: &str, max_iterations: u64) {
@@ -666,10 +790,12 @@ impl GoalQueue {
         self.next_id += 1;
         let id = format!("g-{}", self.next_id);
         self.goals.push_back(Goal {
-            id, description: description.to_string(),
+            id,
+            description: description.to_string(),
             state: GoalState::Active,
             created_at: Instant::now(),
-            iterations: 0, max_iterations,
+            iterations: 0,
+            max_iterations,
         });
     }
 
@@ -721,7 +847,10 @@ impl Default for LifecycleHookRegistry {
 
 impl LifecycleHookRegistry {
     pub fn new() -> Self {
-        Self { pre_hooks: Vec::new(), post_hooks: Vec::new() }
+        Self {
+            pre_hooks: Vec::new(),
+            post_hooks: Vec::new(),
+        }
     }
 
     pub fn register_pre(&mut self, name: &str, hook: PreToolHook) {
@@ -762,7 +891,11 @@ impl LifecycleHookRegistry {
 // ── Subagent System (from Claude Code: fork/async/sync/teammate 4 paths) ──
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SubagentKind { Coder, Explorer, Planner }
+pub enum SubagentKind {
+    Coder,
+    Explorer,
+    Planner,
+}
 
 #[derive(Debug, Clone)]
 pub struct SubagentResult {
@@ -870,7 +1003,11 @@ impl SubagentDispatch {
             Ok(resp) => SubagentResult {
                 kind,
                 output: resp.content,
-                tool_calls: resp.tool_calls.as_ref().map(|c| c.len() as u64).unwrap_or(0),
+                tool_calls: resp
+                    .tool_calls
+                    .as_ref()
+                    .map(|c| c.len() as u64)
+                    .unwrap_or(0),
                 duration_ms: start.elapsed().as_millis() as u64,
                 success: true,
             },
@@ -884,8 +1021,12 @@ impl SubagentDispatch {
         }
     }
 
-    pub async fn run_parallel(tasks: Vec<(SubagentKind, String)>, cwd: &str) -> Vec<SubagentResult> {
-        let handles: Vec<_> = tasks.into_iter()
+    pub async fn run_parallel(
+        tasks: Vec<(SubagentKind, String)>,
+        cwd: &str,
+    ) -> Vec<SubagentResult> {
+        let handles: Vec<_> = tasks
+            .into_iter()
             .map(|(kind, task)| {
                 let cwd = cwd.to_string();
                 tokio::spawn(async move { Self::run(kind, &task, &cwd).await })
@@ -894,8 +1035,11 @@ impl SubagentDispatch {
         let mut results = Vec::new();
         for h in handles {
             results.push(h.await.unwrap_or_else(|e| SubagentResult {
-                kind: SubagentKind::Coder, output: format!("Join error: {}", e),
-                tool_calls: 0, duration_ms: 0, success: false,
+                kind: SubagentKind::Coder,
+                output: format!("Join error: {}", e),
+                tool_calls: 0,
+                duration_ms: 0,
+                success: false,
             }));
         }
         results
@@ -914,18 +1058,27 @@ pub struct CostTracker {
 
 impl CostTracker {
     pub fn new(max_budget: f64) -> Self {
-        Self { total_spent: 0.0, max_budget, call_count: 0, history: VecDeque::new() }
+        Self {
+            total_spent: 0.0,
+            max_budget,
+            call_count: 0,
+            history: VecDeque::new(),
+        }
     }
 
     pub fn record(&mut self, tool: &str, cost: f64, tokens: u64) -> Result<(), String> {
         if self.total_spent + cost > self.max_budget {
-            return Err(format!("Budget exceeded: ${:.4} + ${:.4} > ${:.4} limit",
-                self.total_spent, cost, self.max_budget));
+            return Err(format!(
+                "Budget exceeded: ${:.4} + ${:.4} > ${:.4} limit",
+                self.total_spent, cost, self.max_budget
+            ));
         }
         self.total_spent += cost;
         self.call_count += 1;
         self.history.push_back((tool.to_string(), cost, tokens));
-        if self.history.len() > 1000 { self.history.pop_front(); }
+        if self.history.len() > 1000 {
+            self.history.pop_front();
+        }
         Ok(())
     }
 
@@ -934,14 +1087,21 @@ impl CostTracker {
     }
 
     pub fn summary(&self) -> String {
-        format!("${:.4} spent / ${:.4} budget · {} calls", self.total_spent, self.max_budget, self.call_count)
+        format!(
+            "${:.4} spent / ${:.4} budget · {} calls",
+            self.total_spent, self.max_budget, self.call_count
+        )
     }
 }
 
 // ── Permission System (from Claude Code: allow/deny/ask per tool) ──
 
 #[derive(Debug, Clone)]
-pub enum PermissionLevel { Allow, Deny, Ask }
+pub enum PermissionLevel {
+    Allow,
+    Deny,
+    Ask,
+}
 
 pub struct PermissionSystem {
     pub permissions: Vec<(String, PermissionLevel)>,
@@ -963,7 +1123,10 @@ impl PermissionSystem {
             ("edit".to_string(), PermissionLevel::Allow),
             ("shell".to_string(), PermissionLevel::Ask),
         ];
-        Self { permissions, default_level: PermissionLevel::Ask }
+        Self {
+            permissions,
+            default_level: PermissionLevel::Ask,
+        }
     }
 
     /// Non-blocking policy gate for the streaming path (P0-2). Unlike
@@ -1062,19 +1225,27 @@ impl AcpServer {
 
     pub async fn handle_request(&self, req: AcpRequest) -> AcpResponse {
         let AcpRequest { id, method, params } = req;
-        if !matches!(method.as_str(),
-            "ping" | "agent/process" | "agent/status" | "agent/mode" | "tools/list" | "shutdown")
-        {
+        if !matches!(
+            method.as_str(),
+            "ping" | "agent/process" | "agent/status" | "agent/mode" | "tools/list" | "shutdown"
+        ) {
             // Protocol errors belong in `error`, not smuggled into `result` —
             // clients keying on the error field otherwise see a success.
             return AcpResponse {
                 id,
                 result: None,
-                error: Some(AcpError { code: -32601, message: format!("unknown method: {}", method) }),
+                error: Some(AcpError {
+                    code: -32601,
+                    message: format!("unknown method: {}", method),
+                }),
             };
         }
         let result = self.dispatch(method, params).await;
-        AcpResponse { id, result: Some(result), error: None }
+        AcpResponse {
+            id,
+            result: Some(result),
+            error: None,
+        }
     }
 
     async fn dispatch(&self, method: String, params: serde_json::Value) -> serde_json::Value {
@@ -1096,11 +1267,18 @@ impl AcpServer {
                 })
             }
             "agent/mode" => {
-                let mode_name = params.get("mode").and_then(|v| v.as_str()).unwrap_or("agent");
+                let mode_name = params
+                    .get("mode")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("agent");
                 let mut agent = self.agent.lock().await;
                 match mode_name {
-                    "shell" => { agent.toggle_mode(); }
-                    "plan" => { agent.set_plan_mode(); }
+                    "shell" => {
+                        agent.toggle_mode();
+                    }
+                    "plan" => {
+                        agent.set_plan_mode();
+                    }
                     _ => {}
                 }
                 serde_json::json!({"mode": agent.state.mode})
@@ -1148,15 +1326,40 @@ impl AcpServer {
 
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
-    TurnStart { turn: u64, mode: NeoCodexMode },
-    Thinking { content: String },
-    ToolCallStart { name: String, args: String },
-    ToolCallEnd { name: String, result: String, duration_ms: u64, success: bool },
-    Chunk { text: String },
-    TurnEnd { response: String },
-    Error { message: String },
-    ModeSwitch { from: NeoCodexMode, to: NeoCodexMode },
-    BudgetWarning { remaining: f64, limit: f64 },
+    TurnStart {
+        turn: u64,
+        mode: NeoCodexMode,
+    },
+    Thinking {
+        content: String,
+    },
+    ToolCallStart {
+        name: String,
+        args: String,
+    },
+    ToolCallEnd {
+        name: String,
+        result: String,
+        duration_ms: u64,
+        success: bool,
+    },
+    Chunk {
+        text: String,
+    },
+    TurnEnd {
+        response: String,
+    },
+    Error {
+        message: String,
+    },
+    ModeSwitch {
+        from: NeoCodexMode,
+        to: NeoCodexMode,
+    },
+    BudgetWarning {
+        remaining: f64,
+        limit: f64,
+    },
     Done,
 }
 
@@ -1185,7 +1388,8 @@ impl AgentStream {
         let turn = agent.state.turn_count + 1;
 
         self.events.push_back(AgentEvent::TurnStart {
-            turn, mode: agent.state.mode,
+            turn,
+            mode: agent.state.mode,
         });
 
         // Permission check
@@ -1206,7 +1410,9 @@ impl AgentStream {
         let ctx = ToolCallContext {
             tool_name: tool_name.to_string(),
             args: input.to_string(),
-            cwd: std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+            cwd: std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
             estimated_cost: input.len() as f64 * 0.00001,
         };
         match self.hooks.run_pre(ctx.clone()) {
@@ -1240,7 +1446,8 @@ impl AgentStream {
             }
             if cost.remaining() < cost.max_budget * 0.1 {
                 self.events.push_back(AgentEvent::BudgetWarning {
-                    remaining: cost.remaining(), limit: cost.max_budget,
+                    remaining: cost.remaining(),
+                    limit: cost.max_budget,
                 });
             }
         }
@@ -1255,9 +1462,13 @@ impl AgentStream {
         let duration = start.elapsed().as_millis() as u64;
 
         for line in response.lines() {
-            self.events.push_back(AgentEvent::Chunk { text: line.to_string() });
+            self.events.push_back(AgentEvent::Chunk {
+                text: line.to_string(),
+            });
         }
-        self.events.push_back(AgentEvent::TurnEnd { response: response.clone() });
+        self.events.push_back(AgentEvent::TurnEnd {
+            response: response.clone(),
+        });
         self.events.push_back(AgentEvent::Done);
 
         // Lifecycle post-hook
@@ -1353,7 +1564,9 @@ pub struct NeoCodexAgent {
     pub markdown: StreamingMarkdown,
     pub consciousness: Option<crate::core::nt_core_consciousness_tree::ConsciousnessTree>,
     pub event_bus: Option<crate::neotrix::nt_core_event_bus::EventBus>,
-    pub brain: Option<Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain>>>,
+    pub brain: Option<
+        Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain>>,
+    >,
     // Cycle 112b additions
     pub hooks: LifecycleHookRegistry,
     pub cost: CostTracker,
@@ -1396,12 +1609,18 @@ impl NeoCodexAgent {
     }
 
     /// P2-5: attach the shared MCP registry so the agent can call MCP tools.
-    pub fn with_mcp(mut self, mcp: crate::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry) -> Self {
+    pub fn with_mcp(
+        mut self,
+        mcp: crate::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry,
+    ) -> Self {
         self.mcp = Some(mcp);
         self
     }
 
-    pub fn set_mcp(&mut self, mcp: Option<crate::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry>) {
+    pub fn set_mcp(
+        &mut self,
+        mcp: Option<crate::neotrix::l1_body_impl::nt_agent_mcp_registry::McpRegistry>,
+    ) {
         self.mcp = mcp;
     }
 
@@ -1424,7 +1643,9 @@ impl NeoCodexAgent {
 
     /// Register a pre-tool lifecycle hook (from Kimi Code lifecycle hooks)
     pub fn add_pre_hook<F>(&mut self, name: &str, hook: F)
-    where F: Fn(ToolCallContext) -> HookResult + Send + Sync + 'static {
+    where
+        F: Fn(ToolCallContext) -> HookResult + Send + Sync + 'static,
+    {
         self.hooks.register_pre(name, Arc::new(hook));
     }
 
@@ -1441,12 +1662,17 @@ impl NeoCodexAgent {
         ToolCallContext {
             tool_name: format!("{:?}", self.state.mode),
             args: String::new(),
-            cwd: std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default(),
+            cwd: std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
             estimated_cost: self.state.tokens_used as f64 * 0.00001,
         }
     }
 
-    pub fn set_consciousness_tree(&mut self, tree: crate::core::nt_core_consciousness_tree::ConsciousnessTree) {
+    pub fn set_consciousness_tree(
+        &mut self,
+        tree: crate::core::nt_core_consciousness_tree::ConsciousnessTree,
+    ) {
         self.consciousness = Some(tree);
     }
 
@@ -1454,7 +1680,12 @@ impl NeoCodexAgent {
         self.event_bus = Some(bus);
     }
 
-    pub fn set_brain(&mut self, brain: Arc<tokio::sync::RwLock<crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain>>) {
+    pub fn set_brain(
+        &mut self,
+        brain: Arc<
+            tokio::sync::RwLock<crate::neotrix::nt_mind::self_iterating::SelfIteratingBrain>,
+        >,
+    ) {
         self.brain = Some(brain);
     }
 
@@ -1473,7 +1704,9 @@ impl NeoCodexAgent {
     /// the derived first-message name on read).
     pub fn rename_session(&mut self, name: &str) {
         let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
         // 保留既有标签（重命名不动 tags；读旧态标签并回写）
         let tags = self.read_session_tags();
         self.wire.record(WireEvent::SessionMeta {
@@ -1486,7 +1719,10 @@ impl NeoCodexAgent {
     /// Read the persisted tag set for the current wire session (from last
     /// SessionMeta). Empty when none recorded yet.
     fn read_session_tags(&self) -> Vec<String> {
-        self.wire.events.iter().rev()
+        self.wire
+            .events
+            .iter()
+            .rev()
             .find(|e| matches!(e, WireEvent::SessionMeta { .. }))
             .and_then(|e| match e {
                 WireEvent::SessionMeta { tags, .. } => Some(tags.clone()),
@@ -1520,13 +1756,21 @@ impl NeoCodexAgent {
     /// Overwrite persisted tags (rename/tag/untag 共用落盘点)。
     fn write_session_tags(&mut self, tags: Vec<String>) {
         let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
-        let meta = self.wire.events.iter().rev()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let meta = self
+            .wire
+            .events
+            .iter()
+            .rev()
             .find(|e| matches!(e, WireEvent::SessionMeta { .. }));
-        let name = meta.and_then(|e| match e {
-            WireEvent::SessionMeta { name, .. } => Some(name.clone()),
-            _ => None,
-        }).unwrap_or_else(|| self.wire.session_id.clone());
+        let name = meta
+            .and_then(|e| match e {
+                WireEvent::SessionMeta { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| self.wire.session_id.clone());
         self.wire.record(WireEvent::SessionMeta {
             name,
             timestamp: ts,
@@ -1539,7 +1783,9 @@ impl NeoCodexAgent {
     /// filtered out of resume_session / get_session_messages.
     pub fn record_side_chat(&mut self, content: &str, role: &str) {
         let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
         self.wire.record(WireEvent::SideChatMessage {
             content: content.trim().to_string(),
             timestamp: ts,
@@ -1556,7 +1802,9 @@ impl NeoCodexAgent {
         self.wire = WireSession::new(&format!(
             "s-{}",
             std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
         ));
         self.context.turns.clear();
         self.state.tokens_used = 0;
@@ -1640,7 +1888,9 @@ impl NeoCodexAgent {
     pub async fn process(&mut self, input: &str) -> String {
         self.state.turn_count += 1;
         let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
         self.wire.record(WireEvent::UserMessage {
             content: input.to_string(),
             timestamp,
@@ -1667,7 +1917,9 @@ impl NeoCodexAgent {
         self.wire.record(WireEvent::AgentMessage {
             content: response.clone(),
             timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64,
         });
 
         response
@@ -1684,11 +1936,18 @@ impl NeoCodexAgent {
                 let stdout = String::from_utf8_lossy(&out.stdout).to_string();
                 let stderr = String::from_utf8_lossy(&out.stderr).to_string();
                 let exit_code = out.status.code().unwrap_or(-1);
-                let result = if exit_code == 0 { stdout } else { format!("exit({}): {}", exit_code, stderr) };
+                let result = if exit_code == 0 {
+                    stdout
+                } else {
+                    format!("exit({}): {}", exit_code, stderr)
+                };
                 self.state.tool_call_count += 1;
                 self.wire.record(WireEvent::ToolCall {
-                    name: "shell".into(), args: input.to_string(),
-                    result: result.clone(), duration_ms: 0, success: exit_code == 0,
+                    name: "shell".into(),
+                    args: input.to_string(),
+                    result: result.clone(),
+                    duration_ms: 0,
+                    success: exit_code == 0,
                 });
                 if exit_code != 0 {
                     format!("```\n{}\n```\n\nExit code: {}", result, exit_code)
@@ -1715,11 +1974,14 @@ impl NeoCodexAgent {
                 return format!("[blocked] Hook denied: {}", reason);
             }
             HookDecision::RequireConfirm(msg) => {
-                let response = format!("[confirmed] {}\n\n<thinking>Processing turn {} in Agent mode</thinking>\n\n{}",
-                    msg, self.state.turn_count, input);
+                let response = format!(
+                    "[confirmed] {}\n\n<thinking>Processing turn {} in Agent mode</thinking>\n\n{}",
+                    msg, self.state.turn_count, input
+                );
                 self.markdown.push(&response);
                 let clean = response.clone();
-                self.context.push("assistant", clean.clone(), clean.len() / 4);
+                self.context
+                    .push("assistant", clean.clone(), clean.len() / 4);
                 self.hooks.run_post(ctx, clean.clone(), 0);
                 return clean;
             }
@@ -1742,9 +2004,11 @@ impl NeoCodexAgent {
         self.markdown.push(&response);
         let clean = response.clone();
         let token_estimate = clean.len() / 4;
-        self.context.push("assistant", clean.clone(), token_estimate);
+        self.context
+            .push("assistant", clean.clone(), token_estimate);
         let _ = self.cost.record("agent", 0.0, token_estimate as u64);
-        self.hooks.run_post(ctx, clean.clone(), start.elapsed().as_millis() as u64);
+        self.hooks
+            .run_post(ctx, clean.clone(), start.elapsed().as_millis() as u64);
 
         // Evolution loop advances every turn (self-audit → diagnose → fix)
         EvolutionLoop::step(self);
@@ -1755,10 +2019,17 @@ impl NeoCodexAgent {
     /// Add a goal to the queue (from Kimi Code /goal system)
     pub fn add_goal(&mut self, description: &str, max_iters: u64) {
         self.goals.add(description, max_iters);
-        let id = self.goals.goals.back().map(|g| g.id.clone()).unwrap_or_default();
+        let id = self
+            .goals
+            .goals
+            .back()
+            .map(|g| g.id.clone())
+            .unwrap_or_default();
         self.state.goal_active = true;
         self.wire.record(WireEvent::GoalUpdate {
-            id, state: "active".into(), description: description.into(),
+            id,
+            state: "active".into(),
+            description: description.into(),
         });
     }
 
@@ -1778,7 +2049,8 @@ impl NeoCodexAgent {
             goal.iterations = goal.iterations.saturating_add(1);
             if goal.iterations >= goal.max_iterations {
                 self.wire.record(WireEvent::GoalUpdate {
-                    id: goal.id.clone(), state: "completed".into(),
+                    id: goal.id.clone(),
+                    state: "completed".into(),
                     description: goal.description.clone(),
                 });
                 let next = self.goals.next().map(|g| g.description);
@@ -1792,11 +2064,21 @@ impl NeoCodexAgent {
     }
 
     /// Record a tool call (from Claude Code: StreamingToolExecutor pattern)
-    pub fn record_tool_call(&mut self, name: &str, args: &str, result: String, duration_ms: u64, success: bool) {
+    pub fn record_tool_call(
+        &mut self,
+        name: &str,
+        args: &str,
+        result: String,
+        duration_ms: u64,
+        success: bool,
+    ) {
         self.state.tool_call_count += 1;
         self.wire.record(WireEvent::ToolCall {
-            name: name.to_string(), args: args.to_string(),
-            result, duration_ms, success,
+            name: name.to_string(),
+            args: args.to_string(),
+            result,
+            duration_ms,
+            success,
         });
     }
 
@@ -1810,7 +2092,9 @@ impl NeoCodexAgent {
 
     /// Consume ConsciousnessTree guidance to adjust agent behavior (inbound integration)
     fn apply_consciousness_guidance(&mut self) {
-        let Some(ref tree) = self.consciousness else { return };
+        let Some(ref tree) = self.consciousness else {
+            return;
+        };
 
         let fruit_count = tree.fruits.len();
         let phi_avg = if !tree.fruits.is_empty() {
@@ -1822,7 +2106,10 @@ impl NeoCodexAgent {
 
         if fruit_count < 3 && tree.cycle > 5 && !self.state.goal_active {
             self.state.mode = NeoCodexMode::Plan;
-            self.add_goal("Cultivate capability branches: absorb external knowledge", 5);
+            self.add_goal(
+                "Cultivate capability branches: absorb external knowledge",
+                5,
+            );
         }
     }
 
@@ -1869,14 +2156,18 @@ impl NeoCodexAgent {
                         kind: "provider_error".into(),
                         detail: e.to_string(),
                         timestamp: std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs() as i64,
                     });
                     return Some(format!("[provider error] {}", e));
                 }
             };
 
             self.state.tokens_used += response.usage.total_tokens as usize;
-            let _ = self.cost.record("agent", 0.0, response.usage.total_tokens as u64);
+            let _ = self
+                .cost
+                .record("agent", 0.0, response.usage.total_tokens as u64);
 
             // Attempt to extract a structured tool-call from the response.
             let tool_call = Self::extract_tool_call(&response.content);
@@ -1888,9 +2179,14 @@ impl NeoCodexAgent {
                     // Previously only the CLI AgentStream and exec_agent honored
                     // PermissionSystem; react_loop bypassed it entirely, so
                     // Manual/AcceptEdits/Plan modes were advisory at best.
-                    let allowed = self.permissions.policy_gate(&name, &self.state.permission_mode);
+                    let allowed = self
+                        .permissions
+                        .policy_gate(&name, &self.state.permission_mode);
                     if !allowed {
-                        let denied = format!("[denied] tool `{}` blocked by permission mode `{}`", name, self.state.permission_mode);
+                        let denied = format!(
+                            "[denied] tool `{}` blocked by permission mode `{}`",
+                            name, self.state.permission_mode
+                        );
                         self.wire.record(WireEvent::ToolCall {
                             name: name.clone(),
                             args: args.clone(),
@@ -1906,7 +2202,8 @@ impl NeoCodexAgent {
                     // Tool grounding (Cycle 160e): claimed success when invoked; actual success
                     // if the tool did not return a distinguishable error marker.
                     let actual_ok = !result.starts_with('[');
-                    self.tool_grounding.record_tool_result(&name, true, actual_ok);
+                    self.tool_grounding
+                        .record_tool_result(&name, true, actual_ok);
                     self.wire.record(WireEvent::ToolCall {
                         name: name.clone(),
                         args: args.clone(),
@@ -1926,7 +2223,11 @@ impl NeoCodexAgent {
                         }],
                     ));
                     messages.push(Message::tool(&result, &format!("call-{}", step)));
-                    self.context.push("assistant", response.content.clone(), response.content.len() / 4);
+                    self.context.push(
+                        "assistant",
+                        response.content.clone(),
+                        response.content.len() / 4,
+                    );
                     self.context.push("tool", result.clone(), result.len() / 4);
                     step += 1;
                 }
@@ -1976,7 +2277,9 @@ impl NeoCodexAgent {
                         kind: "provider_error".into(),
                         detail: e.to_string(),
                         timestamp: std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs() as i64,
                     });
                     return Some(format!("[provider error] {}", e));
                 }
@@ -2005,7 +2308,9 @@ impl NeoCodexAgent {
                             kind: "provider_error".into(),
                             detail: e.to_string(),
                             timestamp: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64,
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs() as i64,
                         });
                         return Some(format!("[provider error] {}", e));
                     }
@@ -2037,9 +2342,14 @@ impl NeoCodexAgent {
                 Some((name, args)) => {
                     self.state.tool_call_count += 1;
                     // P0-2: enforce the permission policy on the streaming path.
-                    let allowed = self.permissions.policy_gate(&name, &self.state.permission_mode);
+                    let allowed = self
+                        .permissions
+                        .policy_gate(&name, &self.state.permission_mode);
                     if !allowed {
-                        let denied = format!("[denied] tool `{}` blocked by permission mode `{}`", name, self.state.permission_mode);
+                        let denied = format!(
+                            "[denied] tool `{}` blocked by permission mode `{}`",
+                            name, self.state.permission_mode
+                        );
                         self.wire.record(WireEvent::ToolCall {
                             name: name.clone(),
                             args: args.clone(),
@@ -2055,7 +2365,8 @@ impl NeoCodexAgent {
                     let result = self.execute_tool(&name, &args).await;
                     let tool_duration_ms = tool_started.elapsed().as_millis() as u64;
                     let actual_ok = !result.starts_with('[');
-                    self.tool_grounding.record_tool_result(&name, true, actual_ok);
+                    self.tool_grounding
+                        .record_tool_result(&name, true, actual_ok);
                     self.wire.record(WireEvent::ToolCall {
                         name: name.clone(),
                         args: args.clone(),
@@ -2079,7 +2390,11 @@ impl NeoCodexAgent {
                         }],
                     ));
                     messages.push(Message::tool(&result, &format!("call-{}", step)));
-                    self.context.push("assistant", response_content.clone(), response_content.len() / 4);
+                    self.context.push(
+                        "assistant",
+                        response_content.clone(),
+                        response_content.len() / 4,
+                    );
                     self.context.push("tool", result.clone(), result.len() / 4);
                     step += 1;
                 }
@@ -2102,7 +2417,8 @@ impl NeoCodexAgent {
         let system = "You are NeoCodex, an AI coding agent inside the NeoTrix architecture. \
             Modes: Agent (autonomous coding), Shell (run commands), Plan (draft plans). \
             Use the tools when you need to read files, search the repo, or run shell commands. \
-            Always respond in markdown. Be concise and precise.".to_string();
+            Always respond in markdown. Be concise and precise."
+            .to_string();
         let mut messages = vec![Message::new(Role::System, &system)];
         for turn in &self.context.turns {
             let role = match turn.role.as_str() {
@@ -2124,23 +2440,21 @@ impl NeoCodexAgent {
         // history turn is NOT the same message.
         if self.context.turns.back().map(|t| t.content.as_str()) != Some(input) {
             messages.push(Message::new(Role::User, input));
-        }        messages
+        }
+        messages
     }
 
     /// Bottom-up token budget for the ReAct loop. The local `messages` vec grows
     /// by one assistant + one tool-result turn per step, so a long loop can blow
-    /// the provider context window. Estimated tokens = chars / 4 (consistent with
-    /// resume_session). Evicts oldest non-system turns first; index 0 (system)
-    /// and the trailing current-user request are never evicted.
+    /// the provider context window. Delegates to the shared token-budget engine
+    /// (`nt_io_provider::context_budget::apply_context_budget`, CJK-aware estimate).
+    /// Evicts oldest non-system turns first; index 0 (system) and the trailing
+    /// current-user request are never evicted. Tool-result truncation is disabled
+    /// here (0) — ContextPipeline Layer-3 already caps tool turns.
     fn budget_react_messages(messages: &mut Vec<Message>, max_tokens: usize) {
-        let est = |m: &Message| m.content.len() / 4;
-        let mut total: usize = messages.iter().map(&est).sum();
-        let i = 1;
-        while total > max_tokens && i + 1 < messages.len() {
-            total = total.saturating_sub(est(&messages[i]));
-            messages.remove(i);
-        }
-    }    /// Build an LlmRequest from the current catalog's active provider.
+        super::nt_io_provider::context_budget::apply_context_budget(messages, max_tokens, 0);
+    }
+    /// Build an LlmRequest from the current catalog's active provider.
     fn build_request(&self, messages: Vec<Message>) -> Option<LlmRequest> {
         self.provider.providers.get(self.provider.active)?;
         // P0-3: surface the most recent user-turn image attachment to the model.
@@ -2148,7 +2462,10 @@ impl NeoCodexAgent {
         // image_data was hardcoded None, so attached screenshots never reached
         // the provider despite being rendered inline in the chat.
         let image_data = self.wire.events.iter().rev().find_map(|ev| match ev {
-            WireEvent::UserMessage { attachments: Some(list), .. } => list
+            WireEvent::UserMessage {
+                attachments: Some(list),
+                ..
+            } => list
                 .iter()
                 .find(|a| a.mime_type.starts_with("image/"))
                 .and_then(|a| a.data.clone()),
@@ -2171,10 +2488,8 @@ impl NeoCodexAgent {
                     if let Ok((evidence, _feat)) =
                         crate::core::nt_core_e8::nt_multimodal::VisionBridge::analyze_cached(&bytes)
                     {
-                        if let Some(last_user) = messages
-                            .iter_mut()
-                            .rev()
-                            .find(|m| m.role == Role::User)
+                        if let Some(last_user) =
+                            messages.iter_mut().rev().find(|m| m.role == Role::User)
                         {
                             last_user.content = format!(
                                 "{}\n\n{}\n\n(Note: the active model is text-only; the image attachment was bridged to structured pixel evidence above.)",
@@ -2280,11 +2595,14 @@ impl NeoCodexAgent {
                         return Err(format!("[path error] {} escapes the workspace", raw));
                     }
                 }
-                std::path::Component::CurDir | std::path::Component::RootDir
+                std::path::Component::CurDir
+                | std::path::Component::RootDir
                 | std::path::Component::Prefix(_) => {}
             }
         }
-        let normalized = parts.iter().fold(std::path::PathBuf::new(), |acc, c| acc.join(c));
+        let normalized = parts
+            .iter()
+            .fold(std::path::PathBuf::new(), |acc, c| acc.join(c));
         let resolved = normalized;
         if !resolved.starts_with(&cwd) {
             return Err(format!("[path error] {} is outside the workspace", raw));
@@ -2328,13 +2646,20 @@ impl NeoCodexAgent {
                     if depth > 8 || hits.len() >= 40 {
                         return;
                     }
-                    let Ok(entries) = std::fs::read_dir(dir) else { return };
+                    let Ok(entries) = std::fs::read_dir(dir) else {
+                        return;
+                    };
                     for entry in entries.flatten() {
                         let path = entry.path();
                         let fname = entry.file_name().to_string_lossy().to_string();
-                        if fname == "target" || fname == "node_modules" || fname == ".git"
-                            || fname == "dist" || fname == "build" || fname == ".venv"
-                            || fname == "vendor" {
+                        if fname == "target"
+                            || fname == "node_modules"
+                            || fname == ".git"
+                            || fname == "dist"
+                            || fname == "build"
+                            || fname == ".venv"
+                            || fname == "vendor"
+                        {
                             continue;
                         }
                         if path.is_dir() {
@@ -2344,8 +2669,15 @@ impl NeoCodexAgent {
                         if let Ok(content) = std::fs::read_to_string(&path) {
                             for (i, line) in content.lines().enumerate() {
                                 if line.contains(pattern) {
-                                    hits.push(format!("{}:{}: {}", path.display(), i + 1, line.trim()));
-                                    if hits.len() >= 40 { return; }
+                                    hits.push(format!(
+                                        "{}:{}: {}",
+                                        path.display(),
+                                        i + 1,
+                                        line.trim()
+                                    ));
+                                    if hits.len() >= 40 {
+                                        return;
+                                    }
                                 }
                             }
                         }
@@ -2375,7 +2707,10 @@ impl NeoCodexAgent {
                     Err(e) => return e,
                 };
                 if content.len() > 64_000 {
-                    return format!("[write error] content exceeds 64 KB ({} bytes)", content.len());
+                    return format!(
+                        "[write error] content exceeds 64 KB ({} bytes)",
+                        content.len()
+                    );
                 }
                 if let Some(parent) = path.parent() {
                     if !parent.as_os_str().is_empty() {
@@ -2461,7 +2796,8 @@ impl NeoCodexAgent {
             // error instead of silently pretending to succeed.
             "mcp_call" => {
                 let Some(registry) = &self.mcp else {
-                    return "[mcp_call error] no MCP registry attached; register MCP servers first".to_string();
+                    return "[mcp_call error] no MCP registry attached; register MCP servers first"
+                        .to_string();
                 };
                 let (name, json) = match args.split_once('|') {
                     Some((n, j)) => (n.trim(), j),
@@ -2526,7 +2862,9 @@ impl NeoCodexAgent {
                     self.state.tokens_used += est;
                     restored += 1;
                 }
-                WireEvent::ToolCall { name, args, result, .. } => {
+                WireEvent::ToolCall {
+                    name, args, result, ..
+                } => {
                     self.context.push(
                         "user",
                         format!("[tool {}] args={} result={}", name, args, result),
@@ -2547,7 +2885,8 @@ impl NeoCodexAgent {
 
     /// Produce a full health snapshot of the agent (D25: output must be
     /// consumable — this is consumed by SelfTest, UI status, and evolution).
-    pub fn health_report(&self) -> NeoCodexHealthReport {        let provider_count = self.provider.providers.len();
+    pub fn health_report(&self) -> NeoCodexHealthReport {
+        let provider_count = self.provider.providers.len();
         let provider_resolvable = self.provider.to_llm_provider().is_some();
         let context_usage = if self.context.max_tokens == 0 {
             0.0
@@ -2577,7 +2916,9 @@ impl NeoCodexAgent {
             event_bus_attached: self.event_bus.is_some(),
             evolution_iterations,
             tool_grounding_degraded: self.tool_grounding.any_degraded(),
-            node_snapshots: self.consciousness.as_ref()
+            node_snapshots: self
+                .consciousness
+                .as_ref()
                 .map(|tree| tree.snapshots())
                 .unwrap_or_default(),
         }
@@ -2625,10 +2966,16 @@ impl NeoCodexHealthReport {
             failures.push("session dir not writable".into());
         }
         if self.context_usage > 0.9 {
-            failures.push(format!("context pipeline at {:.0}% (auto-compact will trigger)", self.context_usage * 100.0));
+            failures.push(format!(
+                "context pipeline at {:.0}% (auto-compact will trigger)",
+                self.context_usage * 100.0
+            ));
         }
         if self.cost_spent > self.cost_budget && self.cost_budget > 0.0 {
-            failures.push(format!("budget exhausted ${:.2}/${:.2}", self.cost_spent, self.cost_budget));
+            failures.push(format!(
+                "budget exhausted ${:.2}/${:.2}",
+                self.cost_spent, self.cost_budget
+            ));
         }
         if self.provider_count == 0 {
             failures.push("provider catalog empty".into());
@@ -2646,8 +2993,12 @@ impl NeoCodexHealthReport {
     pub fn summary(&self) -> String {
         format!(
             "NeoCodexHealth[mode={:?} turns={} tools={} ctx={:.0}% providers={} evo={}]",
-            self.mode, self.turn_count, self.tool_call_count,
-            self.context_usage * 100.0, self.provider_count, self.evolution_iterations,
+            self.mode,
+            self.turn_count,
+            self.tool_call_count,
+            self.context_usage * 100.0,
+            self.provider_count,
+            self.evolution_iterations,
         )
     }
 }
@@ -2757,8 +3108,14 @@ impl EvolutionLoop {
         }
 
         // Fix 4: goal queue empty but evolution wants growth → seed introspection goal
-        if agent.goals.goals.is_empty() && agent.goals.active.is_none() && agent.evolution.iteration.is_multiple_of(25) {
-            agent.add_goal("Self-audit: converge NeoCodex toward Codex/Claude Code desktop parity", 5);
+        if agent.goals.goals.is_empty()
+            && agent.goals.active.is_none()
+            && agent.evolution.iteration.is_multiple_of(25)
+        {
+            agent.add_goal(
+                "Self-audit: converge NeoCodex toward Codex/Claude Code desktop parity",
+                5,
+            );
             fixes.push("seeded introspection goal".into());
         }
 
@@ -2820,8 +3177,10 @@ impl NeoCodexUI {
         let report = agent.health_report();
         self.status_text = format!(
             "Turn {} | {} tools | {} tokens | ctx {:.0}% | {}",
-            agent.state.turn_count, agent.state.tool_call_count,
-            agent.state.tokens_used, report.context_usage * 100.0,
+            agent.state.turn_count,
+            agent.state.tool_call_count,
+            agent.state.tokens_used,
+            report.context_usage * 100.0,
             agent.evolution.summary(),
         );
         if let Some(ref goal) = agent.goals.active {
@@ -2830,13 +3189,13 @@ impl NeoCodexUI {
                 id: goal.id.clone(),
                 description: goal.description.clone(),
                 state_label: format!("{:?}", goal.state),
-                    state_icon: match goal.state {
-                        GoalState::Active => "▶".into(),
-                        GoalState::Paused => "⏸".into(),
-                        GoalState::Completed => "✅".into(),
-                        GoalState::Blocked => "🚫".into(),
-                        GoalState::Cancelled => "❌".into(),
-                    },
+                state_icon: match goal.state {
+                    GoalState::Active => "▶".into(),
+                    GoalState::Paused => "⏸".into(),
+                    GoalState::Completed => "✅".into(),
+                    GoalState::Blocked => "🚫".into(),
+                    GoalState::Cancelled => "❌".into(),
+                },
                 iterations: goal.iterations,
                 max_iterations: goal.max_iterations,
                 ..crate::cli::tui::app::types::GoalDisplay::idle()
@@ -2870,14 +3229,23 @@ mod tests {
     fn test_streaming_markdown_code_block() {
         let mut sm = StreamingMarkdown::new();
         sm.push("```rust\nfn main() {}\n```");
-        assert!(sm.chunks.iter().any(|c| matches!(c, MarkdownChunk::CodeBlock { .. })));
+        assert!(sm
+            .chunks
+            .iter()
+            .any(|c| matches!(c, MarkdownChunk::CodeBlock { .. })));
     }
 
     #[test]
     fn test_streaming_markdown_incomplete_code_block() {
         let mut sm = StreamingMarkdown::new();
         sm.push("```rust\nfn main() {\nprintln!(\"hello\");");
-        assert!(sm.chunks.iter().any(|c| matches!(c, MarkdownChunk::CodeBlock { complete: false, .. })));
+        assert!(sm.chunks.iter().any(|c| matches!(
+            c,
+            MarkdownChunk::CodeBlock {
+                complete: false,
+                ..
+            }
+        )));
     }
 
     #[test]
@@ -2980,19 +3348,26 @@ mod tests {
         agent.context.push("user", "question".into(), 10);
         agent.context.push("assistant", "thinking".into(), 10);
         agent.context.push("tool", "tool output".into(), 10);
-        agent.context.push("summary", "distilled earlier context".into(), 10);
+        agent
+            .context
+            .push("summary", "distilled earlier context".into(), 10);
 
         let messages = NeoCodexAgent::build_messages(&agent, "current input");
         let summary_msg = messages.iter().find(|m| m.content.contains("distilled"));
         let tool_msg = messages.iter().find(|m| m.content.contains("tool output"));
 
-        assert!(summary_msg.is_some(), "summary turn must survive into messages");
+        assert!(
+            summary_msg.is_some(),
+            "summary turn must survive into messages"
+        );
         assert_eq!(summary_msg.unwrap().role, Role::Assistant);
         assert_eq!(tool_msg.unwrap().role, Role::Tool);
         assert_eq!(messages.last().unwrap().role, Role::User);
         assert_eq!(messages.last().unwrap().content, "current input");
-        assert!(messages.iter().filter(|m| m.role == Role::System).count() == 1,
-            "only the real system prompt is kept");
+        assert!(
+            messages.iter().filter(|m| m.role == Role::System).count() == 1,
+            "only the real system prompt is kept"
+        );
     }
 
     #[test]
@@ -3067,7 +3442,10 @@ mod tests {
         agent.add_goal("Goal two", 3);
         let queued: Vec<&String> = agent.goals.goals.iter().map(|g| &g.id).collect();
         assert_eq!(queued.len(), 2);
-        assert_ne!(queued[0], queued[1], "distinct goals must have distinct ids");
+        assert_ne!(
+            queued[0], queued[1],
+            "distinct goals must have distinct ids"
+        );
         for gid in queued {
             assert!(
                 agent.wire.events.iter().any(|e| matches!(
@@ -3092,9 +3470,15 @@ mod tests {
         assert_eq!(agent.goals.active.as_ref().unwrap().iterations, 1);
 
         // 2nd call: iterations 1→2 == max, completes.
-        assert!(agent.check_goals().is_none(), "single goal: completion returns None (no next)");
+        assert!(
+            agent.check_goals().is_none(),
+            "single goal: completion returns None (no next)"
+        );
         assert!(agent.goals.active.is_none());
-        assert!(!agent.state.goal_active, "goal_active must reset once queue drains");
+        assert!(
+            !agent.state.goal_active,
+            "goal_active must reset once queue drains"
+        );
         assert_eq!(agent.goals.completed.len(), 1);
     }
 
@@ -3121,8 +3505,14 @@ mod tests {
     fn test_streaming_markdown_headings() {
         let mut sm = StreamingMarkdown::new();
         sm.push("# Title\n## Subtitle\nText body");
-        assert!(sm.chunks.iter().any(|c| matches!(c, MarkdownChunk::Heading { level: 1, .. })));
-        assert!(sm.chunks.iter().any(|c| matches!(c, MarkdownChunk::Heading { level: 2, .. })));
+        assert!(sm
+            .chunks
+            .iter()
+            .any(|c| matches!(c, MarkdownChunk::Heading { level: 1, .. })));
+        assert!(sm
+            .chunks
+            .iter()
+            .any(|c| matches!(c, MarkdownChunk::Heading { level: 2, .. })));
     }
 
     #[test]
@@ -3159,17 +3549,23 @@ mod tests {
         let deny_hook: PreToolHook = Arc::new(|ctx| HookResult {
             decision: if ctx.tool_name == "dangerous" {
                 HookDecision::Deny("blocked".into())
-            } else { HookDecision::Allow },
+            } else {
+                HookDecision::Allow
+            },
             duration_ms: 0,
         });
         registry.register_pre("deny_checker", deny_hook);
         let ctx_safe = ToolCallContext {
-            tool_name: "read".into(), args: String::new(),
-            cwd: "/".into(), estimated_cost: 0.0,
+            tool_name: "read".into(),
+            args: String::new(),
+            cwd: "/".into(),
+            estimated_cost: 0.0,
         };
         let ctx_danger = ToolCallContext {
-            tool_name: "dangerous".into(), args: String::new(),
-            cwd: "/".into(), estimated_cost: 0.0,
+            tool_name: "dangerous".into(),
+            args: String::new(),
+            cwd: "/".into(),
+            estimated_cost: 0.0,
         };
         match registry.run_pre(ctx_safe) {
             HookDecision::Allow => {}
@@ -3189,7 +3585,9 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let req = AcpRequest {
-                id: 1, method: "ping".into(), params: serde_json::json!({}),
+                id: 1,
+                method: "ping".into(),
+                params: serde_json::json!({}),
             };
             let resp = server.handle_request(req).await;
             if let Some(result) = resp.result {
@@ -3211,7 +3609,9 @@ mod tests {
             while let Some(ev) = stream.next_event() {
                 events.push(ev);
             }
-            assert!(events.iter().any(|e| matches!(e, AgentEvent::TurnStart { .. })));
+            assert!(events
+                .iter()
+                .any(|e| matches!(e, AgentEvent::TurnStart { .. })));
             assert!(events.iter().any(|e| matches!(e, AgentEvent::Done)));
         });
     }
@@ -3223,7 +3623,9 @@ mod tests {
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("replay_test.jsonl");
         let event = WireEvent::UserMessage {
-            content: "replay".into(), timestamp: 42, attachments: None,
+            content: "replay".into(),
+            timestamp: 42,
+            attachments: None,
         };
         let line = serde_json::to_string(&event).unwrap();
         let mut f = std::fs::File::create(&path).unwrap();
@@ -3293,7 +3695,12 @@ mod tests {
             en_precise,
             en_crude
         );
-        assert!(en_precise <= en_crude + 4, "english precise {} vs crude {}", en_precise, en_crude);
+        assert!(
+            en_precise <= en_crude + 4,
+            "english precise {} vs crude {}",
+            en_precise,
+            en_crude
+        );
     }
 
     #[test]
@@ -3322,13 +3729,17 @@ mod tests {
         let text = "plain ascii payload for fallback path".to_string();
         pipe.push("user", text.clone(), 42);
         let turn = pipe.turns.front().expect("one turn");
-        assert_eq!(turn.token_count, 42, "caller estimate should be honored when tiktoken disabled");
+        assert_eq!(
+            turn.token_count, 42,
+            "caller estimate should be honored when tiktoken disabled"
+        );
     }
 
     #[test]
     fn test_provider_persist_roundtrip() {
         // Isolate the persisted provider file to a temp data dir.
-        let tmp = std::env::temp_dir().join(format!("neocodex-provider-test-{}", std::process::id()));
+        let tmp =
+            std::env::temp_dir().join(format!("neocodex-provider-test-{}", std::process::id()));
         let old_data = std::env::var("XDG_DATA_HOME").ok();
         let old_home = std::env::var("HOME").ok();
         std::env::set_var("XDG_DATA_HOME", &tmp);
@@ -3337,10 +3748,17 @@ mod tests {
         // Save a persisted choice.
         let mut catalog = ProviderCatalog::new();
         catalog.sync_from_real();
-        assert!(catalog.set_active_provider("ollama"), "ollama should exist in real catalog");
+        assert!(
+            catalog.set_active_provider("ollama"),
+            "ollama should exist in real catalog"
+        );
         catalog.save_persisted();
         let persist_file = ProviderCatalog::persist_path();
-        assert!(persist_file.exists(), "provider.json should be written at {}", persist_file.display());
+        assert!(
+            persist_file.exists(),
+            "provider.json should be written at {}",
+            persist_file.display()
+        );
 
         // Fresh catalog must restore the saved choice after sync.
         let mut restored = ProviderCatalog::new();
@@ -3437,7 +3855,10 @@ mod tests {
         let mut catalog = ProviderCatalog::new();
         catalog.sync_from_real();
         // At least one provider offers code capability
-        assert!(catalog.providers.iter().any(|p| p.capabilities.contains(&ModelCapability::Code)));
+        assert!(catalog
+            .providers
+            .iter()
+            .any(|p| p.capabilities.contains(&ModelCapability::Code)));
     }
 
     #[test]
@@ -3448,9 +3869,19 @@ mod tests {
         let path = dir.join("resume.jsonl");
         let mut f = std::fs::File::create(&path).unwrap();
         for event in [
-            WireEvent::UserMessage { content: "hello".into(), timestamp: 1, attachments: None },
-            WireEvent::AgentMessage { content: "hi there".into(), timestamp: 2 },
-            WireEvent::ModeChange { from: NeoCodexMode::Agent, to: NeoCodexMode::Plan },
+            WireEvent::UserMessage {
+                content: "hello".into(),
+                timestamp: 1,
+                attachments: None,
+            },
+            WireEvent::AgentMessage {
+                content: "hi there".into(),
+                timestamp: 2,
+            },
+            WireEvent::ModeChange {
+                from: NeoCodexMode::Agent,
+                to: NeoCodexMode::Plan,
+            },
         ] {
             let line = serde_json::to_string(&event).unwrap();
             writeln!(f, "{}", line).unwrap();
@@ -3490,7 +3921,12 @@ mod tests {
             let mut agent = NeoCodexAgent::new("react-wired");
             agent.provider.sync_from_real();
             // Find a local/resolvable provider (ollama first in catalog)
-            if let Some(idx) = agent.provider.providers.iter().position(|p| p.name == "ollama") {
+            if let Some(idx) = agent
+                .provider
+                .providers
+                .iter()
+                .position(|p| p.name == "ollama")
+            {
                 agent.provider.active = idx;
                 // to_llm_provider succeeds for ollama even without network (request only)
                 let provider = agent.provider.to_llm_provider();
@@ -3511,7 +3947,20 @@ mod tests {
             agent.provider.active = 0;
             let mut seen = Vec::new();
             let mut tools = Vec::new();
-            let result = agent.react_loop_stream("hi", 3, |t| { seen.push(t.to_string()); true }, |n, _, _, _, _| { tools.push(n.to_string()); true }).await;
+            let result = agent
+                .react_loop_stream(
+                    "hi",
+                    3,
+                    |t| {
+                        seen.push(t.to_string());
+                        true
+                    },
+                    |n, _, _, _, _| {
+                        tools.push(n.to_string());
+                        true
+                    },
+                )
+                .await;
             assert!(result.is_none());
             assert!(seen.is_empty());
             assert!(tools.is_empty());
@@ -3526,7 +3975,12 @@ mod tests {
         rt.block_on(async {
             let mut agent = NeoCodexAgent::new("react-stream-wired");
             agent.provider.sync_from_real();
-            if let Some(idx) = agent.provider.providers.iter().position(|p| p.name == "ollama") {
+            if let Some(idx) = agent
+                .provider
+                .providers
+                .iter()
+                .position(|p| p.name == "ollama")
+            {
                 agent.provider.active = idx;
                 let provider = agent.provider.to_llm_provider();
                 assert!(provider.is_some());
@@ -3592,9 +4046,14 @@ mod tests {
             Message::new(Role::System, "system"),
             Message::new(Role::User, "describe the image"),
         ];
-        let req = agent.build_request(messages.clone()).expect("request built");
+        let req = agent
+            .build_request(messages.clone())
+            .expect("request built");
         // Text-only model → image must be bridged into the user message, image_data None.
-        assert!(req.image_data.is_none(), "image_data must be dropped for text-only");
+        assert!(
+            req.image_data.is_none(),
+            "image_data must be dropped for text-only"
+        );
         let user_msg = req.messages.iter().find(|m| m.role == Role::User).unwrap();
         assert!(
             user_msg.content.contains("<image_evidence>"),
@@ -3631,8 +4090,13 @@ mod tests {
         let messages = vec![Message::new(Role::User, "describe")];
         let req = agent.build_request(messages).expect("request built");
         // Vision-capable model → raw base64 upgraded to a data URI and preserved.
-        let uri = req.image_data.expect("image_data preserved for vision model");
-        assert!(uri.starts_with("data:image/"), "data URI expected, got {uri}");
+        let uri = req
+            .image_data
+            .expect("image_data preserved for vision model");
+        assert!(
+            uri.starts_with("data:image/"),
+            "data URI expected, got {uri}"
+        );
         assert!(!req.messages[0].content.contains("<image_evidence>"));
     }
 
@@ -3654,7 +4118,9 @@ mod tests {
             &self,
             _req: &LlmRequest,
         ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
-            Err(LlmError::Unknown("stream_complete not used in subagent tests".into()))
+            Err(LlmError::Unknown(
+                "stream_complete not used in subagent tests".into(),
+            ))
         }
     }
 
@@ -3679,7 +4145,11 @@ mod tests {
         )
         .await;
         assert!(result.success, "output: {}", result.output);
-        assert!(result.output.contains("fake-ok"), "output: {}", result.output);
+        assert!(
+            result.output.contains("fake-ok"),
+            "output: {}",
+            result.output
+        );
         assert_eq!(result.kind, SubagentKind::Coder);
         assert_eq!(result.tool_calls, 0);
     }
@@ -3697,8 +4167,16 @@ mod tests {
         )
         .await;
         assert!(!result.success, "must fail on provider error");
-        assert!(result.output.contains("Subagent error"), "output: {}", result.output);
-        assert!(result.output.contains("boom"), "error detail must surface: {}", result.output);
+        assert!(
+            result.output.contains("Subagent error"),
+            "output: {}",
+            result.output
+        );
+        assert!(
+            result.output.contains("boom"),
+            "error detail must surface: {}",
+            result.output
+        );
         assert_eq!(result.tool_calls, 0);
     }
 
@@ -3727,7 +4205,9 @@ mod tests {
         let explorer = SubagentDispatch::build_request(&SubagentKind::Explorer, "x");
         assert_eq!(explorer.temperature, None);
         assert!(
-            explorer.messages[0].content.contains("Explore and summarize"),
+            explorer.messages[0]
+                .content
+                .contains("Explore and summarize"),
             "explorer system prompt: {}",
             explorer.messages[0].content
         );

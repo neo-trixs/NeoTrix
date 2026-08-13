@@ -2,16 +2,18 @@ use std::collections::HashMap;
 use std::sync::{Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-use super::circuit_breaker::{BreakerState, CircuitBreaker};
-use super::free_pool::global_free_pool;
-use super::provider_catalog::{ProviderCategory, CommunicationProfile};
-use super::provider_swap::ProviderSwapManager;
 use super::agent_routing::AgentRoutingTable;
+use super::circuit_breaker::{BreakerState, CircuitBreaker};
 use super::factory::LlmProviderType;
+use super::free_pool::global_free_pool;
+use super::provider_catalog::{CommunicationProfile, ProviderCategory};
+use super::provider_swap::ProviderSwapManager;
 use super::rate_limiter::RateLimiter;
 use super::rate_profiles::get_rate_profile;
 use super::types::*;
-use crate::core::nt_core_error_recovery::{ErrorContext, ErrorType, RecoveryAction, RecoveryConfig, RecoveryOrchestrator};
+use crate::core::nt_core_error_recovery::{
+    ErrorContext, ErrorType, RecoveryAction, RecoveryConfig, RecoveryOrchestrator,
+};
 use crate::core::nt_io_cache::{CacheConfig, SemanticCache};
 use crate::core::nt_io_telemetry::{ConsoleTracer, CostTracker, SpanKind, Tracer};
 
@@ -28,7 +30,7 @@ fn is_quota_exhaustion(msg: &str) -> bool {
         || lowered.contains("out of credits")
         || lowered.contains("exceeded your current quota")
         || lowered.contains("billing")
-        && (lowered.contains("activate") || lowered.contains("limit"))
+            && (lowered.contains("activate") || lowered.contains("limit"))
 }
 
 #[derive(Debug)]
@@ -80,13 +82,21 @@ impl ProviderState {
 
     pub fn composite_score(&self) -> f64 {
         let health = self.circuit_breaker.health_penalty();
-        if health <= 0.0 { return 0.0; }
+        if health <= 0.0 {
+            return 0.0;
+        }
         let latency_factor = {
             let mut sorted = self.latency_window.clone();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            let p95 = sorted.get((sorted.len() as f64 * 0.95) as usize)
-                .copied().unwrap_or(1000.0);
-            if p95 > 0.0 { 1.0 / (p95 / 1000.0).max(0.1) } else { 0.5 }
+            let p95 = sorted
+                .get((sorted.len() as f64 * 0.95) as usize)
+                .copied()
+                .unwrap_or(1000.0);
+            if p95 > 0.0 {
+                1.0 / (p95 / 1000.0).max(0.1)
+            } else {
+                0.5
+            }
         };
         let cost_factor = if self.cost_per_1k_tokens > 0.0 {
             1.0 / (self.cost_per_1k_tokens * 10.0 + 1.0)
@@ -212,7 +222,11 @@ impl SubGridHealth {
 
 impl SubGrid {
     /// 创建新子网格
-    pub fn new(name: String, security_profile: CommunicationProfile, provider_names: Vec<String>) -> Self {
+    pub fn new(
+        name: String,
+        security_profile: CommunicationProfile,
+        provider_names: Vec<String>,
+    ) -> Self {
         Self {
             name,
             security_profile,
@@ -277,6 +291,36 @@ impl GatewayV2 {
         self.cost_budget_per_query = budget;
     }
 
+    /// 缓存 key 硬化: 除消息内容外, 纳入会影响响应语义的请求指纹
+    /// (max_tokens / thinking_budget / tools / structured_output)。
+    ///
+    /// 旧 key 仅拼 messages 内容: 同一提示词在不同 max_tokens 或不同工具集下的
+    /// 请求会错误共享缓存 — 可能命中被截断输出 (Length) 或带 tool_calls 的响应,
+    /// 属质量损失型 bug。改为指纹后, 缓存命中语义与请求完全一致。
+    fn prompt_cache_key(&self, request: &LlmRequest) -> String {
+        let content = request
+            .messages
+            .iter()
+            .map(|m| m.content.clone())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut tools: Vec<&str> = request
+            .tools
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect::<Vec<_>>();
+        tools.sort_unstable();
+        let tools_fp = tools.join(",");
+        let structured_fp = match &request.structured_output {
+            Some(s) => serde_json::to_string(s).unwrap_or_default(),
+            None => String::new(),
+        };
+        format!(
+            "{}|max={}|think={:?}|tools=[{}]|struct={}",
+            content, request.max_tokens, request.thinking_budget, tools_fp, structured_fp
+        )
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // SubGrid Composition (子母阵动态组合)
     // 通过组合已有 provider 节点，构建满足指定通信安全级别的小循环子网格
@@ -284,14 +328,23 @@ impl GatewayV2 {
 
     /// 动态组合一个子网格: 从已注册 providers 中选出满足安全画像的子集
     /// `security_profile` 指定目标安全级别; `include_free_only` 限制只组合免费 provider
-    pub fn compose_sub_grid(&self, name: &str, security_profile: CommunicationProfile, include_free_only: bool) -> SubGrid {
+    pub fn compose_sub_grid(
+        &self,
+        name: &str,
+        security_profile: CommunicationProfile,
+        include_free_only: bool,
+    ) -> SubGrid {
         let states = self.states.read().unwrap_or_else(|e| {
             log::warn!("[gateway] states RwLock poisoned: {}", e);
             e.into_inner()
         });
-        let mut provider_names: Vec<String> = states.iter()
+        let mut provider_names: Vec<String> = states
+            .iter()
             .filter(|(_, s)| {
-                let profile_ok = s.category.default_security_profile().meets(security_profile);
+                let profile_ok = s
+                    .category
+                    .default_security_profile()
+                    .meets(security_profile);
                 let free_ok = !include_free_only || s.is_free;
                 profile_ok && free_ok
             })
@@ -324,10 +377,16 @@ impl GatewayV2 {
             e.into_inner()
         });
         // Tier 1: 满足安全级别的免费 provider
-        let best_free = states.iter()
-            .filter(|(_, s)| s.is_available() && s.is_free && s.category.default_security_profile().meets(required))
+        let best_free = states
+            .iter()
+            .filter(|(_, s)| {
+                s.is_available()
+                    && s.is_free
+                    && s.category.default_security_profile().meets(required)
+            })
             .max_by(|(_, a), (_, b)| {
-                a.composite_score().partial_cmp(&b.composite_score())
+                a.composite_score()
+                    .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(name, _)| name.clone());
@@ -335,10 +394,14 @@ impl GatewayV2 {
             return best_free;
         }
         // Tier 2: 满足安全级别的任意 provider
-        states.iter()
-            .filter(|(_, s)| s.is_available() && s.category.default_security_profile().meets(required))
+        states
+            .iter()
+            .filter(|(_, s)| {
+                s.is_available() && s.category.default_security_profile().meets(required)
+            })
             .max_by(|(_, a), (_, b)| {
-                a.composite_score().partial_cmp(&b.composite_score())
+                a.composite_score()
+                    .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(name, _)| name.clone())
@@ -372,7 +435,9 @@ impl GatewayV2 {
         required: CommunicationProfile,
         request: &LlmRequest,
     ) -> Result<LlmResponse, LlmError> {
-        self.complete_for_profile_detailed(required, request).await.map(|(r, _, _)| r)
+        self.complete_for_profile_detailed(required, request)
+            .await
+            .map(|(r, _, _)| r)
     }
 
     /// 与 complete_for_profile 相同, 但返回 (响应, 实际使用的画像, 实际 provider 名)。
@@ -383,10 +448,24 @@ impl GatewayV2 {
         request: &LlmRequest,
     ) -> Result<(LlmResponse, CommunicationProfile, String), LlmError> {
         let start = std::time::Instant::now();
+        // 缓存接入 (与 complete_with_selection 同口径): 命中直接返回, 免去
+        // 子网格选择 + provider 调用整条链路 — 重复的画像内请求 (如能力协调器
+        // 对同一结构化抽取的周期调用) 不再重复计费。
+        let cache_key = self.prompt_cache_key(request);
+        if let Ok(cache) = self.cache.lock() {
+            if let Some(cached) = cache.get_exact(&request.model, &cache_key) {
+                if let Ok(response) = serde_json::from_str::<LlmResponse>(&cached) {
+                    return Ok((response, required, request.model.clone()));
+                }
+            }
+        }
         // 前缀锁定: request.model 形如 `{provider}/{model_id}` 时优先该 provider
         // (与 complete_with_selection 前缀路由一致), 避免 llm7/codestral-latest
         // 被 select_best_for_profile 路由到 composite_score 更高的 pollinations (402/404)。
-        let prefix_provider: Option<String> = request.model.split('/').next()
+        let prefix_provider: Option<String> = request
+            .model
+            .split('/')
+            .next()
             .filter(|p| !p.is_empty())
             .filter(|p| self.providers.contains_key(*p))
             .map(|p| p.to_string());
@@ -408,15 +487,29 @@ impl GatewayV2 {
                 let success = result.is_ok();
                 self.record_sub_grid_call(required, success, latency);
                 if success {
-                    result.map(|r| (r, required, name))
+                    let resp = result;
+                    // 回写 exact cache (仅成功路径)
+                    if let Ok(response) = &resp {
+                        if let Ok(mut cache) = self.cache.lock() {
+                            if let Ok(serialized) = serde_json::to_string(response) {
+                                cache.set_exact(&request.model, &cache_key, serialized);
+                            }
+                        }
+                    }
+                    resp.map(|r| (r, required, name))
                 } else {
                     // Gap 4: 首选 provider 失败 → 降级到更宽松画像重试
-                    let err = result.err().unwrap_or_else(|| LlmError::Unknown("profile call failed".into()));
+                    let err = result
+                        .err()
+                        .unwrap_or_else(|| LlmError::Unknown("profile call failed".into()));
                     self.degraded_retry(required, request, &err).await
                 }
             }
             None => {
-                log::warn!("[gateway] no provider meets {:?} — falling back to default selection", required);
+                log::warn!(
+                    "[gateway] no provider meets {:?} — falling back to default selection",
+                    required
+                );
                 match self.select_best().await {
                     Some(name) => {
                         let result = self.call_provider(&name, request).await;
@@ -439,8 +532,13 @@ impl GatewayV2 {
         crate::core::nt_core_telemetry::global_telemetry().record(
             crate::core::nt_core_telemetry::TelemetryEvent::Custom {
                 name: format!("sub_grid_{:?}", profile),
-                value: format!("{}:{}:{}ms", if success { "ok" } else { "err" }, success as u8, latency_ms),
-            }
+                value: format!(
+                    "{}:{}:{}ms",
+                    if success { "ok" } else { "err" },
+                    success as u8,
+                    latency_ms
+                ),
+            },
         );
     }
 
@@ -464,7 +562,12 @@ impl GatewayV2 {
             if target == required || !required.meets(target) {
                 continue;
             }
-            log::warn!("[gateway] profile {:?} degraded → {:?}: {}", required, target, first_err);
+            log::warn!(
+                "[gateway] profile {:?} degraded → {:?}: {}",
+                required,
+                target,
+                first_err
+            );
             let start = std::time::Instant::now();
             match self.select_best_for_profile(target).await {
                 Some(name) => {
@@ -491,21 +594,25 @@ impl GatewayV2 {
 
     /// 查询所有子网格的健康状态 (反馈回路可见性)
     pub fn sub_grid_health_report(&self) -> Vec<(String, SubGridHealth)> {
-        self.list_sub_grids().into_iter().map(|g| (g.name, g.health)).collect()
+        self.list_sub_grids()
+            .into_iter()
+            .map(|g| (g.name, g.health))
+            .collect()
     }
 
     /// 检查满足指定画像的子网格中是否有健康可用的 (Gap 4 前置判断)
     pub fn has_healthy_sub_grid(&self, required: CommunicationProfile) -> bool {
         self.sub_grids_meeting(required).iter().any(|grid_name| {
-            self.sub_grid_health_report().iter().any(|(name, health)| {
-                name == grid_name && health.is_healthy()
-            })
+            self.sub_grid_health_report()
+                .iter()
+                .any(|(name, health)| name == grid_name && health.is_healthy())
         })
     }
 
     /// 返回当前已组成的子网格中满足给定安全级别的网格名称
     pub fn sub_grids_meeting(&self, required: CommunicationProfile) -> Vec<String> {
-        self.list_sub_grids().into_iter()
+        self.list_sub_grids()
+            .into_iter()
             .filter(|sg| sg.security_profile.meets(required))
             .map(|sg| sg.name)
             .collect()
@@ -519,14 +626,21 @@ impl GatewayV2 {
     /// Run the deterministic challenge suite against a provider. Returns a
     /// scored benchmark (accuracy, latency, cost) for the EvolutionFruit
     /// evidence chain and GatewayV2 provider selection.
-    pub async fn run_llm_challenge(&self, provider_name: &str, task_type: &str) -> Result<crate::core::nt_core_consciousness_tree::ProviderBenchmark, LlmError> {
+    pub async fn run_llm_challenge(
+        &self,
+        provider_name: &str,
+        task_type: &str,
+    ) -> Result<crate::core::nt_core_consciousness_tree::ProviderBenchmark, LlmError> {
         let tasks = self.challenge_tasks(task_type);
         let mut correct = 0usize;
         let mut total_latency_ms = 0u64;
         let mut total_cost = 0.0f64;
 
         for task in tasks {
-            let request = LlmRequest::new(&self.provider_model(provider_name).unwrap_or_default(), &task.prompt);
+            let request = LlmRequest::new(
+                &self.provider_model(provider_name).unwrap_or_default(),
+                &task.prompt,
+            );
             let start = Instant::now();
             let resp = self.call_provider(provider_name, &request).await?;
             total_latency_ms += start.elapsed().as_millis() as u64;
@@ -539,12 +653,17 @@ impl GatewayV2 {
         let task_count = 4usize;
         Ok(crate::core::nt_core_consciousness_tree::ProviderBenchmark {
             provider: provider_name.to_string(),
-            model: self.provider_model(provider_name).unwrap_or_else(|| provider_name.to_string()),
+            model: self
+                .provider_model(provider_name)
+                .unwrap_or_else(|| provider_name.to_string()),
             accuracy: correct as f64 / task_count as f64,
             latency_ms: total_latency_ms / task_count as u64,
             cost_usd: total_cost,
             task_type: task_type.to_string(),
-            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
         })
     }
 
@@ -577,8 +696,13 @@ impl GatewayV2 {
     /// 避免把注册名当模型名发给端点 (pollinations 会 404 "Model not found")。
     /// 非 keyless 的 provider (如 `openai`) 保持返回注册名本身。
     fn provider_model(&self, provider_name: &str) -> Option<String> {
-        let model = provider_name.split('/').next_back().unwrap_or(provider_name);
-        if model.is_empty() { return None; }
+        let model = provider_name
+            .split('/')
+            .next_back()
+            .unwrap_or(provider_name);
+        if model.is_empty() {
+            return None;
+        }
         if model == provider_name {
             // 无 `/` → 仅 keyless provider 回退到 catalog 默认模型
             if let Some(info) = super::provider_catalog::lookup_provider(provider_name) {
@@ -590,7 +714,15 @@ impl GatewayV2 {
         Some(model.to_string())
     }
 
-    fn fire_event(&self, provider_name: &str, success: bool, latency_ms: f64, tokens: u32, model: &str, phase: AttemptPhase) {
+    fn fire_event(
+        &self,
+        provider_name: &str,
+        success: bool,
+        latency_ms: f64,
+        tokens: u32,
+        model: &str,
+        phase: AttemptPhase,
+    ) {
         if let Ok(guard) = self.observer.read() {
             if let Some(ref obs) = *guard {
                 obs(CallEvent {
@@ -638,7 +770,13 @@ impl GatewayV2 {
         self.register_provider_with_category(name, provider, is_free, ProviderCategory::Cloud)
     }
 
-    pub fn register_provider_with_category(&mut self, name: &str, provider: Box<dyn LlmProvider>, is_free: bool, category: ProviderCategory) {
+    pub fn register_provider_with_category(
+        &mut self,
+        name: &str,
+        provider: Box<dyn LlmProvider>,
+        is_free: bool,
+        category: ProviderCategory,
+    ) {
         self.providers.insert(name.to_string(), provider);
         self.states_write(|states| {
             let mut state = ProviderState::new(is_free, category);
@@ -653,13 +791,18 @@ impl GatewayV2 {
     }
 
     pub async fn select_best(&self) -> Option<String> {
-        let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
 
         // Tier 1: Available free providers (preferred)
-        let free_best = states.iter()
+        let free_best = states
+            .iter()
             .filter(|(_, s)| s.is_available() && s.is_free)
             .max_by(|(_, a), (_, b)| {
-                a.composite_score().partial_cmp(&b.composite_score())
+                a.composite_score()
+                    .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(name, _)| name.clone());
@@ -670,20 +813,24 @@ impl GatewayV2 {
 
         // Tier 2: Available paid providers if free-first is off OR all free exhausted
         if !self.prefer_free {
-            return states.iter()
+            return states
+                .iter()
                 .filter(|(_, s)| s.is_available())
                 .max_by(|(_, a), (_, b)| {
-                    a.composite_score().partial_cmp(&b.composite_score())
+                    a.composite_score()
+                        .partial_cmp(&b.composite_score())
                         .unwrap_or(std::cmp::Ordering::Equal)
                 })
                 .map(|(name, _)| name.clone());
         }
 
         // Tier 3: Any available provider (free-first exhausted all free, allow paid)
-        states.iter()
+        states
+            .iter()
             .filter(|(_, s)| s.is_available())
             .max_by(|(_, a), (_, b)| {
-                a.composite_score().partial_cmp(&b.composite_score())
+                a.composite_score()
+                    .partial_cmp(&b.composite_score())
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(name, _)| name.clone())
@@ -697,7 +844,10 @@ impl GatewayV2 {
     /// 2. 其余按 free 优先 + is_available 优先 + composite_score 降序
     /// 3. 去重; 候选全部来自 self.states 实际注册名, 数量上限 `limit`
     pub fn build_candidate_chain(&self, model: &str, limit: usize) -> Vec<String> {
-        let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
         let mut chain: Vec<String> = Vec::new();
 
         // 1. 前缀 provider 优先 (完整注册名匹配优先, 再退化到裸 provider 名)
@@ -714,8 +864,17 @@ impl GatewayV2 {
 
         // 2. 池子其余注册名按 available + free + 有调用记录 + score 排序
         //    (有实际调用记录的 provider 优先于从未尝试的 — 后者默认 EMA 0.8 会虚高)
-        let mut rest: Vec<(&String, f64, bool, bool, u64)> = states.iter()
-            .map(|(name, s)| (name, s.composite_score(), s.is_free, s.is_available(), s.total_calls))
+        let mut rest: Vec<(&String, f64, bool, bool, u64)> = states
+            .iter()
+            .map(|(name, s)| {
+                (
+                    name,
+                    s.composite_score(),
+                    s.is_free,
+                    s.is_available(),
+                    s.total_calls,
+                )
+            })
             .collect();
         rest.sort_by(|a, b| {
             // available 优先
@@ -728,7 +887,9 @@ impl GatewayV2 {
                 .then(b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
         });
         for (name, _, _, _, _) in rest {
-            if chain.len() >= limit { break; }
+            if chain.len() >= limit {
+                break;
+            }
             if !chain.contains(name) {
                 chain.push(name.clone());
             }
@@ -737,11 +898,19 @@ impl GatewayV2 {
         chain
     }
 
-    async fn call_provider(&self, name: &str, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
-        let provider = self.providers.get(name)
+    async fn call_provider(
+        &self,
+        name: &str,
+        request: &LlmRequest,
+    ) -> Result<LlmResponse, LlmError> {
+        let provider = self
+            .providers
+            .get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
         // 剥离 `{provider}/` 前缀 (同 call_provider_stream)。
-        let stripped = request.model.strip_prefix(&format!("{}/", name))
+        let stripped = request
+            .model
+            .strip_prefix(&format!("{}/", name))
             .map(|m| m.to_string());
         let mut req = request.clone();
         if let Some(m) = stripped {
@@ -764,11 +933,12 @@ impl GatewayV2 {
         self.call_provider(provider_name, request).await
     }
 
-    pub async fn complete_with_selection(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
-        // Build prompt key for cache lookup
-        let prompt_key: String = request.messages.iter()
-            .map(|m| m.content.clone())
-            .collect::<Vec<_>>().join("\n");
+    pub async fn complete_with_selection(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<LlmResponse, LlmError> {
+        // Build hardened prompt key for cache lookup (含请求指纹, 见 prompt_cache_key)
+        let prompt_key: String = self.prompt_cache_key(request);
 
         // Check semantic cache (Layer 1: exact match)
         if let Ok(cache) = self.cache.lock() {
@@ -801,8 +971,15 @@ impl GatewayV2 {
                 let est_tokens = (prompt_key.len() / 4) as f64;
                 let estimated_cost = (est_tokens / 1000.0) * 0.002;
                 if estimated_cost > self.cost_budget_per_query {
-                    log::warn!("[gateway] Per-query cost budget exceeded: ${:.4} > ${:.4}", estimated_cost, self.cost_budget_per_query);
-                    return Err(LlmError::Unknown(format!("Cost budget exceeded: ${:.4} > ${:.4}", estimated_cost, self.cost_budget_per_query)));
+                    log::warn!(
+                        "[gateway] Per-query cost budget exceeded: ${:.4} > ${:.4}",
+                        estimated_cost,
+                        self.cost_budget_per_query
+                    );
+                    return Err(LlmError::Unknown(format!(
+                        "Cost budget exceeded: ${:.4} > ${:.4}",
+                        estimated_cost, self.cost_budget_per_query
+                    )));
                 }
             }
         }
@@ -821,7 +998,10 @@ impl GatewayV2 {
 
             // Check rate limit
             {
-                let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                let mut states = self.states.write().unwrap_or_else(|e| {
+                    log::warn!("[gateway] states RwLock poisoned: {}", e);
+                    e.into_inner()
+                });
                 if let Some(state) = states.get_mut(&name) {
                     if !state.rate_limiter.allow_request(20.0) {
                         continue;
@@ -837,13 +1017,23 @@ impl GatewayV2 {
                 Ok(response) => {
                     let token_count = response.usage.total_tokens;
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(&name) {
                             state.record_success(elapsed, token_count);
                             state.rate_limiter.record_usage(token_count as f64);
                         }
                     }
-                    self.fire_event(&name, true, elapsed, token_count, &request.model, AttemptPhase::Normal);
+                    self.fire_event(
+                        &name,
+                        true,
+                        elapsed,
+                        token_count,
+                        &request.model,
+                        AttemptPhase::Normal,
+                    );
                     // End telemetry span on success
                     if let Ok(guard) = self.tracer.read() {
                         if let Some(tracer) = guard.as_ref() {
@@ -854,7 +1044,10 @@ impl GatewayV2 {
                     }
                     // Track usage in global free pool
                     {
-                        let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let states = self.states.read().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get(&name) {
                             if state.is_free {
                                 global_free_pool().record_usage(&name, token_count as u64);
@@ -863,7 +1056,11 @@ impl GatewayV2 {
                     }
                     if let Ok(mut ct) = self.cost_tracker.write() {
                         if let Some(ref mut tracker) = *ct {
-                            tracker.record(&request.model, response.usage.prompt_tokens.into(), response.usage.completion_tokens.into());
+                            tracker.record(
+                                &request.model,
+                                response.usage.prompt_tokens.into(),
+                                response.usage.completion_tokens.into(),
+                            );
                         }
                     }
                     // Store in semantic cache
@@ -878,27 +1075,45 @@ impl GatewayV2 {
                     let error_msg = err.to_string();
                     let is_quota_exhausted = is_quota_exhaustion(&error_msg);
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(&name) {
                             if is_quota_exhausted {
                                 // 配额耗尽 (freellmapi/aimux): 重试无益, 直接熔断剔除该 provider,
                                 // 避免反复打同一个耗尽账户。冷却期后配额恢复探测自动放行。
                                 state.mark_quota_exhausted();
-                                log::warn!("[gateway] provider '{}' quota exhausted → 熔断剔除: {}", name, error_msg);
+                                log::warn!(
+                                    "[gateway] provider '{}' quota exhausted → 熔断剔除: {}",
+                                    name,
+                                    error_msg
+                                );
                             } else {
                                 state.record_failure(elapsed);
                             }
                         }
                     }
-                    self.fire_event(&name, false, elapsed, 0, &request.model, AttemptPhase::Normal);
+                    self.fire_event(
+                        &name,
+                        false,
+                        elapsed,
+                        0,
+                        &request.model,
+                        AttemptPhase::Normal,
+                    );
 
                     // Consult recovery orchestrator
                     let error_type = if is_quota_exhausted {
-                        ErrorType::Unknown("quota exhausted — provider tripped, skip retry".to_string())
+                        ErrorType::Unknown(
+                            "quota exhausted — provider tripped, skip retry".to_string(),
+                        )
                     } else if error_msg.contains("rate limit") || error_msg.contains("429") {
                         ErrorType::RateLimit { retry_after: None }
                     } else if error_msg.contains("timeout") || error_msg.contains("timed out") {
-                        ErrorType::Timeout { elapsed_ms: elapsed as u64 }
+                        ErrorType::Timeout {
+                            elapsed_ms: elapsed as u64,
+                        }
                     } else if error_msg.contains("50") || error_msg.contains("server error") {
                         ErrorType::ServerError { code: 500 }
                     } else {
@@ -910,16 +1125,26 @@ impl GatewayV2 {
                         max_retries: 3,
                         model: request.model.clone(),
                         available_models: self.providers.keys().cloned().collect(),
-                        prompt: request.messages.iter()
+                        prompt: request
+                            .messages
+                            .iter()
                             .map(|m| m.content.clone())
-                            .collect::<Vec<_>>().join("\n"),
+                            .collect::<Vec<_>>()
+                            .join("\n"),
                         prompt_variants: Vec::new(),
                         state_snapshot: None,
                         token_budget_remaining: 0,
                         elapsed_ms: elapsed as u64,
                         metadata: HashMap::new(),
                     };
-                    let action = self.recovery.write().unwrap_or_else(|e| { log::warn!("[gateway] recovery RwLock poisoned: {}", e); e.into_inner() }).handle(&ctx);
+                    let action = self
+                        .recovery
+                        .write()
+                        .unwrap_or_else(|e| {
+                            log::warn!("[gateway] recovery RwLock poisoned: {}", e);
+                            e.into_inner()
+                        })
+                        .handle(&ctx);
                     if let RecoveryAction::Retry { delay_ms, .. } = action {
                         if delay_ms > 0 {
                             tokio::time::sleep(Duration::from_millis(delay_ms)).await;
@@ -946,7 +1171,11 @@ impl GatewayV2 {
         if let Ok(ref response) = result {
             if let Ok(mut ct) = self.cost_tracker.write() {
                 if let Some(ref mut tracker) = *ct {
-                    tracker.record(&request.model, response.usage.prompt_tokens.into(), response.usage.completion_tokens.into());
+                    tracker.record(
+                        &request.model,
+                        response.usage.prompt_tokens.into(),
+                        response.usage.completion_tokens.into(),
+                    );
                 }
             }
         }
@@ -956,34 +1185,51 @@ impl GatewayV2 {
     /// Aggressive fallback: when all providers have failed, temporarily
     /// override circuit breaker states (Open → HalfOpen, reduced cooldown)
     /// and retry every registered provider once more.
-    async fn attempt_aggressive_retry(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+    async fn attempt_aggressive_retry(
+        &self,
+        request: &LlmRequest,
+    ) -> Result<LlmResponse, LlmError> {
         let provider_names: Vec<String> = {
-            let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let states = self.states.read().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
             states.keys().cloned().collect()
         };
 
         if provider_names.is_empty() {
-            return Err(LlmError::Unknown("No providers available for aggressive retry".to_string()));
+            return Err(LlmError::Unknown(
+                "No providers available for aggressive retry".to_string(),
+            ));
         }
 
         // Save original breaker states before override
         let set_aggressive: Vec<(String, u64)> = {
-            let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
-            provider_names.iter().filter_map(|name| {
-                states.get(name).and_then(|s| {
-                    if s.circuit_breaker.state() == BreakerState::Open {
-                        let saved = s.circuit_breaker.half_open_max_probes();
-                        Some((name.clone(), saved))
-                    } else {
-                        None
-                    }
+            let states = self.states.read().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
+            provider_names
+                .iter()
+                .filter_map(|name| {
+                    states.get(name).and_then(|s| {
+                        if s.circuit_breaker.state() == BreakerState::Open {
+                            let saved = s.circuit_breaker.half_open_max_probes();
+                            Some((name.clone(), saved))
+                        } else {
+                            None
+                        }
+                    })
                 })
-            }).collect()
+                .collect()
         };
 
         // Apply aggressive overrides
         {
-            let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let mut states = self.states.write().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
             for (name, _) in &set_aggressive {
                 if let Some(state) = states.get_mut(name) {
                     state.circuit_breaker.set_half_open_max_probes(5);
@@ -995,7 +1241,10 @@ impl GatewayV2 {
         // Try each provider once aggressively
         for name in &provider_names {
             {
-                let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                let mut states = self.states.write().unwrap_or_else(|e| {
+                    log::warn!("[gateway] states RwLock poisoned: {}", e);
+                    e.into_inner()
+                });
                 if let Some(state) = states.get_mut(name) {
                     if !state.rate_limiter.allow_request(10.0) {
                         continue;
@@ -1011,21 +1260,37 @@ impl GatewayV2 {
                 Ok(response) => {
                     let token_count = response.usage.total_tokens;
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(name) {
                             state.record_success(elapsed, token_count);
                             // Restore the provider's configured probe threshold
                             // instead of leaving the aggressive override in place.
-                            let saved = set_aggressive.iter()
+                            let saved = set_aggressive
+                                .iter()
                                 .find(|(n, _)| n == name)
                                 .map(|(_, s)| *s);
-                            state.circuit_breaker.set_half_open_max_probes(saved.unwrap_or(3));
+                            state
+                                .circuit_breaker
+                                .set_half_open_max_probes(saved.unwrap_or(3));
                         }
                     }
-                    self.fire_event(name, true, elapsed, token_count, &request.model, AttemptPhase::AggressiveRetry);
+                    self.fire_event(
+                        name,
+                        true,
+                        elapsed,
+                        token_count,
+                        &request.model,
+                        AttemptPhase::AggressiveRetry,
+                    );
                     // Track usage in global free pool
                     {
-                        let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let states = self.states.read().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get(name) {
                             if state.is_free {
                                 global_free_pool().record_usage(name, token_count as u64);
@@ -1035,10 +1300,11 @@ impl GatewayV2 {
                     // Store in semantic cache
                     if let Ok(mut cache) = self.cache.lock() {
                         if let Ok(serialized) = serde_json::to_string(&response) {
-                            let aggressive_key: String = request.messages.iter()
-                                .map(|m| m.content.clone())
-                                .collect::<Vec<_>>().join("\n");
-                            cache.set_exact(&request.model, &aggressive_key, serialized);
+                            cache.set_exact(
+                                &request.model,
+                                &self.prompt_cache_key(request),
+                                serialized,
+                            );
                         }
                     }
                     return Ok(response);
@@ -1046,20 +1312,33 @@ impl GatewayV2 {
                 Err(err) => {
                     log::warn!("[gateway] Aggressive retry failed for '{}': {}", name, err);
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(name) {
                             state.record_failure(elapsed);
                             state.circuit_breaker.set_half_open_max_probes(3);
                         }
                     }
-                    self.fire_event(name, false, elapsed, 0, &request.model, AttemptPhase::AggressiveRetry);
+                    self.fire_event(
+                        name,
+                        false,
+                        elapsed,
+                        0,
+                        &request.model,
+                        AttemptPhase::AggressiveRetry,
+                    );
                 }
             }
         }
 
         // All aggressive retries failed — restore saved probes
         {
-            let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let mut states = self.states.write().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
             for (name, saved) in &set_aggressive {
                 if let Some(state) = states.get_mut(name) {
                     state.circuit_breaker.set_half_open_max_probes(*saved);
@@ -1067,7 +1346,9 @@ impl GatewayV2 {
             }
         }
 
-        Err(LlmError::Unknown("Aggressive retry exhausted — all providers failed".to_string()))
+        Err(LlmError::Unknown(
+            "Aggressive retry exhausted — all providers failed".to_string(),
+        ))
     }
 
     /// Stream completion with 2-phase retry (normal → aggressive), matching
@@ -1090,7 +1371,10 @@ impl GatewayV2 {
 
             // Check rate limit
             {
-                let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                let mut states = self.states.write().unwrap_or_else(|e| {
+                    log::warn!("[gateway] states RwLock poisoned: {}", e);
+                    e.into_inner()
+                });
                 if let Some(state) = states.get_mut(&name) {
                     if !state.rate_limiter.allow_request(20.0) {
                         continue;
@@ -1107,7 +1391,10 @@ impl GatewayV2 {
                 Err(LlmError::RateLimit(_)) => {
                     // Rate limited by upstream — track failure and try next
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(&name) {
                             state.record_failure(0.0);
                         }
@@ -1117,7 +1404,10 @@ impl GatewayV2 {
                 }
                 Err(_) => {
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(&name) {
                             state.record_failure(0.0);
                         }
@@ -1139,11 +1429,15 @@ impl GatewayV2 {
         name: &str,
         request: &LlmRequest,
     ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
-        let provider = self.providers.get(name)
+        let provider = self
+            .providers
+            .get(name)
             .ok_or_else(|| LlmError::Unknown(format!("Provider '{}' not found", name)))?;
         // 剥离 `{provider}/` 前缀: 请求模型 `llm7/codestral-latest` 传给 provider 时
         // 只传 `codestral-latest` (上游不认识 `llm7/` 前缀, 返回 model_unavailable)。
-        let stripped = request.model.strip_prefix(&format!("{}/", name))
+        let stripped = request
+            .model
+            .strip_prefix(&format!("{}/", name))
             .map(|m| m.to_string());
         let mut req = request.clone();
         if let Some(m) = stripped {
@@ -1160,13 +1454,25 @@ impl GatewayV2 {
     /// returns the description as evidence text. Falls back to the default
     /// provider if none is vision-capable — the model itself then decides
     /// whether it can consume the image_data.
-    pub async fn describe_image(&self, image_b64: &str, question: &str) -> Result<String, LlmError> {
+    pub async fn describe_image(
+        &self,
+        image_b64: &str,
+        question: &str,
+    ) -> Result<String, LlmError> {
         // Prefer a provider whose registered name advertises vision.
         let mut used: Vec<String> = Vec::new();
         let vision_candidates: Vec<String> = {
-            let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let states = self.states.read().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
             let mut names: Vec<String> = states.keys().cloned().collect();
-            names.sort_by_key(|n| (!crate::core::nt_core_e8::nt_multimodal::model_supports_vision(n), n.clone()));
+            names.sort_by_key(|n| {
+                (
+                    !crate::core::nt_core_e8::nt_multimodal::model_supports_vision(n),
+                    n.clone(),
+                )
+            });
             names
         };
         let mut target: Option<String> = None;
@@ -1186,7 +1492,11 @@ impl GatewayV2 {
                     used.push(n.clone());
                     n
                 }
-                None => return Err(LlmError::Unknown("no provider available for image description".into())),
+                None => {
+                    return Err(LlmError::Unknown(
+                        "no provider available for image description".into(),
+                    ))
+                }
             },
         };
 
@@ -1205,32 +1515,46 @@ impl GatewayV2 {
         request: &LlmRequest,
     ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
         let provider_names: Vec<String> = {
-            let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let states = self.states.read().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
             states.keys().cloned().collect()
         };
 
         if provider_names.is_empty() {
-            return Err(LlmError::Unknown("No providers available for aggressive retry".to_string()));
+            return Err(LlmError::Unknown(
+                "No providers available for aggressive retry".to_string(),
+            ));
         }
 
         // Save original breaker states before override
         let set_aggressive: Vec<(String, u64)> = {
-            let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
-            provider_names.iter().filter_map(|name| {
-                states.get(name).and_then(|s| {
-                    if s.circuit_breaker.state() == BreakerState::Open {
-                        let saved = s.circuit_breaker.half_open_max_probes();
-                        Some((name.clone(), saved))
-                    } else {
-                        None
-                    }
+            let states = self.states.read().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
+            provider_names
+                .iter()
+                .filter_map(|name| {
+                    states.get(name).and_then(|s| {
+                        if s.circuit_breaker.state() == BreakerState::Open {
+                            let saved = s.circuit_breaker.half_open_max_probes();
+                            Some((name.clone(), saved))
+                        } else {
+                            None
+                        }
+                    })
                 })
-            }).collect()
+                .collect()
         };
 
         // Apply aggressive overrides
         {
-            let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let mut states = self.states.write().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
             for (name, _) in &set_aggressive {
                 if let Some(state) = states.get_mut(name) {
                     state.circuit_breaker.set_half_open_max_probes(5);
@@ -1242,7 +1566,10 @@ impl GatewayV2 {
         // Try each provider once aggressively
         for name in &provider_names {
             {
-                let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                let mut states = self.states.write().unwrap_or_else(|e| {
+                    log::warn!("[gateway] states RwLock poisoned: {}", e);
+                    e.into_inner()
+                });
                 if let Some(state) = states.get_mut(name) {
                     if !state.rate_limiter.allow_request(10.0) {
                         continue;
@@ -1255,33 +1582,59 @@ impl GatewayV2 {
                     // Restore the provider's configured probe threshold
                     // instead of leaving the aggressive override in place.
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(name) {
-                            let saved = set_aggressive.iter()
+                            let saved = set_aggressive
+                                .iter()
                                 .find(|(n, _)| n == name)
                                 .map(|(_, s)| *s);
-                            state.circuit_breaker.set_half_open_max_probes(saved.unwrap_or(3));
+                            state
+                                .circuit_breaker
+                                .set_half_open_max_probes(saved.unwrap_or(3));
                         }
                     }
-                    self.fire_event(name, true, 0.0, 0, &request.model, AttemptPhase::AggressiveRetry);
+                    self.fire_event(
+                        name,
+                        true,
+                        0.0,
+                        0,
+                        &request.model,
+                        AttemptPhase::AggressiveRetry,
+                    );
                     return Ok(result);
                 }
                 Err(_) => {
                     {
-                        let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+                        let mut states = self.states.write().unwrap_or_else(|e| {
+                            log::warn!("[gateway] states RwLock poisoned: {}", e);
+                            e.into_inner()
+                        });
                         if let Some(state) = states.get_mut(name) {
                             state.record_failure(0.0);
                             state.circuit_breaker.set_half_open_max_probes(3);
                         }
                     }
-                    self.fire_event(name, false, 0.0, 0, &request.model, AttemptPhase::AggressiveRetry);
+                    self.fire_event(
+                        name,
+                        false,
+                        0.0,
+                        0,
+                        &request.model,
+                        AttemptPhase::AggressiveRetry,
+                    );
                 }
             }
         }
 
         // All aggressive retries failed — restore saved probes
         {
-            let mut states = self.states.write().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
+            let mut states = self.states.write().unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            });
             for (name, saved) in &set_aggressive {
                 if let Some(state) = states.get_mut(name) {
                     state.circuit_breaker.set_half_open_max_probes(*saved);
@@ -1289,7 +1642,9 @@ impl GatewayV2 {
             }
         }
 
-        Err(LlmError::Unknown("Aggressive streaming retry exhausted — all providers failed".to_string()))
+        Err(LlmError::Unknown(
+            "Aggressive streaming retry exhausted — all providers failed".to_string(),
+        ))
     }
 
     /// Register providers from FreeModelCatalog discovered entries.
@@ -1326,45 +1681,75 @@ impl GatewayV2 {
             if let Some(proxy_url) = super::super::nt_io_http_factory::proxy_from_env() {
                 provider.set_proxy(&proxy_url);
             }
-            self.register_provider_with_category(&name, provider, entry.is_free, ProviderCategory::Cloud);
-            log::info!("[gateway] Registered from catalog: {} ({})", name, entry.display_name);
+            self.register_provider_with_category(
+                &name,
+                provider,
+                entry.is_free,
+                ProviderCategory::Cloud,
+            );
+            log::info!(
+                "[gateway] Registered from catalog: {} ({})",
+                name,
+                entry.display_name
+            );
         }
     }
 
     pub fn provider_status(&self) -> Vec<serde_json::Value> {
-        let states = self.states.read().unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() });
-        states.iter().map(|(name, state)| {
-            serde_json::json!({
-                "name": name,
-                "available": state.is_available(),
-                "circuit_state": format!("{:?}", state.circuit_breaker.state()),
-                "success_rate": format!("{:.2}", state.success_ema),
-                "total_calls": state.total_calls,
-                "total_errors": state.total_errors,
-                "is_free": state.is_free,
-                "composite_score": format!("{:.4}", state.composite_score()),
+        let states = self.states.read().unwrap_or_else(|e| {
+            log::warn!("[gateway] states RwLock poisoned: {}", e);
+            e.into_inner()
+        });
+        states
+            .iter()
+            .map(|(name, state)| {
+                serde_json::json!({
+                    "name": name,
+                    "available": state.is_available(),
+                    "circuit_state": format!("{:?}", state.circuit_breaker.state()),
+                    "success_rate": format!("{:.2}", state.success_ema),
+                    "total_calls": state.total_calls,
+                    "total_errors": state.total_errors,
+                    "is_free": state.is_free,
+                    "composite_score": format!("{:.4}", state.composite_score()),
+                })
             })
-        }).collect()
+            .collect()
     }
 
     /// 已注册 provider 名称列表
     pub fn providers(&self) -> Vec<String> {
-        self.states.read()
-            .unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() })
-            .keys().cloned().collect()
+        self.states
+            .read()
+            .unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            })
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// 查询 provider 的安全分类
     pub fn category_of(&self, name: &str) -> Option<ProviderCategory> {
-        self.states.read()
-            .unwrap_or_else(|e| { log::warn!("[gateway] states RwLock poisoned: {}", e); e.into_inner() })
-            .get(name).map(|s| s.category)
+        self.states
+            .read()
+            .unwrap_or_else(|e| {
+                log::warn!("[gateway] states RwLock poisoned: {}", e);
+                e.into_inner()
+            })
+            .get(name)
+            .map(|s| s.category)
     }
 
     /// 默认 provider 名称 (注册的第一个, 无则空串)
     pub fn default_provider_name(&self) -> String {
-        self.default_name.read()
-            .unwrap_or_else(|e| { log::warn!("[gateway] default_name RwLock poisoned: {}", e); e.into_inner() })
+        self.default_name
+            .read()
+            .unwrap_or_else(|e| {
+                log::warn!("[gateway] default_name RwLock poisoned: {}", e);
+                e.into_inner()
+            })
             .clone()
     }
 
@@ -1376,7 +1761,10 @@ impl GatewayV2 {
     /// 同步版 (async 版见 `resolve_default_model`, 优先 llm7/codestral-latest)。
     pub fn resolve_default_model_sync(&self) -> String {
         let chain = self.build_candidate_chain("", 8);
-        chain.first().cloned().unwrap_or_else(|| "default".to_string())
+        chain
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "default".to_string())
     }
 }
 
@@ -1388,7 +1776,9 @@ struct ChallengeTask {
 
 impl ChallengeTask {
     fn check(&self, response: &str) -> bool {
-        response.to_lowercase().contains(&self.expected.to_lowercase())
+        response
+            .to_lowercase()
+            .contains(&self.expected.to_lowercase())
     }
 }
 
@@ -1464,10 +1854,20 @@ impl CapabilityIntent {
     pub fn parse(s: &str) -> Option<Self> {
         Some(match s.trim().to_ascii_lowercase().as_str() {
             "local" | "local_reasoning" | "local-reasoning" => Self::LocalReasoning,
-            "general" | "general_reasoning" | "general-reasoning" | "reason" => Self::GeneralReasoning,
-            "retrieve" | "retrieval" | "knowledge" | "knowledge_retrieval" | "knowledge-retrieval" => Self::KnowledgeRetrieval,
+            "general" | "general_reasoning" | "general-reasoning" | "reason" => {
+                Self::GeneralReasoning
+            }
+            "retrieve"
+            | "retrieval"
+            | "knowledge"
+            | "knowledge_retrieval"
+            | "knowledge-retrieval" => Self::KnowledgeRetrieval,
             "write" | "sensitive" | "sensitive_write" | "sensitive-write" => Self::SensitiveWrite,
-            "anonymous" | "anon" | "anonymous_communication" | "anonymous-communication" | "tor" => Self::AnonymousCommunication,
+            "anonymous"
+            | "anon"
+            | "anonymous_communication"
+            | "anonymous-communication"
+            | "tor" => Self::AnonymousCommunication,
             "deep" | "deep_analysis" | "deep-analysis" | "analysis" => Self::DeepAnalysis,
             _ => return None,
         })
@@ -1509,7 +1909,11 @@ pub struct CoordinationRequest {
 
 impl CoordinationRequest {
     pub fn new(intent: CapabilityIntent, prompt: &str) -> Self {
-        Self { intent, prompt: prompt.to_string(), model: None }
+        Self {
+            intent,
+            prompt: prompt.to_string(),
+            model: None,
+        }
     }
 }
 
@@ -1531,16 +1935,26 @@ pub struct CapabilityCoordinator {
 
 impl CapabilityCoordinator {
     pub fn new(gateway: GatewayV2, routing: AgentRoutingTable, swap: ProviderSwapManager) -> Self {
-        Self { gateway, routing, swap }
+        Self {
+            gateway,
+            routing,
+            swap,
+        }
     }
 
     /// 组装默认子网格 (匿名本地 + 代理 + 开放), 供未预先组合时使用
     pub fn ensure_default_sub_grids(&self) {
         let grids = self.gateway.list_sub_grids();
         if grids.is_empty() {
-            self.gateway.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
-            self.gateway.compose_sub_grid("proxied-cloud", CommunicationProfile::Proxied, false);
-            self.gateway.compose_sub_grid("open-all", CommunicationProfile::Open, false);
+            self.gateway.compose_sub_grid(
+                "anonymous-local",
+                CommunicationProfile::Anonymous,
+                false,
+            );
+            self.gateway
+                .compose_sub_grid("proxied-cloud", CommunicationProfile::Proxied, false);
+            self.gateway
+                .compose_sub_grid("open-all", CommunicationProfile::Open, false);
         }
     }
 
@@ -1561,7 +1975,10 @@ impl CapabilityCoordinator {
     /// 2. 健康感知: 偏好健康子网格, 跳过熔断的 provider
     /// 3. 画像降级: 失败自动放宽 (complete_for_profile 内部处理)
     /// 4. 结果注入 swap manager 以驱动长期 failover
-    pub async fn coordinate(&mut self, req: &CoordinationRequest) -> Result<CoordinationOutcome, LlmError> {
+    pub async fn coordinate(
+        &mut self,
+        req: &CoordinationRequest,
+    ) -> Result<CoordinationOutcome, LlmError> {
         self.ensure_default_sub_grids();
         let profile = req.intent.required_profile();
 
@@ -1589,14 +2006,27 @@ impl CapabilityCoordinator {
             ..LlmRequest::new(provider_name.as_str(), &req.prompt)
         };
 
-        let result = self.gateway.complete_for_profile_detailed(profile, &llm_req).await;
+        let result = self
+            .gateway
+            .complete_for_profile_detailed(profile, &llm_req)
+            .await;
         match result {
             Ok((resp, actual_profile, actual_provider)) => {
                 let degraded = actual_profile != profile;
                 if !degraded {
-                    self.swap.record_success(LlmProviderType::from_name(provider_name.as_str()).unwrap_or(LlmProviderType::OpenAI), 0.0);
+                    self.swap.record_success(
+                        LlmProviderType::from_name(provider_name.as_str())
+                            .unwrap_or(LlmProviderType::OpenAI),
+                        0.0,
+                    );
                 }
-                log::debug!("[coordinate] {:?} degraded={} ({:?} → {:?})", req.intent, degraded, profile, actual_profile);
+                log::debug!(
+                    "[coordinate] {:?} degraded={} ({:?} → {:?})",
+                    req.intent,
+                    degraded,
+                    profile,
+                    actual_profile
+                );
                 Ok(CoordinationOutcome {
                     response: resp,
                     used_profile: actual_profile,
@@ -1607,7 +2037,8 @@ impl CapabilityCoordinator {
             Err(e) => {
                 // 降级已由 complete_for_profile 内部处理; 若仍失败, 记录到 swap manager
                 self.swap.record_error(
-                    LlmProviderType::from_name(provider_name.as_str()).unwrap_or(LlmProviderType::OpenAI),
+                    LlmProviderType::from_name(provider_name.as_str())
+                        .unwrap_or(LlmProviderType::OpenAI),
                     &e,
                 );
                 Err(e)
@@ -1617,14 +2048,21 @@ impl CapabilityCoordinator {
 
     fn find_provider_by_category(&self, category: ProviderCategory) -> Option<String> {
         self.gateway.providers().into_iter().find(|name| {
-            self.gateway.category_of(name).map(|c| c == category).unwrap_or(false)
+            self.gateway
+                .category_of(name)
+                .map(|c| c == category)
+                .unwrap_or(false)
         })
     }
 }
 
 impl Default for CapabilityCoordinator {
     fn default() -> Self {
-        Self::new(GatewayV2::new(), AgentRoutingTable::new("default", "default"), ProviderSwapManager::new(vec![]))
+        Self::new(
+            GatewayV2::new(),
+            AgentRoutingTable::new("default", "default"),
+            ProviderSwapManager::new(vec![]),
+        )
     }
 }
 
@@ -1657,7 +2095,10 @@ mod tests {
     #[tokio::test]
     async fn test_provider_model_extraction() {
         let gw = GatewayV2::new();
-        assert_eq!(gw.provider_model("nvidia/meta/llama-3.1-8b-instruct"), Some("llama-3.1-8b-instruct".to_string()));
+        assert_eq!(
+            gw.provider_model("nvidia/meta/llama-3.1-8b-instruct"),
+            Some("llama-3.1-8b-instruct".to_string())
+        );
         assert_eq!(gw.provider_model("openai"), Some("openai".to_string()));
         assert_eq!(gw.provider_model(""), None);
     }
@@ -1681,11 +2122,19 @@ mod tests {
     async fn test_candidate_chain_prefix_catalog_full_name() {
         let mut gw = GatewayV2::new();
         gw.register_provider("pollinations", Box::new(MockProvider::new("p")), true);
-        gw.register_provider("llm7/codestral-latest", Box::new(MockProvider::new("l")), true);
+        gw.register_provider(
+            "llm7/codestral-latest",
+            Box::new(MockProvider::new("l")),
+            true,
+        );
 
         // catalog 完整注册名 `{provider}/{model}` 精确命中 → 直接用
         let chain = gw.build_candidate_chain("llm7/codestral-latest", 8);
-        assert_eq!(chain[0], "llm7/codestral-latest", "完整注册名应第一: {:?}", chain);
+        assert_eq!(
+            chain[0], "llm7/codestral-latest",
+            "完整注册名应第一: {:?}",
+            chain
+        );
     }
 
     #[tokio::test]
@@ -1733,7 +2182,9 @@ mod tests {
         let mut states = gw.states.write().unwrap();
         let f = states.get_mut("failing").unwrap();
         f.success_ema = 0.0;
-        for _ in 0..5 { f.circuit_breaker.on_failure(); }
+        for _ in 0..5 {
+            f.circuit_breaker.on_failure();
+        }
         drop(states);
 
         let selected = gw.select_best().await;
@@ -1762,7 +2213,9 @@ mod tests {
             let mut states = gw.states.write().unwrap();
             for name in ["fail1", "fail2"] {
                 let s = states.get_mut(name).unwrap();
-                for _ in 0..6 { s.circuit_breaker.on_failure(); }
+                for _ in 0..6 {
+                    s.circuit_breaker.on_failure();
+                }
             }
         }
 
@@ -1772,8 +2225,11 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         let msg = format!("{}", err);
-        assert!(msg.contains("Aggressive retry exhausted") || msg.contains("All providers failed"),
-            "expected aggressive retry exhaustion error, got: {}", msg);
+        assert!(
+            msg.contains("Aggressive retry exhausted") || msg.contains("All providers failed"),
+            "expected aggressive retry exhaustion error, got: {}",
+            msg
+        );
     }
 
     #[tokio::test]
@@ -1790,30 +2246,52 @@ mod tests {
         #[async_trait::async_trait]
         impl LlmProvider for ConditionalFail {
             async fn complete(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
-                let count = self.fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let count = self
+                    .fail_count
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if count < self.threshold {
                     Err(LlmError::Server("transient failure".to_string()))
                 } else {
                     Ok(LlmResponse {
                         content: "recovered".to_string(),
                         model: "test".to_string(),
-                        usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+                        usage: Usage {
+                            prompt_tokens: 10,
+                            completion_tokens: 5,
+                            total_tokens: 15,
+                        },
                         finish_reason: FinishReason::Stop,
-                    tool_calls: None,
+                        tool_calls: None,
                     })
                 }
             }
-            async fn stream_complete(&self, _req: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
-                Err(LlmError::Server("stream_complete not implemented for ConditionalFail".to_string()))
+            async fn stream_complete(
+                &self,
+                _req: &LlmRequest,
+            ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError>
+            {
+                Err(LlmError::Server(
+                    "stream_complete not implemented for ConditionalFail".to_string(),
+                ))
             }
         }
 
-        gw.register_provider("transient", Box::new(ConditionalFail { fail_count: fc, threshold: 1 }), true);
+        gw.register_provider(
+            "transient",
+            Box::new(ConditionalFail {
+                fail_count: fc,
+                threshold: 1,
+            }),
+            true,
+        );
 
         let req = LlmRequest::new("test", "recover me");
         // Normal retry fails (1 failure → circuit opens), aggressive retry should succeed
         let result = gw.complete_with_selection(&req).await;
-        assert!(result.is_ok(), "aggressive retry should recover after transient failures");
+        assert!(
+            result.is_ok(),
+            "aggressive retry should recover after transient failures"
+        );
         let resp = result.unwrap();
         assert_eq!(resp.content, "recovered");
     }
@@ -1831,35 +2309,60 @@ mod tests {
         #[async_trait::async_trait]
         impl LlmProvider for StreamConditionalFail {
             async fn complete(&self, _req: &LlmRequest) -> Result<LlmResponse, LlmError> {
-                Err(LlmError::Server("complete not implemented for StreamConditionalFail".to_string()))
+                Err(LlmError::Server(
+                    "complete not implemented for StreamConditionalFail".to_string(),
+                ))
             }
-            async fn stream_complete(&self, _req: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
-                let count = self.fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async fn stream_complete(
+                &self,
+                _req: &LlmRequest,
+            ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError>
+            {
+                let count = self
+                    .fail_count
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 if count < self.threshold {
                     Err(LlmError::Server("transient streaming failure".to_string()))
                 } else {
                     let (tx, rx) = tokio::sync::mpsc::channel(1);
                     tokio::spawn(async move {
-                        let _ = tx.send(Ok(LlmResponse {
-                            content: "stream recovered".to_string(),
-                            model: "test".to_string(),
-                            usage: Usage { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-                            finish_reason: FinishReason::Stop,
-                        tool_calls: None,
-                        })).await;
+                        let _ = tx
+                            .send(Ok(LlmResponse {
+                                content: "stream recovered".to_string(),
+                                model: "test".to_string(),
+                                usage: Usage {
+                                    prompt_tokens: 10,
+                                    completion_tokens: 5,
+                                    total_tokens: 15,
+                                },
+                                finish_reason: FinishReason::Stop,
+                                tool_calls: None,
+                            }))
+                            .await;
                     });
                     Ok(rx)
                 }
             }
         }
 
-        gw.register_provider("stream-transient", Box::new(StreamConditionalFail { fail_count: fc, threshold: 1 }), true);
+        gw.register_provider(
+            "stream-transient",
+            Box::new(StreamConditionalFail {
+                fail_count: fc,
+                threshold: 1,
+            }),
+            true,
+        );
 
         let req = LlmRequest::new("test", "recover me");
-        let mut rx = gw.stream_complete_with_selection(&req).await
+        let mut rx = gw
+            .stream_complete_with_selection(&req)
+            .await
             .expect("streaming aggressive retry should succeed after transient failure");
 
-        let msg = rx.recv().await
+        let msg = rx
+            .recv()
+            .await
             .expect("should receive a stream message")
             .expect("stream message should be Ok");
         assert_eq!(msg.content, "stream recovered");
@@ -1868,11 +2371,22 @@ mod tests {
     #[test]
     fn test_sub_grid_composition() {
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
-        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.register_provider_with_category(
+            "openai",
+            Box::new(MockProvider::new("ok")),
+            false,
+            ProviderCategory::Cloud,
+        );
+        gw.register_provider_with_category(
+            "ollama",
+            Box::new(MockProvider::new("local")),
+            true,
+            ProviderCategory::Local,
+        );
 
         // 组合匿名子网格: 只包含 Local provider (ollama)
-        let anonymous = gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
+        let anonymous =
+            gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
         assert_eq!(anonymous.provider_names, vec!["ollama"]);
         assert!(anonymous.meets_profile(CommunicationProfile::Anonymous));
         assert!(anonymous.meets_profile(CommunicationProfile::Open));
@@ -1889,11 +2403,23 @@ mod tests {
     #[tokio::test]
     async fn test_select_best_for_profile() {
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
-        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.register_provider_with_category(
+            "openai",
+            Box::new(MockProvider::new("ok")),
+            false,
+            ProviderCategory::Cloud,
+        );
+        gw.register_provider_with_category(
+            "ollama",
+            Box::new(MockProvider::new("local")),
+            true,
+            ProviderCategory::Local,
+        );
 
         // 匿名安全级别: 只能选 ollama (Local)
-        let selected = gw.select_best_for_profile(CommunicationProfile::Anonymous).await;
+        let selected = gw
+            .select_best_for_profile(CommunicationProfile::Anonymous)
+            .await;
         assert_eq!(selected, Some("ollama".to_string()));
 
         // 开放安全级别: 可以选 openai 或 ollama (免费优先)
@@ -1915,8 +2441,18 @@ mod tests {
     #[tokio::test]
     async fn test_complete_for_profile() {
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
-        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.register_provider_with_category(
+            "openai",
+            Box::new(MockProvider::new("ok")),
+            false,
+            ProviderCategory::Cloud,
+        );
+        gw.register_provider_with_category(
+            "ollama",
+            Box::new(MockProvider::new("local")),
+            true,
+            ProviderCategory::Local,
+        );
         gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
         gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
 
@@ -1924,7 +2460,9 @@ mod tests {
         req.model = "test-model".to_string();
 
         // 匿名级别: 命中 ollama (Local)
-        let resp = gw.complete_for_profile(CommunicationProfile::Anonymous, &req).await;
+        let resp = gw
+            .complete_for_profile(CommunicationProfile::Anonymous, &req)
+            .await;
         assert!(resp.is_ok());
         assert_eq!(resp.unwrap().content, "local");
     }
@@ -1933,11 +2471,18 @@ mod tests {
     async fn test_complete_for_profile_fallback() {
         // 没有任何 provider 满足 Tor 级别 → 回退默认 select_best
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        gw.register_provider_with_category(
+            "openai",
+            Box::new(MockProvider::new("ok")),
+            false,
+            ProviderCategory::Cloud,
+        );
         gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
 
         let req = LlmRequest::new("test-model", "hello");
-        let resp = gw.complete_for_profile(CommunicationProfile::Tor, &req).await;
+        let resp = gw
+            .complete_for_profile(CommunicationProfile::Tor, &req)
+            .await;
         assert!(resp.is_ok());
         assert_eq!(resp.unwrap().content, "ok");
     }
@@ -1945,15 +2490,26 @@ mod tests {
     #[test]
     fn test_sub_grids_meeting() {
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.register_provider_with_category(
+            "ollama",
+            Box::new(MockProvider::new("local")),
+            true,
+            ProviderCategory::Local,
+        );
         gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
         gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
 
-        assert_eq!(gw.sub_grids_meeting(CommunicationProfile::Anonymous), vec!["anonymous-local"]);
+        assert_eq!(
+            gw.sub_grids_meeting(CommunicationProfile::Anonymous),
+            vec!["anonymous-local"]
+        );
         let meeting_open = gw.sub_grids_meeting(CommunicationProfile::Open);
         assert_eq!(meeting_open.len(), 2); // anonymous 满足 open, open 也满足 open
-        // Tor 需求: 仅 anonymous (Anonymous > Tor 满足), open 不满足
-        assert_eq!(gw.sub_grids_meeting(CommunicationProfile::Tor), vec!["anonymous-local"]);
+                                           // Tor 需求: 仅 anonymous (Anonymous > Tor 满足), open 不满足
+        assert_eq!(
+            gw.sub_grids_meeting(CommunicationProfile::Tor),
+            vec!["anonymous-local"]
+        );
     }
 
     #[test]
@@ -1978,7 +2534,12 @@ mod tests {
     #[test]
     fn test_sub_grid_health_report() {
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.register_provider_with_category(
+            "ollama",
+            Box::new(MockProvider::new("local")),
+            true,
+            ProviderCategory::Local,
+        );
         gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
 
         let report = gw.sub_grid_health_report();
@@ -1990,14 +2551,26 @@ mod tests {
     #[tokio::test]
     async fn test_complete_for_profile_records_health() {
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
-        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.register_provider_with_category(
+            "openai",
+            Box::new(MockProvider::new("ok")),
+            false,
+            ProviderCategory::Cloud,
+        );
+        gw.register_provider_with_category(
+            "ollama",
+            Box::new(MockProvider::new("local")),
+            true,
+            ProviderCategory::Local,
+        );
         gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
 
         let mut req = LlmRequest::new("test-model", "hello");
         req.model = "test-model".to_string();
 
-        let resp = gw.complete_for_profile(CommunicationProfile::Anonymous, &req).await;
+        let resp = gw
+            .complete_for_profile(CommunicationProfile::Anonymous, &req)
+            .await;
         assert!(resp.is_ok());
 
         // 健康状态已记录
@@ -2013,8 +2586,18 @@ mod tests {
         // local-fail 满足 Anonymous 但失败; cloud-ok 仅满足 Open 且成功.
         // 请求 Anonymous → local-fail 失败 → 降级链 Anonymous→Tor→Proxied→Open → cloud-ok 成功
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("local-fail", Box::new(MockProvider::failing()), false, ProviderCategory::Local);
-        gw.register_provider_with_category("cloud-ok", Box::new(MockProvider::new("cloud")), true, ProviderCategory::Cloud);
+        gw.register_provider_with_category(
+            "local-fail",
+            Box::new(MockProvider::failing()),
+            false,
+            ProviderCategory::Local,
+        );
+        gw.register_provider_with_category(
+            "cloud-ok",
+            Box::new(MockProvider::new("cloud")),
+            true,
+            ProviderCategory::Cloud,
+        );
         gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
         gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
 
@@ -2022,24 +2605,50 @@ mod tests {
         req.model = "test-model".to_string();
 
         // 请求 Anonymous → 首选 local-fail 失败 → 降级到 Open → cloud-ok 成功
-        let resp = gw.complete_for_profile(CommunicationProfile::Anonymous, &req).await;
+        let resp = gw
+            .complete_for_profile(CommunicationProfile::Anonymous, &req)
+            .await;
         assert!(resp.is_ok());
         assert_eq!(resp.unwrap().content, "cloud");
     }
 
     #[test]
     fn test_capability_intent_parse() {
-        assert_eq!(CapabilityIntent::parse("local"), Some(CapabilityIntent::LocalReasoning));
-        assert_eq!(CapabilityIntent::parse("deep-analysis"), Some(CapabilityIntent::DeepAnalysis));
-        assert_eq!(CapabilityIntent::parse("anonymous_communication"), Some(CapabilityIntent::AnonymousCommunication));
+        assert_eq!(
+            CapabilityIntent::parse("local"),
+            Some(CapabilityIntent::LocalReasoning)
+        );
+        assert_eq!(
+            CapabilityIntent::parse("deep-analysis"),
+            Some(CapabilityIntent::DeepAnalysis)
+        );
+        assert_eq!(
+            CapabilityIntent::parse("anonymous_communication"),
+            Some(CapabilityIntent::AnonymousCommunication)
+        );
         assert_eq!(CapabilityIntent::parse("unknown_thing"), None);
         // 画像映射
-        assert_eq!(CapabilityIntent::LocalReasoning.required_profile(), CommunicationProfile::Anonymous);
-        assert_eq!(CapabilityIntent::SensitiveWrite.required_profile(), CommunicationProfile::Proxied);
-        assert_eq!(CapabilityIntent::AnonymousCommunication.required_profile(), CommunicationProfile::Tor);
+        assert_eq!(
+            CapabilityIntent::LocalReasoning.required_profile(),
+            CommunicationProfile::Anonymous
+        );
+        assert_eq!(
+            CapabilityIntent::SensitiveWrite.required_profile(),
+            CommunicationProfile::Proxied
+        );
+        assert_eq!(
+            CapabilityIntent::AnonymousCommunication.required_profile(),
+            CommunicationProfile::Tor
+        );
         // 偏好分类
-        assert_eq!(CapabilityIntent::LocalReasoning.preferred_category(), Some(ProviderCategory::Local));
-        assert_eq!(CapabilityIntent::GeneralReasoning.preferred_category(), None);
+        assert_eq!(
+            CapabilityIntent::LocalReasoning.preferred_category(),
+            Some(ProviderCategory::Local)
+        );
+        assert_eq!(
+            CapabilityIntent::GeneralReasoning.preferred_category(),
+            None
+        );
         // 能力计划 (梳理自有能力)
         let plan = CapabilityCoordinator::capability_plan(CapabilityIntent::DeepAnalysis);
         assert!(plan.contains(&"plan"));
@@ -2049,7 +2658,12 @@ mod tests {
     #[tokio::test]
     async fn test_capability_coordinator_local_reasoning() {
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("ollama", Box::new(MockProvider::new("local")), true, ProviderCategory::Local);
+        gw.register_provider_with_category(
+            "ollama",
+            Box::new(MockProvider::new("local")),
+            true,
+            ProviderCategory::Local,
+        );
         let routing = AgentRoutingTable::new("ollama", "local-model");
         let swap = ProviderSwapManager::new(vec![]);
         let mut coord = CapabilityCoordinator::new(gw, routing, swap);
@@ -2067,7 +2681,12 @@ mod tests {
     async fn test_capability_coordinator_fallback_default() {
         // 无任何 provider 满足 Tor → 回退默认 select_best, 通信始终畅通
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("openai", Box::new(MockProvider::new("ok")), false, ProviderCategory::Cloud);
+        gw.register_provider_with_category(
+            "openai",
+            Box::new(MockProvider::new("ok")),
+            false,
+            ProviderCategory::Cloud,
+        );
         let routing = AgentRoutingTable::new("openai", "gpt-model");
         let swap = ProviderSwapManager::new(vec![]);
         let mut coord = CapabilityCoordinator::new(gw, routing, swap);
@@ -2083,8 +2702,18 @@ mod tests {
         // local-fail 满足 Anonymous 但失败 → 降级链落到 Open → cloud-ok 成功.
         // 关键断言: outcome.degraded == true 且 used_profile == Open (真实降级被报告)
         let mut gw = GatewayV2::new();
-        gw.register_provider_with_category("local-fail", Box::new(MockProvider::failing()), false, ProviderCategory::Local);
-        gw.register_provider_with_category("cloud-ok", Box::new(MockProvider::new("cloud")), true, ProviderCategory::Cloud);
+        gw.register_provider_with_category(
+            "local-fail",
+            Box::new(MockProvider::failing()),
+            false,
+            ProviderCategory::Local,
+        );
+        gw.register_provider_with_category(
+            "cloud-ok",
+            Box::new(MockProvider::new("cloud")),
+            true,
+            ProviderCategory::Cloud,
+        );
         gw.compose_sub_grid("anonymous-local", CommunicationProfile::Anonymous, false);
         gw.compose_sub_grid("open-all", CommunicationProfile::Open, false);
         let routing = AgentRoutingTable::new("local-fail", "local-model");
@@ -2122,12 +2751,18 @@ mod tests {
         // A tiny request must still be allowed (per-query semantics).
         let req = LlmRequest::new("test", "hi");
         let result = gw.complete_with_selection(&req).await;
-        assert!(result.is_ok(), "small request must not be blocked by cumulative spend");
+        assert!(
+            result.is_ok(),
+            "small request must not be blocked by cumulative spend"
+        );
 
         // A request large enough on its own to exceed the budget is rejected.
         let big = LlmRequest::new("test", &"x".repeat(2_000_000));
         let result = gw.complete_with_selection(&big).await;
-        assert!(result.is_err(), "oversized single request must be budget-blocked");
+        assert!(
+            result.is_err(),
+            "oversized single request must be budget-blocked"
+        );
     }
 
     #[tokio::test]
@@ -2135,7 +2770,11 @@ mod tests {
         // D19 (freellmapi/aimux 模式): 配额耗尽应熔断剔除 provider, 而非反复重试
         // 同一个耗尽账户。命中 quota 后将 provider 置为不可用 → select_best 跳过。
         let mut gw = GatewayV2::new();
-        gw.register_provider("quota-exhausted", Box::new(MockProvider::quota_failing()), false);
+        gw.register_provider(
+            "quota-exhausted",
+            Box::new(MockProvider::quota_failing()),
+            false,
+        );
         gw.register_provider("working", Box::new(MockProvider::new("ok")), true);
 
         // 直接触发 quota 路径的熔断 (与 complete 内错误分类同语义)
@@ -2147,24 +2786,44 @@ mod tests {
         }
         {
             let states = gw.states.read().unwrap();
-            let walked = states.get("quota-exhausted").map(|s| !s.is_available()).unwrap_or(true);
-            assert!(walked, "quota-exhausted provider must be circuit-open after exhaustion");
-            let still_ok = states.get("working").map(|s| s.is_available()).unwrap_or(false);
+            let walked = states
+                .get("quota-exhausted")
+                .map(|s| !s.is_available())
+                .unwrap_or(true);
+            assert!(
+                walked,
+                "quota-exhausted provider must be circuit-open after exhaustion"
+            );
+            let still_ok = states
+                .get("working")
+                .map(|s| s.is_available())
+                .unwrap_or(false);
             assert!(still_ok, "working provider must remain available");
         }
 
         // 熔断后调用应 failover 到 working 成功, 不再命中的耗尽 provider
         let req = LlmRequest::new("test", "hi");
         let result = gw.complete_with_selection(&req).await;
-        assert!(result.is_ok(), "request must fail over to a working provider after quota trip");
+        assert!(
+            result.is_ok(),
+            "request must fail over to a working provider after quota trip"
+        );
     }
 
     #[test]
     fn test_is_quota_exhaustion_classifies_correctly() {
-        assert!(is_quota_exhaustion("Error 429: quota exceeded for resource"));
-        assert!(is_quota_exhaustion("insufficient_quota: you have exhausted your free tier"));
-        assert!(is_quota_exhaustion("You have exceeded your current quota, please check your plan and billing details"));
-        assert!(is_quota_exhaustion("out of quota: you are being rate limited due to billing"));
+        assert!(is_quota_exhaustion(
+            "Error 429: quota exceeded for resource"
+        ));
+        assert!(is_quota_exhaustion(
+            "insufficient_quota: you have exhausted your free tier"
+        ));
+        assert!(is_quota_exhaustion(
+            "You have exceeded your current quota, please check your plan and billing details"
+        ));
+        assert!(is_quota_exhaustion(
+            "out of quota: you are being rate limited due to billing"
+        ));
         // 瞬时限速不误判为配额耗尽
         assert!(!is_quota_exhaustion("rate limit exceeded: retry after 5s"));
         assert!(!is_quota_exhaustion("429 too many requests"));
@@ -2178,13 +2837,25 @@ mod tests {
 
     impl MockProvider {
         fn new(response: &str) -> Self {
-            Self { response: response.to_string(), should_fail: false, quota_fail: false }
+            Self {
+                response: response.to_string(),
+                should_fail: false,
+                quota_fail: false,
+            }
         }
         fn failing() -> Self {
-            Self { response: String::new(), should_fail: true, quota_fail: false }
+            Self {
+                response: String::new(),
+                should_fail: true,
+                quota_fail: false,
+            }
         }
         fn quota_failing() -> Self {
-            Self { response: String::new(), should_fail: false, quota_fail: true }
+            Self {
+                response: String::new(),
+                should_fail: false,
+                quota_fail: true,
+            }
         }
     }
 
@@ -2194,29 +2865,36 @@ mod tests {
             if self.should_fail {
                 Err(LlmError::Server("mock failure".to_string()))
             } else if self.quota_fail {
-                Err(LlmError::Unknown("insufficient_quota: quota exceeded for your account".to_string()))
+                Err(LlmError::Unknown(
+                    "insufficient_quota: quota exceeded for your account".to_string(),
+                ))
             } else {
                 Ok(LlmResponse {
                     content: self.response.clone(),
                     model: "mock".to_string(),
                     usage: Usage::default(),
                     finish_reason: FinishReason::Stop,
-                tool_calls: None,
+                    tool_calls: None,
                 })
             }
         }
 
-        async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+        async fn stream_complete(
+            &self,
+            _request: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
             let (tx, rx) = tokio::sync::mpsc::channel(1);
             let resp = self.response.clone();
             tokio::spawn(async move {
-                let _ = tx.send(Ok(LlmResponse {
-                    content: resp,
-                    model: "mock".to_string(),
-                    usage: Usage::default(),
-                    finish_reason: FinishReason::Stop,
-                tool_calls: None,
-                })).await;
+                let _ = tx
+                    .send(Ok(LlmResponse {
+                        content: resp,
+                        model: "mock".to_string(),
+                        usage: Usage::default(),
+                        finish_reason: FinishReason::Stop,
+                        tool_calls: None,
+                    }))
+                    .await;
             });
             Ok(rx)
         }
@@ -2230,15 +2908,27 @@ mod tests {
     async fn test_real_gateway_candidate_chain() {
         // 真实池子候选链解析 (不调用 LLM): 验证整体链路从实际注册名构建,
         // resolve_default_model 应选到可用 keyless provider (llm7), 而非硬编码。
-        let gw = crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
+        let gw =
+            crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
         let chain = gw.build_candidate_chain("llm7/codestral-latest", 8);
-        eprintln!("[chain] prefix chain[0]={:?} full={:?}", chain.first(), chain);
+        eprintln!(
+            "[chain] prefix chain[0]={:?} full={:?}",
+            chain.first(),
+            chain
+        );
         let first = chain.first().map(|s| s.as_str()).unwrap_or("");
-        assert!(first == "llm7" || first == "llm7/codestral-latest",
-            "前缀路由应选 llm7, 实际 {:?}", chain.first());
+        assert!(
+            first == "llm7" || first == "llm7/codestral-latest",
+            "前缀路由应选 llm7, 实际 {:?}",
+            chain.first()
+        );
         let def = gw.resolve_default_model_sync();
         eprintln!("[chain] resolve_default_model = {}", def);
-        assert!(!def.is_empty() && def != "default", "默认模型应从池子解析: {}", def);
+        assert!(
+            !def.is_empty() && def != "default",
+            "默认模型应从池子解析: {}",
+            def
+        );
     }
 
     #[tokio::test]
@@ -2248,7 +2938,8 @@ mod tests {
         // 模型 llm7/codestral-latest — 2026-08-06 实测唯一匿名可用流式端点
         // (api-airforce 全局 1req/s 排队 90s, pollinations 队列满 429 + 流式间歇 402)。
         // 同时验证 gateway 前缀路由: llm7/ 应路由到 llm7 provider。
-        let gw = crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
+        let gw =
+            crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async().await;
         let req = LlmRequest {
             model: "llm7/codestral-latest".into(),
             messages: vec![Message::new(Role::User, "Reply with exactly: E2E-OK")],
@@ -2261,7 +2952,10 @@ mod tests {
             constraint_json: None,
             structured_output: None,
         };
-        let mut rx = gw.stream_complete_with_selection(&req).await.expect("stream init ok");
+        let mut rx = gw
+            .stream_complete_with_selection(&req)
+            .await
+            .expect("stream init ok");
         let mut buf = String::new();
         while let Some(chunk) = rx.recv().await {
             match chunk {
@@ -2274,7 +2968,11 @@ mod tests {
                 Err(e) => panic!("stream error: {:?}", e),
             }
         }
-        assert!(!buf.trim().is_empty(), "should receive streaming text, got: {:?}", buf);
+        assert!(
+            !buf.trim().is_empty(),
+            "should receive streaming text, got: {:?}",
+            buf
+        );
         println!("E2E-OK streamed: {:?}", buf);
     }
 }

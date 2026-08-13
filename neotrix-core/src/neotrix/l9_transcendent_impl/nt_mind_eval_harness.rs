@@ -4,37 +4,41 @@
 //! 核心指标: AUDC (Area Under Deferral Curve), QNC (Query-Normalized Cost), Peak Quality
 //! 预算执行: prompt 注入 "use at most K tokens" (Lee et al. 2025)
 
+use crate::core::nt_core_ttc::EffortTier;
+use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::{
+    derive_level, ConsciousnessGoldStandard, ConsciousnessLevel, GoldStandardReport,
+};
+use crate::neotrix::nt_io_provider::{
+    create_provider_from_type, LlmError, LlmProvider, LlmProviderType, LlmRequest,
+};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
-use crate::neotrix::nt_io_provider::{LlmProvider, LlmRequest, LlmError, LlmProviderType, create_provider_from_type};
-use crate::core::nt_core_ttc::EffortTier;
-use crate::neotrix::l9_transcendent_impl::nt_mind_consciousness_gold_standard::{ConsciousnessGoldStandard, ConsciousnessLevel, GoldStandardReport, derive_level};
 
 /// 评测预算网格 (R2-Bench 16 点 + 我们努力分层对齐)
 pub const DEFAULT_BUDGET_GRID: &[u32] = &[
-    0,      // 直接回答 (EffortTier::Low, thinking_budget=0)
-    512,    // 极低
-    1024,   // Low-Medium 边界
-    2048,   // Medium
-    4096,   // High
-    8192,   // XHigh
-    16384,  // Max
-    32768,  // Max+ (unlimited)
+    0,     // 直接回答 (EffortTier::Low, thinking_budget=0)
+    512,   // 极低
+    1024,  // Low-Medium 边界
+    2048,  // Medium
+    4096,  // High
+    8192,  // XHigh
+    16384, // Max
+    32768, // Max+ (unlimited)
 ];
 
 /// 基线模型规格
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelSpec {
     pub name: String,
-    pub provider_type: String,      // "vllm" | "sglang" | "ollama" | "openai" | "anthropic" 等
+    pub provider_type: String, // "vllm" | "sglang" | "ollama" | "openai" | "anthropic" 等
     pub model_id: String,
     pub base_url: Option<String>,
     pub api_key_env: Option<String>,
-    pub pricing_per_1m_in: f64,     // USD per 1M input tokens
-    pub pricing_per_1m_out: f64,    // USD per 1M output tokens
+    pub pricing_per_1m_in: f64,  // USD per 1M input tokens
+    pub pricing_per_1m_out: f64, // USD per 1M output tokens
 }
 
 /// 数据集规格
@@ -42,7 +46,7 @@ pub struct ModelSpec {
 pub struct DatasetSpec {
     pub name: String,
     pub queries: Vec<EvalQuery>,
-    pub judge_model: String,        // e.g. "qwen3-80b-instruct" (LLM-as-judge)
+    pub judge_model: String, // e.g. "qwen3-80b-instruct" (LLM-as-judge)
     pub judge_base_url: Option<String>,
     pub judge_api_key_env: Option<String>,
     pub golden_answers: Option<HashMap<String, String>>, // query_id -> golden answer
@@ -53,9 +57,9 @@ pub struct DatasetSpec {
 pub struct EvalQuery {
     pub id: String,
     pub prompt: String,
-    pub category: String,           // "math" | "reasoning" | "coding" | "knowledge" | "rag" | "creative"
-    pub difficulty: f64,            // 0.0~1.0
-    pub expected_tokens: u32,       // 预估合理输出长度
+    pub category: String, // "math" | "reasoning" | "coding" | "knowledge" | "rag" | "creative"
+    pub difficulty: f64,  // 0.0~1.0
+    pub expected_tokens: u32, // 预估合理输出长度
 }
 
 /// 单次评测结果 (model × budget 点)
@@ -66,7 +70,7 @@ pub struct EvalPoint {
     pub query_id: String,
     pub response: String,
     pub actual_tokens: u32,
-    pub quality_score: f64,         // 0.0~1.0 (LLM judge)
+    pub quality_score: f64, // 0.0~1.0 (LLM judge)
     pub judge_justification: String,
     pub latency_ms: u64,
     pub cost_usd: f64,
@@ -80,7 +84,7 @@ pub struct ModelQualityCurve {
     pub model_name: String,
     pub points: Vec<EvalPoint>,
     // 插值后的连续曲线 (用于 AUDC 计算)
-    pub interpolated_quality: Vec<f64>,  // 对应 DEFAULT_BUDGET_GRID
+    pub interpolated_quality: Vec<f64>, // 对应 DEFAULT_BUDGET_GRID
 }
 
 /// Pareto 前沿点
@@ -98,9 +102,9 @@ pub struct EvalReport {
     pub timestamp: i64,
     pub dataset_name: String,
     pub curves: Vec<ModelQualityCurve>,
-    pub audc_scores: HashMap<String, f64>,      // model -> AUDC
-    pub qnc_scores: HashMap<String, f64>,       // model -> QNC
-    pub peak_quality: HashMap<String, f64>,     // model -> Peak Quality
+    pub audc_scores: HashMap<String, f64>,  // model -> AUDC
+    pub qnc_scores: HashMap<String, f64>,   // model -> QNC
+    pub peak_quality: HashMap<String, f64>, // model -> Peak Quality
     pub pareto_frontier: Vec<ParetoPoint>,
     pub galaxy_vs_baseline: HashMap<String, GalaxyComparison>,
     pub summary: String,
@@ -111,8 +115,8 @@ pub struct EvalReport {
 pub struct GalaxyComparison {
     pub baseline_model: String,
     pub galaxy_effort_tier: EffortTier,
-    pub quality_delta: f64,         // galaxy - baseline (同预算)
-    pub token_savings_pct: f64,     // 同质量下 galaxy 省 token %
+    pub quality_delta: f64,     // galaxy - baseline (同预算)
+    pub token_savings_pct: f64, // 同质量下 galaxy 省 token %
     pub audc_improvement: f64,
 }
 
@@ -145,7 +149,10 @@ impl EvalHarness {
             budget_grid: DEFAULT_BUDGET_GRID.to_vec(),
             baselines,
             datasets,
-            judge: JudgeSpec { provider: judge_provider, model_id: judge_model },
+            judge: JudgeSpec {
+                provider: judge_provider,
+                model_id: judge_model,
+            },
             gold_standard: Arc::new(ConsciousnessGoldStandard::new()),
             concurrency_limit: 4,
         }
@@ -176,7 +183,7 @@ impl EvalHarness {
     /// 运行单数据集评测
     pub async fn run_dataset(&self, dataset: &DatasetSpec) -> Result<EvalReport, EvalError> {
         let mut curves = Vec::new();
-        
+
         // 为每个基线模型跑完整预算网格
         for model_spec in &self.baselines {
             let curve = self.eval_model_on_dataset(model_spec, dataset).await?;
@@ -184,8 +191,9 @@ impl EvalHarness {
         }
 
         // 计算指标
-        let (audc_scores, qnc_scores, peak_quality, pareto_frontier) = self.compute_metrics(&curves);
-        
+        let (audc_scores, qnc_scores, peak_quality, pareto_frontier) =
+            self.compute_metrics(&curves);
+
         // 大阵对比 (若数据集包含同模型不同 effort_tier)
         let galaxy_vs_baseline = self.compare_galaxy_vs_baseline(&curves, dataset);
 
@@ -205,7 +213,11 @@ impl EvalHarness {
     }
 
     /// 评测单模型在单数据集上的全预算曲线
-    async fn eval_model_on_dataset(&self, model: &ModelSpec, dataset: &DatasetSpec) -> Result<ModelQualityCurve, EvalError> {
+    async fn eval_model_on_dataset(
+        &self,
+        model: &ModelSpec,
+        dataset: &DatasetSpec,
+    ) -> Result<ModelQualityCurve, EvalError> {
         let provider = self.build_provider(model)?;
         let semaphore = Arc::new(Semaphore::new(self.concurrency_limit));
         let mut points = Vec::new();
@@ -221,14 +233,25 @@ impl EvalHarness {
                 let query = query.clone();
                 let gold_standard = self.gold_standard.clone();
                 let model_name = model.name.clone();
+                let pricing_in = model.pricing_per_1m_in;
+                let pricing_out = model.pricing_per_1m_out;
 
                 let point = tokio::spawn(async move {
                     let _permit = permit;
                     Self::eval_single_point(
-                        provider, judge, gold_standard,
-                        model_name, query, budget
-                    ).await
-                }).await.map_err(|e| EvalError::JoinError(e.to_string()))??;
+                        provider,
+                        judge,
+                        gold_standard,
+                        model_name,
+                        query,
+                        budget,
+                        pricing_in,
+                        pricing_out,
+                    )
+                    .await
+                })
+                .await
+                .map_err(|e| EvalError::JoinError(e.to_string()))??;
 
                 points.push(point);
             }
@@ -252,6 +275,8 @@ impl EvalHarness {
         model_name: String,
         query: EvalQuery,
         budget: u32,
+        pricing_per_1m_in: f64,
+        pricing_per_1m_out: f64,
     ) -> Result<EvalPoint, EvalError> {
         let start = Instant::now();
 
@@ -263,19 +288,27 @@ impl EvalHarness {
         };
         let full_prompt = format!("{}{}", query.prompt, budget_prompt);
 
+        // 思考预算与输出预算解耦: 此前 with_thinking(budget) 使思考可花掉全部输出预算,
+        // 总生成 token 最高达 2×budget (纯浪费)。思考分配 25%, 输出保底 budget。
+        let thinking = if budget > 0 { (budget / 4).max(1) } else { 0 };
         let request = LlmRequest::new(&model_name, &full_prompt)
             .with_max_tokens(budget.max(512))
-            .with_thinking(budget);
+            .with_thinking(thinking);
 
-        let response = provider.complete(&request).await.map_err(EvalError::ProviderError)?;
+        let response = provider
+            .complete(&request)
+            .await
+            .map_err(EvalError::ProviderError)?;
         let latency = start.elapsed().as_millis() as u64;
 
-        // 计算成本
-        let cost = (response.usage.prompt_tokens as f64 / 1_000_000.0) * 0.0  // 需要从 model_spec 取 pricing
-            + (response.usage.completion_tokens as f64 / 1_000_000.0) * 0.0;
+        // 真实定价 (ModelSpec.pricing_per_1m_*): 之前硬编码 0.0 使成本曲线失真,
+        // 无法支撑 QNC/Pareto 决策。
+        let cost = (response.usage.prompt_tokens as f64 / 1_000_000.0) * pricing_per_1m_in
+            + (response.usage.completion_tokens as f64 / 1_000_000.0) * pricing_per_1m_out;
 
         // LLM Judge 打分
-        let (quality, justification) = Self::judge_response(&judge, &query, &response.content).await?;
+        let (quality, justification) =
+            Self::judge_response(&judge, &query, &response.content).await?;
 
         // 金标意识检测 (可选，低频采样)
         let (phi, level) = if query.difficulty > 0.7 {
@@ -294,7 +327,9 @@ impl EvalHarness {
                 combined_confidence: heuristic_phi * 0.5,
             };
             (Some(dummy_report.phi), Some(derive_level(&dummy_report)))
-        } else { (None, None) };
+        } else {
+            (None, None)
+        };
 
         Ok(EvalPoint {
             model_name,
@@ -332,13 +367,21 @@ Provide your score and brief justification in JSON:
             .with_max_tokens(512)
             .with_temperature(Some(0.0));
 
-        let jr = judge.provider.complete(&request).await.map_err(EvalError::ProviderError)?;
-        
+        let jr = judge
+            .provider
+            .complete(&request)
+            .await
+            .map_err(EvalError::ProviderError)?;
+
         // 解析 JSON
         let parsed: serde_json::Value = serde_json::from_str(&jr.content)
             .map_err(|e| EvalError::JudgeParseError(e.to_string()))?;
         let score = parsed.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let justification = parsed.get("justification").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let justification = parsed
+            .get("justification")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
 
         Ok((score.clamp(0.0, 1.0), justification))
     }
@@ -348,7 +391,10 @@ Provide your score and brief justification in JSON:
         // 按 budget 分组取平均
         let mut budget_to_quality: HashMap<u32, Vec<f64>> = HashMap::new();
         for p in points {
-            budget_to_quality.entry(p.budget).or_default().push(p.quality_score);
+            budget_to_quality
+                .entry(p.budget)
+                .or_default()
+                .push(p.quality_score);
         }
         let avg_quality: HashMap<u32, f64> = budget_to_quality
             .into_iter()
@@ -356,37 +402,45 @@ Provide your score and brief justification in JSON:
             .collect();
 
         // 线性插值
-        grid.iter().map(|&target_budget| {
-            if let Some(&q) = avg_quality.get(&target_budget) {
-                return q;
-            }
-            let mut lower = None;
-            let mut upper = None;
-            for &b in avg_quality.keys() {
-                if b <= target_budget && lower.is_none_or(|l| b > l) {
-                    lower = Some(b);
+        grid.iter()
+            .map(|&target_budget| {
+                if let Some(&q) = avg_quality.get(&target_budget) {
+                    return q;
                 }
-                if b >= target_budget && upper.is_none_or(|u| b < u) {
-                    upper = Some(b);
+                let mut lower = None;
+                let mut upper = None;
+                for &b in avg_quality.keys() {
+                    if b <= target_budget && lower.is_none_or(|l| b > l) {
+                        lower = Some(b);
+                    }
+                    if b >= target_budget && upper.is_none_or(|u| b < u) {
+                        upper = Some(b);
+                    }
                 }
-            }
-            match (lower, upper) {
-                (Some(l), Some(u)) if l != u => {
-                    let ql = avg_quality[&l];
-                    let qu = avg_quality[&u];
-                    let t = (target_budget - l) as f64 / (u - l) as f64;
-                    ql + t * (qu - ql)
+                match (lower, upper) {
+                    (Some(l), Some(u)) if l != u => {
+                        let ql = avg_quality[&l];
+                        let qu = avg_quality[&u];
+                        let t = (target_budget - l) as f64 / (u - l) as f64;
+                        ql + t * (qu - ql)
+                    }
+                    (Some(l), None) => avg_quality[&l],
+                    (None, Some(u)) => avg_quality[&u],
+                    _ => 0.0,
                 }
-                (Some(l), None) => avg_quality[&l],
-                (None, Some(u)) => avg_quality[&u],
-                _ => 0.0,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// 计算 AUDC, QNC, Peak Quality, Pareto 前沿
-    fn compute_metrics(&self, curves: &[ModelQualityCurve]) -> (
-        HashMap<String, f64>, HashMap<String, f64>, HashMap<String, f64>, Vec<ParetoPoint>
+    fn compute_metrics(
+        &self,
+        curves: &[ModelQualityCurve],
+    ) -> (
+        HashMap<String, f64>,
+        HashMap<String, f64>,
+        HashMap<String, f64>,
+        Vec<ParetoPoint>,
     ) {
         let mut audc_scores = HashMap::new();
         let mut qnc_scores = HashMap::new();
@@ -395,15 +449,17 @@ Provide your score and brief justification in JSON:
 
         for curve in curves {
             let qualities = &curve.interpolated_quality;
-            let costs: Vec<f64> = self.budget_grid.iter()
+            let costs: Vec<f64> = self
+                .budget_grid
+                .iter()
                 .map(|&b| b as f64 * 0.000001) // 简化：假设 $1/1M tokens，实际应用 model 定价
                 .collect();
 
             // AUDC: 梯形积分 quality vs cost
             let mut audc = 0.0;
             for i in 1..qualities.len() {
-                let q_avg = (qualities[i-1] + qualities[i]) / 2.0;
-                let c_delta = costs[i] - costs[i-1];
+                let q_avg = (qualities[i - 1] + qualities[i]) / 2.0;
+                let c_delta = costs[i] - costs[i - 1];
                 audc += q_avg * c_delta;
             }
             // 归一化到 [0,1] (除以 max cost)
@@ -428,26 +484,38 @@ Provide your score and brief justification in JSON:
         // QNC: 相对最佳单模型的成本归一化
         let best_peak = peak_quality.values().copied().fold(0.0, f64::max);
         for curve in curves {
-            let min_cost_for_best = all_points.iter()
-                .filter(|p| p.model_name == curve.model_name && (p.quality - best_peak).abs() < 0.01)
+            let min_cost_for_best = all_points
+                .iter()
+                .filter(|p| {
+                    p.model_name == curve.model_name && (p.quality - best_peak).abs() < 0.01
+                })
                 .map(|p| p.cost_usd)
                 .min_by(|a, b| a.total_cmp(b))
                 .unwrap_or(f64::INFINITY);
-            let best_single_cost = all_points.iter()
+            let best_single_cost = all_points
+                .iter()
                 .filter(|p| (p.quality - best_peak).abs() < 0.01)
                 .map(|p| p.cost_usd)
                 .min_by(|a, b| a.total_cmp(b))
                 .unwrap_or(1.0);
-            qnc_scores.insert(curve.model_name.clone(), if best_single_cost > 0.0 { min_cost_for_best / best_single_cost } else { 1.0 });
+            qnc_scores.insert(
+                curve.model_name.clone(),
+                if best_single_cost > 0.0 {
+                    min_cost_for_best / best_single_cost
+                } else {
+                    1.0
+                },
+            );
         }
 
         // Pareto 前沿: 无其他点同时 quality >= 且 cost <=
         let mut pareto = Vec::new();
         for p in &all_points {
-            let dominated = all_points.iter().any(|o| 
-                o.quality >= p.quality && o.cost_usd <= p.cost_usd && 
-                (o.quality > p.quality || o.cost_usd < p.cost_usd)
-            );
+            let dominated = all_points.iter().any(|o| {
+                o.quality >= p.quality
+                    && o.cost_usd <= p.cost_usd
+                    && (o.quality > p.quality || o.cost_usd < p.cost_usd)
+            });
             if !dominated {
                 pareto.push(p.clone());
             }
@@ -459,7 +527,9 @@ Provide your score and brief justification in JSON:
 
     /// 大阵 vs 基线对比: 同模型不同 effort_tier
     fn compare_galaxy_vs_baseline(
-        &self, _curves: &[ModelQualityCurve], _dataset: &DatasetSpec
+        &self,
+        _curves: &[ModelQualityCurve],
+        _dataset: &DatasetSpec,
     ) -> HashMap<String, GalaxyComparison> {
         // 这里简化：实际需对比同模型在 effort_tier=Low/Max 下的曲线
         // 需要数据集包含 effort_tier 标注
@@ -467,10 +537,17 @@ Provide your score and brief justification in JSON:
     }
 
     fn generate_summary(
-        &self, curves: &[ModelQualityCurve], audc: &HashMap<String, f64>, 
-        qnc: &HashMap<String, f64>, peak: &HashMap<String, f64>
+        &self,
+        curves: &[ModelQualityCurve],
+        audc: &HashMap<String, f64>,
+        qnc: &HashMap<String, f64>,
+        peak: &HashMap<String, f64>,
     ) -> String {
-        let mut lines = vec![format!("Eval Summary ({} models, {} budgets)", curves.len(), self.budget_grid.len())];
+        let mut lines = vec![format!(
+            "Eval Summary ({} models, {} budgets)",
+            curves.len(),
+            self.budget_grid.len()
+        )];
         for curve in curves {
             lines.push(format!(
                 "  {}: AUDC={:.3} QNC={:.3} Peak={:.3}",
@@ -484,9 +561,13 @@ Provide your score and brief justification in JSON:
     }
 
     fn build_provider(&self, spec: &ModelSpec) -> Result<Arc<dyn LlmProvider>, EvalError> {
-        let provider_type = LlmProviderType::from_name(&spec.provider_type)
-            .ok_or_else(|| EvalError::ConfigError(format!("Unknown provider type: {}", spec.provider_type)))?;
-        let api_key = spec.api_key_env.as_ref().and_then(|env| std::env::var(env).ok());
+        let provider_type = LlmProviderType::from_name(&spec.provider_type).ok_or_else(|| {
+            EvalError::ConfigError(format!("Unknown provider type: {}", spec.provider_type))
+        })?;
+        let api_key = spec
+            .api_key_env
+            .as_ref()
+            .and_then(|env| std::env::var(env).ok());
         Ok(Arc::from(create_provider_from_type(provider_type, api_key)))
     }
 }
@@ -513,8 +594,32 @@ mod tests {
     #[test]
     fn test_interpolate_quality() {
         let points = vec![
-            EvalPoint { model_name: "m".into(), budget: 1024, query_id: "q1".into(), response: "".into(), actual_tokens: 100, quality_score: 0.5, judge_justification: "".into(), latency_ms: 100, cost_usd: 0.0, consciousness_phi: None, consciousness_level: None },
-            EvalPoint { model_name: "m".into(), budget: 4096, query_id: "q1".into(), response: "".into(), actual_tokens: 400, quality_score: 0.8, judge_justification: "".into(), latency_ms: 200, cost_usd: 0.0, consciousness_phi: None, consciousness_level: None },
+            EvalPoint {
+                model_name: "m".into(),
+                budget: 1024,
+                query_id: "q1".into(),
+                response: "".into(),
+                actual_tokens: 100,
+                quality_score: 0.5,
+                judge_justification: "".into(),
+                latency_ms: 100,
+                cost_usd: 0.0,
+                consciousness_phi: None,
+                consciousness_level: None,
+            },
+            EvalPoint {
+                model_name: "m".into(),
+                budget: 4096,
+                query_id: "q1".into(),
+                response: "".into(),
+                actual_tokens: 400,
+                quality_score: 0.8,
+                judge_justification: "".into(),
+                latency_ms: 200,
+                cost_usd: 0.0,
+                consciousness_phi: None,
+                consciousness_level: None,
+            },
         ];
         let grid = vec![1024, 2048, 4096];
         let interp = EvalHarness::interpolate_quality(&points, &grid);
@@ -526,7 +631,7 @@ mod tests {
     #[test]
     fn test_budget_grid_constants() {
         assert_eq!(DEFAULT_BUDGET_GRID.len(), 8);
-        assert_eq!(DEFAULT_BUDGET_GRID[0], 0);    // Low: 无思考
+        assert_eq!(DEFAULT_BUDGET_GRID[0], 0); // Low: 无思考
         assert_eq!(DEFAULT_BUDGET_GRID[3], 2048); // Medium
         assert_eq!(DEFAULT_BUDGET_GRID[6], 16384); // Max
     }

@@ -5,54 +5,68 @@
 //! 2026-06-30 架构升级: GatewayProvider 包装所有中间件层
 #![deny(clippy::unwrap_used)]
 
-pub mod types;
-pub mod openai;
-pub mod ollama;
-pub mod anthropic;
-pub mod gemini;
-pub mod factory;
-pub mod search_router;
 pub mod agent_routing;
-pub mod discovery;
-pub mod free_catalog;
-pub mod compaction;
+pub mod anthropic;
 pub mod circuit_breaker;
-pub mod rate_limiter;
-pub mod rate_profiles;
-pub mod free_providers;
+pub mod compaction;
+pub mod context_budget;
+pub mod discovery;
+pub mod factory;
+pub mod failover_history;
+pub mod free_catalog;
 pub mod free_pool;
+pub mod free_providers;
 pub mod gateway;
+pub mod gemini;
+pub mod ollama;
+pub mod openai;
 pub mod provider_catalog;
 pub mod provider_swap;
-pub mod failover_history;
+pub mod rate_limiter;
+pub mod rate_profiles;
+pub mod search_router;
+pub mod types;
 
 // Re-export 核心类型
 pub use types::{
-    LlmProvider, LlmRequest, Message, Role, Tool, ToolCallInfo, ToolCallFunction,
-    LlmResponse, Usage, FinishReason, LlmError,
+    FinishReason, LlmError, LlmProvider, LlmRequest, LlmResponse, Message, Role, Tool,
+    ToolCallFunction, ToolCallInfo, Usage,
 };
 
+// Re-export Token 预算引擎 (上下文压缩, AgentLoop/neocodex 共享)
+pub use context_budget::{apply_context_budget, estimate_messages_tokens, estimate_tokens};
+
 // Re-export 故障转移历史
-pub use failover_history::{FailoverEvent, FailoverHistory, record_failover, failover_history, total_failovers, clear_history, report as failover_report};
+pub use failover_history::{
+    clear_history, failover_history, record_failover, report as failover_report, total_failovers,
+    FailoverEvent, FailoverHistory,
+};
 
 // Re-export Provider 实现
-pub use openai::OpenAiProvider;
-pub use ollama::OllamaProvider;
 pub use anthropic::AnthropicProvider;
 pub use gemini::GeminiProvider;
+pub use ollama::OllamaProvider;
+pub use openai::OpenAiProvider;
 
 // Re-export 免费 Provider
-pub use free_providers::{GroqProvider, OpenRouterProvider, PollinationsProvider, CerebrasProvider};
 pub use free_pool::FreePool;
+pub use free_providers::{
+    CerebrasProvider, GroqProvider, OpenRouterProvider, PollinationsProvider,
+};
 
 // Re-export 工厂和配置
-pub use factory::{LlmProviderType, ProviderConfig, create_provider, create_provider_from_type, create_gateway};
+pub use factory::{
+    create_gateway, create_provider, create_provider_from_type, LlmProviderType, ProviderConfig,
+};
 
 // Re-export 路由和配置管理
 pub use agent_routing::{AgentRoutingTable, ProviderProfile, ProviderProfileManager};
 
 // Re-export 网关
-pub use gateway::{GatewayV2, CallEvent, CallObserver, AttemptPhase, SubGrid, CapabilityCoordinator, CapabilityIntent, CoordinationRequest, CoordinationOutcome, SubGridHealth};
+pub use gateway::{
+    AttemptPhase, CallEvent, CallObserver, CapabilityCoordinator, CapabilityIntent,
+    CoordinationOutcome, CoordinationRequest, GatewayV2, SubGrid, SubGridHealth,
+};
 
 // Re-export 断路器 + 限流器
 pub use circuit_breaker::CircuitBreaker;
@@ -60,5 +74,10 @@ pub use rate_limiter::RateLimiter;
 pub use rate_limiter::TokenBucket;
 
 // Re-export ProviderCatalog
-pub use provider_catalog::{ProviderCategory, ProviderInfo, CommunicationProfile, PROVIDER_CATALOG, lookup_provider, providers_by_category, providers_with_key, keyless_providers};
-pub use provider_swap::{ProviderSwapManager, ProviderHealth, SwapRule, GLOBAL_SWAP_MANAGER, ProviderHealthSummary};
+pub use provider_catalog::{
+    keyless_providers, lookup_provider, providers_by_category, providers_with_key,
+    CommunicationProfile, ProviderCategory, ProviderInfo, PROVIDER_CATALOG,
+};
+pub use provider_swap::{
+    ProviderHealth, ProviderHealthSummary, ProviderSwapManager, SwapRule, GLOBAL_SWAP_MANAGER,
+};

@@ -21,9 +21,15 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use super::nt_io_provider::types::{
-    FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo,
+use super::nt_io_multimodal_transform::MultimodalTransform;
+use super::nt_io_output_style::{OutputStyleId, OutputStyleRegistry};
+use super::nt_io_provider::context_budget::{
+    apply_context_budget, estimate_tokens, truncate_preserving,
 };
+use super::nt_io_provider::types::{
+    FinishReason, LlmError, LlmProvider, LlmRequest, Message, Role, ToolCallInfo, Usage,
+};
+use super::nt_shield_propagation_guard::PropagationGuard;
 use crate::cli::approval::{ActionType, PendingAction};
 use crate::core::nt_core_traits::{NativeTool, ToolOutput};
 
@@ -45,8 +51,22 @@ pub struct AgentLoop {
     model: String,
     max_tool_rounds: usize,
     max_history: usize,
+    /// 上下文 token 预算 (估算, chars/token 口径) — 超预算时工具输出截断 + 最旧轮次驱逐。
+    context_token_budget: usize,
+    /// 单条工具输出写入历史前的 token 上限 (0 = 不截断)。
+    max_tool_output_tokens: usize,
+    /// 最近一次 LLM 调用的 usage (观测杠杆: 每次 turn 可见实际 token 消耗)。
+    last_usage: Option<Usage>,
     /// 本会话已执行的工具调用记录。
     pub tool_log: Vec<ToolInvocation>,
+    /// 输出样式 (NT-IO output_style 骨架接线)。默认 Plain 原样透传。
+    style: OutputStyleId,
+    /// 心智病毒传播防护 (NT-SHIELD propagation_guard 骨架接线)。
+    guard: Option<PropagationGuard>,
+    /// 多模态预处理 (NT-IO multimodal_transform 骨架接线)。
+    multimodal: Option<std::sync::Arc<MultimodalTransform>>,
+    /// 样式注册表 (单实例惰性共享)。
+    style_registry: Option<std::sync::Arc<OutputStyleRegistry>>,
 }
 
 impl AgentLoop {
@@ -62,8 +82,50 @@ impl AgentLoop {
             model: model.to_string(),
             max_tool_rounds: 8,
             max_history: 64,
+            context_token_budget: 24_000,
+            max_tool_output_tokens: 3_000,
+            last_usage: None,
             tool_log: Vec::new(),
+            style: OutputStyleId::Plain,
+            guard: None,
+            multimodal: None,
+            style_registry: None,
         }
+    }
+
+    pub fn with_multimodal_transform(mut self, stage: MultimodalTransform) -> Self {
+        self.multimodal = Some(std::sync::Arc::new(stage));
+        self
+    }
+
+    pub fn with_output_style(mut self, style: OutputStyleId) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_propagation_guard(mut self, guard: PropagationGuard) -> Self {
+        // 加固系统提示: 论文结论 — 一句话防线 → 近完全免疫。
+        if guard.is_enabled() {
+            if let Some(first) = self.messages.first_mut() {
+                first.content = guard.harden_system_prompt(&first.content);
+            }
+        }
+        self.guard = Some(guard);
+        self
+    }
+
+    fn emit_final(&mut self, text: &str) -> Result<String, LlmError> {
+        let styled = if self.style == OutputStyleId::Plain {
+            text.to_string()
+        } else {
+            let reg = self
+                .style_registry
+                .get_or_insert_with(|| std::sync::Arc::new(OutputStyleRegistry::new()));
+            reg.apply(self.style, text)
+        };
+        self.messages.push(Message::new(Role::Assistant, &styled));
+        self.trim_history();
+        Ok(styled)
     }
 
     pub fn with_tools(mut self, tools: Vec<Box<dyn NativeTool>>) -> Self {
@@ -79,6 +141,24 @@ impl AgentLoop {
     pub fn with_max_history(mut self, max: usize) -> Self {
         self.max_history = max;
         self
+    }
+
+    /// 设置上下文 token 预算 (估算口径, 与 neocodex ContextPipeline 一致)。
+    /// 超预算时按 工具输出截断 → 最旧轮次驱逐 顺序收敛。
+    pub fn with_context_token_budget(mut self, budget: usize) -> Self {
+        self.context_token_budget = budget;
+        self
+    }
+
+    /// 设置单条工具输出写入历史前的 token 截断上限 (0 = 不截断)。
+    pub fn with_tool_output_budget(mut self, max_tokens: usize) -> Self {
+        self.max_tool_output_tokens = max_tokens;
+        self
+    }
+
+    /// 最近一次 LLM 调用的实际 token 用量 (prompt/completion/total)。
+    pub fn last_usage(&self) -> Option<&Usage> {
+        self.last_usage.as_ref()
     }
 
     pub fn model(&self) -> &str {
@@ -103,28 +183,33 @@ impl AgentLoop {
     pub fn reset_history(&mut self, system_prompt: &str) {
         self.messages.clear();
         if !system_prompt.is_empty() {
-            self.messages.push(Message::new(Role::System, system_prompt));
+            self.messages
+                .push(Message::new(Role::System, system_prompt));
         }
     }
 
     /// 执行一轮对话：用户输入 → (可能的多次工具调用) → 最终回答。
     pub async fn turn(&mut self, user_input: &str) -> Result<String, LlmError> {
-        self.messages.push(Message::new(Role::User, user_input));
+        let user_input = if let Some(stage) = &self.multimodal {
+            // 多模态→文本降维 (pi-deepseek-vision 模式): 目标模型保持 text-only。
+            stage.transform_input(user_input)
+        } else {
+            user_input.to_string()
+        };
+        self.messages.push(Message::new(Role::User, &user_input));
         self.trim_history();
 
         for _round in 0..self.max_tool_rounds {
             let request = self.build_request();
             let response = self.backend.complete(&request).await?;
+            self.last_usage = Some(response.usage.clone());
 
             match response.finish_reason {
                 FinishReason::Tool => {
                     if let Some(calls) = response.tool_calls {
                         if calls.is_empty() {
                             // 模型声明需要工具但没给出调用 → 视为停止，避免死循环。
-                            let text = response.content;
-                            self.messages.push(Message::new(Role::Assistant, &text));
-                            self.trim_history();
-                            return Ok(text);
+                            return self.emit_final(&response.content);
                         }
                         // 记录 assistant 的 tool_calls，供 API 语义配对。
                         let assistant_calls: Vec<ToolCallInfo> = calls.clone();
@@ -132,22 +217,18 @@ impl AgentLoop {
                         continue;
                     }
                     // finish=Tool 但无 tool_calls → 直接返回已有文本。
-                    let text = response.content;
-                    self.messages.push(Message::new(Role::Assistant, &text));
-                    self.trim_history();
-                    return Ok(text);
+                    return self.emit_final(&response.content);
                 }
                 _ => {
-                    let text = response.content;
-                    self.messages.push(Message::new(Role::Assistant, &text));
-                    self.trim_history();
-                    return Ok(text);
+                    return self.emit_final(&response.content);
                 }
             }
         }
 
         // 达到工具轮数上限 — 返回当前上下文摘要作为兜底。
-        Err(LlmError::Server("AgentLoop: max_tool_rounds exceeded".to_string()))
+        Err(LlmError::Server(
+            "AgentLoop: max_tool_rounds exceeded".to_string(),
+        ))
     }
 
     /// 流式对话轮：与 [`turn`] 相同决策循环，但 LLM 响应经 `stream_complete`
@@ -189,6 +270,7 @@ impl AgentLoop {
                             response_tool_calls.extend(calls);
                         }
                         response_finish = resp.finish_reason;
+                        self.last_usage = Some(resp.usage.clone());
                     }
                     Err(e) => {
                         // 单 chunk 失败：返回已累积文本 + 错误。
@@ -219,7 +301,8 @@ impl AgentLoop {
                     }
                     // 回填 assistant tool_calls + 执行工具（复用非流式执行，回填 Tool 消息）。
                     let assistant_calls = response_tool_calls.clone();
-                    self.messages.push(Message::assistant_with_calls("", assistant_calls));
+                    self.messages
+                        .push(Message::assistant_with_calls("", assistant_calls));
                     for call in &response_tool_calls {
                         let args: Value =
                             serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
@@ -230,8 +313,11 @@ impl AgentLoop {
                         }
                         let content = match &result {
                             Ok(ToolOutput { success, content }) => {
-                                if *success { content.clone() }
-                                else { format!("TOOL_ERROR: {}", content) }
+                                if *success {
+                                    content.clone()
+                                } else {
+                                    format!("TOOL_ERROR: {}", content)
+                                }
                             }
                             Err(e) => format!("TOOL_ERROR: {}", e),
                         };
@@ -255,7 +341,9 @@ impl AgentLoop {
             }
         }
 
-        Err(LlmError::Server("AgentLoop: max_tool_rounds exceeded".to_string()))
+        Err(LlmError::Server(
+            "AgentLoop: max_tool_rounds exceeded".to_string(),
+        ))
     }
 
     /// 流式对话轮（带审批门槛版本，P0 权限审批接线）。
@@ -312,6 +400,7 @@ impl AgentLoop {
                             response_tool_calls.extend(calls);
                         }
                         response_finish = resp.finish_reason;
+                        self.last_usage = Some(resp.usage.clone());
                     }
                     Err(e) => {
                         // 单 chunk 失败：返回已累积文本 + 错误。
@@ -343,7 +432,8 @@ impl AgentLoop {
                     }
                     // 回填 assistant tool_calls + 逐个执行工具（含审批门槛）。
                     let assistant_calls = response_tool_calls.clone();
-                    self.messages.push(Message::assistant_with_calls("", assistant_calls));
+                    self.messages
+                        .push(Message::assistant_with_calls("", assistant_calls));
                     for call in &response_tool_calls {
                         let args: Value =
                             serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
@@ -351,7 +441,9 @@ impl AgentLoop {
                         let args_str = call.function.arguments.clone();
 
                         // P0 审批门槛：需审批且被拒绝 → 跳过工具，模型收到明确错误。
-                        if let Err(approval_err) = Self::check_tool_approval(&name, &args, on_approval.as_deref()) {
+                        if let Err(approval_err) =
+                            Self::check_tool_approval(&name, &args, on_approval.as_deref())
+                        {
                             let content = format!("TOOL_ERROR: {}", approval_err);
                             on_tool(&name, &args_str, &content, 0, false);
                             self.tool_log.push(ToolInvocation {
@@ -373,8 +465,11 @@ impl AgentLoop {
                         let duration_ms = started.elapsed().as_millis() as u64;
                         let (content, success) = match &result {
                             Ok(ToolOutput { success, content }) => (
-                                if *success { content.clone() }
-                                else { format!("TOOL_ERROR: {}", content) },
+                                if *success {
+                                    content.clone()
+                                } else {
+                                    format!("TOOL_ERROR: {}", content)
+                                },
                                 *success,
                             ),
                             Err(e) => (format!("TOOL_ERROR: {}", e), false),
@@ -414,22 +509,32 @@ impl AgentLoop {
             return Ok(text);
         }
 
-        Err(LlmError::Server("AgentLoop: max_tool_rounds exceeded".to_string()))
+        Err(LlmError::Server(
+            "AgentLoop: max_tool_rounds exceeded".to_string(),
+        ))
     }
 
     fn build_request(&self) -> LlmRequest {
-        let tools = self.tools.iter().map(|t| {
-            let def = t.to_def();
-            super::nt_io_provider::types::Tool {
-                name: def.name,
-                description: def.description,
-                input_schema: def.input_schema,
-            }
-        }).collect();
+        let tools = self
+            .tools
+            .iter()
+            .map(|t| {
+                let def = t.to_def();
+                super::nt_io_provider::types::Tool {
+                    name: def.name,
+                    description: def.description,
+                    input_schema: def.input_schema,
+                }
+            })
+            .collect();
+
+        // 上下文 token 预算 (R-P 吸收 Headroom/RTK): 在克隆上压缩, 不污染持久历史。
+        let mut messages = self.messages.clone();
+        apply_context_budget(&mut messages, self.context_token_budget, self.max_tool_output_tokens);
 
         LlmRequest {
             model: self.model.clone(),
-            messages: self.messages.clone(),
+            messages,
             temperature: Some(0.7),
             max_tokens: 4096,
             tools,
@@ -461,13 +566,22 @@ impl AgentLoop {
                 }
                 Err(e) => format!("TOOL_ERROR: {}", e),
             };
+            // 工具输出截断 (Headroom/RTK 杠杆): 完整输出进 tool_log 供审计,
+            // 回填历史的仅保留头 60%/尾 40%, 中段折叠 — 防止巨大输出每轮重发。
+            let history_content = if self.max_tool_output_tokens > 0
+                && estimate_tokens(&content) > self.max_tool_output_tokens
+            {
+                truncate_preserving(&content, self.max_tool_output_tokens, 0.6)
+            } else {
+                content.clone()
+            };
             self.tool_log.push(ToolInvocation {
                 name: call.function.name.clone(),
                 arguments: call.function.arguments.clone(),
                 success: result.is_ok(),
                 output: content.clone(),
             });
-            self.messages.push(Message::tool(&content, &call.id));
+            self.messages.push(Message::tool(&history_content, &call.id));
         }
         self.trim_history();
         Ok(())
@@ -496,7 +610,8 @@ impl AgentLoop {
                 blocked.join(", ")
             ));
         }
-        self.tools.iter()
+        self.tools
+            .iter()
             .find(|t| t.id() == name)
             .ok_or_else(|| format!("Unknown tool: {}", name))
             .and_then(|t| t.execute(args))
@@ -508,14 +623,34 @@ impl AgentLoop {
     fn action_type_for_tool(name: &str, args: &Value) -> ActionType {
         let n = name.to_lowercase();
         let args_s = args.to_string();
-        if n.contains("shell") || n.contains("exec") || n.contains("bash") || n.contains("run") || n.contains("command") {
-            ActionType::ShellCommand { command: Self::truncate(&args_s, 120) }
+        if n.contains("shell")
+            || n.contains("exec")
+            || n.contains("bash")
+            || n.contains("run")
+            || n.contains("command")
+        {
+            ActionType::ShellCommand {
+                command: Self::truncate(&args_s, 120),
+            }
         } else if n.contains("git") {
-            ActionType::GitOperation { description: Self::truncate(&args_s, 120) }
-        } else if n.contains("write") || n.contains("create") || n.contains("edit") || n.contains("patch") || n.contains("diff") {
-            ActionType::FileEdit { path: name.to_string(), diff: Self::truncate(&args_s, 120) }
+            ActionType::GitOperation {
+                description: Self::truncate(&args_s, 120),
+            }
+        } else if n.contains("write")
+            || n.contains("create")
+            || n.contains("edit")
+            || n.contains("patch")
+            || n.contains("diff")
+        {
+            ActionType::FileEdit {
+                path: name.to_string(),
+                diff: Self::truncate(&args_s, 120),
+            }
         } else {
-            ActionType::Other { tool: name.to_string(), args: Self::truncate(&args_s, 120) }
+            ActionType::Other {
+                tool: name.to_string(),
+                args: Self::truncate(&args_s, 120),
+            }
         }
     }
 
@@ -604,17 +739,29 @@ mod tests {
     }
 
     impl NativeTool for MockCalc {
-        fn id(&self) -> &str { "calc" }
-        fn description(&self) -> &str { "Mock calculator" }
+        fn id(&self) -> &str {
+            "calc"
+        }
+        fn description(&self) -> &str {
+            "Mock calculator"
+        }
         fn input_schema(&self) -> Value {
             serde_json::json!({"type": "object", "properties": {"expr": {"type": "string"}}})
         }
-        fn capability_tags(&self) -> Vec<&'static str> { vec!["compute"] }
+        fn capability_tags(&self) -> Vec<&'static str> {
+            vec!["compute"]
+        }
         fn execute(&self, args: &Value) -> Result<ToolOutput, String> {
             let expr = args["expr"].as_str().unwrap_or("").to_string();
-            self.calls.lock().unwrap_or_else(|e| e.into_inner()).push(expr.clone());
+            self.calls
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(expr.clone());
             if expr == "1+1" {
-                Ok(ToolOutput { success: true, content: "2".to_string() })
+                Ok(ToolOutput {
+                    success: true,
+                    content: "2".to_string(),
+                })
             } else {
                 Err(format!("cannot compute {}", expr))
             }
@@ -642,22 +789,47 @@ mod tests {
     #[async_trait]
     impl LlmProvider for ScriptedLlm {
         async fn complete(&self, request: &LlmRequest) -> Result<LlmResponse, LlmError> {
-            self.seen_tools.lock().unwrap_or_else(|e| e.into_inner()).push(request.tools.len());
+            self.seen_tools
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(request.tools.len());
             let mut script = self.script.lock().unwrap_or_else(|e| e.into_inner());
             if script.is_empty() {
-                return Ok(LlmResponse::plain("done".into(), "mock".into(), Default::default(), FinishReason::Stop));
+                return Ok(LlmResponse::plain(
+                    "done".into(),
+                    "mock".into(),
+                    Default::default(),
+                    FinishReason::Stop,
+                ));
             }
             let (content, fr, calls) = script.remove(0);
-            Ok(LlmResponse { content, model: "mock".into(), usage: Default::default(), finish_reason: fr, tool_calls: Some(calls) })
+            Ok(LlmResponse {
+                content,
+                model: "mock".into(),
+                usage: Default::default(),
+                finish_reason: fr,
+                tool_calls: Some(calls),
+            })
         }
 
-        async fn stream_complete(&self, request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+        async fn stream_complete(
+            &self,
+            request: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
             use tokio::sync::mpsc;
-            self.seen_tools.lock().unwrap_or_else(|e| e.into_inner()).push(request.tools.len());
+            self.seen_tools
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(request.tools.len());
             let mut script = self.script.lock().unwrap_or_else(|e| e.into_inner());
             let (tx, rx) = mpsc::channel(16);
             if script.is_empty() {
-                let _ = tx.try_send(Ok(LlmResponse::plain("done".into(), "mock".into(), Default::default(), FinishReason::Stop)));
+                let _ = tx.try_send(Ok(LlmResponse::plain(
+                    "done".into(),
+                    "mock".into(),
+                    Default::default(),
+                    FinishReason::Stop,
+                )));
                 return Ok(rx);
             }
             let (content, fr, calls) = script.remove(0);
@@ -670,7 +842,9 @@ mod tests {
                     finish_reason: FinishReason::Stop,
                     tool_calls: None,
                 };
-                if tx.try_send(Ok(resp)).is_err() { break; }
+                if tx.try_send(Ok(resp)).is_err() {
+                    break;
+                }
             }
             let final_resp = LlmResponse {
                 content: String::new(),
@@ -695,9 +869,14 @@ mod tests {
         }
     }
 
-    fn backend_with(script: Vec<(String, FinishReason, Vec<ToolCallInfo>)>) -> (Arc<ScriptedLlm>, Arc<Mutex<Vec<usize>>>) {
+    fn backend_with(
+        script: Vec<(String, FinishReason, Vec<ToolCallInfo>)>,
+    ) -> (Arc<ScriptedLlm>, Arc<Mutex<Vec<usize>>>) {
         let seen = Arc::new(Mutex::new(Vec::new()));
-        let llm = ScriptedLlm { script: Arc::new(Mutex::new(script)), seen_tools: seen.clone() };
+        let llm = ScriptedLlm {
+            script: Arc::new(Mutex::new(script)),
+            seen_tools: seen.clone(),
+        };
         (Arc::new(llm), seen)
     }
 
@@ -705,9 +884,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_turn_simple_stop() {
-        let (llm, _seen) = backend_with(vec![
-            ("hello there".into(), FinishReason::Stop, vec![]),
-        ]);
+        let (llm, _seen) = backend_with(vec![("hello there".into(), FinishReason::Stop, vec![])]);
         let mut loop_ = AgentLoop::new(llm, "mock", "You are NeoTrix.");
         let out = loop_.turn("hi").await.expect("turn ok");
         assert_eq!(out, "hello there");
@@ -716,9 +893,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_turn_without_system_prompt() {
-        let (llm, _seen) = backend_with(vec![
-            ("ok".into(), FinishReason::Stop, vec![]),
-        ]);
+        let (llm, _seen) = backend_with(vec![("ok".into(), FinishReason::Stop, vec![])]);
         let mut loop_ = AgentLoop::new(llm, "mock", "");
         let out = loop_.turn("q").await.expect("turn ok");
         assert_eq!(out, "ok");
@@ -729,11 +904,17 @@ mod tests {
     async fn test_turn_executes_tool_and_continues() {
         // 第 1 轮：模型请求 calc(1+1)；第 2 轮：模型给出最终答案。
         let (llm, seen) = backend_with(vec![
-            ("".into(), FinishReason::Tool, vec![tool_call("calc", "call_1", r#"{"expr":"1+1"}"#)]),
+            (
+                "".into(),
+                FinishReason::Tool,
+                vec![tool_call("calc", "call_1", r#"{"expr":"1+1"}"#)],
+            ),
             ("result is 2".into(), FinishReason::Stop, vec![]),
         ]);
         let calc_calls = Arc::new(Mutex::new(Vec::new()));
-        let calc = MockCalc { calls: calc_calls.clone() };
+        let calc = MockCalc {
+            calls: calc_calls.clone(),
+        };
         let mut loop_ = AgentLoop::new(llm, "mock", "sys")
             .with_tools(vec![Box::new(calc)])
             .with_max_tool_rounds(4);
@@ -742,14 +923,23 @@ mod tests {
         assert_eq!(out, "result is 2");
 
         // 工具确实被执行了。
-        assert_eq!(calc_calls.lock().unwrap_or_else(|e| e.into_inner()).as_slice(), &["1+1".to_string()]);
+        assert_eq!(
+            calc_calls
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .as_slice(),
+            &["1+1".to_string()]
+        );
         // 工具日志有记录。
         assert_eq!(loop_.tool_log.len(), 1);
         assert_eq!(loop_.tool_log[0].name, "calc");
         assert!(loop_.tool_log[0].success);
         assert_eq!(loop_.tool_log[0].output, "2");
         // LLM 两次调用都拿到了工具定义。
-        assert_eq!(seen.lock().unwrap_or_else(|e| e.into_inner()).as_slice(), &[1, 1]);
+        assert_eq!(
+            seen.lock().unwrap_or_else(|e| e.into_inner()).as_slice(),
+            &[1, 1]
+        );
         // 历史：System + User + Assistant(tool_calls) + Tool + Assistant(final) = 5
         assert_eq!(loop_.history_len(), 5);
     }
@@ -757,12 +947,17 @@ mod tests {
     #[tokio::test]
     async fn test_turn_tool_error_surfaces() {
         let (llm, _seen) = backend_with(vec![
-            ("".into(), FinishReason::Tool, vec![tool_call("calc", "call_1", r#"{"expr":"2+2"}"#)]),
+            (
+                "".into(),
+                FinishReason::Tool,
+                vec![tool_call("calc", "call_1", r#"{"expr":"2+2"}"#)],
+            ),
             ("cannot compute".into(), FinishReason::Stop, vec![]),
         ]);
-        let calc = MockCalc { calls: Arc::new(Mutex::new(Vec::new())) };
-        let mut loop_ = AgentLoop::new(llm, "mock", "")
-            .with_tools(vec![Box::new(calc)]);
+        let calc = MockCalc {
+            calls: Arc::new(Mutex::new(Vec::new())),
+        };
+        let mut loop_ = AgentLoop::new(llm, "mock", "").with_tools(vec![Box::new(calc)]);
         let out = loop_.turn("compute 2+2").await.expect("turn ok");
         assert_eq!(out, "cannot compute");
         assert_eq!(loop_.tool_log.len(), 1);
@@ -773,7 +968,11 @@ mod tests {
     #[tokio::test]
     async fn test_turn_unknown_tool_surfaces_error() {
         let (llm, _seen) = backend_with(vec![
-            ("".into(), FinishReason::Tool, vec![tool_call("ghost", "call_9", "{}")]),
+            (
+                "".into(),
+                FinishReason::Tool,
+                vec![tool_call("ghost", "call_9", "{}")],
+            ),
             ("recovered".into(), FinishReason::Stop, vec![]),
         ]);
         let mut loop_ = AgentLoop::new(llm, "mock", "");
@@ -788,11 +987,25 @@ mod tests {
     async fn test_turn_loop_cap_prevents_infinite() {
         // 模型永远请求工具 → 达到上限必须报错而非死循环。
         let (llm, _seen) = backend_with(vec![
-            ("".into(), FinishReason::Tool, vec![tool_call("calc", "c1", r#"{"expr":"1+1"}"#)]),
-            ("".into(), FinishReason::Tool, vec![tool_call("calc", "c2", r#"{"expr":"1+1"}"#)]),
-            ("".into(), FinishReason::Tool, vec![tool_call("calc", "c3", r#"{"expr":"1+1"}"#)]),
+            (
+                "".into(),
+                FinishReason::Tool,
+                vec![tool_call("calc", "c1", r#"{"expr":"1+1"}"#)],
+            ),
+            (
+                "".into(),
+                FinishReason::Tool,
+                vec![tool_call("calc", "c2", r#"{"expr":"1+1"}"#)],
+            ),
+            (
+                "".into(),
+                FinishReason::Tool,
+                vec![tool_call("calc", "c3", r#"{"expr":"1+1"}"#)],
+            ),
         ]);
-        let calc = MockCalc { calls: Arc::new(Mutex::new(Vec::new())) };
+        let calc = MockCalc {
+            calls: Arc::new(Mutex::new(Vec::new())),
+        };
         let mut loop_ = AgentLoop::new(llm, "mock", "")
             .with_tools(vec![Box::new(calc)])
             .with_max_tool_rounds(3);
@@ -802,9 +1015,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_turn_empty_tool_calls_treated_as_stop() {
-        let (llm, _seen) = backend_with(vec![
-            ("finished anyway".into(), FinishReason::Tool, vec![]),
-        ]);
+        let (llm, _seen) =
+            backend_with(vec![("finished anyway".into(), FinishReason::Tool, vec![])]);
         let mut loop_ = AgentLoop::new(llm, "mock", "");
         let out = loop_.turn("q").await.expect("turn ok");
         assert_eq!(out, "finished anyway");
@@ -813,12 +1025,11 @@ mod tests {
     #[tokio::test]
     async fn test_turn_request_carries_tools_and_history() {
         // 验证 build_request 把工具定义 + 全部历史传给 LLM。
-        let (llm, seen) = backend_with(vec![
-            ("ok".into(), FinishReason::Stop, vec![]),
-        ]);
-        let calc = MockCalc { calls: Arc::new(Mutex::new(Vec::new())) };
-        let mut loop_ = AgentLoop::new(llm, "mock", "sys")
-            .with_tools(vec![Box::new(calc)]);
+        let (llm, seen) = backend_with(vec![("ok".into(), FinishReason::Stop, vec![])]);
+        let calc = MockCalc {
+            calls: Arc::new(Mutex::new(Vec::new())),
+        };
+        let mut loop_ = AgentLoop::new(llm, "mock", "sys").with_tools(vec![Box::new(calc)]);
         let _ = loop_.turn("first message").await;
         let _ = loop_.turn("second message").await;
 
@@ -834,11 +1045,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_trim_history_keeps_system() {
-        let (llm, _seen) = backend_with(vec![
-            ("ok".into(), FinishReason::Stop, vec![]),
-        ]);
-        let mut loop_ = AgentLoop::new(llm, "mock", "sys")
-            .with_max_history(4);
+        let (llm, _seen) = backend_with(vec![("ok".into(), FinishReason::Stop, vec![])]);
+        let mut loop_ = AgentLoop::new(llm, "mock", "sys").with_max_history(4);
         for i in 0..5 {
             let _ = loop_.turn(&format!("msg {}", i)).await;
         }
@@ -848,38 +1056,61 @@ mod tests {
 
     #[tokio::test]
     async fn test_turn_stream_simple_stop() {
-        let (llm, seen) = backend_with(vec![
-            ("streamed hello".into(), FinishReason::Stop, vec![]),
-        ]);
+        let (llm, seen) = backend_with(vec![("streamed hello".into(), FinishReason::Stop, vec![])]);
         let mut loop_ = AgentLoop::new(llm, "mock", "sys");
         let mut chunks: Vec<String> = Vec::new();
-        let out = loop_.turn_stream("hi", |c| { chunks.push(c.to_string()); true }, |_, _| {}).await
+        let out = loop_
+            .turn_stream(
+                "hi",
+                |c| {
+                    chunks.push(c.to_string());
+                    true
+                },
+                |_, _| {},
+            )
+            .await
             .expect("turn_stream ok");
         assert_eq!(out, "streamed hello");
         // 逐字符 chunk：11 chars → 11 chunks + final。
-        assert!(chunks.len() >= 11, "expected >=11 chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 11,
+            "expected >=11 chunks, got {}",
+            chunks.len()
+        );
         let joined: String = chunks.concat();
         assert_eq!(joined, "streamed hello");
-        assert_eq!(seen.lock().unwrap_or_else(|e| e.into_inner()).as_slice(), &[0]);
+        assert_eq!(
+            seen.lock().unwrap_or_else(|e| e.into_inner()).as_slice(),
+            &[0]
+        );
     }
 
     #[tokio::test]
     async fn test_turn_stream_executes_tool_and_continues() {
         let (llm, _seen) = backend_with(vec![
-            ("".into(), FinishReason::Tool, vec![tool_call("calc", "call_1", r#"{"expr":"1+1"}"#)]),
+            (
+                "".into(),
+                FinishReason::Tool,
+                vec![tool_call("calc", "call_1", r#"{"expr":"1+1"}"#)],
+            ),
             ("answer is 2".into(), FinishReason::Stop, vec![]),
         ]);
-        let calc = MockCalc { calls: Arc::new(Mutex::new(Vec::new())) };
+        let calc = MockCalc {
+            calls: Arc::new(Mutex::new(Vec::new())),
+        };
         let mut loop_ = AgentLoop::new(llm, "mock", "sys")
             .with_tools(vec![Box::new(calc)])
             .with_max_tool_rounds(4);
 
         let mut tool_seen: Vec<(String, String)> = Vec::new();
-        let out = loop_.turn_stream(
-            "compute",
-            |_| true,
-            |call, output| tool_seen.push((call.function.name.clone(), output.content.clone())),
-        ).await.expect("turn_stream ok");
+        let out = loop_
+            .turn_stream(
+                "compute",
+                |_| true,
+                |call, output| tool_seen.push((call.function.name.clone(), output.content.clone())),
+            )
+            .await
+            .expect("turn_stream ok");
         assert_eq!(out, "answer is 2");
         assert_eq!(tool_seen.len(), 1);
         assert_eq!(tool_seen[0].0, "calc");
@@ -891,15 +1122,28 @@ mod tests {
     #[tokio::test]
     async fn test_turn_stream_cancel_stops_generation() {
         // 模型永远请求工具 → 若 on_token 立即返回 false，应取消并返回已累积文本。
-        let (llm, _seen) = backend_with(vec![
-            ("partial".into(), FinishReason::Tool, vec![tool_call("calc", "c1", r#"{"expr":"1+1"}"#)]),
-        ]);
-        let calc = MockCalc { calls: Arc::new(Mutex::new(Vec::new())) };
-        let mut loop_ = AgentLoop::new(llm, "mock", "sys")
-            .with_tools(vec![Box::new(calc)]);
+        let (llm, _seen) = backend_with(vec![(
+            "partial".into(),
+            FinishReason::Tool,
+            vec![tool_call("calc", "c1", r#"{"expr":"1+1"}"#)],
+        )]);
+        let calc = MockCalc {
+            calls: Arc::new(Mutex::new(Vec::new())),
+        };
+        let mut loop_ = AgentLoop::new(llm, "mock", "sys").with_tools(vec![Box::new(calc)]);
         // on_token 第一次调用返回 false → 取消。
         let mut first = true;
-        let out = loop_.turn_stream("q", |_| { let keep = first; first = false; keep }, |_, _| {}).await
+        let out = loop_
+            .turn_stream(
+                "q",
+                |_| {
+                    let keep = first;
+                    first = false;
+                    keep
+                },
+                |_, _| {},
+            )
+            .await
             .expect("cancel is not error");
         // 取消后返回累积内容（至少首 chunk）。
         assert!(out.chars().count() >= 1);
@@ -920,14 +1164,28 @@ mod tests {
     async fn test_turn_stream_real_llm7() {
         use crate::neotrix::l1_body_impl::nt_io_provider::factory::create_gateway_async;
         let gw = create_gateway_async().await;
-        let mut loop_ = AgentLoop::new(Arc::new(gw), "llm7/codestral-latest", "You are a test assistant. Be terse.");
+        let mut loop_ = AgentLoop::new(
+            Arc::new(gw),
+            "llm7/codestral-latest",
+            "You are a test assistant. Be terse.",
+        );
         let mut streamed = String::new();
-        let out = loop_.turn_stream(
-            "Reply with exactly: E2E-OK",
-            |tok| { streamed.push_str(tok); true },
-            |_, _| {},
-        ).await.expect("turn_stream ok");
-        assert!(streamed.contains("E2E-OK") || out.contains("E2E-OK"),
-            "expected E2E-OK in streamed output, got streamed={:?} out={:?}", streamed, out);
+        let out = loop_
+            .turn_stream(
+                "Reply with exactly: E2E-OK",
+                |tok| {
+                    streamed.push_str(tok);
+                    true
+                },
+                |_, _| {},
+            )
+            .await
+            .expect("turn_stream ok");
+        assert!(
+            streamed.contains("E2E-OK") || out.contains("E2E-OK"),
+            "expected E2E-OK in streamed output, got streamed={:?} out={:?}",
+            streamed,
+            out
+        );
     }
 }
