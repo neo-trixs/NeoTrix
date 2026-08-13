@@ -7,6 +7,8 @@ pub mod nt_l1_shared_types;
 
 // IO
 pub mod nt_io_agent_loop;
+pub mod nt_io_multimodal_transform;
+pub mod nt_io_output_style;
 pub mod nt_io_awareness_core;
 pub mod nt_io_avatar_channel;
 pub mod nt_io_hotreload;
@@ -29,6 +31,7 @@ pub mod nt_io_neocodex;
 
 // Shield
 pub mod nt_shield;
+pub mod nt_shield_propagation_guard;
 pub mod nt_shield_audit;
 pub mod nt_shield_sandbox;
 #[cfg(feature = "sandbox")]

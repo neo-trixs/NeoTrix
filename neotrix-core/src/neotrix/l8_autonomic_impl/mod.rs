@@ -22,5 +22,6 @@ pub mod nt_mind_knowledge_pipeline;
 pub mod nt_mind_hook;
 pub mod nt_mind_memory;
 pub mod nt_mind_skill_engine;
+pub mod nt_repair_causal_trace;
 #[cfg(feature = "research")]
 pub mod nt_mind_absorption_registry;

@@ -62,6 +62,7 @@ pub mod nt_core_negentropy;
 // ═══════════════════════════════════════════════════════════════════
 pub mod l4_cognition;
 pub mod nt_core_e8;
+pub mod nt_core_e8_predictor;
 pub mod nt_core_hex;
 pub mod nt_core_e8_vsa;
 pub mod nt_core_policy;
