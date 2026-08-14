@@ -265,7 +265,7 @@
       "id": "nt_io_hotreload::revertible_effects",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c3benchmark",
+      "constellation": "c4mainpipeline",
       "provides": [
         "hotreload",
         "rollback",
@@ -307,11 +307,19 @@
           "to_node": "nt_io_hotreload::revertible_effects",
           "note": "Promoted to C3",
           "timestamp": "2026-08-14T06:54:01.696408Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_hotreload::revertible_effects",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-14T07:20:25.123648Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T03:07:54.127683Z",
-      "updated_at": "2026-08-14T06:54:01.696409Z",
+      "updated_at": "2026-08-14T07:20:25.123650Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -471,7 +479,7 @@
       "id": "nt_memory_visibility::visibility_gate",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c3benchmark",
+      "constellation": "c4mainpipeline",
       "provides": [
         "visibility",
         "filtering",
@@ -512,11 +520,19 @@
           "to_node": "nt_memory_visibility::visibility_gate",
           "note": "Promoted to C3",
           "timestamp": "2026-08-14T06:54:01.676292Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_visibility::visibility_gate",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-14T07:20:25.112621Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T04:22:16.588985Z",
-      "updated_at": "2026-08-14T06:54:01.676294Z",
+      "updated_at": "2026-08-14T07:20:25.112623Z",
       "deprecated": false,
       "deprecated_reason": null
     },

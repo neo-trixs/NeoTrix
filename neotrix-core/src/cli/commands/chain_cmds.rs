@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 
 use crate::cli::commands::types::{CliCommand, CommandOutput};
 use crate::neotrix::l3_memory_impl::nt_memory_kb::KnowledgeBase;
+use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_visibility::{filter_visibility, Visibility, VisibilityConfig};
 use crate::neotrix::nt_mind::SelfIteratingBrain;
 
 /// 获取共享 KB (惰性打开, 与 sources_cmds 相同模式)
@@ -85,9 +86,19 @@ fn chain_absorb(args: &[String], want_json: bool) -> CommandOutput {
 
     let mut steps = Vec::new();
 
-    // ① 检索
+    // ① 检索 (三值可见性门, visibility_gate C4 接线):
+    // CLI 生产路径 `/chain absorb` 的检索原语经 filter_visibility 末端裁定 —
+    // Drop 高风险/低相关候选不入吸收流程 (R-P79/R-P36: 真实用户可触发消费)。
     let search_results = kb.search(&query, 5).unwrap_or_default();
-    steps.push(format!("① 检索 '{}' → {} 条候选", query, search_results.len()));
+    let verdicts = filter_visibility(search_results.clone(), &VisibilityConfig::default());
+    let dropped = verdicts.iter().filter(|v| v.visibility == Visibility::Drop).count();
+    let search_results = search_results
+        .into_iter()
+        .zip(verdicts.iter())
+        .filter(|(_, v)| v.visibility != Visibility::Drop)
+        .map(|(r, _)| r)
+        .collect::<Vec<_>>();
+    steps.push(format!("① 检索 '{}' → {} 条候选 ({} 条被可见性门剔除)", query, search_results.len(), dropped));
     let top = search_results.first().map(|r| r.node.content.clone().unwrap_or_default()).unwrap_or_default();
 
     // ② 蒸馏 (记录到 session log 作为吸收原料)

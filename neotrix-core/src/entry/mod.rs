@@ -1382,6 +1382,16 @@ pub fn run_headless_mode(_cfg: &NeoTrixConfig, profile: &str) {
             let mut bg = BackgroundLoop::new(bg_agent)
                 .with_goal_loop(bg_goal_loop)
                 .with_nt_world_model(WorldModelV2::new(8, 64));
+            // 插件目录 HMR watch (revertible_effects C4 接线): ~/.neotrix/plugins/
+            // 事务化 load_batch/hot_reload 被真实后台消费。目录不存在则先创建。
+            if let Some(home) = dirs::home_dir() {
+                let plugin_dir = home.join(".neotrix").join("plugins");
+                if std::fs::create_dir_all(&plugin_dir).is_ok() {
+                    bg = bg.with_plugin_watch(plugin_dir);
+                } else {
+                    log::warn!("[entry] cannot create plugin dir; plugin HMR disabled");
+                }
+            }
             #[cfg(feature = "stealth-net")]
             {
                 bg = bg.with_world_consciousness();

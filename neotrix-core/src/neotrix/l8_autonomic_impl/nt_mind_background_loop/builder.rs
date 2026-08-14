@@ -102,6 +102,19 @@ impl BackgroundLoop {
         self
     }
 
+    /// 插件目录 HMR watch (revertible_effects C4 接线):
+    /// 对插件目录启动 `PluginRegistry::watch_dir` — 目录内 `.wasm`/`.dylib`/`.so`
+    /// 变更时触发事务化 load_batch / hot_reload_batch (∂Γ RevertibleContext
+    /// all-or-nothing), 使 revertible 事务回滚能力被真实后台消费 (R-P79/R-P36)。
+    /// watch_dir 返回 JoinHandle, 存入 self.handles 随循环生命周期共存亡。
+    pub fn with_plugin_watch(mut self, plugin_dir: std::path::PathBuf) -> Self {
+        match self.plugin_registry.watch_dir(plugin_dir) {
+            Ok(handle) => self.handles.push(handle),
+            Err(e) => log::error!("[bg] plugin watch failed: {}", e),
+        }
+        self
+    }
+
     #[cfg(feature = "stealth-net")]
     pub fn with_proxy_client(mut self) -> Self {
         self.proxy_client = Some(crate::neotrix::nt_shield_stealth_net::proxy_control::ProxyClient::new());
