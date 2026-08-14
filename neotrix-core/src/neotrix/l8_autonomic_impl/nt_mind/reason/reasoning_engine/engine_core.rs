@@ -13,6 +13,8 @@ use crate::core::nt_core_e8::nt_core_fable_pattern::{FablePatternMatcher, FableP
 use crate::core::nt_core_e8::nt_core_synthesis::{ConsciousnessCoreSynthesis, SynthesisEffortTier};
 use crate::core::nt_core_e8::unified_latent::UnifiedLatentSpace;
 use crate::core::nt_core_e8::nt_latent_reasoning::LatentReasoningPipeline;
+use crate::core::nt_core_e8::nt_latent_transformer::LatentReasoningTransformer;
+use crate::core::nt_core_e8::sparse_moe::SparseMoERouter;
 use crate::core::nt_core_e8::nt_multimodal::{MultimodalEncoder, MultimodalInput};
 use crate::core::nt_core_sae_bridge::SAEBridge;
 use crate::core::nt_core_ttc::{EffortTier, EffortTierSelector, TtcEngine};
@@ -165,6 +167,14 @@ pub struct ReasoningEngine {
     /// Phase 10.2 — end-to-end latent reasoning: E8 latent → hypercube query →
     /// GWT broadcast with no intermediate text.
     pub latent_reasoning: LatentReasoningPipeline,
+    /// Phase 6.3 — recursive latent reasoning transformer: iterates the fused
+    /// attention vector in a continuous latent space, accumulating depth-scaling
+    /// reward (Thinking Pixel §3.3). Wired into the reason hot path so the
+    /// trajectory advances and reward folds into the observer's step feedback.
+    pub latent_transformer: LatentReasoningTransformer,
+    /// Phase 6.3 — sparse MoE router: scores E8 expert groups and keeps the
+    /// top-2 active, masking the fused attention vector with mass conservation.
+    pub sparse_moe: SparseMoERouter,
     /// Phase 10.3 — multimodal unified reasoning: text+image+audio encoders →
     /// unified latent space → cross-modal fusion driving the E8 loop.
     pub multimodal: MultimodalEncoder,
@@ -228,6 +238,8 @@ impl ReasoningEngine {
             observer_error_recovery: ObserverErrorRecovery::new(),
             unified_latent: UnifiedLatentSpace::new(),
             latent_reasoning: LatentReasoningPipeline::new(),
+            latent_transformer: LatentReasoningTransformer::new(),
+            sparse_moe: SparseMoERouter::default(),
             multimodal: MultimodalEncoder::new(),
             context_builder: None,
             cot_generator: None,
@@ -964,6 +976,7 @@ impl ReasoningEngine {
                 }
 
                 let attn_ref = self.last_e8_attention_weights.as_deref().unwrap_or(&[]);
+                let attn_owned: Vec<f64> = attn_ref.to_vec();
                 root_span.set_attribute(
                     "e8_attn_entropy",
                     AttributeValue::Float(
@@ -1012,6 +1025,69 @@ impl ReasoningEngine {
                                     *a /= s;
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Phase 6.3 — recursive latent reasoning transformer: iterate
+                // the fused attention vector (64-d E8 latent) in a continuous
+                // latent space for MAX_LATENT_DEPTH steps. Deeper reasoning
+                // accumulates depth-scaling reward (Thinking Pixel §3.3) which
+                // is folded into the observer's step feedback, and convergence
+                // is surfaced for telemetry. Wired into the reason hot path so
+                // the trajectory actually advances (R-P79).
+                let latent_input: Vec<f64> = attn_owned;
+                if latent_input.len() == crate::core::nt_core_e8::nt_latent_transformer::LATENT_HIDDEN_DIM {
+                    let latent_state = self.latent_transformer.reason(
+                        &latent_input,
+                        crate::core::nt_core_e8::nt_latent_transformer::MAX_LATENT_DEPTH,
+                    );
+                    let depth = self.latent_transformer.current_depth();
+                    let mag = self.latent_transformer.step_magnitude(&latent_state);
+                    let depth_reward = self.latent_transformer.recursive_depth_reward(mag, depth);
+                    let converged = self.latent_transformer.is_converged(1e-4);
+                    root_span.set_attribute("lt_depth", AttributeValue::Int(depth as i64));
+                    root_span.set_attribute("lt_depth_reward", AttributeValue::Float(depth_reward));
+                    root_span.set_attribute("lt_converged", AttributeValue::Bool(converged));
+                    // Fold the recursive-depth reward into the engine's step
+                    // reward telemetry so deeper latent trajectories are
+                    // observable downstream (PRM / SEAL consumers).
+                    self.last_step_rewards.push((
+                        format!("latent_transformer_depth_{}", depth),
+                        depth_reward,
+                    ));
+                }
+
+                // Phase 6.3 — sparse MoE routing: score E8 expert groups for the
+                // current state + task, keep top-2 active, and mask the fused
+                // attention vector so only active experts broadcast to GWT.
+                // Sparsity is surfaced for telemetry; mass is conserved by the
+                // router (apply_mask renormalizes). Previously SparseMoERouter
+                // was only test-covered — now it gates the production attention.
+                if self.last_e8_attention_weights.is_some() {
+                    let cur_mode = self.current_state.mode.0;
+                    let task_type = crate::core::nt_core_e8::domain_transition::E8TaskType::detect(task);
+                    let next_mass: Option<[f64; 8]> = self.last_e8_attention_weights.as_ref().map(|w| {
+                        let mut m = [0.0f64; 8];
+                        for (i, &p) in w.iter().enumerate() {
+                            let g = (i / 8).min(7);
+                            m[g] += p;
+                        }
+                        m
+                    });
+                    let routing = self.sparse_moe.route(cur_mode, task_type, next_mass.as_ref());
+                    let weights_ref = self.last_e8_attention_weights.as_ref();
+                    if let Some(weights) = weights_ref {
+                        if let Ok(arr) = <[f64; 64]>::try_from(weights.as_slice()) {
+                            let masked = self.sparse_moe.apply_mask(&routing, &arr);
+                            self.last_e8_attention_weights = Some(masked.to_vec());
+                            root_span.set_attribute("sparse_moe_active_groups", AttributeValue::String(
+                                format!("{:?}", routing.active_groups),
+                            ));
+                            root_span.set_attribute("sparse_moe_sparsity", AttributeValue::Float(routing.sparsity()));
+                            root_span.set_attribute("sparse_moe_retained_mass", AttributeValue::Float(
+                                self.sparse_moe.retained_mass(&routing, &arr),
+                            ));
                         }
                     }
                 }

@@ -74,14 +74,15 @@ pub struct ConsonanceReport {
 /// 共鸣编排器
 pub struct ConsonanceOrchestrator {
     config: ConsonanceConfig,
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 共鸣历史/统计元数据, 待共振回路接入观测通道后填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl ConsonanceOrchestrator {
     pub fn new(config: ConsonanceConfig) -> Self {
         Self {
             config,
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

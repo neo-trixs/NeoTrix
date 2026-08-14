@@ -52,7 +52,8 @@ pub trait KbIndex: Send + Sync {
 pub struct RetrievalEngine {
     config: RetrievalConfig,
     index: Option<Box<dyn KbIndex>>,
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 检索统计元数据, 待观测通道接入后填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl RetrievalEngine {
@@ -60,7 +61,7 @@ impl RetrievalEngine {
         Self {
             config,
             index: None,
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

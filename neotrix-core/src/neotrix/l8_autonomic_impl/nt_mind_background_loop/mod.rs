@@ -123,7 +123,7 @@ impl BackgroundLoop {
         // 统一 GWT 单例: 阈值 0.3 匹配 activation∈[0,1] 值域 + 注册 14 默认基线专家。
         // 此前 13.0 是温度概念误填 threshold 槽位, 且无默认专家, 令共振过滤恒空
         // (cycle 205 伪收敛溯源); 与 PanoramaPipeline::new() 保持一致。
-        let mut shared_gwt = GlobalWorkspace::new(0.3);
+        let mut shared_gwt = GlobalWorkspace::new(0.3).with_physics_attention(4);
         shared_gwt.register_default_specialists();
         Self {
             cleanup_engine: Some(CleanupEngine::new()),

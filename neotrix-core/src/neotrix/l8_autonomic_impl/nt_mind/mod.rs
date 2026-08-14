@@ -16,8 +16,6 @@ pub use seal_core::self_edit;               // SelfEdit, MicroEdit, ToolCall, ge
 pub use seal_core::self_iterating;          // ReasoningBrain, SelfIteratingBrain, EvaluationRecord
 pub use seal_core::stats;                   // BrainStats, BrainReport, IterationResult
 pub use seal_core::model_router;            // 智能模型分级路由 (T0-T4)
-pub use seal_core::tier_prompts;            // Tier-aware system prompts based on ContextTier
-pub use seal_core::lora;                    // LoRA 低秩适配 (S-12)
 pub use seal_core::multi_brain;             // 多 ReasoningBrain 协同 (S-13)
 pub use crate::neotrix::l3_memory_impl::nt_memory_kb::bm25;  // BM25 (implementation in L3)
 pub use seal_core::embedding;               // TEXT embedding 模块（EMB-1）
@@ -91,7 +89,6 @@ pub use infrastructure::code_review;             // 代码审查引擎 (P2-9.3)
 pub use infrastructure::ux_review;               // UX 审查引擎 (Route E - 平行代码审查)
 pub use infrastructure::react_doctor;            // ReactDoctor: React 代码健康分析引擎
 pub use evolution::goal_loop;               // Goal Loop — 24/7 自主目标追求引擎 (Codex /goal + Ralph loop)
-pub use seal_core::pipeline;                // Context Offloading + L1→L2→L3 渐进式记忆提取管线
 pub use infrastructure::build_context;
 pub use infrastructure::case_study;              // Case Study Writer (Problem→Process→Result)
 pub use infrastructure::stakeholder_comm;        // Stakeholder Communicator (3 audience types)

@@ -97,6 +97,12 @@ pub struct GlobalWorkspace {
     /// Most recent cognitive type profile (Phase 8.1): softmax distribution over
     /// Linguistic/Logical/Knowledge/Social + dominant type + Shannon entropy.
     pub cognitive_profile: Option<super::cognitive_type::CognitiveProfile>,
+    /// CognitiveHub learned cross-group routing: hub index → per-specialist bias
+    /// written at the end of each broadcast (from sparse_routing of the dominant
+    /// type) and applied to raw salience at the start of the next one. This
+    /// closes the record→route loop so learned hub weights actually steer
+    /// attention (previously weights were learned but never consumed).
+    pub hub_routing_bias: [f64; MODULE_COUNT],
     /// Cross-group routing bridge (Phase 8.2): structured cognitive topology
     /// with learnable hub-to-hub collaboration weights.
     pub cognitive_hub: super::cognitive_hub::CognitiveHub,
@@ -171,6 +177,7 @@ impl GlobalWorkspace {
             ctm_verifier: super::ctm_verifier::CtmVerifier::new(),
             last_ctm_report: None,
             cognitive_profile: None,
+            hub_routing_bias: [1.0; MODULE_COUNT],
             cognitive_hub: super::cognitive_hub::CognitiveHub::new(),
             last_sparse_gate: None,
             meta_workspace: super::meta_workspace::MetaWorkspace::new(),
@@ -227,6 +234,15 @@ impl GlobalWorkspace {
 
     pub fn with_vsa_scorer(mut self, scorer: super::vsa_scorer::VsaContentScorer) -> Self {
         self.vsa_scorer = Some(scorer);
+        self
+    }
+
+    /// 启用 Transolver 自适应切片聚类共振 (physics_attention.rs AdaptiveSlicer)。
+    /// 生产接线点: nt_mind_background_loop handlers_consciousness 构造 GWT 时启用。
+    /// 切片按 Hamming 相似度聚类专家, 以切片协聚奖励叠加原始 salience。
+    pub fn with_physics_attention(mut self, num_slices: usize) -> Self {
+        self.physics_slicer = AdaptiveSlicer::new(num_slices);
+        self.use_physics_attention = true;
         self
     }
 
@@ -338,6 +354,15 @@ impl GlobalWorkspace {
                 }
             }
             self.e8_attention_weights = None; // one-shot: consume after use
+        }
+
+        // Step 1b-bis: CognitiveHub learned routing bias — apply the top-2
+        // sparse routing learned from past collaborations (written by the
+        // previous broadcast's Step 4f) to raw salience, steering attention
+        // toward hubs the hub network has learned to pair with the dominant
+        // type. Multiplicative, bounded to avoid runaway.
+        for (i, b) in self.hub_routing_bias.iter().enumerate() {
+            raw[i] = (raw[i] * (0.5 + 0.5 * b)).min(1.0);
         }
 
         // Step 1b: Kuramoto oscillator pre-sync — update amplitudes and synchronize
@@ -526,6 +551,21 @@ impl GlobalWorkspace {
             // the post-resonance winners so hub-to-hub weights learn which
             // cognitive types actually co-activate together (structured topology).
             self.cognitive_hub.record_broadcast_collaborations(&activations);
+            // Consume learned routing: build the per-specialist bias from the
+            // dominant type's top-2 hub targets so the NEXT broadcast steers
+            // attention toward those hubs. Closes the record→route loop.
+            let (targets, probs) = self.cognitive_hub.sparse_routing(profile.dominant);
+            let mut bias = [1.0f64; MODULE_COUNT];
+            for (t, p) in targets.iter().zip(probs.iter()) {
+                for m in self.specialists.values() {
+                    if let Some(idx) = module_index(m) {
+                        if super::cognitive_hub::CognitiveHub::hub_of(m.specialist_type) == *t {
+                            bias[idx] = 1.0 + 0.25 * p;
+                        }
+                    }
+                }
+            }
+            self.hub_routing_bias = bias;
             self.broadcast_history.push(format!(
                 "[cognitive_type] dominant = {}",
                 profile.dominant.label(),

@@ -2,13 +2,12 @@
 // Self-Evolving Architecture Loop — exploration, distillation, self-test, absorption
 
 use uniffi;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use crate::neotrix::ffi::types::*;
 use std::collections::HashMap;
 
 #[derive(Clone)]
 struct SEALPipelineInner {
-    config: NeoTrixConfig,
     status: PipelineStatus,
     exploration: ExplorationResult,
     absorption: AbsorptionProgress,
@@ -30,7 +29,7 @@ impl Clone for SEALPipelineImpl {
 #[uniffi::export]
 impl SEALPipelineImpl {
     #[uniffi::constructor]
-    pub fn init(config: NeoTrixConfig) -> Result<Self, NeoTrixError> {
+    pub fn init(_config: NeoTrixConfig) -> Result<Self, NeoTrixError> {
         let stages = vec![
             PipelineStage { stage_id: "exploration".into(), status: "pending".into(), progress: 0.0, started_at: 0, completed_at: 0, metrics: HashMap::new() },
             PipelineStage { stage_id: "distillation".into(), status: "pending".into(), progress: 0.0, started_at: 0, completed_at: 0, metrics: HashMap::new() },
@@ -39,7 +38,6 @@ impl SEALPipelineImpl {
         ];
         Ok(Self {
             inner: RwLock::new(SEALPipelineInner {
-                config,
                 status: PipelineStatus {
                     current_stage: "idle".into(),
                     stages,

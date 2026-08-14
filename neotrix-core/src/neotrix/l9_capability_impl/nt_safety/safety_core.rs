@@ -35,18 +35,21 @@ impl Default for SafetyConfig {
 /// 核心安全层
 pub struct SafetyCore {
     config: SafetyConfig,
-    risk_history: Vec<f32>,
-    violation_count: usize,
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 历史风险序列, 待风险趋势评估接入后填充
+    _risk_history: Vec<f32>,
+    /// 预留: 违规计数, 待审计报告接入后填充
+    _violation_count: usize,
+    /// 预留: 安全审计元数据, 待观测通道接入后填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl SafetyCore {
     pub fn new(config: SafetyConfig) -> Self {
         Self {
             config,
-            risk_history: Vec::new(),
-            violation_count: 0,
-            metadata: HashMap::new(),
+            _risk_history: Vec::new(),
+            _violation_count: 0,
+            _metadata: HashMap::new(),
         }
     }
 

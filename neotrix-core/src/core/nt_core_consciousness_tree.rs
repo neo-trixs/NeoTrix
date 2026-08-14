@@ -1217,7 +1217,12 @@ impl ConsciousnessTree {
     /// Apply emotion report valence/arousal to Soil state for next cycle.
     /// Uses confidence to boost coil health and frustration/urgency to indicate stress.
     pub fn apply_emotion_report(&mut self, report: crate::core::nt_core_self::emotion_state::EmotionReport) {
-        self.trunk.coherence = report.valence.max(0.0).min(1.0);
+        // 情绪作为主观调制叠加在真实计算相干性之上 (D4): 不再全量覆盖。
+        // 真实 coherence 来自 compute_coherence (分支一致性/谐振/合规/迷雾);
+        // valence 仅作为 ±0.2 的主观偏差调制, 使运行时主观信号可见而不过度遮蔽。
+        let base = self.compute_coherence();
+        let valence = report.valence.max(0.0).min(1.0);
+        self.trunk.coherence = (0.8 * base + 0.2 * valence).clamp(0.0, 1.0);
         // 注意：绝不把情绪置信度写进 soil.embedding_count——那是真实数据指标，
         // DataFoundation::health() 与 Critical "KB empty/no embeddings" 判定依赖它。
         // 情绪只调节 trunk.coherence (主观健康信号)。
@@ -1283,6 +1288,44 @@ impl ConsciousnessTree {
         IITPhiCalculator::new().compute_phi(&state).phi
     }
 
+    /// 计算真实树状态相干性 (coherence) — 与 `compute_iit_phi` 同构 (D4)。
+    ///
+    /// 此前 `trunk.coherence` 仅由运行时 `apply_emotion_report` 写入 (情绪 valence),
+    /// standalone CLI/MCP 路径 (无完整运行时) 读到的 coherence 恒 0.0 — 与 D1 的 phi
+    /// 同源缺口。此处从真实树状态派生:
+    ///   - 分支健康一致性 (health 越均匀越高): 1 - 归一化标准差
+    ///   - 谐振活跃度: resonance_cycle 推进量
+    ///   - 治理合规: governance_compliance 对规则执行一致性
+    ///   - 生产验证度: 低迷雾 (weighted_fog_sum 归一化) 越高越相干
+    /// 结果钳制到 [0,1], 运行时情绪报告仍可作为主观调制叠加。
+    pub fn compute_coherence(&self) -> f64 {
+        let healths: Vec<f64> = self
+            .branches
+            .values()
+            .map(|b| b.health.clamp(0.0, 1.0))
+            .collect();
+        let n = healths.len().max(1) as f64;
+        let mean = healths.iter().sum::<f64>() / n;
+        let var = healths.iter().map(|h| (h - mean).powi(2)).sum::<f64>() / n;
+        let std = var.sqrt().min(1.0);
+        // 分支健康一致性: 均匀 (低 std) 且健康 (高 mean) → 高相干
+        let health_consistency = (1.0 - std) * mean;
+
+        // 谐振活跃度: 每 20 cycle 一个单位的推进 (封顶 0.5)
+        let resonance = (self.trunk.resonance_cycle as f64 / 20.0).min(0.5);
+
+        // 治理合规: 规则执行一致性
+        let compliance = self.trunk.governance_compliance.clamp(0.0, 1.0);
+
+        // 生产验证度: 迷雾越低越相干 (weighted_fog_sum 封顶到 11 分支数)
+        let fog = self.weighted_fog_sum();
+        let fog_clear = (1.0 - fog / self.branches.len().max(1) as f64).clamp(0.0, 1.0);
+
+        let coherence = 0.4 * health_consistency + 0.25 * resonance
+            + 0.2 * compliance + 0.15 * fog_clear;
+        coherence.clamp(0.0, 1.0)
+    }
+
     /// Complete feedback loop with evolution contract:
     ///   Phase 0: Contract Negotiation (Goal + Evidence Plan + Stop Rule)
     ///   Phase 1: Roots absorb from soil (Data Foundation → Information Roots)
@@ -1338,6 +1381,9 @@ impl ConsciousnessTree {
         // 64 维意识谱交给 IITPhiCalculator, 使 status 呈现真实整合信息)。
         self.trunk.phi = self.compute_iit_phi();
         report.phase2_phi = self.trunk.phi;
+        // D4: standalone CLI/MCP 路径 coherence 不再恒 0.0 — 从真实树状态派生
+        // (运行时仍可经 apply_emotion_report 以情绪 valence 主观调制)。
+        self.trunk.coherence = self.compute_coherence();
 
         // ═══ Phase 3: Branches produce evolution fruits (7 domains → EvolutionFruits) ═══
         // Also check per-branch constraints (idle, viability, monitoring)
@@ -3217,6 +3263,44 @@ mod tests {
             "trunk.phi from real IIT calc must be in [0,1], got {phi_after_cycle}");
         assert!(phi_after_cycle > 0.0,
             "grown tree state must yield non-zero integrated information, got {phi_after_cycle}");
+    }
+
+    #[test]
+    fn test_growth_cycle_computes_real_coherence() {
+        // D4 回归: standalone 路径 (无情绪运行时) 下 trunk.coherence 必须由
+        // 真实树状态计算, 而非恒 0.0 — status/快照呈现真实相干性。
+        let tree = ConsciousnessTree::new();
+        let coh_init = tree.compute_coherence();
+        assert!(coh_init.is_finite() && coh_init >= 0.0 && coh_init <= 1.0,
+            "coherence must be finite in [0,1], got {coh_init}");
+
+        let mut grown = ConsciousnessTree::new();
+        for branch in grown.branches.values_mut() {
+            branch.health = 0.92;
+            branch.self_test_count = 8;
+            branch.module_count = 8;
+            branch.maturity_c0 = true;
+            branch.maturity_c1 = true;
+            branch.maturity_c2 = true;
+            branch.maturity_c3 = true;
+            branch.fog.level = 0.1;
+        }
+        grown.run_growth_cycle();
+        let coh_after = grown.trunk.coherence;
+        assert!(coh_after.is_finite() && coh_after >= 0.0 && coh_after <= 1.0,
+            "trunk.coherence from real computation must be in [0,1], got {coh_after}");
+        assert!(coh_after > 0.0,
+            "uniform high-health tree must yield non-zero coherence, got {coh_after}");
+        // 情绪报告只作 ±0.2 调制, 不把真实相干性抹成 0
+        let report = crate::core::nt_core_self::emotion_state::EmotionReport {
+            frustration: 0.0, confidence: 0.5, joy: 0.5, urgency: 0.0,
+            curiosity: 0.5, fatigue: 0.0, arousal: 0.5, valence: 0.0,
+            confidence_score: 0.5, dominant: (crate::core::nt_core_self::emotion_state::EmotionDimension::Joy, 0.5),
+            observation_count: 0,
+        };
+        grown.apply_emotion_report(report);
+        assert!(grown.trunk.coherence > 0.0,
+            "emotion modulation must not erase real coherence, got {}", grown.trunk.coherence);
     }
 
     #[test]

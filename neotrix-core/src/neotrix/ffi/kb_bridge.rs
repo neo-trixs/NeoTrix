@@ -7,7 +7,6 @@ use crate::neotrix::ffi::types::*;
 use std::collections::HashMap;
 
 struct KBBridgeInner {
-    config: NeoTrixConfig,
     nodes: HashMap<String, KBResult>,
     embeddings: Vec<HyperVector>,
 }
@@ -21,10 +20,9 @@ pub struct KBBridgeImpl {
 #[uniffi::export]
 impl KBBridgeImpl {
     #[uniffi::constructor]
-    pub fn init(config: NeoTrixConfig) -> Result<Self, NeoTrixError> {
+    pub fn init(_config: NeoTrixConfig) -> Result<Self, NeoTrixError> {
         Ok(Self {
             inner: Arc::new(RwLock::new(KBBridgeInner {
-                config,
                 nodes: HashMap::new(),
                 embeddings: Vec::new(),
             })),

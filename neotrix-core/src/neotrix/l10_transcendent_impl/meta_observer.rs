@@ -64,14 +64,15 @@ pub struct MetaObservationReport {
 /// 元观察器
 pub struct MetaObserver {
     config: MetaObserverConfig,
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 观察统计元数据, 待失真检测趋势需要时填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl MetaObserver {
     pub fn new(config: MetaObserverConfig) -> Self {
         Self {
             config,
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

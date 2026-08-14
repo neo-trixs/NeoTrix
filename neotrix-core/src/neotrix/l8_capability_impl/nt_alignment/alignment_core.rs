@@ -37,7 +37,8 @@ pub struct AlignmentCore {
     config: AlignmentConfig,
     aligned_model: Option<HashMap<String, Vec<f32>>>,
     history: Vec<AlignmentStep>,
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 对齐过程元数据, 待观测通道接入后填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// 单步对齐记录
@@ -55,7 +56,7 @@ impl AlignmentCore {
             config,
             aligned_model: None,
             history: Vec::new(),
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

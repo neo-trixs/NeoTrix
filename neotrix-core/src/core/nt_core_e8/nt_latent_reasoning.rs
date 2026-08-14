@@ -291,4 +291,53 @@ mod tests {
             assert!(w[0] >= w[1]);
         }
     }
+
+    #[test]
+    fn test_end_to_end_latent_reasoning_flow() {
+        // 端到端潜在推理集成 (路线图 Phase 10.2):
+        // 记录 8 个不同 E8 状态 (mode 0,8,16,...,56) 各带 outcome,
+        // 查询靠近某个已记录状态的新状态, 验证最近邻检索 + GWT 注意力 + 记忆填充度。
+        let mut p = LatentReasoningPipeline::new();
+        for (i, mode) in [0u8, 8, 16, 24, 32, 40, 48, 56].iter().enumerate() {
+            p.record(ReasoningHexagram::new(*mode), 0.5 + 0.05 * i as f64, "seal");
+        }
+
+        // (a) 查询靠近已记录 mode 40 的新状态 → 最近邻 mode 必须是 40
+        let r = p.query_state(ReasoningHexagram::new(41));
+        assert!(!r.neighbor_modes.is_empty(), "query must find neighbors");
+        assert_eq!(
+            r.neighbor_modes[0], 40,
+            "nearest neighbor of mode 41 must be recorded mode 40, got {:?}",
+            r.neighbor_modes
+        );
+        // 最近邻相似度必须为正且有限
+        assert!(r.similarities[0].is_finite() && r.similarities[0] > 0.0);
+        assert!(r.similarities[0] <= 1.0);
+
+        // (b) GWT 注意力产出 64 维 weights, bias 落在 [0,1]
+        let (weights, bias) = p.to_gwt_attention(&r, 0.3);
+        assert_eq!(weights.len(), 64, "GWT attention must be 64-dim");
+        assert!(
+            (0.0..=1.0).contains(&bias),
+            "bias must lie in [0,1], got {bias}"
+        );
+
+        // (c) 注意力归一化和 ≈ 1 (质量守恒)
+        let sum: f64 = weights.iter().sum();
+        assert!(
+            (sum - 1.0).abs() < 1e-9,
+            "attention must normalize to 1, got {sum}"
+        );
+        // 最近邻 mode 槽位应携带注意力质量
+        assert!(weights[40] > 0.0, "nearest-neighbor slot must carry attention");
+
+        // (d) 记忆填充度 > 0 且 <= 1.0
+        let fill = p.fill_ratio();
+        assert!(fill > 0.0 && fill <= 1.0, "fill_ratio must be in (0,1], got {fill}");
+        // 记录 8 条 / 默认容量 256 → 填充度约为 8/256
+        assert!((fill - 8.0 / LATENT_MEMORY_SIZE as f64).abs() < 1e-9, "fill_ratio mismatch: {fill}");
+
+        // 查询计数递增 (生产接线侧证据)
+        assert_eq!(p.queries_served, 1);
+    }
 }

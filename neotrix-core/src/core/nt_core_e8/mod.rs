@@ -21,12 +21,11 @@ pub mod nt_core_trajectory_prm;
 pub mod sparse_moe;
 pub mod unified_latent;
 pub mod nt_latent_reasoning;
+pub mod nt_latent_transformer;
 pub mod nt_multimodal;
 pub mod state_machine;
 pub mod thinking_budget;
-pub mod trace_compression;
 pub mod abduction;
-pub mod nesym;
 
 pub use nt_latent_thought::LatentThoughtVector;
 pub use sparse_moe::{SparseMoERouter, SparseRouting};
@@ -34,6 +33,11 @@ pub use unified_latent::{UnifiedLatentSpace, UNIFIED_LATENT_DIM, SeededProjectio
 pub use nt_latent_reasoning::{
     LatentReasoningPipeline, LatentRetrieval, LatentEpisodicEntry,
     LATENT_MEMORY_SIZE, TOP_K_NEIGHBORS,
+};
+pub use nt_latent_transformer::{
+    LatentReasoningTransformer, LatentState,
+    MAX_LATENT_DEPTH, LATENT_HIDDEN_DIM, NUM_LATENT_LAYERS,
+    RECURSIVE_REWARD_DISCOUNT, DEFAULT_LATENT_TEMPERATURE,
 };
 pub use nt_multimodal::{
     MultimodalEncoder, MultimodalInput, TEXT_EMBED_DIM, VisionBridge, ImageEvidence, ImageClass,

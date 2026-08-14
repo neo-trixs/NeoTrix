@@ -62,7 +62,8 @@ pub struct KnowledgeGraph {
     config: KGConfig,
     nodes: HashMap<String, KGNode>,
     edges: HashMap<String, KGEdge>,
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 图级统计元数据, 待检索/嵌入观测需要时填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl KnowledgeGraph {
@@ -71,7 +72,7 @@ impl KnowledgeGraph {
             config,
             nodes: HashMap::new(),
             edges: HashMap::new(),
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

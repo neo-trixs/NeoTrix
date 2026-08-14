@@ -65,7 +65,8 @@ pub struct TranscendentLoop {
     orchestrator: ConsonanceOrchestrator,
     /// 本次运行的进化建议 (模拟写 L3; 真实接线经 nt_memory_kb)
     suggestions: Vec<EvolutionSuggestion>,
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 闭环运行元数据, 待观测通道接入后填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl TranscendentLoop {
@@ -77,7 +78,7 @@ impl TranscendentLoop {
             observer,
             orchestrator,
             suggestions: Vec::new(),
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

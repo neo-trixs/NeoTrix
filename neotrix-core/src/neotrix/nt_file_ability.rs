@@ -1024,9 +1024,6 @@ pub fn create_from_markdown(
 // 与 VLM 输出比对, 缺失则标记为 ungrounded — 由调用方决定二次校正 (遵循 R-P36:
 // grounding 结果必须进入行为, 而非仅日志)。本模块是纯算法, 无 LLM 依赖。
 
-/// grounding 版本戳 — 算法变更时递增, 保证缓存 key 与旧结果区分
-pub const GROUNDING_VERSION: &str = "11";
-
 /// 关键标识符模式: 大写字母+数字+_/- (如 "Attention-12", "B2")
 const CRITICAL_IDENTIFIER_RE: &str = r"[A-Z]{2,}[A-Z0-9_-]*\d[A-Z0-9_-]*";
 
@@ -1232,6 +1229,8 @@ pub enum VisualPromptKind {
 }
 
 impl VisualPromptKind {
+    /// 预留: 仅供测试断言 (name 往返) 与未来日志/调试输出使用, 非生产调用路径。
+    #[allow(dead_code)]
     pub fn name(&self) -> &'static str {
         match self {
             VisualPromptKind::Document => "document",

@@ -29,7 +29,8 @@ pub struct EvolutionHarness {
     loop_: TranscendentLoop,
     /// 已落盘的建议计数 (累计, 供观测)
     persisted_total: usize,
-    metadata: HashMap<String, serde_json::Value>,
+    /// 预留: harness 运行元数据, 待观测通道接入后填充
+    _metadata: HashMap<String, serde_json::Value>,
 }
 
 impl EvolutionHarness {
@@ -37,7 +38,7 @@ impl EvolutionHarness {
         Self {
             loop_: TranscendentLoop::new(config),
             persisted_total: 0,
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

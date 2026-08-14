@@ -361,4 +361,91 @@ mod tests {
         // State 56 lives in group 7; Agentic affinity favors it (0.8).
         assert!(routing.is_active(56), "current state's group should be active, got {:?}", routing.active_groups);
     }
+
+    #[test]
+    fn test_routing_accuracy_top2() {
+        // 路由精度: 被激活的 top-2 专家组必须是 softmax 分数最高的两个。
+        // 注意: active_groups 按组索引升序存储 (非按分数排序), 因此正确的
+        // 不变量是"激活集合 == 分数最高的两组" — 对每个未激活组 g,
+        // scores[g] 必须 ≤ 两个激活组各自的分数。
+        let mut r = SparseMoERouter::new();
+        for task in E8TaskType::ALL {
+            for state in [0u8, 3, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 63, 11, 37, 61] {
+                let routing = r.route(state, task, None);
+                let a0 = routing.active_groups[0];
+                let a1 = routing.active_groups[1];
+                assert_ne!(a0, a1, "top-2 must be distinct (task={task:?}, state={state})");
+                // 两个激活组互为 top-2: 任何未激活组不得超过其中任一激活组
+                for g in 0..NUM_GROUPS {
+                    if g != a0 && g != a1 {
+                        assert!(
+                            routing.scores[g] <= routing.scores[a0] + 1e-12
+                                && routing.scores[g] <= routing.scores[a1] + 1e-12,
+                            "inactive group {g} ({}) must not outscore any active group \
+                             (a0={a0}:{}, a1={a1}:{}, task={task:?}, state={state})",
+                            routing.scores[g],
+                            routing.scores[a0],
+                            routing.scores[a1]
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_sparsity_constraint_holds() {
+        // 稀疏性约束: TOP_K=2 / NUM_GROUPS=8 → sparsity 固定 0.75,
+        // 且 apply_mask 后非活跃 slot 恰为 0 (精确零, 质量守恒依赖此冻结)。
+        let mut router = SparseMoERouter::new();
+        for task in E8TaskType::ALL {
+            let routing = router.route(24, task, None);
+            assert_eq!(routing.sparsity(), 0.75, "sparsity must equal 1 - TOP_K/NUM_GROUPS (task={task:?})");
+            let masked = router.apply_mask(&routing, &uniform());
+            let frozen = masked
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !routing.is_active(*i as u8))
+                .count();
+            assert_eq!(
+                frozen,
+                NUM_GROUPS * GROUP_SIZE - TOP_K * GROUP_SIZE,
+                "non-active slots must be frozen (task={task:?})"
+            );
+            for (i, &w) in masked.iter().enumerate() {
+                if !routing.is_active(i as u8) {
+                    assert_eq!(w, 0.0, "frozen slot {i} must be exactly 0 (task={task:?})");
+                }
+            }
+            // 激活 slot 数恰为 TOP_K * GROUP_SIZE = 16
+            let active = masked.iter().filter(|&&x| x > 0.0).count();
+            assert_eq!(active, TOP_K * GROUP_SIZE, "active slots count (task={task:?})");
+        }
+    }
+
+    #[test]
+    fn test_affinity_drives_group_selection() {
+        // 领域亲和驱动组选择: Coding 最高亲和是组 5 (1.0),
+        // Math 最高亲和是组 1 与 3 (1.0, 计算组)。
+        let mut r = SparseMoERouter::new();
+        // Coding: 起始态落在组 4..7 (state 32..63) 时, 组 5 应被激活
+        for state in [32u8, 40, 48, 56, 63, 33, 47] {
+            let routing = r.route(state, E8TaskType::Coding, None);
+            assert!(
+                routing.active_groups.contains(&5),
+                "Coding should activate the max-affinity group 5, got {:?} (state={state})",
+                routing.active_groups
+            );
+        }
+        // Math: 起始态在全部 8 组时, 组 1 或 3 (计算组) 必须被激活
+        for state in [0u8, 7, 8, 15, 16, 23, 24, 31, 32, 39, 40, 47, 48, 55, 56, 63] {
+            let routing = r.route(state, E8TaskType::Math, None);
+            let has_compute = routing.active_groups.contains(&1) || routing.active_groups.contains(&3);
+            assert!(
+                has_compute,
+                "Math should activate a computation group (1 or 3), got {:?} (state={state})",
+                routing.active_groups
+            );
+        }
+    }
 }

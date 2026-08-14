@@ -249,10 +249,6 @@ pub use nt_core_sae::{
 };
 pub use nt_core_sae_bridge::SAEBridge;
 pub use nt_core_e8_vsa::E8VsaEmbedding;
-pub use nt_core_e8::nesym::{
-    NeuroSymbolicEngine, NesyValue, NesyFact, NesyRule, NesyInference, NesyStats,
-    FidelityLevel, FidelityAnnotation, FuzzyOperator, InferenceEngine,
-};
 pub use nt_core_plan::{E8Plan, PlanStep, StepStatus, PlanMetrics, PlanGenerator};
 
 pub use nt_core_e8::abduction::{

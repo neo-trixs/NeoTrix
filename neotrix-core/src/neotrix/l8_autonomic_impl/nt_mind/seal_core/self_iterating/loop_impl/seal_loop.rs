@@ -482,13 +482,20 @@ impl SelfIteratingBrain {
             log::trace!("[E8-TM] saved transition matrix to KB (iter {})", self.iteration);
         }
 
-        // ── #5 Curiosity bonus: gap between expected and actual improvement ──
+        // ── #5 Curiosity bonus: E8 状态预测误差驱动 (路线图 Phase 9.3 R_curiosity) ──
+        // LatentPredictor 语义由已有 E8 预测器 (E8PredictionEnsemble/MCTS Oracle, engine_core.rs)
+        // 承担; 此处把真实 E8 预测不确定性 (1 - last_e8_confidence) 融合进好奇心,
+        // 替代此前纯 reward-gap 内联近似 (seal_loop.rs:488-493 旧版)。
+        // R_curiosity = ||h_{t+1} - h_{t+1}||: 模型对下一 E8 状态越不确定, 好奇心越强 → 吸引注意力。
         let score_before = self._snapshot_score();
         let score_after = self.brain.evaluate_capability(self._current_task_type);
         let expected = reward.max(0.0);
         let actual = (score_after - score_before).max(0.0);
-        let prediction_error = (expected - actual).abs();
-        let scaled_curiosity = (prediction_error * 0.1).min(0.05);
+        let reward_gap = (expected - actual).abs();
+        let e8_uncertainty = self.reasoning_engine.as_ref()
+            .map(|e| (1.0 - e.last_e8_confidence).clamp(0.0, 1.0))
+            .unwrap_or(0.0);
+        let scaled_curiosity = (reward_gap * 0.1 + e8_uncertainty * 0.03).min(0.05);
         self.curiosity_bonus = scaled_curiosity;
         reward += scaled_curiosity;
 

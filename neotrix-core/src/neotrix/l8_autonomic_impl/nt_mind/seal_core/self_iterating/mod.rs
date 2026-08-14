@@ -9,7 +9,6 @@ pub mod loop_impl;
 mod persist_impl;
 pub mod checkpoint;
 pub mod pipeline;
-pub mod validation;
 pub mod skillopt;
 pub mod harness_adapter;
 pub mod aging_monitor;
@@ -20,18 +19,14 @@ pub mod recursive_depth_reward;
 pub use brain_impl::{ReasoningBrain, AbsorbValidator, DefaultAbsorbValidator, SelfIteration, EvaluationRecord};
 pub use loop_impl::SelfIteratingBrain;
 pub use loop_impl::EvoStats;
-pub mod sia_loop;
 
 // Hyperagent split modules
 pub mod hypercore;
 pub mod hyperarchive;
 pub mod hyperdgm;
 pub mod hyperstage;
-pub mod hyperagents;
 
 pub use pipeline::{BrainPipeline, BrainStage, StageDecision, BrainSnapshot, AutonomyLevel, seal_pipeline, kernel_iterate_pipeline};
-pub use validation::{ValidationResult, cargo_check_validation, taste_skill_gate, aggregate_reward, user_accept_reject};
-pub use sia_loop::{SIAController, MetaAgent, TargetAgent, FeedbackAgent, SIAImprovement, ExecutionTrajectory, TrajectoryStep, ToolCallRecord, ExecutionMetrics};
 
 // Hyperagent re-exports
 pub use hypercore::{HyperMetaAgent, SelfModificationProposal, FileDiff, ModificationTarget, SafetyCheckResult};
@@ -63,7 +58,6 @@ pub mod process_stage;
 pub mod search_skill_stage;
 
 pub mod dp_sgd_stage;
-pub mod creusot_proof_gate;
 pub mod benchmark_gate;
 pub mod data_synthesis;
 pub mod openspace_evolution;

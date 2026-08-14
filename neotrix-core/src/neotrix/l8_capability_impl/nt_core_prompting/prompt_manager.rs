@@ -46,7 +46,8 @@ pub struct PromptManager {
     config: PromptConfig,
     templates: HashMap<String, PromptTemplate>,
     cache: Vec<(String, String)>, // (name, filled_template)
-    metadata: std::collections::HashMap<String, serde_json::Value>,
+    /// 预留: 提示/缓存统计元数据, 待观测通道接入后填充
+    _metadata: std::collections::HashMap<String, serde_json::Value>,
 }
 
 impl PromptManager {
@@ -55,7 +56,7 @@ impl PromptManager {
             config,
             templates: HashMap::new(),
             cache: Vec::new(),
-            metadata: HashMap::new(),
+            _metadata: HashMap::new(),
         }
     }
 

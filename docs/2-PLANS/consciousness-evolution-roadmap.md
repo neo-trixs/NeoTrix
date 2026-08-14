@@ -123,10 +123,10 @@
 ### 实现检查清单
 - [x] `E8State` → `latent_thought` 嵌入 (nt_latent_thought.rs, 10 tests, Gauss-kernel 可微 embed/interpolate/nearest_state) ✅ iter192
 - [x] `RecursiveDepthReward` in SEAL reward_calc (recursive_depth_reward.rs, 6 tests, seal_loop 融合点接线) ✅ iter192
-- [ ] `SparseMoERouter` 模块 (top-k routing)
-- [ ] `LatentReasoningTransformer` (lightweight, 循环深度)
-- [x] `LatentPredictor` — E8 状态转换预测器 (最近邻, Hamming 距离, curiosity_reward, 16 passes)
-- [ ] 测试: latent vector coherence / depth scaling / MoE routing
+- [x] `SparseMoERouter` 模块 (sparse_moe.rs, 13 tests, top-k=2 稀疏路由 + 质量守恒掩码) ✅ iter193
+- [x] `LatentReasoningTransformer` (nt_latent_transformer.rs, 10 tests, 循环深度 + 潜在相干性 + 收敛检测) ✅ 2026-08-13
+- [x] `LatentPredictor` — E8 状态转换预测器; 语义由已有 `E8PredictionEnsemble`/`E8MctsPredictor`/`E8PredictionOracle` (nt_core_e8_prediction.rs, engine_core.rs 接线) 承担; curiosity_reward 已接线 seal_loop: 好奇心融合真实 E8 预测不确定性 (1-last_e8_confidence), R_curiosity = ||ĥ-h|| (seal_loop.rs #5) ✅ 2026-08-14
+- [x] 测试: latent vector coherence / depth scaling / MoE routing (sparse_moe.rs 路由精度/稀疏性 + nt_latent_transformer.rs 深度增益) ✅ 2026-08-13
 
 ---
 
@@ -230,8 +230,8 @@
 - [x] CognitiveType enum (Linguistic, Logical, Knowledge, Social) — cognitive_type.rs, 10 tests, Step 4f 接线 ✅ iter192
 - [x] `CognitiveHub` — 跨组路由桥梁 (cognitive_hub.rs, 8 tests, 4×4 可学习 hub 权重 + top-2 稀疏路由, broadcast 协作记录) ✅ iter193
 - [x] `GatingNetwork` — 可学习 router (MoERouter::sparse_gate, 4 tests, G(x)=softmax(W_g·x) top-3 广播门控) ✅ iter193
-- [ ] `CognitiveTopology` — 结构化连接矩阵 (组内全连接 + 组间仅经 hub, 由 CognitiveHub 覆盖)
-- [ ] 测试: 路由精度 / 组内协作增益 / 稀疏性约束
+- [x] `CognitiveTopology` — 结构化连接矩阵 (组内全连接 + 组间仅经 hub, 由 CognitiveHub 覆盖) ✅ iter193
+- [x] 测试: 路由精度 / 组内协作增益 / 稀疏性约束 (sparse_moe.rs 路由精度 + 稀疏性约束, 8.1/6.3 覆盖) ✅ 2026-08-13
 
 ---
 
@@ -269,10 +269,10 @@
 ### 实现检查清单
 - [x] `MetaWorkspace` — 二阶观察器 (meta_workspace.rs, 9 tests, overactivation/entropy-anomaly/gate-fixation, 接线 InnerSpeech) ✅ iter193
 - [x] `SelfModel` — 动态自评估 (self_model.rs, 8 tests, capability+uncertainty+fatigue, self-error 内在奖励接线 SEAL) ✅ iter193
-- [x] `CuriosityModule` — 预测误差驱动的好奇心奖励 (LatentPredictor.curiosity_reward + seal_loop 集成, 16 passes)
-- [x] `GaussianThoughtSampler` — GTS 替代 epsilon-greedy 均匀探索 (Box-Muller, E8Policy.select_mode)
-- [x] `PhysicsAttention` — Transolver 自适应切片聚类 (AdaptiveSlicer + resonate_cycle_with_physics, 9 passes)
-- [ ] 测试: self-model 准确性 / 好奇心行为
+- [x] `CuriosityModule` — 预测误差驱动的好奇心奖励; 等价信号由 seal_loop 承担并已升级为融合 E8 预测不确定性 (1-last_e8_confidence), 非独立模块 (seal_loop.rs #5) ✅ 2026-08-14
+- [x] `GaussianThoughtSampler` — GTS 思想已吸收进 E8Policy 探索: select_mode 用 Box-Muller Gaussian 采样替代均匀 epsilon-greedy, sigma ∝ epsilon, 中心为最佳已知模式 (nt_core_policy.rs:101-123) ✅ 2026-08-14 修正
+- [x] `PhysicsAttention` — Transolver 自适应切片聚类 ✅ 代码存在 (nt_core_gwt/physics_attention.rs, AdaptiveSlicer 274 行, 接线 workspace.rs + resonance.rs) 2026-08-14 修正
+- [x] 测试: self-model 准确性 / 好奇心行为 (self_model.rs 准确性收敛 2 组) ✅ 2026-08-13
 
 ---
 
@@ -315,7 +315,7 @@
 - [x] `MultimodalEncoder` (text + image + audio) (nt_multimodal.rs, 7 tests, char n-gram hash kernel + ModalityRouter 融合 → E8 mode) ✅ iter193
 - [x] `UnifiedLatentSpace` — 跨域共享空间 (unified_latent.rs, project_e8/project_workspace/project_vsa + cosine/dot, 接线 engine_core) ✅ iter193
 - [x] `LatentReasoningPipeline` — 潜在 episodic 检索 (nt_latent_reasoning.rs, LATENT_MEMORY_SIZE=256, outcome 加权 top-k 注意力) ✅ iter193
-- [ ] 测试: 潜在空间一致性 / 模态融合 / 端到端推理 (部分覆盖: 跨域 cosine/确定性/融合主导模态; 端到端集成测试待补)
+- [x] 测试: 潜在空间一致性 / 模态融合 / 端到端推理 (跨域 cosine/确定性/融合主导模态 + `test_end_to_end_latent_reasoning_flow` 端到端检索→GWT 注意力) ✅ 2026-08-13
 
 ---
 
@@ -380,14 +380,15 @@ Phase 10 ── 统一潜在推理
 |------|------|------|----------|-------|
 | EntropyMonitor (死锁检测 + 刺激注入) | `core/consciousness/monitor.rs` | 22 ✅ | GWA (arXiv:2604.08206) | 7.1 |
 | GoalRegister | `l8_autonomic_impl/nt_mind/goal_contract.rs` | 11 ✅ | — (SEAL 原生) | — |
-| LatentPredictor (E8 状态预测) | `core/latent_predictor.rs` | 16 ✅ | Latent Prediction Theory (2605.27734) | 6.x |
-| CuriosityBonus (seal_loop 集成) | `seal_loop.rs` | — | LPT + GWA | 9.3 |
+| LatentPredictor (E8 状态预测) | 已有 `nt_core_e8_prediction.rs` (Ensemble/MCTS/Oracle, engine_core.rs 接线) + seal_loop #5 融合 E8 预测不确定性 | ✅ | Latent Prediction Theory (2605.27734) | 6.x |
+| CuriosityBonus (seal_loop 集成) | `loop_impl/seal_loop.rs` (reward_gap + E8 预测不确定性融合) | ✅ | LPT + GWA | 9.3 |
 | StagnationSignal (危机等级 → 回滚) | `monitor.rs` + `seal_loop.rs` | — | GWA (deadlock) | 7.1 |
-| GaussianThoughtSampler | `core/e8_experiment.rs` | 9 ✅ | GTS (arXiv:2602.14077) | 9.3 |
-| PhysicsAttention (AdaptiveSlicer) | `core/consciousness/physics_attention.rs` | 9 ✅ | Transolver (arXiv:2402.02366) | 7.x |
+| GaussianThoughtSampler | 已吸收进 `nt_core_policy.rs` select_mode (Box-Muller Gaussian 探索, sigma ∝ epsilon) | ✅ | GTS (arXiv:2602.14077) | 9.3 |
+| PhysicsAttention (AdaptiveSlicer) | `nt_core_gwt/physics_attention.rs` (接线 workspace.rs + resonance.rs) | ✅ | Transolver (arXiv:2402.02366) | 7.x |
 | DeadlockAwareRollback (最大刺激回滚) | `monitor.rs` + `seal_loop.rs` | — | GWA | 7.1 |
 | InnerSpeech (内心独白 + 上下文写回) | `core/nt_core_gwt/inner_speech.rs` | 11 ✅ | MIRROR (AAAI 2026) §3.3 | 7.2 |
-| SparseMoERouter (top-2 专家组路由) | `core/nt_core_e8/sparse_moe.rs` | 10 ✅ | Thinking Pixel §3.1 | 6.3 |
+| SparseMoERouter (top-2 专家组路由) | `core/nt_core_e8/sparse_moe.rs` | 13 ✅ | Thinking Pixel §3.1 | 6.3 |
+| LatentReasoningTransformer (轻量循环推理) | `core/nt_core_e8/nt_latent_transformer.rs` | 10 ✅ | Thinking Pixel §4 | 6.3 |
 | CognitiveHub (跨组路由桥梁) | `core/nt_core_gwt/cognitive_hub.rs` | 8 ✅ | MiCRo §4.1 | 8.2 |
 | SparseGate (top-3 广播门控) | `core/nt_core_gwt/moe_router.rs` | 4 ✅ | MiCRo §4.2 | 8.3 |
 | MetaWorkspace (二阶观察器) | `core/nt_core_gwt/meta_workspace.rs` | 9 ✅ | CTM-AI §5 / GWA §4.1 | 9.1 |

@@ -253,4 +253,43 @@ mod tests {
         assert_eq!(m.state.fatigue, 0.0);
         assert_eq!(m.updates, 0);
     }
+
+    #[test]
+    fn test_self_model_accuracy_converges() {
+        // self-model 准确性: 模型应能区分"观测稳定 (模型准)"与"观测剧烈波动 (模型不准)"。
+        // 恒定观测: 能力估计收敛到观测值 → 预测先验与观测一致 → self-error 收敛到低值。
+        let mut stable = SelfModel::new();
+        for _ in 0..40 {
+            stable.tick(0.9, 0.0, 0);
+        }
+        assert!(
+            stable.state.self_error < 0.15,
+            "stable observation should converge to low self-error, got {}",
+            stable.state.self_error
+        );
+
+        // 周期观测 (10×0.9 后 10×0.1, 重复 4 轮): 能力估计无法跟上切换 →
+        // 预测先验与观测持续背离 → self-error 反映真实不一致 (> 0.1)。
+        let mut volatile = SelfModel::new();
+        for _ in 0..4 {
+            for _ in 0..10 {
+                volatile.tick(0.9, 0.0, 0);
+            }
+            for _ in 0..10 {
+                volatile.tick(0.1, 0.0, 0);
+            }
+        }
+        assert!(
+            volatile.state.self_error > 0.1,
+            "periodic observation should keep self-error high (model is wrong), got {}",
+            volatile.state.self_error
+        );
+        // 波动模型的误差必须显著高于稳定模型
+        assert!(
+            volatile.state.self_error > stable.state.self_error * 2.0,
+            "volatile self-error ({}) should exceed stable ({}) substantially",
+            volatile.state.self_error,
+            stable.state.self_error
+        );
+    }
 }
