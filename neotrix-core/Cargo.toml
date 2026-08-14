@@ -147,6 +147,7 @@ quick-xml = { version = "0.41", optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 tiktoken-rs = "0.12.0"
 office_oxide = "0.1"
+encoding_rs = "0.8"
 
 [dev-dependencies]
 tempfile = "3"
@@ -167,6 +168,10 @@ harness = false
 
 [[bench]]
 name = "seal_loop"
+harness = false
+
+[[bench]]
+name = "capability_c3"
 harness = false
 
 [[bench]]

@@ -32,7 +32,7 @@ impl Drop for ReentryGuard<'_> {
 }
 
 /// pending-absorb.json 的读取结构 (仅取吸收所需字段)。
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct PendingAbsorb {
     cycle: String,
     #[serde(rename = "session_id")]
@@ -40,20 +40,41 @@ struct PendingAbsorb {
 }
 
 /// 解析 pending JSON — 提取 cycle 用于吸收后 close (R-P16: 单元测试覆盖)。
-fn parse_pending(content: &str) -> Result<PendingAbsorb, String> {
+///
+/// 支持两种格式 (双格式兼容):
+/// - object: 单 session (原协议格式): `{"cycle": "N", "session_id": "sess_..."}`
+/// - list:   多 session 批处理: `[{"cycle": "N", "session_id": "sess_..."}, ...]`
+///
+/// 背景循环必须兼容 list — 实际写入 `~/.neotrix/pending-absorb.json` 的并发
+/// session 使用 list 格式, 否则整个文件被判定 malformed 而滞留 (格式缺陷修复)。
+fn parse_pending(content: &str) -> Result<Vec<PendingAbsorb>, String> {
     let v: serde_json::Value =
         serde_json::from_str(content).map_err(|e| format!("invalid pending JSON: {e}"))?;
-    let cycle = v
-        .get("cycle")
-        .and_then(|c| c.as_str())
-        .ok_or_else(|| "missing 'cycle' field".to_string())?
-        .to_string();
-    let session_id = v
-        .get("session_id")
-        .and_then(|s| s.as_str())
-        .ok_or_else(|| "missing 'session_id' field".to_string())?
-        .to_string();
-    Ok(PendingAbsorb { cycle, session_id })
+
+    let items: Vec<&serde_json::Value> = match &v {
+        serde_json::Value::Array(arr) => arr.iter().collect(),
+        _ => vec![&v],
+    };
+    if items.is_empty() {
+        return Err("pending JSON is empty list".to_string());
+    }
+
+    items
+        .into_iter()
+        .map(|item| {
+            let cycle = item
+                .get("cycle")
+                .and_then(|c| c.as_str())
+                .ok_or_else(|| "missing 'cycle' field".to_string())?
+                .to_string();
+            let session_id = item
+                .get("session_id")
+                .and_then(|s| s.as_str())
+                .ok_or_else(|| "missing 'session_id' field".to_string())?
+                .to_string();
+            Ok(PendingAbsorb { cycle, session_id })
+        })
+        .collect()
 }
 
 /// 定位 neotrix-experience CLI: 优先 ~/.local/bin, 回退 PATH。
@@ -108,52 +129,81 @@ impl BackgroundLoopHandle {
             return;
         };
 
-        log::info!("[bg-absorb] absorbing pending file (session {}, cycle {})", parsed.session_id, parsed.cycle);
-        let absorb = tokio::time::timeout(
-            std::time::Duration::from_secs(600),
-            tokio::process::Command::new(&cli)
-                .arg("absorb")
-                .arg(&pending)
-                .output(),
-        )
-        .await;
+        // 逐个 session 吸收 (list 双格式兼容): 每个 session 写独立临时文件交给 CLI,
+        // 全部成功才删除 pending (all-or-nothing)。避免 CLI 只消费 list 首个元素
+        // 导致后续 session 滞留 (格式缺陷修复)。
+        let mut all_ok = true;
+        for (i, item) in parsed.iter().enumerate() {
+            // 提取该 session 对应的 JSON 子片段 (object 时即为全文; list 时取对应元素)
+            let sub = extract_session(&content, i).unwrap_or_else(|| content.clone());
 
-        match absorb {
-            Ok(Ok(out)) if out.status.success() => {
-                // 吸收成功 → 删除 pending → close 快照 (反馈阶段)
-                let _ = std::fs::remove_file(&pending);
-                log::info!("[bg-absorb] absorbed {} (cycle {}), pending removed", parsed.session_id, parsed.cycle);
-                match tokio::time::timeout(
-                    std::time::Duration::from_secs(60),
-                    tokio::process::Command::new(&cli)
-                        .arg("close")
-                        .arg("--cycle")
-                        .arg(&parsed.cycle)
-                        .output(),
-                )
-                .await
-                {
-                    Ok(Ok(o)) if o.status.success() => {
-                        log::info!("[bg-absorb] closed cycle {}", parsed.cycle);
+            log::info!("[bg-absorb] absorbing pending item {} (session {}, cycle {})", i + 1, item.session_id, item.cycle);
+            let absorb = tokio::time::timeout(
+                std::time::Duration::from_secs(600),
+                tokio::process::Command::new(&cli)
+                    .arg("absorb")
+                    .arg(&sub)
+                    .output(),
+            )
+            .await;
+
+            match absorb {
+                Ok(Ok(out)) if out.status.success() => {
+                    // close 快照 (反馈阶段)
+                    match tokio::time::timeout(
+                        std::time::Duration::from_secs(60),
+                        tokio::process::Command::new(&cli)
+                            .arg("close")
+                            .arg("--cycle")
+                            .arg(&item.cycle)
+                            .output(),
+                    )
+                    .await
+                    {
+                        Ok(Ok(o)) if o.status.success() => {
+                            log::info!("[bg-absorb] closed cycle {}", item.cycle);
+                        }
+                        Ok(Ok(o)) => {
+                            log::warn!("[bg-absorb] close cycle {} failed: {}", item.cycle, String::from_utf8_lossy(&o.stderr).trim());
+                        }
+                        Ok(Err(e)) => log::warn!("[bg-absorb] close spawn failed: {e}"),
+                        Err(_) => log::warn!("[bg-absorb] close timed out"),
                     }
-                    Ok(Ok(o)) => {
-                        log::warn!("[bg-absorb] close cycle {} failed: {}", parsed.cycle, String::from_utf8_lossy(&o.stderr).trim());
-                    }
-                    Ok(Err(e)) => log::warn!("[bg-absorb] close spawn failed: {e}"),
-                    Err(_) => log::warn!("[bg-absorb] close timed out"),
+                }
+                Ok(Ok(out)) => {
+                    // 吸收失败: 保留 pending 下轮重试 (CLI 内部幂等)
+                    all_ok = false;
+                    log::warn!(
+                        "[bg-absorb] absorb failed (exit {}): {}",
+                        out.status,
+                        String::from_utf8_lossy(&out.stderr).trim()
+                    );
+                }
+                Ok(Err(e)) => {
+                    all_ok = false;
+                    log::warn!("[bg-absorb] absorb spawn failed: {e}");
+                }
+                Err(_) => {
+                    all_ok = false;
+                    log::warn!("[bg-absorb] absorb timed out (600s); pending kept for retry");
                 }
             }
-            Ok(Ok(out)) => {
-                // 吸收失败: 保留 pending 下轮重试 (CLI 内部幂等)
-                log::warn!(
-                    "[bg-absorb] absorb failed (exit {}): {}",
-                    out.status,
-                    String::from_utf8_lossy(&out.stderr).trim()
-                );
-            }
-            Ok(Err(e)) => log::warn!("[bg-absorb] absorb spawn failed: {e}"),
-            Err(_) => log::warn!("[bg-absorb] absorb timed out (600s); pending kept for retry"),
         }
+
+        if all_ok {
+            let _ = std::fs::remove_file(&pending);
+            log::info!("[bg-absorb] all {} pending items absorbed, pending removed", parsed.len());
+        }
+    }
+}
+
+/// 从 pending JSON 提取第 idx 个 session 的子 JSON (list 时取元素, object 时取全文)。
+/// 失败时返回 None (调用方回退全文 — object 场景天然全文)。
+fn extract_session(content: &str, idx: usize) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(content).ok()?;
+    match v {
+        serde_json::Value::Array(arr) => arr.get(idx).map(|e| e.to_string()),
+        _ => Some(content.to_string()),
     }
 }
 
@@ -171,9 +221,32 @@ mod tests {
             "domain": "NT-CORE",
             "entries": []
         }"#;
-        let p = parse_pending(json).unwrap();
-        assert_eq!(p.cycle, "1053");
-        assert_eq!(p.session_id, "sess_1234_ab12");
+        let parsed = parse_pending(json).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].cycle, "1053");
+        assert_eq!(parsed[0].session_id, "sess_1234_ab12");
+    }
+
+    #[test]
+    fn test_parse_pending_list_multiple_sessions() {
+        // 格式缺陷修复: list 格式 (多 session 批处理) 必须被解析, 不能判 malformed。
+        let json = r#"[
+            {"schema_version":1,"session_id":"sess_a","cycle":"1109","ts":1,"domain":"NT-CORE","entries":[]},
+            {"schema_version":1,"session_id":"sess_b","cycle":"1110","ts":2,"domain":"NT-MIND","entries":[]}
+        ]"#;
+        let parsed = parse_pending(json).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].cycle, "1109");
+        assert_eq!(parsed[0].session_id, "sess_a");
+        assert_eq!(parsed[1].cycle, "1110");
+        assert_eq!(parsed[1].session_id, "sess_b");
+    }
+
+    #[test]
+    fn test_parse_pending_empty_list_is_error() {
+        // 空 list 无内容可吸收 → 视为 malformed (保留文件待人工处理)。
+        let err = parse_pending("[]").unwrap_err();
+        assert!(err.contains("empty"), "expected empty-list error, got: {err}");
     }
 
     #[test]
@@ -186,6 +259,27 @@ mod tests {
     #[test]
     fn test_parse_pending_invalid_json() {
         assert!(parse_pending("not json{{{").is_err());
+    }
+
+    #[test]
+    fn test_extract_session_list_element() {
+        // list 中提取第 idx 个 session 子 JSON (供 CLI 逐个 absorb)。
+        let json = r#"[
+            {"session_id":"sess_a","cycle":"1109"},
+            {"session_id":"sess_b","cycle":"1110"}
+        ]"#;
+        let sub0 = extract_session(json, 0).unwrap();
+        assert!(sub0.contains("sess_a"));
+        assert!(!sub0.contains("sess_b"));
+        let sub1 = extract_session(json, 1).unwrap();
+        assert!(sub1.contains("sess_b"));
+    }
+
+    #[test]
+    fn test_extract_session_object_returns_full() {
+        let json = r#"{"session_id":"sess_x","cycle":"1111"}"#;
+        let sub = extract_session(json, 0).unwrap();
+        assert!(sub.contains("sess_x"));
     }
 
     #[test]

@@ -120,8 +120,8 @@
         }
       ],
       "metadata": {
-        "tests": "17 passed (nt_core_parallel::isolation)",
-        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts"
+        "absorbed_from": "MDX-Tom/gpt-5.6-instruct, dongshuyan/Awesome-Prompts",
+        "tests": "17 passed (nt_core_parallel::isolation)"
       },
       "created_at": "2026-08-11T17:40:00Z",
       "updated_at": "2026-08-11T17:40:00Z",
@@ -265,7 +265,7 @@
       "id": "nt_io_hotreload::revertible_effects",
       "domain": "io",
       "layer": "l1composite",
-      "constellation": "c1unittest",
+      "constellation": "c3benchmark",
       "provides": [
         "hotreload",
         "rollback",
@@ -291,11 +291,27 @@
           "to_node": "nt_io_hotreload::revertible_effects",
           "note": "Promoted to C1",
           "timestamp": "2026-08-14T03:07:57.852567Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_hotreload::revertible_effects",
+          "note": "Promoted to C2",
+          "timestamp": "2026-08-14T06:28:23.650511Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_io_hotreload::revertible_effects",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-14T06:54:01.696408Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T03:07:54.127683Z",
-      "updated_at": "2026-08-14T03:07:57.852568Z",
+      "updated_at": "2026-08-14T06:54:01.696409Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -455,7 +471,7 @@
       "id": "nt_memory_visibility::visibility_gate",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c3benchmark",
       "provides": [
         "visibility",
         "filtering",
@@ -488,11 +504,19 @@
           "to_node": "nt_memory_visibility::visibility_gate",
           "note": "Promoted to C2",
           "timestamp": "2026-08-14T05:37:20.888094Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_visibility::visibility_gate",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-14T06:54:01.676292Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T04:22:16.588985Z",
-      "updated_at": "2026-08-14T05:37:20.888095Z",
+      "updated_at": "2026-08-14T06:54:01.676294Z",
       "deprecated": false,
       "deprecated_reason": null
     },
@@ -500,7 +524,7 @@
       "id": "nt_memory_provenance::decision_trail",
       "domain": "memory",
       "layer": "l3domainservice",
-      "constellation": "c2integrationtest",
+      "constellation": "c4mainpipeline",
       "provides": [
         "provenance",
         "traceability",
@@ -533,11 +557,27 @@
           "to_node": "nt_memory_provenance::decision_trail",
           "note": "Promoted to C2",
           "timestamp": "2026-08-14T05:37:20.878870Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_provenance::decision_trail",
+          "note": "Promoted to C3",
+          "timestamp": "2026-08-14T06:54:01.687572Z"
+        },
+        {
+          "cycle": "auto",
+          "op": "maturation",
+          "from_nodes": [],
+          "to_node": "nt_memory_provenance::decision_trail",
+          "note": "Promoted to C4",
+          "timestamp": "2026-08-14T06:55:09.488762Z"
         }
       ],
       "metadata": {},
       "created_at": "2026-08-14T04:22:19.107899Z",
-      "updated_at": "2026-08-14T05:37:20.878872Z",
+      "updated_at": "2026-08-14T06:55:09.488764Z",
       "deprecated": false,
       "deprecated_reason": null
     }
@@ -854,6 +894,14 @@
       "domain": "NT-META",
       "promoted_at": 1786681650,
       "rationale": "[蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 3 条经验的模式: [蒸馏-NT-META] 聚合 ",
+      "signal": 0.76
+    },
+    {
+      "action": "awakening_note",
+      "capability": "consciousness::meta_cognition",
+      "domain": "NT-META",
+      "promoted_at": 1786688727,
+      "rationale": "[蒸馏-NT-CORE] 聚合 3 条经验的模式: MARS 桥接死计数器修复法: mars_bridge_hits 字段定义存在 (struct 注释声明 'Purpose bridge: System 2's intent → Syst",
       "signal": 0.76
     }
   ]
