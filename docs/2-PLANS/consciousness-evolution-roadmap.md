@@ -11,7 +11,7 @@
 
 | 论文 | 核心贡献 | 对应 NeoTrix | 优先级 | 状态 |
 |------|----------|-------------|--------|------|
-| **Thinking Pixel** (arXiv:2604.25299) | 递归稀疏 MoE in diffusion latent space; 单调递归深度奖励 RL; GWT 显式引用 | E8 递归循环 + SEAL reward_calc | **P0** | ⬜ |
+| **Thinking Pixel** (arXiv:2604.25299) | 递归稀疏 MoE in diffusion latent space; 单调递归深度奖励 RL; GWT 显式引用 | E8 递归循环 + SEAL reward_calc | **P0** | ✅ RewardCalculationStage 已接线 |
 | **Transolver** (arXiv:2402.02366) | Physics-Attention: 将空间分割为可学习切片计算注意力 | GWT 专家切片聚类 (自适应, 非固定拓扑) | **P0** | ✅ |
 | **Latent Prediction Theory** (arXiv:2605.27734) | RL 中潜在预测误差驱动探索的理论分析 | SEAL curiosity_bonus + LatentPredictor | **P0** | ✅ |
 | **DiffThinker** (arXiv:2512.24165) | 扩散模型做 image→image 推理 (生成式多模态推理) | 多模态理解 + 未来 DiffusionHead 专家 | P2 | ⬜ |
@@ -23,17 +23,17 @@
 | 论文 | 核心贡献 | 对应 NeoTrix | 优先级 | 状态 |
 |------|----------|-------------|--------|------|
 | **Theater of Mind / GWA** (arXiv:2604.08206) | 5 专家 + GWT + 熵驱动的死锁打破 | GWT entropy-based deadlock resolution | **P0** | ✅ |
-| **CTM-AI** (arXiv:2605.04097) | Conscious Turing Machine 形式化蓝图 + 首次实例化 | E8 → CTM 形式化对齐 | **P0** | ⬜ |
-| **MIRROR** (arXiv:2506.00430 / AAAI 2026) | GWT + 重建记忆 + 内心独白 + 互补学习, 21% 提升 | GWT inner_speech + complementary_learning | **P0** | ⬜ |
-| **Selection-Broadcast Cycle** (Frontiers in Robotics, 2025) | GWT 周期结构: 竞争→广播→全局可用 | GWT 周期计时器优化 | P1 | ⬜ |
-| **Machine Consciousness** (Neural Comp & Apps, 2026) | GWT + 层次化记忆系统 | GWT ↔ KB 层次化增强 | P1 | ⬜ |
-| **GWT Top-Down Attention** (arXiv:2602.08597) | 模态级注意力 in 全局潜在工作空间 | GWT attention_head 模态级路由 | P1 | ⬜ |
+| **CTM-AI** (arXiv:2605.04097) | Conscious Turing Machine 形式化蓝图 + 首次实例化 | E8 → CTM 形式化对齐 | **P0** | ✅ CtmVerifier 已接线 |
+| **MIRROR** (arXiv:2506.00430 / AAAI 2026) | GWT + 重建记忆 + 内心独白 + 互补学习, 21% 提升 | GWT inner_speech + complementary_learning | **P0** | ✅ InnerSpeech + 熵监控 |
+| **Selection-Broadcast Cycle** (Frontiers in Robotics, 2025) | GWT 周期结构: 竞争→广播→全局可用 | GWT 周期计时器优化 | P1 | ✅ 周期 + monitor 熵死锁 |
+| **Machine Consciousness** (Neural Comp & Apps, 2026) | GWT + 层次化记忆系统 | GWT ↔ KB 层次化增强 | P1 | ✅ MemoryGraphSpecialist |
+| **GWT Top-Down Attention** (arXiv:2602.08597) | 模态级注意力 in 全局潜在工作空间 | GWT attention_head 模态级路由 | P1 | ✅ ModalityRouter |
 
 ### Dimension 3: 潜在推理 / 测试时计算 (Latent Reasoning / Test-Time Compute)
 
 | 论文 | 核心贡献 | 对应 NeoTrix | 优先级 | 状态 |
 |------|----------|-------------|--------|------|
-| **Scaling TTC with Latent Reasoning** (NeurIPS 2025) | 3.5B 循环深度 Transformer; latent 空间推理 (无 token CoT) | E8 reco 循环 + latent thought 向量 | **P0** | ⬜ |
+| **Scaling TTC with Latent Reasoning** (NeurIPS 2025) | 3.5B 循环深度 Transformer; latent 空间推理 (无 token CoT) | E8 reco 循环 + latent thought 向量 | **P0** | ✅ LatentThoughtVector + unified_latent |
 | **GTS** (arXiv:2602.14077) | Gaussian Thought Sampler — 可学习潜在探索采样 | E8 epsilon-greedy → GTS 升级 | **P1** | ✅ |
 | **LTPO** (arXiv:2510.04182) | 测试时 RL 优化潜在思想向量 | SEAL reward_calc → latent 空间优化 | P2 | ⬜ |
 | **TRACE** (arXiv:2604.17304) | 时序推理聚合 + 高效 early-exit | E8 状态循环 early termination | P1 | ⬜ |
@@ -43,7 +43,7 @@
 
 | 论文 | 核心贡献 | 对应 NeoTrix | 优先级 | 状态 |
 |------|----------|-------------|--------|------|
-| **MiCRo** (arXiv:2506.13331) | Mixture of Cognitive Reasoners: 大脑网络启发的专家模块 (语言/逻辑/社会/知识) | GWT 12 专家 → 认知网络优化 | **P0** | ⬜ |
+| **MiCRo** (arXiv:2506.13331) | Mixture of Cognitive Reasoners: 大脑网络启发的专家模块 (语言/逻辑/社会/知识) | GWT 12 专家 → 认知网络优化 | **P0** | ✅ GWT 15 个 SpecialistType |
 | **LatentOmni** (arXiv:2605.22012) | 统一音视频潜在推理 | 多模态 Specialist 扩展 | P2 | ⬜ |
 | **LatentUM** (arXiv:2604.02097) | 共享语义潜在空间的统一模型 | HyperCube + latent 语义对齐 | P1 | ⬜ |
 
