@@ -1,8 +1,4 @@
-// Allow dead code: social content collection functions are scaffolding for
-// future API-key-based platform integrations.
-#![allow(dead_code)]
-
-use std::time::Duration;
+// Social content collection scaffolding for API-key-based platform integrations.
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -42,63 +38,6 @@ impl std::fmt::Display for SocialFindings {
     }
 }
 
-async fn search_web_for_social(query: &str, client: &Client, source_name: &str) -> Vec<SocialPost> {
-    // Search for "site:reddit.com username" type queries via DuckDuckGo
-    let encoded = urlencoding(query);
-    let url = format!("https://duckduckgo.com/html/?q={encoded}");
-    match client.get(&url)
-        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
-        .timeout(Duration::from_secs(10))
-        .send()
-        .await
-    {
-        Ok(resp) if resp.status().is_success() => {
-            let body = resp.text().await.unwrap_or_default();
-            let mut posts = Vec::new();
-            // Extract result snippets from DDG HTML
-            for line in body.lines() {
-                if line.contains("class=\"result__snippet\"") || line.contains("class=\"result__body\"") {
-                    let content = extract_text_between(line, ">", "</");
-                    if !content.is_empty() {
-                        posts.push(SocialPost {
-                            platform: source_name.to_string(),
-                            author: "search".to_string(),
-                            content: content.to_string(),
-                            url: None,
-                            timestamp: None,
-                            engagement: None,
-                            source: "web-search".to_string(),
-                        });
-                    }
-                }
-            }
-            posts.truncate(20);
-            posts
-        }
-        _ => vec![],
-    }
-}
-
-fn urlencoding(input: &str) -> String {
-    input.as_bytes().iter().map(|&byte| {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (byte as char).to_string(),
-            b' ' => '+'.to_string(),
-            _ => format!("%{:02X}", byte),
-        }
-    }).collect::<String>()
-}
-
-fn extract_text_between<'a>(s: &'a str, start_delim: &str, end_delim: &str) -> &'a str {
-    if let Some(start) = s.find(start_delim) {
-        let from = start + start_delim.len();
-        if let Some(end) = s[from..].find(end_delim) {
-            return s[from..from + end].trim();
-        }
-    }
-    ""
-}
-
 pub async fn investigate(target: &OsintTarget, _client: &Client, _config: &OsintConfig) -> Result<SocialFindings, String> {
     let mut findings = SocialFindings::default();
 
@@ -132,34 +71,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_urlencoding_simple() {
-        assert_eq!(urlencoding("hello"), "hello");
-    }
-
-    #[test]
-    fn test_urlencoding_spaces() {
-        assert_eq!(urlencoding("hello world"), "hello+world");
-    }
-
-    #[test]
-    fn test_urlencoding_special() {
-        let encoded = urlencoding("a&b=c");
-        assert_eq!(encoded, "a%26b%3Dc");
-    }
-
-    #[test]
-    fn test_extract_text_between() {
-        let s = "foo<b>bar</b>baz";
-        assert_eq!(extract_text_between(s, "<b>", "</b>"), "bar");
-    }
-
-    #[test]
-    fn test_extract_text_between_no_match() {
-        let s = "foo bar baz";
-        assert_eq!(extract_text_between(s, "<b>", "</b>"), "");
-    }
-
-    #[test]
     fn test_social_findings_default() {
         let f = SocialFindings::default();
         assert!(f.posts.is_empty());
@@ -171,13 +82,5 @@ mod tests {
         let f = SocialFindings::default();
         let s = format!("{f}");
         assert!(s.contains("Social Media"));
-    }
-
-    #[test]
-    fn test_duckduckgo_url() {
-        let q = urlencoding("site:reddit.com testuser");
-        let url = format!("https://duckduckgo.com/html/?q={q}");
-        assert!(url.contains("testuser"));
-        assert!(url.contains("site%3Areddit"));
     }
 }

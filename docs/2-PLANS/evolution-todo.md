@@ -1,13 +1,13 @@
 # NeoTrix Evolution TODO — 2026-08-13 Cycle 241+ (P1 治理合规 + warning 清零)
 
-## Build Baseline (2026-08-13)
+## Build Baseline (2026-08-14 蜕变迭代后)
 
 | Check | Result |
 |-------|--------|
-| `cargo check --lib -p neotrix` | ✅ 0 errors / 11 warnings (9 对方新模块 metadata + 2 nt_file_ability) |
-| `cargo check --features full --lib -p neotrix` | ✅ 0 errors / 15 warnings |
-| `cargo test -p neotrix --lib` | ✅ 6811 passed / 2 failed(修复后待重跑) / 12 ignored |
-| warning 清理 | 🟢 43 → 11 (无效断言/死代码/未使用变量 + rate_limit_middleware 接线) |
+| `cargo check --lib -p neotrix` | ✅ 0 errors / 0 warnings |
+| `cargo check --features full --lib -p neotrix` | ✅ 0 errors / 0 warnings |
+| `cargo test -p neotrix --lib` | ✅ 6704 passed / 2 flaky(隔离通过) / 12 ignored |
+| 孤儿模块清理 | 🟢 删除 26 个孤儿模块 (~9,663 行) + 零消费者 ws.rs + 2 处 crate-level allow(dead_code) |
 
 ---
 

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;

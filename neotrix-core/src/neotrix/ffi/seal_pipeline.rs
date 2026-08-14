@@ -1,5 +1,11 @@
 // SEAL Pipeline Implementation
 // Self-Evolving Architecture Loop — exploration, distillation, self-test, absorption
+//
+// NOTE: This is a status facade for the mobile (iOS/Android) bridge surface.
+// It reports the real cycle/progress counters of the pipeline lifecycle, but does
+// NOT fabricate exploration discoveries or distillation metrics — those are only
+// reported once genuinely produced by the runtime pipeline (see
+// self_iterating::pipeline::seal_pipeline for the real implementation).
 
 use uniffi;
 use std::sync::RwLock;
@@ -92,11 +98,12 @@ impl SEALPipelineImpl {
 
     pub fn trigger_distillation(&self) -> DistillationResult {
         let inner = self.inner.read().unwrap();
+        // 真实值来自已发生的探索结果; 无探索数据则不伪造蒸馏产出。
         DistillationResult {
             patterns_extracted: inner.exploration.patterns.len() as u32,
-            skills_crystallized: 1,
-            knowledge_compressed_mb: 0.5,
-            duration_ms: 120,
+            skills_crystallized: 0,
+            knowledge_compressed_mb: 0.0,
+            duration_ms: 0,
         }
     }
 
@@ -111,22 +118,8 @@ fn run_stage_inner(inner: &mut SEALPipelineInner, stage_id: &str) {
 
     // Side-effect mutations first (no stage borrow held)
     match stage_id {
-        "exploration" => {
-            inner.exploration.discoveries.push(Discovery {
-                id: format!("d{}", now),
-                domain: "NT-WORLD".into(),
-                content: "Discovered new pattern in message flow".into(),
-                confidence: 0.8,
-                source: "chat_analysis".into(),
-            });
-            inner.exploration.patterns.push(Pattern {
-                id: format!("p{}", now),
-                name: "Message Clustering".into(),
-                description: "Messages cluster by topic affinity".into(),
-                applicability: vec!["chat".into(), "filtering".into()],
-                strength: 0.7,
-            });
-        }
+        // 不再伪造探索发现/模式 — 状态门面只报告真实计数与进度。
+        // 真实发现由 self_iterating 运行管线产生后才会出现在 exploration 中。
         "absorption" => {
             inner.absorption.completed += 1;
             inner.absorption.current_item = format!("cycle-{}", inner.status.cycle_count);

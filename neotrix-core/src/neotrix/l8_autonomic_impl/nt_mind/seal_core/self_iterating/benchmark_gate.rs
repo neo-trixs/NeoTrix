@@ -94,6 +94,9 @@ pub enum BenchmarkGateDecision {
 /// rolls back if performance regresses beyond the threshold.
 pub struct BenchmarkGateStage {
     pub suite: BenchmarkSuite,
+    /// Cached pre-edit benchmark scores, so the gate can compare the next run
+    /// against a true baseline instead of measuring a zero delta on the same state.
+    pub baseline: std::sync::Mutex<Option<HashMap<String, f64>>>,
 }
 
 impl Default for BenchmarkGateStage {
@@ -106,11 +109,15 @@ impl BenchmarkGateStage {
     pub fn new() -> Self {
         Self {
             suite: BenchmarkSuite::default(),
+            baseline: std::sync::Mutex::new(None),
         }
     }
 
     pub fn with_suite(suite: BenchmarkSuite) -> Self {
-        Self { suite }
+        Self {
+            suite,
+            baseline: std::sync::Mutex::new(None),
+        }
     }
 }
 
@@ -124,9 +131,24 @@ impl BrainStage for BenchmarkGateStage {
     }
 
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
-        let pre_scores = self.suite.run(brain);
         let post_scores = self.suite.run(brain);
-        let delta = BenchmarkSuite::compute_delta(&pre_scores, &post_scores);
+
+        let mut baseline_guard = self.baseline.lock().unwrap();
+        let delta = match baseline_guard.as_ref() {
+            Some(pre_scores) => {
+                let d = BenchmarkSuite::compute_delta(pre_scores, &post_scores);
+                // Baseline is consumed each time: the next process() records a fresh
+                // baseline, so deltas always measure a genuine edit-induced change.
+                *baseline_guard = Some(post_scores);
+                d
+            }
+            None => {
+                // First run: record the baseline, defer the gate decision to next run.
+                log::info!("[benchmark-gate] baseline recorded ({} tasks)", post_scores.len());
+                *baseline_guard = Some(post_scores);
+                return Ok(StageDecision::Continue);
+            }
+        };
 
         match self.suite.gate(delta) {
             BenchmarkGateDecision::Accept => {
@@ -224,5 +246,27 @@ mod tests {
     fn test_benchmark_suite_default_has_five_tasks() {
         let suite = BenchmarkSuite::default();
         assert_eq!(suite.tasks.len(), 5);
+    }
+
+    #[test]
+    fn test_process_records_baseline_first_run_then_compares() {
+        let stage = BenchmarkGateStage::new();
+        let mut brain = SelfIteratingBrain::new();
+        // 首次 process: 记录 baseline, 不 gate
+        let first = stage.process(&mut brain).unwrap();
+        assert!(matches!(first, StageDecision::Continue));
+        assert!(stage.baseline.lock().unwrap().is_some());
+        // 第二次 process: 使用 baseline 计算真实 delta (当前仍 Accept, 因为 delta≈0)
+        let second = stage.process(&mut brain).unwrap();
+        assert!(matches!(second, StageDecision::Continue));
+    }
+
+    #[test]
+    fn test_gate_threshold_logic() {
+        let suite = BenchmarkSuite { threshold: -0.05, ..Default::default() };
+        assert!(matches!(suite.gate(0.1), BenchmarkGateDecision::Accept));
+        assert!(matches!(suite.gate(-0.02), BenchmarkGateDecision::Accept));
+        assert!(matches!(suite.gate(-0.08), BenchmarkGateDecision::Retry));
+        assert!(matches!(suite.gate(-0.5), BenchmarkGateDecision::Rollback));
     }
 }
