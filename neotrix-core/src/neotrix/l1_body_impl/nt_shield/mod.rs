@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod guard;
+pub mod guard_chain;
 pub mod key_encryption;
 pub mod perm_chain;
 pub mod permissions;

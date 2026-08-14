@@ -30,6 +30,8 @@ pub mod nt_memory_graphrag;
 pub mod nt_memory_gwtq;
 pub mod nt_memory_diversity;
 pub mod nt_memory_curation;
+pub mod nt_memory_visibility;
+pub mod nt_memory_provenance;
 pub mod nt_memory_skill_cost;
 pub mod nt_memory_ingest;
 pub mod nt_memory_proficiency;
@@ -48,6 +50,7 @@ pub mod nt_memory_tech_reserve;
 pub mod nt_memory_wiki;
 pub mod nt_memory_knowledge_assets;
 pub mod nt_memory_commit_tracker;
+pub mod nt_memory_coeffect;
 pub mod nt_memory_graph_cache;
 pub mod nt_memory_galaxy_hygiene;
 pub mod privacy;
@@ -925,7 +928,30 @@ impl KnowledgeBase {
                 drop(conn);
                 if !conflicts.is_empty() {
                     let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
-                    let _ = nt_memory_curation::apply_supersede(&conn, &conflicts);
+                    // fidelity ledger (diagram-design 吸收): 冲突解决留差异清单
+                    // + provenance 溯源, 供审计回查, 而非仅静默覆盖。
+                    match nt_memory_curation::apply_supersede_with_ledger(&conn, &conflicts) {
+                        Ok((applied, ledger)) => {
+                            if !ledger.is_empty() {
+                                log::info!(
+                                    "[curation] superseded {} nodes w/ provenance ledger: {}",
+                                    applied, ledger.len()
+                                );
+                                // PROV-O 决策溯源 (semantica 吸收): 每次覆盖解决
+                                // 记录谁/做什么/基于什么证据。
+                                for e in &ledger.entries {
+                                    let _ = self.record_decision_provenance(
+                                        "nt_memory_curation",
+                                        crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_provenance::ProvActivity::Supersede,
+                                        &e.older_id,
+                                        &format!("superseded by {}", e.newer_id),
+                                        vec![e.newer_id.clone(), format!("sim={:.3}", e.sim)],
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => log::warn!("[curation] supersede ledger failed: {}", e),
+                    }
                 }
             }
         }
@@ -1527,6 +1553,43 @@ impl KnowledgeBase {
             cache.put(cache_key, results.clone());
         }
         Ok(results)
+    }
+
+    /// 三值可见性过滤的检索入口 (x-algorithm visibility-filtering 吸收):
+    /// 在 `hybrid_rerank_search` 之后对候选做 ALLOW/INTERSTITIAL/DROP 末端裁定。
+    /// 返回 (可展示结果, 可见性裁定)。仅 Allow/Interstitial 进入可展示集。
+    pub fn search_with_visibility(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<(Vec<SearchResult>, Vec<nt_memory_visibility::VisibilityVerdict>), String> {
+        let results = self.hybrid_rerank_search(query, limit)?;
+        let config = nt_memory_visibility::VisibilityConfig::default();
+        let verdicts = nt_memory_visibility::filter_visibility(results, &config);
+        let allowed: Vec<SearchResult> = self
+            .hybrid_rerank_search(query, limit)?
+            .into_iter()
+            .zip(verdicts.iter())
+            .filter(|(_, v)| v.visibility != nt_memory_visibility::Visibility::Drop)
+            .map(|(r, _)| r)
+            .collect();
+        Ok((allowed, verdicts))
+    }
+
+    /// 记录一条决策溯源 (PROV-O, semantica 吸收) 到 kv_store `provenance`。
+    /// 供审计链回查 (D14/D20): 谁在何时基于何证据做了何决策。
+    pub fn record_decision_provenance(
+        &self,
+        agent: &str,
+        activity: nt_memory_provenance::ProvActivity,
+        entity: &str,
+        outcome: &str,
+        evidence: Vec<String>,
+    ) -> Result<String, String> {
+        let conn = self.conn.lock().map_err(|e| format!("Lock: {}", e))?;
+        let record = nt_memory_provenance::ProvenanceRecord::new(agent, activity, entity, outcome)
+            .with_evidence(evidence);
+        nt_memory_provenance::record_with_index(&conn, record)
     }
 
     // ── Agent Memory ──
@@ -2457,6 +2520,93 @@ mod tests {
     #[test]
     fn test_basic() {
         assert!(true);
+    }
+
+    #[test]
+    fn test_decision_trail_production_chain() {
+        // C2 集成测试: 打通生产接线全链路 —
+        // KnowledgeBase::record_decision_provenance (生产入口, mod.rs:1580)
+        // → kv_store provenance 命名空间落盘
+        // → query_provenance (nt_memory_provenance.rs) 回查
+        // 验证 R-P79: record_decision_provenance 被 curation supersede 生产路径调用
+        // (mod.rs:942), 本测试模拟该消费者行为。
+        use super::nt_memory_provenance::{self, ProvActivity};
+        let dir = std::env::temp_dir().join(format!("nt_kb_prov_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_prov.db");
+        let kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        let id1 = kb
+            .record_decision_provenance(
+                "nt_memory_curation",
+                ProvActivity::Supersede,
+                "node-old-1",
+                "superseded by node-new-1",
+                vec!["node-new-1".into(), "sim=0.912".into()],
+            )
+            .expect("record provenance");
+        assert!(id1.starts_with("prov-"));
+
+        let conn = kb.conn.lock().expect("lock");
+        let hits = nt_memory_provenance::query_provenance(
+            &conn, Some("nt_memory_curation"), Some("supersede"), None,
+        ).expect("query provenance");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].entity, "node-old-1");
+        assert_eq!(hits[0].evidence.len(), 2);
+        assert!(hits[0].evidence[0].contains("node-new-1"));
+        drop(conn);
+
+        // 第二次决策 (模拟多 supersede 决策) → 最新优先
+        kb.record_decision_provenance(
+            "nt_memory_curation",
+            ProvActivity::Supersede,
+            "node-old-2",
+            "superseded by node-new-2",
+            vec!["node-new-2".into()],
+        ).expect("record second");
+        let conn = kb.conn.lock().expect("lock");
+        let hits = nt_memory_provenance::query_provenance(
+            &conn, Some("nt_memory_curation"), None, None,
+        ).expect("query all");
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].entity, "node-old-2", "newest first");
+        drop(conn);
+
+        // 审计 JSON 形状 (to_audit_json 供审计链消费)
+        let conn = kb.conn.lock().expect("lock");
+        let hits = nt_memory_provenance::query_provenance(
+            &conn, None, None, Some("node-old-1"),
+        ).expect("query by entity");
+        assert_eq!(hits.len(), 1);
+        let audit = nt_memory_provenance::to_audit_json(&hits[0]);
+        assert_eq!(audit["prov"], "PROV-O");
+        assert_eq!(audit["entity"], "node-old-1");
+    }
+
+    #[test]
+    fn test_visibility_gate_production_chain() {
+        // C2 集成测试: 打通 search_with_visibility 生产入口全链路 —
+        // 先存知识节点 → hybrid_rerank_search → filter_visibility 三值裁定
+        // → Drop 高风险/低相关, Allow 强相关。
+        use super::nt_memory_visibility::{self, Visibility};
+        let dir = std::env::temp_dir().join(format!("nt_kb_vis_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).ok();
+        let db_path = dir.join("test_vis.db");
+        let mut kb = KnowledgeBase::open(Some(db_path.clone())).expect("open kb");
+
+        let mut provider: &mut dyn crate::core::nt_core_traits::MemoryProvider = &mut kb;
+        provider.store("visible_doc", "clean knowledge content about rust ownership").expect("store allow");
+        provider.store("risky_doc", "clean content").expect("store risk");
+
+        let (allowed, verdicts) = kb.search_with_visibility("rust", 5).expect("search w/ visibility");
+        assert!(!verdicts.is_empty(), "verdicts produced for candidate set");
+        // 每个非 Drop 结果都有对应裁定
+        assert_eq!(allowed.len(), verdicts.iter().filter(|v| v.visibility != Visibility::Drop).count());
+        // 裁定含 reason (可审计)
+        for v in &verdicts {
+            assert!(!v.reason.is_empty(), "verdict reason non-empty: {:?}", v.node_id);
+        }
     }
 
     #[test]

@@ -29,6 +29,9 @@ pub struct SkillEntry {
     pub path: PathBuf,
     pub content: String,
     pub active: bool,
+    /// 渐进披露 (progressive disclosure, 吸收自 cathrynlavery/diagram-design):
+    /// SKILL.md 只保留选择指南, 深层细节以 `references/*.md` 按需加载。
+    pub references: Vec<String>,
 }
 
 impl SkillEntry {
@@ -52,6 +55,7 @@ impl SkillEntry {
         let mut tools = Vec::new();
         let mut hooks = Vec::new();
         let mut priority: u8 = 50;
+        let mut references = Vec::new();
 
         for line in frontmatter.lines() {
             let line = line.trim();
@@ -67,6 +71,8 @@ impl SkillEntry {
                 tools = parse_array_field(val);
             } else if let Some(val) = line.strip_prefix("hooks:") {
                 hooks = parse_array_field(val);
+            } else if let Some(val) = line.strip_prefix("references:") {
+                references = parse_array_field(val);
             } else if let Some(val) = line.strip_prefix("priority:") {
                 priority = val.trim().parse::<u8>().unwrap_or(50).min(100);
             }
@@ -87,6 +93,7 @@ impl SkillEntry {
             path: path.to_path_buf(),
             content: content.to_string(),
             active: false,
+            references,
         })
     }
 
@@ -327,6 +334,32 @@ impl SkillEngine {
         self.skills.iter_mut().find(|s| s.name == name)
     }
 
+    /// 渐进披露加载 (progressive disclosure, diagram-design 吸收):
+    /// SKILL.md 只描述技能的选择与入口, 深层细节 (参考文档/模板/示例) 存于
+    /// `<skill_dir>/references/<file>`, 按需读取 — 避免常驻加载拉爆上下文。
+    ///
+    /// 返回已声明引用中命中的内容; 未声明或不存在返回 Err (提示缺失)。
+    pub fn load_reference(&self, name: &str, reference: &str) -> Result<String, String> {
+        let entry = self
+            .get_skill(name)
+            .ok_or_else(|| format!("Skill '{}' not found", name))?;
+        if !entry.references.iter().any(|r| r == reference) {
+            return Err(format!(
+                "Reference '{}' not declared in skill '{}' (declared: {:?})",
+                reference, name, entry.references
+            ));
+        }
+        let skill_dir = entry.path.parent().unwrap_or(&self.skills_dir);
+        let ref_path = skill_dir.join("references").join(reference);
+        if !ref_path.exists() {
+            return Err(format!(
+                "Reference file missing: {}",
+                ref_path.display()
+            ));
+        }
+        std::fs::read_to_string(&ref_path).map_err(|e| format!("read reference: {}", e))
+    }
+
     /// Activate a skill by name. Fires HookEvent::SkillLoaded and GWT broadcast.
     pub fn activate_skill(&mut self, name: &str) -> Result<(), String> {
         let idx = self.skills.iter().position(|s| s.name == name)
@@ -488,6 +521,7 @@ impl SkillEngine {
             path: PathBuf::new(),
             content: yaml,
             active: false,
+            references: vec![],
         }
     }
 
@@ -1043,6 +1077,41 @@ low"#;
         let mut engine = SkillEngine::new(dir.path().join("skills"));
         engine.load_all();
         assert!(engine.list_all().is_empty());
+    }
+
+    #[test]
+    fn test_progressive_disclosure_load_reference() {
+        // 渐进披露 (diagram-design 吸收): SKILL.md 只声明 references,
+        // 细节存 references/*.md 按需加载。
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        let skill_dir = skills_dir.join("my-skill");
+        let refs_dir = skill_dir.join("references");
+        std::fs::create_dir_all(&refs_dir).unwrap();
+
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: my-skill\ndescription: A skill with progressive disclosure\ntriggers: [\"mine\"]\nreferences: [\"type-a.md\", \"type-b.md\"]\n---\nbody",
+        )
+        .unwrap();
+        std::fs::write(refs_dir.join("type-a.md"), "TYPE-A DETAILS").unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+        assert_eq!(engine.list_all().len(), 1);
+
+        // 已声明引用 → 按需加载成功
+        let loaded = engine.load_reference("my-skill", "type-a.md").unwrap();
+        assert!(loaded.contains("TYPE-A DETAILS"));
+
+        // 未声明引用 → 拒绝 (禁未声明加载)
+        assert!(engine.load_reference("my-skill", "secret.md").is_err());
+
+        // 缺失文件 → 报错 (声明了但没落盘)
+        assert!(engine.load_reference("my-skill", "type-b.md").is_err());
+
+        // 不存在的技能 → 报错
+        assert!(engine.load_reference("nope", "type-a.md").is_err());
     }
 
     #[test]

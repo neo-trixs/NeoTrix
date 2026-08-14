@@ -12,6 +12,7 @@ use super::resonance::{
 use super::competition_gate::{CompetitionGate, CompetitionResult};
 use super::compaction::CompactionPipeline;
 use super::moe_router::MoERouter;
+use super::independence::{EffectSpec, IndependenceGate, IndependenceVerdict};
 
 use crate::core::nt_core_hex::ReasoningHexagram;
 use crate::core::nt_core_harness::HarnessAdapter;
@@ -122,6 +123,9 @@ pub struct GlobalWorkspace {
     /// 事件驱动信号 (GWA 离散动态系统) — 非轮询：外部触发 signal_event()，
     /// 消费方 consume_event() 取走事件后执行广播，模拟事件驱动广播循环。
     pub event_pending: bool,
+    /// §3.3.2 Theorem 42 可交换性判定器 — 广播前判定 specialist effect 的
+    /// 独立性 (任意序撤回) vs 顺序敏感 (须外部强加次序)。
+    pub independence: IndependenceGate,
 }
 
 /// Events that trigger an audit block
@@ -184,6 +188,7 @@ impl GlobalWorkspace {
             broadcast_capacity: 3,
             active_broadcast: VecDeque::new(),
             event_pending: false,
+            independence: IndependenceGate::new(),
         }
     }
 
@@ -617,6 +622,34 @@ impl GlobalWorkspace {
             self.append_audit_block(AuditEventType::Compaction, report.winner, report.entropy, ignition, compaction_report.auto_compacted);
         }
 
+        // Step 5d: Independence audit — winner 集群是否可任意序撤回
+        // (§3.3.2 Theorem 42): 独立 → Corollary 21 任意序撤回; 否则须外部次序。
+        {
+            let gated = self.last_sparse_gate.as_ref().map(|(g, _)| g.clone()).unwrap_or_default();
+            let ids: Vec<&str> = gated
+                .iter()
+                .filter_map(|&i| self.specialist_at_index(i).map(|m| m.name.as_str()))
+                .collect();
+            if !ids.is_empty() {
+                match self.independence.assert_any_order(&ids) {
+                    IndependenceVerdict::Independent => {
+                        self.broadcast_history.push(format!(
+                            "[independence] winner cluster independent: {} (任意序撤回)",
+                            ids.join(",")
+                        ));
+                    }
+                    IndependenceVerdict::OrderedRequired { conflicts } => {
+                        let c: Vec<String> = conflicts.iter().map(|(a, b)| format!("{a}<{b}")).collect();
+                        self.broadcast_history.push(format!(
+                            "[independence] ORDER REQUIRED: {} ({})",
+                            ids.join(","),
+                            c.join("; ")
+                        ));
+                    }
+                }
+            }
+        }
+
         // Step 6: store resonance report
         self.last_resonance = Some(report.clone());
         self.resonance_history.push(report.clone());
@@ -774,6 +807,28 @@ impl GlobalWorkspace {
         }
         if self.oscillator_network.is_none() && self.specialists.len() >= 3 {
             self.init_oscillators(self.specialists.len());
+        }
+        // §3.3.2 Theorem 42: 注册默认 specialist 的可交换性声明。
+        // 观测/检索类共享可交换 key (events); 编排/规划类含顺序敏感 key
+        // (plan), 即跨组件撤回须外部强加次序。
+        use super::module_def::SpecialistType as ST;
+        for st in &[
+            ST::PatternMatcher, ST::AnomalyDetector, ST::KnowledgeRetriever,
+            ST::CodeAnalyzer, ST::KnowledgeIntegrator,
+            ST::GoalPrioritizer, ST::RiskAssessor, ST::CreativityGenerator,
+            ST::ReflectionEngine, ST::MetaCognitionAnalyst, ST::AISecurity,
+            ST::ImageGenerator, ST::EvidenceWeightedHypothesis,
+        ] {
+            self.independence.register(EffectSpec::commutative(
+                Box::leak(format!("{st:?}").into_boxed_str()),
+                &["events"],
+            ));
+        }
+        for st in &[ST::Planner, ST::Orchestrator] {
+            self.independence.register(EffectSpec::with_ordered(
+                Box::leak(format!("{st:?}").into_boxed_str()),
+                &[("plan", super::independence::KeyCommutativity::Ordered)],
+            ));
         }
     }
 

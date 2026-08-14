@@ -188,11 +188,30 @@ impl AgentLoop {
         }
     }
 
+    /// 当前任务意图 (agent-vision-toolkit 吸收): 由最近一条用户消息 + 目标模型
+    /// 推导, 注入视觉分析器使其观察贴合当前目标。无历史时退化为模型名。
+    fn task_intent(&self) -> String {
+        let latest = self
+            .messages
+            .iter()
+            .rev()
+            .find(|m| m.role == Role::User)
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+        let latest = latest.trim();
+        if latest.is_empty() {
+            format!("model:{}", self.model)
+        } else {
+            latest.chars().take(200).collect()
+        }
+    }
+
     /// 执行一轮对话：用户输入 → (可能的多次工具调用) → 最终回答。
     pub async fn turn(&mut self, user_input: &str) -> Result<String, LlmError> {
         let user_input = if let Some(stage) = &self.multimodal {
             // 多模态→文本降维 (pi-deepseek-vision 模式): 目标模型保持 text-only。
-            stage.transform_input(user_input)
+            // 意图感知 (agent-vision-toolkit 吸收): 把当前任务意图传给视觉层。
+            stage.transform_input_with_intent(user_input, &self.task_intent())
         } else {
             user_input.to_string()
         };

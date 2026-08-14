@@ -15,6 +15,12 @@ use std::fmt;
 pub trait VisionAnalyzer: Send + Sync {
     /// 对单张图片产出纯文本分析。
     fn analyze(&self, image_id: usize, marker: &str) -> String;
+    /// 意图感知分析 (吸收自 Anionex/agent-vision-toolkit): 把当前任务意图
+    /// 传给视觉层, 使其产出贴合当前目标的观察 (而非通用描述)。默认委托
+    /// [`analyze`](VisionAnalyzer::analyze), 后端可选择覆盖以利用意图。
+    fn analyze_with_intent(&self, image_id: usize, marker: &str, _intent: &str) -> String {
+        self.analyze(image_id, marker)
+    }
     /// 后端是否可用 (不可用则原样透传图片标记，避免丢信息)。
     fn is_available(&self) -> bool {
         true
@@ -111,6 +117,13 @@ impl MultimodalTransform {
 
     /// 变换单条消息文本: 图片标记 → `[PREFIX_n: analysis]`。
     pub fn transform(&self, content: &str) -> Transformed {
+        self.transform_with_intent(content, "")
+    }
+
+    /// 意图感知变换 (modlens + agent-vision-toolkit 吸收):
+    /// 与 [`transform`](MultimodalTransform::transform) 相同, 但把当前任务意图
+    /// 传入视觉分析器, 使图片分析贴合当前目标。意图为空时退化为通用分析。
+    pub fn transform_with_intent(&self, content: &str, intent: &str) -> Transformed {
         if !self.config.enabled {
             return Transformed {
                 text: content.to_string(),
@@ -150,7 +163,7 @@ impl MultimodalTransform {
                         out.push_str(&format!(
                             "[{}: {}]",
                             self.config.marker_prefix,
-                            self.analyzer.analyze(replaced, &marker)
+                            self.analyzer.analyze_with_intent(replaced, &marker, intent)
                         ));
                     } else {
                         passthrough += 1;
@@ -192,6 +205,11 @@ impl MultimodalTransform {
     /// 变换用户输入 (AgentLoop 生产接线点)。
     pub fn transform_input(&self, user_input: &str) -> String {
         self.transform(user_input).text
+    }
+
+    /// 意图感知变换用户输入 (AgentLoop 生产接线点, agent-vision-toolkit 吸收)。
+    pub fn transform_input_with_intent(&self, user_input: &str, intent: &str) -> String {
+        self.transform_with_intent(user_input, intent).text
     }
 }
 
@@ -243,5 +261,41 @@ mod tests {
         let t = MultimodalTransform::with_placeholder(cfg);
         assert!(t.applies_to("deepseek-v4-flash"));
         assert!(!t.applies_to("qwen2.5:7b"));
+    }
+
+    #[test]
+    fn intent_forwarded_to_analyzer() {
+        // 意图感知 (agent-vision-toolkit 吸收): 覆盖 analyze_with_intent 的
+        // 后端应收到当前任务意图。
+        struct IntentAnalyzer {
+            received: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+        }
+        impl VisionAnalyzer for IntentAnalyzer {
+            fn analyze(&self, _id: usize, marker: &str) -> String {
+                format!("base:{}", marker)
+            }
+            fn analyze_with_intent(&self, id: usize, marker: &str, intent: &str) -> String {
+                self.received.lock().unwrap().push(intent.to_string());
+                format!("intent[{}]:{}:{}", id, marker, intent)
+            }
+        }
+        let received = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let t = MultimodalTransform::new(
+            TransformConfig::default(),
+            Box::new(IntentAnalyzer { received: received.clone() }),
+        );
+        let r = t.transform_with_intent("![图](url) 看这个", "提取登录按钮坐标");
+        assert_eq!(r.images_replaced, 1);
+        let got = received.lock().unwrap();
+        assert_eq!(got[0], "提取登录按钮坐标");
+        assert!(r.text.contains("intent[1]"));
+    }
+
+    #[test]
+    fn intent_empty_falls_back_to_base() {
+        // 默认 analyze_with_intent 委托 analyze (placeholder 不感知意图)。
+        let t = MultimodalTransform::with_placeholder(TransformConfig::default());
+        let r = t.transform_with_intent("![a](b)", "");
+        assert_eq!(r.images_replaced, 1);
     }
 }

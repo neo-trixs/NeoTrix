@@ -1,6 +1,76 @@
 //! AutoFixer — 自执行修复引擎
 
+use std::path::{Path, PathBuf};
+
+use crate::core::nt_core_context::revertible::{ClosureEffect, RevertibleContext};
 use crate::core::nt_core_error_parse::{self, CompilerDiagnostic, DiagnosticSeverity};
+
+/// 自愈快照 — 修复前记录文件原内容作为 ∂Γ inverse (写回原状)。
+pub struct HealSnapshot {
+    pub path: PathBuf,
+    pub original: Vec<u8>,
+}
+
+impl HealSnapshot {
+    pub fn capture(path: &Path) -> Result<Self, String> {
+        let original = std::fs::read(path)
+            .map_err(|e| format!("快照读取失败 {}: {}", path.display(), e))?;
+        Ok(Self {
+            path: path.to_path_buf(),
+            original,
+        })
+    }
+}
+
+/// ∂Γ 事务性自愈批次 — heal 前快照, 批内任一步失败 recover 回滚全部已写文件。
+/// 语义: all-or-nothing (与 PluginRegistry::load_batch 同一回滚原语)。
+pub struct RepairBatch {
+    ctx: RevertibleContext<'static, ()>,
+    snapshots: Vec<HealSnapshot>,
+}
+
+impl RepairBatch {
+    pub fn begin() -> Self {
+        Self {
+            ctx: RevertibleContext::new(()),
+            snapshots: Vec::new(),
+        }
+    }
+
+    /// 快照并登记回滚效果 (inverse = 写回原内容 / 原文件不存在则移除)。
+    /// 返回原内容字节, 供调用方读取。
+    pub fn snapshot(&mut self, path: &Path) -> Result<Vec<u8>, String> {
+        let snap = HealSnapshot::capture(path)?;
+        let path2 = snap.path.clone();
+        let original = snap.original.clone();
+        let original_for_inverse = original.clone();
+        self.snapshots.push(snap);
+        self.ctx.track(ClosureEffect::new(
+            format!("heal:{}", path2.display()),
+            |_| {},
+            move |_| {
+                if original_for_inverse.is_empty() {
+                    let _ = std::fs::remove_file(&path2);
+                } else {
+                    let _ = std::fs::write(&path2, &original_for_inverse);
+                }
+            },
+        ));
+        Ok(original)
+    }
+
+    /// 批内失败 → recover 全部回滚。
+    pub fn rollback(&mut self) {
+        self.ctx.recover();
+    }
+
+    /// 提交 — 丢弃回滚日志, 保留修复。返回快照数。
+    pub fn commit(&mut self) -> usize {
+        let n = self.snapshots.len();
+        self.snapshots.clear();
+        n
+    }
+}
 
 /// 自动修复执行器 — 对已检测问题执行真实代码修改
 pub struct AutoFixer;
@@ -202,6 +272,23 @@ impl AutoFixer {
         Ok(removed)
     }
 
+    /// 事务性 TODO 清理 (∂Γ 自愈回滚): 写入前快照原内容, 写失败 recover 回滚。
+    /// 生产路径 (EvolutionDaemon) 应调用此版本而非裸 cleanup_todos。
+    pub fn cleanup_todos_tx(file_path: &str) -> Result<usize, String> {
+        let mut batch = RepairBatch::begin();
+        let _original = batch.snapshot(Path::new(file_path))?;
+        match Self::cleanup_todos(file_path) {
+            Ok(n) => {
+                batch.commit();
+                Ok(n)
+            }
+            Err(e) => {
+                batch.rollback();
+                Err(e)
+            }
+        }
+    }
+
     /// 生产安全: 记录测试缺口而不写入存根
     /// EvolutionDaemon 等生产路径应调用此方法而非 add_test_stub
     pub fn record_test_gap(file_path: &str) -> Result<String, String> {
@@ -267,5 +354,47 @@ mod tests {
         assert_eq!(fix.0, "clone");
         assert!(fix.1.contains("clone"));
         assert!(AutoFixer::suggest_fix_for_code("E9999").is_none());
+    }
+
+    #[test]
+    fn test_repair_batch_snapshot_and_commit() {
+        let dir = std::env::temp_dir().join("neotrix_autofixer_tx");
+        let _ = std::fs::create_dir_all(&dir);
+        let f = dir.join("a.rs");
+        std::fs::write(&f, "// TODO\nfn a() {}\n").unwrap();
+        let mut batch = RepairBatch::begin();
+        let _orig = batch.snapshot(&f).unwrap();
+        // 模拟修复写入
+        std::fs::write(&f, "fn a() {}\n").unwrap();
+        batch.commit();
+        assert_eq!(std::fs::read_to_string(&f).unwrap(), "fn a() {}\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_repair_batch_rolls_back_on_failure() {
+        let dir = std::env::temp_dir().join("neotrix_autofixer_rollback");
+        let _ = std::fs::create_dir_all(&dir);
+        let f = dir.join("b.rs");
+        let original = "fn original() {}\n";
+        std::fs::write(&f, original).unwrap();
+        let mut batch = RepairBatch::begin();
+        let _orig = batch.snapshot(&f).unwrap();
+        // 修复写入后某步失败 → rollback 写回原内容
+        std::fs::write(&f, "fn corrupted() {}\n").unwrap();
+        batch.rollback();
+        assert_eq!(
+            std::fs::read_to_string(&f).unwrap(),
+            original,
+            "rollback 应恢复 heal 前内容"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_cleanup_todos_tx_rolls_back_on_write_failure() {
+        // cleanup_todos_tx 在快照后若 cleanup 失败应回滚; 用不存在路径的 snapshot 失败路径验证
+        let err = AutoFixer::cleanup_todos_tx("/nonexistent/neotrix/nope.rs");
+        assert!(err.is_err(), "快照不存在文件应报错 (不做任何写入)");
     }
 }

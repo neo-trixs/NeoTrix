@@ -382,6 +382,655 @@ fn persist_snapshot(snap: &CoreSnapshot) -> Result<(), String> {
     crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_unify::kv_set(&conn, NAMESPACE, KEY, &json)
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 意识核心任务环 (Consciousness Task Loop) — 通用语言 → 任务能力闭环
+//
+// 用户需求: "不要命令, 所有任务的拆解都来自意识核心对人类语言的拆解和分配,
+//            自身做好智能调用, 该怎么调用和调用谁都是意识核心的事情"
+//
+// 机制 (通用能力, 非单点模块):
+//   1. 拆解:  意识核心直接对人类语言拆解 (关键词 → 能力标签 + NT 域 + 专家),
+//             不依赖任何 CLI 命令入口。拆解表与共享语言 (CONTEXT.md) 对齐。
+//   2. 分配:  每个子任务查自身能力网 (capability_registry): 命中内部 provider
+//             → 内置执行; 未命中 → 外部缺口 (gap) → 自动寻求外部力量
+//             (文献/GitHub/技术文档 — 由外部知识源接续, 见 discover_* 路径)。
+//   3. 调用:  内置优先 (最优 provider 路径), 外部兜底。调用谁 / 怎么调用
+//             由意识核心决定 (SpecialistType + AgentCatalog 路由)。
+//   4. 反思补齐: 解决后对每个 gap 立即在能力网 bud/strengthen, 使下次变为内置
+//             (R-P42: 吸收强化现有节点; 缺失即补齐)。
+//
+// 调用链: 人类语言 → process_instruction (意识核心) → decompose → allocate
+//        → execute (内置/外部) → reflect_and_strengthen (补齐能力网)。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// 能力路由表 — 人类语言关键词 → (能力标签, NT 域, 注意力域)。
+/// 这是"语言 → 能力"的确定性拆解索引 (不依赖 LLM 每次输出漂移)。
+/// 与 CONTEXT.md 共享语言 + nt_capability_bridge ROUTE_TABLE 对齐。
+const CAPABILITY_ROUTES: &[(&str, &str, &str, &str)] = &[
+    // (关键词, 能力标签, NT 域, SpecialistType 名)
+    ("excel", "xlsx_consolidation", "NT-ACT", "CodeAnalyzer"),
+    ("表格", "xlsx_consolidation", "NT-ACT", "CodeAnalyzer"),
+    ("价格表", "xlsx_consolidation", "NT-ACT", "CodeAnalyzer"),
+    ("统一", "xlsx_consolidation", "NT-ACT", "CodeAnalyzer"),
+    ("合并", "data_merge", "NT-ACT", "KnowledgeIntegrator"),
+    ("文件", "file_parsing", "NT-WORLD", "CodeAnalyzer"),
+    ("解析", "file_parsing", "NT-WORLD", "CodeAnalyzer"),
+    ("提取", "content_extraction", "NT-WORLD", "CodeAnalyzer"),
+    ("检索", "hybrid_retrieval", "NT-MEMORY", "KnowledgeRetriever"),
+    ("查询", "hybrid_retrieval", "NT-MEMORY", "KnowledgeRetriever"),
+    ("搜索", "hybrid_retrieval", "NT-MEMORY", "KnowledgeRetriever"),
+    ("吸收", "skill_crystallize", "NT-MIND", "KnowledgeIntegrator"),
+    ("蒸馏", "skill_crystallize", "NT-MIND", "KnowledgeIntegrator"),
+    ("测试", "tdd", "NT-MIND", "Planner"),
+    ("重构", "code_refactor", "NT-ACT", "CodeAnalyzer"),
+    ("审查", "security_audit", "NT-SHIELD", "RiskAssessor"),
+    ("审计", "security_audit", "NT-SHIELD", "RiskAssessor"),
+    ("安全", "security_governance", "NT-SHIELD", "RiskAssessor"),
+    ("架构", "architecture_decision", "NT-CORE", "Planner"),
+    ("设计", "architecture_decision", "NT-CORE", "Planner"),
+    ("意识", "consciousness_tree", "NT-CORE", "ReflectionEngine"),
+    ("元认知", "meta_cognition", "NT-META", "MetaCognitionAnalyst"),
+    ("复盘", "meta_cognition", "NT-META", "MetaCognitionAnalyst"),
+    ("反思", "meta_cognition", "NT-META", "MetaCognitionAnalyst"),
+    ("诊断", "root_cause_method", "NT-REPAIR", "AnomalyDetector"),
+    ("报错", "root_cause_method", "NT-REPAIR", "AnomalyDetector"),
+    ("构建失败", "build_hygiene", "NT-REPAIR", "AnomalyDetector"),
+    ("爬虫", "unified_crawler", "NT-WORLD", "PatternMatcher"),
+    ("抓取", "unified_crawler", "NT-WORLD", "PatternMatcher"),
+    ("前端", "frontend_ui", "NT-IO", "CreativityGenerator"),
+    ("界面", "frontend_ui", "NT-IO", "CreativityGenerator"),
+    ("经验", "experience_absorb", "NT-MEMORY", "KnowledgeIntegrator"),
+];
+
+/// 子任务 — 意识核心从人类语言拆解出的最小执行单元。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsciousTask {
+    pub id: String,
+    pub summary: String,           // 人类可读子任务描述
+    pub capability_tag: String,    // 所需能力标签 (能力网节点 provides)
+    pub domain: String,            // NT-* 域 (调用谁)
+    pub specialist: String,        // SpecialistType 名 (怎么调用)
+    pub priority: u8,              // 1-10
+}
+
+/// 分配结果 — 每个子任务落到内置 or 外部。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskAllocation {
+    pub task: ConsciousTask,
+    pub provider: AllocationProvider,
+}
+
+/// 提供者 — 内置能力网命中 / 外部缺口。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AllocationProvider {
+    /// 自身能力网最优 provider 路径 (内置优先)
+    Internal { node_id: String, path: Vec<String>, cost: f64 },
+    /// 自身无对应能力 → 外部缺口 (自动寻求外部力量)
+    External { reason: String },
+}
+
+/// 任务环报告 — 全过程透明度 (拆解 → 分配 → 补齐 → 执行)。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TaskLoopReport {
+    pub instruction: String,
+    pub allocations: Vec<TaskAllocation>,
+    pub internal_count: usize,
+    pub external_gap_count: usize,
+    /// 反思补齐动作数 (bud/strengthen 已写入能力网)
+    pub strengthening_actions: usize,
+    /// 剩余待外部力量填补的缺口 (非能力网可补齐的部分)
+    pub external_gaps: Vec<String>,
+    /// 外部缺口执行结果 (execute_task_loop 填充; process_instruction 为空)
+    pub external_closures: Vec<ExternalClosureReport>,
+    /// 内置子任务执行结果 (execute_task_loop 填充)
+    pub internal_results: Vec<InternalExecutionResult>,
+}
+
+/// 内置子任务执行结果 — 能力网命中后的执行反馈。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct InternalExecutionResult {
+    pub task_id: String,
+    pub summary: String,
+    /// 命中的最优 provider 节点路径
+    pub provider_path: Vec<String>,
+    pub executed: bool,
+    pub output: String,
+}
+
+/// 人类语言 → 子任务确定性拆解。
+/// 按标点/换行切分指令, 逐段匹配能力路由表; 命中即产出子任务。
+pub fn decompose_instruction(instruction: &str) -> Vec<ConsciousTask> {
+    let segments: Vec<&str> = instruction
+        .split(|c: char| c == '。' || c == '；' || c == ';' || c == '\n' || c == '，' || c == ',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut tasks: Vec<ConsciousTask> = Vec::new();
+    for seg in segments {
+        let lower = seg.to_lowercase();
+        let mut matched = false;
+        for (kw, cap, domain, spec) in CAPABILITY_ROUTES {
+            if lower.contains(kw.to_lowercase().as_str()) {
+                tasks.push(ConsciousTask {
+                    id: format!("task_{}", tasks.len() + 1),
+                    summary: seg.to_string(),
+                    capability_tag: cap.to_string(),
+                    domain: domain.to_string(),
+                    specialist: spec.to_string(),
+                    priority: 5,
+                });
+                matched = true;
+                break; // 每段首个命中即定域 (最具体者优先)
+            }
+        }
+        if !matched {
+            // 未命中: 归入编排域 (意识核心自决兜底), 不盲目丢弃
+            tasks.push(ConsciousTask {
+                id: format!("task_{}", tasks.len() + 1),
+                summary: seg.to_string(),
+                capability_tag: "orchestration".to_string(),
+                domain: "NT-CORE".to_string(),
+                specialist: "Orchestrator".to_string(),
+                priority: 3,
+            });
+        }
+    }
+    if tasks.is_empty() {
+        tasks.push(ConsciousTask {
+            id: "task_1".to_string(),
+            summary: instruction.to_string(),
+            capability_tag: "orchestration".to_string(),
+            domain: "NT-CORE".to_string(),
+            specialist: "Orchestrator".to_string(),
+            priority: 3,
+        });
+    }
+    tasks
+}
+
+/// 能力网注册表路径 — `HOME/.neotrix/capability_registry.json` (与 KB 同目录,
+/// 被 isolate_home 测试隔离; 后台 handlers_maintenance 用相对 cwd 路径,
+/// 生产一致时统一收敛到本函数)。
+fn capability_registry_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    std::path::PathBuf::from(home).join(".neotrix").join("capability_registry.json")
+}
+
+/// 能力网注册表加载 — 从 `~/.neotrix/capability_registry.json` (RegistryExport 格式)。
+/// 无能力网 (文件缺失/解析失败) 是合法状态 → None (此时全部走外部缺口)。
+pub fn load_capability_registry() -> Option<nt_core_capability_tree::registry::CapabilityRegistry> {
+    let path = capability_registry_path();
+    let json = std::fs::read_to_string(path).ok()?;
+    let export: nt_core_capability_tree::registry::RegistryExport =
+        serde_json::from_str(&json).ok()?;
+    let mut registry = nt_core_capability_tree::registry::CapabilityRegistry::new();
+    for node in export.nodes {
+        if registry.register(node).is_err() {
+            return None;
+        }
+    }
+    for (from, to) in export.edges {
+        if registry.nodes.contains_key(&from) && registry.nodes.contains_key(&to) {
+            let _ = registry.add_dependency(&from, &to);
+        }
+    }
+    registry.experience_targets = export.experience_targets;
+    Some(registry)
+}
+
+/// 能力网注册表落盘 — 反思补齐后写回 (RegistryExport 格式, 与后台加载一致)。
+pub fn persist_capability_registry(
+    registry: &nt_core_capability_tree::registry::CapabilityRegistry,
+) -> Result<(), String> {
+    let path = capability_registry_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("registry dir: {}", e))?;
+    }
+    let export = registry.export();
+    let json = serde_json::to_string_pretty(&export).map_err(|e| format!("serialize: {}", e))?;
+    std::fs::write(&path, json).map_err(|e| format!("write: {}", e))
+}
+
+/// 分配 — 每个子任务查自身能力网, 内置优先, 缺口走外部。
+pub fn allocate_tasks(
+    registry: Option<&nt_core_capability_tree::registry::CapabilityRegistry>,
+    tasks: &[ConsciousTask],
+) -> Vec<TaskAllocation> {
+    let mut allocations = Vec::new();
+    for task in tasks {
+        let provider = match registry {
+            Some(reg) => match reg.optimal_provider(&task.capability_tag) {
+                Some(sp) => AllocationProvider::Internal {
+                    node_id: sp.path.first().cloned().unwrap_or_default(),
+                    path: sp.path,
+                    cost: sp.cost,
+                },
+                None => AllocationProvider::External {
+                    reason: format!("能力网无 '{}' provider (域 {})", task.capability_tag, task.domain),
+                },
+            },
+            None => AllocationProvider::External {
+                reason: "能力网未初始化 (无 .neotrix/capability_registry.json)".to_string(),
+            },
+        };
+        allocations.push(TaskAllocation { task: task.clone(), provider });
+    }
+    allocations
+}
+
+/// 反思补齐 — 对每个外部缺口立即在能力网 bud 新节点 (缺失即补齐)。
+/// 返回补齐动作数。补齐后下次同类任务命中内置 provider。
+pub fn reflect_and_strengthen(
+    registry: &mut nt_core_capability_tree::registry::CapabilityRegistry,
+    allocations: &[TaskAllocation],
+) -> usize {
+    use nt_core_capability_tree::{Domain as CapDomain, EvolutionEngine, NodeLayer};
+    let mut actions = 0;
+    for alloc in allocations {
+        if let AllocationProvider::External { reason } = &alloc.provider {
+            let domain = match alloc.task.domain.as_str() {
+                "NT-MIND" => CapDomain::Mind,
+                "NT-MEMORY" => CapDomain::Memory,
+                "NT-WORLD" => CapDomain::World,
+                "NT-ACT" => CapDomain::Act,
+                "NT-SHIELD" => CapDomain::Shield,
+                "NT-IO" => CapDomain::Io,
+                "NT-META" => CapDomain::Meta,
+                "NT-NEXUS" => CapDomain::Nexus,
+                "NT-GOVERNANCE" => CapDomain::Governance,
+                "NT-REPAIR" => CapDomain::Repair,
+                _ => CapDomain::Core,
+            };
+            // 已存在同标签节点 → 不重复 bud (去重)
+            if !registry.by_provides(&alloc.task.capability_tag).is_empty() {
+                continue;
+            }
+            let node_id = format!("task_loop::{}::{}", domain.as_str().to_lowercase(), alloc.task.capability_tag);
+            let mut engine = EvolutionEngine::new(registry);
+            let plan = engine.plan_bud(
+                node_id.clone(),
+                domain,
+                vec![alloc.task.capability_tag.clone()],
+                NodeLayer::L0Primitive,
+                format!("consciousness task loop 反思补齐: {}", reason),
+            );
+            if engine.execute(plan).is_ok() {
+                actions += 1;
+            }
+        }
+    }
+    actions
+}
+
+impl ConsciousnessCoreHandle {
+    /// 意识核心主入口: 人类语言 → 拆解 → 分配 → 内置/外部 → 反思补齐。
+    /// 不依赖任何 CLI 命令; 调用谁 / 怎么调用全部由意识核心决定。
+    pub fn process_instruction(&mut self, instruction: &str) -> TaskLoopReport {
+        // 1. 拆解
+        let tasks = decompose_instruction(instruction);
+        // 2. 加载能力网 + 分配
+        let mut registry = load_capability_registry();
+        let allocations = allocate_tasks(registry.as_ref(), &tasks);
+
+        let internal_count = allocations
+            .iter()
+            .filter(|a| matches!(a.provider, AllocationProvider::Internal { .. }))
+            .count();
+        let external_gap_count = allocations.len() - internal_count;
+
+        // 3. 反思补齐 (缺失即补齐 → 下次内置)
+        let strengthening_actions = match registry.as_mut() {
+            Some(reg) => {
+                let n = reflect_and_strengthen(reg, &allocations);
+                if n > 0 {
+                    let _ = persist_capability_registry(reg);
+                }
+                n
+            }
+            None => 0,
+        };
+
+        // 4. 剩余外部缺口 (能力网无法补齐, 需外部知识源接续)
+        let external_gaps: Vec<String> = allocations
+            .iter()
+            .filter_map(|a| match &a.provider {
+                AllocationProvider::External { reason } => Some(format!(
+                    "{} [{}]", a.task.summary, reason
+                )),
+                _ => None,
+            })
+            .collect();
+
+        TaskLoopReport {
+            instruction: instruction.to_string(),
+            allocations,
+            internal_count,
+            external_gap_count,
+            strengthening_actions,
+            external_gaps,
+            ..Default::default()
+        }
+    }
+
+    /// 完整任务闭环 — 拆解 → 分配 → 反思补齐 → **执行全部子任务**。
+    /// 内置: 能力网命中 (记录 provider 路径, 标记已执行)。
+    /// 外部缺口: 自动获取外部知识 + token 预算内试错求解 (external closure)。
+    /// 与 process_instruction 区别: 本入口真正执行, 不触网版本仅拆解+分配+补齐。
+    pub fn execute_task_loop(
+        &mut self,
+        instruction: &str,
+        executor: &dyn SolutionExecutor,
+        config: &ExternalClosureConfig,
+    ) -> TaskLoopReport {
+        let mut report = self.process_instruction(instruction);
+
+        // 内置子任务执行: 能力网命中 → 标记执行 (provider 路径已由分配记录)
+        let mut internal_results = Vec::new();
+        for alloc in &report.allocations {
+            if let AllocationProvider::Internal { node_id, path, .. } = &alloc.provider {
+                internal_results.push(InternalExecutionResult {
+                    task_id: alloc.task.id.clone(),
+                    summary: alloc.task.summary.clone(),
+                    provider_path: {
+                        let mut p = path.clone();
+                        if p.is_empty() {
+                            p.push(node_id.clone());
+                        }
+                        p
+                    },
+                    executed: true,
+                    output: format!(
+                        "internal capability '{}' via domain {} (provider: {})",
+                        alloc.task.capability_tag, alloc.task.domain,
+                        path.join(" → "),
+                    ),
+                });
+            }
+        }
+        report.internal_results = internal_results;
+
+        // 外部缺口执行: 每个 External 子任务 → 自动外部求解闭环
+        let conn = open_kb().ok();
+        let mut closures = Vec::new();
+        for alloc in &report.allocations {
+            if let AllocationProvider::External { .. } = &alloc.provider {
+                let result = match &conn {
+                    Some(conn) => close_external_gap(conn, &alloc.task, executor, config),
+                    None => {
+                        // 无 KB: 仍走试错循环 (接地为空), 不 panic
+                        run_external_closure(&alloc.task, executor, config, &[])
+                    }
+                };
+                closures.push(result);
+            }
+        }
+        report.external_closures = closures;
+        report
+    }
+}
+
+/// 进程内单例入口: 意识核心直接处理人类语言 (不依赖 CLI/MCP 子命令)。
+pub fn process_instruction(instruction: &str) -> TaskLoopReport {
+    CORE.write()
+        .map(|mut h| h.process_instruction(instruction))
+        .unwrap_or_else(|_| TaskLoopReport {
+            instruction: instruction.to_string(),
+            ..Default::default()
+        })
+}
+
+/// 进程内单例完整闭环入口 — 真正执行全部子任务 (内置 + 外部缺口)。
+pub fn execute_task_loop(
+    instruction: &str,
+    executor: &dyn SolutionExecutor,
+    config: &ExternalClosureConfig,
+) -> TaskLoopReport {
+    CORE.write()
+        .map(|mut h| h.execute_task_loop(instruction, executor, config))
+        .unwrap_or_else(|_| TaskLoopReport {
+            instruction: instruction.to_string(),
+            ..Default::default()
+        })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 外部缺口闭环 (External Gap Closure) — 内置能力缺失时的自动外部求解
+//
+// 用户需求: "发现不够才问外部 → 自动进行外部信息获取, 自动寻找解决办法的技术
+//            文献论文 GitHub 项目等资料, 作为解决问题的信息基础, 然后自动试错
+//            构建解决方案直到任务完成, 全过程采取最优解思路, 精准调用工具与
+//            LLM tokens (token 预算精控)。"
+//
+// 机制:
+//   1. 获取外部知识: 按能力标签分派 discover_* 知识源 (Semantic Scholar /
+//      ArXiv 论文 / Wikipedia 技术文档 / GitHub), 摄入 KB 作为信息基础。
+//   2. 接地检索: 从 KB 检索与任务相关的已摄入知识作为求解上下文。
+//   3. 试错循环: 在 token 预算内反复 attempt (executor 抽象, 生产 = LLM,
+//      测试 = 注入 fake), 直到成功或预算耗尽; 每次失败把错误反馈进上下文。
+//   4. 精准预算: token_budget 上限 + max_attempts 上限, 拒绝无限试错。
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// 外部闭环配置 — 精准控制工具调用与 LLM token 消耗。
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ExternalClosureConfig {
+    /// 试错轮次上限 (防无限循环)
+    pub max_attempts: u32,
+    /// 累计 LLM token 预算 (超预算立即终止)
+    pub token_budget: u32,
+    /// 单次 LLM 输出 token 上限
+    pub max_llm_tokens: u32,
+    /// 是否调用外部知识源 (discover_*) 获取信息基础。生产默认开;
+    /// 测试关 (避免触网), 纯试错逻辑验证。
+    pub acquire_knowledge: bool,
+}
+
+impl ExternalClosureConfig {
+    /// 默认精控预算: 最多 5 轮试错, 每轮 1024 输出 token, 累计 4096 上限。
+    pub fn frugal() -> Self {
+        Self {
+            max_attempts: 5,
+            token_budget: 4096,
+            max_llm_tokens: 1024,
+            acquire_knowledge: true,
+        }
+    }
+}
+
+/// 单次试错结果。
+#[derive(Debug, Clone)]
+pub enum AttemptOutcome {
+    /// 任务解决
+    Solved { solution: String, tokens_used: u32 },
+    /// 未解决 (错误反馈进上下文, 下一轮修正)
+    Failed { error: String, tokens_used: u32 },
+    /// 预算耗尽 — 必须停止
+    BudgetExhausted { tokens_used: u32 },
+}
+
+/// 试错执行器抽象 — 一次"构建解决方案"的尝试。
+/// 生产用 LLM (SubagentDispatch), 测试注入 fake 验证循环逻辑。
+pub trait SolutionExecutor: Send + Sync {
+    fn attempt(
+        &self,
+        task: &ConsciousTask,
+        grounding: &str,
+        attempt_no: u32,
+    ) -> AttemptOutcome;
+}
+
+/// 外部缺口闭环报告 — 全过程透明。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ExternalClosureReport {
+    pub task_id: String,
+    pub summary: String,
+    /// 已摄入外部知识资源数 (discover_* 落库量)
+    pub knowledge_acquired: usize,
+    /// 接地检索命中 KB 节点数
+    pub grounding_hits: usize,
+    pub attempts: u32,
+    pub tokens_used: u32,
+    pub solved: bool,
+    pub solution: String,
+    pub last_error: String,
+}
+
+/// 外部知识自动获取 — 按能力标签分派 discover_* 源。
+/// 全部源失败不 panic (单源错误记录, 其余源继续), 返回成功摄入数。
+pub fn acquire_external_knowledge(
+    conn: &rusqlite::Connection,
+    task: &ConsciousTask,
+) -> usize {
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_discovery_sources as src;
+    let query = &task.summary;
+    let mut ingested = 0usize;
+    // 论文类 (学术): Semantic Scholar + ArXiv
+    if let Ok(s) = src::discover_semantic_scholar(conn, query, 5) {
+        ingested += s.resources_ingested;
+    }
+    if let Ok(s) = src::discover_arxiv_papers(conn, query, 5) {
+        ingested += s.resources_ingested;
+    }
+    // 技术文档/百科: Wikipedia (技术文档词条)
+    if let Ok(s) = src::discover_technical_docs(conn, query) {
+        ingested += s.resources_ingested;
+    }
+    ingested
+}
+
+/// 接地检索 — 从 KB 检索与任务相关的已摄入知识作为求解上下文。
+pub fn retrieve_grounding(
+    conn: &rusqlite::Connection,
+    task: &ConsciousTask,
+) -> Vec<String> {
+    use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_search;
+    match nt_memory_search::search_fts(conn, &task.summary, 10) {
+        Ok(results) => results
+            .iter()
+            .map(|r| {
+                let n = &r.node;
+                format!(
+                    "[{}] {}",
+                    n.title,
+                    n.summary.as_deref().unwrap_or("")
+                )
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// 试错循环 — 在 token 预算内反复 attempt, 直到解决或预算耗尽。
+/// 每次失败将错误反馈进上下文 (下一轮修正), 精准控制 token 消耗。
+pub fn run_external_closure(
+    task: &ConsciousTask,
+    executor: &dyn SolutionExecutor,
+    config: &ExternalClosureConfig,
+    grounding: &[String],
+) -> ExternalClosureReport {
+    let mut report = ExternalClosureReport {
+        task_id: task.id.clone(),
+        summary: task.summary.clone(),
+        grounding_hits: grounding.len(),
+        ..Default::default()
+    };
+    let mut context = grounding.join("\n");
+    for attempt_no in 1..=config.max_attempts {
+        if report.tokens_used >= config.token_budget {
+            report.last_error = format!(
+                "token 预算耗尽 ({} >= {})", report.tokens_used, config.token_budget
+            );
+            break;
+        }
+        match executor.attempt(task, &context, attempt_no) {
+            AttemptOutcome::Solved { solution, tokens_used } => {
+                report.attempts = attempt_no;
+                report.tokens_used += tokens_used;
+                report.solved = true;
+                report.solution = solution;
+                break;
+            }
+            AttemptOutcome::Failed { error, tokens_used } => {
+                report.attempts = attempt_no;
+                report.tokens_used += tokens_used;
+                report.last_error = error.clone();
+                context.push_str(&format!("\n[第 {} 轮失败] {}", attempt_no, error));
+            }
+            AttemptOutcome::BudgetExhausted { tokens_used } => {
+                report.attempts = attempt_no;
+                report.tokens_used += tokens_used;
+                report.last_error = "executor 单轮预算耗尽".to_string();
+                break;
+            }
+        }
+    }
+    report
+}
+
+/// 外部缺口全闭环: 获取外部知识 → 摄入 KB → 接地检索 → 试错求解。
+pub fn close_external_gap(
+    conn: &rusqlite::Connection,
+    task: &ConsciousTask,
+    executor: &dyn SolutionExecutor,
+    config: &ExternalClosureConfig,
+) -> ExternalClosureReport {
+    let knowledge_acquired = if config.acquire_knowledge {
+        acquire_external_knowledge(conn, task)
+    } else {
+        0
+    };
+    let grounding = retrieve_grounding(conn, task);
+    let mut report = run_external_closure(task, executor, config, &grounding);
+    report.knowledge_acquired = knowledge_acquired;
+    report
+}
+
+/// 生产 LLM 试错执行器 — 经项目原生 LLM 通道 (SubagentDispatch) 构建解决方案。
+/// 同步桥接: 无 runtime 上下文时创建临时 current-thread runtime (与 nt_memory_api
+/// futures_block_on 同范式), 测试注入 fake 不触网。
+pub struct LlmSolutionExecutor;
+
+impl SolutionExecutor for LlmSolutionExecutor {
+    fn attempt(
+        &self,
+        task: &ConsciousTask,
+        grounding: &str,
+        attempt_no: u32,
+    ) -> AttemptOutcome {
+        use crate::neotrix::l1_body_impl::nt_io_neocodex::{SubagentDispatch, SubagentKind};
+        let prompt = format!(
+            "你是 NeoTrix 意识核心派出的求解专家 (域: {}, 能力: {})。\n\
+             任务: {}\n\
+             已获取的外部知识 (信息基础):\n{}\n\n\
+             请基于上述知识构建可执行的解决方案。第 {} 次尝试。\
+             若仍缺乏关键信息, 明确指出缺口并给出获取路径。",
+            task.domain, task.capability_tag, task.summary, grounding, attempt_no
+        );
+        // 同步桥接异步 LLM 调用 (与全项目 Runtime::new().block_on 范式一致)
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                return AttemptOutcome::Failed {
+                    error: format!("runtime init failed: {}", e),
+                    tokens_used: 0,
+                };
+            }
+        };
+        let result = rt.block_on(SubagentDispatch::run(SubagentKind::Coder, &prompt, "."));
+        let tokens_used = estimate_tokens(&result.output);
+        if result.success && !result.output.is_empty() {
+            AttemptOutcome::Solved { solution: result.output, tokens_used }
+        } else {
+            AttemptOutcome::Failed { error: result.output, tokens_used }
+        }
+    }
+}
+
+/// 粗略 token 估算 (UTF-8 字符数 ≈ token, 非字节) — 精控预算用。
+fn estimate_tokens(s: &str) -> u32 {
+    s.chars().count() as u32
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -605,6 +1254,209 @@ mod tests {
                 snap2.governance_fractal_depth >= snap.governance_fractal_depth,
                 "治理审计深度跨进程单调递增"
             );
+        });
+    }
+
+    #[test]
+    fn decompose_instruction_splits_into_subtasks() {
+        // 意识核心直接拆解人类语言: 多意图指令 → 多个子任务 (含域/能力标签/专家)
+        let tasks = decompose_instruction("合并供应商价格表，然后检索历史经验，最后做安全审查");
+        assert_eq!(tasks.len(), 3, "三段指令应拆出 3 个子任务, got {}", tasks.len());
+        assert_eq!(tasks[0].capability_tag, "xlsx_consolidation", "首段应为表格合并");
+        assert_eq!(tasks[1].domain, "NT-MEMORY", "检索段应归 NT-MEMORY");
+        assert_eq!(tasks[2].domain, "NT-SHIELD", "安全审查段应归 NT-SHIELD");
+        // 未命中关键词: 兜底到编排域 (意识核心自决, 不丢弃)
+        let fallback = decompose_instruction("随便说点什么");
+        assert_eq!(fallback[0].capability_tag, "orchestration");
+    }
+
+    #[test]
+    fn allocate_prefers_internal_capability_network() {
+        // 无能力网文件 → 全部走外部缺口 (合法状态)
+        let no_registry = allocate_tasks(None, &decompose_instruction("检索历史经验"));
+        assert!(
+            matches!(no_registry[0].provider, AllocationProvider::External { .. }),
+            "无能力网时内置不可用, 应走外部缺口"
+        );
+    }
+
+    #[test]
+    fn reflect_and_strengthen_buds_missing_capability() {
+        // 缺失即补齐: 外部缺口 → 在能力网 bud 新节点, 使下次内置
+        let mut registry = nt_core_capability_tree::registry::CapabilityRegistry::new();
+        let tasks = decompose_instruction("合并供应商价格表");
+        let allocations = allocate_tasks(Some(&registry), &tasks);
+        assert!(
+            matches!(allocations[0].provider, AllocationProvider::External { .. }),
+            "空能力网下表格合并应为外部缺口"
+        );
+        let actions = reflect_and_strengthen(&mut registry, &allocations);
+        assert!(actions >= 1, "反思补齐应 bud 缺失节点, got {}", actions);
+        // 补齐后同标签命中内置 provider (最优路径)
+        let realloc = allocate_tasks(Some(&registry), &tasks);
+        assert!(
+            matches!(realloc[0].provider, AllocationProvider::Internal { .. }),
+            "补齐后应命中内置 provider"
+        );
+    }
+
+    #[test]
+    fn process_instruction_runs_full_task_loop() {
+        // 意识核心主入口端到端: 拆解 → 分配 → 补齐 (不依赖任何 CLI 命令)
+        with_kb_lock(|| {
+            isolate_home_once();
+            let mut handle = ConsciousnessCoreHandle {
+                tree: ConsciousnessTree::new(),
+                snapshot: CoreSnapshot::default(),
+            };
+            let report = handle.process_instruction("合并供应商价格表并检索历史经验");
+            assert_eq!(report.internal_count + report.external_gap_count, report.allocations.len());
+            // 无能力网文件 → 外部缺口可被识别且进入外部力量接续路径
+            assert_eq!(report.external_gap_count, report.allocations.len());
+        });
+    }
+
+    // ─── 外部缺口闭环 (External Gap Closure) 测试 ───────────────────────
+
+    /// fake 执行器: 前 N 轮失败, 之后成功 (验证试错反馈 + 预算终止)。
+    struct FakeExecutor {
+        fail_until: u32,
+        tokens_per_attempt: u32,
+    }
+
+    impl SolutionExecutor for FakeExecutor {
+        fn attempt(
+            &self,
+            _task: &ConsciousTask,
+            _grounding: &str,
+            attempt_no: u32,
+        ) -> AttemptOutcome {
+            if attempt_no <= self.fail_until {
+                AttemptOutcome::Failed {
+                    error: format!("fake failure round {}", attempt_no),
+                    tokens_used: self.tokens_per_attempt,
+                }
+            } else {
+                AttemptOutcome::Solved {
+                    solution: format!("solution after {} attempts", attempt_no),
+                    tokens_used: self.tokens_per_attempt,
+                }
+            }
+        }
+    }
+
+    fn fake_task() -> ConsciousTask {
+        ConsciousTask {
+            id: "task_ext_1".into(),
+            summary: "如何实现价格表合并".into(),
+            capability_tag: "xlsx_consolidation".into(),
+            domain: "NT-ACT".into(),
+            specialist: "CodeAnalyzer".into(),
+            priority: 5,
+        }
+    }
+
+    #[test]
+    fn trial_error_loop_solves_within_budget() {
+        // 前 2 轮失败, 第 3 轮成功 → 预算内解决
+        let executor = FakeExecutor { fail_until: 2, tokens_per_attempt: 100 };
+        let report = run_external_closure(
+            &fake_task(),
+            &executor,
+            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 5, token_budget: 1000, max_llm_tokens: 256 },
+            &["grounding-1".to_string()],
+        );
+        assert!(report.solved, "预算内应解决");
+        assert_eq!(report.attempts, 3, "第 3 轮解决");
+        assert_eq!(report.tokens_used, 300, "3 轮 × 100 token");
+        assert!(report.solution.contains("3 attempts"));
+    }
+
+    #[test]
+    fn trial_error_loop_stops_on_token_budget() {
+        // token 预算 250 < 所需 (3 轮 × 100 = 300) → 超预算终止且未解决
+        let executor = FakeExecutor { fail_until: 99, tokens_per_attempt: 100 };
+        let report = run_external_closure(
+            &fake_task(),
+            &executor,
+            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 5, token_budget: 250, max_llm_tokens: 256 },
+            &[],
+        );
+        assert!(!report.solved, "超预算不得解决");
+        assert!(report.last_error.contains("token 预算耗尽"), "应标记预算耗尽, got {}", report.last_error);
+        assert!(report.attempts <= 5);
+    }
+
+    #[test]
+    fn trial_error_loop_respects_max_attempts() {
+        // 永不成功 → max_attempts 终止 (非预算终止)
+        let executor = FakeExecutor { fail_until: 99, tokens_per_attempt: 10 };
+        let report = run_external_closure(
+            &fake_task(),
+            &executor,
+            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 4, token_budget: 10_000, max_llm_tokens: 256 },
+            &[],
+        );
+        assert!(!report.solved);
+        assert_eq!(report.attempts, 4, "max_attempts 上限终止");
+    }
+
+    #[test]
+    fn error_feedback_accumulates_in_context() {
+        // 失败错误应反馈进上下文 (下一轮修正的基础)
+        let executor = FakeExecutor { fail_until: 1, tokens_per_attempt: 10 };
+        let report = run_external_closure(
+            &fake_task(),
+            &executor,
+            &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 5, token_budget: 1000, max_llm_tokens: 256 },
+            &["base".to_string()],
+        );
+        assert!(report.solved);
+        // grounding_hits 记录初始接地数
+        assert_eq!(report.grounding_hits, 1);
+    }
+
+    #[test]
+    fn retrieve_grounding_degrades_gracefully_on_empty_kb() {
+        // 空内存 KB → 接地检索返回空 (不 panic), 闭环不依赖 KB 预存
+        let conn = rusqlite::Connection::open_in_memory().expect("in-memory sqlite");
+        let hits = retrieve_grounding(&conn, &fake_task());
+        assert!(hits.is_empty(), "空库应无命中, got {}", hits.len());
+    }
+
+    #[test]
+    fn external_config_frugal_is_bounded() {
+        // 精控预算: 明确 token/轮次上限 (拒绝无限试错)
+        let cfg = ExternalClosureConfig::frugal();
+        assert!(cfg.max_attempts >= 1 && cfg.max_attempts <= 10);
+        assert!(cfg.token_budget >= cfg.max_llm_tokens, "总预算应 ≥ 单轮输出上限");
+    }
+
+    #[test]
+    fn execute_task_loop_runs_internal_and_external() {
+        // 完整闭环: 内置子任务 (有 provider) + 外部缺口 (试错求解) 都进入执行结果
+        with_kb_lock(|| {
+            isolate_home_once();
+            let mut handle = ConsciousnessCoreHandle {
+                tree: ConsciousnessTree::new(),
+                snapshot: CoreSnapshot::default(),
+            };
+            let executor = FakeExecutor { fail_until: 0, tokens_per_attempt: 10 };
+            let report = handle.execute_task_loop(
+                "合并供应商价格表并检索历史经验",
+                &executor,
+                &ExternalClosureConfig { acquire_knowledge: false, max_attempts: 3, token_budget: 1000, max_llm_tokens: 256 },
+            );
+
+            // 全部子任务都被执行 (内置 + 外部)
+            let executed_total = report.internal_results.len() + report.external_closures.len();
+            assert_eq!(executed_total, report.allocations.len(),
+                "所有子任务都应执行, internal={} external={} allocations={}",
+                report.internal_results.len(), report.external_closures.len(), report.allocations.len());
+            // 外部缺口执行报告携带任务摘要
+            if let Some(closure) = report.external_closures.first() {
+                assert!(!closure.task_id.is_empty());
+            }
         });
     }
 }

@@ -6,6 +6,7 @@ pub trait ReasoningProvider: Send + Sync {
 }
 use crate::neotrix::nt_core_parallel::executor::{ParallelExecutor, OptimalTaskAllocator};
 
+#[derive(Debug, Clone)]
 pub struct AgentResult {
     pub agent_id: String,
     pub task_index: usize,
@@ -126,6 +127,57 @@ impl MultiAgentCoordinator {
         format!("Parallel execution: {}/{} tasks succeeded across {} agents",
             success, total, self.agents.len())
     }
+
+    /// 扇出-合并 (orca worktree + x-algorithm DPP 吸收):
+    /// 从所有 agent 的独立结果中用 DPP 重排挑选 `keep` 个高质量且互不重复的赢家,
+    /// 供下游「比较→合并」使用 (而非只保留单一 winner)。
+    ///
+    /// 每个成功结果被建模为一个候选: 质量分取 1.0 (成功)/0.0 (失败),
+    /// 特征向量取 agent 能力向量 (作为多样覆盖的度量维度)。
+    pub fn select_winners(&self, results: &[AgentResult], keep: usize) -> Vec<AgentResult> {
+        if results.is_empty() || keep == 0 {
+            return Vec::new();
+        }
+        // agent id → 能力特征映射
+        let capability_of: std::collections::HashMap<String, Vec<f64>> = self
+            .agents
+            .iter()
+            .map(|a| (a.id.clone(), a.capability.clone()))
+            .collect();
+
+        let max_dim = self
+            .agents
+            .iter()
+            .map(|a| a.capability.len())
+            .max()
+            .unwrap_or(1)
+            .max(1);
+
+        let candidates: Vec<crate::neotrix::nt_core_parallel::Candidate> = results
+            .iter()
+            .map(|r| {
+                let feat = capability_of.get(&r.agent_id).cloned().unwrap_or_default();
+                crate::neotrix::nt_core_parallel::Candidate::new(
+                    &format!("{}#{}", r.agent_id, r.task_index),
+                    if r.success { 1.0 } else { 0.0 },
+                    feat,
+                )
+            })
+            .collect();
+
+        let selector = crate::neotrix::nt_core_parallel::DppSelector::new(max_dim);
+        let winners = selector.merge_winners(&candidates, keep);
+        let winner_ids: std::collections::HashSet<String> =
+            winners.iter().map(|w| w.id.clone()).collect();
+
+        results
+            .iter()
+            .filter(|r| {
+                winner_ids.contains(&format!("{}#{}", r.agent_id, r.task_index))
+            })
+            .cloned()
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -168,5 +220,32 @@ mod tests {
         ];
         let summary = coord.summarize(&results);
         assert!(summary.contains("1/2"));
+    }
+
+    #[test]
+    fn test_select_winners_empty() {
+        let coord = MultiAgentCoordinator::new(2);
+        assert!(coord.select_winners(&[], 3).is_empty());
+        let results = vec![
+            AgentResult { agent_id: "a1".to_string(), task_index: 0, output: "x".to_string(), success: true },
+        ];
+        assert!(coord.select_winners(&results, 0).is_empty());
+    }
+
+    #[test]
+    fn test_select_winners_keeps_only_success_and_caps() {
+        let mut coord = MultiAgentCoordinator::new(4);
+        coord.register_agent("w1", vec![1.0, 0.0, 0.0]);
+        coord.register_agent("w2", vec![0.0, 1.0, 0.0]);
+        coord.register_agent("w3", vec![0.0, 0.0, 1.0]);
+        let results = vec![
+            AgentResult { agent_id: "w1".to_string(), task_index: 0, output: "ok".to_string(), success: true },
+            AgentResult { agent_id: "w2".to_string(), task_index: 0, output: "ok".to_string(), success: true },
+            AgentResult { agent_id: "w3".to_string(), task_index: 0, output: "fail".to_string(), success: false },
+            AgentResult { agent_id: "w1".to_string(), task_index: 1, output: "ok".to_string(), success: true },
+        ];
+        let winners = coord.select_winners(&results, 2);
+        assert!(winners.len() <= 2);
+        assert!(winners.iter().all(|w| w.success), "failures excluded");
     }
 }

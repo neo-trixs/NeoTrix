@@ -132,6 +132,49 @@ impl SpecDrivenPipeline {
         self.specs.push(spec);
     }
 
+    /// 增量合并提交 (dot-skill append→delta→merge 吸收):
+    /// 同 id 已有规格时, 不静默覆盖 — 保留既有结论作为基线, 新提交作为 delta
+    /// 追加合并 (描述/约束增量并集, 版本递增, 旧版本标记 Superseded 留证据链)。
+    /// 返回 (合并结果, 是否新建)。新建返回 (Some(id), true); 已存在并合并返回
+    /// (Some(id), false); 目标已被 Rejected 时返回 Err (拒绝复活, 须显式重建)。
+    pub fn submit_spec_incremental(&mut self, spec: EvolutionSpec) -> Result<(String, bool), String> {
+        if spec.id.is_empty() {
+            return Err("spec id must not be empty".to_string());
+        }
+        if let Some(existing) = self.specs.iter().find(|s| s.id == spec.id) {
+            if existing.status == SpecStatus::Rejected {
+                return Err(format!(
+                    "spec '{}' is Rejected (explicitly closed); use a new id to reopen",
+                    spec.id
+                ));
+            }
+            // 提取既有基线 (克隆, 避免借用冲突)
+            let existing_base = existing.clone();
+            // 旧版本归档为 Superseded (证据链保留)。
+            if let Some(prev) = self.specs.iter_mut().find(|s| s.id == spec.id) {
+                prev.status = SpecStatus::Superseded;
+            }
+            // delta 合并: 约束取并集 (既有 + 新增), 保留旧版创建时间。
+            let mut merged_constraints = existing_base.constraints.clone();
+            for c in &spec.constraints {
+                if !merged_constraints.contains(c) {
+                    merged_constraints.push(c.clone());
+                }
+            }
+            let mut merged = spec.clone();
+            merged.constraints = merged_constraints;
+            merged.status = SpecStatus::Pending; // 需要重新验证
+            merged.version = existing_base.version + 1;
+            merged.created_at = existing_base.created_at;
+            let id = merged.id.clone();
+            self.specs.push(merged);
+            return Ok((id, false));
+        }
+        let id = spec.id.clone();
+        self.specs.push(spec);
+        Ok((id, true))
+    }
+
     pub fn verify_all(&mut self, codebase_summary: &str) -> Vec<SpecVerification> {
         let mut results = Vec::new();
         let pending_ids: Vec<String> = self
@@ -273,5 +316,50 @@ mod tests {
         assert_eq!(stats.total, 3);
         assert_eq!(stats.active, 2);
         assert_eq!(stats.pending, 1);
+    }
+
+    #[test]
+    fn test_incremental_merge_keeps_baseline_and_delta() {
+        // 增量合并 (dot-skill append→delta→merge 吸收): 同 id 第二次提交不覆盖
+        // 既有结论, 而是保留旧版本为 Superseded + 新版本约束并集。
+        let mut pipeline = SpecDrivenPipeline::default();
+        let mut spec1 = EvolutionSpec::new("evo-1", "absorb", "baseline", "core");
+        spec1.constraints.push("compiles".to_string());
+        let (id, created) = pipeline.submit_spec_incremental(spec1).unwrap();
+        assert_eq!(id, "evo-1");
+        assert!(created);
+
+        // 第二次提交: delta 合并
+        let mut spec2 = EvolutionSpec::new("evo-1", "absorb", "updated delta", "core");
+        spec2.constraints.push("tests pass".to_string());
+        let (id2, created2) = pipeline.submit_spec_incremental(spec2).unwrap();
+        assert_eq!(id2, "evo-1");
+        assert!(!created2, "existing spec merges, not new");
+
+        // 旧版本归档 Superseded (证据链)
+        assert_eq!(pipeline.specs.iter().filter(|s| s.status == SpecStatus::Superseded).count(), 1);
+        // 最新版本约束 = 并集 (compiles + tests pass)
+        let latest = pipeline.specs.iter().filter(|s| s.status == SpecStatus::Pending).last().unwrap();
+        assert_eq!(latest.version, 2);
+        assert!(latest.constraints.contains(&"compiles".to_string()));
+        assert!(latest.constraints.contains(&"tests pass".to_string()));
+    }
+
+    #[test]
+    fn test_incremental_rejected_cannot_reopen() {
+        let mut pipeline = SpecDrivenPipeline::default();
+        let spec = EvolutionSpec::new("dead", "x", "desc", "m");
+        pipeline.submit_spec(spec);
+        assert!(pipeline.reject("dead"));
+        let reopen = EvolutionSpec::new("dead", "y", "reopen attempt", "m");
+        let err = pipeline.submit_spec_incremental(reopen).unwrap_err();
+        assert!(err.contains("Rejected"), "rejected spec cannot reopen via merge");
+    }
+
+    #[test]
+    fn test_incremental_empty_id_rejected() {
+        let mut pipeline = SpecDrivenPipeline::default();
+        let spec = EvolutionSpec::new("", "x", "desc", "m");
+        assert!(pipeline.submit_spec_incremental(spec).is_err());
     }
 }

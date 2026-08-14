@@ -283,11 +283,11 @@ impl EvolutionDaemon {
                         AutoFixer::split_file(file)
                     }
                     IssueType::TodoLeftovers if !file.is_empty() => {
-                        AutoFixer::cleanup_todos(file)
+                        AutoFixer::cleanup_todos_tx(file)
                             .map(|n| format!("移除 {} 个 TODO", n))
                     }
                     IssueType::TodoLeftovers => {
-                        AutoFixer::cleanup_todos("src/lib.rs")
+                        AutoFixer::cleanup_todos_tx("src/lib.rs")
                             .map(|n| format!("移除 {} 个 TODO", n))
                     }
                     _ => Err("no auto-fix available".into()),
@@ -443,7 +443,7 @@ impl EvolutionDaemon {
                     GoalCategory::TestCoverage => AutoFixer::record_test_gap(&file),
                     GoalCategory::CodeHealth if goal.description.contains("compile") => AutoFixer::cargo_fix(),
                     GoalCategory::CodeHealth => {
-                        AutoFixer::cleanup_todos(&file).map(|n| format!("移除 {} 个 TODO", n))
+                        AutoFixer::cleanup_todos_tx(&file).map(|n| format!("移除 {} 个 TODO", n))
                     }
                     GoalCategory::Architecture => AutoFixer::split_file(&file),
                     GoalCategory::Security => AutoFixer::cargo_fix(),

@@ -157,7 +157,7 @@ pub fn apply_supersede(conn: &Connection, hits: &[ConflictHit]) -> Result<usize,
         let affected = conn
             .execute(
                 "UPDATE nodes SET supersedes = ?1, tier = 'cold', \
-                 updated_at = ?2 WHERE id = ?3",
+                 updated_at = ?2 WHERE id = ?3 AND tier != 'cold'",
                 params![h.newer_id, now_unix(), h.older_id],
             )
             .map_err(|e| e.to_string())?;
@@ -166,6 +166,80 @@ pub fn apply_supersede(conn: &Connection, hits: &[ConflictHit]) -> Result<usize,
         }
     }
     Ok(n)
+}
+
+/// 单条冲突解决的差异记录 (diagram-design fidelity ledger 吸收)。
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct FidelityEntry {
+    pub older_id: String,
+    pub newer_id: String,
+    pub title: String,
+    pub sim: f64,
+    pub polarity_older: i32,
+    pub polarity_newer: i32,
+}
+
+/// Fidelity ledger — 吸收自 cathrynlavery/diagram-design:
+/// 每次冲突解决输出"合并/丢弃/覆盖"差异清单, 而非仅静默改库。
+/// 调用方将 ledger 落盘/审计 (如写回 metadata.provenance)。
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct FidelityLedger {
+    pub entries: Vec<FidelityEntry>,
+}
+
+impl FidelityLedger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+/// 冲突解决 + fidelity ledger: 同 [`apply_supersede`] 应用覆盖, 但返回
+/// 本次解决的差异清单 (哪条被丢弃、胜出者是谁、相似度多少), 供溯源审计。
+pub fn apply_supersede_with_ledger(
+    conn: &Connection,
+    hits: &[ConflictHit],
+) -> Result<(usize, FidelityLedger), String> {
+    let mut n = 0usize;
+    let mut ledger = FidelityLedger::new();
+    for h in hits {
+        let affected = conn
+            .execute(
+                "UPDATE nodes SET supersedes = ?1, tier = 'cold', \
+                 updated_at = ?2 WHERE id = ?3 AND tier != 'cold'",
+                params![h.newer_id, now_unix(), h.older_id],
+            )
+            .map_err(|e| e.to_string())?;
+        if affected > 0 {
+            n += 1;
+            // provenance 溯源: 在旧节点 metadata 记录解决依据 (semantica 吸收 —
+            // "冲突标记而非静默覆盖", 每次决策留痕可回查)。
+            let _ = conn.execute(
+                "UPDATE nodes SET metadata = json_set(
+                     COALESCE(metadata, '{}'), '$.provenance.resolved_by', ?1,
+                     '$.provenance.resolved_at', ?2,
+                     '$.provenance.sim', ?3
+                 ) WHERE id = ?4",
+                params![h.newer_id, now_unix(), h.sim, h.older_id],
+            );
+            ledger.entries.push(FidelityEntry {
+                older_id: h.older_id.clone(),
+                newer_id: h.newer_id.clone(),
+                title: h.title.clone(),
+                sim: h.sim,
+                polarity_older: h.polarity_older,
+                polarity_newer: h.polarity_newer,
+            });
+        }
+    }
+    Ok((n, ledger))
 }
 
 /// T0.3 写后冲突检测 (scoped, T0.3 接线): 只对比指定新节点 vs 既有节点,
@@ -446,6 +520,47 @@ mod tests {
         seed(&conn, "b", "MMR diversity lambda", "diversify uses lambda 0.7", now + 5, 0, 0.8);
         let hits = conflict_detect(&conn, 0.4).unwrap();
         assert!(hits.is_empty(), "same polarity must not conflict");
+    }
+
+    #[test]
+    fn supersede_with_ledger_tracks_provenance() {
+        // fidelity ledger + provenance 溯源 (diagram-design + semantica 吸收):
+        // 覆盖解决需留差异清单, 并在旧节点 metadata 记录解决依据。
+        let conn = mem_conn();
+        let now = now_unix();
+        seed(&conn, "a", "Retry backoff policy", "backoff is enabled", now, 0, 0.8);
+        seed(&conn, "b", "Retry backoff policy", "backoff is not enabled", now + 10, 0, 0.8);
+        let hits = conflict_detect(&conn, 0.4).unwrap();
+        assert_eq!(hits.len(), 1);
+        let (applied, ledger) = apply_supersede_with_ledger(&conn, &hits).unwrap();
+        assert_eq!(applied, 1);
+        assert_eq!(ledger.len(), 1);
+        assert_eq!(ledger.entries[0].older_id, "a");
+        assert_eq!(ledger.entries[0].newer_id, "b");
+        // provenance 落 metadata
+        let meta: String = conn
+            .query_row("SELECT metadata FROM nodes WHERE id='a'", [], |r| r.get(0))
+            .unwrap();
+        assert!(meta.contains("resolved_by"), "provenance must be recorded, got {}", meta);
+        assert!(meta.contains("b"), "resolved_by should point to newer");
+        assert!(meta.contains("sim"));
+        // 幂等: 二次解决无新增
+        let (applied2, ledger2) = apply_supersede_with_ledger(&conn, &hits).unwrap();
+        assert_eq!(applied2, 0);
+        assert!(ledger2.is_empty());
+    }
+
+    #[test]
+    fn ledger_empty_for_no_conflicts() {
+        let conn = mem_conn();
+        let now = now_unix();
+        seed(&conn, "a", "Same claim", "feature is on", now, 0, 0.8);
+        seed(&conn, "b", "Same claim", "feature is on", now + 5, 0, 0.8);
+        let hits = conflict_detect(&conn, 0.4).unwrap();
+        assert!(hits.is_empty());
+        let (applied, ledger) = apply_supersede_with_ledger(&conn, &hits).unwrap();
+        assert_eq!(applied, 0);
+        assert!(ledger.is_empty());
     }
 
     #[test]

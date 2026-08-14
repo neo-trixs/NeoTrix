@@ -1011,6 +1011,29 @@ pub fn run_project_evolve(
 pub fn run_mcp_server() {
     let mut server = neotrix::core::McpServer::new();
     server.register_all_tools();
+    // 单调授权守卫: 阻断破坏性 shell 命令 (NT-SHIELD GuardChain 生产接线)
+    {
+        use neotrix::l1_body_impl::nt_shield::guard_chain::GuardVerdict;
+        server.add_guard("destructive_shell", |tool, args| {
+            if tool != "execute_command" {
+                return GuardVerdict::Allow;
+            }
+            let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+            let dangerous = [
+                "rm -rf /",
+                "rm -rf ~",
+                ":(){ :|:& };:",
+                "mkfs.",
+                "dd if=",
+                "> /dev/sda",
+            ];
+            if dangerous.iter().any(|d| cmd.contains(d)) {
+                GuardVerdict::Deny
+            } else {
+                GuardVerdict::Allow
+            }
+        });
+    }
     // 横幅必须走 stderr: MCP stdio 协议要求 stdout 只承载 JSON-RPC 帧。
     eprintln!("neotrix-mcp {} starting (stdio JSON-RPC 2.0)", env!("CARGO_PKG_VERSION"));
     if let Err(e) = server.run() {

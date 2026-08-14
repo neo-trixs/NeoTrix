@@ -1,11 +1,28 @@
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, Write};
 
+use crate::core::nt_core_dispatch::{DispatchMode, Dispatcher};
+use crate::neotrix::l1_body_impl::nt_shield::guard_chain::{GuardChain, GuardVerdict};
+
 /// MCP Server for NeoTrix — exposes tools via stdio JSON-RPC 2.0 transport.
 pub struct McpServer {
     tools: Vec<McpTool>,
     reader: std::io::Stdin,
     writer: std::io::Stdout,
+    /// 单调授权守卫链 (∂guard): 聚合裁决 Deny/Ask 时拦截工具调用。
+    guard: GuardChain,
+    /// 工具调用钩子 (waterfall 中间件): 短路即拦截, 全部放行才执行真实工具。
+    hooks: Dispatcher<McpToolCall>,
+}
+
+/// 工具调用事件 — hooks (waterfall) 的载荷。
+#[derive(Debug)]
+pub struct McpToolCall {
+    pub id: u64,
+    pub name: String,
+    pub args: serde_json::Value,
+    /// hook 置位表示拦截 (阻止真实工具执行)。仅 dispatch 单线程内访问。
+    pub intercepted: std::cell::Cell<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -48,7 +65,30 @@ impl McpServer {
             tools: Vec::new(),
             reader: std::io::stdin(),
             writer: std::io::stdout(),
+            guard: GuardChain::new(),
+            hooks: Dispatcher::new(),
         }
+    }
+
+    /// 设置授权守卫链 (默认空链 = 全放行)。
+    pub fn set_guard(&mut self, guard: GuardChain) {
+        self.guard = guard;
+    }
+
+    /// 追加单调授权守卫。
+    pub fn add_guard<F>(&mut self, name: impl Into<String>, check: F)
+    where
+        F: Fn(&str, &serde_json::Value) -> GuardVerdict + Send + Sync + 'static,
+    {
+        self.guard.add(name, check);
+    }
+
+    /// 注册工具调用钩子 (waterfall 中间件)。
+    pub fn register_hook<F>(&mut self, handler: F)
+    where
+        F: Fn(&McpToolCall, &dyn Fn()) -> bool + Send + Sync + 'static,
+    {
+        self.hooks.register(handler);
     }
 
     pub fn register_all_tools(&mut self) {
@@ -205,6 +245,33 @@ impl McpServer {
                     }
                 },
                 "required": []
+            }),
+            schema_version: None,
+        });
+        self.register_tool(McpTool {
+            name: "consciousness_task".into(),
+            description: "意识核心直接处理人类语言任务: 拆解→分配→反思补齐→执行全部子任务。\
+                          默认走内置能力网 (optimal provider), 能力缺失时自动获取外部知识 \
+                          (论文/GitHub/技术文档) 并在 token 预算内试错求解。调用谁/怎么调用由意识核心决定。".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "instruction": {
+                        "type": "string",
+                        "description": "人类语言任务指令 (自然语言, 如 '合并供应商价格表并检索历史经验')"
+                    },
+                    "acquire_knowledge": {
+                        "type": "boolean",
+                        "description": "是否调用外部知识源 (discover_*) 获取信息基础 (default true)",
+                        "default": true
+                    },
+                    "max_attempts": {
+                        "type": "integer",
+                        "description": "外部缺口试错轮次上限 (default 5)",
+                        "default": 5
+                    }
+                },
+                "required": ["instruction"]
             }),
             schema_version: None,
         });
@@ -368,18 +435,42 @@ impl McpServer {
     }
 
     fn handle_call_tool(&self, id: u64, name: &str, args: &serde_json::Value) -> McpResponse {
-        let result = match name {
-            "read_file" => call_read_file(args),
-            "write_file" => call_write_file(args),
-            "edit_file" => call_edit_file(args),
-            "search_code" => call_search_code(args),
-            "git_diff" => call_git_diff(args),
-            "execute_command" => call_execute_command(args),
-            "neotrix_command" => call_neotrix_command(args),
-            "consciousness_status" => call_consciousness_status(),
-            "consciousness_tick" => call_consciousness_tick(args),
-            other => Err(format!("Unknown tool: {}", other)),
+        // 第一道闸: 单调授权守卫链 (NT-SHIELD GuardChain)
+        let (verdict, reasons) = self.guard.evaluate(name, args);
+        if !verdict.is_allowed() {
+            return McpResponse {
+                jsonrpc: "2.0".into(),
+                id,
+                result: None,
+                error: Some(McpError {
+                    code: -32000,
+                    message: format!("[{}] Tool call denied by guard: {}", verdict.name(), reasons.join("; ")),
+                }),
+            };
+        }
+
+        // 第二道闸: 工具调用钩子 (waterfall 中间件, 短路即拦截)
+        let event = McpToolCall {
+            id,
+            name: name.to_string(),
+            args: args.clone(),
+            intercepted: std::cell::Cell::new(false),
         };
+        let _ran = self.hooks.dispatch(DispatchMode::Waterfall, &event);
+        if event.intercepted.get() {
+            return McpResponse {
+                jsonrpc: "2.0".into(),
+                id,
+                result: None,
+                error: Some(McpError {
+                    code: -32000,
+                    message: "Tool call intercepted by hook".into(),
+                }),
+            };
+        }
+
+        // 执行真实工具
+        let result = execute_tool(name, args);
 
         match result {
             Ok(content) => McpResponse {
@@ -409,6 +500,23 @@ impl McpServer {
 impl Default for McpServer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// 工具分派 — 无副作用, 由 handle_call_tool 在 guard/hooks 通过后调用。
+fn execute_tool(name: &str, args: &serde_json::Value) -> Result<String, String> {
+    match name {
+        "read_file" => call_read_file(args),
+        "write_file" => call_write_file(args),
+        "edit_file" => call_edit_file(args),
+        "search_code" => call_search_code(args),
+        "git_diff" => call_git_diff(args),
+        "execute_command" => call_execute_command(args),
+        "neotrix_command" => call_neotrix_command(args),
+        "consciousness_status" => call_consciousness_status(),
+        "consciousness_tick" => call_consciousness_tick(args),
+        "consciousness_task" => call_consciousness_task(args),
+        other => Err(format!("Unknown tool: {}", other)),
     }
 }
 
@@ -806,6 +914,39 @@ fn call_consciousness_tick(args: &serde_json::Value) -> Result<String, String> {
     serde_json::to_string_pretty(&data).map_err(|e| format!("Serialize error: {}", e))
 }
 
+/// consciousness_task — 意识核心直接处理人类语言任务 (拆解→分配→补齐→执行)。
+/// 生产执行器 = LlmSolutionExecutor (SubagentDispatch 桥接), 能力缺失自动外部获取。
+fn call_consciousness_task(args: &serde_json::Value) -> Result<String, String> {
+    use crate::core::nt_core_consciousness_core::{
+        ExternalClosureConfig, LlmSolutionExecutor, execute_task_loop,
+    };
+
+    let instruction = args
+        .get("instruction")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| "Missing required field: instruction".to_string())?
+        .to_string();
+
+    let acquire_knowledge = args.get("acquire_knowledge").and_then(|v| v.as_bool()).unwrap_or(true);
+    let max_attempts = args
+        .get("max_attempts")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32)
+        .unwrap_or(5)
+        .clamp(1, 20);
+
+    let config = ExternalClosureConfig {
+        acquire_knowledge,
+        max_attempts,
+        ..ExternalClosureConfig::frugal()
+    };
+
+    let executor = LlmSolutionExecutor;
+    let report = execute_task_loop(&instruction, &executor, &config);
+    serde_json::to_string_pretty(&report).map_err(|e| format!("Serialize error: {}", e))
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // MCP 2026-07-28 v3 Protocol Extensions
 // ═══════════════════════════════════════════════════════════════════
@@ -1001,7 +1142,7 @@ mod tests {
     fn test_register_all_tools() {
         let mut server = McpServer::new();
         server.register_all_tools();
-        assert_eq!(server.tools.len(), 9);
+        assert_eq!(server.tools.len(), 10);
         let names: Vec<&str> = server.tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -1010,6 +1151,7 @@ mod tests {
         assert!(names.contains(&"git_diff"));
         assert!(names.contains(&"execute_command"));
         assert!(names.contains(&"neotrix_command"));
+        assert!(names.contains(&"consciousness_task"), "consciousness_task 应注册");
     }
 
     #[test]
@@ -1020,7 +1162,7 @@ mod tests {
         assert!(resp.error.is_none());
         let result = resp.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 9);
+        assert_eq!(tools.len(), 10);
     }
 
     #[test]
@@ -1285,6 +1427,71 @@ mod tests {
     fn test_server_default() {
         let server = McpServer::default();
         assert!(server.tools.is_empty());
+        assert!(server.guard.is_empty());
+        assert!(server.hooks.is_empty());
+    }
+
+    #[test]
+    fn test_guard_denies_destructive_command() {
+        // 生产接线复刻: 破坏性 shell 守卫
+        let mut server = McpServer::new();
+        server.add_guard("destructive_shell", |tool, args| {
+            if tool != "execute_command" {
+                return GuardVerdict::Allow;
+            }
+            let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+            if cmd.contains("rm -rf /") {
+                GuardVerdict::Deny
+            } else {
+                GuardVerdict::Allow
+            }
+        });
+        let resp = server.handle_call_tool(1, "execute_command", &serde_json::json!({"command": "rm -rf /"}));
+        let err = resp.error.as_ref().expect("should be denied");
+        assert_eq!(err.code, -32000);
+        assert!(err.message.contains("denied by guard"));
+    }
+
+    #[test]
+    fn test_guard_allows_safe_command() {
+        let mut server = McpServer::new();
+        server.add_guard("destructive_shell", |tool, args| {
+            if tool != "execute_command" {
+                return GuardVerdict::Allow;
+            }
+            let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+            if cmd.contains("rm -rf /") {
+                GuardVerdict::Deny
+            } else {
+                GuardVerdict::Allow
+            }
+        });
+        let resp = server.handle_call_tool(1, "execute_command", &serde_json::json!({"command": "echo safe"}));
+        assert!(resp.result.is_some());
+        assert!(resp.error.is_none());
+    }
+
+    #[test]
+    fn test_hook_intercepts_tool_call() {
+        // waterfall 钩子短路 = 拦截, 真实工具不执行
+        let mut server = McpServer::new();
+        server.register_hook(move |event, _next| {
+            event.intercepted.set(true);
+            true
+        });
+        let resp = server.handle_call_tool(1, "execute_command", &serde_json::json!({"command": "echo hello"}));
+        assert!(resp.error.is_some());
+        assert!(resp.error.unwrap().message.contains("intercepted by hook"));
+    }
+
+    #[test]
+    fn test_hook_pass_through_runs_tool() {
+        // 钩子放行 (不短路) → 真实工具执行
+        let mut server = McpServer::new();
+        server.register_hook(move |_event, _next| false);
+        let resp = server.handle_call_tool(1, "execute_command", &serde_json::json!({"command": "echo hook-ok"}));
+        assert!(resp.result.is_some());
+        assert!(resp.error.is_none());
     }
 }
 
@@ -1419,5 +1626,74 @@ mod mcp_v3_tests {
         assert!(cache.contains("a"), "a was refreshed and should survive eviction");
         assert!(!cache.contains("b"), "b was oldest and should be evicted");
         assert_eq!(cache.len(), 3);
+    }
+
+    #[test]
+    fn test_consciousness_task_registered_and_dispatched() {
+        // 注册表: consciousness_task 已在 register_all_tools 中
+        let mut server = McpServer::new();
+        server.register_all_tools();
+        let names: Vec<&str> = server.tools.iter().map(|t| t.name.as_str()).collect();
+        assert!(names.contains(&"consciousness_task"), "consciousness_task 应注册");
+        let tool = server.tools.iter().find(|t| t.name == "consciousness_task").unwrap();
+        assert!(tool.input_schema["required"].as_array().unwrap().contains(&serde_json::Value::String("instruction".into())),
+            "instruction 应为必填");
+        assert!(tool.input_schema["properties"]["acquire_knowledge"]["type"] == "boolean");
+
+        // 分发映射: execute_tool 能路由到 consciousness_task handler
+        let bad = execute_tool("consciousness_task", &serde_json::json!({}));
+        assert!(bad.is_err(), "缺 instruction 应报错");
+        assert!(bad.unwrap_err().contains("instruction"), "错误信息应提示缺 instruction");
+
+        // 未知工具仍报错 (路由未被破坏)
+        let unknown = execute_tool("no_such_tool", &serde_json::json!({}));
+        assert!(unknown.is_err());
+    }
+
+    #[test]
+    fn test_consciousness_task_protocol_end_to_end() {
+        // 协议级端到端: 构造 JSON-RPC 请求 → handle_request → 响应结构正确。
+        // 覆盖 initialize / tools/list / tools/call (缺参错误路径), 不触发真实 LLM 执行。
+        let mut server = McpServer::new();
+        server.register_all_tools();
+
+        // initialize
+        let req = McpRequest {
+            jsonrpc: "2.0".into(),
+            id: 1,
+            method: "initialize".into(),
+            params: Some(serde_json::json!({})),
+        };
+        let resp = server.handle_request(&req);
+        assert!(resp.error.is_none(), "initialize 应成功");
+        assert_eq!(resp.result.as_ref().unwrap()["serverInfo"]["name"], "neotrix-mcp");
+
+        // tools/list → 含 consciousness_task
+        let req = McpRequest {
+            jsonrpc: "2.0".into(),
+            id: 2,
+            method: "tools/list".into(),
+            params: Some(serde_json::json!({})),
+        };
+        let resp = server.handle_request(&req);
+        let tools = resp.result.unwrap()["tools"].as_array().unwrap().clone();
+        let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+        assert!(names.contains(&"consciousness_task"), "tools/list 应暴露 consciousness_task");
+
+        // tools/call 缺 instruction → 协议级错误 (不触发执行)
+        let req = McpRequest {
+            jsonrpc: "2.0".into(),
+            id: 3,
+            method: "tools/call".into(),
+            params: Some(serde_json::json!({
+                "name": "consciousness_task",
+                "arguments": {}
+            })),
+        };
+        let resp = server.handle_request(&req);
+        assert!(resp.error.is_some(), "缺 instruction 应返回协议错误");
+        assert_eq!(resp.error.as_ref().unwrap().code, -32000, "工具内部错误码");
+        // 错误信息提示缺失字段
+        assert!(resp.error.as_ref().unwrap().message.contains("instruction"));
     }
 }

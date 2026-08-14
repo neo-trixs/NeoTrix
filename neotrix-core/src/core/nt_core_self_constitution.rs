@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 use crate::core::nt_core_hcube::fhrr_vsa::{FhrrVector, similarity};
+use crate::neotrix::l1_body_impl::nt_shield::guard_chain::{GuardChain, GuardVerdict};
 
 /// Rule categories for semantic indexing and retrieval
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -106,6 +107,11 @@ pub struct Constitution {
     pub source_hash: String,
     #[serde(skip)]
     vector_index: Option<ConstitutionVectorIndex>,
+    /// 单调授权守卫 (三态治理聚合): verify_compliance 时追加 Deny/Ask 裁决。
+    /// 守卫只许降级 (Deny > Ask > Allow), 对齐 GuardChain 单调语义。
+    /// Arc 使 derive(Clone) 可共享同一守卫链。
+    #[serde(skip)]
+    pub guard: std::sync::Arc<GuardChain>,
 }
 
 impl Constitution {
@@ -176,6 +182,7 @@ impl Constitution {
             loaded_at: 0,
             source_hash: String::new(),
             vector_index: None,
+            guard: std::sync::Arc::new(default_governance_guard()),
         }
     }
 
@@ -246,6 +253,31 @@ impl Constitution {
                     description: format!("Action may violate {}", rule.title),
                 });
             }
+        }
+
+        // 单调授权守卫聚合 (三态治理): Deny → Critical, Ask → High。
+        // 与逐条 keyword 检查并存, 提供授权类规则的单调收敛裁决。
+        let (verdict, reasons) = self
+            .guard
+            .evaluate("constitution", &serde_json::json!({ "action": action_desc }));
+        match verdict {
+            GuardVerdict::Deny => {
+                violations.push(ComplianceViolation {
+                    rule_id: "GUARD-DENY".into(),
+                    rule_title: "Monotonic Guard Deny".into(),
+                    severity: ViolationSeverity::Critical,
+                    description: reasons.join("; "),
+                });
+            }
+            GuardVerdict::Ask => {
+                violations.push(ComplianceViolation {
+                    rule_id: "GUARD-ASK".into(),
+                    rule_title: "Monotonic Guard Ask".into(),
+                    severity: ViolationSeverity::High,
+                    description: reasons.join("; "),
+                });
+            }
+            GuardVerdict::Allow => {}
         }
 
         ComplianceReport {
@@ -526,6 +558,35 @@ fn encode_text_to_fhrr(text: &str) -> FhrrVector {
     FhrrVector::from_scalar(hash as f64)
 }
 
+/// 默认治理守卫 — 单调三态规则 (对齐 GuardChain: Deny > Ask > Allow)。
+/// R-P42 (新模块必扩展已有节点) 判 Deny; R-P47 (拒绝平行适配器) 判 Ask。
+/// verify_compliance 聚合时 Deny → Critical, Ask → High violation。
+fn default_governance_guard() -> GuardChain {
+    let mut guard = GuardChain::new();
+    guard.add("R-P42 新模块须扩展已有节点", |_tool, args| {
+        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
+        let lower = action.to_lowercase();
+        if lower.contains("new module") && !lower.contains("branch") && !lower.contains("extend") {
+            GuardVerdict::Deny
+        } else {
+            GuardVerdict::Allow
+        }
+    });
+    guard.add("R-P47 拒绝平行适配器", |_tool, args| {
+        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
+        let lower = action.to_lowercase();
+        if (lower.contains("adapter") || lower.contains("wrapper") || lower.contains("new mod"))
+            && !lower.contains("node")
+            && !lower.contains("reinforce")
+        {
+            GuardVerdict::Ask
+        } else {
+            GuardVerdict::Allow
+        }
+    });
+    guard
+}
+
 /// Global constitution instance (loaded at startup)
 static GLOBAL_CONSTITUTION: LazyLock<Constitution> = LazyLock::new(|| {
     // 优先加载全量规则文件 dev-rules.md (R-P1~R-P101), 回退 AGENTS.md。
@@ -640,6 +701,44 @@ mod tests {
             assert!(!report.compliant);
             assert!(report.violations.iter().any(|v| v.rule_id == "R-P43"));
         }
+    }
+
+    #[test]
+    fn test_governance_guard_monotonic_deny() {
+        // 空规则 Constitution 仍带默认治理守卫 (R-P42 单调 Deny)
+        let constitution = Constitution::new();
+        let report = constitution.verify_compliance("create new module for standalone feature");
+        assert!(!report.compliant);
+        assert!(
+            report.violations.iter().any(|v| v.rule_id == "GUARD-DENY"),
+            "guard 单调 Deny 应追加 Critical violation: {:?}",
+            report.violations
+        );
+    }
+
+    #[test]
+    fn test_governance_guard_monotonic_ask() {
+        // R-P47 平行适配器 → Ask → High violation (单调降级至 Ask)
+        let constitution = Constitution::new();
+        let report = constitution.verify_compliance("wrap existing api in an adapter");
+        assert!(!report.compliant);
+        assert!(
+            report.violations.iter().any(|v| v.rule_id == "GUARD-ASK"),
+            "guard 单调 Ask 应追加 High violation: {:?}",
+            report.violations
+        );
+    }
+
+    #[test]
+    fn test_governance_guard_allows_extension() {
+        // 扩展已有节点 → Allow, guard 不追加 violation
+        let constitution = Constitution::new();
+        let report = constitution.verify_compliance("extend existing module nt_core_orch_agent with a branch mapping");
+        assert!(
+            !report.violations.iter().any(|v| v.rule_id.starts_with("GUARD-")),
+            "扩展动作不应触发 guard violation: {:?}",
+            report.violations
+        );
     }
 
     #[test]

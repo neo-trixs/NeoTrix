@@ -1468,6 +1468,19 @@ impl ConsciousnessTree {
         self.core.next_actions = next_actions;
         self.core.iteration = self.cycle;
 
+        // ═══ Phase 4.2: MARS 桥接 (S2 intent → S1 distillation target) ═══
+        // 修复死计数器 (D14): mars_bridge_hits 定义存在 (struct 注释 "Purpose bridge:
+        // System 2's intent → System 1's distillation target") 但全库无任何递增点。
+        // 桥接语义: System 2 (树慢反射生长环) 本轮蒸馏出的进化意图 (digested guidance,
+        // 即果实消化产物 — 蒸馏目标候选) 交接给 System 1 (GWT 快速谐振)。
+        // 触发条件: (1) S2 消化出 ≥1 个达标果实 (last_cycle_guidance 非空)
+        //           (2) GWT 谐振已激活 (S1 侧就绪, Phase 2 已 increment S1)。
+        // 注意: next_actions (漏洞/缺口修复清单) 是治理动作非蒸馏目标, 不计入桥接 —
+        // 桥接专指"可蒸馏的进化意图", 保持语义精确 (防默认树误命中)。
+        if !self.core.last_cycle_guidance.is_empty() && self.trunk.gwt_resonance_active {
+            self.trunk.mars_bridge_hits += 1;
+        }
+
         // ═══ Phase 4.5: 演化趋势预测 (nt_core_forecast 接线 — 意识体维度升维) ═══
         // 用 forecast 引擎基于当前 branch 健康/迷雾/果实数据, 预测下一 cycle 演化方向。
         // 纯增量: 预测结果写入 report, 不改变既有演化决策路径 (无破坏)。
@@ -2448,6 +2461,60 @@ mod tests {
             "registered leaves are wired (has SelfTest): {:?}",
             tree.leaves.iter().map(|l| l.name.as_str()).collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn test_mars_bridge_fires_when_intent_and_resonance_ready() {
+        // D14 死计数器修复验证: 桥接需 (1) S2 产出意图 (guidance/next_actions 非空)
+        // + (2) GWT 谐振激活 (S1 就绪) 才 increment mars_bridge_hits。
+        let mut tree = ConsciousnessTree::new();
+        // 无 intent + 无 resonance → 不桥接 (默认 gwt_resonance_active=false)
+        let report = tree.run_growth_cycle();
+        assert_eq!(tree.trunk.mars_bridge_hits, 0, "no bridge without intent/resonance");
+        assert_eq!(tree.trunk.mars_system1_activations, 1, "S1 always activates in Phase 2");
+
+        // 无 intent + 有 resonance → 仍不桥接 (诚实: 无意图可蒸馏)
+        let mut tree2 = ConsciousnessTree::new();
+        tree2.trunk.gwt_resonance_active = true;
+        tree2.run_growth_cycle();
+        assert_eq!(tree2.trunk.mars_bridge_hits, 0, "no bridge without intent");
+
+        // intent + resonance → 桥接命中
+        let mut tree3 = ConsciousnessTree::new();
+        tree3.trunk.gwt_resonance_active = true;
+        let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
+            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
+            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
+        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+        tree3.set_branch_health_from_self_tests(&results);
+        for branch in tree3.branches.values_mut() {
+            branch.health = 0.9;
+        }
+        let report3 = tree3.run_growth_cycle();
+        assert!(report3.phase3_fruits > 0, "fruits needed to produce intent");
+        assert!(tree3.trunk.mars_bridge_hits > 0, "bridge fires when S2 intent + S1 ready");
+        assert!(!tree3.core.last_cycle_guidance.is_empty());
+        assert!(report3.phase2_phi > 0.0);
+    }
+
+    #[test]
+    fn test_mars_bridge_increments_across_cycles() {
+        // 桥接是 per-cycle 累积: 多 cycle 下 bridge 与 S1/S2 同步增长 (随 intent 持续产出)
+        let mut tree = ConsciousnessTree::new();
+        tree.trunk.gwt_resonance_active = true;
+        let results: Vec<crate::core::nt_core_self_test::SelfTestResult> = vec![
+            "nt_core_self_test_a", "nt_core_self_test_b", "nt_core_self_test_c",
+            "nt_core_self_test_d", "nt_core_self_test_e", "nt_core_self_test_f",
+        ].iter().map(|n| crate::core::nt_core_self_test::SelfTestResult::pass(n)).collect();
+        tree.set_branch_health_from_self_tests(&results);
+        for branch in tree.branches.values_mut() {
+            branch.health = 0.9;
+        }
+        for _ in 0..3 {
+            tree.run_growth_cycle();
+        }
+        assert_eq!(tree.trunk.mars_bridge_hits, 3, "bridge hits every cycle with intent");
+        assert_eq!(tree.trunk.mars_system1_activations, 3);
     }
 
     #[test]

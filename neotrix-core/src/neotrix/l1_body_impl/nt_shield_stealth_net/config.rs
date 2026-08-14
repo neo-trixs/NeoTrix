@@ -272,6 +272,20 @@ pub fn reload() -> Result<(), String> {
     Ok(())
 }
 
+/// 返回当前生效配置的不可变快照 (revertible effects 的逆操作载体)。
+///
+/// 吸收自 cordis revertible effects: 每次变换携带逆变换。调用方在 apply
+/// 前置快照, 后续步骤失败时用 [`restore`] 回滚到该快照。
+pub fn snapshot() -> Arc<StealthNetConfig> {
+    INSTANCE.read().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// 回滚到指定快照 — 失败重载的逆操作。
+pub fn restore(prev: Arc<StealthNetConfig>) {
+    *INSTANCE.write().unwrap_or_else(|e| e.into_inner()) = prev;
+    log::info!("[config] reverted to previous snapshot");
+}
+
 /// 返回配置路径字符串（供外部日志/调试）
 pub fn config_file_path() -> String {
     config_path().display().to_string()

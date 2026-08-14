@@ -15,6 +15,8 @@ mod handlers_maintenance;
 mod handlers_guard;
 #[path = "handlers_absorption.rs"]
 mod handlers_absorption;
+#[path = "handlers_daily_intel.rs"]
+mod handlers_daily_intel;
 
 pub struct ConsciousnessThresholds {
     pub warn_quality: f64,
@@ -205,7 +207,7 @@ use crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::SkillEngine;
 use crate::neotrix::l8_autonomic_impl::nt_mind_hook::{HookEvent, MindHookRegistry, LogHook};
 use crate::neotrix::l8_autonomic_impl::nt_mind_knowledge_pipeline::KnowledgeAbsorptionPipeline;
 use crate::neotrix::l1_body_impl::nt_io_session_recovery::SessionRecoveryManager;
-use crate::neotrix::nt_core_event_bus::{EventBus, subscribe_all_layers_sync};
+use crate::neotrix::nt_core_event_bus::{EventBus, flood_guard, subscribe_all_layers_sync};
 use crate::neotrix::nt_mind::distillation::MetaCognitionBridge;
 use crate::core::nt_core_event::CoreEvent;
 use crate::core::nt_core_state_substrate::StateSubstrate;
@@ -226,6 +228,8 @@ impl BackgroundLoop {
 
         // ── Create EventBus and subscribe all 9 layer subscribers ──
         let event_bus = Arc::new(EventBus::new(1024));
+        // ∂guard 事件闸 (生产默认钩子): 防洪 — 同一事件变体 500ms 内重复广播被拦截。
+        event_bus.register_hook(flood_guard(std::time::Duration::from_millis(500)));
         subscribe_all_layers_sync(&event_bus);
 
         // ── Load Constitution at startup ──
@@ -270,6 +274,31 @@ impl BackgroundLoop {
             let issues = kb_ref.integrity_check();
             if !issues.is_empty() {
                 log::warn!("[session-start] KB integrity issues: {:?}", issues);
+            }
+        }
+
+        // ── Coeffect 依赖声明表 (§3.2.1 Def 22/23) — 技能/域 → 注入依赖 key ──
+        // 类型化依赖表持久化到 kv_store namespace `coeffect_deps` (同 knowledge.db)。
+        // 语义: set 走 effect 可回滚 (coeffect operations are effects), 前置条件
+        // k∉dom(σ) 防重复提供; 消费方 NT-MEMORY/CLI 插件注入时读取该表。
+        if let Some(ref kb_ref) = kb {
+            use crate::neotrix::l3_memory_impl::nt_memory_kb::nt_memory_coeffect::{
+                persist_bindings, CoeffectBinding, CoeffectRegistry, CoeffectTx,
+            };
+            if let Ok(mut conn) = kb_ref.raw_conn() {
+                let mut reg = CoeffectRegistry::new();
+                {
+                    let mut tx = CoeffectTx::begin(&mut reg);
+                    // 核心域默认依赖声明: 每 key 唯一 provider (单源纪律)。
+                    let _ = tx.set(CoeffectBinding::new("kb", "nt-memory", "{\"path\":\"knowledge.db\"}"));
+                    let _ = tx.set(CoeffectBinding::new("constitution", "nt-core", "{\"source\":\"AGENTS.md\"}"));
+                    let _ = tx.set(CoeffectBinding::new("event_bus", "nt-mind", "{\"capacity\":1024}"));
+                    let bindings = tx.commit();
+                    match persist_bindings(&conn, &bindings) {
+                        Ok(n) => log::info!("[coeffect] declared {} default dependency bindings", n),
+                        Err(e) => log::warn!("[coeffect] persist failed: {}", e),
+                    }
+                }
             }
         }
 
@@ -547,6 +576,9 @@ cognitive_load: self.cognitive_load.take(),
         // ── 意识能力网内化吸收 (cycle 1053): 60s 检查 pending-absorb.json,
         //    替代原 .opencode/plugins/experience-tree-absorption.js idle 插件。
         spawn_handler!(60, |h| h.handle_pending_absorption().await);
+        // ── 每日信息例行感知检查 (cycle 1107): 每日 1 次检查今日信息是否落盘,
+        //    缺失则记录感知盲区到 KB (NT-WORLD 感知缺失信号)。
+        spawn_handler!(86_400, |h| h.handle_daily_intel_check().await);
         spawn_handler!(120, |h| h.handle_always_on().await);
         spawn_handler!(cfg.scheduler_interval_secs, |h| h.handle_scheduler_tick().await);
         spawn_handler!(cfg.evolution_interval_secs, |h| h.handle_evolve().await);

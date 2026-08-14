@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use crate::core::nt_core_dispatch::{DispatchMode, Dispatcher};
 use crate::core::nt_core_event::CoreEvent;
 
 /// 事件溯源信封 (D4 — maka 'Log is the Runtime' / buzz 事件日志 + 身份 + receipts)
@@ -27,11 +28,14 @@ pub struct EventBus {
     shutdown_flag: Arc<AtomicBool>,
     handles: std::sync::Mutex<Vec<std::thread::JoinHandle<()>>>,
     seq: Arc<AtomicU64>,
+    /// 事件过滤钩子链 (waterfall): hook 返回 true (短路) = 拦截该事件,
+    /// 不落盘不广播。对齐 Cordis/dsh 事件派发可扩展性 (4+1 dispatch modes)。
+    hooks: std::sync::Mutex<Dispatcher<CoreEvent>>,
 }
 
 impl Clone for EventBus {
     fn clone(&self) -> Self {
-        Self { sender: self.sender.clone(), log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: self.seq.clone() }
+        Self { sender: self.sender.clone(), log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: self.seq.clone(), hooks: std::sync::Mutex::new(Dispatcher::new()) }
     }
 }
 
@@ -42,7 +46,7 @@ impl Default for EventBus {
 impl EventBus {
     pub fn new(capacity: usize) -> Self {
         let (sender, _) = broadcast::channel(capacity);
-        Self { sender, log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: Arc::new(AtomicU64::new(0)) }
+        Self { sender, log_file: None, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: Arc::new(AtomicU64::new(0)), hooks: std::sync::Mutex::new(Dispatcher::new()) }
     }
 
     pub fn with_persistence(path: PathBuf) -> Self {
@@ -58,7 +62,7 @@ impl EventBus {
             }
         };
         let (sender, _) = broadcast::channel(1024);
-        Self { sender, log_file: file, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: Arc::new(AtomicU64::new(0)) }
+        Self { sender, log_file: file, shutdown_flag: Arc::new(AtomicBool::new(false)), handles: std::sync::Mutex::new(Vec::new()), seq: Arc::new(AtomicU64::new(0)), hooks: std::sync::Mutex::new(Dispatcher::new()) }
     }
 
     /// 当前已发出的溯源序号 (供外部记录事件链高水位)
@@ -74,7 +78,22 @@ impl EventBus {
 
     /// Emit with 事件溯源身份 (D4) — 记录来源 agent/模块 + 全局 seq, 落盘为 envelope。
     /// 与导出的 emit() 行为一致, 仅多带身份与递增序号。
+    /// 注册事件过滤钩子: 返回 `true` = 拦截该事件 (不落盘不广播)。
+    pub fn register_hook<F>(&self, filter: F)
+    where
+        F: Fn(&CoreEvent) -> bool + Send + Sync + 'static,
+    {
+        if let Ok(mut hooks) = self.hooks.lock() {
+            hooks.on(filter);
+        }
+    }
+
     pub fn emit_from(&self, source: &str, event: CoreEvent) {
+        // ∂guard 事件闸: waterfall 过滤链 — 任一 hook 短路即拦截整事件。
+        if self.hooks.lock().map(|h| h.dispatch_waterfall(&event)).unwrap_or(false) {
+            log::debug!("[event_bus] event filtered by hook");
+            return;
+        }
         if let Some(ref log_file) = self.log_file {
             let seq = self.seq.fetch_add(1, Ordering::SeqCst);
             let env = EventEnvelope {
@@ -107,8 +126,32 @@ impl EventBus {
     pub fn sender(&self) -> broadcast::Sender<CoreEvent> {
         self.sender.clone()
     }
+}
 
-    /// Set the shutdown flag and join all spawned subscriber threads.
+/// 防洪钩子 — 同一事件变体在 `min_interval` 内的重复广播被拦截。
+/// 防广播风暴 (意识回路事件闸的生产默认过滤器)。
+pub fn flood_guard(
+    min_interval: std::time::Duration,
+) -> impl Fn(&CoreEvent) -> bool + Send + Sync + 'static {
+    use std::collections::HashMap;
+    use std::time::Instant;
+    let last: std::sync::Mutex<HashMap<std::mem::Discriminant<CoreEvent>, Instant>> =
+        std::sync::Mutex::new(HashMap::new());
+    move |event: &CoreEvent| {
+        let key = std::mem::discriminant(event);
+        if let Ok(mut map) = last.lock() {
+            match map.get(&key) {
+                Some(t) if t.elapsed() < min_interval => return true,
+                _ => {
+                    map.insert(key, Instant::now());
+                }
+            }
+        }
+        false
+    }
+}
+
+impl EventBus {
     /// Each thread gets up to 2s to exit after the flag is set.
     pub fn shutdown(&self) {
         self.shutdown_flag.store(true, Ordering::SeqCst);
@@ -371,7 +414,7 @@ pub fn subscribe_all_layers_sync(bus: &EventBus) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_event::CoreEvent;
+    use crate::core::nt_core_dispatch::{DispatchMode, Dispatcher};
 
     #[test]
     fn test_event_bus_new() {
@@ -470,5 +513,55 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(50));
         // Drop bus — triggers Drop → shutdown() → joins all threads cleanly
         drop(bus);
+    }
+
+    #[test]
+    fn test_hook_filters_global_halt() {
+        let bus = EventBus::new(16);
+        let mut rx = bus.subscribe();
+        // 拦截所有 GlobalHalt: 短路 = 拦截 (不广播)
+        bus.register_hook(|e: &CoreEvent| matches!(e, CoreEvent::GlobalHalt { .. }));
+        bus.emit(CoreEvent::TaskSubmitted { task: "t".into(), task_type: "g".into(), priority: 1 });
+        bus.emit(CoreEvent::GlobalHalt { reason: "x".into(), source: "test".into() });
+        // TaskSubmitted 应可达; GlobalHalt 被过滤
+        let received = rx.try_recv();
+        assert!(matches!(received, Ok(CoreEvent::TaskSubmitted { .. })), "TaskSubmitted 应通过过滤: {:?}", received);
+        // 第二条消息不存在 (GlobalHalt 被拦截) — 因为 broadcast Lagged 语义, 直接断言无更多
+        assert!(rx.try_recv().is_err(), "GlobalHalt 应被过滤拦截");
+    }
+
+    #[test]
+    fn test_hook_pass_through() {
+        let bus = EventBus::new(16);
+        let mut rx = bus.subscribe();
+        // 不拦截任何事件
+        bus.register_hook(|_e: &CoreEvent| false);
+        bus.emit(CoreEvent::TaskSubmitted { task: "t".into(), task_type: "g".into(), priority: 1 });
+        assert!(matches!(rx.try_recv(), Ok(CoreEvent::TaskSubmitted { .. })));
+    }
+
+    #[test]
+    fn test_flood_guard_filters_repeated_burst() {
+        let bus = EventBus::new(16);
+        let mut rx = bus.subscribe();
+        bus.register_hook(flood_guard(std::time::Duration::from_millis(1000)));
+        // 同一变体短窗内重复 → 防洪拦截 (后续同变体不广播)
+        bus.emit(CoreEvent::TaskSubmitted { task: "t1".into(), task_type: "g".into(), priority: 1 });
+        bus.emit(CoreEvent::TaskSubmitted { task: "t2".into(), task_type: "g".into(), priority: 1 });
+        bus.emit(CoreEvent::TaskSubmitted { task: "t3".into(), task_type: "g".into(), priority: 1 });
+        assert!(matches!(rx.try_recv(), Ok(CoreEvent::TaskSubmitted { .. })), "第一条应广播");
+        assert!(rx.try_recv().is_err(), "短窗重复应被防洪拦截");
+    }
+
+    #[test]
+    fn test_flood_guard_allows_distinct_variants() {
+        let bus = EventBus::new(16);
+        let mut rx = bus.subscribe();
+        bus.register_hook(flood_guard(std::time::Duration::from_millis(1000)));
+        // 不同变体互不影响
+        bus.emit(CoreEvent::TaskSubmitted { task: "t".into(), task_type: "g".into(), priority: 1 });
+        bus.emit(CoreEvent::ExternalReward { reward: 1.0, source: "env".into() });
+        assert!(matches!(rx.try_recv(), Ok(CoreEvent::TaskSubmitted { .. })));
+        assert!(matches!(rx.try_recv(), Ok(CoreEvent::ExternalReward { .. })));
     }
 }

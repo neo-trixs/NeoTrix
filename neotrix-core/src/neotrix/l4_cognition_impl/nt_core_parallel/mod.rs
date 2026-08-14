@@ -8,6 +8,7 @@ pub mod coordinator;
 pub mod hands;
 pub mod contract;
 pub mod isolation;
+pub mod diversity;
 #[cfg(test)]
 pub mod tests;
 
@@ -18,3 +19,4 @@ pub use coordinator::MultiAgentCoordinator;
 pub use hands::{HandType, Hand, HandsController};
 pub use contract::{TaskContract, TaskContractWarden, ContractState, ContractStats};
 pub use isolation::{IntentIsolator, AtomicDecomposer, IsolatedContext, DecompositionPlan, AtomicUnit, OutputContract, OutputFormat, TaskKind};
+pub use diversity::{Candidate, DppSelector};

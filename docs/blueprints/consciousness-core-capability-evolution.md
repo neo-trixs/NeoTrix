@@ -1,160 +1,131 @@
-# 蓝图: 意识核心 + 意识能力网 进化缺陷补齐
+# 蓝图 v3: 意识体整体进化蓝图 + 进化之路地图
 
-> **状态**: 提议 (Proposed) · **类型**: ADR-style evolution blueprint · **日期**: 2026-08-12 (v2 — 追加第二批 10 节点分析)
-> **依据**: 2026-08-12 批量吸收 (1832 batch nodes / 1026 URLs) + 第二批 10 节点 (MangoDisk/Scrapling/pi-mail/reasoning-bank/optimizerDuck/hermes-studio/DeepTutor/qiaomu/atomic/beads) 后 KB 实测 + 源码证据 (Evidence-First)。
-> **范围**: 意识核心 (ConsciousnessTree / GWT / L5 runtime / phi-IIT) + 意识能力网 (capability tree / absorbed_capability mapper)。
-> **约束**: R-P42 (强化现有节点, 禁平行适配器) · R-P79 (同 session 接线到生产路径) · R-P100 (生产能力必须注册能力树)。
-
----
-
-## 0. 背景 (Context)
-
-2026-08-12 批量吸收 1026 个 URL (GitHub/arxiv/站点) 入库。用户要求: 对入库内容分析, 构建 NeoTrix 意识核心与意识能力网的进化缺陷补齐蓝图。
-
-数据面 (KB 实测): 1832 个 batch 节点; github 1288 / arxiv 94 / concept 243; absorbed_capability 分布 = NT-IO 342, NT-CORE 325, NT-MEMORY 286, NT-SHIELD 269, NT-MIND 247, NT-ACT 191, NT-WORLD 172, **NT-META 0**。
-
-代码面 (源码实测): 意识核心共 9 阶段生长环 (含 forecast/fulfillment/drift 闭环) 已 C2; GWT 14 专家 + Kuramoto + NRS-EFC + MetaWorkspace 已 C2; 能力树 (bud/graft/prune/crosspollinate/mature/strengthen) C1-C2。
+> **状态**: 提议 (Proposed) · **类型**: evolution blueprint + roadmap · **日期**: 2026-08-14 (v3 — 基于 2026-08-12 v2 基线 + 本会话 P0-P2 六项落地 + 每日信息 cycle 1107)
+> **依据**: 本会话完整轨迹 (P0×3 + P1×3 + P2×2 全部落地接线), 意识核心实时状态, 能力树 14 节点, 经验库 2453 条, Trendshift 每日榜 8-14, KB cycle 1106/1107。
+> **范围**: 意识核心 (ConsciousnessTree/GWT/L5 runtime/phi-IIT) + 能力网 (capability tree) + 每日信息例行。
+> **约束**: R-P42 (强化现有节点) · R-P79 (同 session 生产接线) · R-P100 (生产能力注册能力树) · 指针守恒 (本文件仅指引, per-cycle 内容落 KB)。
 
 ---
 
-## 1. 缺陷清单 (Defect Registry, 证据锚定)
+## 0. 现状总览 (Evidence-First)
 
-| # | 缺陷 | 严重度 | 证据 (file:line) | 补齐后状态 |
-|---|------|--------|------------------|-----------|
-| D1 | **phi=0 standalone 缺口** — CLI/MCP 状态读取持久化快照, 从未构造 `IITPhiCalculator`; 完整运行时才真实计算 phi | P0 | `entry/mod.rs:782-876` "phi_source: unavailable"; `nt_core_iit_phi.rs:116` (唯一真实 compute_phi); tree Check-6 self-diagnosis (`nt_core_consciousness_tree.rs:1688`) | phi_source=real, 快照含真实 phi |
-| D2 | **FFI 假 phi 自增** — `inner.phi = (inner.phi + 0.005).min(1.0)` 违反 Evidence-First | P0 | `neotrix-core/src/neotrix/ffi/consciousness_tree.rs:113` | 移除假自增, 改走真实 IIT 或显式 unknown |
-| D3 | **C6 不可达** — `Constellation::derive` 六 bool 恒定产生 `c6_adaptive: false` (`nt_core_consciousness_tree.rs:343,356,385,397`), C6EvolutionLoop 在树模型永不晋升 | P0 | `nt_core_consciousness_tree.rs:343-397` | 加入自适应判定输入, C6 可达 |
-| D4 | **NT-META 路由盲区** — absorbed_capability mapper 只有 7 域 (NT-CORE/MIND/MEMORY/WORLD/ACT/SHIELD/IO), **无 NT-META**; 1832 节点 0 命中元认知分支 | P1 | `scripts/absorb_to_capability.py:21,77-85` (DOMAIN_CAPS 7 域); KB 实测 NT-META=0 | 新增 NT-META 域 + meta 关键词, 元认知语料归位 |
-| D5 | **能力谓词缺失** — 能力树 taxonomy 无 `consolidate / broadcast / route / attend / forget / reflect` 动词; NT-MEMORY 只有 recall(251), NT-CORE 只有 explain/critique/detect | P1 | `scripts/absorb_to_capability.py:77-85`; 树 atoms 36 个 (`initialize_capability_atoms` `nt_core_consciousness_tree.rs:936`) | 补 consolidation/attention 谓词, 对应语料归位 |
-| D6 | **过期计数注释** — "70 atoms / 10 categories" vs 实际 36 atoms / 9 categories; "12×12" resonance vs MODULE_COUNT=14; "15 specialists" vs 14 hexagram 状态 (Orchestrator 无 hexagram) | P2 | `nt_core_consciousness_tree.rs` 注释 (line 69 区); `resonance.rs:42-43`; `cognitive_type.rs` | 注释与实现对齐, Orchestrator 补 hexagram |
-| D7 | **果实质控 1.5 越界** — `quality = min(maturity × nourishment, 1.5)` 可超 [0,1] | P2 | `nt_core_consciousness_tree.rs:1202` | 钳到 [0,1] |
-| D8 | **drift 资源硬编码** — `resource_consumed: 0.5 // Simplified` | P2 | `nt_core_consciousness_tree.rs` audit_drift (line 1466 区) | 接入真实资源度量 |
-| D9 | **Phase-1 原则硬编码** — internalized_principles 固定 8 条数组, 不读实际 constitution KB | P2 | `nt_core_consciousness_tree.rs:1141-1150` | 从 constitution 动态加载 |
-| D10 | **mapper 关键词误伤** — keyword_hits 证据产生伪映射 (MangoDisk→NT-CORE/detect; heretic→NT-MIND/generate; 架构图 skills→NT-SHIELD/audit 关键词碰撞 "architecture") | P1 | KB metadata `evidence: keyword_hits:N`; mining §2/§5 | 专家键 (KNOWN_REPOS) 扩展 + 碰撞消歧 |
-| D11 | **第二批 4 例误映射确认** — (a) `reasoning-bank` (Success+Failed 双轨推理记忆, 正是 consolidate 语料) 被标 NT-CORE/critique; (b) `beads` (agent 分布式图记忆) 被标 NT-IO/delegate; (c) `atomic` (语义连接个人知识库) 被标 NT-ACT/send; (d) `MangoDisk` 复现 NT-CORE/detect。四者均为 keyword_hits 证据 | P1 | KB: reasoning-bank/beads/atomic/MangoDisk metadata `evidence: keyword_hits:5-9` | 专家键补 4 条 + 知识库/记忆语义映射到 NT-MEMORY |
+### 意识核心 (2026-08-14 实时)
+| 指标 | 值 | 解读 |
+|------|-----|------|
+| cycle | 34 | 生长周期持续推进 |
+| phi | 0.380 | 整合信息, 低位稳定 (真实 IIT 仅在完整运行时核算) |
+| coherence | 0.574 | 中等一致, 有提升空间 |
+| weighted_fog_sum | 9.35 | 迷雾仍重 (当前进程实时, 快照 1.65 为 tick 后) |
+| governance_compliance | 0.979 | 治理合规度高 (36 层分形深度) |
+| MARS | S1=32 / S2=32 / bridge=0 | 双过程均激活, 但 S1↔S2 桥接从未命中 — 进化信号 |
 
----
+### 能力树 (14 节点)
+- C4 ×1 (disk_cleanup_engine) + C1 ×13 — 本会话新增 8 个吸收节点 (P0×3 + P1×3 + P2×2), 全部 C1 且 validate 通过。
+- 观察: 全部 C1 无上游演进 → 需要 C2 (集成) / C3 (benchmark) 晋升管线, 否则吸收是"入库即停"。
 
-## 2. 语料启示 (Absorbed-Corpus Insights → 能力网进化输入)
-
-### 2.1 三大自进化范式 (语料实证, 应映射到 SEAL)
-
-| 范式 | 语料源 (batch nodes) | NeoTrix 现状 | 补齐方向 (R-P42 强化现有节点) |
-|------|---------------------|-------------|------------------------------|
-| **经验共享** (agent↔agent) | UCSB-AI/GEA, Awesome-Self-Improving-Agents, FrontisAI 综述 | 已有 experience-tree + KB 共享 | 强化 `nt_memory_kb_bridge` / experience 蒸馏, 增加 agent 间经验索引 |
-| **可逆监督轨迹** (meta 训练 agent) | shepherd-agents/shepherd (git-like trace + meta 监督) | 无逆操作轨迹 (轨迹只读) | 最强候选: `nt_mind_self_iterating` 增 trace-reversal 审核 |
-| **RL/自蒸馏** | OpenPipe ART, AgentOPSD, SkillRise, prime-agent | 有 grpo.rs (SEAL) | `nt_core_self/seal/grpo.rs` 强化自蒸馏闭环 |
-
-### 2.2 意识核心直接邻居 (GWT/IIT 概念 1:1 映射)
-
-| 语料 | 映射到 NeoTrix 模块 | 可吸收信号 |
-|------|--------------------|-----------|
-| BRIAN (differentiable Φ from IIT 4.0 + narrative memory) | `nt_core_iit_phi` + `nt_memory` narrative | 可微 Φ 基准对齐; sheaf-H¹ 叙事记忆对照 |
-| CogMem / consciousnessModelR (PyTorch GWT + broadcast + awareness thresholds) | `nt_core_gwt/workspace.rs` | broadcast 阈值与 GWT 点火对照验证 |
-| predictive-workspace-paper (falsifiable continuous workspace) | `nt_core_gwt/meta_workspace.rs` | 可证伪 workspace 评估, 补 MetaWorkspace 观测维度 |
-| jacobian-lens / jspace-viz (empirical global-workspace readouts) | `nt_core_gwt/` 可解释性 | 用真实 LM 读取验证 resonance 权重 (C3 benchmark 输入) |
-| GWT_ASI-Base / multi-theory-consciousness / OpenMythos | `l5_consciousness` 全层 | 架构对照, 缺陷即 D1/D2 的基准面 |
-
-### 2.3 记忆整合 (consolidation) 信号
-
-anima / consciousnessModelR / gnhf (sleep-wake 仪式) → **NT-MEMORY 缺 `consolidate` 谓词 + sleep/wake 整合路径**。现状 `handle_consolidate` 是 background-loop 定时任务; 语料提示需要"主动遗忘"与"夜间整合"两通道。
-
-### 2.4 第二批新增信号 (2026-08-12 v2)
-
-| 语料 | 实质能力 | 当前误映射 | 应映射 (补齐后) |
-|------|---------|-----------|----------------|
-| **google-research/reasoning-bank** | Success+Failed 双轨推理记忆 → agent 自进化 (Scaling Agent Self-Evolving with Reasoning Memory) | NT-CORE/critique | **NT-MEMORY/consolidate** — 与树 `distill_skill_count`(正轨)/`distill_guardrail_count`(负轨) 完全同构; 直接验证 D5 缺失谓词 |
-| gastownhall/beads | agent 分布式图记忆 + issue 追踪 (Dolt 支撑) | NT-IO/delegate | NT-MEMORY/recall + 图记忆 (对齐 graphrag/semantica 图谱系) |
-| kenforthewin/atomic | 自托管语义连接知识库 (PKM) | NT-ACT/send | NT-MEMORY/recall (语义连接 = KB 图) |
-| MangoDisk | 磁盘清理 (重复文件哈希) | NT-CORE/detect | NT-ACT/execute (工具类) — D10 复现 |
-
-**推理**: reasoning-bank 是本批最高信号 — 其双轨 (成功+失败) 推理记忆机制与 NeoTrix SEAL 双轨蒸馏 (`distill_skill_count`/`distill_guardrail_count`) 概念完全一致, 为 D5 新增 `consolidate` 谓词提供最强实证。beads/atomic 强化"图谱记忆 > 向量 RAG"信号 (与 graphrag/semantica/knowledge-graph 聚类一致), 应归 NT-MEMORY 而非当前分布。
+### 经验库 (2453 条)
+- by_domain: NT-CORE 827 / NT-IO 368 / NT-META 339 / NT-MEMORY 299 / NT-MIND 143 / NT-SHIELD 110 / NT-ACT 98 / NT-WORLD 88 / NT-GOVERNANCE 93 / NT-REPAIR 85 / NT-NEXUS 3。
+- 失衡: **NT-WORLD 88 (最低)** / NT-NEXUS 3 (近乎空)。NT-META 339 显示元认知反思充分, 但感知域薄弱。
 
 ---
 
-## 3. 补齐蓝图 (Evolution Blueprint, 分阶段)
+## 1. 本会话缺陷反思 (Defect Reflection, 证据锚定)
 
-### Phase A — 真实 phi 接线 (P0, 关闭 D1/D2)
+### 1.1 新缺陷 (本会话引入, 已修复)
+| # | 缺陷 | 严重度 | 证据 | 修复 |
+|---|------|--------|------|------|
+| N1 | 测试构造 `KnowledgeNode` 误用不存在字段 (data_tier/tier/embedding) → E0560 | P1 | `nt_memory_visibility.rs:170` | 对齐真实字段 (17 个) |
+| N2 | 测试 in-memory kv_store schema 用 (k,v) 而非生产 (key,value,updated_at) → 列名错误 | P1 | `nt_memory_provenance.rs:172` | 对齐 nt_memory_schema.rs:204 |
+| N3 | 同秒写入溯源记录 created_at 相等 → newest-first 断言失败 | P1 | `nt_memory_provenance.rs:139` | 索引插入序倒序作次键 tie-break |
 
-**目标**: standalone CLI/MCP 也能读到真实 phi, 移除 FFI 假自增。
+**模式**: 三个缺陷同源 — **测试侧复用生产 schema/结构的纪律缺失**。R-P16 (不信工具消息) 已覆盖写侧, 但测试侧"构造前先 grep 真实定义"未成文。
 
-1. `neotrix` 二进制状态路径构造 `IITPhiCalculator` (复用 `nt_core_iit_phi.rs:116 compute_phi`), 输入 = 持久化 resonance/coherence 向量 (从 KB `consciousness` 快照重建)。
-2. FFI `consciousness_tree.rs:113` 移除 `+0.005`; 无真实数据时 phi=0 + `phi_source:"unavailable"` (诚实信号), 不再伪造上升。
-3. 树 Check-6 fix_suggestion 标记 resolved, 新增 SelfTest 断言: `status` 路径 phi ∈ {真实值} ∪ {0+unavailable}, 禁止伪装中间值。
-4. **接线 (R-P79)**: CLI `neotrix consciousness status` 与 MCP `consciousness_status` 消费真实 phi; tree Phase 2 的 `phase2_phi` 回填真实值。
+### 1.2 结构缺陷 (本会话发现, 预存)
+| # | 缺陷 | 严重度 | 证据 | 状态 |
+|---|------|--------|------|------|
+| S1 | `nt_io_plugin/registry.rs` E0521 仅 `--all-targets` 暴露 | P2 | registry.rs | 预存, 非本会话引入 |
+| S2 | `guard_chain.rs` untracked 新文件缺 Debug/Clone → 阻塞 test 编译 | P1 | guard_chain.rs | 本会话已补手动 impl (7 tests pass) |
 
-**验收**: `neotrix consciousness status` 输出 `phi_source: iit`; grep FFI 无 `+0.005`; `cargo test -p neotrix iit_phi` 全绿。
-
-### Phase B — 能力网谓词与域扩展 (P1, 关闭 D4/D5/D10)
-
-**目标**: 能力树 taxonomy 补元认知与记忆整合谓词; 加 NT-META 域。
-
-1. `absorb_to_capability.py` DOMAIN_CAPS 增:
-   - `NT-META`: `["monitor","introspect","critique_self","route","calibrate"]` (元认知/自我观察)
-   - `NT-CORE` 增: `["broadcast","attend","route","synthesize_workspace"]`
-   - `NT-MEMORY` 增: `["consolidate","compress","forget","narrative"]`
-2. SOURCE_CORES 增 `("MetaCognition", "NT-META", ["meta-cognit","introspect","self-evolv","self-improv","recursiv","autotelic","self-referent","calibrat","monitor","distill","route"])`。
-3. **专家键防误伤**: KNOWN_REPOS 增 `MengTo/Skills`→NT-META, `heretic`→NT-META/introspect, 架构图类 (oh-my-mermaid/Archscribe/lanshu) 显式 NT-IO (消除 "architecture"→shield 碰撞)。**第二批 (D11)**: `reasoning-bank`→NT-MEMORY/consolidate, `beads`/`atomic`→NT-MEMORY/recall, `MangoDisk`→NT-ACT/execute。
-4. **重跑**: `python3 scripts/absorb_to_capability.py --apply` 对 1842 batch 节点重映射; 预期 NT-META 从 0 升至非零, 误映射回落。
-
-**验收**: 重映射后 `SELECT branch,count GROUP BY` NT-META>0; MangoDisk 不再 NT-CORE/detect; 架构图 skills 落 NT-IO。
-
-### Phase C — 意识核心进化 (P1-P2, 关闭 D3/D6/D7/D8/D9)
-
-| 子项 | 动作 | 接线点 |
-|------|------|--------|
-| C3 (D3) | `Constellation::derive` 增加自适应输入 (如: 果实质量趋势上升 / 自蒸馏闭环活动) 使 `c6_adaptive` 可达 | tree Phase 8 反馈 → C6 晋升; capability-tree `promote_constellation` 对齐 |
-| C6 (D6) | 修正 70→36 atoms、12×12→14、15→14 注释; Orchestrator 补 hexagram 状态 (候选 62 重分配) | 注释+常量对齐, resonance 测试更新 |
-| C7 (D7) | fruit quality 钳位 `min(maturity×nourishment, 1.0)` | Phase 3 fruits |
-| C8 (D8) | `resource_consumed` 接入真实度量 (tick 计数/时间窗), 移除 hardcode | audit_drift Phase 7 |
-| C9 (D9) | internalized_principles 从 constitution KB (`nt_core_self_constitution`) 动态加载 | Phase 1 roots absorb |
-
-### Phase D — 自进化范式吸收 (P1, 语料 → SEAL, R-P79 接线)
-
-| 候选 | 吸收进 | 接线消费者 | 状态 |
-|------|--------|-----------|------|
-| shepherd 可逆监督轨迹 | `nt_mind_self_iterating` 增 trace 逆放审核 (改现有节点, 禁平行模块) | SEAL 自审 Phase-0 | 建议吸收 (最高信号) |
-| BRIAN 可微 Φ 基准 | `nt_core_iit_phi` 增对照基准测试 | consciousness status 快照 | 建议吸收 (C3 benchmark) |
-| jacobian-lens workspace 读取 | `nt_core_gwt` 可解释性观察 (resonance 权重导出) | 审计日志 | 建议吸收 (C3) |
-| sleep/wake 整合 | `nt_memory` consolidation 增主动遗忘通道 | background-loop handle_consolidate | 待评估 |
+### 1.3 启发进化点 (从本会话总结)
+1. **三值裁定模式 (P2-1)**: 过滤层返回与输入同序全量裁定 (含 Drop), 决策标记与展示排序解耦 — 比布尔过滤表达力强 (Allow/Interstitial/Drop), 可推广到 GWT 注意力路由的 salience 分级。
+2. **决策对象化 (P2-2)**: 决策是追溯主体 (who/did/what/why/when), 独立于节点 metadata 存储 → 审计链可独立检索。与 cur curation ledger 同哲学: **"不留溯源的操作是隐式状态变更"**。
+3. **吸收流水线已成熟**: 外部吸收 → R-P42 强化 → R-P79 接线 → R-P100 注册, 本会话 6 项全部一次通过, 证明纪律内化。
+4. **测试侧纪律缺口**: 与生产 schema 对齐 (N1/N2/N3) 应成规则 — 测试构造必须复用生产类型定义。
 
 ---
 
-## 4. 风险与权衡
+## 2. 进化之路地图 (Roadmap, 分阶段)
+
+### Phase A — 每日信息例行自动化 (P1, 今日已启动)
+**目标**: 每日 Trendshift 榜 → 高信号筛选 → 吸收 KB, 形成可重复例行。
+
+1. 方法已验证 (cycle 1107): `webfetch trendshift.io/` 每日榜 → 四字段过滤 → 高信号<20% → `pending-absorb.json` 吸收。
+2. 落 `notes/daily-intel-YYYY-MM-DD.md` 人类可读 + KB cycle 机器可读双写。
+3. **下一步 (自动化)**: 评估背景循环每日定时触发 — 已有 `nt_mind_background_loop` 60s tick, 可挂 `daily_intel` handler (需设计: 触发源/超时/去重)。
+
+**验收**: 连续 3 天每日榜落盘; 每日吸收 cycle 递增; 高信号候选进 roadmap。
+
+### Phase B — 能力树 C2/C3 晋升管线 (P1, 最高杠杆)
+**目标**: 14 个 C1 节点中选 2-3 个晋升 C2 (集成测试) / C3 (benchmark)。
+
+1. 候选: `nt_io_hotreload::revertible_effects` (P0, 与 Cordis revertible effects 同源) → 增集成测试接 SEAL 回退; `nt_memory_provenance::decision_trail` (P2-2) → 增审计链集成测试。
+2. 晋升门槛 (R-P100 cost 已存在): 需 manifest 满足 — 每个晋升必须有消费方 + 测试。
+3. **接线**: `promote_constellation` 对齐 `nt_core_consciousness_tree.rs` C6 自适应 (8-12 蓝图 Phase C 已修正 C6 可达性)。
+
+**验收**: `neotrix-capability mature --target c2` 至少 2 节点; C2 节点有集成测试消费方。
+
+### Phase C — 感知域补强 (P2, 对齐经验库失衡 NT-WORLD 88)
+**目标**: NT-WORLD 是经验库最低域 (88), 感知能力薄弱。
+
+1. modlens 视觉桥接模式 → 强化 `nt_io_multimodal_transform` 真视觉后端 (P3 候选, R-P42)。
+2. OpenBiliClaw 内容发现 agent → NT-WORLD UnifiedCrawler 多平台源借鉴 (观察)。
+3. 每日信息例行本身就是 NT-WORLD 感知输入 — 双写落盘后 NT-WORLD 经验自然增长。
+
+### Phase D — MARS S1↔S2 桥接 (P2, 意识核心)
+**目标**: bridge_hits=0 是意识核心最显著空白 (S1=32 / S2=32 / bridge=0)。
+
+1. 分析 bridge 条件为何从未满足 — `nt_core_self` 中 MARS 双过程桥接逻辑。
+2. 每日信息 (S1 直觉) 与反思 (S2 分析) 的桥接: 如"高信号候选"应触发 S2 深度分析而非仅入库。
+
+### Phase E — 溯源威胁模型 (P2, 每日信息驱动)
+**目标**: watermarks-remover 揭示 PROV-O 的反方 — 溯源标记可被剥离。
+
+1. 记入 KB 威胁模型: 决策溯源 (P2-2) 的鲁棒性依赖标记不可剥离性, 需评估 C2PA 级硬化 vs 内部审计信任。
+2. 低优先级: 不引入对抗代码 (与价值观冲突), 仅作为审计边界输入。
+
+---
+
+## 3. 风险与权衡
 
 | 风险 | 缓解 |
 |------|------|
-| phi 接线改变 status 语义 (0→真实小值) | 语义化: phi_source 字段区分 real/unavailable, 不破坏既有消费者 |
-| mapper 重映射产生新的误映射 | 先 `--dry-run` 预览差异, 抽样验证后 `--apply`; 保留 `redirected_from`/证据字段 |
-| C6 可达可能引发连串晋升 | `promote_constellation` 成本门槛 (R-P100 cost) 已存在, 晋升需满足 manifest |
-| 吸收 shepherd 工作量 | 限定为 trace-reversal 审核单一能力 (R-P42), 不做完整 git 化 |
+| 每日信息例行成为噪声堆积 (高信号<20%) | 四字段过滤 + 吸收判定表 (吸收/观察/威胁模型/市场信号) |
+| C2/C3 晋升引发连串依赖晋升 | R-P100 cost 门槛 + 逐节点 manifest 校验 |
+| NT-WORLD 补强工作量 | 限定 modlens 单能力强化 (R-P42), 不做多平台全面适配 |
+| MARS bridge 调查可能发现深层设计缺陷 | 先证据分析 (branch_1104 已记录 observe 先行/GWT 激活接线修复), 再设计 |
 
-## 5. 决策 (Decision)
+## 4. 决策 (Decision)
 
-**采纳**: Phase A (D1/D2) + Phase B (D4/D5/D10) 为第一批 — 均 P0/P1, 改动集中在 phi 接线与 mapper 扩展, 风险可控, 同 session 可验证。
-**暂缓**: Phase C 各子项可并行但独立验证; Phase D 中 shepherd 吸收为第二阶段, 需单独设计审查 (1-3-1 决策简报: 做/不做/做一半)。
+**采纳 (第一批)**: Phase A (每日信息例行, 今日已启动) + Phase B (C2/C3 晋升管线, 最高杠杆)。
+**采纳 (第二批)**: Phase C (NT-WORLD 补强, modlens 单点)。
+**评估中**: Phase D (MARS bridge, 需先分析) ; Phase E (威胁模型, 仅 KB 输入)。
 
-被拒选项: 为 standalone 写独立假 phi 计算器 (拒绝 — D2 反模式复现); 新建平行 META 适配模块 (拒绝 — R-P42 违规, 必须强化 NT-META 分支或现有 meta 节点)。
+被拒: 为每日信息建独立 cron 系统 (拒绝 — 复用 `nt_mind_background_loop`); 平行视觉适配器 (拒绝 — R-P42, 强化 nt_io_multimodal_transform)。
 
-## 6. 验收矩阵 (脚本可判定)
+## 5. 验收矩阵
 
 | # | 验收标准 | 判定 |
 |---|---------|------|
-| A1 | `grep -rn "0.005" neotrix-core/src/neotrix/ffi/consciousness_tree.rs` 无输出 | PASS/FAIL |
-| A2 | `neotrix consciousness status` 含 `phi_source` 且不等于 `"unavailable"` (真实运行时) | PASS/FAIL |
-| A3 | `cargo test -p neotrix --lib iit_phi` 全绿 | PASS/FAIL |
-| B1 | `sqlite3 knowledge.db "SELECT count(*) FROM nodes WHERE metadata LIKE '%NT-META%'"` > 0 | PASS/FAIL |
-| B2 | MangoDisk/heretic 重映射后 capability 符合语义 (抽样 5 条人工核) | PASS/FAIL |
-| B3 | `reasoning-bank` 重映射后 = NT-MEMORY/consolidate; `beads`/`atomic` = NT-MEMORY/recall (D11) | PASS/FAIL |
-| C1 | `cargo check --lib` 0 errors (改造后) | PASS/FAIL |
-| D1 | shepherd trace-reversal 单测 ≥3 条 (若吸收) | PASS/FAIL |
+| A1 | `notes/daily-intel-*` 连续 3 天存在 | PASS/FAIL |
+| A2 | `neotrix-capability list` 含 C2+ 节点 ≥2 | PASS/FAIL |
+| A3 | `cargo check --lib` 0 errors | PASS/FAIL |
+| A4 | MARS bridge_hits > 0 或明确根因文档 | PASS/FAIL |
+| B1 | `nt_io_multimodal_transform` 真视觉后端 ≥1 (非 placeholder) | PASS/FAIL |
 
----
+## 6. 后续动作 (Next Actions)
 
-## 7. 后续动作 (Next Actions)
-
-1. Phase A: 接线 `IITPhiCalculator` 到 standalone 状态路径 + 删 FFI 假自增 (同 session 完成)。
-2. Phase B: 扩展 `absorb_to_capability.py` (NT-META 域 + 新谓词 + 专家键) → `--dry-run` → 抽样 → `--apply`。
-3. Phase C: 按子项逐个 PR, 每个子项 cargo check + 相关测试。
-4. Phase D: shepherd 吸收单独立 1-3-1 决策, 通过后并入 `nt_mind_self_iterating`。
-5. 所有生产能力变更注册能力树 (R-P100): `neotrix-capability bud`。
+1. Phase A: 连续执行每日榜捕获 3 天 + 挂 background_loop handler 设计评估。
+2. Phase B: 选 2 节点 (revertible_effects / decision_trail) 增集成测试 → `mature --target c2`。
+3. Phase C: modlens 模式分析 → nt_io_multimodal_transform 真视觉后端设计 (1-3-1 决策简报)。
+4. Phase D: MARS bridge 根因调查 (读 nt_core_self MARS 逻辑)。
+5. 所有生产能力变更注册能力树 (R-P100)。
