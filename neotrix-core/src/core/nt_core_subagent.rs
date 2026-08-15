@@ -89,7 +89,7 @@ pub struct PermissionMatrix {
 }
 
 /// 单个工具权限 (allow/deny + 可选 pattern 白名单)。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolPermission {
     pub allow: bool,
     #[serde(default)]
@@ -101,12 +101,6 @@ pub struct ToolPermission {
 pub struct TaskPermission {
     pub deny: Vec<String>,
     pub allow: Vec<String>,
-}
-
-impl Default for ToolPermission {
-    fn default() -> Self {
-        Self { allow: false, patterns: Vec::new() }
-    }
 }
 
 impl PermissionMatrix {

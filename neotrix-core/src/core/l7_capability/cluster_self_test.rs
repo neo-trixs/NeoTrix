@@ -3,6 +3,7 @@
 //! 对 `CapabilityRegistry` 做完整性自审 (R-P23 检测系统自审计):
 //! - 注册表可达且可构造 (不 panic)
 //! - 集群计数非负、模块技能注册幂等
+//!
 //! 供 SEAL 自迭代 pipeline 以 `Box<dyn SelfTest>` 注册消费。
 
 use crate::core::nt_core_self_test::SelfTest;

@@ -1027,6 +1027,14 @@ impl ReasoningEngine {
                             }
                         }
                     }
+                    // G24 latent feedback channel (arxiv 2608.08888): 检索结果经
+                    // GWT 注意力消费后反馈回潜在记忆 — 被注意的隐藏状态强化,
+                    // 形成无监督潜在闭环 (R-P79 接线, 非死代码)。
+                    let feedback_updates = self.latent_reasoning.apply_feedback(&latent_retrieval);
+                    root_span.set_attribute(
+                        "latent_feedback_updates",
+                        AttributeValue::Int(feedback_updates as i64),
+                    );
                 }
 
                 // Phase 6.3 — recursive latent reasoning transformer: iterate

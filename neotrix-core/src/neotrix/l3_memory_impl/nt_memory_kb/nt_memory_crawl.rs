@@ -1035,7 +1035,7 @@ pub fn ingest_geo_cities(
         geo_count += 1;
 
         // 每 BATCH 条提交并重开事务
-        if geo_count % BATCH == 0 {
+        if geo_count.is_multiple_of(BATCH) {
             tx.commit().map_err(|e| format!("tx commit: {}", e))?;
             tx = conn
                 .unchecked_transaction()
@@ -1160,7 +1160,7 @@ pub fn ingest_geo_peaks(
         .map_err(|e| format!("geo upsert error: {}", e))?;
         count += 1;
 
-        if count % BATCH == 0 {
+        if count.is_multiple_of(BATCH) {
             tx.commit().map_err(|e| format!("tx commit: {}", e))?;
             tx = conn
                 .unchecked_transaction()
@@ -1470,7 +1470,7 @@ pub fn ingest_geo_airports(
         .map_err(|e| format!("geo upsert error: {}", e))?;
         count += 1;
 
-        if count % BATCH == 0 {
+        if count.is_multiple_of(BATCH) {
             tx.commit().map_err(|e| format!("tx commit: {}", e))?;
             tx = conn
                 .unchecked_transaction()
@@ -1653,7 +1653,7 @@ pub fn ingest_geo_boundaries(
         .map_err(|e| format!("geo upsert error: {}", e))?;
         count += 1;
 
-        if count % BATCH == 0 {
+        if count.is_multiple_of(BATCH) {
             tx.commit().map_err(|e| format!("tx commit: {}", e))?;
             tx = conn
                 .unchecked_transaction()

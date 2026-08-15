@@ -4,6 +4,7 @@
 //! 统一到一个管道中，路由到 KB 存储，支持调度、去重、增量更新。
 
 pub mod self_curriculum;
+pub mod api_registry;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -13,6 +14,7 @@ use super::nt_world_github_absorber::{GitHubAbsorbReport, GitHubAbsorber};
 use crate::neotrix::l2_world_impl::nt_memory_kb_bridge::{
     CrawlCycleReport, KnowledgeBase, KnowledgeNode, NodeType,
 };
+use rusqlite::Connection;
 
 // ── Types ──
 
@@ -97,6 +99,8 @@ impl Default for AbsorberConfig {
 pub struct UnifiedAbsorber {
     kb: KnowledgeBase,
     github: GitHubAbsorber,
+    /// G30 API/服务注册表 (public-apis/free-for-dev 吸收) — 发现种子源。
+    api_registry: api_registry::ApiRegistry,
 }
 
 impl UnifiedAbsorber {
@@ -104,7 +108,33 @@ impl UnifiedAbsorber {
         Ok(Self {
             github: GitHubAbsorber::new(kb.clone_connection()?),
             kb,
+            api_registry: api_registry::ApiRegistry::new(),
         })
+    }
+
+    /// G30 注册一个 API 条目 (发现种子)。
+    pub fn register_api(&mut self, entry: api_registry::ApiEntry) {
+        self.api_registry.register(entry);
+    }
+
+    /// G30 把注册的 API 条目 URL 作为发现种子注入 crawl queue (供后续摄取)。
+    /// 返回成功注入的种子数。
+    pub fn seed_api_discovery(&self, conn: &Connection) -> Result<usize, String> {
+        let seeds = self.api_registry.seed_urls();
+        let mut injected = 0usize;
+        for url in seeds {
+            let domain = crate::neotrix::l2_world_impl::nt_world_crawl::frontier::extract_domain(&url);
+            if let Err(e) = nt_memory_store::upsert_crawl_queue(conn, &url, 0, &domain, 50, now()) {
+                log::warn!("[absorber] seed api discovery {}: {}", url, e);
+                continue;
+            }
+            injected += 1;
+        }
+        Ok(injected)
+    }
+
+    pub fn api_registry_stats(&self) -> (usize, f64, Vec<(String, usize)>) {
+        self.api_registry.stats()
     }
 
     /// Absorb a single source, automatically detecting type
@@ -409,6 +439,33 @@ impl UnifiedAbsorber {
         let _ = self.kb.kv_set("absorber", "last_cycle", &json);
         Ok(())
     }
+
+    /// G19/G20 视频生产全链产物入 KB: 将 production manifest 落盘为
+    /// Resource 节点 (nvda 领域), 供下游检索与审计。
+    pub fn absorb_video_production(
+        &self,
+        topic: &str,
+        manifest: &[(crate::neotrix::l2_world_impl::nt_world_video_pipeline::ProductionStage, String)],
+        asset_stats: (usize, usize, usize),
+    ) -> Result<String, String> {
+        let mut summary = format!("video production: {}", topic);
+        for (stage, artifact) in manifest {
+            summary.push_str(&format!("\n- {}: {}", stage.label(), artifact));
+        }
+        summary.push_str(&format!(
+            "\nasset enrichment: total={} dup={} kept={}",
+            asset_stats.0, asset_stats.1, asset_stats.2
+        ));
+        let _node_id = self.kb.insert_or_get_node(
+            &format!("video-production-{}", topic),
+            NodeType::Resource,
+            Some(&summary),
+            None,
+            Some("nvda"),
+        )?;
+        let _ = self.kb.kv_set("absorber", "last_video_production", &summary);
+        Ok(summary)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -605,5 +662,57 @@ mod tests {
         assert_eq!(status.repositories, 3);
         assert_eq!(status.papers, 1);
         assert!(status.last_cycle.is_none());
+    }
+
+    #[test]
+    fn test_api_registry_register_and_stats_wired() {
+        // G30 discovery_registry_meta: 注册表接线到 UnifiedAbsorber
+        let entry = api_registry::ApiEntry {
+            name: "OpenAI".into(),
+            description: "AI".into(),
+            auth: "apiKey".into(),
+            https: true,
+            category: "Machine Learning".into(),
+            cors: true,
+            url: "https://api.openai.com".into(),
+        };
+        let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:"))).unwrap();
+        let mut absorber = UnifiedAbsorber::new(kb, AbsorberConfig {
+            max_github_stars: 100,
+            max_source_files: 10,
+            enable_readme: true,
+            enable_deps: false,
+            enable_insights: false,
+            auto_refresh_days: 7,
+            max_concurrent: 4,
+        }).unwrap();
+        absorber.register_api(entry);
+        let (n, https, _auths) = absorber.api_registry_stats();
+        assert_eq!(n, 1);
+        assert_eq!(https, 1.0);
+    }
+
+    #[test]
+    fn test_absorb_video_production_writes_kb_node() {
+        // G19/G20 视频生产全链产物入 KB
+        use crate::neotrix::l2_world_impl::nt_world_video_pipeline::ProductionStage;
+        let kb = KnowledgeBase::open(Some(std::path::PathBuf::from(":memory:"))).unwrap();
+        let absorber = UnifiedAbsorber::new(kb, AbsorberConfig {
+            max_github_stars: 100,
+            max_source_files: 10,
+            enable_readme: true,
+            enable_deps: false,
+            enable_insights: false,
+            auto_refresh_days: 7,
+            max_concurrent: 4,
+        }).unwrap();
+        let manifest = vec![
+            (ProductionStage::Script, "script-x".into()),
+            (ProductionStage::Compose, "out/x-final.mp4".into()),
+            (ProductionStage::Publish, "published/x-final.mp4".into()),
+        ];
+        let summary = absorber.absorb_video_production("X", &manifest, (3, 1, 2)).unwrap();
+        assert!(summary.contains("video production: X"));
+        assert!(summary.contains("asset enrichment: total=3 dup=1 kept=2"));
     }
 }

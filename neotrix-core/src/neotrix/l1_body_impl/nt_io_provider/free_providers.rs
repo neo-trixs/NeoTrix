@@ -476,7 +476,7 @@ impl LlmProvider for PollinationsProvider {
                 let text = response.text().await.unwrap_or_default();
                 let err = match status.as_u16() {
                     429 => LlmError::RateLimit(text),
-                    401 | 402 | 403 => LlmError::Authentication(text),
+                    401..=403 => LlmError::Authentication(text),
                     500..=599 => LlmError::Server(text),
                     _ => LlmError::Unknown(text),
                 };

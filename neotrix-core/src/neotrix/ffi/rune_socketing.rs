@@ -45,24 +45,24 @@ impl RuneSocketingImpl {
     }
 
     pub fn get_runes(&self) -> Vec<Rune> {
-        self.inner.read().unwrap().runes.clone()
+        self.inner.read().expect("ffi rwlock poisoned").runes.clone()
     }
 
     pub fn get_runewords(&self) -> Vec<Runeword> {
-        self.inner.read().unwrap().runewords.clone()
+        self.inner.read().expect("ffi rwlock poisoned").runewords.clone()
     }
 
     pub fn configure_sockets(&self, config: SocketConfig) -> bool {
-        self.inner.write().unwrap().configs.insert(config.module.clone(), config);
+        self.inner.write().expect("ffi rwlock poisoned").configs.insert(config.module.clone(), config);
         true
     }
 
     pub fn get_module_config(&self, module: &str) -> Result<SocketConfig, NeoTrixError> {
-        self.inner.read().unwrap().configs.get(module).cloned().ok_or(NeoTrixError::NotFound)
+        self.inner.read().expect("ffi rwlock poisoned").configs.get(module).cloned().ok_or(NeoTrixError::NotFound)
     }
 
     pub fn compute_runewords(&self, module: &str) -> Vec<Runeword> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let config = match inner.configs.get(module) {
             Some(c) => c,
             None => return Vec::new(),

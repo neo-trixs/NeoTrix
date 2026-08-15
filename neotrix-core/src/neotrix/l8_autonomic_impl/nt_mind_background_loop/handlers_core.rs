@@ -39,10 +39,10 @@ impl BackgroundLoopHandle {
                     nodes
                         .into_iter()
                         .take(64)
-                        .filter_map(|n| {
+                        .map(|n| {
                             let text = n.title;
                             let salience = n.importance.max(0.0).min(1.0);
-                            Some((text, salience))
+                            (text, salience)
                         })
                         .collect()
                 } else {
@@ -104,13 +104,8 @@ impl BackgroundLoopHandle {
         // goal 迭代后顺带跑一次记忆能力面: 巩固规模信号 + 证据计数,
         // 让 meta_agent 不是死代码而是生产路径上的真实消费者。
         if let Some(ref agent) = self.meta_agent {
-            if let Ok(outcome) = agent.capability_consolidate() {
-                match outcome {
-                    crate::neotrix::nt_mind::CapabilityOutcome::Count(n) => {
-                        eprintln!("[bg-agent] memory consolidate: nodes={}", n);
-                    }
-                    _ => {}
-                }
+            if let Ok(crate::neotrix::nt_mind::CapabilityOutcome::Count(n)) = agent.capability_consolidate() {
+                eprintln!("[bg-agent] memory consolidate: nodes={}", n);
             }
         }
 

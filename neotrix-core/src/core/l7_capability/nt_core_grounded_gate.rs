@@ -263,7 +263,7 @@ fn field_matches_type(v: &serde_json::Value, ty: &FieldType) -> bool {
         FieldType::String => v.is_string(),
         FieldType::Number => v.is_number(),
         FieldType::Json => v.is_object() || v.is_array(),
-        FieldType::File => v.is_string() && v.as_str().map_or(false, |s| !s.is_empty()),
+        FieldType::File => v.is_string() && v.as_str().is_some_and(|s| !s.is_empty()),
     }
 }
 

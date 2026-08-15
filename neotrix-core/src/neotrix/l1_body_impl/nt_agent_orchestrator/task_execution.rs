@@ -1,11 +1,11 @@
 //! NT-ACT 编排 — agent-as-tool 执行循环 + 可验证交接 ledger (缺陷网 D7/D8 修复):
 //! - D7 无 agent-as-tool 执行循环: 有序 task 队列, 每任务执行后过测试门,
-//!      红门 (测试失败) 禁止 commit, 失败即停。
+//!   红门 (测试失败) 禁止 commit, 失败即停。
 //! - D8 无可验证交接: 绿 commit 后记录已验公共面 (signatures/types/endpoints)
-//!      入 ledger, 注入下个 task 的 brief, 保证交接可验证。
+//!   入 ledger, 注入下个 task 的 brief, 保证交接可验证。
 //!
 //! 参照: codex-build (编排器-编码器分离 + 测试门在 commit 前每次),
-//!       tuicr (ReviewStore 库 API + 机器可读评论导出)。
+//!    tuicr (ReviewStore 库 API + 机器可读评论导出)。
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};

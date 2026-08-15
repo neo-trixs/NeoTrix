@@ -36,7 +36,7 @@ impl CliCommand for AcpCmd {
                     Err(e) => return CommandOutput::err(&format!("failed to start tokio runtime: {}", e)),
                 };
                 let _guard = rt.enter();
-                let _ = rt.block_on(server.run_stdio());
+                rt.block_on(server.run_stdio());
                 CommandOutput::ok("ACP server exited")
             }
             "help" | "--help" | "-h" => {

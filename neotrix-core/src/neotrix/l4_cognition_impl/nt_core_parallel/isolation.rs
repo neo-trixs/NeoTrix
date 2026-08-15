@@ -361,7 +361,7 @@ impl AtomicDecomposer {
                 let refs: Vec<String> = (0..parallel.len()).map(|i| format!("u{}", i)).collect();
                 let sequential = vec![AtomicUnit {
                     id: "merge".into(),
-                    instruction: format!("综合以下输入, 输出对比结论", ),
+                    instruction: "综合以下输入, 输出对比结论".to_string(),
                     inputs: refs,
                     output_contract: OutputContract {
                         fields: vec!["comparison".into()],
@@ -408,7 +408,7 @@ impl AtomicDecomposer {
 
 /// 按句子切分 (支持中英文标点)
 fn split_sentences(text: &str) -> Vec<String> {
-    text.split(|c: char| matches!(c, '。' | '！' | '？' | '；' | '.' | '!' | '?' | ';'))
+    text.split(['。', '！', '？', '；', '.', '!', '?', ';'])
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
@@ -418,7 +418,7 @@ fn split_sentences(text: &str) -> Vec<String> {
 /// 按逗号/分号/顿号切分子片段 (用于片段级意图剥离)
 fn split_fragments(sentence: &str) -> Vec<String> {
     sentence
-        .split(|c: char| matches!(c, '，' | '、' | ',' | '；' | ';'))
+        .split(['，', '、', ',', '；', ';'])
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
@@ -433,7 +433,7 @@ fn count_entities(task: &str) -> usize {
                 && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
                 && w.len() >= 2
                 && !["The", "This", "That", "What", "Why", "How", "When", "Where", "Compare", "Between", "Explain"]
-                    .contains(&w)
+                    .contains(w)
         })
         .count()
 }

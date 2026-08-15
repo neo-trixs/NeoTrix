@@ -507,6 +507,7 @@ mod tests {
             max_retries: 0,
             profile_name: None,
             use_tiny_profile: false,
+            stealth_params: Default::default(),
         }
     }
 

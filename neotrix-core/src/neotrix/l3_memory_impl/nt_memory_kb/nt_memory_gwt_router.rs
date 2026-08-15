@@ -245,7 +245,7 @@ pub fn extract_features(query: &str) -> QueryFeatures {
         }
     }
     // 中文实体: 顿号/书名号分隔的 2+ 字片段 (去重)
-    q.split(|c: char| c == '《' || c == '》' || c == '、' || c == '，')
+    q.split(['《', '》', '、', '，'])
         .filter(|seg| seg.chars().count() >= 2 && !seg.contains(' '))
         .for_each(|seg| {
             entities.insert(seg);

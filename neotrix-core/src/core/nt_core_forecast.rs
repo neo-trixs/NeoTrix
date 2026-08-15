@@ -487,7 +487,7 @@ impl LlmNarrator {
                             .nth(1)
                             .and_then(|s| s.trim_start().split(|c: char| !c.is_ascii_digit()).next())
                             .and_then(|s| s.parse::<u64>().ok())
-                            .unwrap_or((2u64.pow(attempt as u32) * 3) as u64);
+                            .unwrap_or(2u64.pow(attempt as u32) * 3);
                         log::info!(
                             "[nt_core_forecast] LLM narrate via {provider}/{model} rate-limited, waiting {retry_after}s before retry"
                         );
@@ -587,7 +587,7 @@ impl LlmNarrator {
         let chars: Vec<char> = context.chars().collect();
         // 找最大 char 数使 estimate_tokens(chars[..n]) <= budget - marker_cost
         while lo < hi {
-            let mid = (lo + hi + 1) / 2;
+            let mid = (lo + hi).div_ceil(2);
             let part: String = chars[..mid].iter().collect();
             if Self::estimate_tokens(&part) <= budget.saturating_sub(marker_cost) {
                 lo = mid;

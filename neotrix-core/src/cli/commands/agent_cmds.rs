@@ -62,7 +62,7 @@ impl CliCommand for AgentCmd {
                     // 文件驱动 agent 目录（~/.neotrix/agents/ + 项目 .neotrix/agents/）
                     return CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_full_text());
                 }
-                return CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_text());
+                CommandOutput::ok(&crate::core::l7_capability::nt_core_orch_agent::AgentCatalog::catalog_text())
             }
             "spawn" => {
                 if args.len() < 3 {

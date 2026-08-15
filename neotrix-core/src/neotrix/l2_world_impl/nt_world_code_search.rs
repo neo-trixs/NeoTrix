@@ -179,6 +179,11 @@ impl SymbolIndex {
         hits
     }
 
+    /// 全部符号 (供模块拓扑统计)。
+    pub fn all_symbols(&self) -> &[SymbolRecord] {
+        &self.symbols
+    }
+
     pub fn file_symbol_count(&self, file: &str) -> usize {
         self.by_file.get(file).map(|v| v.len()).unwrap_or(0)
     }

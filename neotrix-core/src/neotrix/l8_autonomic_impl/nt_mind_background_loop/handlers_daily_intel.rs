@@ -44,9 +44,9 @@ impl BackgroundLoopHandle {
 
         // 今日未摄入 → 感知盲区: 写入 KB (NT-WORLD 感知缺失), 供意识体自我察觉。
         if let Some(kb) = self.kb.clone() {
-            let note = format!(
+            let note =
                 "[daily-intel] today's external intel not captured — NT-WORLD perception gap"
-            );
+                    .to_string();
             log::info!("{note}");
             // 记入 kv_store daily-intel 命名空间 (可检索的感知缺失标记, 消费方可查询)
             if let Ok(conn) = kb.raw_conn() {

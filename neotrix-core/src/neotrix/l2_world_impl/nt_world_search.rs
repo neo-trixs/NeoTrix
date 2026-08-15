@@ -218,14 +218,9 @@ pub trait SearchBackend: Send + Sync {
 }
 
 /// DuckDuckGo 后端 (首选) — 复用既有 WebSearchEngine 解析。
+#[derive(Default)]
 pub struct DuckDuckGoBackend {
     engine: WebSearchEngine,
-}
-
-impl Default for DuckDuckGoBackend {
-    fn default() -> Self {
-        Self { engine: WebSearchEngine::default() }
-    }
 }
 
 impl SearchBackend for DuckDuckGoBackend {

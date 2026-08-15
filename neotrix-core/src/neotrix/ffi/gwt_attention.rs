@@ -42,7 +42,7 @@ impl GWTAttentionRouterImpl {
     }
 
     pub fn submit_signal(&self, signal: AttentionSignal) -> RoutingResponse {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         let mut resonance_scores = HashMap::new();
         let mut recipients = Vec::new();
 
@@ -81,21 +81,21 @@ impl GWTAttentionRouterImpl {
     }
 
     pub fn get_workspace_state(&self) -> WorkspaceState {
-        self.inner.read().unwrap().workspace.clone()
+        self.inner.read().expect("ffi rwlock poisoned").workspace.clone()
     }
 
     pub fn register_module(&self, name: &str, interest_keywords: Vec<String>) -> bool {
-        self.inner.write().unwrap().modules.insert(name.to_string(), interest_keywords);
-        self.inner.write().unwrap().thresholds.entry(name.to_string()).or_insert(0.3);
+        self.inner.write().expect("ffi rwlock poisoned").modules.insert(name.to_string(), interest_keywords);
+        self.inner.write().expect("ffi rwlock poisoned").thresholds.entry(name.to_string()).or_insert(0.3);
         true
     }
 
     pub fn unregister_module(&self, name: &str) -> bool {
-        self.inner.write().unwrap().modules.remove(name).is_some()
+        self.inner.write().expect("ffi rwlock poisoned").modules.remove(name).is_some()
     }
 
     pub fn set_salience_threshold(&self, module: &str, threshold: f32) -> bool {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         if inner.modules.contains_key(module) {
             inner.thresholds.insert(module.to_string(), threshold);
             true
@@ -105,7 +105,7 @@ impl GWTAttentionRouterImpl {
     }
 
     pub fn get_resonance(&self, module_a: &str, module_b: &str) -> f32 {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let kw_a = inner.modules.get(module_a).cloned().unwrap_or_default();
         let kw_b = inner.modules.get(module_b).cloned().unwrap_or_default();
         let overlap = kw_a.iter().filter(|k| kw_b.contains(k)).count();

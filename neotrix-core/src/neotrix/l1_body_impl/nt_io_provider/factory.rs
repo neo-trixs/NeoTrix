@@ -230,7 +230,7 @@ impl LlmProvider for DeniedProvider {
 /// 从 base_url 提取主机名 (剥离 scheme/path/port, 兼容 IPv6 括号)。
 pub fn host_of(base_url: &str) -> String {
     let s = base_url.trim();
-    let after_scheme = s.splitn(2, "://").nth(1).unwrap_or(s);
+    let after_scheme = s.split_once("://").map(|x| x.1).unwrap_or(s);
     let authority = after_scheme.split(['/', '?', '#']).next().unwrap_or(after_scheme);
     let authority = authority.trim();
     if authority.starts_with('[') {

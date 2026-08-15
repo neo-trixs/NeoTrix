@@ -44,7 +44,7 @@ impl E8ReasoningImpl {
         let hexagram_index = (hash % 64) as u8;
         let lines = (hash >> 56 & 0x3F) as u8;
         
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let info = &inner.library[hexagram_index as usize];
 
         let chain = vec![
@@ -74,11 +74,11 @@ impl E8ReasoningImpl {
     }
 
     pub fn get_current_hexagram(&self) -> HexagramState {
-        self.inner.read().unwrap().current.clone()
+        self.inner.read().expect("ffi rwlock poisoned").current.clone()
     }
 
     pub fn evolve_hexagram(&self, feedback: String, outcome: bool) -> HexagramState {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         let base = inner.current.lines;
         let shift = if outcome { 1 } else { 2 };
         let new_lines = base.rotate_left(shift) ^ hash_string(&feedback) as u8;
@@ -93,7 +93,7 @@ impl E8ReasoningImpl {
     }
 
     pub fn get_hexagram_library(&self) -> HexagramLibrary {
-        HexagramLibrary { hexagrams: self.inner.read().unwrap().library.clone() }
+        HexagramLibrary { hexagrams: self.inner.read().expect("ffi rwlock poisoned").library.clone() }
     }
 }
 

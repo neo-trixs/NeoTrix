@@ -898,6 +898,229 @@ impl VideoChainRunner {
 }
 
 // ──────────────────────────────────────────────
+// G19 视频生产全链 (MoneyPrinterTurbo 吸收) —
+// 脚本 → 素材检索 → TTS 字幕 → 合成 → 发布
+// ──────────────────────────────────────────────
+
+/// MoneyPrinterTurbo 生产链阶段。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProductionStage {
+    Script,
+    Material,
+    Tts,
+    Compose,
+    Publish,
+}
+
+impl ProductionStage {
+    pub fn label(self) -> &'static str {
+        match self {
+            ProductionStage::Script => "script",
+            ProductionStage::Material => "material",
+            ProductionStage::Tts => "tts",
+            ProductionStage::Compose => "compose",
+            ProductionStage::Publish => "publish",
+        }
+    }
+
+    fn order(self) -> u8 {
+        match self {
+            ProductionStage::Script => 0,
+            ProductionStage::Material => 1,
+            ProductionStage::Tts => 2,
+            ProductionStage::Compose => 3,
+            ProductionStage::Publish => 4,
+        }
+    }
+
+    pub fn next(self) -> Option<ProductionStage> {
+        match self {
+            ProductionStage::Script => Some(ProductionStage::Material),
+            ProductionStage::Material => Some(ProductionStage::Tts),
+            ProductionStage::Tts => Some(ProductionStage::Compose),
+            ProductionStage::Compose => Some(ProductionStage::Publish),
+            ProductionStage::Publish => None,
+        }
+    }
+}
+
+/// 生产链阶段产物。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductionArtifact {
+    pub stage: ProductionStage,
+    pub done: bool,
+    pub artifact: String,
+}
+
+/// 视频生产链 — MoneyPrinterTurbo 全链, 支持 checkpoint 恢复。
+#[derive(Debug, Clone)]
+pub struct VideoProductionChain {
+    pub topic: String,
+    pub stages: Vec<ProductionArtifact>,
+    /// 已消耗 token 预算。
+    pub budget_used: u64,
+    /// 已执行阶段计数。
+    pub executed: u64,
+}
+
+impl VideoProductionChain {
+    pub fn new(topic: &str) -> Self {
+        Self {
+            topic: topic.to_string(),
+            stages: vec![
+                ProductionArtifact { stage: ProductionStage::Script, done: false, artifact: String::new() },
+                ProductionArtifact { stage: ProductionStage::Material, done: false, artifact: String::new() },
+                ProductionArtifact { stage: ProductionStage::Tts, done: false, artifact: String::new() },
+                ProductionArtifact { stage: ProductionStage::Compose, done: false, artifact: String::new() },
+                ProductionArtifact { stage: ProductionStage::Publish, done: false, artifact: String::new() },
+            ],
+            budget_used: 0,
+            executed: 0,
+        }
+    }
+
+    /// 下一个未完成阶段 (resume 起点)。
+    pub fn next_pending(&self) -> Option<ProductionStage> {
+        self.stages.iter().find(|s| !s.done).map(|s| s.stage)
+    }
+
+    pub fn all_done(&self) -> bool {
+        self.stages.iter().all(|s| s.done)
+    }
+
+    /// 执行单个阶段 (脚本为模板生成, 其余为确定性模拟重活)。
+    pub fn run_stage(&mut self, stage: ProductionStage) -> Result<ProductionArtifact, String> {
+        if self.stages.iter().any(|s| s.stage == stage && s.done) {
+            return self
+                .stages
+                .iter()
+                .find(|s| s.stage == stage)
+                .cloned()
+                .ok_or_else(|| "stage not found".into());
+        }
+        let artifact = match stage {
+            ProductionStage::Script => format!("script-{}", slugify(&self.topic)),
+            ProductionStage::Material => format!("materials/{}-assets", slugify(&self.topic)),
+            ProductionStage::Tts => format!("tts/{}-subtitles.srt", slugify(&self.topic)),
+            ProductionStage::Compose => format!("out/{}-final.mp4", slugify(&self.topic)),
+            ProductionStage::Publish => format!("published/{}-final.mp4", slugify(&self.topic)),
+        };
+        if let Some(s) = self.stages.iter_mut().find(|s| s.stage == stage) {
+            s.done = true;
+            s.artifact = artifact.clone();
+        }
+        self.budget_used = self.budget_used.saturating_add(1 + stage.order() as u64);
+        self.executed += 1;
+        Ok(ProductionArtifact { stage, done: true, artifact })
+    }
+
+    /// 全链推进到 Publish。
+    pub fn run_all(&mut self) -> Result<Vec<ProductionStage>, String> {
+        let mut done = Vec::new();
+        let mut current = self.next_pending();
+        while let Some(stage) = current {
+            self.run_stage(stage)?;
+            done.push(stage);
+            current = stage.next();
+        }
+        Ok(done)
+    }
+
+    /// 产物摘要 (供入库描述)。
+    pub fn output_manifest(&self) -> Vec<(ProductionStage, String)> {
+        self.stages.iter().map(|s| (s.stage, s.artifact.clone())).collect()
+    }
+}
+
+fn slugify(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .map(|c| c.to_ascii_lowercase())
+        .collect::<String>()
+}
+
+// ──────────────────────────────────────────────
+// G20 资产 ML 富化 (immich 吸收) —
+// 资产去重 + 语义标签 (CLIP 式轻量指纹)
+// ──────────────────────────────────────────────
+
+/// 单个媒体资产。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaAsset {
+    pub id: String,
+    pub path: String,
+    /// 内容指纹 (如感知哈希 / 帧差分签名)。
+    pub fingerprint: String,
+    /// 已有标签。
+    pub tags: Vec<String>,
+}
+
+/// immich 风格资产富化结果。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetEnrichment {
+    pub asset_id: String,
+    /// 判定为重复的资产 id (去重)。
+    pub dedup_of: Option<String>,
+    /// 语义标签 (CLIP 式: 从路径/指纹推导的主题词)。
+    pub semantic_tags: Vec<String>,
+    /// 是否需纳入产出清单。
+    pub keep: bool,
+}
+
+/// 资产富化器 — immich 吸收: 内容去重 + 语义标签。
+#[derive(Debug, Clone, Default)]
+pub struct AssetEnricher {
+    pub seen: HashMap<String, String>,
+    pub enriched: Vec<AssetEnrichment>,
+}
+
+impl AssetEnricher {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 富化单个资产: 指纹重复 → 标记去重; 否则提取语义标签。
+    pub fn enrich(&mut self, asset: &MediaAsset) -> AssetEnrichment {
+        let mut sem = asset.tags.clone();
+        // 从路径/文件名提取主题词 (轻量语义标签)
+        for token in asset.path.split(['/', '\\', '.', '_', '-']) {
+            let t = token.trim();
+            if t.len() >= 4 && t.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                let t = t.to_lowercase();
+                if !sem.contains(&t) {
+                    sem.push(t);
+                }
+            }
+        }
+        let result = if let Some(orig) = self.seen.get(&asset.fingerprint) {
+            AssetEnrichment {
+                asset_id: asset.id.clone(),
+                dedup_of: Some(orig.clone()),
+                semantic_tags: sem,
+                keep: false,
+            }
+        } else {
+            self.seen.insert(asset.fingerprint.clone(), asset.id.clone());
+            AssetEnrichment {
+                asset_id: asset.id.clone(),
+                dedup_of: None,
+                semantic_tags: sem,
+                keep: true,
+            }
+        };
+        self.enriched.push(result.clone());
+        result
+    }
+
+    /// 去重统计: (总资产, 判定重复数, 保留数)。
+    pub fn stats(&self) -> (usize, usize, usize) {
+        let total = self.enriched.len();
+        let dup = self.enriched.iter().filter(|e| e.dedup_of.is_some()).count();
+        (total, dup, total - dup)
+    }
+}
+
+// ──────────────────────────────────────────────
 
 /// Unified orchestrator wrapping both frame-level [`VideoPipeline`]
 /// and web-based [`ExtractionPipeline`].
@@ -906,6 +1129,10 @@ pub struct VideoOrchestrator {
     pub extraction_pipeline: ExtractionPipeline,
     total_videos_processed: u64,
     transcode_config: TranscodeConfig,
+    /// G19 视频生产全链 (MoneyPrinterTurbo 吸收)。
+    pub production_chain: Option<VideoProductionChain>,
+    /// G20 资产 ML 富化 (immich 吸收)。
+    pub asset_enricher: AssetEnricher,
 }
 
 impl VideoOrchestrator {
@@ -915,7 +1142,28 @@ impl VideoOrchestrator {
             extraction_pipeline: ExtractionPipeline::new(transcode_config.clone()),
             total_videos_processed: 0,
             transcode_config,
+            production_chain: None,
+            asset_enricher: AssetEnricher::new(),
         }
+    }
+
+    /// G19 运行视频生产全链 (脚本→素材→TTS→合成→发布), 产物入库存档。
+    pub fn produce_video(&mut self, topic: &str) -> Result<Vec<(ProductionStage, String)>, String> {
+        let mut chain = VideoProductionChain::new(topic);
+        chain.run_all()?;
+        let manifest = chain.output_manifest();
+        self.total_videos_processed += 1;
+        self.production_chain = Some(chain);
+        Ok(manifest)
+    }
+
+    /// G20 富化一批素材 (去重 + 语义标签)。
+    pub fn enrich_assets(&mut self, assets: &[MediaAsset]) -> Vec<AssetEnrichment> {
+        assets.iter().map(|a| self.asset_enricher.enrich(a)).collect()
+    }
+
+    pub fn asset_enrichment_stats(&self) -> (usize, usize, usize) {
+        self.asset_enricher.stats()
     }
 
     pub fn process_video_file(&mut self, path: &str) -> Result<VideoSummary, String> {
@@ -1308,5 +1556,89 @@ mod tests {
         assert_eq!(VideoStage::Publish.next(), None);
         assert_eq!(VideoStage::Extract.order(), 0);
         assert_eq!(VideoStage::Publish.order(), 4);
+    }
+
+    // ── G19 VideoProductionChain tests ─────────────────────────────────
+
+    #[test]
+    fn production_chain_full_run_manifest() {
+        let mut chain = VideoProductionChain::new("Rust Async Deep Dive");
+        assert_eq!(chain.next_pending(), Some(ProductionStage::Script));
+        let done = chain.run_all().unwrap();
+        assert_eq!(done.len(), 5, "全链 5 阶段");
+        assert!(chain.all_done());
+        let manifest = chain.output_manifest();
+        assert!(manifest.iter().any(|(s, a)| *s == ProductionStage::Compose && a.contains("final.mp4")));
+        assert!(chain.executed >= 5);
+    }
+
+    #[test]
+    fn production_chain_resume_from_partial() {
+        let mut chain = VideoProductionChain::new("T");
+        chain.run_stage(ProductionStage::Script).unwrap();
+        chain.run_stage(ProductionStage::Material).unwrap();
+        assert_eq!(chain.next_pending(), Some(ProductionStage::Tts), "从 TTS 恢复");
+        let remaining = chain.run_all().unwrap();
+        assert_eq!(remaining, vec![ProductionStage::Tts, ProductionStage::Compose, ProductionStage::Publish]);
+    }
+
+    #[test]
+    fn production_chain_skips_completed_stage() {
+        let mut chain = VideoProductionChain::new("T");
+        chain.run_stage(ProductionStage::Script).unwrap();
+        let before = chain.executed;
+        chain.run_stage(ProductionStage::Script).unwrap(); // 已完成 → 跳过
+        assert_eq!(chain.executed, before, "不重复执行");
+    }
+
+    // ── G20 AssetEnricher tests ────────────────────────────────────────
+
+    #[test]
+    fn asset_enricher_dedups_by_fingerprint() {
+        let mut enr = AssetEnricher::new();
+        let a = MediaAsset { id: "a1".into(), path: "cats/happy_cat.png".into(), fingerprint: "fp1".into(), tags: vec!["cat".into()] };
+        let b = MediaAsset { id: "a2".into(), path: "cats/happy_cat_copy.png".into(), fingerprint: "fp1".into(), tags: vec![] };
+        let ea = enr.enrich(&a);
+        assert_eq!(ea.keep, true);
+        let eb = enr.enrich(&b);
+        assert_eq!(eb.dedup_of.as_deref(), Some("a1"), "同指纹判定重复");
+        assert_eq!(eb.keep, false);
+        let (total, dup, kept) = enr.stats();
+        assert_eq!((total, dup, kept), (2, 1, 1));
+    }
+
+    #[test]
+    fn asset_enricher_semantic_tags_from_path() {
+        let mut enr = AssetEnricher::new();
+        let asset = MediaAsset {
+            id: "a1".into(),
+            path: "materials/nature_sunset_beach.png".into(),
+            fingerprint: "f".into(),
+            tags: vec!["photo".into()],
+        };
+        let e = enr.enrich(&asset);
+        assert!(e.semantic_tags.contains(&"nature".to_string()), "路径 token 提取语义标签");
+        assert!(e.semantic_tags.contains(&"photo".to_string()));
+    }
+
+    #[test]
+    fn orchestrator_produce_and_enrich_wired() {
+        let cfg = TranscodeConfig {
+            target_bitrate_kbps: 4000,
+            target_width: 1920,
+            target_height: 1080,
+            ..TranscodeConfig::default()
+        };
+        let mut orch = VideoOrchestrator::new(cfg);
+        let manifest = orch.produce_video("Consciousness Engineering").unwrap();
+        assert_eq!(manifest.len(), 5);
+        let enriched = orch.enrich_assets(&[
+            MediaAsset { id: "x".into(), path: "a/b_shot.png".into(), fingerprint: "F".into(), tags: vec![] },
+            MediaAsset { id: "y".into(), path: "a/b_shot.png".into(), fingerprint: "F".into(), tags: vec![] },
+        ]);
+        assert_eq!(enriched[1].dedup_of.as_deref(), Some("x"));
+        assert_eq!(orch.total_processed(), 1);
+        let (_, dup, _) = orch.asset_enrichment_stats();
+        assert_eq!(dup, 1);
     }
 }

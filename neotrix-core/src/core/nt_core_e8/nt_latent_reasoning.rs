@@ -63,6 +63,12 @@ pub struct LatentReasoningPipeline {
     pub top_k: usize,
     /// Total queries served.
     pub queries_served: u64,
+    /// G24 latent feedback channel (arxiv 2608.08888): 查询后 attention 反馈
+    /// 回写最近邻条目的 outcome, 形成潜在闭环 — 被注意到的隐藏状态强化,
+    /// 未被注意的自然衰减, 无需外部文本标注。
+    pub feedback_applied: u64,
+    /// 反馈强度 (0..1), 每步吸收多少注意质量进 outcome。
+    pub feedback_rate: f64,
 }
 
 impl Default for LatentReasoningPipeline {
@@ -85,6 +91,8 @@ impl LatentReasoningPipeline {
             capacity,
             top_k: top_k.max(1),
             queries_served: 0,
+            feedback_applied: 0,
+            feedback_rate: 0.15,
         }
     }
 
@@ -173,6 +181,38 @@ impl LatentReasoningPipeline {
     pub fn query_state(&mut self, state: ReasoningHexagram) -> LatentRetrieval {
         let emb = self.unified.project_e8_state(state);
         self.query(&emb)
+    }
+
+    /// G24 latent feedback channel (arxiv 2608.08888): 将一次查询的注意力分布
+    /// 反馈回记忆 — 命中的条目 outcome 吸收 attention×feedback_rate 强化,
+    /// 形成「注意→强化→更易被注意」的潜在闭环。反馈不是外部标注, 而是
+    /// 潜在空间内部的自我强化 (无监督), 呼应 latent feedback 论文的隐藏状态回授。
+    ///
+    /// `attention` 为 64 维 E8 注意力向量 (通常来自 `to_gwt_attention` 的 weights)。
+    pub fn apply_feedback(&mut self, retrieval: &LatentRetrieval) -> usize {
+        if self.feedback_rate <= 0.0 {
+            return 0;
+        }
+        let mut updated = 0usize;
+        for entry in self.memory.iter_mut() {
+            let w = retrieval
+                .attention
+                .get(entry.mode as usize)
+                .copied()
+                .unwrap_or(0.0);
+            if w > 0.0 {
+                // outcome 向注意质量方向移动, 但保留旧记忆的惯性
+                entry.outcome = entry.outcome * (1.0 - self.feedback_rate) + w * self.feedback_rate;
+                updated += 1;
+            }
+        }
+        self.feedback_applied += updated as u64;
+        updated
+    }
+
+    /// 反馈通道统计 (供遥测/审计)。
+    pub fn feedback_stats(&self) -> (u64, f64) {
+        (self.feedback_applied, self.feedback_rate)
     }
 
     /// Emit the retrieval as a direct GWT attention vector.
@@ -339,5 +379,74 @@ mod tests {
 
         // 查询计数递增 (生产接线侧证据)
         assert_eq!(p.queries_served, 1);
+    }
+
+    #[test]
+    fn test_feedback_channel_strengthens_attended_state() {
+        // G24 latent feedback (arxiv 2608.08888): 被注意的隐藏状态经反馈通道强化。
+        let mut p = LatentReasoningPipeline::new();
+        p.record(ReasoningHexagram::new(8), 0.5, "seal");
+        p.record(ReasoningHexagram::new(9), 0.5, "seal");
+
+        let before = p.memory.iter().find(|e| e.mode == 8).map(|e| e.outcome).unwrap();
+        let r = p.query_state(ReasoningHexagram::new(8));
+        assert!(r.attention[8] > 0.0, "attended mode must carry attention mass");
+
+        let updated = p.apply_feedback(&r);
+        assert!(updated >= 1, "feedback must update attended entries");
+        let after = p.memory.iter().find(|e| e.mode == 8).map(|e| e.outcome).unwrap();
+        assert!(
+            after > before,
+            "attended state outcome must strengthen: {before:.3} -> {after:.3}"
+        );
+        assert_eq!(p.feedback_applied, updated as u64);
+    }
+
+    #[test]
+    fn test_feedback_does_not_touch_unattended_states() {
+        let mut p = LatentReasoningPipeline::new();
+        p.record(ReasoningHexagram::new(3), 0.4, "seal");
+        p.record(ReasoningHexagram::new(40), 0.4, "seal");
+        let r = p.query_state(ReasoningHexagram::new(40));
+        assert!(
+            r.attention[40] > r.attention[3],
+            "attended mode must carry more attention than distant mode"
+        );
+        let updated = p.apply_feedback(&r);
+        let m3 = p.memory.iter().find(|e| e.mode == 3).map(|e| e.outcome).unwrap();
+        let m40 = p.memory.iter().find(|e| e.mode == 40).map(|e| e.outcome).unwrap();
+        assert!(
+            m40 - 0.4 > m3 - 0.4,
+            "attended state must strengthen more than unattended: 40={m40:.4} vs 3={m3:.4}"
+        );
+        assert!(updated >= 1);
+    }
+
+    #[test]
+    fn test_feedback_rate_zero_disables_channel() {
+        let mut p = LatentReasoningPipeline::new_with(16, 3);
+        p.feedback_rate = 0.0;
+        p.record(ReasoningHexagram::new(20), 0.6, "seal");
+        let r = p.query_state(ReasoningHexagram::new(20));
+        p.apply_feedback(&r);
+        let m = p.memory.iter().find(|e| e.mode == 20).map(|e| e.outcome).unwrap();
+        assert!((m - 0.6).abs() < 1e-9, "rate 0 must not change outcome");
+        assert_eq!(p.feedback_applied, 0);
+    }
+
+    #[test]
+    fn test_feedback_loop_converges_on_attended_mode() {
+        // 端到端: 同一状态反复查询+反馈, outcome 向 attention 质量收敛。
+        let mut p = LatentReasoningPipeline::new();
+        p.record(ReasoningHexagram::new(50), 0.2, "seal");
+        for _ in 0..20 {
+            let r = p.query_state(ReasoningHexagram::new(50));
+            p.apply_feedback(&r);
+        }
+        let final_outcome = p.memory.iter().find(|e| e.mode == 50).map(|e| e.outcome).unwrap();
+        assert!(
+            final_outcome > 0.5,
+            "repeated attention must strengthen outcome well above 0.2, got {final_outcome:.3}"
+        );
     }
 }

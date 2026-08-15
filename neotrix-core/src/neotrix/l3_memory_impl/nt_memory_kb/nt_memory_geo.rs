@@ -1058,7 +1058,7 @@ pub fn insert_trajectory(
     bbox: (f64, f64, f64, f64), // (west, south, east, north)
     distance_km: f64,
 ) -> Result<(), rusqlite::Error> {
-    let _ = ensure_trajectory_table(conn)?;
+    ensure_trajectory_table(conn)?;
     let points_json = serde_json::json!(
         points
             .chunks_exact(2)
@@ -1091,7 +1091,7 @@ pub fn insert_trajectory(
 
 /// 查询所有轨迹 (按 created_at 降序)。
 pub fn query_trajectories(conn: &Connection) -> Result<Vec<TrajectoryRow>, rusqlite::Error> {
-    let _ = ensure_trajectory_table(conn)?;
+    ensure_trajectory_table(conn)?;
     let sql = "SELECT id, name, kind, points_json, bbox_west, bbox_south, bbox_east, bbox_north, distance_km, created_at FROM trajectory ORDER BY created_at DESC";
     let mut stmt = conn.prepare(sql)?;
     let rows = stmt.query_map([], |row| {
@@ -1240,7 +1240,7 @@ pub fn ingest_geo_volcanoes(
         .map_err(|e| format!("volcano upsert: {}", e))?;
         count += 1;
 
-        if count % BATCH == 0 {
+        if count.is_multiple_of(BATCH) {
             tx.commit().map_err(|e| format!("tx commit: {}", e))?;
             tx = conn
                 .unchecked_transaction()
@@ -1386,7 +1386,7 @@ pub fn import_geo_ntpack_to_kb(conn: &Connection, path: &str) -> Result<usize, S
             },
         )
         .map_err(|e| format!("upsert {}: {}", p.node_id, e))?;
-        if (i + 1) % BATCH == 0 {
+        if (i + 1).is_multiple_of(BATCH) {
             tx.commit().map_err(|e| format!("tx commit: {}", e))?;
             tx = conn
                 .unchecked_transaction()
@@ -1542,11 +1542,11 @@ pub fn query_bbox_with_cold(
             if cold_hits.len() >= quota {
                 break;
             }
-            if r.lat >= min_lat && r.lat <= max_lat && r.lng >= min_lng && r.lng <= max_lng {
-                if seen.insert(r.node_id.clone()) {
+            if r.lat >= min_lat && r.lat <= max_lat && r.lng >= min_lng && r.lng <= max_lng
+                    && seen.insert(r.node_id.clone())
+                {
                     cold_hits.push(r);
                 }
-            }
         }
     }
     let cold_count = cold_hits.len();
@@ -1583,11 +1583,10 @@ pub fn query_by_place_with_cold(
             if (country.is_empty() || r.country == country)
                 && (region.is_empty() || r.region == region)
                 && (city.is_empty() || r.city == city)
+                && seen.insert(r.node_id.clone())
             {
-                if seen.insert(r.node_id.clone()) {
-                    out.push(r);
-                    cold_added += 1;
-                }
+                out.push(r);
+                cold_added += 1;
             }
         }
     }

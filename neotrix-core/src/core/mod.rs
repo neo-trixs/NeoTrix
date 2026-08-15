@@ -149,6 +149,7 @@ pub mod nt_core_error_recovery;
 pub mod nt_io_telemetry;
 pub mod nt_core_mcp;
 pub mod nt_core_accessor;
+pub mod nt_core_retrieval;
 pub mod nt_core_cache;
 
 #[cfg(feature = "research")]

@@ -409,7 +409,7 @@ fn classify_image(
     }
     // Blank: near-zero variance OR an essentially solid near-black/white frame
     // (the classic logo/black-screen intro frame that wastes video analysis).
-    if contrast < 0.03 || mean_lum < 0.01 || mean_lum > 0.99 {
+    if contrast < 0.03 || !(0.01..=0.99).contains(&mean_lum) {
         return ImageClass::Blank;
     }
     // Saturated dominant palette = UI chrome (screenshots) more than documents.

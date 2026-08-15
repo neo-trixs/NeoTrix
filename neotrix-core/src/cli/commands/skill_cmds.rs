@@ -73,10 +73,6 @@ impl CliCommand for SkillCmd {
 }
 
 impl SkillCmd {
-    fn new() -> Self {
-        SkillCmd
-    }
-
     fn skills_dir() -> PathBuf {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         PathBuf::from(&home).join(".neotrix").join("skills")
@@ -347,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_placeholder() {
-        let instance = SkillCmd::new();
+        let instance = SkillCmd;
         assert!(true);
     }
 }

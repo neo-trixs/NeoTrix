@@ -510,17 +510,15 @@ pub fn append_chunked(path: &str, new_points: &[GeoPoint], chunk_size: usize) ->
     };
     let _ = old_len;
     // 合并: 若旧文件不存在, merged 直接由 new 建
-    if !data.is_empty() {
-        if data.len() > 8 && &data[0..8] == MAGIC {
-            let old: Vec<GeoPoint> = if data[8] == VERSION_CHUNKED {
-                decode_chunked(&data)?
-            } else {
-                let (_, pts) = super::nt_memory_pack::PackDecoder::decode(&data)?;
-                pts
-            };
-            for p in old {
-                merged.insert(p.node_id.clone(), p);
-            }
+    if !data.is_empty() && data.len() > 8 && &data[0..8] == MAGIC {
+        let old: Vec<GeoPoint> = if data[8] == VERSION_CHUNKED {
+            decode_chunked(&data)?
+        } else {
+            let (_, pts) = super::nt_memory_pack::PackDecoder::decode(&data)?;
+            pts
+        };
+        for p in old {
+            merged.insert(p.node_id.clone(), p);
         }
     }
     for p in new_points {

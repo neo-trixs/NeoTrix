@@ -92,7 +92,7 @@ impl SchedulerEngine {
         let pass = {
             let j = &self.jobs[i];
             j.enabled && j.next_run <= now_ts
-                && j.last_run.map_or(true, |lr| now_ts.saturating_sub(lr) >= j.cooldown_secs)
+                && j.last_run.is_none_or(|lr| now_ts.saturating_sub(lr) >= j.cooldown_secs)
                 && match j.context_gate {
                     ContextGate::Any => true,
                     ContextGate::LowCogLoad(max) => cog_load <= max,
@@ -130,7 +130,7 @@ impl SchedulerEngine {
             .filter(|j| {
                 match j.heartbeat_secs {
                     Some(secs) if secs > 0 => j.last_heartbeat
-                        .map_or(true, |hb| now_ts.saturating_sub(hb) > secs),
+                        .is_none_or(|hb| now_ts.saturating_sub(hb) > secs),
                     _ => false,
                 }
             })

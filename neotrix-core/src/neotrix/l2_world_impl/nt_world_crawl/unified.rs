@@ -71,6 +71,7 @@ impl UnifiedCrawler {
             max_retries: config.max_retries,
             profile_name: None,
             use_tiny_profile: false,
+            stealth_params: Default::default(),
         };
 
         let mut frontier = DualQueueFrontier::new(config.max_pages_per_domain);

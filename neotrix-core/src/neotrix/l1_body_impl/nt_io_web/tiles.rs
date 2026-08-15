@@ -6,6 +6,7 @@
 //!   - bbox: 逗号分隔 4 值 (west, south, east, north), 经纬度
 //!   - limit: 单请求上限 (默认 2000, 硬上限 20k)
 //!   - source: 可选源过滤 (如 `shanhai` → peaks+mappings)
+//!
 //! 返回 GeoJSON FeatureCollection, 供外部 GIS/前端瓦片叠加消费。
 
 use axum::{extract::Query, Json};

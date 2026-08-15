@@ -120,7 +120,7 @@ impl CliCommand for ExploreCmd {
                         None => CommandOutput::err("无法打开 KB"),
                     }
                 } else if what.is_empty() {
-                    return CommandOutput::err("用法: /explore hf <owner/name | url>  |  /explore hf queue [max]");
+                    CommandOutput::err("用法: /explore hf <owner/name | url>  |  /explore hf queue [max]")
                 } else {
                     match try_open_kb() {
                         Some(kb) => match kb.ingest_hf_dataset(what) {

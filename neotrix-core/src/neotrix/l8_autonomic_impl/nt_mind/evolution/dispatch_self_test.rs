@@ -94,7 +94,7 @@ impl SelfTest for DispatchControlPlaneSelfTest {
             std::process::id(),
             now_nanos(),
         ));
-        let kb = match KnowledgeBase::open(Some(tmp.into())) {
+        let kb = match KnowledgeBase::open(Some(tmp)) {
             Ok(kb) => Arc::new(kb),
             Err(e) => return Err(vec![format!("kb open: {}", e)]),
         };

@@ -1,7 +1,8 @@
 //! 检索后处理: recency 时间衰减 (D1) + MMR 多样性去冗余 (D9)
 //!
 //! 参照: supermemory (时间感知检索区分当前/过去) + the-librarian (MMR + recency decay
-//! + brainstorm wildcards)。两个缺陷共用同一个后处理管线, 挂在 hybrid_search 输出端。
+//!    + brainstorm wildcards)。两个缺陷共用同一个后处理管线, 挂在 hybrid_search 输出端。
+//!
 //! 纯函数设计便于无 DB 单测。
 
 use super::nt_memory_embed::cosine_similarity;

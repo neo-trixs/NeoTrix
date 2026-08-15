@@ -165,7 +165,7 @@ impl SessionDigest {
     }
 
     /// 清出单个桶并生成 digest 摘要消息。
-    fn flush(&mut self, key: &(String, String), now: i64) {
+    fn flush(&mut self, key: &(String, String), now: i64) -> Option<SessionMessage> {
         if let Some(bucket) = self.buckets.remove(key) {
             let (session_id, topic) = key.clone();
             let digest_msg = SessionMessage::new(
@@ -190,6 +190,9 @@ impl SessionDigest {
                     last_content: digest_msg.content.clone(),
                 },
             );
+            Some(digest_msg)
+        } else {
+            None
         }
     }
 
@@ -201,11 +204,9 @@ impl SessionDigest {
             .filter(|k| now - self.buckets.get(*k).map(|b| b.last_ts).unwrap_or(now) > self.window_secs)
             .cloned()
             .collect();
-        let mut out = Vec::new();
-        for key in keys {
-            self.flush(&key, now);
-        }
-        out
+        keys.iter()
+            .filter_map(|key| self.flush(key, now))
+            .collect()
     }
 
     pub fn bucket_count(&self) -> usize {

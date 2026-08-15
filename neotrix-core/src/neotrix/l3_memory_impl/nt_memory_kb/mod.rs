@@ -32,6 +32,7 @@ pub mod nt_memory_diversity;
 pub mod nt_memory_curation;
 pub mod nt_memory_visibility;
 pub mod nt_memory_provenance;
+pub mod nt_temporal_audit;
 pub mod nt_memory_skill_cost;
 pub mod nt_memory_ingest;
 pub mod nt_memory_proficiency;
@@ -1727,6 +1728,24 @@ vsa_expander: RwLock::new(VsaAssociativeExpander::default()),
         let record = nt_memory_provenance::ProvenanceRecord::new(agent, activity, entity, outcome)
             .with_evidence(evidence);
         nt_memory_provenance::record_with_index(&conn, record)
+    }
+
+    /// G23 时序图审计 (opencontext 吸收): 记录一条带时序窗口 + 签名的
+    /// NT-SHIELD 审计事件, 供审计链回查 (篡改检测 + supersession 演化)。
+    /// 返回审计记录 id。
+    pub fn record_temporal_audit(
+        &self,
+        subject: &str,
+        action: &str,
+        detail: &str,
+        verdict: &str,
+        key: &[u8],
+    ) -> Result<String, String> {
+        let ledger = nt_temporal_audit::TemporalAuditLedger::open(Some(self.db_path.as_path()))?;
+        let mut rec = nt_temporal_audit::TemporalAuditRecord::new(subject, action, detail, verdict);
+        rec.sign(key);
+        ledger.append(&rec)?;
+        Ok(rec.id)
     }
 
     // ── Agent Memory ──

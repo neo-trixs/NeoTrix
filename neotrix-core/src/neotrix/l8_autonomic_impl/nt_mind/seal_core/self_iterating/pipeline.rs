@@ -1722,7 +1722,7 @@ impl BrainStage for HarnessAdaptStage {
             // 保底抬升是防能力归零的自我修正, 不是真实进化, 不应进入学习信号。
             let snap = brain._snapshot_capability();
             let mut new_snap = snap.clone();
-            for (_i, v) in new_snap.arr_mut().iter_mut().enumerate() {
+            for v in new_snap.arr_mut().iter_mut() {
                 if *v < 0.2 {
                     *v = (*v + boost).min(0.3);
                 }
@@ -2842,7 +2842,7 @@ impl BrainStage for SelfTestStage {
             }
             // T2.5: 自测失败必须改变行为, 不能只写日志。对本次演化施加负向奖励惩罚,
             // 使检测系统降级真实传导到演化信号 (而非静默 Continue)。
-            let degradation = ((total - passed) as f64 / total.max(1) as f64) * -1.0;
+            let degradation = -((total - passed) as f64 / total.max(1) as f64);
             let base = brain._reward();
             brain._set_reward(base + degradation);
         }

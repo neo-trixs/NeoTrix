@@ -287,15 +287,15 @@ impl GovernancePolicy {
         self
     }
 
-    pub fn allow(mut self, pattern: &str) -> Self {
+    pub fn allow(self, pattern: &str) -> Self {
         self.with_rule(pattern, GovernanceAction::Allow)
     }
 
-    pub fn deny(mut self, pattern: &str) -> Self {
+    pub fn deny(self, pattern: &str) -> Self {
         self.with_rule(pattern, GovernanceAction::Deny)
     }
 
-    pub fn require_approval(mut self, pattern: &str) -> Self {
+    pub fn require_approval(self, pattern: &str) -> Self {
         self.with_rule(pattern, GovernanceAction::RequireApproval)
     }
 

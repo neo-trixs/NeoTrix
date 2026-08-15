@@ -322,7 +322,7 @@ impl QTestIndex {
         let low_layer_triggered = closure.iter().any(|f| Self::is_low_layer(f));
 
         let mut entangled_files: BTreeSet<PathBuf> = BTreeSet::new();
-        for (tfile, _) in &self.tests_by_file {
+        for tfile in self.tests_by_file.keys() {
             if closure.contains(tfile) {
                 entangled_files.insert(tfile.clone());
                 continue;

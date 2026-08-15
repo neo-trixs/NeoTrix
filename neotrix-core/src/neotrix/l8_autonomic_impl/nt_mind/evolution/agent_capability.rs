@@ -242,7 +242,7 @@ impl RouteLearner {
                 .iter()
                 .min_by_key(|(_, attempts)| *attempts)
             {
-                return *least;
+                return least;
             }
         }
         // 全部已见臂都达标 → 利用成功率最高的档案。
@@ -454,13 +454,8 @@ impl DispatchTopology {
         } else {
             edges.insert(AttentionDomain::PatternMatch, "explorer");
         }
-        if lower.contains("review") || lower.contains("audit") || lower.contains("verify") {
-            edges.insert(AttentionDomain::SelfReflection, "verifier");
-            edges.insert(AttentionDomain::RiskAssessment, "verifier");
-        } else {
-            edges.insert(AttentionDomain::SelfReflection, "verifier");
-            edges.insert(AttentionDomain::RiskAssessment, "verifier");
-        }
+        edges.insert(AttentionDomain::SelfReflection, "verifier");
+        edges.insert(AttentionDomain::RiskAssessment, "verifier");
         edges.insert(AttentionDomain::Planning, "planner");
         edges.insert(AttentionDomain::GoalAlignment, "planner");
         edges.insert(AttentionDomain::Code, "generalist");
@@ -508,7 +503,7 @@ impl DispatchTopology {
                 if *candidate_rate > current_rate + 0.15 {
                     repairs.push(TopologyRepair {
                         domain: *domain,
-                        from_agent: *current,
+                        from_agent: current,
                         to_agent: candidate,
                         from_success_rate: current_rate,
                         to_success_rate: *candidate_rate,
@@ -561,7 +556,7 @@ impl DispatchTopology {
                 if candidate_mastery > current_mastery + 0.15 {
                     repairs.push(TopologyRepair {
                         domain: *domain,
-                        from_agent: *current,
+                        from_agent: current,
                         to_agent: candidate,
                         from_success_rate: current_mastery,
                         to_success_rate: candidate_mastery,
@@ -1019,6 +1014,7 @@ impl MetaAgentShell {
 ///   - 监控/心跳/巩固       → Semantic (记忆/巩固)
 ///   - 审查/校验/回滚       → RiskAssessment + SelfReflection (把关)
 ///   - 默认                 → SelfReflection (轻量自省, 兜底)
+///
 /// 返回 (域, 刺激强度) 列表; 空文本时只给弱自省, 防空转。
 pub fn domains_for_goal(goal: &str) -> Vec<(AttentionDomain, f64)> {
     let lower = goal.to_lowercase();

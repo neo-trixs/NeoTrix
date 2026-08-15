@@ -54,7 +54,7 @@ impl ConsciousnessTreeImpl {
     }
 
     pub fn get_state(&self) -> ConsciousnessState {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let branches: Vec<BranchState> = inner.branches.values().cloned().collect();
         let overall_health = branches.iter().map(|b| b.health).sum::<f32>() / branches.len() as f32;
         ConsciousnessState {
@@ -103,7 +103,7 @@ impl ConsciousnessTreeImpl {
     }
 
     pub fn trigger_meta_cognition(&self) -> ConsciousnessState {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         let stages = ["Soil", "Roots", "Trunk", "Branches", "Fruits", "Core"];
         let current = stages.iter().position(|s| *s == inner.stage).unwrap_or(2);
         inner.stage = stages[(current + 1) % 6].to_string();
@@ -139,11 +139,11 @@ impl ConsciousnessTreeImpl {
     }
 
     pub fn get_branch(&self, branch_id: &str) -> Result<BranchState, NeoTrixError> {
-        self.inner.read().unwrap().branches.get(branch_id).cloned().ok_or(NeoTrixError::NotFound)
+        self.inner.read().expect("ffi rwlock poisoned").branches.get(branch_id).cloned().ok_or(NeoTrixError::NotFound)
     }
 
     pub fn update_branch_health(&self, branch_id: &str, health: f32, metrics: HashMap<String, f32>) -> bool {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         if let Some(branch) = inner.branches.get_mut(branch_id) {
             // RLMF 元认知校准 (arXiv:2606.32032): 高置信错误 (高 ECE / 高置信错误率)
             // 的模块健康分被惩罚 — 错误自信比低分更危险, 自愈应优先处理。
@@ -159,7 +159,7 @@ impl ConsciousnessTreeImpl {
     }
 
     pub fn get_evolution_history(&self, limit: u32) -> Vec<EvolutionEvent> {
-        self.inner.read().unwrap().history.iter().rev().take(limit as usize).cloned().collect()
+        self.inner.read().expect("ffi rwlock poisoned").history.iter().rev().take(limit as usize).cloned().collect()
     }
 }
 

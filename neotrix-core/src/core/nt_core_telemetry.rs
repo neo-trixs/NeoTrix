@@ -521,7 +521,7 @@ impl crate::core::nt_core_self_test::SelfTest for AnomalyDetector {
     fn self_test(&self) -> Result<(), Vec<String>> {
         let mut failures = Vec::new();
         // Stable baseline then a spike must be flagged.
-        let mut d = AnomalyDetector::default();
+        let d = AnomalyDetector::default();
         for i in 0..10 {
             let v = if i == 9 { 50.0 } else { 1.0 };
             if let Some(a) = d.observe("probe", v) {
@@ -531,7 +531,7 @@ impl crate::core::nt_core_self_test::SelfTest for AnomalyDetector {
             }
         }
         // Fresh metric: 5 warmup samples → stable → spike → drop.
-        let mut d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
         for _ in 0..5 {
             d.observe("m", 1.0);
         }

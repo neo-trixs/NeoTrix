@@ -26,6 +26,21 @@ pub fn neotrix_mcp_tools() -> Vec<McpToolDef> {
             input_schema: serde_json::json!({"type": "object", "properties": {"task": {"type": "string"}}}),
             schema_version: None,
         },
+        McpToolDef {
+            name: "neotrix_code_graph".into(),
+            description: "Deterministic code-graph retrieval (G1, codebase-memory-mcp): search symbols, file stats, graph topology, get node".into(),
+            server_name: "built-in".into(),
+            transport: McpTransport::Local {
+                command: "neotrix".into(),
+                args: vec!["code-graph".into()],
+            },
+            input_schema: serde_json::json!({"type": "object", "properties": {
+                "action": {"type": "string", "enum": ["search_symbols", "file_stats", "graph_topology", "get_node"]},
+                "query": {"type": "string"},
+                "root": {"type": "string"}
+            }, "required": ["action"]}),
+            schema_version: None,
+        },
     ]
 }
 

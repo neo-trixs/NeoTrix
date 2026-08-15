@@ -501,7 +501,7 @@ pub struct InternalExecutionResult {
 /// 按标点/换行切分指令, 逐段匹配能力路由表; 命中即产出子任务。
 pub fn decompose_instruction(instruction: &str) -> Vec<ConsciousTask> {
     let segments: Vec<&str> = instruction
-        .split(|c: char| c == '。' || c == '；' || c == ';' || c == '\n' || c == '，' || c == ',')
+        .split(['。', '；', ';', '\n', '，', ','])
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .collect();
@@ -790,7 +790,7 @@ fn dispatch_internal_capability(task: &ConsciousTask) -> (bool, String) {
                 .iter()
                 .map(|w| w.trim_matches('"').trim_matches('，').trim_matches(','))
                 .find(|w| w.contains('/') || w.contains('\\'))
-                .map(|w| std::path::PathBuf::from(w))
+                .map(std::path::PathBuf::from)
                 .or_else(|| {
                     std::env::var("HOME")
                         .ok()

@@ -75,6 +75,7 @@ pub fn render_session_list(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &
 /// - assistant: `assistant` 标签 + 工具调用折叠行 + thinking 折叠 + markdown 正文
 /// - system/error: 特殊样式
 /// - 目标状态内联（有 goal 时顶部一行）
+///
 /// 对 Line 的所有 Span 应用背景色（用于消息气泡效果）。
 fn apply_bg(line: Line, bg: Color) -> Line {
     Line::from(line.spans.into_iter().map(|span| {
@@ -471,7 +472,7 @@ pub fn render_status_bar(frame: &mut Frame, area: Rect, app: &TuiApp, theme: &Th
 
     // 右段：模型 / 会话 / token / context / 费用
     let model_info = app.streaming_model.as_deref()
-        .map(|m| format!("{}", m))
+        .map(|m| m.to_string())
         .unwrap_or_else(|| app.sessions[app.active_session].messages.iter()
             .rev().find(|m| m.role == "assistant" && m.model.is_some())
             .and_then(|m| m.model.clone())

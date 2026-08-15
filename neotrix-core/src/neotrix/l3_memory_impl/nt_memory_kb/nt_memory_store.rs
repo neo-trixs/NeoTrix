@@ -502,6 +502,7 @@ pub fn insert_or_get_node(
 
 /// upsert_edge 的 metadata 增强版 (T0.1 类型化边, 来源: codebase-memory-mcp 类型化边
 /// + semantica PROV-O 溯源)。metadata 承载结构化溯源 (evidence/source/extractor),
+///
 /// 使 edges 具备"证据优先"的机器可查版本, 而非只塞进 description。
 pub fn upsert_edge_full(
     conn: &Connection,

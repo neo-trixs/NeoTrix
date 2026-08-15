@@ -49,11 +49,11 @@ impl DualSpecializationImpl {
     }
 
     pub fn get_state(&self) -> SpecializationState {
-        self.inner.read().unwrap().state.clone()
+        self.inner.read().expect("ffi rwlock poisoned").state.clone()
     }
 
     pub fn switch_set(&self, set_id: u8) -> Result<SpecializationState, NeoTrixError> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         let now = now_ms();
         if now - inner.state.last_switch < inner.state.switch_cooldown_ms as i64 {
             return Err(NeoTrixError::OperationFailed);
@@ -67,14 +67,14 @@ impl DualSpecializationImpl {
     }
 
     pub fn configure_set(&self, set_id: u8, config: WeaponSet) -> Result<WeaponSet, NeoTrixError> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         let set = inner.state.sets.iter_mut().find(|s| s.set_id == set_id).ok_or(NeoTrixError::NotFound)?;
         *set = config;
         Ok(set.clone())
     }
 
     pub fn recommend_set(&self, task_type: &str) -> u8 {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         match task_type {
             "acquisition" | "crawling" | "research" | "exploration" => 1,
             "evolution" | "learning" | "distillation" | "absorption" => 2,

@@ -39,7 +39,7 @@ impl SkillTreeImpl {
     }
 
     pub fn get_state(&self) -> SkillTreeState {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         SkillTreeState {
             nodes: inner.nodes.clone(),
             allocated_points: inner.allocated,
@@ -49,7 +49,7 @@ impl SkillTreeImpl {
     }
 
     pub fn allocate_point(&self, node_id: &str) -> Result<SkillNode, NeoTrixError> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         if inner.available == 0 {
             return Err(NeoTrixError::OperationFailed);
         }
@@ -68,7 +68,7 @@ impl SkillTreeImpl {
     }
 
     pub fn respec(&self) -> SkillTreeState {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         for node in inner.nodes.iter_mut() {
             node.unlocked = false;
             node.progress = 0.0;
@@ -84,11 +84,11 @@ impl SkillTreeImpl {
     }
 
     pub fn get_node(&self, node_id: &str) -> Result<SkillNode, NeoTrixError> {
-        self.inner.read().unwrap().nodes.iter().find(|n| n.id == node_id).cloned().ok_or(NeoTrixError::NotFound)
+        self.inner.read().expect("ffi rwlock poisoned").nodes.iter().find(|n| n.id == node_id).cloned().ok_or(NeoTrixError::NotFound)
     }
 
     pub fn is_constellation_active(&self, constellation: &str) -> bool {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let constellation_level = constellation[1..].parse::<u8>().unwrap_or(0);
         let total = inner.nodes.iter().filter(|n| n.unlocked).count() as u8;
         total >= constellation_level

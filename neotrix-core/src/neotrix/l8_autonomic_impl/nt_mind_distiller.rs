@@ -476,10 +476,7 @@ impl CommandDistiller {
             let is_error = Self::is_error_line(l);
             let is_head = i < 8;
             let is_tail = i + 12 >= lines.len();
-            if is_error {
-                kept.push(l);
-                blank_run = 0;
-            } else if is_head || is_tail || blank_run <= 1 {
+            if is_error || is_head || is_tail || blank_run <= 1 {
                 kept.push(l);
                 blank_run = 0;
             } else {

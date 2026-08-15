@@ -30,7 +30,7 @@ impl KBBridgeImpl {
     }
 
     pub fn query(&self, q: KBQuery) -> Vec<KBResult> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let lower = q.query.to_lowercase();
         let mut results: Vec<KBResult> = inner
             .nodes
@@ -52,7 +52,7 @@ impl KBBridgeImpl {
         if content.is_empty() {
             return Err(NeoTrixError::InvalidInput);
         }
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         let id = format!("{}-{}", namespace, inner.nodes.len() + 1);
         let embedding = HyperVector {
             dimensions: 1024,
@@ -73,7 +73,7 @@ impl KBBridgeImpl {
     }
 
     pub fn get_stats(&self) -> KBStats {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let mut namespaces = HashMap::new();
         for node in inner.nodes.values() {
             *namespaces.entry(node.namespace.clone()).or_insert(0u64) += 1;
@@ -88,7 +88,7 @@ impl KBBridgeImpl {
     }
 
     pub fn semantic_search(&self, query: &str, namespace: &str, limit: u32) -> Vec<KBResult> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let q_vec = hash_to_bytes(query);
         let mut scored: Vec<(f32, KBResult)> = inner
             .nodes
@@ -108,7 +108,7 @@ impl KBBridgeImpl {
     }
 
     pub fn get_related(&self, concept_id: &str, limit: u32) -> Vec<KBResult> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let base = match inner.nodes.get(concept_id) {
             Some(n) => n,
             None => return Vec::new(),
@@ -128,7 +128,7 @@ impl KBBridgeImpl {
     }
 
     pub fn run_absorption(&self) -> AbsorptionProgress {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         AbsorptionProgress {
             pending: 0,
             in_progress: 0,

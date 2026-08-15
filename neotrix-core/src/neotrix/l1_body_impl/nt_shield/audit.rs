@@ -661,7 +661,7 @@ impl CitationAudit {
                         line: i + 1,
                         detail: "URL 非 https 或缺少域名".to_string(),
                     });
-                } else if !ref_urls.contains(&u) && ref_urls.len() > 0 {
+                } else if !ref_urls.contains(&u) && !ref_urls.is_empty() {
                     // URL 未出现在参考列表 → 计入未验证
                     total += 1;
                     unverified += 1;

@@ -175,7 +175,7 @@ impl SearchSkillStage {
         // 简化：将 FetchResult 转为 SearchResult
         let raw_results: Vec<SearchResult> = crawl_results.into_iter().map(|r| SearchResult {
             url: r.url.clone(),
-            title: r.url.split('/').last().unwrap_or("result").to_string(),
+            title: r.url.split('/').next_back().unwrap_or("result").to_string(),
             snippet: r.text.as_deref().unwrap_or("").chars().take(300).collect(),
             source_type: "web".into(),
             credibility: if r.is_success() { 0.8 } else { 0.1 },

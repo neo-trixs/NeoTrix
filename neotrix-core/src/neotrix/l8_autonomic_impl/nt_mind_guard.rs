@@ -143,17 +143,9 @@ pub struct KbGuardReport {
 }
 
 /// KB 守卫: 备份/校验/恢复
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct KbGuard {
     config: KbGuardConfig,
-}
-
-impl Default for KbGuard {
-    fn default() -> Self {
-        Self {
-            config: KbGuardConfig::default(),
-        }
-    }
 }
 
 impl KbGuard {
@@ -893,7 +885,7 @@ fn temp_mape_dir() -> PathBuf {
         "neotrix-mape-{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("now is after UNIX_EPOCH")
             .as_nanos()
     ))
 }

@@ -27,6 +27,12 @@ pub struct E8Predictor {
     pub transition_counts: Vec<Vec<u64>>,
 }
 
+impl Default for E8Predictor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl E8Predictor {
     /// 创建新的 E8 预测器 (内部使用，load/persist 接口由外部调用)
     pub fn new() -> Self {

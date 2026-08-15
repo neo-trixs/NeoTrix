@@ -582,7 +582,7 @@ impl SkillEngine {
         let mut categories: HashMap<String, usize> = HashMap::new();
         let mut roots = 0usize;
         let mut orphans = 0usize;
-        let mut max_depth = 0usize;
+        let max_depth;
         let mut depth: HashMap<String, usize> = HashMap::new();
 
         for s in &self.skills {
@@ -595,13 +595,13 @@ impl SkillEngine {
             let mut changed = false;
             for s in &self.skills {
                 if s.parent.is_empty() {
-                    if depth.insert(s.name.clone(), 0).map_or(true, |old| old != 0) {
+                    if depth.insert(s.name.clone(), 0).is_none_or(|old| old != 0) {
                         changed = true;
                     }
                 } else {
                     if let Some(pd) = depth.get(&s.parent).copied() {
                         let d = pd + 1;
-                        if depth.insert(s.name.clone(), d).map_or(true, |old| old != d) {
+                        if depth.insert(s.name.clone(), d).is_none_or(|old| old != d) {
                             changed = true;
                         }
                     }

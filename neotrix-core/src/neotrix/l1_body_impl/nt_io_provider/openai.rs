@@ -24,7 +24,7 @@ impl OpenAiProvider {
 
     fn build_body(&self, request: &LlmRequest, stream: bool) -> serde_json::Value {
         let messages: Vec<serde_json::Value> = request.messages.iter()
-            .map(|m| serialize_message(m))
+            .map(serialize_message)
             .collect();
 
         let mut body = serde_json::json!({

@@ -137,7 +137,7 @@ fn chain_absorb(args: &[String], want_json: bool) -> CommandOutput {
 
 /// 变更审查链路: git 状态 → diff 统计 → 静态审查 → 建议
 fn chain_review(args: &[String], want_json: bool) -> CommandOutput {
-    let path = args.iter().filter(|a| *a != "--json").next().cloned().unwrap_or_default();
+    let path = args.iter().find(|a| *a != "--json").cloned().unwrap_or_default();
 
     // ① git 状态
     let status_out = std::process::Command::new("git")
@@ -183,7 +183,7 @@ fn chain_review(args: &[String], want_json: bool) -> CommandOutput {
         risks.push("未发现明显风险模式");
     }
 
-    let steps = vec![
+    let steps = [
         format!("① git 状态 → {} 个变更文件", changed),
         format!("② diff 统计 → {} 个差异块", diff_lines),
         format!("③ 静态审查 → {}", risks.join("; ")),
@@ -225,7 +225,7 @@ fn chain_status(want_json: bool) -> CommandOutput {
     // ④ board 状态
     let board_stats = "看板就绪 (/board list 查看)".to_string();
 
-    let steps = vec![
+    let steps = [
         format!("① {}", brain_stats),
         format!("② {}", kb_stats),
         format!("③ {}", goal_stats),

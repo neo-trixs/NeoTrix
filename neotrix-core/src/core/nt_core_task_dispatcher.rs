@@ -289,7 +289,7 @@ impl TaskDecomposerDispatcher {
                     task,
                     suggestion,
                     i,
-                    &crt_plan,
+                    crt_plan,
                 ).await?;
                 sub_tasks.push(sub_task);
             }
@@ -611,7 +611,7 @@ Output your result for this subtask only."#,
         let outcome_state = if result.is_ok() { predicted_next } else { current_state };
         let actual_trace = vec![current_state, outcome_state];
         predictor.observe_trace(&actual_trace);
-        let _ = predictor_persist(&predictor);
+        predictor_persist(&predictor);
 
         let duration = SystemTime::now().duration_since(start).unwrap_or_default().as_millis() as u64;
 

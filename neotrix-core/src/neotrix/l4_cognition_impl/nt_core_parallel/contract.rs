@@ -153,12 +153,12 @@ impl TaskContract {
         if self.state.is_terminal() {
             return false; // 终态不可再迁移
         }
-        match (self.state, next) {
-            (ContractState::Defined, ContractState::Accepted | ContractState::Cancelled | ContractState::Failed) => true,
-            (ContractState::Accepted, ContractState::InFlight | ContractState::Cancelled | ContractState::Failed) => true,
-            (ContractState::InFlight, ContractState::Done | ContractState::DoneLate | ContractState::Failed | ContractState::Cancelled) => true,
-            _ => false,
-        }
+        matches!(
+            (self.state, next),
+            (ContractState::Defined, ContractState::Accepted | ContractState::Cancelled | ContractState::Failed)
+                | (ContractState::Accepted, ContractState::InFlight | ContractState::Cancelled | ContractState::Failed)
+                | (ContractState::InFlight, ContractState::Done | ContractState::DoneLate | ContractState::Failed | ContractState::Cancelled)
+        )
     }
 
     /// 从 TodoTask 生成契约 (复用已有拆解数据类型)

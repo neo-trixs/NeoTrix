@@ -102,7 +102,7 @@ pub fn decompose_query(query: &str) -> Decomposition {
                 && w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
                 && w.len() >= 2
                 && !["The", "This", "That", "What", "Why", "How", "When", "Where", "Compare", "Between", "Explain"]
-                    .contains(&w)
+                    .contains(w)
         })
         .map(|w| w.to_string())
         .collect();

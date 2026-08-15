@@ -41,7 +41,7 @@ impl CommCmd {
     }
 
     fn fetch(args: &[String]) -> CommandOutput {
-        let url = args.get(0).map(|s| s.as_str()).unwrap_or("");
+        let url = args.first().map(|s| s.as_str()).unwrap_or("");
         if url.is_empty() {
             return CommandOutput::err("Usage: /comm fetch <url> [persona_key]");
         }

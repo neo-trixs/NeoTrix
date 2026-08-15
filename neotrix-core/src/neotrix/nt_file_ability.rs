@@ -782,7 +782,7 @@ pub fn route_attention(e8_state: ReasoningHexagram) -> (SpecialistType, u32, Rea
     for (idx, st) in states.iter().enumerate() {
         let strength = e8_state.resonance_strength(st);
         let t = specialist_index_inv(idx);
-        if best.as_ref().map_or(true, |(_, s, _)| strength > *s) {
+        if best.as_ref().is_none_or(|(_, s, _)| strength > *s) {
             best = Some((t, strength, *st));
         }
     }
@@ -1998,7 +1998,7 @@ pub fn merge_tables_with(
     report.output = output.as_ref().display().to_string();
 
     // 输出数据校验 (阶段2): 数字列非数值 → validation_warnings
-    for (ci, (col, ctype)) in schema.column_types.iter().enumerate() {
+    for (_, (col, ctype)) in schema.column_types.iter().enumerate() {
         if *ctype != ColumnType::Numeric {
             continue;
         }

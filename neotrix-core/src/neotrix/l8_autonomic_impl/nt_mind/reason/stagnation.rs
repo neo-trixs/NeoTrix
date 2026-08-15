@@ -538,6 +538,7 @@ impl StagnationDetector {
     ///   2. Escalate (ReflexGrad 慢进程: m 次连续低分 → 因果重规划)
     ///   3. Cyclic (L2 循环)
     ///   4. Stalling (L1 环增益衰减)
+    ///
     /// 设计为"护栏+引导": 返回洞察供调用方打印, 不阻断执行。
     pub fn observe_stage(&mut self, stage_name: &str, produced: bool) -> StageInsight {
         const WINDOW: usize = 12; // 与 step-budget windowSize*1.2 对齐
@@ -671,6 +672,7 @@ impl StagnationDetector {
     /// 两个条件同时满足才触发, 避免误杀"偶发升级但产出正常"的 pipeline:
     ///   - escalation_streak >= 6 (ESCALATE 级)
     ///   - committed_validity < ABORT_VALIDITY_FLOOR (持续无产出, 证据不信任)
+    ///
     /// ABORT_VALIDITY_FLOOR = 0.3: 连续 ~4 次无产出投票后衰减到达 (0.7^4 ≈ 0.24)。
     pub fn should_abort(&self) -> bool {
         const ABORT_VALIDITY_FLOOR: f64 = 0.3;

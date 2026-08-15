@@ -27,7 +27,7 @@ pub struct SEALPipelineImpl {
 impl Clone for SEALPipelineImpl {
     fn clone(&self) -> Self {
         Self {
-            inner: RwLock::new(self.inner.read().unwrap().clone()),
+            inner: RwLock::new(self.inner.read().expect("ffi rwlock poisoned").clone()),
         }
     }
 }
@@ -68,11 +68,11 @@ impl SEALPipelineImpl {
     }
 
     pub fn get_status(&self) -> PipelineStatus {
-        self.inner.read().unwrap().status.clone()
+        self.inner.read().expect("ffi rwlock poisoned").status.clone()
     }
 
     pub fn run_cycle(&self) -> PipelineStatus {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         inner.status.cycle_count += 1;
         inner.status.last_completed_cycle = now_ms();
 
@@ -87,17 +87,17 @@ impl SEALPipelineImpl {
     }
 
     pub fn run_stage(&self, stage_id: &str) -> PipelineStage {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         run_stage_inner(&mut inner, stage_id);
         inner.status.stages.iter().find(|s| s.stage_id == stage_id).cloned().unwrap()
     }
 
     pub fn get_exploration_results(&self) -> ExplorationResult {
-        self.inner.read().unwrap().exploration.clone()
+        self.inner.read().expect("ffi rwlock poisoned").exploration.clone()
     }
 
     pub fn trigger_distillation(&self) -> DistillationResult {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         // 真实值来自已发生的探索结果; 无探索数据则不伪造蒸馏产出。
         DistillationResult {
             patterns_extracted: inner.exploration.patterns.len() as u32,
@@ -108,7 +108,7 @@ impl SEALPipelineImpl {
     }
 
     pub fn get_absorption_progress(&self) -> AbsorptionProgress {
-        self.inner.read().unwrap().absorption.clone()
+        self.inner.read().expect("ffi rwlock poisoned").absorption.clone()
     }
 }
 

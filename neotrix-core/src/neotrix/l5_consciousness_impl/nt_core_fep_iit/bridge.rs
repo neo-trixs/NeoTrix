@@ -422,6 +422,7 @@ impl FEPIITBridge {
     ///   - info_gain = 动作 belief 与观测的差异度 (1 - cosine), 差异大 = 未知 = 值得探索
     ///   - epistemic_scale = 0 → 纯利用 (退化为 min-FE 反应式)
     ///   - epistemic_scale > 0 → 探索-利用平衡, 主动采样未知状态
+    ///
     /// 让 NT-CORE 从"响应输入"变为"主动提问/主动探索"。
     pub fn efe_action_selection(
         &self,
@@ -459,6 +460,7 @@ impl FEPIITBridge {
     /// 因此:
     ///   - scale=0 → 纯利用: EFE = 1-sqrt(K/DIM), 选 K 最大 = 最强域 (强化已知)
     ///   - scale>1 → 主动探索: EFE = (1-scale)(1-sqrt(K/DIM)) 最负, 选 K 最小 = 最未知域
+    ///
     /// 返回被选中的域索引; 空输入返回 None。
     pub fn efe_select_domain(
         &self,

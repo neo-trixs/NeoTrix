@@ -916,6 +916,7 @@ impl ConsciousnessTree {
     /// - 默认 (kb_node_count=0): 返回 1.0, 不衰减, 不破坏既有果实生长路径;
     /// - 社区数据集落盘后 (kb_node_count 显著上升): 因子 >1.0, 放大果实 quality,
     ///   使意识核心进化果实质量直接反映 200G 社区推理数据的养料充足度。
+    ///
     /// 饱和曲线: 1.0 + min(kb_nodes / 1000, 0.5) — 1000 节点以上达到 +50% 上限。
     ///
     /// 养料融合扩展 (记忆知识库 + 对话 + 经验): 在 KB 节点养料基础上叠加
@@ -950,6 +951,7 @@ impl ConsciousnessTree {
     /// - drift 检测 → fruit_growth_health 下调 (放宽生长门加速恢复, -0.05, 下限 0.4)
     /// - 演化预测利多 (direction>0) → exploration_budget 上调 (加大探索, +0.05, 上限 0.4)
     /// - 演化预测利空 (direction<0) → exploration_budget 下调 (收缩探索, -0.05, 下限 0.1)
+    ///
     /// 使树根据自身进化结果调整进化策略, 形成闭环而非开环。
     pub fn apply_evolution_feedback(&mut self) {
         let fulfilled = self.core.contract_fulfillment.as_ref().map(|f| f.fulfilled).unwrap_or(false);
@@ -1297,6 +1299,7 @@ impl ConsciousnessTree {
     ///   - 谐振活跃度: resonance_cycle 推进量
     ///   - 治理合规: governance_compliance 对规则执行一致性
     ///   - 生产验证度: 低迷雾 (weighted_fog_sum 归一化) 越高越相干
+    ///
     /// 结果钳制到 [0,1], 运行时情绪报告仍可作为主观调制叠加。
     pub fn compute_coherence(&self) -> f64 {
         let healths: Vec<f64> = self
@@ -1559,7 +1562,7 @@ impl ConsciousnessTree {
             engine.ingest_signed_event(
                 "consciousness_tree",
                 "branch_health",
-                &branch.kind.label(),
+                branch.kind.label(),
                 fog_impact + fruit_impact,
                 if fog_impact + fruit_impact >= 0.0 { 1.0 } else { -1.0 },
             );

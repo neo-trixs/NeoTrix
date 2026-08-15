@@ -104,6 +104,7 @@ impl Default for ScraperConfig {
             max_retries: 3,
             profile_name: None,
             use_tiny_profile: true,
+            stealth_params: StealthParams::default(),
         }
     }
 }
@@ -216,11 +217,15 @@ impl BrowserScraper {
 
 pub struct RequestScraper {
     config: ScraperConfig,
+    request_seq: u32,
 }
 
 impl RequestScraper {
     pub fn new(config: ScraperConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            request_seq: 0,
+        }
     }
 
     fn build_client(&self) -> reqwest::blocking::Client {
@@ -239,6 +244,17 @@ impl RequestScraper {
             .unwrap_or_else(|| AntiDetect::new_with_defaults().random_ua().to_string());
         if let Ok(h) = ua.parse::<reqwest::header::HeaderValue>() {
             headers.insert(reqwest::header::USER_AGENT, h);
+        }
+        // G22 隐身参数集: 轮换 header 变体 (若配置非空)
+        if let Some(variant) = self.config.stealth_params.headers_for(self.request_seq) {
+            for (k, v) in variant {
+                if let Ok(h) = v.parse::<reqwest::header::HeaderValue>() {
+                    headers.insert(
+                        reqwest::header::HeaderName::from_bytes(k.as_bytes()).unwrap_or_else(|_| reqwest::header::HeaderName::from_static("X-Stealth")),
+                        h,
+                    );
+                }
+            }
         }
 
         let mut builder = reqwest::blocking::Client::builder()
@@ -261,10 +277,25 @@ impl RequestScraper {
         }
     }
 
-    fn fetch(&self, url: &str, referer: Option<&str>) -> ScrapeResult {
+    fn fetch(&mut self, url: &str, referer: Option<&str>) -> ScrapeResult {
+        // G22 隐身参数集: 请求间隔 (含抖动) + referer 轮换 + 代理轮换边界。
+        self.request_seq = self.request_seq.wrapping_add(1);
+        let seq = self.request_seq;
+        if self.config.stealth_params.enabled {
+            let delay = self.config.stealth_params.interval_for();
+            if !delay.is_zero() {
+                std::thread::sleep(delay);
+            }
+            if self.config.stealth_params.should_rotate_proxy(seq) {
+                log::trace!("[scrape] stealth: rotating proxy at request {}", seq);
+            }
+        }
+        let effective_referer = referer
+            .map(|s| s.to_string())
+            .or_else(|| self.config.stealth_params.referer_for(seq));
         let client = self.build_client();
         let mut req = client.get(url);
-        if let Some(r) = referer {
+        if let Some(r) = &effective_referer {
             req = req.header(reqwest::header::REFERER, r);
         }
         match req.send() {
@@ -303,13 +334,20 @@ impl RequestScraper {
         }
     }
 
-    pub fn get(&self, url: &str) -> ScrapeResult {
+    pub fn get(&mut self, url: &str) -> ScrapeResult {
         self.fetch(url, None)
     }
 
     /// SessionPool 身份注入抓取: 用指定 UA + Cookie 请求 (crawlee SessionPool 技术接线)。
     /// 允许 caller 轮换会话身份, 单会话被站点封禁时不影响其它会话。
-    pub fn get_with_identity(&self, url: &str, user_agent: &str, cookie_str: &str) -> ScrapeResult {
+    pub fn get_with_identity(&mut self, url: &str, user_agent: &str, cookie_str: &str) -> ScrapeResult {
+        self.request_seq = self.request_seq.wrapping_add(1);
+        if self.config.stealth_params.enabled {
+            let delay = self.config.stealth_params.interval_for();
+            if !delay.is_zero() {
+                std::thread::sleep(delay);
+            }
+        }
         let client = self.build_client_with_identity(user_agent, cookie_str);
         match client.get(url).send() {
             Ok(resp) => {
@@ -385,7 +423,7 @@ impl RequestScraper {
         }
     }
 
-    pub fn google_get(&self, url: &str) -> ScrapeResult {
+    pub fn google_get(&mut self, url: &str) -> ScrapeResult {
         self.fetch(url, Some("https://www.google.com/"))
     }
 }
@@ -427,6 +465,216 @@ impl AntiDetect {
             ],
         }
     }
+}
+
+// ────────────────────────────────────────────────────────────────
+// G21 Design Token Extraction (dembrandt 吸收) —
+// 从 HTML/页面提取设计令牌 (颜色/字体/间距), 供 NT-IO web 前端消费
+// ────────────────────────────────────────────────────────────────
+
+/// 提取到的设计令牌。
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DesignTokenSet {
+    /// 十六进制颜色列表 (去重, 保持出现顺序)。
+    pub colors: Vec<String>,
+    /// CSS 颜色名 → 计数 (常见具名色)。
+    pub named_colors: Vec<(String, usize)>,
+    /// font-family 声明 (去重)。
+    pub fonts: Vec<String>,
+    /// font-size 值 (px)。
+    pub font_sizes: Vec<String>,
+    /// spacing / padding / margin 值 (px)。
+    pub spacings: Vec<String>,
+}
+
+/// 设计令牌提取器 — 从 HTML 文档 (含 `<style>` 与内联 `style="..."`) 中
+/// 提取设计令牌 (dembrandt 思路: 视觉风格自动发现)。
+pub struct DesignTokenExtractor;
+
+impl DesignTokenExtractor {
+    /// 从 HTML 文本提取设计令牌。
+    pub fn extract(html: &str) -> DesignTokenSet {
+        let mut tokens = DesignTokenSet::default();
+        // 1. <style> 块
+        for style_block in Self::capture_style_blocks(html) {
+            Self::scan_css(&style_block, &mut tokens);
+        }
+        // 2. 内联 style="..."
+        for inline in Self::capture_inline_styles(html) {
+            Self::scan_css(&inline, &mut tokens);
+        }
+        Self::dedup(&mut tokens);
+        tokens
+    }
+
+    /// 提取 `<style>...</style>` 块。
+    fn capture_style_blocks(html: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut rest = html;
+        while let Some(start) = rest.find("<style") {
+            let after = &rest[start..];
+            let open = after.find('>').map(|i| i + 1).unwrap_or(after.len());
+            let body = &after[open..];
+            match body.find("</style") {
+                Some(end) => {
+                    out.push(body[..end].to_string());
+                    rest = &body[end..];
+                }
+                None => break,
+            }
+        }
+        out
+    }
+
+    /// 捕获内联 `style="..."` 属性。
+    fn capture_inline_styles(html: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut rest = html;
+        while let Some(start) = rest.find("style=") {
+            let after = &rest[start + 6..];
+            let end = after
+                .find('"')
+                .and_then(|i| after[i + 1..].find('"'))
+                .map(|i| i + 1);
+            match end {
+                Some(e) => {
+                    out.push(after[..e].to_string());
+                    rest = &after[e..];
+                }
+                None => break,
+            }
+        }
+        out
+    }
+
+    /// 扫描 CSS 文本填充令牌。
+    fn scan_css(css: &str, tokens: &mut DesignTokenSet) {
+        for line in css.split([';', '{', '}']) {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            // 颜色: #hex 与 rgb/rgba
+            if let Some(h) = find_hex_color(line) {
+                if !tokens.colors.contains(&h) {
+                    tokens.colors.push(h);
+                }
+            }
+            if line.contains("color") && (line.contains("rgb") || line.contains("hsl")) {
+                let c = line.trim().to_string();
+                if !tokens.colors.contains(&c) {
+                    tokens.colors.push(c);
+                }
+            }
+            // 具名颜色
+            for name in ["red", "blue", "green", "black", "white", "gray", "orange", "purple"] {
+                if line.contains(name) && (line.contains("color:") || line.contains("background")) {
+                    if let Some(e) = tokens.named_colors.iter_mut().find(|(n, _)| n == name) {
+                        e.1 += 1;
+                    } else {
+                        tokens.named_colors.push((name.to_string(), 1));
+                    }
+                }
+            }
+            // font-family
+            if line.contains("font-family") {
+                let f = line.trim().to_string();
+                if !tokens.fonts.contains(&f) {
+                    tokens.fonts.push(f);
+                }
+            }
+            // font-size (px)
+            if line.contains("font-size") {
+                if let Some(v) = extract_px(line) {
+                    if !tokens.font_sizes.contains(&v) {
+                        tokens.font_sizes.push(v);
+                    }
+                }
+            }
+            // spacing / padding / margin (px)
+            if (line.contains("spacing") || line.contains("padding") || line.contains("margin"))
+                && line.contains(":")
+            {
+                if let Some(v) = extract_px(line) {
+                    if !tokens.spacings.contains(&v) {
+                        tokens.spacings.push(v);
+                    }
+                }
+            }
+        }
+    }
+
+    /// 去重 + 排序具名色。
+    fn dedup(tokens: &mut DesignTokenSet) {
+        tokens.colors.sort();
+        tokens.colors.dedup();
+        tokens.fonts.sort();
+        tokens.fonts.dedup();
+        tokens.font_sizes.sort_by(|a, b| {
+            let an: f64 = a.trim_end_matches("px").parse().unwrap_or(0.0);
+            let bn: f64 = b.trim_end_matches("px").parse().unwrap_or(0.0);
+            an.partial_cmp(&bn).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        tokens.font_sizes.dedup();
+        tokens.spacings.sort_by(|a, b| {
+            let an: f64 = a.trim_end_matches("px").parse().unwrap_or(0.0);
+            let bn: f64 = b.trim_end_matches("px").parse().unwrap_or(0.0);
+            an.partial_cmp(&bn).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        tokens.spacings.dedup();
+        tokens.named_colors.sort_by(|a, b| b.1.cmp(&a.1));
+    }
+
+    /// 简单可统计性: 令牌计数摘要。
+    pub fn summarize(tokens: &DesignTokenSet) -> String {
+        format!(
+            "{} colors, {} fonts, {} font-sizes, {} spacings",
+            tokens.colors.len(),
+            tokens.fonts.len(),
+            tokens.font_sizes.len(),
+            tokens.spacings.len()
+        )
+    }
+}
+
+/// 从一行 CSS 提取形如 `#fff` / `#a1b2c3` 的十六进制色。
+fn find_hex_color(line: &str) -> Option<String> {
+    let bytes: Vec<char> = line.chars().collect();
+    for (i, c) in bytes.iter().enumerate() {
+        if *c == '#' {
+            let mut hex = String::new();
+            for c2 in bytes[i + 1..].iter() {
+                if c2.is_ascii_hexdigit() {
+                    hex.push(*c2);
+                } else {
+                    break;
+                }
+            }
+            if hex.len() == 3 || hex.len() == 6 {
+                return Some(format!("#{}", hex));
+            }
+        }
+    }
+    None
+}
+
+/// 从一行 CSS 提取 px 值 (如 `16px` → "16px")。
+fn extract_px(line: &str) -> Option<String> {
+    let bytes = line.as_bytes();
+    for (i, b) in bytes.iter().enumerate() {
+        if b.is_ascii_digit() || *b == b'.' {
+            let start = i;
+            let mut j = i;
+            while j < bytes.len() && (bytes[j].is_ascii_digit() || bytes[j] == b'.') {
+                j += 1;
+            }
+            // 紧跟 "px"
+            if j + 1 < bytes.len() && bytes[j] == b'p' && bytes[j + 1] == b'x' {
+                return Some(format!("{}px", &line[start..j]));
+            }
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -483,7 +731,7 @@ mod tests {
     #[test]
     fn test_request_nt_world_scrape_new() {
         let cfg = ScraperConfig::default();
-        let rs = RequestScraper::new(cfg);
+        let mut rs = RequestScraper::new(cfg);
         let result = rs.get("https://example.com");
         assert_eq!(result.url, "https://example.com");
     }
@@ -508,5 +756,86 @@ mod tests {
         assert_eq!(cfg.timeout_secs, 60);
         assert_eq!(cfg.max_retries, 5);
         assert_eq!(cfg.proxy.as_deref(), Some("http://localhost:8080"));
+    }
+
+    #[test]
+    fn test_stealth_params_rotation_and_interval() {
+        let sp = StealthParams::default();
+        assert!(sp.enabled);
+        assert_eq!(sp.referers.len(), 3);
+        // referer 轮换: 不同序号落到不同 referer
+        let r0 = sp.referer_for(0).unwrap();
+        let r1 = sp.referer_for(1).unwrap();
+        assert_ne!(r0, r1, "sequential requests must rotate referer");
+        assert!(r0.contains("google") || r0.contains("bing") || r0.contains("duckduckgo"));
+
+        // 间隔含抖动且大于 0
+        let d = sp.interval_for();
+        assert!(d.as_millis() >= sp.min_interval_ms as u128, "interval >= min");
+        assert!(d.as_millis() <= (sp.min_interval_ms + sp.interval_jitter_ms) as u128, "interval <= min+jitter");
+
+        // 代理轮换边界: request 10 (rotate_proxy_every=10)
+        assert!(sp.should_rotate_proxy(10));
+        assert!(!sp.should_rotate_proxy(9));
+        assert!(!sp.should_rotate_proxy(0));
+
+        // 禁用后无等待
+        let disabled = StealthParams {
+            enabled: false,
+            ..Default::default()
+        };
+        assert!(disabled.interval_for().is_zero());
+        assert!(!disabled.should_rotate_proxy(10));
+    }
+
+    #[test]
+    fn test_stealth_headers_for_empty_returns_none() {
+        let sp = StealthParams::default();
+        assert!(sp.headers_for(0).is_none(), "default empty header variants -> None");
+        let mut sp2 = StealthParams::default();
+        sp2.header_variants = vec![{
+            let mut m = HashMap::new();
+            m.insert("X-Test".to_string(), "v1".to_string());
+            m
+        }];
+        let h = sp2.headers_for(0).unwrap();
+        assert_eq!(h.get("X-Test").map(|s| s.as_str()), Some("v1"));
+    }
+
+    #[test]
+    fn test_design_token_extract_colors_fonts_spacings() {
+        let html = r#"<html><head><style>
+            body { color: #1a2b3c; font-family: Inter, sans-serif; font-size: 16px; padding: 8px; }
+            .title { color: #ffffff; font-size: 24px; margin: 12px; }
+            .btn { background: #1a2b3c; }
+        </style></head>
+        <body style="font-family: Helvetica; spacing: 4px"><p style="color: #f00">hi</p></body></html>"#;
+        let tokens = DesignTokenExtractor::extract(html);
+        assert!(tokens.colors.contains(&"#1a2b3c".to_string()), "style-block color");
+        assert!(tokens.colors.contains(&"#ffffff".to_string()), "second color");
+        assert!(tokens.fonts.len() >= 2, "font-family from style + inline");
+        assert!(tokens.font_sizes.contains(&"16px".to_string()));
+        assert!(tokens.font_sizes.contains(&"24px".to_string()));
+        assert!(tokens.spacings.contains(&"8px".to_string()));
+    }
+
+    #[test]
+    fn test_design_token_dedup_and_summarize() {
+        let html = r#"<style>.a{color:#000}.b{color:#000}.c{color:#abcdef}</style>"#;
+        let tokens = DesignTokenExtractor::extract(html);
+        assert_eq!(tokens.colors.len(), 2, "duplicate #000 deduped");
+        assert!(tokens.colors.contains(&"#abcdef".to_string()));
+        let s = DesignTokenExtractor::summarize(&tokens);
+        assert!(s.contains("colors"));
+        assert!(s.contains("fonts"));
+    }
+
+    #[test]
+    fn test_extract_px_and_hex_helpers() {
+        assert_eq!(extract_px("font-size: 14px"), Some("14px".to_string()));
+        assert_eq!(extract_px("line-height: 1.5"), None, "no px suffix -> None");
+        assert_eq!(find_hex_color(".x { color: #abc; }"), Some("#abc".to_string()));
+        assert_eq!(find_hex_color(".x { color: #aabbcc; }"), Some("#aabbcc".to_string()));
+        assert_eq!(find_hex_color("no color here"), None);
     }
 }

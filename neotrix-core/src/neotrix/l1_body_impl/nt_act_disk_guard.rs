@@ -107,6 +107,7 @@ impl DiskGuard {
     /// - Safe → Allowed (直接放行)
     /// - Confirm → 需确认 (返回 Blocked 带 confirm 标记, 调用方决定是否二次确认)
     /// - Danger → Blocked (拦截)
+    ///
     /// 返回 (verdict, risk_level)。
     pub fn check_risk(&mut self, operation: &str, target: &Path) -> (DiskVerdict, RiskLevel) {
         if !self.is_within(target) {

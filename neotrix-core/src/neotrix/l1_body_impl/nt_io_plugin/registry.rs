@@ -99,7 +99,7 @@ impl InnerRegistry {
             ctx.track(ClosureEffect::new(
                 format!("load:{}", name),
                 move |reg: &mut &mut InnerRegistry| {
-                    let p = cell.lock().unwrap().take().expect("forward invoked once");
+                    let p = cell.lock().expect("plugin registry cell poisoned").take().expect("forward invoked once");
                     let info = PluginInfo {
                         name: fwd_name,
                         version: fwd_version,
@@ -162,14 +162,14 @@ impl InnerRegistry {
                     ctx.track(ClosureEffect::new(
                         format!("replace:{}", name),
                         move |reg: &mut &mut InnerRegistry| {
-                            let (info, new_p) = cell.lock().unwrap().take().expect("forward invoked once");
+                            let (info, new_p) = cell.lock().expect("plugin registry cell poisoned").take().expect("forward invoked once");
                             let stale = reg.plugins.remove(name);
-                            *old_cell_fwd.lock().unwrap() = stale;
+                            *old_cell_fwd.lock().expect("plugin registry old_cell poisoned") = stale;
                             reg.plugins.insert(name, RegisteredPlugin { info: info.clone(), plugin: new_p });
                         },
                         move |reg: &mut &mut InnerRegistry| {
                             reg.plugins.remove(name);
-                            if let Some(old_p) = old_cell.lock().unwrap().take() {
+                            if let Some(old_p) = old_cell.lock().expect("plugin registry cell poisoned").take() {
                                 reg.plugins.insert(name, old_p);
                             }
                         },
@@ -196,7 +196,7 @@ impl InnerRegistry {
                     ctx.track(ClosureEffect::new(
                         format!("load:{}", name),
                         move |reg: &mut &mut InnerRegistry| {
-                            let (info, p) = cell.lock().unwrap().take().expect("forward invoked once");
+                            let (info, p) = cell.lock().expect("plugin registry cell poisoned").take().expect("forward invoked once");
                             reg.plugins.insert(name, RegisteredPlugin { info: info.clone(), plugin: p });
                         },
                         move |reg: &mut &mut InnerRegistry| {

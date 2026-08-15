@@ -116,7 +116,7 @@ impl ReasoningKernel {
 
         let convergence = if intermediates.len() >= 2 {
             let a = &intermediates[intermediates.len() - 2];
-            let b = intermediates.last().unwrap();
+            let b = intermediates.last().expect("intermediates.len() >= 2");
             let delta: f64 = a.iter().zip(b.iter()).map(|(x, y)| (x - y).abs()).sum();
             1.0 - (delta / state.len() as f64).min(1.0)
         } else {

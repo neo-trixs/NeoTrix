@@ -1073,7 +1073,7 @@ impl CliCommand for BoardCmd {
                 let mut thread: Option<String> = None;
                 let mut spec_parts: Vec<String> = Vec::new();
                 let mut i = 0;
-                let raw: Vec<String> = args[1..].iter().cloned().collect();
+                let raw: Vec<String> = args[1..].to_vec();
                 while i < raw.len() {
                     match raw[i].as_str() {
                         "--branch" => {

@@ -362,10 +362,8 @@ impl SelfIteratingBrain {
 
         // pi-agent steer (缺陷②): pipeline 返回 Steer 时保留进度, 输出重定向建议,
         // 不丢弃已产出成果 (区别于 Err 硬失败 — Steer 是"换路线继续"而非"终止")。
-        if let Err(e) = &result {
-            if let NeoTrixError::Steer(msg) = e {
-                println!("[seal] 🧭 steer 重定向建议: {} (cycle {}, 进度保留)", msg, self.iteration);
-            }
+        if let Err(NeoTrixError::Steer(msg)) = &result {
+            println!("[seal] 🧭 steer 重定向建议: {} (cycle {}, 进度保留)", msg, self.iteration);
         }
 
         // ── EWHR reasoning pass: analyze trajectory → propose hypotheses ──

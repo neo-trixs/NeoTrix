@@ -58,7 +58,7 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
             node: KnowledgeNode {
                 id: row.get(0)?,
                 node_type: NodeType::from_str(&row.get::<_, String>(1)?),
-                title: title,
+                title,
                 summary: row.get(3)?,
                 content: row.get(4)?,
                 url: row.get(5)?,
@@ -74,7 +74,7 @@ pub fn search_fts(conn: &Connection, query: &str, limit: usize) -> rusqlite::Res
                 supersedes: None,
                 source_episode: None,
             },
-            score: score,
+            score,
             matched_on: vec![matched_on],
             signals: None,
         })
@@ -315,7 +315,7 @@ pub fn hybrid_search(
                 let score = fused_scores.get(&id).copied().unwrap_or(0.5);
                 Ok(SearchResult {
                     node: KnowledgeNode {
-                        id: id,
+                        id,
                         node_type: NodeType::from_str(&row.get::<_, String>(1)?),
                         title: row.get(2)?,
                         summary: row.get(3)?,
@@ -333,7 +333,7 @@ pub fn hybrid_search(
                         supersedes: None,
                         source_episode: None,
                     },
-                    score: score,
+                    score,
                     matched_on: vec![SearchMatchType::Bm25],
                     signals: None,
                 })

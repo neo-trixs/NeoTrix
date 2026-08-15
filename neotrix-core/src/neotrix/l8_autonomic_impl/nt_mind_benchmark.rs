@@ -485,7 +485,7 @@ impl OriEvalSuite {
     ) -> Result<OriEvalReport, LlmError> {
         let mut scores = Vec::new();
         for (name, provider) in models {
-            let model_scores = self.run_one(&name, provider.as_ref()).await?;
+            let model_scores = self.run_one(name, provider.as_ref()).await?;
             scores.push(model_scores);
         }
         Ok(Self::finalize_report(scores))

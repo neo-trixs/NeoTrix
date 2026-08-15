@@ -260,11 +260,18 @@ pub struct ResponseCache {
     tick: u64,
     hit_count: u64,
     miss_count: u64,
+    /// G26 分层 expert 缓存 (colibri 吸收): 热集 pin — 被 pin 的 key 永不参与
+    /// LRU 驱逐, 保持高频专家响应常驻。
+    pinned: std::collections::HashSet<u64>,
+    /// prefetch 命中计数 (分层缓存 prefetch 遥测)。
+    prefetch_hits: u64,
 }
 
 impl ResponseCache {
     /// 默认容量 (条目数)
     pub const DEFAULT_CAPACITY: usize = 256;
+    /// 热集 pin 上限 (防 pin 过多挤掉冷条目的生存空间)
+    pub const MAX_PINNED: usize = 32;
 
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -273,6 +280,8 @@ impl ResponseCache {
             tick: 0,
             hit_count: 0,
             miss_count: 0,
+            pinned: std::collections::HashSet::new(),
+            prefetch_hits: 0,
         }
     }
 
@@ -307,7 +316,7 @@ impl ResponseCache {
         None
     }
 
-    /// 写入缓存 — 已存在则刷新, 满容量驱逐最久未使用条目
+    /// 写入缓存 — 已存在则刷新, 满容量驱逐最久未使用条目 (pin 条目不参与驱逐)
     pub fn insert(&mut self, key: &str, response: String) {
         let hash = Self::hash_key(key);
         self.tick += 1;
@@ -319,6 +328,7 @@ impl ResponseCache {
             let lru_key = self
                 .entries
                 .iter()
+                .filter(|(k, _)| !self.pinned.contains(k))
                 .min_by_key(|(_, (_, t))| *t)
                 .map(|(k, _)| *k);
             if let Some(k) = lru_key {
@@ -326,6 +336,45 @@ impl ResponseCache {
             }
         }
         self.entries.insert(hash, (response, self.tick));
+    }
+
+    /// G26 热集 pin (colibri 吸收): pin 一个 key, 使其免于 LRU 驱逐。
+    /// 返回是否真正 pin (false = 已 pin 或已达上限)。
+    pub fn pin(&mut self, key: &str) -> bool {
+        if self.pinned.len() >= Self::MAX_PINNED {
+            return false;
+        }
+        self.pinned.insert(Self::hash_key(key))
+    }
+
+    /// 解除 pin。
+    pub fn unpin(&mut self, key: &str) {
+        self.pinned.remove(&Self::hash_key(key));
+    }
+
+    pub fn pinned_count(&self) -> usize {
+        self.pinned.len()
+    }
+
+    /// G26 prefetch (colibri 吸收): 预取已缓存的专家响应 — 命中(存在)则刷新
+    /// LRU 时间戳并计入 prefetch_hits, 未命中仅刷新计数 (无响应返回)。
+    /// 用于在下一轮高概率请求前预热热集, 避免 miss 时重新调用 provider。
+    pub fn prefetch(&mut self, key: &str) -> Option<String> {
+        let hash = Self::hash_key(key);
+        let exists = self.entries.contains_key(&hash);
+        if !exists {
+            return None;
+        }
+        self.tick += 1;
+        if let Some((_, t)) = self.entries.get_mut(&hash) {
+            *t = self.tick;
+        }
+        self.prefetch_hits += 1;
+        self.entries.get(&hash).map(|(resp, _)| resp.clone())
+    }
+
+    pub fn prefetch_hit_count(&self) -> u64 {
+        self.prefetch_hits
     }
 
     pub fn len(&self) -> usize {
@@ -1539,6 +1588,9 @@ impl GatewayV2 {
             let rc_key = ResponseCache::key_for(&request.model, &request.messages);
             if let Ok(mut rc) = self.response_cache.lock() {
                 if let Some(cached) = rc.cache(&rc_key) {
+                    // G26 分层 expert 缓存 (colibri): 高频命中 key 自动 pin 热集,
+                    // 免于 LRU 驱逐 (限 MAX_PINNED 防挤占)。
+                    rc.pin(&rc_key);
                     if let Ok(response) = serde_json::from_str::<LlmResponse>(&cached) {
                         return Ok(response);
                     }
@@ -3690,6 +3742,36 @@ mod provider_reliability_tests {
         assert!(cache.is_empty());
         let min_cap = ResponseCache::new(0);
         assert_eq!(min_cap.capacity(), 1, "容量下限为 1");
+    }
+
+    #[test]
+    fn test_response_cache_pin_protects_from_eviction() {
+        // G26 分层 expert 缓存 (colibri): pin 的 key 不参与 LRU 驱逐。
+        let mut cache = ResponseCache::new(3);
+        cache.insert("k1", "v1".to_string());
+        cache.insert("k2", "v2".to_string());
+        cache.insert("k3", "v3".to_string());
+        assert!(cache.pin("k1"), "pin k1 成功");
+        // 触碰 k2/k3 使其较新
+        assert_eq!(cache.cache("k2"), Some("v2".to_string()));
+        assert_eq!(cache.cache("k3"), Some("v3".to_string()));
+        cache.insert("k4", "v4".to_string());
+        assert_eq!(cache.cache("k1"), Some("v1".to_string()), "pinned k1 免驱逐");
+        assert_eq!(cache.len(), 3, "容量 3 仍保持");
+        assert_eq!(cache.pinned_count(), 1);
+        cache.unpin("k1");
+        assert_eq!(cache.pinned_count(), 0);
+    }
+
+    #[test]
+    fn test_response_cache_prefetch_refreshes_and_counts() {
+        // G26 prefetch (colibri): 命中预取刷新 LRU + 计数, miss 静默。
+        let mut cache = ResponseCache::new(8);
+        cache.insert("hot", "{\"content\":\"hot\"}".to_string());
+        assert_eq!(cache.prefetch("hot"), Some("{\"content\":\"hot\"}".to_string()));
+        assert_eq!(cache.prefetch_hit_count(), 1);
+        assert_eq!(cache.prefetch("cold"), None, "未命中 prefetch 返回 None");
+        assert_eq!(cache.prefetch_hit_count(), 1, "miss 不计 prefetch hit");
     }
 
     #[test]

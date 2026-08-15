@@ -180,7 +180,9 @@ impl IndependenceGate {
             order.push(id.clone());
             if let Some(deps) = dependents.get(&id) {
                 for dep in deps {
-                    let d = indegree.get_mut(dep).unwrap();
+                    let Some(d) = indegree.get_mut(dep) else {
+                        continue;
+                    };
                     *d -= 1;
                     if *d == 0 {
                         queue.push(dep.clone());

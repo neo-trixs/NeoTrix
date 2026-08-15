@@ -696,7 +696,7 @@ impl CleanupPattern {
         // 两侧都 canonicalize: /var → /private/var (macOS symlink), 否则保护失效 (误删风险)
         let canonical_home = std::fs::canonicalize(&home).unwrap_or(home.clone());
         canonical == canonical_home
-            || canonical.starts_with(&canonical_home.join("Library"))
+            || canonical.starts_with(canonical_home.join("Library"))
             || p == std::path::Path::new("/")
             || p == std::path::Path::new("\\")
     }

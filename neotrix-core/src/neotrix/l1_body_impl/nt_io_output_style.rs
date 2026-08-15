@@ -2,6 +2,7 @@
 //!
 //! 吸收源: attention-span + GitHub output-style 生态 (answer-first / spartan / rundown)
 //! + i-have-adhd 输出纪律 (G27 OutputGovernor 10 规则)。
+//!
 //! 与 skills 正交: 样式改变"怎么说话"，不改"怎么编码"。
 //!
 //! 骨架阶段 (C0): 注册表 + 三种内置样式 + 格式化入口已接 AgentLoop 生产路径。

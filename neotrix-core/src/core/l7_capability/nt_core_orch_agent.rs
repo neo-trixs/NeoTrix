@@ -720,26 +720,26 @@ impl AgentCatalog {
         // 回落旧 5 类（兼容既有调用方）
         if hint.contains("research") || hint.contains("研究") || hint.contains("find")
             || hint.contains("aggregate") || hint.contains("synthesize") {
-            return Self::by_name("researcher").unwrap_or_else(|| Self::fallback_profile());
+            return Self::by_name("researcher").unwrap_or_else(Self::fallback_profile);
         }
         if hint.contains("explore") || hint.contains("search") || hint.contains("read")
             || hint.contains("inspect") || hint.contains("audit") || hint.contains("分析")
             || hint.contains("查找") {
-            return Self::by_name("explorer").unwrap_or_else(|| Self::fallback_profile());
+            return Self::by_name("explorer").unwrap_or_else(Self::fallback_profile);
         }
         if hint.contains("plan") || hint.contains("design") || hint.contains("方案")
             || hint.contains("调研") || hint.contains("architecture") {
-            return Self::by_name("planner").unwrap_or_else(|| Self::fallback_profile());
+            return Self::by_name("planner").unwrap_or_else(Self::fallback_profile);
         }
         if hint.contains("verify") || hint.contains("test") || hint.contains("审查")
             || hint.contains("review") || hint.contains("回滚") {
-            return Self::by_name("verifier").unwrap_or_else(|| Self::fallback_profile());
+            return Self::by_name("verifier").unwrap_or_else(Self::fallback_profile);
         }
         if hint.contains("monitor") || hint.contains("watch") || hint.contains("health")
             || hint.contains("监控") || hint.contains("心跳") {
-            return Self::by_name("watcher").unwrap_or_else(|| Self::fallback_profile());
+            return Self::by_name("watcher").unwrap_or_else(Self::fallback_profile);
         }
-        Self::by_name("generalist").unwrap_or_else(|| Self::fallback_profile())
+        Self::by_name("generalist").unwrap_or_else(Self::fallback_profile)
     }
 
     /// 兜底 profile：目录意外缺名时保证 route() 恒有返回值（内部不变量防御）。

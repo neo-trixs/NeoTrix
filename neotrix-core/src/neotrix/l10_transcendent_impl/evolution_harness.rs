@@ -79,7 +79,7 @@ impl EvolutionHarness {
                 .get("metadata")
                 .and_then(|m| m.get("strength"))
                 .and_then(|s| s.as_f64())
-                .unwrap_or_else(|| match constellation.as_str() {
+                .unwrap_or(match constellation.as_str() {
                     "c0" => 0.2,
                     "c1" => 0.4,
                     "c2" => 0.6,

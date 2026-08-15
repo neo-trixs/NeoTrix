@@ -38,19 +38,19 @@ impl ConstellationSystemImpl {
     }
 
     pub fn get_state(&self, module: &str) -> Result<ConstellationState, NeoTrixError> {
-        self.inner.read().unwrap().states.get(module).cloned().ok_or(NeoTrixError::NotFound)
+        self.inner.read().expect("ffi rwlock poisoned").states.get(module).cloned().ok_or(NeoTrixError::NotFound)
     }
 
     pub fn get_all_states(&self) -> Vec<ConstellationState> {
-        self.inner.read().unwrap().states.values().cloned().collect()
+        self.inner.read().expect("ffi rwlock poisoned").states.values().cloned().collect()
     }
 
     pub fn can_upgrade(&self, module: &str) -> bool {
-        self.inner.read().unwrap().states.get(module).map(|s| s.level < 6).unwrap_or(false)
+        self.inner.read().expect("ffi rwlock poisoned").states.get(module).map(|s| s.level < 6).unwrap_or(false)
     }
 
     pub fn check_upgrade(&self, module: &str) -> Result<ConstellationState, NeoTrixError> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write().expect("ffi rwlock poisoned");
         let state = inner.states.get_mut(module).ok_or(NeoTrixError::NotFound)?;
         if state.level < 6 {
             let all_satisfied = state.requirements.iter().all(|r| r.satisfied);
@@ -65,7 +65,7 @@ impl ConstellationSystemImpl {
     }
 
     pub fn get_upgrade_path(&self, module: &str) -> Result<Vec<ConstellationRequirement>, NeoTrixError> {
-        self.inner.read().unwrap().states.get(module).map(|s| s.requirements.clone()).ok_or(NeoTrixError::NotFound)
+        self.inner.read().expect("ffi rwlock poisoned").states.get(module).map(|s| s.requirements.clone()).ok_or(NeoTrixError::NotFound)
     }
 }
 

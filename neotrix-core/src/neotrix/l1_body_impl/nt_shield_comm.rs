@@ -382,8 +382,7 @@ pub fn build_headers(
         .collect();
 
     // apply header_order
-    let ordered = apply_header_order(cleaned, persona);
-    ordered
+    apply_header_order(cleaned, persona)
 }
 
 fn apply_header_order(headers: Vec<(String, String)>, persona: &Persona) -> Vec<(String, String)> {

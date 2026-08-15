@@ -36,7 +36,7 @@ impl VSAHyperCubeImpl {
     }
 
     pub fn random_vector(&self, label: &str) -> HyperVector {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let bytes = (inner.dimensions / 8) as usize;
         let mut data = vec![0u8; bytes];
         let mut seed: u64 = 0xcbf29ce484222325;
@@ -63,7 +63,7 @@ impl VSAHyperCubeImpl {
         Ok(HyperVector {
             dimensions: v1.dimensions,
             data,
-            sparsity: self.inner.read().unwrap().sparsity,
+            sparsity: self.inner.read().expect("ffi rwlock poisoned").sparsity,
         })
     }
 
@@ -71,7 +71,7 @@ impl VSAHyperCubeImpl {
         if vectors.is_empty() {
             return Err(NeoTrixError::InvalidInput);
         }
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read().expect("ffi rwlock poisoned");
         let dim = vectors[0].dimensions;
         let bytes = (dim / 8) as usize;
         if vectors.iter().any(|v| v.dimensions != dim) {
@@ -93,7 +93,7 @@ impl VSAHyperCubeImpl {
         for i in 0..bytes {
             data[(i + shift) % bytes] = vector.data[i];
         }
-        HyperVector { dimensions: vector.dimensions, data, sparsity: self.inner.read().unwrap().sparsity }
+        HyperVector { dimensions: vector.dimensions, data, sparsity: self.inner.read().expect("ffi rwlock poisoned").sparsity }
     }
 
     pub fn similarity(&self, v1: &HyperVector, v2: &HyperVector) -> Result<f32, NeoTrixError> {
@@ -128,12 +128,12 @@ impl VSAHyperCubeImpl {
     }
 
     pub fn store(&self, label: &str, vector: HyperVector) -> bool {
-        self.inner.write().unwrap().store.insert(label.to_string(), vector);
+        self.inner.write().expect("ffi rwlock poisoned").store.insert(label.to_string(), vector);
         true
     }
 
     pub fn retrieve(&self, label: &str) -> Result<HyperVector, NeoTrixError> {
-        self.inner.read().unwrap().store.get(label).cloned().ok_or(NeoTrixError::NotFound)
+        self.inner.read().expect("ffi rwlock poisoned").store.get(label).cloned().ok_or(NeoTrixError::NotFound)
     }
 
     pub fn batch_operation(&self, ops: &[VSAOperation]) -> Result<Vec<VSAResult>, NeoTrixError> {
