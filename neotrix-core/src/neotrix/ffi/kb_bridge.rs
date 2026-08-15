@@ -67,7 +67,7 @@ impl KBBridgeImpl {
             metadata,
             score: 1.0,
         });
-        let emb = inner.nodes.get(&id).unwrap().embedding.clone();
+        let emb = inner.nodes.get(&id).expect("node just inserted").embedding.clone();
         inner.embeddings.push(emb);
         Ok(id)
     }
