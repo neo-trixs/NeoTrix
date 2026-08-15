@@ -4,14 +4,42 @@ use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TelemetryEvent {
-    AgentSpawned { agent_id: String, role: String },
-    AgentCompleted { agent_id: String, success: bool, duration_ms: u64 },
-    ToolCall { tool: String, success: bool, duration_ms: u64 },
-    KnowledgeAbsorbed { source: String, count: u64 },
-    Error { source: String, message: String, severity: u8 },
-    ConsciousnessTick { phi: f64, coherence: f64, quality: f64 },
-    Sealed { cycle: u64, reward: f64 },
-    Custom { name: String, value: String },
+    AgentSpawned {
+        agent_id: String,
+        role: String,
+    },
+    AgentCompleted {
+        agent_id: String,
+        success: bool,
+        duration_ms: u64,
+    },
+    ToolCall {
+        tool: String,
+        success: bool,
+        duration_ms: u64,
+    },
+    KnowledgeAbsorbed {
+        source: String,
+        count: u64,
+    },
+    Error {
+        source: String,
+        message: String,
+        severity: u8,
+    },
+    ConsciousnessTick {
+        phi: f64,
+        coherence: f64,
+        quality: f64,
+    },
+    Sealed {
+        cycle: u64,
+        reward: f64,
+    },
+    Custom {
+        name: String,
+        value: String,
+    },
 }
 
 impl TelemetryEvent {
@@ -68,7 +96,9 @@ impl TelemetryStore {
     /// value only, no raw payload retained.
     pub fn record_metric(&self, metric: &str, value: f64) {
         if let Ok(mut series) = self.metric_series.lock() {
-            let q = series.entry(metric.to_string()).or_insert_with(VecDeque::new);
+            let q = series
+                .entry(metric.to_string())
+                .or_insert_with(VecDeque::new);
             if q.len() >= self.max_events {
                 q.pop_front();
             }
@@ -236,7 +266,10 @@ pub struct MetricSeries {
 
 impl MetricSeries {
     pub fn new(capacity: usize) -> Self {
-        Self { samples: VecDeque::with_capacity(capacity), capacity: capacity.max(2) }
+        Self {
+            samples: VecDeque::with_capacity(capacity),
+            capacity: capacity.max(2),
+        }
     }
 
     pub fn push(&mut self, value: f64) {
@@ -488,7 +521,11 @@ impl AgentBehaviorMap {
                     *freqs.entry(format!("role:{}", role)).or_insert(0) += 1;
                 }
             }
-            TelemetryEvent::AgentCompleted { agent_id, success, duration_ms } => {
+            TelemetryEvent::AgentCompleted {
+                agent_id,
+                success,
+                duration_ms,
+            } => {
                 if let Ok(mut agents) = self.agents.lock() {
                     if let Some(a) = agents.get_mut(agent_id) {
                         a.call_count += 1;
@@ -500,7 +537,11 @@ impl AgentBehaviorMap {
                     }
                 }
             }
-            TelemetryEvent::ToolCall { tool, success, duration_ms } => {
+            TelemetryEvent::ToolCall {
+                tool,
+                success,
+                duration_ms,
+            } => {
                 if let Ok(mut freqs) = self.tool_frequencies.lock() {
                     *freqs.entry(tool.clone()).or_insert(0) += 1;
                 }
@@ -511,7 +552,9 @@ impl AgentBehaviorMap {
                 }
                 let _ = duration_ms;
             }
-            TelemetryEvent::Error { source, message, .. } => {
+            TelemetryEvent::Error {
+                source, message, ..
+            } => {
                 if let Ok(mut patterns) = self.error_patterns.lock() {
                     patterns.push((source.clone(), message.clone()));
                     let excess = patterns.len().saturating_sub(1000);
@@ -683,9 +726,21 @@ mod tests {
     #[test]
     fn test_telemetry_store_record_and_summary() {
         let store = TelemetryStore::new(100);
-        store.record(TelemetryEvent::ToolCall { tool: "bash".into(), success: true, duration_ms: 50 });
-        store.record(TelemetryEvent::ToolCall { tool: "bash".into(), success: true, duration_ms: 30 });
-        store.record(TelemetryEvent::Error { source: "bash".into(), message: "timeout".into(), severity: 2 });
+        store.record(TelemetryEvent::ToolCall {
+            tool: "bash".into(),
+            success: true,
+            duration_ms: 50,
+        });
+        store.record(TelemetryEvent::ToolCall {
+            tool: "bash".into(),
+            success: true,
+            duration_ms: 30,
+        });
+        store.record(TelemetryEvent::Error {
+            source: "bash".into(),
+            message: "timeout".into(),
+            severity: 2,
+        });
         let summary = store.summary();
         assert!(summary.iter().any(|(k, _)| k == "tool_call"));
         assert!(summary.iter().any(|(k, _)| k == "error"));
@@ -696,7 +751,10 @@ mod tests {
     fn test_telemetry_store_max_events() {
         let store = TelemetryStore::new(10);
         for i in 0..20 {
-            store.record(TelemetryEvent::Custom { name: format!("e{}", i), value: "x".into() });
+            store.record(TelemetryEvent::Custom {
+                name: format!("e{}", i),
+                value: "x".into(),
+            });
         }
         let recent = store.recent_events(100);
         assert!(recent.len() <= 10);
@@ -705,10 +763,25 @@ mod tests {
     #[test]
     fn test_agent_behavior_map() {
         let map = AgentBehaviorMap::new();
-        map.record_event(&TelemetryEvent::AgentSpawned { agent_id: "a1".into(), role: "coder".into() });
-        map.record_event(&TelemetryEvent::AgentCompleted { agent_id: "a1".into(), success: true, duration_ms: 100 });
-        map.record_event(&TelemetryEvent::ToolCall { tool: "bash".into(), success: true, duration_ms: 10 });
-        map.record_event(&TelemetryEvent::ToolCall { tool: "read".into(), success: false, duration_ms: 5 });
+        map.record_event(&TelemetryEvent::AgentSpawned {
+            agent_id: "a1".into(),
+            role: "coder".into(),
+        });
+        map.record_event(&TelemetryEvent::AgentCompleted {
+            agent_id: "a1".into(),
+            success: true,
+            duration_ms: 100,
+        });
+        map.record_event(&TelemetryEvent::ToolCall {
+            tool: "bash".into(),
+            success: true,
+            duration_ms: 10,
+        });
+        map.record_event(&TelemetryEvent::ToolCall {
+            tool: "read".into(),
+            success: false,
+            duration_ms: 5,
+        });
         let agents = map.active_agents();
         assert!(agents.iter().any(|(id, _, _)| id == "a1"));
         let tools = map.top_tools(5);
@@ -719,10 +792,18 @@ mod tests {
     fn test_error_pattern_detection() {
         let map = AgentBehaviorMap::new();
         for _ in 0..8 {
-            map.record_event(&TelemetryEvent::Error { source: "bash".into(), message: "timeout".into(), severity: 2 });
+            map.record_event(&TelemetryEvent::Error {
+                source: "bash".into(),
+                message: "timeout".into(),
+                severity: 2,
+            });
         }
         for _ in 0..2 {
-            map.record_event(&TelemetryEvent::Error { source: "read".into(), message: "not found".into(), severity: 1 });
+            map.record_event(&TelemetryEvent::Error {
+                source: "read".into(),
+                message: "not found".into(),
+                severity: 1,
+            });
         }
         let high_error = map.high_error_tools(0.5);
         assert!(high_error.contains(&"bash".to_string()));
@@ -731,7 +812,11 @@ mod tests {
     #[test]
     fn test_telemetry_store_clear() {
         let store = TelemetryStore::new(100);
-        store.record(TelemetryEvent::ToolCall { tool: "test".into(), success: true, duration_ms: 1 });
+        store.record(TelemetryEvent::ToolCall {
+            tool: "test".into(),
+            success: true,
+            duration_ms: 1,
+        });
         assert!(!store.summary().is_empty());
         store.clear();
         assert!(store.summary().is_empty());
@@ -739,10 +824,40 @@ mod tests {
 
     #[test]
     fn test_event_kind() {
-        assert_eq!(TelemetryEvent::ToolCall { tool: "x".into(), success: true, duration_ms: 0 }.kind(), "tool_call");
-        assert_eq!(TelemetryEvent::AgentSpawned { agent_id: "x".into(), role: "r".into() }.kind(), "agent_spawned");
-        assert_eq!(TelemetryEvent::Error { source: "x".into(), message: "m".into(), severity: 1 }.kind(), "error");
-        assert_eq!(TelemetryEvent::Custom { name: "my_event".into(), value: "v".into() }.kind(), "my_event");
+        assert_eq!(
+            TelemetryEvent::ToolCall {
+                tool: "x".into(),
+                success: true,
+                duration_ms: 0
+            }
+            .kind(),
+            "tool_call"
+        );
+        assert_eq!(
+            TelemetryEvent::AgentSpawned {
+                agent_id: "x".into(),
+                role: "r".into()
+            }
+            .kind(),
+            "agent_spawned"
+        );
+        assert_eq!(
+            TelemetryEvent::Error {
+                source: "x".into(),
+                message: "m".into(),
+                severity: 1
+            }
+            .kind(),
+            "error"
+        );
+        assert_eq!(
+            TelemetryEvent::Custom {
+                name: "my_event".into(),
+                value: "v".into()
+            }
+            .kind(),
+            "my_event"
+        );
     }
 
     // ── AnomalyDetector (spike/drop) ───────────────────────────────────
@@ -802,7 +917,7 @@ mod tests {
             d.observe("stable", 1.0);
         }
         d.observe("stable", 10.0); // spike on one metric
-        // unrelated metric keeps its own baseline — no alert from cross-talk
+                                   // unrelated metric keeps its own baseline — no alert from cross-talk
         for _ in 0..5 {
             d.observe("other", 3.0);
         }
@@ -816,20 +931,41 @@ mod tests {
     fn test_window_aggregates_counts_and_durations() {
         let store = TelemetryStore::new(1000);
         for _ in 0..5 {
-            store.record(TelemetryEvent::ToolCall { tool: "bash".into(), success: true, duration_ms: 40 });
+            store.record(TelemetryEvent::ToolCall {
+                tool: "bash".into(),
+                success: true,
+                duration_ms: 40,
+            });
         }
         for _ in 0..2 {
-            store.record(TelemetryEvent::Error { source: "bash".into(), message: "boom".into(), severity: 2 });
+            store.record(TelemetryEvent::Error {
+                source: "bash".into(),
+                message: "boom".into(),
+                severity: 2,
+            });
         }
-        store.record(TelemetryEvent::AgentCompleted { agent_id: "a".into(), success: true, duration_ms: 200 });
+        store.record(TelemetryEvent::AgentCompleted {
+            agent_id: "a".into(),
+            success: true,
+            duration_ms: 200,
+        });
         let aggs = store.window_aggregates(Duration::from_secs(60));
-        let tc = aggs.iter().find(|(k, _)| k == "tool_call").expect("tool_call present");
+        let tc = aggs
+            .iter()
+            .find(|(k, _)| k == "tool_call")
+            .expect("tool_call present");
         assert_eq!(tc.1.count, 5);
         assert_eq!(tc.1.total_duration_ms, 200);
-        let err = aggs.iter().find(|(k, _)| k == "error").expect("error present");
+        let err = aggs
+            .iter()
+            .find(|(k, _)| k == "error")
+            .expect("error present");
         assert_eq!(err.1.count, 2);
         assert_eq!(err.1.error_count, 2);
-        let ac = aggs.iter().find(|(k, _)| k == "agent_completed").expect("agent_completed present");
+        let ac = aggs
+            .iter()
+            .find(|(k, _)| k == "agent_completed")
+            .expect("agent_completed present");
         assert_eq!(ac.1.count, 1);
         assert_eq!(ac.1.total_duration_ms, 200);
     }
@@ -837,8 +973,15 @@ mod tests {
     #[test]
     fn test_privacy_no_raw_payload_in_aggregates() {
         let store = TelemetryStore::new(1000);
-        store.record(TelemetryEvent::Error { source: "db".into(), message: "secret-credential-xyz".into(), severity: 3 });
-        store.record(TelemetryEvent::Custom { name: "raw".into(), value: "user-document-body".into() });
+        store.record(TelemetryEvent::Error {
+            source: "db".into(),
+            message: "secret-credential-xyz".into(),
+            severity: 3,
+        });
+        store.record(TelemetryEvent::Custom {
+            name: "raw".into(),
+            value: "user-document-body".into(),
+        });
         // Aggregates must never expose raw payload strings — only scalars.
         for (kind, agg) in store.window_aggregates(Duration::from_secs(60)) {
             assert!(!kind.contains("secret-credential"));
@@ -847,7 +990,9 @@ mod tests {
             assert!(agg.error_count >= 0);
         }
         let summary = store.summary();
-        assert!(summary.iter().all(|(k, _)| !k.contains("user-document-body")));
+        assert!(summary
+            .iter()
+            .all(|(k, _)| !k.contains("user-document-body")));
     }
 
     #[test]
@@ -856,10 +1001,16 @@ mod tests {
         store.record_metric("gateway_latency_ms", 12.0);
         store.record_metric("gateway_latency_ms", 14.0);
         store.record_metric("gateway_latency_ms", 13.0);
-        assert!(store.metric_names().contains(&"gateway_latency_ms".to_string()));
-        let mean = store.metric_window_mean("gateway_latency_ms", Duration::from_secs(60)).unwrap();
+        assert!(store
+            .metric_names()
+            .contains(&"gateway_latency_ms".to_string()));
+        let mean = store
+            .metric_window_mean("gateway_latency_ms", Duration::from_secs(60))
+            .unwrap();
         assert!((mean - 13.0).abs() < 1e-9);
-        assert!(store.metric_window_mean("unknown", Duration::from_secs(60)).is_none());
+        assert!(store
+            .metric_window_mean("unknown", Duration::from_secs(60))
+            .is_none());
     }
 
     #[test]

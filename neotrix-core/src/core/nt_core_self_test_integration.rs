@@ -1,6 +1,6 @@
 use crate::core::nt_core_arch_fitness::arch_fitness_tests;
-use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry, ConstitutionComplianceTest};
 use crate::core::nt_core_qtest::QTestEngineSelfTest;
+use crate::core::nt_core_self_test::{ConstitutionComplianceTest, SelfTest, SelfTestRegistry};
 
 pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     registry.register(Box::new(AnswerEngineSelfTest));
@@ -14,6 +14,37 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     for t in arch_fitness_tests() {
         registry.register(t);
     }
+    // 2026-08-15 sweep absorption batch (Phase A): reasoning-trace / TLS 指纹 / 设备沙箱
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_shield_audit::ReasoningTraceGuard::default(),
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_shield_traffic::FingerprintStore::new(),
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l1_body_impl::nt_shield_sandbox::DeviceSandbox::new(
+            crate::neotrix::l1_body_impl::nt_shield_sandbox::SandboxSpec::default(),
+        ),
+    ));
+    // 2026-08-15 sweep absorption batch (Phase B): HDA 归因 / 自验证奖励 / 元 harness 优化 / 提示词库
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_mind_evolution_loop::MetaHarnessOptimizer::new(),
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l8_autonomic_impl::nt_mind_skill_engine::PromptLibrary::new(),
+    ));
+    // 2026-08-15 sweep absorption batch (Phase C): 模式路由 / 潜循环 / 记忆四能力
+    registry.register(Box::new(
+        crate::core::nt_core_gwt::mode_router::ModeRouter::new(),
+    ));
+    registry.register(Box::new(
+        crate::core::nt_core_hcube::latent_recurrent::RecurrentLatent::new(
+            crate::core::nt_core_hcube::latent_recurrent::RecurrentLatentConfig::default(),
+        ),
+    ));
+    registry.register(Box::new(
+        crate::neotrix::l3_memory_impl::nt_memory_kb::SweepMemoryCapabilitiesSelfTest,
+    ));
 }
 
 /// 轻量 SelfTest 运行器 (纯内存检测件, 无网络/无全仓扫描) — 供意识核心
@@ -34,7 +65,7 @@ impl SelfTest for AnswerEngineSelfTest {
 
     fn self_test(&self) -> Result<(), Vec<String>> {
         let engine = crate::core::nt_core_answer_engine::AnswerEngine::with_mode(
-            crate::core::nt_core_answer_engine::AnswerMode::Balanced
+            crate::core::nt_core_answer_engine::AnswerMode::Balanced,
         );
         let config = engine.config();
         if config.max_sources == 0 {
