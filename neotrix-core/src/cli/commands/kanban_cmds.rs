@@ -1788,15 +1788,15 @@ mod tests {
         assert!(r.success, "{}", r.message);
         assert!(r.message.contains("branch: feat/x"), "{}", r.message);
         let b = board().lock().unwrap_or_else(|e| e.into_inner());
-        let item = b.items.last().unwrap();
+        // 全局 board() 跨测试共享 — 并行时 items.last() 可能不是本测试刚建的项,
+        // 按 title 精确定位 (共享状态测试隔离纪律)。
+        let item = b.items.iter().rev().find(|i| i.title == "branch task").expect("branch task item");
         assert_eq!(item.git_branch.as_deref(), Some("feat/x"));
         drop(b);
         // cleanup: remove test item so later tests are unaffected
         let mut b2 = board().lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(i) = b2.items.last().cloned() {
-            if i.title == "branch task" {
-                let _ = b2.remove_item(&i.id);
-            }
+        if let Some(i) = b2.items.iter().rev().find(|i| i.title == "branch task").cloned() {
+            let _ = b2.remove_item(&i.id);
         }
     }
 
@@ -1829,7 +1829,7 @@ mod tests {
         let r = cmd.execute(&["create".into(), "bind me".into()], None);
         assert!(r.success, "{}", r.message);
         let b = board().lock().unwrap_or_else(|e| e.into_inner());
-        let id = b.items.last().unwrap().id.clone();
+        let id = b.items.iter().rev().find(|i| i.title == "bind me").expect("bind me item").id.clone();
         drop(b);
         // bind a branch
         let r = cmd.execute(&["branch".into(), id.clone().into(), "feat/bound".into()], None);
@@ -1840,10 +1840,8 @@ mod tests {
         assert!(r.success || r.message.contains("no git repo") || r.message.contains("Available branches"));
         // cleanup
         let mut b2 = board().lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(i) = b2.items.last().cloned() {
-            if i.title == "bind me" {
-                let _ = b2.remove_item(&i.id);
-            }
+        if let Some(i) = b2.items.iter().rev().find(|i| i.title == "bind me").cloned() {
+            let _ = b2.remove_item(&i.id);
         }
     }
 

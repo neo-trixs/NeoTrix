@@ -61,6 +61,12 @@ pub struct CoreSnapshot {
     pub weighted_fog_sum: f64,
     /// 每分支健康 (kind → health), 用于跨会话健康连续性
     pub branch_health: HashMap<String, f64>,
+    /// 每分支迷雾浓度 (kind → fog.level), 用于跨会话迷雾连续性。
+    /// 修复断链: 快照此前只持久化 health, fog 在 load_or_new 后全回默认 0.85
+    /// (DenseFog) → MCP/CLI status 的 weighted_fog_sum 恒 9.35, 即使后台已正确
+    /// 算出 1.65。`#[serde(default)]` 保证旧快照回退为空 (不阻断反序列化)。
+    #[serde(default)]
+    pub branch_fog: HashMap<String, f64>,
     /// 已消化果实完整记录 — 进化产物流入 KB (The Spice Must Flow)
     pub fruits: Vec<FruitRecord>,
     /// 注意力来源通道 — 映射自 x.ai 双搜索通道。
@@ -144,6 +150,12 @@ impl ConsciousnessCoreHandle {
         let latest = load_snapshot().unwrap_or_else(|| core_snapshot_from_tree(&self.tree));
         let base_cycle = latest.cycle;
         let n = cycles.max(1).min(10);
+        // 迷雾治理断链修复: 独立进程 (CLI/MCP tick) 此前不喂 SelfTest 数据 →
+        // 分支健康恒 0 → 果实门 (health > fruit_growth_health) 永关、迷雾无法下降。
+        // 现于生长周期前注入轻量 SelfTest 结果 (纯内存检测件, 无网络/无全仓扫描),
+        // 使健康/果实/迷雾从真实检测件数据派生, 与后台循环同一数据源 (R-P42)。
+        let selftest_results = crate::core::nt_core_self_test_integration::run_lightweight_self_tests();
+        self.tree.set_branch_health_from_self_tests(&selftest_results);
         for _ in 0..n {
             self.tree.run_growth_cycle();
             // Activate GWT resonance to enable coherence calculation
@@ -244,6 +256,11 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
             .iter()
             .map(|(k, b)| (format!("{:?}", k), b.health))
             .collect(),
+        branch_fog: tree
+            .branches
+            .iter()
+            .map(|(k, b)| (format!("{:?}", k), b.fog.level))
+            .collect(),
         fruits: tree
             .fruits
             .iter()
@@ -280,50 +297,61 @@ fn core_snapshot_from_tree(tree: &ConsciousnessTree) -> CoreSnapshot {
 fn load_or_new() -> ConsciousnessTree {
     let mut tree = ConsciousnessTree::new();
     match load_snapshot() {
-        Some(snap) => {
-            // 恢复树干计数器
-            tree.cycle = snap.cycle;
-            tree.trunk.resonance_cycle = snap.resonance_cycle;
-            tree.trunk.phi = snap.phi;
-            tree.trunk.coherence = snap.coherence;
-            tree.trunk.gwt_resonance_active = snap.gwt_resonance_active;
-            tree.trunk.attention_source = snap.attention_source.clone();
-            tree.trunk.mars_system1_activations = snap.mars_system1_activations;
-            tree.trunk.mars_system2_iterations = snap.mars_system2_iterations;
-            tree.trunk.mars_bridge_hits = snap.mars_bridge_hits;
-            tree.trunk.governance_compliance = snap.governance_compliance;
-            tree.trunk.governance_constitution_count = snap.governance_constitution_count;
-            tree.trunk.governance_fractal_depth = snap.governance_fractal_depth;
-            // 恢复分支健康 (跨会话连续性)
-            for (kind_str, health) in &snap.branch_health {
-                if let Some(branch) = tree.branches.get_mut(&branch_kind_from_str(kind_str)) {
-                    branch.health = *health;
-                }
-            }
-            // 恢复已消化果实 — 从快照完整重建证据链投影 (具体 EvidenceChain 以 run_id 标注,
-            // 不重建二进制证据; 进化产物引用保留, 供审计/追踪)。
-            for fr in &snap.fruits {
-                tree.fruits.push(
-                    crate::core::nt_core_consciousness_tree::EvolutionFruit {
-                        name: fr.name.clone(),
-                        source_branch: branch_kind_from_str(&fr.source_branch),
-                        description: fr.description.clone(),
-                        produced_at_cycle: fr.produced_at_cycle,
-                        quality: fr.quality,
-                        claim: fr.claim.clone(),
-                        evidence: crate::core::nt_core_consciousness_tree::EvidenceChain {
-                            run_id: fr.run_id.clone(),
-                            ..Default::default()
-                        },
-                        generation: fr.generation,
-                        ..Default::default()
-                    },
-                );
-            }
-            tree
-        }
+        Some(snap) => tree_from_snapshot(&snap),
         None => tree,
     }
+}
+
+/// 以快照重建树 (纯函数) — 供 load_or_new 与测试共用, 保证恢复逻辑单一事实源。
+fn tree_from_snapshot(snap: &CoreSnapshot) -> ConsciousnessTree {
+    let mut tree = ConsciousnessTree::new();
+    // 恢复树干计数器
+    tree.cycle = snap.cycle;
+    tree.trunk.resonance_cycle = snap.resonance_cycle;
+    tree.trunk.phi = snap.phi;
+    tree.trunk.coherence = snap.coherence;
+    tree.trunk.gwt_resonance_active = snap.gwt_resonance_active;
+    tree.trunk.attention_source = snap.attention_source.clone();
+    tree.trunk.mars_system1_activations = snap.mars_system1_activations;
+    tree.trunk.mars_system2_iterations = snap.mars_system2_iterations;
+    tree.trunk.mars_bridge_hits = snap.mars_bridge_hits;
+    tree.trunk.governance_compliance = snap.governance_compliance;
+    tree.trunk.governance_constitution_count = snap.governance_constitution_count;
+    tree.trunk.governance_fractal_depth = snap.governance_fractal_depth;
+    // 恢复分支健康 (跨会话连续性)
+    for (kind_str, health) in &snap.branch_health {
+        if let Some(branch) = tree.branches.get_mut(&branch_kind_from_str(kind_str)) {
+            branch.health = *health;
+        }
+    }
+    // 恢复分支迷雾 (跨会话连续性) — 修复断链: 不恢复则全回默认 0.85,
+    // weighted_fog_sum 恒 9.35 掩盖后台真实迷雾治理成果。
+    for (kind_str, fog) in &snap.branch_fog {
+        if let Some(branch) = tree.branches.get_mut(&branch_kind_from_str(kind_str)) {
+            branch.fog.level = *fog;
+        }
+    }
+    // 恢复已消化果实 — 从快照完整重建证据链投影 (具体 EvidenceChain 以 run_id 标注,
+    // 不重建二进制证据; 进化产物引用保留, 供审计/追踪)。
+    for fr in &snap.fruits {
+        tree.fruits.push(
+            crate::core::nt_core_consciousness_tree::EvolutionFruit {
+                name: fr.name.clone(),
+                source_branch: branch_kind_from_str(&fr.source_branch),
+                description: fr.description.clone(),
+                produced_at_cycle: fr.produced_at_cycle,
+                quality: fr.quality,
+                claim: fr.claim.clone(),
+                evidence: crate::core::nt_core_consciousness_tree::EvidenceChain {
+                    run_id: fr.run_id.clone(),
+                    ..Default::default()
+                },
+                generation: fr.generation,
+                ..Default::default()
+            },
+        );
+    }
+    tree
 }
 
 fn branch_kind_from_str(s: &str) -> BranchKind {
@@ -1155,6 +1183,47 @@ mod tests {
     fn branch_kind_str_roundtrip() {
         assert_eq!(branch_kind_from_str("World"), BranchKind::World);
         assert_eq!(branch_kind_from_str("unknown"), BranchKind::Core);
+    }
+
+    #[test]
+    fn snapshot_roundtrips_branch_fog_across_sessions() {
+        // 迷雾治理断链回归: CoreSnapshot 必须持久化 per-branch fog_level,
+        // 否则 load_or_new 后所有分支回默认 0.85 → weighted_fog_sum 恒 9.35,
+        // 掩盖后台真实迷雾 (1.65)。跨会话恢复后 fog 应保持原值。
+let mut tree = ConsciousnessTree::new();
+        // 模拟后台治理成果: 三个分支迷雾被清 (wired + consumers + tests)
+        for (name, wired, consumers, test_count) in [
+            ("Core", true, 3, 2),
+            ("Mind", true, 2, 1),
+            ("Memory", true, 4, 3),
+        ] {
+            if let Some(b) = tree.branches.get_mut(&branch_kind_from_str(name)) {
+                // evaluate_fog 第三参为 has_tests: bool — tests 计数 >0 即视为有测试
+                b.evaluate_fog(wired, consumers, test_count > 0);
+            }
+        }
+        let snap = core_snapshot_from_tree(&tree);
+        assert!(
+            snap.branch_fog["Core"] < 0.85,
+            "Core 分支迷雾应被评估清除, got {}",
+            snap.branch_fog["Core"]
+        );
+
+        // 序列化 → 反序列化 → 重建树, fog 必须跨会话保持
+        let json = serde_json::to_string(&snap).unwrap();
+        let back: CoreSnapshot = serde_json::from_str(&json).unwrap();
+        let restored = tree_from_snapshot(&back);
+        assert!(
+            (restored.weighted_fog_sum() - snap.weighted_fog_sum).abs() < 1e-9,
+            "重建树 fog 应与快照一致: snap={} restored={}",
+            snap.weighted_fog_sum,
+            restored.weighted_fog_sum()
+        );
+        assert!(
+            restored.weighted_fog_sum() < 9.35,
+            "迷雾跨会话恢复后不应回退全默认 (9.35), got {}",
+            restored.weighted_fog_sum()
+        );
     }
 
     #[test]

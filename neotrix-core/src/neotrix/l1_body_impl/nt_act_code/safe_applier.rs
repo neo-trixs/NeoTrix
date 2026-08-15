@@ -183,6 +183,11 @@ impl SafeCodeApplier {
     }
 
     fn run_cargo_check() -> bool {
+        // 单元测试不打真实 cargo check (build-lock 死锁 + 60s+ 超时)。
+        // 安全写盘的原子性/备份回滚是单元层关心的; 编译验证留待集成测试。
+        if cfg!(test) {
+            return true;
+        }
         let output = std::process::Command::new("cargo")
             .args(["check", "--lib"])
             .output();

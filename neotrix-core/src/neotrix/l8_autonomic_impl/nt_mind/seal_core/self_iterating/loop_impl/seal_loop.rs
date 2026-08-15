@@ -851,10 +851,20 @@ impl SelfIteratingBrain {
         engine = engine.with_hypothesis_network(hyp_net);
 
         // 连接 GatewayV2: 统一 LLM 网关 (断路器/限流器/回退策略/提供者池)
-        let gateway = std::sync::Arc::new(create_gateway());
-        // R-P79: 注册参与 Auto Exacto 周期重估 — 后台循环 5min cadence 统一 tick
-        crate::neotrix::l1_body_impl::nt_io_provider::gateway::register_gateway_for_re_evaluation(&gateway);
-        engine = engine.with_gateway(gateway.clone());
+        // cfg!(test) 下不接真实网关 — seal 单元测试不该打真实 LLM API (每次 reason
+        // 触发网络调用 + 等待, 单迭代 ~50s)。与 ExternalVerifierStage / SelfReviewStage
+        // 同一测试隔离纪律 (R-P92): 测试验证循环机制, 网关行为留待集成测试。
+        let gateway = if cfg!(test) {
+            None
+        } else {
+            let gw = std::sync::Arc::new(create_gateway());
+            // R-P79: 注册参与 Auto Exacto 周期重估 — 后台循环 5min cadence 统一 tick
+            crate::neotrix::l1_body_impl::nt_io_provider::gateway::register_gateway_for_re_evaluation(&gw);
+            Some(gw)
+        };
+        if let Some(gw) = gateway.as_ref() {
+            engine = engine.with_gateway(gw.clone());
+        }
 
         // 从 self.default_model 设置引擎默认模型（由 entry 层从 config.toml 填充）
         if !self.default_model.is_empty() && self.default_model != "default" {
@@ -906,17 +916,27 @@ impl SelfIteratingBrain {
         // Phase 2: Initialize Task Dispatcher, CoT Generator, Context Builder, and E8Policy
         // 配置系统完善: 支持环境变量覆盖 (NEOTRIX_DISPATCH_* / NEOTRIX_COT_*)
         let dispatcher_config = DispatcherConfig::from_env();
-        let dispatcher = TaskDecomposerDispatcher::new(gateway.clone(), dispatcher_config)
-            .with_kernel(ReasoningKernel::new(self.iteration as usize % 19))
-            .with_e8_policy(E8Policy::default());
-
-        let cot_generator = DefaultCoTGenerator::new(gateway.clone(), CoTConfig::from_env());
         let context_builder = ContextBuilder::new();
         let e8_policy = E8Policy::default();
 
-        // Store in SelfIteratingBrain for later use
-        self.task_dispatcher = Some(dispatcher);
-        self.cot_generator = Some(cot_generator);
+        // 接线纪律 (R-P42/R-P79): TaskDecomposerDispatcher / DefaultCoTGenerator
+        // 需要 Arc<dyn LlmProvider>; gateway 在 cfg!(test) 下为 None (不接真实 LLM)。
+        // 仅在有网关时接线 — 无网关则保持 None, 避免 Option<Arc<GatewayV2>> 类型错配。
+        match gateway {
+            Some(gw) => {
+                let dispatcher = TaskDecomposerDispatcher::new(gw.clone(), dispatcher_config)
+                    .with_kernel(ReasoningKernel::new(self.iteration as usize % 19))
+                    .with_e8_policy(E8Policy::default());
+                let cot_generator = DefaultCoTGenerator::new(gw, CoTConfig::from_env());
+                self.task_dispatcher = Some(dispatcher);
+                self.cot_generator = Some(cot_generator);
+            }
+            None => {
+                // test 模式: 不接 LLM, dispatcher/cot_generator 保持 None (惰性路径)
+                self.task_dispatcher = None;
+                self.cot_generator = None;
+            }
+        }
         self.context_builder = Some(context_builder);
         self.e8_policy = Some(e8_policy);
 

@@ -224,10 +224,15 @@ impl BrainStage for ExternalVerifierStage {
         if let Some(ref engine) = brain.reasoning_engine {
             let traj_len = engine.state_trajectory.len();
             // External grounding: verify reward against cargo check
-            let build_result = std::process::Command::new("cargo")
-                .args(["check", "--lib", "-q", "-p", "neotrix"])
-                .status();
-            let build_ok = build_result.map(|s| s.success()).unwrap_or(false);
+            // 单元测试不打真实 cargo check (build-lock 死锁 + 60s+ 超时) — 与 self_review
+            // / behavioral_verifier 同一 cfg!(test) 隔离纪律。真实验证留待集成测试。
+            let build_ok = if cfg!(test) { true } else {
+                std::process::Command::new("cargo")
+                    .args(["check", "--lib", "-q", "-p", "neotrix"])
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false)
+            };
             let reward_aligns_with_build = if build_ok { brain._reward >= 0.0 } else { brain._reward < 0.0 };
             let verified = brain._reward > 0.3 && build_ok;
             if !verified && brain._reward > 0.3 && !build_ok {

@@ -1446,12 +1446,14 @@ mod tests {
     #[test]
     fn test_autofix_cycle_zeroes_fixes_on_reject() {
         // 接线验证: autofix_cycle_in 中 rejected 变更 → auto_fixes=0 + rollback 模式入报告
-        let mut el = EvolutionLoop::new();
         let dir = std::env::temp_dir().join(format!("nt_audit_gate_{}", std::process::id()));
         std::fs::create_dir_all(dir.join("src")).expect("create mock src");
         std::fs::write(dir.join("src").join("lib.rs"), "pub fn f() {}\n").expect("write mock lib");
 
         // 无 auto_fixable 问题可修 → 修复数为 0, 且 auditor 已注册裁决 (验证接线编译 + 运行)
+        // 用 for_target 锁定扫描目录为 mock 项目 — 否则 PipelineAutoFixer::self_diagnose
+        // 会扫整个真实仓库并对真实源文件写修复 (测试隔离纪律)。
+        let mut el = EvolutionLoop::for_target(&dir);
         let report = el.autofix_cycle_in(Some(&dir), None, None);
         assert!(el.last_audit.is_some(), "autofix_cycle_in 必须产生审计裁决");
         assert_eq!(report.auto_fixes, 0);
