@@ -158,10 +158,128 @@ fn open_memory_conn() -> rusqlite::Connection {
     conn
 }
 
+// ─────────────────── 表格能力 (unified_file_ops) C3 基准 ───────────────────
+use neotrix::neotrix::{
+    merge_tables_with, read_xlsx_sheets_all, write_xlsx_table, MergeSchema, TableData,
+    PRICE_TABLE_SCHEMA,
+};
+use std::path::{Path, PathBuf};
+
+/// 构造临时多 sheet xlsx 目录, 返回目录路径 (bench 前一次性准备)。
+fn make_table_dir() -> PathBuf {
+    let dir = std::env::temp_dir().join("nt_c3_table_bench");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    // 12 个文件, 每个双 sheet, 每 sheet 50 行 (模拟真实价格表形态)
+    for f in 0..12 {
+        let path = dir.join(format!("{}、供应商{f}_价格表.xlsx", f + 1));
+        let mut tables = Vec::new();
+        for (s, sname) in ["主表", "副表"].iter().enumerate() {
+            let mut rows = Vec::new();
+            for r in 0..50 {
+                rows.push(vec![
+                    format!("F{f}-S{s}-{r}"),  // 产品型号
+                    format!("DN{}", 15 + (r % 10) * 5), // 口径
+                    format!("{}", 100.0 + r as f64),     // 单价
+                    format!("{}", 0.5 + r as f64 / 100.0), // 单重
+                    format!("材质{f}"),                    // 阀体材质
+                ]);
+            }
+            tables.push(TableData {
+                name: sname.to_string(),
+                headers: vec![
+                    "产品型号".into(),
+                    "口径".into(),
+                    "含税单价(元)".into(),
+                    "单重(Kg)".into(),
+                    "阀体材质".into(),
+                ],
+                rows,
+            });
+        }
+        // 每文件双 sheet 用 XlsxWriter 写
+        use office_oxide::xlsx::write::{CellData, XlsxWriter};
+        let mut xw = XlsxWriter::new();
+        for (si, t) in tables.iter().enumerate() {
+            let idx = xw.add_sheet_get_index(&t.name);
+            for (c, h) in t.headers.iter().enumerate() {
+                xw.sheet_set_cell(idx, 0, c, CellData::String(h.clone()));
+            }
+            for (r, row) in t.rows.iter().enumerate() {
+                for (c, v) in row.iter().enumerate() {
+                    xw.sheet_set_cell(idx, r + 1, c, CellData::String(v.clone()));
+                }
+            }
+        }
+        xw.save(&path).unwrap();
+    }
+    dir
+}
+
+fn bench_table_read(c: &mut Criterion) {
+    let dir = make_table_dir();
+    let files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    let mut group = c.benchmark_group("table_read_multi_sheet");
+    group.bench_function("read_xlsx_sheets_all_24sheet_600rows", |b| {
+        b.iter(|| {
+            for p in &files {
+                let _ = black_box(read_xlsx_sheets_all(p).unwrap());
+            }
+        });
+    });
+    group.finish();
+}
+
+fn bench_table_merge(c: &mut Criterion) {
+    let dir = make_table_dir();
+    let out = dir.join("bench_merge_out.xlsx");
+    let mut group = c.benchmark_group("table_merge");
+    group.bench_function("merge_tables_with_12files_24sheet", |b| {
+        b.iter(|| {
+            let _ = black_box(
+                merge_tables_with(&PRICE_TABLE_SCHEMA, &dir, &out).unwrap(),
+            );
+        });
+    });
+    group.finish();
+}
+
+fn bench_table_write(c: &mut Criterion) {
+    let dir = make_table_dir();
+    // 600 行单表
+    let mut rows = Vec::new();
+    for r in 0..600 {
+        rows.push(vec![
+            format!("W{r}"),
+            format!("DN{}", 15 + (r % 10) * 5),
+            format!("{}", 100.0 + r as f64),
+        ]);
+    }
+    let table = TableData {
+        name: "Sheet1".into(),
+        headers: vec!["产品型号".into(), "口径".into(), "单价".into()],
+        rows,
+    };
+    let out = dir.join("bench_write_out.xlsx");
+    let mut group = c.benchmark_group("table_write");
+    group.bench_function("write_xlsx_table_600rows", |b| {
+        b.iter(|| {
+            let _ = black_box(write_xlsx_table(&out, &table).unwrap());
+        });
+    });
+    group.finish();
+}
+
 criterion_group!(
     capability_c3,
     bench_visibility_gate,
     bench_decision_trail,
     bench_revertible_effects,
+    bench_table_read,
+    bench_table_merge,
+    bench_table_write,
 );
 criterion_main!(capability_c3);

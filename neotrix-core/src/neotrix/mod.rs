@@ -17,8 +17,6 @@ pub mod l5_consciousness_impl;
 pub mod l6_self_impl;
 pub mod l7_capability_impl;
 pub mod l8_autonomic_impl;
-pub mod l8_capability_impl;
-pub mod l9_capability_impl;
 pub mod l9_transcendent_impl;
 
 // ─── 经验 → 能力树迭代目标桥 (experience-tree 蒸馏 → capability registry) ─
@@ -220,14 +218,14 @@ pub mod proxy_daemon_wrapper;
 // Dark Forest 合规: 模块需有消费者方可存活，每次编辑后需 register_consumer
 pub use nt_file_ability::{
     check_health, consolidate_tables, content_similarity, create_from_markdown, decode_bytes,
-    detect_encoding, embed_text, extract_text, load_snapshot, merge_tables_with,
+    detect_encoding, edit_xlsx_table, embed_text, extract_text, load_snapshot, merge_tables_with,
     normalize_column_name, read_csv, read_structured, read_xlsx_sheets_all, read_xlsx_table,
     replace_placeholder, route_attention, save_edited, specialist_index, store_snapshot,
     to_markdown, write_csv, write_json, write_xlsx_table, ConsolidationReport, ContentSnapshot,
     FileAbility, FileAbilityError, FileAbilitySelfTest, FileKind, FileOperation, ImageMetadata,
     MergeSchema, OcrEngine, OcrResult, PRICE_STANDARD_COLUMNS, PRICE_TABLE_SCHEMA, RuleBasedOcr,
     SheetCellData, SheetCellValueType, SheetData, SheetRowData, StructuredData, TableData,
-    TextEncoding, UnitRule,
+    TableEdit, TextEncoding, UnitRule,
 };
 
 // ─── L7 Capability Tree 採入 (经验 → 能力节点迭代目标) ─────────────────────

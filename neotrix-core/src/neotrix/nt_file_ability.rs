@@ -92,6 +92,8 @@ pub struct ContentSnapshot {
     pub text: Option<String>,
     /// Markdown (office 场景)
     pub markdown: Option<String>,
+    /// 表格数据 (office xlsx / csv 场景; 支持多 sheet 全量)
+    pub table: Option<Vec<TableData>>,
     /// 图像元数据
     pub image: Option<ImageMetadata>,
     /// 音频/视频元数据 (真实头解析, WAV 支持时长)
@@ -615,14 +617,32 @@ impl FileAbility {
         } else {
             None
         };
+        // 表格提取 (office xlsx / csv 场景): 尝试读多 sheet 全量, 失败则 None
+        let table = if self.kind.office() {
+            self.read_table_snapshot()
+        } else {
+            None
+        };
         ContentSnapshot {
             kind: self.kind,
             text,
             markdown,
+            table,
             image,
             media,
             mime_type: self.mime_type.clone(),
             size_bytes: self.size_bytes,
+        }
+    }
+
+    /// 从文件路径读取表格快照 (xlsx 多 sheet 全量 / csv 单表)。
+    fn read_table_snapshot(&self) -> Option<Vec<TableData>> {
+        let path = &self.path;
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        match ext.as_str() {
+            "xlsx" => read_xlsx_sheets_all(path).ok(),
+            "csv" | "tsv" => read_csv(path).ok().map(|t| vec![t]),
+            _ => None,
         }
     }
 }
@@ -1155,6 +1175,101 @@ pub fn write_xlsx_table(path: impl AsRef<Path>, table: &TableData) -> Result<()>
             }
         }
         wb.sheet_set_column_width(sheet, col, (w as f64).clamp(6.0, 40.0));
+    }
+    wb.save(path).map_err(|e| FileAbilityError::Office(office_oxide::OfficeError::from(e)))
+}
+
+/// 单元格编辑操作 (表格级编辑 API — 阶段1.5 基础能力补齐)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableEdit {
+    /// 修改单元格值 (sheet 索引, 行号 0=表头后首行, 列号 0=首列)
+    SetCell { sheet: usize, row: usize, col: usize, value: String },
+    /// 在指定行前插入一行空值 (sheet 索引, 行号)
+    InsertRow { sheet: usize, row: usize },
+    /// 删除一行 (sheet 索引, 行号)
+    RemoveRow { sheet: usize, row: usize },
+}
+
+/// 表格级编辑 — 读全表 → 应用编辑 → 重写回文件 (复用 L1 读写, 无独立实现)。
+/// 返回编辑后的表格 (可用于链式编辑或快照存储)。
+pub fn edit_xlsx_table(
+    path: impl AsRef<Path>,
+    edits: &[TableEdit],
+) -> Result<Vec<TableData>> {
+    let mut tables = read_xlsx_sheets_all(&path)?;
+    for edit in edits {
+        match edit {
+            TableEdit::SetCell { sheet, row, col, value } => {
+                let t = tables.get_mut(*sheet).ok_or_else(|| {
+                    FileAbilityError::Parse(format!("sheet 越界: {sheet}"))
+                })?;
+                if *row >= t.rows.len() {
+                    return Err(FileAbilityError::Parse(format!(
+                        "row 越界: {row} (表 '{}' 共 {} 行)",
+                        t.name,
+                        t.rows.len()
+                    )));
+                }
+                if *col >= t.headers.len() {
+                    return Err(FileAbilityError::Parse(format!(
+                        "col 越界: {col} (表 '{}' 共 {} 列)",
+                        t.name,
+                        t.headers.len()
+                    )));
+                }
+                t.rows[*row][*col] = value.clone();
+            }
+            TableEdit::InsertRow { sheet, row } => {
+                let t = tables.get_mut(*sheet).ok_or_else(|| {
+                    FileAbilityError::Parse(format!("sheet 越界: {sheet}"))
+                })?;
+                if *row > t.rows.len() {
+                    return Err(FileAbilityError::Parse(format!(
+                        "InsertRow 越界: {row} (共 {} 行)",
+                        t.rows.len()
+                    )));
+                }
+                t.rows.insert(*row, vec![String::new(); t.headers.len()]);
+            }
+            TableEdit::RemoveRow { sheet, row } => {
+                let t = tables.get_mut(*sheet).ok_or_else(|| {
+                    FileAbilityError::Parse(format!("sheet 越界: {sheet}"))
+                })?;
+                if *row >= t.rows.len() {
+                    return Err(FileAbilityError::Parse(format!(
+                        "RemoveRow 越界: {row} (共 {} 行)",
+                        t.rows.len()
+                    )));
+                }
+                t.rows.remove(*row);
+            }
+        }
+    }
+    // 多 sheet 用 write_xlsx_sheets 重写
+    write_xlsx_sheets(&path, &tables)?;
+    Ok(tables)
+}
+
+/// 多 sheet 写入 — 每表一个 sheet (用于编辑回写)。
+fn write_xlsx_sheets(path: impl AsRef<Path>, tables: &[TableData]) -> Result<()> {
+    use office_oxide::xlsx::write::{CellData, CellStyle, HAlign, XlsxWriter};
+    let mut wb = XlsxWriter::new();
+    for t in tables {
+        let sheet = wb.add_sheet_get_index(if t.name.is_empty() { "Sheet1" } else { &t.name });
+        let header_style = CellStyle::new()
+            .bold()
+            .font_color("FFFFFF")
+            .background("2F5496")
+            .align(HAlign::Center)
+            .wrap();
+        for (col, h) in t.headers.iter().enumerate() {
+            wb.sheet_set_cell_styled(sheet, 0, col, CellData::String(h.clone()), header_style.clone());
+        }
+        for (r, row) in t.rows.iter().enumerate() {
+            for (col, cell) in row.iter().enumerate() {
+                wb.sheet_set_cell(sheet, r + 1, col, to_cell_data(cell));
+            }
+        }
     }
     wb.save(path).map_err(|e| FileAbilityError::Office(office_oxide::OfficeError::from(e)))
 }
@@ -2452,6 +2567,46 @@ pub fn visual_extract(
 /// FileAbility 自检 — 验证模块能力链路健康
 pub struct FileAbilitySelfTest;
 
+/// 最小压缩 PDF (lopdf 生成, FlateDecode 内容流 + 内嵌 "NeoTrix SelfTest PDF" 文本)
+const PDF_SELF_TEST_SAMPLE: &[u8] = &[
+    0x25,0x50,0x44,0x46,0x2d,0x31,0x2e,0x35,0x0a,0x25,0xbb,0xad,0xc0,0xde,0x0a,0x31,
+    0x20,0x30,0x20,0x6f,0x62,0x6a,0x0a,0x3c,0x3c,0x2f,0x54,0x79,0x70,0x65,0x2f,0x50,
+    0x61,0x67,0x65,0x73,0x2f,0x4b,0x69,0x64,0x73,0x5b,0x35,0x20,0x30,0x20,0x52,0x5d,
+    0x2f,0x43,0x6f,0x75,0x6e,0x74,0x20,0x31,0x2f,0x52,0x65,0x73,0x6f,0x75,0x72,0x63,
+    0x65,0x73,0x20,0x33,0x20,0x30,0x20,0x52,0x2f,0x4d,0x65,0x64,0x69,0x61,0x42,0x6f,
+    0x78,0x5b,0x30,0x20,0x30,0x20,0x35,0x39,0x35,0x20,0x38,0x34,0x32,0x5d,0x3e,0x3e,
+    0x0a,0x65,0x6e,0x64,0x6f,0x62,0x6a,0x0a,0x32,0x20,0x30,0x20,0x6f,0x62,0x6a,0x0a,
+    0x3c,0x3c,0x2f,0x54,0x79,0x70,0x65,0x2f,0x46,0x6f,0x6e,0x74,0x2f,0x53,0x75,0x62,
+    0x74,0x79,0x70,0x65,0x2f,0x54,0x79,0x70,0x65,0x31,0x2f,0x42,0x61,0x73,0x65,0x46,
+    0x6f,0x6e,0x74,0x2f,0x43,0x6f,0x75,0x72,0x69,0x65,0x72,0x3e,0x3e,0x0a,0x65,0x6e,
+    0x64,0x6f,0x62,0x6a,0x0a,0x33,0x20,0x30,0x20,0x6f,0x62,0x6a,0x0a,0x3c,0x3c,0x2f,
+    0x46,0x6f,0x6e,0x74,0x3c,0x3c,0x2f,0x46,0x31,0x20,0x32,0x20,0x30,0x20,0x52,0x3e,
+    0x3e,0x3e,0x3e,0x0a,0x65,0x6e,0x64,0x6f,0x62,0x6a,0x0a,0x34,0x20,0x30,0x20,0x6f,
+    0x62,0x6a,0x0a,0x3c,0x3c,0x2f,0x4c,0x65,0x6e,0x67,0x74,0x68,0x20,0x35,0x32,0x3e,
+    0x3e,0x73,0x74,0x72,0x65,0x61,0x6d,0x0a,0x42,0x54,0x0a,0x2f,0x46,0x31,0x20,0x34,
+    0x38,0x20,0x54,0x66,0x0a,0x31,0x30,0x30,0x20,0x36,0x30,0x30,0x20,0x54,0x64,0x0a,
+    0x28,0x4e,0x65,0x6f,0x54,0x72,0x69,0x78,0x20,0x53,0x65,0x6c,0x66,0x54,0x65,0x73,
+    0x74,0x20,0x50,0x44,0x46,0x29,0x20,0x54,0x6a,0x0a,0x45,0x54,0x0a,0x65,0x6e,0x64,
+    0x73,0x74,0x72,0x65,0x61,0x6d,0x20,0x0a,0x65,0x6e,0x64,0x6f,0x62,0x6a,0x0a,0x35,
+    0x20,0x30,0x20,0x6f,0x62,0x6a,0x0a,0x3c,0x3c,0x2f,0x54,0x79,0x70,0x65,0x2f,0x50,
+    0x61,0x67,0x65,0x2f,0x50,0x61,0x72,0x65,0x6e,0x74,0x20,0x31,0x20,0x30,0x20,0x52,
+    0x2f,0x43,0x6f,0x6e,0x74,0x65,0x6e,0x74,0x73,0x20,0x34,0x20,0x30,0x20,0x52,0x3e,
+    0x3e,0x0a,0x65,0x6e,0x64,0x6f,0x62,0x6a,0x0a,0x36,0x20,0x30,0x20,0x6f,0x62,0x6a,
+    0x0a,0x3c,0x3c,0x2f,0x54,0x79,0x70,0x65,0x2f,0x43,0x61,0x74,0x61,0x6c,0x6f,0x67,
+    0x2f,0x50,0x61,0x67,0x65,0x73,0x20,0x31,0x20,0x30,0x20,0x52,0x3e,0x3e,0x0a,0x65,
+    0x6e,0x64,0x6f,0x62,0x6a,0x0a,0x37,0x20,0x30,0x20,0x6f,0x62,0x6a,0x0a,0x3c,0x3c,
+    0x2f,0x52,0x6f,0x6f,0x74,0x20,0x36,0x20,0x30,0x20,0x52,0x2f,0x54,0x79,0x70,0x65,
+    0x2f,0x58,0x52,0x65,0x66,0x2f,0x53,0x69,0x7a,0x65,0x20,0x38,0x2f,0x57,0x5b,0x31,
+    0x20,0x34,0x20,0x32,0x5d,0x2f,0x49,0x6e,0x64,0x65,0x78,0x5b,0x31,0x20,0x37,0x5d,
+    0x2f,0x4c,0x65,0x6e,0x67,0x74,0x68,0x20,0x34,0x39,0x3e,0x3e,0x73,0x74,0x72,0x65,
+    0x61,0x6d,0x0a,0x01,0x00,0x00,0x00,0x0f,0x00,0x00,0x01,0x00,0x00,0x00,0x68,0x00,
+    0x00,0x01,0x00,0x00,0x00,0xa5,0x00,0x00,0x01,0x00,0x00,0x00,0xcb,0x00,0x00,0x01,
+    0x00,0x00,0x01,0x2f,0x00,0x00,0x01,0x00,0x00,0x01,0x69,0x00,0x00,0x01,0x00,0x00,
+    0x01,0x96,0x00,0x00,0x0a,0x65,0x6e,0x64,0x73,0x74,0x72,0x65,0x61,0x6d,0x20,0x0a,
+    0x65,0x6e,0x64,0x6f,0x62,0x6a,0x0a,0x0a,0x73,0x74,0x61,0x72,0x74,0x78,0x72,0x65,
+    0x66,0x0a,0x34,0x30,0x36,0x0a,0x25,0x25,0x45,0x4f,0x46,
+];
+
 impl SelfTest for FileAbilitySelfTest {
     fn name(&self) -> &str {
         // nt_io_ 前缀 → BranchKind::Io 分支健康上报 (ConsciousnessTree::from_module_name)
@@ -2672,6 +2827,7 @@ impl SelfTest for FileAbilitySelfTest {
             kind: FileKind::Text,
             text: Some("探针".into()),
             markdown: None,
+            table: None,
             image: None,
             media: None,
             mime_type: "text/plain".into(),
@@ -2709,7 +2865,32 @@ impl SelfTest for FileAbilitySelfTest {
             failures.push("低可靠性提取应标记 extraction_bound_ok=false".into());
         }
 
-if failures.is_empty() {
+        // 13) PDF 提取链路 (Ext-8): 探测 + 压缩流解析 (lopdf 生产通路 extract_text)。
+        // 生产接地: extract_text 即 nt_file_ability::plain_text 的 PDF 上游 (T3)。
+        let pdf_fmt = neotrix_types::core::file_parser::FileParser::detect_format(
+            "doc.pdf",
+            "application/pdf",
+            b"%PDF-1.7 \n%%EOF",
+        );
+        if !matches!(
+            pdf_fmt,
+            neotrix_types::core::file_parser::FileFormat::Pdf
+        ) {
+            failures.push("FileParser PDF 探测失败".into());
+        }
+        let pdf_res = neotrix_types::core::file_parser::FileParser::extract_text(
+            "doc.pdf",
+            "application/pdf",
+            PDF_SELF_TEST_SAMPLE,
+        );
+        if !pdf_res.parse_success || !pdf_res.text.contains("NeoTrix SelfTest") {
+            failures.push(format!(
+                "FileParser PDF 压缩流解析失败: success={} text={:?}",
+                pdf_res.parse_success, pdf_res.text
+            ));
+        }
+
+        if failures.is_empty() {
             Ok(())
         } else {
             Err(failures)
@@ -3332,6 +3513,66 @@ mod tests {
         assert!(report.validation_warnings[0].contains("N/A"), "{:?}", report.validation_warnings);
         assert!(report.validation_warnings[1].contains("单重(Kg)"), "{:?}", report.validation_warnings);
         assert!(report.validation_warnings[1].contains("abc"), "{:?}", report.validation_warnings);
+    }
+
+    #[test]
+    fn test_d5_edit_xlsx_table() {
+        // 表格级编辑 API: SetCell / InsertRow / RemoveRow 读写回环
+        let dir = test_dir();
+        let path = dir.join("edit_out.xlsx");
+        let t = TableData {
+            name: "主表".into(),
+            headers: vec!["品名".into(), "单价".into()],
+            rows: vec![
+                vec!["A阀".into(), "100".into()],
+                vec!["B阀".into(), "200".into()],
+            ],
+        };
+        write_xlsx_table(&path, &t).unwrap();
+
+        // SetCell + InsertRow + RemoveRow
+        let tables = edit_xlsx_table(
+            &path,
+            &[
+                TableEdit::SetCell { sheet: 0, row: 0, col: 1, value: "150".into() },
+                TableEdit::InsertRow { sheet: 0, row: 1 },
+                TableEdit::SetCell { sheet: 0, row: 1, col: 0, value: "C阀".into() },
+                TableEdit::SetCell { sheet: 0, row: 1, col: 1, value: "300".into() },
+                TableEdit::RemoveRow { sheet: 0, row: 2 }, // 删原 B阀 行
+            ],
+        )
+        .unwrap();
+        let m = tables.first().unwrap();
+        assert_eq!(m.rows.len(), 2);
+        assert_eq!(m.rows[0][1], "150", "SetCell 生效: {:?}", m.rows[0]);
+        assert_eq!(m.rows[1][0], "C阀", "InsertRow+SetCell 生效: {:?}", m.rows[1]);
+        // 重读验证持久化 (R-P16)
+        let back = read_xlsx_table(&path).unwrap();
+        assert_eq!(back.rows.len(), 2);
+        assert_eq!(back.rows[0][1], "150");
+        assert_eq!(back.rows[1][0], "C阀");
+
+        // 越界应报错
+        let err = edit_xlsx_table(&path, &[TableEdit::SetCell { sheet: 0, row: 99, col: 0, value: "x".into() }]);
+        assert!(err.is_err(), "越界应报错");
+    }
+
+    #[test]
+    fn test_d5_snapshot_table_extraction() {
+        // ContentSnapshot 表格存储: xlsx 快照含多 sheet 表格数据
+        let dir = test_dir();
+        let path = dir.join("snap_out.xlsx");
+        let t = TableData {
+            name: "S1".into(),
+            headers: vec!["品名".into(), "单价".into()],
+            rows: vec![vec!["A阀".into(), "100".into()]],
+        };
+        write_xlsx_table(&path, &t).unwrap();
+        let fa = FileAbility::open(&path).unwrap();
+        let snap = fa.snapshot();
+        let tables = snap.table.as_ref().expect("xlsx 快照应含表格");
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].rows[0][0], "A阀");
     }
 
     #[test]
