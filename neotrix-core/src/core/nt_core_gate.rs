@@ -105,15 +105,30 @@ pub struct ToolSpec {
 
 impl ToolSpec {
     pub fn read_only(name: &str) -> Self {
-        Self { name: name.to_string(), reversibility: ToolReversibility::ReadOnly, undo: None, authority_modifying: false }
+        Self {
+            name: name.to_string(),
+            reversibility: ToolReversibility::ReadOnly,
+            undo: None,
+            authority_modifying: false,
+        }
     }
 
     pub fn reversible(name: &str, undo: &str) -> Self {
-        Self { name: name.to_string(), reversibility: ToolReversibility::Reversible, undo: Some(undo.to_string()), authority_modifying: false }
+        Self {
+            name: name.to_string(),
+            reversibility: ToolReversibility::Reversible,
+            undo: Some(undo.to_string()),
+            authority_modifying: false,
+        }
     }
 
     pub fn irreversible(name: &str) -> Self {
-        Self { name: name.to_string(), reversibility: ToolReversibility::Irreversible, undo: None, authority_modifying: false }
+        Self {
+            name: name.to_string(),
+            reversibility: ToolReversibility::Irreversible,
+            undo: None,
+            authority_modifying: false,
+        }
     }
 }
 
@@ -135,15 +150,16 @@ impl ActionTier {
     pub fn classify(tools: &[ToolSpec]) -> Self {
         let mut tier = ActionTier::Tier1Autonomous;
         for t in tools {
-            let this = if t.authority_modifying || t.reversibility == ToolReversibility::Irreversible {
-                ActionTier::Tier4Human
-            } else if t.reversibility == ToolReversibility::Compensable {
-                ActionTier::Tier3Review
-            } else if t.reversibility == ToolReversibility::Reversible {
-                ActionTier::Tier2Logged
-            } else {
-                ActionTier::Tier1Autonomous
-            };
+            let this =
+                if t.authority_modifying || t.reversibility == ToolReversibility::Irreversible {
+                    ActionTier::Tier4Human
+                } else if t.reversibility == ToolReversibility::Compensable {
+                    ActionTier::Tier3Review
+                } else if t.reversibility == ToolReversibility::Reversible {
+                    ActionTier::Tier2Logged
+                } else {
+                    ActionTier::Tier1Autonomous
+                };
             if tier_rank(this) > tier_rank(tier) {
                 tier = this;
             }
@@ -221,7 +237,10 @@ pub struct Claim {
 
 impl Claim {
     pub fn new(text: &str, refs: &[&str]) -> Self {
-        Self { text: text.to_string(), evidence_refs: refs.iter().map(|s| s.to_string()).collect() }
+        Self {
+            text: text.to_string(),
+            evidence_refs: refs.iter().map(|s| s.to_string()).collect(),
+        }
     }
 }
 
@@ -258,11 +277,24 @@ impl FaithfulnessReport {
                 grounded += 1;
             } else {
                 let missing: Vec<&str> = refs.difference(&evidence).copied().collect();
-                fabricated.push(format!("claim '{}': 引用不存在证据 {:?}", clip(&c.text, 60), missing));
+                fabricated.push(format!(
+                    "claim '{}': 引用不存在证据 {:?}",
+                    clip(&c.text, 60),
+                    missing
+                ));
             }
         }
-        let grounding_ratio = if total == 0 { 0.0 } else { grounded as f64 / total as f64 };
-        Self { claims_total: total, grounded, fabricated, grounding_ratio }
+        let grounding_ratio = if total == 0 {
+            0.0
+        } else {
+            grounded as f64 / total as f64
+        };
+        Self {
+            claims_total: total,
+            grounded,
+            fabricated,
+            grounding_ratio,
+        }
     }
 
     pub fn is_grounded(&self, min_ratio: f64) -> bool {
@@ -292,18 +324,24 @@ pub fn check_schema_fields(required: &[&str], json: &str) -> Vec<SchemaCheck> {
         Ok(serde_json::Value::Object(map)) => Some(map),
         Ok(serde_json::Value::Null) => None,
         Ok(_) => {
-            return required.iter().map(|f| SchemaCheck {
-                field: f.to_string(),
-                present: false,
-                detail: "输出不是 JSON 对象".to_string(),
-            }).collect();
+            return required
+                .iter()
+                .map(|f| SchemaCheck {
+                    field: f.to_string(),
+                    present: false,
+                    detail: "输出不是 JSON 对象".to_string(),
+                })
+                .collect();
         }
         Err(e) => {
-            return required.iter().map(|f| SchemaCheck {
-                field: f.to_string(),
-                present: false,
-                detail: format!("JSON 解析失败: {}", e),
-            }).collect();
+            return required
+                .iter()
+                .map(|f| SchemaCheck {
+                    field: f.to_string(),
+                    present: false,
+                    detail: format!("JSON 解析失败: {}", e),
+                })
+                .collect();
         }
     };
     for f in required {
@@ -311,13 +349,237 @@ pub fn check_schema_fields(required: &[&str], json: &str) -> Vec<SchemaCheck> {
         checks.push(SchemaCheck {
             field: f.to_string(),
             present,
-            detail: if present { "ok".to_string() } else { format!("缺少字段 {}", f) },
+            detail: if present {
+                "ok".to_string()
+            } else {
+                format!("缺少字段 {}", f)
+            },
         });
     }
     checks
 }
 
 // ───────────────────────────── 法官输入 / 意见 ─────────────────────────────
+
+/// 一维评审标准 — Replica 式 per-task rubric 的单个维度。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RubricCriterion {
+    pub name: String,
+    pub description: String,
+    /// 锚定评分范例 (Replica #10: 每维 0.0/0.5/1.0 具体反例锚定分数, 显著降 judge 噪声)。
+    /// 按低→高排列的 <分数, 范例> 对; 缺省空 = 无锚定 (向后兼容)。
+    #[serde(default)]
+    pub score_examples: Vec<(f64, String)>,
+}
+
+impl RubricCriterion {
+    pub fn new(name: &str, description: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            description: description.to_string(),
+            score_examples: Vec::new(),
+        }
+    }
+
+    pub fn with_examples(mut self, examples: Vec<(f64, String)>) -> Self {
+        self.score_examples = examples;
+        self
+    }
+}
+
+/// 任务专属 rubric 规格 (Replica 方法论映射: 自动生成五维 rubric, 低噪声奖励)。
+/// 五维 (Replica 五维 → NeoTrix 评审五维):
+///   claim_support   — 产出是否支撑候选论断 (对应 Replica "支撑科学论断")
+///   evidence_ground — 证据接地, 无幻觉 (对应 Replica "科学诚信/反作弊")
+///   mechanism       — 实现真实机制而非硬编码/代理 (对应 Replica "实现实验设计的机制")
+///   resource        — 计算/预算利用合理 (对应 Replica "预算利用")
+///   fidelity        — 与目标/论文的忠实度 (对应 Replica "图形相似")
+/// 缺省 (None) 时 LLM 法官 fallback 现有 1-4 综合分提示词, 向后兼容。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RubricSpec {
+    pub dimensions: Vec<RubricCriterion>,
+}
+
+impl RubricSpec {
+    /// 缺省五维 rubric — Replica 五维的 NeoTrix 评审映射。
+    pub fn default_five() -> Self {
+        Self {
+            dimensions: vec![
+                RubricCriterion {
+                    name: "claim_support".into(),
+                    description: "产出是否支撑候选论断".into(),
+                    score_examples: vec![
+                        (0.0, "产出与候选论断无关或相矛盾".into()),
+                        (0.5, "产出部分支撑论断但关键环节缺失".into()),
+                        (1.0, "产出完整支撑论断, 无遗漏".into()),
+                    ],
+                },
+                RubricCriterion {
+                    name: "evidence_ground".into(),
+                    description: "证据接地, 无幻觉, 不伪造".into(),
+                    score_examples: vec![
+                        (0.0, "引用不存在的证据或捏造结果".into()),
+                        (0.5, "证据相关但未直接验证断言".into()),
+                        (1.0, "每个断言均有可核验证据支撑".into()),
+                    ],
+                },
+                RubricCriterion {
+                    name: "mechanism".into(),
+                    description: "实现真实机制而非硬编码或代理".into(),
+                    score_examples: vec![
+                        (0.0, "硬编码期望输出绕过机制".into()),
+                        (0.5, "实现了部分机制但走捷径".into()),
+                        (1.0, "实现并执行了完整真实机制".into()),
+                    ],
+                },
+                RubricCriterion {
+                    name: "resource".into(),
+                    description: "计算/预算利用合理, 无浪费".into(),
+                    score_examples: vec![
+                        (0.0, "耗尽预算却无实质进展或空转填充".into()),
+                        (0.5, "预算利用部分合理但有关键浪费".into()),
+                        (1.0, "预算使用与目标成比例, 无浪费".into()),
+                    ],
+                },
+                RubricCriterion {
+                    name: "fidelity".into(),
+                    description: "与目标/论文的忠实度".into(),
+                    score_examples: vec![
+                        (0.0, "声称复现但未忠实于目标设定".into()),
+                        (0.5, "整体忠实但有偏离目标之处".into()),
+                        (1.0, "严格忠实目标设定与实验范围".into()),
+                    ],
+                },
+            ],
+        }
+    }
+}
+
+/// 洞察事件 — 单次 rollout 内实现质量相对历史最佳发生突破 (Replica #2:
+/// within-rollout 洞察检测, 不依赖外部标签, 用 running-max 探测真实能力增长)。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct InsightEvent {
+    /// 触发该事件时的实现质量分数 (样本质量的 running-max 突破点)
+    pub score: f64,
+    /// 突破前的历史最佳 — 事件 = 相对历史的最佳改进幅度
+    pub previous_best: f64,
+    /// 相对改进强度 (0..1) — (score - prev) / (1 - prev); 饱和时 (score==prev==1) 为 0
+    pub strength: f64,
+    /// 该事件所在 rollout 的轮次/编号
+    pub step: u64,
+}
+
+/// 洞察检测器 — 在单个 rollout 内跟踪实现质量的 running-max, 每次质量超过历史最佳
+/// 且改进强度超过阈值时 emit InsightEvent。可序列化跨 session 持久化。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InsightDetector {
+    running_best: f64,
+    threshold: f64,
+    last_step: u64,
+}
+
+impl Default for InsightDetector {
+    fn default() -> Self {
+        Self {
+            running_best: 0.0,
+            threshold: 0.1,
+            last_step: 0,
+        }
+    }
+}
+
+impl InsightDetector {
+    pub fn new(threshold: f64) -> Self {
+        Self {
+            running_best: 0.0,
+            threshold: threshold.max(0.0).min(1.0),
+            last_step: 0,
+        }
+    }
+
+    /// 记录一次实现质量; 若突破 running-best 且强度达阈值则返回洞察事件。
+    /// 首个样本仅建立基线 (running_best==0.0 → 无历史可比, 不构成突破)。
+    pub fn record(&mut self, score: f64, step: u64) -> Option<InsightEvent> {
+        let score = score.clamp(0.0, 1.0);
+        if self.running_best == 0.0 {
+            self.running_best = score;
+            self.last_step = step;
+            return None;
+        }
+        if score > self.running_best && (score - self.running_best) / (1.0 - self.running_best) >= self.threshold {
+            let prev = self.running_best;
+            self.running_best = score;
+            self.last_step = step;
+            return Some(InsightEvent {
+                score,
+                previous_best: prev,
+                strength: if prev == 1.0 { 0.0 } else { (score - prev) / (1.0 - prev) },
+                step,
+            });
+        }
+        None
+    }
+
+    /// 当前 running-best — 序列化恢复后可直接继续追踪。
+    pub fn best(&self) -> f64 {
+        self.running_best
+    }
+
+    /// 重置 — 新 rollout 开始时清除历史最佳。
+    pub fn reset(&mut self) {
+        self.running_best = 0.0;
+        self.last_step = 0;
+    }
+}
+
+/// 自证 — 产物附带生成方对真实执行切片的声明 (Replica #9: 要求报告真实执行切片,
+/// 声称与观测相矛盾则得分砍半)。声明项可为 None = 未自证, 视为轻微扣分而非矛盾。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Attestation {
+    /// 声称真实执行过的代码/工作切片段 id (可空 — 未自证)
+    pub real_slice: Option<String>,
+    /// 声称使用的预算 (可空 — 未自证)
+    pub budget_used: Option<f64>,
+    /// 本轮实际总预算 (观测值)
+    pub budget_total: f64,
+    /// 声称的种子/采样数 (可空 — 未自证)
+    pub claimed_seeds: Option<u32>,
+}
+
+impl Attestation {
+    pub fn new(budget_total: f64) -> Self {
+        Self {
+            real_slice: None,
+            budget_used: None,
+            budget_total,
+            claimed_seeds: None,
+        }
+    }
+
+    /// 与观测比对: 声明与观测矛盾 → 0.5 扣分; 未自证 (声明为 None) → 0.1 轻微扣分;
+    /// 一致 → 无扣分。返回 0..1 的矛盾惩罚系数。
+    pub fn contradiction_score(&self, observed_budget: Option<f64>, observed_seeds: Option<u32>) -> f64 {
+        let mut penalty = 0.0f64;
+        if let Some(declared) = self.budget_used {
+            if let Some(obs) = observed_budget {
+                if declared > obs * 1.05 {
+                    penalty += 0.5;
+                }
+            }
+        }
+        if let Some(declared) = self.claimed_seeds {
+            if let Some(obs) = observed_seeds {
+                if declared != obs {
+                    penalty += 0.5;
+                }
+            }
+        }
+        if penalty == 0.0 && (self.real_slice.is_none() || self.budget_used.is_none()) {
+            penalty += 0.1;
+        }
+        penalty.max(0.0).min(1.0)
+    }
+}
 
 /// 门控输入 — 候选产物 + 声明 + 证据 + 轨迹 + 机械检查失败计数。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -333,6 +595,15 @@ pub struct JudgeInput {
     pub schema_failures: Vec<SchemaCheck>,
     /// 生成方家族 — 用于自我偏好排除
     pub producer_family: JudgeFamily,
+    /// 可选 rubric — 有则五维分评 (Replica: per-task rubric judge); 缺省 fallback 综合分
+    #[serde(default)]
+    pub rubric: Option<RubricSpec>,
+    /// LLM 法官采样次数 — >1 时多次调用取均值降噪 (Replica: 3-sample aggregation)
+    #[serde(default)]
+    pub samples: u8,
+    /// 生成方自证 (Replica #9) — 无则未启用自证纪律
+    #[serde(default)]
+    pub attestation: Option<Attestation>,
 }
 
 impl JudgeInput {
@@ -345,6 +616,9 @@ impl JudgeInput {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            rubric: None,
+            samples: 1,
+            attestation: None,
         }
     }
 }
@@ -395,6 +669,19 @@ pub trait AsyncPanelJudge: Send + Sync + std::fmt::Debug {
     async fn score(&self, input: &JudgeInput) -> JudgeOpinion;
 }
 
+/// 剥离 markdown 代码块围栏: LLM 常返回 ```json ... ``` (实测 llm7/codestral 命中),
+/// 直接 serde 解析会失败 → 误入 llm_parse_failed 低分路径。
+fn strip_markdown_fence(raw: &str) -> String {
+    let s = raw.trim();
+    if s.starts_with("```") {
+        let body = s.trim_start_matches('`');
+        let body = body.strip_prefix("json").unwrap_or(body);
+        let body = body.trim_start_matches('`');
+        return body.trim().trim_end_matches('`').trim().to_string();
+    }
+    s.to_string()
+}
+
 /// LLM 法官适配器 — 把候选结论 + 声明 + 证据喂给 LLM, 要求返回结构化评分。
 ///
 /// 提示词按 FutureAGI 小量表 1-4 出分; 用 structured_output JsonObject 强制 JSON;
@@ -404,6 +691,8 @@ pub struct LLMJudgeAdapter {
     pub family: JudgeFamily,
     pub provider: std::sync::Arc<dyn LlmProvider>,
     pub model: String,
+    /// 采样次数 — >1 时多次调用 LLM 取均值降噪 (Replica: 3-sample aggregation)
+    pub samples: u8,
 }
 
 impl std::fmt::Debug for LLMJudgeAdapter {
@@ -412,47 +701,173 @@ impl std::fmt::Debug for LLMJudgeAdapter {
             .field("id", &self.id)
             .field("family", &self.family)
             .field("model", &self.model)
+            .field("samples", &self.samples)
             .finish()
     }
 }
 
 impl LLMJudgeAdapter {
-    pub fn new(id: &str, family: JudgeFamily, provider: std::sync::Arc<dyn LlmProvider>, model: &str) -> Self {
-        Self { id: id.to_string(), family, provider, model: model.to_string() }
+    pub fn new(
+        id: &str,
+        family: JudgeFamily,
+        provider: std::sync::Arc<dyn LlmProvider>,
+        model: &str,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            family,
+            provider,
+            model: model.to_string(),
+            samples: 1,
+        }
+    }
+
+    pub fn with_samples(mut self, samples: u8) -> Self {
+        self.samples = samples.max(1);
+        self
     }
 
     fn prompt(&self, input: &JudgeInput) -> String {
-        let claims: Vec<String> = input.claims.iter().map(|c| format!("- {}", c.text)).collect();
-        format!(
-            "你是公正评审组的一名评委。请按 1-4 档 (1=完全不可信, 4=可信) 只针对[候选结论]给出综合分。\n\
+        let claims: Vec<String> = input
+            .claims
+            .iter()
+            .map(|c| format!("- {}", c.text))
+            .collect();
+        let base = format!(
+            "你是公正评审组的一名评委。\n\
              [候选结论] {}\n\
              [声明]\n{}\n\
              [证据 id] {}\n\
-             [已记录 grounding 失败] {}\n\
-             输出严格 JSON: {{\"score\": <1..4>, \"confidence\": <0..1>, \"rationale\": \"<一句话>\"}}",
+             [已记录 grounding 失败] {}\n",
             input.candidate,
             claims.join("\n"),
             input.evidence_ids.join(", "),
             input.grounding_failures,
-        )
+        );
+        match &input.rubric {
+            Some(rubric) => {
+                let dims: Vec<String> = rubric
+                    .dimensions
+                    .iter()
+                    .map(|d| {
+                        let anchors: Vec<String> = d
+                            .score_examples
+                            .iter()
+                            .map(|(s, e)| format!("{}分: {}", s, e))
+                            .collect();
+                        if anchors.is_empty() {
+                            format!("  \"{}\": \"{}\",", d.name, d.description)
+                        } else {
+                            format!(
+                                "  \"{}\": \"{}\" (锚定范例: {})",
+                                d.name,
+                                d.description,
+                                anchors.join(" | "),
+                            )
+                        }
+                    })
+                    .collect();
+                format!(
+                    "{}\n\
+                     按以下 rubric 维度逐维评分 (每维 0..1), 并给综合分。\n\
+                     [rubric 维度]\n{}\n\
+                     输出严格 JSON: {{\"score\": <0..1>, \"confidence\": <0..1>, \"rationale\": \"<一句话>\", \
+                     \"criteria\": [{{\"name\": \"<维度名>\", \"score\": <0..1>, \"rationale\": \"<理由>\"}}]}}",
+                    base,
+                    dims.join("\n"),
+                )
+            }
+            None => format!(
+                "{}\n\
+                 请按 1-4 档 (1=完全不可信, 4=可信) 只针对[候选结论]给出综合分。\n\
+                 输出严格 JSON: {{\"score\": <1..4>, \"confidence\": <0..1>, \"rationale\": \"<一句话>\"}}",
+                base,
+            ),
+        }
     }
 
     async fn complete(&self, input: &JudgeInput) -> JudgeOpinion {
+        let samples = input.samples.max(self.samples).max(1) as usize;
+        let mut opinions = Vec::with_capacity(samples);
+        for _ in 0..samples {
+            opinions.push(self.single_sample(input).await);
+        }
+        let mut opinion = opinions.remove(0);
+        if samples > 1 {
+            let mut score_sum = opinion.raw_score;
+            let mut conf_sum = opinion.confidence;
+            for o in &opinions {
+                score_sum += o.raw_score;
+                conf_sum += o.confidence;
+            }
+            opinion.raw_score = (score_sum / samples as f64).max(0.0).min(1.0);
+            opinion.debiased_score = opinion.raw_score;
+            opinion.confidence = (conf_sum / samples as f64).max(0.0).min(1.0);
+            let mut acc: Vec<ScoredCriterion> = Vec::new();
+            let all: Vec<ScoredCriterion> = std::iter::once(&opinion)
+                .chain(opinions.iter())
+                .flat_map(|o| o.criteria.iter().cloned())
+                .collect();
+            for name in [
+                "llm_judge",
+                "claim_support",
+                "evidence_ground",
+                "mechanism",
+                "resource",
+                "fidelity",
+            ] {
+                let grouped: Vec<&ScoredCriterion> =
+                    all.iter().filter(|c| c.name == name).collect();
+                if grouped.is_empty() {
+                    continue;
+                }
+                let s = grouped.iter().map(|c| c.score).sum::<f64>() / grouped.len() as f64;
+                let rationale = grouped
+                    .iter()
+                    .find_map(|c| c.rationale.clone())
+                    .unwrap_or_else(|| format!("{} 维 {} 采样均值", name, grouped.len()));
+                acc.push(ScoredCriterion {
+                    name: name.to_string(),
+                    score: s.max(0.0).min(1.0),
+                    rationale: Some(rationale),
+                });
+            }
+            opinion.criteria = acc;
+            opinion
+                .attribution_tags
+                .push(format!("multi_sample_{}", samples));
+        }
+        opinion
+    }
+
+    async fn single_sample(&self, input: &JudgeInput) -> JudgeOpinion {
         let mut opinion = JudgeOpinion::new(&self.id, self.family);
+        // rubric 五维+criteria 输出体积大, 512 易截断 → rubric 模式放宽到 900
+        let max_tokens = if input.rubric.is_some() { 900 } else { 512 };
         let request = LlmRequest::new(&self.model, &self.prompt(input))
             .with_temperature(Some(0.2))
-            .with_max_tokens(256)
+            .with_max_tokens(max_tokens)
             .with_structured_output(crate::neotrix::l1_body_impl::nt_io_provider::types::StructuredOutputConfig::JsonObject);
         let response = self.provider.complete(&request).await;
         match response {
             Ok(resp) => {
-                match serde_json::from_str::<serde_json::Value>(&resp.content) {
+                // 真实 LLM 常以 ```json 代码块包裹 (实测 llm7/codestral 命中),
+                // 直接 from_str 会误入 llm_parse_failed → 剥离围栏再解析
+                let raw_json = strip_markdown_fence(&resp.content);
+                match serde_json::from_str::<serde_json::Value>(&raw_json) {
                     Ok(v) => {
                         let raw = v.get("score").and_then(|s| s.as_f64()).unwrap_or(0.0);
                         let conf = v.get("confidence").and_then(|s| s.as_f64()).unwrap_or(0.0);
-                        let rationale = v.get("rationale").and_then(|s| s.as_str()).unwrap_or("").to_string();
-                        // 小量表 1-4 → 0..1 (1→0.25, 2→0.5, 3→0.75, 4→1.0)
-                        let score = (raw.max(1.0).min(4.0) - 1.0) / 3.0;
+                        let rationale = v
+                            .get("rationale")
+                            .and_then(|s| s.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let score = if input.rubric.is_some() {
+                            raw.max(0.0).min(1.0)
+                        } else {
+                            (raw.max(1.0).min(4.0) - 1.0) / 3.0
+                        };
                         opinion.raw_score = score.max(0.0).min(1.0);
                         opinion.confidence = conf.max(0.0).min(1.0);
                         opinion.criteria.push(ScoredCriterion {
@@ -460,13 +875,35 @@ impl LLMJudgeAdapter {
                             score,
                             rationale: Some(rationale),
                         });
+                        if let Some(criteria) = v.get("criteria").and_then(|c| c.as_array()) {
+                            for c in criteria {
+                                let name = c
+                                    .get("name")
+                                    .and_then(|n| n.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                let cs = c.get("score").and_then(|s| s.as_f64()).unwrap_or(0.0);
+                                let cr = c
+                                    .get("rationale")
+                                    .and_then(|s| s.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                opinion.criteria.push(ScoredCriterion {
+                                    name,
+                                    score: cs.max(0.0).min(1.0),
+                                    rationale: Some(cr),
+                                });
+                            }
+                        }
                         opinion.attribution_tags.push("llm_provider".to_string());
                     }
                     Err(_) => {
                         // JSON 解析失败 → 低分 + 明确标记, 不 panic
                         opinion.raw_score = 0.2;
                         opinion.confidence = 0.0;
-                        opinion.attribution_tags.push("llm_parse_failed".to_string());
+                        opinion
+                            .attribution_tags
+                            .push("llm_parse_failed".to_string());
                         opinion.criteria.push(ScoredCriterion {
                             name: "llm_judge".to_string(),
                             score: 0.2,
@@ -541,9 +978,19 @@ impl JudgeRegistry {
         Self::default()
     }
 
-    pub fn register(mut self, family: JudgeFamily, provider: std::sync::Arc<dyn LlmProvider>, model: &str) -> Self {
+    pub fn register(
+        mut self,
+        family: JudgeFamily,
+        provider: std::sync::Arc<dyn LlmProvider>,
+        model: &str,
+    ) -> Self {
         let id = format!("llm-{:?}-{}", family, self.entries.len());
-        self.entries.push(JudgeEntry { id, family, provider, model: model.to_string() });
+        self.entries.push(JudgeEntry {
+            id,
+            family,
+            provider,
+            model: model.to_string(),
+        });
         self
     }
 
@@ -556,12 +1003,18 @@ impl JudgeRegistry {
     }
 
     pub fn build_async_judges(&self) -> Vec<Box<dyn AsyncPanelJudge>> {
-        self.entries.iter().map(|e| Box::new(LLMJudgeAdapter {
-            id: e.id.clone(),
-            family: e.family,
-            provider: e.provider.clone(),
-            model: e.model.clone(),
-        }) as Box<dyn AsyncPanelJudge>).collect()
+        self.entries
+            .iter()
+            .map(|e| {
+                Box::new(LLMJudgeAdapter {
+                    id: e.id.clone(),
+                    family: e.family,
+                    provider: e.provider.clone(),
+                    model: e.model.clone(),
+                    samples: 1,
+                }) as Box<dyn AsyncPanelJudge>
+            })
+            .collect()
     }
 }
 
@@ -573,7 +1026,9 @@ pub struct AnalyticPanelJudge {
 
 impl Default for AnalyticPanelJudge {
     fn default() -> Self {
-        Self { id: "analytic-v1".to_string() }
+        Self {
+            id: "analytic-v1".to_string(),
+        }
     }
 }
 
@@ -599,7 +1054,12 @@ impl PanelJudge for AnalyticPanelJudge {
             opinion.criteria.push(ScoredCriterion {
                 name: "soundness".to_string(),
                 score,
-                rationale: Some(format!("轨迹 {} 步, {} 成功, 外部奖励 {}", total, successes, traj.outcome_reward.unwrap_or(0.0))),
+                rationale: Some(format!(
+                    "轨迹 {} 步, {} 成功, 外部奖励 {}",
+                    total,
+                    successes,
+                    traj.outcome_reward.unwrap_or(0.0)
+                )),
             });
         } else {
             let non_empty = !input.candidate.trim().is_empty();
@@ -621,7 +1081,9 @@ impl PanelJudge for AnalyticPanelJudge {
         if input.grounding_failures > 0 {
             let penalty = (input.grounding_failures as f64 * 0.05).max(0.0).min(0.3);
             opinion.raw_score = (opinion.raw_score - penalty).max(0.0).min(1.0);
-            opinion.attribution_tags.push(format!("grounding_failures={}", input.grounding_failures));
+            opinion
+                .attribution_tags
+                .push(format!("grounding_failures={}", input.grounding_failures));
         }
         opinion.confidence = 0.8;
         opinion
@@ -636,7 +1098,9 @@ pub struct EvidencePanelJudge {
 
 impl Default for EvidencePanelJudge {
     fn default() -> Self {
-        Self { id: "evidence-v1".to_string() }
+        Self {
+            id: "evidence-v1".to_string(),
+        }
     }
 }
 
@@ -660,7 +1124,10 @@ impl PanelJudge for EvidencePanelJudge {
         criteria.push(ScoredCriterion {
             name: "faithfulness".to_string(),
             score: faith.grounding_ratio,
-            rationale: Some(format!("grounded {}/{}", faith.grounded, faith.claims_total)),
+            rationale: Some(format!(
+                "grounded {}/{}",
+                faith.grounded, faith.claims_total
+            )),
         });
         if !faith.fabricated.is_empty() {
             tags.push(format!("fabrications={}", faith.fabricated.len()));
@@ -668,13 +1135,23 @@ impl PanelJudge for EvidencePanelJudge {
 
         // 证据覆盖: 每个声明至少 1 条引用
         let refs_total: usize = input.claims.iter().map(|c| c.evidence_refs.len()).sum();
-        let coverage = if input.claims.is_empty() { 0.0 }
-            else { refs_total as f64 / (input.claims.len() as f64).max(1.0) };
+        let coverage = if input.claims.is_empty() {
+            0.0
+        } else {
+            refs_total as f64 / (input.claims.len() as f64).max(1.0)
+        };
         let coverage_score = (coverage / 2.0).max(0.0).min(1.0);
         criteria.push(ScoredCriterion {
             name: "evidence_coverage".to_string(),
             score: coverage_score,
-            rationale: Some(format!("平均引用 {}", if input.claims.is_empty() { 0 } else { refs_total / input.claims.len() })),
+            rationale: Some(format!(
+                "平均引用 {}",
+                if input.claims.is_empty() {
+                    0
+                } else {
+                    refs_total / input.claims.len()
+                }
+            )),
         });
 
         // 冗长惩罚 (verbosity bias mitigation — 在 judge 侧显式记分)
@@ -700,7 +1177,9 @@ pub struct StructuralPanelJudge {
 
 impl Default for StructuralPanelJudge {
     fn default() -> Self {
-        Self { id: "structural-v1".to_string() }
+        Self {
+            id: "structural-v1".to_string(),
+        }
     }
 }
 
@@ -728,11 +1207,17 @@ impl PanelJudge for StructuralPanelJudge {
         opinion.criteria.push(ScoredCriterion {
             name: "schema".to_string(),
             score,
-            rationale: Some(format!("schema_failures={}, claims_structured={}", input.schema_failures.len(), claims_structured)),
+            rationale: Some(format!(
+                "schema_failures={}, claims_structured={}",
+                input.schema_failures.len(),
+                claims_structured
+            )),
         });
         for s in &input.schema_failures {
             if !s.present {
-                opinion.attribution_tags.push(format!("schema_missing:{}", s.field));
+                opinion
+                    .attribution_tags
+                    .push(format!("schema_missing:{}", s.field));
             }
         }
         opinion.confidence = 0.85;
@@ -795,8 +1280,11 @@ impl JudgePanel {
             };
         }
 
-        let excluded: Vec<&str> = if self.debias.require_family_separation && input.producer_family != JudgeFamily::None {
-            self.judges.iter()
+        let excluded: Vec<&str> = if self.debias.require_family_separation
+            && input.producer_family != JudgeFamily::None
+        {
+            self.judges
+                .iter()
                 .filter(|j| j.family() == input.producer_family)
                 .map(|j| j.judge_id())
                 .collect()
@@ -821,7 +1309,11 @@ impl JudgePanel {
     ///
     /// 机械护栏 (schema/grounding/fabrication) 仍确定性前置, LLM 只是聚合中的打分器
     /// (FPAM: 无真实 LLM 法官 → 补齐; R-P79: 同 session 接线生产路径)。
-    pub async fn run_async(&self, input: &JudgeInput, async_judges: &[&dyn AsyncPanelJudge]) -> PanelVerdict {
+    pub async fn run_async(
+        &self,
+        input: &JudgeInput,
+        async_judges: &[&dyn AsyncPanelJudge],
+    ) -> PanelVerdict {
         let guard = GuardrailReport::evaluate(input, &self.debias);
         if guard.action == GuardAction::Reject {
             return PanelVerdict {
@@ -844,11 +1336,19 @@ impl JudgePanel {
             };
         }
 
-        let excluded: Vec<&str> = if self.debias.require_family_separation && input.producer_family != JudgeFamily::None {
-            self.judges.iter()
+        let excluded: Vec<&str> = if self.debias.require_family_separation
+            && input.producer_family != JudgeFamily::None
+        {
+            self.judges
+                .iter()
                 .filter(|j| j.family() == input.producer_family)
                 .map(|j| j.judge_id())
-                .chain(async_judges.iter().filter(|j| j.family() == input.producer_family).map(|j| j.judge_id()))
+                .chain(
+                    async_judges
+                        .iter()
+                        .filter(|j| j.family() == input.producer_family)
+                        .map(|j| j.judge_id()),
+                )
                 .collect()
         } else {
             Vec::new()
@@ -875,14 +1375,46 @@ impl JudgePanel {
         self.finalize(opinions, &excluded)
     }
 
+    /// 异步评审 + 自证观测比对 (Replica #9: 声称与观测矛盾 → 分砍半)。
+    /// 在 run_async 基础上叠加矛盾惩罚: 惩罚系数 → 分数衰减;
+    /// 若衰减后跌破 pass 阈值则 Pass 降级为 Review 转人工。
+    pub async fn run_async_with_observations(
+        &self,
+        input: &JudgeInput,
+        async_judges: &[&dyn AsyncPanelJudge],
+        observed_budget: Option<f64>,
+        observed_seeds: Option<u32>,
+    ) -> PanelVerdict {
+        let mut verdict = self.run_async(input, async_judges).await;
+        if let Some(attestation) = &input.attestation {
+            let penalty = attestation.contradiction_score(observed_budget, observed_seeds);
+            if penalty > 0.0 {
+                verdict.median_score = (verdict.median_score * (1.0 - penalty)).max(0.0);
+                if verdict.median_score < self.debias.pass_threshold
+                    && verdict.verdict == Verdict::Pass
+                {
+                    verdict.verdict = Verdict::Review;
+                    verdict.routed_to_human = true;
+                }
+                verdict.reasoning = format!(
+                    "{}; attestation_penalty={:.2} (矛盾 vs 观测)",
+                    verdict.reasoning, penalty
+                );
+            }
+        }
+        verdict
+    }
+
     /// 对单条意见应用去偏 (verbosity + self-preference), 同步/异步路径共用。
     fn debias_opinion(&self, op: &mut JudgeOpinion, input: &JudgeInput) {
-        let family_same = input.producer_family != JudgeFamily::None && op.family == input.producer_family;
+        let family_same =
+            input.producer_family != JudgeFamily::None && op.family == input.producer_family;
         let penalty = self.debias.verbosity_penalty_for(&input.candidate);
         let mut debiased = op.raw_score - penalty;
         if family_same {
             debiased -= self.debias.self_preference_penalty;
-            op.attribution_tags.push("self_preference_penalized".to_string());
+            op.attribution_tags
+                .push("self_preference_penalized".to_string());
         }
         op.debiased_score = debiased.max(0.0).min(1.0);
     }
@@ -915,10 +1447,21 @@ impl JudgePanel {
         let routed_to_human = verdict == Verdict::Review || verdict == Verdict::Block;
         let reasoning = format!(
             "median={:.3}, agreement={:.3}, judges={}, excluded={:?}, verdict={:?}",
-            median, agreement, opinions.len(), excluded, verdict
+            median,
+            agreement,
+            opinions.len(),
+            excluded,
+            verdict
         );
 
-        PanelVerdict { opinions, median_score: median, agreement, verdict, routed_to_human, reasoning }
+        PanelVerdict {
+            opinions,
+            median_score: median,
+            agreement,
+            verdict,
+            routed_to_human,
+            reasoning,
+        }
     }
 
     /// pass^k 门控: N 次运行, 至少 k 次 Pass 才算放行 (Anthropic: 门禁不用 Pass@1)。
@@ -937,7 +1480,14 @@ impl JudgePanel {
                 routed_to_human: true,
                 reasoning: format!("ensemble 前置护栏拒绝: {}", guard.reason),
             };
-            return EnsembleVerdict { runs, k, passes: 0, passed: false, verdict: Verdict::Block, last: Box::new(v) };
+            return EnsembleVerdict {
+                runs,
+                k,
+                passes: 0,
+                passed: false,
+                verdict: Verdict::Block,
+                last: Box::new(v),
+            };
         }
         if guard.action == GuardAction::Quarantine {
             let v = PanelVerdict {
@@ -948,7 +1498,14 @@ impl JudgePanel {
                 routed_to_human: true,
                 reasoning: format!("ensemble 前置护栏隔离: {}", guard.reason),
             };
-            return EnsembleVerdict { runs, k, passes: 0, passed: false, verdict: Verdict::Review, last: Box::new(v) };
+            return EnsembleVerdict {
+                runs,
+                k,
+                passes: 0,
+                passed: false,
+                verdict: Verdict::Review,
+                last: Box::new(v),
+            };
         }
 
         let k = k.min(runs).max(1);
@@ -962,7 +1519,13 @@ impl JudgePanel {
             last = Some(v);
         }
         let passed = passes >= k;
-        let verdict = if passed { Verdict::Pass } else if passes == 0 { Verdict::Block } else { Verdict::Review };
+        let verdict = if passed {
+            Verdict::Pass
+        } else if passes == 0 {
+            Verdict::Block
+        } else {
+            Verdict::Review
+        };
         EnsembleVerdict {
             runs,
             k,
@@ -982,7 +1545,9 @@ impl DebiasConfig {
             return 0.0;
         }
         let over = (len - self.verbosity_norm_len) as f64 / self.verbosity_norm_len as f64;
-        (over * self.verbosity_penalty).max(0.0).min(self.verbosity_penalty_cap)
+        (over * self.verbosity_penalty)
+            .max(0.0)
+            .min(self.verbosity_penalty_cap)
     }
 }
 
@@ -1115,12 +1680,29 @@ pub fn deliberate(opinions: &[JudgeOpinion]) -> DebateReport {
     }
 
     // 收敛: 反方拉动 (均值向 Con 方向收敛), 分歧大时收敛更强 (取反方意见更重)。
-    let con_mean: Vec<f64> = rounds.iter().filter(|r| r.role == DebateRole::Con).map(|r| r.score).collect();
-    let pro_mean: Vec<f64> = rounds.iter().filter(|r| r.role == DebateRole::Pro).map(|r| r.score).collect();
-    let con_avg = if con_mean.is_empty() { mean } else { con_mean.iter().sum::<f64>() / con_mean.len() as f64 };
-    let pro_avg = if pro_mean.is_empty() { mean } else { pro_mean.iter().sum::<f64>() / pro_mean.len() as f64 };
+    let con_mean: Vec<f64> = rounds
+        .iter()
+        .filter(|r| r.role == DebateRole::Con)
+        .map(|r| r.score)
+        .collect();
+    let pro_mean: Vec<f64> = rounds
+        .iter()
+        .filter(|r| r.role == DebateRole::Pro)
+        .map(|r| r.score)
+        .collect();
+    let con_avg = if con_mean.is_empty() {
+        mean
+    } else {
+        con_mean.iter().sum::<f64>() / con_mean.len() as f64
+    };
+    let pro_avg = if pro_mean.is_empty() {
+        mean
+    } else {
+        pro_mean.iter().sum::<f64>() / pro_mean.len() as f64
+    };
     // 三因素修正: 基准均值 + 反方权重 (分歧度) + 正方残余 (1-分歧度)
-    let converged_score = mean * 0.5 + con_avg * divergence * 0.5 + pro_avg * (1.0 - divergence) * 0.5;
+    let converged_score =
+        mean * 0.5 + con_avg * divergence * 0.5 + pro_avg * (1.0 - divergence) * 0.5;
 
     DebateReport {
         rounds,
@@ -1172,7 +1754,10 @@ impl GuardrailReport {
         if !faith.is_grounded(cfg.grounding_min_ratio) {
             return Self {
                 action: GuardAction::Reject,
-                reason: format!("grounding {:.2} < {:.2}", faith.grounding_ratio, cfg.grounding_min_ratio),
+                reason: format!(
+                    "grounding {:.2} < {:.2}",
+                    faith.grounding_ratio, cfg.grounding_min_ratio
+                ),
                 faithfulness: faith,
                 schema_failures: Vec::new(),
                 grounding_failures: input.grounding_failures,
@@ -1276,13 +1861,18 @@ impl GateDecision {
             tier,
             action: GuardAction::Allow,
             verdict,
-            reason: format!("门控通过: tier={:?}, verdict={:?}, action={:?}", tier, verdict, guardrail.action),
+            reason: format!(
+                "门控通过: tier={:?}, verdict={:?}, action={:?}",
+                tier, verdict, guardrail.action
+            ),
         }
     }
 
     /// 是否允许自治执行 — 唯一放行条件。
     pub fn allows_autonomous(&self) -> bool {
-        self.level == GateLevel::Light && self.action == GuardAction::Allow && self.verdict == Verdict::Pass
+        self.level == GateLevel::Light
+            && self.action == GuardAction::Allow
+            && self.verdict == Verdict::Pass
     }
 
     /// 工具级前置检查 — 给定工具名, 返回 (允许, 原因)。
@@ -1294,7 +1884,10 @@ impl GateDecision {
         _panel: &JudgePanel,
     ) -> (bool, String) {
         let Some(spec) = registry.get(tool_name) else {
-            return (false, format!("工具 '{}' 未在注册表中, 默认拒绝", tool_name));
+            return (
+                false,
+                format!("工具 '{}' 未在注册表中, 默认拒绝", tool_name),
+            );
         };
         // 单工具快速判定: 只读/可逆 → 允许 (后续完整路径再查); 不可逆/扩权 → 拒绝需人工
         match spec.reversibility {
@@ -1391,7 +1984,15 @@ impl CalibrationSet {
     /// 标签规则 (确定性, 非猜测): `type` ∈ 失败族 → Broken; 其余 → Clean。
     pub fn from_kb_experience(entries: &[(String, String)]) -> Self {
         let failure_types = [
-            "defect", "error", "blocker", "block", "regression", "fail", "wip", "warning", "bug",
+            "defect",
+            "error",
+            "blocker",
+            "block",
+            "regression",
+            "fail",
+            "wip",
+            "warning",
+            "bug",
         ];
         let mut gold: Vec<GoldTrajectory> = Vec::new();
         let mut id = 0u64;
@@ -1399,8 +2000,12 @@ impl CalibrationSet {
             if !key.starts_with("branch_") {
                 continue;
             }
-            let Ok(v) = serde_json::from_str::<serde_json::Value>(value) else { continue };
-            let Some(etype) = v.get("type").and_then(|t| t.as_str()) else { continue };
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(value) else {
+                continue;
+            };
+            let Some(etype) = v.get("type").and_then(|t| t.as_str()) else {
+                continue;
+            };
             let content = v.get("content").and_then(|t| t.as_str()).unwrap_or("");
             let evidence = v.get("evidence").and_then(|t| t.as_str()).unwrap_or("");
             let label = if failure_types.iter().any(|f| etype.eq_ignore_ascii_case(f)) {
@@ -1418,10 +2023,15 @@ impl CalibrationSet {
                 output: content.to_string(),
                 duration_ms: None,
                 success: label == TrajectoryLabel::Clean,
-                external_reward: Some(if label == TrajectoryLabel::Clean { 1.0 } else { 0.0 }),
+                external_reward: Some(if label == TrajectoryLabel::Clean {
+                    1.0
+                } else {
+                    0.0
+                }),
             });
             traj.completed = true;
-            let evidence_ids: Vec<String> = evidence.split([',', ' ', ';'])
+            let evidence_ids: Vec<String> = evidence
+                .split([',', ' ', ';'])
                 .filter(|s| !s.trim().is_empty())
                 .map(|s| s.trim().to_string())
                 .collect();
@@ -1432,7 +2042,11 @@ impl CalibrationSet {
                 trajectory: traj,
                 claims: vec![Claim::new(content, &evidence_refs)],
                 evidence_ids,
-                grounding_failures: if label == TrajectoryLabel::Broken { 2 } else { 0 },
+                grounding_failures: if label == TrajectoryLabel::Broken {
+                    2
+                } else {
+                    0
+                },
                 schema_failures: Vec::new(),
             });
             id += 1;
@@ -1457,6 +2071,9 @@ impl CalibrationSet {
                 grounding_failures: g.grounding_failures,
                 schema_failures: g.schema_failures.clone(),
                 producer_family: JudgeFamily::None,
+                rubric: None,
+                samples: 1,
+                attestation: None,
             };
             let ens = panel.run_ensemble(&input, runs, k);
             match g.label {
@@ -1475,11 +2092,31 @@ impl CalibrationSet {
             }
         }
 
-        let clean_recall = if clean_total == 0 { 0.0 } else { clean_pass as f64 / clean_total as f64 };
-        let broken_precision = if broken_total == 0 { 1.0 } else { broken_block as f64 / broken_total as f64 };
-        let balanced = if (clean_recall + broken_precision) == 0.0 { 0.0 } else { 2.0 * clean_recall * broken_precision / (clean_recall + broken_precision) };
+        let clean_recall = if clean_total == 0 {
+            0.0
+        } else {
+            clean_pass as f64 / clean_total as f64
+        };
+        let broken_precision = if broken_total == 0 {
+            1.0
+        } else {
+            broken_block as f64 / broken_total as f64
+        };
+        let balanced = if (clean_recall + broken_precision) == 0.0 {
+            0.0
+        } else {
+            2.0 * clean_recall * broken_precision / (clean_recall + broken_precision)
+        };
 
-        CalibrationReport { clean_total, clean_pass, broken_total, broken_block, clean_recall, broken_precision, balanced }
+        CalibrationReport {
+            clean_total,
+            clean_pass,
+            broken_total,
+            broken_block,
+            clean_recall,
+            broken_precision,
+            balanced,
+        }
     }
 }
 
@@ -1501,10 +2138,12 @@ pub struct CalibrationReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::nt_core_prm::{TrajectoryStep};
     use crate::core::nt_core_hex::ReasoningHexagram;
+    use crate::core::nt_core_prm::TrajectoryStep;
     use crate::core::nt_core_traits::SpecialistType;
-    use crate::neotrix::l1_body_impl::nt_io_provider::{LlmError, LlmResponse, LlmRequest, Usage, FinishReason};
+    use crate::neotrix::l1_body_impl::nt_io_provider::{
+        FinishReason, LlmError, LlmRequest, LlmResponse, Usage,
+    };
 
     /// 测试用 mock LLM 法官 — 返回固定结构化 JSON 评分。
     struct MockJudgeProvider {
@@ -1524,11 +2163,14 @@ mod tests {
                 model: "mock-judge".into(),
                 usage: Usage::default(),
                 finish_reason: FinishReason::Stop,
-            tool_calls: None,
+                tool_calls: None,
             })
         }
 
-        async fn stream_complete(&self, _request: &LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+        async fn stream_complete(
+            &self,
+            _request: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
             let (_, rx) = tokio::sync::mpsc::channel(1);
             Ok(rx)
         }
@@ -1557,21 +2199,33 @@ mod tests {
     fn tier_all_read_only_is_autonomous() {
         let tools = vec![ToolSpec::read_only("select"), ToolSpec::read_only("get")];
         assert_eq!(ActionTier::classify(&tools), ActionTier::Tier1Autonomous);
-        assert_eq!(ActionTier::classify(&tools).required_gate(), GateLevel::Light);
+        assert_eq!(
+            ActionTier::classify(&tools).required_gate(),
+            GateLevel::Light
+        );
     }
 
     #[test]
     fn tier_reversible_is_logged_light() {
         let tools = vec![ToolSpec::reversible("edit_file", "undo_edit")];
         assert_eq!(ActionTier::classify(&tools), ActionTier::Tier2Logged);
-        assert_eq!(ActionTier::classify(&tools).required_gate(), GateLevel::Light);
+        assert_eq!(
+            ActionTier::classify(&tools).required_gate(),
+            GateLevel::Light
+        );
     }
 
     #[test]
     fn tier_irreversible_forces_human() {
-        let tools = vec![ToolSpec::read_only("get"), ToolSpec::irreversible("send_email")];
+        let tools = vec![
+            ToolSpec::read_only("get"),
+            ToolSpec::irreversible("send_email"),
+        ];
         assert_eq!(ActionTier::classify(&tools), ActionTier::Tier4Human);
-        assert_eq!(ActionTier::classify(&tools).required_gate(), GateLevel::Human);
+        assert_eq!(
+            ActionTier::classify(&tools).required_gate(),
+            GateLevel::Human
+        );
     }
 
     #[test]
@@ -1583,7 +2237,15 @@ mod tests {
 
     #[test]
     fn tier_compensable_is_review() {
-        let tools = vec![ToolSpec::read_only("get"), ToolSpec { name: "refund".to_string(), reversibility: ToolReversibility::Compensable, undo: None, authority_modifying: false }];
+        let tools = vec![
+            ToolSpec::read_only("get"),
+            ToolSpec {
+                name: "refund".to_string(),
+                reversibility: ToolReversibility::Compensable,
+                undo: None,
+                authority_modifying: false,
+            },
+        ];
         assert_eq!(ActionTier::classify(&tools), ActionTier::Tier3Review);
     }
 
@@ -1595,7 +2257,8 @@ mod tests {
             Claim::new("claim with missing ref", &["E-999"]),
             Claim::new("claim with no ref", &[]),
         ];
-        let report = FaithfulnessReport::audit(&claims, &["E-001".to_string(), "E-002".to_string()]);
+        let report =
+            FaithfulnessReport::audit(&claims, &["E-001".to_string(), "E-002".to_string()]);
         assert_eq!(report.grounded, 1);
         assert_eq!(report.fabricated.len(), 2);
         assert!(!report.is_grounded(0.6));
@@ -1640,6 +2303,9 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let panel = JudgePanel::default_panel();
         let v = panel.run(&input);
@@ -1658,6 +2324,9 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let panel = JudgePanel::default_panel();
         let v = panel.run(&input);
@@ -1674,6 +2343,9 @@ mod tests {
             grounding_failures: 3,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let panel = JudgePanel::default_panel();
         let v = panel.run(&input);
@@ -1689,7 +2361,10 @@ mod tests {
         let panel = JudgePanel::default_panel();
         let v = panel.run(&input);
         assert_eq!(v.opinions.len(), 2, "同族证据法官应被排除");
-        assert!(v.opinions.iter().all(|o| o.family != JudgeFamily::Heuristic));
+        assert!(v
+            .opinions
+            .iter()
+            .all(|o| o.family != JudgeFamily::Heuristic));
     }
 
     #[test]
@@ -1704,6 +2379,9 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let v = panel.run(&input);
         assert_eq!(v.verdict, Verdict::Review, "{}", v.reasoning);
@@ -1720,6 +2398,9 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let panel = JudgePanel::default_panel();
         let ens = panel.run_ensemble(&input, 5, 5);
@@ -1731,7 +2412,11 @@ mod tests {
     #[test]
     fn guardrail_rejects_schema_failure() {
         let mut input = JudgeInput::new("x");
-        input.schema_failures = vec![SchemaCheck { field: "result".to_string(), present: false, detail: "missing".to_string() }];
+        input.schema_failures = vec![SchemaCheck {
+            field: "result".to_string(),
+            present: false,
+            detail: "missing".to_string(),
+        }];
         let g = GuardrailReport::evaluate(&input, &DebiasConfig::default());
         assert_eq!(g.action, GuardAction::Reject);
     }
@@ -1748,7 +2433,11 @@ mod tests {
     #[test]
     fn guardrail_quarantines_fabrications() {
         let mut input = JudgeInput::new("x");
-        input.claims = vec![Claim::new("c1", &["E-001"]), Claim::new("c2", &["E-001"]), Claim::new("c3", &["E-999"])];
+        input.claims = vec![
+            Claim::new("c1", &["E-001"]),
+            Claim::new("c2", &["E-001"]),
+            Claim::new("c3", &["E-999"]),
+        ];
         input.evidence_ids = vec!["E-001".to_string(), "E-002".to_string()];
         let g = GuardrailReport::evaluate(&input, &DebiasConfig::default());
         assert_eq!(g.action, GuardAction::Quarantine, "{}", g.reason);
@@ -1776,8 +2465,14 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
-        let tools = vec![ToolSpec::read_only("get"), ToolSpec::reversible("edit", "undo")];
+        let tools = vec![
+            ToolSpec::read_only("get"),
+            ToolSpec::reversible("edit", "undo"),
+        ];
         let d = GateDecision::decide(&tools, &input, &JudgePanel::default_panel());
         assert!(d.allows_autonomous(), "{}", d.reason);
     }
@@ -1792,6 +2487,9 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let tools = vec![ToolSpec::irreversible("send_email")];
         let d = GateDecision::decide(&tools, &input, &JudgePanel::default_panel());
@@ -1803,7 +2501,11 @@ mod tests {
     #[test]
     fn gate_reject_wins_over_confidence() {
         let mut input = JudgeInput::new("x");
-        input.schema_failures = vec![SchemaCheck { field: "id".to_string(), present: false, detail: "missing".to_string() }];
+        input.schema_failures = vec![SchemaCheck {
+            field: "id".to_string(),
+            present: false,
+            detail: "missing".to_string(),
+        }];
         let tools = vec![ToolSpec::read_only("get")];
         let d = GateDecision::decide(&tools, &input, &JudgePanel::default_panel());
         assert_eq!(d.action, GuardAction::Reject);
@@ -1830,7 +2532,11 @@ mod tests {
             claims: vec![Claim::new("c1", &["E-999"])],
             evidence_ids: vec!["E-001".to_string()],
             grounding_failures: 4,
-            schema_failures: vec![SchemaCheck { field: "result".to_string(), present: false, detail: "missing".to_string() }],
+            schema_failures: vec![SchemaCheck {
+                field: "result".to_string(),
+                present: false,
+                detail: "missing".to_string(),
+            }],
         };
         let set = CalibrationSet::new(vec![clean, broken]);
         let report = set.pass_k(&JudgePanel::default_panel(), 3, 3);
@@ -1854,7 +2560,11 @@ mod tests {
     #[test]
     fn ensemble_rejects_on_schema_failure() {
         let mut input = JudgeInput::new("x");
-        input.schema_failures = vec![SchemaCheck { field: "id".to_string(), present: false, detail: "missing".to_string() }];
+        input.schema_failures = vec![SchemaCheck {
+            field: "id".to_string(),
+            present: false,
+            detail: "missing".to_string(),
+        }];
         let panel = JudgePanel::default_panel();
         let ens = panel.run_ensemble(&input, 5, 3);
         assert_eq!(ens.verdict, Verdict::Block, "{}", ens.last.reasoning);
@@ -1874,7 +2584,11 @@ mod tests {
     #[test]
     fn ensemble_quarantines_on_fabrication() {
         let mut input = JudgeInput::new("x");
-        input.claims = vec![Claim::new("c1", &["E-001"]), Claim::new("c2", &["E-001"]), Claim::new("c3", &["E-999"])];
+        input.claims = vec![
+            Claim::new("c1", &["E-001"]),
+            Claim::new("c2", &["E-001"]),
+            Claim::new("c3", &["E-999"]),
+        ];
         input.evidence_ids = vec!["E-001".to_string(), "E-002".to_string()];
         let panel = JudgePanel::default_panel();
         let ens = panel.run_ensemble(&input, 3, 3);
@@ -1892,6 +2606,9 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let panel = JudgePanel::default_panel();
         let ens = panel.run_ensemble(&input, 5, 5);
@@ -1904,7 +2621,12 @@ mod tests {
     fn registry_unknown_tool_denied() {
         let reg = ToolRegistry::from_read_only(&["get", "query"]);
         assert!(reg.get("get").is_some());
-        let (allowed, reason) = GateDecision::check_tool_call("rm -rf", &reg, &JudgeInput::new("x"), &JudgePanel::default_panel());
+        let (allowed, reason) = GateDecision::check_tool_call(
+            "rm -rf",
+            &reg,
+            &JudgeInput::new("x"),
+            &JudgePanel::default_panel(),
+        );
         assert!(!allowed, "{}", reason);
     }
 
@@ -1932,6 +2654,9 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let ro_reg = ToolRegistry::from_read_only(&["get"]);
         let ro = GateDecision::check_path(&ro_reg.cloned_specs(), &input, &panel);
@@ -1944,18 +2669,29 @@ mod tests {
     // ── LLM 法官 (异步评审路径) ──
     #[tokio::test]
     async fn llm_judge_scores_good_provider() {
-        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider { score: 4.0, confidence: 0.9 });
-        let judge = LLMJudgeAdapter::new("llm-good", JudgeFamily::Heuristic, provider, "mock-model");
+        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider {
+            score: 4.0,
+            confidence: 0.9,
+        });
+        let judge =
+            LLMJudgeAdapter::new("llm-good", JudgeFamily::Heuristic, provider, "mock-model");
         let input = JudgeInput::new("test");
         let op = judge.score(&input).await;
-        assert!((op.raw_score - 1.0).abs() < 0.01, "4/4 → 1.0, got {}", op.raw_score);
+        assert!(
+            (op.raw_score - 1.0).abs() < 0.01,
+            "4/4 → 1.0, got {}",
+            op.raw_score
+        );
         assert!((op.confidence - 0.9).abs() < 0.01);
         assert!(op.attribution_tags.iter().any(|t| t == "llm_provider"));
     }
 
     #[tokio::test]
     async fn llm_judge_low_score_drags_panel_to_review() {
-        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider { score: 1.0, confidence: 0.9 });
+        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider {
+            score: 1.0,
+            confidence: 0.9,
+        });
         let judge = LLMJudgeAdapter::new("llm-bad", JudgeFamily::Heuristic, provider, "mock-model");
         let input = JudgeInput {
             candidate: "concise grounded".to_string(),
@@ -1965,27 +2701,53 @@ mod tests {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            attestation: None,
+            rubric: None,
+            samples: 1,
         };
         let panel = JudgePanel::default_panel();
         let verdict = panel.run_async(&input, &[&judge]).await;
-        assert!(!verdict.is_pass(), "LLM 低分应阻止放行: {}", verdict.reasoning);
+        assert!(
+            !verdict.is_pass(),
+            "LLM 低分应阻止放行: {}",
+            verdict.reasoning
+        );
     }
 
     #[tokio::test]
     async fn llm_judge_guardrail_still_blocks_schema_failure() {
-        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider { score: 4.0, confidence: 0.9 });
-        let judge = LLMJudgeAdapter::new("llm-good", JudgeFamily::Heuristic, provider, "mock-model");
+        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider {
+            score: 4.0,
+            confidence: 0.9,
+        });
+        let judge =
+            LLMJudgeAdapter::new("llm-good", JudgeFamily::Heuristic, provider, "mock-model");
         let mut input = JudgeInput::new("x");
-        input.schema_failures = vec![SchemaCheck { field: "id".to_string(), present: false, detail: "missing".to_string() }];
+        input.schema_failures = vec![SchemaCheck {
+            field: "id".to_string(),
+            present: false,
+            detail: "missing".to_string(),
+        }];
         let panel = JudgePanel::default_panel();
         let verdict = panel.run_async(&input, &[&judge]).await;
-        assert_eq!(verdict.verdict, Verdict::Block, "机械检查压过 LLM 分数: {}", verdict.reasoning);
+        assert_eq!(
+            verdict.verdict,
+            Verdict::Block,
+            "机械检查压过 LLM 分数: {}",
+            verdict.reasoning
+        );
     }
 
     #[tokio::test]
     async fn judge_registry_builds_async_judges() {
-        let p1: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider { score: 3.0, confidence: 0.8 });
-        let p2: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider { score: 4.0, confidence: 0.85 });
+        let p1: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider {
+            score: 3.0,
+            confidence: 0.8,
+        });
+        let p2: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider {
+            score: 4.0,
+            confidence: 0.85,
+        });
         let registry = JudgeRegistry::new()
             .register(JudgeFamily::Analytic, p1, "model-a")
             .register(JudgeFamily::Symbolic, p2, "model-b");
@@ -1993,6 +2755,183 @@ mod tests {
         let judges = registry.build_async_judges();
         assert_eq!(judges.len(), 2);
         assert!(judges.iter().all(|j| j.family() != JudgeFamily::None));
+    }
+
+    // ── Replica 式 rubric judge (arXiv 2608.13331 吸收) ──
+
+    /// 测试用 rubric mock LLM — 返回五维 criteria JSON (0..1)。
+    struct MockRubricProvider {
+        score: f64,
+        dim: f64,
+    }
+
+    #[async_trait::async_trait]
+    impl LlmProvider for MockRubricProvider {
+        async fn complete(&self, _request: &LlmRequest) -> Result<LlmResponse, LlmError> {
+            let content = format!(
+                r#"{{"score":{}, "confidence":0.8, "rationale":"rubric judge",
+                    "criteria":[
+                      {{"name":"claim_support","score":{}, "rationale":"supports"}},
+                      {{"name":"evidence_ground","score":{}, "rationale":"grounded"}},
+                      {{"name":"mechanism","score":{}, "rationale":"real"}},
+                      {{"name":"resource","score":{}, "rationale":"ok"}},
+                      {{"name":"fidelity","score":{}, "rationale":"faithful"}}
+                    ]}}"#,
+                self.score, self.dim, self.dim, self.dim, self.dim, self.dim
+            );
+            Ok(LlmResponse {
+                content,
+                model: "mock-rubric".into(),
+                usage: Usage::default(),
+                finish_reason: FinishReason::Stop,
+                tool_calls: None,
+            })
+        }
+
+        async fn stream_complete(
+            &self,
+            _request: &LlmRequest,
+        ) -> Result<tokio::sync::mpsc::Receiver<Result<LlmResponse, LlmError>>, LlmError> {
+            let (_, rx) = tokio::sync::mpsc::channel(1);
+            Ok(rx)
+        }
+    }
+
+    #[tokio::test]
+    async fn rubric_judge_parses_five_dimensions() {
+        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockRubricProvider {
+            score: 0.8,
+            dim: 0.7,
+        });
+        let judge =
+            LLMJudgeAdapter::new("llm-rubric", JudgeFamily::Analytic, provider, "mock-rubric");
+        let mut input = JudgeInput::new("candidate");
+        input.rubric = Some(RubricSpec::default_five());
+        let op = judge.score(&input).await;
+        assert!(
+            (op.raw_score - 0.8).abs() < 0.01,
+            "rubric 综合分 0..1 直用: {}",
+            op.raw_score
+        );
+        let names: Vec<&str> = op.criteria.iter().map(|c| c.name.as_str()).collect();
+        for dim in [
+            "llm_judge",
+            "claim_support",
+            "evidence_ground",
+            "mechanism",
+            "resource",
+            "fidelity",
+        ] {
+            assert!(names.contains(&dim), "缺少维度 {}: {:?}", dim, names);
+        }
+        assert!(op.attribution_tags.iter().any(|t| t == "llm_provider"));
+    }
+
+    #[tokio::test]
+    async fn rubric_judge_falls_back_without_spec() {
+        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockJudgeProvider {
+            score: 4.0,
+            confidence: 0.9,
+        });
+        let judge =
+            LLMJudgeAdapter::new("llm-plain", JudgeFamily::Analytic, provider, "mock-model");
+        let input = JudgeInput::new("no rubric");
+        let op = judge.score(&input).await;
+        assert!(
+            (op.raw_score - 1.0).abs() < 0.01,
+            "fallback 1-4 量表: {}",
+            op.raw_score
+        );
+        assert!(
+            op.criteria.iter().all(|c| c.name == "llm_judge"),
+            "无 rubric 不产维度标准"
+        );
+    }
+
+    #[tokio::test]
+    async fn rubric_judge_multi_sample_aggregates_mean() {
+        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(MockRubricProvider {
+            score: 0.8,
+            dim: 0.7,
+        });
+        let judge =
+            LLMJudgeAdapter::new("llm-sample", JudgeFamily::Analytic, provider, "mock-rubric")
+                .with_samples(3);
+        let mut input = JudgeInput::new("candidate");
+        input.rubric = Some(RubricSpec::default_five());
+        let op = judge.score(&input).await;
+        assert!(
+            (op.raw_score - 0.8).abs() < 0.01,
+            "均值聚合: {}",
+            op.raw_score
+        );
+        assert!(
+            op.attribution_tags.iter().any(|t| t == "multi_sample_3"),
+            "应标记多采样"
+        );
+        let cs = op.criteria.iter().filter(|c| c.name == "mechanism").count();
+        assert_eq!(cs, 1, "维度标准应合并为均值单条, got {}", cs);
+    }
+
+    // ── 真实 LLM 端到端链路 (env-gated) ──
+    // LLM7 codestral-latest 匿名可用 (2026-08 实测); 网络隔离需逃生门。
+    // 运行: NT_E2E_LLM7=1 NEOTRIX_NETWORK_UNBLOCK=1 cargo test -p neotrix --lib nt_core_gate::tests::rubric_judge_llm7_live
+    #[tokio::test]
+    async fn rubric_judge_llm7_live() {
+        if std::env::var("NT_E2E_LLM7")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+            != true
+        {
+            eprintln!("skipped: set NT_E2E_LLM7=1 to run live LLM7 e2e");
+            return;
+        }
+        use crate::neotrix::l1_body_impl::nt_io_provider::openai::OpenAiProvider;
+        let mut provider = OpenAiProvider::new(String::new());
+        provider = provider.with_base_url("https://api.llm7.io/v1");
+        let provider: std::sync::Arc<dyn LlmProvider> = std::sync::Arc::new(provider);
+        let judge = LLMJudgeAdapter::new(
+            "llm7-live",
+            JudgeFamily::Analytic,
+            provider,
+            "codestral-latest",
+        );
+        let mut input = JudgeInput::new("缓存分层方案将冷热数据分离");
+        input.claims = vec![Claim::new("c1", &["E-001"])];
+        input.evidence_ids = vec!["E-001".to_string()];
+        input.rubric = Some(RubricSpec::default_five());
+        let op = judge.score(&input).await;
+        assert!(
+            op.raw_score > 0.0 && op.raw_score <= 1.0,
+            "真实 LLM rubric 综合分应在 0..1: {}",
+            op.raw_score
+        );
+        assert!(
+            op.confidence > 0.0,
+            "真实 LLM 应有 confidence: {}",
+            op.confidence
+        );
+        let names: Vec<&str> = op.criteria.iter().map(|c| c.name.as_str()).collect();
+        for dim in [
+            "llm_judge",
+            "claim_support",
+            "evidence_ground",
+            "mechanism",
+            "resource",
+            "fidelity",
+        ] {
+            assert!(
+                names.contains(&dim),
+                "真实 LLM 应产出五维标准, 缺 {}: {:?}",
+                dim,
+                names
+            );
+        }
+        assert!(
+            !op.attribution_tags.iter().any(|t| t == "llm_parse_failed"),
+            "真实 LLM 响应应可解析 (markdown 围栏已剥离): {:?}",
+            op.attribution_tags
+        );
     }
 
     // ── 真实经验 → 校准集 (experience-tree KB) ──
@@ -2006,7 +2945,11 @@ mod tests {
         ];
         let set = CalibrationSet::from_kb_experience(&entries);
         assert_eq!(set.gold.len(), 3, "非 branch_ 前缀应被跳过");
-        assert_eq!(set.gold[0].label, TrajectoryLabel::Broken, "defect → Broken");
+        assert_eq!(
+            set.gold[0].label,
+            TrajectoryLabel::Broken,
+            "defect → Broken"
+        );
         assert_eq!(set.gold[1].label, TrajectoryLabel::Clean, "insight → Clean");
         assert_eq!(set.gold[2].label, TrajectoryLabel::Broken, "fail → Broken");
         assert!(set.gold[0].trajectory.steps.len() >= 1);
@@ -2015,8 +2958,16 @@ mod tests {
     #[test]
     fn calibration_from_kb_runs_to_completion() {
         let entries: Vec<(String, String)> = vec![
-            ("branch_1_0_a".into(), r#"{"type":"insight","content":"clean grounded conclusion","evidence":"E-001"}"#.to_string()),
-            ("branch_1_1_b".into(), r#"{"type":"regression","content":"broken step zero","evidence":"E-900"}"#.to_string()),
+            (
+                "branch_1_0_a".into(),
+                r#"{"type":"insight","content":"clean grounded conclusion","evidence":"E-001"}"#
+                    .to_string(),
+            ),
+            (
+                "branch_1_1_b".into(),
+                r#"{"type":"regression","content":"broken step zero","evidence":"E-900"}"#
+                    .to_string(),
+            ),
         ];
         let set = CalibrationSet::from_kb_experience(&entries);
         let panel = JudgePanel::default_panel();
@@ -2057,7 +3008,11 @@ mod tests {
         assert!(!report.converged, "split → not converged");
         assert!(report.divergence > 0.3, "split creates divergence");
         // 反方 0.1 显著拉低收敛分 (低于纯均值 0.633)
-        assert!(report.converged_score < 0.6, "contrarian drags below mean, got {}", report.converged_score);
+        assert!(
+            report.converged_score < 0.6,
+            "contrarian drags below mean, got {}",
+            report.converged_score
+        );
         // 反方角色被分配
         assert!(report.rounds.iter().any(|r| r.role == DebateRole::Con));
         assert!(report.rounds.iter().any(|r| r.role == DebateRole::Pro));
@@ -2068,5 +3023,67 @@ mod tests {
         let report = deliberate(&[]);
         assert!(report.converged);
         assert_eq!(report.converged_score, 0.0);
+    }
+
+    // ── Replica #2: 洞察事件检测 ──
+    #[test]
+    fn insight_detector_fires_on_breakthrough() {
+        let mut d = InsightDetector::new(0.1);
+        assert!(d.record(0.3, 1).is_none(), "首个样本仅建立基线, 不触发");
+        let ev = d.record(0.6, 2).expect("越过阈值应触发");
+        assert_eq!(ev.previous_best, 0.3);
+        assert!((ev.strength - (0.6 - 0.3) / (1.0 - 0.3)).abs() < 1e-9);
+        assert_eq!(ev.step, 2);
+        assert_eq!(d.best(), 0.6);
+    }
+
+    #[test]
+    fn insight_detector_saturates_and_resets() {
+        let mut d = InsightDetector::new(0.1);
+        d.record(0.95, 1); // 建立基线
+        // 接近饱和后小幅增长 → 强度低于阈值 → 不再触发
+        assert!(d.record(0.952, 2).is_none(), "饱和后小步幅应静默");
+        d.reset();
+        assert_eq!(d.best(), 0.0);
+        assert!(d.record(0.9, 3).is_none(), "reset 后首个样本重建基线");
+        assert!(d.record(0.95, 4).is_some(), "重建基线后新突破触发");
+    }
+
+    #[test]
+    fn insight_detector_serializes_across_sessions() {
+        let mut d = InsightDetector::new(0.05);
+        d.record(0.5, 1);
+        let json = serde_json::to_string(&d).unwrap();
+        let mut restored: InsightDetector = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.best(), 0.5);
+        let ev = restored.record(0.7, 2).expect("恢复后继续追踪");
+        assert_eq!(ev.previous_best, 0.5);
+    }
+
+    // ── Replica #9: 自证纪律 ──
+    #[test]
+    fn attestation_contradiction_halves_score() {
+        let att = Attestation {
+            real_slice: Some("slice-1".into()),
+            budget_used: Some(100.0),
+            budget_total: 100.0,
+            claimed_seeds: Some(5),
+        };
+        // 声明预算 100 但观测只有 50 → 矛盾
+        let p = att.contradiction_score(Some(50.0), Some(5));
+        assert!(p >= 0.5, "预算矛盾应重罚, got {}", p);
+        // 声明种子 5 但观测 3 → 矛盾
+        let p2 = att.contradiction_score(Some(100.0), Some(3));
+        assert!(p2 >= 0.5, "种子矛盾应重罚, got {}", p2);
+        // 完全一致 → 无扣分
+        let p3 = att.contradiction_score(Some(100.0), Some(5));
+        assert!(p3 < 0.1, "一致应接近无扣分, got {}", p3);
+    }
+
+    #[test]
+    fn attestation_missing_self_report_is_light_penalty() {
+        let att = Attestation::new(100.0);
+        let p = att.contradiction_score(None, None);
+        assert!(p >= 0.1 && p < 0.5, "未自证应轻微扣分, got {}", p);
     }
 }

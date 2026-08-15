@@ -1,5 +1,6 @@
 pub mod analyzer;
 pub mod api_proxy;
+pub mod fingerprint;
 
 #[cfg(feature = "stealth-net")]
 pub mod mitm;
@@ -10,6 +11,8 @@ pub use analyzer::{
 };
 
 pub use api_proxy::{ApiProxy, ApiProxyConfig};
+
+pub use fingerprint::{BrowserHeaders, FingerprintStore, TlsFingerprint};
 
 #[cfg(feature = "stealth-net")]
 pub use mitm::{MitmProxy, MitmProxyConfig};

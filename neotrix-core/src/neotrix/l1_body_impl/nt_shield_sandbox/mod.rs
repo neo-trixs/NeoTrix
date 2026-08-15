@@ -8,9 +8,12 @@ use serde::{Deserialize, Serialize};
 use crate::neotrix::l1_body_impl::nt_shield::vault::Vault;
 
 pub mod cli;
+pub mod device;
 pub mod docker;
 pub mod provider;
 pub mod remote;
+
+pub use device::{DeviceSandbox, DeviceTool, SandboxEngine, SandboxSession, SandboxSpec, SandboxStatus};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CloudRuntime {

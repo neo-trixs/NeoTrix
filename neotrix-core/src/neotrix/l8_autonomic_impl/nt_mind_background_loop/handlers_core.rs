@@ -83,6 +83,9 @@ impl BackgroundLoopHandle {
                 grounding_failures: self.tool_grounding.grounding_failures,
                 schema_failures: vec![],
                 producer_family: crate::core::nt_core_gate::JudgeFamily::None,
+                rubric: None,
+                samples: 1,
+                attestation: None,
             };
             let panel = crate::core::nt_core_gate::JudgePanel::default_panel();
             let decision = GateDecision::check_path(&registry.cloned_specs(), &input, &panel);

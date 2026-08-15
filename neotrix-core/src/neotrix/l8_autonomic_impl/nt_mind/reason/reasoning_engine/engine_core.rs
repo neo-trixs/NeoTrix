@@ -1486,6 +1486,9 @@ impl ReasoningEngine {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            rubric: None,
+            samples: 1,
+            attestation: None,
         };
         let registry = JudgeRegistry::new().register(JudgeFamily::None, provider, &self.default_model);
         let judges = registry.build_async_judges();

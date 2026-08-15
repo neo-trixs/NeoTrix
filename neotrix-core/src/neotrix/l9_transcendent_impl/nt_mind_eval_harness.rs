@@ -791,9 +791,185 @@ pub enum EvalError {
     ConcurrencyClosed,
 }
 
+// ────────────────────────────────────────────────────────────────
+// P2: HdaAttribution (吸收 harness.dev blog: Model Trained Detects When Models Think)
+// Harness-Driven Analysis: 解释 score 提升时, 强制归因给具体组件 (Open/Tuned/Guard)。
+// 消除"综合提升"式空洞结论 — attribution 必须单一且带置信度。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HdaComponent {
+    Open,
+    Tuned,
+    Guard,
+}
+
+impl HdaComponent {
+    pub fn label(&self) -> &'static str {
+        match self {
+            HdaComponent::Open => "open-model",
+            HdaComponent::Tuned => "tuned-model",
+            HdaComponent::Guard => "guard-rail",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HdaAttribution {
+    pub component: HdaComponent,
+    pub delta_score: f64,
+    pub confidence: f64,
+    pub evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HdaAttributionReport {
+    pub attributions: Vec<HdaAttribution>,
+    pub total_delta: f64,
+}
+
+impl HdaAttributionReport {
+    /// 按 delta 排序取 top_n, 供进化 loop 定向强化 (隔离每组件增益)。
+    pub fn top(&self, n: usize) -> Vec<HdaAttribution> {
+        let mut v = self.attributions.clone();
+        v.sort_by(|a, b| b.delta_score.partial_cmp(&a.delta_score).unwrap_or(std::cmp::Ordering::Equal));
+        v.truncate(n);
+        v
+    }
+
+    pub fn leading(&self) -> Option<&HdaAttribution> {
+        self.attributions
+            .iter()
+            .max_by(|a, b| a.delta_score.partial_cmp(&b.delta_score).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// 检验归因完备性: 总和接近 total_delta (容差 1e-6), 否则判定空洞归因。
+    pub fn is_complete(&self) -> bool {
+        let sum: f64 = self.attributions.iter().map(|a| a.delta_score).sum();
+        (sum - self.total_delta).abs() < 1e-6
+    }
+}
+
+pub fn hda_attribution(tuned: f64, open: f64, guard: f64, delta: f64) -> HdaAttributionReport {
+    HdaAttributionReport {
+        attributions: vec![
+            HdaAttribution {
+                component: HdaComponent::Tuned,
+                delta_score: tuned,
+                confidence: if tuned > 0.0 { 0.8 } else { 0.2 },
+                evidence: vec!["tuned-model pass-rate delta".into()],
+            },
+            HdaAttribution {
+                component: HdaComponent::Open,
+                delta_score: open,
+                confidence: if open > 0.0 { 0.7 } else { 0.3 },
+                evidence: vec!["open-model baseline shift".into()],
+            },
+            HdaAttribution {
+                component: HdaComponent::Guard,
+                delta_score: guard,
+                confidence: if guard > 0.0 { 0.9 } else { 0.1 },
+                evidence: vec!["guard-rail rejection delta".into()],
+            },
+        ],
+        total_delta: delta,
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
+// P9: SelfVerifiableReward (吸收 arXiv 2607.23802 RLSVR)
+// 可自验证奖励信号: 无需 ground truth 也能给模型反馈。
+// 三个自验证源: 可判定性(确定性校验) / 可提取性(答案可从响应提取) /
+//              约束满足(拒绝策略)。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VerificationChannel {
+    Deterministic,
+    Extractable,
+    Constraint,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SelfVerifiableReward {
+    pub channel: VerificationChannel,
+    pub score: f64,
+    pub verifiable: bool,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RewardSignal {
+    pub rewards: Vec<SelfVerifiableReward>,
+}
+
+impl RewardSignal {
+    pub fn total(&self) -> f64 {
+        self.rewards.iter().map(|r| r.score).sum()
+    }
+
+    /// 只在所有通道都可验证时才给出最终奖励 (RLSVR: 弱信号仅用于对比, 不用于训练)。
+    pub fn gated_total(&self) -> Option<f64> {
+        if self.rewards.iter().all(|r| r.verifiable) {
+            Some(self.total())
+        } else {
+            None
+        }
+    }
+}
+
+pub fn verify_deterministic(expected: &str, actual: &str) -> SelfVerifiableReward {
+    let ok = expected.trim() == actual.trim();
+    SelfVerifiableReward {
+        channel: VerificationChannel::Deterministic,
+        score: if ok { 1.0 } else { 0.0 },
+        verifiable: true,
+        detail: format!("deterministic match: {}", ok),
+    }
+}
+
+pub fn verify_extractable(needle: &str, actual: &str) -> SelfVerifiableReward {
+    let ok = !actual.is_empty() && actual.contains(needle);
+    SelfVerifiableReward {
+        channel: VerificationChannel::Extractable,
+        score: if ok { 1.0 } else { 0.0 },
+        verifiable: true,
+        detail: format!("answer extractable: {}", ok),
+    }
+}
+
+pub fn verify_constraint(policy: &str, actual: &str, forbidden: &[&str]) -> SelfVerifiableReward {
+    let violated = forbidden.iter().any(|f| actual.contains(f));
+    SelfVerifiableReward {
+        channel: VerificationChannel::Constraint,
+        score: if violated { 0.0 } else { 1.0 },
+        verifiable: !actual.is_empty(),
+        detail: format!("policy {} violated={}", policy, violated),
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for EvalHarness {
+    fn name(&self) -> &str {
+        "nt_mind_eval_harness_self_verifiable"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let r = verify_deterministic("42", "42");
+        if !r.verifiable || r.score != 1.0 {
+            return Err(vec!["deterministic channel failed".into()]);
+        }
+        let c = verify_constraint("no-pii", "user@example.com", &["@example.com"]);
+        if c.score != 0.0 {
+            return Err(vec!["constraint channel should reject PII".into()]);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
     use crate::neotrix::nt_io_provider::LlmResponse;
 
     #[test]
@@ -1015,5 +1191,81 @@ mod tests {
         assert!((mean_ap_acc - 0.35).abs() < 1e-9);
         assert_eq!(conformance, 0.0); // 无冲突用例 → 0
         assert!(!passes); // 无冲突用例使 conformance < 0.8
+    }
+
+    // ── P2 HdaAttribution ──
+    #[test]
+    fn test_hda_attribution_complete() {
+        let report = hda_attribution(0.3, 0.1, 0.05, 0.45);
+        assert!(report.is_complete());
+        assert_eq!(report.attributions.len(), 3);
+    }
+
+    #[test]
+    fn test_hda_top_orders_by_delta() {
+        let report = hda_attribution(0.5, 0.2, 0.1, 0.8);
+        let top = report.top(2);
+        assert_eq!(top[0].component, HdaComponent::Tuned);
+        assert_eq!(top[1].component, HdaComponent::Open);
+    }
+
+    #[test]
+    fn test_hda_incomplete_when_sum_mismatch() {
+        let report = hda_attribution(0.3, 0.1, 0.05, 0.99);
+        assert!(!report.is_complete());
+    }
+
+    #[test]
+    fn test_hda_confidence_sanity() {
+        let report = hda_attribution(0.0, 0.0, 0.0, 0.0);
+        for a in &report.attributions {
+            assert!(a.confidence > 0.0 && a.confidence <= 1.0);
+        }
+    }
+
+    // ── P9 SelfVerifiableReward ──
+    #[test]
+    fn test_reward_deterministic() {
+        let r = verify_deterministic("42", "42");
+        assert!(r.verifiable);
+        assert_eq!(r.score, 1.0);
+        let r2 = verify_deterministic("42", "43");
+        assert_eq!(r2.score, 0.0);
+    }
+
+    #[test]
+    fn test_reward_extractable() {
+        let r = verify_extractable("cherry", "the answer is cherry on top");
+        assert_eq!(r.score, 1.0);
+        let r2 = verify_extractable("cherry", "the answer is orange");
+        assert_eq!(r2.score, 0.0);
+    }
+
+    #[test]
+    fn test_reward_constraint_rejects_forbidden() {
+        let r = verify_constraint("no-pii", "contact: alice@example.com", &["@example.com", "alice"]);
+        assert_eq!(r.score, 0.0);
+        let r2 = verify_constraint("no-pii", "all clear", &["@example.com"]);
+        assert_eq!(r2.score, 1.0);
+    }
+
+    #[test]
+    fn test_reward_gated_total() {
+        let signal = RewardSignal {
+            rewards: vec![
+                verify_deterministic("a", "a"),
+                verify_constraint("c", "ok", &[]),
+            ],
+        };
+        assert_eq!(signal.gated_total(), Some(2.0));
+        let empty = RewardSignal {
+            rewards: vec![verify_constraint("c", "", &[])],
+        };
+        assert_eq!(empty.gated_total(), None);
+    }
+
+    #[test]
+    fn test_reward_selftest_passes() {
+        assert!(harness().self_test().is_ok());
     }
 }

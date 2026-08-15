@@ -348,6 +348,98 @@ impl AnomalyDetector {
     }
 }
 
+/// 策略漂移监测器 (Replica #3: 塌缩前兆检测) — 生成策略 vs 训练策略的
+/// JS 散度在塌缩前会上升约 2 个数量级。这里监测 rollout 的 "策略漂移比"
+/// (gen 分布与 train 基线分布间散度 / 基线散度), 当比值跨过数量级阈值
+/// (默认 10×) 时发出塌缩前兆告警, 早于质量分数显式恶化。
+#[derive(Debug)]
+pub struct PolicyDriftMonitor {
+    /// 每轮观察到的漂移比历史 (即 gen/train 散度与基线散度的比值)
+    ratios: Mutex<VecDeque<f64>>,
+    /// 基线散度 — 训练策略稳定期的散度均值; None = 尚未建立基线
+    baseline_divergence: Mutex<Option<f64>>,
+    /// 触发塌缩前兆告警的漂移比阈值 (论文: ~2 数量级 → 默认 10×)
+    magnitude_jump: f64,
+    /// 保留的比率样本数
+    capacity: usize,
+}
+
+impl Default for PolicyDriftMonitor {
+    fn default() -> Self {
+        Self {
+            ratios: Mutex::new(VecDeque::with_capacity(64)),
+            baseline_divergence: Mutex::new(None),
+            magnitude_jump: 10.0,
+            capacity: 64,
+        }
+    }
+}
+
+impl PolicyDriftMonitor {
+    pub fn new(magnitude_jump: f64) -> Self {
+        Self {
+            ratios: Mutex::new(VecDeque::with_capacity(64)),
+            baseline_divergence: Mutex::new(None),
+            magnitude_jump: magnitude_jump.max(2.0),
+            capacity: 64,
+        }
+    }
+
+    /// 记录一次散度观测: `generation` = 生成策略与训练策略的当前散度,
+    /// `baseline_sample` = 是否训练稳定期样本 (用于建立基线)。
+    /// 返回 None = 正常; Some(TelemetryAlert) = 漂移比跨数量级 (塌缩前兆)。
+    pub fn observe(&self, generation: f64, baseline_sample: bool) -> Option<TelemetryAlert> {
+        let mut base = self.baseline_divergence.lock().ok()?;
+        if baseline_sample {
+            // 稳定期样本滚动更新基线 (滚动中位近似: 均值)
+            let samples: Vec<f64> = {
+                let mut ratios = self.ratios.lock().ok()?;
+                ratios.push_back(generation);
+                while ratios.len() > self.capacity {
+                    ratios.pop_front();
+                }
+                ratios.iter().copied().collect()
+            };
+            if !samples.is_empty() {
+                let mean = samples.iter().sum::<f64>() / samples.len() as f64;
+                *base = Some(mean.max(1e-9));
+            }
+            return None;
+        }
+
+        let baseline = (*base)?;
+        let ratio = (generation / baseline).max(0.0);
+        {
+            let mut ratios = self.ratios.lock().ok()?;
+            ratios.push_back(ratio);
+            while ratios.len() > self.capacity {
+                ratios.pop_front();
+            }
+        }
+        if ratio >= self.magnitude_jump {
+            Some(TelemetryAlert {
+                metric: "policy_drift_ratio".into(),
+                kind: AlertKind::Spike,
+                current: ratio,
+                baseline,
+                threshold: self.magnitude_jump,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// 当前漂移比 — 供上层读取趋势。
+    pub fn current_ratio(&self) -> Option<f64> {
+        self.ratios.lock().ok()?.back().copied()
+    }
+
+    /// 基线已建立?
+    pub fn has_baseline(&self) -> bool {
+        matches!(self.baseline_divergence.lock(), Ok(g) if g.is_some())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AgentBehavior {
     pub agent_id: String,
@@ -554,6 +646,36 @@ impl crate::core::nt_core_self_test::SelfTest for AnomalyDetector {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for PolicyDriftMonitor {
+    fn name(&self) -> &str {
+        "PolicyDriftMonitor"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        // 建立基线 (稳定期样本) → 散度 10× 跳变 → 应触发塌缩前兆告警。
+        let m = PolicyDriftMonitor::default();
+        for _ in 0..5 {
+            m.observe(1.0, true);
+        }
+        if !m.has_baseline() {
+            failures.push("baseline not established".into());
+        }
+        if let Some(a) = m.observe(50.0, false) {
+            if a.kind != AlertKind::Spike {
+                failures.push("drift alert wrong kind".into());
+            }
+        } else {
+            failures.push("magnitude jump not flagged".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -738,5 +860,41 @@ mod tests {
         let mean = store.metric_window_mean("gateway_latency_ms", Duration::from_secs(60)).unwrap();
         assert!((mean - 13.0).abs() < 1e-9);
         assert!(store.metric_window_mean("unknown", Duration::from_secs(60)).is_none());
+    }
+
+    #[test]
+    fn test_policy_drift_no_alert_on_stable_rollout() {
+        let m = PolicyDriftMonitor::default();
+        // 稳定期: 连续建立基线 + 小幅波动 → 不告警
+        for _ in 0..5 {
+            m.observe(1.0, true);
+        }
+        for _ in 0..3 {
+            assert!(m.observe(1.5, false).is_none(), "稳定期不应告警");
+        }
+        assert!(m.has_baseline());
+        let r = m.current_ratio().expect("有漂移比");
+        assert!(r < 10.0);
+    }
+
+    #[test]
+    fn test_policy_drift_magnitude_jump_alerts_collapse_precursor() {
+        let m = PolicyDriftMonitor::new(10.0);
+        for _ in 0..5 {
+            m.observe(1.0, true);
+        }
+        // 散度跳 50× (> 阈值 10×) → 塌缩前兆告警
+        let alert = m.observe(50.0, false).expect("数量级跳变应触发");
+        assert_eq!(alert.kind, AlertKind::Spike);
+        assert_eq!(alert.metric, "policy_drift_ratio");
+        assert!(alert.current >= 10.0);
+    }
+
+    #[test]
+    fn test_policy_drift_requires_baseline() {
+        let m = PolicyDriftMonitor::default();
+        // 未建立基线前散度跳变不应误报 (无历史可比)
+        assert!(m.observe(100.0, false).is_none(), "无基线不应告警");
+        assert!(!m.has_baseline());
     }
 }

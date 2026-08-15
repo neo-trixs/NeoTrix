@@ -451,6 +451,13 @@ impl SecurityAuditor {
                 description: "IAM role allows *:* actions for the resource".into(),
                 remediation: "Apply least-privilege IAM policies; use condition keys; audit unused permissions".into(),
             },
+            // ===== AiLlm: Reasoning Trace Leak (P1, arXiv 2608.09867) =====
+            VulnerabilityCheck {
+                id: "V051".into(), title: "Reasoning Trace Block Leak".into(),
+                domain: VulnDomain::AiLlm, severity: Severity::Critical,
+                description: "Encrypted reasoning blocks in persisted/shared transcripts are replayable across session/user/model (weak sibling model decrypts with fidelity 1.00); visible-layer scrubbing is ineffective".into(),
+                remediation: "Strip reasoning blocks before any persistence or sharing; treat transcripts containing encrypted blocks as whole-session leaks".into(),
+            },
         ]
     }
 
@@ -492,9 +499,159 @@ impl SecurityAuditor {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P1: ReasoningTraceGuard (吸收 arXiv 2608.09867 + Snyk research blog)
+// 加密 reasoning block 可跨 session/user/model 复放 = 架构性弱点。
+// 红线: 分享/持久化前必须剥离推理块。启发式识别已知信封, 不做真解密。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TraceGuardMode {
+    Strip,
+    Scan,
+    StripAndScan,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraceLeakReport {
+    pub blocks_found: usize,
+    pub encrypted_blocks: usize,
+    pub has_leak: bool,
+}
+
+impl Default for TraceLeakReport {
+    fn default() -> Self {
+        Self {
+            blocks_found: 0,
+            encrypted_blocks: 0,
+            has_leak: false,
+        }
+    }
+}
+
+/// 已知推理块信封 (开标记, 闭标记)。encrypted 标记表示该信封可承载加密块,
+/// 视为整体泄露 (可见层清洗无效 — Snyk 实证)。
+const REASONING_ENVELOPES: &[(&str, &str, bool)] = &[
+    ("<reasoning>", "</reasoning>", false),
+    ("<antml:reasoning>", "</antml:reasoning>", false),
+    ("[BEGIN REASONING]", "[/END REASONING]", false),
+    ("[BEGIN_REASONING]", "[/END_REASONING]", false),
+    ("||BEGIN_REASONING||", "||END_REASONING||", true),
+    ("<reasoning_encrypted>", "</reasoning_encrypted>", true),
+    ("<encrypted_reasoning>", "</encrypted_reasoning>", true),
+    ("<antml:encrypted_reasoning>", "</antml:encrypted_reasoning>", true),
+];
+
+pub struct ReasoningTraceGuard {
+    pub mode: TraceGuardMode,
+}
+
+impl Default for ReasoningTraceGuard {
+    fn default() -> Self {
+        Self {
+            mode: TraceGuardMode::StripAndScan,
+        }
+    }
+}
+
+impl ReasoningTraceGuard {
+    pub fn with_mode(mode: TraceGuardMode) -> Self {
+        Self { mode }
+    }
+
+    /// 剥离所有已识别推理信封。未闭合的开标记 → 保守剥离到文本末尾。
+    pub fn strip_blocks(&self, text: &str) -> String {
+        let mut out = String::with_capacity(text.len());
+        let mut rest = text;
+        loop {
+            let mut earliest: Option<(usize, &str, &str, bool)> = None;
+            for &(open, close, _enc) in REASONING_ENVELOPES {
+                if let Some(pos) = rest.find(open) {
+                    if earliest.map_or(true, |(e, _, _, _)| pos < e) {
+                        earliest = Some((pos, open, close, _enc));
+                    }
+                }
+            }
+            let Some((pos, open, close, _enc)) = earliest else {
+                out.push_str(rest);
+                break;
+            };
+            out.push_str(&rest[..pos]);
+            let after_open = pos + open.len();
+            let tail = &rest[after_open..];
+            match tail.find(close) {
+                Some(close_pos) => {
+                    // 跳过闭合标记本身, 继续找下一个信封
+                    rest = &tail[close_pos + close.len()..];
+                }
+                None => {
+                    // 未闭合 → 保守剥离到末尾
+                    rest = "";
+                }
+            }
+        }
+        out
+    }
+
+    /// 扫描文本中的推理块。encrypted 标记视为整体泄露 (strip 不足以防护分享)。
+    pub fn scan(&self, text: &str) -> TraceLeakReport {
+        let mut report = TraceLeakReport::default();
+        for &(open, close, encrypted) in REASONING_ENVELOPES {
+            let mut search_from = 0;
+            while let Some(rel) = text[search_from..].find(open) {
+                let open_pos = search_from + rel;
+                report.blocks_found += 1;
+                if encrypted {
+                    report.encrypted_blocks += 1;
+                }
+                // 跳过本块 (含可能的同标签嵌套, 保守取闭标记后)
+                let after_open = open_pos + open.len();
+                let tail = &text[after_open..];
+                match tail.find(close) {
+                    Some(cp) => search_from = after_open + cp + close.len(),
+                    None => break,
+                }
+            }
+        }
+        report.has_leak = report.blocks_found > 0;
+        report
+    }
+
+    /// 统一入口: 按 mode 执行 strip/scan。
+    pub fn process(&self, text: &str) -> (String, TraceLeakReport) {
+        let report = self.scan(text);
+        let stripped = match self.mode {
+            TraceGuardMode::Strip | TraceGuardMode::StripAndScan => self.strip_blocks(text),
+            TraceGuardMode::Scan => text.to_string(),
+        };
+        (stripped, report)
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for ReasoningTraceGuard {
+    fn name(&self) -> &str {
+        "nt_shield_reasoning_trace_guard"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let guard = ReasoningTraceGuard::default();
+        let sample = "Let me think.\n<reasoning>the model's private chain of thought</reasoning>\nFinal answer.";
+        let stripped = guard.strip_blocks(sample);
+        if stripped.contains("chain of thought") {
+            return Err(vec!["strip failed to remove reasoning block".into()]);
+        }
+        let report = guard.scan(sample);
+        if !report.has_leak || report.blocks_found != 1 {
+            return Err(vec![format!("scan miscounted blocks: {:?}", report)]);
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_checklist_count() {
@@ -613,5 +770,70 @@ mod tests {
         let back: VulnerabilityCheck = serde_json::from_str(&json).expect("deserialize failed");
         assert_eq!(checks[0].id, back.id);
         assert_eq!(checks[0].title, back.title);
+    }
+
+    // ── P1 ReasoningTraceGuard ──
+    #[test]
+    fn test_trace_strip_simple() {
+        let guard = ReasoningTraceGuard::default();
+        let out = guard.strip_blocks("a<reasoning>private</reasoning>b");
+        assert_eq!(out, "ab");
+    }
+
+    #[test]
+    fn test_trace_strip_multiple_and_variants() {
+        let guard = ReasoningTraceGuard::default();
+        let out = guard.strip_blocks(
+            "<antml:reasoning>x</antml:reasoning>ok[BEGIN REASONING]y[/END REASONING]done",
+        );
+        assert_eq!(out, "okdone");
+    }
+
+    #[test]
+    fn test_trace_strip_unclosed_conservative() {
+        let guard = ReasoningTraceGuard::default();
+        let out = guard.strip_blocks("before<reasoning>never closed");
+        assert_eq!(out, "before");
+    }
+
+    #[test]
+    fn test_trace_scan_counts_and_encrypted() {
+        let guard = ReasoningTraceGuard::default();
+        let report = guard.scan("<reasoning>a</reasoning><encrypted_reasoning>b</encrypted_reasoning>");
+        assert_eq!(report.blocks_found, 2);
+        assert_eq!(report.encrypted_blocks, 1);
+        assert!(report.has_leak);
+    }
+
+    #[test]
+    fn test_trace_scan_clean() {
+        let guard = ReasoningTraceGuard::default();
+        let report = guard.scan("plain text, no reasoning blocks");
+        assert_eq!(report.blocks_found, 0);
+        assert!(!report.has_leak);
+    }
+
+    #[test]
+    fn test_trace_process_modes() {
+        let strip = ReasoningTraceGuard::with_mode(TraceGuardMode::Strip);
+        let (s, r) = strip.process("x<reasoning>y</reasoning>z");
+        assert_eq!(s, "xz");
+        assert_eq!(r.blocks_found, 1);
+
+        let scan = ReasoningTraceGuard::with_mode(TraceGuardMode::Scan);
+        let (s, _) = scan.process("x<reasoning>y</reasoning>z");
+        assert_eq!(s, "x<reasoning>y</reasoning>z");
+    }
+
+    #[test]
+    fn test_trace_checklist_has_leak_check() {
+        let checks = SecurityAuditor::checklist();
+        assert!(checks.iter().any(|c| c.id == "V051"));
+    }
+
+    #[test]
+    fn test_trace_selftest_passes() {
+        let guard = ReasoningTraceGuard::default();
+        assert!(guard.self_test().is_ok());
     }
 }

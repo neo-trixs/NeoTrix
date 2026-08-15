@@ -972,10 +972,12 @@ impl BackgroundLoopHandle {
     /// Privacy: 只聚合 scalar (计数/时长/数值), 不携带原始 payload。
     pub async fn handle_telemetry(&mut self) {
         use crate::core::nt_core_telemetry::{
-            global_telemetry, AlertKind, AnomalyDetector, TelemetryAlert,
+            global_telemetry, AlertKind, AnomalyDetector, PolicyDriftMonitor, TelemetryAlert,
         };
         static DETECTOR: std::sync::LazyLock<AnomalyDetector> =
             std::sync::LazyLock::new(AnomalyDetector::default);
+        static DRIFT: std::sync::LazyLock<PolicyDriftMonitor> =
+            std::sync::LazyLock::new(PolicyDriftMonitor::default);
         static LAST_ALERTS: std::sync::Mutex<Vec<TelemetryAlert>> =
             std::sync::Mutex::new(Vec::new());
 
@@ -986,6 +988,20 @@ impl BackgroundLoopHandle {
                 if let Some(alert) = DETECTOR.observe(&metric, mean) {
                     alerts.push(alert);
                 }
+            }
+        }
+        // Replica #3 塌缩前兆: 监测策略散度指标的漂移比数量级跳变。数据源经
+        // `store.record_metric("policy_drift", v)` 写入 (SEAL 循环采样生成/训练
+        // 策略散度)。前 5 个观测样本视为稳定期基线 (baseline_sample=true),
+        // 之后同源观测按漂移比跳变判定塌缩前兆; 未写入则静默 (不影响主循环)。
+        if let Some(drift) = store.metric_window_mean("policy_drift", std::time::Duration::from_secs(600)) {
+            static WARMUP: std::sync::Mutex<u32> = std::sync::Mutex::new(0);
+            let mut warm = WARMUP.lock().unwrap_or_else(|e| e.into_inner());
+            if *warm < 5 {
+                *warm += 1;
+                DRIFT.observe(drift, true);
+            } else if let Some(alert) = DRIFT.observe(drift, false) {
+                alerts.push(alert);
             }
         }
         if alerts.is_empty() {

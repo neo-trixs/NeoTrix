@@ -36,6 +36,10 @@ pub struct SkillEntry {
     /// 技能树层级 (AgentSkillOS 吸收): 粗到细分类 + 父技能指针, 支撑互补性检索。
     pub category: String,
     pub parent: String,
+    /// 确定性 selftest 门 (P2-5, shuohao-skills 模式): skill 目录存在
+    /// `scripts/selftest.sh` 或 `scripts/selftest.js` 且产结构化 JSON 即 verified;
+    /// 缺失 → `unverified` (拒收/标记而非静默加载, 与 R-P16 同构)。
+    pub verified: bool,
 }
 
 impl SkillEntry {
@@ -95,6 +99,9 @@ impl SkillEntry {
             return None;
         }
 
+        // 确定性 selftest 门: skill 根目录下 scripts/selftest.sh|js 存在性检查
+        let verified = Self::has_selftest(path);
+
         Some(Self {
             name,
             description,
@@ -109,7 +116,20 @@ impl SkillEntry {
             references,
             category,
             parent,
+            verified,
         })
+    }
+
+    /// 校验 skill 是否带确定性 selftest 脚本 (P2-5 质量门)。
+    /// skill 根 = SKILL.md 所在目录 (目录型) 或自身目录 (单文件型)。
+    fn has_selftest(path: &Path) -> bool {
+        let root = if path.file_name().is_some_and(|n| n == "SKILL.md") {
+            path.parent().unwrap_or(path)
+        } else {
+            path
+        };
+        let scripts = root.join("scripts");
+        scripts.join("selftest.sh").is_file() || scripts.join("selftest.js").is_file()
     }
 
     pub fn body(&self) -> &str {
@@ -741,6 +761,7 @@ impl SkillEngine {
             references: vec![],
             category: "procedural".to_string(),
             parent: String::new(),
+            verified: false,
         }
     }
 
@@ -860,6 +881,97 @@ pub struct DiscoveredSkill {
     pub path: PathBuf,
 }
 
+// ────────────────────────────────────────────────────────────────
+// P23: PromptLibrary (吸收 prompts.chat — 提示词资产库)
+// 提示词资产持久库: 命名 + 版本 + 标签路由。供 harness / 进化 loop
+// 复用工程化提示词, 替代散落的硬编码 prompt。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptEntry {
+    pub name: String,
+    pub version: u32,
+    pub tags: Vec<String>,
+    pub content: String,
+    pub author: String,
+}
+
+impl PromptEntry {
+    pub fn new(name: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            version: 1,
+            tags: vec![],
+            content: content.into(),
+            author: "neotrix".into(),
+        }
+    }
+
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PromptLibrary {
+    prompts: Vec<PromptEntry>,
+}
+
+impl PromptLibrary {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, entry: PromptEntry) -> Result<(), String> {
+        if let Some(existing) = self.prompts.iter_mut().find(|p| p.name == entry.name) {
+            // 同名 → 版本递增 (prompts.chat 语义: 同名可迭代)
+            existing.version += 1;
+            existing.content = entry.content;
+            existing.tags = entry.tags;
+            return Ok(());
+        }
+        self.prompts.push(entry);
+        Ok(())
+    }
+
+    pub fn get(&self, name: &str) -> Option<&PromptEntry> {
+        self.prompts.iter().find(|p| p.name == name)
+    }
+
+    pub fn by_tag(&self, tag: &str) -> Vec<&PromptEntry> {
+        self.prompts.iter().filter(|p| p.tags.iter().any(|t| t == tag)).collect()
+    }
+
+    pub fn all(&self) -> &[PromptEntry] {
+        &self.prompts
+    }
+
+    pub fn len(&self) -> usize {
+        self.prompts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.prompts.is_empty()
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for PromptLibrary {
+    fn name(&self) -> &str {
+        "nt_mind_prompt_library"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut lib = PromptLibrary::new();
+        lib.register(PromptEntry::new("judge_rubric", "score 1-5").with_tags(vec!["eval".into()]))
+            .map_err(|e| vec![e])?;
+        if lib.len() != 1 {
+            return Err(vec!["prompt library should hold 1 entry".into()]);
+        }
+        Ok(())
+    }
+}
+
 /// Hook events for skill lifecycle.
 pub mod skill_hooks {
     use super::*;
@@ -898,6 +1010,7 @@ pub mod skill_hooks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
 
     fn sample_skill_content() -> &'static str {
         r#"---
@@ -924,6 +1037,41 @@ priority: 80
 
     fn setup_temp_dir() -> tempfile::TempDir {
         tempfile::tempdir().expect("failed to create temp dir")
+    }
+
+    #[test]
+    fn test_selftest_gate_marks_unverified_without_script() {
+        // P2-5 质量门: 缺 scripts/selftest.sh|js → unverified
+        let dir = setup_temp_dir();
+        let path = dir.path().join("no-selftest.md");
+        std::fs::write(&path, sample_skill_content()).unwrap();
+        let entry = SkillEntry::from_file(&path).unwrap();
+        assert!(!entry.verified, "skill without scripts/selftest must be unverified");
+    }
+
+    #[test]
+    fn test_selftest_gate_marks_verified_with_script() {
+        // P2-5 质量门: 存在 scripts/selftest.sh → verified
+        let dir = setup_temp_dir();
+        let skill_dir = dir.path().join("with-selftest");
+        let scripts = skill_dir.join("scripts");
+        std::fs::create_dir_all(&scripts).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), sample_skill_content()).unwrap();
+        std::fs::write(scripts.join("selftest.sh"), "#!/usr/bin/env bash\necho '{\"gates\":[]}'\n").unwrap();
+        let entry = SkillEntry::from_file(&skill_dir.join("SKILL.md")).unwrap();
+        assert!(entry.verified, "skill with scripts/selftest.sh must be verified");
+    }
+
+    #[test]
+    fn test_selftest_gate_verified_with_js() {
+        let dir = setup_temp_dir();
+        let skill_dir = dir.path().join("js-selftest");
+        let scripts = skill_dir.join("scripts");
+        std::fs::create_dir_all(&scripts).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), sample_skill_content()).unwrap();
+        std::fs::write(scripts.join("selftest.js"), "console.log('{\"gates\":[]}')").unwrap();
+        let entry = SkillEntry::from_file(&skill_dir.join("SKILL.md")).unwrap();
+        assert!(entry.verified);
     }
 
     #[test]
@@ -1769,5 +1917,49 @@ category: general
         let flagged = engine.flagged_attributions();
         assert!(!flagged.is_empty(), "procedure-heavy skill must surface in flagged report");
         assert!(flagged.iter().all(|a| a.procedure_heavy));
+    }
+
+    // ── P23 PromptLibrary ──
+    #[test]
+    fn test_prompt_register_and_get() {
+        let mut lib = PromptLibrary::new();
+        lib.register(PromptEntry::new("judge", "score").with_tags(vec!["eval".into()])).unwrap();
+        assert_eq!(lib.len(), 1);
+        let p = lib.get("judge").expect("get");
+        assert_eq!(p.version, 1);
+        assert_eq!(p.tags, vec!["eval".to_string()]);
+    }
+
+    #[test]
+    fn test_prompt_same_name_bumps_version() {
+        let mut lib = PromptLibrary::new();
+        lib.register(PromptEntry::new("judge", "v1")).unwrap();
+        lib.register(PromptEntry::new("judge", "v2")).unwrap();
+        assert_eq!(lib.len(), 1);
+        assert_eq!(lib.get("judge").unwrap().version, 2);
+        assert_eq!(lib.get("judge").unwrap().content, "v2");
+    }
+
+    #[test]
+    fn test_prompt_by_tag() {
+        let mut lib = PromptLibrary::new();
+        lib.register(PromptEntry::new("a", "1").with_tags(vec!["eval".into()])).unwrap();
+        lib.register(PromptEntry::new("b", "2").with_tags(vec!["extract".into()])).unwrap();
+        assert_eq!(lib.by_tag("eval").len(), 1);
+        assert_eq!(lib.by_tag("extract").len(), 1);
+        assert_eq!(lib.by_tag("nope").len(), 0);
+    }
+
+    #[test]
+    fn test_prompt_missing_returns_none() {
+        let lib = PromptLibrary::new();
+        assert!(lib.get("absent").is_none());
+        assert!(lib.is_empty());
+    }
+
+    #[test]
+    fn test_prompt_selftest() {
+        let lib = PromptLibrary::new();
+        assert!(lib.self_test().is_ok());
     }
 }

@@ -502,6 +502,148 @@ impl RstFlywheel {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// P7: MetaHarnessOptimizer (吸收 arXiv 2608.13560 AutoDesign)
+// 自我进化的 eval harness 生成器: 用 LLM 生成/变异测试 harness, 过滤重复,
+// 按功能覆盖率裁剪。进化循环的元层: harness 本身也进入进化池。
+// ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HarnessTarget {
+    Compile,
+    UnitTest,
+    Integration,
+    Bench,
+}
+
+impl HarnessTarget {
+    pub fn label(&self) -> &'static str {
+        match self {
+            HarnessTarget::Compile => "compile",
+            HarnessTarget::UnitTest => "unit",
+            HarnessTarget::Integration => "integration",
+            HarnessTarget::Bench => "bench",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HarnessCandidate {
+    pub target: HarnessTarget,
+    pub code: String,
+    /// 归一化指纹: 移除空白后做碰撞检测 (AutoDesign dedup 语义)
+    pub fingerprint: String,
+    /// 覆盖的功能点 (功能覆盖率裁剪依据)
+    pub covers: Vec<String>,
+}
+
+impl HarnessCandidate {
+    pub fn new(target: HarnessTarget, code: impl Into<String>, covers: Vec<String>) -> Self {
+        let code = code.into();
+        let fingerprint = normalize_code(&code);
+        Self {
+            target,
+            fingerprint,
+            code,
+            covers,
+        }
+    }
+}
+
+fn normalize_code(code: &str) -> String {
+    let mut out = String::with_capacity(code.len());
+    for ch in code.chars() {
+        if !ch.is_whitespace() {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MetaHarnessOptimizer {
+    candidates: Vec<HarnessCandidate>,
+}
+
+impl MetaHarnessOptimizer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 提议一个候选, 去重 (指纹碰撞 → 拒绝重复)。
+    pub fn propose(&mut self, c: HarnessCandidate) -> Result<(), String> {
+        if self.candidates.iter().any(|x| x.fingerprint == c.fingerprint) {
+            return Err(format!("duplicate harness fingerprint: {}", c.fingerprint));
+        }
+        self.candidates.push(c);
+        Ok(())
+    }
+
+    /// 功能覆盖剪枝: 保留覆盖点最多的 top_k (AutoDesign 覆盖率裁剪)。
+    pub fn prune(&mut self, k: usize) -> usize {
+        if k == 0 {
+            let n = self.candidates.len();
+            self.candidates.clear();
+            return n;
+        }
+        let mut ranked = self.candidates.clone();
+        ranked.sort_by(|a, b| b.covers.len().cmp(&a.covers.len()));
+        ranked.truncate(k);
+        let removed = self.candidates.len() - ranked.len();
+        self.candidates = ranked;
+        removed
+    }
+
+    pub fn candidates(&self) -> &[HarnessCandidate] {
+        &self.candidates
+    }
+
+    pub fn count(&self) -> usize {
+        self.candidates.len()
+    }
+
+    /// 按 target 分组统计, 供进化调度。
+    pub fn coverage(&self) -> std::collections::HashMap<HarnessTarget, usize> {
+        let mut m = std::collections::HashMap::new();
+        for c in &self.candidates {
+            *m.entry(c.target).or_insert(0) += 1;
+        }
+        m
+    }
+
+    /// 为已注册功能点生成种子 harness 候选 (AutoDesign 初始化)。
+    pub fn seed_for(features: &[(&str, HarnessTarget)]) -> Vec<HarnessCandidate> {
+        features
+            .iter()
+            .map(|(name, target)| {
+                let code = format!(
+                    "#[test]\nfn check_{}() {{ /* auto-generated for {} */ }}",
+                    name.replace(['-', ' '], "_"),
+                    name
+                );
+                HarnessCandidate::new(*target, code, vec![name.to_string()])
+            })
+            .collect()
+    }
+}
+
+impl crate::core::nt_core_self_test::SelfTest for MetaHarnessOptimizer {
+    fn name(&self) -> &str {
+        "nt_mind_meta_harness_optimizer"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut opt = MetaHarnessOptimizer::new();
+        for c in MetaHarnessOptimizer::seed_for(&[("tok_a", HarnessTarget::UnitTest), ("tok_b", HarnessTarget::Compile)]) {
+            opt.propose(c).map_err(|e| vec![e])?;
+        }
+        if opt.count() != 2 {
+            return Err(vec!["expected 2 seeded candidates".into()]);
+        }
+        Ok(())
+    }
+}
+
 /// 自进化循环引擎
 #[derive(Debug, Clone)]
 pub struct EvolutionLoop {
@@ -1141,6 +1283,7 @@ impl EvolutionLoopProvider for EvolutionLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::nt_core_self_test::SelfTest;
 
     #[test]
     fn test_count_actual_unsafe_zero() {
@@ -1446,6 +1589,7 @@ mod tests {
     #[test]
     fn test_autofix_cycle_zeroes_fixes_on_reject() {
         // 接线验证: autofix_cycle_in 中 rejected 变更 → auto_fixes=0 + rollback 模式入报告
+        let mut el = EvolutionLoop::new();
         let dir = std::env::temp_dir().join(format!("nt_audit_gate_{}", std::process::id()));
         std::fs::create_dir_all(dir.join("src")).expect("create mock src");
         std::fs::write(dir.join("src").join("lib.rs"), "pub fn f() {}\n").expect("write mock lib");
@@ -1580,5 +1724,65 @@ mod tests {
         assert_eq!(total, 1 + dist.get(1).copied().unwrap_or(0));
         assert!(dist.len() >= 2, "seed(gen0) + children(gen1)");
         assert_eq!(dist[0], 1, "exactly one seed at gen0");
+    }
+
+    // ── P7 MetaHarnessOptimizer ──
+    #[test]
+    fn test_harness_seed_proposes() {
+        let mut opt = MetaHarnessOptimizer::new();
+        for c in MetaHarnessOptimizer::seed_for(&[("compile_ok", HarnessTarget::Compile), ("bench_fast", HarnessTarget::Bench)]) {
+            opt.propose(c).expect("propose");
+        }
+        assert_eq!(opt.count(), 2);
+    }
+
+    #[test]
+    fn test_harness_dedup_by_fingerprint() {
+        let mut opt = MetaHarnessOptimizer::new();
+        let a = HarnessCandidate::new(HarnessTarget::UnitTest, "  fn  a(){} ", vec!["x".into()]);
+        let b = HarnessCandidate::new(HarnessTarget::UnitTest, "fn a(){}", vec!["x".into()]);
+        opt.propose(a).expect("first");
+        assert!(opt.propose(b).is_err(), "whitespace-normalized duplicate must be rejected");
+    }
+
+    #[test]
+    fn test_harness_prune_keeps_top_coverage() {
+        let mut opt = MetaHarnessOptimizer::new();
+        for c in vec![
+            HarnessCandidate::new(HarnessTarget::Integration, "c1", vec!["a".into()]),
+            HarnessCandidate::new(HarnessTarget::Integration, "c2", vec!["a".into(), "b".into()]),
+            HarnessCandidate::new(HarnessTarget::Integration, "c3", vec!["a".into(), "b".into(), "c".into()]),
+        ] {
+            opt.propose(c).expect("propose");
+        }
+        let removed = opt.prune(2);
+        assert_eq!(removed, 1);
+        assert_eq!(opt.count(), 2);
+        assert_eq!(opt.candidates()[0].covers.len(), 3, "top-coverage candidate survives");
+    }
+
+    #[test]
+    fn test_harness_coverage_grouping() {
+        let mut opt = MetaHarnessOptimizer::new();
+        opt.propose(HarnessCandidate::new(HarnessTarget::Compile, "c1", vec!["a".into()])).unwrap();
+        opt.propose(HarnessCandidate::new(HarnessTarget::UnitTest, "c2", vec!["b".into()])).unwrap();
+        let cov = opt.coverage();
+        assert_eq!(cov.get(&HarnessTarget::Compile), Some(&1));
+        assert_eq!(cov.get(&HarnessTarget::UnitTest), Some(&1));
+    }
+
+    #[test]
+    fn test_harness_prune_zero_clears() {
+        let mut opt = MetaHarnessOptimizer::new();
+        opt.propose(HarnessCandidate::new(HarnessTarget::Compile, "c1", vec!["a".into()])).unwrap();
+        let removed = opt.prune(0);
+        assert_eq!(removed, 1);
+        assert_eq!(opt.count(), 0);
+    }
+
+    #[test]
+    fn test_harness_selftest() {
+        let opt = MetaHarnessOptimizer::new();
+        assert!(opt.self_test().is_ok());
     }
 }

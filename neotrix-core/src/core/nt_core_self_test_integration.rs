@@ -16,6 +16,15 @@ pub fn register_absorbed_modules(registry: &mut SelfTestRegistry) {
     }
 }
 
+/// 轻量 SelfTest 运行器 (纯内存检测件, 无网络/无全仓扫描) — 供意识核心
+/// tick 前注入分支健康数据 (迷雾治理断链修复)。复用吸收模块注册表,
+/// 每个注册项运行 self_test() 并收集 SelfTestResult。
+pub fn run_lightweight_self_tests() -> Vec<crate::core::nt_core_self_test::SelfTestResult> {
+    let mut registry = SelfTestRegistry::new();
+    register_absorbed_modules(&mut registry);
+    registry.run_all()
+}
+
 struct AnswerEngineSelfTest;
 
 impl SelfTest for AnswerEngineSelfTest {
@@ -140,7 +149,14 @@ mod tests {
     fn test_register_all() {
         let mut registry = SelfTestRegistry::new();
         register_absorbed_modules(&mut registry);
-        assert_eq!(registry.count(), 14);
+        // 动态断言: 至少包含基础 8 检测件 + 6 arch_fitness 守卫 (≥14)。
+        // 不硬编码精确计数 — sweep 吸收批 (2026-08-15 Phase A/B/C) 会持续
+        // 增补检测件, 魔法数字会被并行会话反复改破 (拉锯)。
+        assert!(
+            registry.count() >= 14,
+            "注册器应至少含 8 基础 + 6 arch_fitness, got {}",
+            registry.count()
+        );
     }
 
     #[test]
@@ -150,17 +166,12 @@ mod tests {
 
     #[test]
     fn test_all_have_names() {
-        let tests: [&dyn SelfTest; 14] = [
-            &AnswerEngineSelfTest, &AgentTeamSelfTest,
-            &AgenticScanSelfTest, &DigitalHumanSelfTest, &LeannStoreSelfTest,
-            &VideoPipelineSelfTest, &QTestEngineSelfTest, &ConstitutionComplianceTest,
-            &crate::core::nt_core_arch_fitness::LayerBoundaryFitness,
-            &crate::core::nt_core_arch_fitness::NoCycleFitness,
-            &crate::core::nt_core_arch_fitness::CapabilityConsistencyFitness,
-            &crate::core::nt_core_arch_fitness::TreeSingletonFitness,
-            &crate::core::nt_core_arch_fitness::DeadCodeFitness,
-            &crate::core::nt_core_arch_fitness::PanicDensityFitness::default(),
-        ];
-        for t in &tests { assert!(!t.name().is_empty()); }
+        // 动态遍历注册表验证全部检测件都有非空名称 — 不依赖精确数组长度,
+        // 后台增补检测件时无需同步此测试 (Dark Forest: 防漂移)。
+        let mut registry = SelfTestRegistry::new();
+        register_absorbed_modules(&mut registry);
+        for r in registry.run_all() {
+            assert!(!r.name.is_empty());
+        }
     }
 }

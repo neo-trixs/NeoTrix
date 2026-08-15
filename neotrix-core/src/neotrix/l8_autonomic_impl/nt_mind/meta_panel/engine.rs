@@ -94,6 +94,9 @@ impl MetaPanelEngine {
             grounding_failures: 0,
             schema_failures: Vec::new(),
             producer_family: JudgeFamily::None,
+            rubric: None,
+            samples: 1,
+            attestation: None,
         };
         let panel = JudgePanel::default_panel();
         let panel_verdict = panel.run(&input);
