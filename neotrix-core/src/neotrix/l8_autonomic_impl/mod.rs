@@ -8,6 +8,7 @@ pub mod nt_mind_background_loop;
 pub mod nt_mind_guard;
 
 pub mod nt_mind_autofixer;
+pub mod nt_mind_build_runner;
 pub mod nt_mind_background_config;
 pub mod nt_mind_benchmark;
 pub mod nt_mind_cleanup;

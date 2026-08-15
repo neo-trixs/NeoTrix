@@ -502,6 +502,160 @@ impl GauntletMachine {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// G28 Healers 巡检集 (topics/code-health 吸收) —
+// 多维度代码健康巡检器, 每个 healer 扫描一个维度并产出修复建议
+// ────────────────────────────────────────────────────────────────
+
+/// 单个 healer 巡检产出的修复建议。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HealSuggestion {
+    /// 健康维度 (如 "compile" / "todo" / "unused_import" / "unwraps")。
+    pub dimension: String,
+    /// 目标文件 (可空 = 全局维度)。
+    pub file: Option<String>,
+    /// 建议动作描述。
+    pub action: String,
+    /// 是否可自动执行 (AutoFixer 有对应原语)。
+    pub auto_fixable: bool,
+}
+
+/// Healers 巡检集 — 定期扫描多个代码健康维度, 汇总修复建议供治理层处置
+/// (topics/code-health 吸收: 不是单个修复, 而是健康巡检 + 建议流水线)。
+#[derive(Debug, Default, Clone)]
+pub struct HealerRegistry {
+    /// 各维度最近一次扫描结果 (dimension → 建议列表)。
+    pub last_report: Vec<HealSuggestion>,
+    /// 已执行自动修复数 (遥测)。
+    pub auto_fixes_applied: u32,
+}
+
+impl HealerRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 巡检 TODO 幽灵 (removed 文件残留 TODO / 未清理 todo) — 维度 "todo"。
+    /// 扫描给定目录下的 .rs 文件, 统计未加 #[ignore] 的 TODO/FIXME 注释行。
+    /// 纯占位 TODO 行 (// TODO / // FIXME 无正文) 标记 auto_fixable — 由
+    /// apply_auto_fixable 经 cleanup_todos_tx 事务落地 (GAP-3 修复, R-P79)。
+    pub fn scan_todos(&mut self, dir: &Path) -> Vec<HealSuggestion> {
+        let mut out = Vec::new();
+        for path in Self::collect_rs_files(dir) {
+            let Ok(content) = std::fs::read_to_string(&path) else { continue };
+            let count = content
+                .lines()
+                .filter(|l| {
+                    let t = l.trim();
+                    t.starts_with("//") && (t.contains("TODO") || t.contains("FIXME"))
+                })
+                .count();
+            let pure_placeholder = content
+                .lines()
+                .any(|l| {
+                    let t = l.trim();
+                    t == "// TODO" || t == "//TODO" || t == "// FIXME" || t == "//FIXME"
+                });
+            if count > 0 {
+                out.push(HealSuggestion {
+                    dimension: "todo".into(),
+                    file: Some(path.to_string_lossy().to_string()),
+                    action: format!("{} TODO/FIXME comments pending", count),
+                    // 仅含纯占位行可安全事务删除 (cleanup_todos_tx 只删无正文行)
+                    auto_fixable: pure_placeholder,
+                });
+            }
+        }
+        out
+    }
+
+    /// 巡检 unwrap 滥用 (未处理 Result/Option) — 维度 "unwraps"。
+    /// 统计 `.unwrap()` 调用 (不含测试模块)。
+    pub fn scan_unwraps(&mut self, dir: &Path) -> Vec<HealSuggestion> {
+        let mut out = Vec::new();
+        for path in Self::collect_rs_files(dir) {
+            let Ok(content) = std::fs::read_to_string(&path) else { continue };
+            let in_tests = content.contains("#[cfg(test)]");
+            let count = content.matches(".unwrap()").count();
+            if count > 0 && !in_tests {
+                out.push(HealSuggestion {
+                    dimension: "unwraps".into(),
+                    file: Some(path.to_string_lossy().to_string()),
+                    action: format!("{} unwrap() calls in production path", count),
+                    auto_fixable: false,
+                });
+            }
+        }
+        out
+    }
+
+    /// 汇总巡检: 扫描全部维度, 更新 last_report, 返回建议列表。
+    pub fn run_full_scan(&mut self, dir: &Path) -> Vec<HealSuggestion> {
+        let mut report = Vec::new();
+        report.extend(self.scan_todos(dir));
+        report.extend(self.scan_unwraps(dir));
+        self.last_report = report.clone();
+        report
+    }
+
+    /// 对 `auto_fixable` 建议执行真实自动修复 (GAP-3 修复, R-P79 生产接线)。
+    /// 当前落地维度: "todo" → AutoFixer::cleanup_todos_tx (∂Γ 事务 + 快照回滚)。
+    /// 返回实际落地数; 成功者从 last_report 移除 (避免每周期重复尝试)。
+    pub fn apply_auto_fixable(&mut self) -> usize {
+        let mut applied = 0usize;
+        let mut remaining = Vec::with_capacity(self.last_report.len());
+        for s in &self.last_report {
+            if !s.auto_fixable {
+                remaining.push(s.clone());
+                continue;
+            }
+            let landed = match s.dimension.as_str() {
+                "todo" => s
+                    .file
+                    .as_deref()
+                    .map(|f| AutoFixer::cleanup_todos_tx(f).is_ok())
+                    .unwrap_or(false),
+                _ => false,
+            };
+            if landed {
+                applied += 1;
+                log::info!("[healers] auto-fix landed: {} {}", s.dimension, s.file.as_deref().unwrap_or(""));
+            } else {
+                remaining.push(s.clone());
+            }
+        }
+        self.auto_fixes_applied += applied as u32;
+        self.last_report = remaining;
+        applied
+    }
+
+    /// 收集目录下所有 .rs 文件 (递归, 跳过 target/.git)。
+    fn collect_rs_files(dir: &Path) -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        if !dir.is_dir() {
+            return out;
+        }
+        let mut stack = vec![dir.to_path_buf()];
+        while let Some(d) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&d) else { continue };
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    if name == "target" || name == ".git" || name == "node_modules" {
+                        continue;
+                    }
+                    stack.push(p);
+                } else if p.extension().is_some_and(|e| e == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        out.sort();
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -663,5 +817,48 @@ mod tests {
         let v = m.advance("spec", 1, true, true, 0, 0, &[]);
         assert!(!v.pass);
         assert!(v.reason.contains("not started"));
+    }
+
+    #[test]
+    fn test_healer_scan_todos_detects_pending() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(
+            src.join("a.rs"),
+            "pub fn f() {\n    // TODO: finish this\n    // FIXME: cleanup\n    let s = \"TODO not a comment\";\n}\n",
+        )
+        .unwrap();
+
+        let mut reg = HealerRegistry::new();
+        let todos = reg.scan_todos(dir.path());
+        assert_eq!(todos.len(), 1, "one file has TODOs");
+        assert_eq!(todos[0].dimension, "todo");
+        assert_eq!(todos[0].auto_fixable, false);
+    }
+
+    #[test]
+    fn test_healer_scan_unwraps_flags_production() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("prod.rs"), "fn main() { let x = opt.unwrap(); }\n").unwrap();
+
+        let mut reg = HealerRegistry::new();
+        let unwraps = reg.scan_unwraps(dir.path());
+        assert_eq!(unwraps.len(), 1);
+        assert_eq!(unwraps[0].dimension, "unwraps");
+        assert_eq!(unwraps[0].action, "1 unwrap() calls in production path");
+    }
+
+    #[test]
+    fn test_healer_run_full_scan_aggregates_and_reports() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("x.rs"), "pub fn f() {\n    // TODO: finish me\n    opt.unwrap();\n}\n").unwrap();
+
+        let mut reg = HealerRegistry::new();
+        let report = reg.run_full_scan(dir.path());
+        assert!(!report.is_empty(), "full scan must surface findings");
+        assert!(report.iter().any(|s| s.dimension == "todo"));
+        assert!(report.iter().any(|s| s.dimension == "unwraps"));
+        assert_eq!(reg.last_report.len(), report.len());
     }
 }

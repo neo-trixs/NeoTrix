@@ -164,6 +164,10 @@ pub fn is_fixable(diag: &CompilerDiagnostic) -> bool {
 ///   6. 方法不存在 (E0599) → 修正方法名
 ///   7. 重复定义 (E0428) → 移除重复
 ///   8. 未使用项 (dead_code/unused_import/unused_variable/unused_mut) → cargo fix 清理
+///
+/// OfficeCLI 模式 (2026-08-15 吸收): 错误码携带 suggestion + valid_range —
+/// suggestion 给可立即执行的修复指令, valid_range 声明该建议的适用范围,
+/// 使错误响应从"诊断"升级为"可自愈的操作单元"。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixSuggestion {
     /// 错误码 (如 "E0308"), 无码时为 "unknown"
@@ -172,39 +176,71 @@ pub struct FixSuggestion {
     pub action: &'static str,
     /// 人类可读的修复指引
     pub guidance: String,
+    /// 可立即执行的修复指令 (命令/代码模板) — OfficeCLI suggestion 字段
+    pub suggestion: Option<String>,
+    /// 适用范围的合法值声明 — OfficeCLI valid_range 字段
+    pub valid_range: Option<String>,
 }
 
 /// 根据错误码生成修复建议。返回 None 表示无已知自动修复策略。
 pub fn suggest_fix(diag: &CompilerDiagnostic) -> Option<FixSuggestion> {
     let code = diag.code.as_deref()?;
-    let (action, guidance) = match code {
+    let (action, guidance, suggestion, valid_range) = match code {
         // 缺失符号 → add 补全 (经验: 缺失 16535 次, 首选 add 4491 次)
         "E0425" | "E0433" | "E0412" => (
             "add",
             "缺失符号: 补 use 导入或定义缺失的项 (经验: 缺失符号首选 add 补全)",
+            Some("use <module>::<Item>; 或 补全缺失的 fn/struct/enum 定义".to_string()),
+            Some("仅适用缺失符号类诊断 (E0425/E0433/E0412); 若符号确实不存在需补定义而非导入".to_string()),
         ),
         // 类型不匹配 → 对齐类型 / wrap 包裹
         "E0308" => (
             "type_fix",
             "类型不匹配: 对齐类型或用 as/into 转换; 若为 unwrap 崩溃点则用 wrap() 包裹",
+            Some("将右侧值 as 转换, 或 .into() / .to_string() 对齐类型; 若在 unwrap 点改用 Result 处理".to_string()),
+            Some("仅适用类型不匹配 (E0308); 需确认目标类型后选择 as/Into/From 之一".to_string()),
         ),
         // 借用/移动 → clone 切断借用链
         "E0382" | "E0505" => (
             "clone",
             "借用/移动错误: 首选 clone() 切断借用链 (经验: 借用检查错误首选 clone)",
+            Some("在移动点调用 .clone() 保留原值; 或改用借用 & 引用".to_string()),
+            Some("仅适用借用/移动错误 (E0382/E0505); 注意 clone 只适合小对象, 大结构建议改用借用".to_string()),
         ),
         // 非穷尽 match → 补分支
-        "E0004" => ("match_arm", "非穷尽 match: 补全缺失的 match 分支"),
+        "E0004" => (
+            "match_arm",
+            "非穷尽 match: 补全缺失的 match 分支",
+            Some("为枚举补全缺失变体的 match 分支, 或用 `_ => {}` 兜底".to_string()),
+            Some("仅适用非穷尽 match (E0004); 枚举新增变体需同步补全分支".to_string()),
+        ),
         // 字段缺失 → 补字段
-        "E0063" => ("field", "结构体字段缺失: 补全缺失字段初始化"),
+        "E0063" => (
+            "field",
+            "结构体字段缺失: 补全缺失字段初始化",
+            Some("在结构体字面量中补全缺失字段: { .., <field>: <value> }".to_string()),
+            Some("仅适用字段缺失 (E0063); 需按结构体定义补全所有必填字段".to_string()),
+        ),
         // 方法不存在 → 修正方法名
-        "E0599" => ("method", "方法不存在: 修正方法名或补 impl"),
+        "E0599" => (
+            "method",
+            "方法不存在: 修正方法名或补 impl",
+            Some("检查方法名拼写, 或在 impl 块中补充该方法定义".to_string()),
+            Some("仅适用方法不存在 (E0599); 需确认方法属于当前类型且 trait 已导入".to_string()),
+        ),
         // 重复定义 → 去重
-        "E0428" => ("dedup", "重复定义: 移除重复的项定义"),
+        "E0428" => (
+            "dedup",
+            "重复定义: 移除重复的项定义",
+            Some("删除同模块中重复的项定义, 或改用不同名称".to_string()),
+            Some("仅适用重复定义 (E0428); 同名项在模块内只能定义一次".to_string()),
+        ),
         // 未使用 → cargo fix 清理
         "dead_code" | "unused_import" | "unused_variable" | "unused_mut" => (
             "cleanup",
             "未使用项: 运行 cargo fix --lib --allow-dirty 自动清理",
+            Some("cargo fix --lib --allow-dirty".to_string()),
+            Some("仅适用未使用警告 (dead_code/unused_import/unused_variable/unused_mut); 若为公开 API 请加 #[allow] 而非删除".to_string()),
         ),
         _ => return None,
     };
@@ -212,6 +248,8 @@ pub fn suggest_fix(diag: &CompilerDiagnostic) -> Option<FixSuggestion> {
         code: code.to_string(),
         action,
         guidance: guidance.to_string(),
+        suggestion,
+        valid_range,
     })
 }
 
@@ -317,6 +355,33 @@ mod tests {
         let fix = suggest_fix(&d).expect("E0433 should have a fix");
         assert_eq!(fix.action, "add");
         assert!(fix.guidance.contains("add"));
+    }
+
+    #[test]
+    fn test_suggest_fix_officecli_suggestion_and_range() {
+        // OfficeCLI 模式 (2026-08-15): 错误码携带 suggestion + valid_range
+        let d = CompilerDiagnostic {
+            file: "x.rs".into(), line: 1, column: 1,
+            severity: DiagnosticSeverity::Error,
+            code: Some("E0425".into()), message: "".into(), span_text: None,
+        };
+        let fix = suggest_fix(&d).expect("E0425 should have a fix");
+        let sug = fix.suggestion.as_deref().expect("suggestion present");
+        assert!(sug.contains("use "));
+        let range = fix.valid_range.as_deref().expect("valid_range present");
+        assert!(range.contains("E0425"));
+    }
+
+    #[test]
+    fn test_suggest_fix_cleanup_cmd() {
+        let d = CompilerDiagnostic {
+            file: "x.rs".into(), line: 1, column: 1,
+            severity: DiagnosticSeverity::Warning,
+            code: Some("unused_import".into()), message: "".into(), span_text: None,
+        };
+        let fix = suggest_fix(&d).expect("unused_import should have a fix");
+        assert_eq!(fix.action, "cleanup");
+        assert_eq!(fix.suggestion.as_deref(), Some("cargo fix --lib --allow-dirty"));
     }
 
     #[test]

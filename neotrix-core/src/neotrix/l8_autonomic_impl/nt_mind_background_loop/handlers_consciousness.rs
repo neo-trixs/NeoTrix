@@ -401,7 +401,7 @@ impl BackgroundLoopHandle {
                 ];
                 let state_bytes: Vec<u8> = state_trace.iter().map(|h| h.0).collect();
                 predictor.observe_trace(&state_bytes);
-                let _ = predictor_persist(&predictor);
+                predictor_persist(&predictor);
                 log::debug!(
                     "[bg] e8_predictor: absorbed trace ({} states), samples={}, coverage={:.4}",
                     state_bytes.len(),
@@ -1141,13 +1141,15 @@ impl BackgroundLoopHandle {
         use crate::core::nt_core_meta::metacognition_loop::MetaCognitiveLoop;
         use crate::core::nt_core_meta::monitor::MetaMonitor;
         use crate::core::nt_core_meta::nt_core_arch_lint::ArchLint;
-        use crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor;
         use crate::core::nt_core_meta::scanner::CodeScanner;
         use crate::core::nt_core_meta::self_model::SelfModel;
         use crate::core::nt_core_schema_watchdog::SchemaWatchdog;
         use crate::core::nt_core_self::self_audit::{converge_check, ConvergeCheckFn};
         use crate::core::nt_core_self_review::SelfReviewGate;
         use crate::core::nt_core_self_test::{SelfTest, SelfTestRegistry};
+
+        // GAP-2 (T3): MetaAuditor 生产消费端 — 从持久字段克隆, 周期审计发现写回。
+        let mut meta_auditor = self.meta_auditor.clone();
 
         let mut watchdog = SchemaWatchdog::new();
         let mut gaps = 0;
@@ -1229,6 +1231,22 @@ impl BackgroundLoopHandle {
                 report.orphan_count
             );
         }
+        // GAP-2 (T3): converge_check 发现统一汇入 MetaAuditor — 使审计器成为真实消费端,
+        // 不再是仅测试调用的空转检测件 (R-P79 生产接线)。
+        for f in &report.findings {
+            use crate::core::nt_core_meta::nt_core_meta_auditor::AuditorFinding;
+            let severity = match f.severity {
+                crate::core::nt_core_self::self_audit::AuditSeverity::Error => 0.9,
+                crate::core::nt_core_self::self_audit::AuditSeverity::Warning => 0.6,
+                crate::core::nt_core_self::self_audit::AuditSeverity::Info => 0.3,
+            };
+            meta_auditor.record_finding(AuditorFinding {
+                file: f.file.clone(),
+                category: f.category.to_string(),
+                severity,
+                description: f.message.clone(),
+            });
+        }
 
         // ── 星系卫生代码强制 (T3 生产接线): 校验 consciousness 命名空间 ──
         // 幽灵分支预防 / 星辰沉寂检测 / 星系完整性验证 (star-memory skill 法则)
@@ -1252,7 +1270,6 @@ impl BackgroundLoopHandle {
         let model = SelfModel::new();
         let scanner = CodeScanner::new(".");
         let entropy = EntropyMonitor::new(10, 0.5, 3);
-        let meta_auditor = MetaAuditor::new();
         let arch_lint = ArchLint::new();
         let meta_monitor = MetaMonitor::new(model.clone());
         let meta_cog_loop = MetaCognitiveLoop::new(model);
@@ -1272,7 +1289,6 @@ impl BackgroundLoopHandle {
             crate::core::nt_core_consciousness::VolitionEngine::new(),
         ));
         self_tests.register(Box::new(SelfReviewGate::new(false)));
-        self_tests.register(Box::new(meta_auditor));
         self_tests.register(Box::new(arch_lint));
         self_tests.register(Box::new(meta_monitor));
         self_tests.register(Box::new(meta_cog_loop));
@@ -1508,8 +1524,19 @@ impl BackgroundLoopHandle {
             } else {
                 log::warn!("{}", r.summary());
                 failure_count += 1;
+                // GAP-2 (T3): SelfTest 失败同样汇入 MetaAuditor (R-P79 生产消费)。
+                use crate::core::nt_core_meta::nt_core_meta_auditor::AuditorFinding;
+                meta_auditor.record_finding(AuditorFinding {
+                    file: r.name.clone(),
+                    category: "selftest_failure".to_string(),
+                    severity: 0.8,
+                    description: format!("{}: {}", r.name, r.failures.join("; ")),
+                });
             }
         }
+        // 写回持久实例 + 注册副本进 registry, 使 accuracy 随时间真实累积。
+        self.meta_auditor = meta_auditor.clone();
+        self_tests.register(Box::new(meta_auditor));
 
         // Pass SelfTest results to ConsciousnessTree for real branch health
         if let Some(ref mut tree) = self.consciousness_tree {

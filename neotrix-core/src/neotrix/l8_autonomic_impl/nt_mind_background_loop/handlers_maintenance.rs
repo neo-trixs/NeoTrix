@@ -345,6 +345,38 @@ impl BackgroundLoopHandle {
         }
     }
 
+    /// G28 自维护巡检 healers (topics/code-health 吸收): 多维度代码健康扫描,
+    /// 产出修复建议; 有发现时经 EventBus 广播 (供治理层处置)。
+    /// GAP-3 (R-P79): auto_fixable 建议由 apply_auto_fixable 真实落地 (事务 TODO 清理),
+    /// 不再只计数不执行 — 巡检从"报告"升级为"自愈闭环"。
+    pub(crate) async fn handle_healer_scan(&mut self) {
+        let dir = std::path::Path::new(".");
+        let report = self.healer_registry.run_full_scan(dir);
+        let applied = self.healer_registry.apply_auto_fixable();
+        if applied > 0 {
+            log::info!("[bg] healers: {} auto-fixes landed (total {})", applied, self.healer_registry.auto_fixes_applied);
+        }
+        let report = self.healer_registry.last_report.clone();
+        if report.is_empty() {
+            return;
+        }
+        let dims: Vec<String> = report.iter().map(|s| s.dimension.to_string()).collect();
+        log::info!(
+            "[bg] healers: {} findings across {:?} ({} TODO files, {} unwrap files)",
+            report.len(),
+            dims,
+            report.iter().filter(|s| s.dimension == "todo").count(),
+            report.iter().filter(|s| s.dimension == "unwraps").count()
+        );
+        if report.len() > 0 {
+            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                component: "healers".into(),
+                error: format!("{} code-health findings: {:?}", report.len(), dims),
+                severity: "info".into(),
+            });
+        }
+    }
+
     pub(crate) async fn handle_avatar_auto_distill(&mut self) {
         if let Some(ref mut eng) = self.avatar_engine {
             #[allow(clippy::mut_mutex_lock)]

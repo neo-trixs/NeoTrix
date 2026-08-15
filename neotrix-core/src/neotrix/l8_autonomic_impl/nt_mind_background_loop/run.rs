@@ -569,6 +569,7 @@ impl BackgroundLoop {
                 )).with_hooks(hooks)
             },
             session_router: crate::neotrix::nt_agent_protocol::unified_session::SessionRouter::new(),
+            healer_registry: crate::neotrix::l8_autonomic_impl::nt_mind_autofixer::HealerRegistry::new(),
             kb_pipeline,
             session_recovery: self.session_recovery.take(),
             event_bus: Some(event_bus.as_ref().clone()),
@@ -636,6 +637,7 @@ cognitive_load: self.cognitive_load.take(),
             simulate: SimulateEngine::new(),
             convergence_pulse: ConvergencePulse::default(),
             tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor::new(),
+            meta_auditor: crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor::new(),
             // 门控注册表 — 默认只读工具, 运行时可扩展。
             gate_registry: Some(ToolRegistry::from_read_only(&["get", "query", "read", "search"])),
             kb_guard: crate::neotrix::l8_autonomic_impl::nt_mind_guard::KbGuard::default(),
@@ -729,6 +731,7 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
         spawn_handler!(3600, |h| h.handle_skill_scan().await);
         spawn_handler!(300, "session_router", |h| h.handle_session_router_flush().await);
+        spawn_handler!(3600, "healers", |h| h.handle_healer_scan().await);
         spawn_handler!(600, |h| h.handle_avatar_auto_distill().await);
         spawn_handler!(7200, |h| {
             h.handle_kb_absorb().await;
@@ -846,6 +849,8 @@ pub struct BackgroundLoopHandle {
     scheduler: Option<crate::core::nt_core_scheduler::SchedulerEngine>,
     daemon: Option<EvolutionDaemon>,
     skill_engine: SkillEngine,
+    /// G28 自维护巡检 healers (topics/code-health 吸收) — 多维度代码健康巡检。
+    healer_registry: crate::neotrix::l8_autonomic_impl::nt_mind_autofixer::HealerRegistry,
     /// 统一会话路由器 (G18, novu 吸收) — agent↔渠道统一会话模型:
     /// 入站归一 → capability 路由 → digest 合并出站。周期 flush 清出超窗摘要。
     session_router: crate::neotrix::nt_agent_protocol::unified_session::SessionRouter,
@@ -885,6 +890,10 @@ pub struct BackgroundLoopHandle {
     simulate: SimulateEngine,
     convergence_pulse: ConvergencePulse,
     tool_grounding: crate::core::nt_core_self::self_audit::ToolGroundingMonitor,
+    /// 元审计器 — 架构审计真实消费端 (GAP-2 修复): handle_architecture_audit 把
+    /// converge_check 幽灵/孤儿/失效 + SelfTest 失败统一汇入 record_finding,
+    /// 使其从"仅测试调用"变 T3 生产接线 (R-P79), 累计准确性驱动审计质量。
+    meta_auditor: crate::core::nt_core_meta::nt_core_meta_auditor::MetaAuditor,
     /// 门控注册表 — 背景循环工具执行前置检查用。
     gate_registry: Option<ToolRegistry>,
     /// KB 守卫 + 工作区守卫 (Rust 化自 sh 守护脚本)

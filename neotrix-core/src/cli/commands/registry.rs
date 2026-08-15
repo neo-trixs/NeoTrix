@@ -45,6 +45,7 @@ use crate::cli::commands::osint_cmds::OsintCmd;
 use crate::cli::commands::comm_cmds::CommCmd;
 use crate::cli::commands::chain_cmds::ChainCmd;
 use crate::cli::commands::quantum_cmds::QTestCmd;
+use crate::cli::commands::code_graph_cmds::CodeGraphCmd;
 use crate::cli::commands::sources_cmds::SourcesCmd;
 use crate::cli::commands::explore_cmds::ExploreCmd;
 use crate::cli::commands::consolidated_cmds::{
@@ -121,6 +122,7 @@ pub fn default_registry() -> CommandRegistry {
 
     // Memory
     reg.register(Box::new(EvidenceCmd));
+    reg.register(Box::new(CodeGraphCmd));
     reg.register(Box::new(HypothesisCmd));
     reg.register(Box::new(SearchCmd));
     reg.register(Box::new(BoardCmd));

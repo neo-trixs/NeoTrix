@@ -323,18 +323,19 @@ impl SelfAuditCmd {
     fn d42_tool_grounding(&self, project: &str) -> CommandOutput {
         let mut out = String::from("── D42: Tool Grounding ──\n");
 
-        let check = Command::new("cargo")
-            .args(["check", "--lib", "-p", "neotrix"])
-            .current_dir(project)
-            .output();
-        match check {
-            Ok(result) => {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                let errors = stderr.lines().filter(|l| l.contains("error[")).count();
-                if errors == 0 {
+        // GAP-4 修复: 统一 BuildRunner 工具层 (超时+kill+证据), 替代裸 Command 调用。
+        use crate::neotrix::l8_autonomic_impl::nt_mind_build_runner::BuildRunner;
+        let runner = BuildRunner::new()
+            .with_workdir(project)
+            .with_timeout(300);
+        match runner.run("check", &["--lib", "-p", "neotrix"]) {
+            Ok(ev) => {
+                if ev.success() {
                     out.push_str("  ✅ cargo check: 0 errors\n");
+                } else if ev.timed_out {
+                    out.push_str("  ❌ cargo check: TIMEOUT (killed)\n");
                 } else {
-                    out.push_str(&format!("  ❌ cargo check: {errors} errors\n"));
+                    out.push_str(&format!("  ❌ cargo check: {} errors\n", ev.error_count));
                 }
             }
             Err(e) => out.push_str(&format!("  ❌ cargo check failed: {e}\n")),
