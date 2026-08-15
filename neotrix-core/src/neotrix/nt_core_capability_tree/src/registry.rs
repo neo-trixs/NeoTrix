@@ -154,11 +154,19 @@ impl CapabilityRegistry {
         }
 
         // 更新索引
-        self.domain_index.get_mut(&node.domain).map(|v| v.retain(|x| x != id));
-        self.layer_index.get_mut(&node.layer).map(|v| v.retain(|x| x != id));
-        self.constellation_index.get_mut(&(node.constellation as u8)).map(|v| v.retain(|x| x != id));
+        if let Some(v) = self.domain_index.get_mut(&node.domain) {
+            v.retain(|x| x != id);
+        }
+        if let Some(v) = self.layer_index.get_mut(&node.layer) {
+            v.retain(|x| x != id);
+        }
+        if let Some(v) = self.constellation_index.get_mut(&(node.constellation as u8)) {
+            v.retain(|x| x != id);
+        }
         for tag in &node.provides {
-            self.provides_index.get_mut(tag).map(|v| v.retain(|x| x != id));
+            if let Some(v) = self.provides_index.get_mut(tag) {
+                v.retain(|x| x != id);
+            }
         }
 
         // 从依赖者的 dependents 移除
@@ -374,7 +382,7 @@ impl CapabilityRegistry {
             let Some(domain_s) = t.get("domain").and_then(|d| d.as_str()) else { continue };
             let Some(signal) = t.get("signal").and_then(|s| s.as_f64()) else { continue };
             let Some(rationale) = t.get("rationale").and_then(|r| r.as_str()) else { continue };
-            let Some(domain) = Domain::from_str(domain_s) else { continue };
+            let Some(domain) = Domain::parse(domain_s) else { continue };
             let capability_tag = t.get("capability").and_then(|c| c.as_str()).unwrap_or("").to_string();
             if capability_tag.is_empty() {
                 continue;
@@ -507,11 +515,11 @@ impl CapabilityRegistry {
             // 沿依赖边 (cur -> requires) 扩展
             for edge in self.dag.edges_directed(cur, Direction::Outgoing) {
                 let next = edge.target();
-                if !dist.contains_key(&next) {
-                    dist.insert(next, cur_dist + 1);
+                dist.entry(next).or_insert_with(|| {
                     prev.insert(next, cur);
                     queue.push_back(next);
-                }
+                    cur_dist + 1
+                });
             }
         }
 

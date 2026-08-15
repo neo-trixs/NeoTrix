@@ -182,15 +182,14 @@ impl CapabilityRegistry {
             let node = self.nodes.get_mut(id).expect("id exists");
             // 从 id 提取域前缀
             if let Some(prefix) = id.split("::").next() {
-                let candidate = if prefix.starts_with("nt_") {
-                    let slug = &prefix["nt_".len()..];
+                let candidate = if let Some(slug) = prefix.strip_prefix("nt_") {
                     format!("NT-{}", slug.to_uppercase())
                 } else if prefix.starts_with("exp::") || prefix.contains("nt-") {
                     continue; // exp:: 节点保留原域
                 } else {
                     continue;
                 };
-                if let Some(domain) = Domain::from_str(&candidate) {
+                if let Some(domain) = Domain::parse(&candidate) {
                     if node.domain != domain {
                         node.domain = domain;
                         fixed += 1;

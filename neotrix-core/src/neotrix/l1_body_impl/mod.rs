@@ -69,3 +69,4 @@ pub mod nt_agent_protocol;
 
 // MCP Bridge & Registry & Gateway & Media Consumer
 pub mod nt_agent_mcp_registry;
+pub mod nt_agent_mcp_gateway;

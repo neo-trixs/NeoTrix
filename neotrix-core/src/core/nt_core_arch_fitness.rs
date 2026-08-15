@@ -3,12 +3,13 @@
 //! 演进式架构 (Evolutionary Architecture): 架构约束编码为可执行守卫,
 //! 违反即报警 (SelfTest Err), 驱动渐进收敛而非一次性大重构。
 //!
-//! P0 五个守卫:
+//! P0 六个守卫:
 //!   1. LayerBoundaryFitness    — 层边界: L1 不得直接依赖 L8+ (现有 3 文件违规)
 //!   2. NoCycleFitness          — 能力网 DAG 无环
 //!   3. CapabilityConsistencyFitness — 能力网幂等: registry 重复边 = 0
 //!   4. TreeSingletonFitness    — ConsciousnessTree 生产单例 (实例化点 ≤ 1)
 //!   5. DeadCodeFitness         — dead_code warning = 0
+//!   6. PanicDensityFitness     — panic 债务 (unwrap/expect) 密度告警 (ADR-0002)
 //!
 //! 设计原则:
 //!   - 纯只读扫描 (不修改代码), 违规返回 Err 附明细
@@ -76,7 +77,7 @@ impl SelfTest for LayerBoundaryFitness {
                 if re.is_match(line) && line.contains("crate::neotrix") {
                     violations.push(format!(
                         "L1→L8+ 越层: {}:{} | {}",
-                        file.strip_prefix(&repo_root()).unwrap_or(&file).display(),
+                        file.strip_prefix(repo_root()).unwrap_or(&file).display(),
                         i + 1,
                         line.trim()
                     ));
@@ -270,7 +271,7 @@ impl SelfTest for TreeSingletonFitness {
                     if in_register {
                         continue;
                     }
-                    let rel = file.strip_prefix(&repo_root()).unwrap_or(&file).display();
+                    let rel = file.strip_prefix(repo_root()).unwrap_or(&file).display();
                     let site = format!("{}:{}", rel, i + 1);
                     // 测试代码豁免: 测试函数/模块内的实例化不计入生产单例
                     if in_test_context(&content, i) {
@@ -355,7 +356,7 @@ impl SelfTest for DeadCodeFitness {
                 if re.is_match(&code_only.join("\n")) {
                     failures.push(format!(
                         "crate 级 allow(dead_code) 抑制: {}",
-                        file.strip_prefix(&repo_root()).unwrap_or(&file).display()
+                        file.strip_prefix(repo_root()).unwrap_or(&file).display()
                     ));
                 }
             }
@@ -396,6 +397,123 @@ impl SelfTest for DeadCodeFitness {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 6. PanicDensityFitness — panic 债务密度守卫
+// ─────────────────────────────────────────────────────────────
+
+/// panic 债务 (unwrap/expect) 密度: 扫描 neotrix-core/src 统计 unwrap/expect
+/// 调用次数与每千行密度, 输出结构化告警 (SQALE 可维护性维度)。
+///
+/// 阈值策略:
+///   - 绝对数超阈值 (当前 2,213 unwrap + 1,167 expect 基线) → 告警
+///   - 密度 (每千行) 超阈值 → 告警
+///   - 趋势由 SEAL 周期聚合 (单调递减目标, ADR-0002)
+pub struct PanicDensityFitness {
+    pub max_abs: usize,
+    pub max_per_kloc: f64,
+}
+
+impl Default for PanicDensityFitness {
+    fn default() -> Self {
+        Self {
+            max_abs: 3000,
+            max_per_kloc: 12.0,
+        }
+    }
+}
+
+fn count_panics_in(file: &Path) -> (usize, usize) {
+    let Ok(content) = std::fs::read_to_string(file) else { return (0, 0) };
+    let mut unwraps = 0usize;
+    let mut expects = 0usize;
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        // 跳过注释与字符串字面量 (粗略过滤, 足够统计趋势)
+        if trimmed.starts_with("//") || trimmed.starts_with("///") || trimmed.starts_with("#[") {
+            continue;
+        }
+        if trimmed.contains("/*") {
+            continue;
+        }
+        unwraps += count_occurrences(line, ".unwrap(");
+        expects += count_occurrences(line, ".expect(");
+    }
+    (unwraps, expects)
+}
+
+/// 统计字符串在行中非重叠出现次数
+fn count_occurrences(haystack: &str, needle: &str) -> usize {
+    let mut count = 0usize;
+    let mut start = 0usize;
+    while let Some(rel) = haystack[start..].find(needle) {
+        count += 1;
+        start += rel + needle.len();
+    }
+    count
+}
+
+/// 扫描 src 目录, 返回 (总 unwrap, 总 expect, 总行数)
+fn scan_panic_debt() -> (usize, usize, usize) {
+    let src = src_root();
+    let mut unwraps = 0usize;
+    let mut expects = 0usize;
+    let mut lines = 0usize;
+    for file in rs_files(&src) {
+        let (u, e) = count_panics_in(&file);
+        unwraps += u;
+        expects += e;
+        lines += std::fs::read_to_string(&file)
+            .map(|c| c.lines().count())
+            .unwrap_or(0);
+    }
+    (unwraps, expects, lines)
+}
+
+impl SelfTest for PanicDensityFitness {
+    fn name(&self) -> &str {
+        "arch_fitness_panic_density"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let (unwraps, expects, lines) = scan_panic_debt();
+        let per_kloc = (unwraps + expects) as f64 / (lines as f64 / 1000.0);
+        let mut failures = Vec::new();
+
+        let total = unwraps + expects;
+        if total > self.max_abs {
+            failures.push(format!(
+                "panic 调用绝对数超阈值: {} (unwrap={} expect={}, 阈值={})",
+                total, unwraps, expects, self.max_abs
+            ));
+        }
+        if per_kloc > self.max_per_kloc {
+            failures.push(format!(
+                "panic 密度超阈值: {:.1}/千行 (阈值={:.1}/千行, 样本 {} 行)",
+                per_kloc, self.max_per_kloc, lines
+            ));
+        }
+
+        if failures.is_empty() {
+            log::info!(
+                "[arch-fitness] panic_density OK: {} (unwrap={} expect={}, {:.1}/千行)",
+                total,
+                unwraps,
+                expects,
+                per_kloc
+            );
+            Ok(())
+        } else {
+            log::info!(
+                "[arch-fitness] panic_density ALARM: unwrap={} expect={} ({:.1}/千行)",
+                unwraps,
+                expects,
+                per_kloc
+            );
+            Err(failures)
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
 // 批量注册
 // ─────────────────────────────────────────────────────────────
 
@@ -407,6 +525,7 @@ pub fn arch_fitness_tests() -> Vec<Box<dyn SelfTest>> {
         Box::new(CapabilityConsistencyFitness),
         Box::new(TreeSingletonFitness),
         Box::new(DeadCodeFitness),
+        Box::new(PanicDensityFitness::default()),
     ]
 }
 
@@ -450,5 +569,26 @@ mod tests {
     fn test_in_test_context_prod_fn() {
         let content = "fn foo() {\n    ConsciousnessTree::new();\n}\n";
         assert!(!in_test_context(content, 1));
+    }
+
+    #[test]
+    fn test_count_panics_skips_comments() {
+        let tmp = std::env::temp_dir().join("panic_count_test.rs");
+        std::fs::write(
+            &tmp,
+            "let a = x.unwrap();\n// let b = y.unwrap();\nlet c = z.expect(\"m\");\n",
+        )
+        .unwrap();
+        let (u, e) = count_panics_in(&tmp);
+        std::fs::remove_file(&tmp).ok();
+        assert_eq!(u, 1);
+        assert_eq!(e, 1);
+    }
+
+    #[test]
+    fn test_panic_density_runs() {
+        let guard = PanicDensityFitness::default();
+        // 守卫可运行且返回 Ok 或 Err 都算通过 (仅验证不 panic)
+        let _ = guard.self_test();
     }
 }

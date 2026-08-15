@@ -769,6 +769,9 @@ cognitive_load: self.cognitive_load.take(),
         //    依赖 route() 调用时的惰性重估。经 gateway::run_periodic_re_evaluation()
         //    tick 进程级注册表中的活跃网关 ──
         spawn_handler!(300, "market_re_eval", |h| h.handle_market_re_evaluation().await);
+        // ── G29 隐私聚合遥测 (R-P79): 60s 周期把全局 TelemetryStore 数值指标喂
+        //    AnomalyDetector 做 spike/drop 检测, 告警经 EventBus 注入意识监控 ──
+        spawn_handler!(60, "telemetry", |h| h.handle_telemetry().await);
 
         // ── EventBus behavioral consumer (D30 fix) — responds to events with behavioral actions ──
         {
@@ -948,6 +951,91 @@ impl BackgroundLoopHandle {
                 evaluated
             );
         }
+    }
+
+    /// G29 隐私聚合遥测 handler (R-P79 生产接线) — 每 60s 把全局 TelemetryStore
+    /// 的数值指标喂给 AnomalyDetector 做 spike/drop 检测, 告警注入意识监控。
+    /// Privacy: 只聚合 scalar (计数/时长/数值), 不携带原始 payload。
+    pub async fn handle_telemetry(&mut self) {
+        use crate::core::nt_core_telemetry::{
+            global_telemetry, AlertKind, AnomalyDetector, TelemetryAlert,
+        };
+        static DETECTOR: std::sync::LazyLock<AnomalyDetector> =
+            std::sync::LazyLock::new(AnomalyDetector::default);
+        static LAST_ALERTS: std::sync::Mutex<Vec<TelemetryAlert>> =
+            std::sync::Mutex::new(Vec::new());
+
+        let store = global_telemetry();
+        let mut alerts: Vec<TelemetryAlert> = Vec::new();
+        for metric in store.metric_names() {
+            if let Some(mean) = store.metric_window_mean(&metric, std::time::Duration::from_secs(600)) {
+                if let Some(alert) = DETECTOR.observe(&metric, mean) {
+                    alerts.push(alert);
+                }
+            }
+        }
+        if alerts.is_empty() {
+            return;
+        }
+        // 去重: 同类告警连续出现时只记一次 (防告警风暴)。
+        let mut known = LAST_ALERTS.lock().unwrap_or_else(|e| e.into_inner());
+        let fresh: Vec<TelemetryAlert> = alerts
+            .iter()
+            .filter(|a| !known.iter().any(|k| k.metric == a.metric && k.kind == a.kind))
+            .cloned()
+            .collect();
+        *known = alerts;
+        if fresh.is_empty() {
+            return;
+        }
+
+        for a in &fresh {
+            let kind = match a.kind {
+                AlertKind::Spike => "SPIKE",
+                AlertKind::Drop => "DROP",
+            };
+            log::warn!(
+                "[bg-loop] telemetry {kind} {} current={:.2} baseline={:.2} z={:.2}",
+                a.metric,
+                a.current,
+                a.baseline,
+                a.threshold,
+            );
+        }
+        // 注入意识监控: 复用一个现有公开通道 — 若不存在则仅记录日志。
+        self.inject_telemetry_alerts(&fresh);
+    }
+
+    /// 把遥测告警注入意识监控 — 经 EventBus 广播 `SystemError` 事件 (severity
+    /// 按告警类型标记), 供 ConsciousnessTree/GWT 等层消费者订阅。无总线时
+    /// 降级为日志, 不影响主循环。
+    pub fn inject_telemetry_alerts(
+        &self,
+        alerts: &[crate::core::nt_core_telemetry::TelemetryAlert],
+    ) {
+        if alerts.is_empty() {
+            return;
+        }
+        use crate::core::nt_core_event::CoreEvent;
+        use crate::core::nt_core_telemetry::AlertKind;
+        for a in alerts {
+            let severity = match a.kind {
+                AlertKind::Spike => "spike",
+                AlertKind::Drop => "drop",
+            };
+            self.try_emit(CoreEvent::SystemError {
+                component: format!("telemetry.{}", a.metric),
+                error: format!(
+                    "{severity} current={:.2} baseline={:.2} z={:.2}",
+                    a.current, a.baseline, a.threshold
+                ),
+                severity: severity.to_string(),
+            });
+        }
+        log::debug!(
+            "[bg-loop] telemetry alerts fed to consciousness: {}",
+            alerts.len()
+        );
     }
 }
 

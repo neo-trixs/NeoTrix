@@ -442,8 +442,8 @@ mod tests {
     use super::*;
 
     fn cfg_deterministic() -> CoEvoConfig {
-CoEvoConfig {
-            epsilon: 0.1,
+        CoEvoConfig {
+            epsilon: 0.0,
             max_memories: 200,
             min_evidence: 2,
             mastery_gate: 0.5,

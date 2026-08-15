@@ -333,8 +333,8 @@ impl CapabilityCli {
 
     fn parse_constellation(&self, s: &str) -> Result<u8, Box<dyn std::error::Error>> {
         let s = s.to_uppercase();
-        if s.starts_with('C') {
-            let n: u8 = s[1..].parse()?;
+        if let Some(digits) = s.strip_prefix('C') {
+            let n: u8 = digits.parse()?;
             if n <= 6 { Ok(n) } else { Err("Constellation must be C0-C6".into()) }
         } else {
             s.parse().map_err(|_| "Invalid constellation".into())
@@ -599,7 +599,7 @@ impl CapabilityCli {
             let Some(domain_s) = t.get("domain").and_then(|d| d.as_str()) else { continue };
             let Some(signal) = t.get("signal").and_then(|s| s.as_f64()) else { continue };
             let Some(rationale) = t.get("rationale").and_then(|r| r.as_str()) else { continue };
-            let domain = match Domain::from_str(domain_s) {
+            let domain = match Domain::parse(domain_s) {
                 Some(d) => d,
                 None => continue,
             };

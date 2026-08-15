@@ -597,14 +597,3 @@ fn main() {
     };
     println!("{}", run(&scenario, args.verbose));
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_placeholder() {
-        let instance = ::new();
-        assert!(true);
-    }
-}

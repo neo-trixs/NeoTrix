@@ -17,6 +17,7 @@ pub mod free_catalog;
 pub mod free_pool;
 pub mod free_providers;
 pub mod gateway;
+pub mod generation_classifier;
 pub mod gemini;
 pub mod ollama;
 pub mod openai;
@@ -47,6 +48,12 @@ pub use anthropic::AnthropicProvider;
 pub use gemini::GeminiProvider;
 pub use ollama::OllamaProvider;
 pub use openai::OpenAiProvider;
+
+// Re-export F6 生成分类器
+pub use generation_classifier::{
+    Classification, Complexity, Domain, GenerationAnalytics, GenerationClassifier,
+    GenerationRecord, TaskType,
+};
 
 // Re-export 免费 Provider
 pub use free_pool::FreePool;

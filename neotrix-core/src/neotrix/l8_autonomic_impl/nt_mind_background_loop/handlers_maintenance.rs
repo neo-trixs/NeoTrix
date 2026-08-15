@@ -291,6 +291,42 @@ impl BackgroundLoopHandle {
         if !skills.is_empty() {
             log::info!("[bg] skill_scan: {} skills loaded", skills.len());
         }
+        // G6 技能树层级巡检 (AgentSkillOS 吸收): 每轮扫描报告 category 分布 /
+        // 根/叶/孤儿技能, 孤儿(parent 缺失)与树失衡经 EventBus 告警。
+        let stats = self.skill_engine.skill_tree_stats();
+        if stats.total_skills > 0 {
+            log::info!(
+                "[bg] skill_tree: {} skills, {} categories, {} roots, {} orphans, max_depth={}",
+                stats.total_skills,
+                stats.categories.len(),
+                stats.roots,
+                stats.orphans,
+                stats.max_depth
+            );
+            if stats.orphans > 0 {
+                self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                    component: "skill_tree".into(),
+                    error: format!("{} orphan skills (parent missing)", stats.orphans),
+                    severity: "warning".into(),
+                });
+            }
+        }
+        // G7 差分归因 (arxiv 2608.11888 SkillTriage): procedure-heavy 且已激活
+        // 的过度验证技能 (强制劳动毒源) 巡检广播, 供治理层处置。
+        let flagged = self.skill_engine.flagged_attributions();
+        if !flagged.is_empty() {
+            let names: Vec<String> = flagged.iter().map(|a| a.name.clone()).collect();
+            log::warn!(
+                "[bg] skill_attribution: {} procedure-heavy skills flagged: {:?}",
+                flagged.len(),
+                names
+            );
+            self.try_emit(crate::core::nt_core_event::CoreEvent::SystemError {
+                component: "skill_attribution".into(),
+                error: format!("procedure-heavy skills flagged: {:?}", names),
+                severity: "warning".into(),
+            });
+        }
     }
 
     pub(crate) async fn handle_avatar_auto_distill(&mut self) {

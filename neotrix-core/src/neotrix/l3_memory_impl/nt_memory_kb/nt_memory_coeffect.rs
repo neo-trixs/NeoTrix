@@ -165,16 +165,14 @@ impl<'a> CoeffectTx<'a> {
 
     /// 事务化 unset: 撤销不存在项 → 整体回滚。
     pub fn unset(&mut self, key: &str) -> Result<(), String> {
-        let prev = self.ctx.state().dom.get(key).cloned();
-        if prev.is_none() {
+        let key_owned = key.to_string();
+        let Some(prev) = self.ctx.state().dom.get(key).cloned() else {
             self.ctx.recover();
             return Err(format!(
                 "coeffect precondition violated: cannot unset nonexistent key '{}'",
                 key
             ));
-        }
-        let key_owned = key.to_string();
-        let prev = prev.unwrap();
+        };
         self.ctx.track(ClosureEffect::new(
             format!("unset:{}", key_owned),
             {

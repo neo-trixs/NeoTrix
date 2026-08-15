@@ -38,7 +38,7 @@ impl Domain {
     }
 
     /// 从 "NT-*" 字符串解析域 (大小写不敏感); 无法识别时返回 None。
-    pub fn from_str(name: &str) -> Option<Self> {
+    pub fn parse(name: &str) -> Option<Self> {
         match name.to_uppercase().as_str() {
             "NT-CORE" => Some(Domain::Core),
             "NT-MIND" => Some(Domain::Mind),

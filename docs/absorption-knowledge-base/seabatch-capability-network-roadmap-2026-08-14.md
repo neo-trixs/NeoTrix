@@ -54,7 +54,7 @@
 | schema→自动 REST API + Realtime 逻辑复制订阅 (supabase) / Content-Type Builder (strapi) | 🟡 `nt_memory_kb` + `nt_io_web` | KB node/edge schema 自动 API 面缺; 变更订阅未接 `nt_core_event_bus` | T3 |
 | 迁移版本化 + 协作编辑 (outline) | 🟡 `nt_memory_historian`/`nt_memory_curation` | KB schema 迁移版本化缺 | T2 |
 | fidelity ledger 合并/折叠/丢弃收据 (diagram-design) | 🟡 `nt_memory_provenance` [cap reg C2] | 内容操作收据链缺 | T2 |
-| signed-provenance 对抗注入防护 (SEA) | 🟡 `nt_memory_provenance` | 溯源签名 + teacher-second-pass 防对抗注入缺 | T4 |
+| signed-provenance 对抗注入防护 (SEA) | ✅ 2026-08-15 已接线 (HMAC+Teacher-Second-Pass) | 溯源签名 + teacher-second-pass 防对抗注入缺 | T4 |
 
 ### NT-MIND (进化工匠) — 进化域
 
@@ -134,34 +134,34 @@
 | # | 缺陷节点 (能力标签) | 现状 | 补强来源 | 目标节点 (capability_tree) | 消费者 (R-P79) |
 |---|--------------------|------|----------|---------------------------|----------------|
 | G1 | `code_index_graph` (确定性代码图索引) | 缺 | repowise / graphify / codebase-memory-mcp | `nt_world_code_search` 强化 → 补 Bud `nt_core_retrieval::code_graph_mcp` | nt_agent_mcp_registry |
-| G2 | `reversible_distillation` (可逆命令蒸馏) | 缺 | repowise `distill/expand` | `nt_mind_distiller` 强化 | nt_mind_background_loop |
-| G3 | `experience_triplet_pool` (经验三元组池) | 缺 | SEA | `nt_memory_kb` experience namespace 强化 | experience-tree 吸收协议 |
-| G4 | `retrieval_self_evolution` (检索自进化) | 缺 | SimpleMem EvolveMem | `nt_memory_kb` 强化 | nt_mind_evolution_loop |
-| G5 | `temporal_context_graph` (时序事实图) | 缺 | opencontext | `nt_memory_historian`/`nt_memory_kb` 强化 | nt_memory_kb 时序查询 |
+| G2 | `reversible_distillation` (可逆命令蒸馏) | ✅ 2026-08-14 已接线 | repowise `distill/expand` | `nt_mind_distiller` 强化 | nt_mind_background_loop |
+| G3 | `experience_triplet_pool` (经验三元组池) | ✅ 2026-08-14 已接线 | SEA | `nt_memory_kb` experience namespace 强化 | experience-tree 吸收协议 |
+| G4 | `retrieval_self_evolution` (检索自进化) | ✅ 2026-08-14 已接线 | SimpleMem EvolveMem | `nt_memory_kb` 强化 | nt_mind_evolution_loop |
+| G5 | `temporal_context_graph` (时序事实图) | ✅ 2026-08-14 已接线 (KB ingest) | opencontext | `nt_memory_historian`/`nt_memory_kb` 强化 | nt_memory_kb 时序查询 |
 | G6 | `skill_tree_hierarchy` (技能树层级+互补检索) | 缺 | AgentSkillOS | `nt_mind_skill_engine` 强化 | nt_mind_skill_engine 检索路径 |
 | G7 | `skill_differential_attribution` (skill 差分归因) | 缺 | arxiv 2608.11888 | `nt_mind_skill_engine` 强化 | nt_mind_background_loop |
-| G8 | `independent_auditor_gate` (独立验证门) | 缺 | LongHorizon-Harness | `nt_mind_evolution_loop` 强化 | nt_mind_guard |
-| G9 | `loop_ready_scoring` (循环就绪评分) | 缺 | loop-engineering | `nt_mind_background_loop` 强化 | nt_mind_evolution_daemon |
-| G10 | `recursive_task_synthesis` (递归任务合成飞轮) | 缺 | RST 2608.05466 | `nt_mind_evolution_loop`+`nt_mind_distiller` 强化 | nt_mind_benchmark |
-| G11 | `against_prior_accuracy` (反巧合评估) | 缺 | Harness-IF 2608.11727 | `nt_mind_benchmark` 强化 | rev-officer D 系列审查 |
-| G12 | `evidence_gate_delivery` (证据门控交付) | 缺 | old-coder | NT-GOVERNANCE fractal review 强化 | nt_mind_autofixer |
-| G13 | `credential_vault` (凭据保险库) | 缺 | OpenSandbox / anton | `nt_shield_sandbox`/`nt_act_sandbox` 强化 | nt_agent_mcp_registry |
-| G14 | `poc_verification_gate` (真实 PoC 验证门) | 缺 | strix | `nt_shield_agentic_scan` 强化 | nt_shield_audit |
-| G15 | `mcp_governance_proxy` (MCP 治理代理) | 缺 | awesome-mcp-servers | `nt_agent_mcp_gateway`/`nt_shield_audit` 强化 | nt_agent_mcp_tools |
-| G16 | `meta_mcp_gateway` (工具折叠网关) | 缺 | awesome-mcp-servers / openwork | `nt_agent_mcp_gateway` 强化 | nt_agent_orchestrator |
-| G17 | `diagram_rendering` (图表/图渲染) | 缺 | Pretty-mermaid-skills / diagram-design | `nt_io_multimodal_transform` 强化 | nt_mind_knowledge_pipeline |
+| G8 | `independent_auditor_gate` (独立验证门) | ✅ 2026-08-14 已接线 | LongHorizon-Harness | `nt_mind_evolution_loop` 强化 | nt_mind_guard |
+| G9 | `loop_ready_scoring` (循环就绪评分) | ✅ 2026-08-14 已接线 | loop-engineering | `nt_mind_background_loop` 强化 | nt_mind_evolution_daemon |
+| G10 | `recursive_task_synthesis` (递归任务合成飞轮) | ✅ 2026-08-15 已接线 (RstFlywheel) | RST 2608.05466 | `nt_mind_evolution_loop`+`nt_mind_distiller` 强化 | nt_mind_benchmark |
+| G11 | `against_prior_accuracy` (反巧合评估) | ✅ 2026-08-14 已接线 | Harness-IF 2608.11727 | `nt_mind_benchmark` 强化 | rev-officer D 系列审查 |
+| G12 | `evidence_gate_delivery` (证据门控交付) | ✅ 2026-08-15 GAUNTLET 状态机已接线 (nt_mind_autofixer) | old-coder | NT-GOVERNANCE fractal review 强化 | nt_mind_autofixer |
+| G13 | `credential_vault` (凭据保险库) | ✅ 2026-08-14 已接线 (Vault→沙箱 env 注入) | OpenSandbox / anton | `nt_shield_sandbox`/`nt_act_sandbox` 强化 | nt_agent_mcp_registry |
+| G14 | `poc_verification_gate` (真实 PoC 验证门) | ✅ 2026-08-14 已接线 | strix | `nt_shield_agentic_scan` 强化 | nt_shield_audit |
+| G15 | `mcp_governance_proxy` (MCP 治理代理) | ✅ 2026-08-15 已接线 (governed_mcp) | awesome-mcp-servers | `nt_agent_mcp_gateway`/`nt_shield_audit` 强化 | nt_agent_mcp_tools |
+| G16 | `meta_mcp_gateway` (工具折叠网关) | ✅ 2026-08-15 已接线 (FoldedSpecs) | awesome-mcp-servers / openwork | `nt_agent_mcp_gateway` 强化 | nt_agent_orchestrator |
+| G17 | `diagram_rendering` (图表/图渲染) | ✅ 2026-08-15 已接线 (render_diagram/to_mermaid) | Pretty-mermaid-skills / diagram-design | `nt_io_multimodal_transform` 强化 | nt_mind_knowledge_pipeline |
 | G18 | `agent_unified_session` (统一会话模型) | 缺 | novu | `nt_agent_protocol` 强化 (不新建) | nt_io_web / nt_act_autonomy |
-| G19 | `video_publish_pipeline` (视频生产全链) | 弱 | MoneyPrinterTurbo | `nt_world_video_pipeline` 强化 | nt_world_absorber 产物入 KB |
+| G19 | `video_publish_pipeline` (视频生产全链) | 弱 (P2-Checkpoint 已接线: VideoChainRunner resume) | MoneyPrinterTurbo | `nt_world_video_pipeline` 强化 | nt_world_absorber 产物入 KB |
 | G20 | `video_asset_enrichment` (资产 ML 富化) | 弱 | immich | `nt_world_video_pipeline` 强化 | nt_world_absorber |
 | G21 | `design_token_extraction` (设计令牌提取) | 缺 | dembrandt | `nt_world_scrape`/`nt_world_dom_agent` 强化 | NT-IO web 前端 |
 | G22 | `stealth_scrape_params` (隐身抓取参数集) | 弱 | CyberScraper-2077 | `nt_world_scrape`/`nt_shield_stealth_net` 强化 | nt_world_crawl |
 | G23 | `temporal_graph_audit` (加密审计存储) | 缺 | opencontext | NT-SHIELD audit 强化 | nt_memory_provenance |
 | G24 | `latent_feedback_channel` (潜在反馈通道) | 弱 | arxiv 2608.08888 | `nt_core_e8` latent 链强化 | nt_core_gwt |
-| G25 | `multi_agent_shared_context` (阶段化共享上下文编排) | 弱 | arxiv 2603.20131 | `nt_core_parallel` 强化 | nt_io_provider context_budget |
+| G25 | `multi_agent_shared_context` (阶段化共享上下文编排) | ✅ 2026-08-15 已接线 (StagedContextOrchestrator) | arxiv 2603.20131 | `nt_core_parallel` 强化 | nt_io_provider context_budget |
 | G26 | `multi_tier_expert_cache` (分层 expert 缓存) | 缺 | colibri | `nt_io_provider` 强化 | nt_agent_mcp 推理后端 |
-| G27 | `output_discipline_governor` (输出纪律) | 缺 | i-have-adhd | NT-GOVERNANCE constitution 强化 | nt_io CLI |
+| G27 | `output_discipline_governor` (输出纪律) | ✅ 2026-08-15 已接线 (R01-R10 + agent_loop) | i-have-adhd | NT-GOVERNANCE constitution 强化 | nt_io CLI |
 | G28 | `self_healing_healers` (自维护巡检 healers) | 弱 | topics/code-health | `nt_mind_autofixer`/`nt_repair_causal_trace` 强化 | nt_mind_guard |
-| G29 | `privacy_aggregate_telemetry` (隐私聚合遥测+告警) | 弱 | plausible | `nt_io_telemetry`/`nt_core_signal` 强化 | nt_core_signal 意识喂入 |
+| G29 | `privacy_aggregate_telemetry` (隐私聚合遥测+告警) | ✅ 2026-08-15 已接线 (AnomalyDetector→EventBus) | plausible | `nt_io_telemetry`/`nt_core_signal` 强化 | nt_core_signal 意识喂入 |
 | G30 | `discovery_registry_meta` (API/服务注册表 schema) | 弱 | public-apis / free-for-dev | `nt_world_absorber` 强化 | nt_agent_mcp_registry 发现种子 |
 
 ---

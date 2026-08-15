@@ -267,7 +267,7 @@ impl<'a> EvolutionEngine<'a> {
         for node_id in self.registry.aged_exp_nodes(90) {
             plans.push(self.plan_prune(
                 node_id.clone(),
-                format!("Aged exp:: virtual node, no evolution activity for 90+ days"),
+                "Aged exp:: virtual node, no evolution activity for 90+ days".to_string(),
             ));
         }
 

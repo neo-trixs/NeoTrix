@@ -327,6 +327,181 @@ impl AutoFixer {
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// GAUNTLET 证据门控链 (G12 强化, old-coder 吸收) —
+// SPEC→RED→GREEN→GAUNTLET→EVIDENCE 五态门控交付
+// ────────────────────────────────────────────────────────────────
+
+/// GAUNTLET 门控阶段。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GauntletStage {
+    /// SPEC: 变更前必须有明确规格 (spec-before 门禁)。
+    Spec,
+    /// RED: 先写失败测试。
+    Red,
+    /// GREEN: 实现使测试通过。
+    Green,
+    /// GAUNTLET: 硬性检查矩阵 (lint/check/证据必须真实)。
+    Gauntlet,
+    /// EVIDENCE: 交付必须携带真实证据 (evidence-after 门禁)。
+    Evidence,
+}
+
+impl GauntletStage {
+    /// 五阶段顺序。
+    pub const ORDER: [GauntletStage; 5] = [
+        GauntletStage::Spec,
+        GauntletStage::Red,
+        GauntletStage::Green,
+        GauntletStage::Gauntlet,
+        GauntletStage::Evidence,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            GauntletStage::Spec => "SPEC",
+            GauntletStage::Red => "RED",
+            GauntletStage::Green => "GREEN",
+            GauntletStage::Gauntlet => "GAUNTLET",
+            GauntletStage::Evidence => "EVIDENCE",
+        }
+    }
+
+    pub fn next(self) -> Option<GauntletStage> {
+        match self {
+            GauntletStage::Spec => Some(GauntletStage::Red),
+            GauntletStage::Red => Some(GauntletStage::Green),
+            GauntletStage::Green => Some(GauntletStage::Gauntlet),
+            GauntletStage::Gauntlet => Some(GauntletStage::Evidence),
+            GauntletStage::Evidence => None,
+        }
+    }
+}
+
+/// GAUNTLET 门禁判定结果。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GauntletVerdict {
+    pub stage: GauntletStage,
+    /// 是否通过该阶段门禁。
+    pub pass: bool,
+    /// 未通过时的原因 (pass=true 时空)。
+    pub reason: String,
+}
+
+/// GAUNTLET 证据门控状态机。
+///
+/// 每个阶段带独立门禁, 前一阶段未过审则禁止推进:
+/// - SPEC:   必须提供规格 (非空);
+/// - RED:    必须存在至少 1 条失败测试 (evidence-after 前置);
+/// - GREEN:  测试必须全部通过;
+/// - GAUNTLET: 硬检查 (lint 通过 / 无 TODO 残留 / 无 unwrap 滥用) 全绿;
+/// - EVIDENCE: 交付必须携带真实证据包 (非空, 且与实现匹配)。
+#[derive(Debug, Clone, Default)]
+pub struct GauntletMachine {
+    pub current: Option<GauntletStage>,
+    pub passed: Vec<GauntletStage>,
+    pub failures: Vec<GauntletVerdict>,
+}
+
+impl GauntletMachine {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 启动: 从 SPEC 开始。
+    pub fn start(&mut self) {
+        self.current = Some(GauntletStage::Spec);
+    }
+
+    /// 当前阶段。
+    pub fn current(&self) -> Option<GauntletStage> {
+        self.current
+    }
+
+    /// 是否已走完 EVIDENCE (交付完成)。
+    pub fn completed(&self) -> bool {
+        self.current.is_none() && !self.passed.is_empty()
+    }
+
+    /// 评估并推进到下一阶段 (若通过)。返回本次判定。
+    pub fn advance(&mut self, spec: &str, failed_tests: usize, tests_pass: bool, lint_ok: bool, todos: usize, unwraps: usize, evidence: &[String]) -> GauntletVerdict {
+        let stage = match self.current {
+            Some(s) => s,
+            None => {
+                return GauntletVerdict {
+                    stage: GauntletStage::Spec,
+                    pass: false,
+                    reason: "machine not started".into(),
+                };
+            }
+        };
+        let verdict = Self::evaluate_stage(stage, spec, failed_tests, tests_pass, lint_ok, todos, unwraps, evidence);
+        if verdict.pass {
+            self.passed.push(stage);
+            self.current = stage.next();
+        } else {
+            self.failures.push(verdict.clone());
+        }
+        verdict
+    }
+
+    /// 单阶段门禁评估 (纯函数, 便于测试)。
+    pub fn evaluate_stage(stage: GauntletStage, spec: &str, failed_tests: usize, tests_pass: bool, lint_ok: bool, todos: usize, unwraps: usize, evidence: &[String]) -> GauntletVerdict {
+        match stage {
+            GauntletStage::Spec => {
+                if spec.trim().is_empty() {
+                    GauntletVerdict { stage, pass: false, reason: "spec-before: no spec provided".into() }
+                } else {
+                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                }
+            }
+            GauntletStage::Red => {
+                if failed_tests == 0 {
+                    GauntletVerdict { stage, pass: false, reason: "RED: need at least 1 failing test first".into() }
+                } else {
+                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                }
+            }
+            GauntletStage::Green => {
+                if !tests_pass {
+                    GauntletVerdict { stage, pass: false, reason: "GREEN: tests must pass".into() }
+                } else {
+                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                }
+            }
+            GauntletStage::Gauntlet => {
+                let mut problems = Vec::new();
+                if !lint_ok {
+                    problems.push("lint failing".to_string());
+                }
+                if todos > 0 {
+                    problems.push(format!("{todos} TODO leftovers"));
+                }
+                if unwraps > 0 {
+                    problems.push(format!("{unwraps} unwrap abuses"));
+                }
+                if problems.is_empty() {
+                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                } else {
+                    GauntletVerdict { stage, pass: false, reason: format!("GAUNTLET blocked: {}", problems.join(", ")) }
+                }
+            }
+            GauntletStage::Evidence => {
+                if evidence.is_empty() {
+                    GauntletVerdict { stage, pass: false, reason: "evidence-after: no evidence attached".into() }
+                } else {
+                    GauntletVerdict { stage, pass: true, reason: String::new() }
+                }
+            }
+        }
+    }
+
+    /// 是否被某阶段阻挡 (供调用方区分"卡住" vs "完成")。
+    pub fn blocked(&self) -> Option<&GauntletVerdict> {
+        self.failures.last()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,5 +571,97 @@ mod tests {
         // cleanup_todos_tx 在快照后若 cleanup 失败应回滚; 用不存在路径的 snapshot 失败路径验证
         let err = AutoFixer::cleanup_todos_tx("/nonexistent/neotrix/nope.rs");
         assert!(err.is_err(), "快照不存在文件应报错 (不做任何写入)");
+    }
+
+    // ── GAUNTLET evidence gate chain ───────────────────────────────────
+
+    #[test]
+    fn gauntlet_stage_order() {
+        assert_eq!(
+            GauntletStage::ORDER.to_vec(),
+            vec![
+                GauntletStage::Spec,
+                GauntletStage::Red,
+                GauntletStage::Green,
+                GauntletStage::Gauntlet,
+                GauntletStage::Evidence,
+            ]
+        );
+        assert_eq!(GauntletStage::Spec.next(), Some(GauntletStage::Red));
+        assert_eq!(GauntletStage::Evidence.next(), None);
+    }
+
+    #[test]
+    fn gauntlet_spec_requires_spec() {
+        let spec = GauntletMachine::evaluate_stage(GauntletStage::Spec, "", 0, false, false, 0, 0, &[]);
+        assert!(!spec.pass);
+        assert!(spec.reason.contains("spec-before"));
+        let ok = GauntletMachine::evaluate_stage(GauntletStage::Spec, "do X", 0, false, false, 0, 0, &[]);
+        assert!(ok.pass);
+    }
+
+    #[test]
+    fn gauntlet_red_requires_failing_test() {
+        let red = GauntletMachine::evaluate_stage(GauntletStage::Red, "spec", 0, false, false, 0, 0, &[]);
+        assert!(!red.pass, "RED needs a failing test (TDD)");
+        let ok = GauntletMachine::evaluate_stage(GauntletStage::Red, "spec", 1, false, false, 0, 0, &[]);
+        assert!(ok.pass);
+    }
+
+    #[test]
+    fn gauntlet_gauntlet_blocks_on_lint_todos_unwraps() {
+        let clean = GauntletMachine::evaluate_stage(GauntletStage::Gauntlet, "spec", 1, true, true, 0, 0, &[]);
+        assert!(clean.pass);
+        let dirty = GauntletMachine::evaluate_stage(GauntletStage::Gauntlet, "spec", 1, true, false, 3, 1, &[]);
+        assert!(!dirty.pass);
+        assert!(dirty.reason.contains("lint"));
+        assert!(dirty.reason.contains("TODO"));
+        assert!(dirty.reason.contains("unwrap"));
+    }
+
+    #[test]
+    fn gauntlet_evidence_requires_evidence() {
+        let no_ev = GauntletMachine::evaluate_stage(GauntletStage::Evidence, "spec", 1, true, true, 0, 0, &[]);
+        assert!(!no_ev.pass, "evidence-after: must attach evidence");
+        let ok = GauntletMachine::evaluate_stage(GauntletStage::Evidence, "spec", 1, true, true, 0, 0, &["cargo check: 0 errors".to_string()]);
+        assert!(ok.pass);
+    }
+
+    #[test]
+    fn gauntlet_full_pipeline_passes() {
+        let mut m = GauntletMachine::new();
+        m.start();
+        let ev = &["cargo check clean".to_string(), "12 tests passed".to_string()];
+        // SPEC → RED → GREEN → GAUNTLET → EVIDENCE
+        assert!(m.advance("implement parser", 1, false, false, 0, 0, ev).pass);
+        assert!(m.advance("implement parser", 1, false, false, 0, 0, ev).pass);
+        assert!(m.advance("implement parser", 0, true, false, 0, 0, ev).pass);
+        assert!(m.advance("implement parser", 0, true, true, 0, 0, ev).pass);
+        assert!(m.advance("implement parser", 0, true, true, 0, 0, ev).pass);
+        assert!(m.completed(), "all 5 gates passed");
+        assert_eq!(m.passed.len(), 5);
+        assert!(m.current().is_none());
+    }
+
+    #[test]
+    fn gauntlet_blocks_progression_on_green_failure() {
+        let mut m = GauntletMachine::new();
+        m.start();
+        assert!(m.advance("spec ok", 1, false, false, 0, 0, &[]).pass); // SPEC
+        assert!(m.advance("spec ok", 1, false, false, 0, 0, &[]).pass); // RED
+        // GREEN 失败 → 卡住, 不推进
+        let v = m.advance("spec ok", 1, false, false, 0, 0, &[]);
+        assert!(!v.pass);
+        assert_eq!(m.current(), Some(GauntletStage::Green), "blocked at GREEN");
+        assert!(m.blocked().is_some());
+        assert_eq!(m.passed.len(), 2, "only SPEC+RED passed");
+    }
+
+    #[test]
+    fn gauntlet_not_started_rejects_advance() {
+        let mut m = GauntletMachine::new();
+        let v = m.advance("spec", 1, true, true, 0, 0, &[]);
+        assert!(!v.pass);
+        assert!(v.reason.contains("not started"));
     }
 }

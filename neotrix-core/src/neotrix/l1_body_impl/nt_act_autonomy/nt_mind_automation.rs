@@ -246,7 +246,7 @@ impl AutomationEngine {
                 log::info!("[Automation] RunSkill: {} — triggering skill execution", name);
                 // 经注入执行器触发 (L1 不直接依赖 L8 SkillEngine); 未注入则排队降级。
                 if let Some(runner) = &self.skill_runner {
-                    return runner(&name);
+                    return runner(name);
                 }
                 Ok(format!("skill:{} queued for later execution", name))
             }

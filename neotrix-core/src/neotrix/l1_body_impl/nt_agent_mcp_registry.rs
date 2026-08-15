@@ -7,8 +7,10 @@
 
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use crate::neotrix::l1_body_impl::nt_agent_mcp_adapter::McpToolAdapter;
+use crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::{EvidenceEntry, HashChain};
 use crate::neotrix::l1_body_impl::nt_agent_mcp_transport::TransportMode;
 
 // ---------------------------------------------------------------------------
@@ -66,11 +68,28 @@ pub type McpServer = McpServerEntry;
 // McpRegistry — Vec-backed for backward compat with list_servers() -> &[Entry]
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct McpRegistry {
     servers: Vec<McpServerEntry>,
     /// Fast name → index lookup (kept in sync by all mutating methods)
     by_name: HashMap<String, usize>,
+    /// G15/G16 治理证据哈希链 (interior mutability: McpGateway 持 &McpRegistry 也能 record)。
+    evidence: Mutex<HashChain>,
+}
+
+impl Clone for McpRegistry {
+    fn clone(&self) -> Self {
+        let evidence = self
+            .evidence
+            .lock()
+            .map(|c| c.clone())
+            .unwrap_or_else(|e| e.into_inner().clone());
+        Self {
+            servers: self.servers.clone(),
+            by_name: self.by_name.clone(),
+            evidence: Mutex::new(evidence),
+        }
+    }
 }
 
 impl Default for McpRegistry {
@@ -84,6 +103,7 @@ impl McpRegistry {
         Self {
             servers: Vec::new(),
             by_name: HashMap::new(),
+            evidence: Mutex::new(HashChain::new()),
         }
     }
 
@@ -291,7 +311,8 @@ impl McpRegistry {
             .next()
             .ok_or_else(|| format!("MCP tool '{}' not registered", name))?;
 
-        let mode = to_transport_mode(&server.transport, server.url.as_deref());
+        // 优先使用工具自身声明的 transport (工具级 Local 命令/URL 优先于服务器级)。
+        let mode = to_transport_mode(&tool.transport, server.url.as_deref());
         let (content, _cache) = crate::neotrix::l1_body_impl::nt_agent_mcp_transport::mcp_call_tool(&mode, &tool.name, args)
             .map_err(|e| format!("MCP tool '{}' failed: {}", name, e))?;
         Ok(content)
@@ -302,9 +323,111 @@ impl McpRegistry {
         None
     }
 
+    // -- G15/G16 Governance gateway (hash-chain evidence) --------------------
+
+    /// Governed wrapper over the same registry: N→4 folding, allow/deny/HITL,
+    /// SHA-256 chain evidence. Every existing caller that holds `&McpRegistry`
+    /// can reach the production path via this accessor.
+    pub fn gateway(&self) -> crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::McpGateway<'_> {
+        crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::McpGateway::new(self)
+    }
+
+    /// Governed one-shot call with an explicit policy (registry-level surface).
+    /// Returns transport content on approval, records every outcome on the chain.
+    pub fn call_tool_governed(
+        &self,
+        name: &str,
+        args: &Value,
+        policy: &crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::GovernancePolicy,
+    ) -> Result<String, String> {
+        let verdict = policy.check(name);
+        match verdict {
+            crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::Denied => {
+                self.record_evidence(name, args, verdict, false, None);
+                Err(format!(
+                    "MCP governance: tool '{}' denied by policy",
+                    name
+                ))
+            }
+            crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::RequiresApproval => {
+                self.record_evidence(name, args, verdict, false, None);
+                Err(format!(
+                    "MCP governance: tool '{}' requires human approval (not granted)",
+                    name
+                ))
+            }
+            crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict::Approved => {
+                match self.call_tool(name, args) {
+                    Ok(content) => {
+                        self.record_evidence(
+                            name,
+                            args,
+                            verdict,
+                            false,
+                            Some(truncate_for_evidence(&content, 256)),
+                        );
+                        Ok(content)
+                    }
+                    Err(e) => {
+                        self.record_evidence(
+                            name,
+                            args,
+                            verdict,
+                            false,
+                            Some(format!("ERROR: {}", e)),
+                        );
+                        Err(e)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Append a hash-chain evidence entry (used by `McpGateway` and
+    /// `call_tool_governed`). Returns the appended entry.
+    pub fn record_evidence(
+        &self,
+        name: &str,
+        args: &Value,
+        verdict: crate::neotrix::l1_body_impl::nt_act_sandbox::SandboxVerdict,
+        approved_by_hitl: bool,
+        result: Option<String>,
+    ) -> EvidenceEntry {
+        let mut chain = self
+            .evidence
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        chain.append(name, args.clone(), verdict, approved_by_hitl, result)
+    }
+
+    /// Whether the full evidence chain is intact.
+    pub fn chain_valid(&self) -> bool {
+        self.evidence
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .verify()
+    }
+
+    /// Clone of the current evidence chain (append-only audit view).
+    pub fn evidence_chain(&self) -> HashChain {
+        self.evidence
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
     /// Stub
     pub fn prune_cache(&self) -> usize {
         0
+    }
+}
+
+/// Truncate a result preview for evidence (keep it bounded for audit).
+fn truncate_for_evidence(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..max.min(s.len())])
     }
 }
 

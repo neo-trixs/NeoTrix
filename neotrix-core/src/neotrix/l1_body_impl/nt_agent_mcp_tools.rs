@@ -1,4 +1,5 @@
 use crate::agent::tool::mcp::{McpRegistry, McpToolDef, McpTransport};
+use crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::fold_tool_specs_from_defs;
 
 /// Return a list of built-in NeoTrix MCP tool definitions.
 pub fn neotrix_mcp_tools() -> Vec<McpToolDef> {
@@ -29,7 +30,12 @@ pub fn neotrix_mcp_tools() -> Vec<McpToolDef> {
 }
 
 /// Register NeoTrix's built-in MCP tool servers into the given registry.
-pub fn register_neotrix_tools(registry: &mut McpRegistry) {
+/// Returns the N→4 folded tool specs computed at registration time (production
+/// folding: bootstrap registration and the gateway surface both use it).
+pub fn register_neotrix_tools(
+    registry: &mut McpRegistry,
+) -> crate::neotrix::l1_body_impl::nt_agent_mcp_gateway::FoldedSpecs {
     let tools = neotrix_mcp_tools();
     registry.register_stdio("built-in", "neotrix", &["mcp"], tools);
+    fold_tool_specs_from_defs(registry.list_tools())
 }

@@ -22,7 +22,7 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use super::nt_io_multimodal_transform::MultimodalTransform;
-use super::nt_io_output_style::{OutputStyleId, OutputStyleRegistry};
+use super::nt_io_output_style::{GovernanceReport, OutputStyleId, OutputStyleRegistry};
 use super::nt_io_provider::context_budget::{
     apply_context_budget, estimate_tokens, truncate_preserving,
 };
@@ -68,6 +68,8 @@ pub struct AgentLoop {
     multimodal: Option<std::sync::Arc<MultimodalTransform>>,
     /// 样式注册表 (单实例惰性共享)。
     style_registry: Option<std::sync::Arc<OutputStyleRegistry>>,
+    /// G27 最近一次最终输出的治理报告 (观测杠杆: 每次 emit_final 可见纪律合规)。
+    last_governance: Option<GovernanceReport>,
 }
 
 impl AgentLoop {
@@ -91,6 +93,7 @@ impl AgentLoop {
             guard: None,
             multimodal: None,
             style_registry: None,
+            last_governance: None,
         }
     }
 
@@ -124,9 +127,19 @@ impl AgentLoop {
                 .get_or_insert_with(|| std::sync::Arc::new(OutputStyleRegistry::new()));
             reg.apply(self.style, text)
         };
+        // G27 输出纪律治理: 每条最终输出经 OutputGovernor 检查, 报告附于本对象供观测。
+        let reg = self
+            .style_registry
+            .get_or_insert_with(|| std::sync::Arc::new(OutputStyleRegistry::new()));
+        self.last_governance = Some(reg.govern(&styled, self.style));
         self.messages.push(Message::new(Role::Assistant, &styled));
         self.trim_history();
         Ok(styled)
+    }
+
+    /// G27 最近一次最终输出的治理报告 (纯观测, 不影响循环行为)。
+    pub fn last_governance(&self) -> Option<&GovernanceReport> {
+        self.last_governance.as_ref()
     }
 
     pub fn with_tools(mut self, tools: Vec<Box<dyn NativeTool>>) -> Self {
@@ -327,9 +340,8 @@ impl AgentLoop {
                         let args: Value =
                             serde_json::from_str(&call.function.arguments).unwrap_or(Value::Null);
                         let result = self.call_tool(&call.function.name, &args);
-                        match &result {
-                            Ok(output) => on_tool(call, output),
-                            Err(_) => {}
+                        if let Ok(output) = &result {
+                            on_tool(call, output);
                         }
                         let content = match &result {
                             Ok(ToolOutput { success, content }) => {
@@ -675,7 +687,9 @@ impl AgentLoop {
     /// 工具执行前审批门槛。
     /// - 无回调 (None)：需审批工具一律跳过，返回错误 "需审批"（默认安全）
     /// - 有回调：回调决策 approve (true) / deny (false)
+    ///
     /// 锁纪律：必须在调回调前 drop(guard)（回调可能阻塞等待用户按键），
+    ///
     /// 批准后再重新加锁 approve/deny。
     fn check_tool_approval(
         name: &str,
@@ -1167,6 +1181,50 @@ mod tests {
     #[test]
     fn test_tool_def_helper() {
         let _ = tool_def("x");
+    }
+
+    // ── G27 输出纪律治理接线: 每条最终输出经 OutputGovernor 检查 ──────
+    #[tokio::test]
+    async fn test_emit_final_wires_governance() {
+        use crate::neotrix::nt_io_provider::types::LlmResponse as Resp;
+        let mut loop_ = AgentLoop::new(
+            Arc::new(ScriptedLlm {
+                script: Arc::new(Mutex::new(vec![(
+                    "def add(a,b): return a+b".to_string(),
+                    FinishReason::Stop,
+                    Vec::new(),
+                )])),
+                seen_tools: Arc::new(Mutex::new(Vec::new())),
+            }),
+            "mock",
+            "",
+        );
+        let out = loop_.turn("计算 1+1").await.expect("turn ok");
+        let report = loop_.last_governance().expect("governance attached");
+        assert!(report.rule_results.len() >= 10, "all 10 rules run");
+        assert_eq!(out.trim(), "def add(a,b): return a+b");
+        assert!(!report.fixes_applied.is_empty() == false);
+        assert!(report.overall_score > 0, "clean sample scores > 0");
+    }
+
+    #[tokio::test]
+    async fn test_governance_reports_violations_but_keeps_output() {
+        let mut loop_ = AgentLoop::new(
+            Arc::new(ScriptedLlm {
+                script: Arc::new(Mutex::new(vec![(
+                    "答案：42。\n抱歉，这只是一个占位。TODO 补充细节。".to_string(),
+                    FinishReason::Stop,
+                    Vec::new(),
+                )])),
+                seen_tools: Arc::new(Mutex::new(Vec::new())),
+            }),
+            "mock",
+            "",
+        );
+        let out = loop_.turn("question").await.expect("turn ok");
+        let report = loop_.last_governance().expect("governance attached");
+        assert!(!report.violations.is_empty(), "violations surfaced: {:?}", report.violations);
+        assert_eq!(out, "答案：42。\n抱歉，这只是一个占位。TODO 补充细节。");
     }
 
     // ── 真实 LLM 端到端（agent 循环层，本地手动跑，不进 CI）──────────

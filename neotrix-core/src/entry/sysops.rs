@@ -431,14 +431,3 @@ pub fn run_sysops(args: &[String]) {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_placeholder() {
-        let instance = Default::new();
-        assert!(true);
-    }
-}

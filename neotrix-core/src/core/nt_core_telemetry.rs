@@ -41,6 +41,17 @@ pub struct TelemetryStore {
     events: Mutex<VecDeque<(Instant, TelemetryEvent)>>,
     max_events: usize,
     metrics: Mutex<HashMap<String, AggregatedMetric>>,
+    /// Numeric metric series (e.g. latency_ms) — counts/durations only, no raw payloads.
+    metric_series: Mutex<HashMap<String, VecDeque<(Instant, f64)>>>,
+}
+
+/// Aggregate recorded events into per-kind window buckets.
+/// Privacy: counts + durations only — raw payloads (message/value) never escape.
+#[derive(Debug, Clone, Default)]
+pub struct WindowAggregate {
+    pub count: u64,
+    pub error_count: u64,
+    pub total_duration_ms: u64,
 }
 
 impl TelemetryStore {
@@ -49,6 +60,47 @@ impl TelemetryStore {
             events: Mutex::new(VecDeque::with_capacity(max_events.min(100_000))),
             max_events,
             metrics: Mutex::new(HashMap::new()),
+            metric_series: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Record a numeric metric sample (e.g. request latency). Privacy: numeric
+    /// value only, no raw payload retained.
+    pub fn record_metric(&self, metric: &str, value: f64) {
+        if let Ok(mut series) = self.metric_series.lock() {
+            let q = series.entry(metric.to_string()).or_insert_with(VecDeque::new);
+            if q.len() >= self.max_events {
+                q.pop_front();
+            }
+            q.push_back((Instant::now(), value));
+        }
+    }
+
+    /// Names of all recorded numeric metric series.
+    pub fn metric_names(&self) -> Vec<String> {
+        match self.metric_series.lock() {
+            Ok(series) => series.keys().cloned().collect(),
+            Err(_) => vec![],
+        }
+    }
+
+    /// Mean value of a numeric metric over the window (None if no samples).
+    pub fn metric_window_mean(&self, metric: &str, window: Duration) -> Option<f64> {
+        let cutoff = Instant::now() - window;
+        match self.metric_series.lock() {
+            Ok(series) => series.get(metric).and_then(|q| {
+                let samples: Vec<f64> = q
+                    .iter()
+                    .filter(|(t, _)| *t > cutoff)
+                    .map(|(_, v)| *v)
+                    .collect();
+                if samples.is_empty() {
+                    None
+                } else {
+                    Some(samples.iter().sum::<f64>() / samples.len() as f64)
+                }
+            }),
+            Err(_) => None,
         }
     }
 
@@ -111,12 +163,187 @@ impl TelemetryStore {
         }
     }
 
+    /// Count events per kind within the last `window`. Only aggregate scalars
+    /// are surfaced — no raw event payloads leak into the alerting pipeline.
+    pub fn window_aggregates(&self, window: Duration) -> Vec<(String, WindowAggregate)> {
+        let cutoff = Instant::now() - window;
+        let mut agg: HashMap<String, WindowAggregate> = HashMap::new();
+        if let Ok(events) = self.events.lock() {
+            for (t, e) in events.iter() {
+                if *t < cutoff {
+                    continue;
+                }
+                let kind = e.kind().to_string();
+                let entry = agg.entry(kind).or_default();
+                entry.count += 1;
+                if matches!(e, TelemetryEvent::Error { .. }) {
+                    entry.error_count += 1;
+                }
+                entry.total_duration_ms += match e {
+                    TelemetryEvent::ToolCall { duration_ms, .. } => *duration_ms,
+                    TelemetryEvent::AgentCompleted { duration_ms, .. } => *duration_ms,
+                    _ => 0,
+                };
+            }
+        }
+        let mut result: Vec<_> = agg.into_iter().collect();
+        result.sort_by(|a, b| b.1.count.cmp(&a.1.count));
+        result
+    }
+
     pub fn clear(&self) {
         if let Ok(mut events) = self.events.lock() {
             events.clear();
         }
         if let Ok(mut metrics) = self.metrics.lock() {
             metrics.clear();
+        }
+        if let Ok(mut series) = self.metric_series.lock() {
+            series.clear();
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlertKind {
+    Spike,
+    Drop,
+}
+
+#[derive(Debug, Clone)]
+pub struct TelemetryAlert {
+    pub metric: String,
+    pub kind: AlertKind,
+    pub current: f64,
+    pub baseline: f64,
+    pub threshold: f64,
+}
+
+/// Rolling z-score anomaly detector over a metric time series.
+///
+/// Z-score approach (cf. network_diagnostics/protocol.rs EWMA): each observed
+/// value is compared against the mean/std of the trailing window. A value that
+/// exceeds `+z_threshold` std from baseline is a Spike; below `-z_threshold` is
+/// a Drop. Reuses `MetricSeries` sampling so a single compact implementation
+/// serves the background-loop feed (no parallel adapter — R-P42).
+#[derive(Debug, Clone)]
+pub struct MetricSeries {
+    /// (Instant, value) samples, oldest first.
+    samples: VecDeque<(Instant, f64)>,
+    /// Max samples retained.
+    capacity: usize,
+}
+
+impl MetricSeries {
+    pub fn new(capacity: usize) -> Self {
+        Self { samples: VecDeque::with_capacity(capacity), capacity: capacity.max(2) }
+    }
+
+    pub fn push(&mut self, value: f64) {
+        self.samples.push_back((Instant::now(), value));
+        while self.samples.len() > self.capacity {
+            self.samples.pop_front();
+        }
+    }
+
+    /// All samples within `window` (most recent last).
+    pub fn window_values(&self, window: Duration) -> Vec<f64> {
+        let cutoff = Instant::now() - window;
+        self.samples
+            .iter()
+            .filter(|(t, _)| *t >= cutoff)
+            .map(|(_, v)| *v)
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.samples.len()
+    }
+}
+
+/// AnomalyDetector — per-metric rolling z-score spike/drop detection.
+/// Thread-safe: holds its own `MetricSeries` collection behind a Mutex.
+pub struct AnomalyDetector {
+    series: Mutex<HashMap<String, MetricSeries>>,
+    window: Duration,
+    z_threshold: f64,
+    capacity: usize,
+}
+
+impl Default for AnomalyDetector {
+    fn default() -> Self {
+        Self {
+            series: Mutex::new(HashMap::new()),
+            window: Duration::from_secs(600),
+            z_threshold: 2.5,
+            capacity: 64,
+        }
+    }
+}
+
+impl AnomalyDetector {
+    pub fn new(window: Duration, z_threshold: f64, capacity: usize) -> Self {
+        Self {
+            series: Mutex::new(HashMap::new()),
+            window,
+            z_threshold,
+            capacity,
+        }
+    }
+
+    /// Observe one metric value, returning an alert if it spikes or drops
+    /// beyond the z-score threshold relative to the trailing window baseline.
+    /// Returns None when insufficient samples for a stable baseline exist.
+    pub fn observe(&self, metric: &str, value: f64) -> Option<TelemetryAlert> {
+        let mut series = self.series.lock().ok()?;
+        let entry = series
+            .entry(metric.to_string())
+            .or_insert_with(|| MetricSeries::new(self.capacity));
+        let baseline_values = entry.window_values(self.window);
+        if baseline_values.len() < 3 {
+            entry.push(value);
+            return None;
+        }
+        let n = baseline_values.len() as f64;
+        let mean = baseline_values.iter().sum::<f64>() / n;
+        let variance = baseline_values
+            .iter()
+            .map(|v| (v - mean) * (v - mean))
+            .sum::<f64>()
+            / n;
+        // Floor std relative to the mean scale: a perfectly constant series
+        // would otherwise give std=0 → every tiny deviation explodes to +∞ z.
+        let std = variance.sqrt().max(mean.abs() * 0.01).max(1e-9);
+        let z = (value - mean) / std;
+
+        let kind = if z > self.z_threshold {
+            Some(AlertKind::Spike)
+        } else if z < -self.z_threshold {
+            Some(AlertKind::Drop)
+        } else {
+            None
+        };
+
+        entry.push(value);
+        kind.map(|kind| TelemetryAlert {
+            metric: metric.to_string(),
+            kind,
+            current: value,
+            baseline: mean,
+            threshold: self.z_threshold,
+        })
+    }
+
+    pub fn series_len(&self, metric: &str) -> usize {
+        match self.series.lock() {
+            Ok(s) => s.get(metric).map(|m| m.len()).unwrap_or(0),
+            Err(_) => 0,
+        }
+    }
+
+    pub fn reset(&self, metric: &str) {
+        if let Ok(mut s) = self.series.lock() {
+            s.remove(metric);
         }
     }
 }
@@ -286,6 +513,47 @@ impl crate::core::nt_core_self_test::SelfTest for TelemetryStore {
     }
 }
 
+impl crate::core::nt_core_self_test::SelfTest for AnomalyDetector {
+    fn name(&self) -> &str {
+        "AnomalyDetector"
+    }
+
+    fn self_test(&self) -> Result<(), Vec<String>> {
+        let mut failures = Vec::new();
+        // Stable baseline then a spike must be flagged.
+        let mut d = AnomalyDetector::default();
+        for i in 0..10 {
+            let v = if i == 9 { 50.0 } else { 1.0 };
+            if let Some(a) = d.observe("probe", v) {
+                if a.kind == AlertKind::Spike {
+                    failures.push("baseline already spiking".into());
+                }
+            }
+        }
+        // Fresh metric: 5 warmup samples → stable → spike → drop.
+        let mut d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        for _ in 0..5 {
+            d.observe("m", 1.0);
+        }
+        let spike = d.observe("m", 10.0);
+        if !matches!(spike.map(|a| a.kind), Some(AlertKind::Spike)) {
+            failures.push("spike not detected".into());
+        }
+        for _ in 0..5 {
+            d.observe("m", 1.0);
+        }
+        let drop = d.observe("m", 0.1);
+        if !matches!(drop.map(|a| a.kind), Some(AlertKind::Drop)) {
+            failures.push("drop not detected".into());
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -353,5 +621,122 @@ mod tests {
         assert_eq!(TelemetryEvent::AgentSpawned { agent_id: "x".into(), role: "r".into() }.kind(), "agent_spawned");
         assert_eq!(TelemetryEvent::Error { source: "x".into(), message: "m".into(), severity: 1 }.kind(), "error");
         assert_eq!(TelemetryEvent::Custom { name: "my_event".into(), value: "v".into() }.kind(), "my_event");
+    }
+
+    // ── AnomalyDetector (spike/drop) ───────────────────────────────────
+
+    #[test]
+    fn test_anomaly_detector_insufficient_samples() {
+        let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        // Baseline needs >=3 samples; the 1st..3rd observations all return None
+        // (they only push, never alert), and the series grows to 3.
+        for _ in 0..3 {
+            assert!(d.observe("m", 1.0).is_none(), "baseline needs >=3 samples");
+        }
+        assert_eq!(d.series_len("m"), 3);
+    }
+
+    #[test]
+    fn test_anomaly_detector_spike_detection() {
+        let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        for _ in 0..5 {
+            assert!(d.observe("latency", 1.0).is_none());
+        }
+        let alert = d.observe("latency", 10.0).expect("spike should alert");
+        assert_eq!(alert.kind, AlertKind::Spike);
+        assert_eq!(alert.metric, "latency");
+        assert!((alert.current - 10.0).abs() < 1e-9);
+        assert!((alert.baseline - 1.0).abs() < 1e-9);
+        assert_eq!(alert.threshold, 2.5);
+    }
+
+    #[test]
+    fn test_anomaly_detector_drop_detection() {
+        let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        for _ in 0..5 {
+            d.observe("count", 100.0);
+        }
+        let alert = d.observe("count", 1.0).expect("drop should alert");
+        assert_eq!(alert.kind, AlertKind::Drop);
+        assert!((alert.current - 1.0).abs() < 1e-9);
+        assert!((alert.baseline - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_anomaly_detector_no_alert_on_stable() {
+        let d = AnomalyDetector::new(Duration::from_secs(600), 3.0, 64);
+        for _ in 0..5 {
+            d.observe("m", 5.0);
+        }
+        // small perturbation within tolerance → no alert
+        assert!(d.observe("m", 5.1).is_none());
+        assert!(d.observe("m", 4.9).is_none());
+    }
+
+    #[test]
+    fn test_anomaly_detector_metric_isolation() {
+        let d = AnomalyDetector::new(Duration::from_secs(600), 2.5, 64);
+        for _ in 0..5 {
+            d.observe("stable", 1.0);
+        }
+        d.observe("stable", 10.0); // spike on one metric
+        // unrelated metric keeps its own baseline — no alert from cross-talk
+        for _ in 0..5 {
+            d.observe("other", 3.0);
+        }
+        assert!(d.observe("other", 3.05).is_none());
+        assert_eq!(d.series_len("other"), 6);
+    }
+
+    // ── Window aggregation + privacy ───────────────────────────────────
+
+    #[test]
+    fn test_window_aggregates_counts_and_durations() {
+        let store = TelemetryStore::new(1000);
+        for _ in 0..5 {
+            store.record(TelemetryEvent::ToolCall { tool: "bash".into(), success: true, duration_ms: 40 });
+        }
+        for _ in 0..2 {
+            store.record(TelemetryEvent::Error { source: "bash".into(), message: "boom".into(), severity: 2 });
+        }
+        store.record(TelemetryEvent::AgentCompleted { agent_id: "a".into(), success: true, duration_ms: 200 });
+        let aggs = store.window_aggregates(Duration::from_secs(60));
+        let tc = aggs.iter().find(|(k, _)| k == "tool_call").expect("tool_call present");
+        assert_eq!(tc.1.count, 5);
+        assert_eq!(tc.1.total_duration_ms, 200);
+        let err = aggs.iter().find(|(k, _)| k == "error").expect("error present");
+        assert_eq!(err.1.count, 2);
+        assert_eq!(err.1.error_count, 2);
+        let ac = aggs.iter().find(|(k, _)| k == "agent_completed").expect("agent_completed present");
+        assert_eq!(ac.1.count, 1);
+        assert_eq!(ac.1.total_duration_ms, 200);
+    }
+
+    #[test]
+    fn test_privacy_no_raw_payload_in_aggregates() {
+        let store = TelemetryStore::new(1000);
+        store.record(TelemetryEvent::Error { source: "db".into(), message: "secret-credential-xyz".into(), severity: 3 });
+        store.record(TelemetryEvent::Custom { name: "raw".into(), value: "user-document-body".into() });
+        // Aggregates must never expose raw payload strings — only scalars.
+        for (kind, agg) in store.window_aggregates(Duration::from_secs(60)) {
+            assert!(!kind.contains("secret-credential"));
+            assert!(agg.count >= 0);
+            assert!(agg.total_duration_ms >= 0);
+            assert!(agg.error_count >= 0);
+        }
+        let summary = store.summary();
+        assert!(summary.iter().all(|(k, _)| !k.contains("user-document-body")));
+    }
+
+    #[test]
+    fn test_record_metric_series() {
+        let store = TelemetryStore::new(1000);
+        store.record_metric("gateway_latency_ms", 12.0);
+        store.record_metric("gateway_latency_ms", 14.0);
+        store.record_metric("gateway_latency_ms", 13.0);
+        assert!(store.metric_names().contains(&"gateway_latency_ms".to_string()));
+        let mean = store.metric_window_mean("gateway_latency_ms", Duration::from_secs(60)).unwrap();
+        assert!((mean - 13.0).abs() < 1e-9);
+        assert!(store.metric_window_mean("unknown", Duration::from_secs(60)).is_none());
     }
 }

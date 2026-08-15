@@ -217,7 +217,8 @@ impl FileParser {
     pub fn extract_text(filename: &str, mime: &str, data: &[u8]) -> FileParseResult {
         let format = Self::detect_format(filename, mime, data);
         let size = data.len();
-        let data = if data.len() > Self::MAX_EXTRACT_BYTES {
+        // PDF 需完整 xref/trailer 才能解析, 不参与 MAX_EXTRACT_BYTES 截断
+        let data = if data.len() > Self::MAX_EXTRACT_BYTES && format != FileFormat::Pdf {
             &data[..Self::MAX_EXTRACT_BYTES]
         } else {
             data
@@ -290,7 +291,8 @@ impl FileParser {
     pub fn parse_with_layout(filename: &str, mime: &str, data: &[u8]) -> FileParseResult {
         let format = Self::detect_format(filename, mime, data);
         let size = data.len();
-        let data = if data.len() > Self::MAX_EXTRACT_BYTES {
+        // PDF 需完整 xref/trailer 才能解析, 不参与 MAX_EXTRACT_BYTES 截断
+        let data = if data.len() > Self::MAX_EXTRACT_BYTES && format != FileFormat::Pdf {
             &data[..Self::MAX_EXTRACT_BYTES]
         } else {
             data
@@ -298,12 +300,9 @@ impl FileParser {
 
         let (text, spatial_blocks, success) = match &format {
             FileFormat::Pdf => {
+                // text 走 lopdf 完整解析 (与 extract_text 一致); spatial 尽力而为
                 let blocks = Self::extract_pdf_spatial(data);
-                let text = blocks
-                    .iter()
-                    .map(|b| b.text.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                let text = Self::extract_pdf_text(data);
                 (text, blocks, true)
             }
             _ => {

@@ -304,6 +304,204 @@ fn count_actual_unsafe(content: &str) -> usize {
 // 进化引擎
 // ============================================================
 
+// ── G10: RST 递归任务合成飞轮 (seed→extend→realign→validate→reuse) ──
+// 吸收自 RST 2608.05466 (Self-Training with Recursive Task Synthesis):
+// 用已验证种子任务迭代合成更难任务, 验证器 (validator) 对齐生成器, 防止
+// 分布漂移; 验证通过的任务进 reuse 池, 形成数据飞轮。玩具实现: 任务 =
+// 结构化字符串, 验证器 = 启发式 (复杂度单调 + 可解性检查), 无 LLM 依赖,
+// 纯确定性可测。接线到 EvolutionLoop 作为"递归任务合成"进化输入源。
+
+/// RST 任务 — 递归合成的单元。
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RstTask {
+    /// 任务 id。
+    pub id: String,
+    /// 任务描述。
+    pub prompt: String,
+    /// 合成代数 (种子 = 0)。
+    pub generation: u32,
+    /// 复杂度评分 (验证器用于对齐: 应单调不减)。
+    pub complexity: f64,
+    /// 是否已通过验证。
+    pub verified: bool,
+    /// 被复用的父任务 id (None = 种子)。
+    pub parent: Option<String>,
+}
+
+/// RST 验证结果。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RstVerdict {
+    pub task_id: String,
+    pub accepted: bool,
+    /// 拒绝原因 (accepted=false 时)。
+    pub reason: String,
+}
+
+/// RST 飞轮 — seed→extend→realign→validate→reuse。
+#[derive(Debug, Clone)]
+pub struct RstFlywheel {
+    /// 已验证任务池 (reuse 源)。
+    pub verified_pool: Vec<RstTask>,
+    /// 生成代数上限 (防止无界漂移)。
+    pub max_generation: u32,
+    /// 每代最大合成数。
+    pub extend_per_gen: usize,
+    /// 复杂度对齐阈值 — 新任务复杂度必须 ≥ 父任务 × 阈值。
+    pub realign_threshold: f64,
+    /// 复杂度上限 (超出即拒绝, 防发散)。
+    pub complexity_cap: f64,
+    /// 已拒绝计数。
+    pub rejected_count: u64,
+    /// 已接受计数。
+    pub accepted_count: u64,
+}
+
+impl Default for RstFlywheel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RstFlywheel {
+    pub fn new() -> Self {
+        Self {
+            verified_pool: Vec::new(),
+            max_generation: 4,
+            extend_per_gen: 3,
+            realign_threshold: 1.1,
+            complexity_cap: 100.0,
+            rejected_count: 0,
+            accepted_count: 0,
+        }
+    }
+
+    /// 阶段 1 seed: 注入种子任务 (代数 0, 直接入池)。
+    pub fn seed(&mut self, prompt: impl Into<String>) -> RstTask {
+        let task = RstTask {
+            id: format!("rst-{}", uuid::Uuid::new_v4()),
+            prompt: prompt.into(),
+            generation: 0,
+            complexity: 1.0,
+            verified: true,
+            parent: None,
+        };
+        self.verified_pool.push(task.clone());
+        self.accepted_count += 1;
+        task
+    }
+
+    /// 阶段 2 extend: 从已验证池采样父任务, 合成新任务 (复杂度随代数放大)。
+    pub fn extend(&self, parent: &RstTask) -> Vec<RstTask> {
+        if parent.generation >= self.max_generation {
+            return Vec::new();
+        }
+        let gen = parent.generation + 1;
+        (0..self.extend_per_gen)
+            .map(|i| RstTask {
+                id: format!("rst-{gen}-{i}-{}", uuid::Uuid::new_v4()),
+                prompt: format!("extended[{}]: {}", parent.prompt, i),
+                generation: gen,
+                complexity: parent.complexity * 1.3,
+                verified: false,
+                parent: Some(parent.id.clone()),
+            })
+            .collect()
+    }
+
+    /// 阶段 3 realign: 复杂度对齐 — 只保留复杂度 ∈ [父×阈值, cap] 的候选。
+    /// 防生成器漂移 (分布外任务被淘汰)。
+    pub fn realign(&self, parent: &RstTask, candidates: Vec<RstTask>) -> Vec<RstTask> {
+        let floor = parent.complexity * self.realign_threshold;
+        candidates
+            .into_iter()
+            .filter(|c| c.complexity >= floor && c.complexity <= self.complexity_cap)
+            .collect()
+    }
+
+    /// 阶段 4 validate: 启发式验证器 — 任务必须可解 (提示非空) 且复杂度
+    /// 在合理区间。通过 → 入池; 失败 → 记拒绝。
+    pub fn validate(&mut self, candidates: Vec<RstTask>) -> Vec<RstTask> {
+        let mut accepted = Vec::new();
+        for c in candidates {
+            let verdict = self.validate_one(&c);
+            if verdict.accepted {
+                accepted.push(c);
+                self.accepted_count += 1;
+            } else {
+                self.rejected_count += 1;
+            }
+        }
+        accepted
+    }
+
+    fn validate_one(&self, task: &RstTask) -> RstVerdict {
+        if task.prompt.trim().is_empty() {
+            return RstVerdict {
+                task_id: task.id.clone(),
+                accepted: false,
+                reason: "empty prompt".into(),
+            };
+        }
+        if task.complexity <= 0.0 {
+            return RstVerdict {
+                task_id: task.id.clone(),
+                accepted: false,
+                reason: "non-positive complexity".into(),
+            };
+        }
+        if task.complexity > self.complexity_cap {
+            return RstVerdict {
+                task_id: task.id.clone(),
+                accepted: false,
+                reason: "complexity exceeds cap".into(),
+            };
+        }
+        RstVerdict {
+            task_id: task.id.clone(),
+            accepted: true,
+            reason: String::new(),
+        }
+    }
+
+    /// 阶段 5 reuse: 从已验证池采样可复用任务 (round-robin 策略, 确定性)。
+    pub fn reuse(&self, offset: usize) -> Option<&RstTask> {
+        if self.verified_pool.is_empty() {
+            return None;
+        }
+        let idx = offset % self.verified_pool.len();
+        self.verified_pool.get(idx)
+    }
+
+    /// 飞轮完整循环: 从指定父任务 extend → realign → validate → 入池。
+    /// 返回新接受任务数。
+    pub fn run_generation(&mut self, parent: &RstTask) -> usize {
+        let candidates = self.extend(parent);
+        if candidates.is_empty() {
+            return 0;
+        }
+        let aligned = self.realign(parent, candidates);
+        let accepted = self.validate(aligned);
+        let n = accepted.len();
+        self.verified_pool.extend(accepted);
+        n
+    }
+
+    /// 统计: 池规模 / 各代数分布。
+    pub fn stats(&self) -> (usize, Vec<usize>) {
+        let max_gen = self
+            .verified_pool
+            .iter()
+            .map(|t| t.generation)
+            .max()
+            .unwrap_or(0) as usize;
+        let mut dist = vec![0usize; max_gen + 1];
+        for t in &self.verified_pool {
+            dist[t.generation as usize] += 1;
+        }
+        (self.verified_pool.len(), dist)
+    }
+}
+
 /// 自进化循环引擎
 #[derive(Debug, Clone)]
 pub struct EvolutionLoop {
@@ -1260,5 +1458,125 @@ mod tests {
         assert!(report.evolution_score.is_finite());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── G10: RST flywheel ──────────────────────────────────────────────
+
+    #[test]
+    fn rst_seed_creates_verified_gen0() {
+        let mut fw = RstFlywheel::new();
+        let seed = fw.seed("parse the config");
+        assert_eq!(seed.generation, 0);
+        assert!(seed.verified);
+        assert_eq!(fw.stats().0, 1);
+    }
+
+    #[test]
+    fn rst_extend_increments_generation_and_complexity() {
+        let mut fw = RstFlywheel::new();
+        let seed = fw.seed("baseline");
+        let children = fw.extend(&seed);
+        assert_eq!(children.len(), fw.extend_per_gen);
+        assert_eq!(children[0].generation, 1);
+        assert!(!children[0].verified);
+        assert!(children[0].complexity > seed.complexity);
+    }
+
+    #[test]
+    fn rst_extend_stops_at_max_generation() {
+        let mut fw = RstFlywheel::new();
+        let mut t = fw.seed("deep");
+        t.generation = fw.max_generation;
+        assert!(fw.extend(&t).is_empty());
+    }
+
+    #[test]
+    fn rst_realign_filters_below_threshold() {
+        let fw = RstFlywheel::new();
+        let parent = RstTask {
+            id: "p".into(),
+            prompt: "parent".into(),
+            generation: 0,
+            complexity: 10.0,
+            verified: true,
+            parent: None,
+        };
+        let mut low = RstTask {
+            id: "low".into(),
+            prompt: "low".into(),
+            generation: 1,
+            complexity: 10.4, // < 10×1.1=11 → 淘汰
+            verified: false,
+            parent: None,
+        };
+        let mut ok = low.clone();
+        ok.id = "ok".into();
+        ok.complexity = 12.0;
+        let kept = fw.realign(&parent, vec![low, ok]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].id, "ok");
+    }
+
+    #[test]
+    fn rst_validate_rejects_empty_prompt() {
+        let mut fw = RstFlywheel::new();
+        let bad = RstTask {
+            id: "bad".into(),
+            prompt: "  ".into(),
+            generation: 1,
+            complexity: 5.0,
+            verified: false,
+            parent: None,
+        };
+        assert!(fw.validate(vec![bad]).is_empty());
+        assert_eq!(fw.rejected_count, 1);
+    }
+
+    #[test]
+    fn rst_validate_rejects_over_cap() {
+        let mut fw = RstFlywheel::new();
+        let over = RstTask {
+            id: "over".into(),
+            prompt: "x".into(),
+            generation: 1,
+            complexity: fw.complexity_cap + 1.0,
+            verified: false,
+            parent: None,
+        };
+        assert!(fw.validate(vec![over]).is_empty());
+    }
+
+    #[test]
+    fn rst_reuse_samples_verified_pool_roundrobin() {
+        let mut fw = RstFlywheel::new();
+        fw.seed("a");
+        fw.seed("b");
+        let first = fw.reuse(0).unwrap().id.clone();
+        let second = fw.reuse(1).unwrap().id.clone();
+        assert_ne!(first, second, "round-robin rotates across pool");
+        let third = fw.reuse(2).unwrap().id.clone();
+        assert_eq!(third, first, "offset wraps modulo pool size");
+    }
+
+    #[test]
+    fn rst_full_generation_grows_pool() {
+        let mut fw = RstFlywheel::new();
+        let seed = fw.seed("task");
+        let before = fw.stats().0;
+        let accepted = fw.run_generation(&seed);
+        assert!(accepted > 0);
+        assert_eq!(fw.stats().0, before + accepted);
+        assert!(fw.accepted_count >= 1 + accepted as u64);
+    }
+
+    #[test]
+    fn rst_stats_distribution_by_generation() {
+        let mut fw = RstFlywheel::new();
+        let seed = fw.seed("gen0");
+        fw.run_generation(&seed);
+        let (total, dist) = fw.stats();
+        assert_eq!(total, 1 + dist.get(1).copied().unwrap_or(0));
+        assert!(dist.len() >= 2, "seed(gen0) + children(gen1)");
+        assert_eq!(dist[0], 1, "exactly one seed at gen0");
     }
 }

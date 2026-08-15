@@ -137,6 +137,16 @@ pub struct SkillAttribution {
     pub flagged: bool,
 }
 
+/// 技能树层级统计 (G6, AgentSkillOS 吸收): 巡检报告的数据载体。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SkillTreeStats {
+    pub total_skills: usize,
+    pub categories: HashMap<String, usize>,
+    pub roots: usize,
+    pub orphans: usize,
+    pub max_depth: usize,
+}
+
 fn parse_array_field(val: &str) -> Vec<String> {
     let trimmed = val.trim();
     if trimmed.starts_with('[') && trimmed.ends_with(']') {
@@ -564,6 +574,67 @@ impl SkillEngine {
 
     pub fn list_active(&self) -> Vec<&SkillEntry> {
         self.skills.iter().filter(|s| s.active).collect()
+    }
+
+    /// 技能树层级统计 (G6, AgentSkillOS 吸收): category 分布、根/叶/孤儿技能、
+    /// 覆盖率与深度。供背景循环巡检报告使用。
+    pub fn skill_tree_stats(&self) -> SkillTreeStats {
+        let mut categories: HashMap<String, usize> = HashMap::new();
+        let mut roots = 0usize;
+        let mut orphans = 0usize;
+        let mut max_depth = 0usize;
+        let mut depth: HashMap<String, usize> = HashMap::new();
+
+        for s in &self.skills {
+            *categories.entry(s.category.clone()).or_insert(0) += 1;
+            if s.parent.is_empty() {
+                roots += 1;
+            }
+        }
+        for _ in 0..=self.skills.len() {
+            let mut changed = false;
+            for s in &self.skills {
+                if s.parent.is_empty() {
+                    if depth.insert(s.name.clone(), 0).map_or(true, |old| old != 0) {
+                        changed = true;
+                    }
+                } else {
+                    if let Some(pd) = depth.get(&s.parent).copied() {
+                        let d = pd + 1;
+                        if depth.insert(s.name.clone(), d).map_or(true, |old| old != d) {
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        max_depth = depth.values().copied().max().unwrap_or(0);
+        let known: std::collections::HashSet<&String> =
+            self.skills.iter().map(|s| &s.name).collect();
+        for s in &self.skills {
+            if !s.parent.is_empty() && !known.contains(&s.parent) {
+                orphans += 1;
+            }
+        }
+        SkillTreeStats {
+            total_skills: self.skills.len(),
+            categories,
+            roots,
+            orphans,
+            max_depth,
+        }
+    }
+
+    /// 差分归因 flagged 汇总 (G7, arxiv 2608.11888 SkillTriage): 返回
+    /// procedure-heavy 且被标记的技能 (过度验证毒源), 供巡检广播告警。
+    pub fn flagged_attributions(&self) -> Vec<SkillAttribution> {
+        self.attribution_report()
+            .into_iter()
+            .filter(|a| a.flagged || (a.procedure_heavy && a.activations > 0))
+            .collect()
     }
 
     pub fn list_all(&self) -> Vec<&SkillEntry> {
@@ -1625,5 +1696,78 @@ category: general
         let attr = report.iter().find(|a| a.name == "heavy-skill").unwrap();
         assert_eq!(attr.activations, 1);
         assert!(attr.procedure_heavy, "heavy skill must be flagged procedure-heavy");
+    }
+
+    #[test]
+    fn test_skill_tree_stats_counts_hierarchy() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let root = r#"---
+name: root-skill
+description: root
+triggers: ["root"]
+category: coding
+---
+body"#;
+        let child = r#"---
+name: child-skill
+description: child
+triggers: ["child"]
+category: coding
+parent: root-skill
+---
+body"#;
+        let orphan = r#"---
+name: orphan-skill
+description: orphan (parent missing)
+triggers: ["orphan"]
+category: analysis
+parent: ghost-parent
+---
+body"#;
+        std::fs::write(skills_dir.join("root.md"), root).unwrap();
+        std::fs::write(skills_dir.join("child.md"), child).unwrap();
+        std::fs::write(skills_dir.join("orphan.md"), orphan).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+        let stats = engine.skill_tree_stats();
+        assert_eq!(stats.total_skills, 3);
+        assert_eq!(stats.roots, 1, "only root-skill has no parent");
+        assert_eq!(stats.orphans, 1, "orphan-skill points to missing parent");
+        assert_eq!(stats.max_depth, 1, "child depth = 1");
+        assert_eq!(stats.categories.get("coding"), Some(&2));
+        assert_eq!(stats.categories.get("analysis"), Some(&1));
+    }
+
+    #[test]
+    fn test_flagged_attributions_reports_procedure_heavy() {
+        let dir = setup_temp_dir();
+        let skills_dir = dir.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let heavy = r#"---
+name: heavy-skill
+description: procedure heavy
+triggers: ["heavy"]
+category: general
+---
+1. rebuild the entire project and verify the compile twice
+2. cargo clean then re-read every single file and recheck
+3. verify the compile and audit the result line by line
+4. validate the rebuild and recheck the verify output
+5. cargo clean again and re-read the recheck report
+"#;
+        std::fs::write(skills_dir.join("heavy.md"), heavy).unwrap();
+
+        let mut engine = SkillEngine::new(skills_dir);
+        engine.load_all();
+        engine.activate_skill("heavy-skill").unwrap();
+
+        let flagged = engine.flagged_attributions();
+        assert!(!flagged.is_empty(), "procedure-heavy skill must surface in flagged report");
+        assert!(flagged.iter().all(|a| a.procedure_heavy));
     }
 }

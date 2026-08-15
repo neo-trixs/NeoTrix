@@ -23,9 +23,9 @@
 - 项目名称 ≤20 字：NeoTrix 研发闭环
 - 问题与场景：缺陷链路碎片化（Issue/日志/反馈多源分散、根因靠人工、修复无量化门禁、复盘不沉淀）
 - 核心解决方案：AgentTeams Manager-Workers + 5 职能 Agent 串「聚合→定位→修复→验证→复盘」闭环，E8 确定性推理 + experience-tree 自进化
-- 创新点与差异化：确定性 64 态推理内核（对照 OpenHands/SWE-agent 概率式方案）；4240 测试质量门禁；每次复盘自动结晶为 Skill
+- 创新点与差异化：确定性 64 态推理内核（对照 OpenHands/SWE-agent 概率式方案）；8000+ 测试质量门禁；每次复盘自动结晶为 Skill
 - 开放/复用价值：MIT 开源、Skill 体系独立可复用、RAG/可观测可迁移
-- 当前进展：方案设计完成，7 域架构 + 4240 测试 + MCP/Skill/KB 基础设施可支撑复赛 Demo
+- 当前进展：方案设计完成，7 域架构 + 8000+ 测试 + MCP/Skill/KB 基础设施可支撑复赛 Demo
 
 ## slide3 · 目录
 1 场景与价值 · 2 方案总览 · 3 多 Agent 协同设计 · 4 Skills 工具体系 · 5 工程落地运行验证与安全可审计 · 6 开源开放计划 · 7 落地计划与进展 · 8 团队介绍
@@ -81,7 +81,7 @@
 ### slide13 内容页（v2 图：四象限）
 - **图**：可运行性 / 运行证据 / 可观测 / 安全治理 2x2（标题色带+要点区）
 - 可运行性：cargo build/check/test 双验证、Docker 部署、install.sh、CI workflows
-- 运行证据：4240 项测试、SelfTest T1-T3 三层接线、日志/Trace/Metrics 全记录（trace_data + 广播审计链）
+- 运行证据：8000+ 项测试、SelfTest T1-T3 三层接线、真实数据回归（26 家价格表 9082 行 / 3267 USD 零失败）、日志/Trace/Metrics 全记录（trace_data + 广播审计链）
 - 可观测：Skill/MCP/RAG/LLM 推理全链路 Trace；Log 结构化关联 TraceId；Metrics（修复成功率/端到端时延/Token 消耗/Tool 成功率）
 - 安全治理：RAG 证据强制溯源（KB 向量+BM25）、权限矩阵/审批/回滚/审计、gitleaks 密钥扫描、零 unsafe
 - 底部一条：云产品选型（Higress 网关统一入口+凭证托管，可替换性/迁移成本已论证）
@@ -103,7 +103,7 @@
 
 ### slide17 内容页（v2 图：里程碑时间线）
 - **图**：初赛 8.16 → 复赛名单 8.24 → 复赛 9.3 → 决赛名单 9.10 → 决赛 9.22 五节点时间线（色带头+要点区）
-- 当前进展：方案设计完成；7 域架构 23.6 万行 + 4240 测试 + MCP/Skill/KB 基础设施
+- 当前进展：方案设计完成；7 域架构 40 万行 + 8000+ 测试 + MCP/Skill/KB 基础设施
 - 中间一条：复赛工程化（AgentTeams 本地 install.sh→K8s helm；GitHub Issue 端到端 Demo；SWE-bench-style 评测；官方 Skills 接入）
 - 底部两条辅助：评估指标（修复成功率/端到端时延/Token 成本/门禁通过率/经验沉淀速率）+ 风险控制（Mock 与真实接入共用同一 Schema；评审口径对齐评分维度）
 

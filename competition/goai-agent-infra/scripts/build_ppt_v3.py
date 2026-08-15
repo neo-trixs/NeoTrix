@@ -27,7 +27,7 @@ OUT = "/Users/neo/Downloads/neotrix/competition/goai-agent-infra/初赛方案_Ne
 PROJECT = "NeoTrix 研发闭环"
 BACKGROUND = ("AI-native 软件研发全流程多 Agent 协同系统：GWT 注意力调度编排 5 职能 Agent，"
               "E8 确定性推理定位根因，SelfTest T1-T3 质量门禁，experience-tree 复盘自动结晶 Skill，"
-              "MIT 开源、4240 项测试背书")
+              "MIT 开源、8000+ 项测试背书")
 THEME = derive_theme(PROJECT, BACKGROUND)
 
 FONT = "微软雅黑"
@@ -264,7 +264,7 @@ def draw_s13(s):
     th = THEME
     quads = [
         ("可运行性", ["cargo build/check/test 双验证", "Docker 部署 · install.sh", "CI workflows（.github）"], th.primary),
-        ("运行证据", ["4240 项测试 · SelfTest T1-T3 三层接线", "日志 / Trace / Metrics 全记录", "trace_data + SHA-256 广播审计链"], th.support1),
+        ("运行证据", ["8000+ 项测试 · SelfTest T1-T3 三层接线", "真实数据回归：26 家价格表 9082 行 / 3267 USD 零失败", "日志 / Trace / Metrics 全记录", "trace_data + SHA-256 广播审计链"], th.support1),
         ("可观测", ["Skill/MCP/RAG/LLM 全链路 Trace", "Log 结构化关联 TraceId", "Metrics：修复成功率/时延/Token/Tool 成功率"], th.support2),
         ("安全治理", ["RAG：KB 向量+BM25，证据强制溯源", "权限矩阵 · 审批 · 回滚 · 审计", "gitleaks 密钥扫描 · 零 unsafe"], th.positive),
     ]
@@ -281,7 +281,7 @@ def draw_s15(s):
         ("可复用成果", ["Skill 体系独立发布", "mcp-gateway 网关", "KB 检索层 · E8 推理内核"], th.primary),
         ("接口契约与文档", ["README · 部署说明", "开源协议 · 示例配置", "测试方法 · 复现步骤"], th.support1),
         ("协议与依赖披露", ["MIT", "第三方依赖全披露", "商业 API / 闭源模型边界"], th.support2),
-        ("社区共建", ["4240 测试背书", "AI 工程/研发效能社区", "长期维护与迭代"], th.positive),
+        ("社区共建", ["8000+ 测试背书", "AI 工程/研发效能社区", "长期维护与迭代"], th.positive),
     ]
     x = 0.55
     for i, (tt, d, c) in enumerate(steps):
@@ -325,11 +325,11 @@ FILL = {
         "Text 7": "NeoTrix 研发闭环",
         "Text 12": "缺陷链路碎片化：Issue/日志/反馈多源分散，根因定位依赖资深工程师经验，修复质量无量化门禁，复盘经验不沉淀。",
         "Text 17": "AgentTeams Manager-Workers 编排 5 职能 Agent（采集→诊断→实施→审查→沉淀），E8 确定性推理 + experience-tree 自进化。",
-        "Text 22": "① E8 确定性 64 态推理内核，根因定位可复现；② SelfTest T1-T3 生产门禁（4240 测试）+ 复盘自动结晶为 Skill。",
+        "Text 22": "① E8 确定性 64 态推理内核，根因定位可复现；② SelfTest T1-T3 生产门禁（8000+ 测试）+ 复盘自动结晶为 Skill。",
         "Text 27": "MIT 开源、Skill 体系独立可复用、RAG/可观测可迁移到任意多 Agent 生产系统。",
-        "Text 32": "方案设计完成；7 域架构 23.6 万行 + 4240 测试 + MCP/Skill/KB 基础设施可支撑复赛 Demo。",
+        "Text 32": "方案设计完成；7 域架构 40 万行 + 8000+ 测试 + MCP/Skill/KB 基础设施可支撑复赛 Demo。",
     },
-    19: {"文本框 37": "团队名称：NeoTrix（个人参赛 · 郑州大学）\n成员：Asher（郑州大学·软件开发/AI Agent 方向）\n团队分工：Asher — 主控/架构 · Agent/Skill 工程 · Demo/验证（个人参赛，一人承担全流程）\n团队成果：NeoTrix 开源项目（4240 项测试、RQGM 论文 arXiv:2606.26294）；软件研发全流程多 Agent 协同系统\n作品链接：github.com/neo-trixs/NeoTrix"},
+    19: {"文本框 37": "团队名称：NeoTrix（个人参赛 · 郑州大学）\n成员：Asher（郑州大学·软件开发/AI Agent 方向）\n团队分工：Asher — 主控/架构 · Agent/Skill 工程 · Demo/验证（个人参赛，一人承担全流程）\n团队成果：NeoTrix 开源项目（8000+ 项测试、RQGM 论文 arXiv:2606.26294）；软件研发全流程多 Agent 协同系统\n作品链接：github.com/neo-trixs/NeoTrix"},
 }
 
 

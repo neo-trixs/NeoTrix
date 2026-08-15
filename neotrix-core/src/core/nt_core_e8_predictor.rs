@@ -106,9 +106,14 @@ const KB_KEY: &str = "core";
 
 /// 打开 KB 连接 (默认 `~/.neotrix/knowledge.db`), 复用 NT-MEMORY 统一 schema 初始化。
 /// 单一 schema 事实源: 不在此处维护 kv_store 本地 DDL, 避免漂移 (对齐 consciousness_core)。
+/// 测试隔离: `NEOTRIX_KB_PATH` 覆盖数据库路径, 避免污染生产 KB 且不触碰进程级 HOME。
 fn open_kb() -> Result<rusqlite::Connection, String> {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let path = std::path::PathBuf::from(home).join(".neotrix").join("knowledge.db");
+    let path = std::env::var("NEOTRIX_KB_PATH")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            std::path::PathBuf::from(home).join(".neotrix").join("knowledge.db")
+        });
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("KB dir: {}", e))?;
     }
@@ -184,14 +189,15 @@ pub fn safe_u8(value: i32) -> u8 {
 mod tests {
     use super::*;
 
-    /// 测试隔离: 为每个调用分配唯一临时 HOME 目录,
+    /// 测试隔离: 为每个调用分配唯一临时 KB 路径,
     /// 避免污染生产 KB 且测试间状态互不干扰。
+    /// 不再修改进程级 HOME (跨模块并行测试读 HOME 会看到被污染值)。
     fn isolate_home() {
         static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let tmp = std::env::temp_dir().join(format!("neotrix-e8p-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&tmp).ok();
-        std::env::set_var("HOME", &tmp);
+        std::env::set_var("NEOTRIX_KB_PATH", tmp.join("knowledge.db"));
     }
 
     /// 串行化所有触碰隔离 DB 的测试: 共享同库下并行写会互相覆盖基线,

@@ -6,6 +6,10 @@ use super::agent_routing::AgentRoutingTable;
 use super::circuit_breaker::{BreakerState, CircuitBreaker};
 use super::factory::LlmProviderType;
 use super::free_pool::global_free_pool;
+use super::generation_classifier::{
+    GenerationAnalytics, GenerationClassifier, GenerationRecord,
+};
+use crate::neotrix::l8_autonomic_impl::nt_mind_benchmark::{OriEvalCase, OriEvalReport, OriEvalSuite};
 use super::provider_catalog::{CommunicationProfile, ProviderCategory};
 use super::provider_swap::ProviderSwapManager;
 use super::rate_limiter::RateLimiter;
@@ -683,6 +687,10 @@ pub struct GatewayV2 {
     response_healer_enabled: bool,
     /// G: MarketRouter — market-wisdom 路由 + Auto Exacto 周期重估
     pub market_router: Mutex<MarketRouter>,
+    /// F6: GenerationClassifier — 每次生成完成后的分类打标 (默认关闭)
+    pub generation_classifier: Mutex<GenerationClassifier>,
+    pub generation_analytics: Mutex<GenerationAnalytics>,
+    generation_classification_enabled: bool,
 }
 
 impl GatewayV2 {
@@ -704,6 +712,9 @@ impl GatewayV2 {
             response_healer: Mutex::new(ResponseHealer::new()),
             response_healer_enabled: false,
             market_router: Mutex::new(MarketRouter::new()),
+            generation_classifier: Mutex::new(GenerationClassifier::new()),
+            generation_analytics: Mutex::new(GenerationAnalytics::new()),
+            generation_classification_enabled: false,
         }
     }
 
@@ -757,6 +768,71 @@ impl GatewayV2 {
         match self.response_healer.lock() {
             Ok(h) => (h.heal_count(), h.unrepairable_count()),
             Err(_) => (0, 0),
+        }
+    }
+
+    // ── F6: Generation Classification ─────────────────────────────
+
+    /// 开关生成分类打标 (F6: Generation Classifier)
+    pub fn set_generation_classification(&mut self, enabled: bool) {
+        self.generation_classification_enabled = enabled;
+    }
+
+    pub fn generation_classification_enabled(&self) -> bool {
+        self.generation_classification_enabled
+    }
+
+    /// 记录一次生成分类到 analytics (供 activity analytics 聚合)。
+    /// 在成功响应完成路径调用 — 与 heal_and_cache_response 同位置。
+    fn tag_generation(
+        &self,
+        request: &LlmRequest,
+        response: &LlmResponse,
+        provider_name: &str,
+        latency_ms: f64,
+        tokens: u32,
+        success: bool,
+    ) {
+        if !self.generation_classification_enabled {
+            return;
+        }
+        let prompt = request
+            .messages
+            .iter()
+            .map(|m| m.content.clone())
+            .collect::<Vec<_>>()
+            .join("\n");
+        let classification = match self.generation_classifier.lock() {
+            Ok(c) => c.classify(&prompt, &response.content),
+            Err(e) => {
+                log::warn!("[gateway] generation_classifier poisoned: {}", e);
+                return;
+            }
+        };
+        let record = GenerationRecord {
+            model: format!("{}/{}", provider_name, request.model),
+            classification,
+            prompt_len: prompt.len(),
+            response_len: response.content.len(),
+            latency_ms: latency_ms as u64,
+            tokens,
+            success,
+        };
+        if let Ok(mut analytics) = self.generation_analytics.lock() {
+            analytics.record(&record);
+        }
+    }
+
+    /// F6: analytics 快照 — (total, by_task_type, by_complexity, by_domain)
+    pub fn generation_analytics_snapshot(&self) -> (u64, HashMap<String, u64>, HashMap<String, u64>, HashMap<String, u64>) {
+        match self.generation_analytics.lock() {
+            Ok(a) => (
+                a.total,
+                a.distribution("task_type"),
+                a.distribution("complexity"),
+                a.distribution("domain"),
+            ),
+            Err(_) => (0, HashMap::new(), HashMap::new(), HashMap::new()),
         }
     }
 
@@ -1586,6 +1662,8 @@ impl GatewayV2 {
                     }
                     // G: Response Healing + Caching — 修复畸形 JSON, 回写 LRU 缓存
                     let response = self.heal_and_cache_response(request, response);
+                    // F6: Generation Classification — 打标本次生成供 analytics
+                    self.tag_generation(request, &response, &name, elapsed, token_count, true);
                     // Store in semantic cache
                     if let Ok(mut cache) = self.cache.lock() {
                         if let Ok(serialized) = serde_json::to_string(&response) {
@@ -1822,6 +1900,8 @@ impl GatewayV2 {
                     }
                     // G: Response Healing + Caching — 修复畸形 JSON, 回写 LRU 缓存
                     let response = self.heal_and_cache_response(request, response);
+                    // F6: Generation Classification — 打标本次生成供 analytics
+                    self.tag_generation(request, &response, name, elapsed, token_count, true);
                     // Store in semantic cache
                     if let Ok(mut cache) = self.cache.lock() {
                         if let Ok(serialized) = serde_json::to_string(&response) {
@@ -1874,6 +1954,24 @@ impl GatewayV2 {
         Err(LlmError::Unknown(
             "Aggressive retry exhausted — all providers failed".to_string(),
         ))
+    }
+
+    /// F7: Ori-Eval 生产接线 (R-P79) — 以自身 (GatewayV2 实现 LlmProvider) 作为
+    /// 候选模型执行 Ori-Eval 用例集, 返回 per-model 分数表 + 排名 (选模型依据)。
+    /// `cases`: 我们的 agent 提示词集 (F7 OriEvalSuite)。每条用例经完整网关链路
+    /// (候选链 → 重试 → 修复/缓存) 执行, 使评估反映真实生产质量。
+    pub async fn run_ori_eval_self(
+        &self,
+        cases: Vec<OriEvalCase>,
+        model_names: &[&str],
+    ) -> Result<OriEvalReport, LlmError> {
+        let suite = OriEvalSuite::new(cases);
+        let mut scores = Vec::new();
+        for name in model_names {
+            let score = suite.score_with_provider(name, self).await?;
+            scores.push(score);
+        }
+        Ok(OriEvalSuite::finalize_report(scores))
     }
 
     /// Stream completion with 2-phase retry (normal → aggressive), matching

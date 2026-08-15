@@ -133,7 +133,10 @@ impl BrainStage for BenchmarkGateStage {
     fn process(&self, brain: &mut SelfIteratingBrain) -> Result<StageDecision, NeoTrixError> {
         let post_scores = self.suite.run(brain);
 
-        let mut baseline_guard = self.baseline.lock().unwrap();
+        let mut baseline_guard = self
+            .baseline
+            .lock()
+            .map_err(|e| NeoTrixError::Io(format!("benchmark gate baseline lock poisoned: {}", e)))?;
         let delta = match baseline_guard.as_ref() {
             Some(pre_scores) => {
                 let d = BenchmarkSuite::compute_delta(pre_scores, &post_scores);

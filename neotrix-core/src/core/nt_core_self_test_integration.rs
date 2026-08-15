@@ -140,7 +140,7 @@ mod tests {
     fn test_register_all() {
         let mut registry = SelfTestRegistry::new();
         register_absorbed_modules(&mut registry);
-        assert_eq!(registry.count(), 13);
+        assert_eq!(registry.count(), 14);
     }
 
     #[test]
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_all_have_names() {
-        let tests: [&dyn SelfTest; 12] = [
+        let tests: [&dyn SelfTest; 14] = [
             &AnswerEngineSelfTest, &AgentTeamSelfTest,
             &AgenticScanSelfTest, &DigitalHumanSelfTest, &LeannStoreSelfTest,
             &VideoPipelineSelfTest, &QTestEngineSelfTest, &ConstitutionComplianceTest,
@@ -158,6 +158,8 @@ mod tests {
             &crate::core::nt_core_arch_fitness::NoCycleFitness,
             &crate::core::nt_core_arch_fitness::CapabilityConsistencyFitness,
             &crate::core::nt_core_arch_fitness::TreeSingletonFitness,
+            &crate::core::nt_core_arch_fitness::DeadCodeFitness,
+            &crate::core::nt_core_arch_fitness::PanicDensityFitness::default(),
         ];
         for t in &tests { assert!(!t.name().is_empty()); }
     }

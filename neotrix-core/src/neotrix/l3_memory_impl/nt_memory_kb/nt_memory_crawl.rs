@@ -954,7 +954,11 @@ pub fn ingest_geo_cities(
         }
     }
 
-    let arr = data.as_ref().unwrap().as_array().unwrap();
+    let arr = data
+        .as_ref()
+        .ok_or_else(|| "geo cities payload missing after download attempts".to_string())?
+        .as_array()
+        .ok_or_else(|| "geo cities payload is not an array".to_string())?;
 
     // 批量写入: 分批事务 (每 BATCH 条提交一次), 避免单事务过大拖慢 WAL,
     // 也避免每条独立提交 (5 万城市 30 倍加速)。

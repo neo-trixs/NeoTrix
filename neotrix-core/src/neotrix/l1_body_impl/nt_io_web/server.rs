@@ -32,7 +32,7 @@ pub async fn handle_openapi() -> impl IntoResponse {
             axum::response::Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(axum::body::Body::from(format!("failed to serve spec: {e}")))
-                .unwrap()
+                .expect("static error response body is infallible")
         })
 }
 
@@ -194,7 +194,7 @@ pub fn build_router(state: AppState) -> Router {
 pub async fn ws_echo_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
 ) -> impl axum::response::IntoResponse {
-    ws.on_upgrade(|socket| ws_echo_loop(socket))
+    ws.on_upgrade(ws_echo_loop)
 }
 
 async fn ws_echo_loop(socket: axum::extract::ws::WebSocket) {
