@@ -568,6 +568,7 @@ impl BackgroundLoop {
                     &dirs::home_dir().unwrap_or_default().join(".claude").join("skills"),
                 )).with_hooks(hooks)
             },
+            session_router: crate::neotrix::nt_agent_protocol::unified_session::SessionRouter::new(),
             kb_pipeline,
             session_recovery: self.session_recovery.take(),
             event_bus: Some(event_bus.as_ref().clone()),
@@ -727,6 +728,7 @@ cognitive_load: self.cognitive_load.take(),
         spawn_handler!(cfg.evolution_interval_secs, "evolve", |h| h.handle_evolve().await);
         spawn_handler!(cfg.nt_world_sense_interval_secs, "world_sense", |h| h.handle_world_sense().await);
         spawn_handler!(3600, |h| h.handle_skill_scan().await);
+        spawn_handler!(300, "session_router", |h| h.handle_session_router_flush().await);
         spawn_handler!(600, |h| h.handle_avatar_auto_distill().await);
         spawn_handler!(7200, |h| {
             h.handle_kb_absorb().await;
@@ -844,6 +846,9 @@ pub struct BackgroundLoopHandle {
     scheduler: Option<crate::core::nt_core_scheduler::SchedulerEngine>,
     daemon: Option<EvolutionDaemon>,
     skill_engine: SkillEngine,
+    /// 统一会话路由器 (G18, novu 吸收) — agent↔渠道统一会话模型:
+    /// 入站归一 → capability 路由 → digest 合并出站。周期 flush 清出超窗摘要。
+    session_router: crate::neotrix::nt_agent_protocol::unified_session::SessionRouter,
     kb_pipeline: KnowledgeAbsorptionPipeline,
     session_recovery: Option<SessionRecoveryManager>,
     event_bus: Option<EventBus>,

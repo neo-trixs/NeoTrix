@@ -11,6 +11,86 @@ pub struct ScraperConfig {
     pub max_retries: u32,
     pub profile_name: Option<String>,
     pub use_tiny_profile: bool,
+    /// 隐身抓取参数集 (G22, CyberScraper-2077 吸收): 请求间隔 / referer /
+    /// header 池轮换 / 代理轮换 — 降低指纹一致性被反爬捕获的风险。
+    #[serde(default)]
+    pub stealth_params: StealthParams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StealthParams {
+    /// 相邻请求最小间隔 (ms) — 避免无人类节奏的固定频率。
+    pub min_interval_ms: u64,
+    /// 间隔抖动幅度 (±ms) — 请求节奏随机化。
+    pub interval_jitter_ms: u64,
+    /// referer 池 (轮换使用)。
+    pub referers: Vec<String>,
+    /// header 变体池 (轮换使用, 每次请求选一个)。
+    pub header_variants: Vec<HashMap<String, String>>,
+    /// 代理轮换 (每 N 请求换代理)。
+    pub rotate_proxy_every: u32,
+    /// 启用隐身参数 (关掉则退化为普通请求节奏)。
+    pub enabled: bool,
+}
+
+impl Default for StealthParams {
+    fn default() -> Self {
+        Self {
+            min_interval_ms: 1200,
+            interval_jitter_ms: 600,
+            referers: vec![
+                "https://www.google.com/".into(),
+                "https://www.bing.com/".into(),
+                "https://duckduckgo.com/".into(),
+            ],
+            header_variants: vec![
+                HashMap::new(),
+                HashMap::new(),
+                HashMap::new(),
+            ],
+            rotate_proxy_every: 10,
+            enabled: true,
+        }
+    }
+}
+
+impl StealthParams {
+    /// 按请求序号取本轮 referer (轮换)。
+    pub fn referer_for(&self, request_seq: u32) -> Option<String> {
+        if self.referers.is_empty() {
+            return None;
+        }
+        Some(self.referers[(request_seq as usize) % self.referers.len()].clone())
+    }
+
+    /// 按请求序号取本轮 header 变体 (轮换; 全部为空则返回 None 表示无额外 header)。
+    pub fn headers_for(&self, request_seq: u32) -> Option<HashMap<String, String>> {
+        if self.header_variants.is_empty() || self.header_variants.iter().all(|v| v.is_empty()) {
+            return None;
+        }
+        Some(self.header_variants[(request_seq as usize) % self.header_variants.len()].clone())
+    }
+
+    /// 当前请求应等待的间隔 (含抖动)。
+    pub fn interval_for(&self) -> std::time::Duration {
+        if !self.enabled {
+            return std::time::Duration::ZERO;
+        }
+        if self.interval_jitter_ms == 0 {
+            return std::time::Duration::from_millis(self.min_interval_ms);
+        }
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let jitter = (nanos % (self.interval_jitter_ms as u128 + 1)) as u64;
+        std::time::Duration::from_millis(self.min_interval_ms + jitter)
+    }
+
+    /// 该请求序号是否应轮换代理 (命中 rotate 边界)。
+    pub fn should_rotate_proxy(&self, request_seq: u32) -> bool {
+        self.enabled && self.rotate_proxy_every > 0 && request_seq > 0 && request_seq % self.rotate_proxy_every == 0
+    }
 }
 
 impl Default for ScraperConfig {

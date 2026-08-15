@@ -115,7 +115,7 @@ impl UnifiedSession {
 }
 
 /// digest 合并窗口 (novu digest): 同 session+topic 的消息在窗口内聚合。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SessionDigest {
     /// 窗口秒数
     pub window_secs: i64,
